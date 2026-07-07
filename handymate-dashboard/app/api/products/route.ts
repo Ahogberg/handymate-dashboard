@@ -22,14 +22,20 @@ export async function GET(request: NextRequest) {
     const categoryId = request.nextUrl.searchParams.get('category_id')
     const favorites = request.nextUrl.searchParams.get('favorites')
     const include = request.nextUrl.searchParams.get('include')
+    // include_inactive=true — bara för produktbanks-UI:t i inställningarna,
+    // så att aktiv-togglen kan slås PÅ igen. Offertsöket skickar aldrig flaggan.
+    const includeInactive = request.nextUrl.searchParams.get('include_inactive') === 'true'
 
     let query = supabase
       .from('products')
       .select('*')
       .eq('business_id', business.business_id)
-      .eq('is_active', true)
       .order('is_favorite', { ascending: false })
       .order('name')
+
+    if (!includeInactive) {
+      query = query.eq('is_active', true)
+    }
 
     if (search) {
       // Namn ELLER artikelnr — samma pass-through-mönster som

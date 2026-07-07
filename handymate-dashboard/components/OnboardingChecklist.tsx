@@ -123,9 +123,9 @@ export default function OnboardingChecklist({
       items: [
         {
           id: 'pricing',
-          label: 'Lägg till prislista',
+          label: 'Lägg till produkter & priser',
           completed: priceListCount > 0,
-          link: '/dashboard/settings/my-prices',
+          link: '/dashboard/settings/products',
         },
         {
           id: 'templates',

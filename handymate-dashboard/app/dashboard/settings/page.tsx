@@ -1660,8 +1660,8 @@ export default function SettingsPage() {
                   <Package className="w-5 h-5 text-amber-700" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">Produkter & Material</p>
-                  <p className="text-sm text-gray-400">Sökbart register för offerter och fakturor</p>
+                  <p className="font-medium text-gray-900">Produkter & priser</p>
+                  <p className="text-sm text-gray-400">Produktbank med kategorier, priser och komponentkalkyler</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-secondary-700 transition-colors" />

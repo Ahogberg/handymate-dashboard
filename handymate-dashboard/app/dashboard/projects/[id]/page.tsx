@@ -2796,9 +2796,9 @@ export default function ProjectDetailPage() {
             ) : (
               <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                 <p className="text-sm text-gray-400">Du har inga sparade artiklar än.</p>
-                <a href="/dashboard/settings/my-prices" target="_blank" rel="noopener"
+                <a href="/dashboard/settings/products" target="_blank" rel="noopener"
                   className="text-sm text-primary-700 hover:underline mt-1 inline-block">
-                  + Bygg din prislista →
+                  + Bygg din produktbank →
                 </a>
               </div>
             )}
