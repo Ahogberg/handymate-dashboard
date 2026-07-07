@@ -94,9 +94,9 @@ CREATE INDEX IF NOT EXISTS idx_product_components_product ON product_components(
 Exempel Fasadmålning (450 kr/kvm, enhet kvm):
 `{arbete, "Målningsarbete", 0.13, tim, 550}` + `{material, "Grundfärg", 0.1, l, 89}` +
 `{material, "Täckfärg", 0.15, l, 105}`. Kalkylkostnad/kvm = 0.13×550 + 0.1×89 + 0.15×105
-= 97,20 kr → marginal mot 450 kr synlig internt (framtida yta; lagras inte nu).
+= 96,15 kr → marginal mot 450 kr synlig internt (framtida yta; lagras inte nu).
 **Arbetsandel** = arbetskomponenternas kostnadsandel av totala komponentkostnaden
-(71,5/97,2 ≈ 0,74) → appliceras på radpriset för ROT-basen.
+(71,5/96,15 ≈ 0,7436) → appliceras på radpriset för ROT-basen.
 
 ### 4. quote_items — snapshot-kolumner (Del B-kärnan)
 
@@ -190,7 +190,7 @@ Editorn får "Vad ska kunden se?" med exakt tre val som skriver koherenta kombin
 ### Sammansatt produkt i kundens dokument
 Kunden ser: `Fasadmålning · 120 kvm × 450 kr — 54 000 kr`. Internt i editorn:
 expanderbar komponentvy + arbete/material-split + kalkylerade timmar. ROT beräknas
-på 54 000 × 0,74 ≈ 39 960 kr (arbetsandelen), inte på 54 000.
+på 54 000 × 0,7436 ≈ 40 156 kr (arbetsandelen), inte på 54 000.
 
 ---
 
@@ -213,7 +213,7 @@ Varje steg: tsc 0 fel + ren build + enhetstester på split/snapshot/filter. Egen
 ## Slutverifiering (Christoffers facit)
 Kategori Målare→Utvändigt → produkt Fasadmålning 450 kr/kvm ROT med komponenter
 (0.13 tim/kvm à 550 + grundfärg + täckfärg) → ny offert → sök "fasad" → 120 kvm →
-(a) kunden ser EN rad 54 000 kr, (b) ROT på arbetsandelen (~39 960 × 30 % ≈ 11 988 kr),
+(a) kunden ser EN rad 54 000 kr, (b) ROT på arbetsandelen (bas ≈ 40 156 kr → ≈ 12 047 kr),
 inte 16 200, (c) tre visningslägen växlar i förhandsgranskning + PDF + portal,
 (d) totalsumma + ROT alltid synliga, (e) befintliga/AI-offerter renderar oförändrat,
 (f) höj produktpriset → offerten OFÖRÄNDRAD (snapshot).
