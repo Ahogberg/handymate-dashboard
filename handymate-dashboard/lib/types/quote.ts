@@ -32,6 +32,19 @@ export interface QuoteItem {
   // Spårar om raden sparats till prislistan ("Spara i prislistan"-flödet).
   // Tomt = inte sparad. UUID = sparad och kopplad till products.id.
   linked_product_id?: string | null
+  /** Produktbank (v67): kr av radens total som är arbete. AUKTORITATIV för
+      ROT/RUT-basen när satt — 0 är GILTIGT (ren material, ger bas 0).
+      null/undefined = ingen split → motorn använder radens total (legacy). */
+  labor_amount?: number | null
+  /** Härledd: total − labor_amount (aldrig egen beräkning). */
+  material_amount?: number | null
+  /** Kalkylerade timmar = quantity × Σ(arbetskomponenters quantity_per_unit). */
+  estimated_hours?: number | null
+  /** Fryst kopia av produktens komponenter + namn/sku/pris/labor_share vid
+      infogningsögonblicket — offerten är juridiskt fristående från produktbanken. */
+  component_snapshot?: any | null
+  /** Per-rad-override: visa komponentbeskrivningarna för kunden (default false). */
+  show_components_to_customer?: boolean
 }
 
 export interface QuoteTemplate {

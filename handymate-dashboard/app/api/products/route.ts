@@ -3,7 +3,11 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 
 /**
- * GET /api/products?search=&category=&favorites=
+ * GET /api/products?search=&category=&category_id=&favorites=&include=components
+ * - search matchar namn ELLER artikelnr (sku)
+ * - category = legacy-TEXT-kolumnen ('material'/'arbete'/...)
+ * - category_id = hierarkisk kategori (product_categories, v67)
+ * - include=components → produkternas komponentlista bifogas som `components`
  */
 export async function GET(request: NextRequest) {
   try {
@@ -15,7 +19,9 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabase()
     const search = request.nextUrl.searchParams.get('search')
     const category = request.nextUrl.searchParams.get('category')
+    const categoryId = request.nextUrl.searchParams.get('category_id')
     const favorites = request.nextUrl.searchParams.get('favorites')
+    const include = request.nextUrl.searchParams.get('include')
 
     let query = supabase
       .from('products')
@@ -26,10 +32,19 @@ export async function GET(request: NextRequest) {
       .order('name')
 
     if (search) {
-      query = query.ilike('name', `%${search}%`)
+      // Namn ELLER artikelnr — samma pass-through-mönster som
+      // app/api/suppliers/products/route.ts. Kommatecken skulle bryta
+      // PostgREST:s or-syntax → strippas ur söktermen.
+      const q = search.replace(/,/g, ' ').trim()
+      if (q) {
+        query = query.or(`name.ilike.%${q}%,sku.ilike.%${q}%`)
+      }
     }
     if (category) {
       query = query.eq('category', category)
+    }
+    if (categoryId) {
+      query = query.eq('category_id', categoryId)
     }
     if (favorites === 'true') {
       query = query.eq('is_favorite', true)
@@ -39,11 +54,41 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    return NextResponse.json({ products: data || [] })
+    let products = data || []
+
+    // include=components → hämta komponenterna för träffarna och bifoga
+    if (include === 'components' && products.length > 0) {
+      const { data: components, error: compErr } = await supabase
+        .from('product_components')
+        .select('*')
+        .eq('business_id', business.business_id)
+        .in('product_id', products.map((p: any) => p.id))
+        .order('sort_order', { ascending: true })
+
+      if (compErr) throw compErr
+
+      const byProduct: Record<string, any[]> = {}
+      for (const c of components || []) {
+        if (!byProduct[c.product_id]) byProduct[c.product_id] = []
+        byProduct[c.product_id].push(c)
+      }
+      products = products.map((p: any) => ({ ...p, components: byProduct[p.id] || [] }))
+    }
+
+    return NextResponse.json({ products })
   } catch (error: any) {
     console.error('GET products error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+}
+
+/**
+ * default_labor_share måste vara null eller 0–1. OBS: 0 är ett GILTIGT värde
+ * (ren materialprodukt) — därför uttrycklig typ/range-koll, aldrig falsy-koll.
+ */
+function invalidLaborShare(value: unknown): boolean {
+  if (value === null) return false
+  return typeof value !== 'number' || Number.isNaN(value) || value < 0 || value > 1
 }
 
 /**
@@ -61,6 +106,10 @@ export async function POST(request: NextRequest) {
 
     if (!body.name || body.sales_price === undefined) {
       return NextResponse.json({ error: 'Namn och försäljningspris krävs' }, { status: 400 })
+    }
+
+    if (body.default_labor_share !== undefined && invalidLaborShare(body.default_labor_share)) {
+      return NextResponse.json({ error: 'Andel arbete måste vara mellan 0 och 1' }, { status: 400 })
     }
 
     // Auto-calculate markup if purchase_price provided
@@ -86,6 +135,9 @@ export async function POST(request: NextRequest) {
         vat_rate: body.vat_rate ?? 0.25,
         is_active: true,
         is_favorite: body.is_favorite || false,
+        category_id: body.category_id ?? null,
+        // ?? — 0 är giltigt värde (ren material), inte falsy-fallback
+        default_labor_share: body.default_labor_share ?? null,
       })
       .select()
       .single()
@@ -130,6 +182,13 @@ export async function PUT(request: NextRequest) {
     if (body.vat_rate !== undefined) updates.vat_rate = body.vat_rate
     if (body.is_active !== undefined) updates.is_active = body.is_active
     if (body.is_favorite !== undefined) updates.is_favorite = body.is_favorite
+    if (body.category_id !== undefined) updates.category_id = body.category_id
+    if (body.default_labor_share !== undefined) {
+      if (invalidLaborShare(body.default_labor_share)) {
+        return NextResponse.json({ error: 'Andel arbete måste vara mellan 0 och 1' }, { status: 400 })
+      }
+      updates.default_labor_share = body.default_labor_share
+    }
 
     // Auto-calculate markup
     if (updates.purchase_price && updates.sales_price && updates.purchase_price > 0) {

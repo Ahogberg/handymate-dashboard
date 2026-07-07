@@ -480,6 +480,14 @@ export default function EditQuotePage() {
           option_default: item.option_default ?? false,
           category_slug: item.category_slug || undefined,
           linked_product_id: item.linked_product_id || undefined,
+          // Produktbank (v67): snapshot-fälten MÅSTE följa med genom edit-
+          // laddningen — annars raderar nästa spara arbete/material-spliten.
+          // ?? (inte ||): labor_amount 0 = ren material och skall bevaras.
+          labor_amount: item.labor_amount ?? null,
+          material_amount: item.material_amount ?? null,
+          estimated_hours: item.estimated_hours ?? null,
+          component_snapshot: item.component_snapshot ?? null,
+          show_components_to_customer: item.show_components_to_customer ?? false,
           sort_order: item.sort_order ?? idx,
         }))
         setItems(loadedItems)

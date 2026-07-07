@@ -47,12 +47,15 @@ export function calculateQuoteTotals(
   for (const item of regularItems) {
     const lineTotal = item.quantity * item.unit_price
     const rotRut = getItemRotRutType(item)
+    // ROT/RUT-basen per rad: labor_amount (produktbankens arbetsandel, v67)
+    // när den finns — `??`, ALDRIG `||`: 0 är GILTIGT (ren material → bas 0).
+    // Rader utan labor_amount → hela radens total, exakt som tidigare.
     if (rotRut === 'rot') {
       laborTotal += lineTotal
-      rotWorkCost += lineTotal
+      rotWorkCost += item.labor_amount ?? lineTotal
     } else if (rotRut === 'rut') {
       laborTotal += lineTotal
-      rutWorkCost += lineTotal
+      rutWorkCost += item.labor_amount ?? lineTotal
     } else if (item.unit === 'tim' || item.unit === 'hour' || item.unit === 'h') {
       laborTotal += lineTotal
     } else {
@@ -113,6 +116,9 @@ export interface PublicStructuredItem {
   rot_rut_type?: RotRutType
   option_selected?: boolean | null
   option_default?: boolean | null
+  /** Produktbank (v67): arbetsandel i kr — 0 giltigt, null = legacy (hela totalen). */
+  labor_amount?: number | null
+  material_amount?: number | null
 }
 
 /**
@@ -141,6 +147,9 @@ export function calculatePublicQuoteTotals(
     // null → undefined så getItemRotRutType faller tillbaka på boolean-
     // flaggorna för äldre rader där rot_rut_type aldrig sattes.
     rot_rut_type: it.rot_rut_type || undefined,
+    // ?? (inte ||): labor_amount 0 = ren material och skall ge ROT-bas 0.
+    labor_amount: it.labor_amount ?? null,
+    material_amount: it.material_amount ?? null,
     sort_order: it.sort_order ?? 0,
     option_selected:
       it.item_type === 'option' ? selectedOptionIds.has(it.id) : it.option_selected === true,

@@ -36,7 +36,7 @@ export async function GET(
     // sidan noll rader. Exponeras som structured_items vid sidan av legacy items.
     const { data: structuredItems } = await supabase
       .from('quote_items')
-      .select('id, item_type, group_name, description, quantity, unit, unit_price, total, sort_order, is_rot_eligible, is_rut_eligible, rot_rut_type, option_selected, option_default')
+      .select('id, item_type, group_name, description, quantity, unit, unit_price, total, sort_order, is_rot_eligible, is_rut_eligible, rot_rut_type, option_selected, option_default, labor_amount, material_amount, estimated_hours, component_snapshot, show_components_to_customer')
       .eq('quote_id', quote.quote_id)
       .order('sort_order', { ascending: true })
 
@@ -192,7 +192,7 @@ export async function POST(
       ? body.selected_option_ids.map(String) : []
     const { data: allRows } = await supabase
       .from('quote_items')
-      .select('id, item_type, description, quantity, unit, unit_price, total, is_rot_eligible, is_rut_eligible, rot_rut_type, sort_order, option_selected, option_default')
+      .select('id, item_type, description, quantity, unit, unit_price, total, is_rot_eligible, is_rut_eligible, rot_rut_type, sort_order, option_selected, option_default, labor_amount, material_amount')
       .eq('quote_id', quote.quote_id)
       .order('sort_order', { ascending: true })
     const optionRows = (allRows || []).filter(r => r.item_type === 'option')

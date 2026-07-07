@@ -6,6 +6,35 @@ import { calculateQuoteTotals } from '@/lib/quote-calculations'
 import type { QuoteItem } from '@/lib/types/quote'
 
 /**
+ * Produktbank (v67): invariant-backstopp för arbete/material-spliten.
+ * labor_amount + material_amount MÅSTE vara radens total (öres-invariant,
+ * se lib/products/build-item-snapshot.ts). Vid drift: härled material_amount
+ * = total − labor_amount, logga varning, blockera aldrig sparandet.
+ * `??` genomgående — labor_amount 0 är GILTIGT (ren material), inte falsy.
+ */
+function resolveItemSplit(
+  item: QuoteItem,
+  rowTotal: number
+): { labor_amount: number | null; material_amount: number | null } {
+  const labor = item.labor_amount ?? null
+  if (labor === null) {
+    return { labor_amount: null, material_amount: item.material_amount ?? null }
+  }
+  const material = item.material_amount ?? null
+  if (material === null || Math.abs(labor + material - rowTotal) > 0.01) {
+    const derived = Math.round((rowTotal - labor) * 100) / 100
+    if (material !== null) {
+      console.warn(
+        `[quotes] Split-invariant korrigerad för rad "${item.description}": ` +
+        `labor ${labor} + material ${material} != total ${rowTotal} → material_amount ${derived}`
+      )
+    }
+    return { labor_amount: labor, material_amount: derived }
+  }
+  return { labor_amount: labor, material_amount: material }
+}
+
+/**
  * GET - Lista offerter för ett företag
  */
 export async function GET(request: NextRequest) {
@@ -396,28 +425,38 @@ export async function POST(request: NextRequest) {
 
     // Save structured items to quote_items table
     if (structuredItems.length > 0) {
-      const itemInserts = structuredItems.map((item, idx) => ({
-        id: item.id || ('qi_' + Math.random().toString(36).substr(2, 12)),
-        quote_id: quoteId,
-        business_id: businessId,
-        item_type: item.item_type,
-        group_name: item.group_name || null,
-        description: item.description || '',
-        quantity: item.quantity || 0,
-        unit: item.unit || 'st',
-        unit_price: item.unit_price || 0,
-        total: item.item_type === 'item' ? (item.quantity || 0) * (item.unit_price || 0) : (item.total || 0),
-        cost_price: item.cost_price || null,
-        article_number: item.article_number || null,
-        category_slug: item.category_slug || null,
-        is_rot_eligible: item.is_rot_eligible || false,
-        is_rut_eligible: item.is_rut_eligible || false,
-        rot_rut_type: item.rot_rut_type || null,
-        option_selected: item.option_selected ?? false,
-        option_default: item.option_default ?? false,
-        linked_product_id: item.linked_product_id || null,
-        sort_order: idx,
-      }))
+      const itemInserts = structuredItems.map((item, idx) => {
+        const rowTotal = item.item_type === 'item' ? (item.quantity || 0) * (item.unit_price || 0) : (item.total || 0)
+        const split = resolveItemSplit(item, rowTotal)
+        return {
+          id: item.id || ('qi_' + Math.random().toString(36).substr(2, 12)),
+          quote_id: quoteId,
+          business_id: businessId,
+          item_type: item.item_type,
+          group_name: item.group_name || null,
+          description: item.description || '',
+          quantity: item.quantity || 0,
+          unit: item.unit || 'st',
+          unit_price: item.unit_price || 0,
+          total: rowTotal,
+          cost_price: item.cost_price || null,
+          article_number: item.article_number || null,
+          category_slug: item.category_slug || null,
+          is_rot_eligible: item.is_rot_eligible || false,
+          is_rut_eligible: item.is_rut_eligible || false,
+          rot_rut_type: item.rot_rut_type || null,
+          option_selected: item.option_selected ?? false,
+          option_default: item.option_default ?? false,
+          linked_product_id: item.linked_product_id || null,
+          // Produktbank (v67): snapshot-fälten — ?? så att 0 bevaras
+          labor_amount: split.labor_amount,
+          material_amount: split.material_amount,
+          estimated_hours: item.estimated_hours ?? null,
+          component_snapshot: item.component_snapshot ?? null,
+          show_components_to_customer: item.show_components_to_customer ?? false,
+          sort_order: idx,
+        }
+      })
 
       const { error: itemsError } = await supabase.from('quote_items').insert(itemInserts)
       if (itemsError) {
@@ -642,31 +681,41 @@ export async function PUT(request: NextRequest) {
         .eq('quote_id', quote_id)
       const oldIds = (oldRows || []).map((r) => r.id)
 
-      const itemInserts = structuredItems.map((item, idx) => ({
-        // Alltid färskt id: inkommande item.id är ofta ett befintligt rad-id
-        // och skulle kollidera med gamla radens PK medan båda uppsättningarna
-        // samexisterar. Inget (FK eller kod) refererar quote_items.id.
-        id: 'qi_' + Math.random().toString(36).substr(2, 12),
-        quote_id: quote_id,
-        business_id: business.business_id,
-        item_type: item.item_type,
-        group_name: item.group_name || null,
-        description: item.description || '',
-        quantity: item.quantity || 0,
-        unit: item.unit || 'st',
-        unit_price: item.unit_price || 0,
-        total: item.item_type === 'item' ? (item.quantity || 0) * (item.unit_price || 0) : (item.total || 0),
-        cost_price: item.cost_price || null,
-        article_number: item.article_number || null,
-        category_slug: item.category_slug || null,
-        is_rot_eligible: item.is_rot_eligible || false,
-        is_rut_eligible: item.is_rut_eligible || false,
-        rot_rut_type: item.rot_rut_type || null,
-        option_selected: item.option_selected ?? false,
-        option_default: item.option_default ?? false,
-        linked_product_id: item.linked_product_id || null,
-        sort_order: idx,
-      }))
+      const itemInserts = structuredItems.map((item, idx) => {
+        const rowTotal = item.item_type === 'item' ? (item.quantity || 0) * (item.unit_price || 0) : (item.total || 0)
+        const split = resolveItemSplit(item, rowTotal)
+        return {
+          // Alltid färskt id: inkommande item.id är ofta ett befintligt rad-id
+          // och skulle kollidera med gamla radens PK medan båda uppsättningarna
+          // samexisterar. Inget (FK eller kod) refererar quote_items.id.
+          id: 'qi_' + Math.random().toString(36).substr(2, 12),
+          quote_id: quote_id,
+          business_id: business.business_id,
+          item_type: item.item_type,
+          group_name: item.group_name || null,
+          description: item.description || '',
+          quantity: item.quantity || 0,
+          unit: item.unit || 'st',
+          unit_price: item.unit_price || 0,
+          total: rowTotal,
+          cost_price: item.cost_price || null,
+          article_number: item.article_number || null,
+          category_slug: item.category_slug || null,
+          is_rot_eligible: item.is_rot_eligible || false,
+          is_rut_eligible: item.is_rut_eligible || false,
+          rot_rut_type: item.rot_rut_type || null,
+          option_selected: item.option_selected ?? false,
+          option_default: item.option_default ?? false,
+          linked_product_id: item.linked_product_id || null,
+          // Produktbank (v67): snapshot-fälten — ?? så att 0 bevaras
+          labor_amount: split.labor_amount,
+          material_amount: split.material_amount,
+          estimated_hours: item.estimated_hours ?? null,
+          component_snapshot: item.component_snapshot ?? null,
+          show_components_to_customer: item.show_components_to_customer ?? false,
+          sort_order: idx,
+        }
+      })
       const { error: itemsErr } = await supabase.from('quote_items').insert(itemInserts)
       if (itemsErr) {
         console.error('Update quote_items error:', itemsErr)
