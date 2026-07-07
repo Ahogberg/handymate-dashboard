@@ -2499,3 +2499,15 @@ Beslut 2026-05-24 (Andreas): vänta. Dashboard desktop-only, mobil-flow via PWA.
 
 **Helper finns redan:** [lib/ai/get-model.ts](../lib/ai/get-model.ts) (skapad i Steg 6).
 
+
+---
+
+## 2026-07-07 — AI/agent-offerter skriver bara legacy quotes.items JSONB
+
+**Plats:** `app/api/agent/trigger/tool-router.ts` (createQuote), `lib/ai-quote-generator.ts` → `convertLegacyItems` (quotes/new)
+
+**Problem:** AI-genererade offerter (agent-toolen `create_quote`) skriver enbart legacy `quotes.items` JSONB med formatet `{type:'labor'|'material', unit_price, ...}` — aldrig strukturerade `quote_items`-rader. Editor-vägen konverterar via `convertLegacyItems` men agent-direktvägen lämnar offerten utan radtabell. Konsekvens: agent-offerter får aldrig produktbanks-funktioner (snapshot, ROT-split per rad, visningsfilter-gruppering) och all rendering går via JSONB-fallbacken.
+
+**Lösning (senare):** Normaliseringslager `GeneratedQuoteItem[]/legacy items[] → QuoteItem[]` som skriver quote_items vid INSERT (agent-toolen + ev. andra legacy-skrivare). Motorns `?? total`-fallback gör att detta INTE är akut — beteendet är korrekt, bara utan de nya finesserna.
+
+**Beslutat:** STOPP 2-granskningen produktbank 2026-07-07 (tillägg 4) — byggs medvetet INTE i produktbanks-vågen.
