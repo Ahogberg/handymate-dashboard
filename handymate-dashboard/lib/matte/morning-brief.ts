@@ -3,6 +3,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { assembleCashRadar } from '@/lib/cash-radar-data'
 
 export interface BriefDetail {
   text: string
@@ -88,6 +89,27 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
   ])
 
   const karinBrief = buildKarinBrief(overdueInvoices.data || [], pendingInvoices.data || [])
+
+  // Pengar in-radarn: tunn vecka framåt → rad överst i Karins brief.
+  // Non-blocking — radarfel får aldrig fälla hela briefen.
+  try {
+    const radar = await assembleCashRadar(supabase, businessId)
+    if (radar.ready && radar.dips.length > 0) {
+      const dip = radar.dips[0]
+      karinBrief.details.unshift({
+        text: `Vecka ${isoWeekNo(dip.week_start)} ser tunn ut (~${fmt(dip.expected_kr)} kr mot normala ~${fmt(radar.normal_kr)}) — åtgärder finns på dashboarden.`,
+        urgency: 'high',
+        link: '/dashboard',
+      })
+      if (karinBrief.badgeType === 'success') {
+        karinBrief.badge = 'Tunn vecka'
+        karinBrief.badgeType = 'warning'
+      }
+    }
+  } catch (err) {
+    console.warn('[morning-brief] cash-radar hoppades över (icke-blockerande):', err)
+  }
+
   const danielBrief = buildDanielBrief(openLeads.data || [], staleQuotes.data || [])
   const larsBrief = buildLarsBrief(todayBookings.data || [], profWarnings.data || [])
   const hannaBrief = buildHannaBrief(inactiveCustomers.data || [])
@@ -114,6 +136,17 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
 }
 
 function fmt(n: number): string { return n.toLocaleString('sv-SE') }
+
+/** ISO 8601-veckonummer (torsdagsregeln) ur ett ISO-datum, t.ex. '2026-07-06' → 28. */
+function isoWeekNo(isoDate: string): number {
+  const d = new Date(isoDate + 'T00:00:00Z')
+  const dow = (d.getUTCDay() + 6) % 7 // mån=0 ... sön=6
+  d.setUTCDate(d.getUTCDate() - dow + 3) // torsdagen i samma vecka
+  const firstThu = new Date(Date.UTC(d.getUTCFullYear(), 0, 4))
+  const fdow = (firstThu.getUTCDay() + 6) % 7
+  firstThu.setUTCDate(firstThu.getUTCDate() - fdow + 3) // årets första torsdag
+  return 1 + Math.round((d.getTime() - firstThu.getTime()) / (7 * 86_400_000))
+}
 
 function buildKarinBrief(overdue: any[], upcoming: any[]): AgentBrief {
   const total = overdue.reduce((s: number, i: any) => s + (i.total || 0), 0)
