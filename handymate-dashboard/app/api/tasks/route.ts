@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { verifyOwnership } from '@/lib/auth/verify-ownership'
+import { getCurrentUser } from '@/lib/permissions'
 
 // Helper: log task activity
 async function logTaskActivity(
@@ -80,6 +81,13 @@ export async function GET(request: NextRequest) {
 
   const myOnly = searchParams.get('my') === 'true'
   const userId = auth.user_id
+  // Nyckel-mixen i task-tabellen (Bee-buggfix): assigned_to = business_users.id,
+  // created_by = auth user_id. Tidigare jämfördes assigned_to mot auth-id:t →
+  // "Mina uppgifter" matchade aldrig tilldelningar. Hämta business_user-raden
+  // för rätt id. Anställda ser dessutom ALLTID bara egna/tilldelade.
+  const currentUser = await getCurrentUser(request).catch(() => null)
+  const memberId = currentUser?.id || null
+  const isEmployee = currentUser?.role === 'employee'
 
   let query = supabase
     .from('task')
@@ -92,9 +100,13 @@ export async function GET(request: NextRequest) {
   if (dealId) query = query.eq('deal_id', dealId)
   if (projectId) query = query.eq('project_id', projectId)
 
-  // "Mina uppgifter" — bara tilldelade till mig eller skapade av mig
-  if (myOnly && userId) {
-    query = query.or(`assigned_to.eq.${userId},created_by.eq.${userId}`)
+  // "Mina uppgifter" (frivilligt filter) ELLER anställd (tvingande):
+  // bara tilldelade till mig eller skapade av mig
+  if ((myOnly || isEmployee) && (memberId || userId)) {
+    const ors: string[] = []
+    if (memberId) ors.push(`assigned_to.eq.${memberId}`)
+    if (userId) ors.push(`created_by.eq.${userId}`)
+    query = query.or(ors.join(','))
   }
 
   const { data, error } = await query
@@ -102,7 +114,7 @@ export async function GET(request: NextRequest) {
   // Filtrera privata uppgifter — visa bara om jag är skapare eller tilldelad
   const filtered = (data || []).filter((t: any) => {
     if (t.visibility === 'private') {
-      return t.created_by === userId || t.assigned_to === userId
+      return t.created_by === userId || (memberId !== null && t.assigned_to === memberId)
     }
     return true // team + project synliga för alla
   })

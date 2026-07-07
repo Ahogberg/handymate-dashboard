@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { getCurrentUser } from '@/lib/permissions'
 
 /**
  * GET /api/dashboard/today
@@ -40,15 +41,34 @@ export async function GET(req: NextRequest) {
   const items: TodoItem[] = []
 
   try {
+    // Synlighet (Bee-buggfix): anställda ska BARA se uppgifter de är tilldelade
+    // eller skapat själva — inte hela företagets. OBS nyckel-mixen i task-
+    // tabellen: assigned_to = business_users.id, created_by = auth user_id.
+    const currentUser = await getCurrentUser(req).catch(() => null)
+    const isEmployee = currentUser?.role === 'employee'
+
     // 1. Uppgifter med deadline idag eller förfallna
-    const { data: tasks } = await supabase
+    let taskQuery = supabase
       .from('task')
-      .select('id, title, description, status, priority, due_date, due_time, deal_id, project_id, customer_id')
+      .select('id, title, description, status, priority, due_date, due_time, deal_id, project_id, customer_id, assigned_to, created_by, visibility')
       .eq('business_id', bizId)
       .in('status', ['pending', 'in_progress'])
       .lte('due_date', todayStr)
       .order('due_date', { ascending: true })
       .limit(20)
+    if (isEmployee && currentUser) {
+      const ors = [`assigned_to.eq.${currentUser.id}`]
+      if (currentUser.user_id) ors.push(`created_by.eq.${currentUser.user_id}`)
+      taskQuery = taskQuery.or(ors.join(','))
+    }
+    const { data: rawTasks } = await taskQuery
+    // Privata uppgifter: synliga endast för skapare/tilldelad (samma semantik
+    // som /api/tasks) — gäller även owner/admin.
+    const tasks = (rawTasks || []).filter((t: any) => {
+      if (t.visibility !== 'private') return true
+      if (!currentUser) return true
+      return t.created_by === currentUser.user_id || t.assigned_to === currentUser.id
+    })
 
     // 2. Dagens bokningar
     const { data: bookings } = await supabase

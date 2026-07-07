@@ -127,6 +127,9 @@ export default function DashboardPage() {
     context?: { type: 'project' | 'deal'; label: string; link: string }
   }[]>([])
   const [todayLoaded, setTodayLoaded] = useState(false)
+  // Inloggade användarens namn (business_users) — hälsningen ska vara personlig,
+  // inte företagets kontaktperson (Bee-buggfix).
+  const [currentUserName, setCurrentUserName] = useState<string | null>(null)
   const [dashboardErrorSections, setDashboardErrorSections] = useState<Set<string>>(new Set())
   const markSectionError = (section: string) => {
     setDashboardErrorSections(prev => {
@@ -483,6 +486,16 @@ export default function DashboardPage() {
     return notes.split(' - ')[0] || notes.substring(0, 20)
   }
 
+  // Hämta inloggade användarens namn en gång (oberoende av fetchData-pollningen)
+  useEffect(() => {
+    let active = true
+    fetch('/api/me')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (active && d?.user?.name) setCurrentUserName(d.user.name) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
+
   const getGreeting = () => {
     const hour = new Date().getHours()
     if (hour < 10) return 'God morgon'
@@ -491,7 +504,11 @@ export default function DashboardPage() {
   }
 
   const getFirstName = () => {
-    return business.contact_name?.split(' ')[0] || ''
+    // Bee-buggfix: hälsa den INLOGGADE användaren, inte företagets kontaktperson
+    // (anställda fick "Hej Christoffer"). /api/me → business_users.name; fallback
+    // till contact_name tills svaret laddat (ägaren = samma namn ändå).
+    const name = currentUserName || business.contact_name || ''
+    return name.split(' ')[0] || ''
   }
 
   const formatCurrency = (amount: number) => {
