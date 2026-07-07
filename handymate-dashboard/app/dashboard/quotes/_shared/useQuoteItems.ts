@@ -13,6 +13,14 @@ import { createDefaultItem, generateItemId } from '@/lib/quote-calculations'
 import { getCategoryRotRut, type CustomCategory } from '@/lib/constants/categories'
 import type { QuoteItem, RotRutType } from '@/lib/types/quote'
 import type { SelectedProduct } from '@/lib/suppliers/types'
+import {
+  applyProductToItem,
+  normalizeUnit,
+  type ProductWithComponents,
+} from './applyProductToItem'
+
+// Re-export: normalizeUnit bodde här innan produktbanken — behåll importvägen
+export { normalizeUnit }
 
 interface PriceItem {
   id: string
@@ -20,18 +28,6 @@ interface PriceItem {
   name: string
   unit: string
   unit_price: number
-}
-
-/** Normalize legacy unit values to the new set */
-export function normalizeUnit(unit: string): string {
-  const map: Record<string, string> = {
-    hour: 'tim',
-    timmar: 'tim',
-    h: 'tim',
-    piece: 'st',
-    styck: 'st',
-  }
-  return map[unit.toLowerCase()] || unit
 }
 
 /**
@@ -171,6 +167,34 @@ export function useQuoteItems(
     [setItems],
   )
 
+  /**
+   * Produktbank: förfyll en BEFINTLIG rad från vald produkt (inline-combon i
+   * beskrivningsfältet). Hela raden byts atomiskt i samma setState — id och
+   * sort_order bevaras av applyProductToItem (spread).
+   */
+  const applyProductToRow = useCallback(
+    (itemId: string, product: ProductWithComponents) => {
+      setItems(prev =>
+        prev.map(item => (item.id === itemId ? applyProductToItem(item, product) : item)),
+      )
+    },
+    [setItems],
+  )
+
+  /**
+   * Produktbank: NY rad från vald produkt (add-row-combon, sökmodalen,
+   * snabbvals-knapparna) — samma förfyllnings-väg som inline-combon.
+   */
+  const addFromProductBank = useCallback(
+    (product: ProductWithComponents) => {
+      setItems(prev => {
+        const base = createDefaultItem('item', prev.length)
+        return [...prev, applyProductToItem(base, product, 1)]
+      })
+    },
+    [setItems],
+  )
+
   const addFromPriceList = useCallback(
     (priceItem: PriceItem) => {
       const newItem: QuoteItem = {
@@ -202,5 +226,7 @@ export function useQuoteItems(
     handleDragEnd,
     addFromGrossist,
     addFromPriceList,
+    applyProductToRow,
+    addFromProductBank,
   }
 }

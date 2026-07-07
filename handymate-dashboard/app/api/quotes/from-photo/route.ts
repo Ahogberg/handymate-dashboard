@@ -51,12 +51,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Kunde inte tolka bilden', raw: rawText }, { status: 422 })
     }
 
-    // Step 2: Match materials against price_list
-    const { data: priceList } = await supabase
-      .from('price_list')
-      .select('name, unit, unit_price, category')
+    // Step 2: Match materials against produktbanken (products — ersätter
+    // döda price_list; samma fältform via sales_price→unit_price-mappning)
+    const { data: productRows } = await supabase
+      .from('products')
+      .select('name, unit, sales_price, category')
       .eq('business_id', business.business_id)
+      .eq('is_active', true)
       .limit(100)
+
+    const priceList = (productRows || []).map(p => ({
+      name: p.name,
+      unit: p.unit,
+      unit_price: p.sales_price,
+      category: p.category,
+    }))
 
     const pricedItems: Array<{ description: string; quantity: number; unit: string; unitPrice: number; type: string }> = []
 

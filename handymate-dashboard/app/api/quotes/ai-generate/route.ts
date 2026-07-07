@@ -29,10 +29,14 @@ export async function POST(request: NextRequest) {
     const supabase = getServerSupabase()
     const branch = business.industry || 'Bygg'
 
+    // Produktbank-konsolidering: fallback-priskontexten läses ur products
+    // (artikelregistret) i stället för döda price_list. Mappas till samma
+    // PriceListItem-form (unit_price = sales_price) så buildPriceContext är
+    // oförändrad. Kundspecifik price_lists_v2 (topp-prio) RÖRS EJ.
     const [priceListResult, templatesResult] = await Promise.all([
       supabase
-        .from('price_list')
-        .select('name, unit, unit_price, category')
+        .from('products')
+        .select('name, unit, sales_price, category')
         .eq('business_id', business.business_id)
         .eq('is_active', true)
         .limit(50),
@@ -43,7 +47,12 @@ export async function POST(request: NextRequest) {
         .limit(5)
     ])
 
-    const priceListData = priceListResult.data || []
+    const priceListData = (priceListResult.data || []).map(p => ({
+      name: p.name,
+      unit: p.unit,
+      unit_price: p.sales_price,
+      category: p.category,
+    }))
     const templatesData = templatesResult.data || []
 
     const hourlyRate = business.pricing_settings?.hourly_rate || 650

@@ -23,7 +23,7 @@ import {
 import { useQuoteCalculations } from '../_shared/useQuoteCalculations'
 import { useQuoteItems } from '../_shared/useQuoteItems'
 import { usePriceListLookup } from '../_shared/usePriceListLookup'
-import type { ProductSearchResult } from '../_shared/QuoteProductSearchModal'
+import { ensureProductComponents, type ProductWithComponents } from '../_shared/applyProductToItem'
 import { QuoteQuickstartCard, type QuickstartRow } from '../_shared/QuoteQuickstartCard'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 
@@ -268,7 +268,7 @@ export default function NewQuotePage() {
 
   // ─── Shared hooks ──────────────────────────────────────────────────
   const {
-    priceList,
+    products,
     customCategories,
     hydrated: priceListHydrated,
   } = usePriceListLookup(business.business_id)
@@ -301,7 +301,8 @@ export default function NewQuotePage() {
     dndSensors,
     handleDragEnd,
     addFromGrossist,
-    addFromPriceList,
+    applyProductToRow,
+    addFromProductBank,
   } = useQuoteItems(items, setItems, localCustomCategories, !!pricingSettings)
 
   // ─── Derived: standard texts grouped by type ──────────────────────
@@ -1073,23 +1074,25 @@ export default function NewQuotePage() {
   // Product search — sparade produkter från api/products
   // ═══════════════════════════════════════════════════════════════════
 
-  const addFromProduct = useCallback((product: ProductSearchResult) => {
-    const newItem: QuoteItem = {
-      id: generateItemId(),
-      item_type: 'item',
-      description: product.name,
-      article_number: product.sku || undefined,
-      quantity: 1,
-      unit: normalizeUnit(product.unit),
-      unit_price: product.sales_price,
-      cost_price: product.purchase_price ?? undefined,
-      total: product.sales_price,
-      is_rot_eligible: !!product.rot_eligible,
-      is_rut_eligible: !!product.rut_eligible,
-      sort_order: 0,
-    }
-    setItems(prev => [...prev, { ...newItem, sort_order: prev.length }])
-  }, [])
+  // NY rad från produktbanken (add-row-combon + snabbval + modal): komponenterna
+  // hämtas lazily om de saknas (snabbvalens produkter laddas utan) och raden
+  // förfylls via applyProductToItem — snapshot/split/timmar fryses in.
+  const addFromProduct = useCallback(
+    async (product: ProductWithComponents) => {
+      addFromProductBank(await ensureProductComponents(product))
+    },
+    [addFromProductBank],
+  )
+
+  // Förfyll BEFINTLIG rad (inline-combon i beskrivningsfältet) — combon
+  // söker med include=components så inget extra API-anrop behövs, men
+  // ensureProductComponents är en billig no-op-vakt om komponenter saknas.
+  const applyProductToExistingRow = useCallback(
+    async (itemId: string, product: ProductWithComponents) => {
+      applyProductToRow(itemId, await ensureProductComponents(product))
+    },
+    [applyProductToRow],
+  )
 
   // ═══════════════════════════════════════════════════════════════════
   // Payment plan handlers
@@ -1408,15 +1411,15 @@ export default function NewQuotePage() {
               recalculated={recalculated}
               allCategories={allCategories}
               customCategories={localCustomCategories}
-              priceList={priceList}
+              products={products}
               dndSensors={dndSensors}
               onDragEnd={handleDragEnd}
               onAddItem={addItem}
               onUpdateItem={updateItem}
               onRemoveItem={removeItem}
               onMoveItem={moveItem}
-              onAddFromPriceList={addFromPriceList}
-              onSelectProduct={addFromProduct}
+              onSelectProduct={product => { void addFromProduct(product) }}
+              onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
               onAddBlankRow={description => {
                 setItems(prev => [
                   ...prev,

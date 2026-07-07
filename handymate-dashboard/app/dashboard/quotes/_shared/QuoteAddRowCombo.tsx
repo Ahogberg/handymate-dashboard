@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Loader2, Search } from 'lucide-react'
-import type { ProductSearchResult } from './QuoteProductSearchModal'
+import type { ProductWithComponents } from './applyProductToItem'
 
 interface QuoteAddRowComboProps {
-  /** Triggas när användaren väljer en sparad produkt från dropdown */
-  onSelectProduct: (product: ProductSearchResult) => void
+  /** Triggas när användaren väljer en sparad produkt från dropdown —
+   *  produkten kommer med komponenter (include=components) */
+  onSelectProduct: (product: ProductWithComponents) => void
   /** Triggas när användaren trycker Enter utan match — skapar tom rad med
    *  beskrivningen ifylld */
   onAddBlankRow: (description: string) => void
@@ -22,7 +23,7 @@ interface QuoteAddRowComboProps {
  */
 export function QuoteAddRowCombo({ onSelectProduct, onAddBlankRow }: QuoteAddRowComboProps) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<ProductSearchResult[]>([])
+  const [results, setResults] = useState<ProductWithComponents[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
@@ -36,7 +37,7 @@ export function QuoteAddRowCombo({ onSelectProduct, onAddBlankRow }: QuoteAddRow
     }
     const timer = setTimeout(() => {
       setLoading(true)
-      fetch(`/api/products?search=${encodeURIComponent(query.trim())}`)
+      fetch(`/api/products?search=${encodeURIComponent(query.trim())}&include=components`)
         .then(r => r.json())
         .then(data => setResults(data.products || []))
         .catch(() => setResults([]))
@@ -45,7 +46,7 @@ export function QuoteAddRowCombo({ onSelectProduct, onAddBlankRow }: QuoteAddRow
     return () => clearTimeout(timer)
   }, [query])
 
-  function handleSelect(p: ProductSearchResult) {
+  function handleSelect(p: ProductWithComponents) {
     onSelectProduct(p)
     setQuery('')
     setOpen(false)

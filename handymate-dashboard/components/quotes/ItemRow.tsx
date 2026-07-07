@@ -4,6 +4,8 @@ import { Bookmark, BookmarkCheck, GripVertical, Trash2 } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { QuoteItem } from '@/lib/types/quote'
+import { QuoteRowProductCombo } from '@/app/dashboard/quotes/_shared/QuoteRowProductCombo'
+import type { ProductWithComponents } from '@/app/dashboard/quotes/_shared/applyProductToItem'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -72,6 +74,12 @@ interface ItemRowProps {
    * knappen.
    */
   onSaveToProducts?: (item: QuoteItem) => void
+  /**
+   * Produktbank: gör beskrivningsfältet på 'item'-rader till en inline-
+   * autocomplete — produktval förfyller HELA raden (pris, enhet, snapshot).
+   * När undefined är fältet ett vanligt textfält (fritext funkar alltid).
+   */
+  onSelectProduct?: (itemId: string, product: ProductWithComponents) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +101,7 @@ export default function ItemRow({
   newCategoryLabel,
   setNewCategoryLabel,
   onSaveToProducts,
+  onSelectProduct,
 }: ItemRowProps) {
   const badge = ITEM_TYPE_BADGE[item.item_type]
   const rowStyle = ITEM_TYPE_STYLES[item.item_type]
@@ -116,6 +125,10 @@ export default function ItemRow({
     item.item_type === 'item' &&
     item.description.trim() !== ''
   const isSavedToProducts = !!item.linked_product_id
+
+  // Produktbank: inline-autocomplete i beskrivningsfältet — endast vanliga
+  // 'item'-rader (rubrik/fritext/delsumma/rabatt/tillval förblir rena textfält)
+  const useProductCombo = !!onSelectProduct && item.item_type === 'item'
 
   const {
     attributes,
@@ -156,14 +169,24 @@ export default function ItemRow({
               {badge.label}
             </span>
           )}
-          <input
-            type="text"
-            value={item.description}
-            onChange={(e) => onUpdate(item.id, 'description', e.target.value)}
-            placeholder={item.item_type === 'heading' ? 'Rubriktext' : item.item_type === 'text' ? 'Fritext...' : 'Beskrivning'}
-            className={`flex-1 min-w-0 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 ${
-              item.item_type === 'heading' ? 'font-bold' : ''} ${item.item_type === 'text' ? 'italic' : ''}`}
-          />
+          {useProductCombo ? (
+            <QuoteRowProductCombo
+              value={item.description}
+              onChangeText={text => onUpdate(item.id, 'description', text)}
+              onSelectProduct={product => onSelectProduct!(item.id, product)}
+              placeholder="Beskrivning eller sök produkt…"
+              inputClassName="w-full min-w-0 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
+            />
+          ) : (
+            <input
+              type="text"
+              value={item.description}
+              onChange={(e) => onUpdate(item.id, 'description', e.target.value)}
+              placeholder={item.item_type === 'heading' ? 'Rubriktext' : item.item_type === 'text' ? 'Fritext...' : 'Beskrivning'}
+              className={`flex-1 min-w-0 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 ${
+                item.item_type === 'heading' ? 'font-bold' : ''} ${item.item_type === 'text' ? 'italic' : ''}`}
+            />
+          )}
           {canSaveToProducts && (
             <button
               type="button"
@@ -246,14 +269,24 @@ export default function ItemRow({
 
         {/* Description — takes all remaining space (+ Förvald-toggle för tillvalsrader) */}
         <div className="flex items-center gap-2 min-w-0">
-          <input
-            type="text"
-            value={item.description}
-            onChange={(e) => onUpdate(item.id, 'description', e.target.value)}
-            placeholder={item.item_type === 'heading' ? 'Rubriktext' : item.item_type === 'text' ? 'Fritext...' : item.item_type === 'subtotal' ? 'Delsumma' : 'Beskrivning'}
-            className={`flex-1 w-full min-w-0 px-2 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 ${
-              item.item_type === 'heading' ? 'font-bold' : ''} ${item.item_type === 'text' ? 'italic' : ''}`}
-          />
+          {useProductCombo ? (
+            <QuoteRowProductCombo
+              value={item.description}
+              onChangeText={text => onUpdate(item.id, 'description', text)}
+              onSelectProduct={product => onSelectProduct!(item.id, product)}
+              placeholder="Beskrivning eller sök produkt…"
+              inputClassName="w-full min-w-0 px-2 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600"
+            />
+          ) : (
+            <input
+              type="text"
+              value={item.description}
+              onChange={(e) => onUpdate(item.id, 'description', e.target.value)}
+              placeholder={item.item_type === 'heading' ? 'Rubriktext' : item.item_type === 'text' ? 'Fritext...' : item.item_type === 'subtotal' ? 'Delsumma' : 'Beskrivning'}
+              className={`flex-1 w-full min-w-0 px-2 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 ${
+                item.item_type === 'heading' ? 'font-bold' : ''} ${item.item_type === 'text' ? 'italic' : ''}`}
+            />
+          )}
           {isOption && (
             <label
               className="flex items-center gap-1 shrink-0 cursor-pointer select-none"

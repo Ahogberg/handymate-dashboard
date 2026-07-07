@@ -25,6 +25,7 @@ import {
 import { useQuoteCalculations } from '../../_shared/useQuoteCalculations'
 import { useQuoteItems } from '../../_shared/useQuoteItems'
 import { usePriceListLookup } from '../../_shared/usePriceListLookup'
+import { ensureProductComponents, type ProductWithComponents } from '../../_shared/applyProductToItem'
 import { QuoteQuickstartCard, type QuickstartRow } from '../../_shared/QuoteQuickstartCard'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 
@@ -210,7 +211,7 @@ export default function EditQuotePage() {
   const [previewMode, setPreviewMode] = useState<'design' | 'compact'>('design')
 
   // ─── Shared hooks ──────────────────────────────────────────────────
-  const { priceList, customCategories, hydrated: priceListHydrated } = usePriceListLookup(business.business_id)
+  const { products, customCategories, hydrated: priceListHydrated } = usePriceListLookup(business.business_id)
 
   // Custom categories är lokalt state eftersom vi tillåter inline-skapande;
   // initieras från hook-resultatet när det finns (samma mönster som new-vyn)
@@ -237,8 +238,25 @@ export default function EditQuotePage() {
     dndSensors,
     handleDragEnd,
     addFromGrossist,
-    addFromPriceList,
+    applyProductToRow,
+    addFromProductBank,
   } = useQuoteItems(items, setItems, localCustomCategories, !!pricingSettings)
+
+  // Produktbank: NY rad (add-row-combo/snabbval) resp. förfyllnad av
+  // BEFINTLIG rad (inline-combon) — komponenterna hämtas lazily vid behov,
+  // sedan samma applyProductToItem-väg som new-vyn.
+  const addFromProduct = useCallback(
+    async (product: ProductWithComponents) => {
+      addFromProductBank(await ensureProductComponents(product))
+    },
+    [addFromProductBank],
+  )
+  const applyProductToExistingRow = useCallback(
+    async (itemId: string, product: ProductWithComponents) => {
+      applyProductToRow(itemId, await ensureProductComponents(product))
+    },
+    [applyProductToRow],
+  )
 
   // ─── Derived: standard texts grouped by type ──────────────────────
   const textsByType = useMemo(() => {
@@ -918,32 +936,15 @@ export default function EditQuotePage() {
               recalculated={recalculated}
               allCategories={allCategories}
               customCategories={localCustomCategories}
-              priceList={priceList}
+              products={products}
               dndSensors={dndSensors}
               onDragEnd={handleDragEnd}
               onAddItem={addItem}
               onUpdateItem={updateItem}
               onRemoveItem={removeItem}
               onMoveItem={moveItem}
-              onAddFromPriceList={addFromPriceList}
-              onSelectProduct={p => {
-                const newItem: QuoteItem = {
-                  id: generateItemId(),
-                  item_type: 'item',
-                  description: p.name,
-                  article_number: p.sku || undefined,
-                  quantity: 1,
-                  unit: p.unit || 'st',
-                  unit_price: p.sales_price,
-                  cost_price: p.purchase_price ?? undefined,
-                  total: p.sales_price,
-                  is_rot_eligible: !!p.rot_eligible,
-                  is_rut_eligible: !!p.rut_eligible,
-                  linked_product_id: p.id,
-                  sort_order: items.length,
-                }
-                setItems(prev => [...prev, { ...newItem, sort_order: prev.length }])
-              }}
+              onSelectProduct={product => { void addFromProduct(product) }}
+              onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
               onAddBlankRow={description => {
                 setItems(prev => [
                   ...prev,

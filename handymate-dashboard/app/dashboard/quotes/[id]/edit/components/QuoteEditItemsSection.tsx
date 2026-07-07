@@ -8,7 +8,7 @@ import ItemRow from '@/components/quotes/ItemRow'
 import type { QuoteItem } from '@/lib/types/quote'
 import type { CustomCategory } from '@/lib/constants/categories'
 import { QuoteAddRowCombo } from '../../../_shared/QuoteAddRowCombo'
-import type { ProductSearchResult } from '../../../_shared/QuoteProductSearchModal'
+import type { ProductWithComponents } from '../../../_shared/applyProductToItem'
 
 /**
  * QuoteEditItemsSection — IDENTISK till QuoteNewItemsSection per pilot-feedback
@@ -22,28 +22,23 @@ import type { ProductSearchResult } from '../../../_shared/QuoteProductSearchMod
  * _shared/ så de inte kan divergera igen.
  */
 
-interface PriceItem {
-  id: string
-  category: string
-  name: string
-  unit: string
-  unit_price: number
-}
-
 interface QuoteEditItemsSectionProps {
   items: QuoteItem[]
   recalculated: QuoteItem[]
   allCategories: ReturnType<typeof import('@/lib/constants/categories').getAllCategories>
   customCategories: CustomCategory[]
-  priceList: PriceItem[]
+  /** Produktbanken (favoriter först) — snabbvals-knapparna visar de 8 första */
+  products: ProductWithComponents[]
   dndSensors: ReturnType<typeof import('@dnd-kit/core').useSensors>
   onDragEnd: (event: DragEndEvent) => void
   onAddItem: (type: QuoteItem['item_type']) => void
   onUpdateItem: (id: string, field: keyof QuoteItem, value: any) => void
   onRemoveItem: (id: string) => void
   onMoveItem: (index: number, direction: 'up' | 'down') => void
-  onAddFromPriceList: (item: PriceItem) => void
-  onSelectProduct: (product: ProductSearchResult) => void
+  /** NY rad från produkt — add-row-combon + snabbvals-knapparna */
+  onSelectProduct: (product: ProductWithComponents) => void
+  /** Förfyll BEFINTLIG rad från produkt — inline-combon i beskrivningsfältet */
+  onSelectProductForRow: (itemId: string, product: ProductWithComponents) => void
   onAddBlankRow: (description: string) => void
   onOpenGrossistSearch: () => void
   onSaveToProducts?: (item: QuoteItem) => void
@@ -60,15 +55,15 @@ export function QuoteEditItemsSection({
   items,
   recalculated,
   allCategories,
-  priceList,
+  products,
   dndSensors,
   onDragEnd,
   onAddItem,
   onUpdateItem,
   onRemoveItem,
   onMoveItem,
-  onAddFromPriceList,
   onSelectProduct,
+  onSelectProductForRow,
   onAddBlankRow,
   onOpenGrossistSearch,
   onSaveToProducts,
@@ -137,6 +132,7 @@ export function QuoteEditItemsSection({
                   newCategoryLabel={newCategoryLabel}
                   setNewCategoryLabel={setNewCategoryLabel}
                   onSaveToProducts={onSaveToProducts}
+                  onSelectProduct={onSelectProductForRow}
                 />
               ))}
             </div>
@@ -205,33 +201,33 @@ export function QuoteEditItemsSection({
         </div>
       </div>
 
-      {/* Quick add from price list */}
-      {priceList.length > 0 ? (
+      {/* Snabbval från produktbanken — favoriter först, samma väg som combon */}
+      {products.length > 0 ? (
         <div className="mt-4 pt-4 border-t border-slate-100">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Snabbval från prislista</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Snabbval från produktbanken</p>
           <div className="flex flex-wrap gap-2">
-            {priceList.slice(0, 8).map(item => (
+            {products.slice(0, 8).map(product => (
               <button
-                key={item.id}
+                key={product.id}
                 type="button"
-                onClick={() => onAddFromPriceList(item)}
+                onClick={() => onSelectProduct(product)}
                 className="px-3 py-1.5 border border-slate-200 hover:border-primary-300 hover:text-primary-700 hover:bg-primary-50 rounded-lg text-slate-600 text-xs font-medium bg-white transition-colors"
               >
-                {item.name}
+                {product.is_favorite ? '★ ' : ''}{product.name}
               </button>
             ))}
           </div>
         </div>
       ) : (
         <div className="mt-4 pt-4 border-t border-slate-100">
-          <p className="text-xs text-slate-500">Du har inga sparade artiklar än.</p>
+          <p className="text-xs text-slate-500">Du har inga sparade produkter än.</p>
           <a
-            href="/dashboard/settings/my-prices"
+            href="/dashboard/settings/products"
             target="_blank"
             rel="noopener"
             className="text-xs font-semibold text-primary-700 hover:text-primary-600 mt-1 inline-block"
           >
-            + Bygg din prislista →
+            + Bygg din produktbank →
           </a>
           <p className="text-[10px] text-slate-400 mt-0.5">Öppnas i ny flik</p>
         </div>

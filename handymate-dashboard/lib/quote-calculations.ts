@@ -1,4 +1,5 @@
 import { QuoteItem, PaymentPlanEntry, QuoteTotals, RotRutType } from '@/lib/types/quote'
+import { estimateHours, splitAmount, type SnapshotComponent } from '@/lib/products/build-item-snapshot'
 
 /**
  * Get the effective ROT/RUT type for an item.
@@ -245,13 +246,32 @@ export function createDefaultItem(type: QuoteItem['item_type'], sortOrder: numbe
 }
 
 /**
- * Recalculate all subtotal rows and item totals
+ * Recalculate all subtotal rows and item totals.
+ *
+ * Produktbank (v67): rader med component_snapshot och fryst labor_share
+ * räknar om arbete/material-spliten + timmarna vid varje mängd/pris-ändring —
+ * klient-side, från snapshotens per-enhets-data, utan API. `!== null/undefined`
+ * (aldrig falsy-koll): labor_share 0 är GILTIG och ger labor_amount 0.
+ * Rader utan snapshot (fritext, AI, legacy) passerar exakt som tidigare.
  */
 export function recalculateItems(items: QuoteItem[]): QuoteItem[] {
   return items.map((item, index) => {
     // Option-rader beräknas som item (spread behåller option_selected/option_default)
     if (item.item_type === 'item' || item.item_type === 'option') {
-      return { ...item, total: item.quantity * item.unit_price }
+      const total = item.quantity * item.unit_price
+      const laborShare = item.component_snapshot?.labor_share
+      if (laborShare !== null && laborShare !== undefined) {
+        const { labor_amount, material_amount } = splitAmount(total, laborShare)
+        const components: SnapshotComponent[] = item.component_snapshot?.components ?? []
+        return {
+          ...item,
+          total,
+          labor_amount,
+          material_amount,
+          estimated_hours: estimateHours(components, item.quantity),
+        }
+      }
+      return { ...item, total }
     }
     if (item.item_type === 'discount') {
       // Discount: total is negative

@@ -17,6 +17,8 @@ import {
   type SnapshotComponent,
   type SnapshotProduct,
 } from '../lib/products/build-item-snapshot'
+import { recalculateItems } from '../lib/quote-calculations'
+import type { QuoteItem } from '../lib/types/quote'
 
 const fasadComponents: SnapshotComponent[] = [
   { component_type: 'arbete', description: 'Målningsarbete', quantity_per_unit: 0.13, unit: 'tim', unit_cost: 550 },
@@ -137,5 +139,114 @@ test.describe('buildItemSnapshot — Fasadmålning end-to-end', () => {
     expect(result.labor_share).toBeNull()
     expect(result.labor_amount).toBeNull()
     expect(result.material_amount).toBeNull()
+  })
+})
+
+// ─── recalculateItems: mängd/pris-ändring räknar om spliten från snapshoten ──
+
+const FASAD_SHARE = 71.5 / 96.15
+
+function snapshotItem(over: Partial<QuoteItem>): QuoteItem {
+  return {
+    id: 'row_1',
+    item_type: 'item',
+    description: 'Fasadmålning',
+    quantity: 120,
+    unit: 'kvm',
+    unit_price: 450,
+    total: 54000,
+    is_rot_eligible: true,
+    is_rut_eligible: false,
+    rot_rut_type: 'rot',
+    sort_order: 0,
+    linked_product_id: 'prod_fasad',
+    labor_amount: 40156.01,
+    material_amount: 13843.99,
+    estimated_hours: 15.6,
+    component_snapshot: {
+      product_id: 'prod_fasad',
+      product_name: 'Fasadmålning',
+      sku: 'FM-450',
+      sales_price: 450,
+      labor_share: FASAD_SHARE,
+      components: fasadComponents,
+    },
+    ...over,
+  } as QuoteItem
+}
+
+test.describe('recalculateItems — snapshot-omräkning vid mängd/pris-ändring', () => {
+  test('mängdändring 120 → 100 kvm räknar om split + timmar från labor_share', () => {
+    const [row] = recalculateItems([snapshotItem({ quantity: 100 })])
+    expect(row.total).toBe(45000)
+    const expectedLabor = Math.round(45000 * FASAD_SHARE * 100) / 100
+    expect(row.labor_amount).toBe(expectedLabor)
+    // material HÄRLEDS: labor + material === total exakt (öres-invarianten)
+    expect(row.labor_amount! + row.material_amount!).toBe(45000)
+    expect(row.estimated_hours).toBeCloseTo(100 * 0.13, 10)
+  })
+
+  test('prisändring 450 → 500 kr/kvm räknar om spliten (samma andel)', () => {
+    const [row] = recalculateItems([snapshotItem({ unit_price: 500 })])
+    expect(row.total).toBe(60000)
+    expect(row.labor_amount).toBe(Math.round(60000 * FASAD_SHARE * 100) / 100)
+    expect(row.labor_amount! + row.material_amount!).toBe(60000)
+    // timmarna styrs av mängden, inte priset — oförändrade
+    expect(row.estimated_hours).toBeCloseTo(15.6, 10)
+  })
+
+  test('labor_share 0 i snapshot → labor_amount EXAKT 0 (??-vs-||-fällan)', () => {
+    const [row] = recalculateItems([
+      snapshotItem({
+        quantity: 10, unit_price: 300, labor_amount: 0, material_amount: 3000,
+        component_snapshot: {
+          product_id: 'prod_mtrl', product_name: 'Kakel', sku: null,
+          sales_price: 300, labor_share: 0, components: [],
+        },
+      }),
+    ])
+    expect(row.total).toBe(3000)
+    expect(row.labor_amount).toBe(0)
+    expect(row.material_amount).toBe(3000)
+    expect(row.estimated_hours).toBeNull()
+  })
+
+  test('rad UTAN snapshot → orörd legacy-väg (bara total räknas om)', () => {
+    const [row] = recalculateItems([
+      snapshotItem({
+        quantity: 3, unit_price: 100,
+        component_snapshot: undefined,
+        labor_amount: undefined, material_amount: undefined, estimated_hours: undefined,
+      }),
+    ])
+    expect(row.total).toBe(300)
+    expect(row.labor_amount).toBeUndefined()
+    expect(row.material_amount).toBeUndefined()
+    expect(row.estimated_hours).toBeUndefined()
+  })
+
+  test('snapshot med labor_share null → orörd (ingen split påtvingas)', () => {
+    const [row] = recalculateItems([
+      snapshotItem({
+        quantity: 2, unit_price: 100, labor_amount: null, material_amount: null,
+        component_snapshot: {
+          product_id: 'prod_leg', product_name: 'Övrigt', sku: null,
+          sales_price: 100, labor_share: null, components: [],
+        },
+      }),
+    ])
+    expect(row.total).toBe(200)
+    expect(row.labor_amount).toBeNull()
+    expect(row.material_amount).toBeNull()
+  })
+
+  test('tillvalsrad med snapshot räknas om likadant (spread behåller option-fälten)', () => {
+    const [row] = recalculateItems([
+      snapshotItem({ item_type: 'option', option_selected: true, option_default: true, quantity: 10 }),
+    ])
+    expect(row.total).toBe(4500)
+    expect(row.labor_amount).toBe(Math.round(4500 * FASAD_SHARE * 100) / 100)
+    expect(row.option_selected).toBe(true)
+    expect(row.option_default).toBe(true)
   })
 })

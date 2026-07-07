@@ -2,42 +2,49 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2, Search, X } from 'lucide-react'
+import type { ProductWithComponents } from './applyProductToItem'
 
-export interface ProductSearchResult {
+/** Bakåtkompatibelt alias — modalen returnerar numera hela produkten
+ *  (inkl. komponenter + default_labor_share) för applyProductToItem. */
+export type ProductSearchResult = ProductWithComponents
+
+interface CategoryNode {
   id: string
   name: string
-  sku?: string | null
-  unit: string
-  sales_price: number
-  purchase_price?: number | null
-  rot_eligible?: boolean
-  rut_eligible?: boolean
-  is_favorite?: boolean
+  children: CategoryNode[]
 }
 
 interface QuoteProductSearchModalProps {
   open: boolean
   onClose: () => void
-  onSelect: (product: ProductSearchResult) => void
+  onSelect: (product: ProductWithComponents) => void
 }
 
 /**
  * Sökmodal för sparade produkter (api/products). Används av både
  * new- och edit-vyn för att importera artiklar från hantverkarens egen
- * prislista. För grossist-sökning används ProductSearchModal.tsx.
+ * produktbank. För grossist-sökning används ProductSearchModal.tsx.
+ * Valet går genom samma applyProductToItem-väg som inline-combon.
  */
 export function QuoteProductSearchModal({ open, onClose, onSelect }: QuoteProductSearchModalProps) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<ProductSearchResult[]>([])
+  const [results, setResults] = useState<ProductWithComponents[]>([])
   const [loading, setLoading] = useState(false)
+  const [categories, setCategories] = useState<CategoryNode[]>([])
+  const [categoryId, setCategoryId] = useState('')
 
-  const search = useCallback(async (q: string) => {
+  const search = useCallback(async (q: string, catId: string) => {
     setLoading(true)
     try {
-      const url = q.trim()
-        ? `/api/products?search=${encodeURIComponent(q.trim())}`
-        : '/api/products?favorites=true'
-      const res = await fetch(url)
+      const params = new URLSearchParams()
+      if (q.trim()) {
+        params.set('search', q.trim())
+      } else if (!catId) {
+        params.set('favorites', 'true')
+      }
+      if (catId) params.set('category_id', catId)
+      params.set('include', 'components')
+      const res = await fetch(`/api/products?${params.toString()}`)
       if (res.ok) {
         const data = await res.json()
         setResults(data.products || [])
@@ -49,11 +56,16 @@ export function QuoteProductSearchModal({ open, onClose, onSelect }: QuoteProduc
     }
   }, [])
 
-  // Ladda favoriter när modalen öppnas
+  // Ladda favoriter + kategoriträdet när modalen öppnas
   useEffect(() => {
     if (open) {
       setQuery('')
-      search('')
+      setCategoryId('')
+      search('', '')
+      fetch('/api/products/categories')
+        .then(r => (r.ok ? r.json() : { categories: [] }))
+        .then(data => setCategories(data.categories || []))
+        .catch(() => setCategories([]))
     }
   }, [open, search])
 
@@ -75,7 +87,7 @@ export function QuoteProductSearchModal({ open, onClose, onSelect }: QuoteProduc
             value={query}
             onChange={e => {
               setQuery(e.target.value)
-              search(e.target.value)
+              search(e.target.value, categoryId)
             }}
             placeholder="Sök bland sparade produkter…"
             autoFocus
@@ -89,6 +101,31 @@ export function QuoteProductSearchModal({ open, onClose, onSelect }: QuoteProduc
             <X className="w-5 h-5" />
           </button>
         </div>
+        {categories.length > 0 && (
+          <div className="px-5 py-2.5 border-b border-slate-100">
+            <select
+              value={categoryId}
+              onChange={e => {
+                setCategoryId(e.target.value)
+                search(query, e.target.value)
+              }}
+              aria-label="Filtrera på kategori"
+              className="w-full px-2.5 py-1.5 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 cursor-pointer"
+            >
+              <option value="">Alla kategorier</option>
+              {categories.map(main => (
+                <optgroup key={main.id} label={main.name}>
+                  <option value={main.id}>{main.name}</option>
+                  {main.children.map(child => (
+                    <option key={child.id} value={child.id}>
+                      &nbsp;&nbsp;{child.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto p-2 min-h-[200px]">
           {loading ? (
             <div className="flex items-center justify-center py-8">
@@ -134,7 +171,7 @@ export function QuoteProductSearchModal({ open, onClose, onSelect }: QuoteProduc
           ) : (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <p className="text-sm text-slate-500">
-                {query ? 'Inga produkter hittades' : 'Inga favoriter ännu'}
+                {query || categoryId ? 'Inga produkter hittades' : 'Inga favoriter ännu'}
               </p>
               <p className="text-xs text-slate-400 mt-1">
                 Lägg till produkter under Inställningar → Produkter
