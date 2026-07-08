@@ -1062,6 +1062,29 @@ async function executeApprovalPayload(
         }
       }
 
+      case 'invoice_reminder': {
+        // Fakturapåminnelse gatad genom godkännande (cron/send-reminders skapar
+        // denna för företag som ännu inte förtjänat autonomi). Vid godkännande
+        // levereras påminnelsen via SAMMA delade helper som den autonoma
+        // cron-vägen — avgift/ränta muteras BARA här, aldrig vid skapandet.
+        const pl = payload as any
+        const delivery = pl.delivery
+        if (!delivery?.invoiceId) {
+          return { action: 'invoice_reminder', error: 'payload saknar delivery-data' }
+        }
+        const { deliverInvoiceReminder } = await import('@/lib/invoice-reminder-send')
+        const supabaseIR = getServerSupabase()
+        const r = await deliverInvoiceReminder(supabaseIR, delivery)
+        return {
+          action: 'invoice_reminder',
+          sent: !r.skipped,
+          sms_sent: r.smsSent,
+          email_sent: r.emailSent,
+          fee_added: r.feeAdded,
+          interest_added: r.interestAdded,
+        }
+      }
+
       case 'automation': {
         // En v3-automationsregel med requires_approval skapar denna approval och
         // lägger rule_action_type/rule_action_config i payloaden. Utan detta case

@@ -65,10 +65,18 @@ export interface ResolvedApprovalRow {
 }
 
 /**
+ * approval_types som bär en förtjänad-autonomi-nyckel i payload.autonomy_key.
+ * 'automation' → motorns egna regel-approvals. 'invoice_reminder'/'send_sms' →
+ * stand-alone-cronens gatade approvals (send-reminders resp. offert-nudge).
+ * Alla stämplar payload.autonomy_key → samma streak-räkning oavsett väg.
+ */
+const KEYED_APPROVAL_TYPES = ['automation', 'invoice_reminder', 'send_sms']
+
+/**
  * Nyckel ur en approval-rad. review_request → direkt via approval_type
- * (historiska rader räknas). automation → payload.autonomy_key (stämplas av
- * motorn fr.o.m. denna feature — äldre rader saknar den och hoppas över,
- * dvs. streak för motor-typerna räknas från deploy. Medvetet: robust utan
+ * (historiska rader räknas). Nyckel-bärande typer (KEYED_APPROVAL_TYPES) →
+ * payload.autonomy_key (stämplas fr.o.m. denna feature — äldre rader saknar
+ * den och hoppas över, dvs. streak räknas från deploy. Medvetet: robust utan
  * regel-uppslag mot ev. raderade regler).
  */
 export function autonomyKeyFromApproval(row: {
@@ -76,7 +84,7 @@ export function autonomyKeyFromApproval(row: {
   payload: Record<string, unknown> | null
 }): AutonomyKey | null {
   if (row.approval_type === 'review_request') return 'review_request'
-  if (row.approval_type === 'automation') {
+  if (KEYED_APPROVAL_TYPES.includes(row.approval_type)) {
     const k = row.payload?.autonomy_key
     return isAllowlistedKey(k) ? k : null
   }
@@ -169,7 +177,7 @@ export async function computeStreak(
     .from('pending_approvals')
     .select('approval_type, status, payload, created_at')
     .eq('business_id', businessId)
-    .in('approval_type', ['automation', 'review_request'])
+    .in('approval_type', [...KEYED_APPROVAL_TYPES, 'review_request'])
     .in('status', ['approved', 'rejected'])
     .gte('created_at', sinceIso)
     .order('resolved_at', { ascending: false })

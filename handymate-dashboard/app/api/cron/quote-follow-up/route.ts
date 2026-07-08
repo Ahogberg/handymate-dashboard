@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { triggerAgentInternal, makeIdempotencyKey } from '@/lib/agent-trigger'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { isAutonomous } from '@/lib/autonomy/earned-autonomy'
 
 /**
  * GET /api/cron/quote-follow-up - Automatisk uppföljning av offerter via AI agent.
@@ -53,6 +54,22 @@ export async function GET(request: NextRequest) {
       // Samla unika business_ids för att kolla toggles en gång per företag
       const nudgeBizIds = Array.from(new Set((expiringQuotes || []).map((q: any) => q.business_id as string)))
       const nudgeEnabledMap = new Map<string, boolean>()
+      // V3-dedup: företag med aktiv V3 threshold-regel för offerter → motorn äger
+      // uppföljningen, cron rör dem inte (oförändrat prejudikat från huvudloopen).
+      const nudgeV3Handles = new Set<string>()
+      // Förtjänad autonomi per företag (för icke-V3-vägen).
+      const nudgeAutonomousMap = new Map<string, boolean>()
+
+      if (nudgeBizIds.length > 0) {
+        const { data: v3NudgeRules } = await supabase
+          .from('v3_automation_rules')
+          .select('business_id')
+          .eq('trigger_type', 'threshold')
+          .eq('is_active', true)
+          .in('business_id', nudgeBizIds)
+          .contains('trigger_config', { entity: 'quote' })
+        for (const r of v3NudgeRules || []) nudgeV3Handles.add(r.business_id)
+      }
 
       for (const bizId of nudgeBizIds) {
         let enabled = true
@@ -81,6 +98,13 @@ export async function GET(request: NextRequest) {
         }
 
         nudgeEnabledMap.set(bizId, enabled)
+
+        // Autonomi bara relevant för icke-V3-företag (V3 hoppas ändå).
+        if (!nudgeV3Handles.has(bizId)) {
+          let autonomous = false
+          try { autonomous = await isAutonomous(supabase, bizId, 'quote_followup_sms') } catch { autonomous = false }
+          nudgeAutonomousMap.set(bizId, autonomous)
+        }
       }
 
       for (const q of expiringQuotes || []) {
@@ -89,6 +113,9 @@ export async function GET(request: NextRequest) {
 
         // Respektera toggle
         if (!nudgeEnabledMap.get(q.business_id)) continue
+
+        // V3-dedup: motorn äger detta företags offertuppföljning → cron rör inte.
+        if (nudgeV3Handles.has(q.business_id)) continue
 
         // Hämta företagsnamn + svarsnummer
         const { data: biz } = await supabase
@@ -101,8 +128,46 @@ export async function GET(request: NextRequest) {
         const amount = (q.customer_pays || q.total || 0).toLocaleString('sv-SE')
         const firstName = (customer.name || '').split(' ')[0]
         const suffix = buildSmsSuffix(businessName, biz?.assigned_phone_number)
+        const message = `Hej${firstName ? ' ' + firstName : ''}! Din offert "${q.title || ''}" på ${amount} kr går ut om 3 dagar. Hör av dig om du har frågor eller vill gå vidare!\n${suffix}`
 
-        // Skicka SMS direkt (inte via agent — detta är tidskänsligt)
+        // ── Grind: icke-V3-företag gatas genom förtjänad autonomi ──
+        if (!nudgeAutonomousMap.get(q.business_id)) {
+          // Ej autonom → skapa godkännande (dedup mot öppet pending för offerten).
+          // send_sms-casen i executeApprovalPayload skickar via sendSmsViaElks.
+          const { count: existing } = await supabase
+            .from('pending_approvals')
+            .select('*', { count: 'exact', head: true })
+            .eq('business_id', q.business_id)
+            .eq('approval_type', 'send_sms')
+            .eq('status', 'pending')
+            .contains('payload', { related_id: q.quote_id })
+
+          if ((existing ?? 0) > 0) continue
+
+          const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+          const { error: apprErr } = await supabase.from('pending_approvals').insert({
+            id: approvalId,
+            business_id: q.business_id,
+            approval_type: 'send_sms',
+            title: `Följ upp offert innan den går ut`,
+            description: `Offerten "${q.title || ''}" på ${amount} kr går ut om 3 dagar. Godkänn för att skicka en påminnelse till kunden.`,
+            // to/message/related_id → send_sms-casen; autonomy_key → streak-räkning.
+            payload: {
+              to: customer.phone_number,
+              message,
+              customer_id: q.customer_id,
+              related_id: q.quote_id,
+              autonomy_key: 'quote_followup_sms',
+            },
+            status: 'pending',
+            risk_level: 'medium',
+            expires_at: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          })
+          if (apprErr) console.error('[quote-follow-up] nudge approval insert failed:', q.quote_id, apprErr)
+          continue
+        }
+
+        // Autonom → skicka SMS direkt (inte via agent — detta är tidskänsligt)
         if (process.env.ELKS_API_USER) {
           try {
             const smsRes = await fetch('https://api.46elks.com/a1/sms', {
@@ -114,7 +179,7 @@ export async function GET(request: NextRequest) {
               body: new URLSearchParams({
                 from: sanitizeSenderId(businessName),
                 to: customer.phone_number,
-                message: `Hej${firstName ? ' ' + firstName : ''}! Din offert "${q.title || ''}" på ${amount} kr går ut om 3 dagar. Hör av dig om du har frågor eller vill gå vidare!\n${suffix}`,
+                message,
               }).toString(),
             })
 

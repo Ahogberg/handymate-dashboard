@@ -3,7 +3,8 @@ import { getServerSupabase } from '@/lib/supabase'
 import { generateOCR } from '@/lib/ocr'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { buildSwishQRData } from '@/lib/swish-qr'
-import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { isAutonomous } from '@/lib/autonomy/earned-autonomy'
+import { deliverInvoiceReminder } from '@/lib/invoice-reminder-send'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -268,7 +269,8 @@ async function sendAutoReminders() {
 
     let remindersSent = 0
     let feesApplied = 0
-    const results: Array<{ invoice_id: string; invoice_number: string; level: string; success: boolean; fee_added?: number; interest_added?: number }> = []
+    let approvalsCreated = 0
+    const results: Array<{ invoice_id: string; invoice_number: string; level: string; success: boolean; fee_added?: number; interest_added?: number; approval_created?: boolean }> = []
 
     for (const inv of overdueInvoices as any[]) {
       const cfg = configMap[inv.business_id]
@@ -324,212 +326,128 @@ async function sendAutoReminders() {
         amountRaw: amountToPay || 0,
       })
 
-      let smsSent = false
-      let emailSent = false
       const customer = inv.customer as any
 
-      // Skicka SMS
-      if (customer?.phone_number && process.env.ELKS_API_USER) {
-        try {
-          const smsResponse = await fetch('https://api.46elks.com/a1/sms', {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Basic ' + Buffer.from(`${process.env.ELKS_API_USER}:${process.env.ELKS_API_PASSWORD}`).toString('base64'),
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-              from: sanitizeSenderId(businessName),
-              to: customer.phone_number,
-              message: messages.sms,
-            }).toString(),
-          })
-          smsSent = smsResponse.ok
-        } catch (err) {
-          console.error(`[send-reminders] SMS error ${inv.invoice_number}:`, err)
-        }
+      // Beräkna nästa påminnelsetid (samma oavsett väg)
+      const nextCount = currentCount + 1
+      const nextDays = reminderDays[nextCount]
+      const nextReminderAt = nextDays && nextCount < cfg.max_auto_reminders
+        ? new Date(dueDate.getTime() + nextDays * 24 * 60 * 60 * 1000).toISOString()
+        : null
+
+      // Gemensam leverans-input (delas med approval-vägen via payload)
+      const deliveryInput = {
+        invoiceId: inv.invoice_id,
+        invoiceNumber: inv.invoice_number,
+        businessId: inv.business_id,
+        customerId: inv.customer_id ?? null,
+        businessName,
+        customerPhone: customer?.phone_number ?? null,
+        customerEmail: customer?.email ?? null,
+        emailToo: scheduleEntry.emailToo,
+        messages,
+        level,
+        currentCount,
+        nextReminderAt,
+        reminderFee: cfg.reminder_fee,
+        interestAmount,
+        penaltyInterest: cfg.penalty_interest,
+        daysOverdue,
       }
 
-      // Skicka email (från andra påminnelsen)
-      if (scheduleEntry.emailToo && customer?.email && process.env.RESEND_API_KEY) {
-        try {
-          const { Resend } = await import('resend')
-          const resend = new Resend(process.env.RESEND_API_KEY)
-          await resend.emails.send({
-            from: `${businessName} <faktura@${process.env.RESEND_DOMAIN || 'handymate.se'}>`,
-            to: customer.email,
-            subject: messages.emailSubject,
-            html: messages.emailBody,
-          })
-          emailSent = true
-        } catch (err) {
-          console.error(`[send-reminders] Email error ${inv.invoice_number}:`, err)
-        }
-      }
+      // ── Grind: företag UTAN V3-regel gatas genom förtjänad autonomi ──
+      // Autonom → skicka direkt (avgift/ränta muteras BARA vid faktisk leverans
+      // inne i deliverInvoiceReminder). Ej autonom → skapa godkännande, ingen
+      // utskick + INGEN avgiftsmutation förrän hantverkaren godkänner.
+      let autonomous = false
+      try {
+        autonomous = await isAutonomous(supabase, inv.business_id, 'invoice_reminder')
+      } catch { autonomous = false }
 
-      if (smsSent || emailSent) {
-        // ── Lägg till påminnelseavgift + ränta på fakturan (från andra påminnelsen) ──
-        let feeAdded = 0
-        let interestAdded = 0
-
-        if (currentCount >= 1 && (cfg.reminder_fee > 0 || interestAmount > 0)) {
-          try {
-            // Hämta nuvarande items
-            const { data: currentInvoice } = await supabase
-              .from('invoice')
-              .select('items, total, customer_pays, rot_rut_type, rot_rut_percent')
-              .eq('invoice_id', inv.invoice_id)
-              .single()
-
-            if (currentInvoice) {
-              const items = Array.isArray(currentInvoice.items) ? [...currentInvoice.items] : []
-
-              // Lägg till påminnelseavgift (om inte redan tillagd för denna nivå)
-              const existingFeeCount = items.filter((i: any) => i.type === 'reminder_fee').length
-              if (cfg.reminder_fee > 0 && existingFeeCount < currentCount) {
-                items.push({
-                  type: 'reminder_fee',
-                  name: `Påminnelseavgift (påminnelse ${currentCount + 1})`,
-                  quantity: 1,
-                  unit_price: cfg.reminder_fee,
-                  total: cfg.reminder_fee,
-                  vat_rate: 0, // Påminnelseavgift är momsfri
-                })
-                feeAdded = cfg.reminder_fee
-              }
-
-              // Lägg till dröjsmålsränta (uppdatera befintlig eller skapa ny)
-              if (interestAmount > 0) {
-                const existingInterestIdx = items.findIndex((i: any) => i.type === 'penalty_interest')
-                const roundedInterest = Math.round(interestAmount)
-
-                if (existingInterestIdx >= 0) {
-                  items[existingInterestIdx].unit_price = roundedInterest
-                  items[existingInterestIdx].total = roundedInterest
-                  items[existingInterestIdx].name = `Dröjsmålsränta (${cfg.penalty_interest}%, ${daysOverdue} dagar)`
-                } else {
-                  items.push({
-                    type: 'penalty_interest',
-                    name: `Dröjsmålsränta (${cfg.penalty_interest}%, ${daysOverdue} dagar)`,
-                    quantity: 1,
-                    unit_price: roundedInterest,
-                    total: roundedInterest,
-                    vat_rate: 0, // Dröjsmålsränta är momsfri
-                  })
-                }
-                interestAdded = roundedInterest
-              }
-
-              // Beräkna ny total
-              const newTotal = items.reduce((sum: number, i: any) => sum + (i.total || 0), 0)
-
-              // Uppdatera faktura — ROT/RUT påverkas INTE av avgifter (avgifter är utanför)
-              const updateData: Record<string, any> = {
-                items,
-                total: newTotal,
-              }
-
-              // Om kunden betalar med ROT/RUT, uppdatera customer_pays
-              if (currentInvoice.rot_rut_type) {
-                // ROT/RUT gäller bara på original-items, inte avgifter
-                const originalTotal = items
-                  .filter((i: any) => i.type !== 'reminder_fee' && i.type !== 'penalty_interest')
-                  .reduce((sum: number, i: any) => sum + (i.total || 0), 0)
-                const rotRutPercent = currentInvoice.rot_rut_percent || (currentInvoice.rot_rut_type === 'rot' ? 30 : 50)
-                const deduction = Math.round(originalTotal * rotRutPercent / 100)
-                const feesAndInterest = items
-                  .filter((i: any) => i.type === 'reminder_fee' || i.type === 'penalty_interest')
-                  .reduce((sum: number, i: any) => sum + (i.total || 0), 0)
-                updateData.customer_pays = originalTotal - deduction + feesAndInterest
-              } else {
-                updateData.customer_pays = newTotal
-              }
-
-              await supabase
-                .from('invoice')
-                .update(updateData)
-                .eq('invoice_id', inv.invoice_id)
-
-              if (feeAdded > 0 || interestAdded > 0) {
-                feesApplied++
-                console.log(`[send-reminders] Added fee=${feeAdded}kr interest=${interestAdded}kr to ${inv.invoice_number}`)
-              }
-            }
-          } catch (feeErr) {
-            console.error(`[send-reminders] Fee/interest error ${inv.invoice_number}:`, feeErr)
+      if (autonomous) {
+        const delivery = await deliverInvoiceReminder(supabase, deliveryInput)
+        if (!delivery.skipped) {
+          if (delivery.feeAdded > 0 || delivery.interestAdded > 0) {
+            feesApplied++
+            console.log(`[send-reminders] Added fee=${delivery.feeAdded}kr interest=${delivery.interestAdded}kr to ${inv.invoice_number}`)
           }
-        }
-
-        // Beräkna nästa påminnelsetid
-        const nextCount = currentCount + 1
-        const nextDays = reminderDays[nextCount]
-        const nextReminderAt = nextDays && nextCount < cfg.max_auto_reminders
-          ? new Date(dueDate.getTime() + nextDays * 24 * 60 * 60 * 1000).toISOString()
-          : null
-
-        // OBS: 'reminder_sent_at' finns INTE i invoice-schemat. Den gjorde att
-        // hela UPDATE:n kastade (felet sväljdes) → reminder_count/next_reminder_at
-        // uppdaterades aldrig → kunden fick samma påminnelse varje dygn och
-        // max-gränsen nåddes aldrig. Borttagen + synlig felkontroll.
-        const { error: updErr } = await supabase
-          .from('invoice')
-          .update({
-            status: 'overdue',
-            reminder_count: nextCount,
-            last_reminder_at: today.toISOString(),
-            next_reminder_at: nextReminderAt,
-          })
-          .eq('invoice_id', inv.invoice_id)
-        if (updErr) console.error('[send-reminders] invoice update failed (påminnelse-räknare ej uppdaterad):', inv.invoice_id, updErr)
-
-        // Logga SMS
-        if (smsSent) {
-          await supabase.from('sms_log').insert({
-            sms_id: 'sms_' + Math.random().toString(36).slice(2, 12),
-            business_id: inv.business_id,
-            customer_id: inv.customer_id,
-            direction: 'outbound',
-            phone_to: customer?.phone_number,
-            message: messages.sms,
-            message_type: 'invoice_reminder',
-            related_id: inv.invoice_id,
-            status: 'sent',
-            sent_at: new Date().toISOString(),
-          })
-        }
-
-        // Logga aktivitet
-        await supabase.from('activity').insert({
-          business_id: inv.business_id,
-          customer_id: inv.customer_id,
-          activity_type: 'auto_reminder_sent',
-          description: `Automatisk påminnelse ${nextCount} skickad för faktura ${inv.invoice_number}${smsSent ? ' (SMS)' : ''}${emailSent ? ' (email)' : ''}${feeAdded > 0 ? ` — avgift ${feeAdded} kr tillagd` : ''}${interestAdded > 0 ? ` — ränta ${interestAdded} kr tillagd` : ''}`,
-          metadata: {
+          remindersSent++
+          results.push({
             invoice_id: inv.invoice_id,
+            invoice_number: inv.invoice_number,
             level,
-            reminder_count: nextCount,
-            fee_added: feeAdded,
-            interest_added: interestAdded,
-          },
-        })
-
-        remindersSent++
-        results.push({
-          invoice_id: inv.invoice_id,
-          invoice_number: inv.invoice_number,
-          level,
-          success: true,
-          fee_added: feeAdded,
-          interest_added: interestAdded,
-        })
-      } else {
-        results.push({ invoice_id: inv.invoice_id, invoice_number: inv.invoice_number, level, success: false })
+            success: true,
+            fee_added: delivery.feeAdded,
+            interest_added: delivery.interestAdded,
+          })
+        } else {
+          results.push({ invoice_id: inv.invoice_id, invoice_number: inv.invoice_number, level, success: false })
+        }
+        continue
       }
+
+      // ── Ej autonom → skapa godkännande (dedup mot öppet pending) ──
+      const { count: existingApproval } = await supabase
+        .from('pending_approvals')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', inv.business_id)
+        .eq('approval_type', 'invoice_reminder')
+        .eq('status', 'pending')
+        .contains('payload', { invoice_id: inv.invoice_id })
+
+      if ((existingApproval ?? 0) > 0) {
+        results.push({ invoice_id: inv.invoice_id, invoice_number: inv.invoice_number, level, success: false })
+        continue
+      }
+
+      const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+      const amountLabel = amountToPay?.toLocaleString('sv-SE') ?? '0'
+      const { error: apprErr } = await supabase.from('pending_approvals').insert({
+        id: approvalId,
+        business_id: inv.business_id,
+        approval_type: 'invoice_reminder',
+        title: `Skicka påminnelse för faktura ${inv.invoice_number}`,
+        description: `Faktura ${inv.invoice_number} på ${amountLabel} kr är ${daysOverdue} dagar försenad. Godkänn för att skicka påminnelse ${nextCount} till kunden.`,
+        // invoice_id på topp-nivå → dedup-guarden ovan kan matcha via .contains.
+        // autonomy_key → streak-räkning (förtjänad autonomi) kan mappa raden.
+        // delivery → allt deliverInvoiceReminder behöver vid godkännande.
+        payload: {
+          invoice_id: inv.invoice_id,
+          autonomy_key: 'invoice_reminder',
+          delivery: deliveryInput,
+        },
+        status: 'pending',
+        risk_level: 'medium',
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      if (apprErr) {
+        console.error('[send-reminders] approval insert failed:', inv.invoice_id, apprErr)
+        results.push({ invoice_id: inv.invoice_id, invoice_number: inv.invoice_number, level, success: false })
+        continue
+      }
+
+      // Push-notis (fire-and-forget)
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.handymate.se'
+      fetch(`${appUrl}/api/push/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          business_id: inv.business_id,
+          title: 'Godkännande krävs',
+          body: `Skicka påminnelse för faktura ${inv.invoice_number}?`,
+          url: '/dashboard/approvals',
+        }),
+      }).catch(() => {})
+
+      approvalsCreated++
+      results.push({ invoice_id: inv.invoice_id, invoice_number: inv.invoice_number, level, success: false, approval_created: true })
     }
 
     return NextResponse.json({
       success: true,
       reminders_sent: remindersSent,
       fees_applied: feesApplied,
+      approvals_created: approvalsCreated,
       results,
     })
   } catch (error: any) {
