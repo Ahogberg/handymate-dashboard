@@ -391,3 +391,380 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData)
   const arrayBuffer = doc.output('arraybuffer')
   return Buffer.from(arrayBuffer)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OFFERT-PDF (v68) — kundens fullständiga nedladdningsbara arkivkopia.
+// Modell: generateInvoicePDF ovan (samma jsPDF-idiom, marginaler, formatSEK).
+// PDF:en renderar ALLA rader (respekterar EJ on-screen-visningsnivån) men
+// exkluderar tillval som kunden inte valt (option_selected === false).
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface QuoteItemRow {
+  item_type?: string
+  description: string
+  quantity: number
+  unit: string
+  unit_price: number
+  total: number
+  is_rot_eligible?: boolean
+  is_rut_eligible?: boolean
+  option_selected?: boolean | null
+}
+
+export interface QuotePdfData {
+  quote_number: string
+  issued_date?: string | null
+  created_at?: string | null
+  valid_until?: string | null
+  title?: string | null
+  description?: string | null
+  items: QuoteItemRow[]
+  subtotal: number
+  vat_rate: number
+  vat_amount: number
+  total: number
+  rot_rut_type?: string | null
+  rot_work_cost?: number | null
+  rot_deduction?: number | null
+  rot_customer_pays?: number | null
+  rut_work_cost?: number | null
+  rut_deduction?: number | null
+  rut_customer_pays?: number | null
+  reference_person?: string | null
+  personnummer?: string | null
+  fastighetsbeteckning?: string | null
+  customer?: {
+    name: string
+    address_line?: string | null
+    phone_number?: string | null
+    email?: string | null
+    personnummer?: string | null
+  }
+  creator?: {
+    name?: string | null
+    phone?: string | null
+    email?: string | null
+  } | null
+  introduction_text?: string | null
+  conclusion_text?: string | null
+  not_included?: string | null
+  payment_terms_text?: string | null
+}
+
+export interface BusinessPdfData {
+  business_name?: string
+  org_number?: string
+  address?: string
+  contact_name?: string
+  contact_email?: string
+  contact_phone?: string
+  accent_color?: string
+  f_skatt_registered?: boolean
+  bankgiro?: string
+  plusgiro?: string
+  swish_number?: string
+}
+
+/** Konvertera '#0F766E' → [15,118,110]; fallback ACCENT_RGB vid ogiltig input. */
+function hexToRgb(hex: string | null | undefined): readonly [number, number, number] {
+  if (!hex) return ACCENT_RGB
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
+  if (!m) return ACCENT_RGB
+  const n = parseInt(m[1], 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+function formatDateSv(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+export function generateQuotePDF(quote: QuotePdfData, business: BusinessPdfData): Buffer {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const margin = 20
+  const contentWidth = pageWidth - margin * 2
+  let y = margin
+
+  const accent = hexToRgb(business.accent_color)
+
+  // ── Header ──
+  doc.setFontSize(16)
+  doc.setTextColor(...TEXT_PRIMARY)
+  doc.text(business.business_name || 'Företag', margin, y + 6)
+
+  doc.setFontSize(9)
+  doc.setTextColor(...TEXT_SECONDARY)
+  const companyLines = [
+    business.org_number ? `Org.nr ${business.org_number}` : '',
+    business.address || '',
+  ].filter(Boolean)
+  companyLines.forEach((line, i) => {
+    doc.text(line, margin, y + 12 + i * 4)
+  })
+
+  // Dokumenttyp (höger, versal, accent)
+  doc.setFontSize(8)
+  doc.setTextColor(accent[0], accent[1], accent[2])
+  doc.text('OFFERT', pageWidth - margin, y + 3, { align: 'right' })
+
+  // Offertnummer (höger, större)
+  doc.setFontSize(18)
+  doc.setTextColor(...TEXT_PRIMARY)
+  doc.text(quote.quote_number || '', pageWidth - margin, y + 11, { align: 'right' })
+
+  // ── Accent-linje ──
+  y += 24
+  doc.setDrawColor(accent[0], accent[1], accent[2])
+  doc.setLineWidth(0.15)
+  doc.line(margin, y, pageWidth - margin, y)
+  y += 10
+
+  // ── Meta-rad (3 kolumner): kund · datum · avsändare ──
+  const colW = contentWidth / 3
+
+  // Kolumn 1: Offert till
+  doc.setFontSize(7)
+  doc.setTextColor(...LABEL_COLOR)
+  doc.text('OFFERT TILL', margin, y)
+  doc.setFontSize(10)
+  doc.setTextColor(...TEXT_PRIMARY)
+  let cy = y + 5
+  doc.text(quote.customer?.name || 'Kund', margin, cy)
+  doc.setFontSize(9)
+  if (quote.customer?.address_line) { cy += 4; doc.text(quote.customer.address_line, margin, cy) }
+  if (quote.customer?.phone_number) { cy += 4; doc.text(quote.customer.phone_number, margin, cy) }
+  const custPnr = quote.customer?.personnummer || quote.personnummer
+  if (custPnr) { cy += 4; doc.text(`Personnr: ${custPnr}`, margin, cy) }
+
+  // Kolumn 2: Datum
+  const dateX = margin + colW
+  const issued = quote.issued_date || quote.created_at
+  doc.setFontSize(7)
+  doc.setTextColor(...LABEL_COLOR)
+  doc.text('OFFERTDATUM', dateX, y)
+  doc.setFontSize(10)
+  doc.setTextColor(...TEXT_PRIMARY)
+  doc.text(formatDateSv(issued) || '—', dateX, y + 5)
+
+  if (quote.valid_until) {
+    doc.setFontSize(7)
+    doc.setTextColor(...LABEL_COLOR)
+    doc.text('GILTIG TILL', dateX, y + 13)
+    doc.setFontSize(10)
+    doc.setTextColor(accent[0], accent[1], accent[2])
+    doc.text(formatDateSv(quote.valid_until), dateX, y + 18)
+  }
+
+  // Kolumn 3: Vår referens / kontakt (skaparen med fallback)
+  const refX = margin + colW * 2
+  const contactName = quote.creator?.name ?? business.contact_name
+  const contactPhone = quote.creator?.phone ?? business.contact_phone
+  const contactEmail = quote.creator?.email ?? business.contact_email
+  doc.setFontSize(7)
+  doc.setTextColor(...LABEL_COLOR)
+  doc.text('VÅR REFERENS', refX, y)
+  doc.setFontSize(10)
+  doc.setTextColor(...TEXT_PRIMARY)
+  let ry = y + 5
+  doc.text(contactName || business.business_name || '—', refX, ry)
+  doc.setFontSize(9)
+  doc.setTextColor(...TEXT_SECONDARY)
+  if (contactPhone) { ry += 4; doc.text(contactPhone, refX, ry) }
+  if (contactEmail) { ry += 4; doc.text(contactEmail, refX, ry) }
+
+  // Fastställ startpunkt under den längsta kolumnen
+  y = Math.max(cy, y + 18, ry) + 8
+
+  // ── Referensperson (byggarbetsplatsens kontakt) ──
+  if (quote.reference_person) {
+    doc.setFontSize(8)
+    doc.setTextColor(...TEXT_MUTED)
+    doc.text(`Referensperson: ${quote.reference_person}${quote.fastighetsbeteckning ? ` · Fastighet: ${quote.fastighetsbeteckning}` : ''}`, margin, y)
+    y += 6
+  } else if (quote.fastighetsbeteckning) {
+    doc.setFontSize(8)
+    doc.setTextColor(...TEXT_MUTED)
+    doc.text(`Fastighet: ${quote.fastighetsbeteckning}`, margin, y)
+    y += 6
+  }
+
+  // ── Offertens titel + beskrivning ──
+  if (quote.title) {
+    doc.setFontSize(12)
+    doc.setTextColor(...TEXT_PRIMARY)
+    doc.text(quote.title, margin, y)
+    y += 6
+  }
+  if (quote.description) {
+    doc.setFontSize(9)
+    doc.setTextColor(...TEXT_MUTED)
+    const descLines = doc.splitTextToSize(quote.description, contentWidth)
+    doc.text(descLines, margin, y)
+    y += descLines.length * 4 + 4
+  }
+
+  // ── Specifikation ──
+  doc.setFontSize(7)
+  doc.setTextColor(...LABEL_COLOR)
+  doc.text('SPECIFIKATION', margin, y)
+  y += 4
+
+  const tableBody: any[][] = []
+  for (const item of quote.items || []) {
+    const itemType = item.item_type || 'item'
+
+    // Ej valda tillval hör inte till kundens aktuella kopia — exkludera dem.
+    if (itemType === 'option' && item.option_selected === false) continue
+
+    if (itemType === 'heading') {
+      tableBody.push([{ content: item.description, colSpan: 5, styles: { fontStyle: 'bold', textColor: TEXT_PRIMARY } }])
+    } else if (itemType === 'text') {
+      tableBody.push([{ content: item.description, colSpan: 5, styles: { fontStyle: 'italic', textColor: [...TEXT_SECONDARY] } }])
+    } else if (itemType === 'subtotal') {
+      tableBody.push([
+        { content: '', colSpan: 3 },
+        { content: item.description || 'Delsumma', styles: { fontStyle: 'bold' } },
+        { content: formatSEK(item.total), styles: { fontStyle: 'bold', halign: 'right' as const } },
+      ])
+    } else if (itemType === 'discount') {
+      tableBody.push([
+        { content: item.description, styles: { textColor: [accent[0], accent[1], accent[2]] } },
+        { content: String(item.quantity), styles: { textColor: [accent[0], accent[1], accent[2]] } },
+        { content: item.unit, styles: { textColor: [accent[0], accent[1], accent[2]] } },
+        { content: formatSEK(Math.abs(item.unit_price)), styles: { textColor: [accent[0], accent[1], accent[2]] } },
+        { content: `-${formatSEK(Math.abs(item.total))}`, styles: { textColor: [accent[0], accent[1], accent[2]], halign: 'right' as const } },
+      ])
+    } else {
+      // 'item' och valda 'option'
+      const rotTag = item.is_rot_eligible ? ' [ROT]' : item.is_rut_eligible ? ' [RUT]' : ''
+      const optTag = itemType === 'option' ? ' (tillval)' : ''
+      tableBody.push([
+        item.description + rotTag + optTag,
+        String(item.quantity),
+        item.unit,
+        formatSEK(item.unit_price),
+        formatSEK(item.total),
+      ])
+    }
+  }
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Beskrivning', 'Antal', 'Enhet', 'À-pris', 'Summa']],
+    body: tableBody,
+    theme: 'plain',
+    margin: { left: margin, right: margin },
+    headStyles: {
+      fillColor: [255, 255, 255],
+      textColor: [...LABEL_COLOR],
+      fontSize: 7,
+      fontStyle: 'normal',
+      cellPadding: { top: 2, bottom: 4, left: 0, right: 0 },
+    },
+    bodyStyles: {
+      fontSize: 9,
+      textColor: [...TEXT_PRIMARY],
+      cellPadding: { top: 3, bottom: 3, left: 0, right: 0 },
+      lineColor: [...SEPARATOR],
+      lineWidth: { bottom: 0.2 },
+    },
+    columnStyles: {
+      0: { cellWidth: 'auto' },
+      1: { halign: 'right', cellWidth: 18 },
+      2: { halign: 'right', cellWidth: 18 },
+      3: { halign: 'right', cellWidth: 28 },
+      4: { halign: 'right', cellWidth: 28 },
+    },
+    didParseCell: (data: any) => {
+      if (data.row.index === tableBody.length - 1 && data.section === 'body') {
+        data.cell.styles.lineWidth = { bottom: 0 }
+      }
+    },
+  })
+
+  y = (doc as any).lastAutoTable.finalY + 8
+
+  // ── Totals (högerjusterat) ──
+  const totalsW = 65
+  const totalsX = pageWidth - margin - totalsW
+
+  const drawTotalRow = (label: string, value: string, options?: { teal?: boolean; bold?: boolean; topLine?: boolean }) => {
+    if (options?.topLine) {
+      doc.setDrawColor(...BORDER_COLOR)
+      doc.setLineWidth(0.15)
+      doc.line(totalsX, y - 1, totalsX + totalsW, y - 1)
+      y += 3
+    }
+    doc.setFontSize(options?.bold ? 11 : 9)
+    if (options?.teal) doc.setTextColor(accent[0], accent[1], accent[2])
+    else if (options?.bold) doc.setTextColor(...TEXT_PRIMARY)
+    else doc.setTextColor(...TEXT_MUTED)
+    doc.text(label, totalsX, y)
+    doc.text(value, totalsX + totalsW, y, { align: 'right' })
+    y += options?.bold ? 7 : 5
+  }
+
+  drawTotalRow('Delsumma', formatSEK(quote.subtotal))
+  drawTotalRow(`Moms ${quote.vat_rate}%`, formatSEK(quote.vat_amount))
+  drawTotalRow('Totalt inkl moms', formatSEK(quote.total), { bold: !quote.rot_rut_type, topLine: true })
+
+  if (quote.rot_rut_type) {
+    const type = quote.rot_rut_type.toUpperCase()
+    const deduction = quote.rot_rut_type === 'rut'
+      ? (quote.rut_deduction ?? 0)
+      : (quote.rot_deduction ?? 0)
+    const customerPays = quote.rot_rut_type === 'rut'
+      ? (quote.rut_customer_pays ?? quote.total - deduction)
+      : (quote.rot_customer_pays ?? quote.total - deduction)
+    drawTotalRow(`${type}-avdrag`, `-${formatSEK(deduction)}`, { teal: true })
+    drawTotalRow('Att betala', formatSEK(customerPays), { bold: true, topLine: true })
+  }
+
+  y += 6
+
+  // ── Villkorstexter (liten stil) ──
+  const terms: Array<[string, string | null | undefined]> = [
+    ['Inledning', quote.introduction_text],
+    ['Ingår ej', quote.not_included],
+    ['Betalningsvillkor', quote.payment_terms_text],
+    ['Övrigt', quote.conclusion_text],
+  ]
+  for (const [label, text] of terms) {
+    if (!text) continue
+    // Sidbrytning om vi är nära nederkanten
+    if (y > doc.internal.pageSize.getHeight() - 40) {
+      doc.addPage()
+      y = margin
+    }
+    doc.setFontSize(7)
+    doc.setTextColor(...LABEL_COLOR)
+    doc.text(label.toUpperCase(), margin, y)
+    y += 4
+    doc.setFontSize(8)
+    doc.setTextColor(...TEXT_MUTED)
+    const lines = doc.splitTextToSize(text, contentWidth)
+    doc.text(lines, margin, y)
+    y += lines.length * 4 + 4
+  }
+
+  // ── Footer ──
+  const footerY = doc.internal.pageSize.getHeight() - 15
+  doc.setDrawColor(...BORDER_COLOR)
+  doc.setLineWidth(0.15)
+  doc.line(margin, footerY, pageWidth - margin, footerY)
+  doc.setFontSize(7)
+  doc.setTextColor(...TEXT_MUTED)
+  const footerParts = [
+    business.f_skatt_registered ? 'Innehar F-skattsedel' : '',
+    business.org_number ? `Org.nr ${business.org_number}` : '',
+  ].filter(Boolean)
+  if (footerParts.length > 0) {
+    doc.text(footerParts.join(' · '), margin, footerY + 5)
+  }
+
+  const arrayBuffer = doc.output('arraybuffer')
+  return Buffer.from(arrayBuffer)
+}

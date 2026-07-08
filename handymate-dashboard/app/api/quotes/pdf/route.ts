@@ -4,6 +4,86 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { selectTemplate, buildQuoteTemplateData } from '@/lib/quote-templates'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
+import { generateQuotePDF, type QuotePdfData, type BusinessPdfData } from '@/lib/pdf-generator'
+
+/**
+ * Bygg ett PDF-svar (application/pdf, attachment) från en hämtad quote + config
+ * + creator. Delas av alla tre ingångar (POST, GET ?token=, GET ?id=).
+ * Renderar ALLA rader (arkivkopia) — visningsnivåfiltret gäller bara HTML-vyn.
+ */
+function buildQuotePdfResponse(quote: any, config: any, creator: any): NextResponse {
+  const items: QuotePdfData['items'] = (quote.quote_items || []).map((i: any) => ({
+    item_type: i.item_type || 'item',
+    description: i.description || '',
+    quantity: Number(i.quantity || 0),
+    unit: i.unit || 'st',
+    unit_price: Number(i.unit_price || 0),
+    total: Number(i.total || 0),
+    is_rot_eligible: !!i.is_rot_eligible || i.rot_rut_type === 'rot',
+    is_rut_eligible: !!i.is_rut_eligible || i.rot_rut_type === 'rut',
+    option_selected: i.item_type === 'option' ? i.option_selected === true : undefined,
+  }))
+
+  const pdfData: QuotePdfData = {
+    quote_number: quote.quote_number || String(quote.quote_id || '').substring(0, 8).toUpperCase(),
+    issued_date: quote.issued_date,
+    created_at: quote.created_at,
+    valid_until: quote.valid_until,
+    title: quote.title,
+    description: quote.description,
+    items,
+    subtotal: Number(quote.subtotal || 0),
+    vat_rate: Number(quote.vat_rate || 25),
+    vat_amount: Number(quote.vat_amount || 0),
+    total: Number(quote.total || 0),
+    rot_rut_type: quote.rot_rut_type,
+    rot_work_cost: quote.rot_work_cost,
+    rot_deduction: quote.rot_deduction ?? quote.rot_rut_deduction,
+    rot_customer_pays: quote.rot_customer_pays ?? quote.customer_pays,
+    rut_work_cost: quote.rut_work_cost,
+    rut_deduction: quote.rut_deduction,
+    rut_customer_pays: quote.rut_customer_pays ?? quote.customer_pays,
+    reference_person: quote.reference_person,
+    personnummer: quote.personnummer,
+    fastighetsbeteckning: quote.fastighetsbeteckning,
+    customer: quote.customer
+      ? {
+          name: quote.customer.name || 'Kund',
+          address_line: quote.customer.address_line || quote.customer.address || null,
+          phone_number: quote.customer.phone_number || quote.customer.phone || null,
+          email: quote.customer.email || null,
+          personnummer: quote.customer.personnummer || null,
+        }
+      : undefined,
+    creator: creator || null,
+    introduction_text: quote.introduction_text,
+    conclusion_text: quote.conclusion_text,
+    not_included: quote.not_included,
+    payment_terms_text: quote.payment_terms_text,
+  }
+
+  const businessData: BusinessPdfData = {
+    business_name: config?.business_name,
+    org_number: config?.org_number,
+    address: config?.address || config?.service_area,
+    contact_name: config?.contact_name,
+    contact_email: config?.contact_email,
+    contact_phone: config?.phone_number,
+    accent_color: config?.accent_color,
+    f_skatt_registered: config?.f_skatt_registered,
+    bankgiro: config?.bankgiro,
+    plusgiro: config?.plusgiro,
+    swish_number: config?.swish_number,
+  }
+
+  const pdfBuffer = generateQuotePDF(pdfData, businessData)
+  return new NextResponse(pdfBuffer, {
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="Offert-${pdfData.quote_number}.pdf"`,
+    },
+  })
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,7 +100,8 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
-    const { quoteId } = await request.json()
+    const body = await request.json()
+    const { quoteId } = body
 
     const { data: quote } = await supabase
       .from('quotes')
@@ -69,6 +150,12 @@ export async function POST(request: NextRequest) {
     // created_by → business_users. Null när kolumnen saknas (gammal offert)
     // → buildQuoteTemplateData faller tillbaka på ägarens business_config.
     const creator = await fetchQuoteCreator(supabase, quote.created_by)
+
+    // format=pdf → riktig nedladdningsbar PDF (query eller body). Default = HTML.
+    const format = request.nextUrl.searchParams.get('format') || body?.format || 'html'
+    if (format === 'pdf') {
+      return buildQuotePdfResponse(quote, config, creator)
+    }
 
     const templateData = buildQuoteTemplateData(quote, business, config, creator)
     // Per-quote override → fallback till business default
@@ -169,6 +256,13 @@ export async function GET(request: NextRequest) {
 
     // Offert-identitet (v68): avsändaren = skaparen (fallback ägaren när null).
     const creator = await fetchQuoteCreator(supabase, quote.created_by)
+
+    // format=pdf → riktig nedladdningsbar PDF. Fungerar för både ?token= (publik,
+    // ingen auth — samma som HTML-token-vägen) och ?id= (auth redan gjord ovan).
+    const format = request.nextUrl.searchParams.get('format') || 'html'
+    if (format === 'pdf') {
+      return buildQuotePdfResponse(quote, bizConfig, creator)
+    }
 
     const templateData = buildQuoteTemplateData(quote, bizConfig, bizConfig, creator)
     // Style-precedence: ?style=... (settings-preview) > quote.template_style > business default
