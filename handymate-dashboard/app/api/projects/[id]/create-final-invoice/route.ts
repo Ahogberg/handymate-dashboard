@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { generateOCR } from '@/lib/ocr'
+import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 
 export const dynamic = 'force-dynamic'
 
@@ -126,7 +127,7 @@ export async function POST(
     if (project.quote_id) {
       const { data: q, error: quoteError } = await supabase
         .from('quotes')
-        .select('quote_id, total, signed_at, accepted_at, introduction_text, conclusion_text, items')
+        .select('quote_id, total, signed_at, accepted_at, introduction_text, conclusion_text, items, personnummer, fastighetsbeteckning')
         .eq('quote_id', project.quote_id)
         .eq('business_id', business.business_id)
         .maybeSingle()
@@ -327,14 +328,48 @@ export async function POST(
     let rotRutDeduction = 0
     let customerPays = total
 
+    // Årstaksvalidering (Skatteverket): kappa avdraget mot kundens redan
+    // utnyttjade ROT/RUT-utrymme i år — samma modell som from-quote. Ett
+    // okappat avdrag nekas av Skatteverket och lämnar kunden med en obetald
+    // rest. calculateCappedDeduction räknar rate × arbetsbas MEN klipper mot
+    // återstående tak (ROT 50 000, RUT 75 000, gemensamt 75 000 kr/person/år).
     if (rotLabor > 0) {
       rotRutType = 'rot'
-      rotRutDeduction = Math.round(rotLabor * 0.30 * 100) / 100
+      const capped = await calculateCappedDeduction(
+        project.customer_id,
+        business.business_id,
+        'rot',
+        rotLabor,
+      )
+      rotRutDeduction = capped.deduction
       customerPays = Math.round((total - rotRutDeduction) * 100) / 100
     } else if (rutLabor > 0) {
       rotRutType = 'rut'
-      rotRutDeduction = Math.round(rutLabor * 0.50 * 100) / 100
+      const capped = await calculateCappedDeduction(
+        project.customer_id,
+        business.business_id,
+        'rut',
+        rutLabor,
+      )
+      rotRutDeduction = capped.deduction
       customerPays = Math.round((total - rotRutDeduction) * 100) / 100
+    }
+
+    // Personnummer + fastighetsbeteckning måste följa med till fakturan —
+    // en ROT/RUT-faktura utan personnummer är oanvändbar mot Skatteverket.
+    // Källa i prioritetsordning: offerten (ifylld vid ROT/RUT-offert), annars
+    // kundkortet (customer.personal_number / property_designation).
+    let personnummer: string | null = quote?.personnummer ?? null
+    let fastighetsbeteckning: string | null = quote?.fastighetsbeteckning ?? null
+    if (rotRutType && (!personnummer || !fastighetsbeteckning)) {
+      const { data: customerRow } = await supabase
+        .from('customer')
+        .select('personal_number, property_designation')
+        .eq('customer_id', project.customer_id)
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+      personnummer = personnummer ?? customerRow?.personal_number ?? null
+      fastighetsbeteckning = fastighetsbeteckning ?? customerRow?.property_designation ?? null
     }
 
     // ── 8. Generera invoice_number + OCR ────────────────────────
@@ -370,6 +405,8 @@ export async function POST(
         rot_rut_type: rotRutType,
         rot_rut_deduction: rotRutDeduction,
         customer_pays: customerPays,
+        personnummer,
+        fastighetsbeteckning,
         invoice_date: invoiceDate.toISOString().split('T')[0],
         due_date: dueDate.toISOString().split('T')[0],
         ocr_number: ocrNumber,
