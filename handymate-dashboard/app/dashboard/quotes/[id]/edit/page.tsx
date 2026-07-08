@@ -175,7 +175,6 @@ export default function EditQuotePage() {
   const [detailLevel, setDetailLevel] = useState<DetailLevel>('detailed')
   const [showUnitPrices, setShowUnitPrices] = useState(true)
   const [showQuantities, setShowQuantities] = useState(true)
-  const [showCategorySubtotals, setShowCategorySubtotals] = useState(false)
 
   // Template save modal
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
@@ -328,7 +327,6 @@ export default function EditQuotePage() {
         detailLevel,
         showUnitPrices,
         showQuantities,
-        showCategorySubtotals,
         customCategories: localCustomCategories,
       })
     }, 500)
@@ -337,7 +335,7 @@ export default function EditQuotePage() {
     title, selectedCustomer, customers, validDays, recalculated, discountPercent, vatRate,
     introductionText, conclusionText, notIncluded, ataTerms, calculatedPaymentPlan,
     referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices,
-    showQuantities, showCategorySubtotals, localCustomCategories,
+    showQuantities, localCustomCategories,
   ])
 
   // Payload till TemplatePreviewFrame
@@ -1026,8 +1024,6 @@ export default function EditQuotePage() {
               setShowUnitPrices={setShowUnitPrices}
               showQuantities={showQuantities}
               setShowQuantities={setShowQuantities}
-              showCategorySubtotals={showCategorySubtotals}
-              setShowCategorySubtotals={setShowCategorySubtotals}
             />
 
             <QuoteEditTotalsSection

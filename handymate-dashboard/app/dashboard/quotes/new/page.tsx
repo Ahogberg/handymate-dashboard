@@ -220,7 +220,6 @@ export default function NewQuotePage() {
   const [detailLevel, setDetailLevel] = useState<DetailLevel>('detailed')
   const [showUnitPrices, setShowUnitPrices] = useState(true)
   const [showQuantities, setShowQuantities] = useState(true)
-  const [showCategorySubtotals, setShowCategorySubtotals] = useState(false)
 
   // Template save modal
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
@@ -377,7 +376,6 @@ export default function NewQuotePage() {
         detailLevel,
         showUnitPrices,
         showQuantities,
-        showCategorySubtotals,
         customCategories: localCustomCategories,
       })
     }, 300)
@@ -388,7 +386,7 @@ export default function NewQuotePage() {
     title, selectedCustomerObj, validDays, items, discountPercent, vatRate,
     introductionText, conclusionText, notIncluded, ataTerms, paymentPlan,
     referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices, showQuantities,
-    showCategorySubtotals, localCustomCategories,
+    localCustomCategories,
   ])
 
   // ─── TemplatePreviewFrame payload ────────────────────────────────
@@ -1508,8 +1506,6 @@ export default function NewQuotePage() {
               setShowUnitPrices={setShowUnitPrices}
               showQuantities={showQuantities}
               setShowQuantities={setShowQuantities}
-              showCategorySubtotals={showCategorySubtotals}
-              setShowCategorySubtotals={setShowCategorySubtotals}
             />
 
             <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />

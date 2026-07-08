@@ -160,6 +160,73 @@ export function calculatePublicQuoteTotals(
 }
 
 /**
+ * Live-total för publika vyn i 'summary'/'rows'-läge, där à-priserna på
+ * icke-tillvalsrader strippats ur nätverkssvaret (kunden ska inte se dem).
+ *
+ * Klienten kan då inte längre summera basen själv → servern skickar med
+ * `base_totals` (motorkörning över alla ICKE-tillvalsrader). Här läggs kundens
+ * valda tillval på. Tillvalsraderna behåller sina belopp i svaret, så vi kan
+ * köra SAMMA motor över (bas-som-en-syntetisk-rad? nej) — i stället återskapas
+ * en exakt totalsumma genom att räkna om ROT/RUT-cap på den kombinerade basen:
+ *
+ *   subtotal        = base.subtotal + Σ(valda tillvals ex-moms-rad)
+ *   rot/rutWorkCost = base.*WorkCost + Σ(valda tillvals labor_amount ?? radtotal)
+ *   moms/total/avdrag räknas om på den kombinerade basen (cap appliceras EN gång).
+ *
+ * Endast visning — servern räknar alltid om auktoritativt vid signering.
+ */
+export function calculatePublicQuoteTotalsFromBase(
+  base: QuoteTotals,
+  optionRows: PublicStructuredItem[],
+  selectedOptionIds: Set<string>,
+  discountPercent: number = 0,
+  vatRate: number = 25,
+): QuoteTotals {
+  let laborTotal = base.laborTotal
+  let materialTotal = base.materialTotal
+  const serviceTotal = base.serviceTotal
+  let rotWorkCost = base.rotWorkCost
+  let rutWorkCost = base.rutWorkCost
+
+  for (const o of optionRows) {
+    if (o.item_type !== 'option' || !selectedOptionIds.has(o.id)) continue
+    const lineTotal = (o.quantity ?? 0) * (o.unit_price ?? 0)
+    const rotRut = (o.rot_rut_type ?? undefined) || (o.is_rot_eligible ? 'rot' : o.is_rut_eligible ? 'rut' : null)
+    if (rotRut === 'rot') {
+      laborTotal += lineTotal
+      rotWorkCost += o.labor_amount ?? lineTotal
+    } else if (rotRut === 'rut') {
+      laborTotal += lineTotal
+      rutWorkCost += o.labor_amount ?? lineTotal
+    } else if (o.unit === 'tim' || o.unit === 'hour' || o.unit === 'h') {
+      laborTotal += lineTotal
+    } else {
+      materialTotal += lineTotal
+    }
+  }
+
+  const subtotal = laborTotal + materialTotal + serviceTotal
+  // base.discountAmount inkluderar redan ev. rabattraders belopp + procentrabatt
+  // på bas-subtotalen. Räkna om procentdelen på den kombinerade subtotalen och
+  // behåll bas-rabattradernas fasta del (base.discountAmount − procentdel på bas).
+  const baseFixedDiscount = base.discountAmount - base.subtotal * (discountPercent / 100)
+  const discountAmount = subtotal * (discountPercent / 100) + baseFixedDiscount
+  const afterDiscount = subtotal - discountAmount
+  const vat = afterDiscount * (vatRate / 100)
+  const total = afterDiscount + vat
+
+  const rotDeduction = rotWorkCost > 0 ? Math.min(rotWorkCost * 0.30, 50000) : 0
+  const rotCustomerPays = rotWorkCost > 0 ? total - rotDeduction : 0
+  const rutDeduction = rutWorkCost > 0 ? Math.min(rutWorkCost * 0.50, 75000) : 0
+  const rutCustomerPays = rutWorkCost > 0 ? total - rutDeduction : 0
+
+  return {
+    laborTotal, materialTotal, serviceTotal, subtotal, discountAmount, afterDiscount,
+    vat, total, rotWorkCost, rotDeduction, rotCustomerPays, rutWorkCost, rutDeduction, rutCustomerPays,
+  }
+}
+
+/**
  * Calculate subtotal for items above the subtotal row within the same group
  */
 export function calculateSubtotal(items: QuoteItem[], subtotalIndex: number): number {

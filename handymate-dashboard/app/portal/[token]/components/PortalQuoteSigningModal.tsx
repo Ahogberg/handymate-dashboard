@@ -7,8 +7,10 @@ import { formatCurrency } from '../helpers'
 import type { Quote } from '../types'
 import {
   calculatePublicQuoteTotals,
+  calculatePublicQuoteTotalsFromBase,
   type PublicStructuredItem,
 } from '@/lib/quote-calculations'
+import type { QuoteTotals } from '@/lib/types/quote'
 
 interface PortalQuoteSigningModalProps {
   quote: Quote
@@ -44,6 +46,9 @@ export default function PortalQuoteSigningModal({
     discountPercent: 0,
     vatRate: 25,
   })
+  // Bas-totaler (icke-tillvalsrader) från publika GET:en — i summary/rows-läge
+  // är à-priserna strippade och klienten kan inte summera basen själv.
+  const [baseTotals, setBaseTotals] = useState<QuoteTotals | null>(null)
 
   useEffect(() => {
     if (step === 1) setTimeout(() => canvasRef.current?.init(), 100)
@@ -69,6 +74,7 @@ export default function PortalQuoteSigningModal({
           discountPercent: data.quote.discount_percent ?? 0,
           vatRate: data.quote.vat_rate ?? 25,
         })
+        setBaseTotals(data.quote.base_totals ?? null)
       })
       .catch(() => { /* tillval visas ej — signering fungerar ändå */ })
     return () => { cancelled = true }
@@ -76,14 +82,22 @@ export default function PortalQuoteSigningModal({
 
   const optionRows = structuredItems.filter(i => i.item_type === 'option')
   const liveTotals =
-    optionRows.length > 0
-      ? calculatePublicQuoteTotals(
-          structuredItems,
-          selectedOptions,
-          quoteParams.discountPercent,
-          quoteParams.vatRate
-        )
-      : null
+    optionRows.length === 0
+      ? null
+      : baseTotals
+        ? calculatePublicQuoteTotalsFromBase(
+            baseTotals,
+            structuredItems,
+            selectedOptions,
+            quoteParams.discountPercent,
+            quoteParams.vatRate
+          )
+        : calculatePublicQuoteTotals(
+            structuredItems,
+            selectedOptions,
+            quoteParams.discountPercent,
+            quoteParams.vatRate
+          )
   const dispTotal = liveTotals ? liveTotals.total : quote.total
   const dispDeduction = liveTotals
     ? liveTotals.rotDeduction + liveTotals.rutDeduction

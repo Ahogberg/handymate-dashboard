@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { calculateQuoteTotals } from '@/lib/quote-calculations'
+import { resolveDisplayLevel, groupItemsForSummary } from '@/lib/quotes/display-level'
 
 /**
  * GET /api/quotes/public/[token] - Hämta offert via publik signeringslänk
@@ -62,11 +63,79 @@ export async function GET(
     // Check if already signed
     const alreadySigned = quote.status === 'accepted' && quote.signed_at
 
+    // ── Visningsnivå (Del C) — filtrera SERVER-SIDE innan svaret ──────────────
+    // Kunden får ALDRIG à-priser den inte ska se ur nätverkssvaret.
+    // 'summary' → gruppsummor (display_groups) + endast tillval i structured_items
+    //             (tillval behåller fulla fält så live-totalen kan räkna deltan).
+    // 'rows'    → structured_items utan unit_price/quantity (radtotal kvar).
+    // 'full'    → oförändrat.
+    const displayLevel = resolveDisplayLevel({
+      detail_level: quote.detail_level,
+      show_unit_prices: quote.show_unit_prices,
+    })
+
+    const rawItems = structuredItems && structuredItems.length > 0 ? structuredItems : []
+    let responseItems: any[] | undefined = rawItems.length > 0 ? rawItems : undefined
+    let displayGroups: { heading: string; total: number }[] | undefined
+    // Bas-totaler (icke-tillvalsrader) — behövs för live-totalen i summary/rows
+    // där à-priserna strippats: klienten kan inte längre summera basen själv.
+    // Endast siffror, aldrig à-priser. Tillvalsdeltan läggs på i klienten.
+    let baseTotals: ReturnType<typeof calculateQuoteTotals> | undefined
+
+    if (rawItems.length > 0) {
+      const hasOptions = rawItems.some(it => it.item_type === 'option')
+      if (displayLevel === 'summary') {
+        const { groups, options } = groupItemsForSummary(rawItems)
+        displayGroups = groups
+        // Endast tillval kvar bland raderna — med fulla belopp (kundens val).
+        responseItems = options.length > 0 ? options : undefined
+      } else if (displayLevel === 'rows') {
+        // Strippa à-pris + antal ur varje icke-tillvalsrad. Tillval behåller
+        // sina belopp (live-totalen behöver dem). Radtotal (total) står kvar.
+        responseItems = rawItems.map(it =>
+          it.item_type === 'option'
+            ? it
+            : { ...it, unit_price: null, quantity: null },
+        )
+      }
+      // Bas = alla icke-tillvalsrader (fulla värden server-side). Bara relevant
+      // när det finns tillval OCH à-priser strippats ur svaret.
+      if (hasOptions && displayLevel !== 'full') {
+        const nonOptionRows = rawItems.filter(it => it.item_type !== 'option')
+        baseTotals = calculateQuoteTotals(nonOptionRows as any, quote.discount_percent ?? 0, quote.vat_rate ?? 25)
+      }
+    }
+
+    // Sanera bort INTERNA kalkylfält ur svaret: material-split, timmar och den
+    // fulla component_snapshot (som bär unit_cost). Kunden får bara en trimmad
+    // komponentspec (description/quantity_per_unit/unit) när hantverkaren aktivt
+    // slagit på show_components_to_customer — ALDRIG interna kostnader.
+    // labor_amount BEHÅLLS (ROT-arbetsbasen, inte en dold à-pris) — klientens
+    // live-total i 'full' + tillvalsdeltan i summary/rows behöver den.
+    if (responseItems) {
+      responseItems = responseItems.map((it: any) => {
+        const { material_amount, estimated_hours, component_snapshot, ...safe } = it
+        if (it.show_components_to_customer === true && Array.isArray(component_snapshot?.components)) {
+          safe.component_snapshot = {
+            components: component_snapshot.components.map((c: any) => ({
+              description: c?.description ?? '',
+              quantity_per_unit: c?.quantity_per_unit ?? null,
+              unit: c?.unit ?? '',
+            })),
+          }
+        }
+        return safe
+      })
+    }
+
     return NextResponse.json({
       quote: {
         ...quote,
         business_id: undefined, // Don't expose
-        structured_items: structuredItems && structuredItems.length > 0 ? structuredItems : undefined,
+        structured_items: responseItems,
+        display_level: displayLevel,
+        display_groups: displayGroups,
+        base_totals: baseTotals,
       },
       business: {
         name: business?.business_name || '',

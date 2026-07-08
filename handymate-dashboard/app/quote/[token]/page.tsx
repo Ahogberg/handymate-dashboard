@@ -19,7 +19,11 @@ import {
   XCircle,
   Clock,
 } from 'lucide-react'
-import { calculatePublicQuoteTotals } from '@/lib/quote-calculations'
+import {
+  calculatePublicQuoteTotals,
+  calculatePublicQuoteTotalsFromBase,
+} from '@/lib/quote-calculations'
+import type { QuoteTotals } from '@/lib/types/quote'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -50,6 +54,11 @@ interface StructuredQuoteItem {
   option_selected?: boolean | null
   /** Endast 'option'-rader: hantverkarens Förvald-toggle */
   option_default?: boolean | null
+  /** Produktbank (v67): arbetsandel i kr — live-totalen för tillval behöver den. */
+  labor_amount?: number | null
+  /** Per-rad-override: komponentspec som får visas för kunden (ej kostnader). */
+  show_components_to_customer?: boolean | null
+  component_snapshot?: { components?: Array<{ description?: string; quantity_per_unit?: number; unit?: string }> } | null
 }
 
 interface BusinessInfo {
@@ -69,6 +78,12 @@ interface QuoteData {
   description?: string
   items: QuoteItem[]
   structured_items?: StructuredQuoteItem[]
+  /** Visningsnivå (Del C) — server-filtrerad. */
+  display_level?: 'summary' | 'rows' | 'full'
+  /** Endast 'summary': gruppsummor (heading + belopp). */
+  display_groups?: Array<{ heading: string; total: number }>
+  /** Endast summary/rows med tillval: bas-totaler (icke-tillvalsrader). */
+  base_totals?: QuoteTotals
   labor_total: number
   material_total: number
   subtotal: number
@@ -103,6 +118,29 @@ const formatSEK = (amount: number) =>
     currency: 'SEK',
     maximumFractionDigits: 0,
   }).format(amount)
+
+/**
+ * Per-rad-override (show_components_to_customer): komponentspec under raden.
+ * ALDRIG interna kostnader — bara beskrivning + mängd per enhet + enhet.
+ */
+function renderComponentSpec(item: StructuredQuoteItem) {
+  if (item.show_components_to_customer !== true) return null
+  const comps = item.component_snapshot?.components
+  if (!Array.isArray(comps) || comps.length === 0) return null
+  return (
+    <ul className="mt-1.5 space-y-0.5">
+      {comps.map((c, i) => (
+        <li key={i} className="text-xs text-gray-400 flex gap-1.5">
+          <span className="text-primary-700">–</span>
+          <span>
+            {c.description}
+            {c.quantity_per_unit ? ` · ${c.quantity_per_unit} ${c.unit || ''}` : ''}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 const DECLINE_REASONS = [
   { value: 'too_expensive', label: 'Priset är för högt' },
@@ -629,19 +667,41 @@ export default function QuoteSignPage() {
   const itemGroups = groupItems(quote.items || [])
   const canSubmit = !!(name.trim() && hasDrawn && termsAccepted && !submitting)
 
+  // Visningsnivå (Del C) — server-filtrerad. 'summary' → gruppsummor + tillval;
+  // 'rows' → rader utan à-pris/antal; 'full' (default) → som tidigare.
+  const displayLevel = quote.display_level ?? 'full'
+  const displayGroups = quote.display_groups ?? []
+  // Har vi något att rendera i den strukturerade vyn? (grupper ELLER rader)
+  const hasStructuredView = structuredItems.length > 0 || displayGroups.length > 0
+  // Rad för rad / full: dölj à-pris + antal när nivån säger så.
+  const showRowColumns = displayLevel === 'full'
+
   // ── Tillval: live-total på klienten via SAMMA motor som servern ────────────
   // Endast visning — servern räknar alltid om själv vid signering.
   // Låst läge (signerad offert): visa lagrat option_selected, ingen toggling.
   const optionsLocked = !!quote.signed_at
   const hasOptionRows = structuredItems.some((i) => i.item_type === 'option')
-  const liveTotals = hasOptionRows
-    ? calculatePublicQuoteTotals(
-        structuredItems,
-        selectedOptions,
-        quote.discount_percent ?? 0,
-        quote.vat_rate ?? 25
-      )
-    : null
+  // Live-total i alla tre nivåer:
+  // - 'full' (eller summary/rows utan tillval): fulla rader finns → summera direkt.
+  // - summary/rows MED tillval: à-priser strippade ur svaret → använd serverns
+  //   base_totals (icke-tillvalsrader) + tillvalsdeltan. Servern räknar alltid
+  //   om auktoritativt vid signering; detta är endast visning.
+  const liveTotals = !hasOptionRows
+    ? null
+    : quote.base_totals
+      ? calculatePublicQuoteTotalsFromBase(
+          quote.base_totals,
+          structuredItems,
+          selectedOptions,
+          quote.discount_percent ?? 0,
+          quote.vat_rate ?? 25
+        )
+      : calculatePublicQuoteTotals(
+          structuredItems,
+          selectedOptions,
+          quote.discount_percent ?? 0,
+          quote.vat_rate ?? 25
+        )
   const dispLaborTotal = liveTotals ? liveTotals.laborTotal : quote.labor_total
   const dispMaterialTotal = liveTotals ? liveTotals.materialTotal : quote.material_total
   const dispSubtotal = liveTotals
@@ -747,8 +807,15 @@ export default function QuoteSignPage() {
           </div>
 
           {/* Items: quote_items-rader i sort_order (moderna offerter) */}
-          {structuredItems.length > 0 ? (
+          {hasStructuredView ? (
             <div className="bg-gray-100/30 rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-200/50">
+              {/* Summary: gruppsummor (heading + belopp) före tillvalen */}
+              {displayGroups.map((g, idx) => (
+                <div key={`grp-${idx}`} className="px-4 py-3 flex justify-between gap-4 text-sm font-medium">
+                  <span className="text-gray-900">{g.heading}</span>
+                  <span className="text-gray-900 shrink-0">{formatSEK(g.total)}</span>
+                </div>
+              ))}
               {structuredItems.map((item, idx) => {
                 const key = item.id || idx
                 switch (item.item_type) {
@@ -838,11 +905,13 @@ export default function QuoteSignPage() {
                       <div key={key} className="px-4 py-3 flex justify-between gap-4 text-sm">
                         <div className="min-w-0">
                           <p className="text-gray-900">{item.description}</p>
-                          {(item.quantity || 0) > 0 && (
+                          {/* à-pris/antal endast i 'full'; i 'rows' är fälten strippade */}
+                          {showRowColumns && (item.quantity || 0) > 0 && (
                             <p className="text-xs text-gray-400 mt-0.5">
                               {item.quantity} {item.unit || 'st'} × {formatSEK(item.unit_price || 0)}
                             </p>
                           )}
+                          {renderComponentSpec(item)}
                         </div>
                         <span className="text-gray-900 font-medium shrink-0">{formatSEK(item.total || 0)}</span>
                       </div>

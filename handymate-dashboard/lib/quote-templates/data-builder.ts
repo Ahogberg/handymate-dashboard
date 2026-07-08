@@ -1,5 +1,6 @@
-import type { QuoteTemplateData, QuoteTemplateItem } from './types'
+import type { QuoteTemplateData, QuoteTemplateItem, QuoteTemplateComponent } from './types'
 import { formatDateLong } from '@/lib/document-html'
+import { resolveDisplayLevel, displayLevelToColumns, groupItemsForSummary } from '@/lib/quotes/display-level'
 
 const DEFAULT_ACCENT = '#0F766E'
 
@@ -27,6 +28,24 @@ function unitLabel(unit: string | null | undefined): string {
     default:
       return unit || 'st'
   }
+}
+
+/**
+ * Per-rad-override (show_components_to_customer): plocka ut komponentspecen ur
+ * component_snapshot som FÅR visas för kunden. ALDRIG interna kostnader
+ * (unit_cost) — bara beskrivning + mängd per enhet + enhet. Returnerar undefined
+ * när flaggan är av eller snapshot saknas.
+ */
+function extractCustomerComponents(i: any): QuoteTemplateComponent[] | undefined {
+  if (i?.show_components_to_customer !== true) return undefined
+  const snap = i?.component_snapshot
+  const comps = Array.isArray(snap?.components) ? snap.components : null
+  if (!comps || comps.length === 0) return undefined
+  return comps.map((c: any): QuoteTemplateComponent => ({
+    description: String(c?.description ?? ''),
+    quantityPerUnit: Number(c?.quantity_per_unit ?? 0),
+    unit: String(c?.unit ?? ''),
+  }))
 }
 
 function plus30Days(iso: string | null | undefined): string {
@@ -77,6 +96,9 @@ export function buildQuoteTemplateData(
         total,
         isRotEligible: !!i.is_rot_eligible || i.rot_rut_type === 'rot',
         isRutEligible: !!i.is_rut_eligible || i.rot_rut_type === 'rut',
+        // Per-rad-override: visa komponentbeskrivningar (ALDRIG unit_cost) när
+        // hantverkaren aktivt slagit på det. Töms i 'summary' (rader visas ej).
+        components: extractCustomerComponents(i),
       }
     })
   } else {
@@ -93,6 +115,50 @@ export function buildQuoteTemplateData(
       isRotEligible: i.type === 'labor',
       isRutEligible: false,
     }))
+  }
+
+  // ── Visningsnivå (Del C) — filtrera/transformera INNAN mallarna ──
+  // EN sanning: resolveDisplayLevel + displayLevelToColumns. 'summary' ersätter
+  // radlistan med gruppsummor (+ tillval som egna rader); 'rows' behåller rader
+  // men mallarna döljer antal/à-pris via kolumnflaggorna; 'full' är oförändrat.
+  const displayLevel = resolveDisplayLevel({
+    detail_level: quote.detail_level,
+    show_unit_prices: quote.show_unit_prices,
+  })
+  const cols = displayLevelToColumns(displayLevel)
+
+  if (displayLevel === 'summary') {
+    // Gruppera på strukturerade rader (samma källa som mallarna fick).
+    const { groups, options } = groupItemsForSummary(structured.length > 0 ? structured : (quote.items || []))
+    const groupRows: QuoteTemplateItem[] = groups.map(g => ({
+      itemType: 'subtotal',
+      isGroup: true,
+      name: g.heading,
+      quantity: 0,
+      unit: '',
+      unitPrice: 0,
+      total: g.total,
+    }))
+    // Tillval återbyggs från structured-raderna med fulla fält (kundens val).
+    const optionRows: QuoteTemplateItem[] = options.map(o => ({
+      itemType: 'option',
+      optionSelected: o.option_selected === true,
+      name: o.description || '',
+      description: o.long_description || null,
+      quantity: Number(o.quantity || 0),
+      unit: unitLabel(o.unit),
+      unitPrice: Number(o.unit_price || 0),
+      total: Number(o.total || 0),
+      isRotEligible: !!o.is_rot_eligible || o.rot_rut_type === 'rot',
+      isRutEligible: !!o.is_rut_eligible || o.rot_rut_type === 'rut',
+    }))
+    items = [...groupRows, ...optionRows]
+  } else if (displayLevel === 'rows') {
+    // Rad för rad: behåll radtotal, men nolla ut antal/à-pris-signalen och töm
+    // komponentspecar? Nej — komponentspecar visas i 'rows' också (per plan).
+    // Kolumnvisningen styrs av flaggorna nedan; datat lämnas intakt så radtotal
+    // finns kvar. (Vi rör inte quantity/unitPrice-värdena — mallen döljer dem.)
+    // Ingen items-transform behövs.
   }
 
   // ── Totals ─────────────────────────────────────────────────────
@@ -153,6 +219,9 @@ export function buildQuoteTemplateData(
     // Signerad/accepterad offert → tillvals-valen är låsta; mallarna
     // döljer då "Välj dina tillval i kundportalen"-noten.
     isSigned: quote.status === 'accepted' || !!quote.signed_at,
+    displayLevel,
+    showQuantities: cols.showQuantities,
+    showUnitPrices: cols.showUnitPrices,
     business: {
       name: businessName,
       orgNumber: config?.org_number || business?.org_number || '',

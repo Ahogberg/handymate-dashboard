@@ -57,6 +57,20 @@ export interface QuoteTemplateItem {
   total: number
   isRotEligible?: boolean
   isRutEligible?: boolean
+  /** Endast 'summary'-nivå: gruppsummerad rad (heading + belopp), ingen à-pris/antal.
+      Renderas som en sektionsrad med summa till höger. */
+  isGroup?: boolean
+  /** Per-rad-override (show_components_to_customer): komponentspec som visas
+      under raden i 'rows'/'full'. ALDRIG interna kostnader — bara beskrivning +
+      mängd/enhet. Tomt/utelämnat → ingen spec. */
+  components?: QuoteTemplateComponent[]
+}
+
+/** En komponentrad ur component_snapshot som får visas för kunden. */
+export interface QuoteTemplateComponent {
+  description: string
+  quantityPerUnit: number
+  unit: string
 }
 
 export interface QuoteTemplateQuote {
@@ -85,6 +99,9 @@ export interface QuoteTemplateQuote {
   termsText?: string | null
 }
 
+/** Visningsnivå — speglar lib/quotes/display-level.ts DisplayLevel. */
+export type QuoteDisplayLevel = 'summary' | 'rows' | 'full'
+
 export interface QuoteTemplateData {
   business: QuoteTemplateBusiness
   customer: QuoteTemplateCustomer
@@ -92,6 +109,13 @@ export interface QuoteTemplateData {
   /** true när offerten är signerad/accepterad — mallarna döljer då
       "Välj dina tillval i kundportalen"-noten (valen är låsta). */
   isSigned?: boolean
+  /** Kundens visningsnivå (Del C). Styr vilka kolumner mallarna renderar.
+      'summary' → gruppsummor + tillval; 'rows' → rader utan antal/à-pris;
+      'full' → allt. Utelämnad tolkas som 'full' (bakåtkompatibelt). */
+  displayLevel?: QuoteDisplayLevel
+  /** Kolumnflaggor härledda ur displayLevel via displayLevelToColumns. */
+  showQuantities?: boolean
+  showUnitPrices?: boolean
 }
 
 export type TemplateStyle = 'modern' | 'premium' | 'friendly'

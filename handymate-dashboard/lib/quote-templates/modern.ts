@@ -1,4 +1,4 @@
-import type { QuoteTemplateData, TemplateRenderFn } from './types'
+import type { QuoteTemplateData, QuoteTemplateItem, TemplateRenderFn } from './types'
 import { escapeHtml, formatCurrency } from '@/lib/document-html'
 
 /**
@@ -10,33 +10,44 @@ export const renderModern: TemplateRenderFn = (data: QuoteTemplateData): string 
   const accentLight = mixWithWhite(accent, 0.92)
   const accent100 = mixWithWhite(accent, 0.82)
 
+  // Visningsnivå (Del C): dölj antal/à-pris-kolumner enligt kolumnflaggorna.
+  // showQuantities/showUnitPrices utelämnade → full detalj (bakåtkompatibelt).
+  const showQty = data.showQuantities !== false
+  const showPrice = data.showUnitPrices !== false
+  // Kolumnantal: Beskrivning + (Antal) + (Á-pris) + Summa
+  const colCount = 2 + (showQty ? 1 : 0) + (showPrice ? 1 : 0)
+  const qtyCell = (q: number, u: string) => (showQty ? `<td class="num">${formatNumber(q)} ${escapeHtml(u)}</td>` : '')
+  const priceCell = (p: number) => (showPrice ? `<td class="num">${formatCurrency(p)}</td>` : '')
+
   const itemsHtml = data.quote.items.map(item => {
     const itemType = item.itemType || 'item'
     if (itemType === 'heading') {
-      return `<tr class="row-heading"><td colspan="4">${escapeHtml(item.name)}</td></tr>`
+      return `<tr class="row-heading"><td colspan="${colCount}">${escapeHtml(item.name)}</td></tr>`
     }
     if (itemType === 'text') {
-      return `<tr class="row-text"><td colspan="4">${escapeHtml(item.name)}</td></tr>`
+      return `<tr class="row-text"><td colspan="${colCount}">${escapeHtml(item.name)}</td></tr>`
     }
     if (itemType === 'subtotal') {
-      return `<tr class="row-subtotal"><td colspan="3">${escapeHtml(item.name || 'Delsumma')}</td><td class="num">${formatCurrency(item.total)}</td></tr>`
+      // Gruppsummerad rad (summary) eller vanlig delsumma — etikett + belopp.
+      return `<tr class="row-subtotal"><td colspan="${colCount - 1}">${escapeHtml(item.name || 'Delsumma')}</td><td class="num">${formatCurrency(item.total)}</td></tr>`
     }
     if (itemType === 'discount') {
-      return `<tr class="row-discount"><td><div class="item-name">${escapeHtml(item.name || 'Rabatt')}</div></td><td class="num">${formatNumber(item.quantity)} ${escapeHtml(item.unit)}</td><td class="num">${formatCurrency(Math.abs(item.unitPrice))}</td><td class="num">−${formatCurrency(Math.abs(item.total))}</td></tr>`
+      return `<tr class="row-discount"><td><div class="item-name">${escapeHtml(item.name || 'Rabatt')}</div></td>${qtyCell(item.quantity, item.unit)}${priceCell(Math.abs(item.unitPrice))}<td class="num">−${formatCurrency(Math.abs(item.total))}</td></tr>`
     }
     if (itemType === 'option') {
       // Tillvalsrad: ☑ = ikryssad av kunden, ☐ = bortvald (räknas ej i totalen)
       const box = item.optionSelected ? '☑' : '☐'
-      return `<tr class="row-option${item.optionSelected ? '' : ' unselected'}"><td><div class="item-name"><span class="opt-box">${box}</span> ${escapeHtml(item.name)} <span class="opt-badge">Tillval</span></div>${item.description ? `<div class="item-desc">${escapeHtml(item.description)}</div>` : ''}</td><td class="num">${formatNumber(item.quantity)} ${escapeHtml(item.unit)}</td><td class="num">${formatCurrency(item.unitPrice)}</td><td class="num">${formatCurrency(item.total)}</td></tr>`
+      return `<tr class="row-option${item.optionSelected ? '' : ' unselected'}"><td><div class="item-name"><span class="opt-box">${box}</span> ${escapeHtml(item.name)} <span class="opt-badge">Tillval</span></div>${item.description ? `<div class="item-desc">${escapeHtml(item.description)}</div>` : ''}${componentSpec(item.components)}</td>${qtyCell(item.quantity, item.unit)}${priceCell(item.unitPrice)}<td class="num">${formatCurrency(item.total)}</td></tr>`
     }
     return `
     <tr>
       <td>
         <div class="item-name">${escapeHtml(item.name)}</div>
         ${item.description ? `<div class="item-desc">${escapeHtml(item.description)}</div>` : ''}
+        ${componentSpec(item.components)}
       </td>
-      <td class="num">${formatNumber(item.quantity)} ${escapeHtml(item.unit)}</td>
-      <td class="num">${formatCurrency(item.unitPrice)}</td>
+      ${qtyCell(item.quantity, item.unit)}
+      ${priceCell(item.unitPrice)}
       <td class="num">${formatCurrency(item.total)}</td>
     </tr>
   `
@@ -143,6 +154,9 @@ tbody td { padding: 12px; vertical-align: top; font-size: 13px; }
 tbody tr:nth-child(even) { background: var(--row-alt); }
 .item-name { font-weight: 600; color: var(--ink); }
 .item-desc { color: var(--muted); font-size: 12px; margin-top: 2px; white-space: pre-line; }
+.item-components { list-style: none; margin: 6px 0 0; padding: 0; }
+.item-components li { color: var(--muted); font-size: 11px; line-height: 1.5; padding-left: 12px; position: relative; }
+.item-components li::before { content: '–'; position: absolute; left: 0; color: var(--teal); }
 td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 tbody tr.row-heading, tbody tr.row-text, tbody tr.row-subtotal { background: transparent; }
 tbody tr.row-heading td { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; color: var(--ink); padding: 18px 12px 6px; border-bottom: 1px solid var(--border); }
@@ -241,8 +255,8 @@ tbody tr.row-option.unselected .opt-badge { color: var(--muted); background: tra
     <thead>
       <tr>
         <th>Beskrivning</th>
-        <th class="num">Antal</th>
-        <th class="num">Á-pris</th>
+        ${showQty ? '<th class="num">Antal</th>' : ''}
+        ${showPrice ? '<th class="num">Á-pris</th>' : ''}
         <th class="num">Summa</th>
       </tr>
     </thead>
@@ -280,6 +294,18 @@ tbody tr.row-option.unselected .opt-badge { color: var(--muted); background: tra
 }
 
 // ── Helpers ────────────────────────────────────────────────────
+
+/**
+ * Komponentspec (per-rad show_components_to_customer) — liten spec-lista under
+ * raden. ALDRIG interna kostnader; bara beskrivning + mängd per enhet + enhet.
+ */
+function componentSpec(components: QuoteTemplateItem['components']): string {
+  if (!components || components.length === 0) return ''
+  const rows = components
+    .map(c => `<li>${escapeHtml(c.description)}${c.quantityPerUnit ? ` · ${formatNumber(c.quantityPerUnit)} ${escapeHtml(c.unit)}` : ''}</li>`)
+    .join('')
+  return `<ul class="item-components">${rows}</ul>`
+}
 
 function formatNumber(n: number): string {
   if (Number.isInteger(n)) {

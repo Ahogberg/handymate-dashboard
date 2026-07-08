@@ -1,4 +1,4 @@
-import type { QuoteTemplateData, TemplateRenderFn } from './types'
+import type { QuoteTemplateData, QuoteTemplateItem, TemplateRenderFn } from './types'
 import { escapeHtml, formatCurrency } from '@/lib/document-html'
 
 /**
@@ -6,6 +6,14 @@ import { escapeHtml, formatCurrency } from '@/lib/document-html'
  * Ignorerar accent_color — paletten är låst för att bevara identiteten.
  */
 export const renderPremium: TemplateRenderFn = (data: QuoteTemplateData): string => {
+  // Visningsnivå (Del C): dölj antal/à-pris-kolumner. Grid-kolumnerna sätts
+  // dynamiskt via --item-cols nedan så layouten håller ihop utan tomma spalter.
+  const showQty = data.showQuantities !== false
+  const showPrice = data.showUnitPrices !== false
+  const qtyCell = (q: number, u: string) => (showQty ? `<div class="num">${formatNumber(q)} ${escapeHtml(u)}</div>` : '')
+  const priceCell = (p: number) => (showPrice ? `<div class="num">${formatCurrency(p)}</div>` : '')
+  const gridCols = `1fr${showQty ? ' 80px' : ''}${showPrice ? ' 110px' : ''} 120px`
+
   const itemsHtml = data.quote.items.map(item => {
     const itemType = item.itemType || 'item'
     if (itemType === 'heading') {
@@ -15,24 +23,26 @@ export const renderPremium: TemplateRenderFn = (data: QuoteTemplateData): string
       return `<div class="item-text">${escapeHtml(item.name)}</div>`
     }
     if (itemType === 'subtotal') {
+      // Gruppsummerad rad (summary) eller vanlig delsumma — etikett + belopp.
       return `<div class="item-subtotal"><span class="lbl">${escapeHtml(item.name || 'Delsumma')}</span><span class="val">${formatCurrency(item.total)}</span></div>`
     }
     if (itemType === 'discount') {
-      return `<div class="item discount"><div><div class="item-name">${escapeHtml(item.name || 'Rabatt')}</div></div><div class="num">${formatNumber(item.quantity)} ${escapeHtml(item.unit)}</div><div class="num">${formatCurrency(Math.abs(item.unitPrice))}</div><div class="num">−${formatCurrency(Math.abs(item.total))}</div></div>`
+      return `<div class="item discount"><div><div class="item-name">${escapeHtml(item.name || 'Rabatt')}</div></div>${qtyCell(item.quantity, item.unit)}${priceCell(Math.abs(item.unitPrice))}<div class="num">−${formatCurrency(Math.abs(item.total))}</div></div>`
     }
     if (itemType === 'option') {
       // Tillvalsrad: ☑ = ikryssad av kunden, ☐ = bortvald (räknas ej i totalen)
       const box = item.optionSelected ? '☑' : '☐'
-      return `<div class="item option${item.optionSelected ? '' : ' unselected'}"><div><div class="item-name"><span class="opt-box">${box}</span> ${escapeHtml(item.name)} <span class="opt-badge">Tillval</span></div>${item.description ? `<div class="item-desc">${escapeHtml(item.description)}</div>` : ''}</div><div class="num">${formatNumber(item.quantity)} ${escapeHtml(item.unit)}</div><div class="num">${formatCurrency(item.unitPrice)}</div><div class="num">${formatCurrency(item.total)}</div></div>`
+      return `<div class="item option${item.optionSelected ? '' : ' unselected'}"><div><div class="item-name"><span class="opt-box">${box}</span> ${escapeHtml(item.name)} <span class="opt-badge">Tillval</span></div>${item.description ? `<div class="item-desc">${escapeHtml(item.description)}</div>` : ''}${componentSpec(item.components)}</div>${qtyCell(item.quantity, item.unit)}${priceCell(item.unitPrice)}<div class="num">${formatCurrency(item.total)}</div></div>`
     }
     return `
     <div class="item">
       <div>
         <div class="item-name">${escapeHtml(item.name)}</div>
         ${item.description ? `<div class="item-desc">${escapeHtml(item.description)}</div>` : ''}
+        ${componentSpec(item.components)}
       </div>
-      <div class="num">${formatNumber(item.quantity)} ${escapeHtml(item.unit)}</div>
-      <div class="num">${formatCurrency(item.unitPrice)}</div>
+      ${qtyCell(item.quantity, item.unit)}
+      ${priceCell(item.unitPrice)}
       <div class="num">${formatCurrency(item.total)}</div>
     </div>
   `
@@ -118,13 +128,16 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 .quote-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 24px; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 6px; }
 .quote-sub { color: var(--muted); font-size: 13px; margin-bottom: 22px; max-width: 540px; white-space: pre-line; }
 .items { margin-bottom: 28px; }
-.items-head { display: grid; grid-template-columns: 1fr 80px 110px 120px; gap: 16px; padding: 8px 0 12px; border-bottom: 1.5px solid var(--dark); font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; color: var(--dark); }
+.items-head { display: grid; grid-template-columns: var(--item-cols, 1fr 80px 110px 120px); gap: 16px; padding: 8px 0 12px; border-bottom: 1.5px solid var(--dark); font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; color: var(--dark); }
 .items-head .num { text-align: right; }
-.item { display: grid; grid-template-columns: 1fr 80px 110px 120px; gap: 16px; padding: 14px 16px; border-bottom: 1px solid var(--line); border-left: 3px solid var(--amber); margin-left: -19px; padding-left: 16px; }
+.item { display: grid; grid-template-columns: var(--item-cols, 1fr 80px 110px 120px); gap: 16px; padding: 14px 16px; border-bottom: 1px solid var(--line); border-left: 3px solid var(--amber); margin-left: -19px; padding-left: 16px; }
 .item:nth-child(odd) { border-left-color: var(--dark); }
 .item .num { text-align: right; font-variant-numeric: tabular-nums; align-self: center; white-space: nowrap; }
 .item-name { font-weight: 600; color: var(--dark); font-size: 13px; }
 .item-desc { color: var(--muted); font-size: 12px; margin-top: 2px; line-height: 1.5; white-space: pre-line; }
+.item-components { list-style: none; margin: 6px 0 0; padding: 0; }
+.item-components li { color: var(--muted); font-size: 11px; line-height: 1.5; padding-left: 12px; position: relative; }
+.item-components li::before { content: '–'; position: absolute; left: 0; color: var(--amber); }
 .item-heading { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--dark); padding: 20px 0 8px; border-bottom: 1px solid var(--line); }
 .item-text { font-size: 12px; color: var(--muted); line-height: 1.6; padding: 10px 0; border-bottom: 1px solid var(--line); white-space: pre-line; }
 .item-subtotal { display: flex; justify-content: flex-end; gap: 24px; padding: 10px 0; border-bottom: 1px solid var(--dark); font-size: 13px; }
@@ -225,11 +238,11 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
     ${descriptionHtml}
     ${introHtml}
 
-    <div class="items">
+    <div class="items" style="--item-cols: ${gridCols};">
       <div class="items-head">
         <div>Beskrivning</div>
-        <div class="num">Antal</div>
-        <div class="num">Á-pris</div>
+        ${showQty ? '<div class="num">Antal</div>' : ''}
+        ${showPrice ? '<div class="num">Á-pris</div>' : ''}
         <div class="num">Summa</div>
       </div>
       ${itemsHtml}
@@ -272,6 +285,14 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 </div>
 </body>
 </html>`
+}
+
+function componentSpec(components: QuoteTemplateItem['components']): string {
+  if (!components || components.length === 0) return ''
+  const rows = components
+    .map(c => `<li>${escapeHtml(c.description)}${c.quantityPerUnit ? ` · ${formatNumber(c.quantityPerUnit)} ${escapeHtml(c.unit)}` : ''}</li>`)
+    .join('')
+  return `<ul class="item-components">${rows}</ul>`
 }
 
 function formatNumber(n: number): string {

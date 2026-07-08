@@ -1,4 +1,4 @@
-import type { QuoteTemplateData, TemplateRenderFn } from './types'
+import type { QuoteTemplateData, QuoteTemplateItem, TemplateRenderFn } from './types'
 import { escapeHtml, formatCurrency } from '@/lib/document-html'
 
 /**
@@ -9,6 +9,19 @@ export const renderFriendly: TemplateRenderFn = (data: QuoteTemplateData): strin
   const accentDark = darken(accent, 0.20)
   const accent50 = mixWithWhite(accent, 0.94)
   const accent100 = mixWithWhite(accent, 0.85)
+
+  // Visningsnivå (Del C): friendly bakar antal+à-pris i en enda .qty-rad.
+  // 'rows'/'summary' döljer den helt (radtotalen i .item-amt står kvar).
+  const showQty = data.showQuantities !== false
+  const showPrice = data.showUnitPrices !== false
+  // qty-raden visar antal och/eller à-pris; utelämnas när båda är dolda.
+  const qtyLine = (q: number, u: string, p: number): string => {
+    if (!showQty && !showPrice) return ''
+    const parts: string[] = []
+    if (showQty) parts.push(`${formatNumber(q)} ${escapeHtml(u)}`)
+    if (showPrice) parts.push(`á ${formatCurrency(p)}`)
+    return `<div class="qty">${parts.join(' ')}</div>`
+  }
 
   // Löpande numrering räknar bara riktiga artikelrader — rubriker,
   // fritext, delsummor och rabatter får ingen siffra.
@@ -22,6 +35,7 @@ export const renderFriendly: TemplateRenderFn = (data: QuoteTemplateData): strin
       return `<div class="group-text">${escapeHtml(item.name)}</div>`
     }
     if (itemType === 'subtotal') {
+      // Gruppsummerad rad (summary) eller vanlig delsumma — etikett + belopp.
       return `<div class="subtotal-line"><span class="lbl">${escapeHtml(item.name || 'Delsumma')}</span><span class="val">${formatCurrency(item.total)}</span></div>`
     }
     if (itemType === 'discount') {
@@ -30,7 +44,7 @@ export const renderFriendly: TemplateRenderFn = (data: QuoteTemplateData): strin
       <div class="item-num">−</div>
       <div class="item-body">
         <div class="name">${escapeHtml(item.name || 'Rabatt')}</div>
-        <div class="qty">${formatNumber(item.quantity)} ${escapeHtml(item.unit)} á ${formatCurrency(Math.abs(item.unitPrice))}</div>
+        ${qtyLine(item.quantity, item.unit, Math.abs(item.unitPrice))}
       </div>
       <div class="item-amt">−${formatCurrency(Math.abs(item.total))}</div>
     </div>
@@ -46,7 +60,8 @@ export const renderFriendly: TemplateRenderFn = (data: QuoteTemplateData): strin
       <div class="item-body">
         <div class="name">${escapeHtml(item.name)} <span class="opt-badge">Tillval</span></div>
         ${item.description ? `<div class="desc">${escapeHtml(item.description)}</div>` : ''}
-        <div class="qty">${formatNumber(item.quantity)} ${escapeHtml(item.unit)} á ${formatCurrency(item.unitPrice)}</div>
+        ${qtyLine(item.quantity, item.unit, item.unitPrice)}
+        ${componentSpec(item.components)}
       </div>
       <div class="item-amt">${formatCurrency(item.total)}</div>
     </div>
@@ -59,7 +74,8 @@ export const renderFriendly: TemplateRenderFn = (data: QuoteTemplateData): strin
       <div class="item-body">
         <div class="name">${escapeHtml(item.name)}</div>
         ${item.description ? `<div class="desc">${escapeHtml(item.description)}</div>` : ''}
-        <div class="qty">${formatNumber(item.quantity)} ${escapeHtml(item.unit)} á ${formatCurrency(item.unitPrice)}</div>
+        ${qtyLine(item.quantity, item.unit, item.unitPrice)}
+        ${componentSpec(item.components)}
       </div>
       <div class="item-amt">${formatCurrency(item.total)}</div>
     </div>
@@ -155,6 +171,9 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .item-body .name { font-weight: 600; color: var(--ink); font-size: 14px; }
 .item-body .desc { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 2px; white-space: pre-line; }
 .item-body .qty { color: var(--muted); font-size: 11px; margin-top: 4px; font-weight: 500; }
+.item-components { list-style: none; margin: 6px 0 0; padding: 0; }
+.item-components li { color: var(--muted); font-size: 11px; line-height: 1.5; padding-left: 12px; position: relative; }
+.item-components li::before { content: '–'; position: absolute; left: 0; }
 .item-amt { text-align: right; font-weight: 700; color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; align-self: center; }
 .group-heading { font-weight: 700; font-size: 14px; color: var(--ink); padding: 8px 4px 0; }
 .group-text { color: var(--muted); font-size: 12px; line-height: 1.6; padding: 0 4px; white-space: pre-line; }
@@ -294,6 +313,14 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 </div>
 </body>
 </html>`
+}
+
+function componentSpec(components: QuoteTemplateItem['components']): string {
+  if (!components || components.length === 0) return ''
+  const rows = components
+    .map(c => `<li>${escapeHtml(c.description)}${c.quantityPerUnit ? ` · ${formatNumber(c.quantityPerUnit)} ${escapeHtml(c.unit)}` : ''}</li>`)
+    .join('')
+  return `<ul class="item-components">${rows}</ul>`
 }
 
 function formatNumber(n: number): string {

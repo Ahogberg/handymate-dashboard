@@ -1,10 +1,10 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import { useMemo } from 'react'
 import type { QuoteItem, PaymentPlanEntry, DetailLevel } from '@/lib/types/quote'
 import { calculateQuoteTotals, recalculateItems, calculatePaymentPlan } from '@/lib/quote-calculations'
 import { getItemRotRutType } from '@/lib/quote-calculations'
-import { getCategoryLabel, type CustomCategory } from '@/lib/constants/categories'
+import { type CustomCategory } from '@/lib/constants/categories'
 
 // ── Design tokens (matching document-html.ts) ──
 const ACCENT = '#0F766E'
@@ -33,7 +33,6 @@ export interface QuotePreviewData {
   detailLevel: DetailLevel
   showUnitPrices: boolean
   showQuantities: boolean
-  showCategorySubtotals?: boolean
   customCategories?: CustomCategory[]
 }
 
@@ -86,33 +85,14 @@ export default function QuotePreview({ data, businessName, contactName }: QuoteP
     return calculatePaymentPlan(totals.total, data.paymentPlan)
   }, [data.paymentPlan, totals.total])
 
+  // total_only mappas till samma "Bara delsummor"-läge som subtotals_only
+  // (TILLÄGG 3) — nivåväljaren skriver aldrig total_only längre, men äldre
+  // offerter bär värdet och ska rendera delsummor, inte en tom radlista.
+  const summaryLevel = data.detailLevel === 'subtotals_only' || data.detailLevel === 'total_only'
   const itemsToRender = data.items.filter(i => {
-    if (data.detailLevel === 'total_only') return false
-    if (data.detailLevel === 'subtotals_only' && (i.item_type === 'item' || i.item_type === 'text')) return false
+    if (summaryLevel && (i.item_type === 'item' || i.item_type === 'text')) return false
     return true
   })
-
-  // Group items by category for subtotal rendering
-  const groupedByCategory = useMemo(() => {
-    if (!data.showCategorySubtotals) return null
-    const groups: { slug: string; label: string; items: QuoteItem[]; subtotal: number }[] = []
-    const slugMap = new Map<string, typeof groups[0]>()
-
-    for (const item of itemsToRender) {
-      if (item.item_type !== 'item') continue
-      const slug = item.category_slug || '__uncategorized__'
-      if (!slugMap.has(slug)) {
-        const label = slug === '__uncategorized__' ? 'Övrigt' : getCategoryLabel(slug, data.customCategories)
-        const group = { slug, label, items: [], subtotal: 0 }
-        slugMap.set(slug, group)
-        groups.push(group)
-      }
-      const group = slugMap.get(slug)!
-      group.items.push(item)
-      group.subtotal += item.quantity * item.unit_price
-    }
-    return groups
-  }, [itemsToRender, data.showCategorySubtotals, data.customCategories])
 
   // Tillvalsrad: ☑ = ikryssad, ☐ = bortvald. Totals kommer från
   // calculateQuoteTotals som bara räknar valda tillval — raden här är ren visning.
@@ -231,78 +211,7 @@ export default function QuotePreview({ data, businessName, contactName }: QuoteP
                 </tr>
               </thead>
               <tbody>
-                {groupedByCategory ? (
-                  <>
-                    {groupedByCategory.map((group) => (
-                      <React.Fragment key={group.slug}>
-                        <tr>
-                          <td colSpan={10} style={{ fontWeight: 500, fontSize: '7.5px', paddingTop: 8, paddingBottom: 4, borderBottom: `0.5px solid ${BORDER}` }}>
-                            {group.label}
-                          </td>
-                        </tr>
-                        {group.items.map((item) => {
-                          const lineTotal = item.quantity * item.unit_price
-                          const rotRutType = getItemRotRutType(item)
-                          return (
-                            <tr key={item.id} style={{ borderBottom: `0.5px solid #F1F5F9` }}>
-                              <td style={{ padding: '4px 0', verticalAlign: 'top', paddingLeft: 6 }}>
-                                <span style={{ fontWeight: 500, fontSize: '7.5px' }}>{item.description}</span>
-                                {rotRutType === 'rot' && (
-                                  <span style={{ display: 'inline-block', fontSize: '5px', fontWeight: 500, color: ACCENT, background: '#CCFBF1', padding: '0 3px', borderRadius: 2, marginLeft: 3 }}>ROT</span>
-                                )}
-                                {rotRutType === 'rut' && (
-                                  <span style={{ display: 'inline-block', fontSize: '5px', fontWeight: 500, color: '#1d4ed8', background: '#dbeafe', padding: '0 3px', borderRadius: 2, marginLeft: 3 }}>RUT</span>
-                                )}
-                              </td>
-                              {data.showQuantities && (
-                                <>
-                                  <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{item.quantity}</td>
-                                  <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{getUnitLabel(item.unit)}</td>
-                                </>
-                              )}
-                              {data.showUnitPrices && (
-                                <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{formatCurrency(item.unit_price)}</td>
-                              )}
-                              <td style={{ textAlign: 'right', padding: '4px 0', fontWeight: 500 }}>{formatCurrency(lineTotal)}</td>
-                            </tr>
-                          )
-                        })}
-                        <tr>
-                          <td colSpan={10} style={{ textAlign: 'right', fontWeight: 500, borderTop: `0.5px solid ${BORDER}`, paddingTop: 3, paddingBottom: 6, fontSize: '7px', color: MUTED }}>
-                            Delsumma {group.label.toLowerCase()}: {formatCurrency(group.subtotal)}
-                          </td>
-                        </tr>
-                      </React.Fragment>
-                    ))}
-                    {/* Non-item rows (headings, texts, discounts, subtotals) rendered after groups */}
-                    {itemsToRender.filter(i => i.item_type !== 'item').map((item) => {
-                      if (item.item_type === 'heading') {
-                        return (
-                          <tr key={item.id}>
-                            <td colSpan={10} style={{ fontWeight: 500, fontSize: '7.5px', paddingTop: 8, paddingBottom: 4, borderBottom: `0.5px solid ${BORDER}` }}>
-                              {item.description || item.group_name}
-                            </td>
-                          </tr>
-                        )
-                      }
-                      if (item.item_type === 'discount') {
-                        return (
-                          <tr key={item.id}>
-                            <td colSpan={10} style={{ display: 'flex', justifyContent: 'space-between', color: ACCENT, padding: '4px 0', borderBottom: `0.5px solid #F1F5F9` }}>
-                              <span>{item.description || 'Rabatt'}</span>
-                              <span>{formatCurrency(item.total)}</span>
-                            </td>
-                          </tr>
-                        )
-                      }
-                      if (item.item_type === 'option') {
-                        return renderOptionRow(item)
-                      }
-                      return null
-                    })}
-                  </>
-                ) : (
-                  itemsToRender.map((item) => {
+                {itemsToRender.map((item) => {
                     if (item.item_type === 'heading') {
                       return (
                         <tr key={item.id}>
@@ -369,8 +278,7 @@ export default function QuotePreview({ data, businessName, contactName }: QuoteP
                         <td style={{ textAlign: 'right', padding: '4px 0', fontWeight: 500 }}>{formatCurrency(lineTotal)}</td>
                       </tr>
                     )
-                  })
-                )}
+                  })}
               </tbody>
             </table>
           </>
