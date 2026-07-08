@@ -3,6 +3,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { selectTemplate, buildQuoteTemplateData } from '@/lib/quote-templates'
+import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,7 +65,12 @@ export async function POST(request: NextRequest) {
       .eq('business_id', business.business_id)
       .single()
 
-    const templateData = buildQuoteTemplateData(quote, business, config)
+    // Offert-identitet (v68): avsändaren = offertens skapare. Hämtas via
+    // created_by → business_users. Null när kolumnen saknas (gammal offert)
+    // → buildQuoteTemplateData faller tillbaka på ägarens business_config.
+    const creator = await fetchQuoteCreator(supabase, quote.created_by)
+
+    const templateData = buildQuoteTemplateData(quote, business, config, creator)
     // Per-quote override → fallback till business default
     const renderFn = selectTemplate(quote.template_style || config?.quote_template_style)
     const html = renderFn(templateData)
@@ -161,7 +167,10 @@ export async function GET(request: NextRequest) {
       .eq('business_id', quote.business_id)
       .single()
 
-    const templateData = buildQuoteTemplateData(quote, bizConfig, bizConfig)
+    // Offert-identitet (v68): avsändaren = skaparen (fallback ägaren när null).
+    const creator = await fetchQuoteCreator(supabase, quote.created_by)
+
+    const templateData = buildQuoteTemplateData(quote, bizConfig, bizConfig, creator)
     // Style-precedence: ?style=... (settings-preview) > quote.template_style > business default
     const styleOverride = request.nextUrl.searchParams.get('style')
     const renderFn = selectTemplate(

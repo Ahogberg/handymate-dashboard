@@ -116,6 +116,9 @@ export interface QuoteTemplateData {
   /** Kolumnflaggor härledda ur displayLevel via displayLevelToColumns. */
   showQuantities?: boolean
   showUnitPrices?: boolean
+  /** "Vår referens" — offertens skapare (auto men redigerbar). Renderas i
+      kunddokumentets avsändarblock. Utelämnad/null → raden visas ej (legacy). */
+  referencePerson?: string | null
 }
 
 export type TemplateStyle = 'modern' | 'premium' | 'friendly'

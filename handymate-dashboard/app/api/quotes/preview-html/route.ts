@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { getCurrentUser } from '@/lib/permissions'
 import { selectTemplate, buildQuoteTemplateData } from '@/lib/quote-templates'
+import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 
 /**
  * POST /api/quotes/preview-html
@@ -65,7 +67,19 @@ export async function POST(request: NextRequest) {
       .eq('business_id', business.business_id)
       .maybeSingle()
 
-    const templateData = buildQuoteTemplateData(quote, business, config)
+    // Offert-identitet (v68): avsändaren = skaparen. En sparad offert bär
+    // created_by → använd den. Ett osparat utkast (Slutdesign i byggaren)
+    // saknar created_by → visa den INLOGGADE användaren så förhandsvisningen
+    // speglar vad kunden får. Ingen created_by + ingen inloggad → fallback.
+    let creator = await fetchQuoteCreator(supabase, quote.created_by)
+    if (!creator) {
+      const currentUser = await getCurrentUser(request)
+      if (currentUser) {
+        creator = { name: currentUser.name ?? null, phone: currentUser.phone ?? null, email: currentUser.email ?? null }
+      }
+    }
+
+    const templateData = buildQuoteTemplateData(quote, business, config, creator)
     const style = body.template_style || quote.template_style || config?.quote_template_style
     const renderFn = selectTemplate(style)
     const html = renderFn(templateData)

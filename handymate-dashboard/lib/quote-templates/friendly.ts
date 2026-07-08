@@ -251,6 +251,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
         <div class="party-name">${escapeHtml(data.business.name)}</div>
         ${businessAddressLine ? `<div class="party-line">${escapeHtml(businessAddressLine)}</div>` : ''}
         <div class="party-meta">${[data.business.contactName, data.business.phone].filter(Boolean).map(escapeHtml).join(' · ')}${data.business.email ? `<br/>${escapeHtml(data.business.email)}` : ''}</div>
+        ${data.referencePerson ? `<div class="party-meta">Vår referens: ${escapeHtml(data.referencePerson)}</div>` : ''}
       </div>
       <div>
         <div class="card-title">Till</div>

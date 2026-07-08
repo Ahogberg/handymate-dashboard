@@ -60,10 +60,18 @@ function plus30Days(iso: string | null | undefined): string {
  * Hanterar både legacy items-JSONB och nya quote_items-rader,
  * samt ROT/RUT-avdrag och alla varianter av betalnings-/garantitext.
  */
+/**
+ * Offert-identitet (v68): `creator` är den SKAPANDE business_users-posten
+ * (name/phone/email). När den finns visar avsändarblocket skaparens
+ * kontaktuppgifter i stället för ägarens business_config-fält. Företagsnamn,
+ * orgnr, logga m.m. behålls alltid från config. `creator = null` → exakt
+ * dagens fallback-kedja (alla gamla offerter oförändrade).
+ */
 export function buildQuoteTemplateData(
   quote: any,
   business: any,
   config: any,
+  creator?: { name?: string | null; phone?: string | null; email?: string | null } | null,
 ): QuoteTemplateData {
   // ── Items ──────────────────────────────────────────────────────
   const structured: any[] = quote.quote_items || []
@@ -222,13 +230,16 @@ export function buildQuoteTemplateData(
     displayLevel,
     showQuantities: cols.showQuantities,
     showUnitPrices: cols.showUnitPrices,
+    referencePerson: quote.reference_person ?? null,
     business: {
       name: businessName,
       orgNumber: config?.org_number || business?.org_number || '',
       address: businessAddress,
-      contactName: config?.contact_name || business?.contact_name || '',
-      phone: config?.phone_number || business?.phone_number || '',
-      email: config?.contact_email || business?.contact_email || '',
+      // Skaparen vinner (?? så en skapare med null-telefon ändå faller tillbaka,
+      // men ett satt skaparnamn/mail slår igenom). creator null → dagens kedja.
+      contactName: creator?.name ?? (config?.contact_name || business?.contact_name || ''),
+      phone: creator?.phone ?? (config?.phone_number || business?.phone_number || ''),
+      email: creator?.email ?? (config?.contact_email || business?.contact_email || ''),
       website: config?.website || null,
       bankgiro: config?.bankgiro || null,
       plusgiro: config?.plusgiro || null,

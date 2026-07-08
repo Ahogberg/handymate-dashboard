@@ -225,6 +225,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
         <div class="party-name">${escapeHtml(data.business.name)}</div>
         ${data.business.address ? `<div class="party-line">${escapeHtml(data.business.address)}</div>` : ''}
         <div class="party-meta">${[data.business.contactName, data.business.phone].filter(Boolean).map(escapeHtml).join(' · ')}${data.business.email ? `<br/>${escapeHtml(data.business.email)}` : ''}</div>
+        ${data.referencePerson ? `<div class="party-meta">Vår referens: ${escapeHtml(data.referencePerson)}</div>` : ''}
       </div>
       <div>
         <div class="party-label">Mottagare</div>

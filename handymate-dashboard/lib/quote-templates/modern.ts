@@ -238,6 +238,7 @@ tbody tr.row-option.unselected .opt-badge { color: var(--muted); background: tra
       <div class="party-name">${escapeHtml(data.business.name)}</div>
       ${businessAddressLine ? `<div class="party-line">${escapeHtml(businessAddressLine)}</div>` : ''}
       <div class="party-meta">${[data.business.contactName, data.business.phone].filter(Boolean).map(escapeHtml).join(' · ')}${data.business.email ? `<br/>${escapeHtml(data.business.email)}` : ''}</div>
+      ${data.referencePerson ? `<div class="party-meta">Vår referens: ${escapeHtml(data.referencePerson)}</div>` : ''}
     </div>
     <div>
       <div class="party-label">Mottagare</div>
