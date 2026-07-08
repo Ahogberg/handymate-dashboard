@@ -8,6 +8,7 @@ import { getOrCreatePortalLink } from '@/lib/portal-link'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { escapeHtml } from '@/lib/document-html'
+import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -97,7 +98,13 @@ async function sendEmail(
 /**
  * Generera email HTML
  */
-function generateEmailHTML(quote: any, business: any, signUrl?: string, trackingPixelUrl?: string): string {
+function generateEmailHTML(
+  quote: any,
+  business: any,
+  signUrl?: string,
+  trackingPixelUrl?: string,
+  creator?: { name?: string | null; phone?: string | null; email?: string | null } | null
+): string {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(amount)
   }
@@ -108,8 +115,12 @@ function generateEmailHTML(quote: any, business: any, signUrl?: string, tracking
   const customerName = escapeHtml(quote.customer?.name || 'kund')
   const quoteTitle = escapeHtml(quote.title || 'Offert')
   const quoteDescription = escapeHtml(quote.description)
-  const businessPhone = escapeHtml(business.phone_number)
-  const businessEmail = escapeHtml(business.contact_email)
+  // Kontaktuppgifter = offertens SKAPARE när den finns (samma identitet som
+  // kunddokumentet visar), annars företagets/ägarens uppgifter. `??` — en
+  // skapare med tomt telefonfält faller ändå tillbaka på företagets.
+  const businessPhone = escapeHtml(creator?.phone ?? business.phone_number)
+  const businessEmail = escapeHtml(creator?.email ?? business.contact_email)
+  const contactName = creator?.name ? escapeHtml(creator.name) : ''
   const businessOrgNumber = escapeHtml(business.org_number)
   const businessLogoUrl = escapeHtml(business.logo_url)
 
@@ -199,6 +210,7 @@ function generateEmailHTML(quote: any, business: any, signUrl?: string, tracking
       <!-- Footer -->
       <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px; text-align: center; color: #888; font-size: 12px;">
         <p style="margin: 0 0 5px 0;"><strong>${businessName}</strong></p>
+        ${contactName ? `<p style="margin: 0 0 5px 0;">Din kontakt: ${contactName}</p>` : ''}
         <p style="margin: 0;">${businessPhone} | ${businessEmail}</p>
         ${business.org_number ? `<p style="margin: 5px 0 0 0;">Org.nr: ${businessOrgNumber}</p>` : ''}
       </div>
@@ -392,6 +404,10 @@ export async function POST(request: NextRequest) {
       .single()
     const businessWithLogo = { ...business, logo_url: bizConfig?.logo_url, swish_number: bizConfig?.swish_number }
 
+    // Offertens skapare (business_users) → mejlets kontaktuppgifter visar rätt
+    // person, samma identitet som kunddokumentet. Null för gamla offerter.
+    const emailCreator = await fetchQuoteCreator(supabase, quote.created_by)
+
     const formatCurrency = (amount: number) => {
       return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(amount)
     }
@@ -468,7 +484,7 @@ ${suffix}`
         // Om both och ingen email, fortsätt med bara SMS
       } else {
         const emailSubject = `Offert från ${business.business_name} — ${quote.title || 'Offert'}`
-        const emailHTML = generateEmailHTML(quote, businessWithLogo, signUrl, trackingPixelUrl)
+        const emailHTML = generateEmailHTML(quote, businessWithLogo, signUrl, trackingPixelUrl, emailCreator)
         const allRecipients = [quote.customer.email, ...(extraEmails || [])].filter(Boolean)
 
         // Försök Gmail först, fallback till Resend
