@@ -103,11 +103,19 @@ function generateEmailHTML(
   business: any,
   signUrl?: string,
   trackingPixelUrl?: string,
-  creator?: { name?: string | null; phone?: string | null; email?: string | null } | null
+  creator?: { name?: string | null; phone?: string | null; email?: string | null } | null,
+  pdfUrl?: string
 ): string {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(amount)
   }
+
+  // On-brand: företagets accent_color som header/CTA-färg. Validera som 6-siffrig
+  // hex — annars fallback till Handymate-teal. Undviker att osäkert värde
+  // interpoleras i inline-style.
+  const accent = /^#[0-9a-fA-F]{6}$/.test(business.accent_color || '')
+    ? business.accent_color
+    : '#0F766E'
 
   // Escapa all användarstyrd text som interpoleras i HTML — offert-titel,
   // beskrivning och namn kan innehålla tecken som annars tolkas som markup.
@@ -143,7 +151,7 @@ function generateEmailHTML(
       <div style="text-align: center; margin: 30px 0; padding: 24px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px;">
         <p style="color: #166534; font-weight: 600; margin: 0 0 12px 0; font-size: 15px;">Redo att godkänna offerten?</p>
         <p style="color: #4b5563; font-size: 13px; margin: 0 0 16px 0;">I din kundportal kan du granska offerten, signera digitalt och följa ditt projekt.</p>
-        <a href="${signUrl}" style="display: inline-block; background: #0d9488; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 16px;">
+        <a href="${signUrl}" style="display: inline-block; background: ${accent}; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 16px;">
           Öppna din kundportal →
         </a>
         <p style="color: #9ca3af; font-size: 11px; margin: 12px 0 0 0;">Eller kopiera länken: ${signUrl}</p>
@@ -152,7 +160,7 @@ function generateEmailHTML(
       <!-- CTA -->
       <div style="text-align: center; margin: 30px 0;">
         <p style="color: #444; margin-bottom: 15px;">Har du frågor eller vill boka? Kontakta oss:</p>
-        <a href="tel:${businessPhone}" style="display: inline-block; background: #0d9488; color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+        <a href="tel:${businessPhone}" style="display: inline-block; background: ${accent}; color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
           Ring ${businessPhone}
         </a>
       </div>`
@@ -167,7 +175,7 @@ function generateEmailHTML(
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f4f4f5; margin: 0; padding: 20px;">
   <div style="max-width: 600px; margin: 0 auto;">
     <!-- Header -->
-    <div style="background: #0d9488; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <div style="background: ${accent}; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
       ${business.logo_url ? `<img src="${businessLogoUrl}" alt="${businessName}" style="max-height: 48px; margin-bottom: 12px;" />` : ''}
       <h1 style="color: white; margin: 0; font-size: 28px;">${businessName}</h1>
       <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Offert</p>
@@ -184,7 +192,7 @@ function generateEmailHTML(
       </p>
 
       <!-- Quote Box -->
-      <div style="background: #f0fdfa; border-left: 4px solid #0d9488; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+      <div style="background: #f0fdfa; border-left: 4px solid ${accent}; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
         <h2 style="margin: 0 0 10px 0; font-size: 18px; color: #1a1a1a;">
           ${quoteTitle}
         </h2>
@@ -206,6 +214,14 @@ function generateEmailHTML(
       </p>
 
       ${signBlock}
+
+      ${pdfUrl ? `
+      <!-- PDF-nedladdning (sekundär) -->
+      <div style="text-align: center; margin: 0 0 10px 0;">
+        <a href="${pdfUrl}" style="display: inline-block; color: ${accent}; text-decoration: underline; font-size: 14px; font-weight: 600;">
+          Ladda ner offert (PDF)
+        </a>
+      </div>` : ''}
 
       <!-- Footer -->
       <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px; text-align: center; color: #888; font-size: 12px;">
@@ -396,13 +412,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ingen kund kopplad till offerten' }, { status: 400 })
     }
 
-    // Hämta logo_url och swish_number
+    // Hämta logo_url, swish_number och accent_color (varumärkesfärg för mejlet)
     const { data: bizConfig } = await supabase
       .from('business_config')
-      .select('logo_url, swish_number')
+      .select('logo_url, swish_number, accent_color')
       .eq('business_id', business.business_id)
       .single()
-    const businessWithLogo = { ...business, logo_url: bizConfig?.logo_url, swish_number: bizConfig?.swish_number }
+    const businessWithLogo = { ...business, logo_url: bizConfig?.logo_url, swish_number: bizConfig?.swish_number, accent_color: bizConfig?.accent_color }
 
     // Offertens skapare (business_users) → mejlets kontaktuppgifter visar rätt
     // person, samma identitet som kunddokumentet. Null för gamla offerter.
@@ -484,7 +500,8 @@ ${suffix}`
         // Om both och ingen email, fortsätt med bara SMS
       } else {
         const emailSubject = `Offert från ${business.business_name} — ${quote.title || 'Offert'}`
-        const emailHTML = generateEmailHTML(quote, businessWithLogo, signUrl, trackingPixelUrl, emailCreator)
+        const pdfUrl = `${APP_URL}/api/quotes/pdf?token=${signToken}&format=pdf`
+        const emailHTML = generateEmailHTML(quote, businessWithLogo, signUrl, trackingPixelUrl, emailCreator, pdfUrl)
         const allRecipients = [quote.customer.email, ...(extraEmails || [])].filter(Boolean)
 
         // Försök Gmail först, fallback till Resend
@@ -617,16 +634,10 @@ ${suffix}`
       console.error('fireEvent quote_sent error (non-blocking):', eventErr)
     }
 
-    // Portal-notifikation (1h-dedup hanteras internt; offerter skickas oftast
-    // bara en gång så det här är säkert även parallellt med den primära mailen)
-    try {
-      const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
-      await sendPortalNotification(business.business_id, quote.customer_id, 'quote_sent', {
-        context: { title: quote.title, total: quote.total },
-      })
-    } catch (notifErr) {
-      console.error('Portal notification quote_sent error (non-blocking):', notifErr)
-    }
+    // OBS: portal-notisen för 'quote_sent' är BORTTAGEN här med flit. Den skickade
+    // ett andra, minimalt mejl utöver den rika generateEmailHTML ovan → kunden fick
+    // två mejl per offert. quote_sent-notisen anropades enbart härifrån, så den
+    // rika mejlen är nu den enda offert-mejlen (on-brand + PDF-länk).
 
     // Golden Path: säkerställ att en deal finns (skapa-eller-länka) och flytta
     // den till "Offert skickad". Tidigare flyttades bara EN redan befintlig deal
