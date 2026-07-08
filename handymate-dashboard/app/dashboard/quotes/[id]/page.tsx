@@ -119,7 +119,7 @@ export default function QuoteDetailPage() {
     setGeneratingPdf(true)
 
     try {
-      const response = await fetch('/api/quotes/pdf', {
+      const response = await fetch('/api/quotes/pdf?format=pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quoteId: quote.quote_id }),

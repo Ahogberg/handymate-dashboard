@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, Check, FileText, Loader2, PenTool, Sparkles, X } from 'lucide-react'
+import { ArrowRight, Check, Download, FileText, Loader2, PenTool, Sparkles, X } from 'lucide-react'
 import SignatureCanvas, { type SignatureCanvasHandle } from './SignatureCanvas'
 import { formatCurrency } from '../helpers'
 import type { Quote } from '../types'
@@ -352,6 +352,13 @@ export default function PortalQuoteSigningModal({
                   >
                     <FileText size={18} /> Läs offerten
                   </a>
+                  <a
+                    className="bp-cta ghost"
+                    href={`/api/quotes/pdf?token=${quote.sign_token}&format=pdf`}
+                    style={{ marginTop: 10 }}
+                  >
+                    <Download size={18} /> Ladda ner PDF
+                  </a>
                   <p
                     style={{
                       fontSize: 12,
@@ -361,7 +368,8 @@ export default function PortalQuoteSigningModal({
                       textAlign: 'center',
                     }}
                   >
-                    Läs igenom hela offerten innan du signerar. Den öppnas i en ny flik.
+                    Läs igenom hela offerten innan du signerar — den öppnas i en ny flik.
+                    Du kan även ladda ner den som PDF.
                   </p>
                 </div>
               )}
