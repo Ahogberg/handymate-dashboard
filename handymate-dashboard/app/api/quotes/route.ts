@@ -212,6 +212,9 @@ export async function POST(request: NextRequest) {
         customer_id: source.customer_id,
         quote_number: quoteNumber,
         status: 'draft',
+        // Kopian/versionen tillhör den som skapar den (v68-identitet), inte
+        // originalets skapare — annars visar avsändarblocket fel person.
+        created_by: currentUser?.id ?? null,
         title: isVersion ? (source.title || 'Offert') : (source.title ? source.title + ' (kopia)' : 'Kopia'),
         // Version fields
         parent_quote_id: parentQuoteId,
