@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { calculateQuoteTotals } from '@/lib/quote-calculations'
+import { resolveReferencePerson } from '@/lib/quotes/resolve-reference-person'
 import type { QuoteItem } from '@/lib/types/quote'
 
 /**
@@ -393,7 +394,12 @@ export async function POST(request: NextRequest) {
       payment_terms_text: body.payment_terms_text || null,
       terms_text: body.terms_text || null,
       payment_plan: body.payment_plan || [],
-      reference_person: body.reference_person || null,
+      // Offert-identitet (v68): spåra vem som SKAPADE offerten så kunddokumentet
+      // kan visa skaparens namn/tel/mail (fallback till ägaren när null).
+      created_by: currentUser?.id ?? null,
+      // "Vår referens" förifylls med skaparens namn om fältet lämnats tomt;
+      // hantverkarens egen ifyllnad vinner (se resolve-reference-person.ts).
+      reference_person: resolveReferencePerson(body.reference_person, currentUser?.name),
       customer_reference: body.customer_reference || null,
       project_address: body.project_address || null,
       detail_level: body.detail_level || 'detailed',
