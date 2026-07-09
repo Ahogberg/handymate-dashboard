@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { isFortnoxConnected, getFortnoxInvoices } from '@/lib/fortnox'
+import { mapFortnoxInvoice } from '@/lib/fortnox/map-invoice'
 
 interface ExistingInvoice {
   fortnox_document_number: string | null
@@ -84,12 +85,15 @@ export async function POST(request: NextRequest) {
     const today = new Date().toISOString().split('T')[0]
 
     for (const fi of fortnoxInvoices) {
-      const docNumber = fi.DocumentNumber ?? fi.InvoiceNumber
-      if (!docNumber) {
-        // Utan dokumentnummer kan vi varken dedup:a eller peka tillbaka — hoppa.
+      // Ren, testad mappning (status, belopp, reminder_count=0). Null → saknar
+      // dokumentnummer, kan varken dedup:as eller pekas tillbaka → hoppa.
+      const mapped = mapFortnoxInvoice(fi, today)
+      if (!mapped) {
         results.skipped++
         continue
       }
+
+      const { docNumber, row, outstanding } = mapped
 
       // Dedup: redan importerad?
       if (existingDocNumbers.has(docNumber)) {
@@ -103,33 +107,13 @@ export async function POST(request: NextRequest) {
           : null
         if (!customerId) results.unlinked++
 
-        const total = Number(fi.Total) || 0
-        // Balance = utestående. När listan saknar Balance faller vi tillbaka
-        // på Total (obetald faktura → hela beloppet utestående).
-        const outstanding = fi.Balance != null ? Number(fi.Balance) || 0 : total
-
-        const invoiceDate = fi.InvoiceDate ?? today
-        const dueDate = fi.DueDate ?? null
-        // Förfallen om förfallodatum passerat, annars bara skickad.
-        const status = dueDate && dueDate < today ? 'overdue' : 'sent'
-
         const { error: insertError } = await supabase
           .from('invoice')
           .insert({
+            ...row,
             business_id: businessId,
             customer_id: customerId,
-            invoice_number: fi.InvoiceNumber ?? docNumber,
-            invoice_type: 'standard',
-            status,
-            total,
-            invoice_date: invoiceDate,
-            due_date: dueDate,
-            fortnox_document_number: docNumber,
-            fortnox_invoice_number: fi.InvoiceNumber ?? null,
             fortnox_synced_at: new Date().toISOString(),
-            // SÄKERHET: historisk faktura — inga påminnelser trigggas. Håll
-            // reminder_count = 0 och rör INTE next_reminder_at.
-            reminder_count: 0,
           })
 
         if (insertError) {
