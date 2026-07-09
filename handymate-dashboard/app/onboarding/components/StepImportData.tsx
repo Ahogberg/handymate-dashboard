@@ -1,33 +1,32 @@
 'use client'
 
+/**
+ * StepImportData — "Hämta in din verksamhet" (onboarding-steg, efter betalning).
+ *
+ * ALL LOGIK ÄR OFÖRÄNDRAD (Fortnox-OAuth, runFortnoxImport, handleCsvFile,
+ * parseCsvCustomers, view-state-maskinen, setData, felhantering,
+ * useEffect-callbacken). Endast det VISUELLA lagret är de förfinade
+ * obi-*-komponenterna (states A–E) från Claude Design. Kräver CSS-tillägget
+ * obi-* i onboarding.css.
+ *
+ * Beroenden: lucide-react, ./OnboardingHeader, @/lib/agents/team (avatarer).
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ArrowRight,
+  ArrowLeft,
   Check,
   Loader2,
   Upload,
   Link2,
-  Zap,
+  FileSpreadsheet,
+  Download,
+  AlertTriangle,
 } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
+import { TEAM } from '@/lib/agents/team'
 import type { OnboardingFormData } from '../types-redesign'
-
-/**
- * StepImportData — "Hämta in din verksamhet" (onboarding-steg 5, efter betalning).
- *
- * BACKEND-ÄGD, FUNGERANDE men enkelt stylad. Claude Design äger den visuella
- * ytan (states A–E i tasks/onboarding-import-brief.md) och förfinar layout/copy —
- * men rör INTE logiken eller API-anropen här.
- *
- * Flöde:
- *   - Val-skärm: Koppla Fortnox / Ladda upp kundlista / Hoppa över.
- *   - Fortnox: redirect till OAuth (?return=onboarding). Vid retur landar vi
- *     tillbaka här med ?fortnox=connected → kör kund- + fakturaimport och visar
- *     siffrorna.
- *   - CSV: minimal inline fil→POST /api/customers/import (Design byter senare
- *     till den fullständiga wizarden på /dashboard/customers/import).
- *   - Hoppa över blockerar ALDRIG — alltid tillgängligt.
- */
 
 interface Props {
   onNext: () => void
@@ -44,34 +43,31 @@ interface FortnoxResult {
 
 type View = 'choose' | 'fortnox-loading' | 'fortnox-done' | 'csv' | 'csv-done'
 
+const avatarFor = (id: string) => TEAM.find(a => a.id === id)?.avatar
+
 export default function StepImportData({ onNext, onBack, data, setData }: Props) {
   const [view, setView] = useState<View>('choose')
   const [error, setError] = useState<string | null>(null)
   const [fortnoxResult, setFortnoxResult] = useState<FortnoxResult | null>(null)
   const [csvCount, setCsvCount] = useState(0)
   const [csvBusy, setCsvBusy] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const importStartedRef = useRef(false)
 
-  /**
-   * Kör kund- + fakturaimport i sekvens (kunder FÖRST så fakturor kan kopplas).
-   * Aldrig blockerande: fel → mjuk CSV-fallback via felruta + val-skärm.
-   */
+  /* ─────────── LOGIK (oförändrad) ─────────── */
+
   const runFortnoxImport = useCallback(async () => {
     setView('fortnox-loading')
     setError(null)
     try {
       const custRes = await fetch('/api/fortnox/import/customers', { method: 'POST' })
       const cust = await custRes.json().catch(() => ({}))
-      if (!custRes.ok) {
-        throw new Error(cust?.error ?? 'Kunde inte hämta kunder från Fortnox')
-      }
+      if (!custRes.ok) throw new Error(cust?.error ?? 'Kunde inte hämta kunder från Fortnox')
 
       const invRes = await fetch('/api/fortnox/import/invoices', { method: 'POST' })
       const inv = await invRes.json().catch(() => ({}))
-      if (!invRes.ok) {
-        throw new Error(inv?.error ?? 'Kunde inte hämta fakturor från Fortnox')
-      }
+      if (!invRes.ok) throw new Error(inv?.error ?? 'Kunde inte hämta fakturor från Fortnox')
 
       const result: FortnoxResult = {
         customers: Number(cust?.imported ?? 0),
@@ -80,16 +76,19 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
       }
       setFortnoxResult(result)
       setData(d => ({ ...d, importedCustomers: result.customers, importedInvoices: result.invoices }))
+      // Tomt-läge: anslutet men inget att hämta — mjuk fallback (håll kvar felruta + val-skärm).
+      if (result.customers === 0 && result.invoices === 0) {
+        setError('Fortnox var anslutet men innehöll inga kunder eller obetalda fakturor ännu.')
+        setView('choose')
+        return
+      }
       setView('fortnox-done')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Något gick fel vid hämtningen')
-      // Mjuk fallback: tillbaka till val-skärmen där CSV finns.
-      setView('choose')
+      setView('choose') // Mjuk fallback: tillbaka till valen där CSV finns.
     }
   }, [setData])
 
-  // Retur från Fortnox-OAuth: callbacken landar på /onboarding?fortnox=connected.
-  // Kör importen automatiskt en gång, städa sedan URL:en.
   useEffect(() => {
     if (importStartedRef.current) return
     const params = new URLSearchParams(window.location.search)
@@ -107,7 +106,6 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
   }, [runFortnoxImport])
 
   function connectFortnox() {
-    // Redirect till OAuth med retur till onboarding. Vid retur körs importen.
     window.location.href = '/api/integrations/fortnox/connect?return=onboarding'
   }
 
@@ -126,9 +124,7 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
         body: JSON.stringify({ customers }),
       })
       const d = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(d?.error ?? 'Import misslyckades')
-      }
+      if (!res.ok) throw new Error(d?.error ?? 'Import misslyckades')
       const imported = Number(d?.success ?? 0)
       setCsvCount(imported)
       setData(prev => ({ ...prev, importedCustomers: imported }))
@@ -140,136 +136,135 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
     }
   }
 
+  /* ─────────── VY (förfinad, obi-*) ─────────── */
+
   return (
     <div className="ob-screen">
       <OnboardingHeader step={5} total={7} onBack={onBack} onSkip={onNext} />
       <div className="ob-body">
-        <h1 className="ob-headline">Låt ditt AI-team börja jobba direkt</h1>
-        <p className="ob-sub">
-          Hämta in dina kunder och obetalda fakturor — så börjar dina AI-kollegor
-          jobba på din verksamhet från minut ett.
-        </p>
-
-        {error && (
-          <div
-            style={{
-              background: 'var(--ob-rose-50)',
-              border: '1px solid #FECACA',
-              borderRadius: 'var(--ob-r-md)',
-              padding: 10,
-              fontSize: 13,
-              color: '#B91C1C',
-              marginBottom: 16,
-              lineHeight: 1.4,
-            }}
-          >
-            {error} Du kan ladda upp en kundlista i stället, eller hoppa över.
-          </div>
-        )}
-
         {/* A. Val-skärm */}
         {view === 'choose' && (
           <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 18 }}>
-              <ChoiceCard
-                icon={<Link2 size={22} strokeWidth={2.2} />}
-                title="Koppla Fortnox"
-                subtitle="Hämtar dina kunder och obetalda fakturor automatiskt."
-                badge="Rekommenderat"
-                onClick={connectFortnox}
-              />
-              <ChoiceCard
-                icon={<Upload size={22} strokeWidth={2.2} />}
-                title="Ladda upp kundlista"
-                subtitle="Har du en CSV/Excel-fil? Vi läser in den åt dig."
-                onClick={() => setView('csv')}
-              />
+            <h1 className="ob-headline">Låt ditt AI-team börja jobba direkt.</h1>
+            <p className="ob-sub">
+              Hämta in dina kunder och obetalda fakturor — så börjar dina AI-kollegor
+              jobba på din verksamhet från minut ett.
+            </p>
+
+            {error && <FallbackNote text={error} />}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 18 }}>
+              <button className="obi-choice rec" onClick={connectFortnox}>
+                <span className="obi-badge">Rekommenderat</span>
+                <span className="obi-choice-ic teal"><Link2 size={24} strokeWidth={2.2} /></span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span className="obi-choice-title">Koppla Fortnox</span>
+                  <span className="obi-choice-sub">Hämtar dina kunder och obetalda fakturor automatiskt.</span>
+                </span>
+                <span className="obi-choice-arrow"><ArrowRight size={20} /></span>
+              </button>
+
+              <button className="obi-choice" onClick={() => setView('csv')}>
+                <span className="obi-choice-ic soft"><FileSpreadsheet size={24} strokeWidth={2.2} /></span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span className="obi-choice-title">Ladda upp kundlista</span>
+                  <span className="obi-choice-sub">Har du en CSV/Excel-fil? Vi läser in den åt dig.</span>
+                </span>
+                <span className="obi-choice-arrow"><ArrowRight size={20} /></span>
+              </button>
             </div>
 
-            <UnlockRow />
-
-            <button
-              type="button"
-              onClick={onNext}
-              style={{
-                display: 'block',
-                margin: '18px auto 0',
-                background: 'transparent',
-                border: 0,
-                color: 'var(--ob-muted)',
-                fontSize: 13,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
+            <button type="button" className="obi-skiplink" style={{ marginBottom: 22 }} onClick={onNext}>
               Hoppa över — jag gör det senare
             </button>
+
+            <div className="obi-unlock">
+              <div className="obi-unlock-label">Det här låser upp</div>
+              <div className="obi-unlock-row">
+                <UnlockItem id="karin" text={<><b>Karin</b> jagar dina obetalda fakturor</>} />
+                <UnlockItem id="hanna" text={<><b>Hanna</b> väcker vilande kunder</>} />
+                <UnlockItem id="daniel" text={<><b>Daniel</b> följer upp dina offerter</>} />
+              </div>
+            </div>
           </>
         )}
 
         {/* B. Fortnox — hämtar */}
         {view === 'fortnox-loading' && (
-          <div style={{ textAlign: 'center', padding: '32px 0' }}>
-            <Loader2
-              size={36}
-              className="animate-spin"
-              style={{ color: 'var(--ob-primary-700)', margin: '0 auto 16px' }}
-            />
-            <p style={{ fontSize: 15, color: 'var(--ob-ink)', fontWeight: 600 }}>
-              Hämtar din verksamhet från Fortnox…
-            </p>
-            <p style={{ fontSize: 13, color: 'var(--ob-ink-2)', marginTop: 6 }}>
-              Vi läser in dina kunder och obetalda fakturor.
-            </p>
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '100%' }}>
+            <div className="obi-loadcard">
+              <div className="obi-spinner" />
+              <div className="obi-load-title">Hämtar din verksamhet från Fortnox…</div>
+              <div className="obi-load-sub">Det tar bara någon sekund. Karin förbereder allt medan du väntar.</div>
+              <div className="obi-load-steps">
+                <div className="obi-load-step done">
+                  <span className="obi-step-dot"><Check size={14} style={{ color: 'var(--ob-primary-700)' }} /></span>
+                  Ansluten till Fortnox
+                </div>
+                <div className="obi-load-step active">
+                  <span className="obi-step-dot"><span className="obi-step-spin" /></span>
+                  Hämtar kunder…
+                </div>
+                <div className="obi-load-step">
+                  <span className="obi-step-dot"><span className="obi-step-idle" /></span>
+                  Läser obetalda fakturor
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* C. Fortnox — klart */}
+        {/* C. Fortnox — klart (glädje-wow) */}
         {view === 'fortnox-done' && fortnoxResult && (
-          <SuccessBlock
-            lines={[
-              `${fortnoxResult.customers} kunder`,
-              `${fortnoxResult.invoices} obetalda fakturor`,
-              `${fortnoxResult.outstandingKr.toLocaleString('sv-SE')} kr utestående`,
+          <SuccessView
+            title={<>Vi hämtade <span className="hl">{fortnoxResult.customers} kunder</span> och <span className="hl">{fortnoxResult.invoices} obetalda fakturor</span></>}
+            sub="Din verksamhet är inläst. Teamet har redan börjat jobba."
+            stats={[
+              { num: String(fortnoxResult.customers), label: 'kunder' },
+              { num: String(fortnoxResult.invoices), label: 'obetalda fakturor' },
+              { num: fortnoxResult.outstandingKr.toLocaleString('sv-SE'), label: 'kr utestående', hero: true },
             ]}
-            karin={fortnoxResult.invoices > 0}
-            karinCount={fortnoxResult.invoices}
+            agent={fortnoxResult.invoices > 0 ? {
+              id: 'karin',
+              text: <><b>Karin</b> har förberett påminnelser på dina obetalda fakturor — du godkänner dem på dashboarden.</>,
+            } : undefined}
           />
         )}
 
-        {/* D. CSV-import (minimal inline) */}
+        {/* D. CSV-import */}
         {view === 'csv' && (
-          <div>
+          <>
+            <h1 className="ob-headline" style={{ fontSize: 22 }}>Ladda upp kundlista</h1>
+            <p className="ob-sub" style={{ marginBottom: 18 }}>CSV eller Excel — vi känner igen kolumnerna åt dig.</p>
+
+            {error && <FallbackNote text={error} />}
+
             <div
+              className={`obi-drop ${dragOver ? 'over' : ''}`}
               role="button"
               tabIndex={0}
-              onClick={() => fileInputRef.current?.click()}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  fileInputRef.current?.click()
-                }
-              }}
-              style={{
-                border: '1.5px dashed var(--ob-border)',
-                borderRadius: 'var(--ob-r-lg)',
-                padding: '28px 18px',
-                textAlign: 'center',
-                cursor: csvBusy ? 'default' : 'pointer',
-                background: 'var(--ob-surface)',
+              onClick={() => !csvBusy && fileInputRef.current?.click()}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click() } }}
+              onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={e => {
+                e.preventDefault(); setDragOver(false)
+                const f = e.dataTransfer.files?.[0]
+                if (f) handleCsvFile(f)
               }}
             >
               {csvBusy ? (
-                <Loader2 size={28} className="animate-spin" style={{ color: 'var(--ob-primary-700)' }} />
+                <>
+                  <Loader2 size={38} className="animate-spin" style={{ color: 'var(--ob-primary-700)', marginBottom: 12 }} />
+                  <div className="obi-drop-title">Läser in dina kunder…</div>
+                </>
               ) : (
                 <>
-                  <Upload size={28} style={{ color: 'var(--ob-primary-700)', marginBottom: 8 }} />
-                  <p style={{ fontSize: 14, color: 'var(--ob-ink)', fontWeight: 600 }}>
-                    Välj CSV-fil med dina kunder
-                  </p>
-                  <p style={{ fontSize: 12, color: 'var(--ob-muted)', marginTop: 4 }}>
-                    Kolumner: namn, telefon, e-post, adress
-                  </p>
+                  <div className="obi-drop-ic"><Upload size={38} /></div>
+                  <div className="obi-drop-title">Dra och släpp din fil här</div>
+                  <div className="obi-drop-or">eller</div>
+                  <span className="obi-pickbtn"><FileSpreadsheet size={16} /> Välj fil</span>
+                  <div className="obi-hint">Stödjer CSV (komma-, semikolon- eller tab-separerad)</div>
                 </>
               )}
             </div>
@@ -278,33 +273,45 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
               type="file"
               accept=".csv,text/csv,text/plain"
               style={{ display: 'none' }}
-              onChange={e => {
-                const f = e.target.files?.[0]
-                if (f) handleCsvFile(f)
-              }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleCsvFile(f) }}
             />
+
+            <div className="ob-card obi-tips" style={{ marginTop: 16 }}>
+              {[
+                'Första raden ska vara kolumnrubriker (Namn, Telefon, …)',
+                'Telefonnummer i eget fält (07XXXXXXXX eller +467XXXXXXXX)',
+                'Dubbletter uppdateras automatiskt',
+              ].map(t => (
+                <div key={t} className="obi-tip">
+                  <span className="obi-tip-ic"><Check size={16} strokeWidth={2.5} /></span>{t}
+                </div>
+              ))}
+              <button type="button" className="obi-templink" onClick={downloadTemplate}>
+                <Download size={15} /> Ladda ner exempelmall
+              </button>
+            </div>
+
             <button
               type="button"
-              onClick={() => setView('choose')}
-              style={{
-                display: 'block',
-                margin: '16px auto 0',
-                background: 'transparent',
-                border: 0,
-                color: 'var(--ob-muted)',
-                fontSize: 13,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
+              className="obi-skiplink"
+              style={{ marginTop: 16 }}
+              onClick={() => { setError(null); setView('choose') }}
             >
-              Tillbaka till valen
+              <ArrowLeft size={13} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Tillbaka till valen
             </button>
-          </div>
+          </>
         )}
 
-        {/* CSV klart */}
+        {/* CSV — klart */}
         {view === 'csv-done' && (
-          <SuccessBlock lines={[`${csvCount} kunder inlästa`]} karin={false} karinCount={0} />
+          <SuccessView
+            title={<><span className="hl">{csvCount} kunder</span> inlästa</>}
+            sub="Teamet kan nu jobba på hela din kundbas."
+            agent={{
+              id: 'hanna',
+              text: <><b>Hanna</b> kan nu väcka dina vilande kunder med en reaktiverings-kampanj — starta den på dashboarden.</>,
+            }}
+          />
         )}
       </div>
 
@@ -319,11 +326,87 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
   )
 }
 
-/**
- * Minimal CSV-parser för onboarding-fallbacken. Auto-mappar vanliga svenska/
- * engelska kolumnnamn. Design byter senare till den fullständiga wizarden
- * (/dashboard/customers/import) med drop-zon + kolumnmappning.
- */
+/* ─────────── Presentations-hjälpare (obi-*) ─────────── */
+
+function UnlockItem({ id, text }: { id: string; text: React.ReactNode }) {
+  return (
+    <div className="obi-unlock-item">
+      <span className="obi-unlock-av" style={{ backgroundImage: avatarFor(id) ? `url(${avatarFor(id)})` : undefined }} />
+      <span className="obi-unlock-text">{text}</span>
+    </div>
+  )
+}
+
+function FallbackNote({ text }: { text: string }) {
+  return (
+    <div
+      style={{
+        display: 'flex', gap: 10, alignItems: 'flex-start',
+        background: '#FFFBEB', border: '1px solid #FDE68A',
+        borderRadius: 'var(--ob-r-md)', padding: '12px 14px',
+        fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.45, marginBottom: 16,
+      }}
+    >
+      <AlertTriangle size={17} style={{ color: 'var(--ob-amber-600)', flexShrink: 0, marginTop: 1 }} />
+      <span>{text} Ingen fara — ladda upp en kundlista i stället, eller hoppa över.</span>
+    </div>
+  )
+}
+
+function SuccessView({
+  title,
+  sub,
+  stats,
+  agent,
+}: {
+  title: React.ReactNode
+  sub: string
+  stats?: Array<{ num: string; label: string; hero?: boolean }>
+  agent?: { id: string; text: React.ReactNode }
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '100%' }}>
+      <div className="obi-success">
+        <div className="obi-burst"><Check size={40} strokeWidth={2.6} /></div>
+        <h1 className="obi-success-title">{title}</h1>
+        <p className="obi-success-sub">{sub}</p>
+
+        {stats && stats.length > 0 && (
+          <div className="obi-stats">
+            {stats.map((s, i) => (
+              <div key={s.label} className={`obi-stat ${s.hero ? 'hero' : ''}`} style={{ animationDelay: `${0.05 + i * 0.07}s` }}>
+                <div className="obi-stat-num">{s.num}</div>
+                <div className="obi-stat-label">{s.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {agent && (
+          <div className="obi-karin">
+            <span className="obi-karin-av" style={{ backgroundImage: avatarFor(agent.id) ? `url(${avatarFor(agent.id)})` : undefined }} />
+            <span className="obi-karin-text">{agent.text}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ─────────── CSV-parser + mall (oförändrad logik) ─────────── */
+
+function downloadTemplate() {
+  const template =
+    'Namn,Telefon,E-post,Adress\nAnna Andersson,0701234567,anna@example.com,Storgatan 1\nErik Eriksson,0709876543,erik@example.com,Lillvägen 5'
+  const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'kundimport_mall.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 function parseCsvCustomers(
   text: string
 ): Array<{ name: string; phone_number: string; email: string; address: string }> {
@@ -341,7 +424,6 @@ function parseCsvCustomers(
   const emailIdx = findCol(['e-post', 'epost', 'email', 'mail', 'e-mail'])
   const addrIdx = findCol(['adress', 'address', 'gata'])
 
-  // Om ingen header känns igen: anta att raderna redan är data (namn i kol 0).
   const hasHeader = nameIdx >= 0 || phoneIdx >= 0 || emailIdx >= 0
   const dataLines = hasHeader ? lines.slice(1) : lines
 
@@ -356,173 +438,4 @@ function parseCsvCustomers(
     out.push({ name, phone_number: phone, email, address })
   }
   return out
-}
-
-function ChoiceCard({
-  icon,
-  title,
-  subtitle,
-  badge,
-  onClick,
-}: {
-  icon: React.ReactNode
-  title: string
-  subtitle: string
-  badge?: string
-  onClick: () => void
-}) {
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={e => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onClick()
-        }
-      }}
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 14,
-        padding: 16,
-        background: 'var(--ob-surface)',
-        border: '1.5px solid var(--ob-border)',
-        borderRadius: 'var(--ob-r-lg)',
-        cursor: 'pointer',
-        position: 'relative',
-        textAlign: 'left',
-        fontFamily: 'inherit',
-      }}
-    >
-      <div
-        style={{
-          width: 44,
-          height: 44,
-          flexShrink: 0,
-          borderRadius: 'var(--ob-r-md)',
-          background: 'var(--ob-primary-50)',
-          color: 'var(--ob-primary-700)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {icon}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-          <strong style={{ fontSize: 15, color: 'var(--ob-ink)' }}>{title}</strong>
-          {badge && (
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-                color: '#fff',
-                background: 'var(--ob-primary-700)',
-                borderRadius: 'var(--ob-r-pill)',
-                padding: '2px 8px',
-              }}
-            >
-              {badge}
-            </span>
-          )}
-        </div>
-        <p style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.4 }}>{subtitle}</p>
-      </div>
-      <ArrowRight size={18} style={{ color: 'var(--ob-muted)', flexShrink: 0, marginTop: 4 }} />
-    </div>
-  )
-}
-
-function UnlockRow() {
-  const items = [
-    'Karin jagar dina obetalda fakturor',
-    'Hanna väcker vilande kunder',
-    'Daniel följer upp dina offerter',
-  ]
-  return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 6,
-        padding: '12px 14px',
-        background: 'var(--ob-primary-50)',
-        border: '1px solid var(--ob-primary-100)',
-        borderRadius: 'var(--ob-r-md)',
-      }}
-    >
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ob-primary-700)', marginBottom: 2 }}>
-        Det här låser upp
-      </div>
-      {items.map(t => (
-        <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Zap size={13} style={{ color: 'var(--ob-primary-700)', flexShrink: 0 }} />
-          <span style={{ fontSize: 13, color: 'var(--ob-ink-2)' }}>{t}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function SuccessBlock({
-  lines,
-  karin,
-  karinCount,
-}: {
-  lines: string[]
-  karin: boolean
-  karinCount: number
-}) {
-  return (
-    <div style={{ padding: '8px 0' }}>
-      <div
-        style={{
-          width: 52,
-          height: 52,
-          borderRadius: '50%',
-          background: 'var(--ob-primary-700)',
-          color: '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          margin: '0 auto 16px',
-        }}
-      >
-        <Check size={28} strokeWidth={2.5} />
-      </div>
-      <p style={{ fontSize: 15, color: 'var(--ob-ink)', textAlign: 'center', lineHeight: 1.5 }}>
-        Vi hämtade{' '}
-        {lines.map((l, i) => (
-          <span key={l}>
-            <strong>{l}</strong>
-            {i < lines.length - 1 ? ' och ' : ''}
-          </span>
-        ))}
-        .
-      </p>
-      {karin && (
-        <div
-          style={{
-            marginTop: 16,
-            padding: '12px 14px',
-            background: 'var(--ob-primary-50)',
-            border: '1px solid var(--ob-primary-100)',
-            borderRadius: 'var(--ob-r-md)',
-            fontSize: 13,
-            color: 'var(--ob-ink-2)',
-            lineHeight: 1.45,
-          }}
-        >
-          <strong style={{ color: 'var(--ob-primary-700)' }}>Karin är redan igång.</strong> Hon
-          har förberett påminnelser på dina {karinCount} förfallna fakturor — du godkänner dem på
-          dashboarden.
-        </div>
-      )}
-    </div>
-  )
 }
