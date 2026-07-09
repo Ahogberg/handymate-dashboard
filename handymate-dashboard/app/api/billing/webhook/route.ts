@@ -22,6 +22,47 @@ function toIsoOrNull(unixSeconds: unknown): string | null {
 }
 
 /**
+ * Skriver billing-uppdateringar till business_config så att en SAKNAD valfri
+ * kolumn (billing_period_start/end innan sql/v69 körts i prod) ALDRIG kan
+ * blockera den KRITISKA statusskrivningen. Tidigare låg period-fälten i samma
+ * update som subscription_status:'active' — saknades kolumnen avvisades HELA
+ * uppdateringen och prenumerationen aktiverades aldrig i vår databas trots att
+ * Stripe drog pengarna.
+ *
+ * Kritiska fält skrivs + felkontrolleras och kastar vid fel → Stripe retriar
+ * (billing_event-raden loggas först EFTER detta i handlern, så en retry kör om
+ * i stället för att hoppas över). Period-fälten skrivs separat best-effort.
+ */
+async function writeBillingUpdate(
+  supabase: any,
+  businessId: string,
+  critical: Record<string, any>,
+  period?: { start?: string | null; end?: string | null },
+) {
+  const { error } = await supabase
+    .from('business_config')
+    .update(critical)
+    .eq('business_id', businessId)
+  if (error) {
+    console.error('[Billing webhook] KRITISK: subscription-status kunde inte skrivas — kastar för Stripe-retry:', { businessId, error })
+    throw new Error(`business_config kritisk update misslyckades: ${error.message}`)
+  }
+
+  const periodUpdate: Record<string, any> = {}
+  if (period?.start) periodUpdate.billing_period_start = period.start
+  if (period?.end) periodUpdate.billing_period_end = period.end
+  if (Object.keys(periodUpdate).length > 0) {
+    const { error: perr } = await supabase
+      .from('business_config')
+      .update(periodUpdate)
+      .eq('business_id', businessId)
+    if (perr) {
+      console.warn('[Billing webhook] billing_period_* ej skrivet (kolumn saknas innan v69?) — icke-blockerande:', perr.message)
+    }
+  }
+}
+
+/**
  * POST /api/billing/webhook - Stripe webhook handler
  * Ingen auth -- Stripe skickar webhooks direkt.
  * Validerar signatur och hanterar prenumerationshändelser.
@@ -136,29 +177,29 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
     return
   }
 
-  const updates: Record<string, any> = {
+  const critical: Record<string, any> = {
     stripe_customer_id: session.customer as string,
     subscription_plan: planId || 'starter',
     subscription_status: 'active'
   }
+  let period: { start?: string | null; end?: string | null } | undefined
 
   if (session.subscription) {
-    updates.stripe_subscription_id = session.subscription as string
+    critical.stripe_subscription_id = session.subscription as string
 
-    // Hämta prenumerationsperiod
+    // Hämta prenumerationsperiod (best-effort — blockerar aldrig aktiveringen)
     try {
       const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
-      updates.billing_period_start = new Date((subscription as any).current_period_start * 1000).toISOString()
-      updates.billing_period_end = new Date((subscription as any).current_period_end * 1000).toISOString()
+      period = {
+        start: toIsoOrNull((subscription as any).current_period_start),
+        end: toIsoOrNull((subscription as any).current_period_end),
+      }
     } catch (err) {
       console.error('Failed to retrieve subscription details:', err)
     }
   }
 
-  await supabase
-    .from('business_config')
-    .update(updates)
-    .eq('business_id', businessId)
+  await writeBillingUpdate(supabase, businessId, critical, period)
 
   // Logga händelse
   await supabase
@@ -245,31 +286,27 @@ async function updateSubscriptionData(
   const billingStatus = statusMap[subscription.status] || subscription.status
   const planId = subscription.metadata?.plan_id
 
-  const updates: Record<string, any> = {
+  const critical: Record<string, any> = {
     subscription_status: billingStatus,
     stripe_subscription_id: subscription.id
   }
 
-  // Guardat: kastar aldrig om current_period_* saknas → handlern 500:ar inte →
-  // ingen Stripe-retry-loop. Status persisteras alltid (det är det viktiga;
-  // billing_period_* är bara informativt och används inte i gating).
-  const periodStart = toIsoOrNull((subscription as any).current_period_start)
-  const periodEnd = toIsoOrNull((subscription as any).current_period_end)
-  if (periodStart) updates.billing_period_start = periodStart
-  if (periodEnd) updates.billing_period_end = periodEnd
-
   if (planId) {
-    updates.subscription_plan = planId
+    critical.subscription_plan = planId
   }
 
   if (subscription.trial_end) {
-    updates.trial_ends_at = new Date(subscription.trial_end * 1000).toISOString()
+    critical.trial_ends_at = new Date(subscription.trial_end * 1000).toISOString()
   }
 
-  await supabase
-    .from('business_config')
-    .update(updates)
-    .eq('business_id', businessId)
+  // billing_period_* skrivs separat best-effort (kolumnen kan saknas innan v69);
+  // subscription_status MÅSTE persisteras och får aldrig blockeras av den.
+  const period = {
+    start: toIsoOrNull((subscription as any).current_period_start),
+    end: toIsoOrNull((subscription as any).current_period_end),
+  }
+
+  await writeBillingUpdate(supabase, businessId, critical, period)
 
   // Logga händelse
   await supabase
