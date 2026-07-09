@@ -17,12 +17,14 @@ function getStripe() {
 /**
  * POST /api/billing/onboarding-checkout — Stripe Checkout för ONBOARDING.
  *
- * Skillnad mot /api/billing/checkout (som är för uppgradering i Inställningar):
- *  - `subscription_data.trial_period_days: 30` → prenumerationen skapas direkt i
- *    `trialing`; Stripe drar sedan kortet automatiskt när provperioden tar slut.
- *    Detta ERSÄTTER den tidigare setup-intent/confirm-flödet som bara satte
- *    `subscription_status:'trialing'` i vår databas UTAN att någonsin skapa en
- *    Stripe-prenumeration → kunden debiterades aldrig (intäktsblocker).
+ * INGEN provperiod — kunden DEBITERAS DIREKT. Handymates modell är betala-direkt
+ * med en pengarna-tillbaka-garanti som trygghet, inte en trial. Checkouten skapar
+ * en prenumeration som blir `active` med en gång och drar kortet omedelbart.
+ * Detta ERSÄTTER det tidigare setup-intent/confirm-flödet som bara satte
+ * `subscription_status:'trialing'` i vår databas UTAN att någonsin skapa en
+ * Stripe-prenumeration → kunden debiterades aldrig (intäktsblocker).
+ *
+ * Skillnad mot /api/billing/checkout (uppgradering i Inställningar):
  *  - `metadata.onboarding: 'true'` → webhooken (handleCheckoutCompleted)
  *    provisionerar telefonnummer efter genomförd checkout.
  *  - success_url/cancel_url pekar tillbaka in i onboarding-flödet.
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.handymate.se'
 
-    // Skapa Stripe Checkout-session MED 30 dagars provperiod.
+    // Skapa Stripe Checkout-session — INGEN provperiod, debiteras direkt.
     const session = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
       mode: 'subscription',
@@ -108,7 +110,6 @@ export async function POST(request: NextRequest) {
         onboarding: 'true',
       },
       subscription_data: {
-        trial_period_days: 30,
         metadata: {
           business_id: business.business_id,
           plan_id: planId,

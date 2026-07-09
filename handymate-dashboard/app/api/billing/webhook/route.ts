@@ -177,9 +177,10 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
     return
   }
 
-  // Onboarding-checkout skapar prenumerationen MED 30 dagars trial → status ska
-  // spegla Stripe (trialing), inte hårdkodas 'active'. Uppgraderings-checkouten i
-  // Inställningar (utan trial) blir 'active' som tidigare.
+  // Vi speglar Stripes verkliga prenumerationsstatus i stället för att hårdkoda
+  // 'active'. INGEN trial (Handymate debiterar direkt) → status blir 'active' med
+  // en gång för både onboarding-checkouten och uppgradering i Inställningar. Att
+  // spegla statusen skyddar mot edge-fall (t.ex. 'incomplete' vid 3DS/SCA).
   const isOnboarding = session.metadata?.onboarding === 'true'
 
   const statusMap: Record<string, string> = {
