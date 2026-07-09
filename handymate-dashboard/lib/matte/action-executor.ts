@@ -82,17 +82,31 @@ async function executeDirectAction(
         .maybeSingle()
 
       if (!existing) {
-        await supabase.from('leads').insert({
+        // Kolumnen heter pipeline_stage_key (INTE pipeline_stage — den finns
+        // inte). Leads-funneln (pipeline_stages, PLURAL) använder nyckeln
+        // 'new_lead' som default — INTE deals-Kanbanens 'new_inquiry'. Fel
+        // kolumnnamn tidigare → PostgREST avvisade hela inserten → AI-detekterade
+        // leads föll tyst bort (felet lästes aldrig). Kontrollera felet nu.
+        const { error: leadError } = await supabase.from('leads').insert({
           lead_id: `lead_${Math.random().toString(36).substr(2, 12)}`,
           business_id: businessId,
           phone,
-          email: entity.email || null,
-          name: entity.customerName || null,
+          email: entity.email ?? null,
+          name: entity.customerName ?? null,
           source: `${signal.channel}_inbound`,
           status: 'new',
-          pipeline_stage: 'new_inquiry',
+          pipeline_stage_key: 'new_lead',
           created_at: new Date().toISOString(),
         })
+        if (leadError) {
+          console.error('[Matte] create_lead insert misslyckades:', leadError.message)
+          throw new Error(`create_lead misslyckades: ${leadError.message}`)
+        }
+        // TODO (uppföljning): denna väg skapar endast en lead, ingen deal, så
+        // AI-detekterade leads når aldrig deals-pipelinen. Kör golden-path-
+        // helpern (createLeadAndDeal) här för att få in dem i funneln. Deferrat:
+        // kräver source-mappning mot valid_source-CHECK + businessPhoneNumber-
+        // hämtning — större ändring än denna kolumn-/felkontrollsfix.
       }
       break
     }

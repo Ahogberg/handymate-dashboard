@@ -1051,10 +1051,14 @@ async function executeApprovalPayload(
             leadId,
             (await import('@/lib/supabase')).getServerSupabase(),
           )
+          if (result.dealError) {
+            console.error('[approvals/lead_review] Deal skapades inte:', result.dealError)
+          }
           return {
             action: 'lead_review',
             lead_id: leadId,
             deal_id: result.dealId,
+            deal_error: result.dealError ?? null,
             navigate_to: result.dealId ? `/dashboard/pipeline` : `/dashboard/leads/${leadId}`,
           }
         } catch (err: any) {

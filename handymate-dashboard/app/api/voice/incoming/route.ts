@@ -193,6 +193,7 @@ export async function POST(request: NextRequest) {
           source: 'vapi_call',
         }, supabase)
         customerId = gp.customerId
+        if (gp.dealError) console.error('[Voice] Golden Path deal misslyckades:', gp.dealError)
         console.log(`[Voice] Golden Path: lead ${gp.leadId} + deal ${gp.dealId} + customer ${gp.customerId} from ${from}`)
       } catch (leadErr) {
         console.error('[Voice] Auto-lead creation error (non-blocking):', leadErr)

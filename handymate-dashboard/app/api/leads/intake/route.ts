@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'name and phone required' }, { status: 400, headers: corsHeaders })
     }
 
-    await createLeadAndDeal(
+    const gp = await createLeadAndDeal(
       {
         businessId: business.business_id,
         businessPhoneNumber: business.phone_number,
@@ -114,7 +114,15 @@ export async function POST(request: NextRequest) {
       supabase,
     )
 
-    return Response.json({ success: true }, { headers: corsHeaders })
+    // Ett tyst deal-fel får aldrig se ut som success — logga och surfa det.
+    if (gp.dealError) {
+      console.error('[leads/intake] Lead skapad men deal misslyckades:', gp.dealError)
+    }
+
+    return Response.json(
+      { success: true, deal_created: gp.dealId != null, deal_error: gp.dealError ?? null },
+      { headers: corsHeaders },
+    )
   } catch (error: any) {
     console.error('Leads intake error:', error)
     return Response.json({ error: 'Internal error' }, { status: 500, headers: corsHeaders })

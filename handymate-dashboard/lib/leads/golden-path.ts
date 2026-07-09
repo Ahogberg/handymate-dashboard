@@ -20,6 +20,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getNextLeadNumber, getNextCaseNumber } from '@/lib/numbering'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { getStageBySlug } from '@/lib/pipeline'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -75,6 +76,10 @@ export interface CreateLeadAndDealResult {
   leadId: string
   dealId: string | null
   customerId: string
+  /** Sätts om deal-inserten misslyckades (FK/stage saknas). Null = OK eller
+      deal medvetet ej skapad (createDealAndNotify=false). En tyst FK-miss får
+      ALDRIG se ut som success — callers kan inspektera detta fält. */
+  dealError?: string | null
 }
 
 /**
@@ -169,44 +174,47 @@ export async function createLeadAndDeal(
   }
 
   // ── 4. Deal i pipeline (Golden Path) ─────────────────────────
+  // deal.stage_id är en NOT-NULL FK mot pipeline_stage (SINGULAR, deals-Kanban,
+  // nyckelkolumn 'slug'). Tidigare hämtades stage_id från pipeline_stages
+  // (PLURAL, leads-funneln) → ett plural-id är ALDRIG giltigt mot den FK:n →
+  // hela inserten rullades tillbaka tyst → inga deals skapades för golden-path-
+  // leads, men callern såg success. Vi hämtar nu 'new_inquiry'-stegets id från
+  // rätt tabell via getStageBySlug (samma mönster som ensureDealForQuote).
   let dealId: string | null = null
+  let dealError: string | null = null
   try {
-    const { data: firstPipelineStage } = await supabase
-      .from('pipeline_stages')
-      .select('id')
-      .eq('business_id', businessId)
-      .order('sort_order', { ascending: true })
-      .limit(1)
-      .single()
-
-    if (firstPipelineStage) {
+    const stage = await getStageBySlug(businessId, 'new_inquiry')
+    if (!stage) {
+      // Stages ej seedade → inget giltigt stage_id finns. Skapa INGEN deal med
+      // ogiltigt stage_id (FK skulle avvisa). Logga och signalera till callern.
+      dealError = 'pipeline_stage "new_inquiry" saknas — deal ej skapad (stages ej seedade?)'
+      console.warn(`[golden-path] ${dealError} (business ${businessId})`)
+    } else {
       const nextNumber = await getNextCaseNumber(supabase, businessId)
-      const { data: newDeal, error: dealError } = await supabase
+      const { data: newDeal, error: insertError } = await supabase
         .from('deal')
         .insert({
           business_id: businessId,
           title: message ? message.slice(0, 80) : `Förfrågan från ${name}`,
           customer_id: customerId,
           lead_id: leadId,
-          stage_id: firstPipelineStage.id,
+          stage_id: stage.id,
           source: source.toLowerCase(),
           deal_number: nextNumber,
           priority: 'medium',
         })
         .select('id')
         .maybeSingle()
-      // OBS: deal-tabellens PK är 'id' (inte 'deal_id'). Tidigare select på den
-      // obefintliga kolumnen fick PostgREST att fela → HELA inserten rullades
-      // tillbaka → inga deals skapades för golden-path-leads, tyst (supabase
-      // kastar inte; felet lästes aldrig). Logga alltid insert-felet.
-      if (dealError) {
-        console.error('[golden-path] Deal-insert misslyckades:', dealError.message)
+      if (insertError) {
+        dealError = insertError.message
+        console.error('[golden-path] Deal-insert misslyckades:', insertError.message)
       }
-      dealId = newDeal?.id || null
+      dealId = newDeal?.id ?? null
     }
   } catch (err) {
+    dealError = err instanceof Error ? err.message : String(err)
     console.error('[golden-path] Auto-deal creation failed:', err)
-    // Non-blocking — lead skapas ändå
+    // Non-blocking — lead skapas ändå, men felet surfas via dealError.
   }
 
   // ── 5. SMS till hantverkaren (non-blocking) ──────────────────
@@ -226,7 +234,7 @@ export async function createLeadAndDeal(
     })
   } catch { /* non-blocking */ }
 
-  return { leadId, dealId, customerId }
+  return { leadId, dealId, customerId, dealError }
 }
 
 /**
@@ -238,7 +246,8 @@ export async function createLeadAndDeal(
  *   4. fireEvent('lead_received')
  *
  * Ingen customer skapas — den finns redan från webhook.
- * Returnerar dealId | null (deal-skapande är non-blocking).
+ * Returnerar dealId | null + dealError (deal-skapande är non-blocking, men
+ * ett tyst fel får aldrig se ut som success — surfas via dealError).
  *
  * Caller måste verifiera att lead.business_id stämmer med session-
  * business innan denna helper kallas — denna funktion gör ingen
@@ -247,7 +256,7 @@ export async function createLeadAndDeal(
 export async function activatePendingLead(
   leadId: string,
   supabase: SupabaseClient,
-): Promise<{ dealId: string | null }> {
+): Promise<{ dealId: string | null; dealError: string | null }> {
   const { data: lead, error } = await supabase
     .from('leads')
     .select('lead_id, business_id, customer_id, name, phone, email, notes, source')
@@ -272,41 +281,42 @@ export async function activatePendingLead(
     .single()
 
   // Skapa deal i pipeline
+  // Samma fix som createLeadAndDeal: stage_id måste komma från pipeline_stage
+  // (SINGULAR, deals-Kanban) via getStageBySlug('new_inquiry'). Ett id från
+  // pipeline_stages (PLURAL) är ogiltigt mot deal.stage_id-FK:n och gjorde att
+  // inserten rullades tillbaka tyst.
   let dealId: string | null = null
+  let dealError: string | null = null
   try {
-    const { data: firstPipelineStage } = await supabase
-      .from('pipeline_stages')
-      .select('id')
-      .eq('business_id', lead.business_id)
-      .order('sort_order', { ascending: true })
-      .limit(1)
-      .single()
-
-    if (firstPipelineStage) {
+    const stage = await getStageBySlug(lead.business_id, 'new_inquiry')
+    if (!stage) {
+      dealError = 'pipeline_stage "new_inquiry" saknas — deal ej skapad (stages ej seedade?)'
+      console.warn(`[activatePendingLead] ${dealError} (business ${lead.business_id})`)
+    } else {
       const nextNumber = await getNextCaseNumber(supabase, lead.business_id)
       const message = lead.notes
-      const { data: newDeal, error: dealError } = await supabase
+      const { data: newDeal, error: insertError } = await supabase
         .from('deal')
         .insert({
           business_id: lead.business_id,
           title: message ? message.slice(0, 80) : `Förfrågan från ${lead.name || 'kund'}`,
           customer_id: lead.customer_id,
           lead_id: lead.lead_id,
-          stage_id: firstPipelineStage.id,
-          source: (lead.source || 'email_forward').toLowerCase(),
+          stage_id: stage.id,
+          source: (lead.source ?? 'email_forward').toLowerCase(),
           deal_number: nextNumber,
           priority: 'medium',
         })
         .select('id')
         .maybeSingle()
-      // Samma PK-bugg som ovan: 'deal_id' finns inte → select felade → HELA
-      // inserten rullades tillbaka tyst. PK är 'id'; logga alltid felet.
-      if (dealError) {
-        console.error('[activatePendingLead] Deal-insert misslyckades:', dealError.message)
+      if (insertError) {
+        dealError = insertError.message
+        console.error('[activatePendingLead] Deal-insert misslyckades:', insertError.message)
       }
-      dealId = newDeal?.id || null
+      dealId = newDeal?.id ?? null
     }
   } catch (err) {
+    dealError = err instanceof Error ? err.message : String(err)
     console.error('[activatePendingLead] Deal creation failed:', err)
   }
 
@@ -327,5 +337,5 @@ export async function activatePendingLead(
     })
   } catch { /* non-blocking */ }
 
-  return { dealId }
+  return { dealId, dealError }
 }
