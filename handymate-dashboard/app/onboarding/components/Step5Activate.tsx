@@ -69,11 +69,11 @@ interface Step5Props {
 
 /**
  * Betalning sker numera på Stripes hostade Checkout-sida (redirect), inte via
- * inbäddat CardElement. Detta skapar en RIKTIG prenumeration med 30 dagars
- * provperiod. De gamla /api/billing/setup-intent + /api/billing/confirm är
- * ERSATTA (satte bara subscription_status:'trialing' utan att skapa någon
- * Stripe-prenumeration → kunden debiterades aldrig). Routes finns kvar orörda
- * men anropas inte längre härifrån.
+ * inbäddat CardElement. Detta skapar en RIKTIG prenumeration som debiteras
+ * DIREKT (ingen provperiod — modellen är betala direkt + resultatgaranti). De
+ * gamla /api/billing/setup-intent + /api/billing/confirm är ERSATTA (satte bara
+ * subscription_status:'trialing' utan att skapa någon Stripe-prenumeration →
+ * kunden debiterades aldrig). Routes finns kvar orörda men anropas inte längre.
  */
 export default function Step5Activate({ onNext, onBack, data, setData }: Step5Props) {
   const plan = data.plan || 'professional'
@@ -205,8 +205,8 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
         >
           <Shield size={18} style={{ color: 'var(--ob-primary-700)', flexShrink: 0 }} />
           <span style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.45 }}>
-            Du anger kortuppgifterna säkert hos Stripe i nästa steg. Inget dras nu —
-            provperioden är 30 dagar.
+            Du anger kortuppgifterna säkert hos Stripe i nästa steg. Prenumerationen
+            startar direkt — täckt av vår 30-dagars resultatgaranti.
           </span>
         </div>
 
@@ -246,7 +246,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
             Vad händer nu?
           </div>
           {[
-            'Kort dras inte direkt om garantin utlöses',
+            'Pengarna tillbaka om garantin inte infrias',
             'AI-teamet är aktivt från första minuten',
             'Avsluta när som helst',
           ].map((t, i) => (
