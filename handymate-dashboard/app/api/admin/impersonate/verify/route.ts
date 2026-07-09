@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAdminSupabase, logAdminAction } from '@/lib/admin-auth'
+import { getAdminSupabase, logAdminAction, isAdmin } from '@/lib/admin-auth'
 import { cookies } from 'next/headers'
 
 /**
@@ -8,6 +8,13 @@ import { cookies } from 'next/headers'
  */
 export async function GET(request: NextRequest) {
   try {
+    // Kräv autentiserad admin — annars kan vem som helst med en giltig
+    // token-sträng lösa in den och få en magic link till kundens konto.
+    const adminCheck = await isAdmin(request)
+    if (!adminCheck.isAdmin) {
+      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 })
+    }
+
     const token = request.nextUrl.searchParams.get('token')
 
     if (!token || !token.startsWith('imp_')) {
@@ -31,6 +38,12 @@ export async function GET(request: NextRequest) {
     // Check expiration
     if (new Date(tokenData.expires_at) < new Date()) {
       return NextResponse.json({ error: 'Token expired' }, { status: 400 })
+    }
+
+    // Den admin som skapade token måste vara samma admin som löser in den.
+    // Hindrar en admin från att lösa in en annan admins impersonation-token.
+    if (adminCheck.userId !== tokenData.admin_user_id) {
+      return NextResponse.json({ error: 'Forbidden - token belongs to another admin' }, { status: 403 })
     }
 
     // Mark token as used

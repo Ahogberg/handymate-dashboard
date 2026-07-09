@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyElksSignature } from '@/lib/elks-signature'
 
 /**
  * GET/POST /api/voice/missed
@@ -28,11 +29,31 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     // tillbaka till query om de skulle ligga där.
     let state = url.searchParams.get('state') || ''
     let duration = Number(url.searchParams.get('duration') || 0)
-    try {
-      const body = await request.formData()
-      state = String(body.get('state') || state)
-      duration = Number(body.get('duration') || duration)
-    } catch { /* GET eller ingen form-body */ }
+
+    // Läs rå body EN gång — behövs både för signaturvalidering och parsning.
+    let rawBody = ''
+    if (request.method === 'POST') {
+      try { rawBody = await request.text() } catch { /* ingen body */ }
+
+      // Verifiera 46elks-signatur (whenhangup-callbacken signeras med samma
+      // HMAC som övriga webhooks). Utan detta kan call_missed → catch-SMS
+      // triggas av en förfalskad POST. Kan inaktiveras via ELKS_SKIP_SIGNATURE.
+      if (process.env.ELKS_SKIP_SIGNATURE !== 'true') {
+        const req = new NextRequest(request.url, { method: 'POST', headers: request.headers, body: rawBody })
+        if (!verifyElksSignature(req, rawBody)) {
+          console.error('[voice/missed] Ogiltig 46elks-signatur, avvisar webhook')
+          return new NextResponse('Unauthorized', { status: 401 })
+        }
+      }
+    }
+
+    if (rawBody) {
+      try {
+        const body = new URLSearchParams(rawBody)
+        state = String(body.get('state') || state)
+        duration = Number(body.get('duration') || duration)
+      } catch { /* ingen form-body */ }
+    }
 
     const answered = state === 'success' || duration > 0
     console.log('[voice/missed] hangup', { businessId, from, callId, handled, state, duration, answered })

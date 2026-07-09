@@ -98,25 +98,61 @@ export async function exchangeCodeForTokens(code: string): Promise<FortnoxTokens
 }
 
 /**
- * Refresh access token using refresh token
+ * Fel vid token-refresh. `permanent = true` betyder att refresh_token är
+ * definitivt ogiltig (revokerad/utgången) och anslutningen måste rensas.
+ * `permanent = false` = transient fel (Fortnox 5xx, nätverk/timeout) —
+ * lämna tokens intakta så nästa cron-körning kan försöka igen.
+ */
+export class FortnoxRefreshError extends Error {
+  permanent: boolean
+  constructor(message: string, permanent: boolean) {
+    super(message)
+    this.name = 'FortnoxRefreshError'
+    this.permanent = permanent
+  }
+}
+
+/**
+ * Refresh access token using refresh token.
+ *
+ * Kastar FortnoxRefreshError med `permanent`-flagga:
+ * - HTTP 400/401 med `invalid_grant` (eller annat auth-fel) → permanent
+ * - HTTP 5xx / nätverksfel / timeout → transient (permanent = false)
  */
 export async function refreshAccessToken(refreshToken: string): Promise<FortnoxTokens> {
-  const response = await fetch(`${FORTNOX_AUTH_BASE}/token`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': 'Basic ' + Buffer.from(`${FORTNOX_CLIENT_ID}:${FORTNOX_CLIENT_SECRET}`).toString('base64')
-    },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken
-    }).toString()
-  })
+  let response: Response
+  try {
+    response = await fetch(`${FORTNOX_AUTH_BASE}/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': 'Basic ' + Buffer.from(`${FORTNOX_CLIENT_ID}:${FORTNOX_CLIENT_SECRET}`).toString('base64')
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken
+      }).toString()
+    })
+  } catch (err) {
+    // Nätverksfel/timeout — transient, inte kundens fel
+    const msg = err instanceof Error ? err.message : 'Network error'
+    throw new FortnoxRefreshError(`Fortnox refresh network error: ${msg}`, false)
+  }
 
   if (!response.ok) {
-    const error = await response.text()
-    console.error('Fortnox token refresh error:', error)
-    throw new Error('Failed to refresh token')
+    const errorBody = await response.text()
+    console.error('Fortnox token refresh error:', response.status, errorBody)
+
+    // Permanent auth-fel: 400/401 med invalid_grant (revokerad/utgången
+    // refresh_token). Allt annat (5xx, 429, tillfälliga fel) = transient.
+    const isAuthStatus = response.status === 400 || response.status === 401
+    const isInvalidGrant = /invalid_grant|invalid_token|revoked/i.test(errorBody)
+    const permanent = isAuthStatus && isInvalidGrant
+
+    throw new FortnoxRefreshError(
+      `Failed to refresh token (HTTP ${response.status})`,
+      permanent
+    )
   }
 
   return response.json()
@@ -207,11 +243,15 @@ export async function clearFortnoxConnection(businessId: string): Promise<void> 
 /**
  * Refresh token if it expires within 1 hour.
  *
- * Vid refresh-failure (token revokerad på Fortnox-sidan, refresh_token
- * utgånget, eller Fortnox-API-fel): rensar fortnox_connected = false så
- * UI inte fortsätter visa 'Kopplad'-status. Detta förebygger den 'ghost-
+ * Vid PERMANENT refresh-failure (token revokerad på Fortnox-sidan eller
+ * refresh_token utgånget → invalid_grant): rensar fortnox_connected = false
+ * så UI inte fortsätter visa 'Kopplad'-status. Detta förebygger den 'ghost-
  * connected'-bugg som funnits sedan v46 — kunder såg grön status men
  * synkar fungerade aldrig.
+ *
+ * Vid TRANSIENT failure (Fortnox 5xx, nätverksblipp/timeout): behåller
+ * tokens intakta och returnerar null. Nästa cron-körning försöker igen —
+ * inget är revokerat, så kunden ska inte tvingas göra om OAuth.
  */
 export async function refreshTokenIfNeeded(businessId: string): Promise<string | null> {
   const config = await getFortnoxConfig(businessId)
@@ -237,11 +277,19 @@ export async function refreshTokenIfNeeded(businessId: string): Promise<string |
     await saveFortnoxTokens(businessId, newTokens)
     return newTokens.access_token
   } catch (error) {
-    console.error(`[fortnox/refresh] failed for ${businessId} — marking disconnected:`, error)
+    // Skilj på permanent auth-fel (revokerad token) och transient fel
+    // (Fortnox 5xx, nätverksblipp). Bara PERMANENTA fel rensar anslutningen —
+    // annars tvingas kunden göra om OAuth i onödan vid varje tillfälligt fel.
+    const permanent = error instanceof FortnoxRefreshError ? error.permanent : false
+
+    console.error(
+      `[fortnox/refresh] failed for ${businessId} (permanent=${permanent}):`,
+      error
+    )
 
     // Logga till fortnox_api_log med pseudo-endpoint så audit-trail visar
-    // exakt när vi förlorade anslutningen + varför (Fortnox returnerar
-    // typiskt 'invalid_grant' när refresh_token är revokerad).
+    // exakt när/varför refresh failade (Fortnox returnerar typiskt
+    // 'invalid_grant' när refresh_token är revokerad).
     try {
       const { logFortnoxApi } = await import('@/lib/fortnox/api-log')
       await logFortnoxApi({
@@ -252,12 +300,17 @@ export async function refreshTokenIfNeeded(businessId: string): Promise<string |
       })
     } catch { /* logging är non-blocking */ }
 
-    // Markera business som disconnected så cron-routes hoppar över den
-    // + UI uppdaterar status vid nästa /api/fortnox/status-anrop.
-    try {
-      await clearFortnoxConnection(businessId)
-    } catch (clearErr) {
-      console.error(`[fortnox/refresh] failed to mark disconnected for ${businessId}:`, clearErr)
+    // Rensa ENDAST vid permanent fel (revokerad/utgången refresh_token).
+    // Vid transient fel: lämna tokens intakta så nästa cron-körning
+    // försöker igen — inget är revokerat på Fortnox-sidan.
+    if (permanent) {
+      try {
+        await clearFortnoxConnection(businessId)
+      } catch (clearErr) {
+        console.error(`[fortnox/refresh] failed to mark disconnected for ${businessId}:`, clearErr)
+      }
+    } else {
+      console.warn(`[fortnox/refresh] transient fel för ${businessId} — behåller tokens, försöker igen nästa körning`)
     }
 
     return null

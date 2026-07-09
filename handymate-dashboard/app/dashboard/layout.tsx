@@ -16,6 +16,7 @@ import BillingStatusBanner from '@/components/BillingStatusBanner'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { ToastProvider } from '@/components/Toast'
 import { useAuth } from '@/lib/useAuth'
+import { checkSubscriptionStatus } from '@/lib/auth'
 import { useSessionKeepalive } from '@/lib/hooks/useSessionKeepalive'
 import { BusinessContext } from '@/lib/BusinessContext'
 import { CurrentUserProvider } from '@/lib/CurrentUserContext'
@@ -41,14 +42,12 @@ export default function DashboardLayout({
   // Pilots och aktiva prenumerationer släpps förbi. Billing-sidan själv är alltid öppen.
   const billingAllowlist = ['/dashboard/settings/billing', '/dashboard/billing']
   const isOnBillingPage = billingAllowlist.some(p => pathname?.startsWith(p))
+  // EN sanningskälla: checkSubscriptionStatus (samma som API-feature-gaten
+  // använder). Hanterar 'trial' OCH 'trialing' vs trial_ends_at, samt
+  // 'comp'/'active' (släpps förbi). Pilot-flaggan exemperar fortfarande.
   const subscriptionLocked = (() => {
     if (!business || business.is_pilot) return false
-    const status = business.subscription_status
-    if (status === 'past_due' || status === 'cancelled' || status === 'unpaid') return true
-    if (status === 'trialing' && business.trial_ends_at) {
-      return new Date(business.trial_ends_at).getTime() < Date.now()
-    }
-    return false
+    return !checkSubscriptionStatus(business).active
   })()
 
   useEffect(() => {

@@ -161,6 +161,32 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
 
+    // Betalgrind: markera INTE onboarding klar om kontot saknar prenumeration.
+    // Utan detta kan någon navigera direkt till /onboarding?payment=success,
+    // slutföra touren och nå dashboarden utan att ha betalat.
+    //
+    // Val (konservativt): blockera bara TYDLIGT obetalda states. En
+    // nyregistrerad kund har status 'trial' (register-routen sätter det) och
+    // släpps igenom — att komma legitimt hit kräver ändå Checkout-redirecten.
+    // Vi blockerar alltså bara konton helt utan prenumeration (null/inactive)
+    // eller med uppsagd/misslyckad betalning. Detta kan ALDRIG blockera en
+    // riktig betalande kund (som minst har 'trial'/'trialing'/'active'/'comp').
+    const { data: subRow } = await supabase
+      .from('business_config')
+      .select('subscription_status, is_pilot')
+      .eq('business_id', business.business_id)
+      .single()
+
+    const status = String(subRow?.subscription_status ?? '').toLowerCase()
+    const isPilot = subRow?.is_pilot === true
+    const BLOCKED_STATES = ['', 'inactive', 'cancelled', 'canceled', 'past_due', 'unpaid']
+    if (!isPilot && BLOCKED_STATES.includes(status)) {
+      return NextResponse.json(
+        { error: 'Slutför betalningen för att aktivera kontot' },
+        { status: 402 }
+      )
+    }
+
     const updates: Record<string, unknown> = {
       onboarding_step: 10, // Mark fully complete (compat with both V1 and V2 flows)
       onboarding_completed_at: new Date().toISOString(),
