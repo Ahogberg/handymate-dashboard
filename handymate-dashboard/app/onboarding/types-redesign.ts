@@ -41,4 +41,9 @@ export interface OnboardingFormData {
 
   // ── Step 5: Aktivera ─────────────────────────────────────
   plan?: string  // 'starter' | 'professional' | 'business'
+
+  // ── Steg 6: Hämta in verksamhet (import) ─────────────────
+  // Antal importerade rader — LiveTour kan visa dem som payoff (state E).
+  importedCustomers?: number
+  importedInvoices?: number
 }

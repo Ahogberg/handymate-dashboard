@@ -7,10 +7,11 @@ import Step2Business from './components/Step2Business'
 import Step3HowYouWork from './components/Step3HowYouWork'
 import Step4PhoneNumber from './components/Step4PhoneNumber'
 import Step5Activate from './components/Step5Activate'
+import StepImportData from './components/StepImportData'
 import Step6LiveTour from './components/Step6LiveTour'
 import type { OnboardingFormData } from './types-redesign'
 
-const TOTAL_STEPS = 6
+const TOTAL_STEPS = 7
 
 /**
  * Onboarding-orchestrator (Claude Design redesign).
@@ -21,7 +22,8 @@ const TOTAL_STEPS = 6
  *   2 = Step3HowYouWork  (specialties + hours + price)
  *   3 = Step4PhoneNumber (phone reserveras)
  *   4 = Step5Activate    (Stripe payment)
- *   5 = Step6LiveTour    (live tour, klar = onboarding_completed_at)
+ *   5 = StepImportData   (hämta in kunder + öppna fakturor — Fortnox/CSV)
+ *   6 = Step6LiveTour    (live tour, klar = onboarding_completed_at)
  *
  * Resume-logik: Vid sidvisning hämtas onboarding_step från DB.
  * Användaren landar på rätt steg om de stängt mitt i flödet.
@@ -61,8 +63,9 @@ export default function OnboardingPage() {
 
         // Retur från Stripe Checkout (onboarding-betalning).
         //  ?payment=success → betalningen är genomförd (prenumeration skapad i
-        //    trialing). Gå vidare till aktiverings-/tour-steget (5). Telefon-
-        //    numret provisioneras av webhooken; Step6 läser assigned_phone_number.
+        //    trialing). Gå vidare till importsteget (5) — kunden landar på
+        //    "hämta in din verksamhet" direkt efter betalning. Telefonnumret
+        //    provisioneras av webhooken; Step6 läser assigned_phone_number.
         //  ?payment=cancelled → kunden avbröt. Landa kvar på betalsteget (4)
         //    så de kan försöka igen. Aldrig fastna.
         const params = new URLSearchParams(window.location.search)
@@ -243,7 +246,10 @@ export default function OnboardingPage() {
         {step === 4 && (
           <Step5Activate onNext={next} onBack={back} data={data} setData={setDataUpdater} />
         )}
-        {step === 5 && <Step6LiveTour onFinish={finish} data={data} />}
+        {step === 5 && (
+          <StepImportData onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+        )}
+        {step === 6 && <Step6LiveTour onFinish={finish} data={data} />}
       </div>
     </div>
   )
