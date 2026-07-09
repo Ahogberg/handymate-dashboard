@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, type BusinessUser } from '@/lib/permissions'
+
+/**
+ * Ägarskapskontroll för schema-poster.
+ * Owner/admin får ändra/ta bort alla poster. En anställd får endast
+ * ändra/ta bort poster som är tilldelade dem (business_user_id) eller
+ * som de själva skapat (created_by).
+ */
+function canMutateEntry(
+  user: BusinessUser | null,
+  entry: { business_user_id: string | null; created_by: string | null }
+): boolean {
+  if (!user) return false
+  if (user.role === 'owner' || user.role === 'admin') return true
+  return entry.business_user_id === user.id || entry.created_by === user.id
+}
 
 /**
  * PATCH /api/schedule/[id] - Uppdatera schema-post
@@ -22,13 +38,19 @@ export async function PATCH(
     // Verify entry belongs to this business
     const { data: existing, error: fetchError } = await supabase
       .from('schedule_entry')
-      .select('id')
+      .select('id, business_user_id, created_by')
       .eq('id', entryId)
       .eq('business_id', business.business_id)
       .single()
 
     if (fetchError || !existing) {
       return NextResponse.json({ error: 'Schema-post hittades inte' }, { status: 404 })
+    }
+
+    // Rollskydd: anställd får bara ändra sina egna poster; owner/admin alla
+    const currentUser = await getCurrentUser(request)
+    if (!canMutateEntry(currentUser, existing)) {
+      return NextResponse.json({ error: 'Du kan endast ändra dina egna schema-poster' }, { status: 403 })
     }
 
     // Build update object from allowed fields
@@ -132,13 +154,19 @@ export async function DELETE(
     // Verify entry belongs to this business
     const { data: existing, error: fetchError } = await supabase
       .from('schedule_entry')
-      .select('id')
+      .select('id, business_user_id, created_by')
       .eq('id', entryId)
       .eq('business_id', business.business_id)
       .single()
 
     if (fetchError || !existing) {
       return NextResponse.json({ error: 'Schema-post hittades inte' }, { status: 404 })
+    }
+
+    // Rollskydd: anställd får bara ta bort sina egna poster; owner/admin alla
+    const currentUser = await getCurrentUser(request)
+    if (!canMutateEntry(currentUser, existing)) {
+      return NextResponse.json({ error: 'Du kan endast ta bort dina egna schema-poster' }, { status: 403 })
     }
 
     // Hard delete

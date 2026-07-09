@@ -13,6 +13,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Permission check: kräver manage_settings (samma gate som PUT)
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser || !hasPermission(currentUser, 'manage_settings')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+    }
+
     const supabase = getServerSupabase()
 
     const { data: config, error } = await supabase

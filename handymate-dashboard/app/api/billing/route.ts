@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/permissions'
 
 /**
  * GET /api/billing - Hämta aktuell faktureringsstatus
  * Returnerar plan, användning, gränser, prenumerationsstatus och trialminfo
+ *
+ * Rollskydd: ENDAST owner/admin. Fakturering är ägar-/admin-data.
  */
 export async function GET(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const currentUser = await getCurrentUser(request)
+    if (currentUser?.role !== 'owner' && currentUser?.role !== 'admin') {
+      return NextResponse.json({ error: 'Endast ägare/admin' }, { status: 403 })
     }
 
     const supabase = getServerSupabase()

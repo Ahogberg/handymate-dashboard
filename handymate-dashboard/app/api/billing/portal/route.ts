@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/permissions'
 import Stripe from 'stripe'
 
 function getStripe() {
@@ -21,6 +22,13 @@ export async function POST(request: NextRequest) {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rollskydd: ENDAST owner/admin. Utan detta kan en anställd öppna
+    // Stripe-portalen och säga upp/ändra prenumerationen.
+    const currentUser = await getCurrentUser(request)
+    if (currentUser?.role !== 'owner' && currentUser?.role !== 'admin') {
+      return NextResponse.json({ error: 'Endast ägare/admin' }, { status: 403 })
     }
 
     const supabase = getServerSupabase()

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { getCurrentUser, hasPermission } from '@/lib/permissions'
+import { getCurrentUser } from '@/lib/permissions'
 
 /**
  * GET - Löneunderlag per medarbetare och period
@@ -14,10 +14,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Permission check: kräver see_financials
+    // Rollskydd: ENDAST owner/admin. Skarpare än see_financials —
+    // Andreas spec (team/route.ts:8-11): employee/PM/kalkylator ser ALDRIG
+    // företagets löneunderlag, även om de har can_see_financials.
     const currentUser = await getCurrentUser(request)
-    if (!currentUser || !hasPermission(currentUser, 'see_financials')) {
-      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+    if (currentUser?.role !== 'owner' && currentUser?.role !== 'admin') {
+      return NextResponse.json({ error: 'Endast ägare/admin' }, { status: 403 })
     }
 
     const supabase = getServerSupabase()
