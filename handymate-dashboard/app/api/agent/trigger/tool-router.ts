@@ -241,18 +241,51 @@ async function createQuote(
   const validUntil = new Date()
   validUntil.setDate(validUntil.getDate() + ((params.valid_days as number) || 30))
 
+  const rotRutType = (params.rot_rut_type as string) ?? null
+
   const quoteId = generateId('quote')
   const { error } = await supabase.from('quotes').insert({
     quote_id: quoteId, business_id: businessId, customer_id: params.customer_id,
-    title: params.title, status: 'draft', items: JSON.stringify(items),
+    title: params.title, status: 'draft', items,
     labor_total: laborTotal, material_total: materialTotal,
     subtotal, vat_rate: vatRate, vat_amount: vatAmount, total,
-    rot_rut_type: params.rot_rut_type || null,
+    rot_rut_type: rotRutType,
     rot_rut_deduction: rotRutDeduction, customer_pays: total - rotRutDeduction,
     valid_until: validUntil.toISOString(), created_at: new Date().toISOString(),
   })
 
   if (error) return { success: false, error: error.message }
+
+  // Skriv strukturerade rader till quote_items — det är dessa PDF/utskick läser
+  // (quotes.items JSONB är bara en spegling). Utan detta blir offerten TOM i PDF:en.
+  const itemInserts = items.map((i, idx) => {
+    const isLabor = i.type === 'labor'
+    const rowRotEligible = isLabor && rotRutType === 'rot'
+    const rowRutEligible = isLabor && rotRutType === 'rut'
+    return {
+      id: 'qi_' + Math.random().toString(36).substring(2, 14),
+      quote_id: quoteId,
+      business_id: businessId,
+      item_type: 'item',
+      description: i.description ?? '',
+      quantity: i.quantity ?? 0,
+      unit: i.unit ?? 'st',
+      unit_price: i.unit_price ?? 0,
+      total: i.total,
+      is_rot_eligible: rowRotEligible,
+      is_rut_eligible: rowRutEligible,
+      rot_rut_type: (rowRotEligible || rowRutEligible) ? rotRutType : null,
+      sort_order: idx,
+    }
+  })
+
+  const { error: itemsError } = await supabase.from('quote_items').insert(itemInserts)
+  if (itemsError) {
+    // En offert utan rader är korrupt — ta bort huvudet så inget halvsparat blir kvar.
+    await supabase.from('quotes').delete().eq('quote_id', quoteId).eq('business_id', businessId)
+    return { success: false, error: `Kunde inte spara offertens rader: ${itemsError.message}` }
+  }
+
   return { success: true, data: {
     quote_id: quoteId, message: `Offert "${params.title}" skapad`,
     summary: {
@@ -301,9 +334,9 @@ async function createInvoice(
 
   const subtotal = items.reduce((s: number, i: any) => s + (i.total || i.quantity * i.unit_price), 0)
 
-  // Fetch VAT rate from business_config (default 25%)
+  // Fetch VAT rate + fakturanummer-config från business_config
   const { data: bizVat } = await supabase
-    .from('business_config').select('default_vat_rate, pricing_settings')
+    .from('business_config').select('default_vat_rate, pricing_settings, invoice_prefix, next_invoice_number')
     .eq('business_id', businessId).single()
   const vatRate = bizVat?.default_vat_rate ?? bizVat?.pricing_settings?.vat_rate ?? 25
   const vatAmount = Math.round(subtotal * (vatRate / 100))
@@ -314,11 +347,12 @@ async function createInvoice(
   if (rotRutType === 'rot') rotRutDeduction = Math.min(laborTotal * 0.3, 50000)
   if (rotRutType === 'rut') rotRutDeduction = Math.min(laborTotal * 0.5, 75000)
 
+  // Fakturanummer: samma räknare som huvudvägen (invoices/from-quote) —
+  // prefix + next_invoice_number — så agentens fakturor inte krockar med dem.
+  const prefix = bizVat?.invoice_prefix ?? 'FV'
+  const nextNum = bizVat?.next_invoice_number ?? 1
   const year = new Date().getFullYear()
-  const { count } = await supabase.from('invoice')
-    .select('invoice_id', { count: 'exact', head: true })
-    .eq('business_id', businessId).ilike('invoice_number', `${year}-%`)
-  const invoiceNumber = `${year}-${String((count || 0) + 1).padStart(3, '0')}`
+  const invoiceNumber = `${prefix}-${year}-${String(nextNum).padStart(3, '0')}`
 
   const dueDate = new Date()
   dueDate.setDate(dueDate.getDate() + ((params.due_days as number) || 30))
@@ -327,7 +361,7 @@ async function createInvoice(
   const { error } = await supabase.from('invoice').insert({
     invoice_id: invoiceId, business_id: businessId, customer_id: params.customer_id,
     quote_id: params.quote_id || null, invoice_number: invoiceNumber, status: 'draft',
-    items: JSON.stringify(items), subtotal, vat_rate: vatRate, vat_amount: vatAmount, total,
+    items, subtotal, vat_rate: vatRate, vat_amount: vatAmount, total,
     rot_rut_type: rotRutType, rot_rut_deduction: rotRutDeduction, customer_pays: total - rotRutDeduction,
     invoice_date: new Date().toISOString().split('T')[0],
     due_date: dueDate.toISOString().split('T')[0],
@@ -335,6 +369,14 @@ async function createInvoice(
   })
 
   if (error) return { success: false, error: error.message }
+
+  // Öka räknaren så nästa faktura får ett nytt nummer (paritet med from-quote).
+  const { error: counterError } = await supabase
+    .from('business_config')
+    .update({ next_invoice_number: nextNum + 1 })
+    .eq('business_id', businessId)
+  if (counterError) console.error('[createInvoice] next_invoice_number increment failed:', counterError.message)
+
   return { success: true, data: { invoice_id: invoiceId, invoice_number: invoiceNumber, message: `Faktura ${invoiceNumber} skapad`, total, customer_pays: total - rotRutDeduction } }
 }
 
@@ -466,10 +508,16 @@ async function createBooking(
       )
 
       if (googleEventId) {
-        await supabase.from('booking').update({
+        const { error: syncUpdateError } = await supabase.from('booking').update({
           google_event_id: googleEventId,
           synced_to_google_at: new Date().toISOString(),
         }).eq('booking_id', bookingId)
+        if (syncUpdateError) {
+          // Google-eventet skapades men vi kunde inte spara kopplingen. Bokningen
+          // finns kvar (icke-blockerande), men påstå inte att synken lyckades.
+          console.error('[createBooking] google_event_id update failed:', syncUpdateError.message)
+          googleEventId = null
+        }
       }
     } catch (err: any) {
       console.error('[createBooking] Google Calendar sync error:', err.message)
@@ -555,11 +603,12 @@ async function sendSms(
 
     const queueId = 'smq_' + Math.random().toString(36).substring(2, 14)
     const senderName = sanitizeSenderId(context.businessName)
-    await supabase.from('sms_queue').insert({
+    const { error: queueError } = await supabase.from('sms_queue').insert({
       queue_id: queueId, business_id: businessId,
       phone_to: to, sender_name: senderName, message,
       send_after: sendAfter, status: 'queued', created_at: now.toISOString(),
     })
+    if (queueError) return { success: false, error: `Kunde inte köa SMS: ${queueError.message}` }
 
     console.log(`[SMS Queued] Nattspärr kl ${swedenHour}:xx → köat till ${sendAfter} → ${to}`)
     return { success: true, data: { queued: true, queue_id: queueId, send_after: sendAfter, message: `SMS köat — skickas ${swedenHour < 8 ? 'idag' : 'imorgon'} kl 08:00` } }
@@ -784,16 +833,18 @@ async function qualifyLead(
   const now = new Date().toISOString()
 
   if (existingLead) {
-    await supabase.from('leads').update({
+    const { error: updateError } = await supabase.from('leads').update({
       score, score_reasons: scoreReasons.filter(r => r.matched),
       urgency, job_type: jobType, estimated_value: estimatedValue, updated_at: now,
     }).eq('lead_id', existingLead.lead_id)
+    if (updateError) return { success: false, error: `Kunde inte uppdatera lead: ${updateError.message}` }
 
-    await supabase.from('lead_activities').insert({
+    const { error: activityError } = await supabase.from('lead_activities').insert({
       activity_id: generateId('la'), lead_id: existingLead.lead_id, business_id: businessId,
       activity_type: 'score_updated', description: `Score uppdaterad: ${score}, urgency ${urgency}`,
       created_at: now,
     })
+    if (activityError) console.error('[qualifyLead] lead_activities insert (score_updated) failed:', activityError.message)
 
     return { success: true, data: { lead_id: existingLead.lead_id, action: 'updated', score, urgency, job_type: jobType, estimated_value: estimatedValue } }
   }
@@ -809,11 +860,12 @@ async function qualifyLead(
 
   if (error) return { success: false, error: error.message }
 
-  await supabase.from('lead_activities').insert({
+  const { error: createdActivityError } = await supabase.from('lead_activities').insert({
     activity_id: generateId('la'), lead_id: leadId, business_id: businessId,
     activity_type: 'created', description: `Ny lead: ${contactName || phone || 'Okänd'} (${leadNumber}), score ${score}`,
     created_at: now,
   })
+  if (createdActivityError) console.error('[qualifyLead] lead_activities insert (created) failed:', createdActivityError.message)
 
   // V3 Automation Engine: fire lead_created event
   try {
@@ -841,11 +893,12 @@ async function updateLeadStatus(
 
   if (error) return { success: false, error: error.message }
 
-  await supabase.from('lead_activities').insert({
+  const { error: statusActivityError } = await supabase.from('lead_activities').insert({
     activity_id: generateId('la'), lead_id: params.lead_id as string, business_id: businessId,
     activity_type: 'status_changed', description: `Status → ${params.status}`,
     created_at: new Date().toISOString(),
   })
+  if (statusActivityError) console.error('[updateLeadStatus] lead_activities insert failed:', statusActivityError.message)
 
   return { success: true, data: { message: `Lead status → ${params.status}`, lead: data } }
 }
@@ -1040,7 +1093,10 @@ async function createApprovalRequest(
       payload: payload as Record<string, unknown>,
     })
 
-    await supabase.from('pending_approvals').insert({
+    // Om själva åtgärden misslyckades ska vi INTE påstå att den utfördes.
+    const execOk = execResult.error === undefined && execResult.ok !== false
+
+    const { error: auditError } = await supabase.from('pending_approvals').insert({
       id,
       business_id: businessId,
       approval_type,
@@ -1052,6 +1108,15 @@ async function createApprovalRequest(
       resolved_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     })
+    if (auditError) console.error('[createApprovalRequest] pending_approvals audit insert (low) failed:', auditError.message)
+
+    if (!execOk) {
+      return {
+        success: false,
+        error: `Åtgärden "${title}" kunde inte utföras.`,
+        data: { approval_id: id, execution: execResult },
+      }
+    }
 
     return {
       success: true,
@@ -1059,6 +1124,7 @@ async function createApprovalRequest(
         message: `Åtgärd utförd direkt: "${title}".`,
         approval_id: id,
         execution: execResult,
+        audit_logged: !auditError,
       },
     }
   }
@@ -1070,7 +1136,9 @@ async function createApprovalRequest(
       payload: payload as Record<string, unknown>,
     })
 
-    await supabase.from('pending_approvals').insert({
+    const execOk = execResult.error === undefined && execResult.ok !== false
+
+    const { error: auditError } = await supabase.from('pending_approvals').insert({
       id,
       business_id: businessId,
       approval_type,
@@ -1082,6 +1150,15 @@ async function createApprovalRequest(
       resolved_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     })
+    if (auditError) console.error('[createApprovalRequest] pending_approvals audit insert (medium) failed:', auditError.message)
+
+    if (!execOk) {
+      return {
+        success: false,
+        error: `Åtgärden "${title}" kunde inte utföras.`,
+        data: { approval_id: id, execution: execResult },
+      }
+    }
 
     return {
       success: true,
@@ -1089,6 +1166,7 @@ async function createApprovalRequest(
         message: `Åtgärd utförd automatiskt och loggad: "${title}".`,
         approval_id: id,
         execution: execResult,
+        audit_logged: !auditError,
       },
     }
   }
@@ -1503,12 +1581,18 @@ async function sendAgentMessageTool(
     matte: 'Matte', karin: 'Karin', hanna: 'Hanna', daniel: 'Daniel', lars: 'Lars', lisa: 'Lisa',
   }
 
-  // Handoff auto-trigger: fire-and-forget anrop till agent/trigger så mottagaren kör direkt
+  // Handoff auto-trigger: anropa agent/trigger så mottagaren kör direkt. Best-effort
+  // dispatch — vi väntar in svaret med en kort timeout för att kunna rapportera om
+  // leveransen lyckades, men ett fel blockerar aldrig (meddelandet är redan sparat).
   let autoTriggered = false
+  let handoffDelivered = false
   if (type === 'handoff') {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+    autoTriggered = true
     try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-      fetch(`${appUrl}/api/agent/trigger`, {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 8000)
+      const handoffRes = await fetch(`${appUrl}/api/agent/trigger`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1526,9 +1610,15 @@ async function sendAgentMessageTool(
             message_id: inserted?.id,
           },
         }),
-      }).catch(() => {})
-      autoTriggered = true
-    } catch { /* non-blocking */ }
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeout))
+      handoffDelivered = handoffRes.ok
+      if (!handoffRes.ok) console.error('[sendAgentMessage] handoff dispatch svarade', handoffRes.status)
+    } catch (err: any) {
+      // Timeout eller nätverksfel — meddelandet ligger kvar och plockas av mottagaren
+      // vid nästa körning. Icke-fatalt.
+      console.error('[sendAgentMessage] handoff dispatch misslyckades:', err?.message || err)
+    }
   }
 
   return {
@@ -1538,6 +1628,7 @@ async function sendAgentMessageTool(
       to: toAgent,
       type,
       auto_triggered: autoTriggered,
+      handoff_delivered: type === 'handoff' ? handoffDelivered : undefined,
     },
   }
 }
@@ -1562,12 +1653,13 @@ async function getAgentMessagesTool(
     return { success: false, error: `Kunde inte hämta meddelanden: ${error.message}` }
   }
 
-  // Mark as read
+  // Mark as read (non-blockerande — meddelandena är redan hämtade)
   if (data && data.length > 0) {
-    await supabase
+    const { error: markError } = await supabase
       .from('agent_messages')
       .update({ status: 'read' })
       .in('id', data.map((m: any) => m.id))
+    if (markError) console.error('[getAgentMessages] mark-as-read update failed:', markError.message)
   }
 
   const agentNames: Record<string, string> = {

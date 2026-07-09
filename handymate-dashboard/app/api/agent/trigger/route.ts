@@ -10,6 +10,7 @@ import { executeTool } from './tool-router'
 import { getBusinessPreferences } from '@/lib/business-preferences'
 import { routeToAgent, getAgentPromptSuffix, getAgentTools } from '@/lib/agents/personalities'
 import { getRelevantMemories, buildMemoryPrompt, getAgentMessages as fetchAgentMessages, buildMessagesPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
+import { checkCostGuards } from '@/lib/agents/shared/cost-guard'
 
 // Central AI agent endpoint — handles ALL inbound triggers:
 // - Manual (dashboard), phone_call (46elks/Vapi), incoming_sms, cron
@@ -113,6 +114,31 @@ export async function POST(request: NextRequest) {
         error: billingCheck.message || 'Prenumerationen är inte aktiv',
         billing_inactive: true,
       }, { status: 402 })
+    }
+
+    // Kill-switch + kostnadstak: hoppa över hela token-loopen om agenterna är
+    // globalt pausade eller dagens kostnadstak passerats. Gäller ALLA triggers
+    // (SMS/samtal/chat/cron). Returnerar 200 med skipped-flagga så telefoni-/
+    // SMS-webhooks inte tolkar det som ett fel (samma mönster som cron-routen).
+    const { data: guardConfig } = await supabase
+      .from('business_config')
+      .select('business_id, agents_globally_paused, agent_cost_cap_usd_daily')
+      .eq('business_id', businessId)
+      .single()
+
+    if (guardConfig) {
+      const skip = await checkCostGuards(supabase, guardConfig, body.agent_id || 'matte')
+      if (skip) {
+        return NextResponse.json({
+          skipped: skip.skipped,
+          agent_paused: skip.skipped === 'agents_globally_paused',
+          final_response: skip.skipped === 'agents_globally_paused'
+            ? 'Agenterna är pausade — ingen körning genomfördes.'
+            : 'Dagens kostnadstak är nått — ingen körning genomfördes.',
+          today_cost_usd: skip.today_cost_usd,
+          cap_usd: skip.cap_usd,
+        })
+      }
     }
 
     // Fetch Google Calendar/Gmail connection for this business
