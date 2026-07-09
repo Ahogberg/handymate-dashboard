@@ -16,6 +16,26 @@ function settingsUrl(params: Record<string, string>): string {
   return url.toString()
 }
 
+function onboardingUrl(params: Record<string, string>): string {
+  const url = new URL('/onboarding', APP_URL)
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
+  return url.toString()
+}
+
+/**
+ * Destination-hjälpare: state är `${business_id}:${random}:${destination}`.
+ * Startades OAuth från onboarding-importsteget (destination='onboarding')
+ * landar callbacken på /onboarding, annars på inställningssidan (default).
+ * Bakåtkompatibelt: äldre state utan tredje segment → 'settings'.
+ */
+function redirectUrlFor(
+  state: string | null,
+  params: Record<string, string>,
+): string {
+  const destination = state ? state.split(':')[2] : undefined
+  return destination === 'onboarding' ? onboardingUrl(params) : settingsUrl(params)
+}
+
 /**
  * Logga callback-attempt till fortnox_api_log med endpoint='oauth_callback'.
  * Non-blocking — fel sväljs. business_id är obligatoriskt; om okänt vid
@@ -85,7 +105,7 @@ export async function GET(request: NextRequest) {
         { oauth_error: oauthError, oauth_error_description: errorDescription },
       )
       return NextResponse.redirect(
-        settingsUrl({ fortnox: 'error', message: errorDescription || oauthError })
+        redirectUrlFor(state, { fortnox: 'error', message: errorDescription || oauthError })
       )
     }
 
@@ -96,7 +116,7 @@ export async function GET(request: NextRequest) {
         `Missing required params: code=${!!code}, state=${!!state}`,
       )
       return NextResponse.redirect(
-        settingsUrl({ fortnox: 'error', message: 'Missing code or state' })
+        redirectUrlFor(state, { fortnox: 'error', message: 'Missing code or state' })
       )
     }
 
@@ -110,7 +130,7 @@ export async function GET(request: NextRequest) {
         { cookie_present: !!storedState },
       )
       return NextResponse.redirect(
-        settingsUrl({ fortnox: 'error', message: 'Ogiltig state — försök igen' })
+        redirectUrlFor(state, { fortnox: 'error', message: 'Ogiltig state — försök igen' })
       )
     }
 
@@ -118,7 +138,7 @@ export async function GET(request: NextRequest) {
     if (!businessId) {
       await logCallback(null, 'error', 'Invalid state format — no business_id')
       return NextResponse.redirect(
-        settingsUrl({ fortnox: 'error', message: 'Invalid state format' })
+        redirectUrlFor(state, { fortnox: 'error', message: 'Invalid state format' })
       )
     }
 
@@ -128,7 +148,7 @@ export async function GET(request: NextRequest) {
     if (!clientSecret) {
       await logCallback(businessId, 'error', 'FORTNOX_CLIENT_SECRET missing in environment')
       return NextResponse.redirect(
-        settingsUrl({ fortnox: 'error', message: 'FORTNOX_CLIENT_SECRET saknas i miljön' })
+        redirectUrlFor(state, { fortnox: 'error', message: 'FORTNOX_CLIENT_SECRET saknas i miljön' })
       )
     }
 
@@ -154,7 +174,7 @@ export async function GET(request: NextRequest) {
         tokenRes.status,
       )
       return NextResponse.redirect(
-        settingsUrl({ fortnox: 'error', message: 'Token-utbyte misslyckades' })
+        redirectUrlFor(state, { fortnox: 'error', message: 'Token-utbyte misslyckades' })
       )
     }
 
@@ -174,7 +194,7 @@ export async function GET(request: NextRequest) {
       has_refresh_token: !!tokens.refresh_token,
     })
 
-    return NextResponse.redirect(settingsUrl({ fortnox: 'connected' }))
+    return NextResponse.redirect(redirectUrlFor(state, { fortnox: 'connected' }))
   } catch (err: any) {
     await logCallback(
       businessIdFromState,
@@ -184,7 +204,7 @@ export async function GET(request: NextRequest) {
       { stack: err?.stack?.slice(0, 1000) },
     )
     return NextResponse.redirect(
-      settingsUrl({ fortnox: 'error', message: err?.message || 'Callback failed' })
+      redirectUrlFor(state, { fortnox: 'error', message: err?.message || 'Callback failed' })
     )
   }
 }

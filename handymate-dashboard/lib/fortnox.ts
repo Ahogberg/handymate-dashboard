@@ -662,6 +662,86 @@ export async function getFortnoxInvoice(
 }
 
 /**
+ * Slimmad rad från Fortnox LIST-endpoint /invoices. Listan returnerar
+ * lättviktade poster (inte fulla InvoiceRows) — precis vad importen behöver
+ * för att skapa lokala huvud-rader utan att slå ett anrop per faktura.
+ *
+ * Fält enligt Fortnox API v3 /invoices-listan. `Total` = fakturans totalbelopp,
+ * `Balance` = utestående (0 när betald). `FinalPayDate` finns men vi förlitar
+ * oss på DueDate + Balance-filtret.
+ */
+export interface FortnoxInvoiceListItem {
+  DocumentNumber?: string
+  InvoiceNumber?: string
+  CustomerNumber?: string
+  CustomerName?: string
+  InvoiceDate?: string
+  DueDate?: string
+  Total?: number
+  Balance?: number
+  Currency?: string
+  FullyPaid?: boolean
+  Cancelled?: boolean
+  Booked?: boolean
+}
+
+interface FortnoxInvoicesListResponse {
+  Invoices?: FortnoxInvoiceListItem[]
+  MetaInformation?: {
+    '@TotalResources'?: number
+    '@TotalPages'?: number
+    '@CurrentPage'?: number
+  }
+}
+
+/**
+ * Hämta ÖPPNA/OBETALDA fakturor från Fortnox.
+ *
+ * Använder Fortnox list-filter `?filter=unpaid` (öppna, ej fullbetalda — inte
+ * bara förfallna, så Karin ser hela bilden). Fortnox stödjer även
+ * `unpaidoverdue`, men vi vill ha ALLA obetalda. Se Fortnox API v3-docs:
+ * GET /3/invoices?filter=unpaid.
+ *
+ * PAGINERING: Fortnox paginerar (~500/sida). Vi loopar via `?page=N` tills
+ * MetaInformation säger att vi är på sista sidan, med en säkerhetscap
+ * (MAX_PAGES) så en trasig meta inte ger oändlig loop.
+ *
+ * Filtrerar bort Cancelled/FullyPaid klient-sidan som skyddsnät (om Fortnox-
+ * filtret skulle släppa igenom något).
+ *
+ * Återanvänder fortnoxRequest → token-refresh + audit-logg sköts där.
+ */
+export async function getFortnoxInvoices(
+  businessId: string
+): Promise<FortnoxInvoiceListItem[]> {
+  const MAX_PAGES = 4 // ~500/sida × 4 = 2000, rimlig cap för pilot-volym
+  const all: FortnoxInvoiceListItem[] = []
+
+  try {
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const response = await fortnoxRequest<FortnoxInvoicesListResponse>(
+        businessId,
+        'GET',
+        `/invoices?filter=unpaid&page=${page}`
+      )
+
+      const rows = response.Invoices ?? []
+      all.push(...rows)
+
+      const totalPages = response.MetaInformation?.['@TotalPages'] ?? 1
+      const currentPage = response.MetaInformation?.['@CurrentPage'] ?? page
+      if (rows.length === 0 || currentPage >= totalPages) break
+    }
+  } catch (error) {
+    console.error('Get Fortnox invoices error:', error)
+    throw error
+  }
+
+  // Skyddsnät: filtrera bort makulerade och fullbetalda även om filtret missar.
+  return all.filter(inv => !inv.Cancelled && !inv.FullyPaid)
+}
+
+/**
  * Sync a single Handymate invoice to Fortnox
  */
 export async function syncInvoiceToFortnox(

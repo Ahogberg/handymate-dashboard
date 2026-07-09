@@ -44,8 +44,15 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Vart callbacken ska landa efter lyckad koppling. Default = inställningar.
+    // Startas kopplingen från onboarding-importsteget skickas ?return=onboarding
+    // så callbacken redirectar tillbaka dit i stället. Kodas in i state (tredje
+    // segmentet) — callbacken läser det men business_id är fortfarande [0].
+    const returnParam = request.nextUrl.searchParams.get('return')
+    const destination = returnParam === 'onboarding' ? 'onboarding' : 'settings'
+
     const random = crypto.randomBytes(16).toString('hex')
-    const state = `${business.business_id}:${random}`
+    const state = `${business.business_id}:${random}:${destination}`
 
     const cookieStore = await cookies()
     cookieStore.set('fortnox_oauth_state', state, {
