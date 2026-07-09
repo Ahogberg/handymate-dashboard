@@ -10,6 +10,23 @@ interface Step6Props {
   data: OnboardingFormData
 }
 
+/** Payoff-data från /api/onboarding/instant-value (deterministisk, ur importen). */
+interface InstantValue {
+  overdue_count: number
+  overdue_sum_kr: number
+  unpaid_count: number
+  unpaid_sum_kr: number
+  customer_count: number
+  open_deals_count: number
+  open_deals_value_kr: number
+  headline: {
+    agent: string
+    text: string
+    amount_kr?: number
+    count?: number
+  }
+}
+
 interface TourStep {
   id: 'team' | 'matte' | 'approve' | 'setup'
   title: string
@@ -42,6 +59,8 @@ const TOUR_STEPS: TourStep[] = [
 export default function Step6LiveTour({ onFinish, data }: Step6Props) {
   const [tourStep, setTourStep] = useState(-1)
   const [showToast, setShowToast] = useState(true)
+  // Payoff-data: null = laddar (neutral placeholder), sedan värden eller fallback.
+  const [instant, setInstant] = useState<InstantValue | null>(null)
 
   useEffect(() => {
     const t1 = setTimeout(() => setShowToast(false), 2800)
@@ -49,6 +68,24 @@ export default function Step6LiveTour({ onFinish, data }: Step6Props) {
     return () => {
       clearTimeout(t1)
       clearTimeout(t2)
+    }
+  }, [])
+
+  // Hämta kundens RIKTIGA första värde ur importen (deterministiskt, ej cron).
+  // Blockerar ALDRIG finish-knappen — vid fel/tomt faller vi tillbaka på
+  // vänlig generisk touren (aldrig en trasig/tom skärm).
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/onboarding/instant-value')
+      .then(res => (res.ok ? res.json() : null))
+      .then((json: InstantValue | null) => {
+        if (!cancelled && json && json.headline) setInstant(json)
+      })
+      .catch(() => {
+        /* tyst: touren fungerar utan payoff-data */
+      })
+    return () => {
+      cancelled = true
     }
   }, [])
 
@@ -64,7 +101,12 @@ export default function Step6LiveTour({ onFinish, data }: Step6Props) {
 
   return (
     <div className="ob-screen" style={{ background: 'var(--ob-bg)' }}>
-      <MockDashboard highlight={highlight} firstName={data.contactName?.split(' ')[0] || 'där'} companyName={data.companyName || 'Test AB'} />
+      <MockDashboard
+        highlight={highlight}
+        firstName={data.contactName?.split(' ')[0] ?? 'där'}
+        companyName={data.companyName ?? 'Test AB'}
+        instant={instant}
+      />
 
       {/* Confirmation toast */}
       {showToast && (
@@ -139,11 +181,20 @@ interface MockDashboardProps {
   highlight: string | null
   firstName: string
   companyName: string
+  instant: InstantValue | null
 }
 
-function MockDashboard({ highlight, firstName, companyName }: MockDashboardProps) {
+function MockDashboard({ highlight, firstName, companyName, instant }: MockDashboardProps) {
   const dim = highlight ? 0.4 : 1
   const lit = (id: string) => highlight === id
+
+  // Design owns styling per tasks/onboarding-import-brief.md screen E.
+  // Realdata från importen — visa endast ÄRLIGA siffror. Vid tomt/skip
+  // faller värdena tillbaka på 0/generisk copy (aldrig fabricerat).
+  const nf = (n: number) => n.toLocaleString('sv-SE')
+  const unpaidCount = instant?.unpaid_count ?? 0
+  const customerCount = instant?.customer_count ?? 0
+  const openDealsCount = instant?.open_deals_count ?? 0
 
   const teamRow = TEAM.filter(a => a.id !== 'matte').map(a => ({
     id: a.id,
@@ -215,6 +266,53 @@ function MockDashboard({ highlight, firstName, companyName }: MockDashboardProps
           <p style={{ fontSize: 12, color: 'var(--ob-muted)', marginTop: 2 }}>
             AI-teamet är på plats
           </p>
+        </div>
+
+        {/* Payoff-rubrik — Karins krona-fynd ur importen. Design owns styling
+            per tasks/onboarding-import-brief.md screen E. Laddar → neutral
+            placeholder (ej tom); tomt/skip → mjuk default via headline. */}
+        <div
+          style={{
+            marginBottom: 12,
+            padding: 14,
+            background:
+              'linear-gradient(135deg, var(--ob-primary-50), var(--ob-surface))',
+            border: '1px solid var(--ob-primary-100)',
+            borderRadius: 'var(--ob-r-lg)',
+            minHeight: 62,
+          }}
+        >
+          {instant ? (
+            <>
+              <div
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  color: 'var(--ob-primary-700)',
+                }}
+              >
+                Ditt AI-team har redan börjat
+              </div>
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: 'var(--ob-ink)',
+                  marginTop: 4,
+                  lineHeight: 1.35,
+                }}
+              >
+                {instant.headline.text}
+              </div>
+            </>
+          ) : (
+            /* Neutral laddnings-placeholder — inte en jarrig tom yta. */
+            <div style={{ fontSize: 13, color: 'var(--ob-muted)' }}>
+              Ditt AI-team gör sig redo…
+            </div>
+          )}
         </div>
 
         {/* Team strip — TOUR TARGET 1 */}
@@ -302,10 +400,10 @@ function MockDashboard({ highlight, firstName, companyName }: MockDashboardProps
           }}
         >
           {[
-            ['Bokningar', '0', 'denna vecka'],
-            ['Samtal', '0', 'idag'],
-            ['Arbetad tid', '0h', 'denna mån'],
-            ['Projekt', '0', 'aktiva'],
+            ['Kunder', nf(customerCount), 'importerade'],
+            ['Obetalda', nf(unpaidCount), 'fakturor'],
+            ['Öppna affärer', nf(openDealsCount), 'att följa upp'],
+            ['AI-kollegor', '5', 'aktiva'],
           ].map((s, i) => (
             <div
               key={i}
@@ -365,11 +463,13 @@ function MockDashboard({ highlight, firstName, companyName }: MockDashboardProps
                     borderRadius: 'var(--ob-r-pill)',
                   }}
                 >
-                  Inga än
+                  {unpaidCount > 0 ? `${nf(unpaidCount)} att jaga` : 'Inga än'}
                 </span>
               </div>
               <div style={{ fontSize: 12, color: 'var(--ob-muted)' }}>
-                Daniel, Karin och Lars frågar dig här när de behöver ditt godkännande
+                {unpaidCount > 0
+                  ? `Karin har ${nf(unpaidCount)} obetalda fakturor redo att följa upp — du godkänner påminnelserna här`
+                  : 'Daniel, Karin och Lars frågar dig här när de behöver ditt godkännande'}
               </div>
             </div>
           </TourTarget>

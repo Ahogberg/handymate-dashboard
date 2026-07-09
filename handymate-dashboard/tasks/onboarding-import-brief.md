@@ -64,6 +64,39 @@ importerade data + Karins första fynd. Minst: "Din dashboard är redo — {X} k
 {Y} fakturor att följa upp." Om vi kan: Karins konkreta krona-fynd ("3 förfallna fakturor
 värda 45 000 kr väntar på din åtgärd"). Detta är det som säljer priset.
 
+#### Datakontrakt — `GET /api/onboarding/instant-value` (backend, KLART)
+Deterministisk, synkron sammanfattning ur kundens NYSS importerade data — inget cron,
+ingen agent. Samma status-/fältkonventioner som cash-radarn (`invoice.status IN
+('sent','overdue')`, belopp = `invoice.total`) → payoff-siffrorna matchar dashboarden,
+ingen drift. `Step6LiveTour.tsx` anropar den på mount. Svar (JSON):
+
+| Fält | Typ | Betydelse |
+|------|-----|-----------|
+| `overdue_count` | number | Antal förfallna fakturor (`status='overdue'`) |
+| `overdue_sum_kr` | number | Summa förfallna fakturor (kr, heltal) |
+| `unpaid_count` | number | Antal obetalda fakturor (`status` sent+overdue) |
+| `unpaid_sum_kr` | number | Summa obetalda fakturor (kr, heltal) |
+| `customer_count` | number | Antal importerade kunder |
+| `open_deals_count` | number | Öppna affärer (ej won/lost) |
+| `open_deals_value_kr` | number | Summa öppna affärers värde (kr, heltal) |
+| `headline` | object | Det STARKASTE ärliga fyndet, se nedan |
+
+`headline = { agent: 'Karin'|'Hanna'|'Daniel'|'Lisa', text: string, amount_kr?: number, count?: number }`.
+`text` är färdig svensk copy — designen visar den rakt av (dynamiskt fält att stila runt).
+
+**Headline-prioritet (backend väljer, honest — bara det som finns i datan):**
+1. Förfallna fakturor finns → Karin: `"Karin har hittat {overdue_count} förfallna fakturor värda {overdue_sum_kr} kr"`
+2. Annars obetalda fakturor → Karin: `"Karin bevakar {unpaid_count} obetalda fakturor värda {unpaid_sum_kr} kr"`
+3. Annars öppna affärer → Daniel: `"Daniel följer upp {open_deals_count} öppna affärer"`
+4. Annars kunder → Hanna: `"{customer_count} kunder redo — dina AI-kollegor är på plats"`
+5. Allt tomt (skippad import) → Lisa: `"Ditt AI-team är redo — lägg till kunder så börjar de jobba"` (alla siffror 0)
+
+**States designen måste hantera:** laddar (fetch pågår) → neutral placeholder, aldrig tom yta;
+fetch-fel/tomt → mjuk generisk tour (aldrig trasig skärm); skippad import → punkt 5 ovan.
+Finish-knappen ("Kör igång") får ALDRIG blockeras av detta fetch.
+Dynamiska fält att designa placeholders för: `headline.text` (rubrik), samt stödsiffrorna
+`customer_count`, `unpaid_count`, `open_deals_count`.
+
 ## API-kontrakt (backend bygger dessa; komponenten anropar dem)
 - `POST /api/fortnox/import/customers` — FINNS. → `{ imported, skipped, total, errors }`.
 - `POST /api/fortnox/import/invoices` — **NYTT (backend bygger)**. Drar öppna/obetalda
