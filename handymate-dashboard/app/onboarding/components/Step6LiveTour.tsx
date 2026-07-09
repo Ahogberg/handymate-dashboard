@@ -1,8 +1,25 @@
 'use client'
 
+/**
+ * Step6LiveTour — Payoff / "AI-teamet jobbar redan" (sista onboarding-steget).
+ *
+ * Det emotionella toppläget som säljer priset: kunden har precis kopplat sin
+ * verksamhet och ser att AI-teamet redan jobbar på deras RIKTIGA data. En
+ * förhandsvisning av produktens dashboard (så kunden känner igen sig) med en
+ * kort guidad tur (spotlight på team, Matte-knappen, godkännanden, setup).
+ *
+ * ALL LOGIK: tour-state-maskinen (tourStep, showToast, timers), data-fetchen
+ * mot /api/onboarding/instant-value (blockerar ALDRIG finish), next/skip/
+ * finished-logiken, highlight-härledningen och onFinish. Det VISUELLA lagret är
+ * förfinat i linje med StepImportData + obi-/--ob--systemet (payoff-hero,
+ * team-strip, stat-tiles, agent-rader) — allt inline mot befintliga --ob-*-tokens.
+ *
+ * Beroenden: lucide-react, @/lib/agents/team.
+ */
+
 import { useEffect, useState } from 'react'
-import { ListChecks, Rocket, Target } from 'lucide-react'
-import { TEAM } from '@/lib/agents/team'
+import { ListChecks, Rocket, Target, Crown } from 'lucide-react'
+import { TEAM, getAgentById } from '@/lib/agents/team'
 import type { OnboardingFormData } from '../types-redesign'
 
 interface Step6Props {
@@ -73,7 +90,7 @@ export default function Step6LiveTour({ onFinish, data }: Step6Props) {
 
   // Hämta kundens RIKTIGA första värde ur importen (deterministiskt, ej cron).
   // Blockerar ALDRIG finish-knappen — vid fel/tomt faller vi tillbaka på
-  // vänlig generisk touren (aldrig en trasig/tom skärm).
+  // vänlig generisk tour (aldrig en trasig/tom skärm).
   useEffect(() => {
     let cancelled = false
     fetch('/api/onboarding/instant-value')
@@ -188,7 +205,6 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
   const dim = highlight ? 0.4 : 1
   const lit = (id: string) => highlight === id
 
-  // Design owns styling per tasks/onboarding-import-brief.md screen E.
   // Realdata från importen — visa endast ÄRLIGA siffror. Vid tomt/skip
   // faller värdena tillbaka på 0/generisk copy (aldrig fabricerat).
   const nf = (n: number) => n.toLocaleString('sv-SE')
@@ -213,13 +229,17 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
   }))
 
   const matte = TEAM.find(a => a.id === 'matte')
+  const karinAvatar = teamRow.find(a => a.id === 'karin')?.avatar
 
   return (
-    <div style={{ height: '100%', overflow: 'hidden', position: 'relative' }}>
+    <div style={{ height: '100%', overflowY: 'auto', position: 'relative' }}>
       {/* Top bar */}
       <div
         style={{
-          padding: '14px 16px 8px',
+          position: 'sticky',
+          top: 0,
+          zIndex: 3,
+          padding: '14px 16px 10px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -227,7 +247,7 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
           borderBottom: '1px solid var(--ob-border)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           <div
             style={{
               width: 28,
@@ -244,76 +264,50 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
           >
             H
           </div>
-          <strong style={{ fontSize: 14 }}>{companyName}</strong>
+          <strong style={{ fontSize: 14, color: 'var(--ob-ink)' }}>{companyName}</strong>
         </div>
         <div
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: '50%',
-            background: 'var(--ob-primary-50)',
-            backgroundImage: matte?.avatar ? `url(${matte.avatar})` : undefined,
-            backgroundSize: 'cover',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 11,
+            fontWeight: 600,
+            color: 'var(--ob-green-600)',
+            background: 'var(--ob-green-50)',
+            padding: '5px 10px',
+            borderRadius: 'var(--ob-r-pill)',
           }}
-        />
+        >
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--ob-green-600)' }} />
+          Live
+        </div>
       </div>
 
       <div style={{ padding: 16 }}>
+        {/* Greeting */}
         <div style={{ marginBottom: 14 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>
+          <h2 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--ob-ink)' }}>
             Hej, {firstName}!
           </h2>
-          <p style={{ fontSize: 12, color: 'var(--ob-muted)', marginTop: 2 }}>
+          <p
+            style={{
+              fontSize: 12.5,
+              color: 'var(--ob-muted)',
+              marginTop: 3,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--ob-green-600)' }} />
             AI-teamet är på plats
           </p>
         </div>
 
-        {/* Payoff-rubrik — Karins krona-fynd ur importen. Design owns styling
-            per tasks/onboarding-import-brief.md screen E. Laddar → neutral
-            placeholder (ej tom); tomt/skip → mjuk default via headline. */}
-        <div
-          style={{
-            marginBottom: 12,
-            padding: 14,
-            background:
-              'linear-gradient(135deg, var(--ob-primary-50), var(--ob-surface))',
-            border: '1px solid var(--ob-primary-100)',
-            borderRadius: 'var(--ob-r-lg)',
-            minHeight: 62,
-          }}
-        >
-          {instant ? (
-            <>
-              <div
-                style={{
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  color: 'var(--ob-primary-700)',
-                }}
-              >
-                Ditt AI-team har redan börjat
-              </div>
-              <div
-                style={{
-                  fontSize: 15,
-                  fontWeight: 700,
-                  color: 'var(--ob-ink)',
-                  marginTop: 4,
-                  lineHeight: 1.35,
-                }}
-              >
-                {instant.headline.text}
-              </div>
-            </>
-          ) : (
-            /* Neutral laddnings-placeholder — inte en jarrig tom yta. */
-            <div style={{ fontSize: 13, color: 'var(--ob-muted)' }}>
-              Ditt AI-team gör sig redo…
-            </div>
-          )}
-        </div>
+        {/* HERO payoff — Karins krona-fynd ur importen. Laddar/tomt/skip →
+            varm placeholder (aldrig en trasig/tom yta). */}
+        <PayoffHero instant={instant} nf={nf} fallbackAvatar={karinAvatar} />
 
         {/* Team strip — TOUR TARGET 1 */}
         <TourTarget id="team" highlight={lit('team')} dim={dim}>
@@ -323,6 +317,7 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
               background: 'var(--ob-surface)',
               border: '1px solid var(--ob-border)',
               borderRadius: 'var(--ob-r-lg)',
+              boxShadow: 'var(--ob-sh-sm)',
             }}
           >
             <div
@@ -330,33 +325,40 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: 10,
+                marginBottom: 12,
               }}
             >
-              <strong style={{ fontSize: 13 }}>Ditt AI-team idag</strong>
-              <span style={{ fontSize: 10, color: 'var(--ob-muted)' }}>5 aktiva</span>
+              <strong style={{ fontSize: 13, color: 'var(--ob-ink)' }}>Ditt AI-team idag</strong>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: 'var(--ob-green-600)',
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ob-green-600)' }} />
+                5 aktiva
+              </span>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
               {teamRow.map(a => (
                 <div
                   key={a.id}
-                  style={{
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
+                  style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}
                 >
                   <div style={{ position: 'relative' }}>
                     <div
                       style={{
-                        width: 36,
-                        height: 36,
+                        width: 38,
+                        height: 38,
                         borderRadius: '50%',
                         backgroundImage: a.avatar ? `url(${a.avatar})` : undefined,
                         backgroundColor: 'var(--ob-primary-50)',
                         backgroundSize: 'cover',
+                        backgroundPosition: 'center',
                         border: `1.5px solid ${a.color}`,
                       }}
                     />
@@ -365,23 +367,15 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
                         position: 'absolute',
                         bottom: -1,
                         right: -1,
-                        width: 10,
-                        height: 10,
+                        width: 11,
+                        height: 11,
                         background: 'var(--ob-green-600)',
                         border: '2px solid var(--ob-surface)',
                         borderRadius: '50%',
                       }}
                     />
                   </div>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color: 'var(--ob-ink-2)',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {a.name}
-                  </span>
+                  <span style={{ fontSize: 10, color: 'var(--ob-ink-2)', fontWeight: 600 }}>{a.name}</span>
                 </div>
               ))}
             </div>
@@ -400,35 +394,48 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
           }}
         >
           {[
-            ['Kunder', nf(customerCount), 'importerade'],
-            ['Obetalda', nf(unpaidCount), 'fakturor'],
-            ['Öppna affärer', nf(openDealsCount), 'att följa upp'],
-            ['AI-kollegor', '5', 'aktiva'],
-          ].map((s, i) => (
-            <div
-              key={i}
-              style={{
-                padding: 12,
-                background: 'var(--ob-surface)',
-                border: '1px solid var(--ob-border)',
-                borderRadius: 'var(--ob-r-md)',
-              }}
-            >
+            ['Kunder', nf(customerCount), 'importerade', false],
+            ['Obetalda', nf(unpaidCount), 'fakturor', false],
+            ['Öppna affärer', nf(openDealsCount), 'att följa upp', false],
+            ['AI-kollegor', '5', 'aktiva', true],
+          ].map((s, i) => {
+            const hero = s[3] as boolean
+            return (
               <div
+                key={i}
                 style={{
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: '0.1em',
-                  color: 'var(--ob-muted)',
-                  textTransform: 'uppercase',
+                  padding: 13,
+                  background: hero ? 'var(--ob-primary-50)' : 'var(--ob-surface)',
+                  border: `1px solid ${hero ? 'var(--ob-primary-100)' : 'var(--ob-border)'}`,
+                  borderRadius: 'var(--ob-r-md)',
                 }}
               >
-                {s[0]}
+                <div
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    color: hero ? 'var(--ob-primary-700)' : 'var(--ob-muted)',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {s[0]}
+                </div>
+                <div
+                  style={{
+                    fontSize: 23,
+                    fontWeight: 800,
+                    marginTop: 3,
+                    letterSpacing: '-0.02em',
+                    color: hero ? 'var(--ob-primary-700)' : 'var(--ob-ink)',
+                  }}
+                >
+                  {s[1]}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--ob-muted)', marginTop: 1 }}>{s[2]}</div>
               </div>
-              <div style={{ fontSize: 22, fontWeight: 700, marginTop: 2 }}>{s[1]}</div>
-              <div style={{ fontSize: 10, color: 'var(--ob-muted)' }}>{s[2]}</div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* Approvals — TOUR TARGET 3 */}
@@ -440,84 +447,89 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
                 background: 'var(--ob-surface)',
                 border: '1px solid var(--ob-border)',
                 borderRadius: 'var(--ob-r-lg)',
+                boxShadow: 'var(--ob-sh-sm)',
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  marginBottom: 10,
-                }}
-              >
-                <ListChecks size={16} />
-                <strong style={{ fontSize: 13 }}>Godkännanden</strong>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ color: 'var(--ob-primary-700)' }}>
+                  <ListChecks size={16} />
+                </span>
+                <strong style={{ fontSize: 13, color: 'var(--ob-ink)' }}>Godkännanden</strong>
                 <span
                   style={{
                     marginLeft: 'auto',
                     fontSize: 10,
                     fontWeight: 700,
-                    padding: '2px 8px',
-                    background: 'var(--ob-primary-50)',
-                    color: 'var(--ob-primary-700)',
+                    padding: '3px 9px',
+                    background: unpaidCount > 0 ? 'var(--ob-primary-700)' : 'var(--ob-primary-50)',
+                    color: unpaidCount > 0 ? '#fff' : 'var(--ob-primary-700)',
                     borderRadius: 'var(--ob-r-pill)',
                   }}
                 >
                   {unpaidCount > 0 ? `${nf(unpaidCount)} att jaga` : 'Inga än'}
                 </span>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--ob-muted)' }}>
-                {unpaidCount > 0
-                  ? `Karin har ${nf(unpaidCount)} obetalda fakturor redo att följa upp — du godkänner påminnelserna här`
-                  : 'Daniel, Karin och Lars frågar dig här när de behöver ditt godkännande'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div
+                  style={{
+                    width: 30,
+                    height: 30,
+                    flexShrink: 0,
+                    borderRadius: '50%',
+                    backgroundImage: karinAvatar ? `url(${karinAvatar})` : undefined,
+                    backgroundColor: 'var(--ob-primary-50)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    border: '1.5px solid var(--ob-blue-600)',
+                  }}
+                />
+                <div style={{ fontSize: 12, color: 'var(--ob-ink-2)', lineHeight: 1.4 }}>
+                  {unpaidCount > 0 ? (
+                    <>
+                      <b style={{ color: 'var(--ob-ink)' }}>Karin</b> har {nf(unpaidCount)} obetalda fakturor
+                      redo att följa upp — du godkänner påminnelserna här
+                    </>
+                  ) : (
+                    <>
+                      <b style={{ color: 'var(--ob-ink)' }}>Karin, Daniel och Lars</b> frågar dig här när de
+                      behöver ditt godkännande
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </TourTarget>
         </div>
 
         {/* Setup checklist — TOUR TARGET 4 */}
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 12, marginBottom: 8 }}>
           <TourTarget id="setup" highlight={lit('setup')} dim={dim}>
             <div
               style={{
                 padding: 14,
-                background:
-                  'linear-gradient(135deg, var(--ob-primary-50), var(--ob-surface))',
+                background: 'linear-gradient(135deg, var(--ob-primary-50), var(--ob-surface))',
                 border: '1px solid var(--ob-primary-100)',
                 borderRadius: 'var(--ob-r-lg)',
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  marginBottom: 8,
-                }}
-              >
-                <Target size={16} />
-                <strong style={{ fontSize: 13, color: 'var(--ob-primary-700)' }}>
-                  Komplettera setup
-                </strong>
-                <span
-                  style={{
-                    marginLeft: 'auto',
-                    fontSize: 10,
-                    color: 'var(--ob-muted)',
-                  }}
-                >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ color: 'var(--ob-primary-700)' }}>
+                  <Target size={16} />
+                </span>
+                <strong style={{ fontSize: 13, color: 'var(--ob-primary-700)' }}>Komplettera setup</strong>
+                <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 600, color: 'var(--ob-muted)' }}>
                   2/5 klart
                 </span>
               </div>
-              <div
-                style={{
-                  height: 4,
-                  background: 'var(--ob-primary-100)',
-                  borderRadius: 2,
-                  overflow: 'hidden',
-                }}
-              >
-                <div style={{ width: '40%', height: '100%', background: 'var(--ob-primary-700)' }} />
+              <div style={{ height: 5, background: 'var(--ob-primary-100)', borderRadius: 3, overflow: 'hidden' }}>
+                <div
+                  style={{
+                    width: '40%',
+                    height: '100%',
+                    background: 'linear-gradient(90deg, var(--ob-primary-600), var(--ob-primary-500))',
+                    borderRadius: 3,
+                  }}
+                />
               </div>
             </div>
           </TourTarget>
@@ -529,8 +541,8 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
         <TourTarget id="matte" highlight={lit('matte')} dim={dim} round>
           <div
             style={{
-              width: 56,
-              height: 56,
+              width: 58,
+              height: 58,
               borderRadius: '50%',
               backgroundImage: matte?.avatar ? `url(${matte.avatar})` : undefined,
               backgroundColor: 'var(--ob-primary-700)',
@@ -542,6 +554,131 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
           />
         </TourTarget>
       </div>
+    </div>
+  )
+}
+
+/* Payoff-hero: hjälten. Fyllt teal-kort med Karins fynd; tomt/laddar → varmt. */
+function PayoffHero({
+  instant,
+  nf,
+  fallbackAvatar,
+}: {
+  instant: InstantValue | null
+  nf: (n: number) => string
+  fallbackAvatar?: string
+}) {
+  if (!instant) {
+    return (
+      <div
+        style={{
+          marginBottom: 14,
+          padding: 16,
+          borderRadius: 'var(--ob-r-lg)',
+          background: 'linear-gradient(135deg, var(--ob-primary-50), var(--ob-surface))',
+          border: '1px solid var(--ob-primary-100)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 13,
+          minHeight: 62,
+        }}
+      >
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            flexShrink: 0,
+            borderRadius: '50%',
+            backgroundImage: fallbackAvatar ? `url(${fallbackAvatar})` : undefined,
+            backgroundColor: 'var(--ob-primary-50)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            border: '2px solid var(--ob-surface)',
+            boxShadow: '0 0 0 1px var(--ob-primary-100)',
+          }}
+        />
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ob-ink)' }}>Ditt AI-team är redo</div>
+          <div style={{ fontSize: 12.5, color: 'var(--ob-muted)', marginTop: 2, lineHeight: 1.4 }}>
+            Koppla din verksamhet när du vill — då börjar de jobba på dina riktiga siffror.
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const h = instant.headline
+  const agent = getAgentById(h.agent) ?? getAgentById('karin')
+  return (
+    <div
+      style={{
+        marginBottom: 14,
+        padding: 16,
+        borderRadius: 'var(--ob-r-lg)',
+        position: 'relative',
+        overflow: 'hidden',
+        background: 'linear-gradient(135deg, #0F766E 0%, #0D9488 100%)',
+        boxShadow: '0 10px 28px rgba(13,148,136,0.32)',
+      }}
+    >
+      <div style={{ position: 'absolute', top: -14, right: -10, opacity: 0.16, color: '#fff' }}>
+        <Crown size={92} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <div
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: '50%',
+            backgroundImage: agent?.avatar ? `url(${agent.avatar})` : undefined,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            border: '2px solid rgba(255,255,255,0.9)',
+          }}
+        />
+        <span
+          style={{
+            fontSize: 9.5,
+            fontWeight: 700,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.9)',
+          }}
+        >
+          Ditt AI-team har redan börjat
+        </span>
+      </div>
+      <div
+        style={{
+          fontSize: 19,
+          fontWeight: 700,
+          color: '#fff',
+          lineHeight: 1.28,
+          letterSpacing: '-0.01em',
+          position: 'relative',
+        }}
+      >
+        {h.text}
+      </div>
+      {typeof h.amount_kr === 'number' && h.amount_kr > 0 && (
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 12,
+            padding: '6px 12px',
+            borderRadius: 'var(--ob-r-pill)',
+            background: 'rgba(255,255,255,0.16)',
+            color: '#fff',
+            fontSize: 12.5,
+            fontWeight: 700,
+          }}
+        >
+          <Target size={13} /> {nf(h.amount_kr)} kr att driva in
+        </div>
+      )}
     </div>
   )
 }
@@ -565,9 +702,8 @@ function TourTarget({ id, highlight, dim, round, children }: TourTargetProps) {
         zIndex: highlight ? 40 : 1,
         borderRadius: round ? '50%' : 'var(--ob-r-lg)',
         boxShadow: highlight
-          ? '0 0 0 4px rgba(13,148,136,0.5), 0 0 0 9999px rgba(15,23,42,0.55)'
+          ? '0 0 0 4px rgba(13,148,136,0.55), 0 0 0 9999px rgba(15,23,42,0.55)'
           : 'none',
-        animation: highlight ? 'ob-pulse-ring 1.8s infinite' : 'none',
       }}
     >
       {children}
@@ -627,26 +763,8 @@ function SpotlightOverlay({ step, index, total, onNext, onSkip }: SpotlightOverl
           Hoppa över
         </button>
       </div>
-      <h3
-        style={{
-          fontSize: 17,
-          fontWeight: 700,
-          color: 'var(--ob-ink)',
-          marginBottom: 4,
-        }}
-      >
-        {step.title}
-      </h3>
-      <p
-        style={{
-          fontSize: 13,
-          color: 'var(--ob-muted)',
-          lineHeight: 1.5,
-          marginBottom: 14,
-        }}
-      >
-        {step.body}
-      </p>
+      <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--ob-ink)', marginBottom: 4 }}>{step.title}</h3>
+      <p style={{ fontSize: 13, color: 'var(--ob-muted)', lineHeight: 1.5, marginBottom: 14 }}>{step.body}</p>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 4, flex: 1 }}>
           {Array.from({ length: total }).map((_, i) => (
@@ -665,7 +783,7 @@ function SpotlightOverlay({ step, index, total, onNext, onSkip }: SpotlightOverl
           type="button"
           onClick={onNext}
           style={{
-            padding: '8px 16px',
+            padding: '9px 18px',
             background: 'var(--ob-primary-700)',
             color: '#fff',
             border: 'none',
