@@ -383,7 +383,12 @@ export function checkSubscriptionStatus(business: any): {
 } {
   const status = String(business.subscription_status || '').toLowerCase()
 
-  if (status === 'trialing') {
+  // 'trial' = nyregistrerad (register-routen sätter det + trial_ends_at); 'trialing'
+  // = Stripe-prenumeration i trial (webhooken sätter det efter onboarding-checkout).
+  // BÅDA måste respektera trial_ends_at — tidigare föll bara 'trial' igenom till
+  // fail-open-defaulten nedan och gav gratis-access för ALLTID (även efter utgången),
+  // vilket underminerade betalvägen: en kund som hoppade av checkouten behöll kontot.
+  if (status === 'trialing' || status === 'trial') {
     const trialEnd = business.trial_ends_at ? new Date(business.trial_ends_at) : null
     if (trialEnd && trialEnd.getTime() < Date.now()) {
       return {
