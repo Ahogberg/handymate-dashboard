@@ -177,6 +177,22 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
     return
   }
 
+  // Onboarding-checkout skapar prenumerationen MED 30 dagars trial → status ska
+  // spegla Stripe (trialing), inte hårdkodas 'active'. Uppgraderings-checkouten i
+  // Inställningar (utan trial) blir 'active' som tidigare.
+  const isOnboarding = session.metadata?.onboarding === 'true'
+
+  const statusMap: Record<string, string> = {
+    active: 'active',
+    trialing: 'trialing',
+    past_due: 'past_due',
+    canceled: 'cancelled',
+    unpaid: 'past_due',
+    incomplete: 'incomplete',
+    incomplete_expired: 'cancelled',
+    paused: 'paused',
+  }
+
   const critical: Record<string, any> = {
     stripe_customer_id: session.customer as string,
     subscription_plan: planId || 'starter',
@@ -190,6 +206,12 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
     // Hämta prenumerationsperiod (best-effort — blockerar aldrig aktiveringen)
     try {
       const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
+      // Vid trial: sätt trialing + trial_ends_at direkt (customer.subscription.updated
+      // följer också, men vi vill inte ha ett glapp där status felaktigt är 'active').
+      critical.subscription_status = statusMap[subscription.status] || 'active'
+      if (subscription.trial_end) {
+        critical.trial_ends_at = new Date(subscription.trial_end * 1000).toISOString()
+      }
       period = {
         start: toIsoOrNull((subscription as any).current_period_start),
         end: toIsoOrNull((subscription as any).current_period_end),
@@ -200,6 +222,35 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
   }
 
   await writeBillingUpdate(supabase, businessId, critical, period)
+
+  // Onboarding: provisionera telefonnummer nu när betalningen är genomförd.
+  // Vi anropar INTE /api/onboarding/phone härifrån (den kräver användarens
+  // auth-token; webhooken har ingen session). Istället används den delade
+  // service-role-hjälparen direkt — idempotent (returnerar befintligt nummer
+  // om assigned_phone_number redan är satt) och icke-blockerande.
+  if (isOnboarding) {
+    try {
+      const { purchaseAndAssignNumber } = await import('@/lib/phone/purchase-number')
+      const phoneResult = await purchaseAndAssignNumber(supabase, businessId)
+      if (!phoneResult.ok) {
+        console.error('[Billing webhook] Telefon-provisionering misslyckades (onboarding):', {
+          businessId,
+          error: phoneResult.error,
+          details: phoneResult.details,
+        })
+      } else {
+        console.log('[Billing webhook] Telefon provisionerat (onboarding):', {
+          businessId,
+          number: phoneResult.phone_number,
+          already_assigned: phoneResult.already_assigned,
+        })
+      }
+    } catch (err) {
+      // Icke-blockerande — betalningen är redan genomförd. Kunden kan
+      // provisionera numret senare via Inställningar om detta fallerar.
+      console.error('[Billing webhook] Telefon-provisionering kastade (onboarding):', err)
+    }
+  }
 
   // Logga händelse
   await supabase

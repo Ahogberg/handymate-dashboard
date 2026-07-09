@@ -1,15 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { loadStripe } from '@stripe/stripe-js'
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
+import { useState } from 'react'
 import { ArrowRight, Check, Info, Loader2, Shield } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import InfoSheet from './InfoSheet'
 import { TEAM } from '@/lib/agents/team'
 import type { OnboardingFormData } from '../types-redesign'
-
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
 /**
  * Andreas pilot-feedback (2026-06-03): plan-cards behöver visuell ankare
@@ -71,86 +67,47 @@ interface Step5Props {
   setData: (updater: (d: OnboardingFormData) => OnboardingFormData) => void
 }
 
-export default function Step5Activate(props: Step5Props) {
-  return (
-    <Elements stripe={stripePromise}>
-      <Step5Inner {...props} />
-    </Elements>
-  )
-}
-
-function Step5Inner({ onNext, onBack, data, setData }: Step5Props) {
-  const stripe = useStripe()
-  const elements = useElements()
+/**
+ * Betalning sker numera på Stripes hostade Checkout-sida (redirect), inte via
+ * inbäddat CardElement. Detta skapar en RIKTIG prenumeration med 30 dagars
+ * provperiod. De gamla /api/billing/setup-intent + /api/billing/confirm är
+ * ERSATTA (satte bara subscription_status:'trialing' utan att skapa någon
+ * Stripe-prenumeration → kunden debiterades aldrig). Routes finns kvar orörda
+ * men anropas inte längre härifrån.
+ */
+export default function Step5Activate({ onNext, onBack, data, setData }: Step5Props) {
   const plan = data.plan || 'professional'
   const setPlan = (id: string) => setData(d => ({ ...d, plan: id }))
 
-  const [clientSecret, setClientSecret] = useState<string | null>(null)
-  const [planLoading, setPlanLoading] = useState(true)
-  const [processing, setProcessing] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [cardReady, setCardReady] = useState(false)
   const [infoPlanId, setInfoPlanId] = useState<string | null>(null)
 
-  useEffect(() => {
-    setPlanLoading(true)
-    setError(null)
-    setClientSecret(null)
-
-    fetch('/api/billing/setup-intent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ planId: plan }),
-    })
-      .then(r => r.json())
-      .then(d => {
-        if (d.clientSecret) {
-          setClientSecret(d.clientSecret)
-        } else {
-          setError(d.error || 'Kunde inte initiera betalning')
-        }
-      })
-      .catch(() => setError('Nätverksfel — försök igen'))
-      .finally(() => setPlanLoading(false))
-  }, [plan])
-
   async function handleSubmit() {
-    if (!stripe || !elements || !clientSecret || processing) return
-    setProcessing(true)
+    if (redirecting) return
+    setRedirecting(true)
     setError(null)
 
-    const cardEl = elements.getElement(CardElement)
-    if (!cardEl) {
-      setProcessing(false)
-      return
-    }
-
-    const { setupIntent, error: stripeError } = await stripe.confirmCardSetup(clientSecret, {
-      payment_method: { card: cardEl },
-    })
-
-    if (stripeError) {
-      setError(stripeError.message || 'Kortfel — kontrollera uppgifterna')
-      setProcessing(false)
-      return
-    }
-
-    if (setupIntent?.status === 'succeeded') {
-      const res = await fetch('/api/billing/confirm', {
+    try {
+      const res = await fetch('/api/billing/onboarding-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ setupIntentId: setupIntent.id, planId: plan }),
+        body: JSON.stringify({ planId: plan }),
       })
+      const d = await res.json().catch(() => ({}))
 
-      if (res.ok) {
-        onNext()
-      } else {
-        const d = await res.json().catch(() => ({}))
-        setError(d.error || 'Kunde inte bekräfta betalning')
-        setProcessing(false)
+      if (res.ok && d.url) {
+        // Skicka användaren till Stripes hostade betalsida. Vid genomförd
+        // betalning kommer de tillbaka till /onboarding?payment=success.
+        window.location.href = d.url
+        return
       }
-    } else {
-      setProcessing(false)
+
+      setError(d.error || 'Kunde inte starta betalningen — försök igen')
+      setRedirecting(false)
+    } catch {
+      setError('Nätverksfel — försök igen')
+      setRedirecting(false)
     }
   }
 
@@ -233,48 +190,24 @@ function Step5Inner({ onNext, onBack, data, setData }: Step5Props) {
           ))}
         </div>
 
-        {/* Stripe card element — riktig integration */}
-        <label className="ob-label" style={{ marginBottom: 10 }}>
-          Betalkort
-        </label>
+        {/* Betalning sker på Stripes säkra sida (redirect vid "Aktivera") */}
         <div
           style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
             padding: '14px 16px',
             border: '1px solid var(--ob-border)',
             borderRadius: 'var(--ob-r-md)',
             background: 'var(--ob-surface)',
             marginBottom: 10,
-            minHeight: 50,
-            display: 'flex',
-            alignItems: 'center',
           }}
         >
-          {planLoading ? (
-            <Loader2
-              size={18}
-              className="animate-spin"
-              style={{ color: 'var(--ob-primary-700)' }}
-            />
-          ) : (
-            <div style={{ width: '100%' }}>
-              <CardElement
-                onChange={e => setCardReady(e.complete)}
-                options={{
-                  style: {
-                    base: {
-                      fontSize: '16px',
-                      color: '#0F172A',
-                      fontFamily:
-                        '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
-                      '::placeholder': { color: '#94A3B8' },
-                    },
-                    invalid: { color: '#EF4444' },
-                  },
-                  hidePostalCode: true,
-                }}
-              />
-            </div>
-          )}
+          <Shield size={18} style={{ color: 'var(--ob-primary-700)', flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.45 }}>
+            Du anger kortuppgifterna säkert hos Stripe i nästa steg. Inget dras nu —
+            provperioden är 30 dagar.
+          </span>
         </div>
 
         {error && (
@@ -354,12 +287,12 @@ function Step5Inner({ onNext, onBack, data, setData }: Step5Props) {
         <button
           type="button"
           className="ob-cta"
-          disabled={!stripe || processing || !clientSecret || !cardReady}
+          disabled={redirecting}
           onClick={handleSubmit}
         >
-          {processing ? (
+          {redirecting ? (
             <>
-              <Loader2 size={18} className="animate-spin" /> Behandlar…
+              <Loader2 size={18} className="animate-spin" /> Öppnar säker betalning…
             </>
           ) : (
             <>

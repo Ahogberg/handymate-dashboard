@@ -57,7 +57,31 @@ export default function OnboardingPage() {
 
         // Resume: mappa DB-step till UI-step
         const dbStep = d.onboarding_step || 0
-        const uiStep = Math.max(0, Math.min(dbStep, TOTAL_STEPS - 1))
+        let uiStep = Math.max(0, Math.min(dbStep, TOTAL_STEPS - 1))
+
+        // Retur från Stripe Checkout (onboarding-betalning).
+        //  ?payment=success → betalningen är genomförd (prenumeration skapad i
+        //    trialing). Gå vidare till aktiverings-/tour-steget (5). Telefon-
+        //    numret provisioneras av webhooken; Step6 läser assigned_phone_number.
+        //  ?payment=cancelled → kunden avbröt. Landa kvar på betalsteget (4)
+        //    så de kan försöka igen. Aldrig fastna.
+        const params = new URLSearchParams(window.location.search)
+        const payment = params.get('payment')
+        if (payment === 'success') {
+          uiStep = 5
+          // Persistera framsteget (best-effort) och städa URL:en.
+          if (d.business_id) {
+            fetch('/api/onboarding', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ step: 5, data: {}, config: {} }),
+            }).catch(() => {})
+          }
+          window.history.replaceState({}, '', '/onboarding')
+        } else if (payment === 'cancelled') {
+          uiStep = 4
+          window.history.replaceState({}, '', '/onboarding')
+        }
 
         // Återställ form-data från DB om finns
         const restored: OnboardingFormData = {
