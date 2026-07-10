@@ -12,17 +12,19 @@ interface AgentActivity {
   idle: boolean
 }
 
+export interface TeamActivitySummary {
+  total_calls: number
+  total_sms: number
+  total_quotes: number
+  total_invoiced: number
+  total_bookings_updated: number
+  total_automations: number
+  active_agents: number
+}
+
 interface TeamActivityResponse {
   agents: AgentActivity[]
-  summary: {
-    total_calls: number
-    total_sms: number
-    total_quotes: number
-    total_invoiced: number
-    total_bookings_updated: number
-    total_automations: number
-    active_agents: number
-  }
+  summary: TeamActivitySummary
 }
 
 interface Observation {
