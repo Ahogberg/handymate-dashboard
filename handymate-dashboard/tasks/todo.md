@@ -74,5 +74,34 @@ Beslut från Andreas: Christoffer (pilot) äger lanseringsgrindarna → omdesign
 - [ ] Mobil: npx tsc --noEmit → 0 fel
 - [ ] UI-svep: inga engelska termer, teal-tema, 44px touch targets (mobil)
 
-## Review
-(fylls i efter bygge)
+## Review (2026-07-11 — bygget klart, väntar merge-beslut)
+
+**Desktop** (`feat/idag-vy-redesign`, 2 commits): IdagCore + bantad page.tsx
+(~1340 → ~470 rader) + economy-summary-endpoint. `tsc` 0 fel, `next build` ren
+(enda felet = förbyggt fortnox-sync-env-problem, ej relaterat).
+
+**Mobil** (`handymate-mobile` `feat/idag-hemskarm` från `fix/b2-mobile-execution-read`,
+1 commit): 6 nya komponenter + omgjord home.tsx + api-fetchers. `tsc` 0 fel.
+Svepgodkänning borttagen ur ApprovalCard (designbeslut).
+
+**Buggfynd på vägen:** mobilens "Ändra"-flöde hade ALDRIG fungerat —
+`updateApprovalText` PATCH:ade en POST-only-route (405 i prod). Omskriven till
+`action: 'edit'` + `edited_payload`; approvals-skärmens dubbel-anrop
+(edit + approve → 409) fixat. Samma klass som FK-embed-lärdomen: tyst fel,
+grönt UI.
+
+**Avvikelser från checklistan:** OnMyWayButton på desktop-drillkortet skippad
+(bokningsrader länkar till detaljsidan där knappen finns); "Senare idag"-sektion
+behållen på mobilen (designen visade bara nästa bokning, men att dölja dagens
+övriga bokningar vore funktionsregression).
+
+**Kvar innan merge (Andreas/Christoffer):**
+- [ ] Visuell genomgång i dev (`npm run dev` + Expo) — byggena är typcheckade,
+      inte ögontestade
+- [ ] Merge-ordning: dashboard-branchen FÖRST (mobilens Fakturor-kort läser
+      nya economy-summary; döljs tyst tills den är ute)
+- [ ] Mobil: `fix/b2-mobile-execution-read` måste mergas före/med
+      `feat/idag-hemskarm` (byggd ovanpå)
+- [ ] EAS-bygge efter merge för att nå telefoner
+- [ ] Sekvensering mot lanseringssprinten: A-test + B7 Stripe-köp är fortfarande
+      högsta prio (inventeringen 2026-07-11)
