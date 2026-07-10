@@ -51,3 +51,10 @@
 - **Innan ekonomisk slutsats:** Fråga om "pengar faktiskt rör sig" är en business-fråga, inte en DB-fråga. Stripe dashboard är sanning, DB är spegel.
 - **Generell:** När jag drar slutsatser om kundpåverkan (pengar, faktura, refund) — verifiera grundantaganden (är detta riktig betalande kund? co-founder-comp? trial?) **innan** jag flaggar akut. Andreas's affärsmodell är inte alltid synlig i koden.
 - **Loggat som separat TD:** [td-stripe-sync-verification.md](td-stripe-sync-verification.md) — verifiera webhook-sync innan första betalande kund onboardas.
+
+## PostgREST-embeds (`rel:fk_col(...)`) felar TYST när FK saknas — hela queryn dör
+- **Symptom (2026-07-09):** Inga projektflyttar fungerade någonsin — manuella stage-klick OCH alla automatiska (bokning, milstolpe, recension, Fortnox-betalning, deal-vunnen). `advanceProjectStage` hämtade projektet med `select('*, customer:customer_id(*)')`, men `project` saknar FK till `customer` i prod → PostgREST avvisar HELA queryn (PGRST200) → `data=null` → koden tolkade det som "project not found" och returnerade tyst → rutten svarade ändå success. 32/33 projekt hade `current_workflow_stage_id=NULL`.
+- **Regel:** En embeddad join är ett FK-beroende — den KRÄVER att FK-constrainten finns i prod-schemat, inte bara att kolumnen finns. Nya embeds mot `project`/`deal` (TEXT-id-tabeller utan FK:er) är förbjudna — hämta relaterad data separat (etablerat mönster: pipeline-routens "no FK on deal table").
+- **Diagnos-mönster:** "X händer aldrig men inga fel syns" + kod som destrukturerar `{ data }` utan `error` → proba exakta queryn mot prod-REST: `curl '<url>/rest/v1/<table>?select=*,rel:fk(*)&limit=1'`. PGRST200 = saknad FK.
+- **Skärpning av tysta-fel-regeln:** `const { data } = await supabase...` utan error-läsning gäller SELECT också — inte bara insert/update. En felande SELECT ser identisk ut med "rad saknas".
+- **Ärlighets-regel för rutter:** En route får ALDRIG svara success baserat på att en void-funktion "inte kastade" — funktioner som kan misslyckas ska returnera resultat (`{ moved: boolean, error? }`) som rutten kontrollerar.
