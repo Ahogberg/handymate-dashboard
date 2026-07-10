@@ -86,8 +86,17 @@ export async function POST(
     return NextResponse.json({ error: 'Målstage hittades inte' }, { status: 404 })
   }
 
-  // 4. Kör advance via engine — uppdaterar projekt + loggar history + triggar automationer
-  await advanceProjectStage(projectId, targetStageId, business.business_id)
+  // 4. Kör advance via engine — uppdaterar projekt + loggar history + triggar
+  //    automationer. Resultatet KONTROLLERAS: tidigare svarade rutten success
+  //    även när engine tyst misslyckades (embed-buggen) → UI visade "Flyttad"
+  //    medan projektet stod stilla.
+  const result = await advanceProjectStage(projectId, targetStageId, business.business_id)
+  if (!result.moved) {
+    return NextResponse.json(
+      { error: result.error || 'Kunde inte flytta projektet' },
+      { status: 500 }
+    )
+  }
 
   return NextResponse.json({
     success: true,

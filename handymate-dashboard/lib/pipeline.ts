@@ -157,7 +157,9 @@ export async function moveDeal(params: {
     }
   }
 
-  // Update deal
+  // Update deal — FELKONTROLLERAT: en tyst misslyckad update här skulle logga
+  // aktiviteten "Flyttad till X" medan dealen stod kvar (samma tysta-fel-klass
+  // som projekt-stage-buggen). Kasta så att anroparen rapporterar ärligt.
   const updateData: any = {
     stage_id: toStage.id,
     updated_at: new Date().toISOString(),
@@ -166,7 +168,10 @@ export async function moveDeal(params: {
     updateData.closed_at = new Date().toISOString()
   }
 
-  await supabase.from('deal').update(updateData).eq('id', params.dealId)
+  const { error: updateError } = await supabase.from('deal').update(updateData).eq('id', params.dealId)
+  if (updateError) {
+    throw new Error(`Deal-update misslyckades: ${updateError.message}`)
+  }
 
   // Log activity
   await supabase.from('pipeline_activity').insert({

@@ -30,32 +30,65 @@ interface StageHistoryEntry {
   previous_stage_id: string | null
 }
 
+/** Resultat av en stage-flytt — låter anropare (t.ex. advance-stage-rutten)
+ *  rapportera ärligt i stället för att anta att flytten lyckades. */
+export interface AdvanceStageResult {
+  moved: boolean
+  error?: string
+}
+
 /**
  * Flytta ett projekt till en ny stage. Loggar i history, uppdaterar
  * timestamps och triggar automationer.
+ *
+ * VIKTIGT (bugfix 2026-07-09): tidigare hämtades projektet med den embeddade
+ * joinen `customer:customer_id(*)` — men `project` saknar FK till `customer`
+ * i prod, så PostgREST avvisade HELA queryn (PGRST200) → `project` blev null
+ * → funktionen returnerade tyst "not found" → INGEN projektflytt (manuell
+ * eller automatisk) fungerade någonsin, medan rutten ändå svarade success.
+ * Nu hämtas kunden separat (samma mönster som pipeline-rutten: "no FK on
+ * deal table"), och fel rapporteras ärligt via returvärdet.
  */
 export async function advanceProjectStage(
   projectId: string,
   stageId: string,
   businessId: string
-): Promise<void> {
+): Promise<AdvanceStageResult> {
   const supabase = getServerSupabase()
 
-  // Hämta projekt + kund i samma query
-  const { data: project } = await supabase
+  // Hämta projekt UTAN embed (FK till customer saknas — se doc-kommentaren).
+  const { data: project, error: projectError } = await supabase
     .from('project')
-    .select('*, customer:customer_id(*)')
+    .select('*')
     .eq('project_id', projectId)
     .eq('business_id', businessId)
     .maybeSingle()
 
+  if (projectError) {
+    console.error('[project-stages] advanceProjectStage: projekt-query fel:', projectError)
+    return { moved: false, error: projectError.message }
+  }
   if (!project) {
     console.warn('[project-stages] advanceProjectStage: project not found', { projectId, businessId })
-    return
+    return { moved: false, error: 'Projektet hittades inte' }
   }
 
-  // Skip om vi redan är på rätt stage
-  if (project.current_workflow_stage_id === stageId) return
+  // Skip om vi redan är på rätt stage (idempotent — räknas som lyckad).
+  if (project.current_workflow_stage_id === stageId) return { moved: true }
+
+  // Hämta kunden separat — automationerna (SMS-förslag, approvals) behöver
+  // namn/telefon. Saknad kund är OK (projekt utan kundkoppling).
+  if (project.customer_id) {
+    const { data: customer } = await supabase
+      .from('customer')
+      .select('*')
+      .eq('customer_id', project.customer_id)
+      .eq('business_id', businessId)
+      .maybeSingle()
+    project.customer = customer ?? null
+  } else {
+    project.customer = null
+  }
 
   // Logga i stage_history
   const history: StageHistoryEntry[] = Array.isArray(project.workflow_stage_history)
@@ -67,8 +100,9 @@ export async function advanceProjectStage(
     previous_stage_id: project.current_workflow_stage_id || null,
   })
 
-  // Uppdatera projekt
-  await supabase
+  // Uppdatera projekt — FELKONTROLLERAT. En tyst misslyckad update här var
+  // exakt buggen som lät UI:t visa "Flyttad" medan projektet stod stilla.
+  const { error: updateError } = await supabase
     .from('project')
     .update({
       current_workflow_stage_id: stageId,
@@ -77,6 +111,11 @@ export async function advanceProjectStage(
     })
     .eq('project_id', projectId)
     .eq('business_id', businessId)
+
+  if (updateError) {
+    console.error('[project-stages] advanceProjectStage: update misslyckades:', updateError)
+    return { moved: false, error: updateError.message }
+  }
 
   // Trigga automationer
   // Logga stage-övergången med project_id i context — Flödet-vyns AI-strip
@@ -109,6 +148,8 @@ export async function advanceProjectStage(
       console.error('[project-stages] portal notification project_update failed:', notifErr)
     }
   }
+
+  return { moved: true }
 }
 
 async function logProjectStageEvent(

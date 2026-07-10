@@ -28,12 +28,25 @@ export async function GET(
       return NextResponse.json({ error: 'ÄTA hittades inte eller länken är ogiltig' }, { status: 404 })
     }
 
-    // Fetch project + customer
-    const { data: project } = await supabase
+    // Fetch project + customer SEPARAT — project saknar FK till customer i
+    // prod, så en embeddad join (customer:customer_id(...)) avvisas av
+    // PostgREST (PGRST200) och hela queryn felar tyst.
+    const { data: projectRow } = await supabase
       .from('project')
-      .select('name, customer_id, customer:customer_id(name, phone_number, email, address_line)')
+      .select('name, customer_id')
       .eq('project_id', ata.project_id)
       .single()
+
+    let projectCustomer: { name: string; phone_number: string; email: string; address_line: string } | null = null
+    if (projectRow?.customer_id) {
+      const { data: cust } = await supabase
+        .from('customer')
+        .select('name, phone_number, email, address_line')
+        .eq('customer_id', projectRow.customer_id)
+        .maybeSingle()
+      projectCustomer = cust ?? null
+    }
+    const project = projectRow ? { ...projectRow, customer: projectCustomer } : null
 
     // Fetch business info
     const { data: business } = await supabase

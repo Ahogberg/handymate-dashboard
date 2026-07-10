@@ -68,12 +68,28 @@ export async function POST(request: NextRequest) {
       .order('updated_at', { ascending: false })
       .limit(20)
 
-    const { data: activeProjects } = await supabase
+    // OBS: ingen embeddad customer-join här — project saknar FK till customer
+    // i prod (PGRST200 → hela queryn felar). Kundnamn hämtas separat nedan.
+    const { data: activeProjectRows } = await supabase
       .from('project')
-      .select('project_id, name, status, customer:customer_id(name)')
+      .select('project_id, name, status, customer_id')
       .eq('business_id', authBusiness.business_id)
       .eq('status', 'active')
       .limit(10)
+
+    const projCustomerIds = Array.from(new Set((activeProjectRows || []).map(p => p.customer_id).filter(Boolean)))
+    const projCustomerNames: Record<string, string> = {}
+    if (projCustomerIds.length > 0) {
+      const { data: projCustomers } = await supabase
+        .from('customer')
+        .select('customer_id, name')
+        .in('customer_id', projCustomerIds)
+      for (const c of projCustomers || []) projCustomerNames[c.customer_id] = c.name
+    }
+    const activeProjects = (activeProjectRows || []).map(p => ({
+      ...p,
+      customer: p.customer_id ? { name: projCustomerNames[p.customer_id] ?? null } : null,
+    }))
 
     // Step 3: AI analysis with Claude
     const anthropic = getAnthropic()
