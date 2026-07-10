@@ -6,6 +6,7 @@ import {
   fillTemplateContent,
   fetchResolveContext,
 } from '@/lib/document-generator'
+import { GENERATED_DOCUMENT_SELECT, attachDocumentRelations } from '@/lib/documents/enrich'
 
 /**
  * GET - List generated documents
@@ -23,14 +24,11 @@ export async function GET(request: NextRequest) {
     const customerId = request.nextUrl.searchParams.get('customer_id')
     const status = request.nextUrl.searchParams.get('status')
 
+    // OBS: inga customer/project-embeds — FK saknas i prod (PGRST200 dödade
+    // tidigare HELA listan). Relationerna fästs separat via enrich-hjälparen.
     let query = supabase
       .from('generated_document')
-      .select(`
-        *,
-        template:template_id(id, name, category_id, category:category_id(id, name, slug, icon)),
-        customer:customer_id(customer_id, name, phone_number, email),
-        project:project_id(project_id, name)
-      `)
+      .select(GENERATED_DOCUMENT_SELECT)
       .eq('business_id', business.business_id)
       .order('created_at', { ascending: false })
 
@@ -38,26 +36,34 @@ export async function GET(request: NextRequest) {
     if (customerId) query = query.eq('customer_id', customerId)
     if (status) query = query.eq('status', status)
 
-    const { data: documents, error } = await query
+    const { data: rawDocuments, error } = await query
 
     if (error) throw error
 
+    const documents = await attachDocumentRelations(supabase, business.business_id, rawDocuments || [])
+
     // Also fetch uploaded files from customer_document and project_document
+    // (samma sak här: embeds borttagna, relationer fästs i JS nedan)
     const [custDocsRes, projDocsRes] = await Promise.all([
       supabase
         .from('customer_document')
-        .select('*, customer:customer_id(customer_id, name)')
+        .select('*')
         .eq('business_id', business.business_id)
         .order('uploaded_at', { ascending: false }),
       supabase
         .from('project_document')
-        .select('*, project:project_id(project_id, name)')
+        .select('*')
         .eq('business_id', business.business_id)
         .order('created_at', { ascending: false }),
     ])
 
+    const [custDocs, projDocs] = await Promise.all([
+      attachDocumentRelations(supabase, business.business_id, custDocsRes.data || []),
+      attachDocumentRelations(supabase, business.business_id, projDocsRes.data || []),
+    ])
+
     // Normalize uploaded files into a unified shape
-    const customerUploads = (custDocsRes.data || []).map((d: any) => ({
+    const customerUploads = (custDocs || []).map((d: any) => ({
       id: d.id,
       source: 'customer' as const,
       file_name: d.file_name,
@@ -72,7 +78,7 @@ export async function GET(request: NextRequest) {
       created_at: d.uploaded_at,
     }))
 
-    const projectUploads = (projDocsRes.data || []).map((d: any) => ({
+    const projectUploads = (projDocs || []).map((d: any) => ({
       id: d.id,
       source: 'project' as const,
       file_name: d.name,
@@ -137,7 +143,10 @@ export async function POST(request: NextRequest) {
     // Fill template content
     const filledContent = fillTemplateContent(template.content || [], mergedVars)
 
-    // Create document
+    // Create document. OBS: selecten får INTE innehålla customer/project-
+    // embeds — FK saknas i prod, och en ogiltig select avvisar HELA insert-
+    // statementet (samma tysta-fel-klass som Fortnox-kundimporten). Det var
+    // därför noll dokument någonsin skapades i prod.
     const { data: doc, error: createError } = await supabase
       .from('generated_document')
       .insert({
@@ -151,17 +160,14 @@ export async function POST(request: NextRequest) {
         status: 'draft',
         created_by: business.contact_name || null,
       })
-      .select(`
-        *,
-        template:template_id(id, name, category_id, category:category_id(id, name, slug, icon)),
-        customer:customer_id(customer_id, name, phone_number, email),
-        project:project_id(project_id, name)
-      `)
+      .select(GENERATED_DOCUMENT_SELECT)
       .single()
 
     if (createError) throw createError
 
-    return NextResponse.json({ document: doc })
+    const [enriched] = await attachDocumentRelations(supabase, business.business_id, [doc])
+
+    return NextResponse.json({ document: enriched })
   } catch (error: any) {
     console.error('Generate document error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { renderDocumentHTML } from '@/lib/document-generator'
+import { GENERATED_DOCUMENT_SELECT, attachDocumentRelations } from '@/lib/documents/enrich'
 
 /**
  * GET - Get single document
@@ -21,21 +22,20 @@ export async function GET(
     const supabase = getServerSupabase()
     const format = request.nextUrl.searchParams.get('format')
 
-    const { data: doc, error } = await supabase
+    // OBS: inga customer/project-embeds — FK saknas i prod (PGRST200 gav
+    // tidigare 404 för ALLA dokument). Relationerna fästs separat.
+    const { data: rawDoc, error } = await supabase
       .from('generated_document')
-      .select(`
-        *,
-        template:template_id(id, name, category_id, category:category_id(id, name, slug, icon)),
-        customer:customer_id(customer_id, name, phone_number, email),
-        project:project_id(project_id, name)
-      `)
+      .select(GENERATED_DOCUMENT_SELECT)
       .eq('id', id)
       .eq('business_id', business.business_id)
       .single()
 
-    if (error || !doc) {
+    if (error || !rawDoc) {
       return NextResponse.json({ error: 'Dokument hittades inte' }, { status: 404 })
     }
+
+    const [doc] = await attachDocumentRelations(supabase, business.business_id, [rawDoc])
 
     // Return rendered HTML for preview/PDF
     if (format === 'html') {
@@ -112,21 +112,20 @@ export async function PATCH(
       if (updates.status === undefined) updates.status = 'signed'
     }
 
+    // OBS: en ogiltig embed i selecten avvisar HELA update-statementet →
+    // signering/statusbyte rullade tidigare tyst tillbaka. Embeds borttagna.
     const { data: doc, error } = await supabase
       .from('generated_document')
       .update(updates)
       .eq('id', id)
-      .select(`
-        *,
-        template:template_id(id, name, category_id, category:category_id(id, name, slug, icon)),
-        customer:customer_id(customer_id, name, phone_number, email),
-        project:project_id(project_id, name)
-      `)
+      .select(GENERATED_DOCUMENT_SELECT)
       .single()
 
     if (error) throw error
 
-    return NextResponse.json({ document: doc })
+    const [enriched] = await attachDocumentRelations(supabase, business.business_id, [doc])
+
+    return NextResponse.json({ document: enriched })
   } catch (error: any) {
     console.error('Update document error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
