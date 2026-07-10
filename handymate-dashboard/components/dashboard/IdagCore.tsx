@@ -388,9 +388,10 @@ export default function IdagCore({
   function queueAction(approval: Approval, action: 'approve' | 'reject' | 'edit', editedText?: string) {
     setEditingId(null)
     setHiddenIds(prev => new Set(prev).add(approval.id))
+    const isAutonomy = approval.approval_type === 'autonomy_offer'
     const snackText = action === 'reject'
-      ? 'Förslaget avvisas'
-      : approval.approval_type === 'autonomy_offer'
+      ? (isAutonomy ? 'Ok — teamet fortsätter fråga dig' : 'Förslaget avvisas')
+      : isAutonomy
         ? 'Förtroende beviljas'
         : `Skickar: ${approval.title.slice(0, 60)}`
     setSnack({ approvalId: approval.id, text: snackText })
