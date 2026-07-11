@@ -7,11 +7,22 @@ lanseringsgrindarna (A-test + B7 Stripe-köp)._
 
 ## Positionering (in i pitchen, kostar inget)
 
-- [ ] **Approval-kön + förtjänad autonomi UPP i pitchen.** Research-fynd: ingen
-      aktör i världen skeppar cross-domain agentteam bakom en godkännandekö med
-      graderad autonomi (Housecall Pro har bara brandingen, ServiceTitan bara
-      dispatch-accept/reject, Netic/Probook kör autonomi utan kö). Vårt mönster
-      är före skeppat state of the art — säg det.
+- [ ] **Approval-kön + förtjänad autonomi UPP i pitchen — med PRECIS claim.**
+      Sen research-korrigering 2026-07-11: ServiceTitan skeppade "Max" i juni
+      2026 (orkestrerat agentteam, enterprise-nivå) och Avoca kör multi-agent-
+      framing — så säg ALDRIG "ingen har agentteam" (falsifierbart i demo).
+      Det som håller: **ingen skeppar approval-kö-modellen** — alla kör
+      agera-först-eskalera-sen; graderad FÖRTJÄNAD autonomi finns bara i
+      horisontell agent-infra-litteratur, inte produktiserad i någon
+      field-service-produkt. På SMB-nivån (Jobber/HCP) finns inte ens teamet.
+- [ ] **EU AI Act-vinkeln i pitchen:** Artikel 14 (human oversight) träder i
+      kraft aug 2026 — vår människa-godkänner-före-handling-modell är en
+      compliance-berättelse som USA-aktörernas eskalerings-modell inte har.
+- [ ] **Sentiment-fakta för demo/design:** missed-call-text-back är den
+      universellt hyllade featuren (validerar vår Tier 0-kärnkil); röst-AI får
+      delat betyg — äldre kunder lägger på för robotröster (viktigt för
+      Röst-Lisa-designen: ärlig disclosure + snabb human-eskalering), och
+      Jobbers receptionist kostar $450-600/mån all-in (vår prispunkt kan slå).
 - [ ] **Röst-berättelsen:** Skaala (299 kr/mån, egen hantverkar-sida), Svaria
       m.fl. commoditiserar AI-telefonsvar i Sverige. Vår linje: rösten är
       ingången till loopen — Skaala kan ta samtalet men inte skicka offerten,
