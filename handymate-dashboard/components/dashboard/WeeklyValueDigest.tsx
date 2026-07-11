@@ -47,8 +47,10 @@ export default function WeeklyValueDigest() {
 
   if (loading || !data) return null
 
-  // Cold start: visa inget förrän det finns något att skryta om.
-  const hasValue = data.confirmed_kr > 0 || data.captured_count > 0 || data.time_minutes > 0
+  // Cold start: visa inget förrän det finns PENGAR eller JOBB att skryta om.
+  // Enbart sparad tid räcker inte — då blir rubriken "0 kr intjänat", vilket
+  // är sämre än inget kort (bevisbandet tar early-stage-berättelsen).
+  const hasValue = data.confirmed_kr > 0 || data.captured_count > 0
   if (!hasValue) return null
 
   return (
