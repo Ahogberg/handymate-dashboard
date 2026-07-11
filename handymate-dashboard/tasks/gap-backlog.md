@@ -28,6 +28,19 @@ lanseringsgrindarna (A-test + B7 Stripe-köp)._
       ingången till loopen — Skaala kan ta samtalet men inte skicka offerten,
       dra ROT, jaga fakturan. Röst-Lisa efter grindarna som planerat, men
       fönstret är inte oändligt.
+- [ ] **ROI-aritmetik-säljmotionen (från ServiceTitan Max):** sälj "vad kostar
+      ett missat samtal / en tom torsdag / en obetald faktura", inte funktioner.
+      ST motiverar en DUBBLAD månadskostnad mot undviken personal. Vi har redan
+      produktbeviset i appen (veckovärde + saved-scoreboard) — samma aritmetik
+      motiverar Fortnox-licensens 149 kr.
+- [ ] **Scarcity-pilotprogram:** Max säljs som "ansök om early access" + white-
+      glove för första kohorten → casestudies som säljer nästa hundra. Passar
+      vår garanti-modell: pilotprogram som "ansök om plats" istället för öppen
+      signup; Christoffers nätverk = kohort 1.
+- [ ] **Anti-ServiceTitan-argumentet:** STs största kundkritik är prisopacitet
+      ($245–500/tekniker/mån + hemliga tillägg) och data-som-gisslan (BBB/
+      Reddit: kunder behöver jurist för att få ut sin data). Vi kör transparent
+      pris + fri export — säg det mot hela kategorin.
 
 ## Nivå 1 — Snabba vinster
 
@@ -41,9 +54,25 @@ lanseringsgrindarna (A-test + B7 Stripe-köp)._
       osålda offerter, service-recall, återbokning. Våra råvaror finns redan
       (Daniels quote-follow-up, Hannas reaktivering, proactive-care, warranties)
       — gapet är paketering: ett samlat koncept mätt i återvunna kronor.
+      **Max-tillägg:** (a) kapacitetsdriven trigger — "tunn vecka → Hanna
+      föreslår 'vi har tider'-SMS till gamla kunder/osålda offerter" som
+      KÖ-KORT (aldrig autonomt; STs egen skeppade version är bara alerts).
+      Fyll egna CRM:et före annonsplattformar. Kräver kapacitets-primitiven
+      (Nivå 2). (b) "Jobb markerat klart → fakturautkast i kön" med betallänk
+      — ST claimar 14 dagar → 24 tim till faktura; Karins dunning finns redan.
 
 ## Nivå 2 — Medel
 
+- [ ] **Kapacitets-primitiven (från ServiceTitan Max — deras viktigaste
+      mekanik).** En enda siffra alla kanaler läser:
+      `ledig kapacitet = skift (fallback: öppettider) − bokade jobb − övriga
+      händelser`, per kompetens/zon, med %-tak som regler ("boka max 75%,
+      reservera 25% för akutjobb"). Vi har råvarorna: booking + schedule +
+      tidrapportering; CashRadar läser redan "tunna veckor" för pengar — detta
+      är samma mönster för TID. Förutsättning för både Röst-Lisas bokning
+      (boka bara slots som faktiskt finns) och kapacitetsdriven outbound
+      (Nivå 1). Kräver realistiska default-durationer per jobbtyp — annars
+      överbokning (STs dokumenterade fallgrop).
 - [ ] **Serviceavtal/återkommande jobb** — avtalskoncept ovanpå warranties +
       proactive-care (årlig service → automatisk bokning + faktura).
       Förutsägbar intäkt för hantverkaren, churn-skydd för oss.
@@ -56,6 +85,19 @@ lanseringsgrindarna (A-test + B7 Stripe-köp)._
 ## Nivå 3 — Strategiska
 
 - [ ] **Röst-Lisa** (redan beslutad, efter sprinten — se ovan för positionering).
+      **Max-designkrav till specen:** eskalering-först (boka de rutinmässiga
+      70–90%, sömlös överlämning till människa — inte "AI svarar allt");
+      kapacitetsjusterad **bokningsgrad som huvud-KPI** (STs mått: 90%
+      kapacitetsjusterat / 70% totalt); boka mot kapacitets-primitiven i
+      realtid; ärlig AI-disclosure + snabb human-väg (sentiment: äldre kunder
+      lägger på för robotröster).
+- [ ] **Offert-ur-diagnos i fält (från Max):** hantverkaren dikterar/fotar
+      felet på plats → agent utkastar märkt offert (ev. good/better/best) med
+      produktbanks-rader + automatiska ROT-rader → signering på plats innan
+      man lämnar uppfarten. ST claimar 3× close vs muntlig offert. Råvarorna
+      finns: Matte-röst + QuoteCamera i mobilen, produktbank med prishistorik,
+      agent-offerter med riktiga rader (AB1-fixen). ROT-delen kan ST inte
+      kopiera.
 - [ ] **Grossistprislistor i produktbanken** (Ahlsell/Solar/Dahl-feeds;
       `manual_supplier_products` ligger halvdöd i schemat). ⚠ Konkurrenslägget
       OVERIFIERAT — kör riktad research före byggbeslut.
@@ -70,6 +112,17 @@ lanseringsgrindarna (A-test + B7 Stripe-köp)._
   Generisk checklist-infra finns redan för resten. ⚠ Overifierat konkurrensläge.
 - **Konsumentfinansiering** (Wasa/Resurs/Svea): partneravtal, nästan ingen kod.
   Betalningsplan i offerten finns redan.
+
+## Referens: ServiceTitan Max-prissättningen (för egen prisdesign)
+
+Max = hemligt pris, contact-sales, ansökningsgrindat; **per-tekniker**-prissatt
+ovanpå bas ($245–500/tekniker/mån + $5–50k implementation), men **röstagenterna
+är usage-baserade** — ST tar betalt per konsumtion just där konsumtion = ersatt
+arbete (besvarade samtal). Analytiker: Max-kunder dubblar ofta månadskostnaden;
+säljs mot undviken personal. Lärdom för oss: hybrid är legitim — fast bas +
+ev. usage-komponent på röst när Röst-Lisa kommer; och transparens är vårt vapen
+(se Anti-ServiceTitan-argumentet ovan). Full research i plan-filen
+`vad-kan-vi-kopiera-snug-phoenix.md` + Claude-minnet.
 
 ## Öppen research-skuld
 
