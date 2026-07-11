@@ -95,13 +95,14 @@ grönt UI.
 behållen på mobilen (designen visade bara nästa bokning, men att dölja dagens
 övriga bokningar vore funktionsregression).
 
-**Kvar innan merge (Andreas/Christoffer):**
-- [ ] Visuell genomgång i dev (`npm run dev` + Expo) — byggena är typcheckade,
-      inte ögontestade
-- [ ] Merge-ordning: dashboard-branchen FÖRST (mobilens Fakturor-kort läser
-      nya economy-summary; döljs tyst tills den är ute)
+**Status:**
+- [x] Desktop MERGAD till main 2026-07-11 (00833e82) → prod. Andreas beslut:
+      merge före A-testet så testet körs mot ytan kunderna möter.
+      Inkl. UI-svep från prod-genomgången: radar-cold-start borttagen +
+      "en vanlig vecka"-etikett (bd32ab59), veckovärdet döljs utan pengar/jobb
+      (af24d721).
+- [ ] Visuell genomgång av NYA vyn = sker via A-testet mot prod
 - [ ] Mobil: `fix/b2-mobile-execution-read` måste mergas före/med
-      `feat/idag-hemskarm` (byggd ovanpå)
-- [ ] EAS-bygge efter merge för att nå telefoner
-- [ ] Sekvensering mot lanseringssprinten: A-test + B7 Stripe-köp är fortfarande
-      högsta prio (inventeringen 2026-07-11)
+      `feat/idag-hemskarm` (byggd ovanpå) — EJ mergad än
+- [ ] EAS-bygge efter mobil-merge för att nå telefoner
+- [ ] Sekvensering: A-test + B7 Stripe-köp är högsta prio (inventeringen 2026-07-11)
