@@ -111,16 +111,10 @@ export default function CashRadarCard() {
 
   if (!data || !Array.isArray(data.weeks)) return null
 
-  // Cold start: normalen byggs fortfarande — lugnt litet kort, inget larm.
-  if (!data.ready) {
-    return (
-      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-        <p className="text-sm text-gray-500">
-          📈 Pengar in-radarn bygger din normal — kommer igång efter några veckors fakturering.
-        </p>
-      </div>
-    )
-  }
+  // Cold start: prognosen kräver några veckors fakturahistorik. Visa INGET
+  // tills den är redo — ett löfteskort är bara brus för ett nytt konto, och
+  // interna namn ("radarn", "normal") hör aldrig hemma i UI-text.
+  if (!data.ready) return null
 
   // Skala: högsta veckostapeln ELLER normalen (så att normal-linjen alltid ryms).
   const maxScale = Math.max(data.normal_kr, ...data.weeks.map(w => w.invoiced_kr + w.potential_kr), 1)
@@ -131,7 +125,7 @@ export default function CashRadarCard() {
     <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
       <div className="flex items-baseline justify-between gap-2 mb-4 flex-wrap">
         <h2 className="text-base font-bold text-gray-900">Pengar in — 5 veckor framåt</h2>
-        <span className="text-xs text-gray-400">din normal: ~{kr(data.normal_kr)} kr/vecka</span>
+        <span className="text-xs text-gray-400">en vanlig vecka: ~{kr(data.normal_kr)} kr</span>
       </div>
 
       {/* Staplarna */}

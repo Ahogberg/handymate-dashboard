@@ -58,3 +58,16 @@
 - **Diagnos-mönster:** "X händer aldrig men inga fel syns" + kod som destrukturerar `{ data }` utan `error` → proba exakta queryn mot prod-REST: `curl '<url>/rest/v1/<table>?select=*,rel:fk(*)&limit=1'`. PGRST200 = saknad FK.
 - **Skärpning av tysta-fel-regeln:** `const { data } = await supabase...` utan error-läsning gäller SELECT också — inte bara insert/update. En felande SELECT ser identisk ut med "rad saknas".
 - **Ärlighets-regel för rutter:** En route får ALDRIG svara success baserat på att en void-funktion "inte kastade" — funktioner som kan misslyckas ska returnera resultat (`{ moved: boolean, error? }`) som rutten kontrollerar.
+
+## UI-text: interna komponentnamn läcker till användaren (2026-07-11)
+
+**Vad hände:** CashRadar-kortets cold-start visade "Pengar in-radarn bygger din
+normal" i prod — internt komponent-/konceptspråk ("radarn", "normal") rakt mot
+hantverkaren. Andreas fångade det vid genomgång av prod-dashboarden.
+
+**Regel:** UI-text beskriver vad användaren FÅR, aldrig vad systemet HETER
+internt. Feature-/komponentnamn (radarn, digest, agent run) och modellbegrepp
+(normal, streak, pipeline-stage) stannar i koden. Dessutom: empty-states för
+nya konton ska vara osynliga eller ge handling — ett "kommer snart"-löfteskort
+är brus som bygger på-hög-känslan. Granska cold-start/empty-copy som egen punkt
+i varje UI-svep.
