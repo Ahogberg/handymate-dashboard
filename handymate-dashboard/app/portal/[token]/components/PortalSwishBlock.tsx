@@ -8,6 +8,8 @@ interface PortalSwishBlockProps {
   swishNumber: string
   amount: number
   invoiceNumber: string
+  invoiceId: string
+  token: string
 }
 
 /**
@@ -18,9 +20,25 @@ export default function PortalSwishBlock({
   swishNumber,
   amount,
   invoiceNumber,
+  invoiceId,
+  token,
 }: PortalSwishBlockProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+  // 'idle' | 'sending' | 'claimed' — kundens "Jag har betalat"-bekräftelse.
+  const [claimState, setClaimState] = useState<'idle' | 'sending' | 'claimed'>('idle')
+
+  async function claimPaid() {
+    if (claimState !== 'idle') return
+    setClaimState('sending')
+    try {
+      const res = await fetch(`/api/portal/${token}/invoices/${invoiceId}/claim-paid`, { method: 'POST' })
+      // Både ok och already_pending/already_paid → visa tack (idempotent).
+      setClaimState(res.ok ? 'claimed' : 'idle')
+    } catch {
+      setClaimState('idle')
+    }
+  }
 
   useEffect(() => {
     const url = `/api/swish-qr?number=${encodeURIComponent(swishNumber)}&amount=${Math.round(amount)}&message=${encodeURIComponent(invoiceNumber)}`
@@ -160,6 +178,50 @@ export default function PortalSwishBlock({
       >
         Öppna Swish
       </a>
+
+      {/* "Jag har betalat" — bekräftelse till hantverkaren (ingen auto-avprickning) */}
+      {claimState === 'claimed' ? (
+        <div
+          style={{
+            marginTop: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            padding: '10px 16px',
+            fontSize: 13,
+            color: 'rgba(255,255,255,0.8)',
+          }}
+        >
+          <Check size={15} strokeWidth={3} style={{ color: '#10B981' }} />
+          Tack! Vi bekräftar när betalningen kommit in.
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={claimPaid}
+          disabled={claimState === 'sending'}
+          style={{
+            marginTop: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            width: '100%',
+            padding: '11px 16px',
+            background: 'transparent',
+            color: 'rgba(255,255,255,0.75)',
+            border: '1px solid rgba(255,255,255,0.18)',
+            borderRadius: 'var(--r-md)',
+            fontWeight: 600,
+            fontSize: 13,
+            cursor: claimState === 'sending' ? 'default' : 'pointer',
+            opacity: claimState === 'sending' ? 0.6 : 1,
+          }}
+        >
+          {claimState === 'sending' ? 'Skickar…' : 'Jag har betalat'}
+        </button>
+      )}
     </div>
   )
 }
