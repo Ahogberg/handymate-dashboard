@@ -1,7 +1,7 @@
 // Quote system types – used across editor, API, and PDF generation
 
 export type QuoteItemType = 'item' | 'heading' | 'text' | 'subtotal' | 'discount' | 'option'
-export type RotRutType = 'rot' | 'rut' | null
+export type RotRutType = 'rot' | 'rut' | 'gron_solceller' | 'gron_lagring' | 'gron_laddpunkt' | null
 export type DetailLevel = 'detailed' | 'subtotals_only' | 'total_only'
 export type StandardTextType = 'introduction' | 'conclusion' | 'not_included' | 'ata_terms' | 'payment_terms'
 
@@ -105,6 +105,14 @@ export interface QuoteTotals {
   rutWorkCost: number
   rutDeduction: number
   rutCustomerPays: number
+  /** Grön teknik (Fas 1): bas = FULL radtotal (arbete + material), ej bara arbete. */
+  gronBase: number
+  gronDeduction: number
+  gronCustomerPays: number
+  /** Summan av rot/rut/grön-avdrag — för blandade offerter med flera avdragstyper. */
+  totalDeduction: number
+  /** total − totalDeduction — vad kunden faktiskt betalar när flera avdragstyper förekommer. */
+  customerPaysAfterDeductions: number
 }
 
 // Extended quote object with all new fields

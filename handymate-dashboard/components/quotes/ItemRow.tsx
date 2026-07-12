@@ -346,6 +346,11 @@ export default function ItemRow({
             onChange={(e) => onUpdate(item.id, 'rot_rut_type', e.target.value || null)}
             className="w-full min-w-0 text-xs border border-gray-300 rounded-md px-1.5 py-1.5 text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 cursor-pointer">
             <option value="">—</option><option value="rot">ROT</option><option value="rut">RUT</option>
+            <optgroup label="Grön teknik">
+              <option value="gron_solceller">Solceller (15%)</option>
+              <option value="gron_lagring">Batteri (50%)</option>
+              <option value="gron_laddpunkt">Laddbox (50%)</option>
+            </optgroup>
           </select>
         ) : <span />}
 

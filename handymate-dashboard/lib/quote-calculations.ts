@@ -25,6 +25,19 @@ export function setItemRotRut(item: QuoteItem, type: RotRutType): QuoteItem {
 }
 
 /**
+ * Grön teknik-avdrag (Skatteverket 2026, Fas 1) — TRE kategorier, var och en
+ * en % av HELA radtotalen (arbete + material) — TILL SKILLNAD FRÅN ROT/RUT
+ * som bara räknar arbetsandelen. Ett tak på 50 000 kr/år, tillämpat per
+ * offert i Fas 1 (årsvis tvär-offert-spårning är Fas 2, se rot-rut-limits.ts).
+ */
+export const GRON_TEKNIK_RATES: Record<'gron_solceller' | 'gron_lagring' | 'gron_laddpunkt', number> = {
+  gron_solceller: 0.15,
+  gron_lagring: 0.50,
+  gron_laddpunkt: 0.50,
+}
+export const GRON_TEKNIK_MAX_PER_YEAR = 50_000
+
+/**
  * Calculate all quote totals from structured items
  */
 export function calculateQuoteTotals(
@@ -44,6 +57,8 @@ export function calculateQuoteTotals(
   let serviceTotal = 0
   let rotWorkCost = 0
   let rutWorkCost = 0
+  let gronBase = 0
+  let gronDeductionRaw = 0
 
   for (const item of regularItems) {
     const lineTotal = item.quantity * item.unit_price
@@ -57,6 +72,17 @@ export function calculateQuoteTotals(
     } else if (rotRut === 'rut') {
       laborTotal += lineTotal
       rutWorkCost += item.labor_amount ?? lineTotal
+    } else if (rotRut === 'gron_solceller' || rotRut === 'gron_lagring' || rotRut === 'gron_laddpunkt') {
+      // Grön teknik-basen är HELA radtotalen (arbete + material) — inte
+      // labor_amount. Raden flödar ändå in i labor/material-summan precis
+      // som en otaggad rad, så subtotal/moms/total förblir oförändrade.
+      if (item.unit === 'tim' || item.unit === 'hour' || item.unit === 'h') {
+        laborTotal += lineTotal
+      } else {
+        materialTotal += lineTotal
+      }
+      gronBase += lineTotal
+      gronDeductionRaw += lineTotal * GRON_TEKNIK_RATES[rotRut]
     } else if (item.unit === 'tim' || item.unit === 'hour' || item.unit === 'h') {
       laborTotal += lineTotal
     } else {
@@ -81,6 +107,13 @@ export function calculateQuoteTotals(
   const rutDeduction = rutWorkCost > 0 ? Math.min(rutWorkCost * 0.50, 75000) : 0
   const rutCustomerPays = rutWorkCost > 0 ? total - rutDeduction : 0
 
+  // Grön teknik: 15/50% avdrag beroende på kategori, max 50 000 kr/år (per offert i Fas 1)
+  const gronDeduction = gronBase > 0 ? Math.min(gronDeductionRaw, GRON_TEKNIK_MAX_PER_YEAR) : 0
+  const gronCustomerPays = gronBase > 0 ? total - gronDeduction : 0
+
+  const totalDeduction = rotDeduction + rutDeduction + gronDeduction
+  const customerPaysAfterDeductions = total - totalDeduction
+
   return {
     laborTotal,
     materialTotal,
@@ -96,6 +129,11 @@ export function calculateQuoteTotals(
     rutWorkCost,
     rutDeduction,
     rutCustomerPays,
+    gronBase,
+    gronDeduction,
+    gronCustomerPays,
+    totalDeduction,
+    customerPaysAfterDeductions,
   }
 }
 
@@ -187,6 +225,14 @@ export function calculatePublicQuoteTotalsFromBase(
   const serviceTotal = base.serviceTotal
   let rotWorkCost = base.rotWorkCost
   let rutWorkCost = base.rutWorkCost
+  let gronBase = base.gronBase
+  // base.gronDeduction är redan Math.min(raw, TAK). Att addera tillvalens
+  // rådata ovanpå och taka igen ger samma resultat som att taka den sanna
+  // kombinerade rådata i ett steg: om basen redan var otakad är base.gronDeduction
+  // == dess rådata (additionen blir exakt); om basen redan var takad (== TAK)
+  // förblir summan == TAK oavsett tillägg, vilket är korrekt eftersom sann
+  // rådata redan översteg taket.
+  let gronDeductionRaw = base.gronDeduction
 
   for (const o of optionRows) {
     if (o.item_type !== 'option' || !selectedOptionIds.has(o.id)) continue
@@ -198,6 +244,14 @@ export function calculatePublicQuoteTotalsFromBase(
     } else if (rotRut === 'rut') {
       laborTotal += lineTotal
       rutWorkCost += o.labor_amount ?? lineTotal
+    } else if (rotRut === 'gron_solceller' || rotRut === 'gron_lagring' || rotRut === 'gron_laddpunkt') {
+      if (o.unit === 'tim' || o.unit === 'hour' || o.unit === 'h') {
+        laborTotal += lineTotal
+      } else {
+        materialTotal += lineTotal
+      }
+      gronBase += lineTotal
+      gronDeductionRaw += lineTotal * GRON_TEKNIK_RATES[rotRut]
     } else if (o.unit === 'tim' || o.unit === 'hour' || o.unit === 'h') {
       laborTotal += lineTotal
     } else {
@@ -219,10 +273,16 @@ export function calculatePublicQuoteTotalsFromBase(
   const rotCustomerPays = rotWorkCost > 0 ? total - rotDeduction : 0
   const rutDeduction = rutWorkCost > 0 ? Math.min(rutWorkCost * 0.50, 75000) : 0
   const rutCustomerPays = rutWorkCost > 0 ? total - rutDeduction : 0
+  const gronDeduction = gronBase > 0 ? Math.min(gronDeductionRaw, GRON_TEKNIK_MAX_PER_YEAR) : 0
+  const gronCustomerPays = gronBase > 0 ? total - gronDeduction : 0
+
+  const totalDeduction = rotDeduction + rutDeduction + gronDeduction
+  const customerPaysAfterDeductions = total - totalDeduction
 
   return {
     laborTotal, materialTotal, serviceTotal, subtotal, discountAmount, afterDiscount,
     vat, total, rotWorkCost, rotDeduction, rotCustomerPays, rutWorkCost, rutDeduction, rutCustomerPays,
+    gronBase, gronDeduction, gronCustomerPays, totalDeduction, customerPaysAfterDeductions,
   }
 }
 

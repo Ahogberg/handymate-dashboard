@@ -12,6 +12,11 @@ interface QuoteTotals {
   rotCustomerPays: number
   rutDeduction: number
   rutCustomerPays: number
+  gronBase: number
+  gronDeduction: number
+  gronCustomerPays: number
+  totalDeduction: number
+  customerPaysAfterDeductions: number
 }
 
 interface QuoteEditTotalsSectionProps {
@@ -74,6 +79,15 @@ export function QuoteEditTotalsSection({
           </div>
         )}
 
+        {totals.gronBase > 0 && (
+          <div className="flex justify-between items-baseline text-primary-700">
+            <span className="text-sm font-medium">Grön teknik-avdrag</span>
+            <span className="font-heading text-sm font-semibold tabular-nums">
+              −{formatCurrency(totals.gronDeduction)}
+            </span>
+          </div>
+        )}
+
         <div className="pt-3 mt-1 border-t border-slate-200 flex justify-between items-baseline">
           <span className="font-heading text-base font-bold text-slate-900 tracking-tight">
             Totalt <span className="text-xs font-medium text-slate-400">inkl. moms</span>
@@ -85,11 +99,17 @@ export function QuoteEditTotalsSection({
       </div>
 
       {/* Kund betalar box */}
-      {(hasRotItems || hasRutItems) && (totals.rotDeduction > 0 || totals.rutDeduction > 0) && (
+      {(hasRotItems || hasRutItems || totals.gronBase > 0) && totals.totalDeduction > 0 && (
         <div className="bg-primary-50 border border-primary-100 rounded-xl px-4 py-3.5 mt-4 flex justify-between items-baseline">
           <span className="text-xs font-semibold uppercase tracking-wider text-primary-700">Kund betalar</span>
           <span className="font-heading text-xl font-bold text-primary-700 tabular-nums tracking-tight">
-            {formatCurrency(hasRotItems ? totals.rotCustomerPays : totals.rutCustomerPays)}
+            {formatCurrency(
+              totals.gronBase > 0
+                ? totals.customerPaysAfterDeductions
+                : hasRotItems
+                  ? totals.rotCustomerPays
+                  : totals.rutCustomerPays
+            )}
           </span>
         </div>
       )}

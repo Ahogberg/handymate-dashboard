@@ -14,6 +14,15 @@ export const ROT_MAX_PER_YEAR = 50_000
 export const RUT_MAX_PER_YEAR = 75_000
 export const TOTAL_MAX_PER_YEAR = 75_000 // Gemensamt tak för ROT+RUT
 
+/**
+ * Grön teknik-avdrag: solceller 15%, batteri/laddbox 50%, tak 50 000 kr/år.
+ * Separat från ROT/RUT-taket ovan. Fas 1 tillämpar taket per offert i
+ * lib/quote-calculations.ts (calculateQuoteTotals). Årsvis tvär-offert-
+ * spårning (motsvarande getCustomerRotRutUsage för grön teknik) är INTE
+ * implementerad än — deferred till Fas 2.
+ */
+export const GRON_TEKNIK_MAX_PER_YEAR = 50_000
+
 interface RotRutUsage {
   rot_used: number
   rut_used: number

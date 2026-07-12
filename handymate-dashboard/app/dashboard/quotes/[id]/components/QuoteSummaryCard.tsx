@@ -13,6 +13,7 @@ interface QuoteSummaryCardProps {
  */
 export function QuoteSummaryCard({ quote }: QuoteSummaryCardProps) {
   const hasNewRotRut = (quote.rot_work_cost && quote.rot_work_cost > 0) || (quote.rut_work_cost && quote.rut_work_cost > 0)
+  const hasGronTeknik = !!quote.gron_base && quote.gron_base > 0
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 lg:sticky lg:top-6">
@@ -84,6 +85,18 @@ export function QuoteSummaryCard({ quote }: QuoteSummaryCardProps) {
               </div>
             </div>
           )
+        )}
+
+        {hasGronTeknik && (
+          <RotRutBlock
+            label="Grön teknik-avdrag"
+            workCost={quote.gron_base || 0}
+            deduction={quote.gron_deduction || 0}
+            customerPays={quote.gron_customer_pays || 0}
+            workLabel="Underlag (arbete + material)"
+            deductionLabel="Grön teknik-avdrag"
+            tone="green"
+          />
         )}
       </div>
     </div>

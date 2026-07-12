@@ -353,6 +353,12 @@ export default function ModernCanvas({ data, handlers }: Props) {
                   <span className="val" style={{ color: accent }}>−{formatCurrency(data.quote.rutDeduction)}</span>
                 </div>
               )}
+              {data.quote.gronDeduction && (
+                <div className="total-row rot" style={{ color: accent }}>
+                  <span className="lbl">Grön teknik-avdrag</span>
+                  <span className="val" style={{ color: accent }}>−{formatCurrency(data.quote.gronDeduction)}</span>
+                </div>
+              )}
               <div className="total-row grand"><span className="lbl">Att betala</span><span className="val">{formatCurrency(data.quote.amountToPay)}</span></div>
             </div>
           </div>
