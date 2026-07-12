@@ -5,6 +5,35 @@ detaljer i Claude-minnet `competitive-landscape-2026-07`). Andreas beslut:
 **körs EFTER A-testet** (`tasks/launch-verification.md`) — inget här går före
 lanseringsgrindarna (A-test + B7 Stripe-köp)._
 
+## SPRINTAR — godkända 2026-07-11, körs autonomt (byggs på branches; merge
+## till main gate:as på A-testet; rapport till Andreas efter varje sprint)
+
+- [ ] **Sprint A · Exec-chain-mergen** — `fix/exec-chain-step1-lib-extraction`
+      + `fix/exec-chain-step2-execute` (9 omergade commits): live-vägen sväljer
+      exekveringsfel EFTER approve utan retry. Kärnytans (godkänn-köns)
+      pålitlighet = det pitch-claimen vilar på. Fable själv (konfliktrisk mot
+      07-09-audit-fixarna). Fix — mergas till main efter verifiering.
+- [ ] **Sprint B · Pengaloopen del 1** — jobb klart → fakturautkast med
+      betallänk som KÖ-KORT; portalens Swish-QR får "Jag har betalat"-knapp →
+      Karin-avpricknings-kort. (Betalvägen = grundfunktionernas strategiskt
+      svagaste länk: idag manuell mark-paid eller Fortnox-avstämning.)
+      Parallellt: Swish Handel-kvittensväg = UTREDNING (per-företag bankavtal).
+- [ ] **Sprint C · Offert-vinnaranalys + Daniel-coach** — datan loggas redan
+      (track/intelligence/status-timeline), bara analysvyn + Daniels insikter
+      saknas ("offerter inom 4h vinner 2× oftare"). Sonnet-agent + granskning.
+- [ ] **Sprint D · Jobb-facit** — rendera /api/dashboard/profitability (finns,
+      ORENDERAT) + TD-20 stats-strip + "Facit"-kort vid projektavslut
+      (offererat vs verkligt). Datamotorn för framtida AI-prissättning —
+      kompondar först när insamlingen startar.
+- [ ] **Sprint E · Grön teknik-avdrag** (fanns redan som Nivå 1 nedan).
+
+Moat-idéer för SENARE (ej sprintade): "Mitt hem"-portalen, grannskaps-motorn,
+kundminne-som-agentinput, ÄTA-mobil-UI (TD-21), offert-versionshistorik,
+AI-prissättning (kräver sprint D-data). Detaljer i Claude-minnet
+`platform-roadmap-2026-07`. Återkommande bokningar (rrule) byggs som del av
+serviceavtal (Nivå 2). Omergat övrigt: feat/matte-onboarding-v3 (increment 6b),
+fix/b2-mobile-auth-forwarding.
+
 ## Positionering (in i pitchen, kostar inget)
 
 - [ ] **Approval-kön + förtjänad autonomi UPP i pitchen — med PRECIS claim.**
