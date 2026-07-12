@@ -84,19 +84,11 @@ interface Economics {
   unpaidAmount: number
 }
 
-interface WeekStats {
-  bookings: { week: number }
-  customers: { new_this_month: number }
-  time: { week_hours: number }
-}
-
 interface IdagCoreProps {
   bookings: BookingRow[]
   bookingsLoaded: boolean
   pipelineStats: PipelineStats | null
   economics: Economics | null
-  stats: WeekStats | null
-  activeProjects: number
 }
 
 function getAgentKey(approval: Approval): string {
@@ -194,8 +186,6 @@ export default function IdagCore({
   bookingsLoaded,
   pipelineStats,
   economics,
-  stats,
-  activeProjects,
 }: IdagCoreProps) {
   const business = useBusiness()
 
@@ -633,15 +623,8 @@ export default function IdagCore({
         </Link>
       </div>
 
-      {/* ── 6. KPI-fot ── */}
-      {stats && (
-        <div className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-xl text-[13px] text-gray-500">
-          <span>Veckan: <b className="font-semibold text-gray-800">{stats.bookings.week} bokningar</b></span>
-          <span><b className="font-semibold text-gray-800">{stats.customers.new_this_month} nya kunder</b> i månaden</span>
-          <span><b className="font-semibold text-gray-800">{Math.round(stats.time.week_hours)}h arbetat</b></span>
-          <span><b className="font-semibold text-gray-800">{activeProjects} projekt</b></span>
-        </div>
-      )}
+      {/* KPI-veckoraden bor numera som diskret rad under hälsningen i
+          page.tsx — flyttad 2026-07-11 (Andreas: orientering, inte sektion). */}
 
       {/* ── Ångra-snackbar ── */}
       {snack && (

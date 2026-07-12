@@ -327,6 +327,17 @@ export default function DashboardPage() {
               {new Date().toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
             </span>
           </p>
+          {/* Diskret veckoorientering — medvetet UTAN kort-ram och lågmäld:
+              den orienterar men får inte konkurrera med bevisband/kö.
+              Döljs helt när allt är noll (anti-brus-regeln i lessons.md). */}
+          {stats && (stats.bookings.week > 0 || stats.time.week_hours > 0 || stats.customers.new_this_month > 0 || activeProjects > 0) && (
+            <p className="mt-2 text-[13px] text-gray-400">
+              Veckan: <span className="font-medium text-gray-500">{stats.bookings.week} bokningar</span>
+              {' · '}<span className="font-medium text-gray-500">{Math.round(stats.time.week_hours)}h arbetat</span>
+              {' · '}<span className="font-medium text-gray-500">{stats.customers.new_this_month} nya kunder i månaden</span>
+              {' · '}<span className="font-medium text-gray-500">{activeProjects} aktiva projekt</span>
+            </p>
+          )}
         </div>
 
         {/* Welcome popup — visas bara en gång */}
@@ -393,8 +404,6 @@ export default function DashboardPage() {
           bookingsLoaded={bookingsLoaded}
           pipelineStats={pipelineStats}
           economics={economics}
-          stats={stats}
-          activeProjects={activeProjects}
         />
 
         {/* Värdebevis — Pengar in-radarn + veckovärdet (lanseringsytor) */}
