@@ -447,11 +447,9 @@ export default function NewQuotePage() {
   const liveTemplateData: QuoteTemplateData = useMemo(() => {
     const validUntil = new Date()
     validUntil.setDate(validUntil.getDate() + (validDays || 30))
-    const amountToPay = totals.rotDeduction > 0
-      ? totals.rotCustomerPays
-      : totals.rutDeduction > 0
-        ? totals.rutCustomerPays
-        : totals.total
+    const amountToPay = totals.totalDeduction > 0
+      ? totals.customerPaysAfterDeductions
+      : totals.total
     const formatDate = (d: Date) =>
       d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -511,6 +509,7 @@ export default function NewQuotePage() {
         totalIncVat: totals.total,
         rotDeduction: totals.rotDeduction > 0 ? totals.rotDeduction : undefined,
         rutDeduction: totals.rutDeduction > 0 ? totals.rutDeduction : undefined,
+        gronDeduction: totals.gronDeduction > 0 ? totals.gronDeduction : undefined,
         amountToPay,
         paymentTerms: paymentTermsText
           || (selectedCustomerObj?.default_payment_days

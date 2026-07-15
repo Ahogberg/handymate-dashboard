@@ -87,6 +87,8 @@ export interface QuoteTemplateQuote {
   totalIncVat: number
   rotDeduction?: number
   rutDeduction?: number
+  /** Grön teknik-avdrag (Fas 1) — solceller/batteri/laddbox, se lib/quote-calculations.ts. */
+  gronDeduction?: number
   amountToPay: number
   paymentTerms: string
   warrantyText?: string | null

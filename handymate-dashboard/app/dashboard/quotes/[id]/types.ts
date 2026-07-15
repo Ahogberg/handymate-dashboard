@@ -84,6 +84,11 @@ export interface Quote {
   rut_work_cost?: number
   rut_deduction?: number
   rut_customer_pays?: number
+  /** Grön teknik (Fas 1) — persisteras ej ännu (Fas 2); fält finns för
+      framåtkompatibilitet när backend/DB-kolumnerna läggs till. */
+  gron_base?: number
+  gron_deduction?: number
+  gron_customer_pays?: number
   quote_number?: string
   signature_data?: string
   signed_at?: string

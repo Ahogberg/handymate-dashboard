@@ -78,7 +78,7 @@ export default function QuotePreview({ data, businessName, contactName }: QuoteP
 
   const hasRotItems = data.items.some(i => i.is_rot_eligible || getItemRotRutType(i) === 'rot')
   const hasRutItems = data.items.some(i => i.is_rut_eligible || getItemRotRutType(i) === 'rut')
-  const totalDeduction = totals.rotDeduction + totals.rutDeduction
+  const totalDeduction = totals.totalDeduction
 
   const calculatedPlan = useMemo(() => {
     if (data.paymentPlan.length === 0) return []
@@ -327,6 +327,12 @@ export default function QuotePreview({ data, businessName, contactName }: QuoteP
               <div className="flex justify-between" style={{ padding: '2px 0', fontSize: '7.5px', color: ACCENT }}>
                 <span>RUT-avdrag 50%</span>
                 <span>-{formatCurrency(totals.rutDeduction)}</span>
+              </div>
+            )}
+            {totals.gronBase > 0 && (
+              <div className="flex justify-between" style={{ padding: '2px 0', fontSize: '7.5px', color: ACCENT }}>
+                <span>Grön teknik-avdrag</span>
+                <span>-{formatCurrency(totals.gronDeduction)}</span>
               </div>
             )}
             <div className="flex justify-between" style={{ borderTop: `0.5px solid ${BORDER}`, marginTop: 4, paddingTop: 6, fontSize: '8.5px', fontWeight: 500 }}>
