@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { CheckCircle, Clock, Eye, FileText, Loader2, Plus, Search, Send, XCircle } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
+import QuotePerformanceCard from '@/components/dashboard/QuotePerformanceCard'
 
 interface Quote {
   quote_id: string
@@ -187,6 +188,8 @@ export default function QuotesPage() {
             Ny offert
           </Link>
         </header>
+
+        <QuotePerformanceCard />
 
         {/* ── KPI cards ──────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">

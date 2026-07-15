@@ -71,6 +71,9 @@ interface QuoteRow {
   view_count: number | null
   customer_id: string | null
   title: string | null
+  /** 2026-07-12: visningsnivå för acceptans-korrelation (Sprint C).
+   *  'detailed' | 'subtotals_only' | 'total_only' | null. */
+  detail_level: string | null
 }
 
 interface LeadRow {
@@ -149,6 +152,16 @@ export interface DanielAggregate {
      *  truth-source (testad via 43 unit-tester). */
     suggested_sms: string
   }>
+  /**
+   * 2026-07-12 (Sprint C): acceptans per visningsnivå — hantverkaren väljer
+   * själv detail_level, så detta är handlingsbart coaching-underlag (till
+   * skillnad från kundstyrda signaler). Bara nivåer med minst 1 utvärderad
+   * offert (accepterad/avvisad) ingår. null = för lite data för korrelation.
+   */
+  acceptance_by_detail_level: Record<
+    string,
+    { sent: number; accepted: number; acceptance_rate_pct: number }
+  > | null
   leads_by_source: Record<
     string,
     {
@@ -210,7 +223,7 @@ async function buildDanielAggregate(
   // 2026-06-03: sent_at tillkommer för obeöppnad-trigger.
   const { data: quotesData, error: quotesError } = await supabase
     .from('quotes')
-    .select('quote_id, status, total, signed_at, accepted_at, created_at, sent_at, view_count, customer_id, title')
+    .select('quote_id, status, total, signed_at, accepted_at, created_at, sent_at, view_count, customer_id, title, detail_level')
     .eq('business_id', businessId)
     .gte('created_at', ninetyDaysAgo.toISOString())
     .limit(300)
@@ -395,6 +408,34 @@ async function buildDanielAggregate(
     conflictingQuoteIds,
   ).slice(0, 3)
 
+  // ── Acceptans per visningsnivå (2026-07-12, Sprint C) ──────
+  // Bara utvärderade offerter (accepterad/signerad eller avvisad) räknas —
+  // öppna offerter säger inget om utfall än. Nivåer utan utvärderad data
+  // hoppas över; hela blocket blir null om ingen nivå kvalar (för lite data).
+  const detailBuckets: Record<string, { sent: number; accepted: number }> = {}
+  for (const q of quotes) {
+    const level = q.detail_level || 'detailed' // default matchar quote-editorns default
+    const won = q.status === 'accepted' || q.status === 'signed'
+    const lost = q.status === 'declined'
+    if (!won && !lost) continue
+    if (!detailBuckets[level]) detailBuckets[level] = { sent: 0, accepted: 0 }
+    detailBuckets[level].sent += 1
+    if (won) detailBuckets[level].accepted += 1
+  }
+  const acceptanceByDetailLevel: DanielAggregate['acceptance_by_detail_level'] =
+    Object.keys(detailBuckets).length > 0
+      ? Object.fromEntries(
+          Object.entries(detailBuckets).map(([level, b]) => [
+            level,
+            {
+              sent: b.sent,
+              accepted: b.accepted,
+              acceptance_rate_pct: Math.round((b.accepted / b.sent) * 100),
+            },
+          ]),
+        )
+      : null
+
   // ── Leads-källor (90d) ─────────────────────────────────────
   const { data: leadsData } = await supabase
     .from('leads')
@@ -447,6 +488,7 @@ async function buildDanielAggregate(
     business_contact_first_name: businessContactFirstName,
     last_90d: last90d,
     by_customer_type: byCustomerType,
+    acceptance_by_detail_level: acceptanceByDetailLevel,
     stale_opens: staleOpens,
     actionable_nudges: actionableNudges,
     actionable_unopened_quotes: actionableUnopenedQuotes,
@@ -522,6 +564,23 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
    - Vilken kund-typ accepterar de högsta beloppen?
    - Skiljer accepterad vs avvisad snittsumma per typ?
    - Vilket prisspann ger högst acceptans?
+
+4b. **Visningsnivå vs acceptans (2026-07-12):**
+   - I aggregate.acceptance_by_detail_level (kan vara null om för lite data)
+     finns acceptansgrad per visningsnivå: 'detailed' (rad för rad),
+     'subtotals_only' (bara delsummor), 'total_only' (endast totalsumma).
+   - Om EN nivå har tydligt högre acceptans (minst ~15 procentenheter över
+     en annan) OCH båda har minst 3 utvärderade offerter → lyft det som ett
+     handlingsbart mönster: hantverkaren väljer själv nivån, så detta är
+     något de KAN ändra. Ex: "Dina rad-för-rad-offerter vinner klart oftare
+     än de med bara totalsumma — visa gärna specifikationen."
+   - Översätt nivå-nyckeln till svenska i texten (detailed=rad för rad,
+     subtotals_only=delsummor, total_only=endast totalsumma). Nämn ALDRIG
+     det tekniska fältnamnet.
+   - knowledge_type: 'pattern', suggestion: konkret ("Visa specifikationen
+     på fler offerter"), dedup_key: "daniel_detail_level_winrate".
+   - Hoppa HELT över detta om datan är för tunn eller skillnaden liten —
+     hitta inte på ett mönster som inte finns.
 
 5. **Stale-offerter med konkret SMS-nudge-action (Steg 3 Dag 3):**
    - I aggregate.actionable_nudges finns 0-3 offerter med 3+ visningar utan signering OCH där kunden har telefon registrerad.
