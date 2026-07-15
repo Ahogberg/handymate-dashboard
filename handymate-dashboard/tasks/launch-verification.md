@@ -12,31 +12,31 @@ npx playwright test tests/facit-instant-value.spec.ts tests/facit-fortnox-invoic
 
 ---
 
-## Del 1 — Wow-kedjan (manuellt, mot ett testkonto)
+## Del 1 — Wow-kedjan ✅ GODKÄND (verifierad av Andreas; bockad i efterhand 2026-07-15)
 
 Kör hela flödet i ett svep. Bocka av varje steg.
 
-- [ ] **Signup** — nytt konto skapas, landar i onboarding steg 1 (MeetTheTeam).
-- [ ] **Företaget** (steg 2) — namn/org/bransch sparas; konto registreras.
-- [ ] **Så jobbar du** (steg 3) — specialiteter/tider/pris sparas.
-- [ ] **Telefon** (steg 4) — nummer-val sparas (provisioneras först efter betalning).
-- [ ] **Aktivera** (steg 5) — plan väljs, copy säger **debiteras direkt + resultatgaranti**
+- [x] **Signup** — nytt konto skapas, landar i onboarding steg 1 (MeetTheTeam).
+- [x] **Företaget** (steg 2) — namn/org/bransch sparas; konto registreras.
+- [x] **Så jobbar du** (steg 3) — specialiteter/tider/pris sparas.
+- [x] **Telefon** (steg 4) — nummer-val sparas (provisioneras först efter betalning).
+- [x] **Aktivera** (steg 5) — plan väljs, copy säger **debiteras direkt + resultatgaranti**
       (INGEN "provperiod"/"inget dras"-text). → Stripe Checkout (se Del 2).
-- [ ] **Betala** — efter genomförd betalning: redirect till `/onboarding?payment=success`
+- [x] **Betala** — efter genomförd betalning: redirect till `/onboarding?payment=success`
       → flödet går vidare till importsteget.
-- [ ] **Hämta in verksamhet** (steg 6) — "Koppla Fortnox" → OAuth → tillbaka till
+- [x] **Hämta in verksamhet** (steg 6) — "Koppla Fortnox" → OAuth → tillbaka till
       onboarding → hämtar-state → success med **riktiga siffror** (X kunder, Y obetalda,
       Z kr utestående). Testa även CSV-vägen och "Hoppa över".
-- [ ] **Payoff** (steg 7, LiveTour) — payoff-heron visar **Karins krona-fynd** ur den
+- [x] **Payoff** (steg 7, LiveTour) — payoff-heron visar **Karins krona-fynd** ur den
       nyss importerade datan (matchar siffrorna i steg 6). Guidad tur funkar. "Kör igång".
-- [ ] **Dashboard** — landar inloggad; kund-/faktura-siffrorna matchar det payoff visade.
+- [x] **Dashboard** — landar inloggad; kund-/faktura-siffrorna matchar det payoff visade.
 
 ### Fallgropar att aktivt verifiera
-- [ ] **Importerade förfallna fakturor skickar INGET** — kolla att inga SMS/mejl gick ut.
+- [x] **Importerade förfallna fakturor skickar INGET** — kolla att inga SMS/mejl gick ut.
       (Facit-testet låser `reminder_count=0` + inget `next_reminder_at`; verifiera ändå i data.)
-- [ ] **Payoff-siffror = dashboard-siffror** — ingen drift (samma status-konvention).
-- [ ] **Skippad import** ger ändå en varm payoff ("Ditt AI-team är redo"), aldrig tom yta.
-- [ ] **Fortnox utan data** → mjuk CSV-fallback, aldrig återvändsgränd.
+- [x] **Payoff-siffror = dashboard-siffror** — ingen drift (samma status-konvention).
+- [x] **Skippad import** ger ändå en varm payoff ("Ditt AI-team är redo"), aldrig tom yta.
+- [x] **Fortnox utan data** → mjuk CSV-fallback, aldrig återvändsgränd.
 
 ---
 

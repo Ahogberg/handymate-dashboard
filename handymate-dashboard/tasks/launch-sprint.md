@@ -11,25 +11,25 @@ Stripe: aldrig ett skarpt köp; billing_plan har okänt schema.
 
 ---
 
-## Del A — Facit-tester (Andreas, ~45 min totalt, i denna ordning)
+## Del A — Facit-tester ✅ GODKÄND (verifierad av Andreas; bockad i efterhand 2026-07-15)
 
-- [ ] **A1 · Bee-verifiering (2 min):** låt en anställd (ej Christoffer) logga in
+- [x] **A1 · Bee-verifiering (2 min):** låt en anställd (ej Christoffer) logga in
       → hälsningen visar DERAS förnamn → dashboarden visar bara uppgifter de är
       tilldelade/skapat. Christoffer (owner) ser allt som förut.
-- [ ] **A2 · Tillval (10 min):** skapa offert med 2 tillval (ett Förvalt) →
+- [x] **A2 · Tillval (10 min):** skapa offert med 2 tillval (ett Förvalt) →
       alla tre preview-flikarna visar ☑/☐ → skicka till dig själv → öppna
       portalen → "Läs offerten"-PDF:en visar tillvalen + noten → kryssa i/ur,
       se "Att betala" uppdateras live → signera → kolla: quotes-totalen
       uppdaterad, signed_options satt, fakturan (från offert) innehåller exakt
       valen.
-- [ ] **A3 · Aha-samtalet (15 min):** ny test-onboarding → steg 3 reserverar
+- [x] **A3 · Aha-samtalet (15 min):** ny test-onboarding → steg 3 reserverar
       RIKTIGT nummer (obs: köper ett 46elks-nummer) → "Testa Lisa nu" → ring
       från mobilen → hör hälsningen → SMS:et landar i handen → checklistan
       tänds 📞💬✅ → "Ta bort testet" → ring numret IGEN (oarmerat) → normalt
       beteende. Gör även ETT kvällstest (efter 21) — ska fungera identiskt.
-- [ ] **A4 · Förtroendetrappan (2 min):** agent-sidan → panelen visar per-typ
+- [x] **A4 · Förtroendetrappan (2 min):** agent-sidan → panelen visar per-typ
       streaks (X/15). (Beviljande testas organiskt när Bee når 15 raka.)
-- [ ] **A5 · Radar-kollen (när deployad):** dashboarden visar "Pengar in"-kortet;
+- [x] **A5 · Radar-kollen (när deployad):** dashboarden visar "Pengar in"-kortet;
       Bee bör ha ready:true — staplarna rimliga mot verkliga fakturor; testa en
       dipp-åtgärd (Påminn → SMS-flödet; Jaga → förslag i Att godkänna).
 

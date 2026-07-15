@@ -1,7 +1,26 @@
 # Handymate — Ärlig kapabilitets-inventering
 
 _För pitch-/strategiändamål. Ingen hype — vad som FAKTISKT finns._
-_Genererad 2026-07-01 · **Uppdaterad 2026-07-11** (git-verifierad mot main + branch-läget i båda repon)._
+_Genererad 2026-07-01 · **Uppdaterad 2026-07-15** (A-testet godkänt + skörde-mergen; git-verifierad)._
+
+## ⚡ 2026-07-15: A-TESTET GODKÄNT + ALLT SKÖRDAT — stora statusflyttar
+
+**A-testet (A1–A5) + wow-kedjan är körda och godkända av Andreas** (bockade i
+efterhand i launch-docsen). Därmed BYGGT→**LIVE**: tillval-flödet (A2),
+aha-samtalet/onboarding-kedjan (A3), Förtroendetrappan-panelen (A4), Pengar
+in-radarn (A5), Bee-rollverifieringen (A1), onboarding wow-kedjan inkl.
+Fortnox/CSV-import + LiveTour-payoff (Del 1). **Stripe/betalvägen är
+FORTFARANDE BYGGT** — B7-testköpet är INTE kört (Andreas enda kvarvarande grind).
+
+**Skördat till prod 2026-07-15** (mergat + deployat, tsc 0 fel + 204 facit-
+tester gröna): Idag-vy-omdesignen (deployad redan 07-11), offert-vinnaranalysen
+(hopfällbar Offert-prestanda + Daniel-coach), grön teknik-avdraget Fas 1
+(15/50/50%, arbete+material-bas, 14 facit), pengaloopen Del 1 ("Jag har
+betalat"-bekräftelse + delad apply-payment-kärna). Status: **BYGGT/deployade**
+— LIVE först när piloten använt dem skarpt.
+
+**Mobil:** fix/b2 + nya Idag-hemskärmen mergade till mobile-main (tsc 0 fel),
+pushade. **EAS-bygge återstår** — inget på telefoner ännu.
 
 ## Statusdefinitioner (läs först)
 - **LIVE** = deployat *och* driftsatt/körande i prod sedan tidigare (rimligt bekräftat operativt).
@@ -153,14 +172,18 @@ autonomi är nu den tydligaste produkt-manifestationen av lärandet.
   självständighet") — visa panelen, lova inte att den "brukar" bevilja.
 - Matte-chatt på webben (text). Mobil-chatt bara om EAS-bygget gjorts först.
 
-**Får INTE sägas i demo (dödar trovärdighet):**
+**Får INTE sägas i demo (dödar trovärdighet) — uppdaterad 2026-07-15:**
 - ❌ "En AI svarar i telefon och pratar" (finns inte — SPEC).
 - ❌ "Kopplar till din Fortnox" (licens-blockerat för kunden; importen kräver att KUNDEN köper licens 149 kr/mån).
-- ❌ "Betala smidigt i appen" / "registrera dig och kom igång själv" (Stripe-köp + wow-kedjan ALDRIG körda end-to-end).
-- ❌ Golden Path som bevisat fungerande (kodmässigt hel sedan 07-10, aldrig flödesverifierad — och den har gått sönder tyst två gånger).
-- ❌ "Senaste appen i mobilen" (inget bekräftat bygge efter 2026-05-20; juni/juli-fixar omergade).
-- ❌ "Agenterna sköter sig själva när de förtjänat det" som bevisat (motorn är byggd, ingen riktig kund har beviljat autonomi).
-- ❌ Nya Idag-vyn (branch — visa inte ens screenshots som "produkten idag").
+- ❌ "Betala smidigt i appen" (Stripe B7-testköpet fortfarande INTE kört — betalvägen obevisad). OBS: "registrera dig och kom igång själv" är nu OK t.o.m. betalsteget — wow-kedjan är verifierad, men själva köpet är inte.
+- ❌ "Senaste appen i mobilen" (koden mergad 07-15 men INGET EAS-bygge — telefoner kör fortfarande maj-versionen).
+- ❌ "Agenterna sköter sig själva när de förtjänat det" som bevisat (motorn LIVE-verifierad via A4, men ingen riktig kund har nått 15-streaken än — säg "förtjänar", inte "brukar").
+- ❌ Grön teknik/vinnaranalys/betalbekräftelsen som beprövade (deployade 07-15, facit-testade, men ingen har använt dem skarpt — demoa gärna, lova inte drift-historik).
+
+**BORTTAGET från förbudslistan 2026-07-15** (nu OK att visa): nya Idag-vyn
+(LIVE i prod), wow-kedjan/onboarding (A-test-verifierad), tillval, radarn,
+Förtroendetrappan, Golden Path t.o.m. offert→projekt (A-testets flöden körda;
+faktura→Vunnen-steget dock fortfarande obevisat tills B7/riktig betalning).
 
 **Verifieringar som flyttar BYGGT → LIVE (= sprintens definition of done):**
 1. A-testet: wow-kedjan signup → import → payoff → dashboard i ett svep (runbook: `tasks/launch-verification.md`).
