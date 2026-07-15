@@ -8,6 +8,7 @@ import type { Invoice, PaymentInfo } from '../types'
 interface PortalInvoiceDetailProps {
   invoice: Invoice
   paymentInfo: PaymentInfo
+  token: string
   onBack: () => void
 }
 
@@ -18,6 +19,7 @@ interface PortalInvoiceDetailProps {
 export default function PortalInvoiceDetail({
   invoice: inv,
   paymentInfo,
+  token,
   onBack,
 }: PortalInvoiceDetailProps) {
   const total = inv.total
@@ -156,6 +158,8 @@ export default function PortalInvoiceDetail({
               swishNumber={paymentInfo.swish}
               amount={toPay}
               invoiceNumber={inv.invoice_number}
+              invoiceId={inv.invoice_id}
+              token={token}
             />
           </div>
         )}

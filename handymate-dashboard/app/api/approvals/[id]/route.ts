@@ -434,6 +434,27 @@ async function executeApprovalPayload(
         return { action: 'send_invoice', ...r }
       }
 
+      case 'confirm_payment': {
+        // Kundens "Jag har betalat"-bekräftelse (2026-07-12). Godkänn =
+        // hantverkaren bekräftar att pengarna kommit in → markera betald via
+        // delad apply-payment-kärna (samma som manuell mark-paid). Ingen
+        // markedByUserId (bekräftas via kortet, inte en dashboard-användare).
+        if (!payload.invoice_id) return { action: 'confirm_payment', skipped: 'no invoice_id' }
+        const { applyInvoicePayment } = await import('@/lib/invoices/apply-payment')
+        const r = await applyInvoicePayment({
+          businessId,
+          invoiceId: payload.invoice_id as string,
+          markedByUserId: null,
+          source: 'customer_confirmed',
+        })
+        return {
+          action: 'confirm_payment',
+          ok: r.ok,
+          error: r.error,
+          metadata: { already_paid: r.already_paid ?? false, fortnox_synced: r.fortnox_synced ?? null },
+        }
+      }
+
       case 'create_booking': {
         // Audit-4 Fix DEF (2026-06-02): cookie-forwarding så /api/bookings
         // POST inte returnerar 401.

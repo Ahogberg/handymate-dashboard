@@ -261,6 +261,7 @@ export default function CustomerPortalPage() {
         <PortalInvoiceDetail
           invoice={selectedInvoiceData}
           paymentInfo={paymentInfo}
+          token={token}
           onBack={() => { setSubRoute(null); setSelectedInvoice(null) }}
         />
       </PortalThemeProvider>

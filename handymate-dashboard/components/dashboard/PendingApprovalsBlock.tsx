@@ -93,6 +93,8 @@ const TYPE_LABEL: Record<string, string> = {
   review_request: 'Recension',
   manual_project_create: 'Skapa projekt',
   autonomy_offer: 'Förtroende',
+  confirm_payment: 'Betalning',
+  review_auto_invoice: 'Faktura',
 }
 
 function timeAgo(iso: string): string {
