@@ -110,7 +110,9 @@ export async function POST(request: NextRequest) {
       await fireEvent(supabase, 'sms_received', business.business_id, {
         phone: from, message, customer_name: null,
       })
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      console.error('[SMS Incoming] fireEvent sms_received failed (non-blocking):', business.business_id, from, err)
+    }
 
     // Build conversation history for agent context
     const { data: history } = await supabase

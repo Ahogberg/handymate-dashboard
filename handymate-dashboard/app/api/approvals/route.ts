@@ -78,20 +78,22 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
-    // Send push notification (fire and forget)
-    try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-      fetch(`${appUrl}/api/push/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          business_id: business.business_id,
-          title: 'Nytt att godkänna',
-          body: title,
-          url: '/dashboard/approvals',
-        }),
-      })
-    } catch { /* non-fatal */ }
+    // Send push notification (fire and forget). OBS: fetch() är inte await:ad,
+    // så ett synkront try/catch fångar aldrig ett nätverksfel (promisen avvisas
+    // asynkront) — .catch() på promisen krävs för att felet faktiskt loggas.
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+    fetch(`${appUrl}/api/push/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        business_id: business.business_id,
+        title: 'Nytt att godkänna',
+        body: title,
+        url: '/dashboard/approvals',
+      }),
+    }).catch((err) => {
+      console.error('[POST /api/approvals] push notification failed (non-blocking):', business.business_id, id, err)
+    })
 
     return NextResponse.json({ approval: data }, { status: 201 })
   } catch (error: any) {

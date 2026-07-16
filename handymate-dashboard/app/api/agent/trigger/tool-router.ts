@@ -638,7 +638,10 @@ async function sendSms(
       phone_from: senderName, phone_to: to, message,
       status: 'sent', elks_id: result.id, created_at: new Date().toISOString(),
     })
-  } catch { /* non-blocking */ }
+  } catch (err: any) {
+    // Icke-blockerande — SMS:et är redan skickat, bara loggningen misslyckades.
+    console.error('[sendSms] sms_log insert failed (non-blocking):', businessId, to, err?.message || err)
+  }
 
   // Also log to sms_conversation for conversation history continuity
   try {
@@ -649,7 +652,9 @@ async function sendSms(
       content: message,
       created_at: new Date().toISOString(),
     })
-  } catch { /* non-blocking */ }
+  } catch (err: any) {
+    console.error('[sendSms] sms_conversation insert failed (non-blocking):', businessId, to, err?.message || err)
+  }
 
   return { success: true, data: { message: `SMS skickat till ${to}`, sms_id: result.id } }
 }
@@ -874,7 +879,10 @@ async function qualifyLead(
       lead_id: leadId, customer_name: contactName, phone, job_type: jobType,
       urgency, estimated_value: estimatedValue, source,
     })
-  } catch { /* non-blocking */ }
+  } catch (err: any) {
+    // Icke-blockerande — leaden är redan skapad, bara automations-eventet misslyckades.
+    console.error('[qualifyLead] fireEvent lead_created failed (non-blocking):', businessId, leadId, err?.message || err)
+  }
 
   return { success: true, data: { lead_id: leadId, lead_number: leadNumber, action: 'created', score, urgency, job_type: jobType, estimated_value: estimatedValue, message: `Lead skapad ${leadNumber} (score ${score})` } }
 }

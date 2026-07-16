@@ -273,7 +273,10 @@ export async function POST(request: NextRequest) {
             pipeline_stage_label: stage?.label || lead.pipeline_stage_key,
           }
         }
-      } catch { /* non-blocking */ }
+      } catch (err) {
+        // Icke-blockerande — agenten kan köra utan pipeline-kontext, men logga för felsökning.
+        console.error('[AgentTrigger] pipeline context lookup failed (non-blocking):', businessId, trigger_data?.lead_id, err)
+      }
     }
 
     // V5: Fetch agent_context (nattlig analys)
@@ -285,7 +288,10 @@ export async function POST(request: NextRequest) {
         .eq('business_id', businessId)
         .maybeSingle()
       agentContext = ctx
-    } catch { /* non-blocking — tabellen kanske inte finns ännu */ }
+    } catch (err) {
+      // Icke-blockerande — tabellen kanske inte finns ännu.
+      console.error('[AgentTrigger] agent_context fetch failed (non-blocking):', businessId, err)
+    }
 
     // V5: Fetch learned preferences
     let learnedPreferences: any = null
@@ -296,7 +302,9 @@ export async function POST(request: NextRequest) {
         .eq('business_id', businessId)
         .maybeSingle()
       learnedPreferences = prefs
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      console.error('[AgentTrigger] learned preferences fetch failed (non-blocking):', businessId, err)
+    }
 
     // Route to specialist agent
     const agentId = body.agent_id || routeToAgent(trigger_type, trigger_data?.cron_type || trigger_data?.event_name)
@@ -329,7 +337,9 @@ export async function POST(request: NextRequest) {
       ])
       memorySuffix = buildMemoryPrompt(memories)
       messagesSuffix = buildMessagesPrompt(agentMsgs)
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      console.error('[AgentTrigger] memory/messages fetch failed (non-blocking):', businessId, agentId, err)
+    }
 
     const systemPrompt = baseSystemPrompt + '\n\n' + getAgentPromptSuffix(agentId) + memorySuffix + messagesSuffix
 
@@ -485,7 +495,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract and save memory (fire-and-forget)
-    extractAndSaveMemory(businessId, agentId, finalResponse, trigger_type, trigger_data || {}).catch(() => {})
+    extractAndSaveMemory(businessId, agentId, finalResponse, trigger_type, trigger_data || {}).catch((err) =>
+      console.error('[AgentTrigger] extractAndSaveMemory failed (non-blocking):', businessId, agentId, err)
+    )
 
     return NextResponse.json({
       run_id: runId,

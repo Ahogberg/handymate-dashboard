@@ -370,7 +370,9 @@ export async function POST(request: NextRequest) {
         invoice_id: invoice.invoice_id, customer_id, total: invoice.total,
         due_date: invoice.due_date,
       })
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      console.error('[invoices POST] fireEvent invoice_created failed (non-blocking):', invoice.invoice_id, err)
+    }
 
     return NextResponse.json({
       invoice,

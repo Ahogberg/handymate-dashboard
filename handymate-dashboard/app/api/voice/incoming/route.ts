@@ -209,7 +209,9 @@ export async function POST(request: NextRequest) {
           customerId,
           responseChannel: 'call',
         })
-      } catch { /* non-blocking */ }
+      } catch (err) {
+        console.error('[Voice] pauseEnrollmentForResponse failed (non-blocking):', business.business_id, customerId, err)
+      }
     }
 
     // ── Routing baserat på call_handling_mode ──
@@ -229,7 +231,9 @@ export async function POST(request: NextRequest) {
           await fireEvent(supabase, 'call_transferred', business.business_id, {
             to: transferPhone, from, call_id: callId, mode: 'human_work_hours',
           })
-        } catch { /* non-blocking */ }
+        } catch (err) {
+          console.error('[Voice] fireEvent call_transferred failed (non-blocking):', business.business_id, callId, err)
+        }
 
         return NextResponse.json({
           connect: transferPhone,
@@ -255,14 +259,18 @@ export async function POST(request: NextRequest) {
           businessId: business.business_id,
           phoneNumber: from,
         })
-      } catch { /* non-blocking */ }
+      } catch (err) {
+        console.error('[Voice] notifyMissedCall failed (non-blocking):', business.business_id, from, err)
+      }
 
       try {
         const { fireEvent } = await import('@/lib/automation-engine')
         await fireEvent(supabase, 'call_missed', business.business_id, {
           phone: from, call_id: callId,
         })
-      } catch { /* non-blocking */ }
+      } catch (err) {
+        console.error('[Voice] fireEvent call_missed failed (non-blocking):', business.business_id, callId, err)
+      }
 
       // 46elks: spela meddelande och lägg på (agenten hanterar via webhook)
       return NextResponse.json({

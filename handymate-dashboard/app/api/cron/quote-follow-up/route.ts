@@ -83,7 +83,10 @@ export async function GET(request: NextRequest) {
           if (autoSettings) {
             enabled = autoSettings.sms_auto_enabled !== false && autoSettings.sms_quote_followup !== false
           }
-        } catch { /* table may not exist */ }
+        } catch (err) {
+          // Icke-blockerande — tabellen kanske inte finns, då antar vi enabled=true.
+          console.warn('[quote-follow-up] automation_settings lookup failed (non-blocking):', bizId, err)
+        }
 
         // Fallback: kolla communication_settings
         if (enabled) {
@@ -94,7 +97,9 @@ export async function GET(request: NextRequest) {
               .eq('business_id', bizId)
               .single()
             if (commSettings && commSettings.auto_enabled === false) enabled = false
-          } catch { /* non-blocking */ }
+          } catch (err) {
+            console.warn('[quote-follow-up] communication_settings lookup failed (non-blocking):', bizId, err)
+          }
         }
 
         nudgeEnabledMap.set(bizId, enabled)
@@ -102,7 +107,12 @@ export async function GET(request: NextRequest) {
         // Autonomi bara relevant för icke-V3-företag (V3 hoppas ändå).
         if (!nudgeV3Handles.has(bizId)) {
           let autonomous = false
-          try { autonomous = await isAutonomous(supabase, bizId, 'quote_followup_sms') } catch { autonomous = false }
+          try {
+            autonomous = await isAutonomous(supabase, bizId, 'quote_followup_sms')
+          } catch (err) {
+            console.warn('[quote-follow-up] isAutonomous check failed, defaulting to false (non-blocking):', bizId, err)
+            autonomous = false
+          }
           nudgeAutonomousMap.set(bizId, autonomous)
         }
       }
@@ -197,7 +207,9 @@ export async function GET(request: NextRequest) {
                 sent_at: new Date().toISOString(),
               })
             }
-          } catch { /* non-blocking */ }
+          } catch (err) {
+            console.error('[quote-follow-up] expiry-nudge SMS send failed (non-blocking):', q.business_id, q.quote_id, err)
+          }
         }
       }
     } catch (nudgeErr) {

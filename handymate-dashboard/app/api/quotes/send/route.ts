@@ -662,7 +662,9 @@ ${suffix}`
           aiReason: 'Offert skickad till kund',
         })
       }
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      console.error('[quotes/send] ensureDealForQuote/moveDeal failed (non-blocking):', quoteId, err)
+    }
 
     // Bygg svar
     const sentMethods = []

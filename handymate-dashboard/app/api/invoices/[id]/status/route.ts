@@ -111,7 +111,9 @@ export async function PATCH(
           businessId: business.business_id,
           invoiceId,
         })
-      } catch { /* non-blocking */ }
+      } catch (err) {
+        console.error('[invoice status] handleProjectEvent invoice_paid failed (non-blocking):', invoiceId, err)
+      }
 
       // Project workflow stage: 'Faktura betald' (ps-07)
       try {
@@ -194,7 +196,9 @@ export async function PATCH(
             })
           }
         }
-      } catch { /* non-blocking */ }
+      } catch (err) {
+        console.error('[invoice status] Golden Path tack-SMS/recensionsförfrågan failed (non-blocking):', invoiceId, err)
+      }
     }
 
     return NextResponse.json({

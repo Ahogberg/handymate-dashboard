@@ -110,7 +110,9 @@ export async function POST(request: NextRequest) {
         customerId: quote.customer_id,
         context: { quoteId },
       })
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      console.error('[quotes/accept] triggerEventCommunication failed (non-blocking):', quoteId, err)
+    }
 
     try {
       const { notifyQuoteSigned } = await import('@/lib/notifications')
@@ -120,7 +122,9 @@ export async function POST(request: NextRequest) {
         quoteId,
         total: quote.total || 0,
       })
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      console.error('[quotes/accept] notifyQuoteSigned failed (non-blocking):', quoteId, err)
+    }
 
     // Project AI engine: quote_accepted event
     try {
@@ -130,7 +134,9 @@ export async function POST(request: NextRequest) {
         businessId: business.business_id,
         quoteId,
       })
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      console.error('[quotes/accept] handleProjectEvent (quote_accepted) failed (non-blocking):', quoteId, err)
+    }
 
     // Automation engine: fire quote_accepted event
     try {
@@ -143,7 +149,9 @@ export async function POST(request: NextRequest) {
         title: quote.title,
         lead_id: quote.lead_id,
       })
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      console.error('[quotes/accept] fireEvent quote_accepted failed (non-blocking):', quoteId, err)
+    }
 
     // Golden Path: flytta deal till "Offert accepterad" → "Vunnen"
     try {
@@ -164,7 +172,9 @@ export async function POST(request: NextRequest) {
           aiReason: 'Offert signerad av kund — deal vunnen',
         })
       }
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      console.error('[quotes/accept] Golden Path moveDeal to won failed (non-blocking):', quoteId, err)
+    }
 
     // Golden Path: bekräftelse-SMS till kund
     try {
@@ -192,7 +202,9 @@ export async function POST(request: NextRequest) {
           }),
         })
       }
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      console.error('[quotes/accept] bekräftelse-SMS failed (non-blocking):', quoteId, err)
+    }
 
     // Auto-create project from quote (with dedup, milestones, notifications)
     try {
@@ -206,7 +218,9 @@ export async function POST(request: NextRequest) {
     try {
       const { triggerAutopilot } = await import('@/lib/autopilot/trigger')
       await triggerAutopilot(business.business_id, quoteId)
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      console.error('[quotes/accept] triggerAutopilot failed (non-blocking):', quoteId, err)
+    }
 
     // Logga aktivitet
     try {
@@ -219,7 +233,9 @@ export async function POST(request: NextRequest) {
         description: `Offert "${quote.title}" markerades som accepterad`,
         created_by: 'user',
       })
-    } catch { /* non-blocking */ }
+    } catch (err) {
+      console.error('[quotes/accept] customer_activity log failed (non-blocking):', quoteId, err)
+    }
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

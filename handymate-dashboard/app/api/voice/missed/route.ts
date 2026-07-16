@@ -33,7 +33,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     // Läs rå body EN gång — behövs både för signaturvalidering och parsning.
     let rawBody = ''
     if (request.method === 'POST') {
-      try { rawBody = await request.text() } catch { /* ingen body */ }
+      try { rawBody = await request.text() } catch (err) { console.warn('[voice/missed] kunde inte läsa body:', err) }
 
       // Verifiera 46elks-signatur (whenhangup-callbacken signeras med samma
       // HMAC som övriga webhooks). Utan detta kan call_missed → catch-SMS
@@ -52,7 +52,9 @@ async function handle(request: NextRequest): Promise<NextResponse> {
         const body = new URLSearchParams(rawBody)
         state = String(body.get('state') || state)
         duration = Number(body.get('duration') || duration)
-      } catch { /* ingen form-body */ }
+      } catch (err) {
+        console.warn('[voice/missed] kunde inte parsa form-body:', err)
+      }
     }
 
     const answered = state === 'success' || duration > 0

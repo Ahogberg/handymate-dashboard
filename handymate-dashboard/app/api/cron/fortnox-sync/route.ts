@@ -53,6 +53,9 @@ export async function GET(request: Request) {
         errors.push(`${biz.business_id}: ${result.errors.join('; ')}`)
       }
     } catch (err: any) {
+      // Icke-blockerande — loopen fortsätter till nästa business, men felet
+      // både loggas (cron körs obevakat) och surfas i errors-arrayen nedan.
+      console.error('[cron/fortnox-sync] syncFortnoxPaymentsForBusiness failed:', biz.business_id, err)
       errors.push(`${biz.business_id}: ${err?.message || 'sync failed'}`)
     }
   }
