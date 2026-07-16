@@ -463,6 +463,10 @@ export interface BusinessPdfData {
   bankgiro?: string
   plusgiro?: string
   swish_number?: string
+  /** Base64 data-URI (data:image/png;base64,... eller data:image/jpeg;base64,...), förhämtad av anroparen. */
+  logo_base64?: string
+  /** Bildformat för logo_base64 — jsPDF addImage kräver PNG eller JPEG. */
+  logo_format?: 'PNG' | 'JPEG'
 }
 
 /** Konvertera '#0F766E' → [15,118,110]; fallback ACCENT_RGB vid ogiltig input. */
@@ -491,9 +495,39 @@ export function generateQuotePDF(quote: QuotePdfData, business: BusinessPdfData)
   const accent = hexToRgb(business.accent_color)
 
   // ── Header ──
+  // Logga (om tillgänglig och avkodningsbar) ritas till vänster; text för
+  // företagsnamn/org.nr/adress flyttas då till höger om loggan. Misslyckas
+  // hämtning/avkodning/addImage av någon anledning faller vi tyst tillbaka
+  // till samma text-only header som innan denna feature — PDF:en får ALDRIG
+  // krascha på grund av loggan.
+  let textX = margin
+  if (business.logo_base64 && business.logo_format) {
+    try {
+      const maxW = 35
+      const maxH = 14
+      let logoW = maxW
+      let logoH = maxH
+      const props = doc.getImageProperties(business.logo_base64)
+      if (props?.width && props?.height) {
+        const ratio = props.width / props.height
+        logoH = maxH
+        logoW = logoH * ratio
+        if (logoW > maxW) {
+          logoW = maxW
+          logoH = logoW / ratio
+        }
+      }
+      doc.addImage(business.logo_base64, business.logo_format, margin, y, logoW, logoH)
+      textX = margin + logoW + 4
+    } catch (err) {
+      console.error('[generateQuotePDF] Kunde inte rita logga i PDF-header:', err)
+      textX = margin
+    }
+  }
+
   doc.setFontSize(16)
   doc.setTextColor(...TEXT_PRIMARY)
-  doc.text(business.business_name || 'Företag', margin, y + 6)
+  doc.text(business.business_name || 'Företag', textX, y + 6)
 
   doc.setFontSize(9)
   doc.setTextColor(...TEXT_SECONDARY)
@@ -502,7 +536,7 @@ export function generateQuotePDF(quote: QuotePdfData, business: BusinessPdfData)
     business.address || '',
   ].filter(Boolean)
   companyLines.forEach((line, i) => {
-    doc.text(line, margin, y + 12 + i * 4)
+    doc.text(line, textX, y + 12 + i * 4)
   })
 
   // Dokumenttyp (höger, versal, accent)

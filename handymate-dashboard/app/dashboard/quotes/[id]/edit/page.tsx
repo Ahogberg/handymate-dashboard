@@ -347,6 +347,7 @@ export default function EditQuotePage() {
         quote_id: quoteId,
         quote_number: quoteNumberRef.current || undefined,
         title: title || 'Offert',
+        description: description || null,
         status: quoteStatus,
         items: [],
         subtotal: totals.subtotal,
@@ -384,7 +385,7 @@ export default function EditQuotePage() {
       template_style: templateStyle,
     }
   }, [
-    quoteId, title, quoteStatus, totals, validDays, discountPercent, vatRate,
+    quoteId, title, description, quoteStatus, totals, validDays, discountPercent, vatRate,
     introductionText, conclusionText, notIncluded, ataTerms, paymentTermsText,
     referencePerson, customerReference, projectAddress, detailLevel,
     showUnitPrices, showQuantities, personnummer, fastighetsbeteckning,

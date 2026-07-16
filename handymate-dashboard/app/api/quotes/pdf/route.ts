@@ -11,7 +11,7 @@ import { generateQuotePDF, type QuotePdfData, type BusinessPdfData } from '@/lib
  * + creator. Delas av alla tre ingångar (POST, GET ?token=, GET ?id=).
  * Renderar ALLA rader (arkivkopia) — visningsnivåfiltret gäller bara HTML-vyn.
  */
-function buildQuotePdfResponse(quote: any, config: any, creator: any): NextResponse {
+async function buildQuotePdfResponse(quote: any, config: any, creator: any): Promise<NextResponse> {
   const items: QuotePdfData['items'] = (quote.quote_items || []).map((i: any) => ({
     item_type: i.item_type || 'item',
     description: i.description || '',
@@ -74,6 +74,33 @@ function buildQuotePdfResponse(quote: any, config: any, creator: any): NextRespo
     bankgiro: config?.bankgiro,
     plusgiro: config?.plusgiro,
     swish_number: config?.swish_number,
+  }
+
+  // Hämta loggan server-side och konvertera till base64 så jsPDF kan rita
+  // den i PDF-headern. Endast PNG/JPEG stöds av jsPDF addImage — andra
+  // format (t.ex. webp/svg) hoppas över. Misslyckas hämtningen på något
+  // sätt renderas PDF:en precis som innan — utan logga, aldrig ett fel.
+  if (config?.logo_url) {
+    try {
+      const logoRes = await fetch(config.logo_url)
+      if (logoRes.ok) {
+        const contentType = logoRes.headers.get('content-type') || ''
+        const format: 'PNG' | 'JPEG' | null = contentType.includes('png')
+          ? 'PNG'
+          : (contentType.includes('jpeg') || contentType.includes('jpg'))
+            ? 'JPEG'
+            : null
+        if (format) {
+          const arrayBuffer = await logoRes.arrayBuffer()
+          const base64 = Buffer.from(arrayBuffer).toString('base64')
+          const mime = format === 'PNG' ? 'image/png' : 'image/jpeg'
+          businessData.logo_base64 = `data:${mime};base64,${base64}`
+          businessData.logo_format = format
+        }
+      }
+    } catch (err) {
+      console.error('[quotes/pdf] Kunde inte hämta logga för PDF:', err)
+    }
   }
 
   const pdfBuffer = generateQuotePDF(pdfData, businessData)

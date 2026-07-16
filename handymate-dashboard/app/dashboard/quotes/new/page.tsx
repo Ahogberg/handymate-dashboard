@@ -397,7 +397,7 @@ export default function NewQuotePage() {
     return {
       quote: {
         title: title || 'Offert',
-        description: null,
+        description: description || null,
         status: 'draft',
         items: [],
         subtotal: totals.subtotal,
@@ -436,7 +436,7 @@ export default function NewQuotePage() {
       template_style: templateStyle,
     }
   }, [
-    title, selectedCustomer, validDays, recalculated, totals, discountPercent, vatRate,
+    title, description, selectedCustomer, validDays, recalculated, totals, discountPercent, vatRate,
     introductionText, conclusionText, notIncluded, ataTerms, paymentTermsText, termsText,
     referencePerson, customerReference, projectAddress, detailLevel,
     showUnitPrices, showQuantities, personnummer, fastighetsbeteckning,
@@ -487,7 +487,7 @@ export default function NewQuotePage() {
         issuedDate: formatDate(new Date()),
         validUntilDate: formatDate(validUntil),
         title: title || 'Offert',
-        description: null,
+        description: description || null,
         items: recalculated.map((i): QuoteTemplateItem => {
           const itemType = ((i.item_type || 'item') as QuoteTemplateItem['itemType'])
           return {
@@ -521,13 +521,14 @@ export default function NewQuotePage() {
         notIncluded: notIncluded || null,
       },
     }
-  }, [business, businessConfig, selectedCustomerObj, title, recalculated, totals, validDays, paymentTermsText, introductionText, conclusionText, notIncluded, personnummer, customerReference])
+  }, [business, businessConfig, selectedCustomerObj, title, description, recalculated, totals, validDays, paymentTermsText, introductionText, conclusionText, notIncluded, personnummer, customerReference])
 
   const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
 
   const liveHandlers = useMemo(
     () => ({
       onTitleChange: setTitle,
+      onDescriptionChange: setDescription,
       onIntroChange: setIntroductionText,
       onCustomerNameChange: undefined,
       onPaymentTermsChange: setPaymentTermsText,

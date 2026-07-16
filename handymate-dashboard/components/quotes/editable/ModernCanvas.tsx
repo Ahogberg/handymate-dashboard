@@ -105,6 +105,7 @@ function formatNumber(n: number): string {
 
 export interface ModernCanvasHandlers {
   onTitleChange: (v: string) => void
+  onDescriptionChange: (v: string) => void
   onIntroChange: (v: string) => void
   onItemChange: (index: number, item: QuoteTemplateItem) => void
   onItemAdd: () => void
@@ -217,7 +218,15 @@ export default function ModernCanvas({ data, handlers }: Props) {
           </h1>
           <p className="quote-sub">
             <EditableText
-              value={data.quote.introductionText || data.quote.description || ''}
+              value={data.quote.description || ''}
+              onChange={handlers.onDescriptionChange}
+              placeholder="Beskrivning (valfri)"
+              multiline
+            />
+          </p>
+          <p className="quote-sub">
+            <EditableText
+              value={data.quote.introductionText || ''}
               onChange={handlers.onIntroChange}
               placeholder="Introduktionstext (valfri)"
               multiline
