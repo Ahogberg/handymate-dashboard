@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { svDateStr } from '@/lib/dates'
 import { useRealtimeRefresh } from '@/lib/useRealtimeRefresh'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
@@ -150,7 +151,9 @@ export default function DashboardPage() {
 
   async function fetchData() {
     const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
+    // TD-3: dagens datum i svensk lokaltid — toISOString().split('T')[0]
+    // ger UTC-dagen, som är GÅRDAGEN mellan 22/23-midnatt svensk tid.
+    const todayStr = svDateStr(today)
 
     // Fire ALL independent fetches in parallel
     const bookingsPromise = supabase

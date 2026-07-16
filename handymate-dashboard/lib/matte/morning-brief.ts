@@ -4,6 +4,7 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { assembleCashRadar } from '@/lib/cash-radar-data'
+import { svDateStr, svDateStrPlusDays } from '@/lib/dates'
 
 export interface BriefDetail {
   text: string
@@ -28,7 +29,10 @@ export interface MorningBrief {
 
 export async function generateMorningBrief(businessId: string): Promise<MorningBrief> {
   const supabase = getServerSupabase()
-  const today = new Date().toISOString().split('T')[0]
+  // TD-3: morgonbriefen skickas ofta tidigt — UTC-splitting av dagens
+  // datum kan peka på GÅRDAGEN om cronen kör före midnatt UTC men efter
+  // midnatt svensk tid. Måste räknas i svensk lokaltid.
+  const today = svDateStr()
 
   const { data: config } = await supabase
     .from('business_config')
@@ -53,7 +57,7 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
       .select('invoice_id, total, due_date')
       .eq('business_id', businessId).eq('status', 'sent')
       .gte('due_date', today)
-      .lte('due_date', new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0])
+      .lte('due_date', svDateStrPlusDays(3))
       .limit(5),
     supabase.from('leads')
       .select('lead_id, name, job_type, score, pipeline_stage')

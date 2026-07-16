@@ -5,6 +5,7 @@ import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { buildSwishQRData } from '@/lib/swish-qr'
 import { isAutonomous } from '@/lib/autonomy/earned-autonomy'
 import { deliverInvoiceReminder } from '@/lib/invoice-reminder-send'
+import { svDateStr } from '@/lib/dates'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -202,7 +203,10 @@ async function sendAutoReminders() {
   try {
     const supabase = getServerSupabase()
     const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
+    // TD-3: "förfallet till och med idag" ska räknas i svensk lokaltid, inte
+    // UTC-dagen. Cronen kör kl 10:00 UTC idag men gör datumgränsen korrekt
+    // oavsett schema-tid framöver — se lib/dates.ts.
+    const todayStr = svDateStr(today)
 
     // Hämta alla förfallna fakturor
     const { data: overdueInvoices, error } = await supabase

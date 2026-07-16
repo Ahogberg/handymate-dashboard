@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { getCurrentUser } from '@/lib/permissions'
+import { svDateStr, svDateStrPlusDays } from '@/lib/dates'
 
 /**
  * GET /api/dashboard/today
@@ -14,10 +15,11 @@ export async function GET(req: NextRequest) {
   const supabase = getServerSupabase()
   const bizId = business.business_id
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const todayStr = today.toISOString().split('T')[0]
-  const tomorrowStr = new Date(today.getTime() + 86400000).toISOString().split('T')[0]
+  // TD-3: "idag" ska räknas i svensk lokaltid — toISOString().split('T')[0]
+  // gav UTC-dagen, som är GÅRDAGEN mellan 22/23-midnatt svensk tid (Vercel
+  // kör UTC). Detta styr både förfallna uppgifter och dagens bokningar.
+  const todayStr = svDateStr()
+  const tomorrowStr = svDateStrPlusDays(1)
 
   interface TodoContext {
     type: 'project' | 'deal'
