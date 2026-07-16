@@ -22,15 +22,34 @@ export async function GET(
 
     const supabase = getServerSupabase()
 
+    // template_id → form_templates har en riktig FK (sql/v11_forms.sql) —
+    // behålls som embed. project_id → project saknar bekräftat körd FK i
+    // prod (v71 lägger till den men är inte verifierad) — hämtas separat.
     const { data: submission, error } = await supabase
       .from('form_submissions')
-      .select('*, template:template_id(name, category), project:project_id(name)')
+      .select('*, template:template_id(name, category)')
       .eq('id', params.id)
       .eq('business_id', business.business_id)
       .single()
 
     if (error || !submission) {
       return NextResponse.json({ error: 'Formulär hittades inte' }, { status: 404 })
+    }
+
+    if (submission.project_id) {
+      const { data: projectData, error: projectErr } = await supabase
+        .from('project')
+        .select('name')
+        .eq('project_id', submission.project_id)
+        .maybeSingle()
+      if (projectErr) {
+        console.error('[form-submissions/pdf] project fetch error (non-blocking):', projectErr)
+        submission.project = null
+      } else {
+        submission.project = projectData
+      }
+    } else {
+      submission.project = null
     }
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })

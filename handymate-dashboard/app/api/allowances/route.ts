@@ -19,9 +19,12 @@ export async function GET(request: NextRequest) {
     const endDate = request.nextUrl.searchParams.get('endDate')
     const projectId = request.nextUrl.searchParams.get('projectId')
 
+    // allowance_type_id → allowance_types har en riktig FK (behålls som
+    // embed). project_id → project saknar bekräftat körd FK i prod (v71
+    // lägger till den men är inte verifierad) — hämtas separat i batch.
     let query = supabase
       .from('allowance_reports')
-      .select('*, allowance_type:allowance_type_id(*), project:project_id(name)')
+      .select('*, allowance_type:allowance_type_id(*)')
       .eq('business_id', business.business_id)
       .order('report_date', { ascending: false })
       .order('created_at', { ascending: false })
@@ -34,7 +37,26 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    return NextResponse.json({ reports: data || [] })
+    const reports = data || []
+    const projectIds = Array.from(new Set(reports.map((r: any) => r.project_id).filter(Boolean)))
+    const projectMap: Record<string, string> = {}
+    if (projectIds.length > 0) {
+      const { data: projects, error: projectErr } = await supabase
+        .from('project')
+        .select('project_id, name')
+        .in('project_id', projectIds)
+      if (projectErr) {
+        console.error('[allowances GET] project batch fetch error:', projectErr)
+      } else {
+        for (const p of projects || []) projectMap[p.project_id] = p.name
+      }
+    }
+    const enrichedReports = reports.map((r: any) => ({
+      ...r,
+      project: r.project_id ? { name: projectMap[r.project_id] || null } : null,
+    }))
+
+    return NextResponse.json({ reports: enrichedReports })
   } catch (error: any) {
     console.error('GET allowances error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -95,10 +117,26 @@ export async function POST(request: NextRequest) {
         to_address: body.to_address || null,
         distance_km: body.distance_km || null,
       })
-      .select('*, allowance_type:allowance_type_id(*), project:project_id(name)')
+      .select('*, allowance_type:allowance_type_id(*)')
       .single()
 
     if (error) throw error
+
+    // project_id → project saknar bekräftat körd FK i prod — hämta separat.
+    let project: { name: string } | null = null
+    if (data.project_id) {
+      const { data: projectData, error: projectErr } = await supabase
+        .from('project')
+        .select('name')
+        .eq('project_id', data.project_id)
+        .maybeSingle()
+      if (projectErr) {
+        console.error('[allowances POST] project fetch error (non-blocking):', projectErr)
+      } else {
+        project = projectData
+      }
+    }
+    data.project = project
 
     return NextResponse.json({ report: data })
   } catch (error: any) {

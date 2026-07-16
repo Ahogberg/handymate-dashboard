@@ -176,19 +176,35 @@ export async function collectMonthlyData(
     .order('lifetime_value', { ascending: false })
     .limit(10)
 
-  // Förfallna fakturor 30+ dagar
+  // Förfallna fakturor 30+ dagar — invoice saknar FK till customer i prod,
+  // en embed (`customer:customer_id(name)`) avvisar HELA queryn (PGRST200).
+  // Hämta kundnamn separat i batch.
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10)
   const { data: overdueInvoices } = await supabase.from('invoice')
-    .select('invoice_id, customer_id, total, due_date, customer:customer_id(name)')
+    .select('invoice_id, customer_id, total, due_date')
     .eq('business_id', businessId)
     .not('status', 'in', '("paid","credited","draft")')
     .lt('due_date', thirtyDaysAgo)
     .order('due_date', { ascending: true })
     .limit(10) as any
 
+  const overdueInvoiceCustomerIds = Array.from(new Set((overdueInvoices || []).map((inv: any) => inv.customer_id).filter(Boolean)))
+  const overdueInvoiceCustomerMap: Record<string, string> = {}
+  if (overdueInvoiceCustomerIds.length > 0) {
+    const { data: overdueInvoiceCustomers, error: overdueCustErr } = await supabase
+      .from('customer')
+      .select('customer_id, name')
+      .in('customer_id', overdueInvoiceCustomerIds)
+    if (overdueCustErr) {
+      console.error('[monthly-review] overdue invoice customer batch fetch error:', overdueCustErr)
+    } else {
+      for (const c of overdueInvoiceCustomers || []) overdueInvoiceCustomerMap[c.customer_id] = c.name
+    }
+  }
+
   const overdueCustomers = (overdueInvoices || []).map((inv: any) => ({
     customer_id: inv.customer_id,
-    name: inv.customer?.name || 'Okänd kund',
+    name: overdueInvoiceCustomerMap[inv.customer_id] || 'Okänd kund',
     overdue_amount: Number(inv.total) || 0,
     days_overdue: Math.floor((now.getTime() - new Date(inv.due_date).getTime()) / 86_400_000),
   }))

@@ -29,10 +29,13 @@ export async function GET(request: NextRequest) {
       stageMap[stage.id] = { name: stage.name, slug: stage.slug, color: stage.color }
     }
 
-    // Fetch activities with deal join
+    // Fetch activities — pipeline_activity.deal_id → deal deklareras i
+    // sql/pipeline.sql, men är inte bekräftat applicerad i prod (samma
+    // drift-mönster som andra tabeller); en embed (`deal:deal_id(...)`)
+    // riskerar att avvisa HELA queryn (PGRST200) — hämta deal separat.
     let query = supabase
       .from('pipeline_activity')
-      .select('*, deal:deal_id(id, title)')
+      .select('*')
       .eq('business_id', business.business_id)
       .order('created_at', { ascending: false })
       .limit(limit)
@@ -41,15 +44,31 @@ export async function GET(request: NextRequest) {
       query = query.eq('triggered_by', triggeredBy)
     }
 
-    const { data: activities, error } = await query
+    const { data: activitiesRaw, error } = await query
 
     if (error) throw error
 
-    // Enrich with stage names
-    const enriched = (activities || []).map((activity: any) => ({
+    const activities = activitiesRaw || []
+    const dealIds = Array.from(new Set(activities.map((a: any) => a.deal_id).filter(Boolean)))
+    const dealMap: Record<string, { id: string; title: string }> = {}
+    if (dealIds.length > 0) {
+      const { data: deals, error: dealErr } = await supabase
+        .from('deal')
+        .select('id, title')
+        .in('id', dealIds)
+      if (dealErr) {
+        console.error('[pipeline/activity] deal batch fetch error:', dealErr)
+      } else {
+        for (const d of deals || []) dealMap[d.id] = { id: d.id, title: d.title }
+      }
+    }
+
+    // Enrich with stage names + deal
+    const enriched = activities.map((activity: any) => ({
       ...activity,
       from_stage: activity.from_stage_id ? stageMap[activity.from_stage_id] || null : null,
       to_stage: activity.to_stage_id ? stageMap[activity.to_stage_id] || null : null,
+      deal: activity.deal_id ? dealMap[activity.deal_id] || null : null,
     }))
 
     return NextResponse.json({ activities: enriched })

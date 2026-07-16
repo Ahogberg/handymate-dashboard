@@ -93,7 +93,7 @@ async function generateInvoicesForBusiness(params: {
   // Get all unbilled, billable time entries
   let query = supabase
     .from('time_entry')
-    .select('*, customer:customer_id(customer_id, name, phone_number, email)')
+    .select('*')
     .eq('business_id', params.businessId)
     .eq('is_billable', true)
     .is('invoice_id', null)
@@ -124,11 +124,28 @@ async function generateInvoicesForBusiness(params: {
     byCustomer[entry.customer_id].push(entry)
   }
 
+  // Hämta kunder separat i batch — time_entry saknar FK till customer i
+  // prod, en embed (`customer:customer_id(...)`) avvisar HELA queryn
+  // (PGRST200) och gjorde att auto-fakturering aldrig skapade en faktura.
+  const customerMap: Record<string, { customer_id: string; name: string; phone_number: string; email: string }> = {}
+  const customerIds = Object.keys(byCustomer)
+  if (customerIds.length > 0) {
+    const { data: customersData, error: customerErr } = await supabase
+      .from('customer')
+      .select('customer_id, name, phone_number, email')
+      .in('customer_id', customerIds)
+    if (customerErr) {
+      console.error('[invoices/auto-generate] customer batch fetch error:', customerErr)
+    } else {
+      for (const c of customersData || []) customerMap[c.customer_id] = c
+    }
+  }
+
   // Generate invoice per customer
   for (const customerId of Object.keys(byCustomer)) {
     const entries = byCustomer[customerId]
     try {
-      const customer = (entries[0] as any).customer
+      const customer = customerMap[customerId]
       const customerName = customer?.name || 'Okänd kund'
 
       // Build invoice items from time entries

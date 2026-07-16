@@ -34,16 +34,36 @@ export async function createProjectFromQuote(
       return { success: true, project_id: existing.project_id, already_existed: true }
     }
 
-    // 2. Hämta offert med kund
+    // 2. Hämta offert — quotes saknar FK till customer i prod, en embed
+    // (`customer:customer_id(...)`) avvisar HELA queryn (PGRST200) vilket
+    // gjorde att INGET PROJEKT skapades alls för signerade offerter.
     const { data: quote, error: quoteErr } = await supabase
       .from('quotes')
-      .select('*, customer:customer_id(name, phone_number, portal_token, portal_enabled)')
+      .select('*')
       .eq('quote_id', quoteId)
       .eq('business_id', businessId)
       .single()
 
     if (quoteErr || !quote) {
       return { success: false, error: 'Offert hittades inte' }
+    }
+
+    // Kunden används bara för valfria SMS-notiser (steg 7-8) — icke-kritisk,
+    // degradera till null vid fel i stället för att stoppa projektskapandet.
+    if (quote.customer_id) {
+      const { data: customerData, error: customerErr } = await supabase
+        .from('customer')
+        .select('name, phone_number, portal_token, portal_enabled')
+        .eq('customer_id', quote.customer_id)
+        .maybeSingle()
+      if (customerErr) {
+        console.error('[createProjectFromQuote] customer fetch error (non-blocking):', customerErr)
+        quote.customer = null
+      } else {
+        quote.customer = customerData
+      }
+    } else {
+      quote.customer = null
     }
 
     // 3. Beräkna budget från offertens rader via gemensam helper

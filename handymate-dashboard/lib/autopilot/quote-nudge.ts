@@ -11,17 +11,28 @@ export async function createQuoteNudge(
 ): Promise<void> {
   const supabase = getServerSupabase()
 
-  // Hämta offert + kund
-  const { data: quote } = await supabase
+  // Hämta offert — quotes saknar FK till customer i prod, en embed
+  // (`customer:customer(...)`) avvisar HELA queryn (PGRST200) och gjorde
+  // att view-nudges aldrig skapades. Hämta kund separat.
+  const { data: quote, error: quoteErr } = await supabase
     .from('quotes')
-    .select('title, customer_id, customer:customer(name, phone_number, email)')
+    .select('title, customer_id')
     .eq('quote_id', quoteId)
     .single()
 
-  if (!quote?.customer) return
+  if (quoteErr || !quote?.customer_id) return
 
-  const customer = quote.customer as any
-  if (!customer.phone_number) return
+  const { data: customer, error: customerErr } = await supabase
+    .from('customer')
+    .select('name, phone_number, email')
+    .eq('customer_id', quote.customer_id)
+    .maybeSingle()
+
+  if (customerErr) {
+    console.error('[createQuoteNudge] customer fetch error:', customerErr)
+    return
+  }
+  if (!customer?.phone_number) return
 
   // Kolla om en nudge redan skapats för denna offert
   const { count } = await supabase

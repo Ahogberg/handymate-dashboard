@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     // Seed defaults if no sequences exist
     await seedDefaultSequences(business.business_id)
 
-    const [stats, { data: sequences }, { data: enrollments }] = await Promise.all([
+    const [stats, { data: sequences }, { data: enrollmentsRaw, error: enrollmentErr }] = await Promise.all([
       getNurtureStats(business.business_id),
       supabase
         .from('nurture_sequence')
@@ -32,16 +32,42 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: true }),
       supabase
         .from('nurture_enrollment')
-        .select('*, customer:customer_id(name, phone_number, email)')
+        .select('*')
         .eq('business_id', business.business_id)
         .eq('status', 'active')
         .order('next_action_at', { ascending: true })
         .limit(20),
     ])
 
+    if (enrollmentErr) {
+      console.error('[nurture GET] enrollment fetch error:', enrollmentErr)
+    }
+
+    // Hämta kunder separat i batch — nurture_enrollment saknar bekräftat
+    // körd FK till customer i prod (v71 lägger till den men det är inte
+    // verifierat), en embed skulle avvisa hela queryn (PGRST200).
+    const enrollments = enrollmentsRaw || []
+    const customerIds = Array.from(new Set(enrollments.map((e: any) => e.customer_id).filter(Boolean)))
+    const customerMap: Record<string, { name: string; phone_number: string; email: string }> = {}
+    if (customerIds.length > 0) {
+      const { data: customersData, error: customerErr } = await supabase
+        .from('customer')
+        .select('customer_id, name, phone_number, email')
+        .in('customer_id', customerIds)
+      if (customerErr) {
+        console.error('[nurture GET] customer batch fetch error:', customerErr)
+      } else {
+        for (const c of customersData || []) customerMap[c.customer_id] = c
+      }
+    }
+    const enrichedEnrollments = enrollments.map((e: any) => ({
+      ...e,
+      customer: e.customer_id ? customerMap[e.customer_id] || null : null,
+    }))
+
     return NextResponse.json({
       sequences: sequences || [],
-      active_enrollments: enrollments || [],
+      active_enrollments: enrichedEnrollments,
       stats,
     })
   } catch (error: any) {

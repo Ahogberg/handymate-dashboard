@@ -70,16 +70,38 @@ export async function POST(
     const invoiceId = params.id
     const supabase = getServerSupabase()
 
-    // Hämta faktura + kund
+    // Hämta faktura
     const { data: invoice, error: fetchErr } = await supabase
       .from('invoice')
-      .select('*, customer:customer_id(*)')
+      .select('*')
       .eq('invoice_id', invoiceId)
       .eq('business_id', business.business_id)
       .single()
 
     if (fetchErr || !invoice) {
       return NextResponse.json({ error: 'Faktura hittades inte' }, { status: 404 })
+    }
+
+    // Hämta kund separat — invoice saknar FK till customer i prod, en embed
+    // (`customer:customer_id(*)`) avvisar HELA queryn (PGRST200). Fortnox-
+    // synken KRÄVER kunduppgifter (fortnox_customer_number, personnr etc) —
+    // degradera INTE till null här, ge ett tydligt fel i stället.
+    if (invoice.customer_id) {
+      const { data: customerData, error: customerErr } = await supabase
+        .from('customer')
+        .select('*')
+        .eq('customer_id', invoice.customer_id)
+        .maybeSingle()
+      if (customerErr) {
+        console.error('[send-via-fortnox] customer fetch error:', customerErr)
+        return NextResponse.json(
+          { error: 'Kunde inte hämta kunduppgifter för fakturan. Försök igen.' },
+          { status: 502 }
+        )
+      }
+      invoice.customer = customerData
+    } else {
+      invoice.customer = null
     }
 
     if (invoice.status === 'paid' || invoice.status === 'cancelled') {

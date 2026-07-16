@@ -90,13 +90,37 @@ async function getStorefrontData(slug: string) {
     .eq('category', 'labor')
     .limit(12)
 
-  const { data: reviews } = await supabase
+  // review_request saknar FK till customer i prod — en embed (`customer
+  // (name)`) avvisar HELA queryn (PGRST200) och gör att recensioner aldrig
+  // visas på den publika sajten. Hämta kundnamn separat i batch.
+  const { data: reviewsRaw } = await supabase
     .from('review_request')
-    .select('review_rating, review_text, customer(name), sent_at')
+    .select('review_rating, review_text, sent_at, customer_id')
     .eq('business_id', storefront.business_id)
     .not('review_rating', 'is', null)
     .order('sent_at', { ascending: false })
     .limit(6)
+
+  const reviewsList = reviewsRaw || []
+  const reviewCustomerIds = Array.from(new Set(reviewsList.map((r: any) => r.customer_id).filter(Boolean)))
+  const reviewCustomerMap: Record<string, { name: string }> = {}
+  if (reviewCustomerIds.length > 0) {
+    const { data: reviewCustomers, error: reviewCustomerErr } = await supabase
+      .from('customer')
+      .select('customer_id, name')
+      .in('customer_id', reviewCustomerIds)
+    if (reviewCustomerErr) {
+      console.error('[site/[slug]] review customer batch fetch error:', reviewCustomerErr)
+    } else {
+      for (const c of reviewCustomers || []) reviewCustomerMap[c.customer_id] = { name: c.name }
+    }
+  }
+  const reviews = reviewsList.map((r: any) => ({
+    review_rating: r.review_rating,
+    review_text: r.review_text,
+    sent_at: r.sent_at,
+    customer: r.customer_id ? reviewCustomerMap[r.customer_id] || null : null,
+  }))
 
   // Track page view (fire and forget)
   fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/storefront/track`, {

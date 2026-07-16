@@ -756,10 +756,11 @@ export async function syncInvoiceToFortnox(
       return { success: false, skipped: true, error: 'fortnox_not_connected' }
     }
 
-    // Get invoice with customer
+    // Get invoice — invoice saknar FK till customer i prod, en embed
+    // (`customer(...)`) avvisar HELA queryn (PGRST200). Hämta kund separat.
     const { data: invoice, error: fetchError } = await supabase
       .from('invoice')
-      .select('*, customer(customer_id, name, email, phone_number, address_line, fortnox_customer_number)')
+      .select('*')
       .eq('invoice_id', invoiceId)
       .eq('business_id', businessId)
       .single()
@@ -771,6 +772,21 @@ export async function syncInvoiceToFortnox(
     // Already synced?
     if (invoice.fortnox_invoice_number) {
       return { success: true, fortnoxInvoiceNumber: invoice.fortnox_invoice_number, fortnoxDocumentNumber: invoice.fortnox_document_number }
+    }
+
+    // Kunden är KRÄVD för Fortnox-synk — degradera inte tyst till null.
+    if (invoice.customer_id) {
+      const { data: customerData, error: customerErr } = await supabase
+        .from('customer')
+        .select('customer_id, name, email, phone_number, address_line, fortnox_customer_number')
+        .eq('customer_id', invoice.customer_id)
+        .maybeSingle()
+      if (customerErr) {
+        return { success: false, error: `Could not fetch customer: ${customerErr.message}` }
+      }
+      invoice.customer = customerData
+    } else {
+      invoice.customer = null
     }
 
     // Ensure customer exists in Fortnox
@@ -975,10 +991,11 @@ export async function syncQuoteToFortnox(
       return { success: false, skipped: true, error: 'fortnox_not_connected' }
     }
 
-    // Get quote with customer
+    // Get quote — quotes saknar FK till customer i prod, en embed
+    // (`customer(...)`) avvisar HELA queryn (PGRST200). Hämta kund separat.
     const { data: quote, error: fetchError } = await supabase
       .from('quotes')
-      .select('*, customer(customer_id, name, email, phone_number, address_line, fortnox_customer_number)')
+      .select('*')
       .eq('quote_id', quoteId)
       .eq('business_id', businessId)
       .single()
@@ -990,6 +1007,21 @@ export async function syncQuoteToFortnox(
     // Already synced?
     if (quote.fortnox_offer_number) {
       return { success: true, fortnoxOfferNumber: quote.fortnox_offer_number }
+    }
+
+    // Kunden är KRÄVD för Fortnox-synk — degradera inte tyst till null.
+    if (quote.customer_id) {
+      const { data: customerData, error: customerErr } = await supabase
+        .from('customer')
+        .select('customer_id, name, email, phone_number, address_line, fortnox_customer_number')
+        .eq('customer_id', quote.customer_id)
+        .maybeSingle()
+      if (customerErr) {
+        return { success: false, error: `Could not fetch customer: ${customerErr.message}` }
+      }
+      quote.customer = customerData
+    } else {
+      quote.customer = null
     }
 
     // Ensure customer exists in Fortnox

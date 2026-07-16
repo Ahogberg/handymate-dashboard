@@ -25,13 +25,33 @@ export async function POST(request: NextRequest) {
     // Hämta offert och verifiera ägarskap
     const { data: quote, error: fetchErr } = await supabase
       .from('quotes')
-      .select('*, customer(*)')
+      .select('*')
       .eq('quote_id', quoteId)
       .eq('business_id', business.business_id)
       .single()
 
     if (fetchErr || !quote) {
       return NextResponse.json({ error: 'Offert hittades inte' }, { status: 404 })
+    }
+
+    // Hämta kund separat — quotes saknar FK till customer i prod, en embed
+    // (`*, customer(*)`) avvisar HELA queryn (PGRST200) och gjorde att
+    // SIGNERINGSFLÖDET 404:ade trots att offerten fanns. Degradera till
+    // customer=null vid fel snarare än att stoppa hela accept-flödet.
+    if (quote.customer_id) {
+      const { data: customerData, error: customerErr } = await supabase
+        .from('customer')
+        .select('*')
+        .eq('customer_id', quote.customer_id)
+        .maybeSingle()
+      if (customerErr) {
+        console.error('[quotes/accept] customer fetch error (non-blocking):', customerErr)
+        quote.customer = null
+      } else {
+        quote.customer = customerData
+      }
+    } else {
+      quote.customer = null
     }
 
     if (!['sent', 'opened'].includes(quote.status)) {

@@ -13,7 +13,9 @@ async function getBusinessContext(businessId: string, businessName: string) {
   const supabase = getServerSupabase()
   const today = new Date().toISOString().split('T')[0]
 
-  // Fetch today's bookings with customer names
+  // Fetch today's bookings with customer names. booking.customer_id har en
+  // riktig FK mot customer i prod (bekräftat), så den här embedden är säker
+  // att behålla — till skillnad från ai_suggestion/time_entry nedan.
   const { data: todayBookings } = await supabase
     .from('booking')
     .select('booking_id, service_type, booking_date, booking_time, status, customer:customer_id(name)')
@@ -28,14 +30,19 @@ async function getBusinessContext(businessId: string, businessName: string) {
     .select('customer_id', { count: 'exact', head: true })
     .eq('business_id', businessId)
 
-  // Fetch pending/urgent AI suggestions (open cases)
-  const { data: pendingSuggestions } = await supabase
+  // Fetch pending/urgent AI suggestions (open cases) — ai_suggestion saknar
+  // FK till customer i prod, en embed avvisar HELA queryn (PGRST200).
+  const { data: pendingSuggestionsRaw, error: suggestionErr } = await supabase
     .from('ai_suggestion')
-    .select('suggestion_id, suggestion_type, title, description, priority, status, customer:customer_id(name)')
+    .select('suggestion_id, suggestion_type, title, description, priority, status, customer_id')
     .eq('business_id', businessId)
     .eq('status', 'pending')
     .order('priority', { ascending: true })
     .limit(10)
+  if (suggestionErr) {
+    console.error('[ai-copilot] ai_suggestion fetch error:', suggestionErr)
+  }
+  const pendingSuggestions = pendingSuggestionsRaw || []
 
   // Fetch overdue invoices count
   const { count: overdueInvoices } = await supabase
@@ -51,14 +58,37 @@ async function getBusinessContext(businessId: string, businessName: string) {
     .eq('business_id', businessId)
     .in('status', ['draft', 'sent'])
 
-  // Fetch active time entries (who is checked in)
-  const { data: activeTimers } = await supabase
+  // Fetch active time entries (who is checked in) — time_entry saknar FK
+  // till customer i prod, samma PGRST200-risk som ovan.
+  const { data: activeTimersRaw, error: timerErr } = await supabase
     .from('time_entry')
-    .select('time_entry_id, check_in_time, work_category, customer:customer_id(name, customer_id)')
+    .select('time_entry_id, check_in_time, work_category, customer_id')
     .eq('business_id', businessId)
     .is('end_time', null)
     .not('check_in_time', 'is', null)
     .limit(10)
+  if (timerErr) {
+    console.error('[ai-copilot] time_entry fetch error:', timerErr)
+  }
+  const activeTimers = activeTimersRaw || []
+
+  // Hämta kunder för suggestions + timers separat i EN batch-query.
+  const relatedCustomerIds = Array.from(new Set([
+    ...pendingSuggestions.map((s: any) => s.customer_id),
+    ...activeTimers.map((t: any) => t.customer_id),
+  ].filter(Boolean)))
+  const customerMap: Record<string, { name: string }> = {}
+  if (relatedCustomerIds.length > 0) {
+    const { data: relatedCustomers, error: customerErr } = await supabase
+      .from('customer')
+      .select('customer_id, name')
+      .in('customer_id', relatedCustomerIds)
+    if (customerErr) {
+      console.error('[ai-copilot] customer batch fetch error:', customerErr)
+    } else {
+      for (const c of relatedCustomers || []) customerMap[c.customer_id] = { name: c.name }
+    }
+  }
 
   // Fetch active projects
   const { data: activeProjects } = await supabase
@@ -75,13 +105,13 @@ async function getBusinessContext(businessId: string, businessName: string) {
     status: b.status,
   }))
 
-  const urgentCases = (pendingSuggestions || []).filter((s: any) => s.priority === 'high' || s.priority === 'urgent')
+  const urgentCases = pendingSuggestions.filter((s: any) => s.priority === 'high' || s.priority === 'urgent')
 
   return {
     business: businessName,
     todayBookings: formattedBookings,
-    activeTimers: (activeTimers || []).map((t: any) => ({
-      customer: t.customer?.name || 'Okänd',
+    activeTimers: activeTimers.map((t: any) => ({
+      customer: customerMap[t.customer_id]?.name || 'Okänd',
       since: t.check_in_time,
       category: t.work_category,
     })),
@@ -89,8 +119,8 @@ async function getBusinessContext(businessId: string, businessName: string) {
       name: p.name,
       healthScore: p.ai_health_score,
     })),
-    openCases: (pendingSuggestions || []).map((s: any) => ({
-      customer: s.customer?.name || 'Okänd kund',
+    openCases: pendingSuggestions.map((s: any) => ({
+      customer: customerMap[s.customer_id]?.name || 'Okänd kund',
       type: s.suggestion_type,
       title: s.title,
       priority: s.priority,

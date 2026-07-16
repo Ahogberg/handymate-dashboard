@@ -235,18 +235,38 @@ export async function GET(req: NextRequest) {
     }
 
     // 5. Förfallna fakturor — `customer_name` finns inte direkt på invoice-
-    // tabellen, hämtas via FK-join på customer-tabellen (customer.name).
-    const { data: overdueInvoices } = await supabase
+    // tabellen. invoice saknar FK till customer i prod, så en embed
+    // (`customer:customer_id(name)`) avvisar HELA queryn (PGRST200) — hämta
+    // kundnamn separat i batch i stället.
+    const { data: overdueInvoices, error: overdueErr } = await supabase
       .from('invoice')
-      .select('id:invoice_id, invoice_number, total_amount:total, due_date, customer:customer_id(name)')
+      .select('id:invoice_id, invoice_number, total_amount:total, due_date, customer_id')
       .eq('business_id', bizId)
       .eq('status', 'sent')
       .lt('due_date', todayStr)
       .order('due_date', { ascending: true })
       .limit(5)
 
+    if (overdueErr) {
+      console.error('[today] overdue invoices fetch error:', overdueErr)
+    }
+
+    const invoiceCustomerIds = Array.from(new Set((overdueInvoices || []).map((i: any) => i.customer_id).filter(Boolean)))
+    const invoiceCustomerMap: Record<string, string> = {}
+    if (invoiceCustomerIds.length > 0) {
+      const { data: invCustomers, error: invCustErr } = await supabase
+        .from('customer')
+        .select('customer_id, name')
+        .in('customer_id', invoiceCustomerIds)
+      if (invCustErr) {
+        console.error('[today] overdue invoice customer batch fetch error:', invCustErr)
+      } else {
+        for (const c of invCustomers || []) invoiceCustomerMap[c.customer_id] = c.name
+      }
+    }
+
     for (const inv of (overdueInvoices || []) as any[]) {
-      const customerName = inv.customer?.name || 'Okänd kund'
+      const customerName = invoiceCustomerMap[inv.customer_id] || 'Okänd kund'
       items.push({
         id: `inv_${inv.id}`,
         type: 'overdue_invoice',
