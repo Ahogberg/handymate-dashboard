@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { recordLearningEvent } from '@/lib/agent/learning-engine'
 import { sendSmsViaElks } from '@/lib/sms-send'
+import { classifyExecutionResult } from '@/lib/approvals/execution-outcome'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -178,13 +179,55 @@ export async function POST(
       // B2-fix (2026-06-27): mobilen autentiserar med Authorization: Bearer
       // utan cookie → forwarda även den, annars 401 tyst på icke-SMS-actions.
       const authHeader = request.headers.get('authorization')
-      executionResult = await executeApprovalPayload(
-        approvalWithPayload,
-        business.business_id,
-        action_overrides as Record<string, string> | undefined,
-        cookieHeader,
-        authHeader
-      )
+
+      // Utfalls-hårdning (juli-audit): executeApprovalPayload har idag ett
+      // internt catch-all runt hela sin switch, men om den ändå skulle kasta
+      // (t.ex. ett icke-Error-objekt kastas och err.message i det interna
+      // catchet själv kraschar) fångar vi det HÄR — annars bubblar det till
+      // det yttre catchet nedan och ger ett 500-svar med raden redan
+      // status='approved' och INGENTING sparat. Det är precis den tysta
+      // dubbel-lögnen (kunden trodde det gick ut, raden säger godkänt, DB
+      // har inget spår) som denna hårdning ska stänga.
+      try {
+        executionResult = await executeApprovalPayload(
+          approvalWithPayload,
+          business.business_id,
+          action_overrides as Record<string, string> | undefined,
+          cookieHeader,
+          authHeader
+        )
+      } catch (execErr: any) {
+        console.error(`[approvals/${params.id}] executeApprovalPayload kastade okontrollerat:`, execErr)
+        executionResult = { error: String(execErr?.message || execErr), ok: false }
+      }
+
+      // Persistera utfallet på raden — oavsett om execution lyckades,
+      // misslyckades eller kastade. payload är JSONB så detta kräver ingen
+      // schema-ändring. Utan detta finns felet BARA i HTTP-svaret ovan; om
+      // klienten missar det (mobilkrasch, stängd flik) är det osynligt för
+      // alltid och hantverkaren tror felaktigt att handlingen gick igenom.
+      const { outcome, error_text } = classifyExecutionResult(executionResult)
+      const { error: persistError } = await supabase
+        .from('pending_approvals')
+        .update({
+          payload: {
+            ...finalPayload,
+            execution_result: {
+              outcome,
+              error_text,
+              executed_at: new Date().toISOString(),
+            },
+          },
+        })
+        .eq('id', params.id)
+        .eq('business_id', business.business_id)
+
+      if (persistError) {
+        // Non-blocking — exekveringen har redan skett och svaret nedan
+        // innehåller ändå det faktiska utfallet. Men loggas synligt så vi
+        // upptäcker om persisteringen systematiskt failar.
+        console.error(`[approvals/${params.id}] Kunde inte spara execution_result:`, persistError)
+      }
     }
 
     return NextResponse.json({
@@ -633,7 +676,17 @@ async function executeApprovalPayload(
           }
         }
 
-        return { action: 'autopilot_package', results }
+        // Utfalls-hårdning: paketet hade tidigare inget aggregerat ok/error-
+        // fält — även om ALLA sub-actions misslyckades klassades hela
+        // approval-raden som 'success' (results-arrayen fångades aldrig av
+        // classifyExecutionResult). Speglar sub-resultatens ok-fält uppåt.
+        const anyFailed = results.some((r) => r.ok === false)
+        return {
+          action: 'autopilot_package',
+          results,
+          ok: !anyFailed,
+          error: anyFailed ? 'En eller flera delåtgärder i paketet misslyckades' : undefined,
+        }
       }
 
       case 'dispatch_suggestion': {
@@ -998,11 +1051,18 @@ async function executeApprovalPayload(
       case 'price_adjustment': {
         // Uppdatera pris i prislista
         const pl = payload as any
-        if (pl.item_id && pl.suggested_price) {
-          const supabasePa = (await import('@/lib/supabase')).getServerSupabase()
-          await supabasePa.from('price_list').update({
-            unit_price: pl.suggested_price,
-          }).eq('id', pl.item_id).eq('business_id', businessId)
+        // Utfalls-hårdning: saknades item_id/suggested_price gjorde caset
+        // ingenting men returnerade ändå ok:true — dolt no-op klassat som
+        // success. Returnera 'skipped' istället så det syns i utfallet.
+        if (!pl.item_id || !pl.suggested_price) {
+          return { action: 'price_adjustment', skipped: 'no item_id or suggested_price' }
+        }
+        const supabasePa = (await import('@/lib/supabase')).getServerSupabase()
+        const { error: priceUpdateError } = await supabasePa.from('price_list').update({
+          unit_price: pl.suggested_price,
+        }).eq('id', pl.item_id).eq('business_id', businessId)
+        if (priceUpdateError) {
+          return { action: 'price_adjustment', ok: false, error: priceUpdateError.message }
         }
         return { action: 'price_adjustment', ok: true }
       }
@@ -1080,6 +1140,10 @@ async function executeApprovalPayload(
             lead_id: leadId,
             deal_id: result.dealId,
             deal_error: result.dealError ?? null,
+            // Utfalls-hårdning: deal_error surfades tidigare bara under sitt
+            // eget fältnamn — classifyExecutionResult (och UI:t) läser
+            // 'error', så en misslyckad deal-skapelse klassades som success.
+            error: result.dealError ?? undefined,
             navigate_to: result.dealId ? `/dashboard/pipeline` : `/dashboard/leads/${leadId}`,
           }
         } catch (err: any) {
