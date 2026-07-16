@@ -36,11 +36,13 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    // Strippa internal_hourly_cost för icke-owner/admin innan response.
-    // Defense-in-depth utöver UI-rollskydd.
+    // Strippa internal_hourly_cost OCH legacy hourly_cost för icke-owner/admin
+    // innan response. Defense-in-depth utöver UI-rollskydd. (TD-59: hourly_cost
+    // saknade motsvarande skydd trots att den innehåller samma typ av känslig
+    // lönekostnadsdata som internal_hourly_cost.)
     const canSee = canSeeInternalCosts(currentUser?.role)
     const safeMembers = (members || []).map(m =>
-      canSee ? m : { ...m, internal_hourly_cost: null },
+      canSee ? m : { ...m, internal_hourly_cost: null, hourly_cost: null },
     )
 
     return NextResponse.json({ members: safeMembers })

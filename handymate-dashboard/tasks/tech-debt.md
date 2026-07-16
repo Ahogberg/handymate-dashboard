@@ -2511,3 +2511,22 @@ Beslut 2026-05-24 (Andreas): vänta. Dashboard desktop-only, mobil-flow via PWA.
 **Lösning (senare):** Normaliseringslager `GeneratedQuoteItem[]/legacy items[] → QuoteItem[]` som skriver quote_items vid INSERT (agent-toolen + ev. andra legacy-skrivare). Motorns `?? total`-fallback gör att detta INTE är akut — beteendet är korrekt, bara utan de nya finesserna.
 
 **Beslutat:** STOPP 2-granskningen produktbank 2026-07-07 (tillägg 4) — byggs medvetet INTE i produktbanks-vågen.
+
+## 2026-07-15 — Säkerhetskvartetten stängd (Våg 1e i perfektions-programmet)
+
+- **TD-4 LÖST:** /api/checkin/approve har nu approve_time-permission-gate
+  (speglar time-entry/approve). Anställda utan behörighet får 403.
+- **TD-59 LÖST:** /api/team strippar nu hourly_cost för icke-owner/admin,
+  identiskt med internal_hourly_cost-strippningen.
+- **TD-71 & TD-77:** verifierade REDAN LÖSTA på main (commits 1cb14b65
+  respektive a738becb) — loggen ovan var inaktuell.
+- **TD-52 (audit körd, ~25 call-sites kartlagda):** de flesta externa
+  agent-utskick ÄR gatade (approval/förtjänad autonomi/ägar-initierat), MEN
+  7 o-gatade fynd kräver produktbeslut (Andreas): nurture-stegen, daglig
+  communication-check-cron, quote-follow-up agent-vägen (round 1/2),
+  tool-routerns send_sms/send_email (rotorsak — ärvs av alla agent-triggers;
+  OBS user-chat-initierade sends är OK/(b), cron-initierade är risken),
+  gmail-lead-import (ärver), project-stages default-automations
+  (CONTRACT_SIGNED/JOB_STARTED/INVOICE_PAID-tack direkt-SMS), och den
+  föreslagna guard-modulen external-action-guard.ts finns inte.
+  Fynden fixas EJ utan beslut — se Våg 1-rapporten.

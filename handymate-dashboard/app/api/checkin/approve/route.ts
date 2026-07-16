@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 
 /**
  * POST /api/checkin/approve — Attestera eller avvisa en incheckning
@@ -8,6 +9,12 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 export async function POST(request: NextRequest) {
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Permission check: kräver approve_time (samma mönster som /api/time-entry/approve)
+  const currentUser = await getCurrentUser(request)
+  if (!currentUser || !hasPermission(currentUser, 'approve_time')) {
+    return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+  }
 
   const body = await request.json()
   const { checkin_id, approval_id, action, adjusted_minutes } = body
