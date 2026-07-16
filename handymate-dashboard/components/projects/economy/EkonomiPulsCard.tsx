@@ -18,8 +18,13 @@ import { useCurrentUser } from '@/lib/CurrentUserContext'
 /**
  * EkonomiPulsCard (Etapp 4b steg 3, 2026-05-23).
  *
- * Mini-version av ekonomi-vyn för Översikt-tabben. Tre kompakta KPI:er
- * (intäkt, fakturerat, marginal) + "Se hela ekonomivyn →"-länk.
+ * Mini-version av ekonomi-vyn för Översikt-tabben. Fyra kompakta KPI:er
+ * (intäkt, fakturerat, material, marginal) + "Se hela ekonomivyn →"-länk.
+ *
+ * TD-20 (2026-07-16): "Material"-rutan lades till här — datan fanns redan
+ * i den hämtade ProjectEconomics-payloaden (kostnader.material_inkop_kr /
+ * material_billable_kr) men renderades aldrig i pulsen. Speglar samma
+ * fält som KostnadCard.tsx "Material"-rad i hela Ekonomi-vyn.
  *
  * KRITISKT — en sanning, två presentationer:
  * Marginal-pulsen MÅSTE visa exakt samma tillstånd som Ekonomi-flikens
@@ -112,7 +117,7 @@ function PulsCardLayout({
   economics: ProjectEconomics
   onOpenFull: () => void
 }) {
-  const { intakter, marginal } = economics
+  const { intakter, kostnader, meta } = economics
   const totalIntakt = intakter.forvantad_intakt_kr
   const fakturerat = intakter.fakturerat_kr
   const fakturatProcent = totalIntakt > 0
@@ -138,7 +143,7 @@ function PulsCardLayout({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5">
         <PulsStat
           label="Intäkt"
           value={formatKr(totalIntakt)}
@@ -154,6 +159,19 @@ function PulsCardLayout({
           value={formatKr(fakturerat)}
           sub={fakturatProcent != null ? `${fakturatProcent}% av intäkt` : 'inget fakturerat än'}
           tone="slate"
+        />
+        <PulsStat
+          label="Material"
+          value={formatKr(kostnader.material_inkop_kr)}
+          sub={
+            kostnader.material_inkop_kr > 0
+              ? kostnader.material_billable_kr > 0
+                ? `varav ${formatKr(kostnader.material_billable_kr)} fakturerbart`
+                : `${meta.supplier_invoice_count} lev.faktura${meta.supplier_invoice_count === 1 ? '' : 'or'}`
+              : 'inget registrerat än'
+          }
+          tone="slate"
+          valueClass={kostnader.material_inkop_kr === 0 ? 'text-slate-400' : undefined}
         />
         <MarginalPuls state={state} economics={economics} />
       </div>
