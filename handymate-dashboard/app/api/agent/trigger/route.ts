@@ -62,6 +62,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // TD-52 (Andreas-beslut 2026-07-15): avgör om agentens send_sms/send_email
+    // ska skicka direkt eller köas för godkännande. Den interna-secret-grenen
+    // ovan bär BÅDE genuint autonoma crons OCH proxade live-konversationer
+    // (dashboard-/mobil-chatt relayas via matte/conversations med intern
+    // secret för att slippa dubbel auth-kod; telefonsamtal/inkommande SMS/
+    // e-post relayas likaså från webhooks) — så källan avgörs av trigger_type,
+    // INTE av vilken auth-gren som bar HTTP-requesten.
+    //  - 'manual'        → en människa skrev instruktionen just nu.
+    //  - 'phone_call'/'incoming_sms'/'email_received' → agentens svar i en
+    //    PÅGÅENDE kundkontakt som kunden själv startade (juli-audit: räknas
+    //    som användarinitierat — att gate:a ett direkt konversationssvar
+    //    vore ett produktfel, inte en säkerhetsvinst).
+    //  - allt annat (cron, agent_handoff, gmail_lead_imported, m.fl.) är
+    //    agenten som agerar autonomt utan att en människa bett om just detta.
+    const CONVERSATIONAL_TRIGGER_TYPES = new Set(['manual', 'phone_call', 'incoming_sms', 'email_received'])
+    const triggerSource: 'user' | 'system' = CONVERSATIONAL_TRIGGER_TYPES.has(trigger_type) ? 'user' : 'system'
+
     const MODEL =
       trigger_type === 'phone_call' || trigger_type === 'incoming_sms'
         ? MODEL_LIVE
@@ -348,6 +365,7 @@ export async function POST(request: NextRequest) {
       contactEmail: bizConfig.contact_email || '',
       googleConnection,
       agentId,
+      triggerSource,
     }
 
     // Build initial user message

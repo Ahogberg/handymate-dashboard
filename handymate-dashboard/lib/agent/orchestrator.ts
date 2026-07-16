@@ -162,7 +162,10 @@ export async function orchestrate(params: OrchestrateParams): Promise<Orchestrat
     }
 
     // 2. Fetch business context
-    const ctx = await fetchBusinessContext(supabase, businessId)
+    // TD-52: orchestrate() drivs uteslutande av events/regler (fireEvent,
+    // v3-automationer, crons) — aldrig av en levande chatt-session — så
+    // triggerSource är alltid 'system' här.
+    const ctx = await fetchBusinessContext(supabase, businessId, 'system')
     if (!ctx) {
       return {
         success: false,

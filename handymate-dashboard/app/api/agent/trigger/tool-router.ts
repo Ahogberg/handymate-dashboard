@@ -6,6 +6,7 @@ import { getCalendarEvents, createGoogleEvent } from '@/lib/google-calendar'
 import { getCustomerEmails, sendGmailEmail } from '@/lib/gmail'
 import { getNextCustomerNumber, getNextProjectNumber, getNextLeadNumber } from '@/lib/numbering'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { shouldQueueForApproval } from '@/lib/autonomy/agent-gating'
 
 interface ToolResult {
   success: boolean
@@ -30,6 +31,15 @@ interface ToolContext {
   contactEmail: string
   googleConnection: GoogleConnection | null
   agentId?: string
+  /**
+   * TD-52: vem/vad initierade den här agent-körningen. 'user' = en
+   * levande människa just nu (dashboard/mobil-chatt, eller ett svar i en
+   * pågående kundkontakt — telefon/SMS/e-post in). 'system' = agenten
+   * agerar autonomt (cron, schemalagd automation, agent-till-agent-
+   * delegering). Styr om send_sms/send_email skickar direkt eller köas
+   * som pending_approvals — se shouldQueueForApproval.
+   */
+  triggerSource: 'user' | 'system'
 }
 
 function generateId(prefix: string): string {
@@ -75,7 +85,7 @@ export async function executeTool(
       case 'send_sms':
         return await sendSms(supabase, businessId, input, context)
       case 'send_email':
-        return await sendEmail(input, context)
+        return await sendEmail(supabase, businessId, input, context)
       case 'read_customer_emails':
         return await readCustomerEmails(input, context)
       case 'qualify_lead':
@@ -575,15 +585,90 @@ async function logTime(
 
 // ── Communications ──────────────────────────────────────
 
+/**
+ * TD-52: köa ett agent-initierat send_sms/send_email som en pending_approval
+ * istället för att skicka direkt. Används när triggerSource === 'system' och
+ * ingen förtjänad autonomi täcker åtgärden (se shouldQueueForApproval).
+ * Payloaden speglar exakt det som executeApprovalPayload (app/api/approvals/
+ * [id]/route.ts) läser för approval_type 'send_sms'/'send_email' — annars
+ * exekveras kortet inte korrekt vid godkännande.
+ */
+async function queueAgentSendForApproval(
+  supabase: SupabaseClient,
+  businessId: string,
+  approvalType: 'send_sms' | 'send_email',
+  title: string,
+  payload: Record<string, unknown>,
+  context: ToolContext
+): Promise<ToolResult> {
+  const id = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+  const { error } = await supabase.from('pending_approvals').insert({
+    id,
+    business_id: businessId,
+    approval_type: approvalType,
+    title,
+    description: (payload.message as string | undefined) || (payload.body as string | undefined) || null,
+    payload: { ...payload, routed_agent: context.agentId || 'matte' },
+    status: 'pending',
+    risk_level: 'high',
+    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  })
+
+  if (error) {
+    return { success: false, error: `Kunde inte köa för godkännande: ${error.message}` }
+  }
+
+  // Push-notis till hantverkaren (fire-and-forget, samma mönster som
+  // createApprovalRequest högrisk-gren nedan).
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+  fetch(`${appUrl}/api/push/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      business_id: businessId,
+      title: 'Nytt att godkänna',
+      body: title,
+      url: '/dashboard/approvals',
+    }),
+  }).catch((err) => console.error('[queueAgentSendForApproval] push failed (non-blocking):', err))
+
+  return {
+    success: true,
+    data: {
+      queued_for_approval: true,
+      approval_id: id,
+      message: 'Utkastet är lagt i godkännande-kön — hantverkaren måste godkänna innan det skickas.',
+    },
+  }
+}
+
 async function sendSms(
   supabase: SupabaseClient, businessId: string,
-  params: Record<string, unknown>, context: { businessName: string }
+  params: Record<string, unknown>, context: ToolContext
 ): Promise<ToolResult> {
   const to = params.to as string
   const message = params.message as string
 
   if (!to.startsWith('+')) return { success: false, error: 'Telefonnumret måste börja med +46' }
   if (message.length > 1600) return { success: false, error: `Meddelandet är ${message.length} tecken (max 1600)` }
+
+  // TD-52 godkännande-gate: system-triggade sends (cron/automation/agent-
+  // handoff) måste godkännas om inte förtjänad autonomi täcker dem. Det
+  // generiska send_sms-verktyget saknar en v3-regel att signaturmatcha mot
+  // (deriveAutonomyKey kräver trigger_type/action_type/trigger_config från
+  // en regel) — det finns alltså ingen härledbar autonomi-nyckel för ett
+  // friformat LLM-tool-anrop, så autonomyGranted är alltid false här.
+  // (De ställen där förtjänad autonomi FAKTISKT bypassar godkännande —
+  // v3-regelmotorn och fakturapåminnelse-cronen — gör det redan uppströms,
+  // innan detta tool-anrop ens sker.)
+  if (shouldQueueForApproval(context.triggerSource, false)) {
+    return await queueAgentSendForApproval(
+      supabase, businessId, 'send_sms',
+      `SMS till ${to}`,
+      { to, message },
+      context
+    )
+  }
 
   // Night block: queue SMS for 08:00 next morning (skip if DISABLE_SMS_NIGHT_BLOCK is set)
   const now = new Date()
@@ -660,8 +745,19 @@ async function sendSms(
 }
 
 async function sendEmail(
+  supabase: SupabaseClient, businessId: string,
   params: Record<string, unknown>, context: ToolContext
 ): Promise<ToolResult> {
+  // TD-52 godkännande-gate — samma resonemang som sendSms ovan.
+  if (shouldQueueForApproval(context.triggerSource, false)) {
+    return await queueAgentSendForApproval(
+      supabase, businessId, 'send_email',
+      `E-post: ${params.subject}`,
+      { to: params.to, subject: params.subject, body: params.body },
+      context
+    )
+  }
+
   // Prefer Gmail API if connected with send scope
   if (context.googleConnection?.gmail_send_scope_granted && context.googleConnection?.gmail_sync_enabled) {
     try {

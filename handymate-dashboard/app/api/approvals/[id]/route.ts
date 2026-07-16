@@ -440,6 +440,37 @@ async function executeApprovalPayload(
         return { action: 'send_sms', ...r }
       }
 
+      case 'send_email': {
+        // TD-52: motsvarighet till 'send_sms' ovan för agentens send_email-
+        // verktyg när det köats för godkännande (system-triggerad, ej
+        // förtjänad autonomi). Minimal — Resend direkt (lib/email.ts), ingen
+        // Gmail-koppling här (den kräver OAuth-token-hantering som redan
+        // sköts av tool-router:ns egen sendEmail för direkta skick).
+        const to = payload.to as string | undefined
+        const subject = payload.subject as string | undefined
+        const bodyText = payload.body as string | undefined
+        if (!to || !subject || !bodyText) {
+          return { action: 'send_email', error: 'payload saknar to, subject eller body' }
+        }
+        const { sendEmail: sendEmailViaResend, logEmail } = await import('@/lib/email')
+        const businessName = await getBusinessName()
+        const r = await sendEmailViaResend({
+          to,
+          subject,
+          html: bodyText.replace(/\n/g, '<br>'),
+          fromName: businessName || 'Handymate',
+        })
+        await logEmail({
+          businessId,
+          customerId: (payload.customer_id as string | undefined) || undefined,
+          to,
+          subject,
+          status: r.success ? 'sent' : 'failed',
+          messageId: r.messageId,
+        })
+        return { action: 'send_email', ok: r.success, error: r.error, message_id: r.messageId }
+      }
+
       case 'send_quote': {
         // Audit-4 Fix DEF (2026-06-02): tidigare URL `/api/quotes/[id]/send`
         // existerade aldrig — failade med 404 silent. Korrekt: `/api/quotes/send`

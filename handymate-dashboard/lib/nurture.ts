@@ -390,6 +390,15 @@ export async function processEnrollmentStep(enrollmentId: string): Promise<{
   const subject = step.subject ? interpolate(step.subject, variables) : undefined
 
   // Send via channel
+  //
+  // TD-52 (Andreas-beslut 2026-07-15): nurture-utskick är MEDVETET UNDANTAGNA
+  // från agent-approval-gaten (lib/autonomy/agent-gating.ts shouldQueueFor-
+  // Approval). Skälet: en nurture-sekvens armeras EXPLICIT av hantverkaren
+  // per kund (opt-in) — varje enskilt steg är alltså redan förhandsgodkänt av
+  // en människa när sekvensen startades, till skillnad från agentens fria
+  // send_sms/send_email-tool-anrop som inte har någon sådan förhandsöverens-
+  // kommelse. Kill-switchen (business_config.agents_globally_paused) hedras
+  // av cronen som driver denna funktion, så ägaren kan alltid stoppa allt.
   let sendResult: { success: boolean; error?: string } = { success: false, error: '' }
 
   if (step.channel === 'sms') {

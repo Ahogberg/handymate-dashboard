@@ -7,6 +7,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { shouldQueueForApproval } from '@/lib/autonomy/agent-gating'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
@@ -278,31 +279,40 @@ async function runDefaultAutomations(
     case SYSTEM_STAGES.CONTRACT_SIGNED:
       // Lars bekräftar mot kund
       if (customerPhone) {
-        await sendSMS(
-          customerPhone,
-          `Hej! Vi har mottagit er signerade offert för ${projectName}. Vi återkommer snart med startdatum. // ${companyName}`,
-          businessId
-        )
+        await sendStageSms({
+          businessId,
+          to: customerPhone,
+          message: `Hej! Vi har mottagit er signerade offert för ${projectName}. Vi återkommer snart med startdatum. // ${companyName}`,
+          title: `Lars: SMS — kontrakt signerat (${projectName})`,
+          routedAgent: 'lars',
+          project,
+        })
       }
       break
 
     case SYSTEM_STAGES.JOB_STARTED:
       if (customerPhone) {
-        await sendSMS(
-          customerPhone,
-          `Hej! Vi har nu startat arbetet med ${projectName}. Följ projektets framsteg i din portal. // ${companyName}`,
-          businessId
-        )
+        await sendStageSms({
+          businessId,
+          to: customerPhone,
+          message: `Hej! Vi har nu startat arbetet med ${projectName}. Följ projektets framsteg i din portal. // ${companyName}`,
+          title: `Lars: SMS — jobb startat (${projectName})`,
+          routedAgent: 'lars',
+          project,
+        })
       }
       break
 
     case SYSTEM_STAGES.INVOICE_PAID:
       if (customerPhone) {
-        await sendSMS(
-          customerPhone,
-          `Tack för betalningen! Det var ett nöje att jobba med er. // ${companyName}`,
-          businessId
-        )
+        await sendStageSms({
+          businessId,
+          to: customerPhone,
+          message: `Tack för betalningen! Det var ett nöje att jobba med er. // ${companyName}`,
+          title: `Karin: SMS — betalning mottagen (${projectName})`,
+          routedAgent: 'karin',
+          project,
+        })
       }
       // Schemalägg recensionsförfrågan +3 dagar
       await supabase.from('pending_approvals').insert({
@@ -384,6 +394,60 @@ async function executeAutomation(
 
 // Suppress unused-warning eftersom funktionen är @deprecated men behållen.
 void executeAutomation
+
+/**
+ * TD-52 (Andreas-beslut 2026-07-15): default-automationernas kund-SMS vid
+ * stage-övergångar är system-triggade (ingen människa bad om just detta
+ * enskilda SMS) — samma princip som resten av filens automationer (se
+ * SÄKERHETSFIX 2026-05-20-kommentaren ovan i triggerStageAutomations).
+ * Ingen av de tre händelserna (kontrakt signerat/jobb startat/betalning
+ * mottagen) mappar mot en förtjänad-autonomi-nyckel (lib/autonomy/
+ * earned-autonomy.ts AutonomyKey — bara fakturapåminnelse/boknings-
+ * påminnelse/offertuppföljning/recensionsförfrågan finns), så
+ * shouldQueueForApproval('system', false) är alltid true idag. Skriven
+ * via den delade gate-funktionen (inte hårdkodad `if`) så beslutet är
+ * samma testade sanning som agentens send_sms/send_email-tool använder.
+ */
+async function sendStageSms(opts: {
+  businessId: string
+  to: string
+  message: string
+  title: string
+  routedAgent: 'lars' | 'karin'
+  project: any
+}) {
+  const autonomyGranted = false // ingen allowlistad nyckel för stage-notiser (se kommentar ovan)
+  if (shouldQueueForApproval('system', autonomyGranted)) {
+    const supabase = getServerSupabase()
+    const { error } = await supabase.from('pending_approvals').insert({
+      id: 'appr_' + Math.random().toString(36).substring(2, 14),
+      business_id: opts.businessId,
+      approval_type: 'send_sms',
+      title: opts.title,
+      description: opts.message,
+      payload: {
+        to: opts.to,
+        message: opts.message,
+        customer_id: opts.project.customer_id,
+        customer_name: opts.project.customer?.name,
+        project_id: opts.project.project_id,
+        project_name: opts.project.name,
+        // related_id → executor (app/api/approvals/[id]/route.ts, case 'send_sms')
+        // läser payload.related_id för sms_log.related_id-spårning.
+        related_id: opts.project.project_id,
+        routed_agent: opts.routedAgent,
+      },
+      status: 'pending',
+      risk_level: 'low',
+      expires_at: new Date(Date.now() + 7 * 24 * 3600000).toISOString(),
+    })
+    if (error) console.error('[project-stages] sendStageSms: pending_approvals insert failed:', error)
+    return
+  }
+  // Oåtkomlig idag (autonomyGranted är alltid false ovan) — bevarad om en
+  // framtida allowlistad nyckel täcker dessa händelser.
+  await sendSMS(opts.to, opts.message, opts.businessId)
+}
 
 async function sendSMS(phone: string, message: string, businessId: string) {
   try {

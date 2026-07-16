@@ -2530,3 +2530,17 @@ Beslut 2026-05-24 (Andreas): vänta. Dashboard desktop-only, mobil-flow via PWA.
   (CONTRACT_SIGNED/JOB_STARTED/INVOICE_PAID-tack direkt-SMS), och den
   föreslagna guard-modulen external-action-guard.ts finns inte.
   Fynden fixas EJ utan beslut — se Våg 1-rapporten.
+
+## 2026-07-15 (kväll) — TD-52-gatingen BYGGD (Andreas-beslut verkställt)
+
+Fynden #2–#6 ur dagens audit är åtgärdade via trigger-kontext-gate:
+ToolContext.triggerSource ('user'|'system', härledd från trigger_type — INTE
+auth-gren, eftersom internal-secret bär både crons och proxade chattar);
+send_sms/send_email köar som pending_approvals vid system-trigger (ren
+beslutsfunktion lib/autonomy/agent-gating.ts, facit-låst); project-stages
+default-SMS går via kön; ny executor-case send_email (Resend). Nurture
+UNDANTAGEN per beslut (ägar-armerad, kommenterad). #7 delvis: agent-gating.ts
+är nu guard-modulen. KVAR/flaggat: (i) agent_handoff gate:as även i
+användarstartade kedjor (över-gating, medvetet konservativt — Andreas kan
+lätta senare), (ii) förtjänad autonomi är inert på generiska tool-vägen tills
+en kontext-nyckel plumbas in i ToolContext (v3-regelmotorns autonomi opåverkad).

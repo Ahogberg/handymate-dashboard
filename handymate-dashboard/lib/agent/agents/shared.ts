@@ -45,6 +45,13 @@ export interface ToolContext {
   businessName: string
   contactEmail: string
   googleConnection: GoogleConnection | null
+  /**
+   * TD-52: alla subagenter som går via denna delade loop (orchestrator →
+   * lead/ekonomi/strategi-agent) triggas av events/regler — aldrig av en
+   * levande chatt — så anroparen (orchestrator.ts) sätter alltid 'system'.
+   * matte/chat/route.ts (session-auth dashboard-chatt) sätter 'user'.
+   */
+  triggerSource: 'user' | 'system'
 }
 
 export interface GoogleConnection {
@@ -98,7 +105,8 @@ export function filterTools(
 
 export async function fetchBusinessContext(
   supabase: SupabaseClient,
-  businessId: string
+  businessId: string,
+  triggerSource: 'user' | 'system'
 ): Promise<BusinessContext | null> {
   // Fetch business config
   const { data: bizConfig } = await supabase
@@ -248,6 +256,7 @@ export async function fetchBusinessContext(
       businessName: bizConfig.business_name || 'Handymate',
       contactEmail: bizConfig.contact_email || '',
       googleConnection,
+      triggerSource,
     },
   }
 }

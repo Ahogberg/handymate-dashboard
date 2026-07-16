@@ -645,11 +645,14 @@ export async function POST(request: NextRequest) {
     // Verktygskontext för de delade tool-router-verktygen (samma som den
     // autonoma agenten) — ger bl.a. Google-koppling för kalender/bokning.
     const supabase = getServerSupabase()
-    const bizCtx = await fetchBusinessContext(supabase, businessId)
+    // TD-52: detta är en levande dashboard-/mobil-chatt (session-auth ovan
+    // via getAuthenticatedBusiness) — triggerSource är alltid 'user'.
+    const bizCtx = await fetchBusinessContext(supabase, businessId, 'user')
     const toolContext: ToolContext = bizCtx?.toolContext ?? {
       businessName,
       contactEmail: '',
       googleConnection: null,
+      triggerSource: 'user',
     }
 
     // ── Thread-state ────────────────────────────────────────────────────
