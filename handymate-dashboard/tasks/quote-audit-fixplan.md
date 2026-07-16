@@ -6,7 +6,7 @@ item_type överlever); ALLA rotfel ligger i render-lagret. Panelerna är tunna
 wrappers runt delade renderare → fixar i delade lagret når new+edit+mobil._
 
 ## Batch 1 — KRITISKT (kunden ser fel/inget)
-- [ ] **T1 Render-sanningen:** `lib/quote-templates/data-builder.ts:55` filtrerar bort
+- [x] **T1 Render-sanningen:** ✅ KLAR 2026-07-15 (mall-delen fixad tidigare; resten — preview-payloads description:null + ModernCanvas-merge — fixad efter pilotens Bee-feedback: "Offertbeskrivningen som är valfri behöver synas redan i utkastet". Samma commit: logga i offert-PDF:en.) `lib/quote-templates/data-builder.ts:55` filtrerar bort
       heading/text/subtotal/discount → saknas i Slutdesign-preview OCH skarpa
       dokumentet. Fix: `itemType` i `QuoteTemplateItem`, mappa alla typer, rendera i
       modern/premium/friendly. + `white-space: pre-line` på alla textblock (intro/
