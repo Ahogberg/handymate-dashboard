@@ -31,21 +31,30 @@ projekt-avslut till approval-kön. Låg risk, hög kassaflödeseffekt. Kan bygga
 autonomt efter godkänt.
 
 ### Del 2 — Kund betalar → appen VET (avstämning)
-Det svåra. Här är verkligheten:
+**VERIFIERAT 2026-07-17 (webbresearch mot officiella källor — inga
+[VERIFIERA]-flaggor kvar):**
 
-**Swish Handel-kravet [VERIFIERA]:** Swish för företag (Swish Handel) kräver
-att VARJE företag har eget avtal med sin bank + eget Swish-certifikat. En SaaS
-kan inte vara "merchant" åt alla hantverkare — pengarna går till hantverkarens
-konto, så var och en behöver eget Swish Handel-nummer. SaaS:en kan vara
-*teknisk integratör* (skapa payment requests med callbackUrl mot Swish
-m-commerce-API), men hantverkaren måste ändå skaffa eget avtal + cert. →
-Betyder onboarding-friktion per hantverkare.
+**Stripe-Swish: JA, GA.** Stripe stödjer Swish som betalmetod, generellt
+tillgängligt, INGEN svensk Stripe-entitet krävs (28 EU-länder), aktiveras per
+konto i Dashboard, fungerar med Checkout/Payment Links. Avgift: **1 % + 3 kr,
+TAKAD PÅ 7 KR per transaktion** — på en 20 000 kr-faktura = 7 kr. Webhook
+`payment_intent.succeeded` ger omedelbar avstämning. Caveat: "Stripe" står
+som mottagare i kundens Swish-app (hantverkarens namn i meddelandefältet).
+Källa: docs.stripe.com/payments/swish + stripe.com/pricing.
 
-**Stripe-Swish [VERIFIERA — troligen tillgängligt, osäker på 2026-status]:**
-Stripe lade till Swish som betalmetod för svenska företag (~2024-2025). Om
-tillgängligt 2026 är det attraktivt (Stripe redan integrerat för prenumeration)
-— MEN kräver att varje hantverkare kopplar eget Stripe-konto (Connect), vilket
-är egen onboarding.
+**Swish Handel native:** teknisk leverantörs-modell FINNS (SaaS:en certifierar
+sig hos getswish och använder eget certifikat åt alla) — MEN varje hantverkare
+måste ändå teckna eget Swish Handel-avtal med sin bank (~85–500 kr/mån +
+1,50–4 kr/transaktion beroende på bank). Callback-API:t är solitt
+(callbackUrl + payeePaymentReference för faktura-matchning, MSS-sandbox finns).
+Källa: swish.nu/vill-du-bli-partner + developer.swish.nu + Danske Bank.
+
+**Slutsats — Stripe vinner på fakturabelopp:** 7 kr-taket gör Stripe
+BILLIGARE än native Swish Handel för hantverkarfakturor så fort man räknar
+bankens månadsavgift, och Connect-onboarding (självservice) slår
+bankavtals-friktion per hantverkare. Native-vägen lönar sig först vid hög
+volym per hantverkare — och kan byggas senare utan schemaändring om vi
+matchar fakturor via egen referens redan i Stripe-bygget.
 
 **Fortnox-avstämning (finns redan):** för Fortnox-kopplade hantverkare stäms
 bankgiro/OCR av via Fortnox — den pragmatiska RIKTIGA avstämningen finns redan.
@@ -62,13 +71,16 @@ MEN Fortnox är licens-blockerat (149 kr/mån, [[fortnox-license-model]]).
    utan något Swish Handel-avtal. **Ärligt > fejkad auto-betald.**
 3. Där Fortnox är kopplat: visa Fortnox-avstämd betald-status automatiskt (finns).
 
-**Fas 2 (riktig auto-avstämning — affärs-/onboarding-beslut, egen sprint):**
-Utvärdera tre vägar när piloten visar volym:
-- **Stripe-Swish** (om 2026-tillgängligt): återbrukar Stripe, kräver Connect-
-  onboarding per hantverkare. [VERIFIERA tillgänglighet + svensk entitet-krav]
-- **Swish Handel direkt**: varje hantverkares eget avtal + cert, SaaS som
-  teknisk integratör med callbackUrl. Mest "svenskt" men mest onboarding.
-- **Luta på Fortnox** (redan byggt) för de som ändå har licensen.
+**Fas 2 (riktig auto-avstämning) — REKOMMENDATION EFTER VERIFIERING 2026-07-17:
+Stripe Connect + Swish.** En integration, per-hantverkare Connect-konton
+(självservice, noll bankpapper), Swish aktiverat per konto, webhook →
+automatisk mark-paid via befintliga `lib/invoices/apply-payment.ts`. 7 kr max
+per faktura. Designkrav: matcha fakturor via egen referens (payeePayment-
+Reference-mönstret) så en framtida native Swish Handel-väg (teknisk
+leverantörs-certifiering hos getswish) kan slottas in utan schemaändring om
+volymen motiverar det. Fortnox-avstämningen kvarstår parallellt för
+licens-kunder. Byggs som egen sprint när Andreas ger klartecken —
+Fas 1 ("Jag har betalat", DEPLOYAD 2026-07-15) täcker tills dess.
 
 ## Öppna beslut för Andreas
 1. Bygga Del 1 (jobb klart → fakturautkast i kön) nu autonomt? (Rek. JA —
