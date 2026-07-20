@@ -54,10 +54,10 @@ Allt nedan är i `main` och pushat (= auto-deployat kodmässigt) om inget annat 
 | **Facit-tester** — playwright-facit för instant-value, Fortnox-fakturamappning, produktbank (Christoffers scenario a-h) | 07-08/09 | Testerna gröna lokalt |
 | **Idag-vy-omdesign** (desktop + mobil, från Claude Design) | 07-11 | **BRANCH** — `feat/idag-vy-redesign` (desktop klar, tsc+build rent) + mobil under byggnad. EJ mergad, EJ i prod |
 
-**Migrations-grindar (manuella Supabase-körningar):** v67 ✅ KÖRD & verifierad.
-**v68/v69/v70/v71: körd-status EJ dokumenterad** — verifiera i Supabase FÖRE demo
-(offert-identitet, billing-kolumner, Fortnox-kundimport och dokument-API/projektflytt-fixarna
-beror på dem; runbooken flaggar själv v69 som osäker).
+**Migrations-grindar (manuella Supabase-körningar):** v67 ✅ · v68 ✅ · v70 ✅ ·
+v71 ✅ (verifierade i prod 2026-07-19). **v69 KÖRD 2026-07-20** (billing_period-
+kolumner + billing_plan.limits) — därmed är HELA migrations-grinden grön och
+B7-testköpets DB-facit (billing_period_start) kan uppfyllas.
 
 ---
 
