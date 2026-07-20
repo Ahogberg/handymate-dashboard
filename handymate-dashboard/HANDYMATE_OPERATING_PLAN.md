@@ -52,7 +52,7 @@ uppdaterar dokument och mätetavla. Rapporterar per våg/vecka.
       (SISTA steget — bygget är redan klart och väntar). Bjud in Christoffer.
 - [ ] B7 Stripe-testköp: klistra sk_test/pk_test → Claude automatiserar
       resten av riggen → kort 4242 → `subscription_status='active'` bevisat.
-- [ ] v68–v71 migrations-koll i Supabase (5 min SQL, Claude levererar frågan).
+- [x] v68–v71 migrations-koll i Supabase — ✅ KLAR 2026-07-20 (v69 kördes, hela grinden grön).
 - [ ] Supabase-länk för typgenerering (2 min, stoppar typ-drift-klassen).
 
 **Case-studyn (Andreas + Christoffer, ~2 timmar):**
