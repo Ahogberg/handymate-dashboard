@@ -14,6 +14,7 @@ interface Business {
   trial_ends_at: string | null
   onboarding_step: number
   onboarding_completed_at: string | null
+  created_at?: string
 }
 
 export function useAuth(requireAuth = true) {

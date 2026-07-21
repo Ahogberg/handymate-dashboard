@@ -173,7 +173,13 @@ export async function GET(request: NextRequest) {
             risk_level: 'medium',
             expires_at: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString(),
           })
-          if (apprErr) console.error('[quote-follow-up] nudge approval insert failed:', q.quote_id, apprErr)
+          if (apprErr) {
+            console.error('[quote-follow-up] nudge approval insert failed:', q.quote_id, apprErr)
+          } else {
+            // Touchpoint 3 (onboarding-följeskrift): första-händelse-SMS till ägaren.
+            const { sendFirstEventSms } = await import('@/lib/onboarding/first-event-sms')
+            await sendFirstEventSms(q.business_id, 'quote_followup', customer.name || '')
+          }
           continue
         }
 

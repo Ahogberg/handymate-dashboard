@@ -338,6 +338,7 @@ if (action === 'login') {
           subscription_plan,
           onboarding_step: business.onboarding_step ?? 1,
           onboarding_completed_at: business.onboarding_completed_at ?? null,
+          created_at: business.created_at ?? null,
         }
       })
     }

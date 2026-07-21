@@ -63,11 +63,27 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     if (handled !== '1' && !answered && businessId && from) {
       const { getServerSupabase } = await import('@/lib/supabase')
       const { fireEvent } = await import('@/lib/automation-engine')
-      await fireEvent(getServerSupabase(), 'call_missed', businessId, {
+      const supabase = getServerSupabase()
+      await fireEvent(supabase, 'call_missed', businessId, {
         phone: from,
         call_id: callId,
       })
       console.log('[voice/missed] missat samtal → call_missed fyrat (catch-SMS)')
+
+      // Touchpoint 3 (onboarding-följeskrift): första-händelse-SMS till ägaren.
+      // Icke-blockerande — fångar aldrig upp huvudflödet om det failar.
+      try {
+        const { data: customer } = await supabase
+          .from('customer')
+          .select('name')
+          .eq('business_id', businessId)
+          .eq('phone_number', from)
+          .maybeSingle()
+        const { sendFirstEventSms } = await import('@/lib/onboarding/first-event-sms')
+        await sendFirstEventSms(businessId, 'missed_call', customer?.name || '')
+      } catch (err) {
+        console.error('[voice/missed] first-event-sms lookup error (non-blocking):', err)
+      }
     }
   } catch (err) {
     console.error('[voice/missed] error (non-blocking):', err)

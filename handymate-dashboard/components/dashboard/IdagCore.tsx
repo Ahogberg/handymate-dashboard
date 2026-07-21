@@ -421,7 +421,7 @@ export default function IdagCore({
   return (
     <div>
       {/* ── 1. Bevisband ── */}
-      <ProofBand summary={teamSummary} pending={queueLoaded ? pending : null} />
+      <ProofBand summary={teamSummary} pending={queueLoaded ? pending : null} createdAt={business?.created_at ?? null} />
 
       {/* ── 2. Agentremsa (riktig data, befintlig komponent) ── */}
       <TeamActivityStrip onLoaded={handleStripLoaded} />
@@ -647,7 +647,20 @@ export default function IdagCore({
 }
 
 // ── Bevisband ──
-function ProofBand({ summary, pending }: { summary: TeamActivitySummary | null; pending: number | null }) {
+// Touchpoint 2 (dag 1–7-varianten) — se tasks/onboarding-foljeskrift.md.
+// Ett splitternytt konto (< 3 dagar gammalt) har typiskt inget att visa än;
+// cold-start-texten sätter rätt förväntan istället för en tom/död yta.
+const NEW_ACCOUNT_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000
+
+function ProofBand({
+  summary,
+  pending,
+  createdAt,
+}: {
+  summary: TeamActivitySummary | null
+  pending: number | null
+  createdAt?: string | null
+}) {
   const parts: string[] = []
   if (summary) {
     if (summary.total_calls > 0) parts.push(`tog ${summary.total_calls} samtal`)
@@ -659,8 +672,12 @@ function ProofBand({ summary, pending }: { summary: TeamActivitySummary | null; 
     }
   }
 
+  const isNewAccount = !!createdAt && (Date.now() - new Date(createdAt).getTime()) < NEW_ACCOUNT_MAX_AGE_MS
+
   const activityText = parts.length === 0
-    ? 'Teamet är på plats — inget nytt att hantera sedan igår kväll.'
+    ? isNewAccount
+      ? 'Ditt team lär känna företaget. Om ett par dagar börjar du se dem jobba här.'
+      : 'Teamet är på plats — inget nytt att hantera sedan igår kväll.'
     : parts.length === 1
       ? `Sedan igår kväll ${parts[0]} teamet`
       : `Sedan igår kväll ${parts.slice(0, -1).join(', ')} och ${parts[parts.length - 1]} teamet`

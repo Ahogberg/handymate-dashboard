@@ -15,23 +15,97 @@ interface AgentDisplay {
   icon: typeof Phone
   bg: string
   ring: string
+  /** Konkreta exempel (visas endast på desktop) — ärlighetsgranskade texter, ändra inte innebörden. */
+  examples: [string, string]
 }
 
 // Aktivitets-loop + färgmappning per agent — matchar Claude Design.
+// OBS Lisa: "Svarar i telefonen" är FÖRBJUDEN copy (låter som talande röst-AI,
+// vilket produkten inte har) — hon fångar samtal + skickar SMS.
 const AGENT_DISPLAY: Record<string, AgentDisplay> = {
-  lisa:   { id: 'lisa',   activity: 'Svarar i telefonen',  icon: Phone,     bg: '#E0F2FE', ring: '#0EA5E9' },
-  karin:  { id: 'karin',  activity: 'Skickar fakturor',    icon: FileText,  bg: '#DBEAFE', ring: '#2563EB' },
-  daniel: { id: 'daniel', activity: 'Förbereder offert',   icon: FileSignature, bg: '#FEF3C7', ring: '#D97706' },
-  lars:   { id: 'lars',   activity: 'Bekräftar bokningar', icon: Calendar,  bg: '#D1FAE5', ring: '#059669' },
-  hanna:  { id: 'hanna',  activity: 'Skickar SMS-kampanj', icon: Megaphone, bg: '#EDE9FE', ring: '#9333EA' },
+  lisa: {
+    id: 'lisa',
+    activity: 'Fångar samtalen du missar',
+    icon: Phone,
+    bg: '#E0F2FE',
+    ring: '#0EA5E9',
+    examples: [
+      'Missat samtal 14:02 → kunden får ett svars-SMS inom 30 sekunder',
+      'Ny förfrågan sparas med anteckningar — redo att ringa upp',
+    ],
+  },
+  karin: {
+    id: 'karin',
+    activity: 'Skickar fakturor',
+    icon: FileText,
+    bg: '#DBEAFE',
+    ring: '#2563EB',
+    examples: [
+      'Faktura förfallen i 5 dagar → vänlig påminnelse redo i din kö',
+      'Räknar ROT-avdraget rätt — 30 % på arbetet, automatiskt',
+    ],
+  },
+  daniel: {
+    id: 'daniel',
+    activity: 'Förbereder offert',
+    icon: FileSignature,
+    bg: '#FEF3C7',
+    ring: '#D97706',
+    examples: [
+      'Offert utan svar sedan i tisdags → föreslår en uppföljning',
+      'Ser vilka offerter som brukar gå hem — och varför',
+    ],
+  },
+  lars: {
+    id: 'lars',
+    activity: 'Bekräftar bokningar',
+    icon: Calendar,
+    bg: '#D1FAE5',
+    ring: '#059669',
+    examples: [
+      'Bokning imorgon 07:00 → bekräftelse-SMS till kunden ikväll',
+      'Flaggar när ett projekt börjar dra över tid',
+    ],
+  },
+  hanna: {
+    id: 'hanna',
+    activity: 'Skickar SMS-kampanj',
+    icon: Megaphone,
+    bg: '#EDE9FE',
+    ring: '#9333EA',
+    examples: [
+      "Tunn vecka framöver → föreslår 'vi har lediga tider'-SMS till gamla kunder",
+      'Väcker offerter som aldrig blev av',
+    ],
+  },
 }
 
 const REVEAL_ORDER = ['lisa', 'karin', 'daniel', 'lars', 'hanna'] as const
+
+/**
+ * Desktop-detektering för inline-styles (≥768px). Lyssnar på matchMedia-
+ * ändringar så layouten följer med vid fönster-resize. SSR-säkert: startar
+ * false (mobil-layouten) och uppdateras direkt efter mount.
+ */
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(false)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const update = () => setIsDesktop(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+
+  return isDesktop
+}
 
 export default function Step1MeetTheTeam({ onNext }: Step1Props) {
   const [revealed, setRevealed] = useState(0)
   const [showSkip, setShowSkip] = useState(false)
   const [done, setDone] = useState(false)
+  const isDesktop = useIsDesktop()
 
   useEffect(() => {
     const skipTimer = setTimeout(() => setShowSkip(true), 1200)
@@ -94,10 +168,12 @@ export default function Step1MeetTheTeam({ onNext }: Step1Props) {
                 role={agent.role}
                 avatar={agent.avatar || ''}
                 activity={display.activity}
+                examples={display.examples}
                 Icon={display.icon}
                 bg={display.bg}
                 ring={display.ring}
                 revealed={i < revealed}
+                isDesktop={isDesktop}
               />
             )
           })}
@@ -126,20 +202,23 @@ interface AgentRowProps {
   role: string
   avatar: string
   activity: string
+  examples: [string, string]
   Icon: typeof Phone
   bg: string
   ring: string
   revealed: boolean
+  isDesktop: boolean
 }
 
-function AgentRow({ name, role, avatar, activity, Icon, bg, ring, revealed }: AgentRowProps) {
+function AgentRow({ name, role, avatar, activity, examples, Icon, bg, ring, revealed, isDesktop }: AgentRowProps) {
+  const avatarSize = isDesktop ? 76 : 48
   return (
     <div
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 14,
-        padding: '14px 14px',
+        gap: isDesktop ? 18 : 14,
+        padding: isDesktop ? '16px 18px' : '14px 14px',
         background: 'var(--ob-surface)',
         border: '1px solid var(--ob-border)',
         borderRadius: 'var(--ob-r-lg)',
@@ -153,8 +232,8 @@ function AgentRow({ name, role, avatar, activity, Icon, bg, ring, revealed }: Ag
       <div style={{ position: 'relative', flexShrink: 0 }}>
         <div
           style={{
-            width: 48,
-            height: 48,
+            width: avatarSize,
+            height: avatarSize,
             borderRadius: '50%',
             background: bg,
             backgroundImage: avatar ? `url(${avatar})` : undefined,
@@ -169,8 +248,8 @@ function AgentRow({ name, role, avatar, activity, Icon, bg, ring, revealed }: Ag
               position: 'absolute',
               bottom: -2,
               right: -2,
-              width: 14,
-              height: 14,
+              width: isDesktop ? 18 : 14,
+              height: isDesktop ? 18 : 14,
               background: 'var(--ob-green-600)',
               border: '2px solid var(--ob-surface)',
               borderRadius: '50%',
@@ -181,8 +260,8 @@ function AgentRow({ name, role, avatar, activity, Icon, bg, ring, revealed }: Ag
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-          <strong style={{ fontSize: 15, color: 'var(--ob-ink)' }}>{name}</strong>
-          <span style={{ fontSize: 12, color: 'var(--ob-muted)' }}>{role}</span>
+          <strong style={{ fontSize: isDesktop ? 18 : 15, color: 'var(--ob-ink)' }}>{name}</strong>
+          <span style={{ fontSize: isDesktop ? 14 : 12, color: isDesktop ? 'var(--ob-ink-2)' : 'var(--ob-muted)' }}>{role}</span>
         </div>
         <div
           style={{
@@ -198,6 +277,36 @@ function AgentRow({ name, role, avatar, activity, Icon, bg, ring, revealed }: Ag
           <Icon size={14} />
           <span style={{ color: 'var(--ob-ink-2)' }}>{activity}</span>
         </div>
+        {isDesktop && (
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {examples.map(example => (
+              <div
+                key={example}
+                style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  gap: 8,
+                  fontSize: 13,
+                  lineHeight: 1.45,
+                  color: 'var(--ob-muted)',
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    flexShrink: 0,
+                    width: 4,
+                    height: 4,
+                    borderRadius: '50%',
+                    background: ring,
+                    alignSelf: 'center',
+                  }}
+                />
+                <span>{example}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <span
         style={{
