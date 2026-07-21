@@ -38,7 +38,10 @@ async function runDay7Followup() {
   try {
     const supabase = getServerSupabase()
     const now = Date.now()
-    const from = new Date(now - 8 * 24 * 3600_000).toISOString()
+    // 7–10 dagar (inte exakt 7–8): flaggan onboarding_day7_email hindrar
+    // dubbletter, och det bredare fönstret gör att en missad cron-körning
+    // självläker nästa dag istället för att kontot missar mailet permanent.
+    const from = new Date(now - 10 * 24 * 3600_000).toISOString()
     const to = new Date(now - 7 * 24 * 3600_000).toISOString()
 
     const { data: candidates, error } = await supabase
