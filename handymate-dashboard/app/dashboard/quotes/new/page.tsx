@@ -264,6 +264,7 @@ export default function NewQuotePage() {
   const [previewMode, setPreviewMode] = useState<'live' | 'design' | 'compact'>('live')
   const [debouncedPreviewData, setDebouncedPreviewData] = useState<QuotePreviewData | null>(null)
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const descriptionWarningShownRef = useRef(false)
 
   // ─── Shared hooks ──────────────────────────────────────────────────
   const {
@@ -365,6 +366,7 @@ export default function NewQuotePage() {
         items,
         discountPercent,
         vatRate,
+        description,
         introductionText,
         conclusionText,
         notIncluded,
@@ -383,7 +385,7 @@ export default function NewQuotePage() {
       if (previewTimerRef.current) clearTimeout(previewTimerRef.current)
     }
   }, [
-    title, selectedCustomerObj, validDays, items, discountPercent, vatRate,
+    title, selectedCustomerObj, validDays, items, discountPercent, vatRate, description,
     introductionText, conclusionText, notIncluded, ataTerms, paymentPlan,
     referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices, showQuantities,
     localCustomCategories,
@@ -589,6 +591,7 @@ export default function NewQuotePage() {
     const transcript = searchParams?.get('transcript')
     const customerId = searchParams?.get('customerId') || searchParams?.get('customer_id')
     const prefillTitle = searchParams?.get('title')
+    const prefillDescription = searchParams?.get('description')
     const dealId = searchParams?.get('deal_id') || searchParams?.get('lead_id')
     if (transcript) {
       setSourceTranscript(transcript)
@@ -597,6 +600,7 @@ export default function NewQuotePage() {
     }
     if (customerId) setSelectedCustomer(customerId)
     if (prefillTitle) setTitle(prefillTitle)
+    if (prefillDescription) setDescription(prefillDescription)
     if (!referencePerson && business.contact_name) setReferencePerson(business.contact_name)
     if (dealId && customerId) fetchDealDocuments(customerId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1181,6 +1185,11 @@ export default function NewQuotePage() {
       toast.warning('Välj en kund först för att skicka offerten')
       return
     }
+    if (send && !description.trim() && !descriptionWarningShownRef.current) {
+      descriptionWarningShownRef.current = true
+      toast.warning('Offerten saknar beskrivning. Lägg till en kort beskrivning, eller klicka Skicka igen för att fortsätta.')
+      return
+    }
     if (paymentPlan.length > 0 && !paymentPlanValid) {
       toast.warning('Betalningsplanens procentsatser måste summera till 100%')
       return
@@ -1402,6 +1411,7 @@ export default function NewQuotePage() {
               customerPriceListInfo={customerPriceListInfo}
               items={items}
               setItems={setItems}
+              hasItems={items.length > 0}
             />
 
             <QuoteNewItemsSection

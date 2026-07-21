@@ -64,6 +64,7 @@ export const toolDefinitions = [
       properties: {
         customer_id: { type: "string" },
         title: { type: "string" },
+        description: { type: "string", description: "Kort beskrivning av vad offerten avser — visas för kunden" },
         items: {
           type: "array",
           items: {
@@ -81,7 +82,7 @@ export const toolDefinitions = [
         rot_rut_type: { type: "string", enum: ["rot", "rut"] },
         valid_days: { type: "number" },
       },
-      required: ["customer_id", "title", "items"],
+      required: ["customer_id", "title", "description", "items"],
     },
   },
   {

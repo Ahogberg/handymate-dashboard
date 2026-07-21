@@ -256,7 +256,7 @@ async function createQuote(
   const quoteId = generateId('quote')
   const { error } = await supabase.from('quotes').insert({
     quote_id: quoteId, business_id: businessId, customer_id: params.customer_id,
-    title: params.title, status: 'draft', items,
+    title: params.title, description: (params.description as string) ?? null, status: 'draft', items,
     labor_total: laborTotal, material_total: materialTotal,
     subtotal, vat_rate: vatRate, vat_amount: vatAmount, total,
     rot_rut_type: rotRutType,

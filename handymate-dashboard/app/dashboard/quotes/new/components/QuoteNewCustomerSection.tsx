@@ -1,6 +1,6 @@
 'use client'
 
-import { ClipboardList, User } from 'lucide-react'
+import { AlertTriangle, ClipboardList, User } from 'lucide-react'
 import { createDefaultItem } from '@/lib/quote-calculations'
 import type { QuoteItem } from '@/lib/types/quote'
 
@@ -37,6 +37,7 @@ interface QuoteNewCustomerSectionProps {
   customerPriceListInfo: CustomerPriceListInfo | null
   items: QuoteItem[]
   setItems: React.Dispatch<React.SetStateAction<QuoteItem[]>>
+  hasItems: boolean
 }
 
 const INPUT_CLS =
@@ -60,6 +61,7 @@ export function QuoteNewCustomerSection({
   customerPriceListInfo,
   items,
   setItems,
+  hasItems,
 }: QuoteNewCustomerSectionProps) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6">
@@ -158,7 +160,7 @@ export function QuoteNewCustomerSection({
 
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-            Beskrivning <span className="normal-case font-medium text-slate-400">(valfri)</span>
+            Beskrivning <span className="normal-case font-medium text-slate-400">(rekommenderas)</span>
           </label>
           <textarea
             value={description}
@@ -167,6 +169,12 @@ export function QuoteNewCustomerSection({
             rows={2}
             className={`${INPUT_CLS} resize-y leading-relaxed`}
           />
+          {!description.trim() && hasItems && (
+            <p className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-700">
+              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+              Beskriv vad offerten avser — det är det första kunden läser.
+            </p>
+          )}
         </div>
       </div>
     </div>

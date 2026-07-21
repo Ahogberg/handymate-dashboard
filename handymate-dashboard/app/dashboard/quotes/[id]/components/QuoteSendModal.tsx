@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import {
   AlertTriangle,
   FileText,
@@ -70,6 +71,19 @@ export function QuoteSendModal({
         </div>
 
         <div className="px-6 py-4 space-y-4">
+          {/* Beskrivning saknas */}
+          {!quote.description?.trim() && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <span className="text-xs text-amber-800 flex-1">
+                Offerten saknar beskrivning.{' '}
+                <Link href={`/dashboard/quotes/${quote.quote_id}/edit`} className="underline font-medium hover:text-amber-900">
+                  Lägg till i redigeraren
+                </Link>
+              </span>
+            </div>
+          )}
+
           {/* Daniel's intelligence warning */}
           {quoteIntelligence?.show_warning && quoteIntelligence.analysis && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
