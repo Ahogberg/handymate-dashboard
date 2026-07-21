@@ -59,6 +59,10 @@ export interface QuoteTemplate {
   not_included?: string
   ata_terms?: string
   payment_terms_text?: string
+  /** Fria "övriga villkor" — separat fält från de fem StandardTextType-
+      kategorierna (v72-migrationen). Nullable tills sql/v72_quote_template_terms.sql
+      körts manuellt; koden måste tåla att kolumnen saknas i databasen. */
+  terms_text?: string
   default_items: QuoteItem[]
   default_payment_plan: PaymentPlanEntry[]
   detail_level: DetailLevel

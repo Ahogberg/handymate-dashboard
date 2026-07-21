@@ -1005,8 +1005,10 @@ export default function NewQuotePage() {
   // ═══════════════════════════════════════════════════════════════════
 
   function handleNewTemplateSelect(template: QuoteTemplate) {
-    setTitle(template.name)
-    setDescription(template.description || '')
+    // Sätts ENDAST om fälten fortfarande är tomma — en deal-prefill (Etapp 2)
+    // äger jobbets identitet och ska aldrig skrivas över av mallvalet.
+    setTitle(prev => prev || template.name)
+    setDescription(prev => prev || template.description || '')
     setTemplateId(template.id)
 
     if (template.default_items && template.default_items.length > 0) {
@@ -1029,10 +1031,19 @@ export default function NewQuotePage() {
     if (template.not_included) setNotIncluded(template.not_included)
     if (template.ata_terms) setAtaTerms(template.ata_terms)
     if (template.payment_terms_text) setPaymentTermsText(template.payment_terms_text)
+    if (template.terms_text) setTermsText(template.terms_text)
 
     setDetailLevel(template.detail_level || 'detailed')
     setShowUnitPrices(template.show_unit_prices ?? true)
     setShowQuantities(template.show_quantities ?? true)
+
+    // usage_count-räknare — PATCH istället för den gamla dubblett-POST:en som
+    // (buggigt) skapade en NY mallrad i job_template vid varje mallval.
+    fetch('/api/quote-templates', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: template.id, increment_usage: true }),
+    }).catch(() => {})
 
     setShowTemplatePanel(false)
     toast.success(`Mall "${template.name}" tillämpad`)
@@ -1097,12 +1108,6 @@ export default function NewQuotePage() {
         })),
       )
     }
-
-    fetch('/api/quotes/templates', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...template, incrementUsage: true }),
-    }).catch(() => {})
 
     setShowTemplatePanel(false)
     toast.success(`Mall "${template.name}" tillämpad`)
