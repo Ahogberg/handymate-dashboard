@@ -591,6 +591,7 @@ export default function NewQuotePage() {
     const transcript = searchParams?.get('transcript')
     const customerId = searchParams?.get('customerId') || searchParams?.get('customer_id')
     const prefillTitle = searchParams?.get('title')
+    const prefillDescription = searchParams?.get('description')
     const dealId = searchParams?.get('deal_id') || searchParams?.get('lead_id')
     if (transcript) {
       setSourceTranscript(transcript)
@@ -599,6 +600,7 @@ export default function NewQuotePage() {
     }
     if (customerId) setSelectedCustomer(customerId)
     if (prefillTitle) setTitle(prefillTitle)
+    if (prefillDescription) setDescription(prefillDescription)
     if (!referencePerson && business.contact_name) setReferencePerson(business.contact_name)
     if (dealId && customerId) fetchDealDocuments(customerId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
