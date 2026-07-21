@@ -363,7 +363,7 @@ export default function BillingPage() {
                   limit={smsUsage?.quota ?? currentPlan?.limits.sms ?? 50}
                   unit="skickade"
                   extraInfo={smsUsage && smsUsage.extraSent > 0
-                    ? `Extra SMS: ${smsUsage.extraSent} st = ${Math.round(smsUsage.extraCostSek)} kr`
+                    ? `Extra SMS: ${smsUsage.extraSent.toLocaleString('sv-SE')} st = ${Math.round(smsUsage.extraCostSek).toLocaleString('sv-SE')} kr`
                     : undefined}
                 />
                 <UsageBar

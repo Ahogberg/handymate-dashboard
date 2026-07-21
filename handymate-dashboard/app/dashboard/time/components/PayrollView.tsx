@@ -144,7 +144,7 @@ export default function PayrollView() {
                     <h3 className="font-semibold text-gray-900">{p.employee}</h3>
                     <p className="text-xs text-gray-500">
                       {p.employment_type === 'owner' ? 'Ägare' : p.employment_type === 'contractor' ? 'Underentreprenör' : 'Anställd'}
-                      {p.hourly_wage > 0 && ` · ${p.hourly_wage} kr/tim`}
+                      {p.hourly_wage > 0 && ` · ${p.hourly_wage.toLocaleString('sv-SE')} kr/tim`}
                     </p>
                   </div>
                   <div className="text-right">

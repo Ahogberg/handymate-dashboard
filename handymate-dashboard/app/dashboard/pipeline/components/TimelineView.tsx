@@ -176,7 +176,7 @@ export function TimelineView({ deals, stages, onDealClick }: TimelineViewProps) 
                     {deal.isWarning && !deal.isStale && <span title="Ingen aktivitet 24h+">⚠️</span>}
                     {deal.value != null && deal.value > 0 && (
                       <span className="text-[10px] text-gray-400">
-                        {deal.value >= 1000 ? `${Math.round(deal.value / 1000)}k kr` : `${deal.value} kr`}
+                        {deal.value >= 1000 ? `${Math.round(deal.value / 1000).toLocaleString('sv-SE')}k kr` : `${deal.value} kr`}
                       </span>
                     )}
                   </div>

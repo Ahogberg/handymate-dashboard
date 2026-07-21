@@ -175,7 +175,7 @@ export default function JobTypesPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{jt.name}</p>
                   {jt.default_hourly_rate && (
-                    <p className="text-xs text-gray-400">Standardpris: {jt.default_hourly_rate} kr/tim</p>
+                    <p className="text-xs text-gray-400">Standardpris: {jt.default_hourly_rate.toLocaleString('sv-SE')} kr/tim</p>
                   )}
                 </div>
                 <button

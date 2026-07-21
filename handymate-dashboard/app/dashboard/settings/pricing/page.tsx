@@ -462,9 +462,9 @@ export default function PricingSettingsPage() {
                     {pl.contract_type && <span>{pl.contract_type.name}</span>}
                   </div>
                   <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                    {pl.hourly_rate_normal && <span>{pl.hourly_rate_normal} kr/tim</span>}
+                    {pl.hourly_rate_normal && <span>{pl.hourly_rate_normal.toLocaleString('sv-SE')} kr/tim</span>}
                     {pl.material_markup_pct != null && <span>Material +{pl.material_markup_pct}%</span>}
-                    {pl.callout_fee != null && pl.callout_fee > 0 && <span>Utryckn. {pl.callout_fee} kr</span>}
+                    {pl.callout_fee != null && pl.callout_fee > 0 && <span>Utryckn. {pl.callout_fee.toLocaleString('sv-SE')} kr</span>}
                   </div>
                 </div>
                 <div className="flex gap-1">

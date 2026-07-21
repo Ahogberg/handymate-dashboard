@@ -142,6 +142,14 @@ fix/b2-mobile-auth-forwarding.
 - **Konsumentfinansiering** (Wasa/Resurs/Svea): partneravtal, nästan ingen kod.
   Betalningsplan i offerten finns redan.
 
+## Städ (valfritt, ingen användarnytta — kör bara vid tillfälle)
+
+- [ ] Konsolidera ~30 duplicerade format-helpers (formatKr/formatCurrency/
+      formatValue m.fl., utspridda över 55–60 filer) till `lib/format-price.ts`
+      (finns redan, oanvänd). Upptäckt vid tusentalsavgränsnings-fixen
+      2026-07-21 (`feat/kund-deal-siffror`) — inget bytt i den branchen
+      eftersom churnen inte ger användarnytta nu.
+
 ## Referens: ServiceTitan Max-prissättningen (för egen prisdesign)
 
 Max = hemligt pris, contact-sales, ansökningsgrindat; **per-tekniker**-prissatt

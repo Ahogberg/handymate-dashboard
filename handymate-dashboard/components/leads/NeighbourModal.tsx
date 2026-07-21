@@ -129,7 +129,7 @@ export default function NeighbourModal({ jobType, address, jobId, onClose, onCre
                 <div className="bg-gray-50 rounded-xl p-4 mb-5 space-y-1.5">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Uppskattad kostnad</span>
-                    <span className="font-semibold text-gray-900">~{totalCost} kr</span>
+                    <span className="font-semibold text-gray-900">~{totalCost.toLocaleString('sv-SE')} kr</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Återstående kvot</span>
@@ -138,7 +138,7 @@ export default function NeighbourModal({ jobType, address, jobId, onClose, onCre
                   {overQuota > 0 && (
                     <div className="flex justify-between text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2 -mx-1">
                       <span>Överstiger kvot</span>
-                      <span className="font-semibold">{overQuota} extra à {COST_PER_LETTER} kr = {extraCost} kr</span>
+                      <span className="font-semibold">{overQuota} extra à {COST_PER_LETTER} kr = {extraCost.toLocaleString('sv-SE')} kr</span>
                     </div>
                   )}
                 </div>
@@ -167,7 +167,7 @@ export default function NeighbourModal({ jobType, address, jobId, onClose, onCre
                     className="flex-1 flex items-center justify-center gap-2 bg-primary-800 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-50 hover:bg-primary-800 transition-colors"
                   >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    {saving ? 'Skapar...' : `Skicka till ${count} grannar · ${totalCost} kr`}
+                    {saving ? 'Skapar...' : `Skicka till ${count} grannar · ${totalCost.toLocaleString('sv-SE')} kr`}
                   </button>
                 ) : (
                   <button onClick={onClose} className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl font-medium text-sm">

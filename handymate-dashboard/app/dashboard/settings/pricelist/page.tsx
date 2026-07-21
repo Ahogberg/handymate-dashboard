@@ -1050,10 +1050,10 @@ export default function PricelistPage() {
                             <td className="p-2 text-gray-900">{p.name}</td>
                             <td className="p-2 text-gray-500">{p.sku || '-'}</td>
                             <td className="p-2 text-right text-gray-500">
-                              {p.purchase_price ? `${p.purchase_price} kr` : '-'}
+                              {p.purchase_price ? `${p.purchase_price.toLocaleString('sv-SE')} kr` : '-'}
                             </td>
                             <td className="p-2 text-right text-gray-900">
-                              {p.sell_price ? `${p.sell_price} kr` : '-'}
+                              {p.sell_price ? `${p.sell_price.toLocaleString('sv-SE')} kr` : '-'}
                             </td>
                           </tr>
                         ))}

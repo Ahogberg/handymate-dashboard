@@ -291,7 +291,7 @@ export default function SubcontractorsPage() {
                   </div>
                 )}
                 {sub.hourly_rate && (
-                  <p className="text-gray-500">{sub.hourly_rate} kr/h</p>
+                  <p className="text-gray-500">{sub.hourly_rate.toLocaleString('sv-SE')} kr/h</p>
                 )}
               </div>
 

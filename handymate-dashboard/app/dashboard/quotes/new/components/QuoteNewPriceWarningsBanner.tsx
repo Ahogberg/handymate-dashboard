@@ -38,8 +38,8 @@ export function QuoteNewPriceWarningsBanner({ warnings, alternatives }: QuoteNew
               <AlertTriangle className="w-3.5 h-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-amber-800 leading-relaxed">
                 <strong className="font-semibold">{w.product_name}</strong> är {w.difference_pct}% dyrare än normalpris (
-                <span className="tabular-nums">{w.quote_price} kr</span> vs{' '}
-                <span className="tabular-nums">{w.normal_price} kr</span> — {w.supplier_name})
+                <span className="tabular-nums">{w.quote_price.toLocaleString('sv-SE')} kr</span> vs{' '}
+                <span className="tabular-nums">{w.normal_price.toLocaleString('sv-SE')} kr</span> — {w.supplier_name})
               </p>
             </div>
           ))}
@@ -52,7 +52,7 @@ export function QuoteNewPriceWarningsBanner({ warnings, alternatives }: QuoteNew
               <Lightbulb className="w-3.5 h-3.5 text-primary-700 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-primary-800 leading-relaxed">
                 <strong className="font-semibold">{a.cheaper_supplier}</strong> har {a.product_name} {a.savings_pct}% billigare (
-                <span className="tabular-nums">{a.cheaper_price} kr</span>)
+                <span className="tabular-nums">{a.cheaper_price.toLocaleString('sv-SE')} kr</span>)
               </p>
             </div>
           ))}
