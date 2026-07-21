@@ -43,6 +43,7 @@ import { QuoteNewCustomerSection } from './components/QuoteNewCustomerSection'
 import { QuoteNewItemsSection } from './components/QuoteNewItemsSection'
 import { QuoteNewAttachmentsCard } from './components/QuoteNewAttachmentsCard'
 import { QuoteNewTemplatePanel } from './components/QuoteNewTemplatePanel'
+import { QuoteNewStartChooser } from './components/QuoteNewStartChooser'
 import { QuoteNewPreviewPanel } from './components/QuoteNewPreviewPanel'
 import { QuoteNewPriceWarningsBanner } from './components/QuoteNewPriceWarningsBanner'
 
@@ -256,6 +257,10 @@ export default function NewQuotePage() {
   const [priceWarnings, setPriceWarnings] = useState<Array<{ product_name: string; quote_price: number; normal_price: number; supplier_name: string; difference_pct: number }>>([])
   const [priceAlts, setPriceAlts] = useState<Array<{ product_name: string; cheaper_supplier: string; cheaper_price: number; savings_pct: number }>>([])
   const [uploadingFile, setUploadingFile] = useState(false)
+
+  // Startsteg (Etapp 3): "Börja tomt / Använd mall / Beskriv med AI" —
+  // visas bara när ingen styrsignal pekat ut vad offerten redan ska bli.
+  const [startChooserDismissed, setStartChooserDismissed] = useState(false)
 
   // Template panel + preview
   const [showTemplatePanel, setShowTemplatePanel] = useState(false)
@@ -1333,6 +1338,17 @@ export default function NewQuotePage() {
   // Render
   // ═══════════════════════════════════════════════════════════════════
 
+  // Startsteget döljs så fort NÅGON styrsignal redan pekat ut vad offerten
+  // ska bli — transcript (AI-flödet öppnas redan automatiskt ovan),
+  // deal/lead-koppling, vald kund, eller en förifylld titel.
+  const hasQuoteStartSignal = !!(
+    searchParams?.get('transcript') ||
+    searchParams?.get('deal_id') || searchParams?.get('lead_id') ||
+    searchParams?.get('customerId') || searchParams?.get('customer_id') ||
+    searchParams?.get('title')
+  )
+  const showStartChooser = !hasQuoteStartSignal && !startChooserDismissed
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -1343,6 +1359,13 @@ export default function NewQuotePage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <QuoteNewStartChooser
+        show={showStartChooser}
+        onClose={() => setStartChooserDismissed(true)}
+        onSelectTemplate={handleTemplateSelect}
+        onDescribeWithAI={() => setShowAiHelper(true)}
+      />
+
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
         <QuoteNewHeader
           aiGenerated={aiGenerated}
