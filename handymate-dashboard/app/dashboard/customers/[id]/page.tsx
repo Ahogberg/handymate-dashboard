@@ -35,7 +35,8 @@ import {
   Image,
   Download,
   CheckSquare,
-  CheckCircle2
+  CheckCircle2,
+  CalendarClock
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -44,6 +45,7 @@ import { useToast } from '@/components/Toast'
 import Link from 'next/link'
 import CustomerTimeline from '@/components/CustomerTimeline'
 import { CopyId } from '@/components/CopyId'
+import { normalizeSwedishPhone, formatSwedishPhone } from '@/lib/phone-normalize'
 
 interface Customer {
   customer_id: string
@@ -200,6 +202,7 @@ export default function CustomerDetailPage() {
   const [showLogCallModal, setShowLogCallModal] = useState(false)
   const [showAddNoteModal, setShowAddNoteModal] = useState(false)
   const [showSendSMSModal, setShowSendSMSModal] = useState(false)
+  const [showSiteVisitModal, setShowSiteVisitModal] = useState(false)
 
   // Tasks
   const [tasks, setTasks] = useState<Task[]>([])
@@ -705,9 +708,9 @@ export default function CustomerDetailPage() {
 
               <div className="space-y-3">
                 {customer.phone_number && (
-                  <a href={`tel:${customer.phone_number}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all">
+                  <a href={`tel:${normalizeSwedishPhone(customer.phone_number)}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all">
                     <Phone className="w-4 h-4 text-emerald-600" />
-                    <span className="text-gray-900 text-sm">{customer.phone_number}</span>
+                    <span className="text-gray-900 text-sm">{formatSwedishPhone(customer.phone_number)}</span>
                   </a>
                 )}
 
@@ -719,10 +722,16 @@ export default function CustomerDetailPage() {
                 )}
 
                 {customer.address_line && (
-                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(customer.address_line)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all group"
+                  >
                     <MapPin className="w-4 h-4 text-amber-400" />
-                    <span className="text-gray-900 text-sm">{customer.address_line}</span>
-                  </div>
+                    <span className="text-gray-900 text-sm group-hover:underline">{customer.address_line}</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-400 ml-auto flex-shrink-0" />
+                  </a>
                 )}
 
                 {(customer.customer_type === 'company' || customer.customer_type === 'brf') && customer.org_number && (
@@ -770,16 +779,65 @@ export default function CustomerDetailPage() {
             {/* Snabbåtgärder */}
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Åtgärder</h2>
-              
-              <div className="space-y-2">
+
+              {/* Primär snabbrad — stora, färgkodade tryckytor. Ring/SMS
+                  kräver telefonnummer, Karta kräver adress; flex-wrap +
+                  flex-1 gör att raden ser balanserad ut oavsett hur många
+                  som visas (mönster uppskalat från DealCard.tsx:115-148). */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {customer.phone_number && (
+                  <a
+                    href={`tel:${normalizeSwedishPhone(customer.phone_number)}`}
+                    className="flex-1 min-w-[60px] flex flex-col items-center justify-center gap-1.5 min-h-[64px] p-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all"
+                  >
+                    <Phone className="w-5 h-5" />
+                    <span className="text-xs font-medium">Ring</span>
+                  </a>
+                )}
+
+                {customer.phone_number && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSendSMSModal(true)}
+                    className="flex-1 min-w-[60px] flex flex-col items-center justify-center gap-1.5 min-h-[64px] p-2 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 transition-all"
+                  >
+                    <MessageSquare className="w-5 h-5" />
+                    <span className="text-xs font-medium">SMS</span>
+                  </button>
+                )}
+
+                {customer.address_line && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(customer.address_line)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 min-w-[60px] flex flex-col items-center justify-center gap-1.5 min-h-[64px] p-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all"
+                  >
+                    <MapPin className="w-5 h-5" />
+                    <span className="text-xs font-medium">Karta</span>
+                  </a>
+                )}
+
                 <Link
                   href={`/dashboard/quotes/new?customerId=${customer.customer_id}`}
-                  className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
+                  className="flex-1 min-w-[60px] flex flex-col items-center justify-center gap-1.5 min-h-[64px] p-2 rounded-xl border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-all"
                 >
-                  <FileText className="w-4 h-4 text-primary-700" />
-                  <span className="text-gray-900 text-sm">Ny offert</span>
+                  <FileText className="w-5 h-5" />
+                  <span className="text-xs font-medium">Ny offert</span>
                 </Link>
 
+                <button
+                  type="button"
+                  onClick={() => setShowSiteVisitModal(true)}
+                  className="flex-1 min-w-[60px] flex flex-col items-center justify-center gap-1.5 min-h-[64px] p-2 rounded-xl border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition-all"
+                >
+                  <CalendarClock className="w-5 h-5" />
+                  <span className="text-xs font-medium">Platsbesök</span>
+                </button>
+              </div>
+
+              {/* Sekundära åtgärder */}
+              <div className="space-y-2">
                 <button
                   onClick={() => setShowLogCallModal(true)}
                   className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
@@ -787,13 +845,13 @@ export default function CustomerDetailPage() {
                   <PhoneCall className="w-4 h-4 text-sky-700" />
                   <span className="text-gray-900 text-sm">Logga samtal</span>
                 </button>
-                
+
                 <button
-                  onClick={() => setShowSendSMSModal(true)}
+                  onClick={() => setShowAddNoteModal(true)}
                   className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
                 >
-                  <MessageSquare className="w-4 h-4 text-primary-700" />
-                  <span className="text-gray-900 text-sm">Skicka SMS</span>
+                  <FileText className="w-4 h-4 text-primary-500" />
+                  <span className="text-gray-900 text-sm">Lägg till anteckning</span>
                 </button>
 
                 {customer?.phone_number && (
@@ -805,22 +863,6 @@ export default function CustomerDetailPage() {
                     <span className="text-gray-900 text-sm">Öppna SMS-konversation</span>
                   </Link>
                 )}
-                
-                <button
-                  onClick={() => setShowAddNoteModal(true)}
-                  className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
-                >
-                  <FileText className="w-4 h-4 text-primary-500" />
-                  <span className="text-gray-900 text-sm">Lägg till anteckning</span>
-                </button>
-                
-                <Link
-                  href="/dashboard/bookings"
-                  className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
-                >
-                  <Calendar className="w-4 h-4 text-amber-400" />
-                  <span className="text-gray-900 text-sm">Skapa bokning</span>
-                </Link>
               </div>
             </div>
 
@@ -1572,6 +1614,21 @@ export default function CustomerDetailPage() {
           }}
         />
       )}
+
+      {/* Site Visit Modal */}
+      {showSiteVisitModal && (
+        <SiteVisitModal
+          customer={customer}
+          contactName={business.contact_name}
+          businessName={business.business_name}
+          onClose={() => setShowSiteVisitModal(false)}
+          onSaved={() => {
+            setShowSiteVisitModal(false)
+            fetchData()
+            mainToast.success('Platsbesök bokat')
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -1837,6 +1894,165 @@ function SendSMSModal({ customer, businessId, businessName, onClose, onSaved }: 
             className="flex-1 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {sending ? 'Skickar...' : 'Skicka'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Site Visit Modal Component (Platsbesök)
+//
+// Kundkortets variant av pipelinens SiteVisitModal
+// (app/dashboard/pipeline/components/SiteVisitModal.tsx) — bokar direkt mot
+// kunden utan att kräva en deal. Fält och bokningsflöde speglar
+// pipeline/page.tsx:1076 (bookSiteVisit): datum, tid, längd 30/60/90/120,
+// anteckning, checkbox "Skicka SMS till kund". Team-inbjudan och extern UE
+// (som finns i pipeline-varianten) är utelämnade här — kundkortet har ingen
+// deal att koppla dem till.
+//
+// Definieras inline i denna fil (inte i en components/-mapp) för att matcha
+// sidans befintliga mönster: LogCallModal/AddNoteModal/SendSMSModal ovan är
+// också inline funktionskomponenter i page.tsx, och customers/[id]/ har ingen
+// egen components/-katalog idag.
+function SiteVisitModal({ customer, contactName, businessName, onClose, onSaved }: {
+  customer: Customer
+  contactName: string
+  businessName: string
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const toast = useToast()
+  const [date, setDate] = useState('')
+  const [time, setTime] = useState('09:00')
+  const [duration, setDuration] = useState('60')
+  const [notes, setNotes] = useState('')
+  const [sendSms, setSendSms] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  const handleBook = async () => {
+    if (!date) return
+    setSaving(true)
+    try {
+      const start = new Date(`${date}T${time}:00`)
+      const end = new Date(start.getTime() + Number(duration) * 60000)
+
+      // Samma fältshape som pipeline/page.tsx:1084-1094 (bookSiteVisit)
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: customer.customer_id,
+          scheduled_start: start.toISOString(),
+          scheduled_end: end.toISOString(),
+          service_type: 'Platsbesök',
+          notes: notes || `Platsbesök — ${customer.name}`,
+        }),
+      })
+
+      if (!res.ok) throw new Error('Booking failed')
+
+      // Bekräftelse-SMS — samma body-shape som pipelines flöde (rad 1102-1109)
+      if (sendSms && customer.phone_number) {
+        const dateStr = start.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })
+        const timeStr = start.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+        await fetch('/api/sms/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: customer.phone_number,
+            message: `Hej ${customer.name}! Vi kommer på platsbesök ${dateStr} kl ${timeStr}. Välkommen att höra av dig om tiden inte passar. //${contactName || businessName}`,
+          }),
+        }).catch(() => {})
+      }
+
+      onSaved()
+    } catch {
+      toast.error('Kunde inte boka platsbesök')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-md p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Boka platsbesök</h2>
+        <p className="text-sm text-gray-500 mb-4">{customer.name}</p>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-gray-500 mb-1 block">Datum *</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E] min-h-[44px]"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-500 mb-1 block">Tid</label>
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E] min-h-[44px]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-500 mb-1 block">Längd</label>
+            <select
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              className="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E] min-h-[44px]"
+            >
+              <option value="30">30 min</option>
+              <option value="60">1 timme</option>
+              <option value="90">1,5 timmar</option>
+              <option value="120">2 timmar</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-500 mb-1 block">Anteckning</label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="T.ex. vad som ska inspekteras"
+              className="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-[#0F766E] min-h-[44px]"
+            />
+          </div>
+
+          {customer.phone_number && (
+            <label className="flex items-center gap-2 cursor-pointer min-h-[44px]">
+              <input
+                type="checkbox"
+                checked={sendSms}
+                onChange={(e) => setSendSms(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-primary-700 focus:ring-primary-600"
+              />
+              <span className="text-sm text-gray-600">Skicka SMS till kund</span>
+            </label>
+          )}
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200 min-h-[44px]"
+          >
+            Avbryt
+          </button>
+          <button
+            onClick={handleBook}
+            disabled={saving || !date}
+            className="flex-1 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50 min-h-[44px]"
+          >
+            {saving ? 'Bokar...' : 'Boka platsbesök'}
           </button>
         </div>
       </div>
