@@ -3,6 +3,40 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 
 /**
+ * GET - Hämta en deal
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const supabase = getServerSupabase()
+    const { id } = params
+
+    const { data: deal, error } = await supabase
+      .from('deal')
+      .select('*')
+      .eq('id', id)
+      .eq('business_id', business.business_id)
+      .single()
+
+    if (error || !deal) {
+      return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ deal })
+  } catch (error: any) {
+    console.error('Get deal error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+/**
  * PATCH - Uppdatera deal-fält
  */
 export async function PATCH(
