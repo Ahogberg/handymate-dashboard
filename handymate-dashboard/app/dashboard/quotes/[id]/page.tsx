@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
 import { QuoteHeader } from './components/QuoteHeader'
@@ -17,6 +17,7 @@ import type { Quote, QuoteVersion, QuoteIntelligence } from './types'
 export default function QuoteDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const business = useBusiness()
   const quoteId = (params as any)?.id as string
 
@@ -330,6 +331,18 @@ export default function QuoteDetailPage() {
     setTemplateName(quote?.title || '')
     setShowSaveTemplate(true)
   }
+
+  // Deep-link: ?send=true → öppna skicka-modalen direkt (från new-vyns "Skicka"-flöde)
+  const sendDeepLinkHandled = useRef(false)
+  useEffect(() => {
+    if (!quote || sendDeepLinkHandled.current) return
+    if (searchParams?.get('send') === 'true') {
+      sendDeepLinkHandled.current = true
+      onOpenSendModal()
+      window.history.replaceState(null, '', `/dashboard/quotes/${quoteId}`)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quote, searchParams])
 
   if (loading) {
     return (
