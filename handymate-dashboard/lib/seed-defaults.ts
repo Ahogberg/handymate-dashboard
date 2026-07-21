@@ -2,6 +2,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getDefaultStandardTexts } from '@/lib/quote-standard-text-defaults'
 import { getChecklistsForBranch } from '@/lib/checklist-defaults'
 import { getDefaultPriceList } from '@/lib/price-list-defaults'
+import { getDefaultQuoteTemplates, normalizeTemplateBranch } from '@/lib/quote-template-defaults'
 
 type SupabaseClient = ReturnType<typeof getServerSupabase>
 
@@ -25,6 +26,7 @@ export async function seedAllDefaults(
     seedQuoteStandardTexts(supabase, businessId, branch),
     seedChecklistTemplates(supabase, businessId, branch),
     seedPriceList(supabase, businessId, branch),
+    seedQuoteTemplates(supabase, businessId, branch),
   ])
 
   const failed = results.filter(r => r.status === 'rejected')
@@ -243,6 +245,50 @@ async function seedPriceList(supabase: SupabaseClient, businessId: string, branc
       name: e.name,
       unit: e.unit,
       unit_price: e.unit_price,
+    }))
+  )
+}
+
+/**
+ * Seedar mallbanken (quote_templates) — delar lib/quote-template-defaults.ts
+ * med app/api/quote-templates/seed/route.ts (den manuella "Hämta färdiga
+ * mallar"-CTA:n). Idempotent per mallnamn (inte bara "finns någon mall") så
+ * att en business som redan sparat en egen mall ändå får branschmallarna.
+ */
+async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, branch: string) {
+  const normalizedBranch = normalizeTemplateBranch(branch)
+
+  const { data: existingRows } = await supabase
+    .from('quote_templates')
+    .select('name')
+    .eq('business_id', businessId)
+
+  const existingNames = new Set((existingRows || []).map((r: { name: string }) => r.name))
+  const defaultTemplates = getDefaultQuoteTemplates(normalizedBranch).filter(t => !existingNames.has(t.name))
+
+  if (defaultTemplates.length === 0) return
+
+  const defaultTexts = getDefaultStandardTexts(normalizedBranch)
+  const texts: Record<string, string> = {}
+  for (const t of defaultTexts) texts[t.text_type] = t.content
+
+  await supabase.from('quote_templates').insert(
+    defaultTemplates.map((t, i) => ({
+      id: `qtpl_${businessId}_${i}`,
+      business_id: businessId,
+      branch: normalizedBranch,
+      name: t.name,
+      description: t.description,
+      category: t.category,
+      introduction_text: texts.introduction || null,
+      conclusion_text: texts.conclusion || null,
+      not_included: texts.not_included || null,
+      ata_terms: texts.ata_terms || null,
+      payment_terms_text: texts.payment_terms || null,
+      default_items: t.default_items,
+      default_payment_plan: t.default_payment_plan,
+      rot_enabled: t.rot_enabled,
+      rut_enabled: t.rut_enabled,
     }))
   )
 }

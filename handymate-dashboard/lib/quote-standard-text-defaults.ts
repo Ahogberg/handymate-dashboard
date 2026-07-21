@@ -6,13 +6,32 @@ interface DefaultText {
   content: string
 }
 
+// Onboarding-rymden (app/onboarding/constants.ts) är sanningen. 'el'/'vvs'/
+// 'maleri' matchade tidigare ALDRIG en verklig branschnyckel (bara 'bygg'
+// föll igenom till default) — alla företag fick generisk bygg-text oavsett
+// bransch. Riktiga nycklar mappas nu direkt; gamla behålls som alias.
+const BRANCH_ALIASES: Record<string, string> = {
+  bygg: 'construction',
+  snickeri: 'carpenter',
+  el: 'electrician',
+  vvs: 'plumber',
+  maleri: 'painter',
+}
+
+function normalizeBranch(branch?: string): string {
+  if (!branch) return 'other'
+  return BRANCH_ALIASES[branch] || branch
+}
+
 /**
  * Returnerar seed-standardtexter per bransch
  */
 export function getDefaultStandardTexts(branch?: string): DefaultText[] {
-  const companyRef = branch === 'el' ? 'elinstallationer' :
-    branch === 'vvs' ? 'VVS-arbeten' :
-    branch === 'maleri' ? 'måleriarbeten' :
+  const normalized = normalizeBranch(branch)
+  const companyRef = normalized === 'electrician' ? 'elinstallationer' :
+    normalized === 'plumber' ? 'VVS-arbeten' :
+    normalized === 'painter' ? 'måleriarbeten' :
+    normalized === 'carpenter' ? 'snickeriarbeten' :
     'bygg- och renoveringsarbeten'
 
   return [
