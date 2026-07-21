@@ -89,6 +89,11 @@ fix/b2-mobile-auth-forwarding.
       Fyll egna CRM:et före annonsplattformar. Kräver kapacitets-primitiven
       (Nivå 2). (b) "Jobb markerat klart → fakturautkast i kön" med betallänk
       — ST claimar 14 dagar → 24 tim till faktura; Karins dunning finns redan.
+- [ ] **Portal-meddelandetråd i dashboarden** — backend klar (`/api/portal-messages`
+      GET/POST + `customer_message`-tabellen + `PortalMessagesThread` i
+      portalen), endast dashboard-UI saknas; kundkortets meddelandeknapp pekar
+      då om från SMS. (Noterad vid kundkorts-åtgärder-bygget, Etapp B,
+      2026-07-21.)
 
 ## Nivå 2 — Medel
 
