@@ -43,6 +43,7 @@ import { QuoteNewCustomerSection } from './components/QuoteNewCustomerSection'
 import { QuoteNewItemsSection } from './components/QuoteNewItemsSection'
 import { QuoteNewAttachmentsCard } from './components/QuoteNewAttachmentsCard'
 import { QuoteNewTemplatePanel } from './components/QuoteNewTemplatePanel'
+import { QuoteNewStartChooser } from './components/QuoteNewStartChooser'
 import { QuoteNewPreviewPanel } from './components/QuoteNewPreviewPanel'
 import { QuoteNewPriceWarningsBanner } from './components/QuoteNewPriceWarningsBanner'
 
@@ -256,6 +257,10 @@ export default function NewQuotePage() {
   const [priceWarnings, setPriceWarnings] = useState<Array<{ product_name: string; quote_price: number; normal_price: number; supplier_name: string; difference_pct: number }>>([])
   const [priceAlts, setPriceAlts] = useState<Array<{ product_name: string; cheaper_supplier: string; cheaper_price: number; savings_pct: number }>>([])
   const [uploadingFile, setUploadingFile] = useState(false)
+
+  // Startsteg (Etapp 3): "Börja tomt / Använd mall / Beskriv med AI" —
+  // visas bara när ingen styrsignal pekat ut vad offerten redan ska bli.
+  const [startChooserDismissed, setStartChooserDismissed] = useState(false)
 
   // Template panel + preview
   const [showTemplatePanel, setShowTemplatePanel] = useState(false)
@@ -1005,8 +1010,10 @@ export default function NewQuotePage() {
   // ═══════════════════════════════════════════════════════════════════
 
   function handleNewTemplateSelect(template: QuoteTemplate) {
-    setTitle(template.name)
-    setDescription(template.description || '')
+    // Sätts ENDAST om fälten fortfarande är tomma — en deal-prefill (Etapp 2)
+    // äger jobbets identitet och ska aldrig skrivas över av mallvalet.
+    setTitle(prev => prev || template.name)
+    setDescription(prev => prev || template.description || '')
     setTemplateId(template.id)
 
     if (template.default_items && template.default_items.length > 0) {
@@ -1029,10 +1036,19 @@ export default function NewQuotePage() {
     if (template.not_included) setNotIncluded(template.not_included)
     if (template.ata_terms) setAtaTerms(template.ata_terms)
     if (template.payment_terms_text) setPaymentTermsText(template.payment_terms_text)
+    if (template.terms_text) setTermsText(template.terms_text)
 
     setDetailLevel(template.detail_level || 'detailed')
     setShowUnitPrices(template.show_unit_prices ?? true)
     setShowQuantities(template.show_quantities ?? true)
+
+    // usage_count-räknare — PATCH istället för den gamla dubblett-POST:en som
+    // (buggigt) skapade en NY mallrad i job_template vid varje mallval.
+    fetch('/api/quote-templates', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: template.id, increment_usage: true }),
+    }).catch(() => {})
 
     setShowTemplatePanel(false)
     toast.success(`Mall "${template.name}" tillämpad`)
@@ -1097,12 +1113,6 @@ export default function NewQuotePage() {
         })),
       )
     }
-
-    fetch('/api/quotes/templates', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...template, incrementUsage: true }),
-    }).catch(() => {})
 
     setShowTemplatePanel(false)
     toast.success(`Mall "${template.name}" tillämpad`)
@@ -1328,6 +1338,17 @@ export default function NewQuotePage() {
   // Render
   // ═══════════════════════════════════════════════════════════════════
 
+  // Startsteget döljs så fort NÅGON styrsignal redan pekat ut vad offerten
+  // ska bli — transcript (AI-flödet öppnas redan automatiskt ovan),
+  // deal/lead-koppling, vald kund, eller en förifylld titel.
+  const hasQuoteStartSignal = !!(
+    searchParams?.get('transcript') ||
+    searchParams?.get('deal_id') || searchParams?.get('lead_id') ||
+    searchParams?.get('customerId') || searchParams?.get('customer_id') ||
+    searchParams?.get('title')
+  )
+  const showStartChooser = !hasQuoteStartSignal && !startChooserDismissed
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -1338,6 +1359,13 @@ export default function NewQuotePage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <QuoteNewStartChooser
+        show={showStartChooser}
+        onClose={() => setStartChooserDismissed(true)}
+        onSelectTemplate={handleTemplateSelect}
+        onDescribeWithAI={() => setShowAiHelper(true)}
+      />
+
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
         <QuoteNewHeader
           aiGenerated={aiGenerated}
