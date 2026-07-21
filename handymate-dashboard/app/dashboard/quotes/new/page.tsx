@@ -46,6 +46,7 @@ import { QuoteNewTemplatePanel } from './components/QuoteNewTemplatePanel'
 import { QuoteNewStartChooser } from './components/QuoteNewStartChooser'
 import { QuoteNewPreviewPanel } from './components/QuoteNewPreviewPanel'
 import { QuoteNewPriceWarningsBanner } from './components/QuoteNewPriceWarningsBanner'
+import { QuoteNewEfterkalkylBanner, type EfterkalkylInsight } from './components/QuoteNewEfterkalkylBanner'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -256,6 +257,8 @@ export default function NewQuotePage() {
   const [attachments, setAttachments] = useState<{ name: string; url: string; size?: number }[]>([])
   const [priceWarnings, setPriceWarnings] = useState<Array<{ product_name: string; quote_price: number; normal_price: number; supplier_name: string; difference_pct: number }>>([])
   const [priceAlts, setPriceAlts] = useState<Array<{ product_name: string; cheaper_supplier: string; cheaper_price: number; savings_pct: number }>>([])
+  // Motor 1 (Lärande prissättning): efterkalkyl-insikt för vald mall/jobbtyp.
+  const [efterkalkylInsight, setEfterkalkylInsight] = useState<EfterkalkylInsight | null>(null)
   const [uploadingFile, setUploadingFile] = useState(false)
 
   // Startsteg (Etapp 3): "Börja tomt / Använd mall / Beskriv med AI" —
@@ -641,9 +644,37 @@ export default function NewQuotePage() {
         setSelectedCustomer(deal.customer_id)
       }
       // deal.value förifylls INTE — offertens summa byggs av raderna.
+
+      // Motor 1: deal-prefill gav ev. en jobbtyp — hämta efterkalkyl-insikt
+      // som sekundär nyckel (mall vinner om användaren sen väljer en).
+      if (deal.job_type) {
+        fetchEfterkalkylInsight({ jobType: deal.job_type })
+      }
     } catch (err) {
       console.error('[NewQuote] Kunde inte hämta deal:', err)
       // Tyst degradering — formuläret fungerar precis som utan deal-lookup.
+    }
+  }
+
+  /**
+   * Motor 1 (Lärande prissättning): hämtar efterkalkyl-insikt för vald
+   * mall (primär nyckel) eller jobbtyp (sekundär). Tyst degradering vid
+   * fel — bannern visas bara inte.
+   */
+  async function fetchEfterkalkylInsight(params: { templateId?: string; jobType?: string }) {
+    try {
+      const qs = new URLSearchParams()
+      if (params.templateId) qs.set('template_id', params.templateId)
+      else if (params.jobType) qs.set('job_type', params.jobType)
+      else return
+
+      const res = await fetch(`/api/quotes/efterkalkyl-insikt?${qs.toString()}`)
+      if (!res.ok) return
+      const data = await res.json()
+      setEfterkalkylInsight(data)
+    } catch (err) {
+      console.error('[NewQuote] Kunde inte hämta efterkalkyl-insikt:', err)
+      // Tyst degradering — bannern visas bara inte.
     }
   }
 
@@ -1015,6 +1046,8 @@ export default function NewQuotePage() {
     setTitle(prev => prev || template.name)
     setDescription(prev => prev || template.description || '')
     setTemplateId(template.id)
+    // Motor 1: template_id är primär grupperingsnyckel för efterkalkyl-insikt.
+    fetchEfterkalkylInsight({ templateId: template.id })
 
     if (template.default_items && template.default_items.length > 0) {
       const cloned: QuoteItem[] = template.default_items.map((item, idx) => ({
@@ -1583,6 +1616,7 @@ export default function NewQuotePage() {
             />
 
             <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />
+            <QuoteNewEfterkalkylBanner insight={efterkalkylInsight} />
 
             <QuoteEditTotalsSection
               totals={totals}
