@@ -1403,6 +1403,7 @@ export default function NewQuotePage() {
               customerPriceListInfo={customerPriceListInfo}
               items={items}
               setItems={setItems}
+              hasItems={items.length > 0}
             />
 
             <QuoteNewItemsSection
