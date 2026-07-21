@@ -91,7 +91,7 @@ export default function DashboardLayout({
                   {children}
                 </main>
                 <Jobbkompisen />
-                <WelcomeModal businessName={business.business_name} />
+                <WelcomeModal />
                 <FeedbackWidget />
                 <PWAInstallBanner />
               </div>

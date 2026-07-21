@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Sparkles, X, ArrowRight, Phone, FileText, Bot } from 'lucide-react'
+import { X, ArrowRight } from 'lucide-react'
 
-interface WelcomeModalProps {
-  businessName: string
-}
-
-export default function WelcomeModal({ businessName }: WelcomeModalProps) {
+/**
+ * Touchpoint 1 (dag 0, första inloggningen) — se tasks/onboarding-foljeskrift.md.
+ * Ordagrann copy, en kort ruta hantverkaren inte tvingas läsa igenom — inget
+ * feature-kort-rutnät, ingen video. Visas en gång (localStorage-gate).
+ */
+export default function WelcomeModal() {
   const [show, setShow] = useState(false)
 
   useEffect(() => {
@@ -33,47 +34,32 @@ export default function WelcomeModal({ businessName }: WelcomeModalProps) {
           <X className="w-5 h-5" />
         </button>
 
-        <div className="text-center mb-6">
-          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-primary-700 flex items-center justify-center">
-            <Sparkles className="w-7 h-7 text-white" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900">
-            Välkommen till Handymate{businessName ? `, ${businessName}` : ''}!
-          </h2>
-          <p className="text-sm text-gray-500 mt-2">
-            Din AI-drivna plattform för att hantera samtal, offerter och fakturor.
-          </p>
-        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-3">
+          Välkommen — ditt team är på plats.
+        </h2>
 
-        <div className="space-y-3 mb-6">
-          <div className="flex items-start gap-3 p-3 bg-primary-50 rounded-xl">
-            <Phone className="w-5 h-5 text-sky-700 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-gray-900">AI-telefonassistent</p>
-              <p className="text-xs text-gray-500">Svara på samtal, boka möten och skapa leads automatiskt</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3 p-3 bg-primary-50 rounded-xl">
-            <FileText className="w-5 h-5 text-primary-700 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-gray-900">Smarta offerter</p>
-              <p className="text-xs text-gray-500">Generera offerter med AI från foto, röst eller text</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3 p-3 bg-primary-50 rounded-xl">
-            <Bot className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-gray-900">Automatiserad uppföljning</p>
-              <p className="text-xs text-gray-500">SMS-påminnelser, fakturering och kundhantering</p>
-            </div>
-          </div>
-        </div>
+        <p className="text-sm text-gray-600 leading-relaxed mb-3">
+          Du har precis anställt sex medhjälpare. De börjar med att lära känna
+          ditt företag de närmaste dagarna — dina kunder, dina priser, ditt sätt.
+        </p>
+
+        <p className="text-sm text-gray-600 leading-relaxed mb-3">
+          Sen börjar de jobba. Lisa fångar samtalen du missar. Karin håller
+          koll på fakturorna. Daniel följer upp offerterna. Och du?
+        </p>
+
+        <p className="text-sm text-gray-600 leading-relaxed mb-6">
+          <b className="text-gray-900">Du är chefen.</b> Ingenting går ut utan
+          ditt OK. Allt de föreslår hamnar i din kö — godkänn med ett tryck,
+          eller låt bli. Ju mer de bevisar sig, desto mer kan du lämna över, i
+          din takt.
+        </p>
 
         <button
           onClick={dismiss}
           className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary-700 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
         >
-          Kom igång
+          Visa mig kön
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

@@ -443,6 +443,16 @@ async function sendAutoReminders() {
         }),
       }).catch(() => {})
 
+      // Touchpoint 3 (onboarding-följeskrift): första-händelse-SMS till ägaren.
+      // Awaitas (inte fire-and-forget) — serverless-funktionen kan avslutas
+      // innan en oawaitad promise hinner köra klart.
+      try {
+        const { sendFirstEventSms } = await import('@/lib/onboarding/first-event-sms')
+        await sendFirstEventSms(inv.business_id, 'invoice_reminder', customer?.name || '')
+      } catch (err) {
+        console.error('[send-reminders] first-event-sms error (non-blocking):', err)
+      }
+
       approvalsCreated++
       results.push({ invoice_id: inv.invoice_id, invoice_number: inv.invoice_number, level, success: false, approval_created: true })
     }

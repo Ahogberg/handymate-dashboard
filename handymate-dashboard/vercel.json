@@ -104,6 +104,10 @@
     {
       "path": "/api/cron/kapacitet-fyllnad",
       "schedule": "0 7 * * 1"
+    },
+    {
+      "path": "/api/cron/onboarding-followup",
+      "schedule": "45 7 * * *"
     }
   ]
 }

@@ -10,6 +10,7 @@ interface Business {
   subscription_plan: 'starter' | 'professional' | 'business'
   onboarding_step: number
   onboarding_completed_at: string | null
+  created_at?: string
 }
 
 export const BusinessContext = createContext<Business | null>(null)
