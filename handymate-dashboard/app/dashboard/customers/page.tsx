@@ -256,12 +256,9 @@ export default function CustomersPage() {
       setDuplicateConflict(null)
       fetchData()
 
-      if (!editingCustomer && result?.customer) {
-        const customerName = form.name || result.customer.name || 'kunden'
-        const customerId = result.customer.customer_id || result.customer.id
-        if (customerId) {
-          setDealPrompt({ customerId, customerName })
-        }
+      if (!editingCustomer && result?.customerId) {
+        const customerName = form.name || 'kunden'
+        setDealPrompt({ customerId: result.customerId, customerName })
       }
     } catch {
       showToast('Något gick fel', 'error')
