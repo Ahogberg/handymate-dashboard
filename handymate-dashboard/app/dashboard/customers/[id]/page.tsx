@@ -772,6 +772,14 @@ export default function CustomerDetailPage() {
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Åtgärder</h2>
               
               <div className="space-y-2">
+                <Link
+                  href={`/dashboard/quotes/new?customerId=${customer.customer_id}`}
+                  className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
+                >
+                  <FileText className="w-4 h-4 text-primary-700" />
+                  <span className="text-gray-900 text-sm">Ny offert</span>
+                </Link>
+
                 <button
                   onClick={() => setShowLogCallModal(true)}
                   className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
@@ -1234,8 +1242,14 @@ export default function CustomerDetailPage() {
 
                 {/* Offerter */}
                 <div className="bg-white rounded-xl border border-[#E2E8F0]">
-                  <div className="p-4 border-b border-gray-100">
+                  <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-gray-900">Offerter ({quotes.length})</h3>
+                    <a
+                      href={`/dashboard/quotes/new?customerId=${customer.customer_id}`}
+                      className="text-xs text-primary-700 hover:text-primary-700 font-medium"
+                    >
+                      + Ny offert
+                    </a>
                   </div>
                   {quotes.length === 0 ? (
                     <div className="p-8 text-center">

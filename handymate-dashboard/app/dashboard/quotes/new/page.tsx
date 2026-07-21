@@ -265,6 +265,7 @@ export default function NewQuotePage() {
   const [debouncedPreviewData, setDebouncedPreviewData] = useState<QuotePreviewData | null>(null)
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const descriptionWarningShownRef = useRef(false)
+  const dealLookupDoneRef = useRef(false)
 
   // ─── Shared hooks ──────────────────────────────────────────────────
   const {
@@ -603,8 +604,43 @@ export default function NewQuotePage() {
     if (prefillDescription) setDescription(prefillDescription)
     if (!referencePerson && business.contact_name) setReferencePerson(business.contact_name)
     if (dealId && customerId) fetchDealDocuments(customerId)
+    // Deal-lookup (Etapp 2): körs bara en gång per mount (ref-flagga skyddar
+    // mot dubbelkörning t.ex. i React strict mode). Query-param-title/
+    // description har redan satts (rader ovan) och VINNER alltid över
+    // dealens fält — deal-lookupen fyller endast i det som fortfarande är
+    // tomt när svaret kommer tillbaka.
+    if (dealId && !dealLookupDoneRef.current) {
+      dealLookupDoneRef.current = true
+      fetchDealAndPrefill(dealId, !!customerId)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [business.business_id])
+
+  async function fetchDealAndPrefill(dealId: string, hasCustomerIdParam: boolean) {
+    try {
+      const res = await fetch(`/api/pipeline/deals/${dealId}`)
+      if (!res.ok) return
+      const data = await res.json()
+      const deal = data.deal
+      if (!deal) return
+
+      // Query-param vinner alltid — fyll bara i om fältet fortfarande är
+      // tomt när svaret kommer (funktionell uppdatering pga stale closure).
+      if (deal.title) setTitle(prev => prev || deal.title)
+      if (deal.description) setDescription(prev => prev || deal.description)
+
+      // Kund saknas bara om ingen customerId-param fanns (DealModal-grenen) —
+      // sätts befintlig kund-prefill (personnummer, fastighetsbeteckning m.m.)
+      // igång automatiskt via effekten på selectedCustomer.
+      if (!hasCustomerIdParam && deal.customer_id) {
+        setSelectedCustomer(deal.customer_id)
+      }
+      // deal.value förifylls INTE — offertens summa byggs av raderna.
+    } catch (err) {
+      console.error('[NewQuote] Kunde inte hämta deal:', err)
+      // Tyst degradering — formuläret fungerar precis som utan deal-lookup.
+    }
+  }
 
   async function fetchData() {
     const [customersApiRes, settingsRes] = await Promise.all([
