@@ -105,12 +105,21 @@ export async function POST(request: NextRequest) {
       // Fakturainställningar för svenska företag
       tax_id_collection: {
         enabled: true
+      },
+      // Krävs av Stripe när tax_id_collection aktiveras för en BEFINTLIG
+      // customer — annars kastar Stripe ett fel vid session-skapandet.
+      customer_update: {
+        name: 'auto',
+        address: 'auto'
       }
     })
 
     return NextResponse.json({ url: session.url })
   } catch (error: any) {
     console.error('Create checkout session error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Något gick fel med betalningen — försök igen om en stund.' },
+      { status: 500 }
+    )
   }
 }

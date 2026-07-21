@@ -21,9 +21,10 @@ const OPERATORS: { id: string; name: string; code: string }[] = [
   { id: 'telavox', name: 'Telavox', code: 'Logga in → Vidarekoppling' },
 ]
 
-// Reservation-placeholder som visas när backend-endpointen saknas (env-lös dev).
-// Test-kortet renderas aldrig för placeholder-numret.
-const PLACEHOLDER_NUMBER = '+46 76 000 00 00'
+// Historisk platshållare som äldre onboarding-sessioner kan ha persisterat i
+// lisaNumber — behandlas som "inget nummer" (den fick ALDRIG visas som
+// användarens riktiga nummer, men gjorde det i prod när nummerköpet misslyckades).
+const LEGACY_PLACEHOLDER = '+46 76 000 00 00'
 
 interface TestCallStatus {
   armed?: boolean
@@ -283,8 +284,12 @@ function TestLisaCard() {
 }
 
 export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step4Props) {
-  const [phase, setPhase] = useState<'reserving' | 'done'>(data.lisaNumber ? 'done' : 'reserving')
-  const [number, setNumber] = useState<string>(data.lisaNumber || '')
+  // Persisterad platshållare från äldre sessioner räknas som "inget nummer".
+  const initialNumber = data.lisaNumber && data.lisaNumber !== LEGACY_PLACEHOLDER ? data.lisaNumber : ''
+  // 'pending' = köpet gav inget nummer ännu — ärligt väntande-läge, aldrig låtsasnummer.
+  const [phase, setPhase] = useState<'reserving' | 'done' | 'pending'>(initialNumber ? 'done' : 'reserving')
+  const [number, setNumber] = useState<string>(initialNumber)
+  const [retryTick, setRetryTick] = useState(0)
   const [openOp, setOpenOp] = useState<string | null>(null)
   const [whatForOpen, setWhatForOpen] = useState(false)
   const mode = data.phoneMode || 'forward'
@@ -300,48 +305,50 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
     setData(d => ({ ...d, ...updates }))
 
   useEffect(() => {
-    if (data.lisaNumber) return
+    if (number) return
 
     let cancelled = false
-    async function reserve() {
+    const timers: ReturnType<typeof setTimeout>[] = []
+
+    // Ett köpförsök. Misslyckas det: två tysta omförsök (nummerköpet är
+    // idempotent — redan tilldelat nummer returneras), sedan ärligt
+    // väntande-läge. Ett låtsasnummer får ALDRIG visas som användarens.
+    async function reserve(attempt: number) {
+      let assigned = ''
       try {
         const res = await fetch('/api/onboarding/phone/reserve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         }).catch(() => null)
-
-        let assigned = ''
         if (res?.ok) {
           const json = await res.json()
           assigned = json.phone_number || json.number || ''
+          if (!assigned && json.error) console.error('[onboarding] nummerköp misslyckades:', json.error)
         }
+      } catch (err) {
+        console.error('[onboarding] nummerköp misslyckades:', err)
+      }
+      if (cancelled) return
 
-        // Fallback om backend-endpointen inte finns: använd reservation-placeholder
-        // (riktigt nummer aktiveras vid betalning, samma beteende som befintliga Step3Phone)
-        if (!assigned) {
-          assigned = PLACEHOLDER_NUMBER
-        }
-
-        if (!cancelled) {
-          setNumber(assigned)
-          update({ lisaNumber: assigned })
-          setTimeout(() => !cancelled && setPhase('done'), 400)
-        }
-      } catch {
-        if (!cancelled) {
-          setNumber(PLACEHOLDER_NUMBER)
-          setPhase('done')
-        }
+      if (assigned) {
+        setNumber(assigned)
+        update({ lisaNumber: assigned })
+        timers.push(setTimeout(() => !cancelled && setPhase('done'), 400))
+      } else if (attempt < 3) {
+        timers.push(setTimeout(() => reserve(attempt + 1), 4000))
+      } else {
+        setPhase('pending')
       }
     }
 
-    const timer = setTimeout(reserve, 1300)
+    setPhase('reserving')
+    timers.push(setTimeout(() => reserve(1), 1300))
     return () => {
       cancelled = true
-      clearTimeout(timer)
+      timers.forEach(clearTimeout)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [retryTick])
 
   const cleanNumber = number.replace(/[\s-+]/g, '').replace(/^46/, '0')
 
@@ -351,7 +358,7 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
       <div className="ob-body" style={{ display: 'flex', flexDirection: 'column' }}>
         <h1 className="ob-headline">Här är ditt Handymate-nummer</h1>
         <p className="ob-sub">
-          Lisa svarar i telefonen åt dig, och hela teamet använder det
+          Lisa fångar samtalen till numret åt dig, och hela teamet använder det
           för SMS-påminnelser, offert-uppföljning och kund-utskick.
         </p>
 
@@ -384,6 +391,34 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
               <p style={{ color: 'var(--ob-ink-2)', fontSize: 14, fontWeight: 500 }}>
                 Reserverar nummer åt dig…
               </p>
+            </div>
+          ) : phase === 'pending' ? (
+            <div style={{ padding: '14px 0' }}>
+              <p style={{ color: 'var(--ob-ink)', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
+                Ditt nummer tilldelas just nu
+              </p>
+              <p style={{ color: 'var(--ob-muted)', fontSize: 13, lineHeight: 1.5, maxWidth: 300, margin: '0 auto' }}>
+                Det tar ibland en liten stund. Du kan fortsätta — numret dyker upp
+                i appen under Inställningar → Telefoni så snart det är klart.
+              </p>
+              <button
+                type="button"
+                onClick={() => setRetryTick(t => t + 1)}
+                style={{
+                  marginTop: 12,
+                  padding: '8px 16px',
+                  background: 'var(--ob-surface)',
+                  border: '1px solid var(--ob-primary-100)',
+                  borderRadius: 'var(--ob-r-pill)',
+                  color: 'var(--ob-primary-700)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Kolla igen
+              </button>
             </div>
           ) : (
             <div style={{ animation: 'ob-pop-in 600ms cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
@@ -427,13 +462,13 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
               >
                 {number}
               </div>
-              <p style={{ fontSize: 13, color: 'var(--ob-muted)' }}>Lisa svarar — dygnet runt</p>
+              <p style={{ fontSize: 13, color: 'var(--ob-muted)' }}>Lisa fångar samtalen — dygnet runt</p>
             </div>
           )}
         </div>
 
-        {/* "Testa Lisa nu" — bara med riktigt nummer (aldrig för placeholder i env-lös dev) */}
-        {phase === 'done' && number !== PLACEHOLDER_NUMBER && <TestLisaCard />}
+        {/* "Testa Lisa nu" — bara med riktigt tilldelat nummer */}
+        {phase === 'done' && !!number && <TestLisaCard />}
 
         {/* "Vad används detta nummer till?" — InfoSheet-länk */}
         <button
@@ -498,8 +533,14 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
           </div>
         </div>
 
-        {/* Operator instructions */}
-        {mode === 'forward' && (
+        {/* Operator instructions — utan riktigt nummer blir koderna trasiga
+            (**21*#) och får inte visas; ärlig väntetext istället. */}
+        {mode === 'forward' && !number && (
+          <p style={{ fontSize: 13, color: 'var(--ob-muted)', textAlign: 'center', padding: '8px 0' }}>
+            Vidarekopplings-koderna visas här så snart ditt nummer är klart.
+          </p>
+        )}
+        {mode === 'forward' && !!number && (
           <div
             style={{
               background: 'var(--ob-surface)',
@@ -575,10 +616,12 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
       </div>
 
       <div className="ob-footer">
+        {/* 'pending' låser INTE flödet — "aldrig fastna": numret dyker upp i
+            appen när det är klart, användaren ska kunna gå vidare. */}
         <button
           type="button"
           className="ob-cta"
-          disabled={phase !== 'done'}
+          disabled={phase === 'reserving'}
           onClick={onNext}
         >
           Fortsätt <ArrowRight size={18} />
@@ -588,7 +631,7 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
           className="ob-cta ghost"
           onClick={onNext}
           style={{ height: 44, fontSize: 13 }}
-          disabled={phase !== 'done'}
+          disabled={phase === 'reserving'}
         >
           Visa instruktioner senare
         </button>
