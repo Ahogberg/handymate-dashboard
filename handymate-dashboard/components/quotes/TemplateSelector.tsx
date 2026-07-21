@@ -1,32 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { FileStack, Clock, Loader2, X, Trash2, Star, Wrench, Package } from 'lucide-react'
-
-interface JobTemplate {
-  id: string
-  name: string
-  description: string | null
-  branch: string | null
-  estimated_hours: number | null
-  labor_cost: number | null
-  materials: any[]
-  total_estimate: number | null
-  usage_count: number
-  items?: any[]
-  rot_rut_type?: string | null
-  terms?: any
-  category?: string | null
-  is_favorite?: boolean
-}
+import { FileStack, Loader2, X, Trash2, Star, Wrench, Package } from 'lucide-react'
+import type { QuoteTemplate } from '@/lib/types/quote'
 
 interface TemplateSelectorProps {
-  onSelect: (template: JobTemplate) => void
+  onSelect: (template: QuoteTemplate) => void
   onBack: () => void
 }
 
 export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorProps) {
-  const [templates, setTemplates] = useState<JobTemplate[]>([])
+  const [templates, setTemplates] = useState<QuoteTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
 
@@ -36,7 +20,7 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
 
   async function fetchTemplates() {
     try {
-      const res = await fetch('/api/quotes/templates')
+      const res = await fetch('/api/quote-templates')
       const data = await res.json()
       setTemplates(data.templates || [])
     } catch (err) {
@@ -47,10 +31,8 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
 
   async function deleteTemplate(id: string) {
     try {
-      await fetch('/api/quotes/templates', {
+      await fetch(`/api/quote-templates?id=${encodeURIComponent(id)}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
       })
       setTemplates(templates.filter(t => t.id !== id))
     } catch (err) {
@@ -58,16 +40,17 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
     }
   }
 
-  async function toggleFavorite(id: string, current: boolean) {
+  async function toggleFavorite(id: string) {
     try {
-      await fetch('/api/quotes/templates', {
+      const res = await fetch('/api/quote-templates', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, is_favorite: !current })
+        body: JSON.stringify({ id }),
       })
-      setTemplates(templates.map(t =>
-        t.id === id ? { ...t, is_favorite: !current } : t
-      ))
+      const data = await res.json()
+      if (data.template) {
+        setTemplates(prev => prev.map(t => (t.id === id ? data.template : t)))
+      }
     } catch (err) {
       console.error('Failed to toggle favorite:', err)
     }
@@ -140,10 +123,12 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
       ) : (
         <div className="space-y-2">
           {sortedTemplates.map(t => {
-            const itemCount = (t.items || []).length
-            const laborCount = (t.items || []).filter((i: any) => i.type === 'labor').length
-            const materialCount = (t.items || []).filter((i: any) => i.type === 'material').length
-            const hasRichItems = itemCount > 0
+            const itemRows = (t.default_items || []).filter(i => i.item_type === 'item')
+            const laborCount = itemRows.filter(i => i.unit === 'tim' || i.unit === 'timme').length
+            const materialCount = itemRows.length - laborCount
+            const totalEstimate = itemRows.reduce((sum, i) => sum + (i.total ?? i.quantity * i.unit_price), 0)
+            const hasGronTeknik = (t.default_items || []).some(i => (i.rot_rut_type || '').startsWith('gron'))
+            const rotTag = hasGronTeknik ? 'GRÖN TEKNIK' : t.rot_enabled ? 'ROT' : t.rut_enabled ? 'RUT' : null
 
             return (
               <div
@@ -151,7 +136,7 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
                 className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl hover:border-primary-300 transition-all group"
               >
                 <button
-                  onClick={() => toggleFavorite(t.id, !!t.is_favorite)}
+                  onClick={() => toggleFavorite(t.id)}
                   className={`p-1 transition-all ${t.is_favorite ? 'text-amber-500' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`}
                 >
                   <Star className={`w-4 h-4 ${t.is_favorite ? 'fill-amber-500' : ''}`} />
@@ -162,9 +147,9 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
                 >
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium text-gray-900 truncate">{t.name}</p>
-                    {t.rot_rut_type && (
+                    {rotTag && (
                       <span className="px-1.5 py-0.5 text-[10px] font-medium bg-emerald-100 text-emerald-600 rounded">
-                        {t.rot_rut_type.toUpperCase()}
+                        {rotTag}
                       </span>
                     )}
                     {t.category && (
@@ -174,32 +159,19 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
                     )}
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                    {hasRichItems ? (
-                      <>
-                        {laborCount > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Wrench className="w-3 h-3" />
-                            {laborCount} arbeten
-                          </span>
-                        )}
-                        {materialCount > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Package className="w-3 h-3" />
-                            {materialCount} material
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        {t.estimated_hours && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {t.estimated_hours}h
-                          </span>
-                        )}
-                      </>
+                    {laborCount > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Wrench className="w-3 h-3" />
+                        {laborCount} arbeten
+                      </span>
                     )}
-                    {t.total_estimate && <span>{formatCurrency(t.total_estimate)}</span>}
+                    {materialCount > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Package className="w-3 h-3" />
+                        {materialCount} material
+                      </span>
+                    )}
+                    {totalEstimate > 0 && <span>{formatCurrency(totalEstimate)}</span>}
                     {t.usage_count > 0 && <span>Använd {t.usage_count}x</span>}
                   </div>
                 </button>
