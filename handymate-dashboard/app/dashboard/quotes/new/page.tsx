@@ -365,6 +365,7 @@ export default function NewQuotePage() {
         items,
         discountPercent,
         vatRate,
+        description,
         introductionText,
         conclusionText,
         notIncluded,
@@ -383,7 +384,7 @@ export default function NewQuotePage() {
       if (previewTimerRef.current) clearTimeout(previewTimerRef.current)
     }
   }, [
-    title, selectedCustomerObj, validDays, items, discountPercent, vatRate,
+    title, selectedCustomerObj, validDays, items, discountPercent, vatRate, description,
     introductionText, conclusionText, notIncluded, ataTerms, paymentPlan,
     referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices, showQuantities,
     localCustomCategories,

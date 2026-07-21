@@ -316,6 +316,7 @@ export default function EditQuotePage() {
         items: recalculated,
         discountPercent,
         vatRate,
+        description,
         introductionText,
         conclusionText,
         notIncluded,
@@ -332,7 +333,7 @@ export default function EditQuotePage() {
     }, 500)
     return () => clearTimeout(timer)
   }, [
-    title, selectedCustomer, customers, validDays, recalculated, discountPercent, vatRate,
+    title, selectedCustomer, customers, validDays, recalculated, discountPercent, vatRate, description,
     introductionText, conclusionText, notIncluded, ataTerms, calculatedPaymentPlan,
     referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices,
     showQuantities, localCustomCategories,

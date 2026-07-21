@@ -22,6 +22,7 @@ export interface QuotePreviewData {
   items: QuoteItem[]
   discountPercent: number
   vatRate: number
+  description?: string
   introductionText: string
   conclusionText: string
   notIncluded: string
@@ -178,6 +179,13 @@ export default function QuotePreview({ data, businessName, contactName }: QuoteP
                 Er referens: <strong style={{ color: TEXT, fontWeight: 500 }}>{data.customerReference}</strong>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Description ── */}
+        {data.description && (
+          <div style={{ fontSize: '7px', color: TEXT, marginBottom: 10, whiteSpace: 'pre-wrap' }}>
+            {data.description}
           </div>
         )}
 
