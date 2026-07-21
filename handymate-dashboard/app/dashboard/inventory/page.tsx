@@ -291,7 +291,7 @@ export default function InventoryPage() {
                         {item.quantity} <span className="text-xs font-normal text-gray-400">{item.unit}</span>
                       </p>
                       {item.unit_cost > 0 && (
-                        <p className="text-xs text-gray-400">{item.unit_cost} kr/{item.unit}</p>
+                        <p className="text-xs text-gray-400">{item.unit_cost.toLocaleString('sv-SE')} kr/{item.unit}</p>
                       )}
                     </div>
 

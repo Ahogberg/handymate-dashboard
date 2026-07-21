@@ -269,7 +269,7 @@ export function NewDealModal() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Värde (kr)</label>
+                <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Värde (kr, exkl. moms)</label>
                 <input type="number" value={newDealForm.value} onChange={e => setNewDealForm(prev => ({ ...prev, value: e.target.value }))} placeholder="0"
                   className="w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
               </div>

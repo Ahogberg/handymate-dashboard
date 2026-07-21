@@ -993,7 +993,7 @@ export default function TodayView() {
                                 GPS
                               </a>
                             )}
-                            {entry.hourly_rate && <span>{entry.hourly_rate} kr/tim</span>}
+                            {entry.hourly_rate && <span>{entry.hourly_rate.toLocaleString('sv-SE')} kr/tim</span>}
                           </div>
                         </div>
 

@@ -931,7 +931,7 @@ export default function ApprovalsPage() {
 
                   {type === 'price_adjustment' && (payload as any).suggested_price && (
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700">
-                      Nytt pris: <strong>{(payload as any).suggested_price} kr</strong>
+                      Nytt pris: <strong>{Number((payload as any).suggested_price).toLocaleString('sv-SE')} kr</strong>
                     </div>
                   )}
 

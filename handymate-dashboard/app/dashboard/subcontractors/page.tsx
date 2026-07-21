@@ -291,7 +291,7 @@ export default function SubcontractorsPage() {
                   </div>
                 )}
                 {sub.hourly_rate && (
-                  <p className="text-gray-500">{sub.hourly_rate} kr/h</p>
+                  <p className="text-gray-500">{sub.hourly_rate.toLocaleString('sv-SE')} kr/h</p>
                 )}
               </div>
 
@@ -393,7 +393,7 @@ export default function SubcontractorsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Timpris (kr)</label>
+                  <label className="block text-sm text-gray-500 mb-1">Timpris (kr, exkl. moms)</label>
                   <input
                     type="number"
                     value={form.hourly_rate}

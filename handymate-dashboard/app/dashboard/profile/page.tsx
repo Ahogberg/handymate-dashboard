@@ -270,7 +270,7 @@ export default function ProfilePage() {
           <div className="p-4 bg-gray-50 rounded-xl">
             <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Timpris</p>
             <p className="text-gray-900 text-sm font-medium">
-              {user.hourly_rate ? `${user.hourly_rate} kr/h` : '\u2014'}
+              {user.hourly_rate ? `${user.hourly_rate.toLocaleString('sv-SE')} kr/h` : '\u2014'}
             </p>
           </div>
 

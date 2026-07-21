@@ -317,11 +317,11 @@ export default function InventorySettingsPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Inköpspris (kr)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Inköpspris (kr, exkl. moms)</label>
                   <input type="number" min={0} value={newItem.cost_price} onChange={e => setNewItem({ ...newItem, cost_price: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Försäljningspris (kr)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Försäljningspris (kr, exkl. moms)</label>
                   <input type="number" min={0} value={newItem.sell_price} onChange={e => setNewItem({ ...newItem, sell_price: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 </div>
               </div>

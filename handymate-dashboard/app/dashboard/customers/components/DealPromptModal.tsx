@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { TrendingUp } from 'lucide-react'
 
 interface DealPromptModalProps {
@@ -9,6 +10,7 @@ interface DealPromptModalProps {
 }
 
 export function DealPromptModal({ customerId, customerName, onDismiss }: DealPromptModalProps) {
+  const router = useRouter()
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
@@ -34,7 +36,7 @@ export function DealPromptModal({ customerId, customerName, onDismiss }: DealPro
           </button>
           <button
             onClick={() => {
-              window.location.href = `/dashboard/pipeline?newDeal=true&customer_id=${customerId}&customer_name=${encodeURIComponent(customerName)}`
+              router.push(`/dashboard/pipeline?newDeal=true&customer_id=${customerId}&customer_name=${encodeURIComponent(customerName)}`)
             }}
             className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-primary-700 hover:bg-primary-600 rounded-xl transition-colors shadow-sm"
           >

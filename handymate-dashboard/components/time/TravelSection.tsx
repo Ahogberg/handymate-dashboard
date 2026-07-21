@@ -211,7 +211,7 @@ export default function TravelSection({ currentWeek }: TravelSectionProps) {
             <div className="flex items-end">
               <div className="bg-orange-50 border border-orange-200 rounded-xl p-2.5 w-full text-center">
                 <p className="text-xs text-orange-600">Ersättning</p>
-                <p className="text-lg font-bold text-orange-700">{Math.round(estimatedAmount)} kr</p>
+                <p className="text-lg font-bold text-orange-700">{Math.round(estimatedAmount).toLocaleString('sv-SE')} kr</p>
               </div>
             </div>
           </div>
@@ -286,10 +286,10 @@ export default function TravelSection({ currentWeek }: TravelSectionProps) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-gray-900">{entry.distance_km} km</span>
-                  <span className="text-xs text-gray-500">{Math.round(entry.total_amount)} kr</span>
+                  <span className="text-xs text-gray-500">{Math.round(entry.total_amount).toLocaleString('sv-SE')} kr</span>
                   {entry.has_overnight && (
                     <span className="px-1.5 py-0.5 text-xs rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200">
-                      Traktamente {Math.round(entry.allowance_amount)} kr
+                      Traktamente {Math.round(entry.allowance_amount).toLocaleString('sv-SE')} kr
                     </span>
                   )}
                 </div>

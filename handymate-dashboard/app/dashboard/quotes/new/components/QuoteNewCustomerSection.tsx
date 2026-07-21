@@ -99,9 +99,9 @@ export function QuoteNewCustomerSection({
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-primary-700 pl-5">
-                  {customerPriceListInfo.hourlyRate ? <span>Timpris: {customerPriceListInfo.hourlyRate} kr</span> : null}
+                  {customerPriceListInfo.hourlyRate ? <span>Timpris: {customerPriceListInfo.hourlyRate.toLocaleString('sv-SE')} kr</span> : null}
                   {customerPriceListInfo.materialMarkup ? <span>Materialpåslag: {customerPriceListInfo.materialMarkup}%</span> : null}
-                  {customerPriceListInfo.calloutFee ? <span>Utryckning: {customerPriceListInfo.calloutFee} kr</span> : null}
+                  {customerPriceListInfo.calloutFee ? <span>Utryckning: {customerPriceListInfo.calloutFee.toLocaleString('sv-SE')} kr</span> : null}
                 </div>
                 {customerPriceListInfo.items && customerPriceListInfo.items.length > 0 && items.length === 0 && (
                   <button

@@ -867,7 +867,7 @@ function VehicleModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Pris ({billingLabel(billingType)})</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Pris ({billingLabel(billingType)}, exkl. moms)</label>
             <input type="number" value={rate} onChange={e => setRate(e.target.value)} step="0.5" placeholder="4.50" className={inputCls} />
           </div>
         </div>

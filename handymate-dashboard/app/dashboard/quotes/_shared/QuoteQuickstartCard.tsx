@@ -94,7 +94,7 @@ export function QuoteQuickstartCard({ onAddRow }: QuoteQuickstartCardProps) {
               <p className="text-sm font-medium text-slate-900 truncate">{row.name}</p>
               <p className="text-[11px] text-slate-500 mt-0.5 tabular-nums">
                 1 {row.unit}
-                {row.sales_price > 0 && ` × ${row.sales_price} kr`}
+                {row.sales_price > 0 && ` × ${row.sales_price.toLocaleString('sv-SE')} kr`}
                 {row.is_rot_eligible && (
                   <span className="ml-1.5 text-primary-700 font-semibold uppercase tracking-wider">
                     · ROT

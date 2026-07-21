@@ -331,9 +331,9 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
           <div className="flex items-center justify-between">
             <div>
               <p className="text-amber-600 font-medium">Överskjutande SMS</p>
-              <p className="text-sm text-amber-600/70">{overage} SMS × {overageRate} kr</p>
+              <p className="text-sm text-amber-600/70">{overage.toLocaleString('sv-SE')} SMS × {overageRate} kr</p>
             </div>
-            <p className="text-xl font-bold text-amber-600">{overageCost.toFixed(0)} kr</p>
+            <p className="text-xl font-bold text-amber-600">{Math.round(overageCost).toLocaleString('sv-SE')} kr</p>
           </div>
         </div>
       )}

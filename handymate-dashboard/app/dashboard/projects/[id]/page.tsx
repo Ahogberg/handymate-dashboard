@@ -2841,7 +2841,7 @@ export default function ProjectDetailPage() {
                             className="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded text-sm text-gray-900 text-right"
                           />
                         </div>
-                        <div className="col-span-1 text-sm text-gray-500 text-right">{mat.purchase_price} kr</div>
+                        <div className="col-span-1 text-sm text-gray-500 text-right">{formatCurrency(mat.purchase_price || 0)}</div>
                         <div className="col-span-1">
                           <input
                             type="number"
@@ -2851,7 +2851,7 @@ export default function ProjectDetailPage() {
                           />
                         </div>
                         <div className="col-span-1 text-sm text-gray-500 text-right">
-                          {Math.round((mat.purchase_price || 0) * (1 + editValues.markup_percent / 100))} kr
+                          {formatCurrency(Math.round((mat.purchase_price || 0) * (1 + editValues.markup_percent / 100)))}
                         </div>
                         <div className="col-span-1 text-sm text-gray-900 text-right font-medium">
                           {formatCurrency(Math.round(editValues.quantity * (mat.purchase_price || 0) * (1 + editValues.markup_percent / 100)))}
@@ -2874,9 +2874,9 @@ export default function ProjectDetailPage() {
                     ) : (
                       <>
                         <div className="col-span-1 text-sm text-gray-500 text-right">{mat.quantity} {mat.unit}</div>
-                        <div className="col-span-1 text-sm text-gray-500 text-right">{mat.purchase_price} kr</div>
+                        <div className="col-span-1 text-sm text-gray-500 text-right">{formatCurrency(mat.purchase_price || 0)}</div>
                         <div className="col-span-1 text-sm text-gray-500 text-right">{mat.markup_percent}%</div>
-                        <div className="col-span-1 text-sm text-gray-500 text-right">{mat.sell_price} kr</div>
+                        <div className="col-span-1 text-sm text-gray-500 text-right">{formatCurrency(mat.sell_price || 0)}</div>
                         <div className="col-span-1 text-sm text-gray-900 text-right font-medium">{formatCurrency(mat.total_sell || 0)}</div>
                         <div className="col-span-2 flex items-center justify-end gap-1">
                           {mat.invoiced ? (
@@ -4402,7 +4402,7 @@ function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, o
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-500 mb-2 block">Budgetbelopp (kr)</label>
+                  <label className="text-sm text-gray-500 mb-2 block">Budgetbelopp (kr, exkl. moms)</label>
                   <input
                     type="number"
                     value={budgetAmount}

@@ -200,7 +200,7 @@ export default function LeadsOutboundPage() {
             <div className="flex-1">
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-gray-600">{usage.letters_sent} av {usage.letters_quota} brev använda denna månad</span>
-                {usage.extra_letters > 0 && <span className="text-amber-600">+{usage.extra_letters} extra ({usage.extra_cost_sek} kr)</span>}
+                {usage.extra_letters > 0 && <span className="text-amber-600">+{usage.extra_letters.toLocaleString('sv-SE')} extra ({usage.extra_cost_sek.toLocaleString('sv-SE')} kr)</span>}
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div
@@ -492,7 +492,7 @@ function NeighbourCampaignsTab() {
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
                     <span>{c.neighbour_count} brev</span>
-                    <span>{Number(c.cost_sek || 0)} kr</span>
+                    <span>{Number(c.cost_sek || 0).toLocaleString('sv-SE')} kr</span>
                     {c.sent_at && <span>{new Date(c.sent_at).toLocaleDateString('sv-SE')}</span>}
                     {c.converted_count > 0 && <span className="text-primary-700 font-medium">{c.converted_count} jobb</span>}
                   </div>
@@ -589,7 +589,7 @@ function LeadsUpgradePage() {
               </div>
               <ul className="text-sm text-gray-600 space-y-2 mb-6">
                 <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary-600 shrink-0" />{plan.quota} brev/månad inkluderade</li>
-                <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary-600 shrink-0" />Extra brev: {plan.perLetter} kr/st</li>
+                <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary-600 shrink-0" />Extra brev: {plan.perLetter.toLocaleString('sv-SE')} kr/st</li>
                 <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary-600 shrink-0" />AI-genererade brev</li>
                 <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary-600 shrink-0" />Lagfarter + Granneffekten</li>
               </ul>

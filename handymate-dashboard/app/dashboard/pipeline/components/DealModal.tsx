@@ -330,7 +330,7 @@ export function DealModal() {
                     {/* Value + Priority row */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="flex items-center justify-between rounded-lg border border-[#E2E8F0] bg-gray-50/50 px-4 py-3">
-                        <span className="text-sm text-gray-400">Värde</span>
+                        <span className="text-sm text-gray-400">Värde (exkl. moms)</span>
                         {editingValue ? (
                           <div className="flex items-center gap-2">
                             <input type="number" value={editValueInput} onChange={e => setEditValueInput(e.target.value)}
@@ -340,7 +340,7 @@ export function DealModal() {
                           </div>
                         ) : (
                           <button onClick={() => { setEditValueInput(selectedDeal.value?.toString() || ''); setEditingValue(true) }} className="group flex items-center gap-1.5 text-gray-900 font-semibold text-sm">
-                            {formatValue(selectedDeal.value)}<Edit3 className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            {formatValue(selectedDeal.value)}<span className="text-[9px] text-gray-400 ml-0.5">exkl.</span><Edit3 className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </button>
                         )}
                       </div>
