@@ -264,6 +264,7 @@ export default function NewQuotePage() {
   const [previewMode, setPreviewMode] = useState<'live' | 'design' | 'compact'>('live')
   const [debouncedPreviewData, setDebouncedPreviewData] = useState<QuotePreviewData | null>(null)
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const descriptionWarningShownRef = useRef(false)
 
   // ─── Shared hooks ──────────────────────────────────────────────────
   const {
@@ -1180,6 +1181,11 @@ export default function NewQuotePage() {
   const saveQuote = async (send: boolean = false) => {
     if (send && !selectedCustomer) {
       toast.warning('Välj en kund först för att skicka offerten')
+      return
+    }
+    if (send && !description.trim() && !descriptionWarningShownRef.current) {
+      descriptionWarningShownRef.current = true
+      toast.warning('Offerten saknar beskrivning. Lägg till en kort beskrivning, eller klicka Skicka igen för att fortsätta.')
       return
     }
     if (paymentPlan.length > 0 && !paymentPlanValid) {
