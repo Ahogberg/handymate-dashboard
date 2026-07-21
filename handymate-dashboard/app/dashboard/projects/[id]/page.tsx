@@ -4402,7 +4402,7 @@ function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, o
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-500 mb-2 block">Budgetbelopp (kr)</label>
+                  <label className="text-sm text-gray-500 mb-2 block">Budgetbelopp (kr, exkl. moms)</label>
                   <input
                     type="number"
                     value={budgetAmount}

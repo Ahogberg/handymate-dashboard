@@ -265,7 +265,7 @@ export function ProductEditorModal({
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className={LABEL_CLS}>
-                Pris <span className="text-red-600 normal-case font-medium">*</span>
+                Pris (exkl. moms) <span className="text-red-600 normal-case font-medium">*</span>
               </label>
               <div className="relative">
                 <input
@@ -489,7 +489,7 @@ export function ProductEditorModal({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Kostnad</label>
+                        <label className="block text-[11px] text-slate-400 mb-1">Kostnad (exkl. moms)</label>
                         <div className="relative">
                           <input
                             type="number"

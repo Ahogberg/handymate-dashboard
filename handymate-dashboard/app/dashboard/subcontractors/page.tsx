@@ -393,7 +393,7 @@ export default function SubcontractorsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Timpris (kr)</label>
+                  <label className="block text-sm text-gray-500 mb-1">Timpris (kr, exkl. moms)</label>
                   <input
                     type="number"
                     value={form.hourly_rate}

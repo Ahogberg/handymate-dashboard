@@ -601,7 +601,7 @@ export default function TeamPage() {
 
               {/* Hourly rate */}
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Timpris (kr/h)</label>
+                <label className="block text-sm text-gray-500 mb-1">Timpris (kr/h, exkl. moms)</label>
                 <input
                   type="number"
                   value={inviteForm.hourly_rate}
@@ -760,7 +760,7 @@ export default function TeamPage() {
 
               {/* Hourly rate */}
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Timpris (kr/h)</label>
+                <label className="block text-sm text-gray-500 mb-1">Timpris (kr/h, exkl. moms)</label>
                 <input
                   type="number"
                   value={editForm.hourly_rate}

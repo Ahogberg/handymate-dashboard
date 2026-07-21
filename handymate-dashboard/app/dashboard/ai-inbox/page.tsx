@@ -706,7 +706,7 @@ export default function AIInboxPage() {
                                               type="number"
                                               value={editForm.estimated_price || ''}
                                               onChange={(e) => setEditForm({ ...editForm, estimated_price: e.target.value })}
-                                              placeholder="Uppskattat pris (kr)"
+                                              placeholder="Uppskattat pris (kr, exkl. moms)"
                                               className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm"
                                             />
                                           </>
