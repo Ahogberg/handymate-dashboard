@@ -6,7 +6,7 @@ import {
   Phone,
   MessageSquare,
   FileText,
-  Send,
+
   Clock,
   Zap,
   Search,
@@ -915,115 +915,6 @@ function AutonomySettings({ settings, onUpdate, saving, trust }: {
   )
 }
 
-// ── Manual Trigger ─────────────────────────────────────────────────────
-
-const PLACEHOLDER_EXAMPLES = [
-  'Vilka kunder har inte hört av sig på 6 månader?',
-  'Visa mina obetalda fakturor',
-  'Hur mycket fakturerade vi förra månaden?',
-  'Följ upp offerter som skickades för mer än 5 dagar sedan',
-  'Lista alla aktiva projekt just nu',
-]
-
-const QUICK_BUTTONS = [
-  { emoji: '📋', label: 'Ny offert', text: 'Skapa en offert till ' },
-  { emoji: '💰', label: 'Fakturor', text: 'Visa alla obetalda fakturor' },
-  { emoji: '👥', label: 'Kunder', text: 'Vilka kunder behöver uppföljning?' },
-  { emoji: '📅', label: 'Bokningar', text: 'Vilka bokningar har jag den här veckan?' },
-]
-
-function ManualTrigger({ businessId, onTriggered, onOpenChat }: {
-  businessId: string; onTriggered: () => void; onOpenChat: (initial: string) => void
-}) {
-  const [instruction, setInstruction] = useState('')
-  const [placeholderIdx, setPlaceholderIdx] = useState(0)
-  const [history, setHistory] = useState<string[]>([])
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    const interval = setInterval(() => setPlaceholderIdx(prev => (prev + 1) % PLACEHOLDER_EXAMPLES.length), 3000)
-    return () => clearInterval(interval)
-  }, [])
-
-  function handleTrigger() {
-    if (!instruction.trim()) return
-    const query = instruction.trim()
-
-    // Spara i history (max 5, inga dubbletter)
-    setHistory(prev => {
-      const filtered = prev.filter(h => h !== query)
-      return [query, ...filtered].slice(0, 5)
-    })
-
-    // Öppna chat-modalen med texten förifylld
-    onOpenChat(query)
-    setInstruction('')
-  }
-
-  function removeFromHistory(query: string) {
-    setHistory(prev => prev.filter(h => h !== query))
-  }
-
-  return (
-    <div className="bg-white rounded-xl border border-[#E2E8F0] p-5">
-      <div className="flex items-center gap-2 mb-3">
-        {TEAM[0].avatar ? (
-          <img src={TEAM[0].avatar} alt="Matte" className="w-7 h-7 rounded-full object-cover" />
-        ) : (
-          <div className="w-7 h-7 rounded-full bg-primary-700 flex items-center justify-center text-white font-bold text-xs">M</div>
-        )}
-        <h3 className="text-sm font-bold text-gray-900">Prata med Matte</h3>
-      </div>
-
-      {/* History chips */}
-      {history.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2.5">
-          {history.map(q => (
-            <button key={q} onClick={() => { setInstruction(q); inputRef.current?.focus() }}
-              className="group flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50 border border-[#E2E8F0] text-[11px] text-gray-500 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
-              <span className="truncate max-w-[180px]">{q}</span>
-              <span onClick={(e) => { e.stopPropagation(); removeFromHistory(q) }}
-                className="text-gray-300 hover:text-red-400 ml-0.5">×</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Input */}
-      <div className="flex gap-2">
-        <input ref={inputRef} type="text" value={instruction}
-          onChange={e => setInstruction(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleTrigger()}
-          placeholder={PLACEHOLDER_EXAMPLES[placeholderIdx]}
-          className="flex-1 px-4 py-2.5 rounded-lg border border-[#E2E8F0] text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-600" />
-        <button onClick={handleTrigger} disabled={!instruction.trim()}
-          className="px-4 py-2.5 rounded-lg bg-primary-800 text-white text-sm font-medium hover:bg-primary-900 disabled:opacity-50 transition-all flex items-center gap-2 shadow-primary-600/20">
-          <Send className="w-4 h-4" />
-          Kör
-        </button>
-      </div>
-
-      {/* Quick buttons */}
-      <div className="flex flex-wrap gap-1.5 mt-2.5">
-        <button
-          type="button"
-          onClick={() => onOpenChat('')}
-          className="px-2.5 py-1 rounded-lg bg-primary-50 border border-primary-200 text-xs text-primary-800 hover:bg-primary-100 transition-colors font-medium"
-        >
-          💬 Öppna chatt
-        </button>
-        {QUICK_BUTTONS.map(btn => (
-          <button key={btn.label} type="button"
-            onClick={() => { setInstruction(btn.text); inputRef.current?.focus() }}
-            className="px-2.5 py-1 rounded-lg bg-gray-50 border border-[#E2E8F0] text-xs text-gray-600 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
-            {btn.emoji} {btn.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ── Main Dashboard ─────────────────────────────────────────────────────
 
 export default function AgentDashboardPage() {
@@ -1050,11 +941,6 @@ export default function AgentDashboardPage() {
 
   // Minnes-modal state
   const [memoriesAgentId, setMemoriesAgentId] = useState<string | null>(null)
-
-  function openChatWith(initial: string) {
-    setChatInitial(initial)
-    setChatOpen(true)
-  }
 
   // Auto-öppna chatten om det finns en pågående konversation från senaste 6 timmarna
   useEffect(() => {
@@ -1196,11 +1082,16 @@ export default function AgentDashboardPage() {
 
   // ── Filtering ────────────────────────────────────────────────────
 
+  // Teamaktivitet ska visa vad teamet GJORT — inte chatt-småprat. Manuella
+  // körningar utan ett enda verktygssteg är ren konversation (t.ex. "Hej!"
+  // i chatten) och filtreras bort; chatt som faktiskt utfört något (skapat
+  // offert, skickat påminnelse) har tool_calls > 0 och visas.
+  const meaningfulRuns = runs.filter(r => !(r.trigger_type === 'manual' && (r.tool_calls ?? 0) === 0))
   const filteredRuns = filterType === 'all'
-    ? runs
+    ? meaningfulRuns
     : TEAM.some(a => a.id === filterType)
-      ? runs.filter(r => (r.agent_id || getAgentForRun(r).id) === filterType)
-      : runs.filter(r => r.trigger_type === filterType)
+      ? meaningfulRuns.filter(r => (r.agent_id || getAgentForRun(r).id) === filterType)
+      : meaningfulRuns.filter(r => r.trigger_type === filterType)
 
   // ── Success rate ─────────────────────────────────────────────────
   const successRate = stats && stats.total_runs > 0
@@ -1378,14 +1269,8 @@ export default function AgentDashboardPage() {
             </ResponsiveContainer>
           </div>
 
-          {/* Manual Trigger */}
-          <div className="mb-6">
-            <ManualTrigger
-              businessId={business.business_id}
-              onTriggered={() => { fetchRuns(); fetchStats(); fetchChartData() }}
-              onOpenChat={openChatWith}
-            />
-          </div>
+          {/* "Prata med Matte"-modulen borttagen 2026-07 — Matte nås via den
+              globala chattwidgeten på alla sidor; modulen var en dublett. */}
 
           {/* Team Communication */}
           {teamMessages.length > 0 && (
@@ -1519,9 +1404,9 @@ export default function AgentDashboardPage() {
                 ) : (
                   <div className="p-12 text-center">
                     <Bot className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                    <p className="text-sm text-gray-500">Inga agent-körningar ännu</p>
+                    <p className="text-sm text-gray-500">Inget att visa ännu</p>
                     <p className="text-xs text-gray-400 mt-1">
-                      Ge agenten en uppgift ovan eller vänta på inkommande samtal/SMS
+                      Teamets åtgärder dyker upp här — fångade samtal, offert-uppföljningar och påminnelser
                     </p>
                   </div>
                 )}
