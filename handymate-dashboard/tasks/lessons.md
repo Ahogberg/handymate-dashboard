@@ -71,3 +71,13 @@ internt. Feature-/komponentnamn (radarn, digest, agent run) och modellbegrepp
 nya konton ska vara osynliga eller ge handling — ett "kommer snart"-löfteskort
 är brus som bygger på-hög-känslan. Granska cold-start/empty-copy som egen punkt
 i varje UI-svep.
+
+## 2026-07-22 — Kontrollera aktiva agenter INNAN ny agent startas (självfångad)
+
+Nära-incident: en textstädnings-agent startades medan Motor 2 Etapp 2-agenten
+fortfarande ägde arbetsträdet — exakt det tvåagents-misstag som redan står
+dokumenterat ovan. Fångades inom sekunder och stoppades innan något skrevs.
+Regeln skärps: innan VARJE Agent-start i repot — kontrollera aktivt att ingen
+byggagent är igång (todo-listan + senaste agent-notifikationerna). Nya
+uppgifter under pågående bygge KÖAS med färdig prompt istället för att
+avfyras. En agent = äger repot tills merge, utan undantag.
