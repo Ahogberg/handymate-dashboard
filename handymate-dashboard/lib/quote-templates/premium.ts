@@ -74,12 +74,8 @@ export const renderPremium: TemplateRenderFn = (data: QuoteTemplateData): string
   const descriptionHtml = data.quote.description
     ? `<p class="quote-sub">${escapeHtml(data.quote.description)}</p>`
     : ''
-  const introHtml = data.quote.introductionText
-    ? `<p class="quote-sub">${escapeHtml(data.quote.introductionText)}</p>`
-    : ''
-  const conclusionHtml = data.quote.conclusionText
-    ? `<p class="quote-sub conclusion">${escapeHtml(data.quote.conclusionText)}</p>`
-    : ''
+  // Inlednings-/avslutningstext borttagna ur flödet (redundanta mot
+  // beskrivningen, pilot-beslut 2026-07) — se motsvarande kommentar i modern.ts.
 
   return `<!DOCTYPE html>
 <html lang="sv">
@@ -237,7 +233,6 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 
     <h1 class="quote-title">${escapeHtml(data.quote.title)}</h1>
     ${descriptionHtml}
-    ${introHtml}
 
     <div class="items" style="--item-cols: ${gridCols};">
       <div class="items-head">
@@ -269,7 +264,6 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
       </div>
     </div>
 
-    ${conclusionHtml}
     <div class="pay-row">
       ${data.business.bankgiro ? `<div class="pay-card"><div class="l">Bankgiro</div><div class="v">${escapeHtml(data.business.bankgiro)}</div><div class="s">Faktura skickas vid avslut</div></div>` : ''}
       ${data.business.swish ? `<div class="pay-card"><div class="l">Swish företag</div><div class="v">${escapeHtml(data.business.swish)}</div><div class="s">Ange offertnummer i meddelandet</div></div>` : ''}

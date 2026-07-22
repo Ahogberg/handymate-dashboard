@@ -760,11 +760,11 @@ export function generateQuotePDF(quote: QuotePdfData, business: BusinessPdfData)
   y += 6
 
   // ── Villkorstexter (liten stil) ──
+  // Inlednings-/avslutningstext (quote.introduction_text/conclusion_text)
+  // renderas INTE längre — redundanta mot beskrivningen (pilot-beslut 2026-07).
   const terms: Array<[string, string | null | undefined]> = [
-    ['Inledning', quote.introduction_text],
     ['Ingår ej', quote.not_included],
     ['Betalningsvillkor', quote.payment_terms_text],
-    ['Övrigt', quote.conclusion_text],
   ]
   for (const [label, text] of terms) {
     if (!text) continue
