@@ -10,6 +10,7 @@ import {
   Clock,
   User,
   Info,
+  Repeat,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -28,6 +29,9 @@ interface HandymateEvent {
   customerId: string
   customerName: string
   customerPhone: string | null
+  // Motor 2, Etapp 2: satt när bokningen kommer från ett serviceavtal
+  // (Lars serviceavtals-cron) — styr den diskreta återkommande-markeringen.
+  agreementId?: string | null
 }
 
 interface GoogleEvent {
@@ -581,8 +585,11 @@ export default function CalendarPage() {
                   width: `calc(${widthPercent}% - 4px)`,
                 }}
               >
-                <p className="text-[11px] font-medium text-[#0F766E] truncate leading-tight">
-                  {hmEvent.customerName}
+                <p className="text-[11px] font-medium text-[#0F766E] truncate leading-tight flex items-center gap-1">
+                  {hmEvent.agreementId && (
+                    <Repeat className="w-2.5 h-2.5 shrink-0" aria-label="Serviceavtal" />
+                  )}
+                  <span className="truncate">{hmEvent.customerName}</span>
                 </p>
                 {pos.height > 30 && (
                   <p className="text-[10px] text-[#0F766E]/70 truncate leading-tight">
@@ -936,7 +943,18 @@ export default function CalendarPage() {
           <div className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-sm sm:mx-4 p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-[16px] font-semibold text-[#1E293B]">{selectedEvent.customerName}</h3>
+                <h3 className="text-[16px] font-semibold text-[#1E293B] flex items-center gap-1.5">
+                  {selectedEvent.customerName}
+                  {selectedEvent.agreementId && (
+                    <span
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary-50 text-primary-700 text-[10px] font-medium"
+                      title="Återkommande besök från ett serviceavtal"
+                    >
+                      <Repeat className="w-2.5 h-2.5" />
+                      Serviceavtal
+                    </span>
+                  )}
+                </h3>
                 <p className="text-[13px] text-[#64748B]">{selectedEvent.title}</p>
               </div>
               <button onClick={() => setSelectedEvent(null)} className="p-1 text-[#94A3B8] hover:text-[#1E293B]">
