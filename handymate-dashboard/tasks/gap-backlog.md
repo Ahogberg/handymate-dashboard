@@ -178,3 +178,42 @@ ev. usage-komponent på röst när Röst-Lisa kommer; och transparens är vårt 
 1. A-testet + B7 Stripe-köp (lanseringssprinten, `tasks/launch-verification.md`)
 2. Merge av Idag-omdesignen (`tasks/todo.md` review-sektion)
 3. Nivå 1 → 2 → 3 ovan, med omkörd svensk research före ⚠-beslut
+
+## Blinda fläckar-analysen (2026-07-22, godkänd av Andreas att loggas)
+
+Fyra vinklar vi systematiskt inte tänkt på — med triggers, INTE byggda nu.
+Kontext: största risken just nu är inte missade features utan konvertering
+(kund 1–3). Dessa loggas så de inte glöms.
+
+### BF1. Husägaren som tillväxtmotor (trigger: 2 frön NU, loop vid kund 5–10)
+Varje portal/offert/faktura exponerar Handymate för en husägare som anlitar
+FLERA hantverkare. I dag noll återvinning av exponeringen.
+- Frö (1 h): "Drivs av Handymate"-rad i portal + offert med länk
+  "Är du hantverkare? Ge din firma samma team".
+- Vid kund 5–10: husägar-loopen på riktigt — "Mitt hem"-vyn (finns i
+  moat-listan) omramad som FÖRVÄRVSKANAL: kundens fastighetshistorik drar
+  in nästa hantverkare hen anlitar.
+
+### BF2. Benchmark-nätverkseffekten ur Motor 1-datan (trigger: samtycke NU, motor vid kund 10–20)
+project_outcome tvärs firmor = "firmor som din tar 14 % mer för badrum i
+Stockholm och vinner ändå" — anonymiserad benchmarking ingen nordisk
+konkurrent kan kopiera i efterhand (de samlar ingen utfallsdata).
+Nätverkseffekt: värdet växer per ansluten kund.
+- Frö (1 h): samtyckes-kryssruta "Bidra till anonymiserad branschstatistik"
+  i inställningarna — juridiskt kladdigt att eftermontera, billigt nu.
+- Vid kund 10–20: aggregerings-motorn + benchmark-insikter i offertflödet.
+
+### BF3. Pengaflödena runt jobbet — andra intäktsströmmar (trigger: kund 20+)
+Hittills bara SaaS-avgift i tänket. Två klassiska vertikal-expansioner:
+- Inköp: material = 30–50 % av jobbkostnad; grossist-jämförelsen finns
+  redan i offertflödet. Samlad köpkraft + leverantörspartnerskap +
+  marginaldelning.
+- Fintech: fakturaköp/direktutbetalning (hantverkaren ligger ute 30 dagar,
+  + hela ROT-delen tills Skatteverket betalar). Partner + intäktsdelning.
+  Shopify-läroboken: SaaS → betalflöden → kapital.
+
+### BF4. Försäkringsbolagen som kanal (trigger: ett utforskande samtal när case-studyn finns)
+Vattenskade-/försäkringsjobb kräver exakt vår dokumentation (foton,
+checklistor, kvalitetsdokument, BBV). Handymate-firmor = bevisbart spårbara
+→ föredragna utförare. Vänder säljlogiken: firmor skaffar Handymate för att
+FÅ jobb. B2B2B-distribution.
