@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
         })
       }
 
-      results.push({ business_id: biz.business_id, ...result })
+      results.push({ ...result })
     } catch (err) {
       console.error('[cron/avtal-forslag] business error:', biz.business_id, err instanceof Error ? err.message : String(err))
       results.push({ business_id: biz.business_id, error: err instanceof Error ? err.message : String(err) })
