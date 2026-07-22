@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const { data: bookings } = await supabase
       .from('booking')
       .select(`
-        booking_id, customer_id, scheduled_start, scheduled_end, status, notes,
+        booking_id, customer_id, scheduled_start, scheduled_end, status, notes, agreement_id,
         customer (name, phone_number)
       `)
       .eq('business_id', business.business_id)
@@ -44,6 +44,9 @@ export async function GET(request: NextRequest) {
       customerId: b.customer_id,
       customerName: b.customer?.name || 'Okänd kund',
       customerPhone: b.customer?.phone_number || null,
+      // Motor 2, Etapp 2: serie-markering i kalendervyn — satt när bokningen
+      // kommer från Lars serviceavtals-cron (lib/agents/lars/service-bookings.ts).
+      agreementId: b.agreement_id || null,
     }))
 
     // 2. Fetch Google Calendar events (graceful fallback)

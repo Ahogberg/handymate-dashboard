@@ -112,6 +112,10 @@
     {
       "path": "/api/cron/service-bookings",
       "schedule": "20 6 * * *"
+    },
+    {
+      "path": "/api/cron/avtal-forslag",
+      "schedule": "40 8 * * *"
     }
   ]
 }

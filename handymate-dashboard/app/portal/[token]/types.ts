@@ -159,6 +159,19 @@ export interface Message {
   created_at: string
 }
 
+/**
+ * Aktivt serviceavtal — Motor 2, Etapp 2 (portal-avtalsvyn). Pris INKL.
+ * moms (portalen är kundvänd, se lib/agreements/pricing.ts). v1: ingen
+ * kund-självservice, bara insyn — se tasks/motor2-serviceavtal-spec.md.
+ */
+export interface PortalAgreement {
+  agreement_id: string
+  title: string
+  interval_months: number
+  next_visit_at: string | null
+  price_incl_vat: number
+}
+
 export type Tab = 'projects' | 'quotes' | 'invoices' | 'messages' | 'review' | 'changes' | 'reports'
 
 export interface FieldReport {

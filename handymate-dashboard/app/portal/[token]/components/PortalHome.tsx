@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import PortalShellHeader from './PortalShellHeader'
 import PortalHandymateAttribution from './PortalHandymateAttribution'
+import PortalAgreements from './PortalAgreements'
 import { formatCurrency } from '../helpers'
 import type { PortalActivity, PortalData, Project } from '../types'
 
@@ -254,6 +255,9 @@ export default function PortalHome({ portal, token, onNavigate }: PortalHomeProp
             ))}
           </div>
         </div>
+
+        {/* Serviceavtal (Motor 2, Etapp 2) — visas bara vid aktiva avtal */}
+        <PortalAgreements token={token} />
 
         {/* Latest activity */}
         <div style={{ padding: '24px 18px 0' }}>

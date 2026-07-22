@@ -5,6 +5,14 @@
  */
 import { test, expect } from '@playwright/test'
 import { addIntervalMonths, pickBestWeek, type WeekCapacityCandidate } from '../lib/agreements/schedule'
+import {
+  matchAgreementTypesByKeywords,
+  buildFallbackAvtalSms,
+  buildHaikuUserMessage,
+  parseAndValidateHaikuResponse,
+  AVTAL_FORSLAG_SMS_MAX_LENGTH,
+} from '../lib/agents/hanna/avtal-forslag'
+import { priceExclVat, priceInclVatPerVisit } from '../lib/agreements/pricing'
 
 test.describe('addIntervalMonths — nästa-besöks-beräkning', () => {
   test('vanligt fall: +1 månad inom samma år', () => {
@@ -110,5 +118,252 @@ test.describe('pickBestWeek — Lars-cronens veckoval', () => {
     ]
     // Lika (båda 0) → närmast målveckan (2026-08-10 = målveckan själv, avstånd 0)
     expect(pickBestWeek(candidates, '2026-08-10')).toBe('2026-08-10')
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════
+// Etapp 2 — Hannas AI-matchning (lib/agents/hanna/avtal-forslag.ts) +
+// pris-inkl-moms (lib/agreements/pricing.ts). Cron-loopen och Haiku-
+// anropet självt (matchViaHaiku) testas INTE här — de kräver en riktig
+// Supabase-klient respektive Anthropic-API.
+// ═══════════════════════════════════════════════════════════════════════
+
+test.describe('priceInclVatPerVisit / priceExclVat', () => {
+  test('summerar kvantitet × styckpris exkl. moms', () => {
+    const items = [
+      { quantity: 1, unit_price: 800 },
+      { quantity: 2, unit_price: 100 },
+    ]
+    expect(priceExclVat(items)).toBe(1000)
+  })
+
+  test('lägger på 25% moms och avrundar till närmaste krona', () => {
+    const items = [{ quantity: 1, unit_price: 799 }]
+    // 799 * 1.25 = 998.75 → 999
+    expect(priceInclVatPerVisit(items)).toBe(999)
+  })
+
+  test('saknad kvantitet defaultar till 1', () => {
+    const items = [{ unit_price: 400 }]
+    expect(priceExclVat(items)).toBe(400)
+  })
+
+  test('tom/null price_items → 0', () => {
+    expect(priceExclVat(null)).toBe(0)
+    expect(priceInclVatPerVisit(undefined)).toBe(0)
+    expect(priceExclVat([])).toBe(0)
+  })
+})
+
+test.describe('matchAgreementTypesByKeywords — fallback utan LLM', () => {
+  const catalog = [
+    { type_id: 'sat_varmepump', match_keys: ['värmepump', 'värmepumpsservice'] },
+    { type_id: 'sat_vatrum', match_keys: ['våtrum', 'badrum'] },
+    { type_id: 'sat_tak', match_keys: ['tak', 'takarbete'] },
+  ]
+
+  test('hittar match via case-insensitive innehåll i projekttitel', () => {
+    const matches = matchAgreementTypesByKeywords('Byte av VÄRMEPUMP i villa', catalog)
+    expect(matches).toEqual(['sat_varmepump'])
+  })
+
+  test('hittar flera matcher, max 2', () => {
+    const bigCatalog = [
+      { type_id: 'a', match_keys: ['badrum'] },
+      { type_id: 'b', match_keys: ['tak'] },
+      { type_id: 'c', match_keys: ['badrum'] }, // matchar också men vi stannar vid 2
+    ]
+    const matches = matchAgreementTypesByKeywords('Badrumsrenovering med nytt tak', bigCatalog)
+    expect(matches.length).toBe(2)
+    expect(matches).toEqual(['a', 'b'])
+  })
+
+  test('ingen träff → tom lista', () => {
+    expect(matchAgreementTypesByKeywords('Målning av fasad', catalog)).toEqual([])
+  })
+
+  test('tom sökstäng → tom lista (kraschar inte)', () => {
+    expect(matchAgreementTypesByKeywords('', catalog)).toEqual([])
+  })
+
+  test('katalogpost utan match_keys ignoreras säkert', () => {
+    const catalogWithNulls = [{ type_id: 'x', match_keys: null }]
+    expect(matchAgreementTypesByKeywords('värmepump', catalogWithNulls)).toEqual([])
+  })
+})
+
+test.describe('buildFallbackAvtalSms — deterministisk mall-text', () => {
+  test('följer specens exakta mall', () => {
+    const sms = buildFallbackAvtalSms({
+      customerFirstName: 'Anna Andersson',
+      projectTitle: 'värmepumpsbyte',
+      typeName: 'Värmepumpsservice',
+      intervalMonths: 12,
+      priceInclVat: 999,
+      businessName: 'Svensson Bygg',
+    })
+    expect(sms).toBe(
+      'Hej Anna! Nu när värmepumpsbyte är klart: vi erbjuder Värmepumpsservice ' +
+        'var 12:e månad (999 kr/besök). Svara JA så lägger vi upp det. /Svensson Bygg',
+    )
+  })
+
+  test('kund utan namn → generisk hälsning', () => {
+    const sms = buildFallbackAvtalSms({
+      customerFirstName: null,
+      projectTitle: 'takarbete',
+      typeName: 'Takinspektion',
+      intervalMonths: 36,
+      priceInclVat: 1500,
+      businessName: 'Taksmeden',
+    })
+    expect(sms.startsWith('Hej!')).toBe(true)
+    expect(sms).not.toContain('Hej !')
+  })
+
+  test('saknat företagsnamn faller tillbaka på "oss"', () => {
+    const sms = buildFallbackAvtalSms({
+      customerFirstName: 'Erik',
+      projectTitle: 'jobbet',
+      typeName: 'Service',
+      intervalMonths: 12,
+      priceInclVat: 500,
+      businessName: null,
+    })
+    expect(sms).toContain('/oss')
+  })
+
+  test('aldrig längre än 300 tecken även med extremt långa fält', () => {
+    const sms = buildFallbackAvtalSms({
+      customerFirstName: 'Erik',
+      projectTitle: 'A'.repeat(200),
+      typeName: 'B'.repeat(200),
+      intervalMonths: 12,
+      priceInclVat: 999,
+      businessName: 'C'.repeat(100),
+    })
+    expect(sms.length).toBeLessThanOrEqual(AVTAL_FORSLAG_SMS_MAX_LENGTH)
+  })
+
+  test('nämner pris och intervall — aldrig hittepå-siffror', () => {
+    const sms = buildFallbackAvtalSms({
+      customerFirstName: 'Erik',
+      projectTitle: 'värmepumpsbyte',
+      typeName: 'Värmepumpsservice',
+      intervalMonths: 6,
+      priceInclVat: 1234,
+      businessName: 'Testbolaget',
+    })
+    expect(sms).toContain('1234 kr/besök')
+    expect(sms).toContain('var 6:e månad')
+  })
+})
+
+test.describe('parseAndValidateHaikuResponse — JSON-validering + type_id-filtrering', () => {
+  const validIds = ['sat_a', 'sat_b']
+
+  test('giltigt svar → matches + sms behålls', () => {
+    const raw = '{"matches": ["sat_a"], "sms": "Hej! Vill du teckna avtal? /Företaget"}'
+    const result = parseAndValidateHaikuResponse(raw, validIds)
+    expect(result).not.toBeNull()
+    expect(result?.matches).toEqual(['sat_a'])
+    expect(result?.sms).toBe('Hej! Vill du teckna avtal? /Företaget')
+  })
+
+  test('kastar bort type_id som inte finns i katalogen (behåller resten)', () => {
+    const raw = '{"matches": ["sat_a", "sat_hittepa"], "sms": "Hej!"}'
+    const result = parseAndValidateHaikuResponse(raw, validIds)
+    expect(result?.matches).toEqual(['sat_a'])
+  })
+
+  test('tom matches-lista är ett giltigt AI-beslut (respekteras, INTE null)', () => {
+    const raw = '{"matches": [], "sms": "Inget att erbjuda just nu."}'
+    const result = parseAndValidateHaikuResponse(raw, validIds)
+    expect(result).not.toBeNull()
+    expect(result?.matches).toEqual([])
+  })
+
+  test('begränsar till max 2 matches även om AI:n skickar fler', () => {
+    const raw = '{"matches": ["sat_a", "sat_b", "sat_a"], "sms": "Hej!"}'
+    const result = parseAndValidateHaikuResponse(raw, validIds)
+    expect(result?.matches.length).toBeLessThanOrEqual(2)
+  })
+
+  test('trasig JSON → null (utlöser fallback)', () => {
+    expect(parseAndValidateHaikuResponse('inte json alls', validIds)).toBeNull()
+    expect(parseAndValidateHaikuResponse('{"matches": [sat_a]}', validIds)).toBeNull()
+  })
+
+  test('saknad sms-fält → null', () => {
+    const raw = '{"matches": ["sat_a"]}'
+    expect(parseAndValidateHaikuResponse(raw, validIds)).toBeNull()
+  })
+
+  test('matches som inte är en array → null', () => {
+    const raw = '{"matches": "sat_a", "sms": "Hej!"}'
+    expect(parseAndValidateHaikuResponse(raw, validIds)).toBeNull()
+  })
+
+  test('tom/null input → null', () => {
+    expect(parseAndValidateHaikuResponse(null, validIds)).toBeNull()
+    expect(parseAndValidateHaikuResponse('', validIds)).toBeNull()
+  })
+
+  test('extraherar JSON även med omkringliggande text/preamble', () => {
+    const raw = 'Här är mitt svar:\n{"matches": ["sat_b"], "sms": "Hej!"}\nHoppas det hjälper!'
+    const result = parseAndValidateHaikuResponse(raw, validIds)
+    expect(result?.matches).toEqual(['sat_b'])
+  })
+
+  test('trunkerar SMS längre än 300 tecken istället för att kasta ut svaret', () => {
+    const longSms = 'A'.repeat(350)
+    const raw = JSON.stringify({ matches: ['sat_a'], sms: longSms })
+    const result = parseAndValidateHaikuResponse(raw, validIds)
+    expect(result).not.toBeNull()
+    expect(result!.sms.length).toBeLessThanOrEqual(AVTAL_FORSLAG_SMS_MAX_LENGTH)
+  })
+})
+
+test.describe('buildHaikuUserMessage — prompt-byggaren (ren funktion)', () => {
+  test('innehåller aldrig-hitta-på-pris-regeln och katalogens exakta priser', () => {
+    const msg = buildHaikuUserMessage({
+      projectTitle: 'Värmepumpsbyte',
+      itemDescriptions: ['Demontering gammal pump', 'Installation ny pump'],
+      catalog: [
+        { type_id: 'sat_a', name: 'Värmepumpsservice', description: 'Årlig service', interval_months: 12, priceInclVat: 999 },
+      ],
+      customerFirstName: 'Anna',
+      businessName: 'Svensson Bygg',
+    })
+    expect(msg).toContain('ALDRIG hitta på eller ändra pris eller intervall')
+    expect(msg).toContain('999 kr/besök')
+    expect(msg).toContain('sat_a')
+    expect(msg).toContain('Värmepumpsbyte')
+    expect(msg).toContain('Demontering gammal pump')
+    expect(msg).toContain('{"matches"')
+  })
+
+  test('tomma offertrader → placeholder istället för kraschat innehåll', () => {
+    const msg = buildHaikuUserMessage({
+      projectTitle: 'Okänt jobb',
+      itemDescriptions: [],
+      catalog: [],
+      customerFirstName: null,
+      businessName: null,
+    })
+    expect(msg).toContain('inga offertrader tillgängliga')
+  })
+
+  test('begränsar radbeskrivningar till max 15 i prompten', () => {
+    const many = Array.from({ length: 30 }, (_, i) => `Rad ${i + 1}`)
+    const msg = buildHaikuUserMessage({
+      projectTitle: 'Stort jobb',
+      itemDescriptions: many,
+      catalog: [],
+      customerFirstName: null,
+      businessName: null,
+    })
+    expect(msg).toContain('Rad 15')
+    expect(msg).not.toContain('Rad 16')
   })
 })
