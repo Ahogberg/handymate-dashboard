@@ -25,8 +25,6 @@ interface TemplateData {
   description: string
   branch: string
   category: string
-  introduction_text: string
-  conclusion_text: string
   not_included: string
   ata_terms: string
   payment_terms_text: string
@@ -86,8 +84,6 @@ export default function QuoteTemplateEditorPage() {
           description: found.description || '',
           branch: found.branch || '',
           category: found.category || '',
-          introduction_text: found.introduction_text || '',
-          conclusion_text: found.conclusion_text || '',
           not_included: found.not_included || '',
           ata_terms: found.ata_terms || '',
           payment_terms_text: found.payment_terms_text || '',
@@ -293,11 +289,11 @@ export default function QuoteTemplateEditorPage() {
         </div>
       </Section>
 
-      {/* Section: Standard texts */}
+      {/* Section: Standard texts — Inledning/Avslutning borttagna (pilot-
+          beslut 2026-07): redundanta mot mallens Beskrivning, som numera
+          är offertens öppningstext. */}
       <Section title="Standardtexter" sectionKey="texts" expanded={expandedSections.texts} onToggle={toggleSection}>
         <div className="space-y-4">
-          <TextArea label="Inledning" value={template.introduction_text} onChange={v => updateField('introduction_text', v)} />
-          <TextArea label="Avslutning" value={template.conclusion_text} onChange={v => updateField('conclusion_text', v)} />
           <TextArea label="Ej inkluderat" value={template.not_included} onChange={v => updateField('not_included', v)} />
           <TextArea label="ÄTA-villkor" value={template.ata_terms} onChange={v => updateField('ata_terms', v)} />
           <TextArea label="Betalningsvillkor" value={template.payment_terms_text} onChange={v => updateField('payment_terms_text', v)} />

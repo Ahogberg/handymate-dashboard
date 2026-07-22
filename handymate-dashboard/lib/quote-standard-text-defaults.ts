@@ -6,47 +6,18 @@ interface DefaultText {
   content: string
 }
 
-// Onboarding-rymden (app/onboarding/constants.ts) är sanningen. 'el'/'vvs'/
-// 'maleri' matchade tidigare ALDRIG en verklig branschnyckel (bara 'bygg'
-// föll igenom till default) — alla företag fick generisk bygg-text oavsett
-// bransch. Riktiga nycklar mappas nu direkt; gamla behålls som alias.
-const BRANCH_ALIASES: Record<string, string> = {
-  bygg: 'construction',
-  snickeri: 'carpenter',
-  el: 'electrician',
-  vvs: 'plumber',
-  maleri: 'painter',
-}
-
-function normalizeBranch(branch?: string): string {
-  if (!branch) return 'other'
-  return BRANCH_ALIASES[branch] || branch
-}
-
 /**
- * Returnerar seed-standardtexter per bransch
+ * Returnerar seed-standardtexter per bransch.
+ *
+ * OBS: 'introduction'/'conclusion' seedas INTE längre (pilot-beslut 2026-07)
+ * — quotes.description är numera offertens öppningstext och gjorde dessa
+ * redundanta. Befintliga rader av dessa typer på äldre konton rörs inte,
+ * de seedas bara inte för nya konton. `branch` behålls i signaturen för
+ * bakåtkompatibilitet med anroparna, men behövs inte längre av innehållet
+ * nedan (ingen av de kvarvarande texterna är branschspecifik).
  */
-export function getDefaultStandardTexts(branch?: string): DefaultText[] {
-  const normalized = normalizeBranch(branch)
-  const companyRef = normalized === 'electrician' ? 'elinstallationer' :
-    normalized === 'plumber' ? 'VVS-arbeten' :
-    normalized === 'painter' ? 'måleriarbeten' :
-    normalized === 'carpenter' ? 'snickeriarbeten' :
-    'bygg- och renoveringsarbeten'
-
+export function getDefaultStandardTexts(_branch?: string): DefaultText[] {
   return [
-    {
-      text_type: 'introduction',
-      name: 'Standard inledning',
-      content: `Tack för ert intresse! Vi har nöjet att presentera denna offert för ${companyRef} enligt vår överenskommelse. Offerten baseras på vår besiktning av arbetsplatsen och era önskemål. Vi ser fram emot att utföra arbetet åt er.`,
-    },
-    {
-      text_type: 'conclusion',
-      name: 'Standard avslutning',
-      content: `Vi hoppas att offerten motsvarar era förväntningar. Tveka inte att höra av er om ni har frågor eller önskar justeringar. Vi ser fram emot ert svar och att kunna påbörja arbetet.
-
-Med vänliga hälsningar`,
-    },
     {
       text_type: 'not_included',
       name: 'Standard ej inkluderat',

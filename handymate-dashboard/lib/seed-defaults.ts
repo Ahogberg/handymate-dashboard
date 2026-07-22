@@ -282,8 +282,9 @@ async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, 
       name: t.name,
       description: t.description,
       category: t.category,
-      introduction_text: texts.introduction || null,
-      conclusion_text: texts.conclusion || null,
+      // Inlednings-/avslutningstext seedas INTE längre (pilot-beslut 2026-07)
+      // — redundanta mot quotes.description. getDefaultStandardTexts()
+      // returnerar inte längre dessa typer, se lib/quote-standard-text-defaults.ts.
       not_included: texts.not_included || null,
       ata_terms: texts.ata_terms || null,
       payment_terms_text: texts.payment_terms || null,
