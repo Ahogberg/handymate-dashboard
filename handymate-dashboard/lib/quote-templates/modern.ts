@@ -72,12 +72,10 @@ export const renderModern: TemplateRenderFn = (data: QuoteTemplateData): string 
   const descriptionHtml = data.quote.description
     ? `<p class="quote-sub">${escapeHtml(data.quote.description)}</p>`
     : ''
-  const introHtml = data.quote.introductionText
-    ? `<p class="quote-sub">${escapeHtml(data.quote.introductionText)}</p>`
-    : ''
-  const conclusionHtml = data.quote.conclusionText
-    ? `<p class="quote-sub conclusion">${escapeHtml(data.quote.conclusionText)}</p>`
-    : ''
+  // Inlednings-/avslutningstext borttagna ur flödet (redundanta mot
+  // beskrivningen, pilot-beslut 2026-07) — data.quote.introductionText/
+  // conclusionText kan fortsatt bära gamla värden, men mallen skriver
+  // inte längre ut dem.
 
   const customerLines = [
     data.customer.address,
@@ -250,7 +248,6 @@ tbody tr.row-option.unselected .opt-badge { color: var(--muted); background: tra
 
   <h1 class="quote-title">${escapeHtml(data.quote.title)}</h1>
   ${descriptionHtml}
-  ${introHtml}
 
   <table>
     <thead>
@@ -276,7 +273,6 @@ tbody tr.row-option.unselected .opt-badge { color: var(--muted); background: tra
     </div>
   </div>
 
-  ${conclusionHtml}
   ${swishBox}
 
   <p class="terms"><strong>Villkor.</strong> ${data.quote.termsText

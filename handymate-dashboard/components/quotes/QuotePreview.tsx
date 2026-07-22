@@ -23,8 +23,11 @@ export interface QuotePreviewData {
   discountPercent: number
   vatRate: number
   description?: string
-  introductionText: string
-  conclusionText: string
+  /** Borttagna ur redigeringsflödet (redundanta mot description, pilot-beslut
+      2026-07) — kvar som optional/oanvända för bakåtkompatibilitet med gamla
+      anrop. QuotePreview renderar dem inte längre. */
+  introductionText?: string
+  conclusionText?: string
   notIncluded: string
   ataTerms: string
   paymentPlan: PaymentPlanEntry[]
@@ -186,13 +189,6 @@ export default function QuotePreview({ data, businessName, contactName }: QuoteP
         {data.description && (
           <div style={{ fontSize: '7px', color: TEXT, marginBottom: 10, whiteSpace: 'pre-wrap' }}>
             {data.description}
-          </div>
-        )}
-
-        {/* ── Introduction text ── */}
-        {data.introductionText && (
-          <div style={{ fontSize: '7px', color: MUTED, marginBottom: 10, whiteSpace: 'pre-wrap' }}>
-            {data.introductionText}
           </div>
         )}
 
@@ -360,13 +356,6 @@ export default function QuotePreview({ data, businessName, contactName }: QuoteP
                 <span>{formatCurrency(entry.amount)}</span>
               </div>
             ))}
-          </div>
-        )}
-
-        {/* ── Conclusion text ── */}
-        {data.conclusionText && (
-          <div style={{ fontSize: '7px', color: MUTED, marginBottom: 10, whiteSpace: 'pre-wrap' }}>
-            {data.conclusionText}
           </div>
         )}
 

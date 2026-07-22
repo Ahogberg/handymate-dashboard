@@ -266,7 +266,6 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
     <div class="card-title">Det här gäller</div>
     <div class="quote-title">${escapeHtml(data.quote.title)}</div>
     ${data.quote.description ? `<p class="quote-sub">${escapeHtml(data.quote.description)}</p>` : ''}
-    ${data.quote.introductionText ? `<p class="quote-sub">${escapeHtml(data.quote.introductionText)}</p>` : ''}
     <div class="badges">${badges.join('')}</div>
   </section>
 
@@ -293,8 +292,6 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
       <div class="val">${formatCurrency(data.quote.amountToPay)}</div>
     </div>
   </section>
-
-  ${data.quote.conclusionText ? `<section class="card"><p class="conclusion-text">${escapeHtml(data.quote.conclusionText)}</p></section>` : ''}
 
   <section class="pay-row">
     ${data.business.swish ? `<div class="card pay-card"><div class="pay-icon">S</div><div><div class="l">Swish företag</div><div class="v">${escapeHtml(data.business.swish)}</div></div></div>` : ''}

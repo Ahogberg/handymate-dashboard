@@ -7,27 +7,18 @@ interface QuoteDescriptionCardProps {
 }
 
 /**
- * Renderar beskrivning + inledningstext + avslutningstext som tre separata
- * kort (eyebrow-rubrik + body i DM Sans). Saknas allt tre returneras null.
+ * Renderar beskrivningen som ett kort (eyebrow-rubrik + body i DM Sans).
+ * Inlednings-/avslutningstext (quote.introduction_text/conclusion_text)
+ * renderas INTE längre — redundanta mot beskrivningen, som numera är
+ * offertens öppningstext (pilot-beslut 2026-07). Fälten kan fortfarande
+ * finnas på gamla offerter men visas inte.
  */
 export function QuoteDescriptionCard({ quote }: QuoteDescriptionCardProps) {
-  if (!quote.description && !quote.introduction_text && !quote.conclusion_text) {
+  if (!quote.description) {
     return null
   }
 
-  return (
-    <>
-      {quote.description && (
-        <TextCard label="Beskrivning" body={quote.description} preserveWhitespace={false} />
-      )}
-      {quote.introduction_text && (
-        <TextCard label="Inledning" body={quote.introduction_text} preserveWhitespace />
-      )}
-      {quote.conclusion_text && (
-        <TextCard label="Avslutning" body={quote.conclusion_text} preserveWhitespace />
-      )}
-    </>
-  )
+  return <TextCard label="Beskrivning" body={quote.description} preserveWhitespace={false} />
 }
 
 function TextCard({
