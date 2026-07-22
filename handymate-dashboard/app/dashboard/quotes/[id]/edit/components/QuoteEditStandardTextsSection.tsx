@@ -15,10 +15,6 @@ interface QuoteEditStandardTextsSectionProps {
   setCustomerReference: (s: string) => void
   projectAddress: string
   setProjectAddress: (s: string) => void
-  introductionText: string
-  setIntroductionText: (s: string) => void
-  conclusionText: string
-  setConclusionText: (s: string) => void
   notIncluded: string
   setNotIncluded: (s: string) => void
   ataTerms: string
@@ -41,10 +37,6 @@ export function QuoteEditStandardTextsSection({
   setCustomerReference,
   projectAddress,
   setProjectAddress,
-  introductionText,
-  setIntroductionText,
-  conclusionText,
-  setConclusionText,
   notIncluded,
   setNotIncluded,
   ataTerms,
@@ -102,24 +94,10 @@ export function QuoteEditStandardTextsSection({
             </Field>
           </div>
 
-          {/* Standard texts */}
+          {/* Standard texts — inlednings-/avslutningstext borttagna ur flödet
+              (redundanta mot quotes.description, som numera är offertens
+              öppningstext, pilot-beslut 2026-07). */}
           <div className="border-t border-slate-100 pt-4 space-y-3">
-            <TextField
-              label="Inledningstext"
-              placeholder="Hälsningsfras och inledning…"
-              value={introductionText}
-              onChange={setIntroductionText}
-              picker={textsByType.introduction}
-              onPick={setIntroductionText}
-            />
-            <TextField
-              label="Avslutningstext"
-              placeholder="Avslutande text…"
-              value={conclusionText}
-              onChange={setConclusionText}
-              picker={textsByType.conclusion}
-              onPick={setConclusionText}
-            />
             <TextField
               label="Ej inkluderat"
               placeholder="Vad ingår inte…"

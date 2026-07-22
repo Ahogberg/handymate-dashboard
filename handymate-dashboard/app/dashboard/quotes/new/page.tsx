@@ -204,9 +204,8 @@ export default function NewQuotePage() {
   const [customerReference, setCustomerReference] = useState('')
   const [projectAddress, setProjectAddress] = useState('')
 
-  // Standard texts (form content)
-  const [introductionText, setIntroductionText] = useState('')
-  const [conclusionText, setConclusionText] = useState('')
+  // Standard texts (form content) — inlednings-/avslutningstext borttagna
+  // ur flödet (redundanta mot description, pilot-beslut 2026-07).
   const [notIncluded, setNotIncluded] = useState('')
   const [ataTerms, setAtaTerms] = useState('')
   const [paymentTermsText, setPaymentTermsText] = useState('')
@@ -317,8 +316,6 @@ export default function NewQuotePage() {
   // ─── Derived: standard texts grouped by type ──────────────────────
   const textsByType = useMemo(() => {
     const map: Record<string, QuoteStandardText[]> = {
-      introduction: [],
-      conclusion: [],
       not_included: [],
       ata_terms: [],
       payment_terms: [],
@@ -376,8 +373,6 @@ export default function NewQuotePage() {
         discountPercent,
         vatRate,
         description,
-        introductionText,
-        conclusionText,
         notIncluded,
         ataTerms,
         paymentPlan,
@@ -395,7 +390,7 @@ export default function NewQuotePage() {
     }
   }, [
     title, selectedCustomerObj, validDays, items, discountPercent, vatRate, description,
-    introductionText, conclusionText, notIncluded, ataTerms, paymentPlan,
+    notIncluded, ataTerms, paymentPlan,
     referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices, showQuantities,
     localCustomCategories,
   ])
@@ -425,8 +420,6 @@ export default function NewQuotePage() {
         rut_customer_pays: totals.rutCustomerPays,
         customer_pays: totals.rotCustomerPays || totals.rutCustomerPays || totals.total,
         valid_until: validUntil.toISOString().split('T')[0],
-        introduction_text: introductionText || null,
-        conclusion_text: conclusionText || null,
         not_included: notIncluded || null,
         ata_terms: ataTerms || null,
         payment_terms_text: paymentTermsText || null,
@@ -448,7 +441,7 @@ export default function NewQuotePage() {
     }
   }, [
     title, description, selectedCustomer, validDays, recalculated, totals, discountPercent, vatRate,
-    introductionText, conclusionText, notIncluded, ataTerms, paymentTermsText, termsText,
+    notIncluded, ataTerms, paymentTermsText, termsText,
     referencePerson, customerReference, projectAddress, detailLevel,
     showUnitPrices, showQuantities, personnummer, fastighetsbeteckning,
     templateStyle, dealIdFromQuery,
@@ -527,12 +520,10 @@ export default function NewQuotePage() {
             ? `${selectedCustomerObj.default_payment_days} dagar`
             : ''),
         warrantyText: null,
-        introductionText: introductionText || null,
-        conclusionText: conclusionText || null,
         notIncluded: notIncluded || null,
       },
     }
-  }, [business, businessConfig, selectedCustomerObj, title, description, recalculated, totals, validDays, paymentTermsText, introductionText, conclusionText, notIncluded, personnummer, customerReference])
+  }, [business, businessConfig, selectedCustomerObj, title, description, recalculated, totals, validDays, paymentTermsText, notIncluded, personnummer, customerReference])
 
   const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
 
@@ -540,7 +531,6 @@ export default function NewQuotePage() {
     () => ({
       onTitleChange: setTitle,
       onDescriptionChange: setDescription,
-      onIntroChange: setIntroductionText,
       onCustomerNameChange: undefined,
       onPaymentTermsChange: setPaymentTermsText,
       // ModernCanvas renderar ALLA rader (inkl. rubrik/text/delsumma/rabatt)
@@ -742,14 +732,10 @@ export default function NewQuotePage() {
       const texts: QuoteStandardText[] = data.texts || []
       setAllStandardTexts(texts)
 
-      const defaultIntro = texts.find(t => t.text_type === 'introduction' && t.is_default)
-      const defaultConclusion = texts.find(t => t.text_type === 'conclusion' && t.is_default)
       const defaultNotIncluded = texts.find(t => t.text_type === 'not_included' && t.is_default)
       const defaultAta = texts.find(t => t.text_type === 'ata_terms' && t.is_default)
       const defaultPayment = texts.find(t => t.text_type === 'payment_terms' && t.is_default)
 
-      if (defaultIntro) setIntroductionText(defaultIntro.content)
-      if (defaultConclusion) setConclusionText(defaultConclusion.content)
       if (defaultNotIncluded) setNotIncluded(defaultNotIncluded.content)
       if (defaultAta) setAtaTerms(defaultAta.content)
       if (defaultPayment) setPaymentTermsText(defaultPayment.content)
@@ -1064,8 +1050,8 @@ export default function NewQuotePage() {
       setShowPaymentPlan(true)
     }
 
-    if (template.introduction_text) setIntroductionText(template.introduction_text)
-    if (template.conclusion_text) setConclusionText(template.conclusion_text)
+    // Inlednings-/avslutningstext appliceras INTE längre från mallen
+    // (redundanta mot description, pilot-beslut 2026-07).
     if (template.not_included) setNotIncluded(template.not_included)
     if (template.ata_terms) setAtaTerms(template.ata_terms)
     if (template.payment_terms_text) setPaymentTermsText(template.payment_terms_text)
@@ -1289,8 +1275,6 @@ export default function NewQuotePage() {
           quote_items: finalItems,
           vat_rate: vatRate,
           discount_percent: discountPercent,
-          introduction_text: introductionText || null,
-          conclusion_text: conclusionText || null,
           not_included: notIncluded || null,
           ata_terms: ataTerms || null,
           payment_terms_text: paymentTermsText || null,
@@ -1344,8 +1328,6 @@ export default function NewQuotePage() {
           description,
           default_items: recalculateItems(items),
           default_payment_plan: paymentPlan,
-          introduction_text: introductionText || null,
-          conclusion_text: conclusionText || null,
           not_included: notIncluded || null,
           ata_terms: ataTerms || null,
           payment_terms_text: paymentTermsText || null,
@@ -1571,10 +1553,6 @@ export default function NewQuotePage() {
               setCustomerReference={setCustomerReference}
               projectAddress={projectAddress}
               setProjectAddress={setProjectAddress}
-              introductionText={introductionText}
-              setIntroductionText={setIntroductionText}
-              conclusionText={conclusionText}
-              setConclusionText={setConclusionText}
               notIncluded={notIncluded}
               setNotIncluded={setNotIncluded}
               ataTerms={ataTerms}
