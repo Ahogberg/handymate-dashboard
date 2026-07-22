@@ -166,6 +166,36 @@ interface Deal {
   stage?: { label: string; slug: string } | null
 }
 
+interface AgreementPriceItem {
+  description: string
+  quantity: number
+  unit: string
+  unit_price: number
+  total: number
+  rot_rut_type?: string | null
+}
+
+interface ServiceAgreement {
+  agreement_id: string
+  title: string
+  interval_months: number
+  visit_duration_min: number
+  price_items: AgreementPriceItem[]
+  next_visit_at: string | null
+  status: 'active' | 'paused' | 'cancelled'
+  notes: string | null
+}
+
+interface AgreementType {
+  type_id: string
+  name: string
+  description: string | null
+  interval_months: number
+  visit_duration_min: number
+  price_items: AgreementPriceItem[]
+  is_active: boolean
+}
+
 export default function CustomerDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -188,6 +218,7 @@ export default function CustomerDetailPage() {
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [deals, setDeals] = useState<Deal[]>([])
+  const [serviceAgreements, setServiceAgreements] = useState<ServiceAgreement[]>([])
 
   // Edit mode
   const [isEditing, setIsEditing] = useState(false)
@@ -203,6 +234,7 @@ export default function CustomerDetailPage() {
   const [showAddNoteModal, setShowAddNoteModal] = useState(false)
   const [showSendSMSModal, setShowSendSMSModal] = useState(false)
   const [showSiteVisitModal, setShowSiteVisitModal] = useState(false)
+  const [showServiceAgreementModal, setShowServiceAgreementModal] = useState(false)
 
   // Tasks
   const [tasks, setTasks] = useState<Task[]>([])
@@ -363,10 +395,41 @@ export default function CustomerDetailPage() {
       // Tasks table may not exist yet
     }
 
+    await fetchServiceAgreements()
+
     setLoading(false)
   }
 
   // Email threads and thread messages are now handled by CustomerTimeline component
+
+  async function fetchServiceAgreements() {
+    try {
+      const res = await fetch(`/api/agreements?customer_id=${customerId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setServiceAgreements(data.agreements || [])
+      }
+    } catch {
+      // service_agreement-tabellen kan sakna (v74 ej kord) — tyst skip
+    }
+  }
+
+  async function updateAgreementStatus(agreementId: string, action: 'pause' | 'resume' | 'cancel') {
+    try {
+      const res = await fetch('/api/agreements', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agreement_id: agreementId, action }),
+      })
+      if (!res.ok) throw new Error('update failed')
+      await fetchServiceAgreements()
+      mainToast.success(
+        action === 'pause' ? 'Avtalet pausat' : action === 'resume' ? 'Avtalet återupptaget' : 'Avtalet avslutat'
+      )
+    } catch {
+      mainToast.error('Kunde inte uppdatera avtalet')
+    }
+  }
 
   async function fetchTasks() {
     try {
@@ -864,6 +927,74 @@ export default function CustomerDetailPage() {
                   </Link>
                 )}
               </div>
+            </div>
+
+            {/* Serviceavtal */}
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Serviceavtal</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowServiceAgreementModal(true)}
+                  className="flex items-center gap-1 text-xs font-medium text-primary-700 hover:text-primary-800 min-h-[44px] px-2"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Nytt serviceavtal
+                </button>
+              </div>
+
+              {serviceAgreements.length === 0 ? (
+                <p className="text-sm text-gray-400">Inga serviceavtal ännu.</p>
+              ) : (
+                <div className="space-y-3">
+                  {serviceAgreements.map(agreement => {
+                    const total = (agreement.price_items || []).reduce((s, i) => s + (i.total || 0), 0)
+                    return (
+                      <div key={agreement.agreement_id} className="p-3 bg-gray-50 rounded-xl">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{agreement.title}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              Var {agreement.interval_months}:e månad
+                              {agreement.next_visit_at && (
+                                <> · Nästa besök {new Date(agreement.next_visit_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}</>
+                              )}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5">{total.toLocaleString('sv-SE')} kr (exkl. moms) / besök</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1.5 shrink-0">
+                            <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
+                              agreement.status === 'active' ? 'bg-primary-700/20 text-primary-600 border border-primary-600/30' :
+                              agreement.status === 'paused' ? 'bg-amber-500/20 text-amber-600 border border-amber-500/30' :
+                              'bg-gray-100 text-gray-500 border border-gray-300'
+                            }`}>
+                              {agreement.status === 'active' ? 'Aktivt' : agreement.status === 'paused' ? 'Pausat' : 'Avslutat'}
+                            </span>
+                            {agreement.status !== 'cancelled' && (
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => updateAgreementStatus(agreement.agreement_id, agreement.status === 'paused' ? 'resume' : 'pause')}
+                                  className="text-[11px] text-gray-500 hover:text-gray-800 underline decoration-dotted min-h-[44px]"
+                                >
+                                  {agreement.status === 'paused' ? 'Återuppta' : 'Pausa'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateAgreementStatus(agreement.agreement_id, 'cancel')}
+                                  className="text-[11px] text-gray-500 hover:text-red-600 underline decoration-dotted min-h-[44px]"
+                                >
+                                  Avsluta
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Kundportal */}
@@ -1629,6 +1760,19 @@ export default function CustomerDetailPage() {
           }}
         />
       )}
+
+      {/* Service Agreement Modal */}
+      {showServiceAgreementModal && customer && (
+        <ServiceAgreementModal
+          customer={customer}
+          onClose={() => setShowServiceAgreementModal(false)}
+          onSaved={() => {
+            setShowServiceAgreementModal(false)
+            fetchServiceAgreements()
+            mainToast.success('Serviceavtal skapat')
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -2053,6 +2197,318 @@ function SiteVisitModal({ customer, contactName, businessName, onClose, onSaved 
             className="flex-1 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50 min-h-[44px]"
           >
             {saving ? 'Bokar...' : 'Boka platsbesök'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ServiceAgreementModal({ customer, onClose, onSaved }: {
+  customer: Customer
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const toast = useToast()
+  const [mode, setMode] = useState<'catalog' | 'custom'>('catalog')
+  const [agreementTypes, setAgreementTypes] = useState<AgreementType[]>([])
+  const [loadingTypes, setLoadingTypes] = useState(true)
+  const [selectedTypeId, setSelectedTypeId] = useState('')
+
+  const [customTitle, setCustomTitle] = useState('')
+  const [customIntervalMonths, setCustomIntervalMonths] = useState('12')
+  const [customVisitDuration, setCustomVisitDuration] = useState('60')
+  const [customRows, setCustomRows] = useState<{ description: string; quantity: string; unit: string; unit_price: string }[]>([
+    { description: '', quantity: '1', unit: 'tim', unit_price: '' },
+  ])
+
+  const defaultFirstVisit = (() => {
+    const now = new Date()
+    const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+    return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-01`
+  })()
+  const [firstVisitDate, setFirstVisitDate] = useState(defaultFirstVisit)
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/agreement-types')
+        if (res.ok) {
+          const data = await res.json()
+          const types: AgreementType[] = (data.agreement_types || []).filter((t: AgreementType) => t.is_active)
+          setAgreementTypes(types)
+          if (types.length > 0) setSelectedTypeId(types[0].type_id)
+          else setMode('custom')
+        } else {
+          setMode('custom')
+        }
+      } catch {
+        setMode('custom')
+      } finally {
+        setLoadingTypes(false)
+      }
+    })()
+  }, [])
+
+  const selectedType = agreementTypes.find(t => t.type_id === selectedTypeId) || null
+
+  const previewItems: AgreementPriceItem[] = mode === 'catalog' && selectedType
+    ? selectedType.price_items
+    : customRows
+        .filter(r => r.description.trim())
+        .map(r => ({
+          description: r.description,
+          quantity: Number(r.quantity) || 0,
+          unit: r.unit || 'st',
+          unit_price: Number(r.unit_price) || 0,
+          total: (Number(r.quantity) || 0) * (Number(r.unit_price) || 0),
+        }))
+
+  const previewTotal = previewItems.reduce((s, i) => s + (i.total || 0), 0)
+
+  function addRow() {
+    setCustomRows(prev => [...prev, { description: '', quantity: '1', unit: 'tim', unit_price: '' }])
+  }
+  function removeRow(idx: number) {
+    setCustomRows(prev => prev.filter((_, i) => i !== idx))
+  }
+  function updateRow(idx: number, field: 'description' | 'quantity' | 'unit' | 'unit_price', value: string) {
+    setCustomRows(prev => prev.map((r, i) => (i === idx ? { ...r, [field]: value } : r)))
+  }
+
+  const canSave = mode === 'catalog'
+    ? !!selectedTypeId
+    : customTitle.trim().length > 0 && Number(customIntervalMonths) > 0 && previewItems.length > 0
+
+  async function handleSave() {
+    if (!canSave) return
+    setSaving(true)
+    try {
+      const body: Record<string, any> = {
+        customer_id: customer.customer_id,
+        first_visit_date: firstVisitDate,
+        notes: notes || undefined,
+      }
+      if (mode === 'catalog') {
+        body.type_id = selectedTypeId
+      } else {
+        body.title = customTitle
+        body.interval_months = Number(customIntervalMonths)
+        body.visit_duration_min = Number(customVisitDuration) || 60
+        body.price_items = previewItems
+      }
+
+      const res = await fetch('/api/agreements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Kunde inte skapa avtal')
+      }
+      onSaved()
+    } catch (err: any) {
+      toast.error(err?.message || 'Kunde inte skapa serviceavtal')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto p-6">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-lg font-semibold text-gray-900">Nytt serviceavtal</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-900 min-h-[44px] min-w-[44px] flex items-center justify-center">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <p className="text-sm text-gray-500 mb-4">{customer.name}</p>
+
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setMode('catalog')}
+              className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-medium border min-h-[44px] ${
+                mode === 'catalog' ? 'bg-primary-700 text-white border-primary-700' : 'bg-white text-gray-600 border-[#E2E8F0]'
+              }`}
+            >
+              Ur katalogen
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('custom')}
+              className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-medium border min-h-[44px] ${
+                mode === 'custom' ? 'bg-primary-700 text-white border-primary-700' : 'bg-white text-gray-600 border-[#E2E8F0]'
+              }`}
+            >
+              Eget avtal
+            </button>
+          </div>
+
+          {mode === 'catalog' ? (
+            loadingTypes ? (
+              <p className="text-sm text-gray-400">Laddar katalogen…</p>
+            ) : agreementTypes.length === 0 ? (
+              <p className="text-sm text-gray-400">Katalogen är tom. Byt till &quot;Eget avtal&quot; eller lägg till avtalstyper under Inställningar → Serviceavtal.</p>
+            ) : (
+              <div>
+                <label className="text-sm text-gray-500 mb-1 block">Avtalstyp</label>
+                <select
+                  value={selectedTypeId}
+                  onChange={(e) => setSelectedTypeId(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E] min-h-[44px]"
+                >
+                  {agreementTypes.map(t => {
+                    const total = (t.price_items || []).reduce((s, i) => s + (i.total || 0), 0)
+                    return (
+                      <option key={t.type_id} value={t.type_id}>
+                        {t.name} — var {t.interval_months}:e månad — {total.toLocaleString('sv-SE')} kr
+                      </option>
+                    )
+                  })}
+                </select>
+              </div>
+            )
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm text-gray-500 mb-1 block">Namn *</label>
+                <input
+                  type="text"
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                  placeholder="T.ex. Årlig ventilationsservice"
+                  className="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-[#0F766E] min-h-[44px]"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm text-gray-500 mb-1 block">Intervall (månader) *</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={customIntervalMonths}
+                    onChange={(e) => setCustomIntervalMonths(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E] min-h-[44px]"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-500 mb-1 block">Besökslängd (min)</label>
+                  <input
+                    type="number"
+                    min={15}
+                    step={15}
+                    value={customVisitDuration}
+                    onChange={(e) => setCustomVisitDuration(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E] min-h-[44px]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-500 mb-1 block">Prisrader (exkl. moms) *</label>
+                <div className="space-y-2">
+                  {customRows.map((row, idx) => (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <input
+                        type="text"
+                        value={row.description}
+                        onChange={(e) => updateRow(idx, 'description', e.target.value)}
+                        placeholder="Beskrivning"
+                        className="flex-1 min-w-0 px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-[#0F766E] min-h-[44px]"
+                      />
+                      <input
+                        type="number"
+                        value={row.quantity}
+                        onChange={(e) => updateRow(idx, 'quantity', e.target.value)}
+                        className="w-16 px-2 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E] min-h-[44px]"
+                      />
+                      <input
+                        type="number"
+                        value={row.unit_price}
+                        onChange={(e) => updateRow(idx, 'unit_price', e.target.value)}
+                        placeholder="kr"
+                        className="w-20 px-2 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-[#0F766E] min-h-[44px]"
+                      />
+                      {customRows.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeRow(idx)}
+                          className="text-gray-400 hover:text-red-600 min-h-[44px] min-w-[32px] flex items-center justify-center"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={addRow}
+                  className="mt-2 text-xs font-medium text-primary-700 hover:text-primary-800 flex items-center gap-1 min-h-[44px]"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Lägg till rad
+                </button>
+              </div>
+            </div>
+          )}
+
+          {previewItems.length > 0 && (
+            <div className="p-3 bg-gray-50 rounded-xl">
+              <p className="text-xs text-gray-500 mb-1">Frusna prisrader (kopieras till avtalet):</p>
+              {previewItems.map((item, idx) => (
+                <div key={idx} className="flex justify-between text-xs text-gray-600">
+                  <span>{item.description || '—'} ({item.quantity} {item.unit})</span>
+                  <span>{(item.total || 0).toLocaleString('sv-SE')} kr</span>
+                </div>
+              ))}
+              <div className="flex justify-between text-sm font-medium text-gray-900 mt-1.5 pt-1.5 border-t border-gray-200">
+                <span>Totalt</span>
+                <span>{previewTotal.toLocaleString('sv-SE')} kr (exkl. moms)</span>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="text-sm text-gray-500 mb-1 block">Första besöket</label>
+            <input
+              type="date"
+              value={firstVisitDate}
+              onChange={(e) => setFirstVisitDate(e.target.value)}
+              className="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E] min-h-[44px]"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-500 mb-1 block">Anteckning</label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Valfritt"
+              className="w-full px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-[#0F766E] min-h-[44px]"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200 min-h-[44px]"
+          >
+            Avbryt
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !canSave}
+            className="flex-1 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50 min-h-[44px]"
+          >
+            {saving ? 'Sparar...' : 'Skapa serviceavtal'}
           </button>
         </div>
       </div>
