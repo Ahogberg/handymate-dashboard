@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Megaphone, Merge, Plus, Upload, Users } from 'lucide-react'
+import { Megaphone, Merge, Plus, Sparkles, Upload, Users } from 'lucide-react'
 
 type TabKey = 'customers' | 'campaigns' | 'duplicates'
 
@@ -12,6 +12,11 @@ interface CustomersTabsProps {
   campaignCount: number
   onFetchDuplicates: () => void
   onCreateCustomer: () => void
+  /** Visa "Väck kundbasen"-knappen bara om det finns minst en aktiv
+      avtalstyp i katalogen — annars pekar den ingenstans. */
+  showWakeCustomerBase?: boolean
+  wakingCustomerBase?: boolean
+  onWakeCustomerBase?: () => void
 }
 
 /**
@@ -25,6 +30,9 @@ export function CustomersTabs({
   campaignCount,
   onFetchDuplicates,
   onCreateCustomer,
+  showWakeCustomerBase,
+  wakingCustomerBase,
+  onWakeCustomerBase,
 }: CustomersTabsProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -57,7 +65,19 @@ export function CustomersTabs({
       </div>
 
       {activeTab === 'customers' && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {showWakeCustomerBase && (
+            <button
+              onClick={onWakeCustomerBase}
+              disabled={wakingCustomerBase}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-800 text-xs font-semibold rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              title="Hanna går igenom dina tidigare kunder och föreslår serviceavtal"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{wakingCustomerBase ? 'Väcker…' : 'Väck kundbasen'}</span>
+              <span className="sm:hidden">{wakingCustomerBase ? '…' : 'Väck'}</span>
+            </button>
+          )}
           <Link
             href="/dashboard/customers/import"
             className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors"

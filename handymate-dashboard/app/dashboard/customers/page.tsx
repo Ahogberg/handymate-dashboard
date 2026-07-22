@@ -72,6 +72,11 @@ export default function CustomersPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [campaignFilter, setCampaignFilter] = useState<'all' | 'draft' | 'sent'>('all')
 
+  // "Väck kundbasen" (Motor 2, Etapp 2.5) — visas bara om katalogen har
+  // minst en aktiv avtalstyp, annars pekar knappen ingenstans.
+  const [hasActiveAgreementCatalog, setHasActiveAgreementCatalog] = useState(false)
+  const [wakingCustomerBase, setWakingCustomerBase] = useState(false)
+
   // Shared state
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
@@ -159,7 +164,51 @@ export default function CustomersPage() {
       /* non-blocking */
     }
 
+    try {
+      const agreementTypesRes = await fetch('/api/agreement-types').then(r => r.json())
+      const activeCount = (agreementTypesRes.agreement_types || []).filter((t: any) => t.is_active).length
+      setHasActiveAgreementCatalog(activeCount > 0)
+    } catch {
+      /* non-blocking — knappen döljs bara om anropet failar */
+    }
+
     setLoading(false)
+  }
+
+  // === "VÄCK KUNDBASEN" (Motor 2, Etapp 2.5) ===
+  const handleWakeCustomerBase = async () => {
+    const confirmed = window.confirm(
+      'Hanna går igenom dina tidigare kunder och lägger upp till 10 avtalsförslag i din kö.\n\n' +
+        'Inget skickas utan ditt godkännande.',
+    )
+    if (!confirmed) return
+
+    setWakingCustomerBase(true)
+    try {
+      const response = await fetch('/api/agreements/sweep', { method: 'POST' })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok || !data?.ok) {
+        showToast(data?.message || data?.error || 'Något gick fel — försök igen', 'error')
+        return
+      }
+
+      if (data.skipped) {
+        showToast(data.message || 'Kunde inte köra just nu', 'error')
+        return
+      }
+
+      const created = data.result?.created || 0
+      if (created > 0) {
+        showToast(`Hanna la ${created} avtalsförslag i din kö`, 'success')
+      } else {
+        showToast(data.message || 'Inga nya förslag just nu', 'success')
+      }
+    } catch {
+      showToast('Kunde inte nå servern — försök igen', 'error')
+    } finally {
+      setWakingCustomerBase(false)
+    }
   }
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -436,7 +485,7 @@ export default function CustomersPage() {
       {/* Toast */}
       {toast.show && (
         <div
-          className={`fixed top-4 right-4 z-[9999] px-4 py-2.5 rounded-xl border text-sm font-semibold shadow-sm ${
+          className={`fixed top-4 right-4 left-4 sm:left-auto sm:max-w-sm z-[9999] px-4 py-2.5 rounded-xl border text-sm font-semibold shadow-sm ${
             toast.type === 'success'
               ? 'bg-green-50 border-green-200 text-green-700'
               : 'bg-red-50 border-red-200 text-red-700'
@@ -474,6 +523,9 @@ export default function CustomersPage() {
             campaignCount={campaigns.length}
             onFetchDuplicates={fetchDuplicates}
             onCreateCustomer={openCreateModal}
+            showWakeCustomerBase={hasActiveAgreementCatalog}
+            wakingCustomerBase={wakingCustomerBase}
+            onWakeCustomerBase={handleWakeCustomerBase}
           />
 
           {activeTab === 'customers' && (
