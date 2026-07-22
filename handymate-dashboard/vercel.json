@@ -108,6 +108,10 @@
     {
       "path": "/api/cron/onboarding-followup",
       "schedule": "45 7 * * *"
+    },
+    {
+      "path": "/api/cron/service-bookings",
+      "schedule": "20 6 * * *"
     }
   ]
 }

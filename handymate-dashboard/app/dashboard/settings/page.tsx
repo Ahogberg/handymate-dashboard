@@ -1339,6 +1339,7 @@ export default function SettingsPage() {
         { id: '_link_leads', label: 'Lead-källor', icon: Link2, href: '/dashboard/settings/lead-sources' },
         { id: '_link_jobtypes', label: 'Jobbtyper', icon: Briefcase, href: '/dashboard/settings/job-types' },
         { id: '_link_inventory', label: 'Lager & Material', icon: Package, href: '/dashboard/settings/inventory' },
+        { id: '_link_agreement_types', label: 'Serviceavtal', icon: RefreshCw, href: '/dashboard/settings/agreement-types' },
       ],
     },
     {

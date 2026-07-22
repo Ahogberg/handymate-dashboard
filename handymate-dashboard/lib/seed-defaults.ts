@@ -3,6 +3,7 @@ import { getDefaultStandardTexts } from '@/lib/quote-standard-text-defaults'
 import { getChecklistsForBranch } from '@/lib/checklist-defaults'
 import { getDefaultPriceList } from '@/lib/price-list-defaults'
 import { getDefaultQuoteTemplates, normalizeTemplateBranch } from '@/lib/quote-template-defaults'
+import { getDefaultAgreementTypes } from '@/lib/agreement-type-defaults'
 
 type SupabaseClient = ReturnType<typeof getServerSupabase>
 
@@ -27,6 +28,7 @@ export async function seedAllDefaults(
     seedChecklistTemplates(supabase, businessId, branch),
     seedPriceList(supabase, businessId, branch),
     seedQuoteTemplates(supabase, businessId, branch),
+    seedAgreementTypes(supabase, businessId, branch),
   ])
 
   const failed = results.filter(r => r.status === 'rejected')
@@ -291,4 +293,58 @@ async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, 
       rut_enabled: t.rut_enabled,
     }))
   )
+}
+
+/**
+ * Relationen (tabellen) saknas — v74_serviceavtal.sql har inte körts än i
+ * Supabase SQL Editor (migrationer körs manuellt, se CLAUDE.md). Postgres
+ * ger felkod 42P01, PostgREST kan även svara med "schema cache"-text.
+ */
+function isMissingRelationError(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false
+  if (error.code === '42P01') return true
+  const message = String(error.message || '')
+  return /does not exist|schema cache/i.test(message) && /relation|table|service_agreement_type/i.test(message)
+}
+
+/**
+ * Seedar serviceavtalskatalogen (service_agreement_type) — delar
+ * lib/agreement-type-defaults.ts. Idempotent per namn (samma mönster som
+ * seedQuoteTemplates ovan). FAIL-SAFE mot v74 ej körd: om tabellen saknas
+ * skippas tyst istället för att blockera resten av seedAllDefaults (som
+ * körs via Promise.allSettled tillsammans med alla andra seed-steg).
+ */
+async function seedAgreementTypes(supabase: SupabaseClient, businessId: string, branch: string) {
+  const normalizedBranch = normalizeTemplateBranch(branch)
+
+  const { data: existingRows, error: selectErr } = await supabase
+    .from('service_agreement_type')
+    .select('name')
+    .eq('business_id', businessId)
+
+  if (selectErr) {
+    if (isMissingRelationError(selectErr)) return
+    throw selectErr
+  }
+
+  const existingNames = new Set((existingRows || []).map((r: { name: string }) => r.name))
+  const defaultTypes = getDefaultAgreementTypes(normalizedBranch).filter(t => !existingNames.has(t.name))
+
+  if (defaultTypes.length === 0) return
+
+  const { error: insertErr } = await supabase.from('service_agreement_type').insert(
+    defaultTypes.map((t, i) => ({
+      type_id: `sat_${businessId}_${i}`,
+      business_id: businessId,
+      name: t.name,
+      description: t.description,
+      interval_months: t.interval_months,
+      visit_duration_min: t.visit_duration_min,
+      price_items: t.price_items,
+      match_keys: t.match_keys,
+      is_active: true,
+      seeded: true,
+    }))
+  )
+  if (insertErr && !isMissingRelationError(insertErr)) throw insertErr
 }

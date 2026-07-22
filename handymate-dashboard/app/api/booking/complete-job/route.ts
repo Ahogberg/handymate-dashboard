@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     const { data: existing } = await supabase
       .from('booking')
-      .select('booking_id, project_id, scheduled_start')
+      .select('booking_id, project_id, agreement_id, scheduled_start')
       .eq('booking_id', booking_id)
       .eq('business_id', business.business_id)
       .maybeSingle()
@@ -154,6 +154,32 @@ export async function POST(request: NextRequest) {
         } catch (stageErr) {
           console.error('[booking/complete-job] stage advance failed:', stageErr)
         }
+      }
+    }
+
+    // ── Motor 2: serviceavtal — parallellt med projekt-grenen ovan (en
+    // booking har antingen project_id eller agreement_id, aldrig båda i
+    // praktiken, men grenarna är oberoende så det spelar ingen roll).
+    // Karin bygger en utkastfaktura från avtalets frusna price_items +
+    // ett review_auto_invoice-kort. Non-blocking — booking-completion ska
+    // alltid lyckas även om detta steg failar (t.ex. v74 ej körd).
+    if (existing.agreement_id) {
+      try {
+        const { invoiceAgreementVisit } = await import('@/lib/agreements/invoice-visit')
+        const result = await invoiceAgreementVisit(supabase, business.business_id, existing.booking_id)
+        if (result.success && result.invoice_id) {
+          invoiceCreated = {
+            invoice_id: result.invoice_id,
+            invoice_number: result.invoice_number,
+            total: result.total,
+            status: 'draft',
+          }
+          console.log('[booking/complete-job] agreement invoice created:', invoiceCreated)
+        } else if (!result.success) {
+          console.warn('[booking/complete-job] agreement invoice skipped:', result.error)
+        }
+      } catch (invErr) {
+        console.error('[booking/complete-job] agreement invoice failed:', invErr)
       }
     }
 
