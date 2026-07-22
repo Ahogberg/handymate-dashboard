@@ -106,7 +106,6 @@ function formatNumber(n: number): string {
 export interface ModernCanvasHandlers {
   onTitleChange: (v: string) => void
   onDescriptionChange: (v: string) => void
-  onIntroChange: (v: string) => void
   onItemChange: (index: number, item: QuoteTemplateItem) => void
   onItemAdd: () => void
   onItemRemove: (index: number) => void
@@ -216,19 +215,13 @@ export default function ModernCanvas({ data, handlers }: Props) {
               placeholder="Offerttitel"
             />
           </h1>
+          {/* Beskrivningen är offertens öppningstext — inlednings-/avslutnings-
+              texterna är borttagna ur flödet (redundanta, pilot-beslut 2026-07). */}
           <p className="quote-sub">
             <EditableText
               value={data.quote.description || ''}
               onChange={handlers.onDescriptionChange}
-              placeholder="Beskrivning (valfri)"
-              multiline
-            />
-          </p>
-          <p className="quote-sub">
-            <EditableText
-              value={data.quote.introductionText || ''}
-              onChange={handlers.onIntroChange}
-              placeholder="Introduktionstext (valfri)"
+              placeholder="Beskriv vad offerten avser …"
               multiline
             />
           </p>
