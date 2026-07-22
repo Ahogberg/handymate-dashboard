@@ -1,5 +1,5 @@
 /**
- * Hanna — förslagscronen för serviceavtal (Motor 2, Etapp 2, lager 2).
+ * Hanna — förslagsmaskineriet för serviceavtal (Motor 2, Etapp 2, lager 2).
  *
  * Daglig cron (app/api/cron/avtal-forslag/route.ts): completed-projekt
  * senaste 7 dagarna (±12h-fönster, samma mönster som review-requests) vars
@@ -31,6 +31,14 @@
  *
  * Cost-guard: caller (route) kör checkCostGuards/logAgentRun per business
  * (agent-observations-mönstret) — denna fil vet inget om paus/cost-cap.
+ *
+ * DELAT med engångssvepet (lib/agents/hanna/kundbas-svep.ts, Etapp 2.5):
+ * katalog-hämtning (loadActiveAgreementCatalog), kunder med aktivt avtal
+ * (getActiveAgreementCustomerIds), dedup-spärrarna (getDedupExcludedCustomerIds),
+ * AI-matchning+fallback+SMS-bygge (matchAndBuildOffer), offertkontext
+ * (getQuoteContextForMatching) och kö-kort-insert (insertAvtalForslagApproval)
+ * exporteras härifrån och används OFÖRÄNDRAT av svepet — ingen copy-paste,
+ * ingen avvikelse i cronens beteende.
  */
 
 import Anthropic from '@anthropic-ai/sdk'
@@ -305,6 +313,281 @@ interface CustomerRow {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Delat maskineri — används av BÅDE cronen (nedan) och engångssvepet
+// (lib/agents/hanna/kundbas-svep.ts). Extraherat 1:1 ur cronens tidigare
+// inline-logik — ingen beteendeändring, bara namngiven och återanvändbar.
+// ─────────────────────────────────────────────────────────────────
+
+export function isMissingRelationError(error: unknown): boolean {
+  if (!error) return false
+  const e = error as { code?: string; message?: string }
+  if (e.code === '42P01') return true
+  const message = String(e.message || '')
+  return /does not exist|schema cache/i.test(message) && /relation|table|column/i.test(message)
+}
+
+export interface CatalogBundle {
+  catalog: CatalogMatchEntry[]
+  catalogForPrompt: CatalogEntryForPrompt[]
+  catalogById: Map<string, CatalogMatchEntry>
+}
+
+export type CatalogLoadResult =
+  | { ok: true; bundle: CatalogBundle }
+  | { ok: false; reason: 'missing_relation' | 'empty' }
+
+/**
+ * Hämtar businessens aktiva service_agreement_type-katalog (lager 1) och
+ * förbereder både prompt-formen (pris inkl. moms) och en type_id-lookup.
+ * Två sätt att inte ha en katalog att jobba med, hålls isär åt callern
+ * precis som cronen alltid gjort: 'missing_relation' (v74 inte körd —
+ * tyst no-op) vs 'empty' (relationen finns, 0 aktiva rader — räknas som
+ * skipped.no_catalog).
+ */
+export async function loadActiveAgreementCatalog(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<CatalogLoadResult> {
+  const { data: catalogData, error: catalogErr } = await supabase
+    .from('service_agreement_type')
+    .select('type_id, name, description, interval_months, match_keys, price_items')
+    .eq('business_id', businessId)
+    .eq('is_active', true)
+
+  if (catalogErr) {
+    if (isMissingRelationError(catalogErr)) return { ok: false, reason: 'missing_relation' }
+    throw catalogErr
+  }
+
+  const catalog = (catalogData || []) as CatalogMatchEntry[]
+  if (catalog.length === 0) return { ok: false, reason: 'empty' }
+
+  const catalogForPrompt: CatalogEntryForPrompt[] = catalog.map((c) => ({
+    type_id: c.type_id,
+    name: c.name,
+    description: c.description,
+    interval_months: c.interval_months,
+    priceInclVat: priceInclVatPerVisit(c.price_items),
+  }))
+  const catalogById = new Map(catalog.map((c) => [c.type_id, c]))
+
+  return { ok: true, bundle: { catalog, catalogForPrompt, catalogById } }
+}
+
+/** Kunder med ett AKTIVT service_agreement — uteslut helt, oavsett trigger. */
+export async function getActiveAgreementCustomerIds(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<Set<string>> {
+  const { data: activeAgreements, error: agrErr } = await supabase
+    .from('service_agreement')
+    .select('customer_id')
+    .eq('business_id', businessId)
+    .eq('status', 'active')
+
+  if (agrErr && !isMissingRelationError(agrErr)) throw agrErr
+  return new Set(((activeAgreements || []) as Array<{ customer_id: string }>).map((a) => a.customer_id))
+}
+
+/**
+ * Dedup-spärrarna (två lager, se filkommentaren): bred 7-dagars-spärr
+ * (vilket förslag som helst nyligen) + smal 30-dagars-spärr (avvisat
+ * avtalsförslag). Ren mängd av customer_id att utesluta.
+ */
+export async function getDedupExcludedCustomerIds(
+  supabase: SupabaseClient,
+  businessId: string,
+  now: Date,
+): Promise<Set<string>> {
+  const rejectedWindowStart = new Date(now.getTime() - REJECTED_DEDUP_WINDOW_DAYS * 86400000).toISOString()
+  const broadWindowStart = new Date(now.getTime() - BROAD_DEDUP_WINDOW_DAYS * 86400000).toISOString()
+
+  const { data: recentApprovals } = await supabase
+    .from('pending_approvals')
+    .select('payload, status, created_at')
+    .eq('business_id', businessId)
+    .gte('created_at', rejectedWindowStart)
+    .limit(1000)
+
+  const excludeCustomerIds = new Set<string>()
+  for (const row of (recentApprovals || []) as Array<{ payload: unknown; status: string; created_at: string }>) {
+    const payload = (row.payload || {}) as Record<string, unknown>
+    const customerId = payload.customer_id ? String(payload.customer_id) : null
+    if (!customerId) continue
+
+    // Lager 1: bred 7-dagars-spärr — vilket förslag som helst nyligen.
+    if (row.created_at >= broadWindowStart) {
+      excludeCustomerIds.add(customerId)
+      continue
+    }
+
+    // Lager 2: smal 30-dagars-spärr — bara AVVISADE avtalsförslag.
+    if (row.status === 'rejected' && payload.trigger === AVTAL_FORSLAG_TRIGGER) {
+      excludeCustomerIds.add(customerId)
+    }
+  }
+
+  return excludeCustomerIds
+}
+
+/** Antal pending kö-kort med trigger 'avtal_forslag' — svepets batch-tak
+    räknar dessa mot taket (se lib/agents/hanna/kundbas-svep.ts). */
+export async function countPendingAvtalForslagApprovals(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from('pending_approvals')
+    .select('id', { count: 'exact', head: true })
+    .eq('business_id', businessId)
+    .eq('status', 'pending')
+    .contains('payload', { trigger: AVTAL_FORSLAG_TRIGGER })
+
+  if (error) {
+    if (isMissingRelationError(error)) return 0
+    throw error
+  }
+  return count || 0
+}
+
+export interface MatchAndBuildOfferParams {
+  /** Projekttitel (cron) eller offert-/projekttitel (svepet) — texten som
+      visas för AI:n och nämns i fallback-SMS:et. */
+  candidateTitle: string
+  itemDescriptions: string[]
+  jobType: string | null
+  catalog: CatalogMatchEntry[]
+  catalogForPrompt: CatalogEntryForPrompt[]
+  catalogById: Map<string, CatalogMatchEntry>
+  customerFirstName: string | null | undefined
+  businessName: string | null | undefined
+}
+
+export interface MatchAndBuildOfferOutcome {
+  matched: {
+    matchedTypeIds: string[]
+    smsText: string
+    primaryType: CatalogMatchEntry
+  } | null
+  /** true om Haiku inte svarade giltigt och keyword-fallbacken kördes —
+      räknas mot ai_fallback_used OAVSETT om fallbacken hittade en match. */
+  usedFallback: boolean
+  cost_usd: number
+  usage: { input_tokens: number; output_tokens: number } | null
+}
+
+/**
+ * Lager 2: AI-matchning (Haiku) mot katalogen, fail-safe till keyword-
+ * fallback + deterministiskt mall-SMS. Ren orkestrering — inga DB-anrop,
+ * inga sidoeffekter. Delad mellan cron och svep så matchningslogiken
+ * ALDRIG kan divergera mellan de två vägarna.
+ */
+export async function matchAndBuildOffer(params: MatchAndBuildOfferParams): Promise<MatchAndBuildOfferOutcome> {
+  const haikuOutcome = await matchViaHaiku({
+    projectTitle: params.candidateTitle,
+    itemDescriptions: params.itemDescriptions,
+    catalog: params.catalogForPrompt,
+    customerFirstName: params.customerFirstName,
+    businessName: params.businessName,
+  })
+
+  let matchedTypeIds: string[]
+  let smsText: string | null
+  let usedFallback = false
+
+  if (haikuOutcome.result !== null) {
+    matchedTypeIds = haikuOutcome.result.matches
+    smsText = haikuOutcome.result.sms
+  } else {
+    usedFallback = true
+    const searchText = `${params.candidateTitle} ${params.jobType || ''}`.trim()
+    matchedTypeIds = matchAgreementTypesByKeywords(searchText, params.catalog)
+    smsText = null // byggs nedan från första matchen
+  }
+
+  if (matchedTypeIds.length === 0) {
+    return { matched: null, usedFallback, cost_usd: haikuOutcome.cost_usd, usage: haikuOutcome.usage }
+  }
+
+  const primaryType = params.catalogById.get(matchedTypeIds[0])
+  if (!primaryType) {
+    // Bör inte kunna hända (validerat mot katalogen ovan) — fail-safe.
+    return { matched: null, usedFallback, cost_usd: haikuOutcome.cost_usd, usage: haikuOutcome.usage }
+  }
+
+  if (!smsText) {
+    smsText = buildFallbackAvtalSms({
+      customerFirstName: params.customerFirstName,
+      projectTitle: params.candidateTitle,
+      typeName: primaryType.name,
+      intervalMonths: primaryType.interval_months,
+      priceInclVat: priceInclVatPerVisit(primaryType.price_items),
+      businessName: params.businessName,
+    })
+  }
+
+  return {
+    matched: { matchedTypeIds, smsText, primaryType },
+    usedFallback,
+    cost_usd: haikuOutcome.cost_usd,
+    usage: haikuOutcome.usage,
+  }
+}
+
+export interface InsertAvtalForslagApprovalParams {
+  supabase: SupabaseClient
+  businessId: string
+  customer: { customer_id: string; name: string | null; phone_number: string }
+  primaryType: CatalogMatchEntry
+  matchedTypeIds: string[]
+  smsText: string
+  /** T.ex. "efter värmepumpsbyte" — sätts ihop till beskrivningen
+      "{typnamn} {sourceLabel}", exakt cronens tidigare textform. */
+  sourceLabel: string
+  sourceRefs: { project_id?: string | null; quote_id?: string | null }
+  now: Date
+}
+
+/**
+ * Skapar kö-kortet (approval_type 'send_sms', samma form som
+ * review-requests/capacity-fill). Delad mellan cron och svep — payloaden
+ * är identisk oavsett vilken väg som skapade kortet (bara project_id/
+ * quote_id skiljer beroende på källa).
+ */
+export async function insertAvtalForslagApproval(
+  params: InsertAvtalForslagApprovalParams,
+): Promise<{ error: string | null }> {
+  const expiresAt = new Date(params.now.getTime() + APPROVAL_EXPIRES_DAYS * 86400000)
+  const customerLabel = params.customer.name || 'kunden'
+  const toPhone = normalizeSwedishPhone(params.customer.phone_number)
+
+  const payload: Record<string, unknown> = {
+    to: toPhone,
+    message: params.smsText,
+    customer_id: params.customer.customer_id,
+    customer_name: params.customer.name,
+    routed_agent: 'hanna',
+    trigger: AVTAL_FORSLAG_TRIGGER,
+    agreement_type_ids: params.matchedTypeIds,
+  }
+  if (params.sourceRefs.project_id) payload.project_id = params.sourceRefs.project_id
+  if (params.sourceRefs.quote_id) payload.quote_id = params.sourceRefs.quote_id
+
+  const { error } = await params.supabase.from('pending_approvals').insert({
+    business_id: params.businessId,
+    approval_type: 'send_sms',
+    title: `🔧 Serviceavtal — ${customerLabel}`,
+    description: `${params.primaryType.name} ${params.sourceLabel}`,
+    status: 'pending',
+    risk_level: 'low',
+    expires_at: expiresAt.toISOString(),
+    payload,
+  })
+
+  return { error: error?.message || null }
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Public entry-point
 // ─────────────────────────────────────────────────────────────────
 
@@ -352,10 +635,11 @@ function emptyResult(businessId: string): AvtalForslagResult {
 
 /**
  * Hämta offertradsbeskrivningar (max 15, sort_order) + offertens job_type
- * via ett projekts quote_id. Fail-safe: fel/saknad offert ger tom kontext
- * — kandidaten matchas då bara på projekttiteln.
+ * via ett projekts (eller svepets) quote_id. Fail-safe: fel/saknad offert
+ * ger tom kontext — kandidaten matchas då bara på titeln. Delad mellan
+ * cron och svep (se filkommentaren).
  */
-async function getQuoteContextForMatching(
+export async function getQuoteContextForMatching(
   supabase: SupabaseClient,
   businessId: string,
   quoteId: string | null,
@@ -403,31 +687,12 @@ export async function runAvtalForslagForBusiness(
 
   try {
     // ── 1. Katalogen — utan den finns inget att erbjuda ────────────
-    const { data: catalogData, error: catalogErr } = await supabase
-      .from('service_agreement_type')
-      .select('type_id, name, description, interval_months, match_keys, price_items')
-      .eq('business_id', businessId)
-      .eq('is_active', true)
-
-    if (catalogErr) {
-      if (isMissingRelationError(catalogErr)) return result
-      throw catalogErr
-    }
-
-    const catalog = (catalogData || []) as CatalogMatchEntry[]
-    if (catalog.length === 0) {
-      result.skipped.no_catalog = 1
+    const catalogResult = await loadActiveAgreementCatalog(supabase, businessId)
+    if (!catalogResult.ok) {
+      if (catalogResult.reason === 'empty') result.skipped.no_catalog = 1
       return result
     }
-
-    const catalogForPrompt: CatalogEntryForPrompt[] = catalog.map((c) => ({
-      type_id: c.type_id,
-      name: c.name,
-      description: c.description,
-      interval_months: c.interval_months,
-      priceInclVat: priceInclVatPerVisit(c.price_items),
-    }))
-    const catalogById = new Map(catalog.map((c) => [c.type_id, c]))
+    const { catalog, catalogForPrompt, catalogById } = catalogResult.bundle
 
     // ── 2. Kandidat-projekt: completed senaste 7 dagarna ±12h ──────
     const windowAnchor = new Date(now.getTime() - CANDIDATE_WINDOW_DAYS * 86400000)
@@ -452,45 +717,10 @@ export async function runAvtalForslagForBusiness(
     if (projects.length === 0) return result
 
     // ── 3. Kunder med aktivt avtal — uteslut helt ───────────────────
-    const { data: activeAgreements, error: agrErr } = await supabase
-      .from('service_agreement')
-      .select('customer_id')
-      .eq('business_id', businessId)
-      .eq('status', 'active')
-
-    if (agrErr && !isMissingRelationError(agrErr)) throw agrErr
-    const activeAgreementCustomerIds = new Set(
-      ((activeAgreements || []) as Array<{ customer_id: string }>).map((a) => a.customer_id),
-    )
+    const activeAgreementCustomerIds = await getActiveAgreementCustomerIds(supabase, businessId)
 
     // ── 4. Dedup — bred 7d (alla förslag) + smal 30d (avvisade avtal) ──
-    const rejectedWindowStart = new Date(now.getTime() - REJECTED_DEDUP_WINDOW_DAYS * 86400000).toISOString()
-    const broadWindowStart = new Date(now.getTime() - BROAD_DEDUP_WINDOW_DAYS * 86400000).toISOString()
-
-    const { data: recentApprovals } = await supabase
-      .from('pending_approvals')
-      .select('payload, status, created_at')
-      .eq('business_id', businessId)
-      .gte('created_at', rejectedWindowStart)
-      .limit(1000)
-
-    const excludeCustomerIds = new Set<string>()
-    for (const row of (recentApprovals || []) as Array<{ payload: unknown; status: string; created_at: string }>) {
-      const payload = (row.payload || {}) as Record<string, unknown>
-      const customerId = payload.customer_id ? String(payload.customer_id) : null
-      if (!customerId) continue
-
-      // Lager 1: bred 7-dagars-spärr — vilket förslag som helst nyligen.
-      if (row.created_at >= broadWindowStart) {
-        excludeCustomerIds.add(customerId)
-        continue
-      }
-
-      // Lager 2: smal 30-dagars-spärr — bara AVVISADE avtalsförslag.
-      if (row.status === 'rejected' && payload.trigger === AVTAL_FORSLAG_TRIGGER) {
-        excludeCustomerIds.add(customerId)
-      }
-    }
+    const excludeCustomerIds = await getDedupExcludedCustomerIds(supabase, businessId, now)
 
     // ── 5. Per kandidat-projekt ──────────────────────────────────────
     for (const project of projects) {
@@ -542,84 +772,47 @@ export async function runAvtalForslagForBusiness(
 
         // ── Lager 2: AI-matchning (Haiku), fail-safe till keyword-fallback ──
         result.ai_calls++
-        const haikuOutcome = await matchViaHaiku({
-          projectTitle,
+        const outcome = await matchAndBuildOffer({
+          candidateTitle: projectTitle,
           itemDescriptions,
-          catalog: catalogForPrompt,
+          jobType,
+          catalog,
+          catalogForPrompt,
+          catalogById,
           customerFirstName: customerRow.name,
           businessName,
         })
-        result.cost_usd += haikuOutcome.cost_usd
-        if (haikuOutcome.usage) {
-          result.usage.input_tokens += haikuOutcome.usage.input_tokens
-          result.usage.output_tokens += haikuOutcome.usage.output_tokens
+        result.cost_usd += outcome.cost_usd
+        if (outcome.usage) {
+          result.usage.input_tokens += outcome.usage.input_tokens
+          result.usage.output_tokens += outcome.usage.output_tokens
         }
+        if (outcome.usedFallback) result.ai_fallback_used++
 
-        let matchedTypeIds: string[]
-        let smsText: string | null
-
-        if (haikuOutcome.result !== null) {
-          matchedTypeIds = haikuOutcome.result.matches
-          smsText = haikuOutcome.result.sms
-        } else {
-          result.ai_fallback_used++
-          const searchText = `${projectTitle} ${jobType || ''}`.trim()
-          matchedTypeIds = matchAgreementTypesByKeywords(searchText, catalog)
-          smsText = null // byggs nedan från första matchen
-        }
-
-        if (matchedTypeIds.length === 0) {
+        if (!outcome.matched) {
           result.skipped.no_match++
           continue
         }
 
-        const primaryType = catalogById.get(matchedTypeIds[0])
-        if (!primaryType) {
-          // Bör inte kunna hända (validerat mot katalogen ovan) — fail-safe.
-          result.skipped.no_match++
-          continue
-        }
+        const { matchedTypeIds, smsText, primaryType } = outcome.matched
 
-        if (!smsText) {
-          smsText = buildFallbackAvtalSms({
-            customerFirstName: customerRow.name,
-            projectTitle,
-            typeName: primaryType.name,
-            intervalMonths: primaryType.interval_months,
-            priceInclVat: priceInclVatPerVisit(primaryType.price_items),
-            businessName,
-          })
-        }
-
-        const expiresAt = new Date(now.getTime() + APPROVAL_EXPIRES_DAYS * 86400000)
-        const customerLabel = customerRow.name || 'kunden'
-        const toPhone = normalizeSwedishPhone(customerRow.phone_number)
-
-        const { error: insertErr } = await supabase.from('pending_approvals').insert({
-          business_id: businessId,
-          approval_type: 'send_sms',
-          title: `🔧 Serviceavtal — ${customerLabel}`,
-          description: `${primaryType.name} efter ${projectTitle}`,
-          status: 'pending',
-          risk_level: 'low',
-          expires_at: expiresAt.toISOString(),
-          payload: {
-            to: toPhone,
-            message: smsText,
-            customer_id: customerRow.customer_id,
-            customer_name: customerRow.name,
-            routed_agent: 'hanna',
-            trigger: AVTAL_FORSLAG_TRIGGER,
-            agreement_type_ids: matchedTypeIds,
-            project_id: project.project_id,
-          },
+        const { error: insertErr } = await insertAvtalForslagApproval({
+          supabase,
+          businessId,
+          customer: { customer_id: customerRow.customer_id, name: customerRow.name, phone_number: customerRow.phone_number },
+          primaryType,
+          matchedTypeIds,
+          smsText,
+          sourceLabel: `efter ${projectTitle}`,
+          sourceRefs: { project_id: project.project_id },
+          now,
         })
 
         if (insertErr) {
           console.error('[avtal-forslag] approval insert error:', {
             business_id: businessId,
             project_id: project.project_id,
-            error: insertErr.message,
+            error: insertErr,
           })
           result.errors++
           continue
@@ -642,12 +835,4 @@ export async function runAvtalForslagForBusiness(
     result.errors++
     return result
   }
-}
-
-function isMissingRelationError(error: unknown): boolean {
-  if (!error) return false
-  const e = error as { code?: string; message?: string }
-  if (e.code === '42P01') return true
-  const message = String(e.message || '')
-  return /does not exist|schema cache/i.test(message) && /relation|table|column/i.test(message)
 }
