@@ -13,6 +13,14 @@ import {
   AVTAL_FORSLAG_SMS_MAX_LENGTH,
 } from '../lib/agents/hanna/avtal-forslag'
 import { priceExclVat, priceInclVatPerVisit } from '../lib/agreements/pricing'
+import {
+  computeSweepBudget,
+  MAX_NEW_PER_SWEEP,
+  pickLatestPerCustomer,
+  summarizeSweepResult,
+  type KundbasSweepResult,
+  type RawActivityRow,
+} from '../lib/agents/hanna/kundbas-svep'
 
 test.describe('addIntervalMonths — nästa-besöks-beräkning', () => {
   test('vanligt fall: +1 månad inom samma år', () => {
@@ -365,5 +373,147 @@ test.describe('buildHaikuUserMessage — prompt-byggaren (ren funktion)', () => 
     })
     expect(msg).toContain('Rad 15')
     expect(msg).not.toContain('Rad 16')
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════
+// Etapp 2.5 — "Väck kundbasen"-svepet (lib/agents/hanna/kundbas-svep.ts).
+// Svep-loopen självt (DB-anrop + Haiku) testas INTE här — bara de rena
+// kärnfunktionerna: batch-takets beräkning + kandidat-sorteringen.
+// ═══════════════════════════════════════════════════════════════════════
+
+test.describe('computeSweepBudget — batch-takets beräkning', () => {
+  test('inga pending → full budget (10)', () => {
+    expect(computeSweepBudget(0)).toBe(MAX_NEW_PER_SWEEP)
+    expect(computeSweepBudget(0)).toBe(10)
+  })
+
+  test('4 pending → 6 nya tillåts (specens exakta exempel)', () => {
+    expect(computeSweepBudget(4)).toBe(6)
+  })
+
+  test('taket exakt uppnått (10 pending) → 0 nya', () => {
+    expect(computeSweepBudget(10)).toBe(0)
+  })
+
+  test('fler pending än taket (15) → aldrig negativt, 0 nya', () => {
+    expect(computeSweepBudget(15)).toBe(0)
+  })
+
+  test('1 pending → 9 nya', () => {
+    expect(computeSweepBudget(1)).toBe(9)
+  })
+})
+
+test.describe('pickLatestPerCustomer — kandidat-sorteringen', () => {
+  function row(overrides: Partial<RawActivityRow>): RawActivityRow {
+    return {
+      customer_id: 'cust_1',
+      activity_at: '2026-01-01T00:00:00.000Z',
+      title: 'jobbet',
+      source: 'project',
+      project_id: 'proj_1',
+      quote_id: null,
+      ...overrides,
+    }
+  }
+
+  test('en rad per kund, sorterad senaste aktivitet först', () => {
+    const rows: RawActivityRow[] = [
+      row({ customer_id: 'a', activity_at: '2026-01-01T00:00:00.000Z' }),
+      row({ customer_id: 'b', activity_at: '2026-03-01T00:00:00.000Z' }),
+      row({ customer_id: 'c', activity_at: '2026-02-01T00:00:00.000Z' }),
+    ]
+    const result = pickLatestPerCustomer(rows)
+    expect(result.map((r) => r.customer_id)).toEqual(['b', 'c', 'a'])
+  })
+
+  test('kund med både projekt och offert → väljer den FÄRSKASTE av de två', () => {
+    const rows: RawActivityRow[] = [
+      row({ customer_id: 'a', source: 'project', activity_at: '2026-01-01T00:00:00.000Z', title: 'Gammalt jobb' }),
+      row({ customer_id: 'a', source: 'quote', activity_at: '2026-06-01T00:00:00.000Z', title: 'Ny offert', quote_id: 'q_1', project_id: null }),
+    ]
+    const result = pickLatestPerCustomer(rows)
+    expect(result.length).toBe(1)
+    expect(result[0].source).toBe('quote')
+    expect(result[0].title).toBe('Ny offert')
+  })
+
+  test('äldre offert vs nyare projekt → projektet vinner', () => {
+    const rows: RawActivityRow[] = [
+      row({ customer_id: 'a', source: 'quote', activity_at: '2026-01-01T00:00:00.000Z', quote_id: 'q_1', project_id: null }),
+      row({ customer_id: 'a', source: 'project', activity_at: '2026-05-01T00:00:00.000Z', project_id: 'proj_9' }),
+    ]
+    const result = pickLatestPerCustomer(rows)
+    expect(result[0].source).toBe('project')
+    expect(result[0].project_id).toBe('proj_9')
+  })
+
+  test('tom lista → tom lista', () => {
+    expect(pickLatestPerCustomer([])).toEqual([])
+  })
+
+  test('flera kunder, oberoende av inbördes radordning i input', () => {
+    const rows: RawActivityRow[] = [
+      row({ customer_id: 'x', activity_at: '2025-01-01T00:00:00.000Z' }),
+      row({ customer_id: 'y', activity_at: '2026-08-01T00:00:00.000Z' }),
+      row({ customer_id: 'x', activity_at: '2026-07-01T00:00:00.000Z' }), // senare rad för x, ska vinna
+    ]
+    const result = pickLatestPerCustomer(rows)
+    expect(result.map((r) => r.customer_id)).toEqual(['y', 'x'])
+    expect(result.find((r) => r.customer_id === 'x')?.activity_at).toBe('2026-07-01T00:00:00.000Z')
+  })
+})
+
+test.describe('summarizeSweepResult — svensk klarspråks-sammanfattning', () => {
+  function baseResult(overrides: Partial<KundbasSweepResult>): KundbasSweepResult {
+    return {
+      business_id: 'biz_1',
+      candidates_total: 0,
+      candidates_evaluated: 0,
+      created: 0,
+      skipped_active_agreement: 0,
+      skipped_recent: 0,
+      skipped_no_phone: 0,
+      skipped_no_match: 0,
+      ai_calls: 0,
+      ai_fallback_used: 0,
+      cost_usd: 0,
+      usage: { input_tokens: 0, output_tokens: 0 },
+      errors: 0,
+      no_catalog: false,
+      already_at_cap: false,
+      pending_before: 0,
+      ...overrides,
+    }
+  }
+
+  test('tom katalog → tydlig uppmaning', () => {
+    const msg = summarizeSweepResult(baseResult({ no_catalog: true }))
+    expect(msg).toContain('katalog')
+  })
+
+  test('redan vid taket → nämner antal pending', () => {
+    const msg = summarizeSweepResult(baseResult({ already_at_cap: true, pending_before: 10 }))
+    expect(msg).toContain('10')
+  })
+
+  test('inga kandidater alls → ärligt besked', () => {
+    const msg = summarizeSweepResult(baseResult({ candidates_total: 0 }))
+    expect(msg).toBe('Inga kunder med avslutade projekt eller accepterade offerter hittades.')
+  })
+
+  test('kandidater fanns men alla skippades → orsaker i klarspråk', () => {
+    const msg = summarizeSweepResult(
+      baseResult({
+        candidates_total: 20,
+        skipped_active_agreement: 3,
+        skipped_no_phone: 2,
+        skipped_no_match: 5,
+      }),
+    )
+    expect(msg).toContain('3 har redan ett aktivt avtal')
+    expect(msg).toContain('2 saknar telefonnummer')
+    expect(msg).toContain('5 matchade ingen tjänst i katalogen')
   })
 })
