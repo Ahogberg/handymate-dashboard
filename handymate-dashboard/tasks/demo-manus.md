@@ -52,3 +52,33 @@ pengarna tillbaka." → boka onboarding PÅ PLATS (signup tar 10 min).
   "Inget går ut utan mitt OK förrän jag själv gett den förtroendet."
 - "Jag har redan Bygglet/Easoft" → "De ger dig ett verktyg. Det här är ett team.
   Verktyget väntar på dig — teamet jobbar när du inte gör det."
+
+## Variant: "Sovande pengar" (för ETABLERADE firmor, byt ut Akt 2)
+
+_Läs av vem du sitter framför. Jaktfirman (vill ha fler jobb) får Akt 2
+(missat samtal). Den etablerade firman med 10+ år och fullt kundregister
+får den här istället — deras smärta är inte nya kunder, det är att
+kundbasen ligger och sover._
+
+**Öppningsfråga:** "Hur många kunder har du gjort jobb åt genom åren?
+300? 500? … Hur många av dem hörde du av dig till förra året?"
+(Svaret är nästan alltid: ingen. Låt det sjunka in.)
+
+**Visa:** Serviceavtal på kundkortet + "Väck kundbasen" — Hanna går
+igenom hela registret, matchar gamla jobb mot avtalskatalogen och lägger
+färdiga förslag i kön: personligt SMS-erbjudande per kund, du godkänner
+med ett tryck.
+
+**Räkneexemplet (skriv på papper om det behövs):**
+400 gamla kunder → Hanna hittar 80 med matchande jobb → 15 % tackar ja
+→ 12 serviceavtal × 1 500 kr/besök = **18 000+ kr/år i återkommande
+intäkt** — ur data som redan låg i registret. Sen bokar Lars besöken
+automatiskt i dina tunna veckor, och Karin lägger fakturan i din kö
+efter varje besök.
+
+**Stinget:** "Ditt kundregister är en guldgruva som Bygglet och Easoft
+låter ligga orörd. Vårt team gräver — med ditt godkännande på varje steg."
+
+**FÅR INTE SÄGAS-tillägg för denna variant:** lova aldrig specifika
+utfall ("du FÅR 12 avtal") — räkneexemplet presenteras alltid som
+just ett exempel. Siffrorna ovan är antaganden, inte data.

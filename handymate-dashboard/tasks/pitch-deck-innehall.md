@@ -49,6 +49,20 @@ Produktbank med dina priser. Fakturor mot Fortnox. ROT-filen till Skatteverket.
 **Det här är byggt för svenska hantverkare — inte översatt från ett amerikanskt
 program.**
 
+## Slide 6b — Sovande pengar (NY — används mot ETABLERADE firmor)
+Hur många kunder har du i registret? När hörde de från dig senast?
+**Ditt kundregister är en guldgruva. Vårt team gräver.**
+Hanna matchar dina gamla jobb mot serviceavtal (värmepumpsservice,
+våtrumskontroll, takgenomgång…) och lägger färdiga erbjudanden i din kö —
+du godkänner med ett tryck. Lars bokar besöken i dina tunna veckor.
+Karin fakturerar efter varje besök.
+_Räkneexempel (alltid presenterat som exempel, aldrig löfte): 400 kunder →
+80 matchningar → 15 % ja → 12 avtal à 1 500 kr/besök = 18 000+ kr/år i
+återkommande intäkt, ur data som redan låg där._
+**Ingen konkurrent gör något alls med din kundhistorik.**
+_(Presentatörsnot: för jaktfirmor som vill ha NYA jobb — hoppa över denna
+och kör slide 7:s missat samtal-vinkel hårdare. Läs av rummet.)_
+
 ## Slide 7 — Beviset (Christoffer, riktiga siffror)
 [CASE STUDY — ur veckovärdes-vyn på Christoffers eget konto:]
 - X kundsamtal fångade som annars gått förlorade
