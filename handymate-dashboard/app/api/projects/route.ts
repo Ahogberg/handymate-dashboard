@@ -528,6 +528,16 @@ export async function PUT(request: NextRequest) {
         console.error('Auto-invoice on complete error (non-blocking):', invoiceErr)
       }
 
+      // Motor 1: frys utfall-vs-offert (efterkalkyl). Fail-safe — kastar
+      // aldrig, får inte fälla projektstängningen. Körs bara här eftersom
+      // vi passerat 4-eyes-gaten ovan och status faktiskt blev 'completed'.
+      try {
+        const { freezeProjectOutcome } = await import('@/lib/efterkalkyl/freeze-outcome')
+        await freezeProjectOutcome(supabase, business.business_id, project.project_id)
+      } catch (outcomeErr) {
+        console.error('[projects] freezeProjectOutcome error (non-blocking):', outcomeErr)
+      }
+
       // Schemalägg Google-recension 24h efter projektslut
       try {
         const { data: customer } = await supabase

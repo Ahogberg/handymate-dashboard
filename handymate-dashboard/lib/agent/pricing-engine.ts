@@ -204,6 +204,36 @@ export async function updatePricingIntelligence(businessId: string): Promise<{
       return { success: true, jobTypesAnalyzed: 0, quotesClassified, error: 'Inga klassificerade offerter att analysera' }
     }
 
+    // 4.5 Motor 1 (Lärande prissättning): genomsnittlig marginal per
+    // jobbtyp från frusna project_outcome-rader (freezeProjectOutcome,
+    // lib/efterkalkyl/freeze-outcome.ts). Ersätter den tidigare
+    // hårdkodade null:en nedan. Fail-safe: om project_outcome inte finns
+    // än (v73-migrationen ej körd) eller läsningen failar, förblir
+    // avg_margin null precis som innan — ingen ny risk i nattloopen.
+    const avgMarginByJobType: Record<string, number> = {}
+    try {
+      const { data: outcomeRows, error: outcomeErr } = await supabase
+        .from('project_outcome')
+        .select('job_type, margin_pct')
+        .eq('business_id', businessId)
+        .not('job_type', 'is', null)
+        .not('margin_pct', 'is', null)
+
+      if (!outcomeErr && outcomeRows) {
+        const marginsByJobType: Record<string, number[]> = {}
+        for (const row of outcomeRows as Array<{ job_type: string; margin_pct: number }>) {
+          if (!marginsByJobType[row.job_type]) marginsByJobType[row.job_type] = []
+          marginsByJobType[row.job_type].push(Number(row.margin_pct))
+        }
+        for (const jt of Object.keys(marginsByJobType)) {
+          const vals = marginsByJobType[jt]
+          avgMarginByJobType[jt] = Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 100) / 100
+        }
+      }
+    } catch (err) {
+      console.error('[PricingEngine] project_outcome avg_margin-uppslag misslyckades (fail-safe, ignoreras):', err)
+    }
+
     // 5. Aggregera per jobbtyp
     const byJobType: Record<string, QuoteRecord[]> = {}
     for (const q of updatedQuotes) {
@@ -258,7 +288,7 @@ export async function updatePricingIntelligence(businessId: string): Promise<{
         won_quotes: won,
         lost_quotes: lost,
         win_rate: winRate !== null ? Math.round(winRate * 100) / 100 : null,
-        avg_margin: null,
+        avg_margin: avgMarginByJobType[jobType] ?? null,
         price_trend: trend,
       })
     }

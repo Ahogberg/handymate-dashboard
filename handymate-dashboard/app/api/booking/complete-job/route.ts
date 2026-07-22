@@ -130,6 +130,16 @@ export async function POST(request: NextRequest) {
           console.error('[booking/complete-job] auto-invoice failed:', invErr)
         }
 
+        // 2.5. Motor 1: frys utfall-vs-offert (efterkalkyl). Fail-safe —
+        // kastar aldrig, får inte fälla booking-completion. Körs bara här
+        // eftersom projektet faktiskt precis stängdes (is_final_day).
+        try {
+          const { freezeProjectOutcome } = await import('@/lib/efterkalkyl/freeze-outcome')
+          await freezeProjectOutcome(supabase, business.business_id, existing.project_id)
+        } catch (outcomeErr) {
+          console.error('[booking/complete-job] freezeProjectOutcome failed:', outcomeErr)
+        }
+
         // 3. Avancera workflow-stage till slutbesiktning (ps-05). Mobile
         // visar progress-bar baserat på detta. Non-blocking.
         try {
