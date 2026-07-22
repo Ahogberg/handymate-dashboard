@@ -194,7 +194,10 @@ function maleriAgreementTypes(rate: number): DefaultAgreementType[] {
       description: 'Regelbunden fasadtvätt — förlänger målningens livslängd och håller huset fräscht.',
       interval_months: 24,
       visit_duration_min: 180,
-      price_items: finalize([laborLine('Fasadtvätt', 3, rate, true), servicebilLine()]),
+      // OBS: ren rengöring (alg-/fasadtvätt) är INTE ROT-berättigad enligt
+      // Skatteverket — ROT kräver reparation/underhåll, tvätt räknas som
+      // rengöring. (Målning av fasaden är ROT; tvätten ensam är det inte.)
+      price_items: finalize([laborLine('Fasadtvätt', 3, rate, false), servicebilLine()]),
       match_keys: ['fasad', 'fasadmålning', 'fasadtvätt'],
     },
     {
