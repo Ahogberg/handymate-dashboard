@@ -129,15 +129,32 @@ COMMENT ON COLUMN booking.agreement_id IS
   'Länk till service_agreement om bokningen är ett automatiskt schemalagt serviceavtalsbesök (kind=service). NULL = ej avtalskopplad bokning.';
 
 -- ─────────────────────────────────────────────────────────────────
+-- DEL 4: invoice.booking_id — dedup-nyckel för Karins besök→faktura-hook
+-- (lib/agreements/invoice-visit.ts). En faktura per booking_id.
+-- ─────────────────────────────────────────────────────────────────
+
+ALTER TABLE invoice
+  ADD COLUMN IF NOT EXISTS booking_id TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_invoice_booking
+  ON invoice(booking_id)
+  WHERE booking_id IS NOT NULL;
+
+COMMENT ON COLUMN invoice.booking_id IS
+  'Länk till booking om fakturan skapades från ett serviceavtalsbesök. Dedup-nyckel: en faktura per booking_id (se lib/agreements/invoice-visit.ts).';
+
+-- ─────────────────────────────────────────────────────────────────
 -- VERIFIERING
 -- ─────────────────────────────────────────────────────────────────
 
 SELECT
   (SELECT COUNT(*) FROM service_agreement_type) AS agreement_types,
   (SELECT COUNT(*) FROM service_agreement) AS agreements,
-  (SELECT COUNT(*) FROM booking WHERE agreement_id IS NOT NULL) AS agreement_bookings;
+  (SELECT COUNT(*) FROM booking WHERE agreement_id IS NOT NULL) AS agreement_bookings,
+  (SELECT COUNT(*) FROM invoice WHERE booking_id IS NOT NULL) AS agreement_invoices;
 
 -- ROLLBACK (manuellt om behövs):
 -- DROP TABLE IF EXISTS service_agreement;
 -- DROP TABLE IF EXISTS service_agreement_type;
 -- ALTER TABLE booking DROP COLUMN IF EXISTS agreement_id;
+-- ALTER TABLE invoice DROP COLUMN IF EXISTS booking_id;
