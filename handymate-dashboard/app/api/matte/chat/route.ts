@@ -20,6 +20,12 @@ import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { executeTool as executeSharedTool } from '@/app/api/agent/trigger/tool-router'
 import { filterTools, fetchBusinessContext, type ToolContext } from '@/lib/agent/agents/shared'
+import {
+  isExternalSendTool,
+  signPendingExternalAction,
+  verifyPendingExternalAction,
+  buildExternalActionSummary,
+} from '@/lib/agent/external-confirm'
 
 const MAX_IMAGES_PER_MESSAGE = 4
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -481,6 +487,12 @@ interface AgentTurnResult {
   action: any
   /** Satt om Claude använde handoff_to_agent — hanteras i outer loop */
   handoff: { target_agent: string; reason: string; context_for_next_agent: string } | null
+  /**
+   * Fas 0-säkerhetsräcke: satt om Claude anropade ett verktyg som lämnar
+   * huset (send_sms/send_email) medan require_confirm_external=true. Verktyget
+   * har INTE exekverats — outer loop stannar och ber om explicit bekräftelse.
+   */
+  pendingExternal: { toolName: string; toolInput: Record<string, unknown> } | null
 }
 
 /**
@@ -488,6 +500,11 @@ interface AgentTurnResult {
  * upptäcker handoff_to_agent-anrop (som signalerar att outer loop ska byta
  * agent). Om handoff används avbryter vi tool-loopen och returnerar handoff:en
  * — vi skickar inget tool_result tillbaka till modellen för det anropet.
+ *
+ * requireConfirmExternal: om satt gatas send_sms/send_email — anropet
+ * exekveras INTE här, utan turen avbryts och pendingExternal returneras (se
+ * ovan). Precis som handoff skickar vi inget tool_result för det anropet;
+ * turen är slut och väntar på klientens bekräftelse.
  */
 async function runAgentTurn(opts: {
   apiKey: string
@@ -497,6 +514,7 @@ async function runAgentTurn(opts: {
   businessId: string
   supabase: ReturnType<typeof getServerSupabase>
   toolContext: ToolContext
+  requireConfirmExternal: boolean
 }): Promise<AgentTurnResult> {
   const MAX_TOOL_ITERATIONS = 5
   let response = await callClaude({
@@ -529,6 +547,30 @@ async function runAgentTurn(opts: {
           reason: String(handoffBlock.input?.reason || ''),
           context_for_next_agent: String(handoffBlock.input?.context_for_next_agent || ''),
         },
+        pendingExternal: null,
+      }
+    }
+
+    // Säkerhetsräcke: om require_confirm_external är satt och Claude vill
+    // anropa ett verktyg som skickar något UT ur huset (SMS/e-post) — stanna
+    // HELA turen här. Inget verktyg i den här batchen exekveras (varken det
+    // externa eller ev. interna i samma svar), och inget tool_result skickas
+    // tillbaka till modellen. Klienten får en pending_confirmation och måste
+    // svara med en explicit bekräftelse innan exakt detta anrop körs.
+    if (opts.requireConfirmExternal) {
+      const gatedBlock = toolUseBlocks.find((b: any) => isExternalSendTool(b.name))
+      if (gatedBlock) {
+        const text = (response.content || [])
+          .filter((b: any) => b.type === 'text')
+          .map((b: any) => b.text)
+          .join('\n')
+          .trim()
+        return {
+          text,
+          action: finalAction,
+          handoff: null,
+          pendingExternal: { toolName: gatedBlock.name, toolInput: gatedBlock.input || {} },
+        }
       }
     }
 
@@ -567,18 +609,65 @@ async function runAgentTurn(opts: {
     .join('\n')
     .trim()
 
-  return { text: finalText, action: finalAction, handoff: null }
+  return { text: finalText, action: finalAction, handoff: null, pendingExternal: null }
+}
+
+/**
+ * Kör den EXAKTA åtgärden som stod på ett tidigare pending_confirmation-kort,
+ * och bara den. Ingen ny Claude-runda — token:en signerades server-side i
+ * förra svaret och bär redan verktygsnamn + exakta argument, så klienten kan
+ * inte byta ut vad som faktiskt skickas. Går genom samma delade tool-router
+ * som resten av Matte, så t.ex. SMS-nattspärren i sendSms gäller precis som
+ * vanligt — det här ÄR den enda exekveringen, ingen dubbelgating.
+ */
+async function handleConfirmedExternalAction(businessId: string, token: string): Promise<NextResponse> {
+  const pending = verifyPendingExternalAction(token, businessId)
+  if (!pending) {
+    return NextResponse.json(
+      { error: 'Bekräftelsen har gått ut eller är ogiltig — försök igen från chatten.' },
+      { status: 400 }
+    )
+  }
+
+  const supabase = getServerSupabase()
+  const bizCtx = await fetchBusinessContext(supabase, businessId, 'user')
+  const toolContext: ToolContext = bizCtx?.toolContext ?? {
+    businessName: '',
+    contactEmail: '',
+    googleConnection: null,
+    triggerSource: 'user',
+  }
+
+  const result: any = await executeSharedTool(pending.toolName, pending.toolInput, supabase, businessId, toolContext as any)
+  const summary = buildExternalActionSummary(pending.toolName, pending.toolInput)
+  const replyText = result?.success
+    ? ((result?.data?.message as string | undefined) || `${summary} — klart.`)
+    : `Kunde inte utföra åtgärden: ${result?.error || 'okänt fel'}`
+
+  if (pending.threadId) {
+    saveThreadMessage({
+      threadId: pending.threadId,
+      businessId,
+      role: 'assistant',
+      agent: (pending.agent as AgentId) || 'matte',
+      content: replyText,
+    }).catch(() => {})
+    touchThread(pending.threadId).catch(() => {})
+  }
+
+  return NextResponse.json({
+    messages: [{ agent: pending.agent, content: replyText }],
+    current_agent: pending.agent,
+    thread_id: pending.threadId,
+    reply: replyText,
+    action: null,
+    confirmed: true,
+  })
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { messages, context, images: rawImages } = body
-
-    if (!messages || !Array.isArray(messages)) {
-      console.error('[matte/chat] 400:', { reason: 'messages krävs', body })
-      return NextResponse.json({ error: 'messages krävs' }, { status: 400 })
-    }
 
     // Auth: härled businessId från token (Bearer/cookie) — lita ALDRIG på
     // context.businessId från bodyn (annars korstenant-läcka: vem som helst
@@ -587,6 +676,27 @@ export async function POST(request: NextRequest) {
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // ── Bekräftelse-väg (Fas 0-säkerhetsräcke) ───────────────────────────
+    // Klienten skickar tillbaka den signerade token:en från ett tidigare
+    // pending_confirmation-svar när hantverkaren tryckt [Skicka]. Ingen
+    // Claude-inblandning här alls — se handleConfirmedExternalAction.
+    if (body?.confirm?.token) {
+      return await handleConfirmedExternalAction(business.business_id, String(body.confirm.token))
+    }
+
+    const { messages, context, images: rawImages, require_confirm_external } = body
+
+    if (!messages || !Array.isArray(messages)) {
+      console.error('[matte/chat] 400:', { reason: 'messages krävs', body })
+      return NextResponse.json({ error: 'messages krävs' }, { status: 400 })
+    }
+
+    // Fas 0-säkerhetsräcke: default FALSE så mobilappen (som anropar den här
+    // routen utan parametern) är helt opåverkad. Dashboard-bubblan sätter
+    // TRUE. Strikt === true — en trunkig/sanningsvärde-liknande sträng ska
+    // INTE räknas som påslaget.
+    const requireConfirmExternal = require_confirm_external === true
 
     const userName = context?.userName || 'hantverkaren'
     const businessName = context?.businessName || 'företaget'
@@ -822,9 +932,49 @@ export async function POST(request: NextRequest) {
         businessId,
         supabase,
         toolContext,
+        requireConfirmExternal,
       })
 
       if (turn.action && !finalAction) finalAction = turn.action
+
+      // Säkerhetsräcke: Claude ville skicka något ut ur huset. Persistera ev.
+      // text den redan sa (t.ex. "Visst, skickar nu...") och returnera direkt
+      // — inget verktyg har körts, inget mer sker förrän klienten bekräftar.
+      if (turn.pendingExternal) {
+        if (turn.text && thread) {
+          saveThreadMessage({
+            threadId: thread.id,
+            businessId,
+            role: 'assistant',
+            agent: currentAgent,
+            content: turn.text,
+          }).catch(() => {})
+        }
+        if (thread) touchThread(thread.id).catch(() => {})
+
+        const summary = buildExternalActionSummary(turn.pendingExternal.toolName, turn.pendingExternal.toolInput)
+        const token = signPendingExternalAction({
+          toolName: turn.pendingExternal.toolName as 'send_sms' | 'send_email',
+          toolInput: turn.pendingExternal.toolInput,
+          businessId,
+          threadId: thread?.id || null,
+          agent: currentAgent,
+        })
+
+        return NextResponse.json({
+          messages: turn.text ? [{ agent: currentAgent, content: turn.text }] : [],
+          current_agent: currentAgent,
+          thread_id: thread?.id || null,
+          reply: turn.text || summary,
+          action: null,
+          pending_confirmation: {
+            tool_name: turn.pendingExternal.toolName,
+            args: turn.pendingExternal.toolInput,
+            summary,
+            token,
+          },
+        })
+      }
 
       if (!turn.handoff || handoffsThisTurn >= MAX_PER_TURN_HANDOFFS) {
         // Klart: lägg sista textsvaret om det finns
