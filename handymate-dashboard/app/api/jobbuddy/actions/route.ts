@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { executeTool as executeSharedTool } from '@/app/api/agent/trigger/tool-router'
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,45 +40,45 @@ export async function POST(request: NextRequest) {
       }
 
       case 'create_invoice': {
+        // Fas 0 (tasks/ui-ux-audit.md): den här grenen satte tidigare
+        // fakturanummer med Math.random() — en egen, sämre räknare som kunde
+        // krocka med den riktiga (business_config.next_invoice_number).
+        // Routar nu genom den DELADE tool-router:n (samma implementation som
+        // riktiga Matte kör) så alla fakturor delar samma räknare, VAT- och
+        // ROT/RUT-beräkning. Se app/api/agent/trigger/tool-router.ts.
         const { customer_id, description, items } = data
-
-        const invoiceId = `inv-${Date.now()}`
-        const invoiceNumber = Math.floor(1000 + Math.random() * 9000)
-
-        const invoiceItems = items || [{
+        const invoiceItems = (items && items.length > 0 ? items : [{
           description: description || 'Arbete',
           quantity: 1,
           unit: 'st',
           unit_price: 0,
           total: 0,
-        }]
+          type: 'labor',
+        }]).map((item: any) => ({ ...item, type: item.type || 'labor' }))
 
-        const total = invoiceItems.reduce((sum: number, item: any) =>
-          sum + (item.total || item.quantity * item.unit_price || 0), 0)
+        const result: any = await executeSharedTool(
+          'create_invoice',
+          { customer_id: customer_id || null, items: invoiceItems },
+          supabase,
+          businessId,
+          { businessName: authBusiness.business_name || 'Handymate', contactEmail: '', googleConnection: null, triggerSource: 'user' }
+        )
 
-        const { error } = await supabase
-          .from('invoice')
-          .insert({
-            invoice_id: invoiceId,
-            business_id: businessId,
-            customer_id: customer_id || null,
-            invoice_number: invoiceNumber,
-            status: 'draft',
-            items: invoiceItems,
-            total,
-            due_date: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-            created_at: new Date().toISOString(),
-          })
+        if (!result.success) {
+          return NextResponse.json({ error: result.error || 'Kunde inte skapa fakturan' }, { status: 500 })
+        }
 
-        if (error) throw error
         return NextResponse.json({
           success: true,
-          message: 'Fakturautkast skapad',
-          redirect: `/dashboard/invoices/${invoiceId}`,
+          message: result.data?.message || 'Fakturautkast skapad',
+          redirect: `/dashboard/invoices/${result.data?.invoice_id}`,
         })
       }
 
       case 'create_quote': {
+        // Fas 0: samma motivering som create_invoice ovan — routar genom den
+        // delade tool-router:n istället för en lokal dubblett (som dessutom
+        // aldrig skrev quote_items-raderna PDF/utskick läser).
         const { customer_name, description, items } = data
 
         // Try to find customer by name
@@ -93,35 +94,31 @@ export async function POST(request: NextRequest) {
           customerId = found?.customer_id
         }
 
-        const quoteId = `q-${Date.now()}`
-        const quoteItems = items || [{
+        const quoteItems = (items && items.length > 0 ? items : [{
           description: description || 'Arbete',
           quantity: 1,
           unit: 'st',
           unit_price: 0,
           total: 0,
           type: 'labor',
-        }]
+        }]).map((item: any) => ({ ...item, type: item.type || 'labor' }))
 
-        const { error } = await supabase
-          .from('quotes')
-          .insert({
-            quote_id: quoteId,
-            business_id: businessId,
-            customer_id: customerId || null,
-            status: 'draft',
-            items: quoteItems,
-            labor_total: 0,
-            material_total: 0,
-            total: 0,
-            created_at: new Date().toISOString(),
-          })
+        const result: any = await executeSharedTool(
+          'create_quote',
+          { customer_id: customerId || null, title: description || 'Offert från Jobbkompisen', items: quoteItems },
+          supabase,
+          businessId,
+          { businessName: authBusiness.business_name || 'Handymate', contactEmail: '', googleConnection: null, triggerSource: 'user' }
+        )
 
-        if (error) throw error
+        if (!result.success) {
+          return NextResponse.json({ error: result.error || 'Kunde inte skapa offerten' }, { status: 500 })
+        }
+
         return NextResponse.json({
           success: true,
-          message: 'Offertutkast skapad',
-          redirect: `/dashboard/quotes/${quoteId}/edit`,
+          message: result.data?.message || 'Offertutkast skapad',
+          redirect: `/dashboard/quotes/${result.data?.quote_id}/edit`,
         })
       }
 

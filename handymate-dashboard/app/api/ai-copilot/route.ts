@@ -1,3 +1,14 @@
+/**
+ * @deprecated Fas 0 (tasks/ui-ux-audit.md) — bubblans chat-flik
+ * (components/Jobbkompisen.tsx) pratar nu med riktiga Matte via
+ * /api/matte/chat (multi-agent, utför på riktigt via delade tool-router:n)
+ * istället för denna svagare motor. 'jobbuddy'-läget här förslog åtgärder
+ * som exekverades via /api/jobbuddy/actions gamla create_invoice/create_quote
+ * (Math.random-fakturanummer) — den vägen är nu pensionerad, se den routen.
+ * Ingen kvarvarande UI-yta anropar denna route (verifierat med grep). Rör
+ * INTE denna fil för röst/foto — de flikarna använder egna routes
+ * (/api/jobbuddy/voice, /api/jobbuddy/photo), inte den här.
+ */
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServerSupabase } from '@/lib/supabase'
