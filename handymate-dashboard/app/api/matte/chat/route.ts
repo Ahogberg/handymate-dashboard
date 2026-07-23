@@ -182,6 +182,7 @@ const CURATED_TOOL_NAMES = [
   'qualify_lead', 'update_lead_status', 'get_lead', 'search_leads',
   'get_daily_stats', 'create_approval_request', 'check_pending_approvals',
   'get_project_profitability', 'get_pricing_suggestion', 'check_fortnox_status',
+  'get_efterkalkyl_insight', 'run_customer_base_sweep', 'book_site_visit',
 ]
 
 const TOOLS: any[] = [

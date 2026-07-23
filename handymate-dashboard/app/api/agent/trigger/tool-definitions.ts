@@ -442,6 +442,46 @@ export const toolDefinitions = [
       required: ["job_type"],
     },
   },
+  // V73 T1 Efterkalkyl-insikt (Motor 1 — ren läsning)
+  {
+    name: "get_efterkalkyl_insight",
+    description: "Hämta efterkalkyl-insikt (Motor 1 — Lärande prissättning): snittavvikelse i tid och belopp mot offert för avslutade jobb av en viss jobbtyp eller offertmall, plus antal jobb i underlaget. Använd t.ex. när hantverkaren frågar 'hur gick badrummen?' eller vill veta om en jobbtyp brukar dra över tiden. Ange job_type och/eller template_id (minst en krävs). Om underlaget är för litet svarar verktyget att det inte räcker.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        job_type: { type: "string", description: "Jobbtyp att analysera, t.ex. 'badrumsrenovering', 'målning'" },
+        template_id: { type: "string", description: "Offertmall-ID — mer specifikt än job_type om båda finns" },
+      },
+      required: [],
+    },
+  },
+  // V2.5 Motor 2 — kundbassvep (kö-populering, inga direkta utskick)
+  {
+    name: "run_customer_base_sweep",
+    description: "Kör kundbassvepet (Motor 2 — 'väck kundbasen'): letar igenom hela kundhistoriken efter kunder som kan erbjudas ett serviceavtal från avtalskatalogen, och lägger förslagen som väntande godkännanden i kön. Skickar ALDRIG något direkt till kund — bara kö-kort som hantverkaren själv godkänner eller avvisar. Kan skippas om AI-agenterna är pausade eller dagens AI-budget redan är förbrukad.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  // Platsbesök — säker bokning, inget SMS internt
+  {
+    name: "book_site_visit",
+    description: "Boka ett platsbesök hos en kund. Skapar ENDAST bokningen i kalendern — skickar INGET SMS eller e-post till kunden. Om kunden ska meddelas om tiden, gör ett separat send_sms-anrop efteråt (det gatas separat och kräver hantverkarens bekräftelse). Ange antingen customer_id eller customer_name (namnet slås upp — om flera kunder matchar måste du förtydliga med customer_id).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        customer_id: { type: "string", description: "Kundens ID, om känt" },
+        customer_name: { type: "string", description: "Kundens namn — används för att slå upp customer_id om customer_id saknas" },
+        date: { type: "string", description: "Datum, format YYYY-MM-DD" },
+        time: { type: "string", description: "Tid, format HH:MM" },
+        duration_minutes: { type: "number", description: "Längd i minuter, t.ex. 60 (default 60 om utelämnad)" },
+        notes: { type: "string", description: "Valfri anteckning, t.ex. adress eller vad som ska inspekteras" },
+      },
+      required: ["date", "time"],
+    },
+  },
 
   // Inter-agent communication
   {
