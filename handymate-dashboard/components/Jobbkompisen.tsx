@@ -30,7 +30,28 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   actions?: AIAction[]
+  /** Vilken agent i teamet som skrev svaret (matte/lars/karin/daniel/hanna/lisa). */
+  agent?: string | null
 }
+
+/** Fas 0-säkerhetsräcke: kort som visas när Matte vill skicka något ut ur huset. */
+interface PendingConfirmation {
+  tool_name: string
+  args: Record<string, any>
+  summary: string
+  token: string
+}
+
+const EXAMPLE_COMMANDS = [
+  'Skicka påminnelse till kunder med sena fakturor',
+  'Boka platsbesök hos [kund]',
+  'Följ upp offerten till [kund]',
+]
+
+const EXAMPLE_QUESTIONS = [
+  'Vilka offerter väntar på svar?',
+  'Vilka fakturor är förfallna?',
+]
 
 interface AIAction {
   id: string
@@ -54,12 +75,14 @@ export default function Jobbkompisen() {
   const { activeTimer, isOpen, setIsOpen, activeTab, setActiveTab, suggestions, clearSuggestion } = useJobbuddy()
   const business = useBusiness()
 
-  // Chat state
+  // Chat state — riktiga Matte (/api/matte/chat), se Fas 0-spec i tasks/ui-ux-audit.md
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'assistant', content: 'Hej! Jag är din Jobbkompis. Chatta, prata eller fota - jag hjälper dig med allt.' }
   ])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
+  const [threadId, setThreadId] = useState<string | null>(null)
+  const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Voice state
@@ -99,42 +122,103 @@ export default function Jobbkompisen() {
 
   // ── Chat ────────────────────────────────────────────────────────────────────
 
-  async function sendChat() {
-    if (!chatInput.trim() || chatLoading) return
+  // Chat-fliken pratar med RIKTIGA Matte (multi-agent, utför via delade
+  // tool-router:n) istället för den svagare /api/ai-copilot. Bubbelskalet är
+  // oförändrat — bara hjärnan har bytts. require_confirm_external: true ger
+  // säkerhetsräcket (bekräftelsekort) för externa utskick (SMS/e-post).
+  async function sendChat(overrideText?: string) {
+    const userMessage = (overrideText ?? chatInput).trim()
+    if (!userMessage || chatLoading) return
 
-    const userMessage = chatInput.trim()
     setChatInput('')
     setMessages(prev => [...prev, { role: 'user', content: userMessage }])
     setChatLoading(true)
+    setPendingConfirmation(null)
 
     try {
-      const response = await fetch('/api/ai-copilot', {
+      const response = await fetch('/api/matte/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          question: userMessage,
-          mode: 'jobbuddy',
+          messages: [{ role: 'user', content: userMessage }],
           context: {
-            activeTimer: activeTimer ? {
-              customer: activeTimer.customer?.name,
-              duration: activeTimer.check_in_time,
-              category: activeTimer.work_category,
-            } : null,
-          }
+            threadId,
+            userName: business.contact_name,
+            businessName: business.business_name,
+          },
+          require_confirm_external: true,
         }),
       })
 
       const data = await response.json()
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: data.answer,
-        actions: data.actions || undefined,
-      }])
+      if (data.thread_id) setThreadId(data.thread_id)
+
+      // Ev. text Matte redan sa innan den försökte skicka något externt
+      // ("Visst, skickar nu...") renderas alltid, oavsett om ett kort följer.
+      if (Array.isArray(data.messages) && data.messages.length > 0) {
+        setMessages(prev => [
+          ...prev,
+          ...data.messages.map((m: { agent?: string; content: string }) => ({
+            role: 'assistant' as const,
+            content: m.content,
+            agent: m.agent,
+          })),
+        ])
+      } else if (data.reply) {
+        setMessages(prev => [...prev, { role: 'assistant', content: data.reply, agent: data.current_agent }])
+      }
+
+      if (data.pending_confirmation) {
+        setPendingConfirmation(data.pending_confirmation)
+      }
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Ett fel uppstod. Försök igen.' }])
     } finally {
       setChatLoading(false)
     }
+  }
+
+  // Vid [Skicka]: återanropar matte/chat med bekräftelse-token:en — routen
+  // kör EXAKT det verktygsanrop token:en signerade, och bara det.
+  async function confirmPendingAction() {
+    if (!pendingConfirmation || chatLoading) return
+    const token = pendingConfirmation.token
+    setPendingConfirmation(null)
+    setChatLoading(true)
+
+    try {
+      const response = await fetch('/api/matte/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: { token } }),
+      })
+      const data = await response.json()
+      if (data.thread_id) setThreadId(data.thread_id)
+
+      if (Array.isArray(data.messages) && data.messages.length > 0) {
+        setMessages(prev => [
+          ...prev,
+          ...data.messages.map((m: { agent?: string; content: string }) => ({
+            role: 'assistant' as const,
+            content: m.content,
+            agent: m.agent,
+          })),
+        ])
+      } else {
+        setMessages(prev => [...prev, { role: 'assistant', content: data.reply || data.error || 'Klart!' }])
+      }
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Kunde inte skicka — försök igen.' }])
+    } finally {
+      setChatLoading(false)
+    }
+  }
+
+  // [Avbryt]: rent klientsidigt — verktyget kördes aldrig, så det finns
+  // inget att ångra på servern.
+  function cancelPendingAction() {
+    setPendingConfirmation(null)
+    setMessages(prev => [...prev, { role: 'assistant', content: 'Avbrutet — inget skickades.' }])
   }
 
   // ── Voice ───────────────────────────────────────────────────────────────────
@@ -424,10 +508,13 @@ export default function Jobbkompisen() {
             messagesEndRef={messagesEndRef}
             suggestions={suggestions}
             executingActions={executingActions}
+            pendingConfirmation={pendingConfirmation}
             onInputChange={setChatInput}
-            onSend={sendChat}
+            onSend={() => sendChat()}
             onExecuteAction={executeAction}
             onClearSuggestion={clearSuggestion}
+            onConfirmPending={confirmPendingAction}
+            onCancelPending={cancelPendingAction}
             actionIcon={actionIcon}
           />
         )}
@@ -478,10 +565,13 @@ function ChatTab({
   messagesEndRef,
   suggestions,
   executingActions,
+  pendingConfirmation,
   onInputChange,
   onSend,
   onExecuteAction,
   onClearSuggestion,
+  onConfirmPending,
+  onCancelPending,
   actionIcon,
 }: {
   messages: ChatMessage[]
@@ -490,12 +580,18 @@ function ChatTab({
   messagesEndRef: React.RefObject<HTMLDivElement>
   suggestions: { id: string; type: string; title: string; description: string }[]
   executingActions: Set<string>
+  pendingConfirmation: PendingConfirmation | null
   onInputChange: (v: string) => void
   onSend: () => void
   onExecuteAction: (action: AIAction) => void
   onClearSuggestion: (id: string) => void
+  onConfirmPending: () => void
+  onCancelPending: () => void
   actionIcon: (type: string) => React.ReactNode
 }) {
+  // Tomt läge: bara hälsningen finns kvar — visa exempel-kommandon som chips
+  // (fyller inputen, skickar inte automatiskt) så riktiga Matte blir upptäckbar.
+  const showExamples = messages.length <= 1 && suggestions.length === 0
   return (
     <>
       {/* Messages */}
@@ -579,6 +675,48 @@ function ChatTab({
             </div>
           </div>
         )}
+
+        {/* Säkerhetsräcke: bekräftelsekort för externa utskick (SMS/e-post) */}
+        {pendingConfirmation && (
+          <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl space-y-2.5">
+            <p className="text-sm text-gray-900">{pendingConfirmation.summary}</p>
+            <div className="flex gap-2">
+              <button
+                onClick={onConfirmPending}
+                disabled={loading}
+                className="flex-1 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+              >
+                Skicka
+              </button>
+              <button
+                onClick={onCancelPending}
+                disabled={loading}
+                className="flex-1 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-200 disabled:opacity-50 transition-colors"
+              >
+                Avbryt
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Exempel-kommandon — upptäckbarhet för riktiga Matte */}
+        {showExamples && !pendingConfirmation && (
+          <div className="pt-1 space-y-2">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Prova till exempel</p>
+            <div className="flex flex-wrap gap-1.5">
+              {[...EXAMPLE_COMMANDS, ...EXAMPLE_QUESTIONS].map((example) => (
+                <button
+                  key={example}
+                  onClick={() => onInputChange(example)}
+                  className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-full text-xs text-gray-600 hover:border-primary-400 hover:text-primary-700 transition-colors text-left"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -590,7 +728,7 @@ function ChatTab({
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onSend()}
-            placeholder="Fr\åga din jobbkompis..."
+            placeholder="Be Matte göra något…"
             className="flex-1 px-3.5 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 focus:border-primary-600"
           />
           <button
