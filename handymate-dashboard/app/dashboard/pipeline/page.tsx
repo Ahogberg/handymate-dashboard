@@ -52,6 +52,7 @@ import {
   Pencil,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { sendSiteVisitSms } from '@/lib/sms/site-visit-confirm'
 import { useRealtimeRefresh } from '@/lib/useRealtimeRefresh'
 import { getLeadCategory } from '@/lib/lead-categories'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -1095,18 +1096,17 @@ export default function PipelinePage() {
 
       if (!res.ok) throw new Error('Booking failed')
 
-      // Send SMS to customer if enabled
+      // Send SMS to customer if enabled — utfallet synliggörs (tidigare tyst
+      // .catch som dolde billing-/kvot-/nummer-fel).
+      let customerSmsWarning: string | undefined
       if (siteVisitForm.sendSms && selectedDeal.customer?.phone_number) {
         const dateStr = start.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })
         const timeStr = start.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
-        await fetch('/api/sms/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: selectedDeal.customer.phone_number,
-            message: `Hej ${selectedDeal.customer.name}! Vi kommer på platsbesök ${dateStr} kl ${timeStr}. Välkommen att höra av dig om tiden inte passar. //${business.contact_name}`,
-          }),
-        }).catch(() => {})
+        const smsResult = await sendSiteVisitSms({
+          to: selectedDeal.customer.phone_number,
+          message: `Hej ${selectedDeal.customer.name}! Vi kommer på platsbesök ${dateStr} kl ${timeStr}. Välkommen att höra av dig om tiden inte passar. //${business.contact_name}`,
+        })
+        if (!smsResult.ok) customerSmsWarning = smsResult.reason
       }
 
       // Send SMS to invited team members
@@ -1142,7 +1142,11 @@ export default function PipelinePage() {
         }
       }
 
-      showToast('Platsbesök bokat!', 'success')
+      if (customerSmsWarning) {
+        showToast(`Platsbesök bokat — men SMS:et till kunden gick inte iväg: ${customerSmsWarning}`, 'warning')
+      } else {
+        showToast('Platsbesök bokat!', 'success')
+      }
       setShowSiteVisit(false)
       setSiteVisitForm({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true, invitedTeam: [], externalUe: '' })
     } catch {
@@ -1812,9 +1816,9 @@ export default function PipelinePage() {
       {/* Toast */}
       {toast.show && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100]">
-          <div className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border shadow-xl text-sm font-medium ${toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-gray-50 border-gray-200 text-gray-900'}`}>
+          <div className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border shadow-xl text-sm font-medium ${toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' : toast.type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-gray-50 border-gray-200 text-gray-900'}`}>
             {toast.type === 'success' && <CheckCircle2 className="w-4 h-4" />}
-            {toast.type === 'error' && <AlertCircle className="w-4 h-4" />}
+            {(toast.type === 'error' || toast.type === 'warning') && <AlertCircle className="w-4 h-4" />}
             {toast.message}
           </div>
         </div>

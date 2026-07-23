@@ -174,7 +174,7 @@ export interface PipelineStats {
 export interface Toast {
   show: boolean
   message: string
-  type: 'success' | 'error' | 'info'
+  type: 'success' | 'error' | 'info' | 'warning'
 }
 
 export interface CustomerOption {
