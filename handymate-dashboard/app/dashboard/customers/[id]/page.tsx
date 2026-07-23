@@ -42,6 +42,7 @@ import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useToast } from '@/components/Toast'
+import { sendSiteVisitSms } from '@/lib/sms/site-visit-confirm'
 import Link from 'next/link'
 import CustomerTimeline from '@/components/CustomerTimeline'
 import { CopyId } from '@/components/CopyId'
@@ -1753,10 +1754,14 @@ export default function CustomerDetailPage() {
           contactName={business.contact_name}
           businessName={business.business_name}
           onClose={() => setShowSiteVisitModal(false)}
-          onSaved={() => {
+          onSaved={(smsWarning) => {
             setShowSiteVisitModal(false)
             fetchData()
-            mainToast.success('Platsbesök bokat')
+            if (smsWarning) {
+              mainToast.warning(`Platsbesök bokat — men SMS:et till kunden gick inte iväg: ${smsWarning}`)
+            } else {
+              mainToast.success('Platsbesök bokat')
+            }
           }}
         />
       )}
@@ -2064,7 +2069,7 @@ function SiteVisitModal({ customer, contactName, businessName, onClose, onSaved 
   contactName: string
   businessName: string
   onClose: () => void
-  onSaved: () => void
+  onSaved: (smsWarning?: string) => void
 }) {
   const toast = useToast()
   const [date, setDate] = useState('')
@@ -2096,21 +2101,21 @@ function SiteVisitModal({ customer, contactName, businessName, onClose, onSaved 
 
       if (!res.ok) throw new Error('Booking failed')
 
-      // Bekräftelse-SMS — samma body-shape som pipelines flöde (rad 1102-1109)
+      // Bekräftelse-SMS — utfallet synliggörs (tidigare tyst .catch som dolde
+      // billing-/kvot-/nummer-fel). Bokningen är redan giltig; ett SMS-fel
+      // rullar aldrig tillbaka den, bara rapporteras.
+      let smsWarning: string | undefined
       if (sendSms && customer.phone_number) {
         const dateStr = start.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })
         const timeStr = start.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
-        await fetch('/api/sms/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: customer.phone_number,
-            message: `Hej ${customer.name}! Vi kommer på platsbesök ${dateStr} kl ${timeStr}. Välkommen att höra av dig om tiden inte passar. //${contactName || businessName}`,
-          }),
-        }).catch(() => {})
+        const smsResult = await sendSiteVisitSms({
+          to: customer.phone_number,
+          message: `Hej ${customer.name}! Vi kommer på platsbesök ${dateStr} kl ${timeStr}. Välkommen att höra av dig om tiden inte passar. //${contactName || businessName}`,
+        })
+        if (!smsResult.ok) smsWarning = smsResult.reason
       }
 
-      onSaved()
+      onSaved(smsWarning)
     } catch {
       toast.error('Kunde inte boka platsbesök')
     } finally {
