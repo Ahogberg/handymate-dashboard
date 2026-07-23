@@ -204,6 +204,66 @@ Bas 2 495 / Pro 5 995 / Business 11 995, live-price-ids seedade).
 koden har tre planer men positioneringen ovan nämner bara Pro/Enterprise.]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## DEL 2B — INCUMBENT-DISPLACEMENT: VINNA KUNDER FRÅN EASOFT/BYGGLET
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Grundinsikt: slåss aldrig ERP mot ERP.** Ställs frågan som "vilket system
+ska du ha?" jämför kunden funktionslistor — och en incumbent med års försprång
+och inlåst data vinner. Vi byter frågan. Deras kategori = "programvara du
+sköter". Vår = "ett team som jobbar åt dig". Att byta ERP är ett stort jobbigt
+beslut; att anställa någon som svarar i telefonen och jagar pengarna är ett
+litet lockande. **Vi landar som ett tillägg, inte ett byte — och låter det
+gamla systemet dö av sig självt.**
+
+**Den trojanska hästen — samexistera först, ersätt sen.** Kräv aldrig att de
+river ut Bygglet dag ett (där dör affären: "men allt mitt ligger ju där").
+Importera deras data, låt Handymate ta över FRONT OFFICE (samtal, offerter,
+uppföljning, serviceavtal, recensioner) medan det gamla systemet tuffar på i
+bakgrunden. Efter ~2 månader lever kunden i Handymate och ERP:t är död vikt de
+betalar för → de churnar incumbenten, inte oss. Mekanismen som gör
+samexistensen till ett bevis snarare än en kompromiss: agenterna producerar
+värde ERP:t aldrig kunde (fångade samtal, jagade fakturor, avtalsintäkter).
+
+**Beachhead — den frustrerade, betalande firman.** Inte "alla hantverkare".
+Vinnbar kund = firman som REDAN betalar för ett ERP den använder till 10 % och
+är besviken. Bevisad betalningsvilja + kundbas som våra motorer behöver + mest
+mottaglig just för att de redan är missnöjda. "Sovande pengar"-pitchen är
+skräddarsydd för dem (befintlig bas = omedelbar ROI som betalar prenumerationen).
+Firma utan system alls: tekniskt lättast (ingen migrering) men svårare att
+sälja 5 995 kr till — andrahand.
+
+**Tre hävstänger mot bytesmotståndet:**
+1. **Migrering på 10 minuter** — det största hindret är "min data". Behöver
+   import specifikt från Bygglet/Easoft-exporter (kunder, projekt, offerter,
+   prislistor), ovanpå befintlig Fortnox/CSV-import. En "byt från Bygglet"-
+   flöde. **Detta är den konkreta byggsak som mest direkt tjänar strategin —
+   nästa-bygge-kandidat (se DEL 5).**
+2. **Anti-inlåsning som vapen** — incumbenter binder ofta 12 mån. Vi har redan
+   pengarna-tillbaka-garanti + ingen bindningstid. Budskap: _"De binder dig ett
+   år. Vi låter dig gå när du vill — för att du inte kommer vilja."_
+3. **Ändra jämförelsegruppen** — vi är dyrare än en ERP-plats, kan inte vinna
+   på pris. Sluta jämföra mot ERP: _"Bygglet är ett program du betalar för att
+   själv jobba i. Vi är ett team. Jämför oss inte mot Bygglet — jämför mot att
+   anställa en kontorsassistent för ~30 000 kr/mån."_ Då är 5 995 billigt.
+
+**Moaten gör OSS till den sträva parten.** Efter ~6 mån = att lämna Handymate
+är att lämna sin inlärda prissättning (Motor 1) och sin löpande avtalsintäkt
+(Motor 2). Incumbentens efterkalkyl är en statisk rapport; vår blir bättre per
+jobb. + benchmark-nätverkseffekten (omöjlig för Easoft att kopiera i efterhand
+— de samlar ingen utfallsdata) + svensk back-office-korrekthet (ROT/grön teknik
+rätt). "Team not tool" är produktarkitektur, inte en bolt-on-AI de kan klistra
+på ett passivt ERP.
+
+**Kanal: bara jämlik bevisning flyttar en skeptisk hantverkare.** Christoffers
+genomkörning + case study ÄR strategin — allt annat är hypotes tills tre firmor
+faktiskt bytt. Peer-bevis via nätverket först, sedan kall SMS/Ads när caset bär.
+
+**Obekväm sanning:** ovaliderat av marknaden tills tre firmor bytt. De första
+tre casen är strategin. Enda faktapunkten att verifiera innan jämförelse-
+siffrorna spikas: [ANDREAS: exakt incumbent-prissättning per plats för
+Bygglet/Easoft — behövs för "jämför mot assistent"-argumentet].
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ## DEL 3 — GO-TO-MARKET: VÄGEN TILL KUND 1–10
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -304,6 +364,11 @@ ska lösa.]
 - [ ] Kanal 2 om kanal 1 inte gav CAC under [ANDREAS: tröskel, t.ex. 10 000 kr].
 - [ ] Self-serve onboarding verifierad med kund N (ingen handpåläggning).
 - [ ] Cron-kö-ombyggnaden (Del 1.4) senast när kund 15 närmar sig.
+- [ ] **"Byt från Bygglet/Easoft"-migreringsflöde** (import av kunder/projekt/
+      offerter/prislistor ur incumbent-export, ovanpå Fortnox/CSV-importen) —
+      avväpnar "min data ligger där"-invändningen, kärnan i DEL 2B. Bygg när
+      första avslaget beror på migreringsfriktion, inte tidigare (validera
+      behovet mot verkliga affärer först).
 → **Mål: kund 5–10, känd CAC, känd churn.**
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
