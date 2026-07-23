@@ -26,6 +26,7 @@ import {
   verifyPendingExternalAction,
   buildExternalActionSummary,
 } from '@/lib/agent/external-confirm'
+import { getRelevantMemories, buildMemoryPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
 
 const MAX_IMAGES_PER_MESSAGE = 4
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -181,6 +182,7 @@ const CURATED_TOOL_NAMES = [
   'qualify_lead', 'update_lead_status', 'get_lead', 'search_leads',
   'get_daily_stats', 'create_approval_request', 'check_pending_approvals',
   'get_project_profitability', 'get_pricing_suggestion', 'check_fortnox_status',
+  'get_efterkalkyl_insight', 'run_customer_base_sweep', 'book_site_visit',
 ]
 
 const TOOLS: any[] = [
@@ -908,6 +910,19 @@ export async function POST(request: NextRequest) {
     let outerMessages = initialMessages
 
     while (true) {
+      // Minne: samma funktioner (getRelevantMemories/buildMemoryPrompt) som
+      // den autonoma triggern (app/api/agent/trigger/route.ts) använder för
+      // att injicera "vad du vet om detta företag" i systempromptet. Hämtas
+      // per agent (currentAgent kan bytas via handoff mitt i turen).
+      // Fail-safe: fel här får aldrig fälla chatten — degraderar tyst.
+      let memorySuffix = ''
+      try {
+        const memories = await getRelevantMemories(businessId, currentAgent)
+        memorySuffix = buildMemoryPrompt(memories)
+      } catch (err) {
+        console.error('[matte/chat] memory fetch failed (non-blocking):', err)
+      }
+
       const systemArray: any[] = [
         {
           type: 'text',
@@ -922,6 +937,9 @@ export async function POST(request: NextRequest) {
           type: 'text',
           text: `TIDIGARE I KONVERSATIONEN (sammanfattning):\n${historySummary}`,
         })
+      }
+      if (memorySuffix) {
+        systemArray.push({ type: 'text', text: memorySuffix })
       }
 
       const turn = await runAgentTurn({
@@ -1083,6 +1101,16 @@ export async function POST(request: NextRequest) {
       finalAction = { type: 'navigate', target: actionMatch[1] }
     }
     const cleanReply = reply.replace(/\{"action"\s*:\s*"navigate"[^}]+\}\s*/g, '').trim()
+
+    // Minne: extrahera + spara ev. lärdom från den här konversationsturen
+    // (samma pipeline som triggern — se lib/agents/memory.ts). Fire-and-
+    // forget precis som i trigger-vägen; blockerar aldrig svaret och
+    // extractAndSaveMemory degraderar redan internt tyst vid fel/kort svar.
+    extractAndSaveMemory(businessId, currentAgent, cleanReply, 'chat', {
+      customerId,
+      projectId,
+      userMessage: newUserText,
+    }).catch((err) => console.error('[matte/chat] extractAndSaveMemory failed (non-blocking):', err))
 
     return NextResponse.json({
       messages: responseMessages,

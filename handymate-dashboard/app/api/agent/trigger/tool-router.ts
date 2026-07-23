@@ -127,6 +127,12 @@ export async function executeTool(
         return await sendAgentMessageTool(supabase, businessId, context, input)
       case 'get_agent_messages':
         return await getAgentMessagesTool(supabase, businessId, context)
+      case 'get_efterkalkyl_insight':
+        return await getEfterkalkylInsightTool(supabase, businessId, input)
+      case 'run_customer_base_sweep':
+        return await runCustomerBaseSweepTool(supabase, businessId, context)
+      case 'book_site_visit':
+        return await bookSiteVisitTool(supabase, businessId, input, context)
       default:
         return { success: false, error: `Okänt verktyg: ${name}` }
     }
@@ -540,6 +546,69 @@ async function createBooking(
     google_synced: !!googleEventId,
     google_event_id: googleEventId,
   }}
+}
+
+/**
+ * Platsbesök — bygger start/slut från datum+tid+längd och slår upp kund via
+ * namn om customer_id saknas. Återanvänder createBooking() rakt av (samma
+ * bokningsinsert + ev. Google-synk som create_booking-verktyget) — INGEN
+ * dubblettlogik. SÄKERHETSKRAV: skickar aldrig SMS/e-post själv. Om kunden
+ * ska meddelas gör Matte ett separat send_sms-anrop, som gatas av
+ * external-confirm-räcket precis som vanligt.
+ */
+async function bookSiteVisitTool(
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>,
+  context: ToolContext
+): Promise<ToolResult> {
+  const date = params.date ? String(params.date) : ''
+  const time = params.time ? String(params.time) : ''
+  if (!date || !time) {
+    return { success: false, error: 'date (YYYY-MM-DD) och time (HH:MM) krävs.' }
+  }
+
+  let customerId = params.customer_id ? String(params.customer_id) : null
+  if (!customerId && params.customer_name) {
+    const searchResult = await searchCustomers(supabase, businessId, {
+      query: String(params.customer_name),
+      limit: 5,
+    })
+    const customers = ((searchResult.data as any)?.customers || []) as Array<{ customer_id: string; name: string }>
+    if (!searchResult.success || customers.length === 0) {
+      return { success: false, error: `Hittade ingen kund som matchar "${params.customer_name}".` }
+    }
+    if (customers.length > 1) {
+      return {
+        success: false,
+        error: `Flera kunder matchar "${params.customer_name}" — ange customer_id: ${customers
+          .map((c) => `${c.name} (${c.customer_id})`)
+          .join(', ')}`,
+      }
+    }
+    customerId = customers[0].customer_id
+  }
+  if (!customerId) {
+    return { success: false, error: 'customer_id eller customer_name krävs.' }
+  }
+
+  const start = new Date(`${date}T${time}:00`)
+  if (isNaN(start.getTime())) {
+    return { success: false, error: 'Ogiltigt datum eller tid.' }
+  }
+  const durationMinutes = Number(params.duration_minutes) > 0 ? Number(params.duration_minutes) : 60
+  const end = new Date(start.getTime() + durationMinutes * 60000)
+
+  return await createBooking(
+    supabase,
+    businessId,
+    {
+      customer_id: customerId,
+      service_type: 'Platsbesök',
+      scheduled_start: start.toISOString(),
+      scheduled_end: end.toISOString(),
+      notes: params.notes ? String(params.notes) : null,
+    },
+    context
+  )
 }
 
 async function updateProject(
@@ -1634,6 +1703,90 @@ async function getPricingSuggestionTool(
     }
   } catch (err: any) {
     return { success: false, error: `Prisförslag misslyckades: ${err.message}` }
+  }
+}
+
+// ── V73 T1 Motor 1: Efterkalkyl-insikt (ren läsning) ──
+
+/**
+ * Wrapper runt lib/efterkalkyl/get-insight.ts — EXAKT samma lazy-backfill +
+ * aggregering som app/api/quotes/efterkalkyl-insikt/route.ts (som Matte inte
+ * kan anropa direkt eftersom den kräver session-cookies). Ingen dubblettlogik.
+ */
+async function getEfterkalkylInsightTool(
+  supabase: SupabaseClient,
+  businessId: string,
+  params: Record<string, unknown>
+): Promise<ToolResult> {
+  const jobType = params.job_type ? String(params.job_type) : null
+  const templateId = params.template_id ? String(params.template_id) : null
+  if (!jobType && !templateId) {
+    return { success: false, error: 'Ange job_type och/eller template_id.' }
+  }
+
+  try {
+    const { getEfterkalkylInsight } = await import('@/lib/efterkalkyl/get-insight')
+    const insight = await getEfterkalkylInsight(supabase, businessId, { jobType, templateId })
+    return { success: true, data: insight }
+  } catch (err: any) {
+    return { success: false, error: `Efterkalkyl-insikt misslyckades: ${err.message}` }
+  }
+}
+
+// ── V2.5 Motor 2: Kundbassvep (kö-populering, inga direkta utskick) ──
+
+/**
+ * Wrapper runt lib/agents/hanna/kundbas-svep.ts — samma svepfunktion och
+ * cost-guard-mönster som app/api/agreements/sweep/route.ts ("Väck
+ * kundbasen"-knappen). Skapar bara pending_approvals-kort, skickar aldrig
+ * något direkt. Ingen dubblettlogik.
+ */
+async function runCustomerBaseSweepTool(
+  supabase: SupabaseClient,
+  businessId: string,
+  context: ToolContext
+): Promise<ToolResult> {
+  try {
+    const { checkCostGuards, logAgentRun } = await import('@/lib/agents/shared/cost-guard')
+    const { runKundbasSweepForBusiness, summarizeSweepResult } = await import('@/lib/agents/hanna/kundbas-svep')
+
+    const { data: bizGuards } = await supabase
+      .from('business_config')
+      .select('business_id, agents_globally_paused, agent_cost_cap_usd_daily, business_name')
+      .eq('business_id', businessId)
+      .maybeSingle()
+
+    if (bizGuards) {
+      const skip = await checkCostGuards(supabase, bizGuards, 'kundbas-svep')
+      if (skip) {
+        const message =
+          skip.skipped === 'agents_globally_paused'
+            ? 'AI-agenterna är pausade för det här kontot just nu — kontakta support om det är oväntat.'
+            : 'Dagens AI-budget är redan förbrukad — försök igen imorgon.'
+        return { success: true, data: { created: 0, skipped: skip.skipped, message } }
+      }
+    }
+
+    const result = await runKundbasSweepForBusiness(
+      supabase,
+      businessId,
+      bizGuards?.business_name || context.businessName || null
+    )
+
+    if (result.cost_usd > 0) {
+      await logAgentRun(supabase, businessId, 'kundbas-svep', {
+        debug: { usage: result.usage, estimated_cost_usd: result.cost_usd },
+      })
+    }
+
+    const message =
+      result.created > 0
+        ? `La ${result.created} avtalsförslag i godkännande-kön.`
+        : summarizeSweepResult(result)
+
+    return { success: true, data: { created: result.created, candidates_total: result.candidates_total, message } }
+  } catch (err: any) {
+    return { success: false, error: `Kundbassvepet misslyckades: ${err.message}` }
   }
 }
 
