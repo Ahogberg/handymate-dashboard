@@ -46,4 +46,12 @@ export interface OnboardingFormData {
   // Antal importerade rader — LiveTour kan visa dem som payoff (state E).
   importedCustomers?: number
   importedInvoices?: number
+
+  // ── Hemsida-förgreningen (fråga i Step2Business, direkt efter att
+  //    kontot skapats) ──────────────────────────────────────────────
+  // undefined = inte frågad än (resume ska visa frågan igen).
+  // true  = kunden har en egen sajt (websiteUrl satt).
+  // false = kunden har ingen sajt (websiteUrl lämnas tom, microsajt-vägen).
+  hasWebsite?: boolean
+  websiteUrl?: string
 }

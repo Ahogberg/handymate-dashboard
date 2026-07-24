@@ -6,6 +6,20 @@ import { seedAllDefaults } from '@/lib/seed-defaults'
 export const dynamic = 'force-dynamic'
 
 /**
+ * sql/v75_website_url.sql lägger till website_url-kolumnen (hemsida-
+ * förgreningen) men körs MANUELLT av Andreas i Supabase SQL Editor efter
+ * merge — det finns alltså ett fönster där koden är deployad men kolumnen
+ * inte finns än. PostgREST svarar då med PGRST204 ("column ... not found in
+ * schema cache"). Samma mönster som isMissingTermsTextColumn i
+ * app/api/quote-templates/route.ts — försök om utan website_url istället
+ * för att hela steg-sparningen failar.
+ */
+function isMissingWebsiteUrlColumn(error: unknown): boolean {
+  const message = String((error as { message?: string })?.message || '')
+  return /website_url/i.test(message) && /schema cache|does not exist|column/i.test(message)
+}
+
+/**
  * GET /api/onboarding
  * Hämta onboarding-progress (step + data + business info)
  */
@@ -101,6 +115,7 @@ export async function PUT(request: NextRequest) {
         'assigned_phone_number',
         'phone_setup_type',
         'welcome_tour_seen',
+        'website_url',
       ] as const
       for (const col of ALLOWED_COLUMNS) {
         if (col in config) updates[col] = (config as Record<string, unknown>)[col]
@@ -111,10 +126,18 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Inget att uppdatera' }, { status: 400 })
     }
 
-    const { error } = await supabase
+    let { error } = await supabase
       .from('business_config')
       .update(updates)
       .eq('business_id', business.business_id)
+
+    if (error && isMissingWebsiteUrlColumn(error) && 'website_url' in updates) {
+      const { website_url: _websiteUrl, ...fallbackUpdates } = updates
+      ;({ error } = await supabase
+        .from('business_config')
+        .update(fallbackUpdates)
+        .eq('business_id', business.business_id))
+    }
 
     if (error) {
       console.error('PUT /api/onboarding update error:', error)

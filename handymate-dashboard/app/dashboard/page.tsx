@@ -103,6 +103,11 @@ export default function DashboardPage() {
     })
   }
   const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set())
+  // Hemsida-förgreningen (Del 4): styr vilken synlighetsväg-reminder som
+  // visas. undefined = ej laddat än, null = bekräftat att fältet saknas
+  // (eller att kolumnen inte finns — degraderar tyst, se fetchData).
+  const [websiteUrl, setWebsiteUrl] = useState<string | null | undefined>(undefined)
+  const [storefrontInfo, setStorefrontInfo] = useState<{ slug: string; is_published: boolean } | null>(null)
 
   useEffect(() => {
     if (!localStorage.getItem('hm_welcome_seen')) {
@@ -204,6 +209,31 @@ export default function DashboardPage() {
       }
     })()
 
+    // Hemsida-förgreningen (Del 4) — EGEN, isolerad query för website_url.
+    // Kolumnen läggs till av sql/v75_website_url.sql (körs manuellt av
+    // Andreas) — tills dess ska INTE detta fält blandas in i configPromise
+    // ovan (skulle få HELA den frågan att faila och ta ner
+    // showOnboarding/dismissedReminders/kalender-koppling med sig).
+    const websiteUrlPromise = supabase
+      .from('business_config')
+      .select('website_url')
+      .eq('business_id', business.business_id)
+      .single()
+      .then(({ data, error }: { data: { website_url: string | null } | null; error: unknown }) => {
+        if (!error && data) setWebsiteUrl(data.website_url ?? null)
+      })
+      .catch(() => { /* kolumnen finns inte än — degradera tyst, ingen reminder visas */ })
+
+    const storefrontPromise = supabase
+      .from('storefront')
+      .select('slug, is_published')
+      .eq('business_id', business.business_id)
+      .maybeSingle()
+      .then(({ data }: { data: { slug: string; is_published: boolean } | null }) => {
+        setStorefrontInfo(data || null)
+      })
+      .catch(() => { /* ingen storefront skapad än — reminder visas ändå */ })
+
     const callsPromise = supabase
       .from('call_recording')
       .select('*', { count: 'exact', head: true })
@@ -264,6 +294,7 @@ export default function DashboardPage() {
     await Promise.all([
       bookingsPromise, configPromise, callsPromise, priceListPromise,
       projectsPromise, pipelinePromise, statsPromise, economicsPromise,
+      websiteUrlPromise, storefrontPromise,
     ])
   }
 
@@ -487,6 +518,15 @@ export default function DashboardPage() {
             }
             if ((!onboardingData.lead_sources || onboardingData.lead_sources.length === 0) && !dismissedReminders.has('leads')) {
               reminders.push({ id: 'leads', icon: Globe, bgColor: 'bg-emerald-50', border: 'border-emerald-200', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', title: 'Konfigurera lead-källor för att få in kunder automatiskt', desc: 'Ta emot förfrågningar från Offerta, ServiceFinder m.fl.', href: '/dashboard/settings?tab=integrations', cta: 'Kom igång' })
+            }
+            // Hemsida-förgreningen (Del 4) — synlighetsvägen efter onboarding,
+            // baserad på website_url. websiteUrl===undefined = ej laddat än
+            // (visa ingenting förrän vi vet, annars flimrar reminder-1 fram
+            // och försvinner när svaret kommer).
+            if (websiteUrl && !dismissedReminders.has('website_widget')) {
+              reminders.push({ id: 'website_widget', icon: Globe, bgColor: 'bg-sky-50', border: 'border-sky-200', iconBg: 'bg-sky-100', iconColor: 'text-sky-600', title: 'Du har redan en hemsida — lägg till AI-assistenten', desc: 'Klistra in en kodsnutt för AI-chatt, och koppla Google-recensioner under Inställningar.', href: '/dashboard/settings/website-widget', cta: 'Hämta koden' })
+            } else if (websiteUrl === null && !storefrontInfo?.is_published && !dismissedReminders.has('microsite')) {
+              reminders.push({ id: 'microsite', icon: Globe, bgColor: 'bg-teal-50', border: 'border-teal-200', iconBg: 'bg-teal-100', iconColor: 'text-teal-700', title: 'Du har ingen hemsida — vi har redan börjat bygga en åt dig', desc: 'Namn, tjänster och priser är redan ifyllda. Förhandsgranska och publicera med ett klick.', href: '/dashboard/website', cta: 'Förhandsgranska' })
             }
             const r = reminders[0]
             if (!r) return null
