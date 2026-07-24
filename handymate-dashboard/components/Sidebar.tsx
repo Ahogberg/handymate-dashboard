@@ -113,6 +113,10 @@ const NAV: NavItem[] = [
 // Bottom section: Inställningar + Bjud in kollega (rendered below separator)
 const BOTTOM_NAV: NavItem[] = [
   { type: 'link', key: 'settings', label: 'Inställningar', icon: Settings, href: '/dashboard/settings', paths: ['/dashboard/settings', '/dashboard/billing', '/dashboard/automations'] },
+  // Hemsida-förgreningen (Del 5): /dashboard/website fanns bara i employee-
+  // döljlistan tidigare — ägaren kunde alltså aldrig hitta microsajt-
+  // editorn. Synlig post nära "AI på hemsidan".
+  { type: 'link', key: 'my_website', label: 'Min hemsida', icon: Globe, href: '/dashboard/website' },
   { type: 'link', key: 'website_widget', label: 'AI på hemsidan', icon: Globe, href: '/dashboard/settings/website-widget' },
   { type: 'link', key: 'referral', label: 'Bjud in en vän', icon: Gift, href: '/dashboard/referral' },
 ]
@@ -479,7 +483,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
   // ── Role-based filtering ──────────────────────────────────────────
   const isEmployee = currentUser?.role === 'employee'
-  const HIDDEN_FOR_EMPLOYEE = new Set(['approvals', 'agent', 'settings', 'leads-outbound'])
+  const HIDDEN_FOR_EMPLOYEE = new Set(['approvals', 'agent', 'settings', 'leads-outbound', 'my_website'])
   const HIDDEN_CHILDREN_FOR_EMPLOYEE = new Set(['/dashboard/invoices', '/dashboard/invoices/rot-payment', '/dashboard/settings', '/dashboard/settings/my-prices', '/dashboard/settings/products', '/dashboard/settings/pricelist', '/dashboard/billing', '/dashboard/settings?tab=team', '/dashboard/automations', '/dashboard/settings/quote-templates', '/dashboard/settings/quote-texts', '/dashboard/orders', '/dashboard/campaigns', '/dashboard/website', '/dashboard/analytics'])
 
   function filterNavForRole(items: NavItem[]): NavItem[] {
