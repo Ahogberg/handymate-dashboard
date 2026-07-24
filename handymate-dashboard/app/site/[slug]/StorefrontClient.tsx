@@ -346,9 +346,9 @@ export default function StorefrontClient({
 
   return (
     <div ref={animRef} className="min-h-screen bg-white text-gray-900" style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
-      {/* Google Fonts */}
+      {/* Inter laddas redan via next/font i app/layout.tsx (satt på <body>) —
+          ingen runtime @import behövs här. */}
       <style dangerouslySetInnerHTML={{ __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         html { scroll-behavior: smooth; }
         [data-animate] { opacity: 0; transform: translateY(30px); transition: opacity 0.6s ease, transform 0.6s ease; }
         [data-animate].animate-in { opacity: 1; transform: translateY(0); }
