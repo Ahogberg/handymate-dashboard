@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
   ArrowRight,
@@ -15,10 +15,13 @@ import {
   ChevronDown,
   Eye,
   EyeOff,
+  Globe,
+  Check,
 } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import type { OnboardingFormData } from '../types-redesign'
 import { TRADES } from '../constants'
+import { normalizeWebsiteUrl, type ScrapedExtraction } from '@/lib/onboarding/website-scrape'
 
 interface Step2Props {
   onNext: () => void
@@ -44,8 +47,145 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
    */
   const [attemptedNext, setAttemptedNext] = useState(false)
 
+  // ── Hemsida-förgreningen: aha-moment-frågan visas EN gång, direkt efter
+  // att kontot skapats (auth-sessionen finns då — krävs för den
+  // autentiserade skrap-routen, se app/api/onboarding/scrape-website).
+  // 'form' = det vanliga Step2-formuläret (default).
+  // 'question' → 'urlInput' → 'scraping' → 'result' = mikro-flödet.
+  type WebPhase = 'form' | 'question' | 'urlInput' | 'scraping' | 'result'
+  const [webPhase, setWebPhase] = useState<WebPhase>('form')
+  const [webUrlInput, setWebUrlInput] = useState('')
+  const [webInputError, setWebInputError] = useState('')
+  const [webResultError, setWebResultError] = useState('')
+  const [webFoundSummary, setWebFoundSummary] = useState<string[]>([])
+  const mountedRef = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
+
   const update = (updates: Partial<OnboardingFormData>) =>
     setData(d => ({ ...d, ...updates }))
+
+  /** Best-effort — sparar website_url direkt (auth-session finns redan). */
+  async function persistWebsiteUrl(url: string | null) {
+    try {
+      await fetch('/api/onboarding', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: { website_url: url } }),
+      })
+    } catch {
+      // Silent — samma "aldrig fastna"-mönster som saveProgress i page.tsx.
+      // website_url finns kvar i onboarding_data (sanitizeForSave) som
+      // reserv och kan skrivas om senare.
+    }
+  }
+
+  /**
+   * Förifyller ENDAST fält som fortfarande är tomma — skriver ALDRIG över
+   * något användaren redan fyllt i. Mappar mot exakt de fält Step2Business
+   * samlar in (se OnboardingFormData).
+   */
+  function applyExtraction(extracted: ScrapedExtraction) {
+    const patch: Partial<OnboardingFormData> = {}
+    if (extracted.business_name && !data.companyName?.trim()) {
+      patch.companyName = extracted.business_name
+    }
+    if (extracted.org_number && !data.orgNumber?.trim()) {
+      const formatted = formatOrg(extracted.org_number)
+      if (formatted.length === 11) patch.orgNumber = formatted
+    }
+    if (extracted.phone && !data.phone?.trim()) {
+      patch.phone = formatPhone(extracted.phone)
+    }
+    if (extracted.email && !data.email?.trim()) {
+      patch.email = extracted.email
+    }
+    if (extracted.service_area && !data.area?.trim()) {
+      patch.area = extracted.service_area
+    }
+    if (Object.keys(patch).length > 0) update(patch)
+
+    // Rent informativ sammanfattning — visas i UI:t som bekräftelse på att
+    // Matte faktiskt läste sidan, men dessa fält (utan onboarding-motsvarighet)
+    // sparas inte separat.
+    const found: string[] = []
+    if (extracted.business_name) found.push('företagsnamn')
+    if (extracted.org_number) found.push('org.nr')
+    if (extracted.phone) found.push('telefon')
+    if (extracted.email) found.push('e-post')
+    if (extracted.service_area) found.push('område')
+    if (extracted.services && extracted.services.length > 0) found.push(`${extracted.services.length} tjänster`)
+    if (extracted.address) found.push('adress')
+    if (extracted.opening_hours) found.push('öppettider')
+    setWebFoundSummary(found)
+  }
+
+  async function runScrape(url: string) {
+    setWebPhase('scraping')
+    setWebResultError('')
+    const controller = new AbortController()
+    const clientTimeout = setTimeout(() => controller.abort(), 10_000)
+    let normalizedUrl = url
+    try {
+      const res = await fetch('/api/onboarding/scrape-website', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+        signal: controller.signal,
+      })
+      const json = await res.json().catch(() => null)
+      normalizedUrl = json?.normalizedUrl || url
+      if (!mountedRef.current) {
+        // Komponenten hann avmonteras (användaren klickade "Fortsätt ändå")
+        // — spara ändå, men rör ingen state.
+        persistWebsiteUrl(normalizedUrl)
+        return
+      }
+      if (json?.ok && json.extracted) {
+        applyExtraction(json.extracted)
+      } else {
+        setWebResultError('Jag kunde inte läsa sidan — vi fyller i manuellt istället.')
+      }
+    } catch {
+      if (!mountedRef.current) {
+        persistWebsiteUrl(normalizedUrl)
+        return
+      }
+      setWebResultError('Jag kunde inte läsa sidan — vi fyller i manuellt istället.')
+    } finally {
+      clearTimeout(clientTimeout)
+    }
+
+    // Spara website_url OAVSETT om skrapningen lyckades (spec Del 3).
+    update({ hasWebsite: true, websiteUrl: normalizedUrl })
+    persistWebsiteUrl(normalizedUrl)
+    if (mountedRef.current) setWebPhase('result')
+  }
+
+  function answerNoWebsite() {
+    update({ hasWebsite: false, websiteUrl: undefined })
+    persistWebsiteUrl(null)
+    onNext()
+  }
+
+  function submitWebsiteUrl() {
+    const check = normalizeWebsiteUrl(webUrlInput)
+    if (!check.ok) {
+      setWebInputError(check.reason)
+      return
+    }
+    setWebInputError('')
+    runScrape(check.url)
+  }
+
+  /** Beslutar om hemsida-frågan ska visas: hoppas över vid resume om den
+   *  redan besvarats (data.hasWebsite är då true/false, inte undefined). */
+  function proceedAfterAccount() {
+    if (data.hasWebsite !== undefined) {
+      onNext()
+      return
+    }
+    setWebPhase('question')
+  }
 
   const formatOrg = (v: string) => {
     const digits = v.replace(/\D/g, '').slice(0, 10)
@@ -129,7 +269,7 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
     setError('')
 
     if (alreadyRegistered) {
-      onNext()
+      proceedAfterAccount()
       return
     }
 
@@ -166,12 +306,162 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
         businessId: result.businessId,
         emailPending: !!result.emailConfirmationPending,
       })
-      onNext()
+      proceedAfterAccount()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Något gick fel vid registrering')
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // ── Hemsida-förgreningen: mikro-flöde direkt efter kontot skapats ──────
+  if (webPhase !== 'form') {
+    return (
+      <div className="ob-screen">
+        <OnboardingHeader step={0} total={4} onBack={() => setWebPhase('form')} />
+        <div className="ob-body" style={{ display: 'flex', flexDirection: 'column' }}>
+          {webPhase === 'question' && (
+            <>
+              <h1 className="ob-headline">Har du en hemsida?</h1>
+              <p className="ob-sub">
+                Har du redan en sajt läser Matte in den och förifyller det vi kan —
+                annars hjälper vi dig komma igång ändå.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="ob-cta"
+                  onClick={() => setWebPhase('urlInput')}
+                >
+                  <Globe size={18} /> Ja, här är adressen
+                </button>
+                <button
+                  type="button"
+                  className="ob-cta ghost"
+                  onClick={answerNoWebsite}
+                >
+                  Nej, jag har ingen
+                </button>
+              </div>
+            </>
+          )}
+
+          {webPhase === 'urlInput' && (
+            <>
+              <h1 className="ob-headline">Vad är adressen?</h1>
+              <p className="ob-sub">Matte läser sidan och fyller i det han hittar.</p>
+              <div className="ob-field">
+                <label className="ob-label">Webbadress</label>
+                <div style={{ position: 'relative' }}>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: 14,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--ob-subtle)',
+                    }}
+                  >
+                    <Globe size={18} />
+                  </span>
+                  <input
+                    className="ob-input"
+                    style={{ paddingLeft: 42 }}
+                    placeholder="www.dittforetag.se"
+                    autoFocus
+                    value={webUrlInput}
+                    onChange={e => { setWebUrlInput(e.target.value); setWebInputError('') }}
+                    onKeyDown={e => e.key === 'Enter' && submitWebsiteUrl()}
+                  />
+                </div>
+                {webInputError && (
+                  <p className="ob-help" style={{ color: '#B91C1C' }}>{webInputError}</p>
+                )}
+              </div>
+            </>
+          )}
+
+          {webPhase === 'scraping' && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '20px 0' }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  marginBottom: 16,
+                  border: '3px solid var(--ob-primary-100)',
+                  borderTopColor: 'var(--ob-primary-700)',
+                  borderRadius: '50%',
+                  animation: 'ob-spin 0.9s linear infinite',
+                }}
+              />
+              <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--ob-ink)' }}>
+                Matte läser din hemsida…
+              </p>
+              <p style={{ fontSize: 13, color: 'var(--ob-muted)', marginTop: 4 }}>
+                Tar bara några sekunder
+              </p>
+            </div>
+          )}
+
+          {webPhase === 'result' && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '20px 0' }}>
+              {webResultError ? (
+                <>
+                  <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--ob-ink)' }}>{webResultError}</p>
+                  <p style={{ fontSize: 13, color: 'var(--ob-muted)', marginTop: 4 }}>
+                    Din adress är sparad — inga problem, vi fyller i resten manuellt.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      marginBottom: 14,
+                      borderRadius: '50%',
+                      background: 'var(--ob-green-50)',
+                      color: 'var(--ob-green-600)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Check size={24} />
+                  </div>
+                  <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--ob-ink)' }}>
+                    {webFoundSummary.length > 0
+                      ? `Vi hittade: ${webFoundSummary.join(', ')}`
+                      : 'Adressen är sparad'}
+                  </p>
+                  <p style={{ fontSize: 13, color: 'var(--ob-muted)', marginTop: 4 }}>
+                    Du kan alltid ändra det vi fyllt i.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="ob-footer">
+          {webPhase === 'urlInput' && (
+            <button type="button" className="ob-cta" onClick={submitWebsiteUrl} disabled={!webUrlInput.trim()}>
+              Fortsätt <ArrowRight size={18} />
+            </button>
+          )}
+          {(webPhase === 'scraping' || webPhase === 'result') && (
+            <button type="button" className="ob-cta" onClick={onNext}>
+              Fortsätt <ArrowRight size={18} />
+            </button>
+          )}
+          {(webPhase === 'question' || webPhase === 'urlInput') && (
+            <button type="button" className="ob-cta ghost" onClick={answerNoWebsite} style={{ height: 44, fontSize: 13 }}>
+              Hoppa över
+            </button>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (
