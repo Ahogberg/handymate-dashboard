@@ -2,12 +2,69 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import StorefrontClient from './StorefrontClient'
+import StorefrontTracker from './StorefrontTracker'
+import { getAppBaseUrl } from '@/lib/site-url'
+
+// Sidan cachas som ISR och byggs om i bakgrunden en gång i timmen. Den
+// gamla server-side fire-and-forget-fetchen till /api/storefront/track
+// tvingade tidigare fram fullt dynamisk rendering — spårningen ligger nu i
+// StorefrontTracker (klientkomponent) istället, se render() nedan.
+export const revalidate = 3600
 
 function getSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+}
+
+// ─── SEO-hjälpare ──────────────────────────────────────────────────────
+
+const SCHEMA_DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const
+const SCHEMA_DAY_NAMES: Record<string, string> = {
+  monday: 'Monday',
+  tuesday: 'Tuesday',
+  wednesday: 'Wednesday',
+  thursday: 'Thursday',
+  friday: 'Friday',
+  saturday: 'Saturday',
+  sunday: 'Sunday',
+}
+
+// Best-effort-tolkning av svensk fritextadress, ex. "Storgatan 12, 123 45 Ort".
+// Returnerar null om adressen inte matchar ett postnummer+ort-mönster —
+// då faller anroparen tillbaka på hela strängen som oformaterad text
+// istället för att gissa var gatan slutar och orten börjar.
+function parseSwedishAddress(raw: string): { streetAddress?: string; postalCode: string; addressLocality: string } | null {
+  const address = raw.trim()
+  if (!address) return null
+
+  const match = address.match(/(\d{3}\s?\d{2})\s*,?\s*([A-Za-zÅÄÖÉåäöé][A-Za-zÅÄÖÉåäöé\s'-]*)$/)
+  if (!match || match.index === undefined) return null
+
+  const postalCode = match[1].trim()
+  const addressLocality = match[2].trim()
+  const streetAddress = address.slice(0, match.index).replace(/,\s*$/, '').trim()
+
+  return {
+    ...(streetAddress ? { streetAddress } : {}),
+    postalCode,
+    addressLocality,
+  }
+}
+
+function buildOpeningHoursSpecification(
+  workingHours: Record<string, { enabled: boolean; start: string; end: string }> | null
+) {
+  if (!workingHours) return []
+  return SCHEMA_DAY_ORDER
+    .filter(day => workingHours[day]?.enabled && workingHours[day]?.start && workingHours[day]?.end)
+    .map(day => ({
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: `https://schema.org/${SCHEMA_DAY_NAMES[day]}`,
+      opens: workingHours[day].start,
+      closes: workingHours[day].end,
+    }))
 }
 
 interface StorefrontData {
@@ -47,6 +104,7 @@ interface BusinessData {
   widget_enabled: boolean
   subscription_plan: string | null
   working_hours: Record<string, { enabled: boolean; start: string; end: string }> | null
+  logo_url: string | null
 }
 
 interface PriceItem {
@@ -77,7 +135,7 @@ async function getStorefrontData(slug: string) {
 
   const { data: business } = await supabase
     .from('business_config')
-    .select('business_id, business_name, contact_name, contact_email, phone_number, assigned_phone_number, address, service_area, branch, services_offered, default_hourly_rate, rot_enabled, rut_enabled, google_review_url, widget_enabled, subscription_plan, working_hours')
+    .select('business_id, business_name, contact_name, contact_email, phone_number, assigned_phone_number, address, service_area, branch, services_offered, default_hourly_rate, rot_enabled, rut_enabled, google_review_url, widget_enabled, subscription_plan, working_hours, logo_url')
     .eq('business_id', storefront.business_id)
     .single()
 
@@ -122,12 +180,8 @@ async function getStorefrontData(slug: string) {
     customer: r.customer_id ? reviewCustomerMap[r.customer_id] || null : null,
   }))
 
-  // Track page view (fire and forget)
-  fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/storefront/track`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ business_id: storefront.business_id, event: 'page_view' }),
-  }).catch(() => {})
+  // Sidvisning spåras numera klientsidan (se StorefrontTracker) så att
+  // denna funktion förblir ren datahämtning och sidan kan ISR-cachas.
 
   return {
     storefront: storefront as StorefrontData,
@@ -139,18 +193,47 @@ async function getStorefrontData(slug: string) {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
+  const baseUrl = getAppBaseUrl()
   const data = await getStorefrontData(slug)
-  if (!data) return { title: 'Sidan hittades inte' }
+
+  if (!data) {
+    return {
+      title: 'Sidan hittades inte',
+      robots: { index: false, follow: false },
+    }
+  }
 
   const { storefront, business } = data
+  const title = storefront.meta_title || business.business_name
+  const description = storefront.meta_description || storefront.hero_description || ''
+  const canonicalUrl = `${baseUrl}/site/${slug}`
+  const ogImage = storefront.hero_image_url || business.logo_url || undefined
+
   return {
-    title: storefront.meta_title || business.business_name,
-    description: storefront.meta_description || storefront.hero_description || '',
+    metadataBase: new URL(baseUrl),
+    title,
+    description,
+    alternates: {
+      canonical: canonicalUrl,
+    },
     openGraph: {
-      title: storefront.meta_title || business.business_name,
-      description: storefront.meta_description || '',
+      title,
+      description,
+      url: canonicalUrl,
+      siteName: business.business_name,
+      locale: 'sv_SE',
       type: 'website',
-      ...(storefront.hero_image_url ? { images: [storefront.hero_image_url] } : {}),
+      ...(ogImage ? { images: [ogImage] } : {}),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      ...(ogImage ? { images: [ogImage] } : {}),
+    },
+    robots: {
+      index: true,
+      follow: true,
     },
   }
 }
@@ -165,16 +248,69 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
 
   const { storefront, business, priceItems, reviews } = data
 
-  // Build JSON-LD structured data
+  const baseUrl = getAppBaseUrl()
+  const canonicalUrl = `${baseUrl}/site/${slug}`
+  const image = storefront.hero_image_url || business.logo_url || undefined
+
+  // Strukturerad adress om fritexten går att tolka (svenskt "Gata NN, NNN NN
+  // Ort"-format), annars raw text — gissa aldrig på gräns mellan gata/ort.
+  const parsedAddress = business.address ? parseSwedishAddress(business.address) : null
+  const address = business.address
+    ? parsedAddress
+      ? { '@type': 'PostalAddress', ...parsedAddress, addressCountry: 'SE' }
+      : { '@type': 'PostalAddress', streetAddress: business.address, addressCountry: 'SE' }
+    : undefined
+
+  // Prisintervall från timprislistan (labor), annars grundtimpriset.
+  const laborPrices = priceItems.map(p => p.unit_price).filter(p => typeof p === 'number' && p > 0)
+  const priceRange = laborPrices.length > 0
+    ? (Math.min(...laborPrices) === Math.max(...laborPrices)
+        ? `${Math.round(Math.min(...laborPrices))} kr`
+        : `${Math.round(Math.min(...laborPrices))}–${Math.round(Math.max(...laborPrices))} kr`)
+    : business.default_hourly_rate > 0
+      ? `${Math.round(business.default_hourly_rate)} kr/h`
+      : undefined
+
+  const openingHoursSpecification = buildOpeningHoursSpecification(business.working_hours)
+
+  // Tjänstekatalog — visas för alla planer på sidan (ingen plan-gating på
+  // priser i StorefrontClient), så ingen dold data läcker här heller.
+  const hasOfferCatalog = priceItems.length > 0
+    ? {
+        '@type': 'OfferCatalog',
+        name: 'Tjänster',
+        itemListElement: priceItems.map(item => ({
+          '@type': 'Offer',
+          itemOffered: { '@type': 'Service', name: item.name },
+          priceSpecification: {
+            '@type': 'UnitPriceSpecification',
+            price: item.unit_price,
+            priceCurrency: 'SEK',
+            ...(item.unit ? { unitText: item.unit } : {}),
+          },
+        })),
+      }
+    : undefined
+
+  // Build JSON-LD structured data. Ingen aggregateRating/review-markup —
+  // recensionerna är inte verifierbara mot Googles policy för
+  // tredjeparts-omdömen förrän review_rating/review_text-flödet är
+  // dokumenterat (Fas 1b).
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'LocalBusiness',
+    '@id': `${canonicalUrl}#business`,
     name: business.business_name,
     description: storefront.meta_description || storefront.hero_description || '',
+    url: canonicalUrl,
     telephone: business.assigned_phone_number || business.phone_number || '',
     email: business.contact_email || '',
-    ...(business.address ? { address: { '@type': 'PostalAddress', streetAddress: business.address } } : {}),
+    ...(image ? { image, logo: business.logo_url || image } : {}),
+    ...(priceRange ? { priceRange } : {}),
+    ...(address ? { address } : {}),
     ...(business.service_area ? { areaServed: business.service_area } : {}),
+    ...(openingHoursSpecification.length > 0 ? { openingHoursSpecification } : {}),
+    ...(hasOfferCatalog ? { hasOfferCatalog } : {}),
   }
 
   return (
@@ -183,6 +319,7 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <StorefrontTracker businessId={business.business_id} />
       <StorefrontClient
         storefront={storefront}
         business={business}
