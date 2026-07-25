@@ -116,6 +116,19 @@ function buildPushTemplate(
       }
     }
 
+    case 'publish_microsite': {
+      // Hemsida-nudgen (2026-07-25) — Hanna har byggt ett utkast till
+      // hemsida (cron/hemsida-forslag) och väntar på publicerings-OK.
+      const headline = payload.preview?.headline
+      return {
+        title: 'Hanna har byggt ett förslag på hemsida',
+        body: headline
+          ? `"${truncate(headline, 70)}" — godkänn för att publicera`
+          : 'Förhandsgranska och publicera med ett klick',
+        url: '/dashboard/approvals?filter=publish_microsite',
+      }
+    }
+
     case 'agent_observation': {
       // Observation med konkret suggestion → approval-rad skapad → action krävs.
       // Mobile-tap → /approvals?filter=agent_observation för granskning.

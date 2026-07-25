@@ -21,6 +21,7 @@ import {
   Phone,
   ExternalLink,
   Star,
+  Globe,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -96,6 +97,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   create_invoice_from_report: { label: 'Faktura', icon: Receipt, bgColor: 'bg-green-50', textColor: 'text-green-600' },
   dispatch_suggestion: { label: 'Tilldelning', icon: Zap, bgColor: 'bg-violet-50', textColor: 'text-violet-600' },
   review_request: { label: 'Recension', icon: Star, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
+  publish_microsite: { label: 'Hemsida', icon: Globe, bgColor: 'bg-teal-50', textColor: 'text-teal-700' },
   // Förtjänad autonomi: erbjudande om att låta agenten sköta typen själv.
   autonomy_offer: { label: 'Förtroende', icon: CheckCircle, bgColor: 'bg-emerald-50', textColor: 'text-emerald-700' },
   lead_review: { label: 'Ny lead', icon: Phone, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
@@ -776,6 +778,41 @@ export default function ApprovalsPage() {
                                   <pre className="mt-2 whitespace-pre-wrap text-[11px] text-gray-700 font-mono max-h-48 overflow-y-auto">{rawEmail.body_preview || ''}</pre>
                                 </div>
                               </details>
+                            </div>
+                          )
+                        })()}
+                        {/* Publish microsite details (hemsida-nudgen) */}
+                        {approval.approval_type === 'publish_microsite' && approval.payload && (() => {
+                          const pl = approval.payload as any
+                          const preview = pl.preview || {}
+                          return (
+                            <div className="mt-2 bg-teal-50 rounded-lg p-3 space-y-2 border border-teal-100">
+                              {preview.headline && (
+                                <p className="text-sm font-medium text-gray-900">{preview.headline}</p>
+                              )}
+                              {preview.description && (
+                                <p className="text-xs text-gray-600">{preview.description}</p>
+                              )}
+                              <div className="flex items-center gap-3 flex-wrap">
+                                {pl.public_url && (
+                                  <a
+                                    href={pl.public_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-sm text-primary-700 hover:text-primary-800 hover:underline"
+                                  >
+                                    <Globe className="w-3.5 h-3.5" />
+                                    Visa hemsidan
+                                    <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                )}
+                                <a
+                                  href="/dashboard/website"
+                                  className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 hover:underline"
+                                >
+                                  Redigera först
+                                </a>
+                              </div>
                             </div>
                           )
                         })()}

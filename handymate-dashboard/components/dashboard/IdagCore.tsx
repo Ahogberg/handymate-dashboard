@@ -109,6 +109,10 @@ function getPreview(approval: Approval): string {
     const parts = [pl.parsed.name, pl.parsed.phone].filter(Boolean).join(' · ')
     return parts || approval.description || ''
   }
+  if (approval.approval_type === 'publish_microsite' && pl.preview) {
+    const parts = [pl.preview.headline, pl.preview.description].filter(Boolean)
+    return parts.join(' — ').slice(0, 200)
+  }
   if (pl.message) return String(pl.message).slice(0, 200)
   if (pl.sms_text) return String(pl.sms_text).slice(0, 200)
   return ''
@@ -142,6 +146,7 @@ const TYPE_LABEL: Record<string, string> = {
   autonomy_offer: 'Förtroende',
   confirm_payment: 'Betalning',
   review_auto_invoice: 'Faktura',
+  publish_microsite: 'Hemsida',
 }
 
 function timeAgo(iso: string): string {
@@ -822,6 +827,15 @@ function QueueCard({
               <X className="w-4 h-4" />
               Avvisa
             </button>
+            {approval.approval_type === 'publish_microsite' && (
+              <Link
+                href="/dashboard/website"
+                className="text-xs font-medium text-primary-700 hover:text-primary-800 inline-flex items-center gap-1"
+              >
+                Visa först
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+            )}
             <Link
               href={`/dashboard/approvals#approval-${approval.id}`}
               className="ml-auto text-xs font-medium text-gray-400 hover:text-gray-600 inline-flex items-center gap-1"

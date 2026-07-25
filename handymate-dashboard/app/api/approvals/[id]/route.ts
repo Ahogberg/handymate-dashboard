@@ -1205,6 +1205,35 @@ async function executeApprovalPayload(
         }
       }
 
+      case 'publish_microsite': {
+        // Hemsida-nudgen (2026-07-25): kortet erbjuder hantverkaren en
+        // redan genererad hemsida (utkast, is_published=false) — se
+        // app/api/cron/hemsida-forslag/route.ts. Godkänn = publicera.
+        // Avvisa = inget händer, utkastet ligger kvar (kan publiceras
+        // manuellt senare via /dashboard/website).
+        const pl = payload as any
+        if (!pl.storefront_id) {
+          return { action: 'publish_microsite', error: 'payload saknar storefront_id' }
+        }
+        const supabasePM = (await import('@/lib/supabase')).getServerSupabase()
+        const { error: publishError } = await supabasePM
+          .from('storefront')
+          .update({ is_published: true, updated_at: new Date().toISOString() })
+          .eq('id', pl.storefront_id)
+          .eq('business_id', businessId)
+
+        if (publishError) {
+          return { action: 'publish_microsite', ok: false, error: publishError.message }
+        }
+        return {
+          action: 'publish_microsite',
+          ok: true,
+          slug: pl.slug,
+          public_url: pl.public_url,
+          navigate_to: pl.public_url || (pl.slug ? `/site/${pl.slug}` : '/dashboard/website'),
+        }
+      }
+
       case 'automation': {
         // En v3-automationsregel med requires_approval skapar denna approval och
         // lägger rule_action_type/rule_action_config i payloaden. Utan detta case
