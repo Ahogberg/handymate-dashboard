@@ -47,13 +47,19 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
    */
   const [attemptedNext, setAttemptedNext] = useState(false)
 
-  // ── Hemsida-förgreningen: aha-moment-frågan visas EN gång, direkt efter
-  // att kontot skapats (auth-sessionen finns då — krävs för den
-  // autentiserade skrap-routen, se app/api/onboarding/scrape-website).
-  // 'form' = det vanliga Step2-formuläret (default).
-  // 'question' → 'urlInput' → 'scraping' → 'result' = mikro-flödet.
-  type WebPhase = 'form' | 'question' | 'urlInput' | 'scraping' | 'result'
-  const [webPhase, setWebPhase] = useState<WebPhase>('form')
+  // ── Hemsida-förgreningen (flyttad till BÖRJAN, 2026-07): aha-moment-
+  // frågan visas nu FÖRST, innan kontot ens skapats — det är därför
+  // extraktionen kan förifylla formuläret istället för att komma för sent.
+  // Skrap-routen fungerar nu utan session (IP-baserad rate limit), se
+  // app/api/onboarding/scrape-website/route.ts.
+  // 'question' → 'urlInput' → 'scraping' → 'form' (förifyllt) = normalflödet.
+  // 'question' → Nej/Hoppa över → 'form' (tomt) = samma slutpunkt.
+  // Redan besvarad (resume, eller tillbaka-navigering inom samma session)
+  // hoppar rakt till 'form' — frågan ställs aldrig två gånger.
+  type WebPhase = 'form' | 'question' | 'urlInput' | 'scraping'
+  const [webPhase, setWebPhase] = useState<WebPhase>(
+    () => (data.hasWebsite !== undefined ? 'form' : 'question'),
+  )
   const [webUrlInput, setWebUrlInput] = useState('')
   const [webInputError, setWebInputError] = useState('')
   const [webResultError, setWebResultError] = useState('')
@@ -64,7 +70,13 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
   const update = (updates: Partial<OnboardingFormData>) =>
     setData(d => ({ ...d, ...updates }))
 
-  /** Best-effort — sparar website_url direkt (auth-session finns redan). */
+  /**
+   * Best-effort — sparar website_url direkt OM en session redan finns
+   * (resumande, redan registrerad användare som ser frågan igen). För en
+   * helt ny användare finns ingen session än på denna punkt i flödet — då
+   * 401:ar detta anrop tyst och website_url skickas istället med vid
+   * register-anropet i handleSubmit (den primära persistensvägen, se där).
+   */
   async function persistWebsiteUrl(url: string | null) {
     try {
       await fetch('/api/onboarding', {
@@ -74,8 +86,7 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
       })
     } catch {
       // Silent — samma "aldrig fastna"-mönster som saveProgress i page.tsx.
-      // website_url finns kvar i onboarding_data (sanitizeForSave) som
-      // reserv och kan skrivas om senare.
+      // website_url finns kvar i data.websiteUrl (skickas med vid register).
     }
   }
 
@@ -135,15 +146,16 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
       const json = await res.json().catch(() => null)
       normalizedUrl = json?.normalizedUrl || url
       if (!mountedRef.current) {
-        // Komponenten hann avmonteras (användaren klickade "Fortsätt ändå")
-        // — spara ändå, men rör ingen state.
+        // Komponenten hann avmonteras — spara ändå (best effort), rör ingen state.
         persistWebsiteUrl(normalizedUrl)
         return
       }
       if (json?.ok && json.extracted) {
         applyExtraction(json.extracted)
       } else {
-        setWebResultError('Jag kunde inte läsa sidan — vi fyller i manuellt istället.')
+        setWebResultError(json?.reason && res.status === 429
+          ? json.reason
+          : 'Jag kunde inte läsa sidan — vi fyller i manuellt istället.')
       }
     } catch {
       if (!mountedRef.current) {
@@ -156,15 +168,28 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
     }
 
     // Spara website_url OAVSETT om skrapningen lyckades (spec Del 3).
+    // update() håller värdet i formuläret — persistWebsiteUrl är bara ett
+    // best-effort-försök (se kommentar där); den riktiga sparningen sker via
+    // register-anropet i handleSubmit när kontot skapas.
     update({ hasWebsite: true, websiteUrl: normalizedUrl })
     persistWebsiteUrl(normalizedUrl)
-    if (mountedRef.current) setWebPhase('result')
+    // Blockerar aldrig: oavsett utfall går vi vidare till det (nu ev.
+    // förifyllda) formuläret — aldrig fastna i mikro-flödet.
+    if (mountedRef.current) setWebPhase('form')
   }
 
+  /** "Nej" eller "Hoppa över" — inget att skrapa, gå rakt till (tomma) formuläret. */
   function answerNoWebsite() {
     update({ hasWebsite: false, websiteUrl: undefined })
     persistWebsiteUrl(null)
-    onNext()
+    setWebPhase('form')
+  }
+
+  /** Header-tillbaka inom mikro-flödet: ett steg bakåt i frågan, eller ut ur Step2 helt. */
+  function goBackWebFlow() {
+    if (webPhase === 'urlInput') { setWebPhase('question'); return }
+    if (webPhase === 'scraping') { setWebPhase('urlInput'); return }
+    onBack()
   }
 
   function submitWebsiteUrl() {
@@ -175,16 +200,6 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
     }
     setWebInputError('')
     runScrape(check.url)
-  }
-
-  /** Beslutar om hemsida-frågan ska visas: hoppas över vid resume om den
-   *  redan besvarats (data.hasWebsite är då true/false, inte undefined). */
-  function proceedAfterAccount() {
-    if (data.hasWebsite !== undefined) {
-      onNext()
-      return
-    }
-    setWebPhase('question')
   }
 
   const formatOrg = (v: string) => {
@@ -269,7 +284,10 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
     setError('')
 
     if (alreadyRegistered) {
-      proceedAfterAccount()
+      // Kontot finns redan (resume/tillbaka-navigering) — hemsida-frågan är
+      // redan besvarad (annars hade webPhase varit 'question' vid mount),
+      // gå bara vidare.
+      onNext()
       return
     }
 
@@ -295,6 +313,10 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
             plusgiro: data.paymentMethod === 'plusgiro' ? data.paymentNumber?.trim() : null,
             bankAccount: data.paymentMethod === 'bankAccount' ? data.paymentNumber?.trim() : null,
             referralCode: refCode || undefined,
+            // Primär persistensväg för website_url (hemsida-förgreningen,
+            // flyttad till början) — frågan besvarades INNAN kontot fanns,
+            // så det finns ingen session att spara via förrän nu.
+            websiteUrl: data.hasWebsite ? (data.websiteUrl || null) : null,
           },
         }),
       })
@@ -306,7 +328,7 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
         businessId: result.businessId,
         emailPending: !!result.emailConfirmationPending,
       })
-      proceedAfterAccount()
+      onNext()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Något gick fel vid registrering')
     } finally {
@@ -314,11 +336,12 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
     }
   }
 
-  // ── Hemsida-förgreningen: mikro-flöde direkt efter kontot skapats ──────
+  // ── Hemsida-förgreningen: mikro-flöde ALLRA FÖRST i Step2, innan kontot
+  // ens skapats ────────────────────────────────────────────────────────
   if (webPhase !== 'form') {
     return (
       <div className="ob-screen">
-        <OnboardingHeader step={0} total={4} onBack={() => setWebPhase('form')} />
+        <OnboardingHeader step={0} total={4} onBack={goBackWebFlow} />
         <div className="ob-body" style={{ display: 'flex', flexDirection: 'column' }}>
           {webPhase === 'question' && (
             <>
@@ -402,55 +425,11 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
               </p>
             </div>
           )}
-
-          {webPhase === 'result' && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '20px 0' }}>
-              {webResultError ? (
-                <>
-                  <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--ob-ink)' }}>{webResultError}</p>
-                  <p style={{ fontSize: 13, color: 'var(--ob-muted)', marginTop: 4 }}>
-                    Din adress är sparad — inga problem, vi fyller i resten manuellt.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div
-                    style={{
-                      width: 48,
-                      height: 48,
-                      marginBottom: 14,
-                      borderRadius: '50%',
-                      background: 'var(--ob-green-50)',
-                      color: 'var(--ob-green-600)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Check size={24} />
-                  </div>
-                  <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--ob-ink)' }}>
-                    {webFoundSummary.length > 0
-                      ? `Vi hittade: ${webFoundSummary.join(', ')}`
-                      : 'Adressen är sparad'}
-                  </p>
-                  <p style={{ fontSize: 13, color: 'var(--ob-muted)', marginTop: 4 }}>
-                    Du kan alltid ändra det vi fyllt i.
-                  </p>
-                </>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="ob-footer">
           {webPhase === 'urlInput' && (
             <button type="button" className="ob-cta" onClick={submitWebsiteUrl} disabled={!webUrlInput.trim()}>
-              Fortsätt <ArrowRight size={18} />
-            </button>
-          )}
-          {(webPhase === 'scraping' || webPhase === 'result') && (
-            <button type="button" className="ob-cta" onClick={onNext}>
               Fortsätt <ArrowRight size={18} />
             </button>
           )}
@@ -472,6 +451,38 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
         <p className="ob-sub">
           <Clock size={14} /> Tar ca 60 sekunder
         </p>
+
+        {/* Hemsida-förgreningen: diskret bekräftelse att fälten nedan kom
+            från kundens hemsida (eller vänligt fel om läsningen misslyckades)
+            — visas bara om användaren faktiskt svarade "Ja" på frågan.
+            Ingen låsning: fälten går att ändra precis som vanligt. */}
+        {data.hasWebsite === true && (webFoundSummary.length > 0 || webResultError) && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 8,
+              background: webResultError ? 'var(--ob-rose-50)' : 'var(--ob-green-50)',
+              border: `1px solid ${webResultError ? '#FECACA' : 'var(--ob-green-100)'}`,
+              borderRadius: 'var(--ob-r-md)',
+              padding: '10px 12px',
+              fontSize: 13,
+              color: webResultError ? '#B91C1C' : 'var(--ob-green-600)',
+              marginBottom: 16,
+            }}
+          >
+            {webResultError ? (
+              <Globe size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+            ) : (
+              <Check size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+            )}
+            <span>
+              {webResultError
+                ? webResultError
+                : <>Hämtat från din hemsida: <strong>{webFoundSummary.join(', ')}</strong> — ändra gärna om något blivit fel.</>}
+            </span>
+          </div>
+        )}
 
         {error && (
           <div

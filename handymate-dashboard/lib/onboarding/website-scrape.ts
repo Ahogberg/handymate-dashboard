@@ -19,6 +19,46 @@ export const SCRAPE_MAX_REDIRECTS = 3
 export const SCRAPE_USER_AGENT =
   'HandymateBot/1.0 (+https://app.handymate.se; läser in kunddata vid onboarding)'
 
+/**
+ * Minsta textlängd (efter htmlToExtractableText) för att det ska vara värt
+ * att bränna en LLM-anrop på extraktion. Tomma/nästan tomma sidor (parkerade
+ * domäner, "under uppbyggnad", JS-only SPA:er som inte renderat) ger sällan
+ * meningsfull text under denna gräns — degradera till ok:false istället för
+ * att skicka nästan-ingenting till Haiku.
+ */
+export const SCRAPE_MIN_TEXT_CHARS = 100
+
+/**
+ * Rate limit-nyckel för /api/onboarding/scrape-website (hemsida-förgreningen,
+ * flytt-till-början). Routen är nåbar UTAN inloggad session (frågan ställs nu
+ * innan kontot skapats) — se route.ts. Ren funktion, testas i
+ * tests/hemsida-forgrening.spec.ts.
+ *
+ * - Autentiserad business → spårning per business (mer exakt, samma person
+ *   kan inte kringgå genom att byta nätverk).
+ * - Ingen session → spårning per IP (obligatoriskt SSRF/kostnads-skydd för
+ *   den oautentiserade vägen).
+ */
+export function buildScrapeRateLimitKey(ip: string, businessId: string | null): string {
+  return businessId ? `scrape:business:${businessId}` : `scrape:${ip}`
+}
+
+/**
+ * Läser klientens IP ur standard-proxy-headers. Samma mönster som
+ * app/api/quotes/public/[token]/route.ts: x-forwarded-for (första värdet,
+ * kan vara en kommaseparerad kedja av proxy-hopp) med fallback x-real-ip.
+ * Ren funktion (tar emot header-strängarna, inte NextRequest) så den kan
+ * testas utan att mocka ett helt Request-objekt.
+ */
+export function extractClientIp(forwardedFor: string | null, realIp: string | null): string {
+  if (forwardedFor) {
+    const first = forwardedFor.split(',')[0]?.trim()
+    if (first) return first
+  }
+  if (realIp && realIp.trim()) return realIp.trim()
+  return 'unknown'
+}
+
 export interface NormalizedUrlOk {
   ok: true
   url: string

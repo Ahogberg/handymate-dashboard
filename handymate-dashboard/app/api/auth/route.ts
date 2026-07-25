@@ -5,6 +5,19 @@ import { cookies } from 'next/headers'
 import { getKnowledgeForBranch } from '@/lib/knowledge-defaults'
 import { isSuperAdmin, IMPERSONATION_COOKIE } from '@/lib/auth/superadmin'
 
+/**
+ * sql/v75_website_url.sql lägger till website_url-kolumnen (hemsida-
+ * förgreningen) men körs MANUELLT av Andreas i Supabase SQL Editor efter
+ * merge — samma fönster/mönster som isMissingWebsiteUrlColumn i
+ * app/api/onboarding/route.ts. Sedan förgreningen flyttades till BÖRJAN av
+ * företagssteget skickas website_url med redan i register-anropet (ingen
+ * session finns förrän kontot skapats), så samma skydd behövs här.
+ */
+function isMissingWebsiteUrlColumn(error: unknown): boolean {
+  const message = String((error as { message?: string })?.message || '')
+  return /website_url/i.test(message) && /schema cache|does not exist|column/i.test(message)
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)
@@ -21,7 +34,7 @@ if (action === 'register') {
   if (!data?.email || !data?.password || !data?.businessName || !data?.contactName) {
     return NextResponse.json({ error: 'Fyll i alla obligatoriska fält' }, { status: 400 })
   }
-  const { email, password, businessName, displayName, contactName, phone, branch, serviceArea, referralCode, orgNumber, bankgiro, plusgiro, bankAccount } = data
+  const { email, password, businessName, displayName, contactName, phone, branch, serviceArea, referralCode, orgNumber, bankgiro, plusgiro, bankAccount, websiteUrl } = data
 
   // 1. Skapa auth user via admin API (skippar e-postverifiering)
   const supabaseAdmin = getServerSupabase()
@@ -68,31 +81,46 @@ if (action === 'register') {
   // Get branch-specific knowledge base defaults
   const knowledgeBase = getKnowledgeForBranch(branch)
 
-  const { error: businessError } = await supabaseAdmin
+  const businessInsert: Record<string, unknown> = {
+    business_id: businessId,
+    user_id: authData.user.id,
+    business_name: businessName,
+    display_name: displayName || businessName,
+    contact_name: contactName,
+    contact_email: email,
+    phone_number: phone,
+    branch: branch,
+    service_area: serviceArea || null,
+    org_number: orgNumber || null,
+    bankgiro: bankgiro || null,
+    plusgiro: plusgiro || null,
+    bank_account_number: bankAccount || null,
+    subscription_status: 'trial',
+    subscription_plan: 'starter',
+    trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    working_hours: defaultWorkingHours,
+    call_mode: 'human_first',
+    knowledge_base: knowledgeBase,
+    referred_by: referralCode || null,
+    website_api_key: `HM-${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`,
+    // Hemsida-förgreningen (flyttad till början): frågan besvaras innan
+    // kontot skapas, så website_url skickas med här direkt istället för via
+    // en efterföljande PUT. null om kunden svarade "Nej"/hoppade över.
+    website_url: websiteUrl || null,
+  }
+
+  let { error: businessError } = await supabaseAdmin
     .from('business_config')
-    .insert({
-      business_id: businessId,
-      user_id: authData.user.id,
-      business_name: businessName,
-      display_name: displayName || businessName,
-      contact_name: contactName,
-      contact_email: email,
-      phone_number: phone,
-      branch: branch,
-      service_area: serviceArea || null,
-      org_number: orgNumber || null,
-      bankgiro: bankgiro || null,
-      plusgiro: plusgiro || null,
-      bank_account_number: bankAccount || null,
-      subscription_status: 'trial',
-      subscription_plan: 'starter',
-      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      working_hours: defaultWorkingHours,
-      call_mode: 'human_first',
-      knowledge_base: knowledgeBase,
-      referred_by: referralCode || null,
-      website_api_key: `HM-${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`,
-    })
+    .insert(businessInsert)
+
+  if (businessError && isMissingWebsiteUrlColumn(businessError)) {
+    // v75-migrationen har inte körts än — försök om utan website_url
+    // istället för att hela registreringen failar.
+    const { website_url: _websiteUrl, ...fallbackInsert } = businessInsert
+    ;({ error: businessError } = await supabaseAdmin
+      .from('business_config')
+      .insert(fallbackInsert))
+  }
 
   if (businessError) {
     console.error('Business error:', businessError)
