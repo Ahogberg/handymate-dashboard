@@ -3,15 +3,19 @@ import dns from 'node:dns'
 import Anthropic from '@anthropic-ai/sdk'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getClaudeModel } from '@/lib/ai/get-model'
+import { checkRateLimitDb } from '@/lib/rate-limit-db'
 import {
   normalizeWebsiteUrl,
   isBlockedHostname,
   isPrivateOrReservedIp,
   htmlToExtractableText,
   parseExtractionJson,
+  buildScrapeRateLimitKey,
+  extractClientIp,
   SCRAPE_TIMEOUT_MS,
   SCRAPE_MAX_BYTES,
   SCRAPE_MAX_REDIRECTS,
+  SCRAPE_MIN_TEXT_CHARS,
   SCRAPE_USER_AGENT,
 } from '@/lib/onboarding/website-scrape'
 
@@ -26,9 +30,17 @@ export const dynamic = 'force-dynamic'
  * att förifylla onboardingen. Extraktionen gissar ALDRIG — Haiku instrueras
  * att returnera null för allt som inte faktiskt står på sidan.
  *
- * Kräver autentiserad business (auth via getAuthenticatedBusiness) — detta
- * är en SSRF-känslig endpoint (server-side fetch mot en kundangiven URL) och
- * ska aldrig vara nåbar utan inloggad session.
+ * Hemsida-förgreningen flyttades till BÖRJAN av företagssteget (Step2Business)
+ * — frågan ställs nu innan kontot skapas, alltså innan det finns någon
+ * inloggad session. Routen kräver därför INTE längre getAuthenticatedBusiness
+ * som hårt villkor:
+ *  - Finns en session (t.ex. en resumande användare mitt i onboardingen) →
+ *    används den för spårning (rate limit per business).
+ *  - Finns ingen session → tillåts anropet ändå, men hastighetsbegränsas
+ *    obligatoriskt per IP (checkRateLimitDb, se buildScrapeRateLimitKey).
+ * Detta är fortsatt en SSRF-känslig endpoint (server-side fetch mot en
+ * kundangiven URL) — därför är SSRF-skydden nedan oförändrade och gäller
+ * lika strikt oavsett auth-status.
  *
  * SSRF-skydd:
  *  - Bara http/https-scheman.
@@ -170,9 +182,25 @@ Text från hemsidan:
 
 export async function POST(request: NextRequest) {
   try {
-    const business = await getAuthenticatedBusiness(request)
-    if (!business) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Ingen hård auth-spärr längre — se doc-kommentaren ovan. Sessionen
+    // används bara för att spåra per business istället för per IP när den
+    // finns; ett fel/timeout i auth-uppslaget ska inte blockera flödet.
+    const business = await getAuthenticatedBusiness(request).catch(() => null)
+
+    const ip = extractClientIp(
+      request.headers.get('x-forwarded-for'),
+      request.headers.get('x-real-ip'),
+    )
+    const rateLimitKey = buildScrapeRateLimitKey(ip, business?.business_id ?? null)
+    const rateLimit = await checkRateLimitDb(rateLimitKey, {
+      maxRequests: 5,
+      windowMs: 60 * 60 * 1000, // 1 timme
+    })
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { ok: false, reason: 'Du har provat lite för många gånger — vänta en stund och försök igen.' },
+        { status: 429 },
+      )
     }
 
     const body = await request.json().catch(() => null)
@@ -192,8 +220,10 @@ export async function POST(request: NextRequest) {
     }
 
     const text = htmlToExtractableText(fetchResult.html)
-    if (!text || text.length < 20) {
-      return NextResponse.json({ ok: false, reason: 'Sidan innehöll ingen läsbar text', normalizedUrl: normalized.url })
+    if (!text || text.length < SCRAPE_MIN_TEXT_CHARS) {
+      // För lite innehåll för att vara värt en LLM-extraktion (parkerad
+      // domän, "sida under uppbyggnad", JS-only SPA som inte renderat, ...).
+      return NextResponse.json({ ok: false, reason: 'Sidan innehöll för lite text för att läsas', normalizedUrl: normalized.url })
     }
 
     if (!process.env.ANTHROPIC_API_KEY) {
