@@ -116,6 +116,10 @@
     {
       "path": "/api/cron/avtal-forslag",
       "schedule": "40 8 * * *"
+    },
+    {
+      "path": "/api/cron/hemsida-forslag",
+      "schedule": "50 8 * * *"
     }
   ]
 }
