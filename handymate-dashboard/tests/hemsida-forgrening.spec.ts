@@ -12,6 +12,8 @@ import {
   isBlockedHostname,
   htmlToExtractableText,
   parseExtractionJson,
+  buildScrapeRateLimitKey,
+  extractClientIp,
   SCRAPE_MAX_TEXT_CHARS,
 } from '../lib/onboarding/website-scrape'
 
@@ -198,5 +200,47 @@ test.describe('parseExtractionJson — gissar aldrig', () => {
   test('tom services-array normaliseras till null', () => {
     const r = parseExtractionJson('{"services":[]}')
     expect(r?.services).toBeNull()
+  })
+})
+
+test.describe('extractClientIp — samma monster som quotes/public/[token]', () => {
+  test('anvander forsta vardet i x-forwarded-for', () => {
+    expect(extractClientIp('203.0.113.5, 10.0.0.1', null)).toBe('203.0.113.5')
+  })
+
+  test('trimmar whitespace runt forsta vardet', () => {
+    expect(extractClientIp('  203.0.113.5  , 10.0.0.1', null)).toBe('203.0.113.5')
+  })
+
+  test('faller tillbaka till x-real-ip om x-forwarded-for saknas', () => {
+    expect(extractClientIp(null, '198.51.100.7')).toBe('198.51.100.7')
+  })
+
+  test('foredrar x-forwarded-for framfor x-real-ip', () => {
+    expect(extractClientIp('203.0.113.5', '198.51.100.7')).toBe('203.0.113.5')
+  })
+
+  test('ger "unknown" nar inga headers finns, ingen krasch', () => {
+    expect(extractClientIp(null, null)).toBe('unknown')
+  })
+
+  test('tom strang i x-forwarded-for faller tillbaka till x-real-ip', () => {
+    expect(extractClientIp('', '198.51.100.7')).toBe('198.51.100.7')
+  })
+})
+
+test.describe('buildScrapeRateLimitKey — spårning per business eller per IP', () => {
+  test('anvander business-nyckel nar business_id finns', () => {
+    expect(buildScrapeRateLimitKey('203.0.113.5', 'biz_abc123')).toBe('scrape:business:biz_abc123')
+  })
+
+  test('anvander IP-nyckel nar ingen session finns', () => {
+    expect(buildScrapeRateLimitKey('203.0.113.5', null)).toBe('scrape:203.0.113.5')
+  })
+
+  test('olika IP:er ger olika nycklar', () => {
+    const a = buildScrapeRateLimitKey('203.0.113.5', null)
+    const b = buildScrapeRateLimitKey('198.51.100.7', null)
+    expect(a).not.toBe(b)
   })
 })
