@@ -2,10 +2,25 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useBusiness } from '@/lib/BusinessContext'
 
 interface BriefDetail { text: string; urgency: 'low' | 'medium' | 'high'; link?: string }
 interface AgentBrief { agentId: string; quote: string; badge?: string; badgeType: string; details: BriefDetail[] }
 interface MorningBrief { date: string; greeting: string; agents: AgentBrief[]; generatedAt: string }
+
+// Samma tröskel som IdagCore:s bevisband (ProofBand) — ett splitternytt
+// konto har inget att visa än. Dupliceras hellre lokalt än att koppla
+// ihop widgeten med IdagCore-filen (minimal diff, se tasks-uppdraget).
+const NEW_ACCOUNT_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000
+
+// Har briefen någon riktig signal, eller är alla agenter bara på sina
+// "inget att rapportera"-defaultvärden? Ett nytt konto ska aldrig mötas
+// av en brief som låtsas ha koll ("Allt lugnt idag") innan teamet ens
+// hunnit lära känna företaget — döljs helt då (bevisbandet nedanför
+// äger cold start-förväntningen redan).
+function hasSignal(brief: MorningBrief): boolean {
+  return brief.agents.some(a => a.details.length > 0 || a.badgeType === 'danger' || a.badgeType === 'warning')
+}
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 
@@ -32,6 +47,7 @@ const URGENCY_DOT: Record<string, string> = {
 
 export default function MorningBriefWidget() {
   const router = useRouter()
+  const business = useBusiness()
   const [brief, setBrief] = useState<MorningBrief | null>(null)
   const [selected, setSelected] = useState('matte')
   const [loading, setLoading] = useState(true)
@@ -59,6 +75,13 @@ export default function MorningBriefWidget() {
   )
 
   if (!brief) return null
+
+  // Cold start: nytt konto (< 3 dagar) utan någon riktig signal — rendera
+  // inget alls. Bevisbandet i IdagCore, som visas direkt under, sätter
+  // rätt förväntan ("Ditt team lär känna företaget…"); en tom skryt-lägesrapport
+  // härifrån ovanpå den vore både brus och missvisande.
+  const isNewAccount = !!business?.created_at && (Date.now() - new Date(business.created_at).getTime()) < NEW_ACCOUNT_MAX_AGE_MS
+  if (isNewAccount && !hasSignal(brief)) return null
 
   const selectedBrief = brief.agents.find(a => a.agentId === selected)
 
@@ -140,12 +163,12 @@ export default function MorningBriefWidget() {
             selectedBrief.details.slice(0, 3).map((detail, i) => (
               <div
                 key={i}
-                className={`flex items-start gap-2 py-1.5 rounded-lg px-1 -mx-1 ${
+                className={`flex items-center gap-2 py-1.5 min-h-[44px] rounded-lg px-1 -mx-1 ${
                   detail.link ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''
                 }`}
                 onClick={() => detail.link && router.push(detail.link)}
               >
-                <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${URGENCY_DOT[detail.urgency] || 'bg-gray-300'}`} />
+                <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${URGENCY_DOT[detail.urgency] || 'bg-gray-300'}`} />
                 <span className={`text-xs leading-relaxed ${detail.link ? 'text-gray-700 hover:text-primary-700' : 'text-gray-600'}`}>
                   {detail.text}
                 </span>
