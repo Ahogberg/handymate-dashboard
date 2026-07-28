@@ -485,7 +485,7 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
           value={personalPhone}
           onChange={(e) => setPersonalPhone(e.target.value)}
           className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
-          placeholder="+46708379552"
+          placeholder="+46701234567"
         />
       </div>
 

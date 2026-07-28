@@ -58,6 +58,17 @@ export async function POST(request: NextRequest) {
 
         const { to } = data
 
+        // Samtalet kopplas till FÖRETAGETS eget nummer — aldrig ett hårdkodat.
+        // (Tidigare låg grundarens privata nummer hårdkodat här sedan tidiga
+        // testdagar → alla kunders "ring upp"-samtal hade kopplats till honom.)
+        const connectPhone = authBusiness.forward_phone_number || authBusiness.phone_number
+        if (!connectPhone) {
+          return NextResponse.json(
+            { error: 'Inget telefonnummer att koppla samtalet till — lägg till ditt nummer under Inställningar → Telefoni.' },
+            { status: 400 }
+          )
+        }
+
         const response = await fetch('https://api.46elks.com/a1/calls', {
           method: 'POST',
           headers: {
@@ -67,7 +78,7 @@ export async function POST(request: NextRequest) {
           body: new URLSearchParams({
             from: ELKS_PHONE_NUMBER,
             to: to,
-            voice_start: JSON.stringify({ connect: '+46708379552' }),
+            voice_start: JSON.stringify({ connect: connectPhone }),
           }),
         })
 
