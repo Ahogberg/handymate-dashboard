@@ -191,3 +191,17 @@ faktura→Vunnen-steget dock fortfarande obevisat tills B7/riktig betalning).
 3. EAS-mobilbygge (efter merge av `fix/b2-mobile-execution-read`) + bekräftad TestFlight-installation.
 4. Migrations-svep: bekräfta v68–v71 körda i Supabase (v67 ✅).
 5. En riktig deal genom hela Golden Path till "Vunnen".
+
+## 7. Partner-systemet (upptäckt odokumenterat 2026-07-28)
+
+| Del | Status |
+|---|---|
+| Partner-registrering/login/dashboard (app/partners/*) + API (app/api/partners/*) | **BYGGT** — aldrig verifierat i drift |
+| P-kod-attribution i registreringen (referred_by + referrals-rad + partner-webhook) | **BYGGT** |
+| Provisionsmotor 20%/12 mån (lib/partners/commission.ts, nattlig via agent-context, hoppar churnade) | **BYGGT** — matchar publika erbjudandet på /partners |
+| Utbetalningsmarkering (markCommissionPaid, manuell admin) | **BYGGT** |
+| Partneravtal + partner-paket | **UTKAST** (content/partner/, avtal kräver jurist) |
+
+**Verifiering som flyttar BYGGT→LIVE:** end-to-end-test (testpartner → kod →
+registrering → dashboard → provisionsrad) + bekräfta v14_partners körd i prod.
+Får INTE säljas som beprövat till partner innan dess.
