@@ -484,7 +484,7 @@ async function handlePaymentFailed(supabase: any, event: Stripe.Event) {
   // Hitta business via stripe_customer_id
   const { data: business } = await supabase
     .from('business_config')
-    .select('business_id')
+    .select('business_id, contact_email, contact_name, subscription_status')
     .eq('stripe_customer_id', customerId)
     .single()
 
@@ -492,6 +492,8 @@ async function handlePaymentFailed(supabase: any, event: Stripe.Event) {
     console.error('Payment failed but no matching business for customer:', customerId)
     return
   }
+
+  const wasAlreadyPastDue = business.subscription_status === 'past_due'
 
   await supabase
     .from('business_config')
@@ -512,4 +514,100 @@ async function handlePaymentFailed(supabase: any, event: Stripe.Event) {
         next_payment_attempt: invoice.next_payment_attempt
       }
     })
+
+  // Notifiering ENDAST vid FÖRSTA misslyckandet — Stripe skickar ett event per
+  // betalningsförsök, och vi ska inte spamma kunden/oss själva vid varje retry.
+  // Allt nedan är best-effort: webhooken har redan gjort sitt kritiska jobb
+  // ovan (status + billing_event-logg) och måste alltid returnera 200 till
+  // Stripe oavsett om mailen lyckas.
+  if (!wasAlreadyPastDue) {
+    try {
+      const { sendEmail, logEmail } = await import('@/lib/email')
+
+      if (business.contact_email) {
+        const firstName = (business.contact_name || '').trim().split(/\s+/)[0] || ''
+        const subject = 'Din betalning till Handymate gick inte igenom'
+        const html = buildPaymentFailedEmailHtml(firstName)
+
+        const result = await sendEmail({
+          to: business.contact_email,
+          subject,
+          html,
+          replyTo: 'andreas@handymate.se',
+        })
+
+        await logEmail({
+          businessId: business.business_id,
+          to: business.contact_email,
+          subject,
+          status: result.success ? 'sent' : 'failed',
+          messageId: result.messageId,
+        })
+
+        if (!result.success) {
+          console.error('[Billing webhook] kundmail om misslyckad betalning gick inte att skicka:', business.business_id, result.error)
+        }
+      }
+
+      // Internt larm till Andreas
+      const amountKr = typeof invoice.amount_due === 'number' ? (invoice.amount_due / 100).toLocaleString('sv-SE') : 'okänt'
+      const nextAttempt = invoice.next_payment_attempt
+        ? new Date(invoice.next_payment_attempt * 1000).toLocaleDateString('sv-SE')
+        : 'inget'
+      const internalHtml = `
+<!DOCTYPE html>
+<html lang="sv">
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1F2937;">
+  <p style="font-size: 14px; line-height: 1.6;">
+    <b>Business ID:</b> ${business.business_id}<br/>
+    <b>Belopp:</b> ${amountKr} kr<br/>
+    <b>Försök:</b> ${invoice.attempt_count ?? 'okänt'}<br/>
+    <b>Nästa försök:</b> ${nextAttempt}
+  </p>
+</body>
+</html>`
+
+      const internalResult = await sendEmail({
+        to: 'andreas@handymate.se',
+        subject: `💳 Betalning misslyckades: ${business.business_id}`,
+        html: internalHtml,
+      })
+      if (!internalResult.success) {
+        console.error('[Billing webhook] internt betalningslarm gick inte att skicka:', internalResult.error)
+      }
+    } catch (err) {
+      console.error('[Billing webhook] notifiering vid past_due misslyckades (icke-blockerande):', err)
+    }
+  }
+}
+
+function buildPaymentFailedEmailHtml(firstName: string): string {
+  const greeting = firstName ? `Hej ${firstName},` : 'Hej,'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+
+  return `
+<!DOCTYPE html>
+<html lang="sv">
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1F2937;">
+  <div style="background: #0F766E; padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+    <span style="color: white; font-size: 18px; font-weight: 700;">Handymate</span>
+  </div>
+  <div style="background: #ffffff; border: 1px solid #E5E7EB; border-top: none; border-radius: 0 0 12px 12px; padding: 24px;">
+    <p style="font-size: 15px; line-height: 1.6; color: #374151;">${greeting}</p>
+    <p style="font-size: 15px; line-height: 1.6; color: #374151;">
+      Din senaste betalning till Handymate gick inte igenom, så kontot är pausat
+      tills kortet är uppdaterat. Det kan bero på ett utgånget kort eller en
+      tillfällig spärr — inget konstigt, och du fixar det enkelt själv.
+    </p>
+    <div style="text-align: center; margin: 28px 0;">
+      <a href="${appUrl}/dashboard/settings/billing" style="display: inline-block; background: #0F766E; color: white; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">
+        Uppdatera betalning →
+      </a>
+    </div>
+    <p style="font-size: 13px; line-height: 1.6; color: #6B7280;">
+      Har du frågor? Svara på det här mailet.
+    </p>
+  </div>
+</body>
+</html>`
 }

@@ -1725,6 +1725,31 @@ export default function SettingsPage() {
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-primary-700 transition-colors" />
             </Link>
+
+            {/* Din data — GDPR-export */}
+            <div className="p-4 bg-gray-50 rounded-xl border border-gray-300">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-lg bg-gray-100 border border-gray-200">
+                  <Download className="w-5 h-5 text-gray-500" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Din data</p>
+                  <p className="text-sm text-gray-400">
+                    Ladda ner en kopia av all din data — kunder, offerter, fakturor, bokningar och projekt.
+                  </p>
+                </div>
+              </div>
+              <a
+                href="/api/gdpr/export"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 text-sm font-medium rounded-lg hover:bg-primary-100 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Exportera min data
+              </a>
+              <p className="text-xs text-gray-400 mt-2">
+                Filen laddas ner som JSON. Personnummer är maskerade som standard.
+              </p>
+            </div>
           </div>
         )}
 

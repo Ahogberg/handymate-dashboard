@@ -50,11 +50,12 @@ Kategoriterm: **AI-team för hantverkare.**
   därför byggdes produktbanken dagar efter att vår pilot bad om den. Ingen
   bindningstid, pengarna-tillbaka-garanti — och din data kan du få ut när
   du vill."
-  _[VERIFIERA före skarp användning: (a) "datan ligger i EU" — bekräfta
-  Supabase-projektets region innan det påstås; (b) exakt exportväg för
-  kunddata (GDPR-funktionerna) — säg inte "exportera själv" om det i
-  praktiken är en supportbegäran. Formuleringen ovan är den säkra tills
-  båda är kollade.]_
+  _[VERIFIERAT 2026-07-29: "din data kan du få ut när du vill" är SKARPT —
+  självbetjäningsknapp "Exportera min data" finns under Inställningar →
+  Företagsinformation (JSON med kunder/offerter/fakturor/bokningar/projekt,
+  personnummer maskerade som standard). KVARSTÅR att verifiera: "datan
+  ligger i EU" — Andreas bekräftar Supabase-projektets region
+  (Settings → General) innan det påstås.]_
 - **"Vad händer när AI:n gör fel?"** → "Inget går ut utan ditt OK. Teamet
   föreslår, du godkänner. Ju mer du godkänner desto mer kan du släppa
   taget — men du bestämmer alltid takten."
