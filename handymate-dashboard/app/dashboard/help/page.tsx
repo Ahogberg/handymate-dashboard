@@ -1,5 +1,19 @@
 'use client'
 
+/**
+ * Hjälpcenter — supportsidan i appen.
+ *
+ * Innehållsregler (samma ärlighetslinje som allt kundriktat material,
+ * se tasks/capability-inventory.md):
+ * - Ingen talande röst-AI: teamet FÅNGAR samtal, "svarar" aldrig i telefon.
+ * - Inget "skickas automatiskt" i nutid — allt går via godkännande-kön.
+ * - ROT/RUT/grön teknik-siffrorna kommer från lib/rot-rut-limits.ts —
+ *   ändras reglerna där ska texten här ändras samtidigt.
+ * - Fortnox nämns medvetet INTE (publika linjen är "på väg").
+ * - Support-mailen är andreas@handymate.se — byt INTE till en adress
+ *   utan bemannad inkorg.
+ */
+
 import { useState } from 'react'
 import Link from 'next/link'
 import {
@@ -7,7 +21,6 @@ import {
   Search,
   ChevronDown,
   Mail,
-  Clock,
   FileText,
   Phone,
   Users,
@@ -16,70 +29,181 @@ import {
   Calendar,
   Zap,
   ArrowRight,
-  MessageSquare
+  MessageSquare,
+  CheckSquare,
+  Leaf,
+  RefreshCw,
+  ShieldCheck,
+  Bot,
 } from 'lucide-react'
 
 interface FAQItem {
+  category: string
   question: string
   answer: string
   icon: React.ReactNode
 }
 
+const CATEGORY_ORDER = [
+  'Komma igång & teamet',
+  'Samtal & kunder',
+  'Offerter & ROT',
+  'Fakturor & pengar',
+  'Serviceavtal & återkommande kunder',
+  'Konto, betalning & din data',
+]
+
 const faqItems: FAQItem[] = [
+  // ── Komma igång & teamet ──────────────────────────────────────────
   {
-    question: 'Hur skapar jag en offert?',
+    category: 'Komma igång & teamet',
+    question: 'Vad gör mitt AI-team egentligen?',
     answer:
-      'Gå till Jobb > Offerter och klicka på "Ny offert". Du kan välja en befintlig kund eller skapa en ny. Lägg till arbetsrader och material, ange ROT/RUT om det gäller, och klicka "Skapa offert". Du kan också låta AI-assistenten generera en offert automatiskt baserat på ett samtal eller en beskrivning av jobbet.',
-    icon: <FileText className="w-5 h-5" />,
+      'Du har sex medhjälpare med var sitt ansvar: Lisa fångar samtalen du missar, Daniel följer upp offerter som blivit liggande, Karin förbereder fakturor och påminnelser, Lars håller koll på projekt och bokningar, Hanna hör av sig till gamla kunder, och Matte är assistenten du pratar med. Det de förbereder hamnar som förslag i din kö på Idag-vyn — inget går ut till en kund utan att du godkänt det.',
+    icon: <Bot className="w-5 h-5" />,
   },
   {
-    question: 'Hur kopplar jag mitt telefonnummer?',
+    category: 'Komma igång & teamet',
+    question: 'Varför måste jag godkänna allt teamet gör?',
     answer:
-      'Under Inställningar > Telefon kan du koppla ditt företagsnummer. Handymate tilldelar dig ett dedikerat nummer via 46elks. Inkommande samtal vidarekopplas till ditt mobilnummer, och samtalen spelas in (med kundens samtycke) för AI-analys. Du kan även ställa in öppettider och hälsningsmeddelanden.',
+      'Det är en medveten konstruktion: teamet föreslår, du bestämmer. Varje förslag i kön kan du godkänna med ett tryck, ändra först, eller avvisa. Ju fler gånger du godkänner samma sorts ärende, desto närmare kommer teamet att få sköta det självständigt — men det är alltid du som sätter takten, och du kan alltid ta tillbaka ratten.',
+    icon: <CheckSquare className="w-5 h-5" />,
+  },
+  {
+    category: 'Komma igång & teamet',
+    question: 'Hur pratar jag med Matte?',
+    answer:
+      'Öppna chatten med Matte i appen och skriv som du skulle skriva till en anställd — "boka in Svensson på torsdag", "hur ligger vi till med offerten till Karlsson?", "påminn mig om besiktningen". Matte kan svara på frågor om ditt företag och förbereda åtgärder, som vanligt via din kö när något ska ut till en kund.',
+    icon: <MessageSquare className="w-5 h-5" />,
+  },
+
+  // ── Samtal & kunder ───────────────────────────────────────────────
+  {
+    category: 'Samtal & kunder',
+    question: 'Vad händer när jag missar ett samtal?',
+    answer:
+      'Samtalet fångas av Lisa: kunden får ett SMS om att du hört av dig, och ett ärende dyker upp i din kö så att inget faller mellan stolarna. Du ser hela samtalshistoriken under Samtal. Ingen robot pratar med dina kunder i telefon — Lisa fångar, du ringer tillbaka.',
     icon: <Phone className="w-5 h-5" />,
   },
   {
-    question: 'Vad är ROT/RUT-avdrag?',
+    category: 'Samtal & kunder',
+    question: 'Hur kopplar jag mitt telefonnummer?',
     answer:
-      'ROT-avdrag gäller reparation, ombyggnad och tillbyggnad av bostäder. RUT-avdrag gäller hushållsnära tjänster som städning och trädgårdsarbete. Avdraget är 30% för ROT och 50% för RUT (max 75 000 kr per person och år). Handymate beräknar automatiskt avdraget på offerter och fakturor, så kunden ser sitt pris efter avdrag.',
-    icon: <CreditCard className="w-5 h-5" />,
+      'Under Inställningar → Telefon kopplar du ditt företagsnummer. Inkommande samtal vidarekopplas till din mobil, och missade samtal fångas upp av teamet. Där ställer du också in vart samtalen ska kopplas.',
+    icon: <Phone className="w-5 h-5" />,
   },
   {
-    question: 'Hur skickar jag en faktura?',
+    category: 'Samtal & kunder',
+    question: 'Hur lägger jag in mina kunder?',
     answer:
-      'Gå till Jobb > Fakturor och klicka "Ny faktura", eller konvertera en godkänd offert till faktura direkt. Fyll i raderna, ange förfallodatum och klicka "Skicka". Fakturan skickas som PDF via e-post och/eller SMS till kunden. Du kan följa betalningsstatus och skicka påminnelser automatiskt.',
+      'Gå till Kunder och klicka på importknappen — du kan ladda upp en fil från Excel (CSV) med namn, telefon, e-post och adress, och systemet visar en förhandsgranskning innan något sparas. Du kan förstås också lägga till kunder en i taget, och när du skapar en ny kund kan du samtidigt skapa en deal så att inget tappas bort.',
+    icon: <Users className="w-5 h-5" />,
+  },
+
+  // ── Offerter & ROT ────────────────────────────────────────────────
+  {
+    category: 'Offerter & ROT',
+    question: 'Hur skapar jag en offert?',
+    answer:
+      'Gå till Jobb → Offerter och klicka "Ny offert" — eller skapa den direkt från kundkortet, så är kunduppgifterna redan ifyllda. Välj en av dina mallar eller börja tomt, lägg till rader och skicka. Kunden öppnar offerten på sin mobil, kan kryssa i tillval och signera direkt.',
     icon: <FileText className="w-5 h-5" />,
   },
   {
-    question: 'Hur fungerar AI-assistenten?',
+    category: 'Offerter & ROT',
+    question: 'Hur räknas ROT- och RUT-avdraget?',
     answer:
-      'AI-assistenten analyserar dina inspelade samtal och skapar automatiska förslag: boka jobb, skicka offert, följa upp kund, med mera. Du hittar förslagen i Samtal-fliken. Godkänn eller avvisa med ett klick. Du kan även använda röstkommando under Samtal för att ge instruktioner direkt till AI:n.',
-    icon: <Zap className="w-5 h-5" />,
-  },
-  {
-    question: 'Hur importerar jag kunder?',
-    answer:
-      'Gå till Kunder och klicka på importknappen. Du kan ladda upp en CSV-fil med kolumnerna namn, telefon, e-post och adress. Systemet matchar automatiskt kolumner och visar en förhandsgranskning innan import. Du kan även lägga till kunder manuellt en i taget.',
-    icon: <Users className="w-5 h-5" />,
-  },
-  {
-    question: 'Hur byter jag plan?',
-    answer:
-      'Gå till Inställningar > Prenumeration. Där ser du din nuvarande plan och kan uppgradera eller nedgradera. Ändringen träder i kraft vid nästa faktureringsperiod. Vid uppgradering får du tillgång till fler samtal, SMS och funktioner direkt.',
+      'ROT är 30 % av arbetskostnaden (max 50 000 kr per person och år), RUT är 50 % (max 75 000 kr) — och det gemensamma taket är 75 000 kr per person och år. Handymate räknar ut avdraget på arbetsandelen rad för rad, så materialet aldrig räknas med av misstag, och kunden ser sitt pris efter avdrag direkt i offerten.',
     icon: <CreditCard className="w-5 h-5" />,
   },
   {
-    question: 'Hur exporterar jag min data?',
+    category: 'Offerter & ROT',
+    question: 'Vad gäller för grön teknik-avdrag?',
     answer:
-      'Under Inställningar > Data kan du exportera kunder, bokningar, offerter och fakturor som CSV-filer. Du äger alltid din data och kan ladda ner allt när som helst. Exporter inkluderar all historik och kan användas för bokföring eller övergång till annat system.',
+      'Grön teknik är ett eget avdrag, skilt från ROT och RUT: 15 % för solceller och 50 % för batteri och laddbox, med ett tak på 50 000 kr per person och år. Handymate håller isär grön teknik och ROT åt dig — till exempel räknas service av en befintlig värmepump som ROT, inte grön teknik.',
+    icon: <Leaf className="w-5 h-5" />,
+  },
+  {
+    category: 'Offerter & ROT',
+    question: 'Jag ändrade mina priser — varför ändras inte gamla offerter?',
+    answer:
+      'Det är meningen. Varje offert fryses när den skapas, som ett kvitto: det kunden fick är det som gäller, oavsett vad du ändrar i prislistan efteråt. Nya offerter använder alltid dina aktuella priser.',
+    icon: <FileText className="w-5 h-5" />,
+  },
+
+  // ── Fakturor & pengar ─────────────────────────────────────────────
+  {
+    category: 'Fakturor & pengar',
+    question: 'Hur skickar jag en faktura?',
+    answer:
+      'Enklast: konvertera en godkänd offert till faktura med ett klick — allt följer med. Du kan också skapa en ny faktura under Jobb → Fakturor. Kunden får en länk där fakturan går att betala med Swish direkt från mobilen.',
+    icon: <CreditCard className="w-5 h-5" />,
+  },
+  {
+    category: 'Fakturor & pengar',
+    question: 'Vad händer när en kund inte betalar i tid?',
+    answer:
+      'Karin håller koll på förfallodatum och förbereder en vänlig påminnelse som hamnar i din kö — du godkänner med ett tryck, så slipper du det obekväma samtalet. När du litar på teamet kan du låta påminnelserna gå ut på egen hand, i din takt.',
+    icon: <RefreshCw className="w-5 h-5" />,
+  },
+  {
+    category: 'Fakturor & pengar',
+    question: 'Kan kunden betala med Swish?',
+    answer:
+      'Ja — fakturan kunden får innehåller en Swish-kod att skanna. När kunden betalat kan hen trycka "Jag har betalat", och du får en bekräftelse i din kö att stämma av mot kontot.',
+    icon: <CreditCard className="w-5 h-5" />,
+  },
+
+  // ── Serviceavtal & återkommande kunder ────────────────────────────
+  {
+    category: 'Serviceavtal & återkommande kunder',
+    question: 'Vad är "Väck kundbasen"?',
+    answer:
+      'Hanna går igenom ditt kundregister, matchar gamla jobb mot serviceavtal som passar — värmepumpsservice, takgenomgång, våtrumskontroll och liknande — och lägger färdiga, personliga erbjudanden i din kö. Du godkänner de du vill skicka. Ditt kundregister är en guldgruva; det här är sättet att gräva i den utan att själv sitta en kväll med telefonlistan.',
+    icon: <Users className="w-5 h-5" />,
+  },
+  {
+    category: 'Serviceavtal & återkommande kunder',
+    question: 'Hur fungerar serviceavtal?',
+    answer:
+      'Ett serviceavtal på kundkortet betyder återkommande besök — till exempel årlig service. Lars föreslår besökstider i veckor där du har luckor i schemat, och efter varje utfört besök förbereder Karin fakturan åt dig. Allt via din kö, som vanligt.',
+    icon: <Calendar className="w-5 h-5" />,
+  },
+
+  // ── Konto, betalning & din data ───────────────────────────────────
+  {
+    category: 'Konto, betalning & din data',
+    question: 'Hur byter jag abonnemang?',
+    answer:
+      'Gå till Inställningar → Fakturering. Där ser du din nuvarande plan och kan byta — ändringen gäller från nästa betalningsperiod. Det finns ingen bindningstid, och funkar inte Handymate för dig får du pengarna tillbaka.',
+    icon: <CreditCard className="w-5 h-5" />,
+  },
+  {
+    category: 'Konto, betalning & din data',
+    question: 'Min betalning gick inte igenom — vad gör jag?',
+    answer:
+      'Du får ett mail från oss om det händer, och kontot pausas tills betalningen är löst. Oftast beror det på ett utgånget kort eller en tillfällig spärr — gå till Inställningar → Fakturering och uppdatera kortet, så är allt igång igen direkt.',
+    icon: <CreditCard className="w-5 h-5" />,
+  },
+  {
+    category: 'Konto, betalning & din data',
+    question: 'Hur får jag ut min data?',
+    answer:
+      'Du äger din data och kan ladda ner den när du vill: gå till Inställningar → Företagsinformation och klicka "Exportera min data". Du får en fil med kunder, offerter, fakturor, bokningar, tidrapporter och projekt. Personnummer är maskerade som standard i exporten.',
     icon: <Download className="w-5 h-5" />,
+  },
+  {
+    category: 'Konto, betalning & din data',
+    question: 'Hur får jag Handymate som app i mobilen?',
+    answer:
+      'Öppna app.handymate.se i mobilens webbläsare och välj "Lägg till på hemskärmen" (på iPhone: dela-knappen → Lägg till på hemskärmen). Då får du Handymate som en app-ikon och kan slå på notiser, så att du ser direkt när något väntar på ditt OK. På iPhone måste appen ligga på hemskärmen för att notiserna ska fungera.',
+    icon: <ShieldCheck className="w-5 h-5" />,
   },
 ]
 
 const quickLinks = [
   {
     title: 'Skapa offert',
-    description: 'Generera en ny offert med AI-hjälp',
+    description: 'Ny offert från mall eller tom',
     href: '/dashboard/quotes/new',
     icon: <FileText className="w-6 h-6" />,
     color: 'from-primary-700 to-primary-600',
@@ -100,7 +224,7 @@ const quickLinks = [
   },
   {
     title: 'Samtal',
-    description: 'AI-inbox och samtalshistorik',
+    description: 'Samtalshistorik och ärenden',
     href: '/dashboard/calls',
     icon: <Phone className="w-6 h-6" />,
     color: 'from-amber-500 to-orange-500',
@@ -123,7 +247,7 @@ const quickLinks = [
 
 export default function HelpPage() {
   const [searchQuery, setSearchQuery] = useState('')
-  const [openIndex, setOpenIndex] = useState<number | null>(null)
+  const [openKey, setOpenKey] = useState<string | null>(null)
 
   const filteredFAQ = faqItems.filter(
     (item) =>
@@ -131,8 +255,12 @@ export default function HelpPage() {
       item.answer.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  function toggleFAQ(index: number) {
-    setOpenIndex(openIndex === index ? null : index)
+  const visibleCategories = CATEGORY_ORDER.filter((cat) =>
+    filteredFAQ.some((item) => item.category === cat)
+  )
+
+  function toggleFAQ(key: string) {
+    setOpenKey(openKey === key ? null : key)
   }
 
   return (
@@ -147,7 +275,7 @@ export default function HelpPage() {
             Hjälpcenter
           </h1>
           <p className="text-slate-500 text-lg">
-            Hitta svar på vanliga frågor eller kontakta oss
+            Hitta svar på vanliga frågor eller hör av dig till oss
           </p>
         </div>
 
@@ -160,72 +288,80 @@ export default function HelpPage() {
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value)
-              setOpenIndex(null)
+              setOpenKey(null)
             }}
             className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F766E] focus:border-primary-600 transition-all text-base"
           />
         </div>
 
-        {/* FAQ Accordion */}
+        {/* FAQ grupperat per kategori */}
         <section className="mb-12">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-primary-700" />
-            Vanliga frågor
-          </h2>
-          <div className="space-y-3">
-            {filteredFAQ.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-xl p-8 text-center">
-                <Search className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500">
-                  Inga frågor matchade din sökning.
-                </p>
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="mt-3 text-primary-700 hover:text-sky-700 text-sm font-medium transition-colors"
-                >
-                  Rensa sökning
-                </button>
+          {filteredFAQ.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-xl p-8 text-center">
+              <Search className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500">
+                Inga frågor matchade din sökning. Hittar du inte svaret? Hör av
+                dig till oss längst ner på sidan.
+              </p>
+              <button
+                onClick={() => setSearchQuery('')}
+                className="mt-3 text-primary-700 hover:text-primary-800 text-sm font-medium transition-colors"
+              >
+                Rensa sökning
+              </button>
+            </div>
+          ) : (
+            visibleCategories.map((cat) => (
+              <div key={cat} className="mb-8">
+                <h2 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-primary-700" />
+                  {cat}
+                </h2>
+                <div className="space-y-3">
+                  {filteredFAQ
+                    .filter((item) => item.category === cat)
+                    .map((item) => {
+                      const key = item.question
+                      const isOpen = openKey === key
+                      return (
+                        <div
+                          key={key}
+                          className="bg-white border border-slate-200 rounded-xl overflow-hidden transition-all"
+                        >
+                          <button
+                            onClick={() => toggleFAQ(key)}
+                            className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-[#F8FAFC] transition-colors"
+                          >
+                            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-primary-50 to-primary-50 border border-primary-100 flex items-center justify-center text-primary-700">
+                              {item.icon}
+                            </div>
+                            <span className="flex-1 text-sm sm:text-base font-medium text-slate-900">
+                              {item.question}
+                            </span>
+                            <ChevronDown
+                              className={`w-5 h-5 text-slate-400 transition-transform duration-200 flex-shrink-0 ${
+                                isOpen ? 'rotate-180' : ''
+                              }`}
+                            />
+                          </button>
+                          <div
+                            className={`transition-all duration-200 ease-in-out overflow-hidden ${
+                              isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                            }`}
+                          >
+                            <div className="px-5 pb-5 pl-[4.5rem]">
+                              <p className="text-slate-600 text-sm leading-relaxed">
+                                {item.answer}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
               </div>
-            ) : (
-              filteredFAQ.map((item, index) => {
-                const isOpen = openIndex === index
-                return (
-                  <div
-                    key={index}
-                    className="bg-white border border-slate-200 rounded-xl overflow-hidden transition-all"
-                  >
-                    <button
-                      onClick={() => toggleFAQ(index)}
-                      className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-[#F8FAFC] transition-colors"
-                    >
-                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-primary-50 to-primary-50 border border-primary-100 flex items-center justify-center text-primary-700">
-                        {item.icon}
-                      </div>
-                      <span className="flex-1 text-sm sm:text-base font-medium text-slate-900">
-                        {item.question}
-                      </span>
-                      <ChevronDown
-                        className={`w-5 h-5 text-slate-400 transition-transform duration-200 flex-shrink-0 ${
-                          isOpen ? 'rotate-180' : ''
-                        }`}
-                      />
-                    </button>
-                    <div
-                      className={`transition-all duration-200 ease-in-out overflow-hidden ${
-                        isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-                      }`}
-                    >
-                      <div className="px-5 pb-5 pl-[4.5rem]">
-                        <p className="text-slate-600 text-sm leading-relaxed">
-                          {item.answer}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
+            ))
+          )}
         </section>
 
         {/* Quick Links */}
@@ -260,11 +396,11 @@ export default function HelpPage() {
           </div>
         </section>
 
-        {/* Contact Support */}
+        {/* Kontakt */}
         <section>
           <h2 className="text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2">
             <Mail className="w-5 h-5 text-primary-700" />
-            Kontakta support
+            Hör av dig
           </h2>
           <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
@@ -273,27 +409,20 @@ export default function HelpPage() {
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-slate-900 mb-1">
-                  Behöver du mer hjälp?
+                  Hittade du inte svaret?
                 </h3>
                 <p className="text-slate-500 text-sm mb-4">
-                  Vårt supportteam hjälper dig gärna med frågor om plattformen.
+                  Maila oss — du får svar från grundarna, inte en svarsrobot. Vi
+                  läser varje mail.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-primary-700" />
-                    <a
-                      href="mailto:support@handymate.se"
-                      className="text-sky-700 hover:text-primary-700 font-medium text-sm transition-colors"
-                    >
-                      support@handymate.se
-                    </a>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-slate-400" />
-                    <span className="text-slate-500 text-sm">
-                      Svarstid: Inom 24 timmar
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-primary-700" />
+                  <a
+                    href="mailto:andreas@handymate.se"
+                    className="text-primary-700 hover:text-primary-800 font-medium text-sm transition-colors"
+                  >
+                    andreas@handymate.se
+                  </a>
                 </div>
               </div>
             </div>

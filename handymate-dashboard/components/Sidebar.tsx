@@ -27,6 +27,7 @@ import {
   Megaphone,
   CheckSquare,
   Globe,
+  HelpCircle,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -119,6 +120,7 @@ const BOTTOM_NAV: NavItem[] = [
   { type: 'link', key: 'my_website', label: 'Min hemsida', icon: Globe, href: '/dashboard/website' },
   { type: 'link', key: 'website_widget', label: 'AI på hemsidan', icon: Globe, href: '/dashboard/settings/website-widget' },
   { type: 'link', key: 'referral', label: 'Bjud in en vän', icon: Gift, href: '/dashboard/referral' },
+  { type: 'link', key: 'help', label: 'Hjälp', icon: HelpCircle, href: '/dashboard/help' },
 ]
 
 // ── Component ─────────────────────────────────────────────────────────
