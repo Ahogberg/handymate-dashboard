@@ -672,7 +672,7 @@ EXAKT EXEMPEL — kopiera strukturen:
     "action": {
       "type": "send_sms",
       "to": "+46701234567",
-      "message": "Hej Anna! Jag märkte att du inte hunnit titta på offerten jag skickade. Är det fortfarande aktuellt för dig? Mvh Christoffer",
+      "message": "Hej Anna! Jag märkte att du inte hunnit titta på offerten jag skickade. Är det fortfarande aktuellt för dig? Mvh \${kontaktpersonens förnamn}",
       "customer_id": "cust_anna",
       "customer_name": "Anna L.",
       "related_id": "q_unopened_1"
