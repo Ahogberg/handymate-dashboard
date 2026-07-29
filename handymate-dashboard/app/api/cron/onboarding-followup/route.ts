@@ -170,7 +170,7 @@ function buildDay7EmailHtml(firstName: string, value: WeeklyValue): string {
       </a>
     </div>
     <p style="font-size: 13px; line-height: 1.6; color: #6B7280;">
-      Har du frågor? Svara på det här mailet — Andreas eller Christoffer läser.
+      Har du frågor? Svara på det här mailet — vi läser varje svar.
     </p>
   </div>
 </body>
