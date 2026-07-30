@@ -340,6 +340,7 @@ export async function POST(
         business.business_id,
         'rot',
         rotLabor,
+        { vatRate },
       )
       rotRutDeduction = capped.deduction
       customerPays = Math.round((total - rotRutDeduction) * 100) / 100
@@ -350,6 +351,7 @@ export async function POST(
         business.business_id,
         'rut',
         rutLabor,
+        { vatRate },
       )
       rotRutDeduction = capped.deduction
       customerPays = Math.round((total - rotRutDeduction) * 100) / 100

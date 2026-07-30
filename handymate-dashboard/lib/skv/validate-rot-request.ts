@@ -29,6 +29,10 @@ export interface SkvInvoiceLike {
   rot_property_designation?: string | null
   rot_brf_org_number?: string | null
   rot_apartment_number?: string | null
+  /** Momssats (%) för fakturan — rot_work_cost/rut_work_cost är lagrade EXKL moms,
+      men Skatteverkets fil vill ha PrisForArbete INKLUSIVE moms (vad kunden
+      faktiskt betalade). Default 25 om saknas (äldre fakturor). */
+  vat_rate?: number | null
 }
 
 export interface SkvValidationInput {
@@ -118,7 +122,12 @@ export function validateInvoiceForSkv(input: SkvValidationInput): ValidationResu
   }
 
   // 8. Belopp
-  const workCost = Math.round((type === 'rut' ? inv.rut_work_cost : inv.rot_work_cost) || 0)
+  // rot_work_cost/rut_work_cost lagras EXKL moms — Skatteverkets fil vill ha
+  // PrisForArbete INKLUSIVE moms (vad kunden faktiskt betalade för arbetet).
+  // rot_deduction/rut_deduction lämnas oförändrade: redan slutgiltigt belopp.
+  const vatRate = inv.vat_rate ?? 25
+  const workCostExVat = (type === 'rut' ? inv.rut_work_cost : inv.rot_work_cost) || 0
+  const workCost = Math.round(workCostExVat * (1 + vatRate / 100))
   const deduction = Math.round((type === 'rut' ? inv.rut_deduction : inv.rot_deduction) || 0)
   if (workCost <= 0) errors.push('Arbetskostnad saknas eller är noll.')
   if (deduction <= 0) errors.push('Begärt avdrag saknas eller är noll.')

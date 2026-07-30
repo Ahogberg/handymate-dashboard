@@ -6,6 +6,10 @@
  * räknas grön teknik-avdraget på HELA radtotalen (arbete + material). Tre kategorier:
  * solceller 15%, batteri (lagring) 50%, laddbox (laddpunkt) 50%. Tak 50 000 kr/år,
  * tillämpat per offert i Fas 1.
+ *
+ * Momsregel (verifierad 2026-07-30 mot skatteverket.se): precis som ROT/RUT räknas
+ * avdraget på kostnaden INKLUSIVE moms. Radpriserna i testerna nedan är exkl moms
+ * (25 %) → avdraget = radtotal × sats × 1.25, takat vid 50 000 kr.
  */
 import { test, expect } from '@playwright/test'
 import { calculateQuoteTotals, GRON_TEKNIK_MAX_PER_YEAR } from '../lib/quote-calculations'
@@ -29,8 +33,9 @@ test.describe('Grön teknik-avdrag på HELA radtotalen (arbete + material)', () 
       }),
     ])
     expect(t.gronBase).toBe(25000)
-    expect(t.gronDeduction).toBe(12500) // 50 % av 25000
-    expect(t.gronCustomerPays).toBe(t.total - 12500)
+    // 50 % av 25000 = 12500 (ex moms), × 1.25 moms = 15625
+    expect(t.gronDeduction).toBe(15625)
+    expect(t.gronCustomerPays).toBe(t.total - 15625)
   })
 
   test('solceller: radtotal 100000 → avdrag 15%', () => {
@@ -38,7 +43,8 @@ test.describe('Grön teknik-avdrag på HELA radtotalen (arbete + material)', () 
       item({ description: 'Solcellsanläggning', quantity: 1, unit: 'st', unit_price: 100000, total: 100000, rot_rut_type: 'gron_solceller' }),
     ])
     expect(t.gronBase).toBe(100000)
-    expect(t.gronDeduction).toBe(15000) // 15 % av 100000
+    // 15 % av 100000 = 15000 (ex moms), × 1.25 moms = 18750
+    expect(t.gronDeduction).toBe(18750)
   })
 
   test('tak: batteri radtotal 120000 → rått avdrag 60000, takas till 50000', () => {
@@ -46,7 +52,7 @@ test.describe('Grön teknik-avdrag på HELA radtotalen (arbete + material)', () 
       item({ description: 'Batterilager', quantity: 1, unit: 'st', unit_price: 120000, total: 120000, rot_rut_type: 'gron_lagring' }),
     ])
     expect(t.gronBase).toBe(120000)
-    // Rått avdrag (60 % ... nej 50 % av 120000 = 60000) överskrider taket
+    // Rått avdrag (50 % av 120000 = 60000, × 1.25 moms = 75000) överskrider taket
     expect(t.gronDeduction).toBe(GRON_TEKNIK_MAX_PER_YEAR)
     expect(t.gronDeduction).toBe(50000)
   })
@@ -60,7 +66,8 @@ test.describe('Grön teknik-avdrag på HELA radtotalen (arbete + material)', () 
       }),
     ])
     expect(t.gronBase).toBe(20000) // = lineTotal, inte labor_amount (500)
-    expect(t.gronDeduction).toBe(10000) // 50 % av HELA 20000, inte av 500
+    // 50 % av HELA 20000 (inte av 500) = 10000 ex moms, × 1.25 moms = 12500
+    expect(t.gronDeduction).toBe(12500)
   })
 
   test('ROT-rad och grön-rad i samma offert räknas oberoende — totalDeduction = summan', () => {
@@ -69,10 +76,12 @@ test.describe('Grön teknik-avdrag på HELA radtotalen (arbete + material)', () 
       item({ description: 'Solceller', quantity: 1, unit: 'st', unit_price: 40000, total: 40000, rot_rut_type: 'gron_solceller' }),
     ])
     expect(t.rotWorkCost).toBe(10000)
-    expect(t.rotDeduction).toBe(3000) // 30 % av 10000
+    // 30 % av 10000 = 3000 ex moms, × 1.25 moms = 3750
+    expect(t.rotDeduction).toBe(3750)
     expect(t.gronBase).toBe(40000)
-    expect(t.gronDeduction).toBe(6000) // 15 % av 40000
-    expect(t.totalDeduction).toBeCloseTo(3000 + 6000, 10)
+    // 15 % av 40000 = 6000 ex moms, × 1.25 moms = 7500
+    expect(t.gronDeduction).toBe(7500)
+    expect(t.totalDeduction).toBeCloseTo(3750 + 7500, 10)
     expect(t.customerPaysAfterDeductions).toBeCloseTo(t.total - t.totalDeduction, 10)
   })
 
@@ -100,6 +109,7 @@ test.describe('Grön teknik-avdrag på HELA radtotalen (arbete + material)', () 
     expect(t.laborTotal).toBe(10000)
     expect(t.materialTotal).toBe(0)
     expect(t.gronBase).toBe(10000)
-    expect(t.gronDeduction).toBe(1500)
+    // 15 % av 10000 = 1500 ex moms, × 1.25 moms = 1875
+    expect(t.gronDeduction).toBe(1875)
   })
 })

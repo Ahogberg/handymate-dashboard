@@ -126,7 +126,7 @@ export async function invoiceAgreementVisit(
       const rate = rotRutType === 'rut' ? 0.5 : 0.3
       const eligibleLabor = items.filter(i => i.is_rot_eligible).reduce((sum, i) => sum + (i.total || 0), 0)
       if (eligibleLabor > 0) {
-        const capped = await calculateCappedDeduction(customerId, businessId, rotRutType as 'rot' | 'rut', eligibleLabor)
+        const capped = await calculateCappedDeduction(customerId, businessId, rotRutType as 'rot' | 'rut', eligibleLabor, { vatRate })
         rotRutDeduction = capped.deduction
       }
       customerPays = total - rotRutDeduction

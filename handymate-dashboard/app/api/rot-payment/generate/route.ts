@@ -79,6 +79,8 @@ export async function POST(request: NextRequest) {
   for (const inv of invoices as any[]) {
     const customer = inv.customer || {}
     const v = validateInvoiceForSkv({
+      // select('*') hämtar redan vat_rate — invoice.vat_rate driver moms-
+      // uppräkningen av PrisForArbete i validateInvoiceForSkv.
       invoice: inv,
       customerPersonalNumber: customer.personal_number,
       customerPropertyDesignation: customer.property_designation,

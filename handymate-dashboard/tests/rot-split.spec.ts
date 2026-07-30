@@ -28,9 +28,10 @@ test.describe('ROT-basen på arbetsandelen', () => {
       }),
     ])
     expect(t.rotWorkCost).toBe(40156.01)
-    // Motorn avrundar inte avdraget — exakt 40156.01 × 0.30 (≈ 12046.80)
-    expect(t.rotDeduction).toBeCloseTo(40156.01 * 0.30, 10)
-    expect(t.rotDeduction).toBeCloseTo(12046.8, 1)
+    // Skatteverket: avdraget är 30 % av arbetskostnaden INKLUSIVE moms.
+    // Motorn avrundar inte avdraget — exakt 40156.01 × 1.25 × 0.30 (≈ 15058.50)
+    expect(t.rotDeduction).toBeCloseTo(40156.01 * 1.25 * 0.30, 10)
+    expect(t.rotDeduction).toBeCloseTo(15058.5, 1)
     // Subtotal/laborTotal påverkas INTE av spliten — hela raden är kvar
     expect(t.subtotal).toBe(54000)
     expect(t.laborTotal).toBe(54000)
@@ -42,7 +43,8 @@ test.describe('ROT-basen på arbetsandelen', () => {
       item({ rot_rut_type: 'rot', is_rot_eligible: true, unit_price: 2000, total: 2000 }),
     ])
     expect(t.rotWorkCost).toBe(2000)
-    expect(t.rotDeduction).toBe(600)
+    // 2000 × 1.25 (moms) × 0.30 = 750 (inte 600 — avdraget räknas inkl moms)
+    expect(t.rotDeduction).toBe(750)
   })
 
   test('labor_amount 0 → bidrar EXAKT 0 till basen (??-vs-||-fällan)', () => {
@@ -85,7 +87,8 @@ test.describe('ROT-basen på arbetsandelen', () => {
       item({ rot_rut_type: 'rut', is_rut_eligible: true, unit_price: 2000, total: 2000 }),
     ])
     expect(t.rutWorkCost).toBe(8000)
-    expect(t.rutDeduction).toBe(4000)
+    // 8000 × 1.25 (moms) × 0.50 = 5000 (inte 4000 — avdraget räknas inkl moms)
+    expect(t.rutDeduction).toBe(5000)
   })
 
   test('tillval med labor_amount: räknas bara när valt (option_selected)', () => {

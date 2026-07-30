@@ -57,7 +57,7 @@ test.describe('FACIT produktbank — Christoffers scenario', () => {
     expect(snap.component_snapshot?.components).toHaveLength(3)
   })
 
-  test('(b) ROT på arbetsandelen, inte totalen: bas ≈ 40 156, avdrag ≈ 12 047 (INTE 16 200)', () => {
+  test('(b) ROT på arbetsandelen, inte totalen: bas ≈ 40 156, avdrag ≈ 15 059 (INTE 16 200)', () => {
     // Arbetsandelen härledd ur komponenterna.
     expect(snap.labor_share).toBeCloseTo(71.5 / 96.15, 10)
     expect(snap.labor_amount).toBe(40156.01)
@@ -73,9 +73,10 @@ test.describe('FACIT produktbank — Christoffers scenario', () => {
     ], 0, 25)
 
     expect(t.rotWorkCost).toBe(40156.01)          // basen = arbetsandelen
-    expect(t.rotDeduction).toBeCloseTo(12046.803, 3) // 40156.01 × 0.30
-    // Kontrast: en naiv beräkning på hela raden hade gett 54000 × 0.30 = 16 200.
-    expect(t.rotDeduction).not.toBeCloseTo(16200, 0)
+    // Skatteverket: avdraget är 30 % av arbetskostnaden INKL moms: 40156.01 × 1.25 × 0.30
+    expect(t.rotDeduction).toBeCloseTo(15058.504, 3)
+    // Kontrast: en naiv beräkning på hela raden (inkl moms) hade gett 54000 × 1.25 × 0.30 = 20 250.
+    expect(t.rotDeduction).not.toBeCloseTo(20250, 0)
   })
 
   test('(c)/(d) tre visningsnivåer + totalsumma/ROT alltid synliga', () => {
@@ -106,7 +107,7 @@ test.describe('FACIT produktbank — Christoffers scenario', () => {
       item({ description: 'Gammal ROT-rad', quantity: 1, unit: 'st', unit_price: 10000, total: 10000, is_rot_eligible: true, rot_rut_type: 'rot' }),
     ], 0, 25)
     expect(t.rotWorkCost).toBe(10000)             // ?? radtotal
-    expect(t.rotDeduction).toBe(3000)             // 10000 × 0.30
+    expect(t.rotDeduction).toBe(3750)             // 10000 × 1.25 (moms) × 0.30
   })
 
   test('(f) snapshot fryser arbetsandelen — produktprisändring rör inte skapad rad', () => {

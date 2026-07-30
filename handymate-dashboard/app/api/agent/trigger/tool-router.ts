@@ -7,6 +7,7 @@ import { getCustomerEmails, sendGmailEmail } from '@/lib/gmail'
 import { getNextCustomerNumber, getNextProjectNumber, getNextLeadNumber } from '@/lib/numbering'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { shouldQueueForApproval } from '@/lib/autonomy/agent-gating'
+import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 
 interface ToolResult {
   success: boolean
@@ -251,8 +252,8 @@ async function createQuote(
   const total = subtotal + vatAmount
 
   let rotRutDeduction = 0
-  if (params.rot_rut_type === 'rot') rotRutDeduction = Math.min(laborTotal * 0.3, 50000)
-  if (params.rot_rut_type === 'rut') rotRutDeduction = Math.min(laborTotal * 0.5, 75000)
+  if (params.rot_rut_type === 'rot') rotRutDeduction = rotRutDeductionInclVat('rot', laborTotal, { vatRate })
+  if (params.rot_rut_type === 'rut') rotRutDeduction = rotRutDeductionInclVat('rut', laborTotal, { vatRate })
 
   const validUntil = new Date()
   validUntil.setDate(validUntil.getDate() + ((params.valid_days as number) || 30))
@@ -360,8 +361,8 @@ async function createInvoice(
 
   const laborTotal = items.filter((i: any) => i.type === 'labor').reduce((s: number, i: any) => s + (i.total || 0), 0)
   let rotRutDeduction = 0
-  if (rotRutType === 'rot') rotRutDeduction = Math.min(laborTotal * 0.3, 50000)
-  if (rotRutType === 'rut') rotRutDeduction = Math.min(laborTotal * 0.5, 75000)
+  if (rotRutType === 'rot') rotRutDeduction = rotRutDeductionInclVat('rot', laborTotal, { vatRate })
+  if (rotRutType === 'rut') rotRutDeduction = rotRutDeductionInclVat('rut', laborTotal, { vatRate })
 
   // Fakturanummer: samma räknare som huvudvägen (invoices/from-quote) —
   // prefix + next_invoice_number — så agentens fakturor inte krockar med dem.

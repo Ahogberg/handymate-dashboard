@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
         .filter((i: any) => i.is_rot_eligible || i.is_rut_eligible)
         .reduce((s: number, i: any) => s + (i.total || 0), 0)
       if (eligibleLabor > 0) {
-        const capped = await calculateCappedDeduction(resolvedCustomerId, business_id, rot_rut_type as 'rot' | 'rut', eligibleLabor)
+        const capped = await calculateCappedDeduction(resolvedCustomerId, business_id, rot_rut_type as 'rot' | 'rut', eligibleLabor, { vatRate })
         rotRutDeduction = capped.deduction
         customerPays = total - rotRutDeduction
       }

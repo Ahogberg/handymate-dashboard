@@ -1,4 +1,5 @@
 import { InvoiceItem, InvoiceTotals } from '@/lib/types/invoice'
+import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 
 /**
  * Calculate all invoice totals from structured items
@@ -42,12 +43,17 @@ export function calculateInvoiceTotals(
   const vat = afterDiscount * (vatRate / 100)
   const total = afterDiscount + vat
 
-  // ROT: 30% avdrag, max 50 000 kr/person/år
-  const rotDeduction = rotWorkCost > 0 ? Math.min(rotWorkCost * 0.30, 50000) : 0
+  // Skatteverket: avdraget räknas på arbetskostnaden INKLUSIVE moms, efter rabatt
+  // (radpriserna ovan är exkl moms). discountFactor fångar både procentrabatt och
+  // rabattrader proportionellt mot bruttosubtotalen.
+  const discountFactor = subtotal > 0 ? afterDiscount / subtotal : 1
+
+  // ROT: 30% avdrag (inkl moms), max 50 000 kr/person/år
+  const rotDeduction = rotRutDeductionInclVat('rot', rotWorkCost, { vatRate, discountFactor })
   const rotCustomerPays = rotWorkCost > 0 ? total - rotDeduction : 0
 
-  // RUT: 50% avdrag, max 75 000 kr/person/år
-  const rutDeduction = rutWorkCost > 0 ? Math.min(rutWorkCost * 0.50, 75000) : 0
+  // RUT: 50% avdrag (inkl moms), max 75 000 kr/person/år
+  const rutDeduction = rotRutDeductionInclVat('rut', rutWorkCost, { vatRate, discountFactor })
   const rutCustomerPays = rutWorkCost > 0 ? total - rutDeduction : 0
 
   return {

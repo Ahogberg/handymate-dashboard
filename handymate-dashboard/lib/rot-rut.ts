@@ -9,6 +9,36 @@ export const RUT_RATE = 0.50
 export const ROT_MAX_PER_PERSON = 50000
 export const RUT_MAX_PER_PERSON = 75000
 
+/**
+ * Skatteverkets regel (verifierad 2026-07-30 mot skatteverket.se):
+ * avdraget är X % av arbetskostnaden INKLUSIVE moms, efter rabatt.
+ * Motorernas arbetskostnader är exkl moms → grossa upp med momsfaktorn
+ * och skala med rabattfaktorn INNAN procentsatsen och taket appliceras.
+ */
+export function rotRutDeductionInclVat(
+  type: 'rot' | 'rut',
+  workCostExVat: number,
+  opts: { vatRate?: number; discountFactor?: number } = {}
+): number {
+  if (workCostExVat <= 0) return 0
+  const vatFactor = 1 + (opts.vatRate ?? 25) / 100
+  const factor = Math.max(0, Math.min(1, opts.discountFactor ?? 1))
+  const rate = type === 'rot' ? ROT_RATE : RUT_RATE
+  const cap = type === 'rot' ? ROT_MAX_PER_PERSON : RUT_MAX_PER_PERSON
+  return Math.min(workCostExVat * factor * vatFactor * rate, cap)
+}
+
+export const GRON_TEKNIK_MAX = 50_000
+export function gronTeknikDeductionInclVat(
+  rawDeductionExVat: number,
+  opts: { vatRate?: number; discountFactor?: number } = {}
+): number {
+  if (rawDeductionExVat <= 0) return 0
+  const vatFactor = 1 + (opts.vatRate ?? 25) / 100
+  const factor = Math.max(0, Math.min(1, opts.discountFactor ?? 1))
+  return Math.min(rawDeductionExVat * factor * vatFactor, GRON_TEKNIK_MAX)
+}
+
 export type RotRutType = 'rot' | 'rut' | ''
 
 export interface RotRutResult {
@@ -51,7 +81,7 @@ export function calculateRotRut(
   const rate = type === 'rot' ? ROT_RATE : RUT_RATE
   const maxPerPerson = type === 'rot' ? ROT_MAX_PER_PERSON : RUT_MAX_PER_PERSON
   const eligible = laborTotal
-  const deduction = Math.min(eligible * rate, maxPerPerson)
+  const deduction = rotRutDeductionInclVat(type, eligible)
   const customerPays = (totalInclVat || 0) - deduction
 
   return {

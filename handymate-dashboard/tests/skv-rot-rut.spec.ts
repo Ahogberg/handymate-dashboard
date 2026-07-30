@@ -214,7 +214,9 @@ test.describe('validateInvoiceForSkv — giltiga fall', () => {
     expect(r.normalized).toBeTruthy()
     expect(r.normalized?.type).toBe('rot')
     expect(r.normalized?.personnummer12).toBe(PNR_ADULT)
-    expect(r.normalized?.prisForArbete).toBe(10000)
+    // rot_work_cost (10000) lagras EXKL moms — PrisForArbete i filen ska vara
+    // INKL moms (25 % default): 10000 × 1.25 = 12500.
+    expect(r.normalized?.prisForArbete).toBe(12500)
     expect(r.normalized?.begartBelopp).toBe(3000)
     expect(r.normalized?.category).toBe('El')
     expect(r.normalized?.fastighetsbeteckning).toBe('Gården 1:23')
@@ -304,7 +306,9 @@ test.describe('validateInvoiceForSkv — varje regel', () => {
     expect(err(validInput({ invoice: { ...validInput().invoice, rot_deduction: 0 } }))).toContain('Begärt avdrag saknas')
   })
   test('begärt avdrag ≥ arbetskostnad', () => {
-    expect(err(validInput({ invoice: { ...validInput().invoice, rot_deduction: 10000 } }))).toContain('större än')
+    // rot_work_cost 10000 (ex moms) → PrisForArbete 12500 (inkl moms, default 25%)
+    // efter momsfixen — begärt avdrag måste nå den nya, högre gränsen.
+    expect(err(validInput({ invoice: { ...validInput().invoice, rot_deduction: 12500 } }))).toContain('större än')
   })
   test('årstak överskrids inkl. tidigare begärt', () => {
     expect(err(validInput({ alreadyRequestedThisYearKr: 48000 }))).toContain('årstaket')

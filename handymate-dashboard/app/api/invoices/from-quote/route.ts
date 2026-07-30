@@ -155,6 +155,7 @@ export async function POST(request: NextRequest) {
           business_id,
           quote.rot_rut_type as 'rot' | 'rut',
           laborCost,
+          { vatRate },
         )
         rotRutDeduction = capped.deduction
         customerPays = total - rotRutDeduction

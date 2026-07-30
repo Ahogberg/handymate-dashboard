@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
+import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { generateOCR } from '@/lib/ocr'
 import { InvoiceItem } from '@/lib/types/invoice'
 
@@ -241,7 +242,8 @@ export async function POST(request: NextRequest) {
         customer_id,
         business_id,
         rot_rut_type as 'rot' | 'rut',
-        laborCost
+        laborCost,
+        { vatRate: vat_rate }
       )
 
       rotRutDeduction = cappedResult.deduction
@@ -251,8 +253,12 @@ export async function POST(request: NextRequest) {
       const laborCost = items
         .filter((i: any) => i.is_rot_eligible || i.is_rut_eligible || i.type === 'labor')
         .reduce((sum: number, i: any) => sum + (i.quantity * i.unit_price), 0)
-      const deductionRate = rot_rut_type === 'rot' ? 0.30 : 0.50
-      rotRutDeduction = Math.round(laborCost * deductionRate * 100) / 100
+      // Utan kund kan årstaket inte kollas — men momsbasen och 50/75k-taket
+      // ska ändå vara rätt (delade kärnan, samma som customer_id-grenen ovan).
+      rotRutDeduction =
+        Math.round(
+          rotRutDeductionInclVat(rot_rut_type as 'rot' | 'rut', laborCost, { vatRate: vat_rate }) * 100
+        ) / 100
       customerPays = total - rotRutDeduction
     }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 
 // Force-dynamic — preview-data är realtidssnap av signerade ÄTA +
 // quote_items, får inte cachas.
@@ -321,7 +322,9 @@ export async function GET(
       | null = null
 
     if (rotWorkCost > 0) {
-      const deduction = rotWorkCost * 0.30
+      // Skatteverket: avdraget är 30 % av arbetskostnaden INKLUSIVE moms, takat
+      // vid 50 000 kr/person/år (denna vy saknade tidigare taket helt).
+      const deduction = rotRutDeductionInclVat('rot', rotWorkCost)
       rotRutSummary = {
         type: 'ROT',
         eligible_amount: Math.round(rotWorkCost * 100) / 100,
@@ -330,7 +333,9 @@ export async function GET(
         customer_pays: 0, // fylls i nedan efter total-beräkning
       }
     } else if (rutWorkCost > 0) {
-      const deduction = rutWorkCost * 0.50
+      // Skatteverket: avdraget är 50 % av arbetskostnaden INKLUSIVE moms, takat
+      // vid 75 000 kr/person/år (denna vy saknade tidigare taket helt).
+      const deduction = rotRutDeductionInclVat('rut', rutWorkCost)
       rotRutSummary = {
         type: 'RUT',
         eligible_amount: Math.round(rutWorkCost * 100) / 100,

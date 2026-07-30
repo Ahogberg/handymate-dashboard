@@ -187,6 +187,7 @@ export async function autoInvoiceOnComplete(
           businessId,
           rotRutType as 'rot' | 'rut',
           eligibleLabor,
+          { vatRate },
         )
         rotRutDeduction = capped.deduction
       }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { X, Plus, Trash2, Receipt, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 
 interface InvoiceLine {
   id: string
@@ -136,8 +137,10 @@ export default function ProjectInvoiceModal({ projectId, onClose }: Props) {
 
   const rotEligible = [...laborLines, ...extraLines].filter(l => l.is_rot_eligible).reduce((s, l) => s + l.total, 0)
   const rutEligible = [...laborLines, ...extraLines].filter(l => l.is_rut_eligible).reduce((s, l) => s + l.total, 0)
-  const rotDeduction = rotRutType === 'rot' ? Math.min(Math.round(rotEligible * 0.3), 50000) : 0
-  const rutDeduction = rotRutType === 'rut' ? Math.min(Math.round(rutEligible * 0.5), 75000) : 0
+  // Skatteverket: avdraget räknas på arbetskostnaden inkl moms, efter rabatt.
+  const discountFactor = subtotal > 0 ? netAmount / subtotal : 1
+  const rotDeduction = rotRutType === 'rot' ? Math.round(rotRutDeductionInclVat('rot', rotEligible, { vatRate: 25, discountFactor })) : 0
+  const rutDeduction = rotRutType === 'rut' ? Math.round(rotRutDeductionInclVat('rut', rutEligible, { vatRate: 25, discountFactor })) : 0
   const customerPays = grossTotal - rotDeduction - rutDeduction
 
   async function handleGenerate() {

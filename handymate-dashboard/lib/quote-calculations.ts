@@ -1,5 +1,6 @@
 import { QuoteItem, PaymentPlanEntry, QuoteTotals, RotRutType } from '@/lib/types/quote'
 import { estimateHours, splitAmount, type SnapshotComponent } from '@/lib/products/build-item-snapshot'
+import { rotRutDeductionInclVat, gronTeknikDeductionInclVat } from '@/lib/rot-rut'
 
 /**
  * Get the effective ROT/RUT type for an item.
@@ -99,16 +100,21 @@ export function calculateQuoteTotals(
   const vat = afterDiscount * (vatRate / 100)
   const total = afterDiscount + vat
 
-  // ROT: 30% avdrag, max 50 000 kr/person/år
-  const rotDeduction = rotWorkCost > 0 ? Math.min(rotWorkCost * 0.30, 50000) : 0
+  // Skatteverket: avdraget räknas på arbetskostnaden INKLUSIVE moms, efter rabatt
+  // (radpriserna ovan är exkl moms). discountFactor fångar både procentrabatt och
+  // rabattrader proportionellt mot bruttosubtotalen.
+  const discountFactor = subtotal > 0 ? afterDiscount / subtotal : 1
+
+  // ROT: 30% avdrag (inkl moms), max 50 000 kr/person/år
+  const rotDeduction = rotRutDeductionInclVat('rot', rotWorkCost, { vatRate, discountFactor })
   const rotCustomerPays = rotWorkCost > 0 ? total - rotDeduction : 0
 
-  // RUT: 50% avdrag, max 75 000 kr/person/år
-  const rutDeduction = rutWorkCost > 0 ? Math.min(rutWorkCost * 0.50, 75000) : 0
+  // RUT: 50% avdrag (inkl moms), max 75 000 kr/person/år
+  const rutDeduction = rotRutDeductionInclVat('rut', rutWorkCost, { vatRate, discountFactor })
   const rutCustomerPays = rutWorkCost > 0 ? total - rutDeduction : 0
 
-  // Grön teknik: 15/50% avdrag beroende på kategori, max 50 000 kr/år (per offert i Fas 1)
-  const gronDeduction = gronBase > 0 ? Math.min(gronDeductionRaw, GRON_TEKNIK_MAX_PER_YEAR) : 0
+  // Grön teknik: 15/50% avdrag beroende på kategori (inkl moms), max 50 000 kr/år (per offert i Fas 1)
+  const gronDeduction = gronTeknikDeductionInclVat(gronDeductionRaw, { vatRate, discountFactor })
   const gronCustomerPays = gronBase > 0 ? total - gronDeduction : 0
 
   const totalDeduction = rotDeduction + rutDeduction + gronDeduction
@@ -226,13 +232,13 @@ export function calculatePublicQuoteTotalsFromBase(
   let rotWorkCost = base.rotWorkCost
   let rutWorkCost = base.rutWorkCost
   let gronBase = base.gronBase
-  // base.gronDeduction är redan Math.min(raw, TAK). Att addera tillvalens
-  // rådata ovanpå och taka igen ger samma resultat som att taka den sanna
-  // kombinerade rådata i ett steg: om basen redan var otakad är base.gronDeduction
-  // == dess rådata (additionen blir exakt); om basen redan var takad (== TAK)
-  // förblir summan == TAK oavsett tillägg, vilket är korrekt eftersom sann
-  // rådata redan översteg taket.
-  let gronDeductionRaw = base.gronDeduction
+  // base.gronDeduction är redan färdig-momsad/rabattfaktorerad/takad (post-fix).
+  // Tillvalens tillskott är fortfarande rått (ex moms, bara satsen applicerad) —
+  // momsa/rabattfaktorera det tillskottet likadant innan det adderas, och taka
+  // EN gång på summan. Ev. drift jämfört med att räkna om hela rad-listan i ett
+  // svep vid rabatt är acceptabel eftersom detta är ren visning — servern
+  // räknar alltid om auktoritativt med hela radlistan vid signering.
+  let optionGronRaw = 0
 
   for (const o of optionRows) {
     if (o.item_type !== 'option' || !selectedOptionIds.has(o.id)) continue
@@ -251,7 +257,7 @@ export function calculatePublicQuoteTotalsFromBase(
         materialTotal += lineTotal
       }
       gronBase += lineTotal
-      gronDeductionRaw += lineTotal * GRON_TEKNIK_RATES[rotRut]
+      optionGronRaw += lineTotal * GRON_TEKNIK_RATES[rotRut]
     } else if (o.unit === 'tim' || o.unit === 'hour' || o.unit === 'h') {
       laborTotal += lineTotal
     } else {
@@ -269,11 +275,22 @@ export function calculatePublicQuoteTotalsFromBase(
   const vat = afterDiscount * (vatRate / 100)
   const total = afterDiscount + vat
 
-  const rotDeduction = rotWorkCost > 0 ? Math.min(rotWorkCost * 0.30, 50000) : 0
+  // Samma momsregel som calculateQuoteTotals: avdraget är X % av arbetskostnaden
+  // INKLUSIVE moms, efter rabatt. Ev. drift vid rabatt (jämfört med att räkna om
+  // hela rad-listan i ett svep) är acceptabel eftersom detta är ren visning —
+  // servern räknar alltid om auktoritativt med hela radlistan vid signering.
+  const discountFactor = subtotal > 0 ? afterDiscount / subtotal : 1
+  const rotDeduction = rotRutDeductionInclVat('rot', rotWorkCost, { vatRate, discountFactor })
   const rotCustomerPays = rotWorkCost > 0 ? total - rotDeduction : 0
-  const rutDeduction = rutWorkCost > 0 ? Math.min(rutWorkCost * 0.50, 75000) : 0
+  const rutDeduction = rotRutDeductionInclVat('rut', rutWorkCost, { vatRate, discountFactor })
   const rutCustomerPays = rutWorkCost > 0 ? total - rutDeduction : 0
-  const gronDeduction = gronBase > 0 ? Math.min(gronDeductionRaw, GRON_TEKNIK_MAX_PER_YEAR) : 0
+  // base.gronDeduction är redan färdigberäknad (momsad/rabatterad/takad). Tillvalets
+  // tillskott (rått, ex moms) momsas/rabattfaktoreras likadant och läggs på — taket
+  // appliceras EN gång på den kombinerade summan.
+  const optionGronInclVat = optionGronRaw * (1 + vatRate / 100) * discountFactor
+  const gronDeduction = gronBase > 0
+    ? Math.min(base.gronDeduction + optionGronInclVat, GRON_TEKNIK_MAX_PER_YEAR)
+    : 0
   const gronCustomerPays = gronBase > 0 ? total - gronDeduction : 0
 
   const totalDeduction = rotDeduction + rutDeduction + gronDeduction

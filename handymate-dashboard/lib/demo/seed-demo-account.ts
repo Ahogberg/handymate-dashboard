@@ -1,5 +1,6 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { calculateQuoteTotals } from '@/lib/quote-calculations'
+import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { generateOCR } from '@/lib/ocr'
 import { getNextCustomerNumber, getNextCaseNumber } from '@/lib/numbering'
 import { ensureDefaultStages, getStageBySlug } from '@/lib/pipeline'
@@ -584,7 +585,7 @@ export async function resetDemoAccount(
   const johanSubtotal = 9600
   const johanVat = johanSubtotal * 0.25
   const johanTotal = johanSubtotal + johanVat
-  const johanRotDeduction = Math.min(johanSubtotal * 0.3, 50000)
+  const johanRotDeduction = rotRutDeductionInclVat('rot', johanSubtotal, { vatRate: 25 })
   const johanInvoiceNumber = `FV-${new Date().getFullYear()}-D02`
   const { data: johanInvoice, error: johanInvErr } = await supabase
     .from('invoice')

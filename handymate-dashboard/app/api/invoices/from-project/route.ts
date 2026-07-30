@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
+import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 
 export const dynamic = 'force-dynamic'
 
@@ -191,6 +192,9 @@ export async function POST(request: NextRequest) {
   let rutDeduction = 0
   let customerPays = total
 
+  // Skatteverket: avdraget räknas på arbetskostnaden inkl moms, efter rabatt.
+  const discountFactor = subtotal > 0 ? taxableAmount / subtotal : 1
+
   // Kapa mot kundens ÅRSUTRYMME (ej bara engångstaket) — annars kan avdraget
   // bli för högt om kunden redan använt sitt ROT/RUT och Skatteverket nekar.
   if (rot_rut_type === 'rot') {
@@ -198,16 +202,16 @@ export async function POST(request: NextRequest) {
       .filter((i: any) => i.is_rot_eligible)
       .reduce((s: number, i: any) => s + (i.total || 0), 0)
     rotDeduction = customer_id && rotWorkCost > 0
-      ? (await calculateCappedDeduction(customer_id, business.business_id, 'rot', rotWorkCost)).deduction
-      : Math.min(Math.round(rotWorkCost * 0.3), 50000)
+      ? (await calculateCappedDeduction(customer_id, business.business_id, 'rot', rotWorkCost, { vatRate: vat_rate, discountFactor })).deduction
+      : Math.round(rotRutDeductionInclVat('rot', rotWorkCost, { vatRate: vat_rate, discountFactor }))
     customerPays = total - rotDeduction
   } else if (rot_rut_type === 'rut') {
     rutWorkCost = items
       .filter((i: any) => i.is_rut_eligible)
       .reduce((s: number, i: any) => s + (i.total || 0), 0)
     rutDeduction = customer_id && rutWorkCost > 0
-      ? (await calculateCappedDeduction(customer_id, business.business_id, 'rut', rutWorkCost)).deduction
-      : Math.min(Math.round(rutWorkCost * 0.5), 75000)
+      ? (await calculateCappedDeduction(customer_id, business.business_id, 'rut', rutWorkCost, { vatRate: vat_rate, discountFactor })).deduction
+      : Math.round(rotRutDeductionInclVat('rut', rutWorkCost, { vatRate: vat_rate, discountFactor }))
     customerPays = total - rutDeduction
   }
 

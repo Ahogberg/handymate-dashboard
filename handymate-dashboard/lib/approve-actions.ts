@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 
 /**
  * Shared action execution for AI suggestion approval.
@@ -279,9 +280,9 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
       let rotRutType = aiQuote.suggestedDeductionType || 'none'
       let rotRutDeduction = 0
       if (rotRutType === 'rot') {
-        rotRutDeduction = Math.min(Math.round(laborTotal * 0.3), 50000)
+        rotRutDeduction = Math.round(rotRutDeductionInclVat('rot', laborTotal, { vatRate }))
       } else if (rotRutType === 'rut') {
-        rotRutDeduction = Math.min(Math.round(laborTotal * 0.5), 75000)
+        rotRutDeduction = Math.round(rotRutDeductionInclVat('rut', laborTotal, { vatRate }))
       }
 
       quoteData.title = aiQuote.jobTitle || actionData.service || 'Offert'

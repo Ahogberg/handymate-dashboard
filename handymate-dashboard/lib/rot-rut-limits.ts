@@ -1,4 +1,5 @@
 import { getServerSupabase } from '@/lib/supabase'
+import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 
 /**
  * ROT/RUT årstak enligt Skatteverket:
@@ -23,7 +24,7 @@ export const TOTAL_MAX_PER_YEAR = 75_000 // Gemensamt tak för ROT+RUT
  */
 export const GRON_TEKNIK_MAX_PER_YEAR = 50_000
 
-interface RotRutUsage {
+export interface RotRutUsage {
   rot_used: number
   rut_used: number
   total_used: number
@@ -94,21 +95,31 @@ export async function getCustomerRotRutUsage(
 }
 
 /**
- * Validera om ett ROT/RUT-avdrag är tillåtet och beräkna max tillåtet belopp
+ * Beräkna det råa (inkl-moms-korrekta) ROT/RUT-avdraget på en arbetskostnad,
+ * INNAN kundens årstak (getCustomerRotRutUsage) appliceras. Ren funktion —
+ * ingen DB-åtkomst — så den kan testas direkt utan mockning.
+ *
+ * Skatteverkets regel: avdraget är X % av arbetskostnaden INKLUSIVE moms,
+ * efter ev. rabatt. laborCost förväntas vara EXKL moms (appens radpriser).
  */
-export async function validateRotRutDeduction(
-  customerId: string,
-  businessId: string,
+export function calculateRawDeduction(
   type: 'rot' | 'rut',
   laborCost: number,
-  excludeInvoiceId?: string
-): Promise<RotRutValidation> {
-  const usage = await getCustomerRotRutUsage(customerId, businessId)
+  opts: { vatRate?: number; discountFactor?: number } = {}
+): number {
+  return Math.round(rotRutDeductionInclVat(type, laborCost, opts) * 100) / 100
+}
 
-  // Beräkna begärt avdrag
-  const rate = type === 'rot' ? ROT_RATE : RUT_RATE
-  const requestedDeduction = Math.round(laborCost * rate * 100) / 100
-
+/**
+ * Ren funktion: bygger valideringsresultatet från ett redan beräknat begärt
+ * avdrag + kundens (redan hämtade) årsanvändning. Ingen DB-åtkomst — gör att
+ * årstaks-begränsningen kan testas direkt utan att mocka Supabase.
+ */
+export function buildValidationFromUsage(
+  type: 'rot' | 'rut',
+  requestedDeduction: number,
+  usage: RotRutUsage
+): RotRutValidation {
   // Bestäm max tillåtet utifrån årstaket
   const typeMax = type === 'rot' ? ROT_MAX_PER_YEAR : RUT_MAX_PER_YEAR
   const typeUsed = type === 'rot' ? usage.rot_used : usage.rut_used
@@ -142,6 +153,24 @@ export async function validateRotRutDeduction(
 }
 
 /**
+ * Validera om ett ROT/RUT-avdrag är tillåtet och beräkna max tillåtet belopp
+ */
+export async function validateRotRutDeduction(
+  customerId: string,
+  businessId: string,
+  type: 'rot' | 'rut',
+  laborCost: number,
+  opts: { vatRate?: number; discountFactor?: number; excludeInvoiceId?: string } = {}
+): Promise<RotRutValidation> {
+  const usage = await getCustomerRotRutUsage(customerId, businessId)
+
+  // Beräkna begärt avdrag (inkl-moms-korrekt, se lib/rot-rut.ts)
+  const requestedDeduction = calculateRawDeduction(type, laborCost, opts)
+
+  return buildValidationFromUsage(type, requestedDeduction, usage)
+}
+
+/**
  * Beräkna ROT/RUT-avdrag med hänsyn till årstak
  * Returnerar det faktiska avdraget (kan vara lägre än begärt)
  */
@@ -149,9 +178,10 @@ export async function calculateCappedDeduction(
   customerId: string,
   businessId: string,
   type: 'rot' | 'rut',
-  laborCost: number
+  laborCost: number,
+  opts: { vatRate?: number; discountFactor?: number } = {}
 ): Promise<{ deduction: number; capped: boolean; warning?: string }> {
-  const validation = await validateRotRutDeduction(customerId, businessId, type, laborCost)
+  const validation = await validateRotRutDeduction(customerId, businessId, type, laborCost, opts)
 
   if (validation.requested_deduction <= validation.max_allowed_deduction) {
     return { deduction: validation.requested_deduction, capped: false }
