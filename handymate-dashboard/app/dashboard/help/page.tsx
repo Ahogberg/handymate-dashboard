@@ -112,7 +112,7 @@ const faqItems: FAQItem[] = [
     category: 'Offerter & ROT',
     question: 'Hur räknas ROT- och RUT-avdraget?',
     answer:
-      'ROT är 30 % av arbetskostnaden (max 50 000 kr per person och år), RUT är 50 % (max 75 000 kr) — och det gemensamma taket är 75 000 kr per person och år. Handymate räknar ut avdraget på arbetsandelen rad för rad, så materialet aldrig räknas med av misstag, och kunden ser sitt pris efter avdrag direkt i offerten.',
+      'ROT är 30 % av arbetskostnaden inklusive moms (max 50 000 kr per person och år), RUT är 50 % (max 75 000 kr) — och det gemensamma taket är 75 000 kr per person och år. Handymate räknar ut avdraget på arbetsandelen rad för rad enligt Skatteverkets regler, så materialet aldrig räknas med av misstag, och kunden ser sitt pris efter avdrag direkt i offerten.',
     icon: <CreditCard className="w-5 h-5" />,
   },
   {

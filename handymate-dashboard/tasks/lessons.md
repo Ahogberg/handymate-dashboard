@@ -81,3 +81,22 @@ Regeln skärps: innan VARJE Agent-start i repot — kontrollera aktivt att ingen
 byggagent är igång (todo-listan + senaste agent-notifikationerna). Nya
 uppgifter under pågående bygge KÖAS med färdig prompt istället för att
 avfyras. En agent = äger repot tills merge, utan undantag.
+
+## 2026-07-30 — Extern regelverkslogik facit-verifieras mot KÄLLAN, inte mot intern konsistens (självfångad)
+
+**Vad hände:** ROT/RUT/grön teknik-avdragen beräknades som procent av
+arbetskostnaden EXKL moms — internt helt konsekvent (offert, faktura, PDF,
+SKV-fil visade samma siffra), men Skatteverkets regel är procent av
+arbetskostnaden INKLUSIVE moms. Kunden fick 20 % för lågt avdrag. Buggen
+överlevde flera granskningar just för att alla delar var sinsemellan
+konsistenta — och matten var duplicerad på ~19 ställen, så en punktfix hade
+aldrig räckt. Hittades först när facit-tester skulle skrivas och basen
+ifrågasattes mot skatteverket.se.
+
+**Regel:** (1) All logik som implementerar EXTERNA regelverk (skatteregler,
+myndighetsformat, lagkrav) ska ha minst ett facit-test vars förväntade värde
+kommer ORDAGRANT från myndighetens eget exempel — intern konsistens bevisar
+ingenting. (2) Vid fynd av duplicerad beräkningslogik: fixa aldrig punktvis —
+extrahera delad kärna först, byt sedan ut alla anropsställen, och grep-verifiera
+att inga fler finns. (3) Momsfrågan ställs alltid explicit vid pengalogik:
+är basen inkl eller exkl moms, och vad kräver regeln?
