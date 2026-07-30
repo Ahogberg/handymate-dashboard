@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         },
       ],
       // Tillbaka in i onboarding-flödet. page.tsx läser ?payment=success och
-      // går vidare till aktiverings-/tour-steget; ?payment=cancelled → kvar på
+      // går vidare till importsteget; ?payment=cancelled → kvar på
       // betalsteget så kunden kan försöka igen.
       success_url: `${appUrl}/onboarding?payment=success&plan=${planId}`,
       cancel_url: `${appUrl}/onboarding?payment=cancelled`,

@@ -18,6 +18,25 @@ function isMissingWebsiteUrlColumn(error: unknown): boolean {
   return /website_url/i.test(message) && /schema cache|does not exist|column/i.test(message)
 }
 
+/**
+ * Fynd 4b (nykundsresan-granskning) — Supabase auth-fel kommer på rå engelska
+ * (authError.message) och visades tidigare rakt av i UI:t. Mappar de vanligaste
+ * fallen till svenska; originalfelet loggas ALLTID med console.error av
+ * anroparen innan denna funktion används, så inget går förlorat för felsökning.
+ * Dubbelregistrerings-texten (rad ~54-55 nedan) är oförändrad — den hanteras
+ * separat, redan på svenska.
+ */
+function mapAuthErrorToSwedish(message: string): string {
+  const m = message.toLowerCase()
+  if (/invalid.*email|email.*invalid|unable to validate email/.test(m)) {
+    return 'Ogiltig e-postadress — kontrollera att du skrivit rätt.'
+  }
+  if (/password/.test(m)) {
+    return 'Lösenordet uppfyller inte kraven — minst 6 tecken krävs.'
+  }
+  return 'Kontot kunde inte skapas — kontrollera uppgifterna och försök igen.'
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)
@@ -54,7 +73,7 @@ if (action === 'register') {
     if (authError.message?.includes('already') || authError.message?.includes('exists')) {
       return NextResponse.json({ error: 'En användare med denna e-post finns redan. Försök logga in istället.' }, { status: 400 })
     }
-    return NextResponse.json({ error: authError.message }, { status: 400 })
+    return NextResponse.json({ error: mapAuthErrorToSwedish(authError.message || '') }, { status: 400 })
   }
 
   if (!authData.user) {
@@ -185,6 +204,11 @@ if (action === 'register') {
           } catch (err) {
             console.error('[Register] Partner webhook notification failed:', err)
           }
+        } else {
+          // Fynd 1d — koden matchade ingen aktiv partner. Registreringen
+          // fortsätter ändå (koden är valfri och får aldrig blockera) men
+          // detta försvann tidigare spårlöst — logga så det syns i efterhand.
+          console.warn('[Register] Partnerkod matchade ingen aktiv partner:', { referralCode, businessId })
         }
       } else {
         // Customer-to-customer referral

@@ -419,6 +419,10 @@ export default function IdagCore({
   // Regel, inte data-flagga: de två senaste renderas fullt, resten kompakt.
   // Ett expanderat kompakt kort renderas fullt på sin plats.
   const fullIds = new Set(visible.slice(0, MAX_FULL_CARDS).map(a => a.id))
+  // Samma cold-start-signal som ProofBand (se NEW_ACCOUNT_MAX_AGE_MS längre
+  // ned): ett splitternytt konto utan kö-historik ska inte få "Allt klart"
+  // (låter som att teamet redan hunnit jobba klart) — annan text istället.
+  const isNewAccount = !!business?.created_at && (Date.now() - new Date(business.created_at).getTime()) < NEW_ACCOUNT_MAX_AGE_MS
 
   const queueEmpty = queueLoaded && pending === 0
   const doneExpanded = doneOpen || queueEmpty
@@ -465,8 +469,17 @@ export default function IdagCore({
             <span className="w-11 h-11 rounded-full bg-primary-50 text-primary-700 inline-flex items-center justify-center mb-2">
               <Check className="w-5 h-5" strokeWidth={2.5} />
             </span>
-            <h3 className="font-semibold text-gray-900">Allt klart</h3>
-            <p className="text-sm text-gray-500 mt-0.5">Teamet jobbar vidare — vi säger till när något behöver dig.</p>
+            {isNewAccount ? (
+              <>
+                <h3 className="font-semibold text-gray-900">Teamet lär känna ditt företag</h3>
+                <p className="text-sm text-gray-500 mt-0.5">De första förslagen dyker upp här.</p>
+              </>
+            ) : (
+              <>
+                <h3 className="font-semibold text-gray-900">Allt klart</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Teamet jobbar vidare — vi säger till när något behöver dig.</p>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-2">

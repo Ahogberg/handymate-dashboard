@@ -75,7 +75,7 @@ export default function OnboardingChecklist({
         },
         {
           id: 'phone',
-          label: 'Telefonnummer aktiverat',
+          label: 'Ditt nummer är på plats',
           completed: !!businessConfig.assigned_phone_number,
           link: '/dashboard/settings?tab=phone',
         },

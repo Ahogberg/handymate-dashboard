@@ -22,6 +22,7 @@ import OnboardingHeader from './OnboardingHeader'
 import type { OnboardingFormData } from '../types-redesign'
 import { TRADES } from '../constants'
 import { normalizeWebsiteUrl, type ScrapedExtraction } from '@/lib/onboarding/website-scrape'
+import { readStep2Draft, writeStep2Draft, clearStep2Draft } from '../step2-draft'
 
 interface Step2Props {
   onNext: () => void
@@ -47,6 +48,44 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
    */
   const [attemptedNext, setAttemptedNext] = useState(false)
 
+  // Fynd 1 — partner-attribution. Förifylls från ?ref= (nuvarande beteende),
+  // men blir nu ett synligt, redigerbart fält istället för att bara skickas
+  // med tyst i register-anropet. Valfritt — koden får ALDRIG blockera
+  // registreringen, bara bekräftas/varnas om.
+  const [referralCodeInput, setReferralCodeInput] = useState(refCode)
+  const [partnerCheck, setPartnerCheck] = useState<{
+    status: 'idle' | 'checking' | 'valid' | 'invalid'
+    partnerName?: string
+  }>({ status: 'idle' })
+
+  async function validatePartnerCode(code: string) {
+    const trimmed = code.trim()
+    if (!trimmed) {
+      setPartnerCheck({ status: 'idle' })
+      return
+    }
+    setPartnerCheck({ status: 'checking' })
+    try {
+      const res = await fetch(`/api/partners/validate?code=${encodeURIComponent(trimmed)}`)
+      const json = await res.json().catch(() => null)
+      if (json?.valid) {
+        setPartnerCheck({ status: 'valid', partnerName: json.partnerName })
+      } else {
+        setPartnerCheck({ status: 'invalid' })
+      }
+    } catch {
+      // Nätverksfel — degradera tyst, koden skickas med ändå vid submit.
+      setPartnerCheck({ status: 'idle' })
+    }
+  }
+
+  // Validera direkt om koden kom förifylld från länken (?ref=) — annars
+  // väntar vi på blur (se fältet nedan) för att inte spamma anrop per tecken.
+  useEffect(() => {
+    if (refCode) validatePartnerCode(refCode)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // ── Hemsida-förgreningen (flyttad till BÖRJAN, 2026-07): aha-moment-
   // frågan visas nu FÖRST, innan kontot ens skapats — det är därför
   // extraktionen kan förifylla formuläret istället för att komma för sent.
@@ -69,6 +108,39 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
 
   const update = (updates: Partial<OnboardingFormData>) =>
     setData(d => ({ ...d, ...updates }))
+
+  /**
+   * Fynd 3 — hydrera ett sparat utkast (företagsnamn, org.nr, e-post) vid
+   * mount. Skriver ALDRIG över fält som redan finns i state (resume/tillbaka-
+   * navigering vinner alltid över sessionStorage-utkastet). Körs bara för en
+   * ännu inte skapad användare — en redan registrerad kund har redan sin
+   * riktiga data från DB.
+   */
+  useEffect(() => {
+    if (data.businessId) return
+    const draft = readStep2Draft()
+    if (!draft) return
+    const patch: Partial<OnboardingFormData> = {}
+    if (draft.companyName && !data.companyName?.trim()) patch.companyName = draft.companyName
+    if (draft.orgNumber && !data.orgNumber?.trim()) patch.orgNumber = draft.orgNumber
+    if (draft.email && !data.email?.trim()) patch.email = draft.email
+    if (Object.keys(patch).length > 0) update(patch)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /**
+   * Fynd 3 — spara utkastet löpande medan användaren skriver, så en refresh
+   * INNAN kontot skapats (t.ex. 401 på /api/onboarding-anropet i page.tsx)
+   * inte längre raderar ifylld data. Lösenordet sparas ALDRIG.
+   */
+  useEffect(() => {
+    if (data.businessId) return
+    writeStep2Draft({
+      companyName: data.companyName || '',
+      orgNumber: data.orgNumber || '',
+      email: data.email || '',
+    })
+  }, [data.businessId, data.companyName, data.orgNumber, data.email])
 
   /**
    * Best-effort — sparar website_url direkt OM en session redan finns
@@ -239,9 +311,15 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
     data.paymentNumber?.trim()
   )
 
+  // Fynd 4a — enkel e-postformat-validering client-side, innan submit.
+  // Servern (auth/route.ts) validerar också, men detta ger direkt svensk
+  // feedback istället för att gå via ett API-anrop + rått Supabase-fel.
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
   const validAccount = !!(
     data.contactName?.trim() &&
     data.email?.trim() &&
+    EMAIL_RE.test(data.email.trim()) &&
     data.password &&
     data.password.length >= 6 &&
     data.phone &&
@@ -268,6 +346,7 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
     if (!alreadyRegistered) {
       if (!data.contactName?.trim()) missing.push('kontaktnamn')
       if (!data.email?.trim()) missing.push('e-post')
+      else if (!EMAIL_RE.test(data.email.trim())) missing.push('giltig e-postadress')
       if (!data.password || data.password.length < 6) missing.push('lösenord (min 6 tecken)')
       if (!data.phone || data.phone.replace(/\D/g, '').length < 10) missing.push('privat mobilnummer')
     }
@@ -312,7 +391,7 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
             bankgiro: data.paymentMethod === 'bankgiro' ? data.paymentNumber?.trim() : null,
             plusgiro: data.paymentMethod === 'plusgiro' ? data.paymentNumber?.trim() : null,
             bankAccount: data.paymentMethod === 'bankAccount' ? data.paymentNumber?.trim() : null,
-            referralCode: refCode || undefined,
+            referralCode: referralCodeInput.trim() || undefined,
             // Primär persistensväg för website_url (hemsida-förgreningen,
             // flyttad till början) — frågan besvarades INNAN kontot fanns,
             // så det finns ingen session att spara via förrän nu.
@@ -328,6 +407,7 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
         businessId: result.businessId,
         emailPending: !!result.emailConfirmationPending,
       })
+      clearStep2Draft()
       onNext()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Något gick fel vid registrering')
@@ -341,7 +421,7 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
   if (webPhase !== 'form') {
     return (
       <div className="ob-screen">
-        <OnboardingHeader step={0} total={4} onBack={goBackWebFlow} />
+        <OnboardingHeader step={0} total={5} onBack={goBackWebFlow} />
         <div className="ob-body" style={{ display: 'flex', flexDirection: 'column' }}>
           {webPhase === 'question' && (
             <>
@@ -445,7 +525,7 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
 
   return (
     <div className="ob-screen">
-      <OnboardingHeader step={0} total={4} onBack={onBack} />
+      <OnboardingHeader step={0} total={5} onBack={onBack} />
       <div className="ob-body">
         <h1 className="ob-headline">Berätta om ditt företag</h1>
         <p className="ob-sub">
@@ -866,6 +946,32 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
+                </div>
+
+                {/* Fynd 1 — partner-attribution, synlig och redigerbar (tidigare
+                    tyst från ?ref=). Valfri — blockerar aldrig registreringen. */}
+                <div className="ob-field">
+                  <label className="ob-label">Partnerkod (valfritt)</label>
+                  <input
+                    className="ob-input"
+                    placeholder="t.ex. P-1234"
+                    value={referralCodeInput}
+                    onChange={e => {
+                      setReferralCodeInput(e.target.value)
+                      if (partnerCheck.status !== 'idle') setPartnerCheck({ status: 'idle' })
+                    }}
+                    onBlur={() => validatePartnerCode(referralCodeInput)}
+                  />
+                  {partnerCheck.status === 'valid' && (
+                    <p className="ob-help" style={{ color: 'var(--ob-green-600)' }}>
+                      Hänvisad av {partnerCheck.partnerName} ✓
+                    </p>
+                  )}
+                  {partnerCheck.status === 'invalid' && (
+                    <p className="ob-help" style={{ color: 'var(--ob-amber-600)' }}>
+                      Koden känns inte igen — kontrollera med din kontakt.
+                    </p>
+                  )}
                 </div>
               </div>
             )}

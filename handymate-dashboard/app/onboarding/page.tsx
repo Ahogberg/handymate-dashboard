@@ -10,6 +10,7 @@ import Step5Activate from './components/Step5Activate'
 import StepImportData from './components/StepImportData'
 import Step6LiveTour from './components/Step6LiveTour'
 import type { OnboardingFormData } from './types-redesign'
+import { hasStep2Draft } from './step2-draft'
 
 const TOTAL_STEPS = 7
 
@@ -41,9 +42,14 @@ export default function OnboardingPage() {
       try {
         const res = await fetch('/api/onboarding')
         if (!res.ok) {
-          // Ny användare — börja från Step 1 (intro)
+          // Ny användare — börja från Step 1 (intro). UNDANTAG (Fynd 3): om
+          // ett sparat Step2-utkast finns i sessionStorage (kunden hann
+          // fylla i innan en refresh/401 tog bort sessionen) hoppar vi rakt
+          // till registreringssteget istället — annars ser det ut som att
+          // allt försvann. Step2Business hydrerar sina fält från samma
+          // utkast vid mount.
           if (!cancelled) {
-            setStep(0)
+            setStep(hasStep2Draft() ? 1 : 0)
             setLoading(false)
           }
           return
@@ -172,29 +178,46 @@ export default function OnboardingPage() {
     setStep(s => Math.max(0, s - 1))
   }, [])
 
+  // finish() navigerar bara till dashboarden om finalize-anropet faktiskt
+  // lyckades — tidigare sväljde try/catch{} felet tyst och pushade ändå,
+  // vilket kunde landa kunden på en dashboard utan seedade defaults
+  // (automation_rules, pipeline_stages, etc.) utan att någon märkte det.
+  const [finishing, setFinishing] = useState(false)
+  const [finishError, setFinishError] = useState(false)
+
   const finish = useCallback(async () => {
-    if (data.businessId) {
+    if (!data.businessId) {
+      // Inget konto att finalisera (edge case) — inget att fela på.
+      router.push('/dashboard')
+      return
+    }
+    setFinishing(true)
+    setFinishError(false)
+    try {
       // Server-side finalize via /api/onboarding POST (befintlig endpoint
       // sätter onboarding_step + onboarding_completed_at + seedar defaults).
-      // Vi lägger till welcome_tour_seen via PUT med config-payload.
-      try {
-        await fetch('/api/onboarding', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        })
-        await fetch('/api/onboarding', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            config: { welcome_tour_seen: new Date().toISOString() },
-          }),
-        })
-      } catch {
-        // silent — användaren landar på dashboard ändå
-      }
+      // Kritiskt anrop — måste lyckas innan vi navigerar.
+      const res = await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (!res.ok) throw new Error('finalize failed')
+
+      // welcome_tour_seen är kosmetiskt — best-effort, blockerar inte klar-flödet.
+      await fetch('/api/onboarding', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          config: { welcome_tour_seen: new Date().toISOString() },
+        }),
+      }).catch(() => {})
+
+      router.push('/dashboard')
+    } catch {
+      setFinishing(false)
+      setFinishError(true)
     }
-    router.push('/dashboard')
   }, [data.businessId, router])
 
   const setDataUpdater = useCallback(
@@ -251,6 +274,54 @@ export default function OnboardingPage() {
         )}
         {step === 6 && <Step6LiveTour onFinish={finish} data={data} />}
       </div>
+
+      {/* Finalize-fel (Fynd 6): navigera ALDRIG till dashboarden på ett
+          misslyckat finalize-anrop — visa fel + låt kunden försöka igen. */}
+      {step === 6 && finishError && (
+        <div
+          role="alert"
+          style={{
+            position: 'fixed',
+            left: '50%',
+            bottom: 24,
+            transform: 'translateX(-50%)',
+            zIndex: 100,
+            background: '#fff',
+            border: '1px solid #FECACA',
+            borderRadius: 12,
+            padding: '14px 18px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            maxWidth: 'calc(100vw - 32px)',
+          }}
+        >
+          <span style={{ fontSize: 13, color: '#B91C1C', fontWeight: 500 }}>
+            Något gick fel när vi avslutade — försök igen.
+          </span>
+          <button
+            type="button"
+            onClick={finish}
+            disabled={finishing}
+            style={{
+              padding: '8px 14px',
+              background: '#0F766E',
+              color: '#fff',
+              border: 0,
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: finishing ? 'default' : 'pointer',
+              opacity: finishing ? 0.6 : 1,
+              flexShrink: 0,
+              fontFamily: 'inherit',
+            }}
+          >
+            {finishing ? 'Försöker…' : 'Försök igen'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

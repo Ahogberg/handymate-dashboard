@@ -12,12 +12,13 @@ interface HeaderProps {
 
 /**
  * Återanvändbar onboarding-header: bakåt-knapp + progress-prickar + skip.
- * Per Claude Designs spec — fyra prickar för fyra interaktiva steg
- * (Step 1 är passivt välkomstskärm utan progress).
+ * Fem prickar för de fem interaktiva stegen (Business, Arbetssätt, Telefon,
+ * Betalning, Import) — Step 1 (välkomst) och Step 6 (live tour) är passiva
+ * payoff-skärmar utan progress.
  */
 export default function OnboardingHeader({
   step = 0,
-  total = 4,
+  total = 5,
   onBack,
   onSkip,
   hideProgress = false,

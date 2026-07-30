@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { logAutomationActivity } from '@/lib/automations'
 import Stripe from 'stripe'
 
 function getStripe() {
@@ -239,6 +240,16 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
           error: phoneResult.error,
           details: phoneResult.details,
         })
+        // Fångas av driftlarm-cronen (/api/cron/driftlarm sveper
+        // automation_activity där status='failed') — annars försvinner
+        // felet spårlöst i loggarna och ingen märker att kunden saknar nummer.
+        await logAutomationActivity({
+          businessId,
+          automationType: 'phone_provisioning',
+          action: 'purchase_and_assign_number',
+          description: `Telefonnummer kunde inte provisioneras vid onboarding: ${phoneResult.error || 'okänt fel'}`,
+          status: 'failed',
+        }).catch(() => { /* best-effort — betalningen är redan genomförd */ })
       } else {
         console.log('[Billing webhook] Telefon provisionerat (onboarding):', {
           businessId,
@@ -250,6 +261,13 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
       // Icke-blockerande — betalningen är redan genomförd. Kunden kan
       // provisionera numret senare via Inställningar om detta fallerar.
       console.error('[Billing webhook] Telefon-provisionering kastade (onboarding):', err)
+      await logAutomationActivity({
+        businessId,
+        automationType: 'phone_provisioning',
+        action: 'purchase_and_assign_number',
+        description: `Telefonnummer-provisionering kastade ett fel vid onboarding: ${err instanceof Error ? err.message : String(err)}`,
+        status: 'failed',
+      }).catch(() => { /* best-effort — betalningen är redan genomförd */ })
     }
   }
 

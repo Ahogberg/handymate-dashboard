@@ -443,8 +443,12 @@ export default function DashboardPage() {
           </Link>
         )}
 
-        {/* Phone setup banner — show when phone not configured and onboarding dismissed */}
-        {!showOnboarding && onboardingData && !onboardingData.assigned_phone_number && (
+        {/* Telefonvarning — visas OAVSETT checklist-läge (showOnboarding) när
+            numret saknas eller fortfarande är en legacy-platshållare, se
+            app/onboarding/components/Step4PhoneNumber.tsx:LEGACY_PLACEHOLDER.
+            Tidigare doldes den bakom !showOnboarding, vilket gjorde att en
+            kund med pågående nummerprovisionering aldrig fick veta det. */}
+        {onboardingData && (!onboardingData.assigned_phone_number || onboardingData.assigned_phone_number === '+46 76 000 00 00') && (
           <Link href="/dashboard/settings/phone">
             <div className="mb-6 p-4 bg-primary-50 border border-[#E2E8F0] rounded-xl hover:border-primary-300 transition-all cursor-pointer">
               <div className="flex items-center justify-between">
@@ -454,15 +458,15 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <p className="font-medium text-gray-900">
-                      Koppla ditt nummer och missa aldrig ett samtal igen
+                      Ditt telefonnummer är inte klart ännu
                     </p>
                     <p className="text-sm text-gray-500">
-                      Det tar bara 5 minuter.
+                      Vi jobbar på det. Samtal kopplas inte förrän det är på plats.
                     </p>
                   </div>
                 </div>
                 <span className="text-secondary-700 font-medium text-sm flex items-center gap-1">
-                  Kom igång <ArrowRight className="w-4 h-4" />
+                  Mer info <ArrowRight className="w-4 h-4" />
                 </span>
               </div>
             </div>

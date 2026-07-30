@@ -140,7 +140,7 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
 
   return (
     <div className="ob-screen">
-      <OnboardingHeader step={5} total={7} onBack={onBack} onSkip={onNext} />
+      <OnboardingHeader step={4} total={5} onBack={onBack} onSkip={onNext} />
       <div className="ob-body">
         {/* A. Val-skärm */}
         {view === 'choose' && (
