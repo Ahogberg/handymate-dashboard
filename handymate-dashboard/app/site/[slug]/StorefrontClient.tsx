@@ -93,13 +93,16 @@ interface ColorScheme {
 }
 
 const COLOR_SCHEMES: Record<string, ColorScheme> = {
+  // Default-schemat (nyckeln heter 'blue' av historiska skäl men är
+  // Handymate-teal): gradienten var tidigare teal→blue→indigo — driftade
+  // bort från varumärket på kundens mest synliga yta. Nu koherent teal.
   blue: {
-    gradient: 'from-teal-700 via-blue-700 to-indigo-900',
+    gradient: 'from-teal-700 via-teal-800 to-teal-950',
     accent: 'bg-teal-700',
     accentBg: 'bg-teal-50',
     accentLight: 'bg-teal-700/10',
     accentHover: 'hover:bg-teal-800',
-    accentText: 'text-sky-700',
+    accentText: 'text-primary-700',
     ring: 'focus:ring-teal-500',
   },
   green: {

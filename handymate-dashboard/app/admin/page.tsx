@@ -345,7 +345,7 @@ export default function AdminDashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -534,7 +534,7 @@ export default function AdminDashboardPage() {
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
-                    <Building2 className="w-5 h-5 text-sky-700" />
+                    <Building2 className="w-5 h-5 text-primary-700" />
                   </div>
                   <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Totalt</span>
                 </div>
@@ -738,7 +738,7 @@ export default function AdminDashboardPage() {
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center group-hover:bg-primary-300 transition-colors">
-                      <UserPlus className="w-5 h-5 text-sky-700" />
+                      <UserPlus className="w-5 h-5 text-primary-700" />
                     </div>
                     <div>
                       <p className="font-medium text-gray-900">Pilot Onboarding</p>

@@ -683,7 +683,7 @@ export default function DocumentsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -835,7 +835,7 @@ export default function DocumentsPage() {
                     >
                       <div className="flex items-start gap-4">
                         <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                          {doc.template?.category ? getCategoryIcon(doc.template.category.icon, 'w-5 h-5 text-sky-700') : <FileText className="w-5 h-5 text-sky-700" />}
+                          {doc.template?.category ? getCategoryIcon(doc.template.category.icon, 'w-5 h-5 text-primary-700') : <FileText className="w-5 h-5 text-primary-700" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-1">
@@ -874,7 +874,7 @@ export default function DocumentsPage() {
                           {doc.status === 'draft' && (
                             <button
                               onClick={() => openEdit(doc)}
-                              className="p-2 text-gray-500 hover:text-sky-700 hover:bg-gray-100 rounded-lg transition-all"
+                              className="p-2 text-gray-500 hover:text-primary-700 hover:bg-gray-100 rounded-lg transition-all"
                               title="Redigera"
                             >
                               <PenTool className="w-4 h-4" />
@@ -928,7 +928,7 @@ export default function DocumentsPage() {
                           <h3 className="text-sm font-medium text-gray-900 truncate mb-1">{file.file_name}</h3>
                           <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
                             <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
-                              file.source === 'customer' ? 'bg-primary-50 text-sky-700' : 'bg-primary-50 text-primary-700'
+                              file.source === 'customer' ? 'bg-primary-50 text-primary-700' : 'bg-primary-50 text-primary-700'
                             }`}>
                               {file.source === 'customer' ? <Users className="w-3 h-3" /> : <FolderKanban className="w-3 h-3" />}
                               {file.source === 'customer' ? 'Kund' : 'Projekt'}
@@ -955,7 +955,7 @@ export default function DocumentsPage() {
                           <button
                             type="button"
                             onClick={() => openUploadedFile(file)}
-                            className="p-2 text-gray-500 hover:text-sky-700 hover:bg-gray-100 rounded-lg transition-all"
+                            className="p-2 text-gray-500 hover:text-primary-700 hover:bg-gray-100 rounded-lg transition-all"
                             title="Öppna fil"
                           >
                             <ExternalLink className="w-4 h-4" />
@@ -990,14 +990,14 @@ export default function DocumentsPage() {
                     >
                       <div className="flex items-start gap-3 mb-3">
                         <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                          {tpl.category ? getCategoryIcon(tpl.category.icon, 'w-5 h-5 text-sky-700') : <FileText className="w-5 h-5 text-sky-700" />}
+                          {tpl.category ? getCategoryIcon(tpl.category.icon, 'w-5 h-5 text-primary-700') : <FileText className="w-5 h-5 text-primary-700" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="text-sm font-medium text-gray-900 mb-0.5">{tpl.name}</h3>
                           <p className="text-xs text-gray-400">{tpl.category?.name}</p>
                         </div>
                         {tpl.is_system ? (
-                          <span className="px-2 py-0.5 bg-primary-50 text-sky-700 text-xs rounded-full">System</span>
+                          <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">System</span>
                         ) : (
                           <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full">Egen</span>
                         )}
@@ -1013,7 +1013,7 @@ export default function DocumentsPage() {
                           >
                             <Copy className="w-3.5 h-3.5" />
                           </button>
-                          <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-sky-700 transition-colors" />
+                          <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-primary-700 transition-colors" />
                         </div>
                       </div>
                       {tpl.branch && (
@@ -1077,7 +1077,7 @@ export default function DocumentsPage() {
                               onClick={() => selectTemplate(tpl)}
                               className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 border border-[#E2E8F0] hover:border-primary-300 rounded-xl text-left transition-all"
                             >
-                              {getCategoryIcon(cat.icon, 'w-5 h-5 text-sky-700')}
+                              {getCategoryIcon(cat.icon, 'w-5 h-5 text-primary-700')}
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-900">{tpl.name}</p>
                                 <p className="text-xs text-gray-400 truncate">{tpl.description}</p>
@@ -1242,7 +1242,7 @@ export default function DocumentsPage() {
             <div className="flex-1 overflow-y-auto p-4">
               {loadingHtml ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+                  <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
                 </div>
               ) : (
                 <div className="bg-white rounded-xl overflow-hidden">
@@ -1308,7 +1308,7 @@ export default function DocumentsPage() {
                 if (section.type === 'signatures') return null
                 return (
                   <div key={idx}>
-                    {section.title && <h3 className="text-sm font-medium text-sky-700 mb-3">{section.title}</h3>}
+                    {section.title && <h3 className="text-sm font-medium text-primary-700 mb-3">{section.title}</h3>}
                     {section.fields?.map((field: any) => (
                       <div key={field.variable} className="mb-3">
                         <label className="text-xs text-gray-500 mb-1 block">{field.label}</label>

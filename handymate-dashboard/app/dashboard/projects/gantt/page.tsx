@@ -176,7 +176,7 @@ export default function GanttPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Gantt-vy</h1>
             <p className="text-gray-500 mt-1">Visualisera projekt och bokningar på en tidslinje</p>
           </div>
-          <Link href="/dashboard/projects" className="text-sm text-sky-700 hover:text-primary-700">
+          <Link href="/dashboard/projects" className="text-sm text-primary-700 hover:text-primary-700">
             ← Tillbaka till projekt
           </Link>
         </div>
@@ -277,7 +277,7 @@ export default function GanttPage() {
                       <div key={project.project_id}>
                         <div className="flex border-b border-gray-100 hover:bg-gray-50/30">
                           <div className="w-52 flex-shrink-0 px-4 py-3 border-r border-gray-200">
-                            <Link href={`/dashboard/projects/${project.project_id}`} className="text-sm font-medium text-gray-900 hover:text-sky-700 truncate block">
+                            <Link href={`/dashboard/projects/${project.project_id}`} className="text-sm font-medium text-gray-900 hover:text-primary-700 truncate block">
                               {project.name}
                             </Link>
                             <p className="text-xs text-gray-400 truncate">{project.customer?.name || ''}</p>

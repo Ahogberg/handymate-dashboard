@@ -332,7 +332,7 @@ export default function RecordingsPage() {
         {/* Info box */}
         <div className="mb-6 p-4 bg-primary-50 border border-[#E2E8F0] rounded-xl">
           <div className="flex items-start gap-3">
-            <Sparkles className="w-5 h-5 text-sky-700 mt-0.5" />
+            <Sparkles className="w-5 h-5 text-primary-700 mt-0.5" />
             <div>
               <p className="text-gray-900 font-medium">AI-analys av samtal</p>
               <p className="text-sm text-gray-500 mt-1">
@@ -400,7 +400,7 @@ export default function RecordingsPage() {
                               {recording.direction === 'inbound' ? 'Inkommande' : 'Utgående'}
                             </span>
                             {recording.transcript && (
-                              <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-sky-700 border border-[#E2E8F0]">
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-primary-700 border border-[#E2E8F0]">
                                 Transkriberad
                               </span>
                             )}
@@ -510,7 +510,7 @@ export default function RecordingsPage() {
                         <div className="p-4 bg-gray-50 rounded-xl">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
-                              <Sparkles className="w-4 h-4 text-sky-700" />
+                              <Sparkles className="w-4 h-4 text-primary-700" />
                               <p className="text-sm text-gray-500">AI-förslag</p>
                             </div>
                             <button

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getWeeklyValue, type WeeklyValue } from '@/lib/weekly-value'
 import { sendEmail, logEmail } from '@/lib/email'
-import { setBusinessPreference } from '@/lib/business-preferences'
+import { setBusinessPreference, deleteBusinessPreference } from '@/lib/business-preferences'
 
 /**
  * GET/POST /api/cron/onboarding-followup
@@ -63,13 +63,31 @@ async function runDay7Followup() {
       .in('business_id', bizIds)
 
     const alreadySent = new Set((flags || []).map((f) => f.business_id))
-    const targets = candidates.filter((b) => !alreadySent.has(b.business_id) && b.contact_email)
+    // Demokontot får ALDRIG kundlivscykel-mail (det reseedas och delas av
+    // flera personer) — samma exkludering som driftlarm-cronen.
+    const demoBusinessId = process.env.DEMO_BUSINESS_ID || null
+    const targets = candidates.filter(
+      (b) => !alreadySent.has(b.business_id) && b.contact_email && b.business_id !== demoBusinessId
+    )
 
     let sent = 0
     let failed = 0
 
     for (const biz of targets) {
       try {
+        // CLAIM-FIRST (ändrat 2026-07-31): flaggan sätts INNAN skicket. Den
+        // gamla ordningen (skicka → flagga) spammade kunden en gång per dag
+        // när flaggan tyst misslyckades (saknad unik constraint svalde
+        // upsert-felet). At-most-once är rätt semantik för ett välkomstmail:
+        // hellre ett uteblivet mail än ett dagligen upprepat. Kan flaggan
+        // inte sättas skickar vi INTE (fail-closed).
+        const claimed = await setBusinessPreference(biz.business_id, FLAG_KEY, '1', 'onboarding')
+        if (!claimed) {
+          failed++
+          console.error('[onboarding-followup] kunde inte sätta dubblettskyddet — hoppar över:', biz.business_id)
+          continue
+        }
+
         const value = await getWeeklyValue(supabase, biz.business_id)
         const firstName = (biz.contact_name || '').trim().split(/\s+/)[0] || ''
         const html = buildDay7EmailHtml(firstName, value)
@@ -90,13 +108,13 @@ async function runDay7Followup() {
         })
 
         if (result.success) {
-          // Sätt flaggan ENDAST efter lyckat skick — annars kan ett tillfälligt
-          // Resend-fel permanent tysta touchpointen för det kontot.
-          await setBusinessPreference(biz.business_id, FLAG_KEY, '1', 'onboarding')
           sent++
         } else {
           failed++
           console.error('[onboarding-followup] sendEmail failed:', biz.business_id, result.error)
+          // Rulla tillbaka claimen så morgondagens körning kan försöka igen
+          // (fönstret är 7–10 dagar just för att tåla en missad dag).
+          await deleteBusinessPreference(biz.business_id, FLAG_KEY)
         }
       } catch (err) {
         failed++

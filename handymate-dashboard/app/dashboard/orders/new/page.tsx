@@ -337,7 +337,7 @@ export default function NewOrderPage() {
                 </div>
                 <button
                   onClick={addEmptyItem}
-                  className="flex items-center gap-2 px-3 py-2 text-sm bg-primary-100 border border-[#E2E8F0] rounded-xl text-sky-700 hover:bg-primary-700/30"
+                  className="flex items-center gap-2 px-3 py-2 text-sm bg-primary-100 border border-[#E2E8F0] rounded-xl text-primary-700 hover:bg-primary-700/30"
                 >
                   <Plus className="w-4 h-4" />
                   Lägg till rad

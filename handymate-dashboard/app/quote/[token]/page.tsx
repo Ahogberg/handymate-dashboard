@@ -511,7 +511,7 @@ export default function QuoteSignPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
+          <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
           <p className="text-gray-500 text-sm">Laddar offert...</p>
         </div>
       </div>
@@ -531,7 +531,7 @@ export default function QuoteSignPage() {
           <p className="text-gray-500 mb-6">{errorMessage}</p>
           <a
             href="/"
-            className="inline-block px-6 py-3 text-sm font-medium text-sky-700 hover:text-primary-700 transition-colors"
+            className="inline-block px-6 py-3 text-sm font-medium text-primary-700 hover:text-primary-700 transition-colors"
           >
             Tillbaka till startsidan
           </a>
@@ -781,7 +781,7 @@ export default function QuoteSignPage() {
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center">
-                <FileText className="w-5 h-5 text-sky-700" />
+                <FileText className="w-5 h-5 text-primary-700" />
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-900">
@@ -927,7 +927,7 @@ export default function QuoteSignPage() {
               return (
                 <div key={type}>
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-sky-700">{group.icon}</span>
+                    <span className="text-primary-700">{group.icon}</span>
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
                       {group.label}
                     </h3>
@@ -1090,7 +1090,7 @@ export default function QuoteSignPage() {
         <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-4">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center">
-              <PenTool className="w-5 h-5 text-sky-700" />
+              <PenTool className="w-5 h-5 text-primary-700" />
             </div>
             <div>
               <h3 className="text-lg font-bold text-gray-900">Signera offerten</h3>

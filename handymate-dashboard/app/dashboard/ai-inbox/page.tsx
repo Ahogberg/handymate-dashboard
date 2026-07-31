@@ -438,8 +438,8 @@ export default function AIInboxPage() {
             }`}
           >
             <div className="flex items-center justify-between">
-              <Sparkles className={`w-5 h-5 ${statusFilter === 'all' ? 'text-sky-700' : 'text-gray-400'}`} />
-              <span className={`text-2xl font-bold ${statusFilter === 'all' ? 'text-sky-700' : 'text-gray-900'}`}>
+              <Sparkles className={`w-5 h-5 ${statusFilter === 'all' ? 'text-primary-700' : 'text-gray-400'}`} />
+              <span className={`text-2xl font-bold ${statusFilter === 'all' ? 'text-primary-700' : 'text-gray-900'}`}>
                 {stats.pending + stats.approved + stats.rejected}
               </span>
             </div>
@@ -583,13 +583,13 @@ export default function AIInboxPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {group.extractedInfo.address && (
                             <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
-                              <MapPin className="w-4 h-4 text-sky-700" />
+                              <MapPin className="w-4 h-4 text-primary-700" />
                               <span className="text-sm text-gray-700">{group.extractedInfo.address}</span>
                             </div>
                           )}
                           {group.extractedInfo.preferredDate && (
                             <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
-                              <Calendar className="w-4 h-4 text-sky-700" />
+                              <Calendar className="w-4 h-4 text-primary-700" />
                               <span className="text-sm text-gray-700">{group.extractedInfo.preferredDate}</span>
                             </div>
                           )}
@@ -633,7 +633,7 @@ export default function AIInboxPage() {
                                       : 'bg-gray-200/50'
                                   }`}>
                                     <Icon className={`w-4 h-4 ${
-                                      suggestion.status === 'pending' ? 'text-sky-700' : 'text-gray-400'
+                                      suggestion.status === 'pending' ? 'text-primary-700' : 'text-gray-400'
                                     }`} />
                                   </div>
 

@@ -374,7 +374,7 @@ export default function ImportCustomersPage() {
               
               <button
                 onClick={downloadTemplate}
-                className="flex items-center gap-2 mt-6 text-sm text-sky-700 hover:text-primary-700"
+                className="flex items-center gap-2 mt-6 text-sm text-primary-700 hover:text-primary-700"
               >
                 <Download className="w-4 h-4" />
                 Ladda ner exempelmall
@@ -447,7 +447,7 @@ export default function ImportCustomersPage() {
                         <th key={i} className="px-3 py-2 text-left text-gray-400 font-medium">
                           {header}
                           {Object.entries(mapping).find(([_, v]) => v === i) && (
-                            <span className="ml-2 text-sky-700">
+                            <span className="ml-2 text-primary-700">
                               ← {Object.entries(mapping).find(([_, v]) => v === i)?.[0]}
                             </span>
                           )}
@@ -524,8 +524,8 @@ export default function ImportCustomersPage() {
               )}
 
               {duplicateCount > 0 && (
-                <div className="p-4 bg-sky-50 border border-sky-200 rounded-xl mb-6">
-                  <p className="text-sm text-sky-700 mb-3">
+                <div className="p-4 bg-primary-50 border border-primary-200 rounded-xl mb-6">
+                  <p className="text-sm text-primary-700 mb-3">
                     {duplicateCount} kunder finns redan i systemet
                   </p>
                   <div className="flex gap-3">
@@ -533,7 +533,7 @@ export default function ImportCustomersPage() {
                       onClick={() => setSkipDuplicates(false)}
                       className={`px-4 py-2 text-sm rounded-lg border transition-all ${
                         !skipDuplicates
-                          ? 'bg-sky-100 border-sky-400 text-sky-800 font-medium'
+                          ? 'bg-primary-100 border-primary-400 text-primary-800 font-medium'
                           : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
                       }`}
                     >
@@ -543,7 +543,7 @@ export default function ImportCustomersPage() {
                       onClick={() => setSkipDuplicates(true)}
                       className={`px-4 py-2 text-sm rounded-lg border transition-all ${
                         skipDuplicates
-                          ? 'bg-sky-100 border-sky-400 text-sky-800 font-medium'
+                          ? 'bg-primary-100 border-primary-400 text-primary-800 font-medium'
                           : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
                       }`}
                     >

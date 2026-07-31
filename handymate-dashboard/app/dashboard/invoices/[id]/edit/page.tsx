@@ -181,7 +181,7 @@ export default function EditInvoicePage() {
   if (loading) {
     return (
       <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }

@@ -119,7 +119,7 @@ export default function GuardrailsEditor({ businessId, onGuardrailsChange }: Gua
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -133,9 +133,9 @@ export default function GuardrailsEditor({ businessId, onGuardrailsChange }: Gua
       )}
 
       {/* Intro */}
-      <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 flex items-start gap-3">
-        <Shield className="w-5 h-5 text-sky-700 flex-shrink-0 mt-0.5" />
-        <div className="text-sm text-sky-900 leading-relaxed">
+      <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 flex items-start gap-3">
+        <Shield className="w-5 h-5 text-primary-700 flex-shrink-0 mt-0.5" />
+        <div className="text-sm text-primary-900 leading-relaxed">
           <strong className="font-semibold">Sätt gränser för vad chattboten får svara på.</strong>{' '}
           Utan boundaries kan besökare fråga om vad som helst — juridik, konkurrenter,
           medicinska råd — och boten kan ge svar du inte vill stå för. Definiera tydligt

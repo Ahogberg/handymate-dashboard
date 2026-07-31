@@ -340,11 +340,11 @@ export default function BookingsPage() {
               <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-400">{filter === 'today' ? 'Inga bokningar idag' : 'Inga bokningar ännu'}</p>
               {customers.length > 0 ? (
-                <button onClick={openCreateModal} className="mt-4 text-sky-700 hover:text-primary-700">
+                <button onClick={openCreateModal} className="mt-4 text-primary-700 hover:text-primary-700">
                   Skapa din första bokning →
                 </button>
               ) : (
-                <a href="/dashboard/customers" className="mt-4 text-sky-700 hover:text-primary-700 block">
+                <a href="/dashboard/customers" className="mt-4 text-primary-700 hover:text-primary-700 block">
                   Skapa en kund först →
                 </a>
               )}
@@ -366,7 +366,7 @@ export default function BookingsPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         <div className="w-10 h-10 bg-[#F0FDFA] rounded-xl flex items-center justify-center border border-[#E2E8F0]">
-                          <User className="w-5 h-5 text-sky-700" />
+                          <User className="w-5 h-5 text-primary-700" />
                         </div>
                         <div className="ml-4">
                           <p className="font-medium text-gray-900">{booking.customer?.name || 'Okänd'}</p>

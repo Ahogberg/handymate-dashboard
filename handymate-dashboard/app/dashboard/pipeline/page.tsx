@@ -1494,7 +1494,7 @@ export default function PipelinePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -1769,7 +1769,7 @@ export default function PipelinePage() {
           <div className="flex-shrink-0 border-t border-gray-200 bg-white/60 backdrop-blur-sm">
             <button onClick={() => setAiPanelOpen(!aiPanelOpen)} className="w-full flex items-center justify-between px-4 lg:px-6 py-3 hover:bg-white/80 transition-colors">
               <div className="flex items-center gap-2">
-                <Bot className="w-4 h-4 text-sky-700" />
+                <Bot className="w-4 h-4 text-primary-700" />
                 <span className="text-sm font-medium text-gray-900">AI-aktivitet</span>
                 <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{aiActivities.length}</span>
               </div>
@@ -1779,7 +1779,7 @@ export default function PipelinePage() {
               <div className="max-h-64 overflow-y-auto px-4 lg:px-6 pb-4 space-y-2">
                 {aiActivities.map(act => (
                   <div key={act.id} className={`flex items-start gap-3 p-3 rounded-lg border ${act.undone_at ? 'bg-gray-50 border-gray-100 opacity-50' : 'bg-white border-gray-200'}`}>
-                    <Bot className="w-4 h-4 text-sky-700 mt-0.5 flex-shrink-0" />
+                    <Bot className="w-4 h-4 text-primary-700 mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <span className="text-sm text-gray-900">{act.description || 'AI-åtgärd'}</span>
                       {act.deal_title && <span className="text-xs text-gray-400 ml-1">({act.deal_title})</span>}

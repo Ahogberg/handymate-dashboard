@@ -100,3 +100,20 @@ ingenting. (2) Vid fynd av duplicerad beräkningslogik: fixa aldrig punktvis —
 extrahera delad kärna först, byt sedan ut alla anropsställen, och grep-verifiera
 att inga fler finns. (3) Momsfrågan ställs alltid explicit vid pengalogik:
 är basen inkl eller exkl moms, och vad kräver regeln?
+
+## 2026-07-31 — Bulk-textbyten görs ALDRIG med PowerShell Get-Content (självfångad)
+
+**Vad hände:** en global sky→primary-sweep kördes med PowerShell; Get-Content
+läste UTF-8-filerna som Windows-1252 och skrev tillbaka mojibake (å→Ã¥) i 48
+filer. Fångades direkt via diff-granskning (68 ändrade rader där 2 förväntades)
+och återställdes med git restore innan commit. Dessutom: sed-mönstret
+bg-sky-(50|100) utan ordgräns träffade bg-sky-500 (Lisas persona-färg) —
+fångades via grep-verifiering efteråt.
+
+**Regel:** (1) Bulk-ersättningar i UTF-8-filer görs med byte-säkra verktyg
+(sed via Git Bash), aldrig PowerShell-cmdlets. (2) Efter varje bulk-byte:
+granska diff-statistiken per fil — fler ändrade rader än förväntade träffar =
+stoppa och inspektera. (3) Regex mot Tailwind-klasser kräver ordgräns eller
+exakta suffix — bg-sky-50 är prefix till bg-sky-500. (4) Skyddslistan
+(persona-färger, medvetna undantag) verifieras med grep EFTER bytet, inte
+bara excluderas i mönstret.

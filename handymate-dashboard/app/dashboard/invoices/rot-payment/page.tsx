@@ -79,7 +79,7 @@ export default function RotPaymentPage() {
         Skapa en fil med dina betalda ROT/RUT-fakturor och begär utbetalningen från Skatteverket.
       </p>
 
-      <div className="ml-11 mb-6 flex items-start gap-2 p-3 bg-sky-50 border border-sky-200 rounded-xl text-sm text-sky-800">
+      <div className="ml-11 mb-6 flex items-start gap-2 p-3 bg-primary-50 border border-primary-200 rounded-xl text-sm text-primary-800">
         <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
         <span>Ladda upp den genererade XML-filen i Skatteverkets e-tjänst <strong>&quot;Rot och rut – företag&quot;</strong> och logga in med BankID. ROT och RUT laddas upp som separata filer.</span>
       </div>

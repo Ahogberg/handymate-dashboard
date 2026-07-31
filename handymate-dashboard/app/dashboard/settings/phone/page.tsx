@@ -422,7 +422,7 @@ export default function PhoneSettingsPage() {
                     }`}>
                       {step > i ? <Check className="w-4 h-4" /> : i + 1}
                     </div>
-                    <span className={`text-xs hidden sm:inline ${step === i ? 'text-sky-700 font-medium' : 'text-gray-400'}`}>{label}</span>
+                    <span className={`text-xs hidden sm:inline ${step === i ? 'text-primary-700 font-medium' : 'text-gray-400'}`}>{label}</span>
                     {i < 3 && <ChevronRight className="w-4 h-4 text-gray-300" />}
                   </div>
                 ))}
@@ -443,7 +443,7 @@ export default function PhoneSettingsPage() {
                       <PhoneForwarded className="w-6 h-6 text-primary-700" />
                       <h3 className="font-semibold text-gray-900">Vidarekoppling</h3>
                     </div>
-                    <p className="text-xs text-sky-700 font-medium mb-3">Snabbaste – 5 minuter</p>
+                    <p className="text-xs text-primary-700 font-medium mb-3">Snabbaste – 5 minuter</p>
                     <p className="text-sm text-gray-600 mb-4">
                       Ditt befintliga nummer kopplar vidare samtal till Handymate.
                     </p>
@@ -465,7 +465,7 @@ export default function PhoneSettingsPage() {
                         Liten extra kostnad per samtal
                       </div>
                     </div>
-                    <div className="mt-4 text-sky-700 font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
+                    <div className="mt-4 text-primary-700 font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
                       Välj vidarekoppling <ArrowRight className="w-4 h-4" />
                     </div>
                   </button>
@@ -473,13 +473,13 @@ export default function PhoneSettingsPage() {
                   {/* Porting card */}
                   <button
                     onClick={() => { setMethod('porting'); setStep(1) }}
-                    className="text-left p-5 bg-white rounded-xl border-2 border-gray-200 hover:border-purple-400 hover:shadow-md transition-all group"
+                    className="text-left p-5 bg-white rounded-xl border-2 border-gray-200 hover:border-primary-400 hover:shadow-md transition-all group"
                   >
                     <div className="flex items-center gap-2 mb-3">
-                      <RefreshCw className="w-6 h-6 text-purple-500" />
+                      <RefreshCw className="w-6 h-6 text-primary-600" />
                       <h3 className="font-semibold text-gray-900">Nummerportering</h3>
                     </div>
-                    <p className="text-xs text-purple-600 font-medium mb-3">Bäst – 1-2 veckor</p>
+                    <p className="text-xs text-primary-700 font-medium mb-3">Bäst – 1-2 veckor</p>
                     <p className="text-sm text-gray-600 mb-4">
                       Ditt nummer flyttas till Handymate. Samma nummer, full kontroll.
                     </p>
@@ -501,7 +501,7 @@ export default function PhoneSettingsPage() {
                         Tar 1-2 veckor
                       </div>
                     </div>
-                    <div className="mt-4 text-purple-600 font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
+                    <div className="mt-4 text-primary-700 font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
                       Välj nummerportering <ArrowRight className="w-4 h-4" />
                     </div>
                   </button>
@@ -519,7 +519,7 @@ export default function PhoneSettingsPage() {
                 {hasNumber ? (
                   <div className="mb-6">
                     <p className="text-sm text-gray-600 mb-3">Vi har tilldelat dig numret:</p>
-                    <div className="text-2xl font-mono font-bold text-sky-700 bg-primary-50 border border-[#E2E8F0] rounded-lg px-4 py-3 inline-block">
+                    <div className="text-2xl font-mono font-bold text-primary-700 bg-primary-50 border border-[#E2E8F0] rounded-lg px-4 py-3 inline-block">
                       {formatPhone(config!.assigned_phone_number!)}
                     </div>
                     <p className="text-xs text-gray-400 mt-2">Alla samtal till detta nummer spelas in och analyseras av vår AI.</p>
@@ -625,7 +625,7 @@ export default function PhoneSettingsPage() {
 
                 {/* Alternative: only when busy/no answer */}
                 <details className="mt-5 group">
-                  <summary className="cursor-pointer text-sm font-medium text-sky-700 hover:text-primary-700 flex items-center gap-1">
+                  <summary className="cursor-pointer text-sm font-medium text-primary-700 hover:text-primary-700 flex items-center gap-1">
                     <ChevronRight className="w-4 h-4 transition-transform group-open:rotate-90" />
                     Alternativ: Bara vid upptaget eller inget svar
                   </summary>
@@ -695,7 +695,7 @@ export default function PhoneSettingsPage() {
                   <div className="bg-primary-50 border border-[#E2E8F0] rounded-lg p-5 text-center">
                     <Loader2 className="w-8 h-8 text-primary-700 animate-spin mx-auto mb-3" />
                     <p className="text-primary-800 font-medium">Väntar på testsamtal...</p>
-                    <p className="text-sm text-sky-700 mt-1">
+                    <p className="text-sm text-primary-700 mt-1">
                       {verifySeconds < 120
                         ? `${Math.floor((120 - verifySeconds) / 60)}:${String((120 - verifySeconds) % 60).padStart(2, '0')} kvar`
                         : 'Tiden gick ut'
@@ -776,7 +776,7 @@ export default function PhoneSettingsPage() {
                     <button
                       onClick={submitPortingRequest}
                       disabled={!portOperator || !portPhone || portSubmitting}
-                      className="px-6 py-2.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-medium text-sm disabled:opacity-50 flex items-center gap-2"
+                      className="px-6 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium text-sm disabled:opacity-50 flex items-center gap-2"
                     >
                       {portSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                       Skicka begäran
@@ -814,7 +814,7 @@ export default function PhoneSettingsPage() {
             {[
               { icon: Phone, label: 'Kund ringer', color: 'blue' },
               { icon: PhoneForwarded, label: 'Ditt nummer', color: 'cyan' },
-              { icon: Mic, label: 'Handymate spelar in', color: 'purple' },
+              { icon: Mic, label: 'Handymate spelar in', color: 'primary' },
               { icon: Bot, label: 'AI analyserar & agerar', color: 'emerald' },
             ].map((item, i) => (
               <div key={item.label} className="flex items-center gap-0">

@@ -477,7 +477,7 @@ export default function Jobbkompisen() {
             onClick={() => setActiveTab(tab.id)}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-all ${
               activeTab === tab.id
-                ? 'text-sky-700 border-b-2 border-primary-600 bg-primary-50/50'
+                ? 'text-primary-700 border-b-2 border-primary-600 bg-primary-50/50'
                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
             }`}
           >
@@ -786,7 +786,7 @@ function VoiceTab({
       <div className="flex-1 overflow-y-auto p-4">
         {/* What AI understood */}
         <div className="mb-4 p-3 bg-primary-50 border border-primary-200 rounded-xl">
-          <p className="text-xs font-medium text-sky-700 mb-1">F\örstod:</p>
+          <p className="text-xs font-medium text-primary-700 mb-1">F\örstod:</p>
           <p className="text-sm text-gray-900">{result.understood}</p>
         </div>
 
@@ -811,11 +811,11 @@ function VoiceTab({
                   action.status === 'done' ? 'bg-emerald-100' : 'bg-primary-100'
                 }`}>
                   {executingActions.has(action.id) ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-sky-700" />
+                    <Loader2 className="w-4 h-4 animate-spin text-primary-700" />
                   ) : action.status === 'done' ? (
                     <CheckCircle className="w-4 h-4 text-emerald-600" />
                   ) : (
-                    <span className="text-sky-700">{actionIcon(action.type)}</span>
+                    <span className="text-primary-700">{actionIcon(action.type)}</span>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -995,7 +995,7 @@ function PhotoTab({
           <img src={preview} alt="" className="w-full max-h-[150px] object-cover" />
         </div>
         <div className="p-3 bg-primary-50 border border-primary-200 rounded-xl mb-4">
-          <p className="text-xs font-medium text-sky-700 mb-1">Analys</p>
+          <p className="text-xs font-medium text-primary-700 mb-1">Analys</p>
           <p className="text-sm text-gray-900 whitespace-pre-wrap">{result}</p>
         </div>
         <div className="flex gap-3">

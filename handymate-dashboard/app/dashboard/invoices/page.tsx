@@ -176,7 +176,7 @@ export default function InvoicesPage() {
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
-      case 'sent': return 'bg-primary-100 text-sky-700 border-primary-200'
+      case 'sent': return 'bg-primary-100 text-primary-700 border-primary-200'
       case 'paid': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
       case 'overdue': return 'bg-red-100 text-red-600 border-red-200'
       case 'cancelled': return 'bg-gray-100 text-gray-500 border-gray-300'
@@ -258,7 +258,7 @@ export default function InvoicesPage() {
   if (loading) {
     return (
       <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -400,7 +400,7 @@ export default function InvoicesPage() {
               <p className="text-gray-500 mb-2">Inga fakturor hittades</p>
               <Link
                 href="/dashboard/invoices/new"
-                className="text-sky-700 hover:text-primary-700 text-sm"
+                className="text-primary-700 hover:text-primary-700 text-sm"
               >
                 Skapa din första faktura
               </Link>
@@ -470,7 +470,7 @@ export default function InvoicesPage() {
                             <button
                               onClick={() => handleSend(invoice.invoice_id)}
                               disabled={sendingId === invoice.invoice_id}
-                              className="flex-1 flex items-center justify-center gap-2 p-2.5 text-sky-700 bg-primary-50 rounded-lg min-h-[44px] disabled:opacity-50"
+                              className="flex-1 flex items-center justify-center gap-2 p-2.5 text-primary-700 bg-primary-50 rounded-lg min-h-[44px] disabled:opacity-50"
                             >
                               {sendingId === invoice.invoice_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                               Skicka
@@ -530,7 +530,7 @@ export default function InvoicesPage() {
                         <tr key={invoice.invoice_id} className="hover:bg-primary-50/30 transition-colors group">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
-                              <Link href={`/dashboard/invoices/${invoice.invoice_id}`} className="font-semibold text-gray-900 hover:text-sky-700">
+                              <Link href={`/dashboard/invoices/${invoice.invoice_id}`} className="font-semibold text-gray-900 hover:text-primary-700">
                                 #{invoice.invoice_number}
                               </Link>
                               {invoice.is_credit_note && (
@@ -614,7 +614,7 @@ export default function InvoicesPage() {
 
                               <Link
                                 href={`/dashboard/invoices/${invoice.invoice_id}/edit`}
-                                className="p-2 text-gray-400 hover:text-sky-700 hover:bg-primary-50 rounded-lg transition-all"
+                                className="p-2 text-gray-400 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-all"
                                 title="Redigera"
                               >
                                 <Pencil className="w-4 h-4" />
@@ -625,7 +625,7 @@ export default function InvoicesPage() {
                                   <button
                                     onClick={() => handleSend(invoice.invoice_id)}
                                     disabled={sendingId === invoice.invoice_id}
-                                    className="p-2 text-gray-400 hover:text-sky-700 hover:bg-primary-50 rounded-lg transition-all disabled:opacity-50"
+                                    className="p-2 text-gray-400 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-all disabled:opacity-50"
                                     title="Skicka"
                                   >
                                     {sendingId === invoice.invoice_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

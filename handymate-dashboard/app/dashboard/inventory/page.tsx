@@ -178,7 +178,7 @@ export default function InventoryPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Package className="w-7 h-7 text-sky-700" />
+            <Package className="w-7 h-7 text-primary-700" />
             Lager
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -245,7 +245,7 @@ export default function InventoryPage() {
       {/* Items list */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+          <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
@@ -306,7 +306,7 @@ export default function InventoryPage() {
                       </button>
                       <button
                         onClick={() => setShowTransactionModal({ item, type: 'out' })}
-                        className="p-2 text-sky-700 hover:bg-primary-50 rounded-lg transition-colors"
+                        className="p-2 text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
                         title="Ta ut"
                       >
                         <ArrowUpCircle className="w-5 h-5" />
@@ -344,7 +344,7 @@ export default function InventoryPage() {
                   <div className="mt-4 pt-4 border-t border-gray-100">
                     <p className="text-xs font-medium text-gray-500 mb-2">Senaste transaktioner</p>
                     {historyLoading ? (
-                      <Loader2 className="w-4 h-4 text-sky-700 animate-spin" />
+                      <Loader2 className="w-4 h-4 text-primary-700 animate-spin" />
                     ) : transactions.length === 0 ? (
                       <p className="text-xs text-gray-400">Inga transaktioner</p>
                     ) : (

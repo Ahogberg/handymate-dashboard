@@ -335,7 +335,7 @@ export default function CommunicationPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-sky-700" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary-700" />
       </div>
     )
   }
@@ -373,7 +373,7 @@ export default function CommunicationPage() {
               className="focus:outline-none"
             >
               {settings.auto_enabled ? (
-                <ToggleRight className="w-10 h-10 text-sky-700" />
+                <ToggleRight className="w-10 h-10 text-primary-700" />
               ) : (
                 <ToggleLeft className="w-10 h-10 text-gray-400" />
               )}
@@ -409,13 +409,13 @@ export default function CommunicationPage() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-sky-700" />
+            <MessageSquare className="w-5 h-5 text-primary-700" />
             Senaste meddelanden
           </h2>
           {logs.length > 5 && (
             <button
               onClick={() => setShowAllLogs(!showAllLogs)}
-              className="text-sm text-sky-700 hover:text-primary-700"
+              className="text-sm text-primary-700 hover:text-primary-700"
             >
               {showAllLogs ? 'Visa färre' : `Visa alla (${logs.length})`}
             </button>
@@ -439,7 +439,7 @@ export default function CommunicationPage() {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <div className={`p-1.5 rounded-lg ${log.channel === 'sms' ? 'bg-primary-50' : 'bg-purple-50'}`}>
-                        <ChannelIcon className={`w-3.5 h-3.5 ${log.channel === 'sms' ? 'text-sky-700' : 'text-purple-600'}`} />
+                        <ChannelIcon className={`w-3.5 h-3.5 ${log.channel === 'sms' ? 'text-primary-700' : 'text-purple-600'}`} />
                       </div>
                       <span className="text-sm font-medium text-gray-900">
                         Till: {log.customer_name}
@@ -542,7 +542,7 @@ export default function CommunicationPage() {
                         setEditingRule(rule)
                         setEditTemplate(rule.message_template)
                       }}
-                      className="p-2 text-gray-400 hover:text-sky-700 hover:bg-primary-50 rounded-lg"
+                      className="p-2 text-gray-400 hover:text-primary-700 hover:bg-primary-50 rounded-lg"
                       title="Redigera mall"
                     >
                       <Pencil className="w-4 h-4" />
@@ -553,7 +553,7 @@ export default function CommunicationPage() {
                       title={rule.is_enabled ? 'Inaktivera' : 'Aktivera'}
                     >
                       {rule.is_enabled ? (
-                        <ToggleRight className="w-8 h-8 text-sky-700" />
+                        <ToggleRight className="w-8 h-8 text-primary-700" />
                       ) : (
                         <ToggleLeft className="w-8 h-8 text-gray-400" />
                       )}
@@ -728,7 +728,7 @@ export default function CommunicationPage() {
                     <button
                       key={v}
                       onClick={() => setEditTemplate(editTemplate + v)}
-                      className="px-2 py-1 text-xs bg-primary-50 text-sky-700 rounded-md hover:bg-primary-100"
+                      className="px-2 py-1 text-xs bg-primary-50 text-primary-700 rounded-md hover:bg-primary-100"
                     >
                       {v}
                     </button>

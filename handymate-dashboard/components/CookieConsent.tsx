@@ -29,7 +29,7 @@ export default function CookieConsent() {
         <div className="flex-1 min-w-0">
           <p className="text-sm text-gray-700">
             Vi använder cookies för att förbättra din upplevelse.{' '}
-            <Link href="/privacy" className="text-sky-700 hover:underline">
+            <Link href="/privacy" className="text-primary-700 hover:underline">
               Läs vår integritetspolicy
             </Link>
           </p>

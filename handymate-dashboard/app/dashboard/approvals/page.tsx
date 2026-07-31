@@ -88,14 +88,14 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   send_sms: { label: 'SMS', icon: MessageSquare, bgColor: 'bg-blue-50', textColor: 'text-blue-600' },
   send_quote: { label: 'Offert', icon: FileText, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   send_invoice: { label: 'Faktura', icon: Receipt, bgColor: 'bg-green-50', textColor: 'text-green-600' },
-  create_booking: { label: 'Bokning', icon: Calendar, bgColor: 'bg-purple-50', textColor: 'text-purple-600' },
+  create_booking: { label: 'Bokning', icon: Calendar, bgColor: 'bg-cyan-50', textColor: 'text-cyan-700' },
   autopilot_package: { label: 'Autopilot', icon: Zap, bgColor: 'bg-amber-50', textColor: 'text-amber-600' },
-  quote_nudge: { label: 'Manuell åtgärd', icon: Phone, bgColor: 'bg-sky-50', textColor: 'text-sky-700' },
+  quote_nudge: { label: 'Manuell åtgärd', icon: Phone, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   low_stock_alert: { label: 'Lager', icon: Package, bgColor: 'bg-red-50', textColor: 'text-red-600' },
   seasonal_campaign: { label: 'Säsong', icon: Calendar, bgColor: 'bg-orange-50', textColor: 'text-orange-600' },
-  time_attestation: { label: 'Tid', icon: Clock, bgColor: 'bg-sky-50', textColor: 'text-sky-600' },
+  time_attestation: { label: 'Tid', icon: Clock, bgColor: 'bg-primary-50', textColor: 'text-primary-600' },
   create_invoice_from_report: { label: 'Faktura', icon: Receipt, bgColor: 'bg-green-50', textColor: 'text-green-600' },
-  dispatch_suggestion: { label: 'Tilldelning', icon: Zap, bgColor: 'bg-violet-50', textColor: 'text-violet-600' },
+  dispatch_suggestion: { label: 'Tilldelning', icon: Zap, bgColor: 'bg-slate-100', textColor: 'text-slate-600' },
   review_request: { label: 'Recension', icon: Star, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
   publish_microsite: { label: 'Hemsida', icon: Globe, bgColor: 'bg-teal-50', textColor: 'text-teal-700' },
   // Förtjänad autonomi: erbjudande om att låta agenten sköta typen själv.
@@ -670,9 +670,9 @@ export default function ApprovalsPage() {
                         {approval.approval_type === 'time_attestation' && approval.payload && (() => {
                           const pl = approval.payload as any
                           return (
-                            <div className="mt-2 bg-sky-50 rounded-lg p-3 space-y-2">
+                            <div className="mt-2 bg-primary-50 rounded-lg p-3 space-y-2">
                               <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center text-xs font-semibold text-sky-700">
+                                <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-xs font-semibold text-primary-700">
                                   {(pl.user_name || '??').slice(0, 2).toUpperCase()}
                                 </div>
                                 <div>

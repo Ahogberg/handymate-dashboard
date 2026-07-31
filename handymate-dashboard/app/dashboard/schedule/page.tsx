@@ -802,7 +802,7 @@ export default function SchedulePage() {
   if (loading) {
     return (
       <div className="pt-16 sm:pt-8 p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -1072,7 +1072,7 @@ export default function SchedulePage() {
                 <th
                   key={day.toISOString()}
                   className={`text-center text-xs font-medium py-3 px-1 ${
-                    isToday(day) ? 'text-sky-700' : 'text-gray-400'
+                    isToday(day) ? 'text-primary-700' : 'text-gray-400'
                   } ${getDay(day) === 0 || getDay(day) === 6 ? 'opacity-50' : ''}`}
                 >
                   <div>{format(day, 'EEE', { locale: sv })}</div>
@@ -1160,7 +1160,7 @@ export default function SchedulePage() {
           {/* Team heading */}
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-900">Team</h3>
-            <button onClick={toggleAll} className="text-xs text-sky-700 hover:text-primary-700">
+            <button onClick={toggleAll} className="text-xs text-primary-700 hover:text-primary-700">
               {allSelected ? 'Avmarkera' : 'Markera alla'}
             </button>
           </div>
@@ -1219,7 +1219,7 @@ export default function SchedulePage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold text-gray-900">Ledighetsansokningar</h3>
-                <span className="text-xs bg-primary-100 text-sky-700 px-2 py-0.5 rounded-full">
+                <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">
                   {timeOffRequests.length}
                 </span>
               </div>
@@ -1410,7 +1410,7 @@ export default function SchedulePage() {
                       onClick={() => setEntryForm({ ...entryForm, type: opt.value })}
                       className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
                         entryForm.type === opt.value
-                          ? 'bg-primary-100 text-sky-700 border border-primary-600/40'
+                          ? 'bg-primary-100 text-primary-700 border border-primary-600/40'
                           : 'bg-gray-100 text-gray-500 border border-gray-300 hover:border-gray-300'
                       }`}
                     >
@@ -1618,7 +1618,7 @@ export default function SchedulePage() {
           <div className="absolute top-28 left-4 right-4 bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-900">Filtrera team</h3>
-              <button onClick={toggleAll} className="text-xs text-sky-700 hover:text-primary-700">
+              <button onClick={toggleAll} className="text-xs text-primary-700 hover:text-primary-700">
                 {allSelected ? 'Avmarkera' : 'Markera alla'}
               </button>
             </div>
@@ -1670,7 +1670,7 @@ export default function SchedulePage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-[#F0FDFA] rounded-xl flex items-center justify-center border border-[#E2E8F0]">
-              <CalendarDays className="w-5 h-5 text-sky-700" />
+              <CalendarDays className="w-5 h-5 text-primary-700" />
             </div>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Resursplanering</h1>
@@ -1834,7 +1834,7 @@ export default function SchedulePage() {
                                 </p>
                                 <p
                                   className={`text-lg font-semibold ${
-                                    today ? 'text-sky-700' : 'text-gray-900'
+                                    today ? 'text-primary-700' : 'text-gray-900'
                                   }`}
                                 >
                                   {format(day, 'd')}
@@ -1864,7 +1864,7 @@ export default function SchedulePage() {
                             </p>
                             <p
                               className={`text-lg font-semibold ${
-                                isToday(currentDate) ? 'text-sky-700' : 'text-gray-900'
+                                isToday(currentDate) ? 'text-primary-700' : 'text-gray-900'
                               }`}
                             >
                               {format(currentDate, 'd MMMM', { locale: sv })}
@@ -1886,7 +1886,7 @@ export default function SchedulePage() {
                       <p className="text-gray-400">Inga poster under denna period</p>
                       <button
                         onClick={() => openCreateModal()}
-                        className="mt-4 text-sky-700 hover:text-primary-700 text-sm"
+                        className="mt-4 text-primary-700 hover:text-primary-700 text-sm"
                       >
                         Lagg till en post
                       </button>

@@ -152,7 +152,7 @@ export default function BookingDetailPage() {
   if (loading) {
     return (
       <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -198,7 +198,7 @@ export default function BookingDetailPage() {
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Bokningsinformation</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-start gap-3">
-                  <Calendar className="w-5 h-5 text-sky-700 mt-0.5" />
+                  <Calendar className="w-5 h-5 text-primary-700 mt-0.5" />
                   <div>
                     <p className="text-sm text-gray-400">Datum & tid</p>
                     <p className="text-gray-900">{formatDateTime(booking.scheduled_start)}</p>

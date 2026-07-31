@@ -1691,7 +1691,7 @@ export default function SettingsPage() {
               className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-300 hover:border-primary-300 transition-all group"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-sky-600/20 to-sky-500/20 border border-sky-300">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-primary-600/20 to-primary-500/20 border border-primary-300">
                   <FileText className="w-5 h-5 text-secondary-700" />
                 </div>
                 <div>

@@ -107,7 +107,7 @@ export default function AIQuotePreview({
       {/* Header with confidence */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-sky-700" />
+          <Sparkles className="w-5 h-5 text-primary-700" />
           <h2 className="text-lg font-semibold text-gray-900">AI-förslag</h2>
         </div>
         <span className={`text-sm font-medium ${confidenceColor}`}>

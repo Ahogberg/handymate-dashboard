@@ -148,7 +148,7 @@ export default function CampaignsPage() {
                 <p className="text-2xl font-bold text-gray-900">{campaigns.length}</p>
               </div>
               <div className="p-3 rounded-xl bg-primary-100">
-                <Megaphone className="w-5 h-5 text-sky-700" />
+                <Megaphone className="w-5 h-5 text-primary-700" />
               </div>
             </div>
           </div>
@@ -223,7 +223,7 @@ export default function CampaignsPage() {
               </p>
               <Link 
                 href="/dashboard/campaigns/new" 
-                className="text-sky-700 hover:text-primary-700 text-sm"
+                className="text-primary-700 hover:text-primary-700 text-sm"
               >
                 Skapa din första kampanj →
               </Link>
@@ -235,7 +235,7 @@ export default function CampaignsPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center flex-1 min-w-0">
                       <div className="w-10 h-10 bg-[#F0FDFA] rounded-xl flex items-center justify-center border border-[#E2E8F0] mr-4">
-                        <MessageSquare className="w-5 h-5 text-sky-700" />
+                        <MessageSquare className="w-5 h-5 text-primary-700" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3">
@@ -289,7 +289,7 @@ export default function CampaignsPage() {
                         {campaign.status === 'sent' && (
                           <Link
                             href={`/dashboard/campaigns/${campaign.campaign_id}`}
-                            className="px-3 py-1.5 text-xs font-medium text-sky-700 hover:text-primary-700 bg-primary-50 border border-[#E2E8F0] rounded-lg"
+                            className="px-3 py-1.5 text-xs font-medium text-primary-700 hover:text-primary-700 bg-primary-50 border border-[#E2E8F0] rounded-lg"
                           >
                             Visa resultat
                           </Link>

@@ -679,7 +679,7 @@ export default function CustomerDetailPage() {
   if (loading) {
     return (
       <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -863,7 +863,7 @@ export default function CustomerDetailPage() {
                   <button
                     type="button"
                     onClick={() => setShowSendSMSModal(true)}
-                    className="flex-1 min-w-[60px] flex flex-col items-center justify-center gap-1.5 min-h-[64px] p-2 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 transition-all"
+                    className="flex-1 min-w-[60px] flex flex-col items-center justify-center gap-1.5 min-h-[64px] p-2 rounded-xl border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-all"
                   >
                     <MessageSquare className="w-5 h-5" />
                     <span className="text-xs font-medium">SMS</span>
@@ -906,7 +906,7 @@ export default function CustomerDetailPage() {
                   onClick={() => setShowLogCallModal(true)}
                   className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
                 >
-                  <PhoneCall className="w-4 h-4 text-sky-700" />
+                  <PhoneCall className="w-4 h-4 text-primary-700" />
                   <span className="text-gray-900 text-sm">Logga samtal</span>
                 </button>
 
@@ -1185,7 +1185,7 @@ export default function CustomerDetailPage() {
                   <div className="p-8 text-center">
                     <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                     <p className="text-gray-400">Inga bokningar</p>
-                    <Link href="/dashboard/bookings" className="text-sm text-sky-700 hover:text-primary-700 mt-2 inline-block">
+                    <Link href="/dashboard/bookings" className="text-sm text-primary-700 hover:text-primary-700 mt-2 inline-block">
                       Skapa första bokningen →
                     </Link>
                   </div>
@@ -1313,7 +1313,7 @@ export default function CustomerDetailPage() {
                             <button
                               type="button"
                               onClick={() => openDocument(doc)}
-                              className="p-2.5 text-gray-400 hover:text-sky-700 hover:bg-primary-50 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+                              className="p-2.5 text-gray-400 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
                               title="Öppna"
                             >
                               <Download className="w-4 h-4" />

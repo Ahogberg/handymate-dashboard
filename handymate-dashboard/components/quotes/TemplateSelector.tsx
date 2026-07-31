@@ -112,7 +112,7 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
 
       {loading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+          <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
         </div>
       ) : sortedTemplates.length === 0 ? (
         <div className="text-center py-8">
@@ -153,7 +153,7 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
                       </span>
                     )}
                     {t.category && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary-100 text-sky-700 rounded">
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary-100 text-primary-700 rounded">
                         {t.category}
                       </span>
                     )}

@@ -391,7 +391,7 @@ const messageSuggestions = [
                         : 'bg-gray-50 border-gray-300 hover:border-gray-300'
                     }`}
                   >
-                    <f.icon className={`w-5 h-5 mb-2 ${filterType === f.id ? 'text-sky-700' : 'text-gray-400'}`} />
+                    <f.icon className={`w-5 h-5 mb-2 ${filterType === f.id ? 'text-primary-700' : 'text-gray-400'}`} />
                     <p className={`text-sm font-medium ${filterType === f.id ? 'text-gray-900' : 'text-gray-700'}`}>
                       {f.label}
                     </p>
@@ -414,7 +414,7 @@ const messageSuggestions = [
                         className="w-full pl-10 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
                       />
                     </div>
-                    <button onClick={selectAll} className="text-sm text-sky-700 hover:text-primary-700">
+                    <button onClick={selectAll} className="text-sm text-primary-700 hover:text-primary-700">
                       Välj alla
                     </button>
                     <button onClick={deselectAll} className="text-sm text-gray-400 hover:text-gray-700">
@@ -440,7 +440,7 @@ const messageSuggestions = [
                           type="checkbox"
                           checked={selectedCustomers.has(customer.customer_id)}
                           onChange={() => toggleCustomer(customer.customer_id)}
-                          className="w-4 h-4 rounded border-gray-300 bg-gray-200 text-sky-700 focus:ring-primary-600/50 mr-3"
+                          className="w-4 h-4 rounded border-gray-300 bg-gray-200 text-primary-700 focus:ring-primary-600/50 mr-3"
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{customer.name || 'Okänd'}</p>
@@ -461,7 +461,7 @@ const messageSuggestions = [
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-primary-100">
-                    <Users className="w-5 h-5 text-sky-700" />
+                    <Users className="w-5 h-5 text-primary-700" />
                   </div>
                   <div>
                     <p className="text-gray-900 font-medium">{recipientCount} mottagare</p>
@@ -507,7 +507,7 @@ const messageSuggestions = [
           }`}
         >
           <div className="flex items-center gap-3 mb-2">
-            <MessageSquare className={`w-5 h-5 ${campaignType === 'interactive' ? 'text-sky-700' : 'text-gray-400'}`} />
+            <MessageSquare className={`w-5 h-5 ${campaignType === 'interactive' ? 'text-primary-700' : 'text-gray-400'}`} />
             <span className={`font-medium ${campaignType === 'interactive' ? 'text-gray-900' : 'text-gray-700'}`}>
               Interaktiv
             </span>
@@ -526,7 +526,7 @@ const messageSuggestions = [
           }`}
         >
           <div className="flex items-center gap-3 mb-2">
-            <Send className={`w-5 h-5 ${campaignType === 'broadcast' ? 'text-sky-700' : 'text-gray-400'}`} />
+            <Send className={`w-5 h-5 ${campaignType === 'broadcast' ? 'text-primary-700' : 'text-gray-400'}`} />
             <span className={`font-medium ${campaignType === 'broadcast' ? 'text-gray-900' : 'text-gray-700'}`}>
               Broadcast
             </span>
@@ -609,7 +609,7 @@ const messageSuggestions = [
 
       {/* Förslag */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <Sparkles className="w-4 h-4 text-sky-700" />
+        <Sparkles className="w-4 h-4 text-primary-700" />
         <span className="text-sm text-gray-500">Förslag:</span>
         {messageSuggestions.map((s, i) => (
           <button
@@ -731,7 +731,7 @@ const messageSuggestions = [
   <span className="text-gray-900 font-medium flex items-center gap-2">
     {campaignType === 'interactive' ? (
       <>
-        <Sparkles className="w-4 h-4 text-sky-700" />
+        <Sparkles className="w-4 h-4 text-primary-700" />
         Interaktiv (AI-svar)
       </>
     ) : (
@@ -758,7 +758,7 @@ const messageSuggestions = [
                         : 'bg-gray-50 border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <Send className={`w-5 h-5 ${scheduleType === 'now' ? 'text-sky-700' : 'text-gray-400'}`} />
+                    <Send className={`w-5 h-5 ${scheduleType === 'now' ? 'text-primary-700' : 'text-gray-400'}`} />
                     <div>
                       <p className={`text-sm font-medium ${scheduleType === 'now' ? 'text-gray-900' : 'text-gray-700'}`}>Skicka nu</p>
                       <p className="text-xs text-gray-400">Skickas direkt</p>
@@ -772,7 +772,7 @@ const messageSuggestions = [
                         : 'bg-gray-50 border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <CalendarClock className={`w-5 h-5 ${scheduleType === 'later' ? 'text-sky-700' : 'text-gray-400'}`} />
+                    <CalendarClock className={`w-5 h-5 ${scheduleType === 'later' ? 'text-primary-700' : 'text-gray-400'}`} />
                     <div>
                       <p className={`text-sm font-medium ${scheduleType === 'later' ? 'text-gray-900' : 'text-gray-700'}`}>Schemalägg</p>
                       <p className="text-xs text-gray-400">Välj datum & tid</p>

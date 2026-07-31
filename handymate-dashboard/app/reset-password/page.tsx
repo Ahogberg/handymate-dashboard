@@ -110,7 +110,7 @@ function ResetPasswordForm() {
         <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8">
           {sessionValid === null ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin text-sky-700" />
+              <Loader2 className="w-8 h-8 animate-spin text-primary-700" />
             </div>
           ) : sessionValid === false ? (
             <div className="text-center py-4">
@@ -123,7 +123,7 @@ function ResetPasswordForm() {
               </p>
               <a
                 href="/forgot-password"
-                className="text-sky-700 hover:text-primary-700 text-sm"
+                className="text-primary-700 hover:text-primary-700 text-sm"
               >
                 Begär en ny länk
               </a>
@@ -137,7 +137,7 @@ function ResetPasswordForm() {
               <p className="text-gray-500 text-sm mb-4">
                 Du kan nu logga in med ditt nya lösenord.
               </p>
-              <Loader2 className="w-5 h-5 animate-spin text-sky-700 mx-auto" />
+              <Loader2 className="w-5 h-5 animate-spin text-primary-700 mx-auto" />
               <p className="text-gray-400 text-xs mt-2">Omdirigerar till inloggning...</p>
             </div>
           ) : (

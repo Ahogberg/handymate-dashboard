@@ -186,7 +186,7 @@ export default function WeekView() {
                         key={day.date}
                         className={`p-3 text-center ${isToday ? 'ring-2 ring-inset ring-primary-500' : ''}`}
                       >
-                        <p className={`text-xs font-medium mb-1 ${isToday ? 'text-sky-700' : 'text-gray-500'}`}>
+                        <p className={`text-xs font-medium mb-1 ${isToday ? 'text-primary-700' : 'text-gray-500'}`}>
                           {DAY_NAMES[i]}
                         </p>
                         <div className={`rounded-lg p-2 border ${getDayColor(day, data!.config.dailyLimit)}`}>

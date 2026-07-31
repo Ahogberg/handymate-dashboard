@@ -98,7 +98,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -166,7 +166,7 @@ export default function ProfilePage() {
       {/* Edit form card */}
       <div className="relative bg-white rounded-xl border border-[#E2E8F0] p-6 mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
-          <User className="w-5 h-5 text-sky-700" />
+          <User className="w-5 h-5 text-primary-700" />
           Redigera profil
         </h3>
 
@@ -242,7 +242,7 @@ export default function ProfilePage() {
       {/* Info card */}
       <div className="relative bg-white rounded-xl border border-[#E2E8F0] p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
-          <Shield className="w-5 h-5 text-sky-700" />
+          <Shield className="w-5 h-5 text-primary-700" />
           Kontoinformation
         </h3>
 
@@ -297,7 +297,7 @@ export default function ProfilePage() {
       {/* Connected Calendars */}
       <div className="relative bg-white rounded-xl border border-[#E2E8F0] p-6 mt-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
-          <CalendarDays className="w-5 h-5 text-sky-700" />
+          <CalendarDays className="w-5 h-5 text-primary-700" />
           Anslutna kalendrar
         </h3>
 

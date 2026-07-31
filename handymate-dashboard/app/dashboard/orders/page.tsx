@@ -223,7 +223,7 @@ export default function OrdersPage() {
           <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
-                <Package className="w-5 h-5 text-sky-700" />
+                <Package className="w-5 h-5 text-primary-700" />
               </div>
               <div>
                 <p className="text-xl font-bold text-gray-900">{stats.total}</p>
@@ -307,7 +307,7 @@ export default function OrdersPage() {
               <p className="text-gray-500 mb-2">Inga beställningar hittades</p>
               <Link
                 href="/dashboard/orders/new"
-                className="text-sky-700 hover:text-primary-700 text-sm"
+                className="text-primary-700 hover:text-primary-700 text-sm"
               >
                 Skapa din första beställning →
               </Link>
@@ -319,7 +319,7 @@ export default function OrdersPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-start gap-4">
                       <div className="w-10 h-10 bg-[#F0FDFA] rounded-xl flex items-center justify-center border border-[#E2E8F0]">
-                        <Package className="w-5 h-5 text-sky-700" />
+                        <Package className="w-5 h-5 text-primary-700" />
                       </div>
                       <div>
                         <div className="flex items-center gap-3">

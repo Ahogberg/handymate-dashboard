@@ -314,7 +314,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -367,7 +367,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                 <p className="text-xs text-gray-400">Aktiva</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-sky-700">{stats.withPhone}</p>
+                <p className="text-2xl font-bold text-primary-700">{stats.withPhone}</p>
                 <p className="text-xs text-gray-400">Med nummer</p>
               </div>
             </div>
@@ -377,7 +377,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
         {/* Create Form */}
         <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Plus className="w-5 h-5 text-sky-700" />
+            <Plus className="w-5 h-5 text-primary-700" />
             Onboarda ny pilot
           </h2>
 
@@ -409,7 +409,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                   <p className="text-sm text-gray-500">Meddelande till piloten:</p>
                   <button
                     onClick={copyToClipboard}
-                    className="flex items-center gap-1 px-3 py-1 text-sm text-sky-700 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
+                    className="flex items-center gap-1 px-3 py-1 text-sm text-primary-700 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
                   >
                     {copied ? (
                       <>
@@ -608,7 +608,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                       </td>
                       <td className="px-4 py-3">
                         {pilot.assignedPhoneNumber ? (
-                          <code className="text-sm text-sky-700 bg-primary-50 px-2 py-1 rounded">
+                          <code className="text-sm text-primary-700 bg-primary-50 px-2 py-1 rounded">
                             {pilot.assignedPhoneNumber}
                           </code>
                         ) : (
@@ -624,7 +624,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                       <td className="px-4 py-3">
                         <button
                           onClick={() => handleImpersonate(pilot.businessId)}
-                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-sky-700 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary-700 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
                         >
                           <LogIn className="w-3 h-3" />
                           Logga in som

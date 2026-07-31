@@ -491,7 +491,7 @@ export default function DashboardPage() {
             // (visa ingenting förrän vi vet, annars flimrar reminder-1 fram
             // och försvinner när svaret kommer).
             if (websiteUrl && !dismissedReminders.has('website_widget')) {
-              reminders.push({ id: 'website_widget', icon: Globe, bgColor: 'bg-sky-50', border: 'border-sky-200', iconBg: 'bg-sky-100', iconColor: 'text-sky-600', title: 'Du har redan en hemsida — lägg till AI-assistenten', desc: 'Klistra in en kodsnutt för AI-chatt, och koppla Google-recensioner under Inställningar.', href: '/dashboard/settings/website-widget', cta: 'Hämta koden' })
+              reminders.push({ id: 'website_widget', icon: Globe, bgColor: 'bg-primary-50', border: 'border-primary-200', iconBg: 'bg-primary-100', iconColor: 'text-primary-600', title: 'Du har redan en hemsida — lägg till AI-assistenten', desc: 'Klistra in en kodsnutt för AI-chatt, och koppla Google-recensioner under Inställningar.', href: '/dashboard/settings/website-widget', cta: 'Hämta koden' })
             } else if (websiteUrl === null && !storefrontInfo?.is_published && !dismissedReminders.has('microsite')) {
               reminders.push({ id: 'microsite', icon: Globe, bgColor: 'bg-teal-50', border: 'border-teal-200', iconBg: 'bg-teal-100', iconColor: 'text-teal-700', title: 'Du har ingen hemsida — vi har redan börjat bygga en åt dig', desc: 'Namn, tjänster och priser är redan ifyllda. Förhandsgranska och publicera med ett klick.', href: '/dashboard/website', cta: 'Förhandsgranska' })
             }

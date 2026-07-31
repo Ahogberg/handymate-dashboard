@@ -101,7 +101,7 @@ function LoginForm() {
             </div>
 
 <div className="text-right">
-  <a href="/forgot-password" className="text-sm text-sky-700 hover:text-primary-700">
+  <a href="/forgot-password" className="text-sm text-primary-700 hover:text-primary-700">
     Glömt lösenordet?
   </a>
 </div>
@@ -131,7 +131,7 @@ function LoginForm() {
         {/* Footer */}
         <p className="text-center text-sm text-gray-400 mt-6">
           Har du inget konto?{' '}
-          <a href="/signup" className="text-sky-700 hover:text-primary-700">
+          <a href="/signup" className="text-primary-700 hover:text-primary-700">
             Skapa konto
           </a>
         </p>

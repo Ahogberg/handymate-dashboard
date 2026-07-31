@@ -169,7 +169,7 @@ export default function KnowledgeEditor({ businessId, onKnowledgeChange }: Knowl
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -196,7 +196,7 @@ export default function KnowledgeEditor({ businessId, onKnowledgeChange }: Knowl
       {/* Bransch */}
       <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Zap className="w-5 h-5 text-sky-700" />
+          <Zap className="w-5 h-5 text-primary-700" />
           Bransch
         </h2>
         <select

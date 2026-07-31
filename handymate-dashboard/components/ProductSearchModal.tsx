@@ -264,7 +264,7 @@ export default function ProductSearchModal({
         <div className="flex-1 overflow-y-auto">
           {loadingSuppliers ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+              <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
               <span className="ml-3 text-gray-500">Laddar grossister...</span>
             </div>
           ) : suppliers.length === 0 ? (
@@ -332,7 +332,7 @@ export default function ProductSearchModal({
                         onClick={() => handleCategoryChange('')}
                         className={`w-full px-4 py-2 text-sm text-left transition-colors ${
                           !category
-                            ? 'text-sky-700 bg-primary-50'
+                            ? 'text-primary-700 bg-primary-50'
                             : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
                         }`}
                       >
@@ -344,7 +344,7 @@ export default function ProductSearchModal({
                           onClick={() => handleCategoryChange(cat)}
                           className={`w-full px-4 py-2 text-sm text-left transition-colors ${
                             category === cat
-                              ? 'text-sky-700 bg-primary-50'
+                              ? 'text-primary-700 bg-primary-50'
                               : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
                           }`}
                         >
@@ -372,7 +372,7 @@ export default function ProductSearchModal({
               {/* Loading state */}
               {loading && (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-5 h-5 text-sky-700 animate-spin" />
+                  <Loader2 className="w-5 h-5 text-primary-700 animate-spin" />
                   <span className="ml-3 text-gray-500 text-sm">Söker...</span>
                 </div>
               )}
@@ -493,7 +493,7 @@ export default function ProductSearchModal({
                                 <label className="block text-xs text-gray-400 mb-1">
                                   Kundpris
                                 </label>
-                                <p className="text-sm font-semibold text-sky-700">
+                                <p className="text-sm font-semibold text-primary-700">
                                   {formatPrice(
                                     Math.round(sellPrice * 100) / 100
                                   )}

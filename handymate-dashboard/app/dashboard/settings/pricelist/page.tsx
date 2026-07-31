@@ -477,7 +477,7 @@ export default function PricelistPage() {
         <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Building className="w-5 h-5 text-sky-700" />
+              <Building className="w-5 h-5 text-primary-700" />
               Leverantörer
             </h2>
             <button
@@ -486,7 +486,7 @@ export default function PricelistPage() {
                 setSupplierForm({ name: '', customer_number: '', contact_email: '', contact_phone: '' })
                 setShowSupplierModal(true)
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-primary-100 border border-[#E2E8F0] rounded-xl text-sky-700 hover:bg-primary-700/30 text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-primary-100 border border-[#E2E8F0] rounded-xl text-primary-700 hover:bg-primary-700/30 text-sm"
             >
               <Plus className="w-4 h-4" />
               Lägg till
@@ -528,7 +528,7 @@ export default function PricelistPage() {
                           setImportSupplierId(supplier.supplier_id)
                           setShowImportModal(true)
                         }}
-                        className="p-1.5 text-gray-400 hover:text-sky-700 hover:bg-primary-50 rounded"
+                        className="p-1.5 text-gray-400 hover:text-primary-700 hover:bg-primary-50 rounded"
                         title="Importera produkter"
                       >
                         <Upload className="w-4 h-4" />
@@ -880,7 +880,7 @@ export default function PricelistPage() {
           <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-sky-700" />
+                <FileSpreadsheet className="w-5 h-5 text-primary-700" />
                 Importera produkter
               </h3>
               <button onClick={closeImportModal} className="text-gray-400 hover:text-gray-900">
@@ -1084,7 +1084,7 @@ export default function PricelistPage() {
             {/* Step 4: Importing */}
             {importStep === 'importing' && (
               <div className="text-center py-12">
-                <Loader2 className="w-12 h-12 text-sky-700 animate-spin mx-auto mb-4" />
+                <Loader2 className="w-12 h-12 text-primary-700 animate-spin mx-auto mb-4" />
                 <p className="text-gray-900 font-medium">Importerar produkter...</p>
                 <p className="text-gray-400 text-sm">Detta kan ta en stund</p>
               </div>

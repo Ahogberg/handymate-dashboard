@@ -7,7 +7,7 @@ import { Inbox, Volume2, Mail, Loader2 } from 'lucide-react'
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center py-20">
-    <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+    <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
   </div>
 )
 
@@ -53,7 +53,7 @@ export default function CallsPage() {
                   : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <tab.icon className={`w-4 h-4 ${activeTab === tab.key ? 'text-sky-700' : ''}`} />
+              <tab.icon className={`w-4 h-4 ${activeTab === tab.key ? 'text-primary-700' : ''}`} />
               {tab.label}
             </button>
           ))}

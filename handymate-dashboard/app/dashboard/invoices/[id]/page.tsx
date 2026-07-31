@@ -1039,7 +1039,7 @@ export default function InvoiceDetailPage() {
                   href={`/api/invoices/${invoiceId}/reminder-pdf`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-sky-700 hover:text-primary-700 flex items-center gap-1"
+                  className="text-xs text-primary-700 hover:text-primary-700 flex items-center gap-1"
                 >
                   <Eye className="w-3 h-3" />
                   Visa påminnelse-PDF

@@ -115,7 +115,7 @@ export default function InviteAcceptPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -150,7 +150,7 @@ export default function InviteAcceptPage() {
             </p>
             <a
               href="/login"
-              className="inline-block px-6 py-3 text-sm font-medium text-sky-700 hover:text-primary-700 transition-colors"
+              className="inline-block px-6 py-3 text-sm font-medium text-primary-700 hover:text-primary-700 transition-colors"
             >
               Tillbaka till inloggning
             </a>
@@ -176,7 +176,7 @@ export default function InviteAcceptPage() {
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Välkommen!</h2>
             <p className="text-gray-500 mb-4">Ditt konto har skapats. Omdirigerar...</p>
-            <Loader2 className="w-5 h-5 text-sky-700 animate-spin mx-auto" />
+            <Loader2 className="w-5 h-5 text-primary-700 animate-spin mx-auto" />
           </div>
         </div>
       </div>
@@ -209,7 +209,7 @@ export default function InviteAcceptPage() {
                 {invite.business_name}
               </span>
             </h2>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary-50 text-sky-700 border border-primary-600/20">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-600/20">
               {roleLabels[invite.role] || invite.role}
               {invite.title ? ` – ${invite.title}` : ''}
             </span>
@@ -308,7 +308,7 @@ export default function InviteAcceptPage() {
         {/* Footer */}
         <p className="text-center text-sm text-gray-400 mt-6">
           Har du redan ett konto?{' '}
-          <a href="/login" className="text-sky-700 hover:text-primary-700">
+          <a href="/login" className="text-primary-700 hover:text-primary-700">
             Logga in
           </a>
         </p>

@@ -33,7 +33,7 @@ export default function Home() {
 
         <div className="mt-8 pt-6 border-t border-gray-200">
           <p className="text-center text-xs text-gray-400">
-            <a href="https://handymate.se" className="text-sky-700 hover:text-primary-700 transition-colors">
+            <a href="https://handymate.se" className="text-primary-700 hover:text-primary-700 transition-colors">
               ← Tillbaka till handymate.se
             </a>
           </p>

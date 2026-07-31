@@ -158,7 +158,7 @@ export default function AnalyticsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <BarChart3 className="w-6 h-6 text-sky-700" />
+              <BarChart3 className="w-6 h-6 text-primary-700" />
               Analys &amp; Ekonomi
             </h1>
             <p className="text-sm text-gray-500 mt-1">Försäljningsinsikter och ekonomiöversikt</p>
@@ -176,7 +176,7 @@ export default function AnalyticsPage() {
 
         {loading ? (
           <div className="flex items-center justify-center py-24">
-            <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
+            <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
           </div>
         ) : (
           <>
@@ -213,7 +213,7 @@ export default function AnalyticsPage() {
                     <div className="space-y-2.5">
                       {[
                         { label: 'Din vinst (est.)', value: Math.max(0, econ.invoiced - econ.materialCost - econ.laborCost - econ.overhead), color: 'bg-emerald-500' },
-                        { label: 'Material', value: econ.materialCost, color: 'bg-sky-500' },
+                        { label: 'Material', value: econ.materialCost, color: 'bg-cyan-500' },
                         { label: 'Din tid', value: econ.laborCost, color: 'bg-primary-600' },
                         { label: 'Overhead', value: econ.overhead, color: 'bg-gray-400' },
                       ].filter(r => r.value > 0).map(row => {
@@ -278,7 +278,7 @@ export default function AnalyticsPage() {
               </div>
               <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1.5 rounded-lg bg-primary-100"><TrendingUp className="w-4 h-4 text-sky-700" /></div>
+                  <div className="p-1.5 rounded-lg bg-primary-100"><TrendingUp className="w-4 h-4 text-primary-700" /></div>
                   <span className="text-xs text-gray-400 uppercase tracking-wider">Vunnet totalt</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{formatValue(winLossData?.won_value || 0)}</p>
@@ -311,7 +311,7 @@ export default function AnalyticsPage() {
             {insights.length > 0 && (
               <div className="bg-gradient-to-r from-primary-50 to-primary-50 rounded-xl border border-[#E2E8F0] p-5">
                 <h3 className="text-sm font-semibold text-primary-900 flex items-center gap-2 mb-3">
-                  <Lightbulb className="w-4 h-4 text-sky-700" />
+                  <Lightbulb className="w-4 h-4 text-primary-700" />
                   AI-insikter
                 </h3>
                 <div className="space-y-2">
@@ -400,7 +400,7 @@ export default function AnalyticsPage() {
               <div className="bg-white rounded-xl border border-[#E2E8F0]">
                 <div className="p-5 border-b border-gray-100">
                   <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                    <Target className="w-4 h-4 text-sky-700" />
+                    <Target className="w-4 h-4 text-primary-700" />
                     Win/Loss-analys
                   </h3>
                 </div>

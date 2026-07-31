@@ -64,7 +64,7 @@ export default function ProjectComparisonPage() {
 
   const getMarginColor = (percent: number) => {
     if (percent >= 30) return 'text-emerald-600'
-    if (percent >= 10) return 'text-sky-700'
+    if (percent >= 10) return 'text-primary-700'
     if (percent >= 0) return 'text-orange-600'
     return 'text-red-600'
   }
@@ -135,7 +135,7 @@ export default function ProjectComparisonPage() {
                         {proj.customer?.name || 'Ingen kund'}
                         <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
                           proj.status === 'active' ? 'bg-emerald-50 text-emerald-600' :
-                          proj.status === 'completed' ? 'bg-primary-50 text-sky-700' :
+                          proj.status === 'completed' ? 'bg-primary-50 text-primary-700' :
                           'bg-gray-100 text-gray-600'
                         }`}>{proj.status}</span>
                       </p>

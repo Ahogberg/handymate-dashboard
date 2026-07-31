@@ -72,12 +72,12 @@ export default function KnowledgeBasePage() {
         </div>
 
         {/* Hub-banner — pekar mot AI på hemsidan där kunskap också finns */}
-        <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 mb-6 flex items-start gap-3">
-          <Globe className="w-5 h-5 text-sky-700 flex-shrink-0 mt-0.5" />
-          <div className="flex-1 text-sm text-sky-900 leading-relaxed">
+        <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <Globe className="w-5 h-5 text-primary-700 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 text-sm text-primary-900 leading-relaxed">
             <strong className="font-semibold">Kunskapsbasen styr chattboten på din hemsida.</strong>{' '}
             Du kan redigera den både här och under{' '}
-            <Link href="/dashboard/settings/website-widget?tab=knowledge" className="font-semibold underline hover:text-sky-700 inline-flex items-center gap-1">
+            <Link href="/dashboard/settings/website-widget?tab=knowledge" className="font-semibold underline hover:text-primary-700 inline-flex items-center gap-1">
               AI på hemsidan → Kunskap <ArrowRight className="w-3.5 h-3.5" />
             </Link>
             {' '}— samma data, samma effekt.

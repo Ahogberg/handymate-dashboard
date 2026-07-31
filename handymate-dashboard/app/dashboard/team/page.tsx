@@ -526,7 +526,7 @@ export default function TeamPage() {
           <div className="bg-white border border-[#E2E8F0] rounded-t-2xl sm:rounded-xl p-6 w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-sky-700" />
+                <UserPlus className="w-5 h-5 text-primary-700" />
                 Bjud in teammedlem
               </h3>
               <button onClick={() => setInviteModalOpen(false)} className="text-gray-400 hover:text-gray-900 transition-colors">
@@ -926,7 +926,7 @@ export default function TeamPage() {
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 sm:p-16 text-center">
             <div className="flex justify-center mb-6">
               <div className="w-20 h-20 rounded-full bg-[#F0FDFA] flex items-center justify-center border border-[#E2E8F0]">
-                <Users className="w-10 h-10 text-sky-700" />
+                <Users className="w-10 h-10 text-primary-700" />
               </div>
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Du arbetar ensam just nu</h2>

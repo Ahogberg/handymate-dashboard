@@ -240,7 +240,7 @@ export default function WebsiteWidgetPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -270,7 +270,7 @@ export default function WebsiteWidgetPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Globe className="w-6 h-6 text-sky-700" />
+            <Globe className="w-6 h-6 text-primary-700" />
             Hemsida-widget
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -386,14 +386,14 @@ export default function WebsiteWidgetPage() {
         <div className="space-y-6">
           {analyticsLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+              <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
             </div>
           ) : analytics ? (
             <>
               {/* KPI Cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { label: 'Konversationer', value: analytics.total_conversations, icon: MessageSquare, color: 'text-sky-700 bg-primary-50' },
+                  { label: 'Konversationer', value: analytics.total_conversations, icon: MessageSquare, color: 'text-primary-700 bg-primary-50' },
                   { label: 'Leads skapade', value: analytics.leads_created, icon: Users, color: 'text-green-600 bg-green-50' },
                   { label: 'Konverteringsgrad', value: `${analytics.conversion_rate}%`, icon: Target, color: 'text-primary-700 bg-primary-50' },
                   { label: 'Snitt meddelanden', value: analytics.avg_messages_per_conversation, icon: TrendingUp, color: 'text-amber-600 bg-amber-50' },
@@ -467,7 +467,7 @@ export default function WebsiteWidgetPage() {
             <div className="text-center py-16">
               <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-sm text-gray-500">Kunde inte ladda statistik</p>
-              <button onClick={fetchAnalytics} className="mt-2 text-sm text-sky-700 hover:underline">
+              <button onClick={fetchAnalytics} className="mt-2 text-sm text-primary-700 hover:underline">
                 Försök igen
               </button>
             </div>
@@ -588,7 +588,7 @@ export default function WebsiteWidgetPage() {
                   <button
                     onClick={addQuickQuestion}
                     disabled={!newQuestion.trim()}
-                    className="p-2 text-sky-700 hover:bg-primary-50 rounded-lg disabled:opacity-30 transition-colors"
+                    className="p-2 text-primary-700 hover:bg-primary-50 rounded-lg disabled:opacity-30 transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
@@ -688,7 +688,7 @@ export default function WebsiteWidgetPage() {
           {/* Embed code */}
           <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2">
-              <Code className="w-4 h-4 text-sky-700" />
+              <Code className="w-4 h-4 text-primary-700" />
               Installationskod
             </h3>
             <p className="text-xs text-gray-500 mb-4">

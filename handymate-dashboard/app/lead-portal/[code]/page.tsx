@@ -43,8 +43,8 @@ interface Lead {
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   new: { label: 'Ny', color: 'bg-blue-100 text-blue-700', icon: Clock },
   contacted: { label: 'Kontaktad', color: 'bg-yellow-100 text-yellow-700', icon: CheckCircle2 },
-  qualified: { label: 'Kvalificerad', color: 'bg-purple-100 text-purple-700', icon: CheckCircle2 },
-  quote_sent: { label: 'Offert skickad', color: 'bg-indigo-100 text-indigo-700', icon: FileText },
+  qualified: { label: 'Kvalificerad', color: 'bg-primary-100 text-primary-700', icon: CheckCircle2 },
+  quote_sent: { label: 'Offert skickad', color: 'bg-cyan-100 text-cyan-700', icon: FileText },
   won: { label: 'Vunnen', color: 'bg-green-100 text-green-700', icon: Trophy },
   lost: { label: 'Ej intresse', color: 'bg-red-100 text-red-700', icon: XCircle },
 }

@@ -190,7 +190,7 @@ export default function FormTemplatesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -201,7 +201,7 @@ export default function FormTemplatesPage() {
       <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen max-w-3xl mx-auto">
         <button
           onClick={() => setEditing(null)}
-          className="flex items-center gap-1 text-sm text-sky-700 hover:text-primary-700 mb-6"
+          className="flex items-center gap-1 text-sm text-primary-700 hover:text-primary-700 mb-6"
         >
           <ArrowLeft className="w-4 h-4" /> Tillbaka till mallar
         </button>
@@ -303,7 +303,7 @@ export default function FormTemplatesPage() {
             <div className="mt-3 relative">
               <button
                 onClick={() => setShowAddField(!showAddField)}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-sky-700 hover:text-primary-700 border border-dashed border-gray-300 rounded-lg hover:border-primary-500 transition w-full justify-center"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-primary-700 hover:text-primary-700 border border-dashed border-gray-300 rounded-lg hover:border-primary-500 transition w-full justify-center"
               >
                 <Plus className="w-4 h-4" /> Lägg till fält
               </button>
@@ -355,7 +355,7 @@ export default function FormTemplatesPage() {
     <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen max-w-3xl mx-auto">
       <button
         onClick={() => router.push('/dashboard/settings')}
-        className="flex items-center gap-1 text-sm text-sky-700 hover:text-primary-700 mb-6"
+        className="flex items-center gap-1 text-sm text-primary-700 hover:text-primary-700 mb-6"
       >
         <ArrowLeft className="w-4 h-4" /> Tillbaka till inställningar
       </button>
@@ -394,7 +394,7 @@ export default function FormTemplatesPage() {
             <div className="flex items-center gap-1">
               <button
                 onClick={() => duplicateTemplate(t)}
-                className="p-2 text-gray-400 hover:text-sky-600 transition"
+                className="p-2 text-gray-400 hover:text-primary-600 transition"
                 title="Kopiera"
               >
                 <Copy className="w-4 h-4" />

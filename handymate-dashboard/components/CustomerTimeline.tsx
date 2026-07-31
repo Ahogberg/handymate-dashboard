@@ -134,7 +134,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
   function getIcon(type: string) {
     if (type.startsWith('call_inbound') || type === 'call_inbound') return <PhoneIncoming className="w-4 h-4 text-emerald-600" />
     if (type.startsWith('call_outbound') || type === 'call_outbound') return <PhoneOutgoing className="w-4 h-4 text-primary-600" />
-    if (type === 'call_logged') return <PhoneCall className="w-4 h-4 text-sky-700" />
+    if (type === 'call_logged') return <PhoneCall className="w-4 h-4 text-primary-700" />
     if (type === 'sms_sent') return <Send className="w-4 h-4 text-primary-700" />
     if (type === 'sms_received') return <MessageSquare className="w-4 h-4 text-primary-500" />
     if (type.startsWith('quote_')) return <FileText className="w-4 h-4 text-primary-600" />
@@ -144,7 +144,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
     if (type === 'booking_created') return <Calendar className="w-4 h-4 text-amber-400" />
     if (type === 'booking_completed') return <CheckCircle className="w-4 h-4 text-emerald-600" />
     if (type.startsWith('lead_')) return <Target className="w-4 h-4 text-orange-500" />
-    if (type === 'agent_action') return <Bot className="w-4 h-4 text-sky-700" />
+    if (type === 'agent_action') return <Bot className="w-4 h-4 text-primary-700" />
     if (type === 'time_entry') return <Timer className="w-4 h-4 text-indigo-500" />
     if (type === 'note_added') return <FileText className="w-4 h-4 text-gray-500" />
     if (type === 'rating_received') return <Star className="w-4 h-4 text-yellow-400" />
@@ -215,7 +215,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-5 h-5 text-sky-700 animate-spin" />
+        <Loader2 className="w-5 h-5 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -230,7 +230,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
             onClick={() => { setFilter(f.key); setExpandedId(null) }}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               filter === f.key
-                ? 'bg-primary-100 text-sky-700 border border-primary-300'
+                ? 'bg-primary-100 text-primary-700 border border-primary-300'
                 : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
             }`}
           >
@@ -330,7 +330,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
                         <div className="flex items-center gap-2 min-w-0">
                           <p className="font-medium text-gray-900 text-sm truncate">{event.title}</p>
                           {link && (
-                            <Link href={link} className="text-primary-700 hover:text-sky-700 flex-shrink-0">
+                            <Link href={link} className="text-primary-700 hover:text-primary-700 flex-shrink-0">
                               <ChevronDown className="w-3.5 h-3.5 rotate-[-90deg]" />
                             </Link>
                           )}
@@ -363,7 +363,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
                       {hasDetails && (
                         <button
                           onClick={() => setExpandedId(isExpanded ? null : event.id)}
-                          className="mt-1.5 text-xs text-sky-700 hover:text-primary-700 flex items-center gap-1"
+                          className="mt-1.5 text-xs text-primary-700 hover:text-primary-700 flex items-center gap-1"
                         >
                           <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                           {isExpanded ? 'Visa mindre' : 'Visa detaljer'}
@@ -387,7 +387,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
                             </div>
                           ) : null}
                           {Boolean(event.metadata.recording_url) ? (
-                            <button className="flex items-center gap-1 text-xs text-sky-700 hover:text-primary-700">
+                            <button className="flex items-center gap-1 text-xs text-primary-700 hover:text-primary-700">
                               <Play className="w-3 h-3" />
                               Spela upp inspelning
                             </button>
@@ -413,7 +413,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
             <button
               onClick={() => fetchTimeline(filter, events.length)}
               disabled={loadingMore}
-              className="text-sm text-sky-700 hover:text-primary-700 disabled:opacity-50"
+              className="text-sm text-primary-700 hover:text-primary-700 disabled:opacity-50"
             >
               {loadingMore ? <Loader2 className="w-4 h-4 animate-spin inline mr-1" /> : null}
               Visa fler ({total - events.length} kvar)

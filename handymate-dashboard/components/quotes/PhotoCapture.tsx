@@ -41,7 +41,7 @@ export default function PhotoCapture({ onCapture, onBack, analyzing }: PhotoCapt
           </div>
         )}
         <div className="space-y-3">
-          <Loader2 className="w-8 h-8 text-sky-700 animate-spin mx-auto" />
+          <Loader2 className="w-8 h-8 text-primary-700 animate-spin mx-auto" />
           <p className="text-gray-900 font-medium">Analyserar bild...</p>
           <div className="space-y-2 text-sm text-gray-400">
             <p>Identifierar arbete och material...</p>

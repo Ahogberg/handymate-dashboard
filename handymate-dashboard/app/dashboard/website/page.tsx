@@ -468,7 +468,7 @@ export default function WebsitePage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Din hemsida</h1>
             <div className="flex items-center gap-2 mt-1">
-              <a href={siteUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-sky-700 hover:text-primary-700 flex items-center gap-1">
+              <a href={siteUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary-700 hover:text-primary-700 flex items-center gap-1">
                 {siteUrl} <ExternalLink className="w-3.5 h-3.5" />
               </a>
               <button
@@ -519,7 +519,7 @@ export default function WebsitePage() {
           <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
             <div className="p-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
               <span className="text-xs text-gray-400 font-mono">{siteUrl}</span>
-              <a href={siteUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-700 flex items-center gap-1">
+              <a href={siteUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary-700 flex items-center gap-1">
                 Öppna i ny flik <ExternalLink className="w-3 h-3" />
               </a>
             </div>
@@ -541,7 +541,7 @@ export default function WebsitePage() {
                 <button
                   onClick={handleGenerate}
                   disabled={generating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-sky-700 border border-[#E2E8F0] rounded-lg hover:bg-primary-50 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-primary-700 border border-[#E2E8F0] rounded-lg hover:bg-primary-50 transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} />
                   Regenerera med AI
