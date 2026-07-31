@@ -38,6 +38,9 @@ const formatShortDate = (dateStr: string) => {
 
 interface BillingData {
   plan: {
+    /** plan_id från billing_plan (starter/professional/business) — stabil
+        nyckel för matchning; name är visningsnamn och kan bytas fritt. */
+    id?: string
     name: string
     status: 'active' | 'trialing' | 'past_due' | 'cancelled'
     trialEndsAt: string | null
@@ -64,7 +67,7 @@ interface UsageData {
 const PLANS = [
   {
     id: 'starter',
-    name: 'Starter',
+    name: 'Bas',
     price: 2495,
     features: [
       '50 SMS/mån (0,89 kr/extra)',
@@ -83,15 +86,15 @@ const PLANS = [
   },
   {
     id: 'professional',
-    name: 'Professional',
+    name: 'Firman',
     price: 5995,
     features: [
       '300 SMS/mån (0,79 kr/extra)',
       '400 samtal/mån',
-      'Upp till 10 användare',
+      'Upp till 3 användare',
       '10 offertmallar',
       'Alla automationer + custom',
-      'Hela backoffice-teamet (5 agenter)',
+      'Hela AI-teamet — sex medarbetare',
       'AI-minne (agenten lär sig)',
       'Allt i Starter',
       'Uppföljningssekvenser',
@@ -102,14 +105,14 @@ const PLANS = [
   },
   {
     id: 'business',
-    name: 'Enterprise',
+    name: 'Storfirman',
     price: 11995,
     features: [
       '1 000 SMS/mån (0,69 kr/extra)',
       'Obegränsade samtal',
       'Obegränsade användare',
       'Obegränsade mallar',
-      'Allt i Professional',
+      'Allt i Firman',
       'Leads-addon inkluderat',
       'Anpassad AI-röst',
       'Dedikerad support',
@@ -238,8 +241,10 @@ export default function BillingPage() {
     }
   }
 
-  const currentPlanName = billing?.plan?.name || 'Starter'
-  const currentPlan = PLANS.find((p) => p.name === currentPlanName)
+  // Matcha på plan_id (stabil nyckel) — inte på visningsnamnet, som numera
+  // kan skilja mellan DB (billing_plan.name) och koden under namnbyten.
+  const currentPlanId = billing?.plan?.id || 'starter'
+  const currentPlan = PLANS.find((p) => p.id === currentPlanId)
   const trialDaysLeft =
     billing?.plan?.status === 'trialing' && billing.plan.trialEndsAt
       ? Math.max(0, Math.ceil((new Date(billing.plan.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -296,7 +301,7 @@ export default function BillingPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-3 flex-wrap">
-                        <h2 className="text-xl font-bold text-gray-900">{currentPlanName}</h2>
+                        <h2 className="text-xl font-bold text-gray-900">{currentPlan?.name || billing?.plan?.name || 'Bas'}</h2>
                         <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${status.className}`}>
                           {status.text}
                         </span>
@@ -406,12 +411,12 @@ export default function BillingPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {SELECTABLE_PLANS.map((plan) => {
-                  const isCurrent = plan.name === currentPlanName
-                  // currentIndex blir -1 för Starter-kunder (Starter finns inte i
+                  const isCurrent = plan.id === currentPlanId
+                  // currentIndex blir -1 för Bas-kunder (starter finns inte i
                   // SELECTABLE_PLANS) — då räknas båda kvarvarande planerna korrekt
-                  // som uppgraderingar, vilket stämmer (Starter är alltid lägst).
-                  const currentIndex = SELECTABLE_PLANS.findIndex((p) => p.name === currentPlanName)
-                  const planIndex = SELECTABLE_PLANS.findIndex((p) => p.name === plan.name)
+                  // som uppgraderingar, vilket stämmer (Bas är alltid lägst).
+                  const currentIndex = SELECTABLE_PLANS.findIndex((p) => p.id === currentPlanId)
+                  const planIndex = SELECTABLE_PLANS.findIndex((p) => p.id === plan.id)
                   const isUpgrade = planIndex > currentIndex
                   const isDowngrade = planIndex < currentIndex
 

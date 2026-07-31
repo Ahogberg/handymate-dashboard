@@ -87,7 +87,7 @@ och kör slide 7:s missat samtal-vinkel hårdare. Läs av rummet.)_
 Ett missat badrumsjobb är 50 000 kr. En glömd faktura är pengar som aldrig
 kommer in. **Funkar det inte — pengarna tillbaka.** Ingen bindningstid som
 straffar dig, en garanti som står bakom.
-_(Om frågan kommer: Business 11 995 för större team med fler anställda;
+_(Om frågan kommer: Storfirman 11 995 från 4 anställda;
 anpassat upplägg för stora företag — "hör av dig så tar vi det".
 OBS: Bas/Starter finns inte längre i utbudet — nämn den aldrig.)_
 

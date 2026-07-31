@@ -352,10 +352,13 @@ export function getPlanPrice(plan: PlanType): number {
 }
 
 export function getPlanLabel(plan: PlanType): string {
+  // Svenska visningsnamn (Andreas-beslut 2026-07-31): interna nycklar
+  // (starter/professional/business) och Stripe-objekt byts ALDRIG — endast
+  // det kunden ser. 'Bas' = legacy-visning för befintliga starter-konton.
   const labels: Record<PlanType, string> = {
-    starter: 'Starter',
-    professional: 'Professional',
-    business: 'Business',
+    starter: 'Bas',
+    professional: 'Firman',
+    business: 'Storfirman',
   }
   return labels[plan]
 }

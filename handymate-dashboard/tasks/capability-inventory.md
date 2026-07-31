@@ -208,8 +208,8 @@ Får INTE säljas som beprövat till partner innan dess.
 
 ## §8 Planstruktur (ändrad 2026-07-31, Andreas-beslut)
 
-Publikt utbud: **Professional 5 995 kr/mån** (ingång — hela AI-teamet, sex
-medarbetare) + **Business 11 995 kr/mån** (skillnad = volym & människor:
+Publikt utbud: **Firman 5 995 kr/mån** (intern nyckel: professional) (ingång — hela AI-teamet, sex
+medarbetare) + **Storfirman 11 995 kr/mån** (intern nyckel: business) (skillnad = volym & människor:
 obegränsade användare, 1 000 SMS, större användningsutrymme, hemsida+SEO,
 dedikerad support) + **"Anpassad — kontakta oss"** (inget löfte om
 enterprise-funktioner; bara kontaktväg). **Starter/Bas (2 495) är BORTTAGEN

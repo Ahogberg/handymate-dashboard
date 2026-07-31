@@ -19,36 +19,41 @@ import type { OnboardingFormData } from '../types-redesign'
  * kvar i lib/feature-gates.ts och backend (tyst nedgradering + befintliga
  * konton) — se kommentar där för motivering.
  */
+// Svenska namn (Andreas-beslut 2026-07-31): Firman (1–3 personer) och
+// Storfirman (från 4 anställda). Interna id:n byts aldrig. VIKTIGT:
+// BÅDA planerna ger hela AI-teamet (sex medarbetare) — det är
+// kategorilöftet; skillnaden är volym & människor, aldrig agenter
+// (tidigare copy här påstod fel att Lars/Matte krävde Business).
 const PLANS = [
   {
     id: 'professional',
-    name: 'Pro',
+    name: 'Firman',
     price: 5995,
     popular: true,
-    agents: ['lisa', 'karin', 'daniel', 'hanna'],
-    features: ['Hela försäljnings- och kund-teamet', 'Obegränsade samtal', 'Offert-uppföljning + SMS-kampanjer'],
+    agents: ['lisa', 'karin', 'daniel', 'hanna', 'lars', 'matte'],
+    features: ['Hela AI-teamet — sex medarbetare', 'Missade samtal fångas 24/7', 'Offerter, ROT/RUT & fakturor', 'SMS-utskick & kampanjer', 'Upp till 3 användare'],
     valueBullets: [
-      'Daniel följer obeöppnade offerter och föreslår SMS-påminnelser',
-      'Hanna kör säsongs-kampanjer och kund-reaktivering',
-      'Karin + Daniel samarbetar kring offert→faktura-flödet',
-      'Lämplig om du har 3+ pågående offerter samtidigt',
+      'Daniel följer upp offerter som blivit liggande',
+      'Hanna väcker gamla kunder med kampanjer och serviceavtal',
+      'Karin förbereder fakturor och påminnelser åt dig',
+      'För firmor med 1–3 personer',
     ],
-    upgradeHint: 'När ditt team växer eller du vill ha Lars projektledning, gå till Business.',
+    upgradeHint: 'Fler än tre som behöver logga in? Då är Storfirman rätt.',
   },
   {
     id: 'business',
-    name: 'Business',
+    name: 'Storfirman',
     price: 11995,
     popular: false,
     agents: ['lisa', 'karin', 'daniel', 'hanna', 'lars', 'matte'],
-    features: ['Allt i Pro', 'Lars projektledning', 'Matte chef-assistent', 'Egen onboarding-coach'],
+    features: ['Allt i Firman', 'Obegränsade användare', 'Större utrymme för SMS & utskick', 'Egen hemsida med SEO', 'Dedikerad support'],
     valueBullets: [
-      'Lars håller koll på marginal och flagga projekt som tappar pengar',
-      'Matte är din personliga assistent som koordinerar allt',
-      'Egen onboarding-coach hjälper dig komma igång snabbt',
-      'Passar dig med flera anställda eller 5+ samtidiga projekt',
+      'Hela teamet loggar in — tidrapporter och projekt på ett ställe',
+      'Lars håller koll på marginalerna när projekten blir fler',
+      'Större utrymme för utskick när kundbasen växer',
+      'Från 4 anställda och uppåt',
     ],
-    upgradeHint: 'Du är på toppen — kontakta oss om ni har special-behov.',
+    upgradeHint: 'Fler än 10 anställda eller flera bolag? Hör av dig så skräddarsyr vi.',
   },
 ]
 
