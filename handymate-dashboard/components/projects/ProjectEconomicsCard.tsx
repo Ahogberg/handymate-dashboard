@@ -64,6 +64,17 @@ interface ProjectEconomics {
     supplier_invoice_count: number
     extra_cost_count: number
   }
+  // Lokal duplicat av lib/projects/compute-economics.ts ProjectEconomics
+  // (se kommentar där) — hålls i synk manuellt eftersom denna komponent
+  // deklarerar sin egen kopia av shapen istället för att importera.
+  quote_rot_rut: {
+    rot_rut_type: 'rot' | 'rut'
+    rot_work_cost?: number
+    rot_deduction?: number
+    rut_work_cost?: number
+    rut_deduction?: number
+    customer_pays?: number
+  } | null
 }
 
 interface ProjectEconomicsCardProps {

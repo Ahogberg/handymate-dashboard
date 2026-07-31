@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { computeProjectEconomics } from '@/lib/projects/compute-economics'
+import { computeProjectEconomics, type ProjectEconomics } from '@/lib/projects/compute-economics'
 
 /**
  * GET /api/projects/[id]/profitability
@@ -43,9 +44,69 @@ export async function GET(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
+    // ROT/RUT-fotrad (Projektvy Fas 2, 2026-07-31): projektets kopplade
+    // offert äger de redan lagrade ROT/RUT-fälten — lib/rot-rut.ts gör
+    // beräkningen vid offert-skapande/uppdatering. Vi vidarebefordrar
+    // ENDAST lagrade kolumner, ingen omräkning här (se ProjectEconomics.
+    // quote_rot_rut docstring i compute-economics.ts).
+    economics.quote_rot_rut = await getQuoteRotRut(supabase, params.id, business.business_id)
+
     return NextResponse.json(economics)
   } catch (error: any) {
     console.error('Get profitability error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+}
+
+/**
+ * Hämtar ROT/RUT-fält från projektets kopplade offert (om någon).
+ * Ren vidarebefordran av lagrade quotes-kolumner — se
+ * ProjectEconomics['quote_rot_rut'] i compute-economics.ts för
+ * kontrakt och fallback-regler. Fält som är null utelämnas ur svaret.
+ */
+async function getQuoteRotRut(
+  supabase: SupabaseClient,
+  projectId: string,
+  businessId: string,
+): Promise<ProjectEconomics['quote_rot_rut']> {
+  const { data: projectRow } = await supabase
+    .from('project')
+    .select('quote_id')
+    .eq('project_id', projectId)
+    .eq('business_id', businessId)
+    .maybeSingle()
+
+  if (!projectRow?.quote_id) return null
+
+  const { data: quoteRow } = await supabase
+    .from('quotes')
+    .select('rot_rut_type, rot_work_cost, rot_deduction, rot_rut_deduction, rut_work_cost, rut_deduction, customer_pays')
+    .eq('quote_id', projectRow.quote_id)
+    .eq('business_id', businessId)
+    .maybeSingle()
+
+  if (!quoteRow || (quoteRow.rot_rut_type !== 'rot' && quoteRow.rot_rut_type !== 'rut')) {
+    return null
+  }
+
+  // rot_deduction har legacy-fallback till rot_rut_deduction, exakt som
+  // app/api/quotes/pdf/route.ts gör (offerter skapade innan ROT/RUT-
+  // splitten infördes har bara den kombinerade legacy-kolumnen ifylld).
+  const fields: Record<string, number | string | null | undefined> = {
+    rot_rut_type: quoteRow.rot_rut_type,
+    rot_work_cost: quoteRow.rot_work_cost,
+    rot_deduction: quoteRow.rot_deduction ?? quoteRow.rot_rut_deduction,
+    rut_work_cost: quoteRow.rut_work_cost,
+    rut_deduction: quoteRow.rut_deduction,
+    customer_pays: quoteRow.customer_pays,
+  }
+
+  const result: Record<string, number | string> = {}
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== null && value !== undefined) result[key] = value
+  }
+
+  // rot_rut_type är obligatoriskt för att raden ska vara meningsfull —
+  // redan säkerställt av guard-checken ovan.
+  return result as ProjectEconomics['quote_rot_rut']
 }

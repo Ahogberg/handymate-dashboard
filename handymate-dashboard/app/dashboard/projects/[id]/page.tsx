@@ -409,8 +409,19 @@ function SortableMilestoneRow({
 
   const hasTimeData = ms.actual_hours > 0 || ms.budget_hours != null
 
+  // Canvas mrow-stil (DESIGN-NOTES §Accordion): ✓-cirkel teal fylld = klar,
+  // teal-ring + fet text = pågår, grå ring = kommande. Högerställd
+  // statuschip med datum. Funktionalitet (cycle/edit/delete/drag) orörd —
+  // bara presentationen byts (Projektvy Fas 2, Del 2a).
+  const chip =
+    ms.status === 'completed'
+      ? { cls: 'bg-green-100 text-green-700', text: ms.due_date ? `Klart ${formatDate(ms.due_date)}` : 'Klart' }
+      : ms.status === 'in_progress'
+        ? { cls: 'bg-primary-50 text-primary-700', text: ms.due_date ? formatDate(ms.due_date) : 'Pågående' }
+        : { cls: 'bg-gray-100 text-gray-500', text: ms.due_date ? formatDate(ms.due_date) : 'Väntande' }
+
   return (
-    <div ref={setNodeRef} style={style} className="p-4 hover:bg-gray-100/30 transition-all">
+    <div ref={setNodeRef} style={style} className="p-4 hover:bg-gray-50 transition-all">
       <div className="flex items-center gap-3">
         <button
           className="flex-shrink-0 cursor-grab active:cursor-grabbing touch-none text-gray-300 hover:text-gray-500"
@@ -426,36 +437,29 @@ function SortableMilestoneRow({
           title="Byt status"
         >
           {ms.status === 'completed' ? (
-            <CheckCircle className="w-6 h-6 text-emerald-600" />
+            <span className="w-6 h-6 rounded-full bg-primary-700 flex items-center justify-center">
+              <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+            </span>
           ) : ms.status === 'in_progress' ? (
-            <CircleDot className="w-6 h-6 text-primary-600" />
+            <span className="w-6 h-6 rounded-full ring-2 ring-primary-600 flex items-center justify-center bg-white">
+              <span className="w-2 h-2 rounded-full bg-primary-600" />
+            </span>
           ) : (
-            <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
+            <span className="w-6 h-6 rounded-full ring-2 ring-gray-300 bg-white block" />
           )}
         </button>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <p className={`font-medium text-sm ${ms.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-              {ms.name}
-            </p>
-            <span className={`px-2 py-0.5 text-xs rounded-full border ${
-              ms.status === 'completed'
-                ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
-                : ms.status === 'in_progress'
-                ? 'bg-primary-700/20 text-primary-600 border-primary-600/30'
-                : 'bg-gray-100 text-gray-500 border-gray-300'
-            }`}>
-              {ms.status === 'completed' ? 'Klart' : ms.status === 'in_progress' ? 'Pågående' : 'Väntande'}
-            </span>
-          </div>
+          <p className={`text-sm mb-0.5 ${
+            ms.status === 'completed'
+              ? 'text-gray-400 line-through font-medium'
+              : ms.status === 'in_progress'
+                ? 'text-gray-900 font-semibold'
+                : 'text-gray-900 font-medium'
+          }`}>
+            {ms.name}
+          </p>
           <div className="flex flex-wrap gap-3 text-xs text-gray-400">
-            {ms.due_date && (
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                {formatDate(ms.due_date)}
-              </span>
-            )}
             {hasTimeData && (
               <span className="flex items-center gap-1">
                 <Clock className="w-3 h-3" />
@@ -482,6 +486,10 @@ function SortableMilestoneRow({
             </div>
           )}
         </div>
+
+        <span className={`px-2 py-0.5 text-[11px] font-medium rounded-full whitespace-nowrap flex-shrink-0 ${chip.cls}`}>
+          {chip.text}
+        </span>
 
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
@@ -1738,12 +1746,17 @@ export default function ProjectDetailPage() {
   function groupSubrow(key: GroupKey): string | null {
     switch (key) {
       case 'economy_offert': {
+        // Del 3 (Projektvy Fas 2): copy accordion_subs vill ha "offertens
+        // totalbelopp" — forvantad_intakt_kr (budget + signerad ÄTA), samma
+        // värde som "Offererat"-ebaren i statuskortet — inte fakturerat-
+        // hittills-summan. Gatingen (visa bara om NÅGOT är fakturerat) är
+        // oförändrad.
         if (!canSeeFinancials || !statusEconomics) return null
-        const fakturerat = statusEconomics.intakter.fakturerat_kr
-        if (fakturerat <= 0) return null
+        const { fakturerat_kr, forvantad_intakt_kr } = statusEconomics.intakter
+        if (fakturerat_kr <= 0) return null
         return todoMode === 'klart_ofakturerat'
-          ? `${formatSEK(fakturerat)} · slutfaktura väntar på ditt OK`
-          : `${formatSEK(fakturerat)} · delfakturerad`
+          ? `${formatSEK(forvantad_intakt_kr)} · slutfaktura väntar på ditt OK`
+          : `${formatSEK(forvantad_intakt_kr)} · delfakturerad`
       }
       case 'changes': {
         if (changes.length === 0) return 'Inga ännu'
@@ -1759,6 +1772,16 @@ export default function ProjectDetailPage() {
         const hrs = summary?.total_hours ?? 0
         if (hrs <= 0) return 'Inga tidrapporter ännu'
         return `${formatHours(hrs)} · ${projectTeam.length} person${projectTeam.length === 1 ? '' : 'er'}`
+      }
+      case 'documentation': {
+        // Filantal från documents-listan. Egenkontroll-aggregatet
+        // (copy-exemplet "egenkontroll 6/9") utelämnat medvetet:
+        // project_checklist saknar en category-kolumn som skiljer
+        // "egenkontroll" från andra checklistetyper (bara fri-text
+        // `name` + `template_id`), så det går inte att räkna fram utan
+        // att gissa — se handoff-rapporten.
+        if (documents.length === 0) return null
+        return `${documents.length} fil${documents.length === 1 ? '' : 'er'}`
       }
       default:
         return null
@@ -2218,7 +2241,16 @@ export default function ProjectDetailPage() {
                 <p className="text-gray-400 text-sm">Planera arbete via resursplaneringen</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              // Canvas-tabellstil (DESIGN-NOTES §Desktop): uppercase
+              // kolumnrubriker 11.5px grå, tunna delare — samma mönster
+              // som Tidrapporter-tabellen ovan (Projektvy Fas 2, Del 2a).
+              <div className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-gray-100">
+                <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-3 text-[11.5px] uppercase tracking-wide text-gray-400 font-medium">
+                  <div className="col-span-4">Vad</div>
+                  <div className="col-span-3">När</div>
+                  <div className="col-span-3">Team</div>
+                  <div className="col-span-2 text-right">Status</div>
+                </div>
                 {projectSchedule.map(entry => {
                   const startDate = new Date(entry.start_datetime)
                   const endDate = new Date(entry.end_datetime)
@@ -2227,38 +2259,55 @@ export default function ProjectDetailPage() {
                   const timeStr = entry.all_day
                     ? 'Heldag'
                     : `${startDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`
+                  const statusChip = {
+                    cls: entry.status === 'completed' ? 'bg-green-100 text-green-700'
+                      : entry.status === 'cancelled' ? 'bg-red-100 text-red-700'
+                      : 'bg-primary-50 text-primary-700',
+                    text: entry.status === 'completed' ? 'Klart' : entry.status === 'cancelled' ? 'Avbokat' : 'Planerat',
+                  }
 
                   return (
                     <div
                       key={entry.id}
-                      className={`bg-white rounded-xl border border-[#E2E8F0] p-4 flex items-center gap-4 ${isPast ? 'opacity-60' : ''}`}
+                      className={`p-4 flex items-center gap-4 sm:grid sm:grid-cols-12 sm:gap-4 ${isPast ? 'opacity-60' : ''}`}
                     >
-                      <div className="w-1 h-12 rounded-full shrink-0" style={{ backgroundColor: entry.color || entry.business_user?.color || '#8B5CF6' }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-gray-900 font-medium truncate">{entry.title}</p>
-                        <div className="flex items-center gap-3 text-sm text-gray-500 mt-0.5">
+                      <div className="w-1 h-10 rounded-full shrink-0 sm:hidden" style={{ backgroundColor: entry.color || entry.business_user?.color || '#8B5CF6' }} />
+                      <div className="flex-1 min-w-0 sm:col-span-4">
+                        <p className="text-gray-900 font-medium truncate text-sm">{entry.title}</p>
+                        <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5 sm:hidden">
                           <span>{dateStr}</span>
                           <span>{timeStr}</span>
                         </div>
                       </div>
-                      {entry.business_user && (
-                        <div className="flex items-center gap-2 shrink-0">
+                      <div className="hidden sm:block sm:col-span-3 text-sm text-gray-500">
+                        {dateStr} · {timeStr}
+                      </div>
+                      <div className="hidden sm:flex sm:col-span-3 items-center gap-2">
+                        {entry.business_user && (
+                          <>
+                            <div
+                              className="w-6 h-6 rounded-full flex items-center justify-center text-gray-900 text-[10px] font-bold flex-shrink-0"
+                              style={{ backgroundColor: entry.business_user.color }}
+                            >
+                              {entry.business_user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                            </div>
+                            <span className="text-sm text-gray-500 truncate">{entry.business_user.name}</span>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 sm:col-span-2 sm:justify-end">
+                        {entry.business_user && (
                           <div
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-gray-900 text-xs font-bold"
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-gray-900 text-[10px] font-bold sm:hidden"
                             style={{ backgroundColor: entry.business_user.color }}
                           >
                             {entry.business_user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                           </div>
-                          <span className="text-sm text-gray-500 hidden sm:block">{entry.business_user.name}</span>
-                        </div>
-                      )}
-                      <span className={`text-xs px-2 py-1 rounded-full border shrink-0 ${
-                        entry.status === 'completed' ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
-                          : entry.status === 'cancelled' ? 'bg-red-100 text-red-600 border-red-500/30'
-                          : 'bg-primary-700/20 text-primary-600 border-primary-600/30'
-                      }`}>
-                        {entry.status === 'completed' ? 'Klart' : entry.status === 'cancelled' ? 'Avbokat' : 'Planerat'}
-                      </span>
+                        )}
+                        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0 ${statusChip.cls}`}>
+                          {statusChip.text}
+                        </span>
+                      </div>
                     </div>
                   )
                 })}
@@ -2768,9 +2817,9 @@ export default function ProjectDetailPage() {
                 </button>
               </div>
             ) : (
-              <div className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-gray-200">
-                {/* Table header */}
-                <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-3 text-xs text-gray-400 font-medium">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-gray-100">
+                {/* Table header — canvas-tabellstil (DESIGN-NOTES §Desktop) */}
+                <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-3 text-[11.5px] uppercase tracking-wide text-gray-400 font-medium">
                   <div className="col-span-2">Datum</div>
                   <div className="col-span-3">Beskrivning</div>
                   <div className="col-span-1 text-right">Tid</div>
@@ -2783,7 +2832,7 @@ export default function ProjectDetailPage() {
                   const hours = (entry.duration_minutes || 0) / 60
                   const total = hours * (entry.hourly_rate || 0)
                   return (
-                    <div key={entry.time_entry_id} className="p-4 hover:bg-gray-100/30 transition-all">
+                    <div key={entry.time_entry_id} className="p-4 hover:bg-gray-50 transition-all">
                       {/* Mobile layout */}
                       <div className="sm:hidden space-y-2">
                         <div className="flex items-center justify-between">
@@ -2804,7 +2853,7 @@ export default function ProjectDetailPage() {
                           </div>
                         </div>
                         {entry.description && <p className="text-sm text-gray-500">{entry.description}</p>}
-                        <div className="flex items-center justify-between text-xs text-gray-400">
+                        <div className="flex items-center justify-between text-xs text-gray-400 tabular-nums">
                           <span>{formatHours(hours)}</span>
                           <span>{formatCurrency(Math.round(total))}</span>
                         </div>
@@ -2814,9 +2863,9 @@ export default function ProjectDetailPage() {
                       <div className="hidden sm:grid grid-cols-12 gap-4 items-center">
                         <div className="col-span-2 text-sm text-gray-900">{formatDate(entry.work_date)}</div>
                         <div className="col-span-3 text-sm text-gray-500 truncate">{entry.description || '-'}</div>
-                        <div className="col-span-1 text-sm text-gray-900 text-right">{formatHours(hours)}</div>
-                        <div className="col-span-2 text-sm text-gray-500 text-right">{formatCurrency(entry.hourly_rate)}/tim</div>
-                        <div className="col-span-2 text-sm text-gray-900 text-right font-medium">{formatCurrency(Math.round(total))}</div>
+                        <div className="col-span-1 text-sm text-gray-900 text-right tabular-nums">{formatHours(hours)}</div>
+                        <div className="col-span-2 text-sm text-gray-500 text-right tabular-nums">{formatCurrency(entry.hourly_rate)}/tim</div>
+                        <div className="col-span-2 text-sm text-gray-900 text-right font-medium tabular-nums">{formatCurrency(Math.round(total))}</div>
                         <div className="col-span-2 flex items-center justify-end gap-2">
                           {entry.work_type?.name && (
                             <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-secondary-700 border border-[#E2E8F0]">
@@ -3201,7 +3250,12 @@ export default function ProjectDetailPage() {
                 <p className="text-gray-400 text-sm mt-1">Lagg till teammedlemmar for att tilldela dem detta projekt</p>
               </div>
             ) : (
-              <div className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-gray-200">
+              // Person-chips (DESIGN-NOTES §Desktop): avatar + fet namn +
+              // grå roll-subrad i bg-gray-50 rounded-lg-pill. Timmar/person
+              // utelämnat medvetet — TimeEntry saknar business_user_id här
+              // (se kommentar vid todoActionRows ovan), går inte att räkna
+              // fram utan att hitta på.
+              <div className="flex flex-col gap-2">
                 {[...projectTeam]
                   .sort((a, b) => {
                     if (a.role === 'lead' && b.role !== 'lead') return -1
@@ -3211,8 +3265,8 @@ export default function ProjectDetailPage() {
                   .map(assignment => {
                   const isLead = assignment.role === 'lead'
                   return (
-                  <div key={assignment.id} className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  <div key={assignment.id} className="flex items-center justify-between gap-3 bg-gray-50 border border-[#E2E8F0] rounded-lg px-3 py-2.5">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div
                         className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: assignment.business_user.color }}
@@ -3221,11 +3275,11 @@ export default function ProjectDetailPage() {
                           {assignment.business_user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                         </span>
                       </div>
-                      <div>
-                        <p className="text-gray-900 font-medium">{assignment.business_user.name}</p>
-                        <p className="text-xs text-gray-400">{assignment.business_user.title || assignment.business_user.role}</p>
+                      <div className="min-w-0">
+                        <p className="text-gray-900 font-semibold text-sm truncate">{assignment.business_user.name}</p>
+                        <p className="text-xs text-gray-400 truncate">{assignment.business_user.title || assignment.business_user.role}</p>
                       </div>
-                      <span className={`px-2 py-0.5 text-xs rounded-full border ${
+                      <span className={`px-2 py-0.5 text-xs rounded-full border flex-shrink-0 ${
                         isLead
                           ? 'bg-amber-50 text-amber-700 border-amber-200 font-medium'
                           : 'bg-gray-100 text-gray-500 border-gray-300'
@@ -3234,13 +3288,13 @@ export default function ProjectDetailPage() {
                       </span>
                     </div>
                     {can('see_all_projects') && (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         <button
                           onClick={() => handleSetLead(assignment.business_user_id, !isLead)}
                           className={`px-2.5 py-1.5 text-xs rounded-lg transition-all font-medium ${
                             isLead
-                              ? 'text-amber-700 hover:bg-amber-50'
-                              : 'text-gray-400 hover:text-amber-700 hover:bg-amber-50'
+                              ? 'text-amber-700 hover:bg-amber-100'
+                              : 'text-gray-400 hover:text-amber-700 hover:bg-amber-100'
                           }`}
                           title={isLead ? 'Ta bort som ansvarig' : 'Gör till ansvarig'}
                         >
@@ -3275,7 +3329,7 @@ export default function ProjectDetailPage() {
             {generatedDocs.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-gray-700">Malldokument</h3>
+                  <h3 className="text-[15px] font-semibold text-gray-900">Malldokument</h3>
                   <a href="/dashboard/documents" className="text-xs text-secondary-700 hover:text-primary-700">Alla dokument &rarr;</a>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -3546,7 +3600,7 @@ export default function ProjectDetailPage() {
                 </button>
                 <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-gray-900 font-semibold">{activeChecklist.name}</h3>
+                    <h3 className="text-[15px] font-semibold text-gray-900">{activeChecklist.name}</h3>
                     <span className={`px-2 py-0.5 text-xs rounded-full ${
                       activeChecklist.status === 'completed'
                         ? 'bg-emerald-100 text-emerald-600'
@@ -3631,7 +3685,7 @@ export default function ProjectDetailPage() {
                         className="bg-white rounded-xl border border-[#E2E8F0] p-4 text-left hover:border-primary-300 transition"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <h3 className="text-sm font-medium text-gray-900">{cl.name}</h3>
+                          <h3 className="text-[15px] font-semibold text-gray-900">{cl.name}</h3>
                           <span className={`px-2 py-0.5 text-xs rounded-full ${
                             cl.status === 'completed'
                               ? 'bg-emerald-100 text-emerald-600'
@@ -3682,7 +3736,7 @@ export default function ProjectDetailPage() {
                         className="bg-white rounded-xl border border-[#E2E8F0] p-4 text-left hover:border-primary-300 transition"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <h3 className="text-sm font-medium text-gray-900">{fs.name}</h3>
+                          <h3 className="text-[15px] font-semibold text-gray-900">{fs.name}</h3>
                           <span className={`px-2 py-0.5 text-xs rounded-full ${
                             fs.status === 'signed'
                               ? 'bg-emerald-100 text-emerald-600'

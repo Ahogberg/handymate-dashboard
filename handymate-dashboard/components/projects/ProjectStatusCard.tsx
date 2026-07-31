@@ -18,13 +18,13 @@ import type { ProjectEconomics } from '@/lib/projects/compute-economics'
  * Ekonomistaplar + prognosrad (`canSeeFinancials=true` + `economics`
  * laddad) visas ENDAST för ägaren — layouten fungerar utan dem.
  *
- * ROT-fotrad (canvas-designen har en) UTELÄMNAD medvetet: varken
- * /api/projects/[id]/profitability (ProjectEconomics) eller offert-
- * contexten (quote-context) exponerar ett färdigberäknat ROT-belopp/
- * arbetskostnad-för-kund-fält att visa. Att räkna ut det själv här hade
- * brutit mot regeln "hitta inte på matte" och riskerat att återinföra
- * ROT-buggen som nyligen fixades (lib/rot-rut.ts äger den beräkningen).
- * Se handoff-rapporten för detaljer.
+ * ROT-fotrad (Projektvy Fas 2, 2026-07-31): /api/projects/[id]/
+ * profitability exponerar nu `quote_rot_rut` — lagrade ROT/RUT-fält
+ * från projektets kopplade offert (se getQuoteRotRut i profitability/
+ * route.ts + ProjectEconomics.quote_rot_rut i compute-economics.ts).
+ * Raden renderas ENDAST när arbetskostnad, avdrag OCH kunden-betalar
+ * samtliga finns — annars utelämnas den helt (ingen gissad matte,
+ * lib/rot-rut.ts äger fortfarande själva beräkningen).
  *
  * Fas-stepper-mappning (tolkning, ej explicit i HANDOFF — dokumenterad i
  * rapporten): position 1–2 (Kontrakt signerat, Startmöte bokat) =
@@ -221,6 +221,19 @@ function EkonomiStaplar({ economics, state }: { economics: ProjectEconomics; sta
   const isPositive = isConfirmed && (economics.marginal.marginal_kr ?? 0) >= 0
   const isNegative = isConfirmed && (economics.marginal.marginal_kr ?? 0) < 0
 
+  // ROT-fotrad (statuskort.rot_rad) — lagrade värden från kopplad offert,
+  // aldrig omräknade här. Visas bara när arbetsbas, avdrag OCH
+  // kunden-betalar samtliga finns för den aktiva typen (rot|rut).
+  const qrr = economics.quote_rot_rut
+  const rotIsRot = qrr?.rot_rut_type === 'rot'
+  const rotIsRut = qrr?.rot_rut_type === 'rut'
+  const rotWork = rotIsRot ? qrr!.rot_work_cost : rotIsRut ? qrr!.rut_work_cost : undefined
+  const rotDeduction = rotIsRot ? qrr!.rot_deduction : rotIsRut ? qrr!.rut_deduction : undefined
+  const rotCustomerPays = qrr?.customer_pays
+  const rotLabel = rotIsRot ? 'ROT' : rotIsRut ? 'RUT' : null
+  const showRotRow =
+    rotLabel != null && rotWork != null && rotDeduction != null && rotCustomerPays != null
+
   let dotClass = 'bg-amber-500'
   // copy.projektvy.sv.json prognos_kvar = "kvar att fakturera {belopp}" (belopp
   // sist) — DESIGN-NOTES.md-exemplet visar motsatt ordning, men JSON:en är
@@ -252,6 +265,14 @@ function EkonomiStaplar({ economics, state }: { economics: ProjectEconomics; sta
         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotClass}`} />
         <span className="text-xs font-medium text-gray-700">{prognosText}</span>
       </div>
+
+      {showRotRow && (
+        <p className="text-xs text-gray-500 pt-3 mt-1 border-t border-gray-100">
+          Varav arbete <span className="font-semibold text-gray-700">{formatSEK(rotWork!)}</span>{' '}
+          → {rotLabel}-avdrag <span className="font-semibold text-gray-700">{formatSEK(rotDeduction!)}</span>{' '}
+          · kunden betalar <span className="font-semibold text-gray-700">{formatSEK(rotCustomerPays!)}</span>
+        </p>
+      )}
     </div>
   )
 }

@@ -102,6 +102,29 @@ export interface ProjectEconomics {
     supplier_invoice_count: number
     extra_cost_count: number  // antal project_cost-rader
   }
+
+  /**
+   * ROT/RUT-fält från projektets kopplade offert (Projektvy Fas 2,
+   * 2026-07-31). OBS: populeras av /api/projects/[id]/profitability
+   * (route-lagret) — INTE av computeProjectEconomics ovan. Helpern
+   * känner inte till quotes-tabellen och gör ingen ROT/RUT-matte;
+   * detta är rena, redan lagrade quotes-kolumner vidarebefordrade
+   * ograverade (lib/rot-rut.ts äger själva beräkningen).
+   *
+   * null om projektet saknar kopplad offert, offerten saknar
+   * rot_rut_type, eller quotes-raden inte kunde hämtas. Nycklarna är
+   * EXAKT quotes-tabellens kolumnnamn (verifierat mot app/api/quotes/
+   * — rot_deduction har fallback till legacy-kolumnen rot_rut_deduction
+   * på samma sätt som app/api/quotes/pdf/route.ts gör).
+   */
+  quote_rot_rut: {
+    rot_rut_type: 'rot' | 'rut'
+    rot_work_cost?: number
+    rot_deduction?: number
+    rut_work_cost?: number
+    rut_deduction?: number
+    customer_pays?: number
+  } | null
 }
 
 export interface ProjectExtraCost {
@@ -431,5 +454,8 @@ export async function computeProjectEconomics(
       supplier_invoice_count: supplierInvoices.length,
       extra_cost_count: extraCosts.length,
     },
+    // Sätts av routen (se fältets docstring ovan) — helpern har ingen
+    // quotes-koppling.
+    quote_rot_rut: null,
   }
 }

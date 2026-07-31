@@ -85,7 +85,7 @@ export function ProjectQuoteDocumentCard({ projectId }: ProjectQuoteDocumentCard
 
   return (
     <div>
-      <h3 className="text-sm font-medium text-gray-700 mb-3">Offert</h3>
+      <h3 className="text-[15px] font-semibold text-gray-900 mb-3">Offert</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <a
           href={data.dokument.pdf_url}
