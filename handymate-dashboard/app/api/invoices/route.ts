@@ -27,6 +27,8 @@ export async function GET(request: NextRequest) {
     const businessId = business.business_id
     const status = request.nextUrl.searchParams.get('status')
     const customerId = request.nextUrl.searchParams.get('customerId')
+    // Projektvyns Fakturor-panel (2026-07-31): filtrera på kopplat projekt.
+    const projectId = request.nextUrl.searchParams.get('projectId')
     const invoiceType = request.nextUrl.searchParams.get('invoiceType')
     const dateFrom = request.nextUrl.searchParams.get('dateFrom')
     const dateTo = request.nextUrl.searchParams.get('dateTo')
@@ -54,6 +56,9 @@ export async function GET(request: NextRequest) {
     }
     if (customerId) {
       query = query.eq('customer_id', customerId)
+    }
+    if (projectId) {
+      query = query.eq('project_id', projectId)
     }
     if (invoiceType) {
       query = query.eq('invoice_type', invoiceType)

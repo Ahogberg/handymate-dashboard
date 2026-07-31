@@ -644,6 +644,18 @@ export default function ProjectDetailPage() {
   const [supplierInvoices, setSupplierInvoices] = useState<any[]>([])
   const [siModal, setSiModal] = useState<{ open: boolean; editing: any | null }>({ open: false, editing: null })
 
+  // Kundfakturor kopplade till projektet (Fakturor-panelen, canvas desktop-
+  // frame 2). Ägar-gated — hämtas bara i economy_offert-gruppens effekt.
+  const [projectInvoices, setProjectInvoices] = useState<{
+    invoice_id: string
+    invoice_number: string | null
+    status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'credited'
+    total: number | null
+    invoice_date: string | null
+    paid_at: string | null
+    due_date: string | null
+  }[]>([])
+
   // Time entry modal
   const [showTimeModal, setShowTimeModal] = useState(false)
   const [timeModalCustomers, setTimeModalCustomers] = useState<{ customer_id: string; name: string }[]>([])
@@ -820,6 +832,7 @@ export default function ProjectDetailPage() {
       // ProjectEconomicsCard hämtar /api/projects/[id]/profitability själv.
       // Icke-ägare ser bara offert-specen i denna grupp — inga ekonomihämtningar.
       fetchSupplierInvoices()
+      fetchProjectInvoices()
       if (projectPriceList.length === 0) {
         supabase
           .from('price_list')
@@ -1055,6 +1068,18 @@ export default function ProjectDetailPage() {
       if (res.ok) {
         const data = await res.json()
         setSupplierInvoices(data.invoices || [])
+      }
+    } catch { /* ignore */ }
+  }
+
+  const fetchProjectInvoices = async () => {
+    try {
+      // GET /api/invoices kräver see_financials server-side — anropas bara
+      // från den ägar-gatade economy_offert-effekten.
+      const res = await fetch(`/api/invoices?projectId=${projectId}&sortBy=invoice_date&sortOrder=asc`)
+      if (res.ok) {
+        const data = await res.json()
+        setProjectInvoices(data.invoices || data || [])
       }
     } catch { /* ignore */ }
   }
@@ -3802,6 +3827,55 @@ export default function ProjectDetailPage() {
         {/* === TAB: Offert === */}
         {activeGroup === 'economy_offert' && (
           <ProjectQuoteSpec projectId={projectId} />
+        )}
+
+        {/* === Fakturor — kundfakturor kopplade till projektet (ägar-gated,
+             canvas desktop-frame 2). Panelen utelämnas helt när inga finns. === */}
+        {activeGroup === 'economy_offert' && canSeeFinancials && projectInvoices.length > 0 && (
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-5">
+            <h3 className="text-[15px] font-semibold text-gray-900 mb-3">Fakturor</h3>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left">
+                  <th className="text-[11.5px] font-semibold uppercase tracking-wide text-gray-400 pb-2 border-b border-gray-100">Faktura</th>
+                  <th className="text-[11.5px] font-semibold uppercase tracking-wide text-gray-400 pb-2 border-b border-gray-100">Status</th>
+                  <th className="text-[11.5px] font-semibold uppercase tracking-wide text-gray-400 pb-2 border-b border-gray-100 text-right">Belopp</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projectInvoices.map(inv => {
+                  const chip =
+                    inv.status === 'paid'
+                      ? { cls: 'bg-green-100 text-green-700', label: inv.paid_at ? `Betald ${new Date(inv.paid_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}` : 'Betald' }
+                      : inv.status === 'overdue'
+                        ? { cls: 'bg-red-100 text-red-700', label: 'Förfallen' }
+                        : inv.status === 'sent'
+                          ? { cls: 'bg-primary-100 text-primary-700', label: 'Skickad' }
+                          : inv.status === 'credited'
+                            ? { cls: 'bg-gray-100 text-gray-500', label: 'Krediterad' }
+                            : inv.status === 'cancelled'
+                              ? { cls: 'bg-gray-100 text-gray-500', label: 'Makulerad' }
+                              : { cls: 'bg-gray-100 text-gray-500', label: 'Utkast' }
+                  return (
+                    <tr key={inv.invoice_id} className="border-b border-gray-100 last:border-b-0">
+                      <td className="py-2.5 pr-3 text-gray-700">
+                        {inv.invoice_number ? `Faktura ${inv.invoice_number}` : 'Faktura'}
+                        {inv.invoice_date && (
+                          <span className="text-gray-400"> · {new Date(inv.invoice_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 pr-3">
+                        <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-md whitespace-nowrap ${chip.cls}`}>{chip.label}</span>
+                      </td>
+                      <td className="py-2.5 text-right font-semibold text-gray-900 tabular-nums whitespace-nowrap">
+                        {inv.total != null ? formatSEK(inv.total) : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {/* === TAB: Ekonomi === (ägar-gated) */}
