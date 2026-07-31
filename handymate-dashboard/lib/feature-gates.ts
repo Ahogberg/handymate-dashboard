@@ -1,3 +1,10 @@
+// Andreas-beslut 2026-07-31: 'starter' är borttagen ur det publika köpflödet
+// (onboarding + uppgraderingssidan) fr.o.m. 2026-07-31 — den bryter
+// kategorilöftet "hela teamet" som publikt utbud nu är Professional (ingång)
+// + Business (volym) + Anpassad. 'starter' behålls här som plantyp för
+// befintliga konton och som ett tyst nedgraderingsalternativ (support kan
+// fortfarande sätta en kund till starter) — all gating-logik nedan är
+// OFÖRÄNDRAD och gäller precis som förut.
 export type PlanType = 'starter' | 'professional' | 'business'
 
 export interface FeatureGate {

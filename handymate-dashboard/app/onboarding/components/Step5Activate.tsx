@@ -12,22 +12,14 @@ import type { OnboardingFormData } from '../types-redesign'
  * via agent-avatars + rich-content InfoSheet med "vilka fördelar".
  * agents-array listar vilka TEAM-IDs som ingår; valueBullets används i
  * InfoSheet för "typiskt värde + när byter folk upp"-kontext.
+ *
+ * Andreas-beslut 2026-07-31: Starter/Bas borttagen ur köpflödet — publikt
+ * utbud är nu bara Professional (ingång, hela teamet) + Business (volym/
+ * fler användare) + "Anpassad — kontakta oss". Plantypen 'starter' finns
+ * kvar i lib/feature-gates.ts och backend (tyst nedgradering + befintliga
+ * konton) — se kommentar där för motivering.
  */
 const PLANS = [
-  {
-    id: 'starter',
-    name: 'Bas',
-    price: 2495,
-    popular: false,
-    agents: ['lisa', 'karin'],
-    features: ['Lisa svarar i telefonen åt dig', 'Karin följer fakturor', 'Upp till 50 samtal/mån'],
-    valueBullets: [
-      'Du missar inga samtal — Lisa svarar 24/7 även när du är på taket',
-      'Karin nudgar förfallna fakturor automatiskt (med ditt godkännande)',
-      'Passar enmansföretagare som vill släppa telefonen',
-    ],
-    upgradeHint: 'När du börjar skicka 5+ offerter/månad är det dags att titta på Pro (Daniel följer dem).',
-  },
   {
     id: 'professional',
     name: 'Pro',
@@ -111,7 +103,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
     }
   }
 
-  const selectedPlan = PLANS.find(p => p.id === plan) || PLANS[1]
+  const selectedPlan = PLANS.find(p => p.id === plan) || PLANS[0]
 
   return (
     <div className="ob-screen">
@@ -178,7 +170,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
         <label className="ob-label" style={{ marginBottom: 10 }}>
           Välj plan
         </label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 10 }}>
           {PLANS.map(p => (
             <PlanCard
               key={p.id}
@@ -189,6 +181,13 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
             />
           ))}
         </div>
+
+        <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--ob-muted)', marginBottom: 24 }}>
+          Större företag med särskilda behov?{' '}
+          <a href="mailto:andreas@handymate.se" style={{ color: 'var(--ob-primary-700)', fontWeight: 600 }}>
+            Mejla oss på andreas@handymate.se
+          </a>
+        </p>
 
         {/* Betalning sker på Stripes säkra sida (redirect vid "Aktivera") */}
         <div

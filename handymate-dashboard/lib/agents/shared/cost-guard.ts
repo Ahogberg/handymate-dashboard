@@ -1,5 +1,6 @@
 /**
- * lib/agents/shared/cost-guard.ts (Steg 7-fix, 2026-05-29).
+ * lib/agents/shared/cost-guard.ts (Steg 7-fix, 2026-05-29; marginalstyrda
+ * plan-tak Andreas-beslut 2026-07-31).
  *
  * Delad cost-guardrail-logik för agent-observation-routes.
  *
@@ -18,6 +19,31 @@
  *   logAgentRun()      — efter runner. Skriver agent_runs-rad med
  *                        usage + estimated_cost från callAgentWithThinking-
  *                        debug. Non-blocking på fel.
+ *
+ * DEGRADERA-INTE-STOPPA-SEMANTIK (Andreas-beslut 2026-07-31):
+ * Taket är byggt för att skydda marginal på BAKGRUNDS-observationer — de
+ * schemalagda agent-observation-körningarna (karin/daniel/lars/hanna) som
+ * cron:ar två gånger i veckan och proaktivt letar upp saker att flagga.
+ * Om taket nås för dagen skippas EN DAGS körning för den businessen; nästa
+ * cron-körning (nästa schemalagda dag) summerar om från noll och kör igen.
+ * Inget går förlorat permanent — det är senarelagt, inte bortglömt.
+ *
+ * Detta ska ALDRIG påverka en pågående kundkontakt eller en hantverkare
+ * som aktivt använder produkten. Verifierat 2026-07-31:
+ *   - app/api/matte/chat/route.ts (Mattes chatt, webb+mobil) anropar INTE
+ *     checkCostGuards någonstans — chatten är helt okopplad från taket.
+ *   - app/api/agent/trigger/route.ts anropar DÄREMOT checkCostGuards för
+ *     ALLA trigger_types (se kommentar vid TD-52 i den filen, rad ~136-139:
+ *     "Gäller ALLA triggers (SMS/samtal/chat/cron)") — INKLUSIVE 'manual',
+ *     'phone_call', 'incoming_sms' och 'email_received', som routens EGEN
+ *     kommentar klassar som användarinitierade/konversationella triggers.
+ *     Det betyder att taket i praktiken KAN stoppa en pågående kundkontakt
+ *     eller ett hantverkar-initierat anrop via den routen — vilket INTE
+ *     stämmer med degradera-inte-stoppa-löftet ovan. Detta är en verklig
+ *     avvikelse, flaggad för Andreas 2026-07-31 — INTE ändrad här (ingår
+ *     inte i detta uppdrag, och en beteendeändring i den routen kräver ett
+ *     eget beslut om vad som ska hända istället när taket nås mitt i ett
+ *     kundsamtal).
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -31,14 +57,55 @@ export interface CostGuardSkip {
 }
 
 /** Subset av business_config-fält som cost-guarden behöver. Caller
-    ansvarar för att SELECT:a dessa i sin business_config-query. */
+    ansvarar för att SELECT:a dessa i sin business_config-query.
+    subscription_plan är valfri — utan den faller cap-resolutionen tillbaka
+    på DEFAULT_CAP_USD precis som innan planbaserade tak infördes (bakåt-
+    kompatibelt för anropare som inte SELECT:ar fältet ännu). */
 export interface CostGuardBusiness {
   business_id: string
   agents_globally_paused?: boolean | null
   agent_cost_cap_usd_daily?: number | string | null
+  subscription_plan?: string | null
 }
 
 const DEFAULT_CAP_USD = 5.0
+
+/**
+ * Per-plan default-tak i USD/dygn för bakgrunds-agentkörningar.
+ *
+ * Andreas-beslut 2026-07-31: nivåerna är satta för att skydda 85–90 %
+ * bruttomarginal vid full nyttjande av respektive plan (baserat på
+ * Anthropic-kostnad per observation-körning vs. planens abonnemangspris).
+ * Ett explicit värde i business_config.agent_cost_cap_usd_daily VINNER
+ * ALLTID över plan-defaulten — se resolveCostCapUsd().
+ */
+export const PLAN_COST_CAPS_USD: Record<string, number> = {
+  starter: 1.5,
+  professional: 3.0,
+  business: 8.0,
+}
+
+/**
+ * Cap-resolution, delad av checkCostGuards() och driftlarm-svepet
+ * (app/api/cron/driftlarm/route.ts) så de aldrig kan divergera.
+ *
+ * Prioritet: 1) explicit agent_cost_cap_usd_daily på businessen,
+ *            2) PLAN_COST_CAPS_USD[subscription_plan],
+ *            3) DEFAULT_CAP_USD (5.0) som sista fallback.
+ */
+export function resolveCostCapUsd(business: {
+  agent_cost_cap_usd_daily?: number | string | null
+  subscription_plan?: string | null
+}): number {
+  if (business.agent_cost_cap_usd_daily != null) {
+    return Number(business.agent_cost_cap_usd_daily)
+  }
+  const plan = business.subscription_plan
+  if (plan && PLAN_COST_CAPS_USD[plan] != null) {
+    return PLAN_COST_CAPS_USD[plan]
+  }
+  return DEFAULT_CAP_USD
+}
 
 /**
  * Start of today (UTC) ISO-sträng. Används som lower bound när vi
@@ -77,9 +144,7 @@ export async function checkCostGuards(
   }
 
   // ── 2. Cost-cap ────────────────────────────────────────────────
-  const cap = business.agent_cost_cap_usd_daily != null
-    ? Number(business.agent_cost_cap_usd_daily)
-    : DEFAULT_CAP_USD
+  const cap = resolveCostCapUsd(business)
 
   let todayCostUsd = 0
   try {

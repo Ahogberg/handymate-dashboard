@@ -133,18 +133,26 @@ export async function POST(request: NextRequest) {
       }, { status: 402 })
     }
 
-    // Kill-switch + kostnadstak: hoppa över hela token-loopen om agenterna är
-    // globalt pausade eller dagens kostnadstak passerats. Gäller ALLA triggers
-    // (SMS/samtal/chat/cron). Returnerar 200 med skipped-flagga så telefoni-/
-    // SMS-webhooks inte tolkar det som ett fel (samma mönster som cron-routen).
+    // Kill-switch + kostnadstak (degradera-inte-stoppa, Andreas-beslut
+    // 2026-07-31): kill-switchen (agents_globally_paused — kundens egen paus)
+    // gäller ALLA triggers. Kostnadstaket gäller däremot ENDAST bakgrunds-
+    // triggers (triggerSource 'system': cron, importer m.m.) — kundhändelser
+    // (phone_call, incoming_sms, manual, e-post = 'user') får ALDRIG stoppas
+    // av taket: ett ignorerat inkommande samtal är förlorat för alltid,
+    // medan ett senarelagt cron-jobb körs ikapp nästa dag. Returnerar 200
+    // med skipped-flagga så telefoni-/SMS-webhooks inte tolkar det som fel.
     const { data: guardConfig } = await supabase
       .from('business_config')
-      .select('business_id, agents_globally_paused, agent_cost_cap_usd_daily')
+      .select('business_id, agents_globally_paused, agent_cost_cap_usd_daily, subscription_plan')
       .eq('business_id', businessId)
       .single()
 
     if (guardConfig) {
-      const skip = await checkCostGuards(supabase, guardConfig, body.agent_id || 'matte')
+      const skip = triggerSource === 'user'
+        ? (guardConfig.agents_globally_paused === true
+            ? { skipped: 'agents_globally_paused' as const }
+            : null)
+        : await checkCostGuards(supabase, guardConfig, body.agent_id || 'matte')
       if (skip) {
         return NextResponse.json({
           skipped: skip.skipped,

@@ -205,3 +205,18 @@ faktura→Vunnen-steget dock fortfarande obevisat tills B7/riktig betalning).
 **Verifiering som flyttar BYGGT→LIVE:** end-to-end-test (testpartner → kod →
 registrering → dashboard → provisionsrad) + bekräfta v14_partners körd i prod.
 Får INTE säljas som beprövat till partner innan dess.
+
+## §8 Planstruktur (ändrad 2026-07-31, Andreas-beslut)
+
+Publikt utbud: **Professional 5 995 kr/mån** (ingång — hela AI-teamet, sex
+medarbetare) + **Business 11 995 kr/mån** (skillnad = volym & människor:
+obegränsade användare, 1 000 SMS, större användningsutrymme, hemsida+SEO,
+dedikerad support) + **"Anpassad — kontakta oss"** (inget löfte om
+enterprise-funktioner; bara kontaktväg). **Starter/Bas (2 495) är BORTTAGEN
+ur allt publikt utbud och säljmaterial** — den bröt kategorilöftet (bara
+Matte ≠ AI-team). Plantypen finns kvar i koden för befintliga konton och
+tyst nedgradering. FÖRBJUDET framåt: nämna 2 495/Bas/Starter i pitch, demo
+eller publika sidor. Interna marginaltak per plan ($1,5/$3/$8 per dag,
+degradera-inte-stoppa) är INTERNA — får aldrig beskrivas som "tokens" eller
+tak mot kund; kundspråket är "normal användning" (se
+content/juridik/fair-use-utkast.md, jurist krävs).

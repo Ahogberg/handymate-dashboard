@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { sendEmail } from '@/lib/email'
+import { resolveCostCapUsd } from '@/lib/agents/shared/cost-guard'
 
 /**
  * GET/POST /api/cron/driftlarm
@@ -19,6 +20,11 @@ import { sendEmail } from '@/lib/email'
  *  4. automation_activity — status='failed' (tabell + kolumner verifierade i
  *     sql/automation_center.sql och lib/automations.ts:logAutomationActivity —
  *     business_id, automation_type, action, description, status, created_at)
+ *  5. Användningssignal (Andreas-beslut 2026-07-31) — INTE ett fel-svep. Letar
+ *     efter businesses som konsekutivt ligger nära sitt AI-kostnadstak (samma
+ *     cap-resolution som lib/agents/shared/cost-guard.ts) — uppsäljningssignal,
+ *     inte en driftstörning. Räknas separat från felantalet, men triggar mail
+ *     på egen hand (se mailed-villkoret nedan).
  *
  * Demokontot (business_id === DEMO_BUSINESS_ID) exkluderas ur alla svep så det
  * aldrig orsakar dagliga larm.
@@ -179,24 +185,99 @@ async function runDriftlarm() {
     brokenSweeps.push('Automationer')
   }
 
+  // 5. Användningssignal — INTE ett fel-svep (se filhuvudet). Summerar
+  // agent_runs.estimated_cost per business per rullande 24h-dygn de senaste
+  // 7 dygnen (dygn 0 = senaste 24h, ..., dygn 6 = 7 dygn sedan). Om ≥3 av de
+  // 7 dygnen ligger ≥80 % av businessens tak (samma resolveCostCapUsd som
+  // cost-guard.ts: explicit agent_cost_cap_usd_daily → PLAN_COST_CAPS_USD →
+  // 5.0-fallback) räknas businessen som en uppgraderingskandidat.
+  let usageSignal: SweepOutcome = EMPTY
+  try {
+    const now = Date.now()
+    const sevenDaysAgoIso = new Date(now - 7 * 24 * 3600_000).toISOString()
+
+    let bizQ = supabase
+      .from('business_config')
+      .select('business_id, subscription_plan, agent_cost_cap_usd_daily')
+    if (demoBusinessId) bizQ = bizQ.neq('business_id', demoBusinessId)
+    const { data: bizRows, error: bizErr } = await bizQ
+    if (bizErr) throw bizErr
+
+    let runsQ = supabase
+      .from('agent_runs')
+      .select('business_id, estimated_cost, created_at')
+      .gte('created_at', sevenDaysAgoIso)
+    if (demoBusinessId) runsQ = runsQ.neq('business_id', demoBusinessId)
+    const { data: runRows, error: runErr } = await runsQ
+    if (runErr) throw runErr
+
+    // business_id → 7 dygns-slots (index 0 = senaste 24h)
+    const dayBuckets = new Map<string, number[]>()
+    for (const r of (runRows || []) as Array<{ business_id: string; estimated_cost: number | string | null; created_at: string }>) {
+      const ageMs = now - new Date(r.created_at).getTime()
+      const dayIdx = Math.min(6, Math.max(0, Math.floor(ageMs / 86_400_000)))
+      if (!dayBuckets.has(r.business_id)) dayBuckets.set(r.business_id, [0, 0, 0, 0, 0, 0, 0])
+      dayBuckets.get(r.business_id)![dayIdx] += Number(r.estimated_cost || 0)
+    }
+
+    const candidates: Array<{ business_id: string; plan: string; avgDailyCostUsd: number; capUsd: number }> = []
+    for (const biz of (bizRows || []) as Array<{ business_id: string; subscription_plan: string | null; agent_cost_cap_usd_daily: number | string | null }>) {
+      const dayCosts = dayBuckets.get(biz.business_id)
+      if (!dayCosts) continue
+      const capUsd = resolveCostCapUsd(biz)
+      const threshold = capUsd * 0.8
+      const daysNearCap = dayCosts.filter((c) => c >= threshold).length
+      if (daysNearCap >= 3) {
+        const avgDailyCostUsd = dayCosts.reduce((s, c) => s + c, 0) / 7
+        candidates.push({
+          business_id: biz.business_id,
+          plan: biz.subscription_plan || 'starter',
+          avgDailyCostUsd,
+          capUsd,
+        })
+      }
+    }
+
+    usageSignal = {
+      ok: true,
+      count: candidates.length,
+      rows: candidates.slice(0, 5).map(
+        (c) =>
+          `${escapeHtml(c.business_id)} — plan ${escapeHtml(c.plan)} — snitt ${c.avgDailyCostUsd.toFixed(2)} USD/dag (tak ${c.capUsd.toFixed(2)} USD)`
+      ),
+    }
+  } catch (err) {
+    console.error('[driftlarm] användningssignal-svepet kraschade:', err)
+    brokenSweeps.push('Användningssignal')
+  }
+
   const totals = {
     sms: sms.count,
     email: email.count,
     billing: billing.count,
     automation: automation.count,
   }
+  // usageSignal räknas medvetet INTE in i totalErrors — det är en
+  // uppsäljningssignal, inte ett fel (se filhuvudet + Del 3-beslutet).
   const totalErrors = totals.sms + totals.email + totals.billing + totals.automation
 
   let mailed = false
-  // Mailar om något faktiskt hittades ELLER ett svep gick sönder (en trasig
-  // kontroll är i sig en driftrisk Andreas ska känna till — tystnad ska
-  // aldrig betyda "vi vet inte" utan "vi kollade och det var rent").
-  if (totalErrors > 0 || brokenSweeps.length > 0) {
+  // Mailar om något faktiskt hittades, ett svep gick sönder, ELLER
+  // användningssignalen ensam har träffar (en trasig kontroll är i sig en
+  // driftrisk Andreas ska känna till — tystnad ska aldrig betyda "vi vet
+  // inte" utan "vi kollade och det var rent").
+  if (totalErrors > 0 || brokenSweeps.length > 0 || usageSignal.count > 0) {
     try {
-      const html = buildDriftlarmHtml({ sms, email, billing, automation, brokenSweeps })
+      const html = buildDriftlarmHtml({ sms, email, billing, automation, usageSignal, brokenSweeps })
+      // Om enbart signalen utlöser mailet (inga fel, inga trasiga svep) får
+      // det en egen ämnesrad — signalen ska aldrig se ut som ett driftlarm.
+      const onlySignal = totalErrors === 0 && brokenSweeps.length === 0 && usageSignal.count > 0
+      const subject = onlySignal
+        ? `💡 Handymate användningssignal: ${usageSignal.count} kunder nära taket`
+        : `⚠️ Handymate driftlarm: ${totalErrors} fel senaste dygnet`
       const result = await sendEmail({
         to: 'andreas@handymate.se',
-        subject: `⚠️ Handymate driftlarm: ${totalErrors} fel senaste dygnet`,
+        subject,
         html,
       })
       mailed = result.success
@@ -208,7 +289,7 @@ async function runDriftlarm() {
     }
   }
 
-  return NextResponse.json({ success: true, totals, mailed })
+  return NextResponse.json({ success: true, totals, usage_signal_count: usageSignal.count, mailed })
 }
 
 function categorySection(title: string, sweep: SweepOutcome, broken: boolean): string {
@@ -233,20 +314,54 @@ function categorySection(title: string, sweep: SweepOutcome, broken: boolean): s
     </div>`
 }
 
+/**
+ * Egen rendering (inte categorySection) — usageSignal är medvetet inte ett
+ * fel-svep. "N fel"-formatet och den röda/gula färgskalan i categorySection
+ * skulle felaktigt signalera driftstörning; detta ska läsas som en
+ * affärssignal i stället.
+ */
+function usageSignalSection(sweep: SweepOutcome, broken: boolean): string {
+  if (broken) {
+    return `
+      <div style="margin-bottom: 20px;">
+        <p style="font-size: 15px; color: #92400E; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 10px 14px; margin: 0;">
+          <b>💡 Användningssignal:</b> kunde inte kontrolleras (svepet kraschade — se serverloggen)
+        </p>
+      </div>`
+  }
+  if (sweep.count === 0) return ''
+  const rowsHtml = sweep.rows.map((r) => `<li style="margin-bottom: 6px;">${r}</li>`).join('\n')
+  const more =
+    sweep.count > sweep.rows.length
+      ? `<p style="font-size: 12px; color: #1E40AF; margin: 4px 0 0;">+ ${sweep.count - sweep.rows.length} till</p>`
+      : ''
+  return `
+    <div style="margin-bottom: 20px; padding: 14px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px;">
+      <p style="font-size: 15px; color: #1E3A8A; margin: 0 0 6px;"><b>💡 Användningssignal: ${sweep.count} kund${sweep.count === 1 ? '' : 'er'} nära taket</b></p>
+      <p style="font-size: 12px; color: #1E40AF; margin: 0 0 10px;">Kunder som konsekvent ligger nära sitt användningsutrymme — kandidater för uppgraderingssamtal, INTE för spärr.</p>
+      <ul style="font-size: 13px; line-height: 1.6; color: #1E3A8A; padding-left: 20px; margin: 0;">
+        ${rowsHtml}
+      </ul>
+      ${more}
+    </div>`
+}
+
 function buildDriftlarmHtml(params: {
   sms: SweepOutcome
   email: SweepOutcome
   billing: SweepOutcome
   automation: SweepOutcome
+  usageSignal: SweepOutcome
   brokenSweeps: string[]
 }): string {
-  const { sms, email, billing, automation, brokenSweeps } = params
+  const { sms, email, billing, automation, usageSignal, brokenSweeps } = params
 
   const sections = [
     categorySection('SMS', sms, brokenSweeps.includes('SMS-loggen')),
     categorySection('E-post', email, brokenSweeps.includes('E-post/kommunikationsloggen')),
     categorySection('Betalningar', billing, brokenSweeps.includes('Betalningar')),
     categorySection('Automationer', automation, brokenSweeps.includes('Automationer')),
+    usageSignalSection(usageSignal, brokenSweeps.includes('Användningssignal')),
   ]
     .filter(Boolean)
     .join('\n')

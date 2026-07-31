@@ -35,7 +35,7 @@ Sex medhjälpare, var och en med sitt:
 - **Daniel** följer upp offerterna som blivit liggande
 - **Karin** jagar fakturorna och räknar ROT-avdraget
 - **Lars** håller koll på projekten och tiderna
-- **Hanna** väcker gamla kunder när kalendern är tunn
+- **Hanna** väcker gamla kunder med SMS-kampanjer när kalendern är tunn
 - **Matte** är chefsassistenten du pratar med — han fördelar jobbet
 _(Bild: de sex agent-ansiktena.)_
 
@@ -64,8 +64,10 @@ Hur många kunder har du i registret? När hörde de från dig senast?
 **Ditt kundregister är en guldgruva. Vårt team gräver.**
 Hanna matchar dina gamla jobb mot serviceavtal (värmepumpsservice,
 våtrumskontroll, takgenomgång…) och lägger färdiga erbjudanden i din kö —
-du godkänner med ett tryck. Lars bokar besöken i dina tunna veckor.
-Karin fakturerar efter varje besök.
+du godkänner med ett tryck, och de går ut som personliga SMS. Hon kan
+också köra SMS-kampanjer mot hela segment ("alla villakunder inför
+vintern"). Lars bokar besöken i dina tunna veckor. Karin fakturerar
+efter varje besök.
 _Räkneexempel (alltid presenterat som exempel, aldrig löfte): 400 kunder →
 80 matchningar → 15 % ja → 12 avtal à 1 500 kr/besök = 18 000+ kr/år i
 återkommande intäkt, ur data som redan låg där._
@@ -85,7 +87,9 @@ och kör slide 7:s missat samtal-vinkel hårdare. Läs av rummet.)_
 Ett missat badrumsjobb är 50 000 kr. En glömd faktura är pengar som aldrig
 kommer in. **Funkar det inte — pengarna tillbaka.** Ingen bindningstid som
 straffar dig, en garanti som står bakom.
-_(Om frågan kommer: Bas 2 495 för enmansfirma, Business 11 995 för större team.)_
+_(Om frågan kommer: Business 11 995 för större team med fler anställda;
+anpassat upplägg för stora företag — "hör av dig så tar vi det".
+OBS: Bas/Starter finns inte längre i utbudet — nämn den aldrig.)_
 
 ## Slide 9 — Så kommer du igång
 Registrering tar 10 minuter. Ditt nummer kopplas, dina kunder importeras,
@@ -111,4 +115,7 @@ _(Kontakt: Christoffer + Andreas.)_
 - FÖRBJUDET (inventeringens lista): påstå talande röst-AI, "kopplar till din
   Fortnox" utan licens-brasklappen, "betala i appen" före B7 grön, "senaste
   appen" före TestFlight, nya features som "beprövade i drift".
+- **Grannutskick (fysiska brev till grannar):** INTE färdigbyggt — får ALDRIG
+  pitchas som nutid. Om kunden själv frågar: "det är på väg". SMS-kampanjerna
+  däremot är i drift och FÅR lyftas fritt (slide 4 + 6b).
 - Priset nämns EFTER värdet, aldrig före. Låt smärtan sätta sig först.

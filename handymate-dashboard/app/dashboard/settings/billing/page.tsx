@@ -119,6 +119,13 @@ const PLANS = [
   },
 ]
 
+// Andreas-beslut 2026-07-31: Starter borttagen ur köpflödet (se
+// lib/feature-gates.ts). Befintliga starter-kunder ska fortfarande SE sin
+// nuvarande plan korrekt i statuskortet ovan (som läser billing.plan.name
+// direkt, opåverkat av detta) — men Starter ska inte gå att VÄLJA för
+// uppgradering/nedgradering. SELECTABLE_PLANS styr bara "Välj plan"-rutnätet.
+const SELECTABLE_PLANS = PLANS.filter((p) => p.id !== 'starter')
+
 function getProgressColor(percentage: number): string {
   if (percentage >= 90) return 'bg-red-500'
   if (percentage >= 70) return 'bg-amber-500'
@@ -397,11 +404,14 @@ export default function BillingPage() {
                 <h2 className="text-lg font-semibold text-gray-900">Valj plan</h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {PLANS.map((plan) => {
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {SELECTABLE_PLANS.map((plan) => {
                   const isCurrent = plan.name === currentPlanName
-                  const currentIndex = PLANS.findIndex((p) => p.name === currentPlanName)
-                  const planIndex = PLANS.findIndex((p) => p.name === plan.name)
+                  // currentIndex blir -1 för Starter-kunder (Starter finns inte i
+                  // SELECTABLE_PLANS) — då räknas båda kvarvarande planerna korrekt
+                  // som uppgraderingar, vilket stämmer (Starter är alltid lägst).
+                  const currentIndex = SELECTABLE_PLANS.findIndex((p) => p.name === currentPlanName)
+                  const planIndex = SELECTABLE_PLANS.findIndex((p) => p.name === plan.name)
                   const isUpgrade = planIndex > currentIndex
                   const isDowngrade = planIndex < currentIndex
 

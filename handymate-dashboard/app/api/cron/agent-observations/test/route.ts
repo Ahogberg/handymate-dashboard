@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabase()
     const { data: biz } = await supabase
       .from('business_config')
-      .select('business_name, agents_globally_paused, agent_cost_cap_usd_daily')
+      .select('business_name, agents_globally_paused, agent_cost_cap_usd_daily, subscription_plan')
       .eq('business_id', businessId)
       .maybeSingle()
     businessName = biz?.business_name || 'företaget'
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
   // även om CRON_SECRET-grenen redan hämtade en del).
   const { data: bizGuards } = await supabase
     .from('business_config')
-    .select('business_id, agents_globally_paused, agent_cost_cap_usd_daily')
+    .select('business_id, agents_globally_paused, agent_cost_cap_usd_daily, subscription_plan')
     .eq('business_id', businessId)
     .maybeSingle()
 

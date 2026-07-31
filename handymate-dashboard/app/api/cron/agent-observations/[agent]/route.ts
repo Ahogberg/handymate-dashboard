@@ -63,7 +63,7 @@ export async function GET(
   //   - agent_cost_cap_usd_daily: dygnsmax i USD, summerat från agent_runs
   const { data: businesses, error: bizError } = await supabase
     .from('business_config')
-    .select('business_id, business_name, agents_globally_paused, agent_cost_cap_usd_daily')
+    .select('business_id, business_name, agents_globally_paused, agent_cost_cap_usd_daily, subscription_plan')
     .eq('is_active', true)
 
   if (bizError) {
@@ -81,6 +81,7 @@ export async function GET(
     business_name: string | null
     agents_globally_paused: boolean | null
     agent_cost_cap_usd_daily: number | string | null
+    subscription_plan: string | null
   }>) {
     // ── Pre-checks (pause + cost-cap) via delad helper ─────────
     const skip = await checkCostGuards(supabase, biz, agentId)
