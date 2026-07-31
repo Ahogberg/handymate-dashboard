@@ -53,6 +53,7 @@ import {
   Printer,
   MessageSquare,
   GripVertical,
+  MoreVertical,
 } from 'lucide-react'
 import {
   DndContext,
@@ -84,7 +85,6 @@ import dynamic from 'next/dynamic'
 import ProjectInvoiceModal from '@/components/invoices/ProjectInvoiceModal'
 import TimeEntryModal from '@/components/time/TimeEntryModal'
 import { ProjectBookingsTable } from './components/ProjectBookingsTable'
-import { ProjectStageStrip } from '@/components/projects/ProjectStageStrip'
 import { ProjectStageModal } from '@/components/pipeline/unified/ProjectStageModal'
 import { ProjectEconomicsCard } from '@/components/projects/ProjectEconomicsCard'
 import { ProjectInfoCard } from '@/components/projects/economy/ProjectInfoCard'
@@ -92,6 +92,10 @@ import { EkonomiPulsCard } from '@/components/projects/economy/EkonomiPulsCard'
 import { FramdriftCard } from '@/components/projects/economy/FramdriftCard'
 import { ProjectQuoteSpec } from '@/components/projects/ProjectQuoteSpec'
 import { ProjectQuoteDocumentCard } from '@/components/projects/ProjectQuoteDocumentCard'
+import { ProjectStatusCard, getStageBucket } from '@/components/projects/ProjectStatusCard'
+import ProjectTodoBlock, { TODO_PRIMARY_LABEL, type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
+import { formatSEK } from '@/lib/format-price'
+import type { ProjectEconomics } from '@/lib/projects/compute-economics'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -222,6 +226,62 @@ interface Summary {
 
 type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'quote_spec' | 'documents' | 'log' | 'checklists' | 'arbetsorder' | 'leverantorer' | 'canvas' | 'field_reports' | 'tasks'
 
+// Projektvy Fas 1 (2026-07-31) — ny IA: 16 gamla flikar grupperas i 6 nya.
+// `canvas` hör inte till någon grupp (TD-75: dold, nås bara via ?tab=canvas,
+// oförändrat). Se handoff/projektvy/HANDOFF.md.
+type GroupKey = 'overview' | 'economy_offert' | 'changes' | 'planning' | 'time_team' | 'documentation'
+
+const NEW_GROUPS: { key: GroupKey; label: string; tabs: TabKey[] }[] = [
+  { key: 'overview', label: 'Översikt', tabs: ['overview'] },
+  { key: 'economy_offert', label: 'Ekonomi & offert', tabs: ['economy', 'quote_spec', 'material', 'leverantorer'] },
+  { key: 'changes', label: 'ÄTA', tabs: ['changes'] },
+  { key: 'planning', label: 'Planering', tabs: ['milestones', 'tasks', 'schedule', 'arbetsorder'] },
+  { key: 'time_team', label: 'Tid & team', tabs: ['time', 'team'] },
+  { key: 'documentation', label: 'Dokumentation', tabs: ['checklists', 'field_reports', 'log', 'documents'] },
+]
+
+// Gammal flik-nyckel → ny grupp. Används både för att derivera activeGroup
+// från ?tab=<gammal nyckel> och för att den befintliga setActiveTab-wrappern
+// automatiskt ska öppna rätt grupp när gammal kod anropar setActiveTab('x').
+const GROUP_OF_TAB: Record<TabKey, GroupKey | null> = {
+  overview: 'overview',
+  economy: 'economy_offert',
+  quote_spec: 'economy_offert',
+  material: 'economy_offert',
+  leverantorer: 'economy_offert',
+  changes: 'changes',
+  milestones: 'planning',
+  tasks: 'planning',
+  schedule: 'planning',
+  arbetsorder: 'planning',
+  time: 'time_team',
+  team: 'time_team',
+  checklists: 'documentation',
+  field_reports: 'documentation',
+  log: 'documentation',
+  documents: 'documentation',
+  canvas: null,
+}
+
+const ALL_TAB_KEYS: TabKey[] = ['overview', 'team', 'schedule', 'milestones', 'changes', 'time', 'material', 'economy', 'quote_spec', 'documents', 'log', 'checklists', 'arbetsorder', 'leverantorer', 'canvas', 'field_reports', 'tasks']
+
+/** Läser ?tab=X — accepterar både gamla flik-nycklar och de nya
+    grupp-nycklarna (Del 3b: deep-länkar ska fungera med båda). */
+function readInitialTabAndGroup(): { tab: TabKey; group: GroupKey } {
+  if (typeof window !== 'undefined') {
+    const tabParam = new URLSearchParams(window.location.search).get('tab')
+    if (tabParam) {
+      const group = NEW_GROUPS.find(g => g.key === tabParam)
+      if (group) return { tab: group.tabs[0], group: group.key }
+      if ((ALL_TAB_KEYS as string[]).includes(tabParam)) {
+        const tab = tabParam as TabKey
+        return { tab, group: GROUP_OF_TAB[tab] || 'overview' }
+      }
+    }
+  }
+  return { tab: 'overview', group: 'overview' }
+}
+
 interface ScheduleEntry {
   id: string
   title: string
@@ -298,14 +358,6 @@ const STATUS_MAP: Record<string, string> = {
   paused: 'Pausat',
   completed: 'Avslutat',
   cancelled: 'Avbrutet'
-}
-
-const STATUS_STYLES: Record<string, string> = {
-  planning: 'bg-primary-700/20 text-primary-600 border-primary-600/30',
-  active: 'bg-emerald-100 text-emerald-600 border-emerald-500/30',
-  paused: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  completed: 'bg-gray-100 text-gray-500 border-gray-300',
-  cancelled: 'bg-red-100 text-red-600 border-red-500/30'
 }
 
 const PROJECT_TYPE_LABELS: Record<string, string> = {
@@ -536,16 +588,20 @@ export default function ProjectDetailPage() {
 
   // UI state
   const [loading, setLoading] = useState(true)
-  // Initialisera activeTab från ?tab=X — gör att deep-länkar (t.ex. dashboardens
-  // "Att göra"-lista) öppnar rätt flik direkt utan flicker.
-  const [activeTab, setActiveTab] = useState<TabKey>(() => {
-    const allowed: TabKey[] = ['overview', 'team', 'schedule', 'milestones', 'changes', 'time', 'material', 'economy', 'quote_spec', 'documents', 'log', 'checklists', 'arbetsorder', 'leverantorer', 'canvas', 'field_reports', 'tasks']
-    if (typeof window !== 'undefined') {
-      const tabParam = new URLSearchParams(window.location.search).get('tab')
-      if (tabParam && (allowed as string[]).includes(tabParam)) return tabParam as TabKey
-    }
-    return 'overview'
-  })
+  // Initialisera activeTab/activeGroup från ?tab=X — gör att deep-länkar
+  // (t.ex. dashboardens "Att göra"-lista) öppnar rätt flik-grupp direkt utan
+  // flicker. Fas 1 (2026-07-31): activeTab finns kvar (canvas + lazy-fetch-
+  // effekter beror på den), activeGroup styr den nya 6-grupps-navigationen.
+  const [activeTab, setActiveTabRaw] = useState<TabKey>(() => readInitialTabAndGroup().tab)
+  const [activeGroup, setActiveGroup] = useState<GroupKey>(() => readInitialTabAndGroup().group)
+  // Wrapper: alla befintliga setActiveTab('x')-anrop i filen (quick actions,
+  // "Hantera"-länkar, EkonomiPulsCard.onOpenFull m.fl.) öppnar nu automatiskt
+  // rätt ny flik-grupp också — inget anropsställe behövde ändras.
+  const setActiveTab = useCallback((tab: TabKey) => {
+    setActiveTabRaw(tab)
+    const group = GROUP_OF_TAB[tab]
+    if (group) setActiveGroup(group)
+  }, [])
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
   // Etapp 4a.1: klick på fas-strip öppnar modal med byt-stage + tasks
   const [stageModalOpen, setStageModalOpen] = useState(false)
@@ -560,6 +616,15 @@ export default function ProjectDetailPage() {
   const [economicsRefreshKey, setEconomicsRefreshKey] = useState(0)
   const [sendingAtaId, setSendingAtaId] = useState<string | null>(null)
   const [expandedAtaId, setExpandedAtaId] = useState<string | null>(null)
+
+  // Projektvy Fas 1 (2026-07-31): statuskortets ekonomistaplar/prognosrad
+  // delar samma /api/projects/[id]/profitability-payload som EkonomiPulsCard
+  // — hämtas här en gång (parent) så både ProjectStatusCard och läges-
+  // logiken i "Att göra" kan använda samma data utan dubbel-fetch.
+  // Ägar-gating: hämtas bara om can('see_financials').
+  const [statusEconomics, setStatusEconomics] = useState<ProjectEconomics | null>(null)
+  const [statusEconomicsLoading, setStatusEconomicsLoading] = useState(true)
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false)
 
   // Work orders
   const [workOrders, setWorkOrders] = useState<any[]>([])
@@ -739,20 +804,24 @@ export default function ProjectDetailPage() {
   }, [fetchProjectData])
 
   useEffect(() => {
-    if (activeTab === 'economy') {
+    // Projektvy Fas 1: economy/quote_spec/material/leverantorer är nu grupperade
+    // under "Ekonomi & offert" och renderas staplade — en gemensam grupp-check
+    // ersätter de fyra separata activeTab===-villkoren (economy + leverantorer
+    // delade ändå samma fetchSupplierInvoices-anrop).
+    if (activeGroup === 'economy_offert' && can('see_financials')) {
       // ProjectEconomicsCard hämtar /api/projects/[id]/profitability själv.
-      // supplier_invoices fetchas separat för leverantörer-tab.
+      // Icke-ägare ser bara offert-specen i denna grupp — inga ekonomihämtningar.
       fetchSupplierInvoices()
+      if (projectPriceList.length === 0) {
+        supabase
+          .from('price_list')
+          .select('id, name, unit, unit_price, default_quantity, category')
+          .eq('business_id', business.business_id)
+          .eq('is_active', true)
+          .then(({ data }: { data: any }) => { if (data) setProjectPriceList(data) })
+      }
     }
-    if (activeTab === 'material' && projectPriceList.length === 0) {
-      supabase
-        .from('price_list')
-        .select('id, name, unit, unit_price, default_quantity, category')
-        .eq('business_id', business.business_id)
-        .eq('is_active', true)
-        .then(({ data }: { data: any }) => { if (data) setProjectPriceList(data) })
-    }
-  }, [activeTab])
+  }, [activeGroup])
 
   const fetchProjectTeam = useCallback(async () => {
     try {
@@ -786,44 +855,54 @@ export default function ProjectDetailPage() {
   }, [projectId])
 
   useEffect(() => {
-    if (activeTab === 'team') {
+    // Projektvy Fas 1: grupp-check istället för exakt gammal flik-nyckel,
+    // eftersom "Planering" (schema/uppgifter/arbetsorder/delmoment) och
+    // "Tid & team" (tid/team) och "Dokumentation" (checklistor/fältrapporter/
+    // logg/dokument) nu renderar sina gamla flikars innehåll staplat.
+    if (activeGroup === 'time_team') {
       fetchProjectTeam()
     }
-    if (activeTab === 'schedule') {
+    if (activeGroup === 'planning') {
       fetchProjectSchedule()
+      fetchWorkOrders()
+      fetchProjectTasks()
+      // Återanvänd team-listan om vi inte redan hämtat den (för assignee-dropdown)
+      if (allTeamMembers.length === 0) fetchProjectTeam()
     }
-    if (activeTab === 'documents') {
+    if (activeGroup === 'documentation') {
       fetchDocuments()
       fetchGeneratedDocs()
-    }
-    if (activeTab === 'log') {
       fetchLogs()
-    }
-    if (activeTab === 'checklists') {
       fetchChecklists()
       fetchChecklistTemplates()
       fetchFormSubmissions()
       fetchFormTemplates()
     }
-    if (activeTab === 'arbetsorder') {
-      fetchWorkOrders()
-    }
-    if (activeTab === 'leverantorer') {
-      fetchSupplierInvoices()
-    }
-    if (activeTab === 'tasks') {
-      fetchProjectTasks()
-      // Återanvänd team-listan om vi inte redan hämtat den (för assignee-dropdown)
-      if (allTeamMembers.length === 0) fetchProjectTeam()
-    }
-  }, [activeTab, fetchProjectTeam, fetchProjectTasks, allTeamMembers.length])
+  }, [activeGroup, fetchProjectTeam, fetchProjectTasks, allTeamMembers.length])
 
   // Re-fetch documents when category filter changes
   useEffect(() => {
-    if (activeTab === 'documents') {
+    if (activeGroup === 'documentation') {
       fetchDocuments()
     }
   }, [docCategory])
+
+  // Statuskortets ekonomidata — ägar-gated, delas mellan ProjectStatusCard
+  // och läges-avgöringen i "Att göra" (se render-sektionen längre ned).
+  useEffect(() => {
+    if (!can('see_financials')) {
+      setStatusEconomicsLoading(false)
+      return
+    }
+    let cancelled = false
+    setStatusEconomicsLoading(true)
+    fetch(`/api/projects/${projectId}/profitability`)
+      .then(res => (res.ok ? res.json() : null))
+      .then((data: ProjectEconomics | null) => { if (!cancelled) setStatusEconomics(data) })
+      .catch(() => { if (!cancelled) setStatusEconomics(null) })
+      .finally(() => { if (!cancelled) setStatusEconomicsLoading(false) })
+    return () => { cancelled = true }
+  }, [projectId, economicsRefreshKey, can])
 
   async function createProjectTask() {
     if (!newTaskTitle.trim()) return
@@ -1579,43 +1658,206 @@ export default function ProjectDetailPage() {
     )
   }
 
-  // --- Tab definitions ---
+  // --- Statuskort / Att göra — läges-avgöring (Projektvy Fas 1, 2026-07-31) ---
+  // Se handoff/projektvy/HANDOFF.md för läges-tabellen. Ägar-gating: over_budget
+  // och klart_ofakturerat bygger på ekonomidata (nedlagt/offererat/ofakturerat)
+  // som bara hämtas för can('see_financials') — utan den behörigheten växlar
+  // sidan bara mellan nystartat/pågående (roll-agnostisk signal: har något
+  // arbete alls registrerats?).
+  const canSeeFinancials = can('see_financials')
+  const stageBucket = getStageBucket(project.current_workflow_stage_id)
+  const nedlagtKr = statusEconomics?.kostnader.total_kr ?? null
+  const offereratKr = statusEconomics?.intakter.forvantad_intakt_kr ?? 0
+  const isOverBudget = canSeeFinancials && nedlagtKr != null && offereratKr > 0 && nedlagtKr > offereratKr
+  const uninvoicedRevenue = canSeeFinancials ? (summary?.uninvoiced_revenue ?? 0) : 0
+  const noWorkYet = (summary?.total_hours ?? 0) === 0 && materials.length === 0
 
-  // Tab-grupper — Etapp 4a.2 (2026-05-22):
-  // 4 logiska grupper istället för 5. ÄTA + Delmoment till ÖVERSIKT
-  // (ekonomi-relaterade). Rityta dold men koden behållen (TD-75).
-  // INGA sammanslagningar — varje tab är fortfarande separat tab,
-  // bara visuellt grupperad. Sammanslagningar är 4c-arbete.
-  const tabGroups: { group: string; items: { key: TabKey; label: string }[] }[] = [
-    { group: 'ÖVERSIKT', items: [
-      { key: 'overview', label: 'Översikt' },
-      { key: 'milestones', label: 'Delmoment' },
-      { key: 'economy', label: 'Ekonomi' },
-      { key: 'quote_spec', label: 'Offert' },
-      { key: 'changes', label: 'ÄTA' },
-    ]},
-    { group: 'ARBETE', items: [
-      { key: 'arbetsorder', label: 'Arbetsorder' },
-      { key: 'tasks', label: 'Uppgifter' },
-      { key: 'schedule', label: 'Schema' },
-      { key: 'time', label: 'Tidrapporter' },
-    ]},
-    { group: 'RESURSER', items: [
-      { key: 'team', label: 'Team' },
-      { key: 'material', label: 'Material' },
-      { key: 'leverantorer', label: 'Leverantörer' },
-    ]},
-    { group: 'DOKUMENTATION', items: [
-      { key: 'checklists', label: 'Egenkontroll & checklistor' },
-      { key: 'field_reports', label: 'Fältrapporter' },
-      { key: 'log', label: 'Byggdagbok' },
-      { key: 'documents', label: 'Dokument' },
-    ]},
-    // Rityta (canvas) DOLD från tabbarna i Etapp 4a.3 — koden behålls
-    // för framtida platsbesök-funktionalitet. activeTab='canvas' via
-    // URL-bookmark renderar fortfarande (allowed-array inkluderar den).
-  ]
-  const allTabs = tabGroups.flatMap(g => g.items)
+  let todoMode: TodoMode = 'pagaende'
+  if (isOverBudget) {
+    todoMode = 'over_budget'
+  } else if (stageBucket === 'klart' && canSeeFinancials && uninvoicedRevenue > 0) {
+    todoMode = 'klart_ofakturerat'
+  } else if (stageBucket === 'planering' && noWorkYet) {
+    todoMode = 'nystartat'
+  }
+
+  // Röd över-budget-alert kräver ett specifikt delmoment med registrerad
+  // överskriden timbudget (copy-mallen behöver {moment} + {n tim}) — annars
+  // utelämnas alertet trots over_budget-läge (hitta inte på ett moment).
+  let overBudgetAlert: OverBudgetAlert | null = null
+  if (todoMode === 'over_budget' && nedlagtKr != null) {
+    const worstMilestone = milestones
+      .filter(m => m.budget_hours != null && m.budget_hours > 0 && m.actual_hours > (m.budget_hours as number))
+      .sort((a, b) => (b.actual_hours - (b.budget_hours || 0)) - (a.actual_hours - (a.budget_hours || 0)))[0]
+    if (worstMilestone) {
+      overBudgetAlert = {
+        belopp: Math.max(0, nedlagtKr - offereratKr),
+        moment: worstMilestone.name,
+        timmar: Math.round(worstMilestone.actual_hours - (worstMilestone.budget_hours || 0)),
+      }
+    }
+  }
+
+  // Åtgärdsrader — bara de vars underlag faktiskt finns i redan hämtad data.
+  // "Ingen tidrapport i går" och "Egenkontroll X kvar" utelämnade medvetet:
+  // TimeEntry-typen som hämtas här saknar business_user_id (kan inte avgöra
+  // VEM som inte rapporterat), och checklists-listan har bara aggregerad
+  // progress (checked/total) — inte vilken specifik punkt som återstår.
+  // Se handoff-rapporten.
+  const todoActionRows: TodoRow[] = []
+  if (projectTeam.length === 0) {
+    todoActionRows.push({
+      id: 'ingen-personal',
+      dotClass: 'bg-gray-300',
+      text: 'Ingen personal tilldelad ännu',
+      actionLabel: 'Tilldela personal',
+      onAction: () => { setActiveTab('team'); setTimeout(() => setShowAddMember(true), 100) },
+    })
+  }
+  if (milestones.length === 0) {
+    todoActionRows.push({
+      id: 'inga-delmoment',
+      dotClass: 'bg-gray-300',
+      text: 'Inga delmoment planerade',
+      actionLabel: 'Planera delmoment',
+      onAction: () => { setActiveTab('milestones'); setMilestoneModal({ open: true, editing: null }) },
+    })
+  }
+  if (canSeeFinancials && uninvoicedRevenue > 0) {
+    todoActionRows.push({
+      id: 'ofakturerat',
+      dotClass: 'bg-amber-500',
+      text: `Ofakturerat: ${formatSEK(uninvoicedRevenue)}`,
+      actionLabel: 'Förbered delfaktura',
+      onAction: () => setActiveTab('economy'),
+    })
+  }
+
+  // Accordion/flikrad-subrader (Del 3a, copy.accordion_subs) — bara med
+  // verklig data, annars null (gruppen visas då utan subrad).
+  function groupSubrow(key: GroupKey): string | null {
+    switch (key) {
+      case 'economy_offert': {
+        if (!canSeeFinancials || !statusEconomics) return null
+        const fakturerat = statusEconomics.intakter.fakturerat_kr
+        if (fakturerat <= 0) return null
+        return todoMode === 'klart_ofakturerat'
+          ? `${formatSEK(fakturerat)} · slutfaktura väntar på ditt OK`
+          : `${formatSEK(fakturerat)} · delfakturerad`
+      }
+      case 'changes': {
+        if (changes.length === 0) return 'Inga ännu'
+        const waiting = changes.filter(c => c.status === 'sent').length
+        return waiting > 0 ? `${changes.length} st · ${waiting} väntar på kundsvar` : `${changes.length} st`
+      }
+      case 'planning': {
+        if (milestones.length === 0) return null
+        const done = milestones.filter(m => m.status === 'completed').length
+        return `Delmoment ${done} av ${milestones.length} klara`
+      }
+      case 'time_team': {
+        const hrs = summary?.total_hours ?? 0
+        if (hrs <= 0) return 'Inga tidrapporter ännu'
+        return `${formatHours(hrs)} · ${projectTeam.length} person${projectTeam.length === 1 ? '' : 'er'}`
+      }
+      default:
+        return null
+    }
+  }
+
+  const GROUP_ICON: Record<GroupKey, typeof Layers> = {
+    overview: Layers,
+    economy_offert: Receipt,
+    changes: AlertTriangle,
+    planning: Calendar,
+    time_team: Users,
+    documentation: FolderOpen,
+  }
+
+  // Ekonomi-gating (HANDOFF.md): ekonomiinnehållet visas ENDAST för ägaren.
+  // MEN offert-specen är de anställdas ARBETSINSTRUKTION (beskrivningar och
+  // mängder — priserna maskeras redan i ProjectQuoteSpec, se TD-77-mönstret).
+  // Icke-ägare får därför gruppen kvar, omdöpt till "Offert" och begränsad
+  // till specen; Ekonomi/Material/Leverantörer-panelerna förblir ägar-gatade.
+  const visibleGroups = NEW_GROUPS.map(g =>
+    g.key === 'economy_offert' && !canSeeFinancials
+      ? { ...g, label: 'Offert', tabs: ['quote_spec'] as TabKey[] }
+      : g
+  )
+
+  // Primärknappens mål (kopplas till befintliga handlers — se HANDOFF.md-
+  // tabellen). Beräknas en gång och delas mellan ProjectTodoBlock och
+  // sidhuvudets dubblerade knapp ("samma åtgärd, aldrig två olika primärer").
+  const todoPrimaryHref = todoMode === 'nystartat' ? '/dashboard/calendar' : undefined
+  const todoPrimaryOnClick =
+    todoMode === 'nystartat'
+      ? undefined
+      : todoMode === 'klart_ofakturerat'
+        ? () => setShowInvoiceModal(true)
+        : todoMode === 'over_budget'
+          ? () => setChangeModal({ open: true, editing: null })
+          : () => openTimeModal()
+
+  function renderPrimaryTodoButton() {
+    const label = TODO_PRIMARY_LABEL[todoMode]
+    const cls = 'inline-flex items-center justify-center gap-2 px-5 h-11 bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold rounded-lg transition-colors'
+    return todoPrimaryHref ? (
+      <Link href={todoPrimaryHref} className={cls}>{label}</Link>
+    ) : (
+      <button type="button" onClick={todoPrimaryOnClick} className={cls}>{label}</button>
+    )
+  }
+
+  // "Fler åtgärder" — konsoliderar de tidigare fristående header-knapparna
+  // (Nytt tilläggsarbete, Förhandsgranska faktura, Visa offert, status-
+  // ändring) i en meny, eftersom canvasens sidhuvud inte har plats för dem
+  // som egna knappar. Ingen ny logik — samma handlers som innan Fas 1.
+  function renderMoreActionsMenu() {
+    if (!project) return null
+    return (
+      <div className="absolute top-full right-0 lg:right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-20 w-64 overflow-hidden">
+        <button
+          onClick={() => { setMoreMenuOpen(false); setChangeModal({ open: true, editing: null }) }}
+          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+        >
+          <Plus className="w-4 h-4 text-slate-400" />
+          Nytt tilläggsarbete
+        </button>
+        <button
+          onClick={() => { setMoreMenuOpen(false); showToast('Faktura-förhandsgranskning kommer snart', 'success') }}
+          className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+        >
+          <Receipt className="w-4 h-4 text-slate-400" />
+          Förhandsgranska faktura
+        </button>
+        {project.quote_id && (
+          <Link
+            href={`/dashboard/quotes/${project.quote_id}`}
+            onClick={() => setMoreMenuOpen(false)}
+            className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <FileText className="w-4 h-4 text-slate-400" />
+            Visa offert
+          </Link>
+        )}
+        <div className="border-t border-slate-100 mt-1 pt-1">
+          <p className="px-4 pt-1.5 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Ändra status</p>
+          {Object.entries(STATUS_MAP).map(([key, label]) => (
+            <button
+              key={key}
+              disabled={savingStatus}
+              onClick={() => { setMoreMenuOpen(false); updateProjectStatus(key) }}
+              className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 transition-colors ${
+                key === project.status ? 'text-primary-700 font-medium' : 'text-slate-700'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   // --- Render ---
 
@@ -1639,8 +1881,8 @@ export default function ProjectDetailPage() {
       )}
 
       <div className="relative max-w-6xl mx-auto">
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-slate-500 mb-3">
+        {/* Breadcrumb — desktop head (Del 3c) */}
+        <nav className="hidden lg:flex items-center gap-2 text-sm text-slate-500 mb-3">
           <Link href="/dashboard/projects" className="hover:text-slate-700 transition-colors">
             Projekt
           </Link>
@@ -1648,15 +1890,49 @@ export default function ProjectDetailPage() {
           <span className="text-slate-900 font-semibold truncate">{project.name}</span>
         </nav>
 
-        {/* Hero — left (name + meta + actions) + right placeholder (totals-card kommer i commit 2) */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 items-start mb-8">
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight mb-3">
+        {/* Appbar (mobil) — tillbaka-pil + brödsmula + "Fler åtgärder"-kebab */}
+        <div className="flex items-center gap-2 mb-2 lg:hidden">
+          <Link href="/dashboard/projects" className="p-2 -ml-2 text-slate-500 hover:text-slate-700">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <span className="text-sm text-slate-500">Projekt</span>
+          <button
+            type="button"
+            onClick={() => setMoreMenuOpen(o => !o)}
+            className="ml-auto p-2 text-slate-500 hover:text-slate-700"
+            aria-label="Fler åtgärder"
+          >
+            <MoreVertical className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Titel + meta + chips (Del 1a) + desktop-actions */}
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mb-2 truncate">
               {project.name}
             </h1>
-
-            {/* Meta-rad: kund · adress · status */}
-            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 mb-5">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+              {/* Statuschip — DESIGN-NOTES: teal Pågående / grön Klart {datum} /
+                  neutral Planering, härledd från samma stageBucket som stepper. */}
+              {stageBucket === 'klart' ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                  Klart{(project.completed_at || project.end_date) ? ` ${formatDate((project.completed_at || project.end_date) as string)}` : ''}
+                </span>
+              ) : stageBucket === 'pagaende' ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-primary-50 text-primary-700">
+                  Pågående
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                  Planering
+                </span>
+              )}
+              {isOverBudget && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                  Över offererat
+                </span>
+              )}
               {project.customer && (
                 <span className="inline-flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 text-slate-400" />
@@ -1669,256 +1945,123 @@ export default function ProjectDetailPage() {
                   <span>{project.customer.address_line}</span>
                 </>
               )}
-              <span className="text-slate-300">·</span>
-              <span className="inline-flex items-center gap-1.5">
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    project.status === 'completed' ? 'bg-emerald-500'
-                    : project.status === 'active' ? 'bg-amber-500'
-                    : project.status === 'cancelled' ? 'bg-red-500'
-                    : 'bg-slate-400'
-                  }`}
-                />
-                {STATUS_MAP[project.status] || project.status}
-                {typeof project.progress_percent === 'number' && project.progress_percent > 0 && (
-                  <span className="text-slate-400 ml-1">· {project.progress_percent}%</span>
-                )}
-              </span>
-            </div>
-
-            {/* Action-knappar — primary + ghost + ghost (conditional) */}
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => setChangeModal({ open: true, editing: null })}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-primary-700 text-white text-sm font-semibold rounded-lg hover:bg-primary-600 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Nytt tilläggsarbete
-              </button>
-              <button
-                onClick={() => showToast('Faktura-förhandsgranskning kommer snart', 'success')}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white text-slate-700 text-sm font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
-                title="Förhandsgranska faktura (kommer snart)"
-              >
-                <Receipt className="w-4 h-4" />
-                Förhandsgranska faktura
-              </button>
-              {project.quote_id && (
-                <Link
-                  href={`/dashboard/quotes/${project.quote_id}`}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white text-slate-700 text-sm font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
-                >
-                  <FileText className="w-4 h-4" />
-                  Visa offert
-                </Link>
-              )}
-
-              {/* Status-dropdown — funktionell kvar, flyttad till actions-rad */}
-              <div className="relative ml-auto">
-                <button
-                  onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-                  disabled={savingStatus}
-                  className={`flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg border transition-all ${STATUS_STYLES[project.status] || 'bg-gray-100 text-gray-500 border-gray-300'}`}
-                >
-                  {savingStatus && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  {STATUS_MAP[project.status] || project.status}
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </button>
-
-                {statusDropdownOpen && (
-                  <div className="absolute top-full right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-20 w-44 overflow-hidden">
-                    {Object.entries(STATUS_MAP).map(([key, label]) => (
-                      <button
-                        key={key}
-                        onClick={() => updateProjectStatus(key)}
-                        className={`w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 transition-all ${
-                          key === project.status ? 'text-primary-700 bg-slate-50' : 'text-slate-700'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 
-          {/* Right column — Totals-card med stack */}
-          <aside className="hidden lg:block">
-            {(() => {
-              const atas = changes || []
-              const signedStatuses = ['signed', 'invoiced']
-              const isConfirmed = (a: any) => signedStatuses.includes(a.status)
-              const isAddition = (a: any) => a.change_type !== 'removal'
-              const isRemoval = (a: any) => a.change_type === 'removal'
-              const sentPending = atas.filter(a => a.status === 'sent')
-
-              const tillagg = atas
-                .filter(a => isConfirmed(a) && isAddition(a))
-                .reduce((s, a) => s + Math.abs(a.total || 0), 0)
-              const avgar = atas
-                .filter(a => isConfirmed(a) && isRemoval(a))
-                .reduce((s, a) => s + Math.abs(a.total || 0), 0)
-              const pendingTotal = sentPending.reduce((s, a) => {
-                const v = Math.abs(a.total || 0)
-                return s + (isRemoval(a) ? -v : v)
-              }, 0)
-
-              const original = typeof project.budget_amount === 'number' ? project.budget_amount : null
-              const grandTotal = (original ?? 0) + tillagg - avgar
-              const hasOriginal = original !== null
-
-              const fmt = (n: number) => formatCurrency(n)
-
-              const statusDot = (status: string) => {
-                if (status === 'invoiced') return 'bg-purple-500'
-                if (status === 'signed') return 'bg-primary-700'
-                if (status === 'sent') return 'bg-blue-500'
-                if (status === 'declined') return 'bg-red-500'
-                return 'bg-slate-400'
-              }
-
-              return (
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                    Aktuell totalsumma
-                  </div>
-                  <div className="text-3xl font-bold text-slate-900 tabular-nums tracking-tight">
-                    {fmt(grandTotal)}
-                  </div>
-
-                  {/* Breakdown */}
-                  <div className="text-xs text-slate-500 mt-2 leading-relaxed">
-                    {hasOriginal ? (
-                      <>
-                        Original {fmt(original)}
-                        {tillagg > 0 && (
-                          <> <span className="text-emerald-600 font-semibold">+ {fmt(tillagg)}</span> tillägg</>
-                        )}
-                        {avgar > 0 && (
-                          <> <span className="text-red-600 font-semibold">− {fmt(avgar)}</span> avgår</>
-                        )}
-                      </>
-                    ) : (
-                      <span className="italic text-slate-400">Saknar offert-grund · bara ÄTA-summa</span>
-                    )}
-                  </div>
-
-                  {sentPending.length > 0 && (
-                    <div className="text-[11px] text-slate-400 mt-1">
-                      {pendingTotal >= 0 ? '+' : '−'} {fmt(Math.abs(pendingTotal))} väntar på signering
-                    </div>
-                  )}
-
-                  {/* Stack — list-rad-stil (TD-24: proportional bars v2) */}
-                  {atas.length > 0 && (
-                    <div className="mt-4 space-y-1.5">
-                      {atas.map(a => {
-                        const sign = isRemoval(a) ? '−' : '+'
-                        const colorClass = isRemoval(a) ? 'text-red-700' : 'text-emerald-700'
-                        return (
-                          <div
-                            key={a.change_id}
-                            className="flex items-center gap-2.5 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg"
-                          >
-                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot(a.status)}`} />
-                            <span className="flex-1 text-xs text-slate-700 font-medium truncate">
-                              ÄTA-{a.ata_number || '?'} · {a.description || 'Utan rubrik'}
-                            </span>
-                            <span className={`text-xs font-bold tabular-nums ${colorClass}`}>
-                              {sign}{fmt(Math.abs(a.total || 0))}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-
-                  {/* Lockad original-rad */}
-                  {hasOriginal && (
-                    <div className="mt-2 px-3 py-2.5 bg-slate-100 border border-dashed border-slate-300 rounded-lg flex items-center gap-2.5">
-                      <Lock className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                      <span className="flex-1 text-xs text-slate-500 font-medium">
-                        Original-offert · signerad
-                      </span>
-                      <span className="text-xs font-bold text-slate-700 tabular-nums">
-                        {fmt(original)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )
-            })()}
-          </aside>
+          {/* Desktop-actions: "Fler åtgärder" (befintliga sekundär-åtgärder,
+              se nedan) + dubblerad primärknapp (samma läge/åtgärd som
+              vänsterkolumnens ProjectTodoBlock). */}
+          <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMoreMenuOpen(o => !o)}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white text-slate-700 text-sm font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+              >
+                Fler åtgärder
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+              {moreMenuOpen && renderMoreActionsMenu()}
+            </div>
+            {renderPrimaryTodoButton()}
+          </div>
         </div>
 
-        {/* Close dropdown when clicking outside */}
-        {statusDropdownOpen && (
-          <div className="fixed inset-0 z-10" onClick={() => setStatusDropdownOpen(false)} />
+        {/* Mobil "Fler åtgärder" — samma innehåll som desktop-kebaben, öppnas
+            av appbarens MoreVertical-knapp ovan. */}
+        {moreMenuOpen && (
+          <div className="relative lg:hidden mb-4">
+            {renderMoreActionsMenu()}
+          </div>
         )}
 
-        {/* 8-fas-tidslinje — Etapp 4a.1 (2026-05-22): vertikal stapel
-            ersatt av kompakt horisontell strip (samma mönster som
-            Verksamhetsöversikten). Klick på fas öppnar modal med
-            byt-stage + tasks + AI-aktivitet. */}
-        <div className="mb-6 bg-white border border-slate-200 rounded-xl p-4">
-          <ProjectStageStrip
-            currentStageId={project.current_workflow_stage_id || 'ps-01'}
-            onStageClick={() => setStageModalOpen(true)}
+        {/* Close dropdown when clicking outside */}
+        {moreMenuOpen && (
+          <div
+            className="fixed inset-0 z-10"
+            onClick={() => setMoreMenuOpen(false)}
           />
-        </div>
+        )}
 
-        {/* Mobile: horizontal scroll tabs */}
-        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 md:hidden">
-          {allTabs.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-                activeTab === tab.key
-                  ? 'bg-primary-700 text-white'
-                  : 'bg-gray-100 text-gray-500'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Body — Del 3a: desktop tvåkolumn 400px|1fr, mobil enkolumn
+            (statuskort → Att göra → nav). Vänsterkolumnen ÄR mobilvyns
+            översta block, i samma ordning på båda. */}
+        <div className="lg:grid lg:grid-cols-[400px_1fr] lg:gap-5 lg:items-start">
+          {/* Vänsterkolumn: statuskort + Att göra */}
+          <div className="space-y-4 mb-6 lg:mb-0">
+            <ProjectStatusCard
+              currentStageId={project.current_workflow_stage_id}
+              quoteTitle={quote?.title || null}
+              startDate={project.start_date}
+              endDate={project.end_date}
+              canSeeFinancials={canSeeFinancials}
+              economics={statusEconomics}
+              economicsLoading={statusEconomicsLoading}
+              onStageClick={() => setStageModalOpen(true)}
+            />
+            <ProjectTodoBlock
+              projectId={projectId}
+              mode={todoMode}
+              primaryHref={todoPrimaryHref}
+              onPrimaryClick={todoPrimaryOnClick}
+              overBudgetAlert={overBudgetAlert}
+              actionRows={todoActionRows}
+            />
+          </div>
 
-        {/* Desktop: sidebar + content grid */}
-        <div className="flex gap-6">
-          {/* Vertical sidebar nav — desktop only */}
-          <nav className="hidden md:block w-[200px] flex-shrink-0">
-            <div className="sticky top-4 space-y-4">
-              {tabGroups.map(group => (
-                <div key={group.group}>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 px-3">{group.group}</p>
-                  <div className="space-y-0.5">
-                    {group.items.map(tab => (
-                      <button
-                        key={tab.key}
-                        onClick={() => setActiveTab(tab.key)}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all ${
-                          activeTab === tab.key
-                            ? 'text-primary-700 bg-primary-50 font-medium border-l-2 border-primary-700'
-                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-l-2 border-transparent'
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
+          {/* Högerkolumn: nav (accordion mobil / flikrad desktop) + paneler */}
+          <div className="min-w-0">
+            {/* Mobil accordion — sex grupper, en öppen åt gången (Del 3a) */}
+            <div className="lg:hidden space-y-2 mb-4">
+              {visibleGroups.map(group => {
+                const Icon = GROUP_ICON[group.key]
+                const isOpen = activeGroup === group.key
+                const sub = groupSubrow(group.key)
+                return (
+                  <div key={group.key} className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab(group.tabs[0])}
+                      className={`w-full flex items-center gap-3 px-4 py-3 min-h-[44px] text-left transition-colors ${isOpen ? 'bg-gray-50' : ''}`}
+                    >
+                      <span className="w-[30px] h-[30px] rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <Icon className="w-4 h-4 text-gray-500" />
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm font-semibold text-gray-900">{group.label}</span>
+                        {sub && <span className="block text-xs text-gray-400 truncate">{sub}</span>}
+                      </span>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
                   </div>
-                </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop flikrad — sex grupper */}
+            <div className="hidden lg:flex items-center gap-1 border-b border-gray-200 mb-5">
+              {visibleGroups.map(group => (
+                <button
+                  key={group.key}
+                  type="button"
+                  onClick={() => setActiveTab(group.tabs[0])}
+                  className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    activeGroup === group.key
+                      ? 'text-primary-700 border-primary-700'
+                      : 'text-gray-500 border-transparent hover:text-gray-700'
+                  }`}
+                >
+                  {group.label}
+                </button>
               ))}
             </div>
-          </nav>
 
-          {/* Content area */}
-          <div className="flex-1 min-w-0">
+            {/* Panel-innehåll — Fas 1: befintliga flikars render-block
+                återanvänds oförändrade, gated på activeGroup istället för
+                exakt activeTab (se GROUP_OF_TAB/NEW_GROUPS ovan). */}
 
         {/* === TAB: Oversikt === */}
-        {activeTab === 'overview' && (
+        {activeGroup === 'overview' && (
           <div className="space-y-6">
             {/* Projektinfo (Etapp 4b steg 3) */}
             <ProjectInfoCard
@@ -2033,7 +2176,7 @@ export default function ProjectDetailPage() {
         )}
 
         {/* === TAB: Schema === */}
-        {activeTab === 'schedule' && (
+        {activeGroup === 'planning' && (
           <div className="space-y-6">
             {/* Bokningar (kund) — riktiga kund-bokningar via /api/bookings */}
             <div className="space-y-4">
@@ -2125,7 +2268,7 @@ export default function ProjectDetailPage() {
         )}
 
         {/* === TAB: Delmoment === */}
-        {activeTab === 'milestones' && (
+        {activeGroup === 'planning' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Delmoment</h2>
@@ -2168,7 +2311,7 @@ export default function ProjectDetailPage() {
         )}
 
         {/* === TAB: ÄTA === */}
-        {activeTab === 'changes' && (
+        {activeGroup === 'changes' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">ÄTA (Ändring/Tillägg/Avgående)</h2>
@@ -2409,7 +2552,7 @@ export default function ProjectDetailPage() {
         )}
 
         {/* === TAB: Uppgifter === */}
-        {activeTab === 'tasks' && (
+        {activeGroup === 'planning' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
@@ -2585,7 +2728,7 @@ export default function ProjectDetailPage() {
         )}
 
         {/* === TAB: Tidrapporter === */}
-        {activeTab === 'time' && (
+        {activeGroup === 'time_team' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Tidrapporter</h2>
@@ -2697,8 +2840,8 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {/* === TAB: Material === */}
-        {activeTab === 'material' && (
+        {/* === TAB: Material === (ägar-gated — kostnader) */}
+        {activeGroup === 'economy_offert' && canSeeFinancials && (
           <div className="space-y-6">
             {/* Förtydligande (Etapp 4c, 2026-05-24): Material vs Leverantörer */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 leading-relaxed">
@@ -2921,7 +3064,7 @@ export default function ProjectDetailPage() {
         )}
 
         {/* === TAB: Team === */}
-        {activeTab === 'team' && (
+        {activeGroup === 'time_team' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -3121,7 +3264,7 @@ export default function ProjectDetailPage() {
         )}
 
         {/* === TAB: Dokument === */}
-        {activeTab === 'documents' && (
+        {activeGroup === 'documentation' && (
           <div className="space-y-6">
             {/* Offert-PDF via referens (Etapp 3.3). Owner/admin-only +
                 server-side stripping i quote-context-endpoint. Komponenten
@@ -3237,7 +3380,7 @@ export default function ProjectDetailPage() {
         )}
 
         {/* === TAB: Byggdagbok === */}
-        {activeTab === 'log' && (
+        {activeGroup === 'documentation' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -3374,7 +3517,7 @@ export default function ProjectDetailPage() {
         )}
 
         {/* === TAB: Checklistor === */}
-        {activeTab === 'checklists' && (
+        {activeGroup === 'documentation' && (
           <div className="space-y-6">
 
             {/* --- Active form fill-in view --- */}
@@ -3519,12 +3662,12 @@ export default function ProjectDetailPage() {
                 {/* Formulär section */}
                 <div className="flex items-center justify-between mt-8">
                   <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-sky-600" />
+                    <FileText className="w-5 h-5 text-primary-700" />
                     Formulär
                   </h2>
                   <button
                     onClick={() => setShowFormCreate(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-sky-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
+                    className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90"
                   >
                     <Plus className="w-4 h-4" /> Nytt formulär
                   </button>
@@ -3536,7 +3679,7 @@ export default function ProjectDetailPage() {
                       <button
                         key={fs.id}
                         onClick={() => { setActiveForm(fs); setFormAnswers(fs.answers || {}) }}
-                        className="bg-white rounded-xl border border-[#E2E8F0] p-4 text-left hover:border-sky-300 transition"
+                        className="bg-white rounded-xl border border-[#E2E8F0] p-4 text-left hover:border-primary-300 transition"
                       >
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-sm font-medium text-gray-900">{fs.name}</h3>
@@ -3544,7 +3687,7 @@ export default function ProjectDetailPage() {
                             fs.status === 'signed'
                               ? 'bg-emerald-100 text-emerald-600'
                               : fs.status === 'completed'
-                                ? 'bg-sky-100 text-sky-600'
+                                ? 'bg-primary-100 text-primary-700'
                                 : 'bg-amber-500/20 text-amber-400'
                           }`}>
                             {fs.status === 'signed' ? 'Signerat' : fs.status === 'completed' ? 'Ifyllt' : 'Utkast'}
@@ -3603,12 +3746,12 @@ export default function ProjectDetailPage() {
         )}
 
         {/* === TAB: Offert === */}
-        {activeTab === 'quote_spec' && (
+        {activeGroup === 'economy_offert' && (
           <ProjectQuoteSpec projectId={projectId} />
         )}
 
-        {/* === TAB: Ekonomi === */}
-        {activeTab === 'economy' && (
+        {/* === TAB: Ekonomi === (ägar-gated) */}
+        {activeGroup === 'economy_offert' && canSeeFinancials && (
           <ProjectEconomicsCard
             projectId={projectId}
             refreshKey={economicsRefreshKey}
@@ -3616,7 +3759,7 @@ export default function ProjectDetailPage() {
           />
         )}
         {/* === TAB: Arbetsorder === */}
-        {activeTab === 'arbetsorder' && (
+        {activeGroup === 'planning' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -3881,8 +4024,8 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {/* ═══════ LEVERANTÖRSFAKTUROR TAB ═══════ */}
-        {activeTab === 'leverantorer' && (
+        {/* ═══════ LEVERANTÖRSFAKTUROR TAB ═══════ (ägar-gated — kostnader) */}
+        {activeGroup === 'economy_offert' && canSeeFinancials && (
           <div className="space-y-4">
             {/* Förtydligande (Etapp 4c, 2026-05-24): Material vs Leverantörer */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 leading-relaxed">
@@ -4046,8 +4189,25 @@ export default function ProjectDetailPage() {
         )}
       </div>
 
-          </div>{/* /content area */}
-        </div>{/* /flex wrapper */}
+        {/* === TAB: Fältrapporter ===
+            Projektvy Fas 1 (2026-07-31): FieldReportsTab-komponenten (se
+            nedan i filen) fanns redan definierad men var aldrig kopplad in
+            i den gamla flik-listan — "Fältrapporter" renderade tomt.
+            HANDOFF.md räknar uttryckligen field_reports som en av
+            Dokumentation-gruppens flikar, så den kopplas in nu (oförändrad
+            komponentkod, bara den saknade activeGroup-villkoret). */}
+        {activeGroup === 'documentation' && (
+          <div className="mt-6">
+            <FieldReportsTab
+              projectId={projectId}
+              customerId={project.customer?.customer_id || null}
+              businessId={business.business_id}
+            />
+          </div>
+        )}
+
+          </div>{/* /hogerkolumn */}
+        </div>{/* /lg:grid-wrapper */}
 
       {/* === Milestone Modal === */}
       {milestoneModal.open && (
@@ -5496,7 +5656,7 @@ function FormCreateModal({ templates, onClose, onCreate }: {
               onClick={() => setSelectedTemplate(t)}
               className={`w-full p-4 rounded-xl text-left border transition ${
                 selectedTemplate?.id === t.id
-                  ? 'bg-secondary-50 border-sky-300 ring-1 ring-sky-300'
+                  ? 'bg-secondary-50 border-primary-300 ring-1 ring-primary-300'
                   : 'bg-gray-50 border-gray-200 hover:border-gray-300'
               }`}
             >
@@ -5526,7 +5686,7 @@ function FormCreateModal({ templates, onClose, onCreate }: {
           <button
             onClick={() => selectedTemplate && onCreate(selectedTemplate.id)}
             disabled={!selectedTemplate}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-sky-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             Skapa formulär
           </button>
@@ -5652,7 +5812,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
     ? Math.round((answeredRequired.length / requiredFields.length) * 100)
     : 100
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-sky-400'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400'
 
   return (
     <div className="space-y-4">
@@ -5671,7 +5831,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
             isSigned
               ? 'bg-emerald-100 text-emerald-600'
               : isCompleted
-                ? 'bg-sky-100 text-sky-600'
+                ? 'bg-primary-100 text-primary-700'
                 : 'bg-amber-500/20 text-amber-400'
           }`}>
             {isSigned ? 'Signerat' : isCompleted ? 'Ifyllt' : 'Utkast'}
@@ -5724,7 +5884,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
                     checked={answer.checked || false}
                     onChange={e => updateAnswer(field.id, 'checked', e.target.checked)}
                     disabled={isSigned}
-                    className="w-4 h-4 mt-0.5 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                    className="w-4 h-4 mt-0.5 rounded border-gray-300 text-primary-700 focus:ring-primary-500"
                   />
                   <div>
                     <span className={`text-sm ${answer.checked ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
@@ -5777,7 +5937,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
                       )}
                     </div>
                   ) : !isSigned ? (
-                    <label className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-sky-400 transition">
+                    <label className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 transition">
                       <Image className="w-5 h-5 text-gray-400" />
                       <span className="text-sm text-gray-500">Välj foto...</span>
                       <input
@@ -5849,7 +6009,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
                             const sigData = getSignatureData()
                             if (sigData) updateAnswer(field.id, 'signature_data', sigData)
                           }}
-                          className="text-xs text-sky-600 hover:text-secondary-700 ml-auto"
+                          className="text-xs text-primary-700 hover:text-secondary-700 ml-auto"
                         >
                           Spara signatur
                         </button>
@@ -5874,7 +6034,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
               <button
                 onClick={() => onSave()}
                 disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-sky-600 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Spara

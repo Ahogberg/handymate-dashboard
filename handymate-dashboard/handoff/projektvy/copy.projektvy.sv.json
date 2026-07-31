@@ -1,0 +1,50 @@
+{
+  "statuskort": {
+    "rubrik": "Hur ligger vi till?",
+    "faser": ["Planering", "Pågående", "Klart"],
+    "staplar": { "offererat": "Offererat", "nedlagt": "Nedlagt", "fakturerat": "Fakturerat" },
+    "rot_rad": "Varav arbete 120 000 kr → ROT-avdrag 36 000 kr · kunden betalar 149 000 kr",
+    "prognos_ok": "Inom budget",
+    "prognos_kvar": "kvar att fakturera {belopp}",
+    "prognos_over": "{belopp} över offererat"
+  },
+  "att_gora": {
+    "rubrik": "Att göra",
+    "primar": {
+      "nystartat": "Boka första besök",
+      "pagaende": "Rapportera tid",
+      "klart_ofakturerat": "Godkänn & skicka",
+      "over_budget": "Skapa ÄTA"
+    },
+    "ok_tagg": "Skickas efter ditt OK",
+    "godkann_kort_vem": "{namn} har förberett",
+    "knappar": ["Godkänn", "Ändra", "Avvisa"],
+    "rader": {
+      "tidrapport_saknas": "Ingen tidrapport i går — {namn}",
+      "tidrapport_atgard": "Lägg till tid",
+      "ofakturerat": "Ofakturerat: {belopp}",
+      "ofakturerat_atgard": "Förbered delfaktura",
+      "egenkontroll": "Egenkontroll: {n} punkt kvar — {punkt}",
+      "egenkontroll_atgard": "Bocka av",
+      "ingen_personal": "Ingen personal tilldelad ännu",
+      "ingen_personal_atgard": "Tilldela personal",
+      "inga_delmoment": "Inga delmoment planerade",
+      "inga_delmoment_atgard": "Planera delmoment"
+    },
+    "tom_ko_rubrik": "Inget väntar på dig här",
+    "tom_ko_text": "När teamet förbereder något för projektet dyker det upp här — du godkänner med ett tryck.",
+    "over_budget_larm_rubrik": "Nedlagt överstiger offererat med {belopp}",
+    "over_budget_larm_text": "Lars flaggade: {moment} tog {n} tim mer än kalkylen. Merarbete som kunden beställt muntligt bör bli en ÄTA — annars betalar du det själv."
+  },
+  "flikar": ["Översikt", "Ekonomi & offert", "ÄTA", "Planering", "Tid & team", "Dokumentation"],
+  "accordion_subs": {
+    "ekonomi_delfakturerad": "185 000 kr · delfakturerad",
+    "ekonomi_slutfaktura": "185 000 kr · slutfaktura väntar på ditt OK",
+    "ata_vantar": "2 st · 1 väntar på kundsvar",
+    "ata_inga": "Inga ännu",
+    "planering": "Delmoment {x} av {y} klara",
+    "tid_team": "{tim} tim · {n} personer",
+    "tid_inga": "Inga tidrapporter ännu"
+  },
+  "status_chips": { "pagaende": "Pågående", "klart": "Klart {datum}", "planering": "Planering", "over_offererat": "Över offererat" }
+}

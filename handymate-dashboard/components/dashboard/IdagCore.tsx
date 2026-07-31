@@ -15,6 +15,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import TeamActivityStrip, { TeamActivitySummary } from '@/components/TeamActivityStrip'
+import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 
 /**
  * IdagCore — kärnstacken i nya Idag-vyn (2026-07-11, från Idag-vy.html-designen).
@@ -35,14 +36,8 @@ import TeamActivityStrip, { TeamActivitySummary } from '@/components/TeamActivit
  */
 
 // ── Agent-metadata (samma mapp som PendingApprovalsBlock/approvals-sidan) ──
-const AGENT_INFO: Record<string, { name: string; role: string; color: string; initials: string; dot: string }> = {
-  matte: { name: 'Matte', role: 'Chefsassistent', color: 'bg-primary-700', dot: '#0f766e', initials: 'M' },
-  karin: { name: 'Karin', role: 'Ekonom', color: 'bg-blue-600', dot: '#2563eb', initials: 'K' },
-  hanna: { name: 'Hanna', role: 'Marknadschef', color: 'bg-purple-600', dot: '#9333ea', initials: 'H' },
-  daniel: { name: 'Daniel', role: 'Säljare', color: 'bg-amber-600', dot: '#d97706', initials: 'D' },
-  lars: { name: 'Lars', role: 'Projektledare', color: 'bg-emerald-600', dot: '#059669', initials: 'L' },
-  lisa: { name: 'Lisa', role: 'Kundservice', color: 'bg-sky-500', dot: '#0ea5e9', initials: 'Li' },
-}
+// Extraherad till components/dashboard/agentPersonas.ts (Projektvy Fas 1,
+// 2026-07-31) så ProjectApprovalsBlock.tsx kan återanvända samma karta.
 
 interface Approval {
   id: string
