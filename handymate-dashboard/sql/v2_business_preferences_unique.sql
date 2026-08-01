@@ -1,29 +1,51 @@
--- v2_business_preferences_unique.sql
--- Rotorsak till dag-7-mail-spammen (2026-07-31): setBusinessPreference gör
--- upsert med ON CONFLICT (business_id, key) — utan unik constraint failar
--- upserten tyst och dubblettskydds-flaggor "fastnar" aldrig, så cron-mail
--- går om varje dag. Idempotent: säker att köra även om constrainten finns.
+-- v2_business_preferences_unique.sql  (OMSKRIVEN 2026-08-01 efter körfel)
 --
--- Körs manuellt i Supabase SQL Editor.
+-- Rotorsaken visade sig djupare än saknad constraint: prod-tabellen
+-- business_preferences har FEL FORM. v5_learning_events.sql skapade en
+-- en-rad-per-företag-profil (communication_tone m.m.); när
+-- v2_business_preferences.sql senare kördes var dess CREATE TABLE IF NOT
+-- EXISTS en tyst no-op. Nyckel/värde-tabellen som ALL aktiv kod använder
+-- (setBusinessPreference, dag-7-flaggan, morgonbrief-cachen,
+-- tool-routerns preferenser) har alltså aldrig existerat — varje anrop
+-- har misslyckats tyst. Profilkolumnerna läses numera från
+-- ai_learned_preferences (v63), så v5-tabellen är föräldralös.
+--
+-- Åtgärd: döp undan den döda tabellen (data bevaras för säkerhets skull)
+-- och skapa den korrekta. Körs manuellt i Supabase SQL Editor.
 
--- 1) Städa ev. dubbletter som hunnit uppstå (behåll senast uppdaterade raden)
-DELETE FROM business_preferences a
-USING business_preferences b
-WHERE a.business_id = b.business_id
-  AND a.key = b.key
-  AND a.ctid < b.ctid;
+-- 0) Säkerhetskoll: visa den befintliga tabellens kolumner INNAN bytet.
+--    Förväntat: id, business_id, updated_at, communication_tone,
+--    pricing_tendency, lead_response_style, preferred_sms_length,
+--    custom_preferences (v5-formen). Ser du "key"/"value" här är tabellen
+--    redan rätt — kör då INTE resten, säg till istället.
+SELECT column_name FROM information_schema.columns
+WHERE table_name = 'business_preferences' ORDER BY ordinal_position;
 
--- 2) Unik constraint som upsertens ON CONFLICT kräver
-CREATE UNIQUE INDEX IF NOT EXISTS business_preferences_business_id_key_uniq
-  ON business_preferences (business_id, key);
+-- 1) Döp undan den föräldralösa v5-tabellen (droppas inte — ev. data kvar)
+ALTER TABLE business_preferences RENAME TO business_preferences_legacy_v5;
 
--- 3) Verifiering: ska returnera exakt en rad med indexnamnet
-SELECT indexname FROM pg_indexes
-WHERE tablename = 'business_preferences'
-  AND indexname = 'business_preferences_business_id_key_uniq';
+-- 2) Skapa nyckel/värde-tabellen som koden förväntar sig (v2-specen)
+CREATE TABLE business_preferences (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  business_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  source TEXT DEFAULT 'agent',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(business_id, key)
+);
 
--- 4) Verifiering av dag-7-flaggan för demokontot (kan vara 0 rader — cron:en
---    exkluderar numera demokontot helt, så flaggan behövs inte där):
-SELECT business_id, key, value, updated_at
-FROM business_preferences
-WHERE key = 'onboarding_day7_email';
+CREATE INDEX IF NOT EXISTS idx_business_preferences_business
+  ON business_preferences(business_id);
+
+-- 3) Verifiering A: nya tabellens kolumner (ska innehålla key + value)
+SELECT column_name FROM information_schema.columns
+WHERE table_name = 'business_preferences' ORDER BY ordinal_position;
+
+-- 4) Verifiering B: unik-constrainten som upsertens ON CONFLICT kräver
+SELECT conname FROM pg_constraint
+WHERE conrelid = 'business_preferences'::regclass AND contype = 'u';
+
+-- 5) Nyfikenhetskoll: låg det någon data i den gamla tabellen?
+SELECT count(*) AS legacy_rader FROM business_preferences_legacy_v5;
