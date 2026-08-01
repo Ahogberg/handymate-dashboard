@@ -117,3 +117,21 @@ stoppa och inspektera. (3) Regex mot Tailwind-klasser kräver ordgräns eller
 exakta suffix — bg-sky-50 är prefix till bg-sky-500. (4) Skyddslistan
 (persona-färger, medvetna undantag) verifieras med grep EFTER bytet, inte
 bara excluderas i mönstret.
+
+## 2026-08-01 — CREATE TABLE IF NOT EXISTS + namnkrock = tyst fel schema
+
+**Vad hände:** v5_learning_events skapade business_preferences med
+profilform; v2-migrationens CREATE TABLE IF NOT EXISTS blev tyst no-op.
+All nyckel/värde-kod felade tyst i månader (dag-7-spam var symptomet).
+Upptäcktes först när Andreas SQL-körning gav "column a.key does not
+exist" — mitt fix-script antog schemat från MIGRATIONSFILEN, inte från
+produktionens faktiska tillstånd.
+
+**Regel:** (1) Migrations-SQL som bygger på en befintlig tabell inleds
+ALLTID med en schema-verifiering (information_schema-select) med
+förväntat resultat dokumenterat — avviker det, avbryt. (2) CREATE TABLE
+IF NOT EXISTS är en fälla vid namnkrock: den garanterar att tabellen
+finns, inte att den har rätt form. Nya migrationer på "befintliga"
+tabeller ska verifiera formen, inte anta den. (3) Tysta ignorerade
+DB-fel (catch utan logg / oläst error) gjorde att felet överlevde —
+samma lärdom som setBusinessPreference-fixen.
