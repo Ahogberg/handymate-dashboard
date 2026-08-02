@@ -6,14 +6,23 @@ export const dynamic = 'force-dynamic'
 
 /**
  * POST /api/push/send — Internal helper to send push notifications
- * Body: { business_id, title, body, url?, tag? }
+ * Body: { business_id, title, body, url?, tag?, target_user_id? }
  *
  * This is an INTERNAL route — called by other API routes (approvals, crons).
  * It uses web-push to send to all subscriptions for the business.
+ *
+ * Etapp 4 (multi-employee-parity-plan.md): valfri `target_user_id` —
+ * en auth-uuid som MÅSTE matcha vad push_subscriptions.user_id faktiskt
+ * lagrar (satt i app/api/push/subscribe/route.ts). När den skickas med
+ * riktas web-pushen mot bara den personens prenumerationer istället för
+ * att blasta till hela businessen. Utelämnad = oförändrat beteende
+ * (blast, som idag). Gäller ENDAST web-push (push_subscriptions) — Expo/
+ * mobile-push (push_tokens, lib/notifications/expo-push.ts) har ingen
+ * per-user-kolumn och blastar fortfarande till hela businessen oavsett.
  */
 export async function POST(request: NextRequest) {
   try {
-    const { business_id, title, body, url, tag } = await request.json()
+    const { business_id, title, body, url, tag, target_user_id } = await request.json()
 
     if (!business_id || !title) {
       return NextResponse.json({ error: 'Missing business_id or title' }, { status: 400 })
@@ -32,11 +41,18 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
 
-    // Get all subscriptions for this business
-    const { data: subscriptions, error } = await supabase
+    // Get all subscriptions for this business — riktad mot en enskild
+    // person om target_user_id skickades med (Etapp 4), annars alla.
+    let subscriptionsQuery = supabase
       .from('push_subscriptions')
       .select('endpoint, p256dh, auth')
       .eq('business_id', business_id)
+
+    if (target_user_id) {
+      subscriptionsQuery = subscriptionsQuery.eq('user_id', target_user_id)
+    }
+
+    const { data: subscriptions, error } = await subscriptionsQuery
 
     if (error || !subscriptions?.length) {
       return NextResponse.json({ success: true, sent: 0 })

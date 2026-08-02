@@ -1041,6 +1041,33 @@ async function executeApprovalPayload(
           .update({ status: 'draft' })
           .eq('quote_id', pl.quote_id)
 
+        // Etapp 4 (multi-employee-parity-plan.md): denna push är riktad
+        // till SKAPAREN specifikt ("Offert godkänd" — du kan nu skicka den),
+        // inte en generell businessnotis. pl.requested_by_user_id är
+        // business_users.id (satt av app/api/quotes/send/route.ts, se
+        // lib/approvals/routing.ts) — INTE en auth-uuid, så vi måste slå
+        // upp business_users.user_id innan vi skickar target_user_id till
+        // /api/push/send (som förväntar sig auth-uuid, matchande
+        // push_subscriptions.user_id). ALDRIG business.user_id/
+        // getAuthenticatedBusiness().user_id här — det är alltid ägarens
+        // uuid, inte skaparens, se lib/auth.ts. Om uppslaget saknas eller
+        // missar faller vi tillbaka till oförändrat businessblast (som
+        // innan denna etapp).
+        let targetUserId: string | null = null
+        if (pl.requested_by_user_id) {
+          const { data: requester, error: requesterErr } = await supabase4e
+            .from('business_users')
+            .select('user_id')
+            .eq('id', pl.requested_by_user_id)
+            .maybeSingle()
+
+          if (requesterErr) {
+            console.error('[four_eyes_quote/push] business_users-uppslag misslyckades:', requesterErr)
+          } else if (requester?.user_id) {
+            targetUserId = requester.user_id
+          }
+        }
+
         // Push-notis till skaparen. Fire-and-forget — fördröjer inte
         // approval-response, men loggar fel så vi kan upptäcka push-issues
         // (TD: bygg push-fail-monitoring-cron eller Sentry-integration).
@@ -1055,6 +1082,7 @@ async function executeApprovalPayload(
             title: 'Offert godkänd',
             body: `Din offert på ${(pl.quote_total || 0).toLocaleString('sv-SE')} kr har godkänts — du kan nu skicka den`,
             url: `/dashboard/quotes/${pl.quote_id}`,
+            ...(targetUserId ? { target_user_id: targetUserId } : {}),
           }),
         })
           .then(async (r) => {

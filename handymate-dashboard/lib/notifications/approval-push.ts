@@ -14,10 +14,27 @@
  * en push-fail aldrig blockar approval-skapande.
  */
 
+import { getServerSupabase } from '@/lib/supabase'
+
 interface ApprovalLike {
   business_id: string
   approval_type: string
   payload?: Record<string, unknown> | null
+  /**
+   * Etapp 4 (multi-employee-parity-plan.md) — business_users.id (INTE en
+   * auth-uuid) för vem pushen ska riktas mot specifikt, om caller vet det
+   * (t.ex. pending_approvals.routed_business_user_id, Etapp 3a-kolumnen).
+   * sendApprovalPush slår upp business_users.user_id (auth-uuid) innan den
+   * skickas vidare som target_user_id till /api/push/send — ALDRIG
+   * getAuthenticatedBusiness().user_id, som alltid är ÄGARENS uuid oavsett
+   * vem som faktiskt agerar (se lib/auth.ts).
+   *
+   * Ingen creation-site sätter routed_business_user_id ännu (Etapp 3b satte
+   * bara routing_role) — detta fält är alltså strukturellt klart men no-op
+   * (blast till hela businessen, oförändrat) i produktion tills en senare
+   * körning börjar fylla i kolumnen.
+   */
+  routed_business_user_id?: string | null
 }
 
 interface PushTemplate {
@@ -157,6 +174,35 @@ function buildPushTemplate(
 }
 
 /**
+ * Etapp 4: business_users.id → business_users.user_id (auth-uuid).
+ * Returnerar null om businessUserId saknas, uppslaget missar, eller
+ * DB-anropet failar — alla dessa fall ska falla tillbaka till oförändrat
+ * businessblast i sendApprovalPush, inte kasta/blockera pushen.
+ */
+async function resolveTargetUserId(businessUserId?: string | null): Promise<string | null> {
+  if (!businessUserId) return null
+
+  try {
+    const supabase = getServerSupabase()
+    const { data, error } = await supabase
+      .from('business_users')
+      .select('user_id')
+      .eq('id', businessUserId)
+      .maybeSingle()
+
+    if (error) {
+      console.error('[approval-push] business_users-uppslag misslyckades:', error)
+      return null
+    }
+
+    return data?.user_id || null
+  } catch (err) {
+    console.error('[approval-push] resolveTargetUserId threw:', err)
+    return null
+  }
+}
+
+/**
  * Skicka push-notis för en approval. Fire-and-forget — fel loggas
  * men kastas inte.
  *
@@ -175,6 +221,12 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
+  // Etapp 4: slå upp auth-uuid:n för routed_business_user_id (om satt) så
+  // pushen kan riktas mot en enskild person. Fel/miss här är icke-fatalt —
+  // faller tillbaka till oförändrat businessblast, precis som innan detta
+  // fält fanns.
+  const targetUserId = await resolveTargetUserId(approval.routed_business_user_id)
+
   try {
     const res = await fetch(`${appUrl}/api/push/send`, {
       method: 'POST',
@@ -185,6 +237,7 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
         body: template.body,
         url: template.url,
         tag: `approval:${approval.approval_type}`,
+        ...(targetUserId ? { target_user_id: targetUserId } : {}),
       }),
     })
 
