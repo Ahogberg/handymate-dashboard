@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { ensureBucket } from '@/lib/storage'
+import { analyzeProjectPhoto } from '@/lib/egenkontroll/analyze-and-queue'
 
 const BUCKET = 'project-files'
 
@@ -164,6 +165,26 @@ export async function POST(
         { error: `Kunde inte spara dokument-metadata: ${insertError.message}` },
         { status: 500 },
       )
+    }
+
+    // Egenkontroll-agenten (etapp 1b, tasks/easoft-gap-plan.md): fire-and-
+    // forget fotobedömning mot projektets aktiva checklistor. ENDAST bilder
+    // — icke-bilder rörs inte. Anropas EFTER att vi har `document` (behöver
+    // dess id som photoRef) men INTE awaitat — .catch() istället för try/
+    // await, så uppladdningssvaret nedan aldrig fördröjs eller riskerar att
+    // fastna på en AI-analys som kan ta flera sekunder. analyzeProjectPhoto
+    // är själv fail-safe (kastar aldrig), .catch() är bara ett extra skyddsnät.
+    if (document && (file.type || '').startsWith('image/')) {
+      const { data: publicUrlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
+      analyzeProjectPhoto({
+        businessId: business.business_id,
+        projectId,
+        photoRef: document.id,
+        imageSource: { type: 'url', url: publicUrlData.publicUrl },
+        uploadedBy: business.user_id || null,
+      }).catch(err => {
+        console.error('[projects/documents] egenkontroll-analys misslyckades (fire-and-forget):', err)
+      })
     }
 
     return NextResponse.json({ document })

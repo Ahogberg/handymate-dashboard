@@ -22,6 +22,7 @@ import {
   ExternalLink,
   Star,
   Globe,
+  ClipboardCheck,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -106,6 +107,9 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   // eller kontakta support). Skapas från /api/quotes/public/[token] när
   // createProjectFromQuote() returnerar success=false eller kastar exception.
   manual_project_create: { label: 'Skapa projekt', icon: AlertTriangle, bgColor: 'bg-red-50', textColor: 'text-red-700' },
+  // Egenkontroll-agenten (etapp 1b, tasks/easoft-gap-plan.md).
+  egenkontroll_foto: { label: 'Egenkontroll', icon: ClipboardCheck, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
+  egenkontroll_avvikelse: { label: 'Egenkontroll-avvikelse', icon: AlertTriangle, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 
@@ -214,7 +218,7 @@ export default function ApprovalsPage() {
   }
 
   // Typer som INTE behöver bekräftelse (rena acknowledgements)
-  const SKIP_CONFIRM = ['time_attestation', 'low_stock_alert', 'profitability_warning', 'dispatch_suggestion', 'quote_nudge']
+  const SKIP_CONFIRM = ['time_attestation', 'low_stock_alert', 'profitability_warning', 'dispatch_suggestion', 'quote_nudge', 'egenkontroll_foto', 'egenkontroll_avvikelse']
 
   function requestApprove(approval: Approval, editedPayload?: Record<string, unknown>) {
     if (SKIP_CONFIRM.includes(approval.approval_type)) {

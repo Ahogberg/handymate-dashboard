@@ -80,6 +80,9 @@ const TYPE_LABEL: Record<string, string> = {
   review_request: 'Recension',
   confirm_payment: 'Betalning',
   review_auto_invoice: 'Faktura',
+  // Egenkontroll-agenten (etapp 1b, tasks/easoft-gap-plan.md).
+  egenkontroll_foto: 'Egenkontroll',
+  egenkontroll_avvikelse: 'Egenkontroll-avvikelse',
 }
 
 export default function ProjectApprovalsBlock({ projectId, onCountChange }: ProjectApprovalsBlockProps) {

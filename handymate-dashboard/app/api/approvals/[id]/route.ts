@@ -1234,6 +1234,69 @@ async function executeApprovalPayload(
         }
       }
 
+      case 'egenkontroll_foto': {
+        // Egenkontroll-agenten (etapp 1b, tasks/easoft-gap-plan.md). Skapas
+        // av systemkod (lib/egenkontroll/analyze-and-queue.ts) — INTE av ett
+        // agent-verktyg — så tool-definitions.ts/tool-router.ts rörs
+        // medvetet inte (agentregeln i CLAUDE.md gäller nya tools, inte nya
+        // approval_types som bara systemkoden själv skapar).
+        //
+        // Godkänn = markera de föreslagna punkterna som klara + lägg en
+        // spårbar notering på checklistan (bevis vid besiktning/ÄTA-tvist).
+        // Progress beräknas on-read i GET /checklists (items.filter(checked))
+        // — inget separat progress-fält att uppdatera här.
+        const pl = payload as any
+        const checklistId = pl.checklist_id as string | undefined
+        const forslag = (pl.forslag as Array<{ punkt_id: string; text: string }>) || []
+        if (!checklistId || forslag.length === 0) {
+          return { action: 'egenkontroll_foto', skipped: 'no checklist_id or forslag' }
+        }
+
+        const supabaseEk = getServerSupabase()
+        const { data: checklist, error: fetchClErr } = await supabaseEk
+          .from('project_checklist')
+          .select('items, notes')
+          .eq('id', checklistId)
+          .eq('business_id', businessId)
+          .maybeSingle()
+
+        if (fetchClErr || !checklist) {
+          return { action: 'egenkontroll_foto', ok: false, error: fetchClErr?.message || 'Checklista hittades inte' }
+        }
+
+        const punktIds = new Set(forslag.map(f => f.punkt_id))
+        const items = ((checklist.items as any[]) || []).map(it =>
+          punktIds.has(it.id) ? { ...it, checked: true } : it,
+        )
+
+        const today = new Date().toLocaleDateString('sv-SE')
+        const notering = `Styrkt med foto ${pl.photo_ref || ''} ${today}`.trim()
+        const notes = checklist.notes ? `${checklist.notes}\n${notering}` : notering
+
+        const { error: updateClErr } = await supabaseEk
+          .from('project_checklist')
+          .update({ items, notes })
+          .eq('id', checklistId)
+          .eq('business_id', businessId)
+
+        if (updateClErr) {
+          return { action: 'egenkontroll_foto', ok: false, error: updateClErr.message }
+        }
+
+        return { action: 'egenkontroll_foto', ok: true, checklist_id: checklistId, marked_count: forslag.length }
+      }
+
+      case 'egenkontroll_avvikelse': {
+        // Motsatt fall av 'egenkontroll_foto' ovan — samma systemkod-
+        // ursprung, samma medvetna undantag från agentregeln.
+        //
+        // Godkänn = kvittera avvikelsen. Kortet ÄR informationen (Lars
+        // flaggade att fotot motsäger punkten) — ingen datamutation, bara
+        // en bekräftelse att hantverkaren sett den. Precis som
+        // 'profitability_warning' ovan.
+        return { action: 'egenkontroll_avvikelse', acknowledged: true }
+      }
+
       case 'automation': {
         // En v3-automationsregel med requires_approval skapar denna approval och
         // lägger rule_action_type/rule_action_config i payloaden. Utan detta case

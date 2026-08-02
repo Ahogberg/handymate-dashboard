@@ -142,6 +142,9 @@ const TYPE_LABEL: Record<string, string> = {
   confirm_payment: 'Betalning',
   review_auto_invoice: 'Faktura',
   publish_microsite: 'Hemsida',
+  // Egenkontroll-agenten (etapp 1b, tasks/easoft-gap-plan.md).
+  egenkontroll_foto: 'Egenkontroll',
+  egenkontroll_avvikelse: 'Egenkontroll-avvikelse',
 }
 
 function timeAgo(iso: string): string {
