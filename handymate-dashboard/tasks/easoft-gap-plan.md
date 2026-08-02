@@ -86,23 +86,38 @@ inte hör till projekt; påstå "besiktningsgodkänd av AI" (juridik).
 
 ## Etapp 2 — Tidrapport-förslag (tidstjuv #1)
 
-**Kärnidé:** Lars föreslår tidrapporter från det systemet redan VET —
-bokningar och projektbemanning — i stället för att någon knappar:
-"Du var bokad på Svensson i går 07–15. Rapportera 8 tim?" → godkänn med
-ett tryck. INTE GPS (integritet + kräver mobilapp) — kalenderbaserat.
+**⚠ OMSKRIVEN 2026-08-02 efter schemaverifiering (samma disciplin som
+lärdomen 2026-08-01 kräver — verifierat mot faktisk kod, inte antaget):**
+
+- `booking` har INGET person-tilldelningsfält — en bokning hör till
+  business+kund+projekt, aldrig till en namngiven anställd. Planens
+  ursprungliga "Du var bokad på Svensson i går 07–15" (per PERSON) går
+  därför inte att bygga sant idag.
+- `time_entry.business_user_id` finns i schemat (löneexporten läser den,
+  app/api/time-reports/payroll-export/route.ts) men SÄTTS ALDRIG av
+  någon av de fyra ställen som skapar en time_entry-rad (tool-router,
+  checkin/approve, voice/execute, approvals-caset). Separat, redan
+  existerande bugg — sannolikt gör löneexporten tyst ofullständig.
+  INTE i scope för etapp 2 (ändrar inte matchningens grundmodell), men
+  flaggad till Andreas som eget fast-follow-fynd.
+
+**Reviderad kärnidé:** matcha på PROJEKT, inte person. "Projektet
+Svensson hade en bokning i går (07–15) men ingen tidrapport än —
+förbered en?" → godkänn med ett tryck. Samma värde (tidstjuv #1 löst,
+admin bort från hantverkaren), ärligare mot datan. INTE GPS (integritet
++ kräver mobilapp) — kalenderbaserat, som ursprungsplanen.
 
 **Bygget (2 increments):**
 2a. **Förslagsmotorn**: dagligt cron (befintligt cron-mönster, registreras
-    i vercel.json) som för varje business hittar gårdagens bokningar utan
-    motsvarande tidrapport → förslag i kön per person/projekt. Ren
-    matchningskärna med facit-tester (bokning+rapport-fixtures).
-    Schemakoll FÖRST (lärdomen 2026-08-01): verifiera time_entry- och
-    booking-kolumnerna mot faktisk DB innan kod skrivs — fas 1 noterade
-    att TimeEntry saknar business_user_id i projektvyns fetch; om
-    kolumnen saknas i DB krävs migration, om den bara saknas i selecten
-    är det en kodrad.
+    i vercel.json) som för varje business hittar gårdagens bokningar
+    (booking.scheduled_start/end, status som indikerar utfört) utan
+    matchande time_entry (project_id + work_date) → förslag i kön PER
+    PROJEKT. Ren matchningskärna med facit-tester (bokning+rapport-
+    fixtures). Persona: Lars (samma som etapp 1).
 2b. **"Ingen tidrapport i går"-raden** i projektvyn (canvas-designen,
-    utelämnad i fas 1) — får nu sitt underlag från samma matchningskärna.
+    utelämnad i fas 1 pga just denna dataluta) — attribueras nu till
+    PROJEKTET, inte en person. Copy justeras ärligt från originalmallen
+    (som förutsatte ett namn) — ingen påhittad person i texten.
 
 **DoD:** som etapp 1 + hård regel: tidsförslag är löne-/fakturaunderlag →
 godkännande ALLTID, aldrig förtjänad autonomi på denna typ (skriv in i
