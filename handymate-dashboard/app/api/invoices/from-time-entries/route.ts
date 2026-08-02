@@ -32,6 +32,26 @@ export async function POST(request: NextRequest) {
 
     if (timeError) throw timeError
 
+    // Etapp 6 (multi-employee-parity-plan.md): fakturarader ska ärva vem
+    // som utförde arbetet från time_entry.business_user_id (satt av Etapp 1
+    // Tier A/B på alla fyra insert-ställen). `items` är ett JSONB-fält på
+    // `invoice` (ingen egen fakturarad-tabell, se sql/invoice_overhaul.sql)
+    // — inga strukturella hinder mot att lägga till fälten direkt, ingen
+    // migration krävs. Slå upp namn i en batch för att undvika N+1.
+    const businessUserIds = Array.from(
+      new Set((timeEntries || []).map((e) => e.business_user_id).filter(Boolean))
+    ) as string[]
+    const businessUserNameById = new Map<string, string>()
+    if (businessUserIds.length > 0) {
+      const { data: businessUsers } = await supabase
+        .from('business_users')
+        .select('id, name')
+        .in('id', businessUserIds)
+      for (const bu of businessUsers || []) {
+        businessUserNameById.set(bu.id, bu.name)
+      }
+    }
+
     const items: any[] = []
 
     // Gruppera tidrapporter och skapa items
@@ -51,6 +71,10 @@ export async function POST(request: NextRequest) {
         is_rot_eligible: rot_rut_type === 'rot',
         is_rut_eligible: rot_rut_type === 'rut',
         sort_order: items.length,
+        business_user_id: entry.business_user_id ?? null,
+        performed_by_name: entry.business_user_id
+          ? businessUserNameById.get(entry.business_user_id) ?? null
+          : null,
       })
     }
 

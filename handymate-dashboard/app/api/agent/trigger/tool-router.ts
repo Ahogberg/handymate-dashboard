@@ -8,6 +8,7 @@ import { getNextCustomerNumber, getNextProjectNumber, getNextLeadNumber } from '
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { shouldQueueForApproval } from '@/lib/autonomy/agent-gating'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
+import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
 
 interface ToolResult {
   success: boolean
@@ -669,9 +670,37 @@ async function logTime(
     .select('pricing_settings').eq('business_id', businessId).single()
   const rate = config?.pricing_settings?.hourly_rate || 695
 
+  // Etapp 1 Tier B (multi-employee-parity-plan.md): logTime() har ingen
+  // inloggad-användare-identitet i sitt anrop (telefon-/Matte-triggat).
+  // Fallback-kedja: bokningens assigned_user_id (Etapp 5) → sole-firma-
+  // fallback → null. Se lib/time-entries/resolve-attribution.ts.
+  let bookingAssignedUserId: string | null = null
+  if (params.booking_id) {
+    const { data: booking } = await supabase
+      .from('booking')
+      .select('assigned_user_id')
+      .eq('business_id', businessId)
+      .eq('booking_id', params.booking_id)
+      .maybeSingle()
+    bookingAssignedUserId = booking?.assigned_user_id ?? null
+  }
+
+  let activeBusinessUserIds: string[] = []
+  if (!bookingAssignedUserId) {
+    const { data: activeBusinessUsers } = await supabase
+      .from('business_users')
+      .select('id')
+      .eq('business_id', businessId)
+      .eq('is_active', true)
+    activeBusinessUserIds = (activeBusinessUsers || []).map((u) => u.id)
+  }
+
+  const businessUserId = resolveTimeEntryAttribution(bookingAssignedUserId, activeBusinessUserIds)
+
   const entryId = generateId('time')
   const { error } = await supabase.from('time_entry').insert({
     time_entry_id: entryId, business_id: businessId,
+    business_user_id: businessUserId,
     booking_id: params.booking_id || null, customer_id: params.customer_id,
     work_date: params.work_date, start_time: params.start_time, end_time: params.end_time,
     duration_minutes: duration, description: params.description || null,

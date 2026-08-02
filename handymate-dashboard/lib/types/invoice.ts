@@ -22,6 +22,12 @@ export interface InvoiceItem {
   sort_order: number
   // Backwards compatibility with old 'labor' | 'material' type
   type?: 'labor' | 'material'
+  // Etapp 6 (multi-employee-parity-plan.md): vem som utförde arbetet, ärvt
+  // från time_entry.business_user_id när raden byggs från tidrapporter.
+  // Saknas (undefined/null) för äldre fakturor och för rader som inte
+  // kommer från en tidrapport (material, manuellt tillagda rader).
+  business_user_id?: string | null
+  performed_by_name?: string | null
 }
 
 export interface InvoiceTotals {
