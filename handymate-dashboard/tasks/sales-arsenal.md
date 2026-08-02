@@ -71,6 +71,14 @@ Kategoriterm: **AI-team för hantverkare.**
 
 ## Konkurrent-motdrag (förberedda svar)
 
+- **"Har inte Easoft/Bygglet redan AI?"** → Easoft har själva publicerat
+  "Tio tidsbovar för byggföretag" (easoft.se/blogg, läst 2026-08-02) —
+  exakt de tio problemen vi säger att teamet löser. Deras lösning för
+  samtliga tio: digitala formulär och rapportverktyg. Ordet AI förekommer
+  inte i en enda lösning, bara som menylänk på sajten i övrigt. **Citera
+  gärna rakt av** — det är deras egen artikel, inte vår tolkning: "Fråga
+  dem vilken av de tio punkterna en agent faktiskt löser åt dig. Svaret
+  är noll — allihop kräver att DU fyller i formuläret."
 - **Deras chatbot lanseras** → vi äger redan distinktionen (SEO-artikeln
   "chatbot vs team", se seo-drafts/10); fällefrågorna gör jobbet.
 - **De köper röst före oss** → "deras röst svarar, vår kommer att boka" —
