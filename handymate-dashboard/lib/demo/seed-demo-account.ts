@@ -24,7 +24,7 @@ import type { QuoteItem } from '@/lib/types/quote'
  *
  * Tabeller som seedas (samma set som raderas, i beroendeordning vid radering):
  *   pending_approvals, agent_runs, pipeline_activity, quote_items, invoice,
- *   project, quotes, deal, customer
+ *   project_checklist, project, quotes, deal, customer
  */
 
 export interface DemoResetSummary {
@@ -99,6 +99,7 @@ export async function resetDemoAccount(
   await supabase.from('pipeline_activity').delete().eq('business_id', businessId)
   await supabase.from('quote_items').delete().eq('business_id', businessId)
   await supabase.from('invoice').delete().eq('business_id', businessId)
+  await supabase.from('project_checklist').delete().eq('business_id', businessId)
   await supabase.from('project').delete().eq('business_id', businessId)
   await supabase.from('quotes').delete().eq('business_id', businessId)
   await supabase.from('deal').delete().eq('business_id', businessId)
@@ -529,6 +530,41 @@ export async function resetDemoAccount(
   if (kristinaProjErr || !kristinaProject) return { error: `Kunde inte skapa projekt (Kristina): ${kristinaProjErr?.message}` }
 
   // ══════════════════════════════════════════════════════════
+  // 6b. EGENKONTROLL-CHECKLISTA (1 st, aktiv) — Anna-badrummet, tema
+  //     lånat från BRANCH_CHECKLISTS.plumber['Badrumsrenovering'] (se
+  //     lib/checklist-defaults.ts) så demot känns verkligt istället för
+  //     hittepå. 4 punkter redan avbockade (som om hantverkaren jobbat på
+  //     projektet i 9 dagar, progress_percent=35 ovan), 2 kvarstår — båda
+  //     required:true så "Bocka av"-raden i projektvyn (Etapp 1c,
+  //     app/dashboard/projects/[id]/page.tsx ~1772) har något att visa.
+  //     De två öppna punkterna är MEDVETET valda som mål för de två
+  //     egenkontroll-godkännandena nedan (8b/8c) — ett foto som styrker
+  //     den ena, ett foto som motsäger den andra.
+  // ══════════════════════════════════════════════════════════
+  const checklistItemFallMotBrunn = { id: genId('ci'), text: 'Verifiera fall mot brunn', required: true, checked: false }
+  const checklistItemGenomforing = { id: genId('ci'), text: 'Kontrollera tätning vid rörgenomföring', required: true, checked: false }
+  const badrumChecklistItems = [
+    { id: genId('ci'), text: 'Tätskikt applicerat enligt BBV', required: true, checked: true },
+    { id: genId('ci'), text: 'Provtrycka tätskikt', required: true, checked: true },
+    { id: genId('ci'), text: 'Kontrollera golvbrunn position', required: false, checked: true },
+    { id: genId('ci'), text: 'Installera blandare och kopplingar', required: false, checked: true },
+    checklistItemFallMotBrunn,
+    checklistItemGenomforing,
+  ]
+  const badrumChecklistId = genId('cl')
+  const { error: checklistErr } = await supabase.from('project_checklist').insert({
+    id: badrumChecklistId,
+    project_id: annaProject.project_id,
+    business_id: businessId,
+    template_id: null,
+    name: 'Badrumsrenovering — egenkontroll',
+    items: badrumChecklistItems,
+    status: 'in_progress',
+    created_at: isoAt(-2, 14, 0),
+  })
+  if (checklistErr) return { error: `Kunde inte skapa checklista (Anna): ${checklistErr.message}` }
+
+  // ══════════════════════════════════════════════════════════
   // 7. FAKTUROR (3 st): betald, skickad ej förfallen, förfallen 8 dagar
   // ══════════════════════════════════════════════════════════
   type SeedInvoiceItem = { id: string; item_type: string; description: string; quantity: number; unit: string; unit_price: number; total: number; type: string; is_rot_eligible: boolean; is_rut_eligible: boolean; sort_order: number }
@@ -647,10 +683,19 @@ export async function resetDemoAccount(
   if (kristinaInvErr || !kristinaInvoice) return { error: `Kunde inte skapa faktura (Kristina): ${kristinaInvErr?.message}` }
 
   // ══════════════════════════════════════════════════════════
-  // 8. PENDING_APPROVALS (3 st) — payload-strukturen kopierad EXAKT från
+  // 8. PENDING_APPROVALS (5 st) — payload-strukturen kopierad EXAKT från
   //    lib/autopilot/quote-nudge.ts (Daniel), app/api/cron/send-reminders
-  //    (Karin) och executeApprovalPayload's generiska 'send_sms'-case (Lisa),
-  //    se app/api/approvals/[id]/route.ts.
+  //    (Karin), executeApprovalPayload's generiska 'send_sms'-case (Lisa),
+  //    se app/api/approvals/[id]/route.ts, samt lib/egenkontroll/
+  //    analyze-and-queue.ts (Lars) för de två egenkontroll-korten (8d/8e)
+  //    — så Etapp 1's DoD-punkt "demobar på demokontot med seedade foton"
+  //    är uppfylld utan att en live Anthropic-analys behöver köras under
+  //    demot. photo_ref pekar INTE på en riktig Supabase Storage-fil —
+  //    varken ProjectApprovalsBlock.tsx eller IdagCore.tsx hämtar en
+  //    bild-URL från payload, de visar bara title/description som text
+  //    (verifierat: getPreview() läser bara payload.message/sms_text, och
+  //    executeApprovalPayload's 'egenkontroll_foto'-case skriver bara in
+  //    photo_ref som en textsträng i checklistans notes-fält).
   // ══════════════════════════════════════════════════════════
   const daysOverdue = 8
   const reminderFee = 60
@@ -738,6 +783,59 @@ export async function resetDemoAccount(
         },
       },
       created_at: isoAt(0, 9, 5),
+      expires_at: isoAt(7),
+    },
+    // Lars — egenkontroll: foto styrker en öppen punkt (kopierar
+    // förslag-grenen av lib/egenkontroll/analyze-and-queue.ts:254-271
+    // EXAKT — title/description-formlerna med forslag.length=1 gäller
+    // ordagrant). Godkänn bockar av 'Verifiera fall mot brunn' på
+    // badrum-checklistan (executeApprovalPayload's 'egenkontroll_foto'-case).
+    {
+      id: genId('appr'),
+      business_id: businessId,
+      approval_type: 'egenkontroll_foto',
+      title: 'Foto styrker 1 egenkontrollpunkt — markera som klara?',
+      description: `Punkter: ${checklistItemFallMotBrunn.text}`,
+      status: 'pending',
+      risk_level: 'low',
+      payload: {
+        routed_agent: 'lars',
+        project_id: annaProject.project_id,
+        checklist_id: badrumChecklistId,
+        photo_ref: genId('doc'),
+        forslag: [
+          {
+            punkt_id: checklistItemFallMotBrunn.id,
+            text: checklistItemFallMotBrunn.text,
+            motivering: 'Fotot visar tydligt att fallet mot golvbrunnen är korrekt utfört enligt punkten.',
+          },
+        ],
+        uploaded_by: null,
+      },
+      created_at: isoAt(0, 9, 20),
+      expires_at: isoAt(7),
+    },
+    // Lars — egenkontroll: foto motsäger en öppen punkt (kopierar
+    // avvikelse-grenen av lib/egenkontroll/analyze-and-queue.ts:286-304
+    // EXAKT). Godkänn kvitterar bara flaggan (ingen mutation, se
+    // executeApprovalPayload's 'egenkontroll_avvikelse'-case).
+    {
+      id: genId('appr'),
+      business_id: businessId,
+      approval_type: 'egenkontroll_avvikelse',
+      title: `Lars flaggade: ${checklistItemGenomforing.text} ser inte klar ut på fotot`,
+      description: 'Fotot visar att skarven vid genomföringen inte är tätad.',
+      status: 'pending',
+      risk_level: 'low',
+      payload: {
+        routed_agent: 'lars',
+        project_id: annaProject.project_id,
+        checklist_id: badrumChecklistId,
+        photo_ref: genId('doc'),
+        punkt_id: checklistItemGenomforing.id,
+        motivering: 'Fotot visar att skarven vid genomföringen inte är tätad.',
+      },
+      created_at: isoAt(0, 9, 35),
       expires_at: isoAt(7),
     },
   ]
