@@ -504,6 +504,8 @@ export async function PUT(request: NextRequest) {
                 id: approvalId,
                 business_id: business.business_id,
                 approval_type: 'four_eyes_project_close',
+                // Etapp 3b (multi-employee-parity-plan.md): kö-routing.
+                routing_role: 'owner_admin',
                 title: `Projektstängning kräver godkännande — ${pVal.toLocaleString('sv-SE')} kr`,
                 description: `Projektets värde överstiger gränsen på ${(fourEyesConfig.four_eyes_threshold_sek || 50000).toLocaleString('sv-SE')} kr.`,
                 payload: { project_id, budget_amount: pVal, threshold: fourEyesConfig.four_eyes_threshold_sek },

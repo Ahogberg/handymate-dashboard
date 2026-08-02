@@ -181,6 +181,8 @@ export async function suggestDispatch(params: {
     id: approvalId,
     business_id: params.businessId,
     approval_type: 'dispatch_suggestion',
+    // Etapp 3b (multi-employee-parity-plan.md): kö-routing.
+    routing_role: 'owner_admin',
     title: `Tilldela ${best.member.name} → ${params.jobTitle}`,
     description: `${best.reasons.join(' · ')}${params.customerName ? ` · ${params.customerName}` : ''}`,
     risk_level: 'low',

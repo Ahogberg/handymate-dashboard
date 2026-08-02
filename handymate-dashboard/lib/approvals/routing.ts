@@ -18,19 +18,32 @@ export type RoutingRole = 'any' | 'owner_admin' | 'can_approve_time' | 'project_
 /**
  * Ren uppslagstabell approval_type → RoutingRole.
  *
- * Etapp 3a håller sig MEDVETET till fyra buckets (any/owner_admin/
- * can_approve_time/project_team) — den fullständiga tabellen med fler
- * buckets (can_create_invoices, can_see_financials, assignee, m.fl., se
- * tabellen under "Etapp 3b" i planfilen) rullas ut i en senare körning.
- * Tabellen är medvetet TOM i denna körning — ingen creation-site sätter
- * routing_role != 'any' än, så det finns inget att slå upp i praktiken.
- * Etapp 3b fyller i den här tabellen (och de motsvarande
- * creation-ställena) enligt plandokumentets tabell.
+ * Etapp 3a höll sig MEDVETET till fyra buckets (any/owner_admin/
+ * can_approve_time/project_team) — den fullständiga tabellen från
+ * planfilen har fler buckets (can_create_invoices, can_see_financials,
+ * assignee, m.fl.) som INTE finns i RoutingRole än. Etapp 3b fyller bara
+ * i de typer som mappar mot de fyra existerande buckets — typer som
+ * skulle behöva en ny bucket (t.ex. price_adjustment → can_see_financials,
+ * send_invoice → can_create_invoices) lämnas medvetet utanför tabellen
+ * (fallback 'any', oförändrat beteende) tills den bucketen faktiskt läggs
+ * till i RoutingRole i en senare körning.
  *
  * Okänd/ej listad typ → 'any' (fallback, ingen beteendeförändring).
  */
 const ROUTING_TABLE: Partial<Record<string, RoutingRole>> = {
-  // Etapp 3b fyller i denna.
+  // owner_admin
+  four_eyes_quote: 'owner_admin',
+  four_eyes_project_close: 'owner_admin',
+  dispatch_suggestion: 'owner_admin',
+
+  // can_approve_time
+  time_attestation: 'can_approve_time',
+  tidrapport_forslag: 'can_approve_time',
+
+  // project_team
+  egenkontroll_foto: 'project_team',
+  egenkontroll_avvikelse: 'project_team',
+  checklist_forslag: 'project_team',
 }
 
 export function getRoutingBucket(approvalType: string): RoutingRole {

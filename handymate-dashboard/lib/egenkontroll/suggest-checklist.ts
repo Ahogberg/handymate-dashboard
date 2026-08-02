@@ -136,6 +136,8 @@ export async function suggestChecklistForProject(input: SuggestChecklistInput): 
       id: approvalId,
       business_id: businessId,
       approval_type: 'checklist_forslag',
+      // Etapp 3b (multi-employee-parity-plan.md): kö-routing.
+      routing_role: 'project_team',
       title: `Vill du använda "${suggestion.name}"-checklistan för det här projektet?`,
       description: `${suggestion.items.length} punkter, varav ${requiredCount} obligatoriska.`,
       status: 'pending',

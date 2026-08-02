@@ -255,6 +255,8 @@ export async function analyzeProjectPhoto(input: AnalyzeProjectPhotoInput): Prom
             id: approvalId,
             business_id: businessId,
             approval_type: 'egenkontroll_foto',
+            // Etapp 3b (multi-employee-parity-plan.md): kö-routing.
+            routing_role: 'project_team',
             title: `Foto styrker ${forslag.length} egenkontrollpunkt${forslag.length === 1 ? '' : 'er'} — markera som klara?`,
             description: `Punkter: ${punktLista}`,
             status: 'pending',
@@ -288,6 +290,8 @@ export async function analyzeProjectPhoto(input: AnalyzeProjectPhotoInput): Prom
             id: approvalId,
             business_id: businessId,
             approval_type: 'egenkontroll_avvikelse',
+            // Etapp 3b (multi-employee-parity-plan.md): kö-routing.
+            routing_role: 'project_team',
             title: `Lars flaggade: ${avv.punkttext} ser inte klar ut på fotot`,
             description: avv.motivering,
             status: 'pending',

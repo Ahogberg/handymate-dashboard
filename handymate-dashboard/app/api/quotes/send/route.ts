@@ -331,6 +331,8 @@ export async function POST(request: NextRequest) {
         id: approvalId,
         business_id: quote.business_id,
         approval_type: 'four_eyes_quote',
+        // Etapp 3b (multi-employee-parity-plan.md): kö-routing.
+        routing_role: 'owner_admin',
         title: `Offert kräver godkännande — ${(quoteTotal).toLocaleString('sv-SE')} kr`,
         description: `${quote.title || 'Offert'} till ${quote.customer?.name || 'kund'}. Beloppet överstiger gränsen på ${(fourEyesConfig.four_eyes_threshold_sek || 50000).toLocaleString('sv-SE')} kr.`,
         payload: {

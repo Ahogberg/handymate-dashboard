@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/permissions'
 
 /**
  * PATCH /api/projects/[id]/checklists/[checklistId] - Uppdatera checklista
@@ -38,11 +39,18 @@ export async function PATCH(
       updates.notes = body.notes
     }
 
-    // Mark as completed
+    // Mark as completed. completed_by sätts ALDRIG från klient-body längre
+    // (spoofbart — vem som helst kunde tidigare påstå att vem som helst
+    // avslutade egenkontrollen). Härleds istället från sessionen via
+    // getCurrentUser() (tasks/multi-employee-parity-plan.md, Etapp 7).
     if (body.status === 'completed') {
+      const currentUser = await getCurrentUser(request)
+      if (!currentUser) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
       updates.status = 'completed'
       updates.completed_at = new Date().toISOString()
-      updates.completed_by = body.completed_by || null
+      updates.completed_by = currentUser.name
     }
 
     if (Object.keys(updates).length === 0) {

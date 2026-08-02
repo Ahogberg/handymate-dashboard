@@ -355,6 +355,8 @@ export async function suggestTimeEntriesForBusiness(businessId: string): Promise
         id: approvalId,
         business_id: businessId,
         approval_type: 'tidrapport_forslag',
+        // Etapp 3b (multi-employee-parity-plan.md): kö-routing.
+        routing_role: 'can_approve_time',
         title,
         description: `Bokning ${timeSpan} i går, ingen tidrapport hittad än.`,
         status: 'pending',

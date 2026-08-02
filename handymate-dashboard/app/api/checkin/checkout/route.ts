@@ -70,6 +70,8 @@ export async function POST(request: NextRequest) {
     id: approvalId,
     business_id: business.business_id,
     approval_type: 'time_attestation',
+    // Etapp 3b (multi-employee-parity-plan.md): kö-routing.
+    routing_role: 'can_approve_time',
     title: `Attestera: ${checkin.user_name || 'Anställd'}`,
     description: `${formatDuration(durationMinutes)} · ${checkin.project_name || 'Inget projekt'} · ${formatDate(checkin.checked_in_at)}`,
     risk_level: 'low',

@@ -43,18 +43,25 @@ test.describe('getRoutingBucket', () => {
     expect(getRoutingBucket('nagot_helt_pahittat')).toBe('any')
   })
 
-  test("Etapp 3a: tabellen är medvetet TOM — typer som SKA routas i Etapp 3b ger 'any' idag", () => {
-    // Dokumenterar det avsiktliga nuläget: ingen creation-site sätter
-    // routing_role != 'any' än, så tabellen är tom och alla typer — även
-    // de som planfilens Etapp 3b-tabell pekar ut som framtida
-    // owner_admin/can_approve_time/project_team — mappar till 'any' tills
-    // vidare. Om detta test börjar faila har någon börjat fylla i
-    // ROUTING_TABLE — uppdatera testet medvetet, inte av misstag.
-    expect(getRoutingBucket('four_eyes_quote')).toBe('any')
-    expect(getRoutingBucket('time_attestation')).toBe('any')
-    expect(getRoutingBucket('tidrapport_forslag')).toBe('any')
-    expect(getRoutingBucket('egenkontroll_foto')).toBe('any')
+  test('Etapp 3b: tabellen fylld — routade typer mappar till sina buckets', () => {
+    // Etapp 3b (tasks/multi-employee-parity-plan.md) fyllde i ROUTING_TABLE
+    // för de åtta typer som mappar mot de fyra existerande buckets. Detta
+    // test ersätter Etapp 3a:s "tabellen är tom"-test — uppdaterat medvetet,
+    // inte av misstag (se git-historik för denna fil om det behöver spåras).
+    expect(getRoutingBucket('four_eyes_quote')).toBe('owner_admin')
+    expect(getRoutingBucket('four_eyes_project_close')).toBe('owner_admin')
+    expect(getRoutingBucket('dispatch_suggestion')).toBe('owner_admin')
+    expect(getRoutingBucket('time_attestation')).toBe('can_approve_time')
+    expect(getRoutingBucket('tidrapport_forslag')).toBe('can_approve_time')
+    expect(getRoutingBucket('egenkontroll_foto')).toBe('project_team')
+    expect(getRoutingBucket('egenkontroll_avvikelse')).toBe('project_team')
+    expect(getRoutingBucket('checklist_forslag')).toBe('project_team')
+
+    // Typer som planfilens fulla Etapp 3b-tabell pekar mot buckets som INTE
+    // finns i RoutingRole än (can_see_financials, can_create_invoices) är
+    // medvetet utanför denna körnings scope → oförändrat 'any'.
     expect(getRoutingBucket('send_invoice')).toBe('any')
+    expect(getRoutingBucket('price_adjustment')).toBe('any')
   })
 
   test('tom sträng → any', () => {
