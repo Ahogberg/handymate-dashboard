@@ -6,6 +6,7 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { getQuoteBudgetDerivation } from '@/lib/quotes/get-quote-budget-derivation'
+import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 
 interface CreateResult {
   success: boolean
@@ -107,6 +108,14 @@ export async function createProjectFromQuote(
     if (insertErr) {
       return { success: false, error: insertErr.message }
     }
+
+    // Egenkontroll-agenten (etapp 1d, tasks/easoft-gap-plan.md). Fire-and-
+    // forget — föreslår en branschchecklista i godkännande-kön om
+    // projektet saknar checklista sedan tidigare. Fail-safe (kastar
+    // aldrig), får inte sinka projekt-skapandet.
+    suggestChecklistForProject({ businessId, projectId }).catch(err => {
+      console.error('[createProjectFromQuote] suggestChecklistForProject error (non-blocking):', err)
+    })
 
     // 5. Skapa milestones från offertens arbetsrader
     // Använder labor_items från budgetDerivation (samma helper) så

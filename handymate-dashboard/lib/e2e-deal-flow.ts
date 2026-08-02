@@ -9,6 +9,7 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 
 // ── Stegdefinitioner med risknivåer ──────────────────────
 
@@ -583,6 +584,13 @@ async function executeProjectCreation(
 
     // Länka projekt till deal
     await supabase.from('deal').update({ project_id: projectId }).eq('id', dealId)
+
+    // Egenkontroll-agenten (etapp 1d, tasks/easoft-gap-plan.md).
+    // Fire-and-forget, fail-safe (kastar aldrig) — får inte sinka
+    // deal-flödets stegexekvering.
+    suggestChecklistForProject({ businessId, projectId }).catch(err => {
+      console.error('[e2e-deal-flow] suggestChecklistForProject error (non-blocking):', err)
+    })
 
     await logDealFlowActivity(
       businessId,

@@ -6,6 +6,7 @@
 import { getServerSupabase } from '@/lib/supabase'
 import type { PipelineStageId } from './stages'
 import { advanceProjectStage, SYSTEM_STAGES } from '@/lib/project-stages/automation-engine'
+import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 
 export async function onDealStageChanged(
   dealId: string,
@@ -143,6 +144,13 @@ async function handleQuoteAccepted(dealId: string, businessId: string) {
         description: deal.description,
         budget_amount: deal.value,
         status: 'active',
+      })
+
+      // Egenkontroll-agenten (etapp 1d, tasks/easoft-gap-plan.md).
+      // Fire-and-forget, fail-safe (kastar aldrig) — får inte sinka
+      // deal-stage-övergången.
+      suggestChecklistForProject({ businessId, projectId: newProjectId }).catch(err => {
+        console.error('[pipeline/automations] suggestChecklistForProject error (non-blocking):', err)
       })
 
       // Synka räknaren så framtida fristående projekt inte återanvänder samma nummer

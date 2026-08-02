@@ -145,6 +145,8 @@ const TYPE_LABEL: Record<string, string> = {
   // Egenkontroll-agenten (etapp 1b, tasks/easoft-gap-plan.md).
   egenkontroll_foto: 'Egenkontroll',
   egenkontroll_avvikelse: 'Egenkontroll-avvikelse',
+  // Checklistförslag vid projektskapande (etapp 1d, tasks/easoft-gap-plan.md).
+  checklist_forslag: 'Checklista',
 }
 
 function timeAgo(iso: string): string {

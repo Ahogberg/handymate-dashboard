@@ -2,6 +2,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { findNextAvailableSlot } from './find-slot'
 import { generateCustomerSms } from './generate-sms'
 import { hasFeature, PlanType } from '@/lib/feature-gates'
+import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 
 export interface AutopilotAction {
   id: string
@@ -91,6 +92,12 @@ export async function triggerAutopilot(
       if (!projErr) {
         projectId = newProjectId
         projectName = name
+        // Egenkontroll-agenten (etapp 1d, tasks/easoft-gap-plan.md).
+        // Fire-and-forget, fail-safe (kastar aldrig) — får inte sinka
+        // autopilot-paketets skapande.
+        suggestChecklistForProject({ businessId, projectId: newProjectId }).catch(err => {
+          console.error('[autopilot/trigger] suggestChecklistForProject error (non-blocking):', err)
+        })
       }
     }
 

@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getNextProjectNumber, bumpCounter } from '@/lib/numbering'
 import { getQuoteBudgetDerivation } from '@/lib/quotes/get-quote-budget-derivation'
+import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 
 /**
  * GET - Lista projekt för ett företag
@@ -389,6 +390,16 @@ export async function POST(request: NextRequest) {
         await supabase.from('project_milestone').insert(milestones)
       }
     }
+
+    // Egenkontroll-agenten (etapp 1d, tasks/easoft-gap-plan.md). Fire-and-
+    // forget — föreslår en branschchecklista i godkännande-kön om
+    // projektet saknar checklista sedan tidigare. suggestChecklistForProject
+    // är själv fail-safe (kastar aldrig), .catch() är bara ett extra
+    // skyddsnät (samma mönster som analyzeProjectPhoto i
+    // app/api/projects/[id]/documents/route.ts, etapp 1b).
+    suggestChecklistForProject({ businessId, projectId: project.project_id }).catch(err => {
+      console.error('[projects] suggestChecklistForProject error (non-blocking):', err)
+    })
 
     return NextResponse.json({ project })
 

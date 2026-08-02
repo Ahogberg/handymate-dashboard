@@ -1297,6 +1297,47 @@ async function executeApprovalPayload(
         return { action: 'egenkontroll_avvikelse', acknowledged: true }
       }
 
+      case 'checklist_forslag': {
+        // Egenkontroll-agenten (etapp 1d, tasks/easoft-gap-plan.md). Skapas
+        // av systemkod (lib/egenkontroll/suggest-checklist.ts) — INTE av
+        // ett agent-verktyg — samma medvetna undantag från agentregeln som
+        // 'egenkontroll_foto'/'egenkontroll_avvikelse' ovan (agentregeln i
+        // CLAUDE.md gäller nya tools, inte approval_types som bara
+        // systemkoden själv skapar).
+        //
+        // Godkänn = skapa checklistan i project_checklist med mallens
+        // punkter som startvärde — samma INSERT-form som POST
+        // /api/projects/[id]/checklists (återanvänds INTE via internt
+        // HTTP-anrop, skrivs direkt här som övriga cases i filen). checked
+        // nollställs alltid explicit, oavsett vad payload råkar innehålla —
+        // samma försiktighet som checklist-POST-routen redan har.
+        const pl = payload as any
+        const projectId = pl.project_id as string | undefined
+        const templateItems = (pl.template_items as any[]) || []
+        if (!projectId || templateItems.length === 0) {
+          return { action: 'checklist_forslag', skipped: 'no project_id or template_items' }
+        }
+
+        const supabaseCf = getServerSupabase()
+        const checklistId = `cl_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+        const items = templateItems.map((it: any) => ({ ...it, checked: false }))
+
+        const { error: insertCfErr } = await supabaseCf.from('project_checklist').insert({
+          id: checklistId,
+          project_id: projectId,
+          business_id: businessId,
+          name: pl.template_name || 'Checklista',
+          items,
+          status: 'in_progress',
+        })
+
+        if (insertCfErr) {
+          return { action: 'checklist_forslag', ok: false, error: insertCfErr.message }
+        }
+
+        return { action: 'checklist_forslag', ok: true, checklist_id: checklistId, project_id: projectId }
+      }
+
       case 'automation': {
         // En v3-automationsregel med requires_approval skapar denna approval och
         // lägger rule_action_type/rule_action_config i payloaden. Utan detta case

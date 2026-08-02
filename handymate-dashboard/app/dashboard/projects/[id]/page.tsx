@@ -1732,10 +1732,8 @@ export default function ProjectDetailPage() {
   }
 
   // Åtgärdsrader — bara de vars underlag faktiskt finns i redan hämtad data.
-  // "Ingen tidrapport i går" och "Egenkontroll X kvar" utelämnade medvetet:
-  // TimeEntry-typen som hämtas här saknar business_user_id (kan inte avgöra
-  // VEM som inte rapporterat), och checklists-listan har bara aggregerad
-  // progress (checked/total) — inte vilken specifik punkt som återstår.
+  // "Ingen tidrapport i går" utelämnad medvetet: TimeEntry-typen som hämtas
+  // här saknar business_user_id (kan inte avgöra VEM som inte rapporterat).
   // Se handoff-rapporten.
   const todoActionRows: TodoRow[] = []
   if (projectTeam.length === 0) {
@@ -1763,6 +1761,27 @@ export default function ProjectDetailPage() {
       text: `Ofakturerat: ${formatSEK(uninvoicedRevenue)}`,
       actionLabel: 'Förbered delfaktura',
       onAction: () => setActiveTab('economy'),
+    })
+  }
+  // Egenkontroll (Etapp 1c, tasks/easoft-gap-plan.md, copy.projektvy.sv.json
+  // "egenkontroll"/"egenkontroll_atgard"): visar den FÖRSTA obligatoriska
+  // punkten som saknas på en aktiv checklista. items-arrayen (checked/
+  // required/text) finns rakt av på checklists-raderna — inget att gissa.
+  // "Bocka av" återanvänder befintlig checklist-UI (öppnar Dokumentation-
+  // fliken med den checklistan aktiv) istället för att bygga en ny genväg.
+  const checklistWithMissingRequired = checklists.find(
+    (cl: any) => cl.status === 'in_progress' && (cl.items || []).some((i: any) => i.required && !i.checked),
+  )
+  if (checklistWithMissingRequired) {
+    const missingRequired = (checklistWithMissingRequired.items || []).filter(
+      (i: any) => i.required && !i.checked,
+    )
+    todoActionRows.push({
+      id: 'egenkontroll',
+      dotClass: 'bg-amber-500',
+      text: `Egenkontroll: ${missingRequired.length} punkt kvar — ${missingRequired[0].text}`,
+      actionLabel: 'Bocka av',
+      onAction: () => { setActiveTab('checklists'); setActiveChecklist(checklistWithMissingRequired) },
     })
   }
 
@@ -1799,14 +1818,30 @@ export default function ProjectDetailPage() {
         return `${formatHours(hrs)} · ${projectTeam.length} person${projectTeam.length === 1 ? '' : 'er'}`
       }
       case 'documentation': {
-        // Filantal från documents-listan. Egenkontroll-aggregatet
-        // (copy-exemplet "egenkontroll 6/9") utelämnat medvetet:
-        // project_checklist saknar en category-kolumn som skiljer
-        // "egenkontroll" från andra checklistetyper (bara fri-text
-        // `name` + `template_id`), så det går inte att räkna fram utan
-        // att gissa — se handoff-rapporten.
-        if (documents.length === 0) return null
-        return `${documents.length} fil${documents.length === 1 ? '' : 'er'}`
+        // Filantal från documents-listan + egenkontroll-aggregat från aktiva
+        // checklistor (Etapp 1c, tasks/easoft-gap-plan.md). Tidigare
+        // utelämnat med motiveringen att project_checklist saknade en
+        // category-kolumn för att skilja ut "egenkontroll" — men items-
+        // arrayen (checked/total) finns redan rakt av på varje rad i
+        // `checklists` (GET .../checklists lägger bara till `progress` som
+        // en beräknad extra-summering ovanpå den), så aggregatet kräver
+        // ingen ny kolumn eller gissning.
+        const parts: string[] = []
+        if (documents.length > 0) {
+          parts.push(`${documents.length} fil${documents.length === 1 ? '' : 'er'}`)
+        }
+        const activeChecklists = checklists.filter((cl: any) => cl.status === 'in_progress')
+        if (activeChecklists.length > 0) {
+          const total = activeChecklists.reduce((sum: number, cl: any) => sum + (cl.items?.length || 0), 0)
+          const checked = activeChecklists.reduce(
+            (sum: number, cl: any) => sum + (cl.items || []).filter((i: any) => i.checked).length,
+            0,
+          )
+          if (total > 0) {
+            parts.push(`Egenkontroll: ${checked} av ${total} punkter styrkta`)
+          }
+        }
+        return parts.length > 0 ? parts.join(' · ') : null
       }
       default:
         return null
