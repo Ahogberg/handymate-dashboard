@@ -1,14 +1,24 @@
 /**
  * Egenkontroll-agenten — Etapp 2a (v-plan tasks/easoft-gap-plan.md,
  * "Tidrapport-förslag", omskriven 2026-08-02 till PROJEKTNIVÅ efter
- * schemaverifiering).
+ * schemaverifiering; utökad 2026-08-02 med namn-vid-entydig-tilldelning).
  *
  * ⚠ VARFÖR PROJEKTNIVÅ, INTE PERSONNIVÅ: `booking` har inget
  * person-tilldelningsfält — en bokning hör till business+kund+ev. projekt,
  * aldrig till en namngiven anställd. Förslaget attribueras därför till
  * PROJEKTET ("Projektet Svensson hade en bokning i går men ingen
- * tidrapport än"), aldrig till en person. Ärlighetsregeln gäller titel,
- * description OCH payload — inget påhittat namn någonstans.
+ * tidrapport än"), aldrig till en person, ANNARS UPPSTÅR EN GISSNING.
+ *
+ * ⚠ NYANS (2a-förfining): `project_assignment` (sql/business_users.sql)
+ * kopplar business_user_id ↔ project_id med en riktig, existerande
+ * tilldelning — inte en gissning. Om ETT projekt har EXAKT EN tilldelad
+ * person där, är namnet ett FAKTUM och får läggas till (payload.
+ * assigned_person_name + i titeln). Har projektet 0 eller 2+ tilldelade
+ * personer sätts fältet ALDRIG — inget gissat namn, ingen lista av namn,
+ * ingen "en av två personer"-formulering. Se pickUnambiguousAssignee/
+ * fetchUnambiguousAssigneeName nedan, som är den enda källan till detta
+ * namn i hela flödet (server- OCH klientsidan, se app/dashboard/projects/
+ * [id]/page.tsx som återanvänder samma helper för projektvyns rad).
  *
  * Schema, verifierat mot faktisk kod (inte antaget):
  *  - `booking.status` (pending/confirmed/cancelled, se t.ex.
@@ -165,6 +175,66 @@ function minutesBetween(startIso: string, endIso: string): number {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// pickUnambiguousAssignee — ren, facit-testbar namn-kärna (2a-förfining)
+// ─────────────────────────────────────────────────────────────────
+
+/** Delmängd av business_users-kolumner (via project_assignment-join) som
+    namnvalet behöver — se sql/business_users.sql, kolumnen heter `name`. */
+export interface AssigneeNameRow {
+  name: string | null
+}
+
+/**
+ * Väljer ett projekts entydiga tilldelade person, om en sådan finns. Ren
+ * funktion — ingen I/O, inget Supabase.
+ *
+ * Ärlighetsregel: EXAKT EN rad → det namnet (ett faktum, inte en gissning
+ * — se filhuvudet). 0 rader ELLER 2+ rader → null. Aldrig en lista, aldrig
+ * "en av två" — bara ett sant namn eller inget alls. Tom/null `name` på
+ * den enda raden räknas också som "inget namn" (kan inte påstå ett namn
+ * vi inte faktiskt har).
+ */
+export function pickUnambiguousAssignee(assignments: AssigneeNameRow[]): string | null {
+  if (assignments.length !== 1) return null
+  const name = assignments[0].name
+  return name && name.trim().length > 0 ? name.trim() : null
+}
+
+/**
+ * I/O-wrappern runt pickUnambiguousAssignee — slår upp project_assignment
+ * för ETT projekt och returnerar namnet om tilldelningen är entydig.
+ * Delad mellan suggestTimeEntriesForBusiness (nedan) och projektvyns
+ * "Ingen tidrapport i går"-rad (app/dashboard/projects/[id]/page.tsx,
+ * Etapp 2b) så namnlogiken aldrig behöver skrivas på två ställen.
+ *
+ * Kastar aldrig — ett DB-fel behandlas som "ingen entydig tilldelning"
+ * (samma fail-safe-hållning som resten av filen), aldrig som ett gissat
+ * namn.
+ */
+export async function fetchUnambiguousAssigneeName(
+  supabase: ReturnType<typeof getServerSupabase> | any,
+  businessId: string,
+  projectId: string,
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('project_assignment')
+      .select('business_user:business_user_id (name)')
+      .eq('business_id', businessId)
+      .eq('project_id', projectId)
+
+    if (error || !data) return null
+    return pickUnambiguousAssignee(
+      (data as { business_user: { name: string | null } | null }[]).map(row => ({
+        name: row.business_user?.name ?? null,
+      })),
+    )
+  } catch {
+    return null
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
 // suggestTimeEntriesForBusiness — orkestrering (fail-safe, kastar ALDRIG)
 // ─────────────────────────────────────────────────────────────────
 
@@ -269,14 +339,23 @@ export async function suggestTimeEntriesForBusiness(businessId: string): Promise
       }
       if (count && count > 0) continue
 
+      // ── 5b. Entydig tilldelning? (2a-förfining, se filhuvudet) ────
+      // Ett FAKTUM från project_assignment, aldrig en gissning — utelämnas
+      // helt (payload.assigned_person_name sätts inte) om 0 eller 2+
+      // personer är tilldelade projektet.
+      const assignedPersonName = await fetchUnambiguousAssigneeName(supabase, businessId, m.project_id)
+
       const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
       const timeSpan = `${svTimeStr(new Date(m.scheduled_start))}–${svTimeStr(new Date(m.scheduled_end))}`
+      const title = assignedPersonName
+        ? `Ingen tidrapport för ${projectName} i går (${assignedPersonName}) — förbered en?`
+        : `Ingen tidrapport för ${projectName} i går — förbered en?`
 
       const { error: insertErr } = await supabase.from('pending_approvals').insert({
         id: approvalId,
         business_id: businessId,
         approval_type: 'tidrapport_forslag',
-        title: `Ingen tidrapport för ${projectName} i går — förbered en?`,
+        title,
         description: `Bokning ${timeSpan} i går, ingen tidrapport hittad än.`,
         status: 'pending',
         risk_level: 'low',
@@ -288,6 +367,7 @@ export async function suggestTimeEntriesForBusiness(businessId: string): Promise
           scheduled_start: m.scheduled_start,
           scheduled_end: m.scheduled_end,
           suggested_minutes: m.suggested_minutes,
+          ...(assignedPersonName ? { assigned_person_name: assignedPersonName } : {}),
         },
       })
 

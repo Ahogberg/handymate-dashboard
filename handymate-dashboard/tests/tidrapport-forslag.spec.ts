@@ -2,20 +2,26 @@
  * Egenkontroll-agenten — Etapp 2a facit-tester (tasks/easoft-gap-plan.md).
  * Körs: npx playwright test tests/tidrapport-forslag.spec.ts --no-deps
  *
- * Testar den rena, exporterade funktionen i
+ * Testar de rena, exporterade funktionerna i
  * lib/egenkontroll/suggest-time-entry.ts:
  *   - findProjectsMissingTimeEntry (vilka DISTINKTA project_id som saknar
  *     en matchande time_entry för gårdagens genomförda bokningar)
+ *   - pickUnambiguousAssignee (2a-förfining: namn ENDAST vid exakt en
+ *     tilldelning via project_assignment — aldrig en gissning, aldrig en
+ *     lista)
  *
- * INGEN DB, INGET Supabase — suggestTimeEntriesForBusiness (som gör I/O)
- * testas inte här, bara den rena matchningslogiken den bygger på. Samma
- * upplägg som tests/egenkontroll-checklist.spec.ts (etapp 1d).
+ * INGEN DB, INGET Supabase — suggestTimeEntriesForBusiness och
+ * fetchUnambiguousAssigneeName (som gör I/O) testas inte här, bara den
+ * rena matchnings-/namnlogiken de bygger på. Samma upplägg som
+ * tests/egenkontroll-checklist.spec.ts (etapp 1d).
  */
 import { test, expect } from '@playwright/test'
 import {
   findProjectsMissingTimeEntry,
+  pickUnambiguousAssignee,
   type BookingForTimeMatch,
   type TimeEntryForTimeMatch,
+  type AssigneeNameRow,
 } from '../lib/egenkontroll/suggest-time-entry'
 
 const REF_DATE = '2026-08-01'
@@ -103,5 +109,36 @@ test.describe('findProjectsMissingTimeEntry — matchningskärna', () => {
   test('tom input → tom output', () => {
     const result = findProjectsMissingTimeEntry([], [], REF_DATE)
     expect(result).toEqual([])
+  })
+})
+
+test.describe('pickUnambiguousAssignee — namn-kärna (2a-förfining)', () => {
+  test('exakt 1 tilldelad person → namnet returneras', () => {
+    const assignments: AssigneeNameRow[] = [{ name: 'Lars Andersson' }]
+    expect(pickUnambiguousAssignee(assignments)).toBe('Lars Andersson')
+  })
+
+  test('0 tilldelade → inget namn (null)', () => {
+    expect(pickUnambiguousAssignee([])).toBeNull()
+  })
+
+  test('2+ tilldelade → inget namn (aldrig en lista, aldrig "en av två")', () => {
+    const assignments: AssigneeNameRow[] = [{ name: 'Lars Andersson' }, { name: 'Hanna Berg' }]
+    expect(pickUnambiguousAssignee(assignments)).toBeNull()
+  })
+
+  test('3 tilldelade → inget namn', () => {
+    const assignments: AssigneeNameRow[] = [{ name: 'A' }, { name: 'B' }, { name: 'C' }]
+    expect(pickUnambiguousAssignee(assignments)).toBeNull()
+  })
+
+  test('exakt 1 tilldelad men namnet är null (aldrig satt på business_users-raden) → inget namn', () => {
+    const assignments: AssigneeNameRow[] = [{ name: null }]
+    expect(pickUnambiguousAssignee(assignments)).toBeNull()
+  })
+
+  test('exakt 1 tilldelad men namnet är tomt/whitespace → inget namn', () => {
+    const assignments: AssigneeNameRow[] = [{ name: '   ' }]
+    expect(pickUnambiguousAssignee(assignments)).toBeNull()
   })
 })

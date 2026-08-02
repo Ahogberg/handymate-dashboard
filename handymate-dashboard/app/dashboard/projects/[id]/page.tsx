@@ -96,6 +96,13 @@ import { ProjectStatusCard, getStageBucket } from '@/components/projects/Project
 import ProjectTodoBlock, { TODO_PRIMARY_LABEL, type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
 import { formatSEK } from '@/lib/format-price'
 import type { ProjectEconomics } from '@/lib/projects/compute-economics'
+import { svDateStr, svDateStrPlusDays, svStartOfDay } from '@/lib/dates'
+import {
+  findProjectsMissingTimeEntry,
+  pickUnambiguousAssignee,
+  type BookingForTimeMatch,
+  type TimeEntryForTimeMatch,
+} from '@/lib/egenkontroll/suggest-time-entry'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -682,6 +689,17 @@ export default function ProjectDetailPage() {
   })
   const [timeSaving, setTimeSaving] = useState(false)
 
+  // "Ingen tidrapport i går" (Etapp 2b, tasks/easoft-gap-plan.md) — körs
+  // LIVE mot gårdagens bokning/tidrapport-data för DETTA projekt (inte
+  // bara läst ur en redan skapad pending_approval, se fetchYesterdayTimeGap
+  // nedan). personName kommer från samma entydig-tilldelning-logik som
+  // Etapp 2a (pickUnambiguousAssignee) — null om 0 eller 2+ tilldelade.
+  const [yesterdayTimeGap, setYesterdayTimeGap] = useState<{ missing: boolean; personName: string | null } | null>(null)
+  // Dedup (Etapp 2b, punkt 4): sant om ett 'tidrapport_forslag'-kort redan
+  // syns i ProjectApprovalsBlock för samma projekt+dag — då hoppas raden
+  // över, länken i kortet räcker.
+  const [hasPendingTimeApproval, setHasPendingTimeApproval] = useState(false)
+
   // Saving states
   const [savingStatus, setSavingStatus] = useState(false)
   const [creatingInvoice, setCreatingInvoice] = useState(false)
@@ -864,6 +882,82 @@ export default function ProjectDetailPage() {
       }
     } catch { /* ignore */ }
   }, [projectId])
+
+  // "Ingen tidrapport i går" (Etapp 2b) — samma matchningskärna som cronen
+  // (lib/egenkontroll/suggest-time-entry.ts findProjectsMissingTimeEntry),
+  // körd LIVE mot gårdagens bokning/tidrapport-data för bara DETTA
+  // projekt, så raden är korrekt även om dagens cron-körning inte hunnit
+  // köra än. Fail-safe: fel här döljer bara raden, kraschar aldrig sidan.
+  const fetchYesterdayTimeGap = useCallback(async () => {
+    if (!business?.business_id || !projectId) return
+    try {
+      const yesterday = svDateStrPlusDays(-1)
+      const today = svDateStr()
+      const rangeStart = svStartOfDay(new Date(`${yesterday}T12:00:00Z`))
+      const rangeEnd = svStartOfDay(new Date(`${today}T12:00:00Z`))
+
+      const [bookingsRes, entriesRes, approvalsRes] = await Promise.all([
+        supabase
+          .from('booking')
+          .select('booking_id, project_id, job_status, scheduled_start, scheduled_end')
+          .eq('business_id', business.business_id)
+          .eq('project_id', projectId)
+          .eq('job_status', 'completed')
+          .gte('scheduled_start', rangeStart.toISOString())
+          .lt('scheduled_start', rangeEnd.toISOString()),
+        supabase
+          .from('time_entry')
+          .select('project_id')
+          .eq('business_id', business.business_id)
+          .eq('project_id', projectId)
+          .eq('work_date', yesterday),
+        // Dedup-underlag (punkt 4): finns redan ett pending tidrapport_forslag-
+        // kort för samma projekt+dag i ProjectApprovalsBlock?
+        supabase
+          .from('pending_approvals')
+          .select('*', { count: 'exact', head: true })
+          .eq('business_id', business.business_id)
+          .eq('approval_type', 'tidrapport_forslag')
+          .eq('status', 'pending')
+          .contains('payload', { project_id: projectId, booking_date: yesterday }),
+      ])
+
+      setHasPendingTimeApproval(!!approvalsRes.count && approvalsRes.count > 0)
+
+      const missing = findProjectsMissingTimeEntry(
+        (bookingsRes.data || []) as BookingForTimeMatch[],
+        (entriesRes.data || []) as TimeEntryForTimeMatch[],
+        yesterday,
+      )
+      if (missing.length === 0) {
+        setYesterdayTimeGap({ missing: false, personName: null })
+        return
+      }
+
+      // Entydig tilldelning? Samma ärlighetsregel/funktion som Etapp 2a
+      // (pickUnambiguousAssignee) — ett namn ENDAST om project_assignment
+      // har exakt en rad för projektet, annars null.
+      const { data: assignments } = await supabase
+        .from('project_assignment')
+        .select('business_user:business_user_id (name)')
+        .eq('business_id', business.business_id)
+        .eq('project_id', projectId)
+
+      const personName = pickUnambiguousAssignee(
+        ((assignments || []) as { business_user: { name: string | null } | null }[]).map(row => ({
+          name: row.business_user?.name ?? null,
+        })),
+      )
+
+      setYesterdayTimeGap({ missing: true, personName })
+    } catch {
+      setYesterdayTimeGap(null)
+    }
+  }, [business?.business_id, projectId])
+
+  useEffect(() => {
+    fetchYesterdayTimeGap()
+  }, [fetchYesterdayTimeGap])
 
   const fetchProjectTasks = useCallback(async () => {
     try {
@@ -1732,9 +1826,10 @@ export default function ProjectDetailPage() {
   }
 
   // Åtgärdsrader — bara de vars underlag faktiskt finns i redan hämtad data.
-  // "Ingen tidrapport i går" utelämnad medvetet: TimeEntry-typen som hämtas
-  // här saknar business_user_id (kan inte avgöra VEM som inte rapporterat).
-  // Se handoff-rapporten.
+  // "Ingen tidrapport i går" (Etapp 2b, tasks/easoft-gap-plan.md) byggd
+  // nedan, mot ett fristående live-uppslag (yesterdayTimeGap, se
+  // fetchYesterdayTimeGap) istället för TimeEntry-typen här ovan — den
+  // saknar business_user_id och kan inte i sig avgöra "saknas tidrapport".
   const todoActionRows: TodoRow[] = []
   if (projectTeam.length === 0) {
     todoActionRows.push({
@@ -1782,6 +1877,26 @@ export default function ProjectDetailPage() {
       text: `Egenkontroll: ${missingRequired.length} punkt kvar — ${missingRequired[0].text}`,
       actionLabel: 'Bocka av',
       onAction: () => { setActiveTab('checklists'); setActiveChecklist(checklistWithMissingRequired) },
+    })
+  }
+  // "Ingen tidrapport i går" (Etapp 2b, tasks/easoft-gap-plan.md): körs
+  // LIVE mot gårdagens bokning/tidrapport-data för just detta projekt (se
+  // fetchYesterdayTimeGap ovan) — inte bara läst ur en redan skapad
+  // pending_approval, så raden stämmer även om dagens cron inte hunnit
+  // köra än. Döljs om ett 'tidrapport_forslag'-kort redan syns i
+  // ProjectApprovalsBlock för samma projekt+dag (hasPendingTimeApproval)
+  // — annars dubbelvisning av samma åtgärd; kortets egen länk räcker då.
+  // Namnet i texten kommer ENDAST från en entydig project_assignment-
+  // tilldelning (Etapp 2a, pickUnambiguousAssignee) — aldrig en gissning.
+  if (yesterdayTimeGap?.missing && !hasPendingTimeApproval) {
+    todoActionRows.push({
+      id: 'ingen-tidrapport-igar',
+      dotClass: 'bg-amber-500',
+      text: yesterdayTimeGap.personName
+        ? `Ingen tidrapport i går — ${yesterdayTimeGap.personName}`
+        : 'Ingen tidrapport för projektet i går',
+      actionLabel: 'Lägg till tid',
+      onAction: () => openTimeModal(),
     })
   }
 
