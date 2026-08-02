@@ -139,11 +139,19 @@ finns inte på någon telefon. Mobilen kan INTE demoas med senaste funktionerna.
 | AI-lärda preferenser (ton/pris/stil) | Ja | Ja — i agent-prompten | **BYGGT** |
 | agent_context (nattlig företagsanalys) | Ja | Ja — i prompten | **BYGGT** |
 | Veckovärde (kr + tid) | Ja | Ja — dashboard | **BYGGT** |
+| **Egenkontroll-agenten** (foto mot checklistpunkt → vision-bedömning → förslag/avvikelse i kön; checklist-förslag vid projektskapande) | Ja | Nej — 0 kund har använt den skarpt | **BYGGT★** (08-02) — tasks/easoft-gap-plan.md etapp 1 (1a-1d) komplett, tsc 0 fel, 86 facit-tester, ej demokörd på riktigt konto ännu |
 
 **Moat-bedömning (oförändrad i sak, starkare i bevis):** moaten = DJUPET i svensk
 back-office (ROT-split på arbetsandel i produktbanken, årstak + personnummer mot
 Skatteverket, Fortnox-loop) — inte agent-tekniken (commodity, jfr GHL). Förtjänad
 autonomi är nu den tydligaste produkt-manifestationen av lärandet.
+
+**Easoft-gap-planen (08-02, tasks/easoft-gap-plan.md):** Easofts egen
+"tio tidstjuvar"-artikel som mätsticka — 5 av 10 nu AI-först (kommunikation,
+planering, budget/Motor 1, realtidsdata, kvalitetskontroll/egenkontroll-
+agenten). 3 halva (tid, arbetsorder), 2 luckor (dokument, inventarier).
+FÅR INTE SÄGAS: "alla tio" eller "10 av 10" förrän samtliga är BYGGT★ MED
+kunddrift — se planens ärlighetsregel.
 
 ---
 

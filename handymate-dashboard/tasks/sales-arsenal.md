@@ -79,6 +79,13 @@ Kategoriterm: **AI-team för hantverkare.**
   gärna rakt av** — det är deras egen artikel, inte vår tolkning: "Fråga
   dem vilken av de tio punkterna en agent faktiskt löser åt dig. Svaret
   är noll — allihop kräver att DU fyller i formuläret."
+  _[STATUSUPPDATERING 08-02, tasks/easoft-gap-plan.md: 5 av deras 10
+  punkter är nu AI-först hos oss (senast kvalitetskontroll —
+  egenkontroll-agenten läser foton mot checklistan och föreslår vilka
+  punkter som är styrkta). ⚠️ SÄG ALDRIG "alla tio" eller ett specifikt
+  antal i skarp pitch — planens ärlighetsregel gäller: bara BYGGT★ MED
+  verklig kunddrift räknas som "stängt". Repliken ovan ("svaret är noll")
+  är fortfarande den säkra att använda tills fler etapper är kunddrivna.]_
 - **Deras chatbot lanseras** → vi äger redan distinktionen (SEO-artikeln
   "chatbot vs team", se seo-drafts/10); fällefrågorna gör jobbet.
 - **De köper röst före oss** → "deras röst svarar, vår kommer att boka" —
