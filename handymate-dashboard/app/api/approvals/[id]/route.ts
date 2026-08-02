@@ -1338,6 +1338,59 @@ async function executeApprovalPayload(
         return { action: 'checklist_forslag', ok: true, checklist_id: checklistId, project_id: projectId }
       }
 
+      case 'tidrapport_forslag': {
+        // Egenkontroll-agenten — Etapp 2a (tasks/easoft-gap-plan.md).
+        // Skapas av systemkod (lib/egenkontroll/suggest-time-entry.ts) —
+        // INTE av ett agent-verktyg — samma medvetna undantag från
+        // agentregeln som 'egenkontroll_foto'/'checklist_forslag' ovan.
+        //
+        // HÅRD REGEL FRÅN PLANEN: ett tidsförslag är löne-/fakturaunderlag,
+        // så det finns ingen "förtjänad autonomi"-genväg för den här typen
+        // — godkännande sker alltid via den här POST:en, aldrig autonomt av
+        // cronen som skapade kortet. (Granskning av filens övriga cases
+        // hittade ingen generell autonomi-auto-approve-mekanism att
+        // medvetet hoppa över här — regeln är alltså redan strukturellt
+        // uppfylld, men dokumenteras enligt planens krav.)
+        //
+        // Godkänn = skapa time_entry, samma fält-form som 'time_attestation'
+        // ovan (project_id/work_date/duration_minutes/description/
+        // is_billable) fast med data från förslaget istället för en
+        // incheckning.
+        const plTe = payload as any
+        const projectIdTe = plTe.project_id as string | undefined
+        const bookingDate = plTe.booking_date as string | undefined
+        const suggestedMinutes = Number(plTe.suggested_minutes) || 0
+        if (!projectIdTe || !bookingDate) {
+          return { action: 'tidrapport_forslag', skipped: 'no project_id or booking_date' }
+        }
+
+        const supabaseTe = getServerSupabase()
+        const entryIdTe = 'te_' + Math.random().toString(36).substr(2, 9)
+        const { error: insertTeErr } = await supabaseTe.from('time_entry').insert({
+          time_entry_id: entryIdTe,
+          business_id: businessId,
+          project_id: projectIdTe,
+          work_date: bookingDate,
+          duration_minutes: suggestedMinutes,
+          description: plTe.project_name
+            ? `Tidrapport-förslag · ${plTe.project_name}`
+            : 'Tidrapport-förslag',
+          is_billable: true,
+        })
+
+        if (insertTeErr) {
+          return { action: 'tidrapport_forslag', ok: false, error: insertTeErr.message }
+        }
+
+        return {
+          action: 'tidrapport_forslag',
+          ok: true,
+          time_entry_id: entryIdTe,
+          project_id: projectIdTe,
+          minutes: suggestedMinutes,
+        }
+      }
+
       case 'automation': {
         // En v3-automationsregel med requires_approval skapar denna approval och
         // lägger rule_action_type/rule_action_config i payloaden. Utan detta case

@@ -85,6 +85,9 @@ const TYPE_LABEL: Record<string, string> = {
   egenkontroll_avvikelse: 'Egenkontroll-avvikelse',
   // Checklistförslag vid projektskapande (etapp 1d, tasks/easoft-gap-plan.md).
   checklist_forslag: 'Checklista',
+  // Tidrapport-förslag (etapp 2a, tasks/easoft-gap-plan.md) — projektnivå,
+  // inte person (se lib/egenkontroll/suggest-time-entry.ts).
+  tidrapport_forslag: 'Tidrapport',
 }
 
 export default function ProjectApprovalsBlock({ projectId, onCountChange }: ProjectApprovalsBlockProps) {

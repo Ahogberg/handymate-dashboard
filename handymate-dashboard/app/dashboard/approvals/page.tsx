@@ -113,6 +113,9 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   egenkontroll_avvikelse: { label: 'Egenkontroll-avvikelse', icon: AlertTriangle, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
   // Checklistförslag vid projektskapande (etapp 1d, tasks/easoft-gap-plan.md).
   checklist_forslag: { label: 'Checklista', icon: ClipboardList, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
+  // Tidrapport-förslag (etapp 2a, tasks/easoft-gap-plan.md) — projektnivå,
+  // inte person (se lib/egenkontroll/suggest-time-entry.ts).
+  tidrapport_forslag: { label: 'Tidrapport', icon: Clock, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 
@@ -221,7 +224,7 @@ export default function ApprovalsPage() {
   }
 
   // Typer som INTE behöver bekräftelse (rena acknowledgements)
-  const SKIP_CONFIRM = ['time_attestation', 'low_stock_alert', 'profitability_warning', 'dispatch_suggestion', 'quote_nudge', 'egenkontroll_foto', 'egenkontroll_avvikelse', 'checklist_forslag']
+  const SKIP_CONFIRM = ['time_attestation', 'low_stock_alert', 'profitability_warning', 'dispatch_suggestion', 'quote_nudge', 'egenkontroll_foto', 'egenkontroll_avvikelse', 'checklist_forslag', 'tidrapport_forslag']
 
   function requestApprove(approval: Approval, editedPayload?: Record<string, unknown>) {
     if (SKIP_CONFIRM.includes(approval.approval_type)) {
