@@ -38,7 +38,7 @@ mest visuellt demobar ("titta, den SÅG att fuktspärren inte var klar"),
 och kvalitetsdokumentation är ett äkta juridiskt behov (besiktning,
 försäkring, ÄTA-tvister).
 
-**Bygget (3 increments, en agent-körning per increment):**
+**Bygget (4 increments, en agent-körning per increment):**
 1a. **Fotoanalys-kärnan**: när foto laddas upp till ett projekt med aktiv
     checklista → vision-anrop (Sonnet, via befintlig get-model) med
     checklistpunkterna som kontext → strukturerad bedömning per punkt
@@ -56,13 +56,32 @@ försäkring, ÄTA-tvister).
     kräver samtidigt att project_checklist får typ/punktnamn exponerat
     (SQL-migration: kolumn `kind` på project_checklist, fil enligt
     sql/v2_*-konvention, Andreas kör manuellt).
+1d. **Checklist-förslaget** (tillagd 2026-08-02, adoptionsfynd):
+    checklistor skapas INTE automatiskt idag — hantverkaren måste aktivt
+    välja mall i Dokumentation-fliken. Utan det steget finns ingen
+    checklista för 1a/1b att analysera foton mot, och egenkontroll-agenten
+    blir byggt-men-oanvänt. Lösning, i linje med kö-först-principen (inget
+    auto-kopplas utan godkännande): när ett projekt skapas → Lars (eller
+    Hanna, verifiera vem som redan äger projekt-skapande-flödet) föreslår
+    rätt checklista i kön baserat på projektets bransch/jobbtyp, mot
+    BEFINTLIGA branschmallar i lib/checklist-defaults.ts (ingen ny
+    malldata). "Vill du använda Elsäkerhetskontroll-checklistan för det
+    här projektet?" → godkänn = POST till befintlig
+    /api/projects/[id]/checklists med template_id. Dedup: inget förslag
+    om projektet redan har en checklista (aktiv eller ej). Ny approval_type
+    'checklist_forslag' i BÅDA tool-filerna om skapandet triggas av
+    agentverktyg — annars systemkod-genererad som 1b:s kort (bedöm utifrån
+    var projekt faktiskt skapas: agentflöde vs. UI-formulär).
 
 **DoD:** tsc + build rena; facit-tester på bedömningslogiken (mockade
-modellsvar — aldrig live-API i test); demobar på demokontot med seedade
-foton; capability-inventory uppdaterad till BYGGT★; SEO-artikelutkast
-"AI-först egenkontroll" skrivet men INTE publicerat förrän Andreas testat.
+modellsvar — aldrig live-API i test) OCH på checklist-matchningslogiken
+(1d); demobar på demokontot med seedade foton OCH ett nytt projekt utan
+checklista som visar 1d:s förslag; capability-inventory uppdaterad till
+BYGGT★; SEO-artikelutkast "AI-först egenkontroll" skrivet men INTE
+publicerat förrän Andreas testat.
 
-**Får inte:** auto-markera punkter utan godkännande; analysera foton som
+**Får inte:** auto-markera punkter utan godkännande; auto-koppla
+checklista utan godkännande (1d — samma princip); analysera foton som
 inte hör till projekt; påstå "besiktningsgodkänd av AI" (juridik).
 
 ## Etapp 2 — Tidrapport-förslag (tidstjuv #1)
