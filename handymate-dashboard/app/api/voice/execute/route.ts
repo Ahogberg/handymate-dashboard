@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
@@ -10,6 +11,19 @@ import { sanitizeSenderId } from '@/lib/sms/sender-id'
 export async function POST(request: NextRequest) {
   const business = await getAuthenticatedBusiness(request)
   if (!business) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Etapp 0 (multi-employee-parity-plan.md): denna route saknade helt
+  // anställd-identitet innan — bara getAuthenticatedBusiness (business-
+  // nivå). Routen har ingen egen/alternativ auth-mekanism (verifierat: den
+  // enda auth-koden i filen var getAuthenticatedBusiness ovan, och ingen
+  // caller av /api/voice/execute hittades i klient-koden i repot — den
+  // körs bakom samma cookie/Bearer-session som allt annat), så detta
+  // lägger till identitet utan att dubbel-autentisera eller blockera ett
+  // annat flöde.
+  const currentUser = await getCurrentUser(request)
+  if (!currentUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -44,6 +58,11 @@ export async function POST(request: NextRequest) {
         const { error: teError } = await supabase.from('time_entry').insert({
           time_entry_id: entryId,
           business_id: businessId,
+          // Etapp 1 Tier A (multi-employee-parity-plan.md): identiteten
+          // finns redan direkt via currentUser efter Etapp 0 ovan — ingen
+          // join behövs (till skillnad från checkin/approve och
+          // time_attestation som bara har ett auth-uuid i payloaden).
+          business_user_id: currentUser.id,
           customer_id: customer.customer_id,
           project_id: project?.project_id || null,
           description: action.data.description || '',

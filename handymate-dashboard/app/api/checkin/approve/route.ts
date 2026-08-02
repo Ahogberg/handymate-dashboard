@@ -50,9 +50,12 @@ export async function POST(request: NextRequest) {
 
     // Resolve hourly_rate: per-user-rate → business-default → 0.
     // checkin.user_id är auth-UUID (TD-1) — matchar mot business_users.user_id.
+    // `id` hämtas med samma query (Etapp 1, multi-employee-parity-plan.md)
+    // för att sätta time_entry.business_user_id — annars läser löneexporten
+    // (app/api/time-reports/payroll-export/route.ts) tomt för denna rad.
     const { data: businessUser } = await supabase
       .from('business_users')
-      .select('hourly_rate')
+      .select('id, hourly_rate')
       .eq('user_id', checkin.user_id)
       .eq('business_id', business.business_id)
       .maybeSingle()
@@ -88,7 +91,11 @@ export async function POST(request: NextRequest) {
       .from('time_checkins')
       .update({
         status: 'approved',
-        approved_by: business.contact_name || 'Chef',
+        // Etapp 0 (multi-employee-parity-plan.md): attestören är
+        // currentUser, inte en fritextsträng — business.contact_name pekade
+        // dessutom alltid på ägarens namn oavsett vem som faktiskt klickade
+        // Godkänn.
+        approved_by: currentUser.id,
         approved_at: approvedAt,
         duration_minutes: minutes,
       })
@@ -111,6 +118,10 @@ export async function POST(request: NextRequest) {
     await supabase.from('time_entry').insert({
       time_entry_id: entryId,
       business_id: business.business_id,
+      // Etapp 1 Tier A (multi-employee-parity-plan.md): identiteten på
+      // vem tiden tillhör — null om ingen matchande business_users-rad
+      // hittades (aldrig sämre än tidigare beteende, som alltid var null).
+      business_user_id: businessUser?.id ?? null,
       project_id: checkin.project_id || null,
       customer_id: customerId,
       description: `Incheckning ${new Date(checkin.checked_in_at).toLocaleDateString('sv-SE')}${checkin.project_name ? ' · ' + checkin.project_name : ''}`,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { getNextProjectNumber, bumpCounter } from '@/lib/numbering'
 import { getQuoteBudgetDerivation } from '@/lib/quotes/get-quote-budget-derivation'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
@@ -19,6 +20,19 @@ export async function GET(request: NextRequest) {
     const businessId = business.business_id
     const status = request.nextUrl.searchParams.get('status')
     const customerId = request.nextUrl.searchParams.get('customerId')
+
+    // Behörighetskoll (Etapp 2, tasks/multi-employee-parity-plan.md): en
+    // anställd utan can_see_all_projects ska bara se sina egna tilldelade
+    // projekt, och en anställd utan can_see_financials ska inte få budget/
+    // ekonomifält i svaret. getCurrentUser() returnerar null dels för
+    // superadmin-impersonation, dels om ingen business_users-rad hittas för
+    // auth-användaren (ska i praktiken inte hända för ägare — se
+    // sql/business_users.sql punkt 4 samt app/api/auth/register/route.ts
+    // som båda skapar en owner-rad — men vi failsafe:ar öppet mot null så
+    // ägarens vy ALDRIG blir mer begränsad än idag).
+    const currentUser = await getCurrentUser(request)
+    const canSeeAllProjects = !currentUser || hasPermission(currentUser, 'see_all_projects')
+    const canSeeFinancials = !currentUser || hasPermission(currentUser, 'see_financials')
 
     // include=workflow → joina stage-data per projekt så mobilen slipper N+1
     // mot /api/projects/[id]/workflow. Utan param: bakåtkompatibel respons.
@@ -44,6 +58,28 @@ export async function GET(request: NextRequest) {
 
     if (customerId) {
       query = query.eq('customer_id', customerId)
+    }
+
+    // Begränsad anställd: filtrera till bara projekt hen är tilldelad via
+    // project_assignment (samma join-mönster som app/api/projects/[id]/team/
+    // route.ts). Tom lista → tom respons (inte "alla"), matchar principen
+    // att en oidentifierad tilldelning inte ska läcka andras projekt.
+    if (!canSeeAllProjects && currentUser) {
+      const { data: assignments } = await supabase
+        .from('project_assignment')
+        .select('project_id')
+        .eq('business_id', businessId)
+        .eq('business_user_id', currentUser.id)
+
+      const assignedProjectIds = Array.from(
+        new Set((assignments || []).map((a: any) => a.project_id))
+      )
+
+      if (assignedProjectIds.length === 0) {
+        return NextResponse.json({ projects: [], job_types: [] })
+      }
+
+      query = query.in('project_id', assignedProjectIds)
     }
 
     const { data: projects, error } = await query
@@ -190,8 +226,16 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    // Strippa budget/ekonomifält för anställda utan can_see_financials
+    // (Etapp 2). budget_amount/budget_hours kommer från project-raden
+    // (`...project` i base ovan), actual_amount räknas fram från
+    // time_entry.hourly_rate — samtliga tre är ekonomikänsliga.
+    const responseProjects = canSeeFinancials
+      ? enrichedProjects
+      : enrichedProjects.map(({ budget_amount, budget_hours, actual_amount, ...rest }: any) => rest)
+
     return NextResponse.json({
-      projects: enrichedProjects,
+      projects: responseProjects,
       job_types: jobTypesData || [],
     })
 

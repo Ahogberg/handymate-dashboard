@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/permissions'
 import { recordLearningEvent } from '@/lib/agent/learning-engine'
 import { sendSmsViaElks } from '@/lib/sms-send'
 import { classifyExecutionResult } from '@/lib/approvals/execution-outcome'
@@ -22,6 +23,20 @@ export async function POST(
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Etapp 0 (multi-employee-parity-plan.md): identifierar VILKEN anställd
+    // som agerar — tidigare kändes bara business_id, så resolved_by lagrade
+    // ett business_id istället för en aktör. Notera: superadmin-
+    // impersonation (getAuthenticatedBusiness._impersonation) har ingen
+    // business_users-rad för admin-anvädaren i target-businessen, så
+    // currentUser blir null och detta 401:ar impersonerade skriv-anrop mot
+    // godkännande-kön — det fanns ingen tidigare write-spärr för
+    // impersonation någonstans i API-lagret, så detta är en (avsedd,
+    // ofarlig) sidoeffekt, inte en regression för vanliga anställda/ägare.
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -60,7 +75,9 @@ export async function POST(
     const updateData: Record<string, unknown> = {
       status: newStatus,
       resolved_at: new Date().toISOString(),
-      resolved_by: business.business_id,
+      // Etapp 0: currentUser.id (business_users.id), inte business_id —
+      // resolved_by ska identifiera aktören, inte bara företaget.
+      resolved_by: currentUser.id,
     }
     if (action === 'edit') {
       updateData.payload = finalPayload
@@ -756,11 +773,27 @@ async function executeApprovalPayload(
           duration_minutes: minutes,
         }).eq('id', plTime.checkin_id)
 
+        // Etapp 1 Tier A (multi-employee-parity-plan.md): payload.user_id är
+        // checkin.user_id, dvs auth-UUID:n för den anställda vars tid det
+        // gäller (INTE nödvändigtvis den som klickar Godkänn här) — matcha
+        // mot business_users.user_id, samma mönster som checkin/approve.
+        let timeAttestationBusinessUserId: string | null = null
+        if (plTime.user_id) {
+          const { data: attestedBusinessUser } = await supabaseTime
+            .from('business_users')
+            .select('id')
+            .eq('user_id', plTime.user_id)
+            .eq('business_id', businessId)
+            .maybeSingle()
+          timeAttestationBusinessUserId = attestedBusinessUser?.id ?? null
+        }
+
         // Create time_entry
         const entryId = 'te_' + Math.random().toString(36).substr(2, 9)
         await supabaseTime.from('time_entry').insert({
           time_entry_id: entryId,
           business_id: businessId,
+          business_user_id: timeAttestationBusinessUserId,
           project_id: plTime.project_id || null,
           description: `Incheckning ${plTime.checked_in_at ? new Date(plTime.checked_in_at).toLocaleDateString('sv-SE') : ''}${plTime.project_name ? ' · ' + plTime.project_name : ''}`,
           duration_minutes: minutes,
