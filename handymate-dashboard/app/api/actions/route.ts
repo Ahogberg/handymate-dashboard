@@ -297,9 +297,30 @@ case 'create_booking': {
     return NextResponse.json({ error: bookingSmsLimit.error }, { status: 429 })
   }
 
-  const { customerId, scheduledStart, scheduledEnd, notes } = data
+  const { customerId, scheduledStart, scheduledEnd, notes, assignedUserId } = data
 
   const bookingId = 'book_' + Math.random().toString(36).substr(2, 9)
+
+  // Manuell tilldelning (valfri) — validera att business_user_id faktiskt
+  // tillhör den här businessen innan skrivning. Samma valideringsmönster
+  // som app/api/projects/[id]/team/route.ts POST / app/api/bookings/route.ts.
+  let assignedUserIdValidated: string | null = null
+  let assignedToName: string | null = null
+  if (assignedUserId) {
+    const { data: targetUser } = await supabase
+      .from('business_users')
+      .select('id, name')
+      .eq('id', assignedUserId)
+      .eq('business_id', authBusiness.business_id)
+      .eq('is_active', true)
+      .single()
+
+    if (!targetUser) {
+      return NextResponse.json({ error: 'Vald tekniker hittades inte' }, { status: 400 })
+    }
+    assignedUserIdValidated = targetUser.id
+    assignedToName = targetUser.name
+  }
 
   // Skapa bokning
   const { error } = await supabase
@@ -312,6 +333,8 @@ case 'create_booking': {
       scheduled_end: scheduledEnd,
       status: 'confirmed',
       notes: notes || null,
+      assigned_user_id: assignedUserIdValidated,
+      assigned_to: assignedToName,
       created_at: new Date().toISOString(),
     })
 
@@ -329,6 +352,28 @@ case 'create_booking': {
     .select('business_name, assigned_phone_number')
     .eq('business_id', authBusiness.business_id)
     .single()
+
+  // Smart dispatch — föreslå tekniker (non-blocking). Denna case är den
+  // faktiska "manuellt skapa bokning"-vägen (kalenderns bokningsformulär,
+  // app/dashboard/calendar/page.tsx) och saknade tidigare suggestDispatch()
+  // helt — samma lucka som tool-router.ts createBooking() hade (Etapp 5,
+  // multi-employee-parity-plan.md). Mirrorar app/api/bookings/route.ts POST.
+  try {
+    const { suggestDispatch } = await import('@/lib/dispatch')
+    await suggestDispatch({
+      businessId: authBusiness.business_id,
+      jobTitle: notes || 'Bokning',
+      jobAddress: null,
+      scheduledStart,
+      scheduledEnd: scheduledEnd || null,
+      jobType: notes || '',
+      contextType: 'booking',
+      contextId: bookingId,
+      customerName: customer?.name || null,
+    })
+  } catch (dispatchErr) {
+    console.error('Dispatch suggestion error (non-blocking):', dispatchErr)
+  }
 
   // Skicka bekräftelse-SMS
   if (customer?.phone_number && businessConfig?.business_name) {
@@ -369,18 +414,50 @@ case 'create_booking': {
 }
 
       case 'update_booking': {
-        const { bookingId, scheduledStart, scheduledEnd, status, notes } = data
-        
+        const { bookingId, scheduledStart, scheduledEnd, status, notes, assignedUserId } = data
+
+        const updates: Record<string, any> = {
+          scheduled_start: scheduledStart,
+          scheduled_end: scheduledEnd,
+          status,
+          notes,
+          updated_at: new Date().toISOString(),
+        }
+
+        // Manuell tilldelning (valfri) — samma valideringsmönster som
+        // create_booking ovan / app/api/projects/[id]/team/route.ts.
+        // Skickas inte fältet med alls (undefined) bevaras nuvarande
+        // beteende exakt (fältet rörs inte).
+        if (assignedUserId !== undefined) {
+          if (assignedUserId === null) {
+            updates.assigned_user_id = null
+            updates.assigned_to = null
+          } else {
+            const { data: targetUser } = await supabase
+              .from('business_users')
+              .select('id, name')
+              .eq('id', assignedUserId)
+              .eq('business_id', authBusiness.business_id)
+              .eq('is_active', true)
+              .single()
+
+            if (!targetUser) {
+              return NextResponse.json({ error: 'Vald tekniker hittades inte' }, { status: 400 })
+            }
+            updates.assigned_user_id = targetUser.id
+            updates.assigned_to = targetUser.name
+          }
+        }
+
+        // business_id-scopning tillagd (upptäckt under Etapp 5-granskning,
+        // multi-employee-parity-plan.md): saknades helt tidigare — endast
+        // booking_id filtrerade uppdateringen, ett cross-tenant-hål om
+        // booking_id någonsin gissas/läcker.
         const { error } = await supabase
           .from('booking')
-          .update({
-            scheduled_start: scheduledStart,
-            scheduled_end: scheduledEnd,
-            status,
-            notes,
-            updated_at: new Date().toISOString(),
-          })
+          .update(updates)
           .eq('booking_id', bookingId)
+          .eq('business_id', authBusiness.business_id)
 
         if (error) throw error
         return NextResponse.json({ success: true })
@@ -388,11 +465,13 @@ case 'create_booking': {
 
       case 'delete_booking': {
         const { bookingId } = data
-        
+
+        // business_id-scopning tillagd (samma fynd som update_booking ovan).
         const { error } = await supabase
           .from('booking')
           .delete()
           .eq('booking_id', bookingId)
+          .eq('business_id', authBusiness.business_id)
 
         if (error) throw error
         return NextResponse.json({ success: true })

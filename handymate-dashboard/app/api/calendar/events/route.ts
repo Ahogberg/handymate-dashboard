@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       .from('booking')
       .select(`
         booking_id, customer_id, scheduled_start, scheduled_end, status, notes, agreement_id,
+        assigned_user_id,
         customer (name, phone_number)
       `)
       .eq('business_id', business.business_id)
@@ -47,6 +48,9 @@ export async function GET(request: NextRequest) {
       // Motor 2, Etapp 2: serie-markering i kalendervyn — satt när bokningen
       // kommer från Lars serviceavtals-cron (lib/agents/lars/service-bookings.ts).
       agreementId: b.agreement_id || null,
+      // Etapp 5 (multi-employee-parity-plan.md): manuell tilldelning, så
+      // redigeringsmodalen kan förifylla vald tekniker.
+      assignedUserId: b.assigned_user_id || null,
     }))
 
     // 2. Fetch Google Calendar events (graceful fallback)

@@ -189,10 +189,31 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
     const body = await request.json()
-    const { customer_id, scheduled_start, scheduled_end, notes, service_type } = body
+    const { customer_id, scheduled_start, scheduled_end, notes, service_type, assigned_user_id } = body
 
     if (!scheduled_start) {
       return NextResponse.json({ error: 'Missing scheduled_start' }, { status: 400 })
+    }
+
+    // Manuell tilldelning (valfri) — validera att business_user_id faktiskt
+    // tillhör den här businessen innan skrivning. Samma valideringsmönster
+    // som app/api/projects/[id]/team/route.ts POST.
+    let assignedUserId: string | null = null
+    let assignedToName: string | null = null
+    if (assigned_user_id) {
+      const { data: targetUser } = await supabase
+        .from('business_users')
+        .select('id, name')
+        .eq('id', assigned_user_id)
+        .eq('business_id', business.business_id)
+        .eq('is_active', true)
+        .single()
+
+      if (!targetUser) {
+        return NextResponse.json({ error: 'Vald tekniker hittades inte' }, { status: 400 })
+      }
+      assignedUserId = targetUser.id
+      assignedToName = targetUser.name
     }
 
     const bookingId = 'book_' + Math.random().toString(36).substr(2, 9)
@@ -208,6 +229,8 @@ export async function POST(request: NextRequest) {
         scheduled_end: scheduled_end || null,
         status: 'confirmed',
         notes: combinedNotes,
+        assigned_user_id: assignedUserId,
+        assigned_to: assignedToName,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -351,6 +374,30 @@ export async function PUT(request: NextRequest) {
     if (body.scheduled_end !== undefined) updates.scheduled_end = body.scheduled_end
     if (body.status !== undefined) updates.status = body.status
     if (body.notes !== undefined) updates.notes = body.notes
+
+    // Manuell tilldelning (valfri) — samma valideringsmönster som
+    // app/api/projects/[id]/team/route.ts POST. Skickas inte fältet med
+    // alls bevaras nuvarande beteende exakt (fältet rörs inte).
+    if (body.assigned_user_id !== undefined) {
+      if (body.assigned_user_id === null) {
+        updates.assigned_user_id = null
+        updates.assigned_to = null
+      } else {
+        const { data: targetUser } = await supabase
+          .from('business_users')
+          .select('id, name')
+          .eq('id', body.assigned_user_id)
+          .eq('business_id', business.business_id)
+          .eq('is_active', true)
+          .single()
+
+        if (!targetUser) {
+          return NextResponse.json({ error: 'Vald tekniker hittades inte' }, { status: 400 })
+        }
+        updates.assigned_user_id = targetUser.id
+        updates.assigned_to = targetUser.name
+      }
+    }
     updates.updated_at = new Date().toISOString()
 
     const { data: booking, error } = await supabase

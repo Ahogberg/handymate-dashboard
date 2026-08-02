@@ -32,6 +32,13 @@ interface HandymateEvent {
   // Motor 2, Etapp 2: satt när bokningen kommer från ett serviceavtal
   // (Lars serviceavtals-cron) — styr den diskreta återkommande-markeringen.
   agreementId?: string | null
+  // Etapp 5 (multi-employee-parity-plan.md): manuell tilldelning.
+  assignedUserId?: string | null
+}
+
+interface TeamMember {
+  id: string
+  name: string
 }
 
 interface GoogleEvent {
@@ -216,6 +223,7 @@ export default function CalendarPage() {
   const [bookingModalOpen, setBookingModalOpen] = useState(false)
   const [editingBooking, setEditingBooking] = useState<HandymateEvent | null>(null)
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [actionLoading, setActionLoading] = useState(false)
   const [bookingForm, setBookingForm] = useState({
     customer_id: '',
@@ -224,6 +232,7 @@ export default function CalendarPage() {
     end_time: '10:00',
     notes: '',
     status: 'confirmed',
+    assigned_user_id: '',
   })
 
   // ─── Detail panel ─────────────────────────────────────────────────────────
@@ -308,6 +317,23 @@ export default function CalendarPage() {
       .then(({ data }: { data: Customer[] | null }) => setCustomers(data || []))
   }, [business.business_id])
 
+  // Fetch team members for booking modal (tilldelning) — samma datakälla
+  // som NewDealModal.tsx (pipeline/page.tsx fetchTeamMembers): /api/team,
+  // filtrerat på is_active.
+  useEffect(() => {
+    if (!business.business_id) return
+    fetch('/api/team')
+      .then(res => (res.ok ? res.json() : { members: [] }))
+      .then((data: { members?: any[] }) => {
+        setTeamMembers(
+          (data.members || [])
+            .filter((m: any) => m.is_active)
+            .map((m: any) => ({ id: m.id, name: m.name }))
+        )
+      })
+      .catch(() => { /* silent — tilldelning är valfri */ })
+  }, [business.business_id])
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Navigation
   // ═══════════════════════════════════════════════════════════════════════════
@@ -346,6 +372,7 @@ export default function CalendarPage() {
       end_time: time ? `${String(parseInt(time.split(':')[0]) + 1).padStart(2, '0')}:${time.split(':')[1]}` : '10:00',
       notes: '',
       status: 'confirmed',
+      assigned_user_id: '',
     })
     setBookingModalOpen(true)
   }
@@ -362,6 +389,7 @@ export default function CalendarPage() {
       end_time: endDate.toTimeString().substring(0, 5),
       notes: event.title,
       status: event.status,
+      assigned_user_id: event.assignedUserId || '',
     })
     setBookingModalOpen(true)
   }
@@ -383,8 +411,8 @@ export default function CalendarPage() {
         body: JSON.stringify({
           action: editingBooking ? 'update_booking' : 'create_booking',
           data: editingBooking
-            ? { bookingId: editingBooking.id, scheduledStart, scheduledEnd, status: bookingForm.status, notes: bookingForm.notes }
-            : { customerId: bookingForm.customer_id, scheduledStart, scheduledEnd, notes: bookingForm.notes, businessId: business.business_id },
+            ? { bookingId: editingBooking.id, scheduledStart, scheduledEnd, status: bookingForm.status, notes: bookingForm.notes, assignedUserId: bookingForm.assigned_user_id || null }
+            : { customerId: bookingForm.customer_id, scheduledStart, scheduledEnd, notes: bookingForm.notes, businessId: business.business_id, assignedUserId: bookingForm.assigned_user_id || null },
         }),
       })
 
@@ -1258,6 +1286,21 @@ export default function CalendarPage() {
                   className="w-full px-3 py-[9px] text-[13px] border border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-none"
                 />
               </div>
+              {teamMembers.length > 0 && (
+                <div>
+                  <label className="block text-[12px] text-[#64748B] mb-1">Tilldela</label>
+                  <select
+                    value={bookingForm.assigned_user_id}
+                    onChange={(e) => setBookingForm({ ...bookingForm, assigned_user_id: e.target.value })}
+                    className="w-full px-3 py-[9px] text-[13px] border border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                  >
+                    <option value="">Ej tilldelad</option>
+                    {teamMembers.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 mt-5">

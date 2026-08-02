@@ -541,6 +541,36 @@ async function createBooking(
     }
   }
 
+  // Smart dispatch — föreslå tekniker (non-blocking). Mirrorar POST
+  // /api/bookings (app/api/bookings/route.ts) rakt av, så telefon-/
+  // Matte-skapade bokningar också får ett dispatch-förslag — innan denna
+  // ändring fick de aldrig ett.
+  try {
+    const { suggestDispatch } = await import('@/lib/dispatch')
+    let dispatchCustomerName: string | null = null
+    if (params.customer_id) {
+      const { data: cust } = await supabase
+        .from('customer')
+        .select('name')
+        .eq('customer_id', params.customer_id as string)
+        .maybeSingle()
+      dispatchCustomerName = cust?.name || null
+    }
+    await suggestDispatch({
+      businessId,
+      jobTitle: (params.service_type as string) || (params.notes as string) || 'Bokning',
+      jobAddress: (params.address as string) || null,
+      scheduledStart: params.scheduled_start as string,
+      scheduledEnd: (params.scheduled_end as string) || null,
+      jobType: (params.service_type as string) || '',
+      contextType: 'booking',
+      contextId: bookingId,
+      customerName: dispatchCustomerName,
+    })
+  } catch (dispatchErr: any) {
+    console.error('[createBooking] Dispatch suggestion error (non-blocking):', dispatchErr.message)
+  }
+
   return { success: true, data: {
     booking_id: bookingId,
     message: `Bokning skapad: ${params.service_type}`,
