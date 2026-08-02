@@ -203,21 +203,24 @@ export default function ApprovalsPage() {
     if (!business?.business_id) return
     setLoading(true)
     try {
-      let query = supabase
-        .from('pending_approvals')
-        .select('*')
-        .eq('business_id', business.business_id)
-        .order('created_at', { ascending: false })
-        .limit(50)
-
-      if (activeTab === 'pending') {
-        query = query.eq('status', 'pending')
-      } else {
-        query = query.in('status', ['approved', 'rejected', 'expired', 'auto_approved'])
+      // Etapp 3a (multi-employee-parity-plan.md): hämtar via GET
+      // /api/approvals istället för direkt Supabase-query — routing-
+      // filtret (canActOnApproval) körs server-side där. Realtime-
+      // subscriptionen nedan används fortfarande, men bara som "något
+      // ändrades, hämta om"-trigger — inte längre som datakälla.
+      // status='resolved' motsvarar den tidigare
+      // .in('status', ['approved','rejected','expired','auto_approved']).
+      const { data: { session } } = await supabase.auth.getSession()
+      const status = activeTab === 'pending' ? 'pending' : 'resolved'
+      const res = await fetch(`/api/approvals?status=${status}&limit=50`, {
+        headers: {
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+      })
+      if (res.ok) {
+        const result = await res.json().catch(() => null)
+        setApprovals(result?.approvals || [])
       }
-
-      const { data, error } = await query
-      if (!error) setApprovals(data || [])
     } finally {
       setLoading(false)
     }

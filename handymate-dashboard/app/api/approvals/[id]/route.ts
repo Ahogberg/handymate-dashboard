@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/permissions'
 import { recordLearningEvent } from '@/lib/agent/learning-engine'
 import { sendSmsViaElks } from '@/lib/sms-send'
 import { classifyExecutionResult } from '@/lib/approvals/execution-outcome'
+import { canActOnApproval } from '@/lib/approvals/routing'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -58,6 +59,23 @@ export async function POST(
 
     if (fetchError || !approval) {
       return NextResponse.json({ error: 'Approval not found' }, { status: 404 })
+    }
+
+    // Etapp 3a (multi-employee-parity-plan.md): stänger den bekräftade
+    // luckan där execute-endpointen tidigare inte kollade NÅGON identitet/
+    // behörighet utöver business_id-matchning — vilken inloggad anställd
+    // som helst kunde godkänna/avvisa VILKET kort som helst för sitt
+    // business, inklusive finansiella och löne-typer. routing_role har
+    // default 'any' på alla rader idag (Etapp 3b sätter specifika buckets
+    // vid skapande i en senare körning) så detta är i praktiken en no-op
+    // för de flesta typer just nu — UTOM four_eyes_quote, där
+    // canActOnApproval hårdkodat nekar självgodkännande oavsett bucket.
+    const canAct = await canActOnApproval(supabase, currentUser, approval)
+    if (!canAct) {
+      return NextResponse.json(
+        { error: 'Du saknar behörighet att agera på detta godkännande' },
+        { status: 403 },
+      )
     }
 
     if (approval.status !== 'pending') {

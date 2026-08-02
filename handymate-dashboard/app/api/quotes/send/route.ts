@@ -339,6 +339,11 @@ export async function POST(request: NextRequest) {
           quote_total: quoteTotal,
           threshold: fourEyesConfig.four_eyes_threshold_sek,
           requested_by: currentUser?.name || 'Användare',
+          // Etapp 3a (multi-employee-parity-plan.md): behövs av
+          // canActOnApproval (lib/approvals/routing.ts) för
+          // självgodkännande-spärren — requested_by ovan är bara ett
+          // visningsnamn, inte ett id att jämföra mot.
+          requested_by_user_id: currentUser?.id || null,
           send_method: method,
           extra_emails: extraEmails,
           bcc_emails: bccEmails,

@@ -226,14 +226,21 @@ export default function IdagCore({
 
   const fetchQueue = useCallback(async () => {
     if (!business?.business_id) return
-    const { data, error } = await supabase
-      .from('pending_approvals')
-      .select('*')
-      .eq('business_id', business.business_id)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-      .limit(15)
-    if (!error) setApprovals(data || [])
+    // Etapp 3a (multi-employee-parity-plan.md): hämtar via GET
+    // /api/approvals istället för direkt Supabase-query — routing-filtret
+    // (canActOnApproval) körs server-side där. Realtime-subscriptionen
+    // nedan används fortfarande, men bara som "något ändrades, hämta
+    // om"-trigger — inte längre som datakälla.
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/approvals?status=pending&limit=15', {
+      headers: {
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
+    })
+    if (res.ok) {
+      const result = await res.json().catch(() => null)
+      setApprovals(result?.approvals || [])
+    }
     setQueueLoaded(true)
   }, [business?.business_id])
 

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/permissions'
+import { canActOnApproval, type ApprovalRoutingRow } from '@/lib/approvals/routing'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,6 +11,11 @@ export const dynamic = 'force-dynamic'
  * POST /api/approvals — Create a new approval request
  */
 
+// Statusarna som räknas som "hanterade" — motsvarar activeTab==='resolved'
+// i app/dashboard/approvals/page.tsx (Etapp 3a, migrerad från direkt
+// Supabase-query till denna route).
+const RESOLVED_STATUSES = ['approved', 'rejected', 'expired', 'auto_approved']
+
 export async function GET(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
@@ -16,16 +23,37 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Etapp 3a (multi-employee-parity-plan.md): denna route hade ingen
+    // identitets-/routing-koll alls tidigare (och användes inte av någon
+    // klient) — nu grunden för att de tre dashboard-ytorna (approvals/
+    // page.tsx, IdagCore.tsx, ProjectApprovalsBlock.tsx) hämtar härifrån
+    // istället för direkt Supabase-query med anon-key.
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getServerSupabase()
     const status = request.nextUrl.searchParams.get('status') || 'pending'
     const approvalType = request.nextUrl.searchParams.get('approval_type')
+    const limitParam = request.nextUrl.searchParams.get('limit')
+    const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 0, 1), 200) : 100
 
     let query = supabase
       .from('pending_approvals')
       .select('*')
       .eq('business_id', business.business_id)
-      .eq('status', status)
       .order('created_at', { ascending: false })
+      .limit(limit)
+
+    // status=resolved är en samlingsterm för "inte längre pending" — samma
+    // statusuppsättning som approvals/page.tsx tidigare frågade direkt mot
+    // Supabase med .in('status', [...]) för sin "Hanterade"-flik.
+    if (status === 'resolved') {
+      query = query.in('status', RESOLVED_STATUSES)
+    } else {
+      query = query.eq('status', status)
+    }
 
     if (approvalType) {
       query = query.eq('approval_type', approvalType)
@@ -35,7 +63,16 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    return NextResponse.json({ approvals: data || [] })
+    // Routing-filter (Etapp 3a): hämta behörigheter EN gång (currentUser
+    // ovan) och filtrera listan i minnet — inte N DB-anrop per approval.
+    // canActOnApproval kortsluter till `true` direkt för 'any'-bucketen
+    // (idag alla rader, se lib/approvals/routing.ts) så detta är i
+    // praktiken en no-op tills Etapp 3b börjar sätta specifika buckets.
+    const rows = (data || []) as ApprovalRoutingRow[]
+    const permits = await Promise.all(rows.map((row) => canActOnApproval(supabase, currentUser, row)))
+    const visible = rows.filter((_, i) => permits[i])
+
+    return NextResponse.json({ approvals: visible })
   } catch (error: any) {
     console.error('GET /api/approvals error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

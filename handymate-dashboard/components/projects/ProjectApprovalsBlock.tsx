@@ -101,15 +101,22 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
 
   const fetchApprovals = useCallback(async () => {
     if (!business?.business_id) return
-    const { data, error: err } = await supabase
-      .from('pending_approvals')
-      .select('*')
-      .eq('business_id', business.business_id)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-      .limit(50)
-    if (!err) {
-      const filtered = (data || []).filter(
+    // Etapp 3a (multi-employee-parity-plan.md): hämtar via GET
+    // /api/approvals istället för direkt Supabase-query — routing-filtret
+    // (canActOnApproval) körs server-side där. Realtime-subscriptionen
+    // nedan används fortfarande, men bara som "något ändrades, hämta
+    // om"-trigger — inte längre som datakälla. project_id-filtreringen
+    // sker fortsatt client-side (samma som tidigare — API:t har ingen
+    // project_id-queryparam).
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/approvals?status=pending&limit=50', {
+      headers: {
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
+    })
+    if (res.ok) {
+      const result = await res.json().catch(() => null)
+      const filtered = ((result?.approvals || []) as Approval[]).filter(
         (a: Approval) => (a.payload as any)?.project_id === projectId,
       )
       setApprovals(filtered)
