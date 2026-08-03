@@ -8,6 +8,7 @@ import { getNextCustomerNumber, getNextProjectNumber, getNextLeadNumber } from '
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { shouldQueueForApproval } from '@/lib/autonomy/agent-gating'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
+import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
 
 interface ToolResult {
@@ -252,9 +253,27 @@ async function createQuote(
   const vatAmount = Math.round(subtotal * (vatRate / 100))
   const total = subtotal + vatAmount
 
+  // Årstakskontroll (VÅG 1b, value-chain-plan.md) — samma mönster som
+  // app/api/invoices/from-quote (calculateCappedDeduction), som INTE bara
+  // beräknar det råa avdraget utan även begränsar mot kundens redan
+  // utnyttjade ROT/RUT-utrymme i år. Utan detta kunde agenten skapa
+  // offerter med avdrag som Skatteverket nekar. customer_id är required i
+  // create_quote-schemat så det finns alltid data för kontrollen.
   let rotRutDeduction = 0
-  if (params.rot_rut_type === 'rot') rotRutDeduction = rotRutDeductionInclVat('rot', laborTotal, { vatRate })
-  if (params.rot_rut_type === 'rut') rotRutDeduction = rotRutDeductionInclVat('rut', laborTotal, { vatRate })
+  let rotRutCapped = false
+  let rotRutWarning: string | undefined
+  if ((params.rot_rut_type === 'rot' || params.rot_rut_type === 'rut') && params.customer_id) {
+    const capped = await calculateCappedDeduction(
+      params.customer_id as string,
+      businessId,
+      params.rot_rut_type as 'rot' | 'rut',
+      laborTotal,
+      { vatRate }
+    )
+    rotRutDeduction = capped.deduction
+    rotRutCapped = capped.capped
+    rotRutWarning = capped.warning
+  }
 
   const validUntil = new Date()
   validUntil.setDate(validUntil.getDate() + ((params.valid_days as number) || 30))
@@ -285,7 +304,11 @@ async function createQuote(
       quote_id: quoteId,
       business_id: businessId,
       item_type: 'item',
-      description: i.description ?? '',
+      // create_quote-schemat (tool-definitions.ts) definierar radfältet som
+      // "name", inte "description" — den gamla `i.description ?? ''` gav
+      // därför alltid en tom rad-beskrivning i PDF:en. name är primärt,
+      // description accepteras också ifall agenten (mot schema) skickar det.
+      description: i.name ?? i.description ?? '',
       quantity: i.quantity ?? 0,
       unit: i.unit ?? 'st',
       unit_price: i.unit_price ?? 0,
@@ -310,6 +333,7 @@ async function createQuote(
       labor_total: laborTotal, material_total: materialTotal,
       subtotal_ex_vat: subtotal, vat_rate: vatRate, vat_amount: vatAmount, total_incl_vat: total,
       rot_rut_deduction: rotRutDeduction, customer_pays: total - rotRutDeduction,
+      ...(rotRutCapped ? { rot_rut_capped: true, rot_rut_warning: rotRutWarning } : {}),
     }
   }}
 }
@@ -361,9 +385,28 @@ async function createInvoice(
   const total = subtotal + vatAmount
 
   const laborTotal = items.filter((i: any) => i.type === 'labor').reduce((s: number, i: any) => s + (i.total || 0), 0)
+
+  // Årstakskontroll (VÅG 1b) — samma mönster som createQuote ovan och
+  // app/api/invoices/from-quote: räkna om avdraget mot kundens redan
+  // utnyttjade ROT/RUT-utrymme i år, oavsett om raderna kommer från en
+  // offert (quote_id) eller skickas direkt (items) — precis som
+  // from-quote INTE kopierar quotens rot_rut_deduction rakt av (kunden kan
+  // ha använt mer av sitt utrymme sedan offerten skapades).
   let rotRutDeduction = 0
-  if (rotRutType === 'rot') rotRutDeduction = rotRutDeductionInclVat('rot', laborTotal, { vatRate })
-  if (rotRutType === 'rut') rotRutDeduction = rotRutDeductionInclVat('rut', laborTotal, { vatRate })
+  let rotRutCapped = false
+  let rotRutWarning: string | undefined
+  if ((rotRutType === 'rot' || rotRutType === 'rut') && params.customer_id) {
+    const capped = await calculateCappedDeduction(
+      params.customer_id as string,
+      businessId,
+      rotRutType as 'rot' | 'rut',
+      laborTotal,
+      { vatRate }
+    )
+    rotRutDeduction = capped.deduction
+    rotRutCapped = capped.capped
+    rotRutWarning = capped.warning
+  }
 
   // Fakturanummer: samma räknare som huvudvägen (invoices/from-quote) —
   // prefix + next_invoice_number — så agentens fakturor inte krockar med dem.
@@ -395,7 +438,11 @@ async function createInvoice(
     .eq('business_id', businessId)
   if (counterError) console.error('[createInvoice] next_invoice_number increment failed:', counterError.message)
 
-  return { success: true, data: { invoice_id: invoiceId, invoice_number: invoiceNumber, message: `Faktura ${invoiceNumber} skapad`, total, customer_pays: total - rotRutDeduction } }
+  return { success: true, data: {
+    invoice_id: invoiceId, invoice_number: invoiceNumber, message: `Faktura ${invoiceNumber} skapad`,
+    total, customer_pays: total - rotRutDeduction,
+    ...(rotRutCapped ? { rot_rut_capped: true, rot_rut_warning: rotRutWarning } : {}),
+  } }
 }
 
 async function checkCalendar(

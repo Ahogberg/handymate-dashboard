@@ -112,6 +112,70 @@ export async function getLearnedConfidence(
   }
 }
 
+/** Minimal shape som computeApprovalStats behöver — matchar pending_approvals-selecten. */
+export interface ResolvedApprovalRow {
+  id: string
+  status: string
+}
+
+/**
+ * Ren, testbar kärna: bygger ApprovalStats från en lista redan-hämtade
+ * resolved approvals + mängden approval-id:n som redigerades innan
+ * godkännande. Ingen DB-åtkomst — går att testa direkt utan mockning.
+ *
+ * Bugg som fixades här (VÅG 1a, value-chain-plan.md): den gamla koden
+ * läste learning_events.context?.approval_type/.approval_id — men
+ * learning_events har ingen context-kolumn (se sql/v5_learning_events.sql:
+ * event_type, reference_id, reference_type, agent_suggestion,
+ * human_override, learned_preference, preference_category, confidence).
+ * editedApprovalIds blev därför alltid tom, edited_count alltid 0, och
+ * no_edit_rate = acceptance_rate — redigerade förslag räknades som rena
+ * godkännanden och blåste upp confidence-boosten för förtjänad autonomi.
+ *
+ * Fix: reference_id på en 'approval_edited'-rad ÄR redan pending_approvals.id
+ * (TEXT, samma id som skickas in i recordLearningEvent från
+ * approvals/[id]/route.ts) — ingen separat context-kolumn behövs.
+ * approval_type-filtreringen görs redan av anroparen (approvals-selecten
+ * nedan är filtrerad på approval_type), så det räcker att skära mot
+ * pending_approvals-id:n som redan är typ-filtrerade.
+ */
+export function computeApprovalStats(
+  approvals: ResolvedApprovalRow[],
+  editedApprovalIds: Set<string>
+): ApprovalStats {
+  if (approvals.length === 0) return emptyStats()
+
+  const total = approvals.length
+  const approved = approvals.filter(a => a.status === 'approved' || a.status === 'auto_approved').length
+  const rejected = approvals.filter(a => a.status === 'rejected').length
+  const edited = approvals.filter(a => editedApprovalIds.has(a.id)).length
+  const approvedWithoutEdit = Math.max(0, approved - edited)
+
+  // Räkna konsekutiva: positiv = godkännanden i rad, negativ = avvisningar i rad
+  let consecutive = 0
+  const firstStatus = approvals[0].status
+  const isApproval = firstStatus === 'approved' || firstStatus === 'auto_approved'
+  for (const a of approvals) {
+    const thisIsApproval = a.status === 'approved' || a.status === 'auto_approved'
+    if (thisIsApproval === isApproval) {
+      consecutive += isApproval ? 1 : -1
+    } else {
+      break
+    }
+  }
+
+  return {
+    total_resolved: total,
+    approved_count: approved,
+    approved_without_edit: approvedWithoutEdit,
+    rejected_count: rejected,
+    edited_count: edited,
+    consecutive_approvals: consecutive,
+    acceptance_rate: total > 0 ? approved / total : 0,
+    no_edit_rate: total > 0 ? approvedWithoutEdit / total : 0,
+  }
+}
+
 /**
  * Hämta statistik för en approval-typ
  */
@@ -135,53 +199,25 @@ async function getApprovalStats(
 
   if (!approvals || approvals.length === 0) return emptyStats()
 
-  // Hämta edit-events från learning_events
+  // Hämta edit-events från learning_events. reference_id på en
+  // 'approval_edited'-rad är pending_approvals.id (TEXT) — se
+  // computeApprovalStats-kommentaren ovan för varför context/approval_type
+  // inte används (kolumnen finns inte).
   const { data: editEvents } = await supabase
     .from('learning_events')
-    .select('event_type, context')
+    .select('reference_id')
     .eq('business_id', businessId)
     .eq('event_type', 'approval_edited')
+    .eq('reference_type', 'approval')
     .gte('created_at', sixMonthsAgo.toISOString())
 
-  // Filtrera edits som matchar denna approval_type
   const editedApprovalIds = new Set(
     (editEvents || [])
-      .filter((e: any) => e.context?.approval_type === approvalType)
-      .map((e: any) => e.context?.approval_id)
-      .filter(Boolean)
+      .map((e: any) => e.reference_id as string | null)
+      .filter((id): id is string => !!id)
   )
 
-  const total = approvals.length
-  const approved = approvals.filter(a => a.status === 'approved' || a.status === 'auto_approved').length
-  const rejected = approvals.filter(a => a.status === 'rejected').length
-  const edited = approvals.filter(a => editedApprovalIds.has(a.id)).length
-  const approvedWithoutEdit = approved - edited
-
-  // Räkna konsekutiva: positiv = godkännanden i rad, negativ = avvisningar i rad
-  let consecutive = 0
-  if (approvals.length > 0) {
-    const firstStatus = approvals[0].status
-    const isApproval = firstStatus === 'approved' || firstStatus === 'auto_approved'
-    for (const a of approvals) {
-      const thisIsApproval = a.status === 'approved' || a.status === 'auto_approved'
-      if (thisIsApproval === isApproval) {
-        consecutive += isApproval ? 1 : -1
-      } else {
-        break
-      }
-    }
-  }
-
-  return {
-    total_resolved: total,
-    approved_count: approved,
-    approved_without_edit: Math.max(0, approvedWithoutEdit),
-    rejected_count: rejected,
-    edited_count: edited,
-    consecutive_approvals: consecutive,
-    acceptance_rate: total > 0 ? approved / total : 0,
-    no_edit_rate: total > 0 ? Math.max(0, approvedWithoutEdit) / total : 0,
-  }
+  return computeApprovalStats(approvals, editedApprovalIds)
 }
 
 /**

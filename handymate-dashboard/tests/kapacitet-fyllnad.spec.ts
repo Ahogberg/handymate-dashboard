@@ -163,13 +163,43 @@ test.describe('rankUnsoldQuoteCandidates', () => {
 })
 
 test.describe('rankPastCustomerCandidates', () => {
-  test('mest inaktiv (flest dagar) först', () => {
+  // VÅG 1d (value-chain-plan.md): LTV-viktad — högst lifetime_value först,
+  // days_since_last_job är bara tie-break vid lika/okänt LTV.
+  test('högst lifetime_value först, oavsett tystnadstid', () => {
     const ranked = rankPastCustomerCandidates([
-      { customer_id: 'c1', days_since_last_job: 95 },
-      { customer_id: 'c2', days_since_last_job: 400 },
-      { customer_id: 'c3', days_since_last_job: 120 },
+      { customer_id: 'c1', days_since_last_job: 400, lifetime_value: 5_000 },
+      { customer_id: 'c2', days_since_last_job: 95, lifetime_value: 80_000 },
+      { customer_id: 'c3', days_since_last_job: 120, lifetime_value: 20_000 },
     ])
     expect(ranked.map(c => c.customer_id)).toEqual(['c2', 'c3', 'c1'])
+  })
+
+  test('lika lifetime_value → mest inaktiv (flest dagar) vinner tie-break', () => {
+    const ranked = rankPastCustomerCandidates([
+      { customer_id: 'c1', days_since_last_job: 95, lifetime_value: 10_000 },
+      { customer_id: 'c2', days_since_last_job: 400, lifetime_value: 10_000 },
+      { customer_id: 'c3', days_since_last_job: 120, lifetime_value: 10_000 },
+    ])
+    expect(ranked.map(c => c.customer_id)).toEqual(['c2', 'c3', 'c1'])
+  })
+
+  test('okänt LTV (0 för alla) faller tillbaka på gamla mest-inaktiv-ordningen', () => {
+    const ranked = rankPastCustomerCandidates([
+      { customer_id: 'c1', days_since_last_job: 95, lifetime_value: 0 },
+      { customer_id: 'c2', days_since_last_job: 400, lifetime_value: 0 },
+      { customer_id: 'c3', days_since_last_job: 120, lifetime_value: 0 },
+    ])
+    expect(ranked.map(c => c.customer_id)).toEqual(['c2', 'c3', 'c1'])
+  })
+
+  test('mutation-fri — kopierar input, ändrar inte originallistan', () => {
+    const original = [
+      { customer_id: 'c1', days_since_last_job: 95, lifetime_value: 1_000 },
+      { customer_id: 'c2', days_since_last_job: 400, lifetime_value: 90_000 },
+    ]
+    const copy = [...original]
+    rankPastCustomerCandidates(original)
+    expect(original).toEqual(copy)
   })
 })
 

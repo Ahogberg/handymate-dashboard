@@ -12,8 +12,11 @@
  *      kund med telefon) — högst värde först. En kund som redan bett om
  *      en offert är varmare än en gammal kund vi bara gissar är intresserad.
  *   2. Om färre än 3: tidigare kunder (last_job_date >90 dagar sedan,
- *      telefon) — samma datadisciplin som lib/agents/hanna-outbound.ts
- *      (mest inaktiva först, per-kandidat senaste job_type för personlig ton).
+ *      telefon) — LTV-viktad (VÅG 1d, value-chain-plan.md): högst
+ *      lifetime_value först, mest inaktiva som tie-break (se
+ *      rankPastCustomerCandidates nedan). Mest värt att fylla veckan med en
+ *      kund som spenderat mycket hos oss förut. Per-kandidat senaste
+ *      job_type hämtas separat för personlig ton.
  *
  * Datadisciplin — VIKTIGT: föreslår ENDAST när kapaciteten kommer från en
  * verklig inställning (capacity.configured / source==='settings'). En
@@ -123,6 +126,8 @@ export interface PastCustomerCandidate {
   customer_phone_e164: string
   job_type: string | null
   days_since_last_job: number
+  /** kundens totala fakturerade belopp (customer.lifetime_value, se sql/v20_customer_ltv.sql) — 0 om okänt. */
+  lifetime_value: number
 }
 
 export type CapacityFillCandidate =
@@ -153,9 +158,17 @@ export function rankUnsoldQuoteCandidates<T extends { total_kr: number }>(candid
   return [...candidates].sort((a, b) => b.total_kr - a.total_kr)
 }
 
-/** Mest inaktiva först (samma prioritering som lib/agents/hanna-outbound.ts). */
-export function rankPastCustomerCandidates<T extends { days_since_last_job: number }>(candidates: T[]): T[] {
-  return [...candidates].sort((a, b) => b.days_since_last_job - a.days_since_last_job)
+/**
+ * LTV-viktad rangordning (VÅG 1d, value-chain-plan.md). Tidigare sorterades
+ * bara på days_since_last_job — det fyller lediga tider men prioriterar inte
+ * de mest värdefulla kunderna. Primärt: högst lifetime_value (customer.
+ * lifetime_value, se sql/v20_customer_ltv.sql) — mest värt att fylla veckan
+ * med en kund som spenderat mycket hos oss förut. Sekundärt (tie-break vid
+ * lika/okänt LTV, t.ex. båda 0): mest inaktiva först, samma princip som
+ * tidigare och som lib/agents/hanna-outbound.ts.
+ */
+export function rankPastCustomerCandidates<T extends { lifetime_value: number; days_since_last_job: number }>(candidates: T[]): T[] {
+  return [...candidates].sort((a, b) => b.lifetime_value - a.lifetime_value || b.days_since_last_job - a.days_since_last_job)
 }
 
 /** Ta bort kandidater vars customer_id redan finns i excludeCustomerIds (dedup). */
@@ -219,6 +232,7 @@ interface PastCustomerRow {
   name: string | null
   phone_number: string | null
   last_job_date: string | null
+  lifetime_value: number | null
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -349,7 +363,7 @@ export async function runCapacityFill(
     const cutoffIso = new Date(now - PAST_CUSTOMER_INACTIVE_DAYS * 24 * 3600_000).toISOString()
     const { data: custData } = await supabase
       .from('customer')
-      .select('customer_id, name, phone_number, last_job_date')
+      .select('customer_id, name, phone_number, last_job_date, lifetime_value')
       .eq('business_id', businessId)
       .not('last_job_date', 'is', null)
       .lte('last_job_date', cutoffIso)
@@ -372,6 +386,7 @@ export async function runCapacityFill(
           days_since_last_job: Math.floor(
             (now - new Date(c.last_job_date as string).getTime()) / 86400000,
           ),
+          lifetime_value: Number(c.lifetime_value) || 0,
         }
       })
       .filter((x): x is PastCustomerCandidate => x !== null)
