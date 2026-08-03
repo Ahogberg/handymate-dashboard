@@ -126,6 +126,16 @@ export default function ItemRow({
     item.description.trim() !== ''
   const isSavedToProducts = !!item.linked_product_id
 
+  // P4 (UX-revision 2026-08-03): AI-rad utan träff i produktbanken. Amber-
+  // markering på prisfältet så länge priset fortfarande är 0 — försvinner
+  // naturligt så fort hantverkaren fyller i ett pris (villkoret är unit_price,
+  // inte flaggan ensam). Nudge-checkboxen ("Spara i produktbanken vid spar")
+  // tar över samma kolumn som bookmark-knappen så fort ett pris finns, tills
+  // raden faktiskt är sparad (linked_product_id).
+  const priceMissingStyle = item.ai_price_missing && item.unit_price === 0
+  const showSaveToProductsNudge =
+    item.ai_price_missing && item.item_type === 'item' && item.unit_price > 0 && !isSavedToProducts
+
   // Produktbank: inline-autocomplete i beskrivningsfältet — endast vanliga
   // 'item'-rader (rubrik/fritext/delsumma/rabatt/tillval förblir rena textfält)
   const useProductCombo = !!onSelectProduct && item.item_type === 'item'
@@ -187,7 +197,7 @@ export default function ItemRow({
                 item.item_type === 'heading' ? 'font-bold' : ''} ${item.item_type === 'text' ? 'italic' : ''}`}
             />
           )}
-          {canSaveToProducts && (
+          {canSaveToProducts && !showSaveToProductsNudge && (
             <button
               type="button"
               onClick={() => onSaveToProducts!(item)}
@@ -223,9 +233,23 @@ export default function ItemRow({
             </select>
             <input type="number" value={item.unit_price} onChange={(e) => onUpdate(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
               onFocus={(e) => e.target.select()}
-              className="w-20 px-1.5 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary-600" min={0} step="any" />
+              title={priceMissingStyle ? 'AI hittade inget pris i produktbanken — fyll i manuellt' : undefined}
+              className={`w-20 px-1.5 py-1.5 border rounded-lg text-gray-900 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary-600 ${
+                priceMissingStyle ? 'bg-amber-50 border-amber-300 ring-1 ring-amber-300' : 'bg-white border-gray-200'
+              }`} min={0} step="any" />
             <span className="flex-1 text-right text-xs font-medium text-gray-900 whitespace-nowrap">{formatCurrency(displayTotal)}</span>
           </div>
+        )}
+        {showSaveToProductsNudge && (
+          <label className="flex items-center gap-1.5 w-fit cursor-pointer select-none pl-6">
+            <input
+              type="checkbox"
+              checked={item.save_to_products ?? true}
+              onChange={(e) => onUpdate(item.id, 'save_to_products', e.target.checked)}
+              className="w-3.5 h-3.5 rounded border-gray-300 accent-primary-700 cursor-pointer"
+            />
+            <span className="text-xs font-medium text-primary-700">Spara i produktbanken</span>
+          </label>
         )}
         {showTotal && !isEditable && (
           <div className="text-right"><span className="text-xs font-medium text-gray-900">{formatCurrency(displayTotal)}</span></div>
@@ -322,7 +346,10 @@ export default function ItemRow({
         {isEditable ? (
           <input type="number" value={item.unit_price} onChange={(e) => onUpdate(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
             onFocus={(e) => e.target.select()}
-            className="w-full min-w-0 px-1 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary-600" min={0} step="any" />
+            title={priceMissingStyle ? 'AI hittade inget pris i produktbanken — fyll i manuellt' : undefined}
+            className={`w-full min-w-0 px-1 py-1.5 border rounded-md text-gray-900 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary-600 ${
+              priceMissingStyle ? 'bg-amber-50 border-amber-300 ring-1 ring-amber-300' : 'bg-white/80 border-gray-200'
+            }`} min={0} step="any" />
         ) : <span />}
 
         {/* Total */}
@@ -354,8 +381,23 @@ export default function ItemRow({
           </select>
         ) : <span />}
 
-        {/* Save to products — bookmark, visible on hover (eller alltid om sparad) */}
-        {canSaveToProducts ? (
+        {/* Save to products — P4-nudgen (auto-save vid offert-spar) tar över
+            kolumnen för AI-rader med nyss ifyllt pris; annars vanlig
+            bookmark-knapp (manuellt, modal-flöde) om raden kvalificerar. */}
+        {showSaveToProductsNudge ? (
+          <label
+            className="justify-self-center cursor-pointer select-none"
+            title="Spara i produktbanken när offerten sparas"
+          >
+            <input
+              type="checkbox"
+              checked={item.save_to_products ?? true}
+              onChange={(e) => onUpdate(item.id, 'save_to_products', e.target.checked)}
+              aria-label="Spara i produktbanken när offerten sparas"
+              className="w-3.5 h-3.5 rounded border-gray-300 accent-primary-700 cursor-pointer"
+            />
+          </label>
+        ) : canSaveToProducts ? (
           <button
             type="button"
             onClick={() => onSaveToProducts!(item)}

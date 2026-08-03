@@ -11,6 +11,7 @@ import {
   Plus,
   Search,
   Star,
+  Upload,
   Wrench,
   X,
 } from 'lucide-react'
@@ -18,6 +19,7 @@ import { useToast } from '@/components/Toast'
 import { PRODUCT_UNIT_OPTIONS } from '@/components/products/ProductModal'
 import { CategoryTree, type CategoryFilter } from './components/CategoryTree'
 import { ProductEditorModal } from './components/ProductEditorModal'
+import { ProductCsvImportModal } from './components/ProductCsvImportModal'
 import type { ComponentPayload, ProductCategory, ProductRow } from './types'
 
 const MIGRATION_FLAG = 'hm_produktbank_migration_seen'
@@ -31,6 +33,7 @@ export default function ProductsPage() {
   const [filter, setFilter] = useState<CategoryFilter>('all')
   const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showBanner, setShowBanner] = useState(false)
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
@@ -282,6 +285,13 @@ export default function ProductsPage() {
             <p className="text-sm text-gray-500 mt-0.5">Din produktbank — kategorier, priser och komponentkalkyler för offerter</p>
           </div>
           <button
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-[#E2E8F0] text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors shrink-0"
+            title="Ladda upp prislista (CSV)"
+          >
+            <Upload className="w-4 h-4" /> <span className="hidden sm:inline">Importera CSV</span>
+          </button>
+          <button
             onClick={() => setShowNewModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg font-medium hover:bg-primary-600 transition-colors shrink-0"
           >
@@ -346,18 +356,37 @@ export default function ProductsPage() {
                 {visibleProducts.length === 0 && (
                   <div className="px-5 py-12 text-center">
                     <Package className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                    <p className="text-gray-400 text-sm">
-                      {search || filter !== 'all'
-                        ? 'Inga produkter matchar sökningen eller filtret'
-                        : 'Inga produkter ännu'}
-                    </p>
-                    {!search && filter === 'all' && (
-                      <button
-                        onClick={() => setShowNewModal(true)}
-                        className="mt-3 text-sm text-primary-700 hover:text-primary-800 font-medium"
-                      >
-                        + Lägg till din första produkt
-                      </button>
+                    {search || filter !== 'all' ? (
+                      <p className="text-gray-400 text-sm">Inga produkter matchar sökningen eller filtret</p>
+                    ) : (
+                      <div className="max-w-md mx-auto">
+                        {/* P2 (UX-revision 2026-08-03): agent-kopplat tomt-läge — Daniel
+                            (säljar-agenten som skriver AI-offerterna) förklarar VARFÖR
+                            produktbanken behövs, inte bara att den är tom. */}
+                        <p className="text-sm font-semibold text-gray-900 mb-1">
+                          Daniel har inga priser att räkna på än
+                        </p>
+                        <p className="text-gray-500 text-sm">
+                          Utan priser här sätter jag material till 0 kr i alla offerter.
+                          Lägg in dina vanligaste artiklar så räknar jag rätt.
+                        </p>
+                        <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2">
+                          <button
+                            onClick={() => setShowImportModal(true)}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors"
+                          >
+                            <Upload className="w-4 h-4" />
+                            Ladda upp prislista (CSV)
+                          </button>
+                          <button
+                            onClick={() => setShowNewModal(true)}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-[#E2E8F0] text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Lägg till manuellt
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
@@ -466,6 +495,18 @@ export default function ProductsPage() {
           onSave={handleSave}
           onClose={() => { setShowNewModal(false); setEditingProduct(null) }}
           onError={msg => toast.error(msg)}
+        />
+      )}
+
+      {/* CSV-import (P2) */}
+      {showImportModal && (
+        <ProductCsvImportModal
+          onClose={() => setShowImportModal(false)}
+          onImported={() => {
+            setShowImportModal(false)
+            fetchProducts(search)
+            fetchCategories()
+          }}
         />
       )}
     </div>

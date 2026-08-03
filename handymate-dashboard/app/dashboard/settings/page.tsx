@@ -548,10 +548,21 @@ export default function SettingsPage() {
         .not('clicked_at', 'is', null)
       setReviewStats({ sent: sentCount || 0, clicked: clickedCount || 0 })
 
-      // Ekonomi-inställningar från business_config
-      const ps = (data.pricing_settings as Record<string, any>) || {}
+      // Ekonomi-inställningar från business_config.
+      // OBS (P1.3, UX-revision 2026-08-03): hourly_cost_sek lästes tidigare
+      // från pricing_settings.hourly_rate — SAMMA nyckel AI-agenterna läser
+      // som försäljnings-timpris (app/api/quotes/ai-generate/route.ts m.fl.).
+      // Fältet var däremot etiketterat och avsett som intern timKOSTNAD
+      // ("Ekonomi"-fliken: "Används för lönsamhetsberäkningar"), och
+      // korrekt lagringsplats för det finns redan: business_config.
+      // default_internal_hourly_cost (sql/v53_internal_hourly_cost.sql),
+      // som lib/projects/compute-economics.ts faktiskt läser och som den
+      // dedikerade "Intern timkostnad"-sidan (endast owner/admin) redan
+      // hanterar. Den gamla pricing_settings.hourly_rate-skrivningen här
+      // var alltså dubblerad OCH läckte in i AI:ns försäljningspris. Fixat
+      // genom att peka om käll-/mål-nyckeln — se sparhandlern nedan.
       setEconPrefs({
-        hourly_cost_sek: Number(ps.hourly_rate) || 450,
+        hourly_cost_sek: Number(data.default_internal_hourly_cost) || 450,
         overhead_monthly_sek: Number(data.overhead_monthly_sek) || 0,
         margin_target_percent: Number(data.margin_target_percent) || 50,
       })
@@ -4157,20 +4168,27 @@ export default function SettingsPage() {
               <p className="text-sm text-gray-500 mt-1">Används för lönsamhetsberäkningar och estimat på dashboarden</p>
             </div>
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Din timkostnad</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={econPrefs.hourly_cost_sek}
-                    onChange={e => setEconPrefs(p => ({ ...p, hourly_cost_sek: Number(e.target.value) || 0 }))}
-                    className="w-32 px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:border-primary-500"
-                    min={0}
-                  />
-                  <span className="text-sm text-gray-400">kr/h</span>
+              {/* Intern timkostnad — samma lagring (business_config.default_internal_hourly_cost)
+                  som den dedikerade "Intern timkostnad"-sidan, som av Andreas policy (v53,
+                  Etapp 2.0) är förbehållen owner/admin. Gömd här av samma anledning — en
+                  anställd med undantagsvis satt can_manage_users ska ändå aldrig se eller
+                  skriva intern lönekostnad. */}
+              {isOwnerOrAdmin && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Din timkostnad</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={econPrefs.hourly_cost_sek}
+                      onChange={e => setEconPrefs(p => ({ ...p, hourly_cost_sek: Number(e.target.value) || 0 }))}
+                      className="w-32 px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:border-primary-500"
+                      min={0}
+                    />
+                    <span className="text-sm text-gray-400">kr/h</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Vad din tid kostar — används för att beräkna din faktiska vinst per jobb. Business-default för hela teamet; per-anställd timkostnad sätts under <Link href="/dashboard/settings/internal-costs" className="underline hover:text-gray-600">Intern timkostnad</Link>.</p>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">Vad din tid kostar — används för att beräkna din faktiska vinst per jobb</p>
-              </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Månatlig overhead</label>
                 <div className="flex items-center gap-2">
@@ -4204,13 +4222,18 @@ export default function SettingsPage() {
                 onClick={async () => {
                   setEconSaving(true)
                   try {
-                    // Spara timkostnad i pricing_settings, overhead + marginal direkt på business_config
-                    const currentPricing = (config?.pricing_settings as Record<string, any>) || {}
-                    const updatedPricing = { ...currentPricing, hourly_rate: econPrefs.hourly_cost_sek }
+                    // P1.3-fix: timkostnad sparas i default_internal_hourly_cost
+                    // (samma kolumn som "Intern timkostnad"-sidan och
+                    // compute-economics.ts läser) — INTE längre i
+                    // pricing_settings.hourly_rate, som är AI-agenternas
+                    // försäljnings-timpris (app/api/quotes/ai-generate/route.ts).
+                    // Endast owner/admin skickar med fältet (matchar rollskyddet
+                    // på /api/business-config/internal-cost-default och gatingen
+                    // på inputen ovan).
                     await supabase
                       .from('business_config')
                       .update({
-                        pricing_settings: updatedPricing,
+                        ...(isOwnerOrAdmin ? { default_internal_hourly_cost: econPrefs.hourly_cost_sek } : {}),
                         overhead_monthly_sek: econPrefs.overhead_monthly_sek,
                         margin_target_percent: econPrefs.margin_target_percent,
                       })

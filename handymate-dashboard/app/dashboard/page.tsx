@@ -21,6 +21,7 @@ import WeeklyValueDigest from '@/components/dashboard/WeeklyValueDigest'
 import CashRadarCard from '@/components/dashboard/CashRadarCard'
 import IdentityPill from '@/components/IdentityPill'
 import MorningBriefWidget from '@/components/dashboard/MorningBriefWidget'
+import { AgentReadinessCard } from '@/components/dashboard/AgentReadinessCard'
 
 /**
  * Idag-vyn (omdesign 2026-07-11, från Idag-vy.html + Idag-mobil.html).
@@ -68,6 +69,11 @@ interface OnboardingData {
   lead_sources?: string[]
   google_calendar_connected?: boolean
   gmail_enabled?: boolean
+  /** P3 (UX-revision 2026-08-03) — "Teamets beredskap"-kortet.
+      default_hourly_rate = onboardingens slider; pricing_settings.hourly_rate
+      = override (samma fallback-kedja som app/api/quotes/ai-generate/route.ts). */
+  default_hourly_rate?: number | null
+  pricing_settings?: { hourly_rate?: number } | null
 }
 
 export default function DashboardPage() {
@@ -164,7 +170,8 @@ export default function DashboardPage() {
         .select(`
           email_confirmed_at, assigned_phone_number, phone_setup_type,
           forwarding_confirmed, working_hours, logo_url,
-          onboarding_dismissed, onboarding_data, lead_sources
+          onboarding_dismissed, onboarding_data, lead_sources,
+          default_hourly_rate, pricing_settings
         `)
         .eq('business_id', business.business_id)
         .single()
@@ -416,6 +423,15 @@ export default function DashboardPage() {
             priceListCount={priceListCount}
             onDismiss={() => setShowOnboarding(false)}
             onUpdate={fetchData}
+          />
+        )}
+
+        {/* Teamets beredskap (P3) — agent-förutsättningar, försvinner helt när allt är grönt */}
+        {onboardingData && (
+          <AgentReadinessCard
+            hourlyRateSet={!!(onboardingData.pricing_settings?.hourly_rate || onboardingData.default_hourly_rate)}
+            productsCount={priceListCount}
+            customersCount={stats ? stats.customers.total : null}
           />
         )}
 

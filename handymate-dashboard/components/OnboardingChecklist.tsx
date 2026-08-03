@@ -24,7 +24,7 @@ interface OnboardingChecklistProps {
     google_calendar_connected?: boolean
     gmail_enabled?: boolean
     services_offered?: string[]
-    default_hourly_rate?: number
+    default_hourly_rate?: number | null
   }
   callCount: number
   customerCount?: number

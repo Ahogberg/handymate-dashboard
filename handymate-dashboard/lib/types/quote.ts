@@ -45,6 +45,19 @@ export interface QuoteItem {
   component_snapshot?: any | null
   /** Per-rad-override: visa komponentbeskrivningarna för kunden (default false). */
   show_components_to_customer?: boolean
+  /** P4 (UX-revision 2026-08-03): true om raden kom från AI:n utan träff i
+      produktbanken (unitPrice 0 eller note "PRIS SAKNAS" — se
+      lib/ai-quote-generator.ts). Sätts ENDAST vid AI-konvertering
+      (convertLegacyItems i app/dashboard/quotes/new/page.tsx, sourceIsAi=true)
+      och rörs aldrig av manuell radredigering. Styr amber-markeringen på
+      prisfältet i editorn (ItemRow) samt "Spara i produktbanken"-nudgen när
+      användaren fyller i ett pris. Editor-internt — strippas innan
+      quote_items POSTas (saveQuote). */
+  ai_price_missing?: boolean
+  /** Checkbox-state för samma nudge — default true på ai_price_missing-rader.
+      Kryssade rader med unit_price > 0 POSTas till /api/products vid
+      offert-spar, sedan strippas fältet innan quote_items skickas. */
+  save_to_products?: boolean
 }
 
 export interface QuoteTemplate {

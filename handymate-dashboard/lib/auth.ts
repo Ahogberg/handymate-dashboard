@@ -21,6 +21,10 @@ export interface AuthenticatedBusiness {
   forward_phone_number: string | null
   call_recording_enabled: boolean
   pricing_settings: Record<string, any> | null
+  /** Onboardingens timpris-slider (sql/onboarding_v2.sql). Fallback-nivå
+      under pricing_settings.hourly_rate när AI:n behöver ett timpris —
+      se app/api/quotes/ai-generate/route.ts och app/api/sms/incoming/route.ts. */
+  default_hourly_rate: number | null
   knowledge_base: Record<string, any> | null
   org_number: string | null
   address: string | null

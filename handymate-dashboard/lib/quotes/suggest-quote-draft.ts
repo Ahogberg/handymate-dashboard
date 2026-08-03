@@ -219,7 +219,7 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
     // ── 5. Cost-guard (bakgrund) ───────────────────────────────────
     const { data: bizRow, error: bizErr } = await supabase
       .from('business_config')
-      .select('business_id, agents_globally_paused, agent_cost_cap_usd_daily, subscription_plan, industry, pricing_settings')
+      .select('business_id, agents_globally_paused, agent_cost_cap_usd_daily, subscription_plan, industry, pricing_settings, default_hourly_rate')
       .eq('business_id', businessId)
       .maybeSingle()
 
@@ -268,9 +268,13 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
     }))
     const templates: QuoteTemplate[] = templatesResult.data || []
 
-    const bizConfig = bizRow as { industry?: string | null; pricing_settings?: { hourly_rate?: number } | null }
+    const bizConfig = bizRow as {
+      industry?: string | null
+      pricing_settings?: { hourly_rate?: number } | null
+      default_hourly_rate?: number | null
+    }
     const branch = bizConfig.industry || 'Bygg'
-    const hourlyRate = bizConfig.pricing_settings?.hourly_rate || 650
+    const hourlyRate = bizConfig.pricing_settings?.hourly_rate || bizConfig.default_hourly_rate || 650
 
     // Rå lead-text — ÄTALLTID vad som skickas vidare till exekveraren
     // (payload.description), aldrig den AI-skrivna kundvända varianten.

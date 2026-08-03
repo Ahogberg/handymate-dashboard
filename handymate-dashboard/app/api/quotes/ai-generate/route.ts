@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     }))
     const templatesData = templatesResult.data || []
 
-    const hourlyRate = business.pricing_settings?.hourly_rate || 650
+    const hourlyRate = business.pricing_settings?.hourly_rate || business.default_hourly_rate || 650
 
     // Om flera bilder: analysera extra bilder och kombinera med textDescription
     let combinedText = textDescription || ''
@@ -109,14 +109,14 @@ export async function POST(request: NextRequest) {
     const priceWarning = quote.priceListEmpty
       ? {
           warning: true,
-          message: 'Din prislista är tom. Lägg till dina priser under Inställningar → Prislista för att få konsekventa AI-offerter.',
-          link: '/dashboard/settings/pricing',
+          message: 'Din produktbank är tom. Lägg till dina priser under Inställningar → Produkter för att få konsekventa AI-offerter.',
+          link: '/dashboard/settings/products',
         }
       : quote.missingPriceCount > 0
         ? {
             warning: true,
-            message: `${quote.missingPriceCount} rad${quote.missingPriceCount > 1 ? 'er' : ''} saknar pris från din prislista. Fyll i priserna manuellt eller uppdatera din prislista under Inställningar → Prislista.`,
-            link: '/dashboard/settings/pricing',
+            message: `${quote.missingPriceCount} rad${quote.missingPriceCount > 1 ? 'er' : ''} saknar pris från din produktbank. Fyll i priserna manuellt eller lägg till dem under Inställningar → Produkter.`,
+            link: '/dashboard/settings/products',
           }
         : null
 

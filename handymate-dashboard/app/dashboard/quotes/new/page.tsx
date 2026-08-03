@@ -111,6 +111,12 @@ function normalizeUnit(unit: string): string {
  * `option_default` på tillvalsrader. `option_default: false` alltid för
  * AI-föreslagna tillval — kunden ska aktivt välja till, aldrig få dem
  * förikryssade.
+ *
+ * `sourceIsAi` (P4, UX-revision 2026-08-03): true endast från applyAiResult.
+ * Styr `ai_price_missing`-flaggan (unitPrice 0 eller note "PRIS SAKNAS" —
+ * lib/ai-quote-generator.ts). Default false så mall-anropen (handleTemplateSelect)
+ * är oförändrade — en avsiktligt $0-radad mallrad ("Framkörning ingår") ska
+ * INTE amber-markeras som "AI gissade fel pris".
  */
 function convertLegacyItems(
   legacyItems: Array<{
@@ -122,12 +128,17 @@ function convertLegacyItems(
     unit: string
     unit_price: number
     total: number
+    note?: string | null
+    fromPriceList?: boolean
   }>,
   suggestedDeductionType: 'rot' | 'rut' | 'none' | null | undefined = null,
   itemType: 'item' | 'option' = 'item',
+  sourceIsAi: boolean = false,
 ): QuoteItem[] {
-  return legacyItems.map((item, idx) =>
-    applyOptionRowDefaults(
+  return legacyItems.map((item, idx) => {
+    const priceMissing =
+      sourceIsAi && (item.unit_price === 0 || !!(item.note && item.note.includes('PRIS SAKNAS')))
+    return applyOptionRowDefaults(
       setItemRotRut(
         {
           id: generateItemId(),
@@ -140,11 +151,12 @@ function convertLegacyItems(
           is_rot_eligible: false,
           is_rut_eligible: false,
           sort_order: idx,
+          ...(priceMissing ? { ai_price_missing: true, save_to_products: true } : {}),
         },
         legacyItemRotRutType(item.type, suggestedDeductionType),
       ),
-    ),
-  )
+    )
+  })
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -960,10 +972,10 @@ export default function NewQuotePage() {
     // lämna is_rot_eligible kvar TRUE samtidigt som is_rut_eligible sattes
     // TRUE (RUT-jobb fick ROT eftersom getItemRotRutType kollar ROT först),
     // och 'none' ROT-flaggade ändå allt arbete via convertLegacyItems.
-    const converted = convertLegacyItems(quote.items || [], quote.suggestedDeductionType)
+    const converted = convertLegacyItems(quote.items || [], quote.suggestedDeductionType, 'item', true)
     // B5: AI:ns föreslagna tillval (0-3 st, tomt om inget genuint relevant)
     // läggs efter grundraderna som avbockade item_type 'option'-rader.
-    const options = convertLegacyItems(quote.options || [], quote.suggestedDeductionType, 'option')
+    const options = convertLegacyItems(quote.options || [], quote.suggestedDeductionType, 'option', true)
     const combined = [
       ...converted,
       ...options.map((o, idx) => ({ ...o, sort_order: converted.length + idx })),
@@ -971,7 +983,18 @@ export default function NewQuotePage() {
     setItems(combined)
     setAiGenerated(true)
     setAiConfidence(quote.confidence || null)
-    toast.success('AI genererade offertförslag!')
+
+    // P4 (UX-revision 2026-08-03): positiv signal när produktbanken faktiskt
+    // gjorde jobbet — räknas på de RÅA AI-raderna (fromPriceList finns bara
+    // där, convertLegacyItems bär inte med sig det). Visas bara när det finns
+    // något att vara nöjd över — annars ingen extra brus utöver standardtoasten.
+    const rawItems = [...(quote.items || []), ...(quote.options || [])] as Array<{ fromPriceList?: boolean }>
+    const fromBankCount = rawItems.filter(i => i.fromPriceList === true).length
+    toast.success(
+      fromBankCount > 0
+        ? `AI genererade offertförslag! ${fromBankCount} av ${rawItems.length} rader prissatta från din produktbank.`
+        : 'AI genererade offertförslag!',
+    )
   }
 
   // B1 (kodrevision 2026-08-03): komprimera INNAN base64 — en okomprimerad
@@ -1331,7 +1354,62 @@ export default function NewQuotePage() {
 
     setSaving(true)
     try {
-      const finalItems = recalculateItems(items).map((item, idx) => ({ ...item, sort_order: idx }))
+      // P4 (UX-revision 2026-08-03): AI-rader som saknade pris, som
+      // användaren fyllt i och lämnat ikryssade ("Spara i produktbanken",
+      // default PÅ — se ItemRow) — auto-POSTas till /api/products HÄR, före
+      // offerten sparas, så nästa AI-offert hittar priset. `workingItems` är
+      // en lokal kopia (inte `items`-state) eftersom setState inte
+      // reflekteras synkront — linked_product_id måste hinna sättas innan
+      // finalItems byggs nedan.
+      let workingItems = items
+      const autoSaveCandidates = workingItems.filter(
+        i =>
+          i.item_type === 'item' &&
+          i.ai_price_missing &&
+          i.save_to_products !== false &&
+          i.unit_price > 0 &&
+          !i.linked_product_id &&
+          i.description.trim() !== '',
+      )
+      if (autoSaveCandidates.length > 0) {
+        for (const row of autoSaveCandidates) {
+          try {
+            const res = await fetch('/api/products', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: row.description,
+                description: null,
+                category: row.category_slug || 'material_bygg',
+                sku: null,
+                unit: row.unit,
+                purchase_price: row.cost_price ?? null,
+                sales_price: row.unit_price,
+                rot_eligible: row.is_rot_eligible,
+                rut_eligible: row.is_rut_eligible,
+                is_favorite: false,
+              }),
+            })
+            if (res.ok) {
+              const data = await res.json()
+              const newId = data.product?.id
+              if (newId) {
+                workingItems = workingItems.map(i => (i.id === row.id ? { ...i, linked_product_id: newId } : i))
+              }
+            }
+          } catch (err) {
+            // Sväljs medvetet — en misslyckad produktbanks-auto-save får
+            // aldrig blockera offert-sparandet.
+            console.error('[saveQuote] auto-save till produktbanken misslyckades:', err)
+          }
+        }
+        setItems(workingItems)
+      }
+
+      const finalItems = recalculateItems(workingItems)
+        .map((item, idx) => ({ ...item, sort_order: idx }))
+        // Editor-interna flaggor (P4) ska inte fastna i den sparade offerten.
+        .map(({ ai_price_missing, save_to_products, ...rest }) => rest)
 
       const res = await fetch('/api/quotes', {
         method: 'POST',
