@@ -1,7 +1,38 @@
 # Handymate — Ärlig kapabilitets-inventering
 
 _För pitch-/strategiändamål. Ingen hype — vad som FAKTISKT finns._
-_Genererad 2026-07-01 · **Uppdaterad 2026-07-15** (A-testet godkänt + skörde-mergen; git-verifierad)._
+_Genererad 2026-07-01 · **Uppdaterad 2026-08-02** (Storfirman-paritet, git-verifierad)._
+
+## ⚡ 2026-08-02: STORFIRMAN-PARITET — 9 etapper byggda på en dag, BYGGT (ej LIVE)
+
+Andreas-direktiv: alla funktioner ska fungera lika bra för ett flermans-
+företag som för en enskild firma. Full kodrevision hittade att detta var
+ETT strukturellt hål (`getAuthenticatedBusiness()` identifierar aldrig
+VILKEN anställd som agerar, bara vilket företag) som visade sig på 11
+ställen — två av dem redan LIVE säkerhets-/dataläckagebuggar, inte bara
+framtida begränsningar. Se `tasks/multi-employee-parity-plan.md` för
+fullständig teknisk detalj och commit-hashar.
+
+**BYGGT idag (main, tsc+build rent, 82 nya/ändrade facit-tester gröna):**
+projektläckage stängd (GET /api/projects filtrerar nu på behörighet),
+löneattribuering (time_entry.business_user_id sätts nu på alla 4
+insert-ställen — löneexporten var tyst fel/tom per anställd för varje
+flermansfirma), kö-routing-infrastruktur + RLS-fix (pending_approvals var
+`USING(true)` — inte ens business-scopad i databasen, en tidigare
+migration hade av misstag återöppnat en redan fixad policy), per-typ
+routing utrullad (finansiella/löne-/projekttyper riktas nu mot rätt
+roll/person), riktade push-notiser, bokningstilldelning (UI + API, plus
+en dispatch-lucka och ett cross-tenant-hål som upptäcktes och fixades i
+samma svep), fakturarader ärver utförare, checklista-spoofing fixad.
+
+**Status = BYGGT, inte LIVE:** två SQL-migrationer (v76, v77) väntar på
+att Andreas kör dem manuellt i Supabase — RLS-fixen (v77) är särskilt
+känslig och har egna verifieringssteg inbyggda i migrationsfilen. Ingen
+riktig flermansfirma har använt något av detta skarpt än.
+
+**Medvetet INTE byggt (Etapp 8, egen framtida plan):** kapacitetsplanering
+per anställd, och att Matte (chatt-assistenten) vet vilken anställd som
+frågar — båda kräver bredare designarbete utöver denna dags scope.
 
 ## ⚡ 2026-07-15: A-TESTET GODKÄNT + ALLT SKÖRDAT — stora statusflyttar
 

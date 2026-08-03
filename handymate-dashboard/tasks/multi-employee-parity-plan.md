@@ -6,6 +6,36 @@ lika bra för stora företag med många anställda som för en enskild firma."
 Full kodrevision (Explore-agent) + teknisk plan (Plan-agent) 2026-08-02,
 allt verifierat mot faktisk kod._
 
+## ✅ STATUS 2026-08-02: Etapp 0,1,2,3a,3b,4,5,6,7 alla BYGGDA och i main
+
+Kört igenom hela planen autonomt samma dag (Andreas: "Kör igenom alltihop
+autonomt och rapportera sedan till mig"). Commits: d97b95a8 (0+1A+2),
+d68eb536 (3a), 1e79b2cf (7+3b), bd03f59e (4), 01add9a0 (5), c493a10d
+(1B+6). Endast Etapp 8 kvarstår, medvetet — se dess avsnitt längre ner.
+
+**Andreas manuella steg innan allt är skarpt i produktion:**
+1. Kör `sql/v76_time_checkins_business_user_fk.sql` i Supabase SQL Editor.
+2. Kör `sql/v77_pending_approvals_routing.sql` i Supabase SQL Editor —
+   **läs migrationens egna kommentarer först** (steg 1: verifiera nuvarande
+   RLS-policy innan du kör resten; steg 4: verifiera efteråt att bara två
+   policies finns kvar). Den känsligaste av de två migrationerna.
+
+**Fynd under bygget (utöver ursprunglig scope, fixade i samma svep):**
+- **RLS-regression:** `sql/v15_autopilot.sql` hade av misstag DROP:at
+  v4:s RLS-fix och återöppnat `pending_approvals` till `USING(true)` —
+  v77 stänger detta på nytt, historiken dokumenterad i migrationsfilen.
+- **push/subscribe-buggen:** stämplade ALLTID en prenumeration med
+  ÄGARENS auth-uuid oavsett vem som faktiskt subscribade — hade gjort
+  Etapp 4:s riktade push till en no-op för alla utom ägaren. Fixad.
+- **Bokningsformuläret postar till `/api/actions`, inte `/api/bookings`**
+  som planen antog — båda vägarna uppdaterade i Etapp 5.
+- **Manuellt skapade bokningar fick aldrig ett dispatch-förslag** —
+  planens antagande att bara telefon/Matte-vägen saknade det stämde inte;
+  ingen väg hade det. Fixat i båda.
+- **Cross-tenant-hål:** `update_booking`/`delete_booking` i `/api/actions`
+  filtrerade bara på `booking_id`, aldrig `business_id`. Fixat i samma
+  körning som Etapp 5.
+
 ## Rotorsak
 
 `getAuthenticatedBusiness()` (lib/auth.ts:117-146) identifierar ALDRIG
@@ -116,7 +146,7 @@ buggarna på en gång.
 faktiskt påbörjas (undviker att specen blir inaktuell om koden ändras
 under tiden).
 
-## Etapp 3a — Kö-routing infrastruktur (KRITISK, strukturell) — EJ PÅBÖRJAD
+## Etapp 3a — Kö-routing infrastruktur (KRITISK, strukturell) — ✅ BYGGT (d68eb536)
 
 **Schema** (`sql/v77_pending_approvals_routing.sql`, Andreas kör manuellt):
 - `ALTER TABLE pending_approvals ADD COLUMN routing_role TEXT DEFAULT 'any'`
@@ -157,7 +187,7 @@ under tiden).
 **Storlek:** medel — 1 migration, 1 ny lib-fil, 2 route-filer, 3
 klientkomponenters fetch-path.
 
-## Etapp 3b — Per-typ routing-utrullning — EJ PÅBÖRJAD
+## Etapp 3b — Per-typ routing-utrullning — ✅ BYGGT (1e79b2cf)
 
 Konkret tabell för `getRoutingBucket()`:
 
@@ -174,7 +204,7 @@ En enradsändring per skapande-ställe (~10 st), var för sig lågrisk
 eftersom default är `'any'`. Ingen ny `approval_type` skapas — routing är
 ett ortogonalt fält, TYPE_CONFIG-konventionen (3 filer) gäller inte här.
 
-## Etapp 4 — Push-notiser per mottagare — EJ PÅBÖRJAD
+## Etapp 4 — Push-notiser per mottagare — ✅ BYGGT (bd03f59e)
 
 `push_subscriptions.user_id` finns redan och sätts korrekt vid
 subscribe-tillfället (app/api/push/subscribe/route.ts:34). `POST
@@ -185,7 +215,7 @@ till alla. Lägg till valfri `target_user_id`, härledd via
 `getAuthenticatedBusiness().user_id`, som alltid är ägaren). Beror på
 Etapp 3.
 
-## Etapp 5 — Bokningstilldelning (UI + API) — EJ PÅBÖRJAD
+## Etapp 5 — Bokningstilldelning (UI + API) — ✅ BYGGT (01add9a0)
 
 `booking.assigned_user_id` (sql/v17_dispatch.sql:10-11) finns men skrivs
 ENDAST av dispatch-godkännande-flödet — ingen UI för manuell tilldelning
@@ -196,13 +226,13 @@ teamMembers-datakälla som NewDealModal.tsx), samt `suggestDispatch()`-
 anrop i `tool-router.ts createBooking()` (saknas helt idag — telefon-/
 Matte-skapade bokningar får aldrig ett dispatch-förslag).
 
-## Etapp 6 — Fakturarader ärver business_user_id — EJ PÅBÖRJAD
+## Etapp 6 — Fakturarader ärver business_user_id — ✅ BYGGT (c493a10d)
 
 app/api/invoices/from-time-entries/route.ts:38-55 tappar
 `time_entry.business_user_id` när fakturarader byggs. Beror HELT på
 Etapp 1 — ingen mening att bygga innan källdatan faktiskt finns.
 
-## Etapp 7 — Checklista completed_by från session, inte klient-body — EJ PÅBÖRJAD
+## Etapp 7 — Checklista completed_by från session, inte klient-body — ✅ BYGGT (1e79b2cf)
 
 app/api/projects/[id]/checklists/[checklistId]/route.ts:45 litar idag på
 klient-skickad `body.completed_by` — spoofbar. Byt till
