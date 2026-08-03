@@ -50,6 +50,15 @@ export async function POST(request: NextRequest) {
     const whisperData = await whisperResponse.json()
     const transcript = whisperData.text
 
+    // Matte-flytten (Andreas 2026-08-03): hörnbubblan skickar transcribe_only
+    // och matar transkriptet genom /api/matte/chat (multi-agent, dirigering,
+    // Fas 0-säkerhetsräcke) istället för denna routes egna, svagare Claude-
+    // analys. Whisper-delen behålls här; analysen nedan är kvar enbart för
+    // ev. äldre anropare och kan tas bort när ingen använder den.
+    if (formData.get('transcribe_only') === '1') {
+      return NextResponse.json({ transcript: transcript?.trim() || '' })
+    }
+
     if (!transcript || transcript.trim().length < 3) {
       return NextResponse.json({
         transcript: '',

@@ -77,7 +77,7 @@ export default function Jobbkompisen() {
 
   // Chat state — riktiga Matte (/api/matte/chat), se Fas 0-spec i tasks/ui-ux-audit.md
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'assistant', content: 'Hej! Jag är din Jobbkompis. Chatta, prata eller fota - jag hjälper dig med allt.' }
+    { role: 'assistant', content: 'Hej! Matte här. Chatta, prata eller fota — jag och teamet hjälper dig med allt.' }
   ])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
@@ -95,11 +95,9 @@ export default function Jobbkompisen() {
   const chunksRef = useRef<Blob[]>([])
   const voiceTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Photo state
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  // Photo state (Matte-flytten 2026-08-03: bara analys-flaggan + kamera-ref
+  // kvar — preview/result/fileInputRef hörde till den borttagna foto-fliken)
   const [photoAnalyzing, setPhotoAnalyzing] = useState(false)
-  const [photoResult, setPhotoResult] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
   // Action execution
@@ -126,7 +124,12 @@ export default function Jobbkompisen() {
   // tool-router:n) istället för den svagare /api/ai-copilot. Bubbelskalet är
   // oförändrat — bara hjärnan har bytts. require_confirm_external: true ger
   // säkerhetsräcket (bekräftelsekort) för externa utskick (SMS/e-post).
-  async function sendChat(overrideText?: string) {
+  //
+  // payloadOverride (Matte-flytten 2026-08-03): det som VISAS som
+  // användarmeddelande kan skilja sig från det som SKICKAS till Matte —
+  // fotoflödet visar "📷 Skickade ett foto" men skickar hela bildanalysen
+  // som kontext. Rösten behöver det inte (transkriptet ÄR meddelandet).
+  async function sendChat(overrideText?: string, payloadOverride?: string) {
     const userMessage = (overrideText ?? chatInput).trim()
     if (!userMessage || chatLoading) return
 
@@ -140,7 +143,7 @@ export default function Jobbkompisen() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [{ role: 'user', content: userMessage }],
+          messages: [{ role: 'user', content: (payloadOverride ?? userMessage).trim() }],
           context: {
             threadId,
             userName: business.contact_name,
@@ -265,6 +268,12 @@ export default function Jobbkompisen() {
     }
   }
 
+  // Matte-flytten (Andreas 2026-08-03): rösten är nu "prata istället för
+  // skriva" in i SAMMA Matte-tråd som chatten — Whisper transkriberar
+  // (transcribe_only, jobbuddy/voice:s egna Claude-analys hoppas över),
+  // transkriptet skickas genom sendChat → multi-agent-dirigering +
+  // Fas 0-säkerhetsräcket, istället för den gamla parallella
+  // understood/actions-vägen utan endera.
   async function processVoice() {
     if (!audioBlob) return
 
@@ -272,11 +281,7 @@ export default function Jobbkompisen() {
     try {
       const formData = new FormData()
       formData.append('audio', audioBlob, 'recording.webm')
-      formData.append('mode', 'jobbuddy')
-      if (activeTimer?.customer) {
-        formData.append('active_customer', activeTimer.customer.name)
-        formData.append('active_customer_id', activeTimer.customer.customer_id)
-      }
+      formData.append('transcribe_only', '1')
 
       const response = await fetch('/api/jobbuddy/voice', {
         method: 'POST',
@@ -284,10 +289,18 @@ export default function Jobbkompisen() {
       })
 
       const data = await response.json()
-      setVoiceResult({
-        understood: data.understood || data.transcript || '',
-        actions: data.actions || [],
-      })
+      const transcript = (data.transcript || '').trim()
+      if (transcript.length < 3) {
+        setVoiceResult({
+          understood: 'Kunde inte uppfatta vad du sa. Försök igen.',
+          actions: [],
+        })
+        return
+      }
+
+      resetVoice()
+      setActiveTab('chat')
+      sendChat(transcript)
     } catch {
       setVoiceResult({
         understood: 'Kunde inte bearbeta inspelningen. Försök igen.',
@@ -307,22 +320,26 @@ export default function Jobbkompisen() {
 
   // ── Photo ───────────────────────────────────────────────────────────────────
 
-  function handlePhotoFile(file: File) {
-    if (!file.type.startsWith('image/')) return
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      setPhotoPreview(e.target?.result as string)
-      setPhotoResult(null)
-    }
-    reader.readAsDataURL(file)
-  }
-
-  async function analyzePhoto() {
-    if (!photoPreview) return
+  // Matte-flytten (Andreas 2026-08-03): fotot går nu in i SAMMA Matte-tråd
+  // som chatten — vision-analysen (jobbuddy/photo) behålls som ren
+  // bildtolkning, men resultatet skickas som kontext till Matte
+  // (payloadOverride) så uppföljningsfrågor har både analysen i tråden och
+  // multi-agent-dirigeringen. Användaren ser bara "📷 Skickade ett foto".
+  // Triggas direkt vid fotoval från kameraknappen i chatt-inputen (den
+  // gamla foto-FLIKEN var onåbar död kod — ingen tab-knapp pekade på den).
+  async function analyzePhotoIntoChat(file: File) {
+    if (!file.type.startsWith('image/') || photoAnalyzing) return
 
     setPhotoAnalyzing(true)
     try {
-      const base64 = photoPreview.split(',')[1]
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = (e) => resolve(e.target?.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const base64 = dataUrl.split(',')[1]
+
       const response = await fetch('/api/jobbuddy/photo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -330,9 +347,18 @@ export default function Jobbkompisen() {
       })
 
       const data = await response.json()
-      setPhotoResult(data.analysis || 'Ingen analys tillgänglig.')
+      const analysis = (data.analysis || '').trim()
+      if (!analysis) {
+        setMessages(prev => [...prev, { role: 'assistant', content: 'Kunde inte analysera bilden. Försök igen.' }])
+        return
+      }
+
+      sendChat(
+        '📷 Skickade ett foto',
+        `Hantverkaren skickade ett foto. Bildanalys: ${analysis}\n\nHjälp hantverkaren vidare utifrån vad fotot visar — föreslå en konkret åtgärd om det är lämpligt.`,
+      )
     } catch {
-      setPhotoResult('Kunde inte analysera bilden. Försök igen.')
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Kunde inte analysera bilden. Försök igen.' }])
     } finally {
       setPhotoAnalyzing(false)
     }
@@ -418,7 +444,7 @@ export default function Jobbkompisen() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        aria-label="Öppna Jobbkompisen"
+        aria-label="Öppna Matte"
         className={`fixed bottom-6 right-6 w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center hover:scale-105 transition-all z-50 overflow-hidden ${
           hasActiveJob
             ? 'bg-gradient-to-br from-emerald-500 to-primary-600 shadow-emerald-500/20 ring-2 ring-emerald-300'
@@ -454,7 +480,8 @@ export default function Jobbkompisen() {
       <div className="flex items-center justify-between px-4 py-3 bg-primary-700 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-gray-900" />
-          <span className="font-semibold text-gray-900">Jobbkompisen</span>
+          {/* "Matte rakt av" — Andreas 2026-08-03; Jobbkompisen-namnet utgår. */}
+          <span className="font-semibold text-gray-900">Matte</span>
           {activeTimer && (
             <span className="text-xs bg-white/30 text-gray-900 px-2 py-0.5 rounded-full">
               {activeTimer.customer?.name || 'Aktivt jobb'}
@@ -516,6 +543,8 @@ export default function Jobbkompisen() {
             onConfirmPending={confirmPendingAction}
             onCancelPending={cancelPendingAction}
             actionIcon={actionIcon}
+            onPhotoClick={() => cameraInputRef.current?.click()}
+            photoAnalyzing={photoAnalyzing}
           />
         )}
 
@@ -538,20 +567,20 @@ export default function Jobbkompisen() {
           />
         )}
 
-        {activeTab === 'photo' && (
-          <PhotoTab
-            preview={photoPreview}
-            analyzing={photoAnalyzing}
-            result={photoResult}
-            fileInputRef={fileInputRef}
-            cameraInputRef={cameraInputRef}
-            onFile={handlePhotoFile}
-            onAnalyze={analyzePhoto}
-            onReset={() => { setPhotoPreview(null); setPhotoResult(null) }}
-            onCreateQuote={() => setIsOpen(false)}
-          />
-        )}
+        {/* Foto-fliken borttagen (Matte-flytten 2026-08-03) — den var redan
+            onåbar (ingen tab-knapp pekade på 'photo'). Foto går nu via
+            kameraknappen i chatt-inputen → analyzePhotoIntoChat. */}
       </div>
+
+      {/* Dolda file-inputs för kameraknappen i chatten */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) analyzePhotoIntoChat(f); e.target.value = '' }}
+      />
     </div>
   )
 }
@@ -573,6 +602,8 @@ function ChatTab({
   onConfirmPending,
   onCancelPending,
   actionIcon,
+  onPhotoClick,
+  photoAnalyzing,
 }: {
   messages: ChatMessage[]
   input: string
@@ -588,6 +619,8 @@ function ChatTab({
   onConfirmPending: () => void
   onCancelPending: () => void
   actionIcon: (type: string) => React.ReactNode
+  onPhotoClick: () => void
+  photoAnalyzing: boolean
 }) {
   // Tomt läge: bara hälsningen finns kvar — visa exempel-kommandon som chips
   // (fyller inputen, skickar inte automatiskt) så riktiga Matte blir upptäckbar.
@@ -737,6 +770,16 @@ function ChatTab({
       {/* Input */}
       <div className="p-3 border-t border-gray-200 flex-shrink-0">
         <div className="flex items-center gap-2">
+          {/* Kameraknapp (Matte-flytten 2026-08-03): foto → vision-analys →
+              in i samma Matte-tråd. Ersätter den onåbara foto-fliken. */}
+          <button
+            onClick={onPhotoClick}
+            disabled={loading || photoAnalyzing}
+            aria-label="Skicka ett foto till Matte"
+            className="w-10 h-10 bg-gray-100 border border-gray-200 text-gray-500 rounded-xl flex items-center justify-center hover:text-primary-700 hover:border-primary-300 disabled:opacity-50 transition-colors flex-shrink-0"
+          >
+            {photoAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+          </button>
           <input
             type="text"
             value={input}
@@ -961,148 +1004,3 @@ function VoiceTab({
   )
 }
 
-// ── PhotoTab ────────────────────────────────────────────────────────────────
-
-function PhotoTab({
-  preview,
-  analyzing,
-  result,
-  fileInputRef,
-  cameraInputRef,
-  onFile,
-  onAnalyze,
-  onReset,
-  onCreateQuote,
-}: {
-  preview: string | null
-  analyzing: boolean
-  result: string | null
-  fileInputRef: React.RefObject<HTMLInputElement>
-  cameraInputRef: React.RefObject<HTMLInputElement>
-  onFile: (file: File) => void
-  onAnalyze: () => void
-  onReset: () => void
-  onCreateQuote?: () => void
-}) {
-  if (analyzing) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
-        {preview && (
-          <div className="w-24 h-24 rounded-xl overflow-hidden mb-4 border border-gray-200">
-            <img src={preview} alt="" className="w-full h-full object-cover" />
-          </div>
-        )}
-        <Loader2 className="w-8 h-8 text-primary-700 animate-spin mb-3" />
-        <p className="text-gray-900 font-medium">Analyserar bild...</p>
-        <div className="mt-2 space-y-1 text-xs text-gray-400 text-center">
-          <p>Identifierar arbete och material...</p>
-          <p>Ber\äknar ungef\ärlig omfattning...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (result && preview) {
-    return (
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="rounded-xl overflow-hidden mb-4 border border-gray-200">
-          <img src={preview} alt="" className="w-full max-h-[150px] object-cover" />
-        </div>
-        <div className="p-3 bg-primary-50 border border-primary-200 rounded-xl mb-4">
-          <p className="text-xs font-medium text-primary-700 mb-1">Analys</p>
-          <p className="text-sm text-gray-900 whitespace-pre-wrap">{result}</p>
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={onReset}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-700 text-sm hover:bg-gray-200"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Ny bild
-          </button>
-          <a
-            href={`/dashboard/quotes/new?transcript=${encodeURIComponent(result)}`}
-            onClick={onCreateQuote}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary-700 rounded-xl text-white text-sm font-medium hover:opacity-90"
-          >
-            <FileText className="w-4 h-4" />
-            Skapa offert
-          </a>
-        </div>
-      </div>
-    )
-  }
-
-  // Preview with analyze button
-  if (preview) {
-    return (
-      <div className="flex-1 flex flex-col p-4">
-        <div className="rounded-xl overflow-hidden mb-4 border border-gray-200">
-          <img src={preview} alt="" className="w-full max-h-[200px] object-contain bg-gray-50" />
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={onReset}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-100 border border-gray-200 rounded-xl text-gray-700 text-sm hover:bg-gray-200"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Ny bild
-          </button>
-          <button
-            onClick={onAnalyze}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary-700 rounded-xl text-white font-medium text-sm hover:opacity-90"
-          >
-            <Zap className="w-4 h-4" />
-            Analysera
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // No photo yet
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6">
-      <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center w-full mb-4">
-        <Camera className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-        <p className="text-sm text-gray-500 mb-4">Fota jobbet f\ör analys</p>
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={() => cameraInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium text-sm hover:opacity-90"
-          >
-            <Camera className="w-4 h-4" />
-            Ta bild
-          </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-gray-700 text-sm hover:bg-gray-200"
-          >
-            <Upload className="w-4 h-4" />
-            V\älj bild
-          </button>
-        </div>
-      </div>
-      <p className="text-xs text-gray-400 text-center">
-        AI:n identifierar material, arbete och ger offertf\örslag.
-      </p>
-
-      {/* Hidden file inputs */}
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
-      />
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
-      />
-    </div>
-  )
-}
