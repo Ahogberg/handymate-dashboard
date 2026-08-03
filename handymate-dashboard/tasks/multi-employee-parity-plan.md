@@ -6,19 +6,28 @@ lika bra för stora företag med många anställda som för en enskild firma."
 Full kodrevision (Explore-agent) + teknisk plan (Plan-agent) 2026-08-02,
 allt verifierat mot faktisk kod._
 
-## ✅ STATUS 2026-08-02: Etapp 0,1,2,3a,3b,4,5,6,7 alla BYGGDA och i main
+## ✅ STATUS 2026-08-03: Etapp 0,1,2,3a,3b,4,5,6,7 BYGGDA + migrationer körda i prod
 
 Kört igenom hela planen autonomt samma dag (Andreas: "Kör igenom alltihop
 autonomt och rapportera sedan till mig"). Commits: d97b95a8 (0+1A+2),
 d68eb536 (3a), 1e79b2cf (7+3b), bd03f59e (4), 01add9a0 (5), c493a10d
 (1B+6). Endast Etapp 8 kvarstår, medvetet — se dess avsnitt längre ner.
 
-**Andreas manuella steg innan allt är skarpt i produktion:**
-1. Kör `sql/v76_time_checkins_business_user_fk.sql` i Supabase SQL Editor.
-2. Kör `sql/v77_pending_approvals_routing.sql` i Supabase SQL Editor —
-   **läs migrationens egna kommentarer först** (steg 1: verifiera nuvarande
-   RLS-policy innan du kör resten; steg 4: verifiera efteråt att bara två
-   policies finns kvar). Den känsligaste av de två migrationerna.
+**Manuella SQL-steg — KLARA 2026-08-03:**
+1. ✅ `sql/v76_time_checkins_business_user_fk.sql` — körd (13 checkins,
+   12 matchade, 1 legacy-testdata utan match, som väntat).
+2. ✅ `sql/v77_pending_approvals_routing.sql` — körd, verifierad. Live
+   pg_policies-kollen (steg 1) visade att prod ALDRIG hade regressionen
+   git-historiken antydde (v4:s fem policies var redan korrekt scopade) —
+   migrationen omskriven till en konsolidering (5→2 policies: SELECT +
+   UPDATE, INTE FOR ALL — ingen ny INSERT/DELETE-yta för klienten) snarare
+   än en akut fix. Backfill-koll (steg 1b) hittade 6 ägare utan
+   business_users-rad — 4 testkonton + 2 döda/orörda konton (Andreas eget
+   testkonto "Elexperten", samt Christoffers FÖRSTA (övergivna) Bee
+   Service-konto — det AKTIVA Bee-kontot har redan en korrekt
+   business_users-rad, opåverkat). Slutverifiering: exakt tre policies,
+   ingen med qual='true'. **Storfirman-paritetsplanen är nu fullt live,
+   inte bara mergad.**
 
 **Fynd under bygget (utöver ursprunglig scope, fixade i samma svep):**
 - **RLS-regression:** `sql/v15_autopilot.sql` hade av misstag DROP:at
