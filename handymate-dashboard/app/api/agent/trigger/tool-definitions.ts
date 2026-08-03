@@ -476,6 +476,18 @@ export const toolDefinitions = [
       required: [],
     },
   },
+  // Våg 2d (tasks/value-chain-plan.md) — enskild-projekt-efterkalkyl (job_completed-triggern)
+  {
+    name: "get_project_outcome",
+    description: "Hämta den frusna efterkalkylen (utfall vs offert) för ETT specifikt avslutat projekt: offererade/faktiska timmar, arbets- och materialkostnad, ÄTA-signerat, fakturerat, marginal och avvikelse i procent mot offerten. Skiljer sig från get_efterkalkyl_insight som är ett AGGREGAT över flera jobb av samma jobbtyp/mall — detta är enskild-projekt-nivå. Använd direkt efter att ett jobb avslutats för att bedöma om DET jobbet gick enligt plan.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        project_id: { type: "string", description: "Projekt-ID att hämta utfall för" },
+      },
+      required: ["project_id"],
+    },
+  },
   // V2.5 Motor 2 — kundbassvep (kö-populering, inga direkta utskick)
   {
     name: "run_customer_base_sweep",

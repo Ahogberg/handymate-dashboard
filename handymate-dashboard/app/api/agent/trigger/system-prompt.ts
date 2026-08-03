@@ -320,6 +320,27 @@ Historik: ${triggerData?.conversation_history || '(Ingen)'}`
     case 'cron':
       return `### Schemalagt jobb (${triggerData?.cron_type || 'daily_check'})`
 
+    // Våg 2c (tasks/value-chain-plan.md) — Karin väcks direkt när en faktura
+    // blir förfallen (check-overdue-cronen). trigger_type sätts direkt till
+    // 'invoice_overdue' (inte 'cron'+cron_type) så matchAgentByPrefix routar
+    // rätt ('invoice_*' → Karin).
+    case 'invoice_overdue':
+      return `### Faktura blev förfallen idag
+Faktura: ${triggerData?.invoice_number || triggerData?.invoice_id || 'Okänd'}
+Kund: ${triggerData?.customer_name || 'Okänd'}${triggerData?.customer_id ? ` (customer_id: ${triggerData.customer_id})` : ''}
+Belopp: ${triggerData?.amount ?? '?'} kr
+Dagar sena: ${triggerData?.days_overdue ?? '?'}
+${triggerData?.instruction || ''}
+En mekanisk mall-påminnelse skickas ändå automatiskt via påminnelsekedjan (send-reminders) om du inte agerar. Bedöm kund/belopp/relation (get_customer för historik) — föreslå en annan åtgärd bara om läget faktiskt avviker från standard.`
+
+    // Våg 2d (tasks/value-chain-plan.md) — Lars väcks direkt när ett jobb
+    // avslutas och efterkalkylen frysts (booking/complete-job + projects PUT).
+    case 'job_completed':
+      return `### Jobb avslutat — efterkalkyl klar
+Projekt: ${triggerData?.project_id || 'Okänt'}${triggerData?.job_type ? `\nJobbtyp: ${triggerData.job_type}` : ''}${triggerData?.hours_diff_pct != null ? `\nTidsavvikelse mot offert: ${triggerData.hours_diff_pct}%` : ''}${triggerData?.amount_diff_pct != null ? `\nBeloppsavvikelse mot offert: ${triggerData.amount_diff_pct}%` : ''}
+${triggerData?.instruction || ''}
+Använd get_project_outcome(project_id) om du behöver fler detaljer om utfallet.`
+
     case 'manual':
       return `### Manuell begäran
 ${triggerData?.instruction || '(Ingen instruktion)'}`

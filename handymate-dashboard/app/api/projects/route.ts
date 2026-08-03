@@ -588,11 +588,48 @@ export async function PUT(request: NextRequest) {
       // Motor 1: frys utfall-vs-offert (efterkalkyl). Fail-safe — kastar
       // aldrig, får inte fälla projektstängningen. Körs bara här eftersom
       // vi passerat 4-eyes-gaten ovan och status faktiskt blev 'completed'.
+      let outcomeForTrigger: {
+        job_type: string | null
+        hours_diff_pct: number | null
+        amount_diff_pct: number | null
+        margin_pct: number | null
+      } | null = null
       try {
         const { freezeProjectOutcome } = await import('@/lib/efterkalkyl/freeze-outcome')
         await freezeProjectOutcome(supabase, business.business_id, project.project_id)
+
+        const { getProjectOutcome } = await import('@/lib/efterkalkyl/get-project-outcome')
+        const outcome = await getProjectOutcome(supabase, business.business_id, project.project_id)
+        outcomeForTrigger = {
+          job_type: outcome.job_type,
+          hours_diff_pct: outcome.hours_diff_pct,
+          amount_diff_pct: outcome.amount_diff_pct,
+          margin_pct: outcome.margin_pct,
+        }
       } catch (outcomeErr) {
         console.error('[projects] freezeProjectOutcome error (non-blocking):', outcomeErr)
+      }
+
+      // Våg 2d (tasks/value-chain-plan.md) — väck Lars (job_completed-
+      // trigger, matchAgentByPrefix routar 'job_*' till honom). Fire-and-
+      // forget, fail-safe, får aldrig fälla projektstängningen.
+      try {
+        const { triggerAgentFireAndForget, makeIdempotencyKey } = await import('@/lib/agent-trigger')
+        triggerAgentFireAndForget(
+          business.business_id,
+          'job_completed',
+          {
+            project_id: project.project_id,
+            job_type: outcomeForTrigger?.job_type ?? null,
+            hours_diff_pct: outcomeForTrigger?.hours_diff_pct ?? null,
+            amount_diff_pct: outcomeForTrigger?.amount_diff_pct ?? null,
+            margin_pct: outcomeForTrigger?.margin_pct ?? null,
+            instruction: `Projektet (project_id: ${project.project_id}) avslutades just. Bedöm om det gick enligt plan utifrån avvikelsen i tid/belopp mot offert och föreslå åtgärd om något sticker ut — annars räcker en kort notering. Använd get_project_outcome om du behöver fler detaljer.`,
+          },
+          makeIdempotencyKey('job_completed', business.business_id, project.project_id)
+        )
+      } catch (triggerErr) {
+        console.error('[projects] job_completed agent trigger failed (non-blocking):', triggerErr)
       }
 
       // Schemalägg Google-recension 24h efter projektslut

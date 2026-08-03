@@ -136,6 +136,8 @@ export async function executeTool(
         return await getAgentMessagesTool(supabase, businessId, context)
       case 'get_efterkalkyl_insight':
         return await getEfterkalkylInsightTool(supabase, businessId, input)
+      case 'get_project_outcome':
+        return await getProjectOutcomeTool(supabase, businessId, input)
       case 'run_customer_base_sweep':
         return await runCustomerBaseSweepTool(supabase, businessId, context)
       case 'book_site_visit':
@@ -1918,6 +1920,33 @@ async function getEfterkalkylInsightTool(
     return { success: true, data: insight }
   } catch (err: any) {
     return { success: false, error: `Efterkalkyl-insikt misslyckades: ${err.message}` }
+  }
+}
+
+// ── Våg 2d (tasks/value-chain-plan.md): Enskild-projekt-efterkalkyl (job_completed-triggern) ──
+
+/**
+ * Wrapper runt lib/efterkalkyl/get-project-outcome.ts — enskild-projekt-
+ * läsning (till skillnad från getEfterkalkylInsight ovan som aggregerar
+ * över flera projekt av samma jobbtyp/mall). Fail-safe: getProjectOutcome
+ * kastar aldrig, degraderar till found:false vid fel.
+ */
+async function getProjectOutcomeTool(
+  supabase: SupabaseClient,
+  businessId: string,
+  params: Record<string, unknown>
+): Promise<ToolResult> {
+  const projectId = params.project_id ? String(params.project_id) : ''
+  if (!projectId) {
+    return { success: false, error: 'project_id krävs.' }
+  }
+
+  try {
+    const { getProjectOutcome } = await import('@/lib/efterkalkyl/get-project-outcome')
+    const outcome = await getProjectOutcome(supabase, businessId, projectId)
+    return { success: true, data: outcome }
+  } catch (err: any) {
+    return { success: false, error: `Kunde inte hämta projektutfall: ${err.message}` }
   }
 }
 

@@ -93,6 +93,16 @@ Skriv alltid på svenska.`,
       'log_automation_action', 'run_customer_base_sweep',
       'send_agent_message', 'get_agent_messages',
     ],
+    // job_completed: deklarerad här men når INTE Hanna via triggerAgentInternal/
+    // routeToAgent — matchAgentByPrefix routar prefix 'job_*' till EN agent
+    // (Lars, se lib/agents/personalities.ts lars.triggers-kommentaren).
+    // Andreas-beslut 2026-08-03 (Våg 2d): Hannas serviceavtalsdel vid
+    // projektavslut hanteras oförändrat av cron/avtal-forslag (redan
+    // kopplad, avtal-forslag.ts), inte av denna trigger. triggers-arrayen
+    // här är alltså dokumentation av avsikt snarare än en aktiv dispatch-
+    // väg — samma gäller övriga agenters triggers-listor (se routeToAgent/
+    // matchAgentByPrefix nedan, som är prefix-baserad och inte läser dessa
+    // arrayer alls).
     triggers: ['customer_inactive', 'job_completed', 'leads_batch_ready'],
   },
 
@@ -116,6 +126,8 @@ Skriv alltid på svenska.`,
       'get_pricing_suggestion', 'get_efterkalkyl_insight',
       // Våg 2b (tasks/value-chain-plan.md) — ÄTA-kedjan.
       'create_ata_draft',
+      // Våg 2d (tasks/value-chain-plan.md) — enskild-projekt-efterkalkyl.
+      'get_project_outcome',
       'send_agent_message', 'get_agent_messages',
     ],
     triggers: ['lead_created', 'quote_sent', 'quote_opened', 'quote_expired'],
@@ -138,8 +150,15 @@ Skriv alltid på svenska.`,
       'get_daily_stats', 'create_approval_request',
       'check_pending_approvals', 'log_automation_action',
       'get_project_profitability', 'get_efterkalkyl_insight',
+      // Våg 2d (tasks/value-chain-plan.md) — enskild-projekt-efterkalkyl,
+      // läses direkt vid job_completed-triggern (se nedan).
+      'get_project_outcome',
       'send_agent_message', 'get_agent_messages',
     ],
+    // job_completed: matchAgentByPrefix routar EN agent per trigger via
+    // 'job_'-prefix → Lars (avvikelseanalys). Hanna deklarerar samma trigger
+    // nedan men når den aldrig via denna väg (se kommentar vid hennes post) —
+    // Andreas-beslut 2026-08-03 (tasks/value-chain-plan.md, Våg 2d).
     triggers: ['booking_created', 'job_completed', 'work_order_created'],
   },
 
