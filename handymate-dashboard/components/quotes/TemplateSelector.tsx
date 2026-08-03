@@ -12,6 +12,8 @@ interface TemplateSelectorProps {
 export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorProps) {
   const [templates, setTemplates] = useState<QuoteTemplate[]>([])
   const [loading, setLoading] = useState(true)
+  const [seeding, setSeeding] = useState(false)
+  const [seedDone, setSeedDone] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
 
   useEffect(() => {
@@ -22,11 +24,36 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
     try {
       const res = await fetch('/api/quote-templates')
       const data = await res.json()
-      setTemplates(data.templates || [])
+      // Tomma mallar (inga rader) döljs i VÄLJAREN — en mall utan innehåll
+      // går inte att starta en offert från. Vanligaste källan: "Ny mall"-
+      // knappen i Inställningar skapar en tom rad direkt som blir kvar om
+      // redigeringen överges (Andreas skärmdump 2026-08-03 visade två
+      // sådana). De syns och kan redigeras/raderas i Inställningar →
+      // Offertmallar som vanligt.
+      const all: QuoteTemplate[] = data.templates || []
+      setTemplates(all.filter(t => (t.default_items || []).some(i => i.item_type === 'item')))
     } catch (err) {
       console.error('Failed to fetch templates:', err)
     }
     setLoading(false)
+  }
+
+  // Befintliga konton fick aldrig mallbank-seeden (17 branschmallar) — den
+  // kördes bara vid onboarding för NYA konton efter 2026-07-21. Erbjud den
+  // direkt i väljaren (idempotent server-side: redan-seedade namn hoppas
+  // över, dubbelklick är ofarligt).
+  async function seedTemplates() {
+    setSeeding(true)
+    try {
+      const res = await fetch('/api/quote-templates/seed', { method: 'POST' })
+      if (res.ok) {
+        setSeedDone(true)
+        await fetchTemplates()
+      }
+    } catch (err) {
+      console.error('Failed to seed templates:', err)
+    }
+    setSeeding(false)
   }
 
   async function deleteTemplate(id: string) {
@@ -118,7 +145,16 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
         <div className="text-center py-8">
           <FileStack className="w-10 h-10 text-gray-400 mx-auto mb-2" />
           <p className="text-gray-400">Inga mallar ännu.</p>
-          <p className="text-xs text-gray-400 mt-1">Spara en offert som mall för att komma igång.</p>
+          {!seedDone && (
+            <button
+              onClick={seedTemplates}
+              disabled={seeding}
+              className="mt-3 px-4 py-2 bg-primary-700 text-white text-sm font-medium rounded-lg hover:bg-primary-800 transition-colors disabled:opacity-50"
+            >
+              {seeding ? 'Hämtar…' : 'Hämta färdiga mallar för din bransch'}
+            </button>
+          )}
+          <p className="text-xs text-gray-400 mt-2">Eller spara en offert som mall för att komma igång.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -184,6 +220,20 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
               </div>
             )
           })}
+
+          {/* Seed-CTA även när några mallar finns men branschbanken saknas —
+              befintliga konton (pre 2026-07-21) fick aldrig seeden vid
+              onboarding. Tröskel <5: efter seed har även minsta bransch
+              fler, så knappen försvinner av sig själv. */}
+          {sortedTemplates.length < 5 && !seedDone && (
+            <button
+              onClick={seedTemplates}
+              disabled={seeding}
+              className="w-full p-4 border border-dashed border-primary-300 rounded-xl text-sm font-medium text-primary-700 hover:bg-primary-50 transition-colors disabled:opacity-50"
+            >
+              {seeding ? 'Hämtar…' : 'Hämta färdiga mallar för din bransch'}
+            </button>
+          )}
         </div>
       )}
     </div>
