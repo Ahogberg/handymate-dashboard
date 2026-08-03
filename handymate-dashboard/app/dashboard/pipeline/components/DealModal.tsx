@@ -142,6 +142,7 @@ export function DealModal() {
 
     setShowSiteVisit,
     setSiteVisitForm,
+    handleQuickSms,
 
     closeDealDetail,
     showToast,
@@ -541,9 +542,33 @@ export function DealModal() {
                       </div>
                     )}
 
-                    {/* Quick actions */}
+                    {/* Quick actions — samma uppsättning som kundkortets
+                        snabbrad (Andreas 2026-08-03): Ring/SMS/Karta fanns
+                        på DealCard-hovern och kundkortet men saknades här i
+                        deal-översikten. handleQuickSms + QuickSmsModal är
+                        redan wirade via PipelineContext (kanban-korten
+                        använder dem). */}
                     <div className="space-y-3 pt-2">
                       <div className="flex flex-wrap gap-2">
+                        {selectedDeal.customer?.phone_number && (
+                          <a href={`tel:${selectedDeal.customer.phone_number}`}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-sm text-emerald-700 hover:bg-emerald-100 transition-colors">
+                            <Phone className="w-4 h-4" /> Ring
+                          </a>
+                        )}
+                        {selectedDeal.customer?.phone_number && (
+                          <button onClick={() => handleQuickSms(selectedDeal)}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-sm text-primary-700 hover:bg-primary-100 transition-colors">
+                            <MessageSquare className="w-4 h-4" /> SMS
+                          </button>
+                        )}
+                        {selectedDeal.customer?.address_line && (
+                          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedDeal.customer.address_line)}`}
+                            target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-sm text-amber-700 hover:bg-amber-100 transition-colors">
+                            <MapPin className="w-4 h-4" /> Karta
+                          </a>
+                        )}
                         <Link href={selectedDeal.quote_id
                           ? `/dashboard/quotes/${selectedDeal.quote_id}`
                           : selectedDeal.customer_id
@@ -553,7 +578,7 @@ export function DealModal() {
                           <FileText className="w-4 h-4" /> {selectedDeal.quote_id ? 'Visa offert' : 'Skapa offert'}
                         </Link>
                         <button onClick={() => { setShowSiteVisit(true); setSiteVisitForm({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true, invitedTeam: [], externalUe: '' }) }}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm text-primary-700 hover:bg-primary-50 transition-colors">
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-violet-200 bg-violet-50 text-sm text-violet-700 hover:bg-violet-100 transition-colors">
                           <Calendar className="w-4 h-4" /> Platsbesök
                         </button>
                       </div>
