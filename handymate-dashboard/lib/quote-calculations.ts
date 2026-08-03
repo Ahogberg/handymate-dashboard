@@ -26,6 +26,29 @@ export function setItemRotRut(item: QuoteItem, type: RotRutType): QuoteItem {
 }
 
 /**
+ * Ren mappning: legacy AI/mall-rad (type: labor/material/service) + en
+ * föreslagen/satt avdragstyp → den ROT/RUT-typ raden faktiskt ska få.
+ *
+ * Kodrevision 2026-08-03 (Fix 1+2): `convertLegacyItems` i quotes/new och
+ * quotes/[id]/edit satte tidigare `is_rot_eligible: item.type === 'labor'`
+ * OBEROENDE av vad AI:n föreslagit — ett RUT-jobb (städ/trädgård) kunde få
+ * kvarliggande ROT-flagga eftersom `getItemRotRutType` kollar ROT FÖRST, och
+ * 'none' (nybygge/företag/lokal) ROT-flaggade ändå allt arbete. Denna
+ * funktion är den enda källan till sanning för den mappningen — endast
+ * 'labor'-rader kan bli ROT/RUT-berättigade, och bara när avdragstypen
+ * faktiskt är 'rot' eller 'rut' ('none'/null/undefined ⇒ ingen avdragstyp).
+ * Kombinera alltid med setItemRotRut() så att EXAKT en flagga sätts.
+ */
+export function legacyItemRotRutType(
+  legacyType: 'labor' | 'material' | 'service',
+  suggestedDeductionType: 'rot' | 'rut' | 'none' | null | undefined,
+): RotRutType {
+  if (legacyType !== 'labor') return null
+  if (suggestedDeductionType === 'rot' || suggestedDeductionType === 'rut') return suggestedDeductionType
+  return null
+}
+
+/**
  * Grön teknik-avdrag (Skatteverket 2026, Fas 1) — TRE kategorier, var och en
  * en % av HELA radtotalen (arbete + material) — TILL SKILLNAD FRÅN ROT/RUT
  * som bara räknar arbetsandelen. Ett tak på 50 000 kr/år, tillämpat per

@@ -13,6 +13,8 @@ import {
   calculatePaymentPlan,
   generateItemId,
   recalculateItems,
+  setItemRotRut,
+  legacyItemRotRutType,
 } from '@/lib/quote-calculations'
 import { getAllCategories, type CustomCategory } from '@/lib/constants/categories'
 import {
@@ -77,7 +79,15 @@ function formatCurrency(amount: number) {
   }).format(amount)
 }
 
-/** Convert legacy AI/template items (type: labor/material/service) to new QuoteItem format */
+/**
+ * Convert legacy AI/template items (type: labor/material/service) to new
+ * QuoteItem format. `suggestedDeductionType` styr ROT/RUT via
+ * legacyItemRotRutType + setItemRotRut (kodrevision 2026-08-03, Fix 1+2) —
+ * tidigare sattes is_rot_eligible: item.type === 'labor' OBEROENDE av
+ * offertens faktiska rot_rut_type, så en gammal RUT- eller nybygge-offert
+ * (utan avdrag) kunde visas med ROT-flaggat arbete vid laddning. Default
+ * null håller anrop utan känd avdragstyp oförändrade (ingen avdragstyp).
+ */
 function convertLegacyItems(
   legacyItems: Array<{
     id: string
@@ -89,19 +99,25 @@ function convertLegacyItems(
     unit_price: number
     total: number
   }>,
+  suggestedDeductionType: 'rot' | 'rut' | 'none' | null | undefined = null,
 ): QuoteItem[] {
-  return legacyItems.map((item, idx) => ({
-    id: generateItemId(),
-    item_type: 'item' as const,
-    description: item.name || item.description || '',
-    quantity: item.quantity,
-    unit: normalizeUnit(item.unit),
-    unit_price: item.unit_price,
-    total: item.quantity * item.unit_price,
-    is_rot_eligible: item.type === 'labor',
-    is_rut_eligible: false,
-    sort_order: idx,
-  }))
+  return legacyItems.map((item, idx) =>
+    setItemRotRut(
+      {
+        id: generateItemId(),
+        item_type: 'item' as const,
+        description: item.name || item.description || '',
+        quantity: item.quantity,
+        unit: normalizeUnit(item.unit),
+        unit_price: item.unit_price,
+        total: item.quantity * item.unit_price,
+        is_rot_eligible: false,
+        is_rut_eligible: false,
+        sort_order: idx,
+      },
+      legacyItemRotRutType(item.type, suggestedDeductionType),
+    ),
+  )
 }
 
 function normalizeUnit(unit: string): string {
@@ -503,7 +519,9 @@ export default function EditQuotePage() {
         }))
         setItems(loadedItems)
       } else if (quote.items && Array.isArray(quote.items) && quote.items.length > 0) {
-        setItems(convertLegacyItems(quote.items))
+        // quote.rot_rut_type är offertens (förstrukturerade-rader-eran)
+        // helhets-avdragstyp — samma fält from-quote/tool-router redan läser.
+        setItems(convertLegacyItems(quote.items, quote.rot_rut_type))
       }
 
       // Inlednings-/avslutningstext laddas INTE längre in i redigerbart state

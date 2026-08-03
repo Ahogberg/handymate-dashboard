@@ -10,7 +10,7 @@ import ProductSearchModal from '@/components/ProductSearchModal'
 import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import type { QuotePreviewData } from '@/components/quotes/QuotePreview'
 import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates/types'
-import { generateItemId, recalculateItems } from '@/lib/quote-calculations'
+import { generateItemId, recalculateItems, setItemRotRut, legacyItemRotRutType } from '@/lib/quote-calculations'
 import { getAllCategories, type CustomCategory } from '@/lib/constants/categories'
 import {
   type DetailLevel,
@@ -97,6 +97,13 @@ function normalizeUnit(unit: string): string {
   return map[unit.toLowerCase()] || unit
 }
 
+/**
+ * Konverterar legacy AI/mall-rader (type: labor/material/service) till
+ * strukturerade QuoteItem-rader. `suggestedDeductionType` styr ROT/RUT via
+ * legacyItemRotRutType + setItemRotRut (kodrevision 2026-08-03, Fix 1+2) —
+ * default null (ingen avdragstyp antagen) håller befintliga anrop som inte
+ * bryr sig om ROT/RUT oförändrade.
+ */
 function convertLegacyItems(
   legacyItems: Array<{
     id: string
@@ -108,19 +115,25 @@ function convertLegacyItems(
     unit_price: number
     total: number
   }>,
+  suggestedDeductionType: 'rot' | 'rut' | 'none' | null | undefined = null,
 ): QuoteItem[] {
-  return legacyItems.map((item, idx) => ({
-    id: generateItemId(),
-    item_type: 'item' as const,
-    description: item.name || item.description || '',
-    quantity: item.quantity,
-    unit: normalizeUnit(item.unit),
-    unit_price: item.unit_price,
-    total: item.quantity * item.unit_price,
-    is_rot_eligible: item.type === 'labor',
-    is_rut_eligible: false,
-    sort_order: idx,
-  }))
+  return legacyItems.map((item, idx) =>
+    setItemRotRut(
+      {
+        id: generateItemId(),
+        item_type: 'item' as const,
+        description: item.name || item.description || '',
+        quantity: item.quantity,
+        unit: normalizeUnit(item.unit),
+        unit_price: item.unit_price,
+        total: item.quantity * item.unit_price,
+        is_rot_eligible: false,
+        is_rut_eligible: false,
+        sort_order: idx,
+      },
+      legacyItemRotRutType(item.type, suggestedDeductionType),
+    ),
+  )
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -930,16 +943,13 @@ export default function NewQuotePage() {
   function applyAiResult(quote: any) {
     setTitle(quote.jobTitle || '')
     setDescription(quote.jobDescription || '')
-    const converted = convertLegacyItems(quote.items || [])
-    if (quote.suggestedDeductionType === 'rot') {
-      converted.forEach(item => {
-        if (item.unit === 'tim') item.is_rot_eligible = true
-      })
-    } else if (quote.suggestedDeductionType === 'rut') {
-      converted.forEach(item => {
-        if (item.unit === 'tim') item.is_rut_eligible = true
-      })
-    }
+    // Kodrevision 2026-08-03 (Fix 1+2): ROT/RUT sätts nu ENDAST via
+    // convertLegacyItems' egen setItemRotRut-mappning, styrd av AI:ns
+    // suggestedDeductionType. Tidigare additiva forEach-block här kunde
+    // lämna is_rot_eligible kvar TRUE samtidigt som is_rut_eligible sattes
+    // TRUE (RUT-jobb fick ROT eftersom getItemRotRutType kollar ROT först),
+    // och 'none' ROT-flaggade ändå allt arbete via convertLegacyItems.
+    const converted = convertLegacyItems(quote.items || [], quote.suggestedDeductionType)
     setItems(converted)
     setAiGenerated(true)
     setAiConfidence(quote.confidence || null)
