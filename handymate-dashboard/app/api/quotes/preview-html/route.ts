@@ -4,6 +4,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getCurrentUser } from '@/lib/permissions'
 import { selectTemplate, buildQuoteTemplateData } from '@/lib/quote-templates'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
+import { stripPrintBar } from '@/lib/document-html'
 
 /**
  * POST /api/quotes/preview-html
@@ -82,7 +83,12 @@ export async function POST(request: NextRequest) {
     const templateData = buildQuoteTemplateData(quote, business, config, creator)
     const style = body.template_style || quote.template_style || config?.quote_template_style
     const renderFn = selectTemplate(style)
-    const html = renderFn(templateData)
+    // ETAPP 1d: denna route används ENDAST för sandboxade iframe-previews
+    // (TemplatePreviewFrame) — .print-bar-knapparna (Stäng/Skriv ut) är där
+    // aldrig klickbara (iframe utan allow-scripts) och skräpar bara i
+    // nederkanten. "Visa offert" (riktig flik, print() funkar) går genom
+    // /api/quotes/pdf GET/POST utan format=pdf och behåller baren.
+    const html = stripPrintBar(renderFn(templateData))
 
     return new NextResponse(html, {
       headers: {

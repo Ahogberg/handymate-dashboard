@@ -97,6 +97,13 @@ export const renderPremium: TemplateRenderFn = (data: QuoteTemplateData): string
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.5; padding: 32px 16px; }
+/* ETAPP 1d (offert-masterplan.md): .page SJÄLV har ingen padding — här är
+   det .header (28mm topp) och .body (22mm sidor/botten) som ÄGER
+   dokumentmarginalen via sin egen padding. .page renderas i fullt A4-mått
+   (210×297mm), så @page/Chromium-margin måste vara 0 (se @media print
+   nedan + app/api/quotes/pdf/route.ts page.pdf-margin) — annars dubbel-
+   räknas marginalen och sista delen av sidan knuffas ut på en nästan
+   tom sida 2. */
 .page { width: 210mm; min-height: 297mm; margin: 0 auto; background: var(--paper); box-shadow: 0 16px 40px rgba(15,23,42,0.14); display: flex; flex-direction: column; }
 .header { background: var(--dark); color: #fff; padding: 28mm 20mm 22mm; position: relative; overflow: hidden; }
 .header::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle at 90% 10%, rgba(217,119,6,0.18), transparent 40%), repeating-linear-gradient(45deg, transparent 0 18px, rgba(255,255,255,0.025) 18px 19px); pointer-events: none; }
@@ -126,7 +133,10 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 .items { margin-bottom: 28px; }
 .items-head { display: grid; grid-template-columns: var(--item-cols, 1fr 80px 110px 120px); gap: 16px; padding: 8px 0 12px; border-bottom: 1.5px solid var(--dark); font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; color: var(--dark); }
 .items-head .num { text-align: right; }
-.item { display: grid; grid-template-columns: var(--item-cols, 1fr 80px 110px 120px); gap: 16px; padding: 14px 16px; border-bottom: 1px solid var(--line); border-left: 3px solid var(--amber); margin-left: -19px; padding-left: 16px; }
+/* ETAPP 1d: Premium bygger rader med <div>-grid (ingen <table>) — varje
+   rad/kort/summeringsblock får break-inside:avoid så en rad inte klyvs
+   mitt itu över en sidbrytning i PDF. */
+.item { display: grid; grid-template-columns: var(--item-cols, 1fr 80px 110px 120px); gap: 16px; padding: 14px 16px; border-bottom: 1px solid var(--line); border-left: 3px solid var(--amber); margin-left: -19px; padding-left: 16px; break-inside: avoid; page-break-inside: avoid; }
 .item:nth-child(odd) { border-left-color: var(--dark); }
 .item .num { text-align: right; font-variant-numeric: tabular-nums; align-self: center; white-space: nowrap; }
 .item-name { font-weight: 600; color: var(--dark); font-size: 13px; }
@@ -136,7 +146,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 .item-components li::before { content: '–'; position: absolute; left: 0; color: var(--amber); }
 .item-heading { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--dark); padding: 20px 0 8px; border-bottom: 1px solid var(--line); }
 .item-text { font-size: 12px; color: var(--muted); line-height: 1.6; padding: 10px 0; border-bottom: 1px solid var(--line); white-space: pre-line; }
-.item-subtotal { display: flex; justify-content: flex-end; gap: 24px; padding: 10px 0; border-bottom: 1px solid var(--dark); font-size: 13px; }
+.item-subtotal { display: flex; justify-content: flex-end; gap: 24px; padding: 10px 0; border-bottom: 1px solid var(--dark); font-size: 13px; break-inside: avoid; page-break-inside: avoid; }
 .item-subtotal .lbl { color: var(--muted); font-weight: 600; }
 .item-subtotal .val { font-weight: 700; color: var(--dark); font-variant-numeric: tabular-nums; min-width: 120px; text-align: right; }
 .item.discount .item-name, .item.discount .num { color: var(--amber); }
@@ -146,7 +156,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 .opt-badge { display: inline-block; font-family: 'Syne', sans-serif; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.16em; color: var(--amber); border: 1px solid var(--amber); border-radius: 2px; padding: 1px 5px; margin-left: 6px; vertical-align: 1px; }
 .item.option.unselected .opt-badge { color: var(--muted); border-color: var(--line); }
 .options-note { font-size: 11px; color: var(--muted); font-style: italic; padding: 10px 0 0; }
-.totals-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; margin-bottom: 28px; align-items: stretch; }
+.totals-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; margin-bottom: 28px; align-items: stretch; break-inside: avoid; page-break-inside: avoid; }
 .terms-card { border: 1px solid var(--line); padding: 18px; background: #fff; }
 .terms-card h3 { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; color: var(--dark); margin-bottom: 8px; }
 .terms-card p { font-size: 11px; color: var(--muted); line-height: 1.7; white-space: pre-line; }
@@ -162,8 +172,8 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 .total-grand { margin-top: 10px; padding: 18px 20px; background: var(--dark); color: #fff; display: flex; justify-content: space-between; align-items: center; }
 .total-grand .lbl { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.7); }
 .total-grand .val { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800; letter-spacing: -0.01em; color: #fff; }
-.pay-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 24px; }
-.pay-card { border: 1px solid var(--line); background: #fff; padding: 14px 16px; }
+.pay-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid; }
+.pay-card { border: 1px solid var(--line); background: #fff; padding: 14px 16px; break-inside: avoid; page-break-inside: avoid; }
 .pay-card .l { font-family: 'Syne', sans-serif; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.2em; color: var(--amber); margin-bottom: 4px; }
 .pay-card .v { font-weight: 600; color: var(--dark); font-size: 14px; font-variant-numeric: tabular-nums; }
 .pay-card .s { font-size: 11px; color: var(--muted); margin-top: 2px; }

@@ -2,6 +2,7 @@
 
 import { Sparkles } from 'lucide-react'
 import type { QuoteItem } from '@/lib/types/quote'
+import { applyGlobalRotToggle } from '@/lib/quote-calculations'
 
 interface QuoteEditRotSectionProps {
   items: QuoteItem[]
@@ -22,17 +23,13 @@ export function QuoteEditRotSection({
   fastighetsbeteckning,
   setFastighetsbeteckning,
 }: QuoteEditRotSectionProps) {
+  // ETAPP 1c-i (offert-masterplan.md): går nu via applyGlobalRotToggle
+  // (lib/quote-calculations) — F1:s enda källa för rot_rut_type/boolean-
+  // synk. Tidigare satte denna funktion bara is_rot_eligible direkt, vilket
+  // varken satte rot_rut_type eller nollställde is_rut_eligible → rader
+  // kunde bli både ROT och RUT samtidigt. RUT-rader rörs aldrig av denna toggle.
   const toggle = () => {
-    if (hasRotItems) {
-      setItems(prev => prev.map(item => ({ ...item, is_rot_eligible: false })))
-    } else {
-      setItems(prev =>
-        prev.map(item => ({
-          ...item,
-          is_rot_eligible: item.item_type === 'item' && item.unit === 'tim',
-        })),
-      )
-    }
+    setItems(prev => applyGlobalRotToggle(prev, !hasRotItems))
   }
 
   return (

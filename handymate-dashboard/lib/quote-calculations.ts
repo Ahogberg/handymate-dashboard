@@ -26,6 +26,37 @@ export function setItemRotRut(item: QuoteItem, type: RotRutType): QuoteItem {
 }
 
 /**
+ * Global ROT-toggle (ETAPP 1c-i, offert-masterplan.md): tidigare satte
+ * QuoteEditRotSection.toggle() bara `is_rot_eligible` direkt på items,
+ * UTAN att gå via setItemRotRut — det satte varken `rot_rut_type` (F1:s
+ * enda källa, getItemRotRutType läser den FÖRST) eller nollställde
+ * `is_rut_eligible`. En rad som redan var RUT kunde därför bli BÅDE
+ * ROT och RUT samtidigt (desync mellan de tre fälten).
+ *
+ * Denna rena funktion är den enda källan för global-togglens mappning:
+ * - PÅ: 'tim'-rader av item_type 'item' som SAKNAR avdragstyp (rot_rut_type
+ *   null/undefined och ingen boolean redan satt) får 'rot'. Rader som redan
+ *   har en avdragstyp (t.ex. RUT eller grön teknik satt manuellt per rad)
+ *   rörs INTE — global-togglen ska bara fylla i det som är tomt.
+ * - AV: rader vars EFFEKTIVA typ är 'rot' (getItemRotRutType) nollställs
+ *   till null. RUT- och grön teknik-rader rörs ALDRIG av ROT-togglen,
+ *   i vare sig riktning.
+ */
+export function applyGlobalRotToggle(items: QuoteItem[], on: boolean): QuoteItem[] {
+  return items.map(item => {
+    if (item.item_type !== 'item') return item
+    const current = getItemRotRutType(item)
+    if (on) {
+      if (current !== null && current !== undefined) return item
+      if (item.unit !== 'tim') return item
+      return setItemRotRut(item, 'rot')
+    }
+    if (current !== 'rot') return item
+    return setItemRotRut(item, null)
+  })
+}
+
+/**
  * Tillvalsrad-specifika default-fält (B5, kodrevision 2026-08-03): en rad
  * med item_type 'option' behöver option_selected/option_default explicit
  * satta till false (v66-schemat, sql/v66_quote_option_rows.sql) — AI-

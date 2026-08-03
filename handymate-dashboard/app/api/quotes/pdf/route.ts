@@ -5,6 +5,7 @@ import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { selectTemplate, buildQuoteTemplateData } from '@/lib/quote-templates'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 import { generateQuotePDF, type QuotePdfData, type BusinessPdfData } from '@/lib/pdf-generator'
+import { stripPrintBar } from '@/lib/document-html'
 
 // Chromium-rendering kräver Node-runtime (inte Edge) och tål kallstart —
 // @sparticuz/chromium packar upp binären vid första anropet.
@@ -50,13 +51,23 @@ async function renderHtmlToPdf(html: string): Promise<Buffer | null> {
     })
     try {
       const page = await browser.newPage()
+      // ETAPP 1d (offert-masterplan.md): mallarna äger sin egen dokument-
+      // marginal via inbyggd CSS-padding (se .page/.header/.body i
+      // modern/premium/friendly.ts) — .page renderas redan i fullt A4-mått
+      // (210×297mm). Chromium-marginalen måste därför vara 0 på alla sidor;
+      // tidigare {top:12mm, bottom:14mm} lades OVANPÅ mallens egen padding
+      // och dubbelräknade marginalen, vilket knuffade sidans sista del ut
+      // på en nästan tom sida 2. .print-bar (Stäng/Skriv ut) är avsedd för
+      // "Visa offert" i en riktig flik, inte för denna PDF-väg — strippas
+      // explicit (se stripPrintBar-kommentar).
+      const printHtml = stripPrintBar(html)
       // 'load' väntar in bilder/loggor (mallens externa <img>-resurser);
       // 'networkidle0' finns inte i denna puppeteer-versions setContent-typ.
-      await page.setContent(html, { waitUntil: 'load', timeout: 15000 })
+      await page.setContent(printHtml, { waitUntil: 'load', timeout: 15000 })
       const pdf = await page.pdf({
         format: 'a4',
         printBackground: true,
-        margin: { top: '12mm', bottom: '14mm', left: '0mm', right: '0mm' },
+        margin: { top: '0mm', bottom: '0mm', left: '0mm', right: '0mm' },
       })
       return Buffer.from(pdf)
     } finally {
@@ -185,6 +196,10 @@ async function buildQuotePdfResponse(quote: any, config: any, creator: any): Pro
     }
   }
 
+  // ETAPP 1e (offert-masterplan.md): tydlig, greppbar logg-tagg när
+  // jsPDF-fallbacken faktiskt slår in (inte bara loggarna ovan om VARFÖR
+  // Chromium-vägen misslyckades) — lätt att söka fram i Vercel-loggarna.
+  console.error('[quotes/pdf] FALLBACK-JSPDF AKTIV — Chromium-rendering misslyckades, offerten laddas ner med den äldre jsPDF-renderaren')
   const pdfBuffer = generateQuotePDF(pdfData, businessData)
   return new NextResponse(pdfBuffer, {
     headers: {

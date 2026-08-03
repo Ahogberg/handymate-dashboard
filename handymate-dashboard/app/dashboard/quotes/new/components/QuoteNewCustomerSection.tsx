@@ -95,7 +95,7 @@ export function QuoteNewCustomerSection({
                 <div className="flex items-start gap-2">
                   <ClipboardList className="w-3.5 h-3.5 text-primary-700 mt-0.5 flex-shrink-0" />
                   <div className="text-xs text-primary-800 leading-relaxed">
-                    Prislista: <strong className="font-semibold">{customerPriceListInfo.name}</strong>
+                    Kundens prislista: <strong className="font-semibold">{customerPriceListInfo.name}</strong>
                     {customerPriceListInfo.segment && ` · ${customerPriceListInfo.segment}`}
                     {customerPriceListInfo.contractType && ` · ${customerPriceListInfo.contractType}`}
                   </div>

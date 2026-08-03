@@ -124,6 +124,11 @@ export const renderModern: TemplateRenderFn = (data: QuoteTemplateData): string 
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.5; padding: 32px 16px; }
+/* ETAPP 1d (offert-masterplan.md): .page ÄGER dokumentmarginalen via sin
+   egen padding (22mm topp/botten, 20mm sidor) — .page renderas redan i
+   fullt A4-mått (210×297mm). @page/Chromium-margin ska därför vara 0 (se
+   @media print nedan + app/api/quotes/pdf/route.ts page.pdf-margin) så
+   marginalen aldrig dubbelräknas. */
 .page { width: 210mm; min-height: 297mm; padding: 22mm 20mm; margin: 0 auto; background: #fff; box-shadow: 0 16px 40px rgba(15,23,42,0.10); display: flex; flex-direction: column; }
 .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
 .brand { display: flex; align-items: center; gap: 12px; }
@@ -146,8 +151,11 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .quote-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 22px; color: var(--ink); letter-spacing: -0.015em; margin-bottom: 4px; }
 .quote-sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; white-space: pre-line; }
 table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+/* ETAPP 1d: upprepa tabellhuvudet på varje sida vid sidbrytning i PDF. */
+thead { display: table-header-group; }
 thead th { text-align: left; padding: 10px 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); border-bottom: 1.5px solid var(--ink); }
 thead th.num { text-align: right; }
+tbody tr { break-inside: avoid; page-break-inside: avoid; }
 tbody td { padding: 12px; vertical-align: top; font-size: 13px; }
 tbody tr:nth-child(even) { background: var(--row-alt); }
 .item-name { font-weight: 600; color: var(--ink); }
@@ -167,7 +175,7 @@ tbody tr.row-option.unselected .opt-box { color: var(--muted); }
 .opt-badge { display: inline-block; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--teal); background: var(--teal-50); border: 1px solid var(--teal-100); border-radius: 4px; padding: 1px 6px; margin-left: 6px; vertical-align: 1px; }
 tbody tr.row-option.unselected .opt-badge { color: var(--muted); background: transparent; border-color: var(--border); }
 .options-note { font-size: 11px; color: var(--muted); font-style: italic; margin: -14px 0 24px; }
-.totals-wrap { display: flex; justify-content: flex-end; margin-bottom: 28px; }
+.totals-wrap { display: flex; justify-content: flex-end; margin-bottom: 28px; break-inside: avoid; page-break-inside: avoid; }
 .totals { width: 50%; min-width: 280px; }
 .total-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
 .total-row:last-child { border-bottom: none; }
@@ -177,7 +185,7 @@ tbody tr.row-option.unselected .opt-badge { color: var(--muted); background: tra
 .total-row.grand .lbl { color: var(--ink); }
 .total-row .val { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
 .total-row.rot .val { color: var(--teal); }
-.pay-box { border: 1px solid var(--teal-100); background: var(--teal-50); border-radius: 10px; padding: 16px 18px; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; margin-bottom: 28px; }
+.pay-box { border: 1px solid var(--teal-100); background: var(--teal-50); border-radius: 10px; padding: 16px 18px; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; margin-bottom: 28px; break-inside: avoid; page-break-inside: avoid; }
 .pay-box.single { grid-template-columns: 1fr; }
 .pay-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--teal); margin-bottom: 4px; }
 .pay-text { font-size: 12px; color: var(--ink); line-height: 1.6; }

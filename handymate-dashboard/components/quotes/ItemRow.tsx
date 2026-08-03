@@ -118,7 +118,7 @@ export default function ItemRow({
     onUpdate(item.id, 'option_selected', checked)
   }
 
-  // "Spara i prislistan" — endast för 'item'-rader med beskrivning,
+  // "Spara i produktbanken" (ETAPP 1c-iii: EN term överallt) — endast för 'item'-rader med beskrivning,
   // när orchestrator har wirat upp callback:en
   const canSaveToProducts =
     !!onSaveToProducts &&
@@ -201,8 +201,8 @@ export default function ItemRow({
             <button
               type="button"
               onClick={() => onSaveToProducts!(item)}
-              aria-label={isSavedToProducts ? 'Sparad i prislistan' : 'Spara i prislistan'}
-              title={isSavedToProducts ? 'Sparad i prislistan' : 'Spara i prislistan'}
+              aria-label={isSavedToProducts ? 'Sparad i produktbanken' : 'Spara i produktbanken'}
+              title={isSavedToProducts ? 'Sparad i produktbanken' : 'Spara i produktbanken'}
               className={`p-1 shrink-0 transition-colors ${
                 isSavedToProducts
                   ? 'text-primary-700'
@@ -238,6 +238,38 @@ export default function ItemRow({
                 priceMissingStyle ? 'bg-amber-50 border-amber-300 ring-1 ring-amber-300' : 'bg-white border-gray-200'
               }`} min={0} step="any" />
             <span className="flex-1 text-right text-xs font-medium text-gray-900 whitespace-nowrap">{formatCurrency(displayTotal)}</span>
+          </div>
+        )}
+        {/* Row 2b: Kategori + ROT/RUT — ETAPP 1c-ii (offert-masterplan.md):
+            fanns tidigare bara i desktop-gridden, saknades helt i
+            mobilstacken. ≥40px träffyta (min-h-[40px]) — hantverkaren
+            använder mobilen på bygget. */}
+        {isEditable && (
+          <div className="grid grid-cols-2 gap-1.5">
+            <CategorySelect
+              item={item}
+              allCategories={allCategories}
+              onUpdate={onUpdate}
+              isCreatingCategory={!!isCreatingCategory}
+              onCreateCategory={onCreateCategory}
+              showNewCategoryInput={showNewCategoryInput}
+              setShowNewCategoryInput={setShowNewCategoryInput}
+              newCategoryLabel={newCategoryLabel}
+              setNewCategoryLabel={setNewCategoryLabel}
+              compact={false}
+            />
+            <select
+              value={item.rot_rut_type || (item.is_rot_eligible ? 'rot' : item.is_rut_eligible ? 'rut' : '')}
+              onChange={(e) => onUpdate(item.id, 'rot_rut_type', e.target.value || null)}
+              className="w-full min-h-[40px] text-sm border border-gray-300 rounded-lg px-2 py-2.5 text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 cursor-pointer"
+            >
+              <option value="">ROT/RUT —</option><option value="rot">ROT</option><option value="rut">RUT</option>
+              <optgroup label="Grön teknik">
+                <option value="gron_solceller">Solceller (15%)</option>
+                <option value="gron_lagring">Batteri (50%)</option>
+                <option value="gron_laddpunkt">Laddbox (50%)</option>
+              </optgroup>
+            </select>
           </div>
         )}
         {showSaveToProductsNudge && (
@@ -401,8 +433,8 @@ export default function ItemRow({
           <button
             type="button"
             onClick={() => onSaveToProducts!(item)}
-            aria-label={isSavedToProducts ? 'Sparad i prislistan' : 'Spara i prislistan'}
-            title={isSavedToProducts ? 'Sparad i prislistan — klicka för att uppdatera' : 'Spara i prislistan'}
+            aria-label={isSavedToProducts ? 'Sparad i produktbanken' : 'Spara i produktbanken'}
+            title={isSavedToProducts ? 'Sparad i produktbanken — klicka för att uppdatera' : 'Spara i produktbanken'}
             className={`p-1 transition-all justify-self-center ${
               isSavedToProducts
                 ? 'text-primary-700 opacity-100'
@@ -436,6 +468,7 @@ export default function ItemRow({
 function CategorySelect({
   item, allCategories, onUpdate, isCreatingCategory, onCreateCategory,
   showNewCategoryInput, setShowNewCategoryInput, newCategoryLabel, setNewCategoryLabel,
+  compact = true,
 }: {
   item: QuoteItem
   allCategories: { slug: string; label: string }[]
@@ -446,7 +479,13 @@ function CategorySelect({
   setShowNewCategoryInput?: (id: string | null) => void
   newCategoryLabel?: string
   setNewCategoryLabel?: (label: string) => void
+  /** Desktop-gridden (default true) håller sig till den kompakta text-xs/
+      py-1.5-storleken. Mobilstacken (ETAPP 1c-ii) sätter false för en
+      ≥40px träffyta — samma val, samma handlers, bara större yta. */
+  compact?: boolean
 }) {
+  const sizeCls = compact ? 'px-1.5 py-1.5 text-xs' : 'px-3 py-2.5 text-sm min-h-[40px]'
+
   if (isCreatingCategory && onCreateCategory && setShowNewCategoryInput && setNewCategoryLabel) {
     return (
       <input type="text" value={newCategoryLabel || ''} autoFocus
@@ -456,7 +495,7 @@ function CategorySelect({
           else if (e.key === 'Escape') { setShowNewCategoryInput(null); setNewCategoryLabel('') }
         }}
         placeholder="Namn..."
-        className="w-full px-2 py-1.5 text-xs border border-primary-600 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-primary-600" />
+        className={`w-full ${sizeCls} border border-primary-600 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-primary-600`} />
     )
   }
 
@@ -468,7 +507,7 @@ function CategorySelect({
           setShowNewCategoryInput(item.id); setNewCategoryLabel('')
         } else { onUpdate(item.id, 'category_slug', e.target.value || undefined) }
       }}
-      className={`w-full min-w-0 px-1.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 cursor-pointer ${hasValue ? 'text-gray-900' : 'text-gray-500'}`}>
+      className={`w-full min-w-0 ${sizeCls} border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 cursor-pointer ${hasValue ? 'text-gray-900' : 'text-gray-500'}`}>
       <option value="">Välj kategori…</option>
       <optgroup label="Arbete">
         {allCategories.filter(c => c.slug.startsWith('arbete')).map(c => <option key={c.slug} value={c.slug}>{c.label}</option>)}

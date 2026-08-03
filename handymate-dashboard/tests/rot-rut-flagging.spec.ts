@@ -22,6 +22,7 @@ import {
   getItemRotRutType,
   setItemRotRut,
   legacyItemRotRutType,
+  applyGlobalRotToggle,
 } from '../lib/quote-calculations'
 import type { QuoteItem } from '../lib/types/quote'
 
@@ -125,5 +126,42 @@ test.describe('Regression: convertLegacyItems-mönstret (setItemRotRut + legacyI
   test('(m) materialrader förblir avdragsfria även när AI föreslår RUT för jobbet i stort', () => {
     const item = convertOneLegacyItem('material', 'rut')
     expect(getItemRotRutType(item)).toBeNull()
+  })
+})
+
+test.describe('applyGlobalRotToggle — ETAPP 1c-i: global ROT-toggle går via setItemRotRut, ingen desync', () => {
+  test('(n) PÅ: tim-rad utan avdragstyp blir ROT', () => {
+    const items = [baseItem({ unit: 'tim' })]
+    const result = applyGlobalRotToggle(items, true)
+    expect(getItemRotRutType(result[0])).toBe('rot')
+    expect(result[0].is_rot_eligible).toBe(true)
+    expect(result[0].is_rut_eligible).toBe(false)
+  })
+
+  test('(o) PÅ: st-rad (material) rörs inte — bara tim-rader antas vara arbete', () => {
+    const items = [baseItem({ unit: 'st' })]
+    const result = applyGlobalRotToggle(items, true)
+    expect(getItemRotRutType(result[0])).toBeNull()
+  })
+
+  test('(p) AV: ROT-rad blir null (ingen avdragstyp)', () => {
+    const items = [setItemRotRut(baseItem({ unit: 'tim' }), 'rot')]
+    const result = applyGlobalRotToggle(items, false)
+    expect(getItemRotRutType(result[0])).toBeNull()
+    expect(result[0].is_rot_eligible).toBe(false)
+  })
+
+  test('(q) RUT-rader orörda i båda riktningarna — aldrig konverterade till ROT eller nollställda', () => {
+    const rutItem = setItemRotRut(baseItem({ unit: 'tim' }), 'rut')
+    const onResult = applyGlobalRotToggle([rutItem], true)
+    expect(getItemRotRutType(onResult[0])).toBe('rut')
+    const offResult = applyGlobalRotToggle([rutItem], false)
+    expect(getItemRotRutType(offResult[0])).toBe('rut')
+  })
+
+  test('(r) icke-item-rader (rubrik/delsumma/rabatt/tillval) rörs aldrig', () => {
+    const heading: QuoteItem = { ...baseItem({ unit: 'tim' }), item_type: 'heading' }
+    const result = applyGlobalRotToggle([heading], true)
+    expect(getItemRotRutType(result[0])).toBeNull()
   })
 })

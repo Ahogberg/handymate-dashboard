@@ -26,6 +26,20 @@ export function escapeHtml(text: string | null | undefined): string {
     .replace(/'/g, '&#039;')
 }
 
+/**
+ * Tar bort .print-bar-baren (Stäng/Skriv ut-knapparna) ur en renderad
+ * mall-HTML. ETAPP 1d (offert-masterplan.md): baren är avsedd för "Visa
+ * offert" (riktig flik, print() faktiskt användbar) men skräpar i
+ * sandboxade preview-sammanhang (iframe utan allow-scripts, headless
+ * Chromium-PDF) där knapparna ändå aldrig kan klickas. Chromium-PDF-vägen
+ * har redan `@media print { .print-bar { display: none } }`, men vi
+ * stripper explicit här också (minsta robusta ingrepp — funkar oavsett
+ * Puppeteers media-emulering).
+ */
+export function stripPrintBar(html: string): string {
+  return html.replace(/<div class="print-bar">[\s\S]*?<\/div>\s*/, '')
+}
+
 export function formatCurrency(amount: number | null | undefined): string {
   if (amount == null) return '0 kr'
   // Intl.NumberFormat('sv-SE') producerar NBSP ( ) eller narrow nbsp

@@ -134,6 +134,11 @@ export const renderFriendly: TemplateRenderFn = (data: QuoteTemplateData): strin
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.55; padding: 32px 16px; }
+/* ETAPP 1d (offert-masterplan.md): .page ÄGER dokumentmarginalen via sin
+   egen padding (14mm på alla sidor) — .page renderas redan i fullt A4-mått
+   (210×297mm). @page/Chromium-margin ska därför vara 0 (se @media print
+   nedan + app/api/quotes/pdf/route.ts page.pdf-margin) så marginalen
+   aldrig dubbelräknas. */
 .page { width: 210mm; min-height: 297mm; margin: 0 auto; background: var(--bg); box-shadow: 0 16px 40px rgba(15,23,42,0.10); display: flex; flex-direction: column; padding: 14mm; gap: 14px; }
 .header { background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%); border-radius: 16px; padding: 24px 26px; color: #fff; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 8px 24px rgba(15,118,110,0.18); position: relative; overflow: hidden; }
 .header::after { content: ''; position: absolute; top: -40px; right: -40px; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.12), transparent 70%); }
@@ -147,7 +152,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .doc-number { font-weight: 800; font-size: 26px; letter-spacing: -0.02em; margin-top: 2px; }
 .doc-ref { font-size: 11px; color: var(--muted); margin-top: 4px; font-weight: 500; }
 .doc-dates { font-size: 12px; color: rgba(255,255,255,0.85); margin-top: 8px; line-height: 1.7; }
-.card { background: var(--paper); border-radius: 14px; padding: 20px 22px; box-shadow: 0 2px 6px rgba(15,23,42,0.04), 0 0 0 1px rgba(15,23,42,0.04); }
+.card { background: var(--paper); border-radius: 14px; padding: 20px 22px; box-shadow: 0 2px 6px rgba(15,23,42,0.04), 0 0 0 1px rgba(15,23,42,0.04); break-inside: avoid; page-break-inside: avoid; }
 .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: var(--teal); margin-bottom: 10px; }
 .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .party-name { font-weight: 700; font-size: 16px; color: var(--ink); }
@@ -166,7 +171,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .badge.warranty { background: var(--amber-bg); color: var(--amber); }
 .badge.warranty .dot { background: var(--amber); }
 .items-grid { display: flex; flex-direction: column; gap: 10px; }
-.item-card { display: grid; grid-template-columns: 36px 1fr auto; gap: 14px; align-items: flex-start; padding: 14px 16px; background: var(--bg); border-radius: 12px; border: 1px solid rgba(15,23,42,0.04); }
+.item-card { display: grid; grid-template-columns: 36px 1fr auto; gap: 14px; align-items: flex-start; padding: 14px 16px; background: var(--bg); border-radius: 12px; border: 1px solid rgba(15,23,42,0.04); break-inside: avoid; page-break-inside: avoid; }
 .item-num { width: 30px; height: 30px; border-radius: 50%; background: var(--teal-100); color: var(--teal-dark); font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .item-body .name { font-weight: 600; color: var(--ink); font-size: 14px; }
 .item-body .desc { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 2px; white-space: pre-line; }
@@ -177,7 +182,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .item-amt { text-align: right; font-weight: 700; color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; align-self: center; }
 .group-heading { font-weight: 700; font-size: 14px; color: var(--ink); padding: 8px 4px 0; }
 .group-text { color: var(--muted); font-size: 12px; line-height: 1.6; padding: 0 4px; white-space: pre-line; }
-.subtotal-line { display: flex; justify-content: flex-end; gap: 16px; padding: 2px 16px 4px; font-size: 13px; }
+.subtotal-line { display: flex; justify-content: flex-end; gap: 16px; padding: 2px 16px 4px; font-size: 13px; break-inside: avoid; page-break-inside: avoid; }
 .subtotal-line .lbl { color: var(--muted); font-weight: 600; }
 .subtotal-line .val { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
 .item-card.discount .item-num { background: var(--green-bg); color: #166534; }
@@ -197,7 +202,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .total-row.rot { background: var(--green-bg); padding: 10px 12px; border-radius: 8px; margin: 6px 0; }
 .total-row.rot .lbl { color: #166534; font-weight: 600; }
 .total-row.rot .val { color: #166534; }
-.grand-card { background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%); border-radius: 12px; padding: 20px 24px; color: #fff; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 6px 20px rgba(15,118,110,0.18); }
+.grand-card { background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%); border-radius: 12px; padding: 20px 24px; color: #fff; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 6px 20px rgba(15,118,110,0.18); break-inside: avoid; page-break-inside: avoid; }
 .grand-card .lbl { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 0.12em; }
 .grand-card .val { font-weight: 800; font-size: 34px; letter-spacing: -0.02em; }
 .pay-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

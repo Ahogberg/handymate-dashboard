@@ -38,7 +38,7 @@ import { QuoteEditRotSection } from './components/QuoteEditRotSection'
 import { QuoteEditStandardTextsSection } from './components/QuoteEditStandardTextsSection'
 import { QuoteEditPaymentPlanSection } from './components/QuoteEditPaymentPlanSection'
 import { QuoteEditDisplaySettingsSection } from './components/QuoteEditDisplaySettingsSection'
-import { QuoteEditTemplatePicker } from './components/QuoteEditTemplatePicker'
+import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
 import { QuoteEditPreviewPanel } from './components/QuoteEditPreviewPanel'
 import { QuoteEditTotalsSection } from './components/QuoteEditTotalsSection'
 import { QuoteEditSaveTemplateModal } from './components/QuoteEditSaveTemplateModal'
@@ -913,10 +913,10 @@ export default function EditQuotePage() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(620px,46%)] gap-5 items-start">
           {/* ── Left Column — Form ─────────────────────────────────── */}
           <div className="flex flex-col gap-4">
-            <QuoteEditTemplatePicker
+            <QuoteStylePicker
               quoteId={quoteId}
-              templateStyle={templateStyle}
-              setTemplateStyle={setTemplateStyle}
+              value={templateStyle}
+              onChange={setTemplateStyle}
               businessDefaultStyle={businessDefaultStyle}
             />
 

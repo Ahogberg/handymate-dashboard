@@ -11,6 +11,16 @@ interface QuoteNewHeaderProps {
   // Action-knappar (rendas i sticky top-bar; tidigare i högerkolumnen)
   saving: boolean
   canSend: boolean
+  /** ETAPP 1f (offert-masterplan.md): synlig orsakstext när canSend är
+      false — härledd av föräldern ur SAMMA villkor som canSend, istället
+      för en tyst disabled-knapp utan förklaring. */
+  sendDisabledReason?: string
+  /** Beskrivningsvarningen (tidigare descriptionWarningShownRef — en
+      osynlig "klicka Skicka igen"-vägg): visar en inline-bekräftelse
+      vid knappen istället. */
+  sendConfirmPending?: boolean
+  onConfirmSend?: () => void
+  onCancelSend?: () => void
   hasItems: boolean
   onSendQuote: () => void
   onSaveDraft: () => void
@@ -29,6 +39,10 @@ export function QuoteNewHeader({
   aiPhotoCount,
   saving,
   canSend,
+  sendDisabledReason,
+  sendConfirmPending,
+  onConfirmSend,
+  onCancelSend,
   hasItems,
   onSendQuote,
   onSaveDraft,
@@ -87,15 +101,45 @@ export function QuoteNewHeader({
           >
             Spara utkast
           </button>
-          <button
-            type="button"
-            onClick={onSendQuote}
-            disabled={saving || !canSend}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-700 hover:bg-primary-600 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm"
-          >
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-            {saving ? 'Sparar…' : 'Skicka offert'}
-          </button>
+          <div className="relative flex flex-col items-end gap-1">
+            <button
+              type="button"
+              onClick={onSendQuote}
+              disabled={saving || !canSend}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-700 hover:bg-primary-600 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm"
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              {saving ? 'Sparar…' : 'Skicka offert'}
+            </button>
+            {/* ETAPP 1f: disabled Skicka-knapp får alltid en synlig orsak
+                istället för ett tyst lås. */}
+            {!canSend && sendDisabledReason && (
+              <span className="text-[10px] text-slate-400 whitespace-nowrap">{sendDisabledReason}</span>
+            )}
+            {sendConfirmPending && (
+              <div className="absolute right-0 top-full mt-2 z-40 w-64 bg-white border border-amber-200 rounded-xl shadow-lg p-3">
+                <p className="text-xs text-slate-700 mb-2.5 leading-relaxed">
+                  Beskrivning saknas — skicka ändå?
+                </p>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={onCancelSend}
+                    className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                  >
+                    Avbryt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onConfirmSend}
+                    className="px-3 py-1.5 text-xs font-semibold bg-primary-700 hover:bg-primary-600 text-white rounded-lg transition-colors"
+                  >
+                    Skicka ändå
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

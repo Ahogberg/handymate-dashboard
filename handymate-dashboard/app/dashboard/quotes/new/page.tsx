@@ -37,6 +37,8 @@ import { QuoteEditTotalsSection } from '../[id]/edit/components/QuoteEditTotalsS
 import { QuoteEditMobilePreviewModal } from '../[id]/edit/components/QuoteEditMobilePreviewModal'
 import { QuoteEditSaveTemplateModal } from '../[id]/edit/components/QuoteEditSaveTemplateModal'
 
+import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
+
 // Nya komponenter unika för new-vyn
 import { QuoteNewHeader } from './components/QuoteNewHeader'
 import { QuoteNewAIHelper } from './components/QuoteNewAIHelper'
@@ -309,7 +311,9 @@ export default function NewQuotePage() {
   const [previewMode, setPreviewMode] = useState<'live' | 'design' | 'compact'>('live')
   const [debouncedPreviewData, setDebouncedPreviewData] = useState<QuotePreviewData | null>(null)
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const descriptionWarningShownRef = useRef(false)
+  // ETAPP 1f: inline-bekräftelse för "beskrivning saknas" (ersätter den
+  // gamla descriptionWarningShownRef-vägen — se saveQuote/QuoteNewHeader).
+  const [sendConfirmPending, setSendConfirmPending] = useState(false)
   const dealLookupDoneRef = useRef(false)
 
   // ─── Shared hooks ──────────────────────────────────────────────────
@@ -433,69 +437,33 @@ export default function NewQuotePage() {
     localCustomCategories,
   ])
 
-  // ─── TemplatePreviewFrame payload ────────────────────────────────
+  // ─── EN preview-pipeline (ETAPP 1a, offert-masterplan.md) ─────────
+  // quoteTemplateData (→ ModernCanvas) och templatePreviewPayload (→
+  // TemplatePreviewFrame/iframen) byggdes tidigare i TVÅ separata useMemo
+  // med nästan identiska men inte identiska beroendelistor och egna
+  // kopior av validUntil/formatDate/amountToPay-logiken — risk att
+  // live-canvasen och iframe-previewn tyst visar olika siffror om bara
+  // den ena uppdaterades. Nu EN useMemo, EN beroendelista, delad
+  // validUntil/amountToPay. quote_items i payloaden är MEDVETET fortsatt
+  // rå QuoteItem-form (inte QuoteTemplateItem) — servern (buildQuoteTemplateData)
+  // räknar om totalerna själv och behöver de råa fälten (rot_rut_type,
+  // option_selected, labor_amount m.fl.) som inte finns kvar i den
+  // visningsfärdiga QuoteTemplateData-formen.
   const dealIdFromQuery = searchParams?.get('deal_id') || searchParams?.get('lead_id') || null
-  const templatePreviewPayload: TemplatePreviewPayload = useMemo(() => {
+  const { quoteTemplateData, templatePreviewPayload } = useMemo(() => {
     const validUntil = new Date()
     validUntil.setDate(validUntil.getDate() + (validDays || 30))
-    return {
-      quote: {
-        title: title || 'Offert',
-        description: description || null,
-        status: 'draft',
-        items: [],
-        subtotal: totals.subtotal,
-        discount_percent: discountPercent,
-        discount_amount: totals.discountAmount,
-        vat_rate: vatRate,
-        vat_amount: totals.vat,
-        total: totals.total,
-        rot_work_cost: totals.rotWorkCost,
-        rot_deduction: totals.rotDeduction,
-        rot_customer_pays: totals.rotCustomerPays,
-        rut_work_cost: totals.rutWorkCost,
-        rut_deduction: totals.rutDeduction,
-        rut_customer_pays: totals.rutCustomerPays,
-        customer_pays: totals.rotCustomerPays || totals.rutCustomerPays || totals.total,
-        valid_until: validUntil.toISOString().split('T')[0],
-        not_included: notIncluded || null,
-        ata_terms: ataTerms || null,
-        payment_terms_text: paymentTermsText || null,
-        terms_text: termsText || null,
-        reference_person: referencePerson || null,
-        customer_reference: customerReference || null,
-        project_address: projectAddress || null,
-        detail_level: detailLevel,
-        show_unit_prices: showUnitPrices,
-        show_quantities: showQuantities,
-        personnummer: personnummer || null,
-        fastighetsbeteckning: fastighetsbeteckning || null,
-        template_style: templateStyle,
-      },
-      quote_items: recalculated.map((it, idx) => ({ ...it, sort_order: idx })),
-      customer_id: selectedCustomer || null,
-      deal_id: dealIdFromQuery,
-      template_style: templateStyle,
-    }
-  }, [
-    title, description, selectedCustomer, validDays, recalculated, totals, discountPercent, vatRate,
-    notIncluded, ataTerms, paymentTermsText, termsText,
-    referencePerson, customerReference, projectAddress, detailLevel,
-    showUnitPrices, showQuantities, personnummer, fastighetsbeteckning,
-    templateStyle, dealIdFromQuery,
-  ])
-
-  // ─── Live ModernCanvas data ──────────────────────────────────────
-  const liveTemplateData: QuoteTemplateData = useMemo(() => {
-    const validUntil = new Date()
-    validUntil.setDate(validUntil.getDate() + (validDays || 30))
+    // En sanning: samma "vad kunden faktiskt betalar"-formel som
+    // calculateQuoteTotals/totals redan äger — användes tidigare bara av
+    // liveTemplateData; templatePreviewPayload skickade en enklare (och
+    // vid grön teknik-avdrag ofullständig) `customer_pays`-variant.
     const amountToPay = totals.totalDeduction > 0
       ? totals.customerPaysAfterDeductions
       : totals.total
     const formatDate = (d: Date) =>
       d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })
 
-    return {
+    const quoteTemplateData: QuoteTemplateData = {
       business: {
         name: businessConfig?.business_name || business.business_name || 'Företag',
         orgNumber: businessConfig?.org_number || '',
@@ -561,7 +529,58 @@ export default function NewQuotePage() {
         notIncluded: notIncluded || null,
       },
     }
-  }, [business, businessConfig, selectedCustomerObj, title, description, recalculated, totals, validDays, paymentTermsText, notIncluded, personnummer, customerReference])
+
+    const templatePreviewPayload: TemplatePreviewPayload = {
+      quote: {
+        title: title || 'Offert',
+        description: description || null,
+        status: 'draft',
+        items: [],
+        subtotal: totals.subtotal,
+        discount_percent: discountPercent,
+        discount_amount: totals.discountAmount,
+        vat_rate: vatRate,
+        vat_amount: totals.vat,
+        total: totals.total,
+        rot_work_cost: totals.rotWorkCost,
+        rot_deduction: totals.rotDeduction,
+        rot_customer_pays: totals.rotCustomerPays,
+        rut_work_cost: totals.rutWorkCost,
+        rut_deduction: totals.rutDeduction,
+        rut_customer_pays: totals.rutCustomerPays,
+        // Samma amountToPay som quoteTemplateData (var tidigare en egen,
+        // ofullständig formel — se kommentar ovan).
+        customer_pays: amountToPay,
+        valid_until: validUntil.toISOString().split('T')[0],
+        not_included: notIncluded || null,
+        ata_terms: ataTerms || null,
+        payment_terms_text: paymentTermsText || null,
+        terms_text: termsText || null,
+        reference_person: referencePerson || null,
+        customer_reference: customerReference || null,
+        project_address: projectAddress || null,
+        detail_level: detailLevel,
+        show_unit_prices: showUnitPrices,
+        show_quantities: showQuantities,
+        personnummer: personnummer || null,
+        fastighetsbeteckning: fastighetsbeteckning || null,
+        template_style: templateStyle,
+      },
+      quote_items: recalculated.map((it, idx) => ({ ...it, sort_order: idx })),
+      customer_id: selectedCustomer || null,
+      deal_id: dealIdFromQuery,
+      template_style: templateStyle,
+    }
+
+    return { quoteTemplateData, templatePreviewPayload }
+  }, [
+    business, businessConfig, selectedCustomerObj, selectedCustomer, title, description,
+    recalculated, totals, validDays, discountPercent, vatRate,
+    notIncluded, ataTerms, paymentTermsText, termsText,
+    referencePerson, customerReference, projectAddress, detailLevel,
+    showUnitPrices, showQuantities, personnummer, fastighetsbeteckning,
+    templateStyle, dealIdFromQuery,
+  ])
 
   const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
 
@@ -1339,16 +1358,21 @@ export default function NewQuotePage() {
   // Save
   // ═══════════════════════════════════════════════════════════════════
 
-  const saveQuote = async (send: boolean = false) => {
+  // ETAPP 1f (offert-masterplan.md): `skipDescriptionConfirm` ersätter den
+  // gamla descriptionWarningShownRef-dubbelklicksväggen (osynlig — kräver
+  // att man vet att man ska klicka Skicka igen). Nu visar QuoteNewHeader
+  // en inline-bekräftelse ("Skicka ändå?") och skickar true hit när
+  // hantverkaren aktivt bekräftar.
+  const saveQuote = async (send: boolean = false, skipDescriptionConfirm: boolean = false) => {
     if (send && !selectedCustomer) {
       toast.warning('Välj en kund först för att skicka offerten')
       return
     }
-    if (send && !description.trim() && !descriptionWarningShownRef.current) {
-      descriptionWarningShownRef.current = true
-      toast.warning('Offerten saknar beskrivning. Lägg till en kort beskrivning, eller klicka Skicka igen för att fortsätta.')
+    if (send && !description.trim() && !skipDescriptionConfirm) {
+      setSendConfirmPending(true)
       return
     }
+    setSendConfirmPending(false)
     if (paymentPlan.length > 0 && !paymentPlanValid) {
       toast.warning('Betalningsplanens procentsatser måste summera till 100%')
       return
@@ -1538,6 +1562,10 @@ export default function NewQuotePage() {
           aiPhotoCount={aiPhotoCount}
           saving={saving}
           canSend={!!selectedCustomer}
+          sendDisabledReason={!selectedCustomer ? 'Välj kund först' : undefined}
+          sendConfirmPending={sendConfirmPending}
+          onConfirmSend={() => saveQuote(true, true)}
+          onCancelSend={() => setSendConfirmPending(false)}
           hasItems={items.length > 0}
           onSendQuote={() => saveQuote(true)}
           onSaveDraft={() => saveQuote(false)}
@@ -1555,55 +1583,6 @@ export default function NewQuotePage() {
               setOpen={setShowTemplatePanel}
               onSelect={handleTemplateSelect}
             />
-
-            {/* Stil-väljare — overridar business default per offert */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Offertstil</p>
-                {templateStyle && (
-                  <button
-                    type="button"
-                    onClick={() => setTemplateStyle(null)}
-                    className="text-xs text-slate-500 hover:text-primary-700 transition-colors"
-                  >
-                    Återställ
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {([
-                  { id: 'modern', label: 'Modern', tagline: 'Ren & tidlös' },
-                  { id: 'premium', label: 'Premium', tagline: 'Påkostad' },
-                  { id: 'friendly', label: 'Friendly', tagline: 'Varm' },
-                ] as const).map(opt => {
-                  const effective = templateStyle || businessDefaultStyle
-                  const isSelected = effective === opt.id
-                  const isDefault = !templateStyle && businessDefaultStyle === opt.id
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setTemplateStyle(opt.id)}
-                      className={`relative p-3 rounded-xl border text-left transition-all ${
-                        isSelected
-                          ? 'border-primary-700 bg-primary-50 shadow-sm'
-                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className={`text-xs font-bold tracking-tight ${isSelected ? 'text-primary-700' : 'text-slate-900'}`}>
-                        {opt.label}
-                      </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">{opt.tagline}</div>
-                      {isDefault && (
-                        <div className="text-[9px] font-semibold uppercase tracking-wider text-primary-700 mt-1.5">
-                          Standard
-                        </div>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
 
             {/* Snabbstart-sektion borttagen 2026-05-20 per pilot-feedback —
                 tog upp onödig plats utan att ge värde. QuoteQuickstartCard-
@@ -1745,6 +1724,16 @@ export default function NewQuotePage() {
             <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />
             <QuoteNewEfterkalkylBanner insight={efterkalkylInsight} />
 
+            {/* ETAPP 1b (offert-masterplan.md): flyttad hit (var tidigare
+                position 2, direkt under mallpanelen) — ett kosmetiskt val
+                ska inte vara beslut #2 före kunden/raderna. */}
+            <QuoteStylePicker
+              value={templateStyle}
+              onChange={setTemplateStyle}
+              businessDefaultStyle={businessDefaultStyle}
+              accentColor={businessConfig?.accent_color}
+            />
+
             <QuoteEditTotalsSection
               totals={totals}
               vatRate={vatRate}
@@ -1764,7 +1753,7 @@ export default function NewQuotePage() {
               previewMode={previewMode}
               setPreviewMode={setPreviewMode}
               liveAvailable={liveAvailable}
-              liveTemplateData={liveTemplateData}
+              liveTemplateData={quoteTemplateData}
               liveHandlers={liveHandlers}
               templatePreviewPayload={templatePreviewPayload}
               debouncedPreviewData={debouncedPreviewData}
