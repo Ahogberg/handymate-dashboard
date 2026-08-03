@@ -632,6 +632,20 @@ function ChatTab({
                 }`}
               >
                 {message.content}
+                {/* Dirigering synlig (Andreas 2026-08-03): agent-fältet togs
+                    emot från /api/matte/chat men renderades aldrig här —
+                    Mattes handoff till specialisterna var osynlig i hörn-
+                    bubblan. Samma mönster som MatteChatModal (Agent-sidan). */}
+                {message.role === 'assistant' && message.agent && message.agent !== 'matte' && (() => {
+                  const agent = getAgentById(message.agent)
+                  if (!agent) return null
+                  return (
+                    <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-200 text-[11px] text-gray-500">
+                      <span className={`w-2 h-2 rounded-full ${agent.color}`} />
+                      <span>💬 via {agent.name} <span className="text-gray-400">({agent.role})</span></span>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
             {/* Actions from AI */}
