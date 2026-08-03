@@ -1,7 +1,41 @@
 # Handymate — Ärlig kapabilitets-inventering
 
 _För pitch-/strategiändamål. Ingen hype — vad som FAKTISKT finns._
-_Genererad 2026-07-01 · **Uppdaterad 2026-08-02** (Storfirman-paritet, git-verifierad)._
+_Genererad 2026-07-01 · **Uppdaterad 2026-08-03** (värdekedjorna stängda, git-verifierad)._
+
+## ⚡ 2026-08-03: VÄRDEKEDJORNA STÄNGDA — "motorerna fanns, triggrarna saknades", BYGGT (ej LIVE)
+
+Tre parallella kodrevisioner inför lansering konvergerade: motorerna, kön
+och godkännandemekaniken fanns — men triggrarna saknades. Allt byggt på
+en dag (tasks/value-chain-plan.md har commit-hashar + detaljer):
+
+**Agenterna GÖR nu mer av det som redan var byggt:**
+- Auto-offertutkast: kvalificerad lead (score >= 50 + beskrivning) →
+  färdigt utkast med produktbanksrader i kön, utan att någon ber om det.
+- ÄTA-kedjan: Daniel/Matte föreslår ÄTA-utkast när kundkommunikation
+  klassas som tilläggsbeställning på ett identifierat projekt.
+- Karin väcks på JUST förfallna fakturor (bedömer kund/belopp/relation —
+  mallpåminnelsen kvar som mekanisk fallback).
+- Lars väcks på avslutat jobb med avvikelsedata inline; nytt
+  get_project_outcome-verktyg (enskilt projekt).
+- Daniel får nattlig push på efterkalkyl per jobbtyp + ÄTA-frekvens
+  ("badrummen drar X % över — höj tidsraderna i mallen").
+- Verktygsallokeringen rättad: specialisterna hade inte sina egna
+  domänverktyg (Daniel saknade pris/efterkalkyl, Karin saknade Fortnox).
+
+**Fyra korrekthetsbuggar fixade** (varav en SÄKERHET: auto-approve räknade
+redigerade förslag som rena godkännanden → förtjänad autonomi eskalerade
+för snabbt) + **foto→offert-revisionen** (RUT→ROT-buggen, ROT-default,
+årstak i offertflödet, klientkomprimering av foton som annars kraschade
+mobilflödet, AI-tillval, kundprislistor) + **prisdata-UX** (allvarligast:
+"Din timkostnad"-fältet skrev till AI:ns försäljningsprisnyckel — kunder
+fick offerter till självkostnad; CSV-import; AgentReadinessCard;
+självläkande 0-kr-rader) + **landningssidans BankID-påstående ersatt med
+sant** (ingen BankID-integration finns — SPEC, backlog).
+
+**Status BYGGT, inte LIVE:** v78-migrationen väntar på Andreas; ingen
+kund har använt flödena skarpt. Våg 3 (byggdagbok, grannskapskampanj,
+materialorder, recensionsfångst, avvikelselogg) väntar på pilotsignal.
 
 ## ⚡ 2026-08-02: STORFIRMAN-PARITET — 9 etapper byggda på en dag, BYGGT (ej LIVE)
 

@@ -107,20 +107,20 @@ agentverktyg `create_ata_draft` i BÅDA tool-filerna (Daniel + Matte),
 wire:a `lib/matte/action-executor.ts`. Trigger: kundkommunikation klassad
 som tilläggsbeställning → kort i kön. Facit-test på intent→action-mappningen.
 
-**2c. Karin på förfallen faktura — 🔨 PÅGÅR**
+**2c. Karin på förfallen faktura — ✅ BYGGT (2aec93aa)**
 `app/api/cron/check-overdue/route.ts:51` sätter idag bara status. Lägg
 till `triggerAgentInternal('invoice_overdue')` — triggern redan deklarerad
 (`personalities.ts:74`), `invoice_*`-prefix routar till Karin.
 Reminder-cronen kvar som fallback med dedup mot Karins kort.
 
-**2d. Lars + Hanna på avslutat jobb — 🔨 PÅGÅR**
+**2d. Lars + Hanna på avslutat jobb — ✅ BYGGT (2aec93aa; dispatchen är prefix-baserad → bara Lars väcks, Hannas del kvar i avtal-forslag-cronen som redan täcker den)**
 `booking/complete-job` + `projects/route.ts` fryser efterkalkylen men
 väcker ingen agent. Trigga `job_completed` (finns i bådas triggerlistor,
 `personalities.ts:95,138`). Nytt läsverktyg `get_project_outcome`
 (specifikt projekt — get_efterkalkyl_insight är bara aggregat). Hanna
 återanvänder `lib/agents/hanna/avtal-forslag.ts`-logiken i rätt ögonblick.
 
-**2e. Daniel får push på efterkalkyl — EJ PÅBÖRJAD**
+**2e. Daniel får push på efterkalkyl — ✅ BYGGT (5cf50cc1)**
 `lib/agents/daniel/observation-prompt.ts` läser aldrig `project_outcome`.
 Lägg till outcome-aggregat per jobbtyp (ÅTERANVÄND helpern i
 `lib/efterkalkyl/get-insight.ts`) + `ata_frequency` från business_patterns
