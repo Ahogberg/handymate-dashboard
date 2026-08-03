@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
 import Link from 'next/link'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 
 interface Supplier {
   supplier_id: string
@@ -258,10 +259,9 @@ export default function NewOrderPage() {
 
               <div>
                 <label className="block text-sm text-gray-500 mb-2">Leveransadress</label>
-                <input
-                  type="text"
+                <AddressAutocomplete
                   value={deliveryAddress}
-                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  onChange={setDeliveryAddress}
                   placeholder="Adress för leverans"
                   className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 />

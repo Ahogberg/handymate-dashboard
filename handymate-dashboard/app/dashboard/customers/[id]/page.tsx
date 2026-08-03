@@ -47,6 +47,7 @@ import Link from 'next/link'
 import CustomerTimeline from '@/components/CustomerTimeline'
 import { CopyId } from '@/components/CopyId'
 import { normalizeSwedishPhone, formatSwedishPhone } from '@/lib/phone-normalize'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 
 interface Customer {
   customer_id: string
@@ -1648,7 +1649,7 @@ export default function CustomerDetailPage() {
 
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Adress</label>
-                <input type="text" value={editForm.address_line || ''} onChange={(e) => setEditForm({ ...editForm, address_line: e.target.value })}
+                <AddressAutocomplete value={editForm.address_line || ''} onChange={(v) => setEditForm({ ...editForm, address_line: v })}
                   className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]" />
               </div>
 
@@ -1661,7 +1662,7 @@ export default function CustomerDetailPage() {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Fakturaadress</label>
-                    <input type="text" value={editForm.invoice_address || ''} onChange={(e) => setEditForm({ ...editForm, invoice_address: e.target.value })} placeholder="Om annan än besöksadress"
+                    <AddressAutocomplete value={editForm.invoice_address || ''} onChange={(v) => setEditForm({ ...editForm, invoice_address: v })} placeholder="Om annan än besöksadress"
                       className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]" />
                   </div>
                 </>

@@ -14,6 +14,7 @@ import {
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { format, startOfWeek, endOfWeek } from 'date-fns'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 
 interface TravelEntry {
   id: string
@@ -132,8 +133,11 @@ export default function TravelSection({ currentWeek }: TravelSectionProps) {
   const veh = VEHICLE_TYPES.find(v => v.value === form.vehicle_type)
   const estimatedAmount = km * (veh?.rate || 25)
 
+  // overflow-hidden borttagen ur rotdivven (2026-08-03): klippte
+  // AddressAutocomplete-dropdownen för från/till-fälten. Säkert att släppa
+  // — inga barn har egna bakgrundsfärger som når de rundade hörnen.
   return (
-    <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+    <div className="bg-white shadow-sm rounded-2xl border border-gray-200">
       <div className="p-4 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500">
@@ -189,14 +193,14 @@ export default function TravelSection({ currentWeek }: TravelSectionProps) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Från</label>
-              <input type="text" value={form.from_address} placeholder="Startadress"
-                onChange={e => setForm({ ...form, from_address: e.target.value })}
+              <AddressAutocomplete value={form.from_address} onChange={v => setForm({ ...form, from_address: v })}
+                placeholder="Startadress"
                 className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/50" />
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Till</label>
-              <input type="text" value={form.to_address} placeholder="Destination"
-                onChange={e => setForm({ ...form, to_address: e.target.value })}
+              <AddressAutocomplete value={form.to_address} onChange={v => setForm({ ...form, to_address: v })}
+                placeholder="Destination"
                 className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/50" />
             </div>
           </div>

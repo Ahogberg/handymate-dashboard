@@ -49,15 +49,26 @@ export default function AddressAutocomplete({
   const wrapperRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click (mouse + touch, för iOS/Android)
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
+    function handleClick(e: MouseEvent | TouchEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
         setShowDropdown(false)
       }
     }
     document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    document.addEventListener('touchstart', handleClick)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('touchstart', handleClick)
+    }
+  }, [])
+
+  // Logga tydligt om Mapbox-token saknas — annars ser fältet bara ut som ett vanligt textfält utan förklaring
+  useEffect(() => {
+    if (!MAPBOX_TOKEN) {
+      console.warn('[AddressAutocomplete] NEXT_PUBLIC_MAPBOX_TOKEN saknas — adressökning avaktiverad, degraderar till vanligt textfält.')
+    }
   }, [])
 
   const search = useCallback(async (query: string) => {
@@ -153,6 +164,8 @@ export default function AddressAutocomplete({
         <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
         <input
           type="text"
+          name="search-field"
+          autoComplete="off"
           value={value}
           onChange={e => handleChange(e.target.value)}
           onFocus={() => { if (suggestions.length > 0) setShowDropdown(true) }}
@@ -164,8 +177,10 @@ export default function AddressAutocomplete({
         {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-600 animate-spin" />}
       </div>
 
+      {/* OBS: hög z-index löser stacking mot syskon-element, men klipps ändå av en förälder med overflow-hidden
+          (t.ex. en modal-card med rundade hörn). Fullständig fix kräver en portal — se komponentens README-notis. */}
       {showDropdown && suggestions.length > 0 && (
-        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+        <div className="absolute z-[999] left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
           {suggestions.map((s, i) => (
             <button
               key={s.id}

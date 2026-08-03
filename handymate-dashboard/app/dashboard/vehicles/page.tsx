@@ -6,6 +6,7 @@ import {
   Calendar, Edit2, Trash2, X, ExternalLink, Search,
   DollarSign, Loader2, AlertTriangle,
 } from 'lucide-react'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 
 // ── Types ──
 
@@ -628,20 +629,18 @@ function ReportModal({
             <>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Från</label>
-                <input
-                  type="text"
+                <AddressAutocomplete
                   value={startAddress}
-                  onChange={e => setStartAddress(e.target.value)}
+                  onChange={setStartAddress}
                   placeholder="Storgatan 12, Stockholm"
                   className={inputCls}
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Till</label>
-                <input
-                  type="text"
+                <AddressAutocomplete
                   value={endAddress}
-                  onChange={e => setEndAddress(e.target.value)}
+                  onChange={setEndAddress}
                   placeholder="Solrosvägen 14, Uppsala"
                   className={inputCls}
                 />

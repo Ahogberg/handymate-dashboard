@@ -17,6 +17,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { LEAD_CATEGORIES, getLeadCategory } from '@/lib/lead-categories'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 
 interface PortalData {
   source: { id: string; name: string; portal_code: string; default_category: string | null }
@@ -353,10 +354,9 @@ export default function LeadPortalPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Adress</label>
-                    <input
-                      type="text"
+                    <AddressAutocomplete
                       value={formAddress}
-                      onChange={e => setFormAddress(e.target.value)}
+                      onChange={setFormAddress}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
                       placeholder="Storgatan 1, Stockholm"
                     />

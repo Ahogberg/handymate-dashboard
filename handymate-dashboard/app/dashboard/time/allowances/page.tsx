@@ -29,6 +29,7 @@ import {
   addDays,
 } from 'date-fns'
 import { sv } from 'date-fns/locale'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 
 interface AllowanceType {
   id: string
@@ -482,20 +483,18 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm text-gray-500 mb-2 block">Från</label>
-                <input
-                  type="text"
+                <AddressAutocomplete
                   value={fromAddress}
-                  onChange={e => setFromAddress(e.target.value)}
+                  onChange={setFromAddress}
                   placeholder="Startadress"
                   className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
               <div>
                 <label className="text-sm text-gray-500 mb-2 block">Till</label>
-                <input
-                  type="text"
+                <AddressAutocomplete
                   value={toAddress}
-                  onChange={e => setToAddress(e.target.value)}
+                  onChange={setToAddress}
                   placeholder="Slutadress"
                   className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
                 />

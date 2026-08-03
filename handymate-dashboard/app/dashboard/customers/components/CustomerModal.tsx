@@ -197,10 +197,9 @@ export function CustomerModal({
               </div>
               <div>
                 <label className={LABEL_CLS}>Fakturaadress</label>
-                <input
-                  type="text"
+                <AddressAutocomplete
                   value={form.invoice_address}
-                  onChange={e => setForm({ ...form, invoice_address: e.target.value })}
+                  onChange={val => setForm({ ...form, invoice_address: val })}
                   placeholder="Om annan än besöksadress"
                   className={INPUT_CLS}
                 />
