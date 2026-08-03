@@ -17,10 +17,15 @@ ALTER TABLE time_checkins
 -- 2. Backfill: matcha på BÅDE business_id och user_id (en person kan vara
 --    anställd/ägare i flera businesses med samma auth-uuid — utan
 --    business_id-matchningen kan backfillen råka peka på fel företags rad).
+--    ::text-cast på båda sidor (2026-08-03, körfel): schemat har glidit
+--    sedan v17/business_users.sql skrevs — business_users.user_id är UUID
+--    i prod idag (auth.uid() jämförs mot den överallt i RLS/appkod), inte
+--    TEXT som den ursprungliga migrationsfilen deklarerade. Casta explicit
+--    så det fungerar oavsett vilken sida som faktiskt är UUID.
 UPDATE time_checkins tc
 SET business_user_id = bu.id
 FROM business_users bu
-WHERE bu.user_id = tc.user_id
+WHERE bu.user_id::text = tc.user_id::text
   AND bu.business_id = tc.business_id
   AND tc.business_user_id IS NULL;
 
