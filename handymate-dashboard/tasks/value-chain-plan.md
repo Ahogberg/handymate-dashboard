@@ -24,7 +24,44 @@ gate-princip som easoft-gap-plan.md)._
    anropar `lib/rot-rut-limits.ts`, agentens createQuote/createInvoice
    aldrig → kan lova kunden avdrag som spränger 50 000-taket.
 
-## VÅG 1 — Korrekthetsbuggar + verktygsallokering — EJ PÅBÖRJAD
+## ✅ STATUS 2026-08-03 (löpande uppdaterad under autonom genomkörning)
+
+Byggt, granskat, committat och pushat till main (auto-deploy):
+- **Våg 1** (9a5cc1d6) — alla fyra korrekthetsbuggarna + verktygsallokering
+  + LTV-ranking. Migration `sql/v78_learning_events_reference_text.sql`
+  VÄNTAR på Andreas (Supabase SQL Editor) — utan den fortsätter
+  learning_events tappa data.
+- **Våg 2a** (6c9cc5f2) — auto-offertutkast från kvalificerad lead.
+  Viktig avvikelse: qualifyLead sätter aldrig status; riktiga
+  inkopplingspunkter är updateLeadStatus + PATCH /api/leads (alla tre
+  kopplade).
+- **Våg 2b** (f5ccc01d) — ÄTA-kedjan ihopkopplad (verktyg + Matte-intent
+  + routing 'project_team'). Känd begränsning flaggad i
+  lib/ata/suggest-ata-draft.ts: exekveraren skapar inte project_change-
+  raden — uppföljning bör koppla den till POST /api/ata.
+- **F1** (09e3bdf4) — RUT→ROT-buggen, ROT-default 'none' respekteras,
+  årstak i offertflödet, död from-photo-route raderad. (F-paketet =
+  foto→offert-revisionens juridiska fixar, utanför ursprungsplanen,
+  Andreas-beslut "ALLA dina punkter är bra. Genomför vi alltihop nu?")
+- **F2** (21e47485) — klientkomprimering av foton (trolig prod-krasch
+  stängd), ETT Sonnet-anrop istället för två, produktbanks-sortering,
+  kundprislistor in i AI:n, AI-tillval (gör hemsidespåståendet sant),
+  foton sparas som bilagor (+ fix: attachments skrevs aldrig vid spar).
+- **P** (84e81bd7) — prisdata-UX: timpris-fallback-kedjan lagad, död
+  CTA-länk fixad, "Din timkostnad"-fältet skrev till AI:ns FÖRSÄLJNINGS-
+  prisnyckel (allvarligast — kunder fick offerter till självkostnad; nu
+  default_internal_hourly_cost + owner/admin-gate), CSV-import till
+  produktbanken, AgentReadinessCard, självläkande 0-kr-rader.
+  OBS: kunder som redan skrivit fel nyckel har kvar gamla värdet i
+  pricing_settings.hourly_rate — stickprovskolla pilot/demo manuellt.
+- **Landningssidan** (handymate-landing fbaa990) — BankID-påståendet
+  ersatt med sant "spårbart signaturbevis", 60s → utkast-löfte.
+
+Pågående: Våg 2c+2d (Karin på invoice_overdue, Lars/Hanna på
+job_completed, get_project_outcome-verktyg). Kvar: 2e (Daniel-push på
+efterkalkyl + ata_frequency), DoD-stängning.
+
+## VÅG 1 — Korrekthetsbuggar + verktygsallokering — ✅ BYGGT (9a5cc1d6)
 
 **1a. learning_events lagad:** migration
 `sql/v78_learning_events_reference_text.sql` (ALTER `reference_id` → TEXT;
@@ -51,7 +88,7 @@ Ren konfiguration — verktygen är redan byggda och routade.
 
 ## VÅG 2 — Trigger-inkopplingar av redan byggda motorer
 
-**2a. Auto-offertutkast från kvalificerad lead — EJ PÅBÖRJAD (STÖRSTA HÅLET)**
+**2a. Auto-offertutkast från kvalificerad lead — ✅ BYGGT (6c9cc5f2) (STÖRSTA HÅLET)**
 Motorn: `lib/ai-quote-generator.ts` (produktbank v67 + mallar + historik) —
 enda anroparen idag är UI-knappen. Bygg: lead kvalificeras över tröskel →
 utkast genereras → `create_quote_draft`-kort (exekveraren finns redan
@@ -62,7 +99,7 @@ har offert. ÅTERANVÄND ai-quote-generator — bygg INTE via döda
 senare). Demo-verifiering: seedad lead på demokontot → kort med
 produktbanksrader.
 
-**2b. ÄTA-kedjan — EJ PÅBÖRJAD (störst pengavärde)**
+**2b. ÄTA-kedjan — ✅ BYGGT (f5ccc01d) (störst pengavärde)**
 Allt finns utom kopplingen: exekveraren `create_ata_draft`
 (approvals/[id]/route.ts:996), signeringsflödet (ata/sign/[token]),
 intent-klassificeringen (`lib/matte/intent-agent.ts:57`). Bygg: nytt
@@ -70,13 +107,13 @@ agentverktyg `create_ata_draft` i BÅDA tool-filerna (Daniel + Matte),
 wire:a `lib/matte/action-executor.ts`. Trigger: kundkommunikation klassad
 som tilläggsbeställning → kort i kön. Facit-test på intent→action-mappningen.
 
-**2c. Karin på förfallen faktura — EJ PÅBÖRJAD**
+**2c. Karin på förfallen faktura — 🔨 PÅGÅR**
 `app/api/cron/check-overdue/route.ts:51` sätter idag bara status. Lägg
 till `triggerAgentInternal('invoice_overdue')` — triggern redan deklarerad
 (`personalities.ts:74`), `invoice_*`-prefix routar till Karin.
 Reminder-cronen kvar som fallback med dedup mot Karins kort.
 
-**2d. Lars + Hanna på avslutat jobb — EJ PÅBÖRJAD**
+**2d. Lars + Hanna på avslutat jobb — 🔨 PÅGÅR**
 `booking/complete-job` + `projects/route.ts` fryser efterkalkylen men
 väcker ingen agent. Trigga `job_completed` (finns i bådas triggerlistor,
 `personalities.ts:95,138`). Nytt läsverktyg `get_project_outcome`
