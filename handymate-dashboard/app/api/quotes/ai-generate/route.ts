@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
-import { generateQuoteFromInput, getAveragePrice, analyzeJobImage } from '@/lib/ai-quote-generator'
+import { generateQuoteFromInput, getAveragePrice, analyzeJobImage, resolveCustomerPriceList } from '@/lib/ai-quote-generator'
 import { getServerSupabase } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
@@ -32,19 +32,32 @@ export async function POST(request: NextRequest) {
     // Produktbank-konsolidering: fallback-priskontexten läses ur products
     // (artikelregistret) i stället för döda price_list. Mappas till samma
     // PriceListItem-form (unit_price = sales_price) så buildPriceContext är
-    // oförändrad. Kundspecifik price_lists_v2 (topp-prio) RÖRS EJ.
-    const [priceListResult, templatesResult] = await Promise.all([
+    // oförändrad. Kundspecifik price_lists_v2 (topp-prio) hämtas separat
+    // nedan (B4) via resolveCustomerPriceList och tar över när den finns.
+    //
+    // B3 (kodrevision 2026-08-03): tidigare .limit(50) UTAN .order() gav en
+    // hantverkare med 300 artiklar 50 GODTYCKLIGA rader i AI-prompten
+    // (Postgres garanterar ingen ordning utan ORDER BY). Samma order som
+    // usePriceListLookup.ts (favoriter → namn) — konsekvent med hur
+    // snabbvalen i quotes/new redan sorterar produktbanken. Höjd limit
+    // (50 → 100) ger fler kandidater innan gränsen träffas.
+    const [priceListResult, templatesResult, customerPriceList] = await Promise.all([
       supabase
         .from('products')
         .select('name, unit, sales_price, category')
         .eq('business_id', business.business_id)
         .eq('is_active', true)
-        .limit(50),
+        .order('is_favorite', { ascending: false })
+        .order('name')
+        .limit(100),
       supabase
         .from('quote_templates')
         .select('name, default_items, category')
         .eq('business_id', business.business_id)
-        .limit(5)
+        .limit(5),
+      // B4: kundspecifik prislista (price_lists_v2) — undefined om ingen
+      // customerId, ingen kundprislista finns, eller uppslaget failar.
+      resolveCustomerPriceList(business.business_id, customerId),
     ])
 
     const priceListData = (priceListResult.data || []).map(p => ({
@@ -82,7 +95,8 @@ export async function POST(request: NextRequest) {
       textDescription: combinedText || undefined,
       customerId,
       priceList: priceListData,
-      templates: templatesData
+      templates: templatesData,
+      customerPriceList,
     })
 
     // Get price comparison

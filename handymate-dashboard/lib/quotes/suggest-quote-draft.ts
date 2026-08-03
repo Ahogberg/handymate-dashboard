@@ -241,13 +241,18 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
     // ── 6. Produktbank + mallar (samma mönster som app/api/quotes/ ──
     // ai-generate/route.ts — fallback-priskontexten läses ur products,
     // se kommentaren där om produktbanks-konsolideringen v67).
+    // B3 (kodrevision 2026-08-03): samma .limit(50)-utan-.order()-mönster
+    // kopierades hit från ai-generate/route.ts — samma fix, samma
+    // sortering (favoriter → namn, se usePriceListLookup.ts).
     const [priceListResult, templatesResult] = await Promise.all([
       supabase
         .from('products')
         .select('name, unit, sales_price, category')
         .eq('business_id', businessId)
         .eq('is_active', true)
-        .limit(50),
+        .order('is_favorite', { ascending: false })
+        .order('name')
+        .limit(100),
       supabase
         .from('quote_templates')
         .select('name, default_items, category')

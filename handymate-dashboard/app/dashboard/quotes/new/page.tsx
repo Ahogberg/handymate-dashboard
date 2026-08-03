@@ -10,7 +10,8 @@ import ProductSearchModal from '@/components/ProductSearchModal'
 import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import type { QuotePreviewData } from '@/components/quotes/QuotePreview'
 import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates/types'
-import { generateItemId, recalculateItems, setItemRotRut, legacyItemRotRutType } from '@/lib/quote-calculations'
+import { generateItemId, recalculateItems, setItemRotRut, legacyItemRotRutType, applyOptionRowDefaults } from '@/lib/quote-calculations'
+import { compressImageFile } from '@/lib/images/compress-photo'
 import { getAllCategories, type CustomCategory } from '@/lib/constants/categories'
 import {
   type DetailLevel,
@@ -103,6 +104,13 @@ function normalizeUnit(unit: string): string {
  * legacyItemRotRutType + setItemRotRut (kodrevision 2026-08-03, Fix 1+2) —
  * default null (ingen avdragstyp antagen) håller befintliga anrop som inte
  * bryr sig om ROT/RUT oförändrade.
+ *
+ * `itemType` (kodrevision 2026-08-03, B5): AI:ns föreslagna TILLVAL
+ * (`quote.options`) mappas genom samma funktion med itemType 'option' —
+ * v66-schemat (sql/v66_quote_option_rows.sql) kräver `option_selected` +
+ * `option_default` på tillvalsrader. `option_default: false` alltid för
+ * AI-föreslagna tillval — kunden ska aktivt välja till, aldrig få dem
+ * förikryssade.
  */
 function convertLegacyItems(
   legacyItems: Array<{
@@ -116,22 +124,25 @@ function convertLegacyItems(
     total: number
   }>,
   suggestedDeductionType: 'rot' | 'rut' | 'none' | null | undefined = null,
+  itemType: 'item' | 'option' = 'item',
 ): QuoteItem[] {
   return legacyItems.map((item, idx) =>
-    setItemRotRut(
-      {
-        id: generateItemId(),
-        item_type: 'item' as const,
-        description: item.name || item.description || '',
-        quantity: item.quantity,
-        unit: normalizeUnit(item.unit),
-        unit_price: item.unit_price,
-        total: item.quantity * item.unit_price,
-        is_rot_eligible: false,
-        is_rut_eligible: false,
-        sort_order: idx,
-      },
-      legacyItemRotRutType(item.type, suggestedDeductionType),
+    applyOptionRowDefaults(
+      setItemRotRut(
+        {
+          id: generateItemId(),
+          item_type: itemType,
+          description: item.name || item.description || '',
+          quantity: item.quantity,
+          unit: normalizeUnit(item.unit),
+          unit_price: item.unit_price,
+          total: item.quantity * item.unit_price,
+          is_rot_eligible: false,
+          is_rut_eligible: false,
+          sort_order: idx,
+        },
+        legacyItemRotRutType(item.type, suggestedDeductionType),
+      ),
     ),
   )
 }
@@ -950,28 +961,68 @@ export default function NewQuotePage() {
     // TRUE (RUT-jobb fick ROT eftersom getItemRotRutType kollar ROT först),
     // och 'none' ROT-flaggade ändå allt arbete via convertLegacyItems.
     const converted = convertLegacyItems(quote.items || [], quote.suggestedDeductionType)
-    setItems(converted)
+    // B5: AI:ns föreslagna tillval (0-3 st, tomt om inget genuint relevant)
+    // läggs efter grundraderna som avbockade item_type 'option'-rader.
+    const options = convertLegacyItems(quote.options || [], quote.suggestedDeductionType, 'option')
+    const combined = [
+      ...converted,
+      ...options.map((o, idx) => ({ ...o, sort_order: converted.length + idx })),
+    ]
+    setItems(combined)
     setAiGenerated(true)
     setAiConfidence(quote.confidence || null)
     toast.success('AI genererade offertförslag!')
   }
 
-  function handlePhotoFile(file: File) {
+  // B1 (kodrevision 2026-08-03): komprimera INNAN base64 — en okomprimerad
+  // mobilkamerabild (3-8 MB) blir 4-11 MB som base64 och spränger både
+  // Vercels ~4,5 MB request-gräns och Anthropics 5 MB/bild-gräns. Gäller
+  // ALLA foto-inläsningsvägar (kamera, galleri, "+"-rutan) — de går alla
+  // genom denna enda funktion (QuoteNewAIHelper → onPhotoFile).
+  async function handlePhotoFile(file: File) {
     if (!file.type.startsWith('image/')) return
     if (photos.length >= MAX_PHOTOS) {
       toast.error(`Max ${MAX_PHOTOS} foton`)
       return
     }
-    const reader = new FileReader()
-    reader.onload = e => {
-      const dataUrl = e.target?.result as string
+    try {
+      const dataUrl = await compressImageFile(file)
       setPhotos(prev => [...prev, dataUrl])
+    } catch (err) {
+      console.error('Kunde inte komprimera foto:', err)
+      toast.error('Kunde inte läsa in fotot')
     }
-    reader.readAsDataURL(file)
   }
 
   function removePhoto(index: number) {
     setPhotos(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // B6: laddar upp ett (redan komprimerat, B1) foto till samma lagringsväg
+  // som QuoteNewAttachmentsCard/handleFileUpload använder för manuella
+  // bilagor — bara källan skiljer sig (dataURL i state i stället för en
+  // File från en <input>). Attachments kräver ingen quote_id (skickas med
+  // i POST-bodyn vid spar, se saveQuote) så uppladdningen kan ske direkt
+  // efter analys, innan `photos` rensas. Sväljer fel — en misslyckad
+  // bilage-uppladdning ska aldrig stoppa det redan lyckade AI-förslaget.
+  async function uploadPhotoAsAttachment(
+    dataUrl: string,
+    index: number,
+  ): Promise<{ name: string; url: string; size: number } | null> {
+    try {
+      const arrayBuffer = await (await fetch(dataUrl)).arrayBuffer()
+      const timestamp = Date.now()
+      const filePath = `${business.business_id}/quotes/drafts/${timestamp}_foto_${index + 1}.jpg`
+      const { error: uploadError } = await supabase.storage
+        .from('customer-documents')
+        .upload(filePath, arrayBuffer, { contentType: 'image/jpeg', upsert: false })
+      if (uploadError) throw uploadError
+      const { data: urlData } = supabase.storage.from('customer-documents').getPublicUrl(filePath)
+      return { name: `Foto ${index + 1}.jpg`, url: urlData.publicUrl, size: arrayBuffer.byteLength }
+    } catch (err) {
+      console.error('Kunde inte spara foto som bilaga:', err)
+      return null
+    }
   }
 
   async function analyzePhoto() {
@@ -994,6 +1045,14 @@ export default function NewQuotePage() {
         applyAiResult(data.quote)
         setAiPriceWarning(data.priceWarning || null)
         setAiPhotoCount(data.photoCount || photos.length)
+        // B6: spara de analyserade fotona som bilagor på offerten i stället
+        // för att bara slänga dem — hantverkarens dokumentation ska finnas
+        // kvar. Görs innan `setPhotos([])` nedan.
+        const uploaded = await Promise.all(photos.map((p, i) => uploadPhotoAsAttachment(p, i)))
+        const newAttachments = uploaded.filter((a): a is { name: string; url: string; size: number } => !!a)
+        if (newAttachments.length > 0) {
+          setAttachments(prev => [...prev, ...newAttachments])
+        }
         setPhotos([])
         setPhotoDescription('')
       } else {

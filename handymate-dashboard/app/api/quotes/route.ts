@@ -442,6 +442,12 @@ export async function POST(request: NextRequest) {
       customer_pays: customerPays,
       terms: body.terms || {},
       images: body.images || [],
+      // B6 (kodrevision 2026-08-03): body.attachments skickades redan från
+      // quotes/new/page.tsx (bifogade dokument + nu även analyserade AI-
+      // foton) men saknades helt i insertData — kolumnen (quotes.attachments,
+      // sql/quote_overhaul.sql) fanns, men POST skrev aldrig till den, så
+      // ALLA bilagor tappades tyst redan vid skapande, oavsett foto-fixen.
+      attachments: body.attachments || [],
       valid_until: validUntil.toISOString().split('T')[0],
       sent_at: body.status === 'sent' ? new Date().toISOString() : null,
       ai_generated: body.ai_generated || false,
@@ -674,6 +680,9 @@ export async function PUT(request: NextRequest) {
     if (body.fastighetsbeteckning !== undefined && body.fastighetsbeteckning !== null) updates.fastighetsbeteckning = body.fastighetsbeteckning
     if (body.terms !== undefined) updates.terms = body.terms
     if (body.images !== undefined) updates.images = body.images
+    // Parity med POST (B6, kodrevision 2026-08-03) — samma bugg fanns här:
+    // attachments skrevs aldrig vid uppdatering.
+    if (body.attachments !== undefined) updates.attachments = body.attachments
 
     // New text fields
     if (body.introduction_text !== undefined) updates.introduction_text = body.introduction_text

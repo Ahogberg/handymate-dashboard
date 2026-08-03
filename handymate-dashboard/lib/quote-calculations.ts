@@ -26,6 +26,21 @@ export function setItemRotRut(item: QuoteItem, type: RotRutType): QuoteItem {
 }
 
 /**
+ * Tillvalsrad-specifika default-fält (B5, kodrevision 2026-08-03): en rad
+ * med item_type 'option' behöver option_selected/option_default explicit
+ * satta till false (v66-schemat, sql/v66_quote_option_rows.sql) — AI-
+ * föreslagna tillval (convertLegacyItems i app/dashboard/quotes/new/
+ * page.tsx) ska ALLTID starta avbockade och oförvalda; kunden väljer aktivt
+ * till, aldrig förvalt. Extraherad hit (samma skäl som legacyItemRotRutType
+ * ovan) så mappningen är facit-testbar utan att rendera sidan. No-op för
+ * alla andra item_type.
+ */
+export function applyOptionRowDefaults(item: QuoteItem): QuoteItem {
+  if (item.item_type !== 'option') return item
+  return { ...item, option_selected: false, option_default: false }
+}
+
+/**
  * Ren mappning: legacy AI/mall-rad (type: labor/material/service) + en
  * föreslagen/satt avdragstyp → den ROT/RUT-typ raden faktiskt ska få.
  *
