@@ -85,6 +85,27 @@ export const toolDefinitions = [
       required: ["customer_id", "title", "description", "items"],
     },
   },
+  // Våg 2b (tasks/value-chain-plan.md) — ÄTA-kedjan. Skapar ALDRIG en ÄTA
+  // direkt — bara ett förslagskort i godkännande-kön (kö-först-principen,
+  // samma som create_approval_request). Använd när kunden ber om
+  // tilläggsarbete på ett PÅGÅENDE projekt via samtal/SMS/mail — inte för
+  // en helt ny förfrågan utan projekt (använd create_quote istället för
+  // det, eller låt create_approval_request/quote_addition-flödet hantera
+  // det om det är för tidigt för en formell offert).
+  {
+    name: "create_ata_draft",
+    description: "Föreslå ett ÄTA-utkast (ändrings-/tilläggsarbete) på ett pågående projekt. Skapar ETT kort i godkännandekön — skickar INGET till kunden och skapar INGEN ÄTA direkt. Hantverkaren granskar förslaget och skapar/skickar den riktiga ÄTA:n själv. Om projektet redan har ett väntande ÄTA-förslag skapas inget nytt (dedup).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        project_id: { type: "string", description: "ID för det pågående projektet tilläggsarbetet hör till" },
+        description: { type: "string", description: "Konkret beskrivning av tilläggsarbetet, t.ex. 'Kunden vill även ha ett extra eluttag i garaget'" },
+        amount_estimate: { type: "number", description: "Valfri grov kostnadsuppskattning i kr, om känd" },
+        customer_context: { type: "string", description: "Valfritt citat/sammanhang från kundens förfrågan, t.ex. SMS-texten som föranledde förslaget — visas i kortet" },
+      },
+      required: ["project_id", "description"],
+    },
+  },
   {
     name: "get_quotes",
     description: "Hämta offerter, valfritt filtrerade på kund/status.",

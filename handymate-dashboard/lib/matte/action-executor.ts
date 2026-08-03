@@ -6,6 +6,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import type { MatteDecision, MatteAction, IncomingSignal } from './intent-agent'
 import type { ResolvedEntity } from './resolver'
 import type { TimeSlot } from './calendar-slots'
+import { suggestAtaDraft } from '@/lib/ata/suggest-ata-draft'
 
 export async function executeMatteActions(
   decision: MatteDecision,
@@ -15,7 +16,39 @@ export async function executeMatteActions(
   supabase: SupabaseClient,
   availableSlots?: TimeSlot[]
 ): Promise<void> {
+  // Våg 2b (tasks/value-chain-plan.md) — ÄTA-kedjan: en tilläggsbeställning
+  // (intent 'quote_addition') på ett REDAN identifierat projekt är en ÄTA,
+  // inte en vanlig ny offert. Körs FÖRE actions-loopen och skapar kortet via
+  // en egen, projekt-medveten väg (lib/ata/suggest-ata-draft.ts — delad med
+  // agentverktyget create_ata_draft) istället för den generiska
+  // createApproval() nedan. Skälet: createApproval() sätter varken
+  // routing_role='project_team' eller payload.project_id på rätt sätt för
+  // dedup/routing, och exekverarens 'quote_addition'-case (approvals/[id]/
+  // route.ts) saknar ÄTA-prefixet ('create_ata_draft' har det). Utan
+  // projekt (decision.projectId saknas) är det en vanlig ny offertförfrågan
+  // — lämnas oförändrad till den generiska vägen.
+  const ataHandled = decision.intent === 'quote_addition' && !!decision.projectId
+  if (ataHandled) {
+    await suggestAtaDraft(supabase, {
+      businessId,
+      projectId: decision.projectId as string,
+      // Rå kundtext, samma princip som suggest-quote-draft.ts: exekveraren
+      // skickar payload.description vidare till AI-generatorn vid
+      // godkännande, så det ska vara vad kunden faktiskt skrev — inte en
+      // redan omskriven sammanfattning.
+      description: signal.body,
+      customerContext: decision.reasoning,
+      customerId: entity.customerId || undefined,
+      routedAgent: 'daniel',
+    }).catch(err => console.error('[Matte] suggestAtaDraft error (non-blocking):', err))
+  }
+
   for (const action of decision.actions) {
+    // Redan hanterad ovan via den ÄTA-specifika vägen — hoppa över den
+    // generiska godkännande-vägen för samma action-typ så det inte blir
+    // två kort (ett 'create_ata_draft' + ett generiskt 'quote_addition')
+    // för samma kundförfrågan.
+    if (ataHandled && action.type === 'quote_addition') continue
     try {
       if (action.autonomous) {
         await executeDirectAction(action, entity, signal, businessId, supabase)

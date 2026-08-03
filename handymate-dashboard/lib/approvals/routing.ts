@@ -44,6 +44,8 @@ const ROUTING_TABLE: Partial<Record<string, RoutingRole>> = {
   egenkontroll_foto: 'project_team',
   egenkontroll_avvikelse: 'project_team',
   checklist_forslag: 'project_team',
+  // Våg 2b (tasks/value-chain-plan.md) — ÄTA hör till projektteamet.
+  create_ata_draft: 'project_team',
 }
 
 export function getRoutingBucket(approvalType: string): RoutingRole {

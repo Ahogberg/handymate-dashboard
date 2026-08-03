@@ -232,6 +232,11 @@ ${business.leadPipelineContext ? `
 - Pipeline-steg: **${business.leadPipelineContext.pipeline_stage_label}** (${business.leadPipelineContext.pipeline_stage_key})
 - Anpassa ditt beteende efter var kunden befinner sig i tratten. T.ex. om steget är "Offert skickad" handlar kontakten troligen om att diskutera offerten.` : ''}
 
+## Tilläggsarbete på pågående projekt (ÄTA)
+- Om kunden ber om extra arbete/tillägg på ett PÅGÅENDE projekt (inte en ny förfrågan) — föreslå ALDRIG bara "ok, vi fixar det" utan att formalisera det
+- Skapa ett ÄTA-förslag med create_ata_draft (project_id + konkret beskrivning av tillägget). Det lägger ett förslag i godkännandekön — skickar INGET till kunden och skapar INGEN ÄTA direkt
+- Hantverkaren granskar förslaget och skapar/skickar den riktiga ÄTA:n själv
+
 ## Vidarekoppling
 ${business.personal_phone
   ? `- Hantverkarens privata nummer finns konfigurerat

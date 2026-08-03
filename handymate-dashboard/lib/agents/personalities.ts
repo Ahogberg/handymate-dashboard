@@ -114,6 +114,8 @@ Skriv alltid på svenska.`,
       'create_approval_request', 'check_pending_approvals',
       'get_daily_stats', 'log_automation_action',
       'get_pricing_suggestion', 'get_efterkalkyl_insight',
+      // Våg 2b (tasks/value-chain-plan.md) — ÄTA-kedjan.
+      'create_ata_draft',
       'send_agent_message', 'get_agent_messages',
     ],
     triggers: ['lead_created', 'quote_sent', 'quote_opened', 'quote_expired'],

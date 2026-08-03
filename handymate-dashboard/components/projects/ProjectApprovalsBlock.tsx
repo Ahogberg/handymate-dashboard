@@ -90,6 +90,8 @@ const TYPE_LABEL: Record<string, string> = {
   tidrapport_forslag: 'Tidrapport',
   // Auto-offertutkast från kvalificerad lead (etapp 2a, tasks/value-chain-plan.md).
   create_quote_draft: 'Offertutkast',
+  // ÄTA-kedjan (etapp 2b, tasks/value-chain-plan.md).
+  create_ata_draft: 'ÄTA-förslag',
 }
 
 export default function ProjectApprovalsBlock({ projectId, onCountChange }: ProjectApprovalsBlockProps) {

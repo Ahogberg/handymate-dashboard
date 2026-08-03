@@ -11,6 +11,7 @@ import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
 import { suggestQuoteDraftForLead } from '@/lib/quotes/suggest-quote-draft'
+import { suggestAtaDraft } from '@/lib/ata/suggest-ata-draft'
 
 interface ToolResult {
   success: boolean
@@ -78,6 +79,8 @@ export async function executeTool(
         return await getQuotes(supabase, businessId, input)
       case 'create_invoice':
         return await createInvoice(supabase, businessId, input)
+      case 'create_ata_draft':
+        return await createAtaDraftTool(supabase, businessId, input)
       case 'check_calendar':
         return await checkCalendar(supabase, businessId, input, context)
       case 'create_booking':
@@ -758,6 +761,68 @@ async function logTime(
 
   if (error) return { success: false, error: error.message }
   return { success: true, data: { time_entry_id: entryId, duration_minutes: duration, message: `${(duration/60).toFixed(1)} timmar loggade` } }
+}
+
+/**
+ * Våg 2b (tasks/value-chain-plan.md) — ÄTA-kedjan. Skapar ETT förslagskort
+ * i godkännandekön (approval_type 'create_ata_draft') — aldrig en ÄTA
+ * direkt. Dedup + insert delas med lib/matte/action-executor.ts via
+ * lib/ata/suggest-ata-draft.ts (samma mönster som create_quote_draft,
+ * etapp 2a). Denna funktion äger bara det tool-specifika I/O:t: verifiera
+ * att projektet finns för företaget och slå upp dess customer_id (så
+ * exekverarens ai-generate-anrop kan använda kundens prislista).
+ */
+async function createAtaDraftTool(
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+): Promise<ToolResult> {
+  const projectId = params.project_id ? String(params.project_id) : ''
+  const description = params.description ? String(params.description).trim() : ''
+  if (!projectId || !description) {
+    return { success: false, error: 'project_id och description krävs.' }
+  }
+
+  const { data: project, error: projectErr } = await supabase
+    .from('project')
+    .select('project_id, name, customer_id')
+    .eq('business_id', businessId)
+    .eq('project_id', projectId)
+    .maybeSingle()
+
+  if (projectErr) return { success: false, error: `Kunde inte slå upp projektet: ${projectErr.message}` }
+  if (!project) return { success: false, error: `Hittade inget projekt med id "${projectId}".` }
+
+  const amountEstimate = typeof params.amount_estimate === 'number'
+    ? params.amount_estimate
+    : (params.amount_estimate ? Number(params.amount_estimate) : undefined)
+
+  const result = await suggestAtaDraft(supabase, {
+    businessId,
+    projectId,
+    description,
+    amountEstimate: Number.isFinite(amountEstimate) ? amountEstimate : undefined,
+    customerContext: params.customer_context ? String(params.customer_context) : undefined,
+    customerId: project.customer_id || undefined,
+    routedAgent: 'daniel',
+  })
+
+  if (result.created) {
+    return {
+      success: true,
+      data: {
+        message: `ÄTA-förslag skapat för projektet "${project.name || projectId}". Hantverkaren granskar och skapar/skickar den riktiga ÄTA:n i kön.`,
+        approval_id: result.approvalId,
+      },
+    }
+  }
+
+  if (result.reason === 'duplicate') {
+    return {
+      success: true,
+      data: { message: `Projektet har redan ett väntande ÄTA-förslag i kön — skapade inget nytt (dedup).`, skipped: true },
+    }
+  }
+
+  return { success: false, error: `Kunde inte skapa ÄTA-förslaget (${result.reason || 'okänt fel'}).` }
 }
 
 // ── Communications ──────────────────────────────────────

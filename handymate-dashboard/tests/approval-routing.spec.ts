@@ -56,6 +56,9 @@ test.describe('getRoutingBucket', () => {
     expect(getRoutingBucket('egenkontroll_foto')).toBe('project_team')
     expect(getRoutingBucket('egenkontroll_avvikelse')).toBe('project_team')
     expect(getRoutingBucket('checklist_forslag')).toBe('project_team')
+    // Våg 2b (tasks/value-chain-plan.md) — ÄTA-kedjan, tillagd medvetet
+    // (se git-historik för denna fil om det behöver spåras).
+    expect(getRoutingBucket('create_ata_draft')).toBe('project_team')
 
     // Typer som planfilens fulla Etapp 3b-tabell pekar mot buckets som INTE
     // finns i RoutingRole än (can_see_financials, can_create_invoices) är
