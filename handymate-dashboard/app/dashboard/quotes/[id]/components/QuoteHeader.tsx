@@ -171,6 +171,19 @@ export function QuoteHeader({
             </button>
           </>
         )}
+        {/* "Visa offert" alltid tillgänglig (Andreas 2026-08-03) — tidigare
+            fanns bara "Visa kundvy" som kräver sign_token (dvs. inte för
+            utkast). Öppnar den renderade mall-HTML:en (samma vy som
+            signeringssidan och numera PDF:en) i ny flik. */}
+        <a
+          href={`/api/quotes/pdf?id=${quote.quote_id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={GHOST_BTN}
+        >
+          <Eye className="w-4 h-4" />
+          Visa offert
+        </a>
         <Link href={`/dashboard/quotes/${quote.quote_id}/edit`} className={GHOST_BTN}>
           <Edit className="w-4 h-4" />
           Redigera

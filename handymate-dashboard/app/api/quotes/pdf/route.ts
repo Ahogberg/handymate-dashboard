@@ -6,12 +6,94 @@ import { selectTemplate, buildQuoteTemplateData } from '@/lib/quote-templates'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 import { generateQuotePDF, type QuotePdfData, type BusinessPdfData } from '@/lib/pdf-generator'
 
+// Chromium-rendering kräver Node-runtime (inte Edge) och tål kallstart —
+// @sparticuz/chromium packar upp binären vid första anropet.
+export const runtime = 'nodejs'
+export const maxDuration = 30
+
+/**
+ * PRIMÄR PDF-väg (Andreas-beslut 2026-08-03: "PDF:en måste matcha
+ * live-vy-offerten EXAKT"): rendera SAMMA HTML som live-vyn/signerings-
+ * sidan (selectTemplate + buildQuoteTemplateData — Modern/Premium/Friendly
+ * per offert) och skriv ut den till PDF via headless Chromium. Exakt match
+ * per definition — mallbyten slår igenom i PDF:en automatiskt.
+ *
+ * Tidigare gick nedladdningen genom en HELT separat jsPDF-renderare
+ * (lib/pdf-generator.ts) som inte delade en rad med HTML-mallarna — därav
+ * att PDF:en såg annorlunda ut. Den behålls ENBART som fail-safe-fallback
+ * (Chromium-start kan misslyckas lokalt på Windows-dev utan
+ * CHROME_EXECUTABLE_PATH, eller vid kallstartstimeout) — hellre en ful men
+ * korrekt PDF än ingen alls. OBS: detta reverserar även den tidigare
+ * "arkivkopia"-designen (jsPDF renderade ALLA rader oavsett visningsnivå)
+ * — exakt-match-kravet innebär att HTML-vyns visningsregler vinner.
+ */
+async function renderHtmlToPdf(html: string): Promise<Buffer | null> {
+  try {
+    const puppeteer = await import('puppeteer-core')
+    let executablePath: string | undefined
+    let args: string[] = []
+
+    // Lokal dev (Windows/Mac): peka på en installerad Chrome via env.
+    // Vercel/Linux: @sparticuz/chromium packar upp sin egen binär.
+    if (process.env.CHROME_EXECUTABLE_PATH) {
+      executablePath = process.env.CHROME_EXECUTABLE_PATH
+    } else {
+      const chromium = (await import('@sparticuz/chromium')).default
+      executablePath = await chromium.executablePath()
+      args = chromium.args
+    }
+
+    const browser = await puppeteer.launch({
+      executablePath,
+      args: [...args, '--no-sandbox', '--disable-setuid-sandbox'],
+      headless: true,
+    })
+    try {
+      const page = await browser.newPage()
+      // 'load' väntar in bilder/loggor (mallens externa <img>-resurser);
+      // 'networkidle0' finns inte i denna puppeteer-versions setContent-typ.
+      await page.setContent(html, { waitUntil: 'load', timeout: 15000 })
+      const pdf = await page.pdf({
+        format: 'a4',
+        printBackground: true,
+        margin: { top: '12mm', bottom: '14mm', left: '0mm', right: '0mm' },
+      })
+      return Buffer.from(pdf)
+    } finally {
+      await browser.close()
+    }
+  } catch (err) {
+    console.error('[quotes/pdf] Chromium-rendering misslyckades — faller tillbaka till jsPDF:', err)
+    return null
+  }
+}
+
 /**
  * Bygg ett PDF-svar (application/pdf, attachment) från en hämtad quote + config
  * + creator. Delas av alla tre ingångar (POST, GET ?token=, GET ?id=).
- * Renderar ALLA rader (arkivkopia) — visningsnivåfiltret gäller bara HTML-vyn.
+ * Primärt: Chromium-utskrift av mall-HTML:en (exakt match mot live-vyn).
+ * Fallback: den gamla jsPDF-renderaren (se renderHtmlToPdf ovan).
  */
 async function buildQuotePdfResponse(quote: any, config: any, creator: any): Promise<NextResponse> {
+  // ── Primär väg: samma HTML som live-vyn → Chromium → PDF ─────────────
+  try {
+    const templateData = buildQuoteTemplateData(quote, config, config, creator)
+    const renderFn = selectTemplate(quote.template_style || config?.quote_template_style)
+    const html = renderFn(templateData)
+    const pdfFromHtml = await renderHtmlToPdf(html)
+    if (pdfFromHtml) {
+      return new NextResponse(pdfFromHtml, {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="Offert-${quote.quote_number || String(quote.quote_id || '').substring(0, 8).toUpperCase()}.pdf"`,
+        },
+      })
+    }
+  } catch (err) {
+    console.error('[quotes/pdf] HTML→PDF-vägen kastade — faller tillbaka till jsPDF:', err)
+  }
+
+  // ── Fallback: gamla jsPDF-renderaren ─────────────────────────────────
   const items: QuotePdfData['items'] = (quote.quote_items || []).map((i: any) => ({
     item_type: i.item_type || 'item',
     description: i.description || '',
