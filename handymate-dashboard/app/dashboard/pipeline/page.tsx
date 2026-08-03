@@ -68,6 +68,7 @@ import { PipelineStats as PipelineStatsView } from './components/PipelineStats'
 import { PipelineHeader } from './components/PipelineHeader'
 import { SiteVisitModal } from './components/SiteVisitModal'
 import { LossModal } from './components/LossModal'
+import { WonModal } from './components/WonModal'
 import { QuickSmsModal } from './components/QuickSmsModal'
 import { StageSettingsModal } from './components/StageSettingsModal'
 import { NewDealModal } from './components/NewDealModal'
@@ -146,6 +147,11 @@ export default function PipelinePage() {
   const [lossDealId, setLossDealId] = useState<string | null>(null)
   const [lossReason, setLossReason] = useState('')
   const [lossReasonDetail, setLossReasonDetail] = useState('')
+
+  // Grattis-modal (vunnen deal utan projekt) — speglar LossModal fast omvänt
+  const [showWonModal, setShowWonModal] = useState(false)
+  const [wonDealId, setWonDealId] = useState<string | null>(null)
+  const [creatingProjectFromWon, setCreatingProjectFromWon] = useState(false)
 
   // Quick actions
   function handleQuickSms(deal: Deal) {
@@ -853,7 +859,8 @@ export default function PipelinePage() {
     }
 
     // Optimistisk uppdatering — flytta kortet direkt i UI
-    const previousStageId = deals.find(d => d.id === dealId)?.stage_id
+    const dealBeingMoved = deals.find(d => d.id === dealId)
+    const previousStageId = dealBeingMoved?.stage_id
     if (targetStage) {
       setDeals(prev => prev.map(d => d.id === dealId ? { ...d, stage_id: targetStage.id, updated_at: new Date().toISOString() } : d))
       if (selectedDeal?.id === dealId) {
@@ -907,10 +914,59 @@ export default function PipelinePage() {
 
       showToast('Deal flyttad', 'success')
       fetchAiActivities()
+
+      // Grattis-modal: dealen är vunnen och saknar ännu projekt → fråga om
+      // hantverkaren vill skapa ett. Dyker inte upp om projekt redan finns
+      // (t.ex. signeringsflödet har redan auto-skapat ett — modal vore brus).
+      if (targetStage?.is_won && !dealBeingMoved?.project) {
+        setWonDealId(dealId)
+        setShowWonModal(true)
+      }
     } catch {
       showToast('Kunde inte flytta deal', 'error')
       fetchPipeline()
     }
+  }
+
+  async function createProjectFromWonDeal() {
+    if (!wonDealId) return
+    const deal = deals.find(d => d.id === wonDealId)
+    if (!deal) { setShowWonModal(false); setWonDealId(null); return }
+
+    setCreatingProjectFromWon(true)
+    try {
+      const body: Record<string, any> = deal.quote_id
+        ? { from_quote_id: deal.quote_id, name: deal.title }
+        : { from_deal_id: deal.id, name: deal.title }
+
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        showToast(errData.error || 'Kunde inte skapa projekt', 'error')
+        return
+      }
+
+      const data = await res.json()
+      setShowWonModal(false)
+      setWonDealId(null)
+      showToast('Projekt skapat!', 'success')
+      await fetchPipeline()
+      router.push(`/dashboard/projects/${data.project.project_id}`)
+    } catch {
+      showToast('Kunde inte skapa projekt', 'error')
+    } finally {
+      setCreatingProjectFromWon(false)
+    }
+  }
+
+  function dismissWonModal() {
+    setShowWonModal(false)
+    setWonDealId(null)
   }
 
   async function confirmLossReason() {
@@ -1604,6 +1660,13 @@ export default function PipelinePage() {
     setLossReasonDetail,
     confirmLossReason,
 
+    showWonModal,
+    setShowWonModal,
+    wonDealId,
+    creatingProjectFromWon,
+    createProjectFromWonDeal,
+    dismissWonModal,
+
     showStageSettings,
     setShowStageSettings,
     stageEdits,
@@ -1811,6 +1874,7 @@ export default function PipelinePage() {
 
       <StageSettingsModal />
       <LossModal />
+      <WonModal />
       <QuickSmsModal />
 
       {/* Toast */}

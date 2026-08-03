@@ -212,6 +212,13 @@ export interface PipelineContextValue {
   setLossReasonDetail: Dispatch<SetStateAction<string>>
   confirmLossReason: () => Promise<void>
 
+  showWonModal: boolean
+  setShowWonModal: Dispatch<SetStateAction<boolean>>
+  wonDealId: string | null
+  creatingProjectFromWon: boolean
+  createProjectFromWonDeal: () => Promise<void>
+  dismissWonModal: () => void
+
   showStageSettings: boolean
   setShowStageSettings: Dispatch<SetStateAction<boolean>>
   stageEdits: Record<string, { name: string; color: string }>
