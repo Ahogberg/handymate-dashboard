@@ -11,22 +11,25 @@
 -- routing) är Etapp 3b — en SENARE körning. Default 'any' på routing_role
 -- => NOLL beteendeförändring för befintliga rader vid denna deploy.
 --
--- RLS-historik (viktigt att förstå innan du kör detta — hittat vid
--- kodgranskning, INTE en live-DB-fråga):
+-- RLS-historik — RÄTTAD 2026-08-03 efter faktisk pg_policies-koll (den
+-- tidigare versionen av denna kommentar gissade fel utifrån git-historik
+-- istället för live-data — exakt den disciplin denna fil själv predikar):
 --   sql/v2_pending_approvals.sql:30   — öppnade policyn USING(true) (bug)
 --   sql/v4_pending_approvals_rls_fix.sql — stängde den (business-scopad,
 --                                          5 separata policies)
---   sql/v15_autopilot.sql:24-26        — DROP:ade v4:s policies igen och
---                                          återskapade USING(true)
---                                          (sannolikt oavsiktlig regression
---                                          — filen kör en idempotent
---                                          CREATE TABLE IF NOT EXISTS-setup
---                                          som kopierade v2:s ursprungliga
---                                          policy utan att veta att v4 redan
---                                          hade skärpt den).
---   → Nuvarande produktionsstate är alltså sannolikt USING(true) igen,
---     dvs INTE ens business-scopad. Steg 1 nedan verifierar detta faktiskt
---     innan resten körs.
+--   sql/v15_autopilot.sql:24-26        — INNEHÅLLER kod som skulle återöppna
+--                                          den, MEN Andreas pg_policies-koll
+--                                          2026-08-03 visar att prod ALDRIG
+--                                          fick den regressionen (v15:s
+--                                          idempotenta block körde
+--                                          sannolikt aldrig mot denna tabell,
+--                                          eller kördes före v4 i praktiken).
+--   → Nuvarande produktionsstate ÄR v4:s fem policies (owner_select/update
+--     via business_config, team_select/update via business_users,
+--     service_role) — redan korrekt business-scopat. INTE en akut
+--     säkerhetslucka. Denna migration är alltså en KONSOLIDERING (5→2
+--     policies, enhetlig is_active-koll) och infrastruktur för routing_role
+--     — inte en brådskande fix av en läckande databas.
 --
 -- Server-routes (SUPABASE_SERVICE_ROLE_KEY, se lib/supabase.ts
 -- getServerSupabase()) bypassar RLS helt oavsett policy — den här
@@ -37,12 +40,25 @@
 -- app/dashboard/projects/[id]/page.tsx som INTE migreras i denna körning).
 -- ============================================================
 
--- 1. Verifiera nuvarande policy INNAN du kör resten (för din egen skull):
+-- 1. Verifiera nuvarande policy INNAN du kör resten (redan gjort
+--    2026-08-03 — bekräftat: v4:s fem policies, korrekt business-scopade,
+--    inget qual='true'. Kör igen om det gått ett tag sedan förra kollen).
 --
 --   SELECT policyname, cmd, qual, with_check
 --   FROM pg_policies WHERE tablename = 'pending_approvals';
---
--- Om qual='true' här bekräftar det regressionen ovan.
+
+-- 1b. Backfill-koll INNAN du droppar owner_select/owner_update (steg 3
+--     nedan): dessa två policies är ägarens ENDA väg in via business_config
+--     (utan business_users-koppling). Om en ägare saknar en business_users-
+--     rad låser vi ute den ägaren från sin egen godkännande-kö genom att
+--     droppa dem. Förväntat resultat: 0 rader. Om raderna INTE är 0 —
+--     STOPPA, säg till, kör inte resten förrän de företagen är backfyllda.
+SELECT bc.business_id, bc.business_name, bc.user_id
+FROM business_config bc
+WHERE NOT EXISTS (
+  SELECT 1 FROM business_users bu
+  WHERE bu.business_id = bc.business_id AND bu.user_id = bc.user_id
+);
 
 -- 2. Nya kolumner (idempotent, ingen beteendeförändring — default 'any')
 ALTER TABLE pending_approvals ADD COLUMN IF NOT EXISTS routing_role TEXT DEFAULT 'any';
@@ -81,19 +97,35 @@ CREATE POLICY "pending_approvals_service_role" ON pending_approvals
   WITH CHECK (auth.role() = 'service_role');
 
 -- Business-scopad bakstopp: business_id måste matcha en AKTIV business_users-
--- rad för auth.uid(). OBS mot planspecen: business_users.sql (steg 4) har
--- redan backfyllt en 'owner'-rad i business_users för varje
--- business_config.user_id — så till skillnad från v4:s separata
--- owner-via-business_config-policy räcker EN EXISTS-klausul mot
--- business_users här. is_active=true är ett TILLÄGG utöver planens
+-- rad för auth.uid(). is_active=true är ett TILLÄGG utöver planens
 -- ordagranna EXISTS-exempel (som inte nämnde is_active) — motiveringen är
 -- att lib/permissions.ts:124-146 getCurrentUser() (app-lagrets
 -- motsvarighet) redan filtrerar på is_active=true, så RLS-bakstoppen
 -- annars skulle vara SVAGARE än app-lagret för en inaktiverad anställd vars
--- Supabase-auth-konto fortfarande är giltigt. Flaggat i körrapporten för
--- extra granskning.
-CREATE POLICY "pending_approvals_business_scoped" ON pending_approvals
-  FOR ALL
+-- Supabase-auth-konto fortfarande är giltigt.
+--
+-- RÄTTAD 2026-08-03: SELECT + UPDATE, INTE "FOR ALL". Det gamla v4-setet
+-- (owner/team select+update) gav ALDRIG icke-service-role-användare
+-- INSERT/DELETE via RLS — de operationerna föll tyst igenom till nekad,
+-- eftersom ingen policy täckte dem. "FOR ALL" här hade varit en
+-- kapacitetsUTÖKNING (vem som helst i businessen hade kunnat INSERTa/
+-- DELETEa rader direkt via anon-key från webbläsarens devtools), inte en
+-- ren konsolidering — appen skapar/raderar aldrig approvals klientsidan
+-- (allt går via service-role-API:er), så det finns ingen anledning att
+-- öppna den ytan som en bieffekt av denna migration.
+CREATE POLICY "pending_approvals_business_select" ON pending_approvals
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM business_users
+      WHERE business_users.business_id = pending_approvals.business_id
+        AND business_users.user_id = auth.uid()
+        AND business_users.is_active = true
+    )
+  );
+
+CREATE POLICY "pending_approvals_business_update" ON pending_approvals
+  FOR UPDATE
   USING (
     EXISTS (
       SELECT 1 FROM business_users
@@ -116,10 +148,11 @@ CREATE POLICY "pending_approvals_business_scoped" ON pending_approvals
 --   SELECT policyname, cmd, qual FROM pg_policies
 --   WHERE tablename = 'pending_approvals' ORDER BY policyname;
 --
--- Förväntat: 2 policies (pending_approvals_service_role +
--- pending_approvals_business_scoped). Inga 'true'-policies kvar. Testa
--- gärna cross-business i SQL Editor med olika auth-kontext innan du litar
--- på detta i produktion (DoD-krav för Etapp 3a i planfilen).
+-- Förväntat: 3 policies (pending_approvals_service_role [ALL],
+-- pending_approvals_business_select [SELECT],
+-- pending_approvals_business_update [UPDATE]). Inga 'true'-policies kvar.
+-- Testa gärna cross-business i SQL Editor med olika auth-kontext innan du
+-- litar på detta i produktion (DoD-krav för Etapp 3a i planfilen).
 
 -- 5. Verifiera routing_role-defaultet (ska visa 100% 'any' direkt efter körning)
 SELECT routing_role, COUNT(*) AS antal
