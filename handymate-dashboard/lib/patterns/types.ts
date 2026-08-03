@@ -172,6 +172,16 @@ export interface AtaFrequencyMetadata extends ExclusionMetadata {
     with_ata: number
     pct: number
   }>
+  /** Per jobbtyp (project.job_type, v49) — annan dimension än
+      project_type (som är hourly/fixed-faktureringsform). Våg 2e
+      (tasks/value-chain-plan.md): Daniels nattliga observations-push
+      läser denna breakdown och filtrerar på egen >=3-tröskel (calculatorns
+      is_stale/confidence gäller HELA mönstret, inte enskilda buckets). */
+  by_job_type?: Record<string, {
+    total: number
+    with_ata: number
+    pct: number
+  }>
 }
 
 // ─────────────────────────────────────────────────────────────────

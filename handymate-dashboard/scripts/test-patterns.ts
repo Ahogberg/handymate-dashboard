@@ -768,10 +768,16 @@ function makeDeal(id: string, cycleDays: number): DealCycleSample {
 
 section('computeAtaFrequency')
 
-function makeProject(id: string, ataCount: number, projectType: string | null = null): AtaFrequencySample {
+function makeProject(
+  id: string,
+  ataCount: number,
+  projectType: string | null = null,
+  jobType: string | null = null,
+): AtaFrequencySample {
   return {
     id,
     project_type: projectType,
+    job_type: jobType,
     created_at: '2026-05-01T10:00:00Z',
     ata_count: ataCount,
   }
@@ -862,6 +868,28 @@ function makeProject(id: string, ataCount: number, projectType: string | null = 
     assertEqual(meta.by_project_type.kök.total, 2, 'kök total=2')
     assertEqual(meta.by_project_type.kök.with_ata, 0, 'kök with_ata=0')
     assertEqual(meta.by_project_type.kök.pct, 0, 'kök pct=0')
+  }
+}
+
+// by_job_type-breakdown (Våg 2e, tasks/value-chain-plan.md)
+{
+  const samples: AtaFrequencySample[] = [
+    makeProject('p1', 0, null, 'badrum'),
+    makeProject('p2', 1, null, 'badrum'),
+    makeProject('p3', 2, null, 'badrum'),
+    makeProject('p4', 0, null, 'kök'),
+    makeProject('p5', 0, null, 'kök'),
+  ]
+  const result = computeAtaFrequency(samples, WINDOW_START, WINDOW_END)
+  const meta = result.metadata as { by_job_type?: Record<string, { total: number; with_ata: number; pct: number }> }
+  if (!meta.by_job_type) {
+    failed++
+    console.log('  ✗ by_job_type saknas')
+  } else {
+    assertEqual(meta.by_job_type.badrum.total, 3, 'badrum total=3')
+    assertEqual(meta.by_job_type.badrum.with_ata, 2, 'badrum with_ata=2')
+    assertEqual(meta.by_job_type.kök.total, 2, 'kök total=2')
+    assertEqual(meta.by_job_type.kök.with_ata, 0, 'kök with_ata=0')
   }
 }
 

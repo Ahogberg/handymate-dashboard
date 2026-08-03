@@ -111,6 +111,108 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Per-jobbtyp-gruppering (Våg 2e, tasks/value-chain-plan.md)
+//
+// Daniels nattliga observations-pipeline (lib/agents/daniel/
+// observation-prompt.ts) behöver efterkalkyl grupperad per jobbtyp
+// ("badrummen drar 22% över offererad tid") istället för ett enda
+// aggregat/filter som getEfterkalkylInsight ovan ger. ÅTERANVÄNDER
+// samma lazy-backfill + MIN_SAMPLE_SIZE + average/round1-helpers —
+// bara grupperingsdimensionen skiljer sig.
+// ─────────────────────────────────────────────────────────────────
+
+export interface JobTypeEfterkalkylInsight {
+  job_type: string
+  count: number
+  avg_hours_diff_pct: number
+  avg_amount_diff_pct: number | null
+}
+
+/**
+ * Ren funktion (ingen I/O): grupperar frusna project_outcome-rader per
+ * jobbtyp. Samma ärlighetsprincip som getEfterkalkylInsight — en jobbtyp
+ * med färre än MIN_SAMPLE_SIZE (3) kvalificerade utfall (hours_diff_pct
+ * != null) exkluderas HELT ur resultatet. Facit-testad separat (rena
+ * indata → output, ingen mock av Supabase behövs).
+ */
+export function aggregateOutcomesByJobType(
+  rows: Array<{
+    job_type: string | null
+    hours_diff_pct: number | null
+    amount_diff_pct: number | null
+  }>,
+): JobTypeEfterkalkylInsight[] {
+  const byType: Record<
+    string,
+    Array<{ hours_diff_pct: number; amount_diff_pct: number | null }>
+  > = {}
+
+  for (const row of rows) {
+    if (!row.job_type) continue
+    if (row.hours_diff_pct == null) continue
+    if (!byType[row.job_type]) byType[row.job_type] = []
+    byType[row.job_type].push({
+      hours_diff_pct: row.hours_diff_pct,
+      amount_diff_pct: row.amount_diff_pct,
+    })
+  }
+
+  const result: JobTypeEfterkalkylInsight[] = []
+  for (const [jobType, entries] of Object.entries(byType)) {
+    if (entries.length < MIN_SAMPLE_SIZE) continue // ärlighetsprincipen
+
+    const amountEntries = entries.filter((e) => e.amount_diff_pct != null)
+    result.push({
+      job_type: jobType,
+      count: entries.length,
+      avg_hours_diff_pct: round1(average(entries.map((e) => e.hours_diff_pct))),
+      avg_amount_diff_pct:
+        amountEntries.length > 0
+          ? round1(average(amountEntries.map((e) => e.amount_diff_pct as number)))
+          : null,
+    })
+  }
+
+  // Störst avvikelse (absolutbelopp) först — mest actionable för Daniel.
+  return result.sort(
+    (a, b) => Math.abs(b.avg_hours_diff_pct) - Math.abs(a.avg_hours_diff_pct),
+  )
+}
+
+/**
+ * DB-wrapper: läser project_outcome (efter lazy backfill) och grupperar
+ * per jobbtyp via aggregateOutcomesByJobType. Fail-safe: kastar aldrig,
+ * degraderar till tom array (samma princip som getEfterkalkylInsight).
+ */
+export async function getEfterkalkylInsightsByJobType(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<JobTypeEfterkalkylInsight[]> {
+  await lazyBackfillOutcomes(supabase, businessId)
+
+  const { data: rows, error } = await supabase
+    .from('project_outcome')
+    .select('job_type, hours_diff_pct, amount_diff_pct')
+    .eq('business_id', businessId)
+
+  if (error) {
+    console.error(
+      '[efterkalkyl-insikt/by-job-type] läsning misslyckades, degraderar till tom lista:',
+      error,
+    )
+    return []
+  }
+
+  return aggregateOutcomesByJobType(
+    (rows || []) as Array<{
+      job_type: string | null
+      hours_diff_pct: number | null
+      amount_diff_pct: number | null
+    }>,
+  )
+}
+
 async function lazyBackfillOutcomes(supabase: SupabaseClient, businessId: string): Promise<void> {
   try {
     const { data: candidates, error: candErr } = await supabase

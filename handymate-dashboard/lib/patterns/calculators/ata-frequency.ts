@@ -41,6 +41,11 @@ import type { AtaFrequencyValue, AtaFrequencyMetadata, CalculatorResult } from '
 export interface AtaFrequencySample {
   id: string
   project_type: string | null
+  /** project.job_type (v49) — annan dimension än project_type (som är
+      hourly/fixed-faktureringsform). Våg 2e (tasks/value-chain-plan.md):
+      Daniels nattliga push läser by_job_type-breakdown för "badrum får
+      ÄTA i 60% av fallen". */
+  job_type: string | null
   created_at: string
   ata_count: number  // antal project_change-rader (inkl 0)
 }
@@ -91,9 +96,26 @@ export function computeAtaFrequency(
     t.pct = t.total > 0 ? t.with_ata / t.total : 0
   }
 
+  // Breakdown per jobbtyp (Våg 2e) — samma mönster som by_project_type
+  // ovan, bara annan grupperingsnyckel (project.job_type, v49).
+  const byJobType: Record<string, { total: number; with_ata: number; pct: number }> = {}
+  for (const sample of samples) {
+    if (!sample.job_type) continue
+    if (!byJobType[sample.job_type]) {
+      byJobType[sample.job_type] = { total: 0, with_ata: 0, pct: 0 }
+    }
+    byJobType[sample.job_type].total++
+    if (sample.ata_count > 0) byJobType[sample.job_type].with_ata++
+  }
+  for (const type of Object.keys(byJobType)) {
+    const t = byJobType[type]
+    t.pct = t.total > 0 ? t.with_ata / t.total : 0
+  }
+
   const metadata: AtaFrequencyMetadata = {
     excluded_total: 0,  // explicit — inga exclusions för ata_frequency
     ...(Object.keys(byProjectType).length > 0 ? { by_project_type: byProjectType } : {}),
+    ...(Object.keys(byJobType).length > 0 ? { by_job_type: byJobType } : {}),
   }
 
   return {
@@ -113,6 +135,7 @@ export function computeAtaFrequency(
 interface ProjectRow {
   project_id: string
   project_type: string | null
+  job_type: string | null
   created_at: string
 }
 
@@ -141,7 +164,7 @@ export async function calculateAtaFrequency(
 
   const { data: projectsData, error: projectsErr } = await supabase
     .from('project')
-    .select('project_id, project_type, created_at')
+    .select('project_id, project_type, job_type, created_at')
     .eq('business_id', businessId)
     .gte('created_at', window.start.toISOString())
     .lte('created_at', window.end.toISOString())
@@ -176,6 +199,7 @@ export async function calculateAtaFrequency(
   const samples: AtaFrequencySample[] = projects.map(p => ({
     id: p.project_id,
     project_type: p.project_type,
+    job_type: p.job_type,
     created_at: p.created_at,
     ata_count: ataCountByProject[p.project_id] || 0,
   }))

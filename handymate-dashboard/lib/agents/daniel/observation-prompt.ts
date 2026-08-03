@@ -31,6 +31,20 @@ import {
   buildUnopenedNudgeMessage,
   UNOPENED_CONFLICT_WINDOW_HOURS,
 } from '@/lib/agents/daniel/unopened-quotes'
+import {
+  getEfterkalkylInsightsByJobType,
+  type JobTypeEfterkalkylInsight,
+} from '@/lib/efterkalkyl/get-insight'
+
+/**
+ * Ärlighetströskel för ÄTA-frekvens per jobbtyp (Våg 2e). Samma princip
+ * som MIN_SAMPLE_SIZE i lib/efterkalkyl/get-insight.ts (3) — en jobbtyp
+ * med färre samples i business_patterns.ata_frequency-metadatan nämns
+ * aldrig. Egen konstant här eftersom calculatorns is_stale/confidence
+ * gäller HELA mönstret (tröskel 10 för preliminary), inte enskilda
+ * jobbtyps-buckets i by_job_type.
+ */
+const MIN_ATA_JOB_TYPE_SAMPLE = 3
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
@@ -178,6 +192,28 @@ export interface DanielAggregate {
     source: string | null
     score: number | null
     days_in_pipeline: number
+  }>
+  /**
+   * 2026-08-03 (Våg 2e, tasks/value-chain-plan.md): efterkalkyl per
+   * jobbtyp — ÅTERANVÄNDER getEfterkalkylInsightsByJobType (lib/
+   * efterkalkyl/get-insight.ts), samma helper som Matte-verktyget
+   * get_efterkalkyl_insight (motor 1: frusna project_outcome-rader).
+   * Bara jobbtyper med >=3 utfall (ärlighetsprincipen — under tröskeln
+   * exkluderas jobbtypen HELT, den listas inte som "för lite data").
+   */
+  efterkalkyl_by_job_type: JobTypeEfterkalkylInsight[]
+  /**
+   * 2026-08-03 (Våg 2e): ÄTA-frekvens per jobbtyp ur
+   * business_patterns.ata_frequency (beräknas dagligen av
+   * lib/patterns/run-patterns.ts — tidigare write-only, ingen läste den).
+   * Bara jobbtyper med >=3 projekt i mönstrets 12-månaders-fönster.
+   */
+  ata_frequency_by_job_type: Array<{
+    job_type: string
+    total: number
+    with_ata: number
+    /** Avrundad heltalsprocent (0-100), inte 0..1-fraktion. */
+    pct_with_ata: number
   }>
 }
 
@@ -483,6 +519,49 @@ async function buildDanielAggregate(
     .sort((a, b) => (b.score || 0) - (a.score || 0))
     .slice(0, 5)
 
+  // ── Efterkalkyl per jobbtyp (Våg 2e) ────────────────────────
+  // ÅTERANVÄNDER getEfterkalkylInsightsByJobType — samma lazy-backfill +
+  // aggregeringskärna som get_efterkalkyl_insight-verktyget (Matte/Lars).
+  // Fail-safe internt (degraderar till [] vid DB-fel), kastar aldrig.
+  const efterkalkylByJobType = await getEfterkalkylInsightsByJobType(supabase, businessId)
+
+  // ── ÄTA-frekvens per jobbtyp (Våg 2e) ───────────────────────
+  // business_patterns.ata_frequency: en rad per business (UNIQUE
+  // business_id+pattern_key), beräknad dagligen av lib/patterns/
+  // run-patterns.ts. Breakdown per jobbtyp i metadata.by_job_type
+  // (lib/patterns/calculators/ata-frequency.ts). Var write-only fram
+  // till denna våg — ingen läste raden.
+  const ataFrequencyByJobType: DanielAggregate['ata_frequency_by_job_type'] = []
+  try {
+    const { data: ataPatternRow, error: ataPatternError } = await supabase
+      .from('business_patterns')
+      .select('metadata')
+      .eq('business_id', businessId)
+      .eq('pattern_key', 'ata_frequency')
+      .maybeSingle()
+
+    if (!ataPatternError && ataPatternRow) {
+      const metadata = ataPatternRow.metadata as
+        | { by_job_type?: Record<string, { total: number; with_ata: number; pct: number }> }
+        | null
+      const byJobType = metadata?.by_job_type || {}
+      for (const [jobType, stats] of Object.entries(byJobType)) {
+        if (stats.total < MIN_ATA_JOB_TYPE_SAMPLE) continue // ärlighetsprincipen
+        ataFrequencyByJobType.push({
+          job_type: jobType,
+          total: stats.total,
+          with_ata: stats.with_ata,
+          pct_with_ata: Math.round(stats.pct * 100),
+        })
+      }
+      ataFrequencyByJobType.sort((a, b) => b.pct_with_ata - a.pct_with_ata)
+    }
+  } catch (err) {
+    // Fail-safe — business_patterns kan sakna raden (patterns-cron inte
+    // kört än för denna business) eller v61-migrationen inte körd.
+    console.error('[daniel/aggregate] ata_frequency-läsning misslyckades (fail-safe, ignoreras):', err)
+  }
+
   return {
     period_days: 90,
     business_contact_first_name: businessContactFirstName,
@@ -494,6 +573,8 @@ async function buildDanielAggregate(
     actionable_unopened_quotes: actionableUnopenedQuotes,
     leads_by_source: leadsBySource,
     hot_leads: hotLeads,
+    efterkalkyl_by_job_type: efterkalkylByJobType,
+    ata_frequency_by_job_type: ataFrequencyByJobType,
   }
 }
 
@@ -599,6 +680,20 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
    - Confidence: 0.65 (försiktigare än stale-opens — kunden kan ha hela mailtråden i SPAM).
    - knowledge_type: "recommendation"
 
+7. **Jobbtyper som drar över offererad tid (2026-08-03, Våg 2e):**
+   - aggregate.efterkalkyl_by_job_type: array av { job_type, count, avg_hours_diff_pct, avg_amount_diff_pct }, byggd från faktiska avslutade projekt jämfört mot offererad tid/belopp. Bara jobbtyper med minst 3 avslutade+efterkalkylerade projekt finns med — under den tröskeln är arrayen tom för den jobbtypen, du ser den aldrig.
+   - Om en jobbtyp har avg_hours_diff_pct > 15 (drar mer än 15% över offererad tid) med de minst 3 utfallen som redan garanteras av aggregatet → föreslå konkret att höja tidsraderna i mallen för den jobbtypen.
+   - Exempel: "Badrum drar i snitt 22% mer tid än offererat, sett över 5 avslutade jobb — värt att höja tidsraderna i mallen för den jobbtypen?"
+   - knowledge_type: "recommendation". dedup_key: "daniel_job_type_overrun:\${job_type}" (byt \${job_type} mot faktisk jobbtyps-slug). confidence: 0.75.
+   - ÄRLIGHETSREGEL: nämn ALDRIG en procentsats du inte har i aggregate.efterkalkyl_by_job_type. Om arrayen är tom, eller ingen jobbtyp passerar 15%-tröskeln — hoppa HELT över denna punkt. Hitta inte på siffror eller jobbtyper.
+
+8. **Jobbtyper med hög ÄTA-frekvens (2026-08-03, Våg 2e):**
+   - aggregate.ata_frequency_by_job_type: array av { job_type, total, with_ata, pct_with_ata }, byggd från senaste 12 månadernas projekt och hur ofta de fått tilläggsbeställning (ÄTA). Bara jobbtyper med minst 3 projekt finns med.
+   - Om en jobbtyp har pct_with_ata >= 40 (minst 4 av 10 projekt får tilläggsbeställning) → föreslå att offerten för den jobbtypen förtydligar avgränsningen, eller att en ÄTA-buffert räknas in redan i utgångsofferten.
+   - Exempel: "Kök får tilläggsbeställning i 60% av fallen — 6 av 10 projekt senaste året — värt att tydliggöra avgränsningen i offerten eller räkna in en buffert?"
+   - knowledge_type: "recommendation". dedup_key: "daniel_ata_buffer:\${job_type}". confidence: 0.7.
+   - ÄRLIGHETSREGEL: nämn ALDRIG en procentsats du inte har i aggregate.ata_frequency_by_job_type. Tom array, eller ingen jobbtyp över 40% → hoppa HELT över denna punkt.
+
 Generera 1-3 KORTA observationer (max 2-3 meningar var) med konkret suggestion när det är vettigt.
 
 Var inte trivial. "Du har X offerter ute" = data, inte observation.
@@ -677,6 +772,33 @@ EXAKT EXEMPEL — kopiera strukturen:
       "customer_name": "Anna L.",
       "related_id": "q_unopened_1"
     }
+  },
+  {
+    "knowledge_type": "recommendation",
+    "title": "Badrum drar 22% över offererad tid",
+    "observation": "Badrum drar i snitt 22% mer tid än offererat, sett över 5 avslutade jobb senaste tiden. Det är ett mönster, inte en engångsföreteelse.",
+    "suggestion": "Höj tidsraderna i mallen för badrum.",
+    "confidence": 0.75,
+    "data_basis": {
+      "job_type": "badrum",
+      "count": 5,
+      "avg_hours_diff_pct": 22.0
+    },
+    "dedup_key": "daniel_job_type_overrun:badrum"
+  },
+  {
+    "knowledge_type": "recommendation",
+    "title": "Kök får ÄTA i 60% av fallen",
+    "observation": "Kök får tilläggsbeställning i 60% av fallen — 6 av 10 projekt senaste året. Kunderna säger ofta ja i efterhand men det blir extra administration varje gång.",
+    "suggestion": "Tydliggör avgränsningen i offerten för kök, eller räkna in en ÄTA-buffert direkt.",
+    "confidence": 0.7,
+    "data_basis": {
+      "job_type": "kök",
+      "total": 10,
+      "with_ata": 6,
+      "pct_with_ata": 60
+    },
+    "dedup_key": "daniel_ata_buffer:kök"
   }
 ]`
 }
