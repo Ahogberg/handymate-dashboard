@@ -355,9 +355,12 @@ async function runPostSendAutomations(
         await moveDeal({
           dealId: deal.id,
           businessId,
-          // Ingen 'invoiced'-stage finns; faktura skickad men ej betald
-          // → håll i 'quote_accepted'. 'won' triggas vid betalning.
-          toStageSlug: 'quote_accepted',
+          // V80: Ingen 'invoiced'-stage finns längre ('quote_accepted' är
+          // borttaget, sql/v80_merge_accepted_into_won.sql) — flytta direkt
+          // till 'won'. Betalstatus är fakturamodulens ansvar, inte pipeline-
+          // stegets. De flesta dealsen är redan i 'won' via Golden Path vid
+          // signering — moveDeal() no-opar då.
+          toStageSlug: 'won',
           triggeredBy: 'system',
         })
       }

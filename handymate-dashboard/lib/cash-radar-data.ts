@@ -105,7 +105,7 @@ export async function assembleCashRadar(
 
   const { data: dealRows } = await supabase
     .from('deal')
-    .select('id, value, stage_id, expected_close_date, quote_id, customer_id, title')
+    .select('id, value, stage_id, expected_close_date, quote_id, customer_id, title, invoice_id')
     .eq('business_id', businessId)
     .limit(1000)
 
@@ -119,7 +119,14 @@ export async function assembleCashRadar(
   }> = []
   for (const d of dealRows || []) {
     const stage = stageById.get(String(d.stage_id))
-    if (!stage || stage.is_won || stage.is_lost) continue
+    if (!stage || stage.is_lost) continue
+    // V80: 'quote_accepted' slogs ihop med 'won' — en nyss vunnen, ännu
+    // ofakturerad deal ska fortsätta synas som "nära kassa"-potential
+    // (annars försvinner den ur radarn helt tills en faktura skapats).
+    // Så fort dealen har en faktura (deal.invoice_id satt av findDealByInvoice/
+    // fakturaflödena) räknas den istället exakt via unpaidInvoices ovan —
+    // eller är redan betald och ska inte dubbelräknas. Uteslut den då.
+    if (stage.is_won && d.invoice_id) continue
     openDeals.push({
       id: String(d.id),
       value: Number(d.value) || 0,

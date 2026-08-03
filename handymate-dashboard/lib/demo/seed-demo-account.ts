@@ -217,8 +217,10 @@ export async function resetDemoAccount(
   const stageNewInquiry = await getStageBySlug(businessId, 'new_inquiry')
   const stageContacted = await getStageBySlug(businessId, 'contacted')
   const stageQuoteSent = await getStageBySlug(businessId, 'quote_sent')
-  const stageQuoteAccepted = await getStageBySlug(businessId, 'quote_accepted')
-  if (!stageNewInquiry || !stageContacted || !stageQuoteSent || !stageQuoteAccepted) {
+  // V80: 'quote_accepted' är borttaget (sql/v80_merge_accepted_into_won.sql)
+  // — demokontots "accepterad offert"-exempel visas numera i 'won' istället.
+  const stageWon = await getStageBySlug(businessId, 'won')
+  if (!stageNewInquiry || !stageContacted || !stageQuoteSent || !stageWon) {
     return { error: 'Pipeline-steg saknas för demokontot — kunde inte skapa affärer.' }
   }
 
@@ -273,7 +275,7 @@ export async function resetDemoAccount(
       customerKey: 'anna',
       title: 'Badrumsrenovering – Björkvägen 14',
       value: 185000,
-      stage: stageQuoteAccepted,
+      stage: stageWon,
       priority: 'high',
       source: 'website',
       job_type: 'badrum',

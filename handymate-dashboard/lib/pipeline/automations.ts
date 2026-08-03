@@ -5,8 +5,6 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import type { PipelineStageId } from './stages'
-import { advanceProjectStage, SYSTEM_STAGES } from '@/lib/project-stages/automation-engine'
-import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 
 export async function onDealStageChanged(
   dealId: string,
@@ -26,9 +24,6 @@ export async function onDealStageChanged(
       break
     case 'quote_sent':
       await handleQuoteSent(dealId, businessId)
-      break
-    case 'quote_accepted':
-      await handleQuoteAccepted(dealId, businessId)
       break
     case 'lost':
       await handleLost(dealId, businessId)
@@ -92,105 +87,12 @@ async function handleQuoteSent(dealId: string, businessId: string) {
   })
 }
 
-async function handleQuoteAccepted(dealId: string, businessId: string) {
-  // Auto-create project from deal + quote
-  const supabase = getServerSupabase()
-
-  try {
-    const { data: deal } = await supabase
-      .from('deal')
-      .select('*, customer:customer(*)')
-      .eq('id', dealId)
-      .single()
-
-    if (!deal) return
-
-    // Check if project already exists for this deal
-    const { data: existingProject } = await supabase
-      .from('project')
-      .select('project_id')
-      .eq('deal_id', dealId)
-      .single()
-
-    let createdProjectId: string | null = existingProject?.project_id || null
-
-    if (!existingProject) {
-      // Hämta offerttitel som fallback om dealen saknar titel
-      let quoteTitle: string | null = null
-      if (deal.quote_id) {
-        const { data: q } = await supabase
-          .from('quotes')
-          .select('title')
-          .eq('quote_id', deal.quote_id)
-          .single()
-        quoteTitle = q?.title ?? null
-      }
-
-      // Projektnumret matchar deal-numret så att hantverkaren ser samma
-      // ärende-id i säljtratten och i projektlistan (deal #1003 → P-1003).
-      const projectNumber = deal.deal_number ? `P-${deal.deal_number}` : null
-      const projectName = deal.title || quoteTitle || 'Projekt'
-      const newProjectId = 'proj_' + Math.random().toString(36).substring(2, 14)
-      createdProjectId = newProjectId
-
-      await supabase.from('project').insert({
-        project_id: newProjectId,
-        business_id: businessId,
-        customer_id: deal.customer_id,
-        deal_id: dealId,
-        quote_id: deal.quote_id,
-        project_number: projectNumber,
-        name: projectName,
-        description: deal.description,
-        budget_amount: deal.value,
-        status: 'active',
-      })
-
-      // Egenkontroll-agenten (etapp 1d, tasks/easoft-gap-plan.md).
-      // Fire-and-forget, fail-safe (kastar aldrig) — får inte sinka
-      // deal-stage-övergången.
-      suggestChecklistForProject({ businessId, projectId: newProjectId }).catch(err => {
-        console.error('[pipeline/automations] suggestChecklistForProject error (non-blocking):', err)
-      })
-
-      // Synka räknaren så framtida fristående projekt inte återanvänder samma nummer
-      if (deal.deal_number) {
-        await supabase.rpc('bump_counter', {
-          p_business_id: businessId,
-          p_counter_type: 'project',
-          p_min_value: deal.deal_number,
-        })
-      }
-    }
-
-    // Move deal to 'won'
-    const { data: wonStage } = await supabase
-      .from('pipeline_stage')
-      .select('id')
-      .eq('business_id', businessId)
-      .eq('slug', 'won')
-      .single()
-
-    if (wonStage) {
-      await supabase.from('deal').update({
-        stage_id: wonStage.id,
-        won_at: new Date().toISOString(),
-        closed_at: new Date().toISOString(),
-      }).eq('id', dealId)
-    }
-
-    // Aktivera projektets workflow-stage 'Kontrakt signerat' (non-blocking)
-    if (createdProjectId) {
-      try {
-        await advanceProjectStage(createdProjectId, SYSTEM_STAGES.CONTRACT_SIGNED, businessId)
-      } catch (err) {
-        console.error('[Pipeline Automation] advanceProjectStage failed:', err)
-      }
-    }
-  } catch (err) {
-    console.error('[Pipeline Automation] handleQuoteAccepted error:', err)
-  }
-}
+// V80: handleQuoteAccepted (tyst auto-skapa-projekt-och-flytta-till-won när
+// en deal manuellt drogs till 'quote_accepted') är borttagen tillsammans med
+// steget självt. Ersatt medvetet av WonModal (app/dashboard/pipeline/
+// components/WonModal.tsx) — hantverkaren FRÅGAS nu istället för att ett
+// projekt skapas tyst, oavsett om flytten går via drag-and-drop eller
+// DealModal-stegväljaren. Se sql/v80_merge_accepted_into_won.sql.
 
 async function handleLost(dealId: string, businessId: string) {
   const supabase = getServerSupabase()

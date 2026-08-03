@@ -3,15 +3,21 @@
  * tasks/cash-radar-spec.md). INFLÖDEN endast. Tre siffror hålls isär:
  * fakturerat (åtagande) / viktad potential / normal (historisk median).
  */
+// V80: 'quote_accepted' slogs ihop med 'won' (sql/v80_merge_accepted_into_won.sql).
+// 'won' finns bara med här för deals som är vunna men ÄNNU INTE fakturerade —
+// se lib/cash-radar-data.ts som filtrerar bort won-deals som redan har en
+// fakturarad (de räknas då via unpaidInvoices/invoiced_kr istället, en exakt
+// siffra snarare än en viktad gissning). Utan denna nyckel skulle nyss vunna,
+// ofakturerade affärer försvinna helt ur radarn tills en faktura skapats.
 export const STAGE_WEIGHTS: Record<string, number> = {
-  quote_accepted: 0.9,
+  won: 0.9,
   quote_sent: 0.35,
   contacted: 0.15,
   new_inquiry: 0.15,
 }
 /** Stage-schablon när expected_close_date saknas (veckor framåt). */
 const STAGE_HORIZON_WEEKS: Record<string, number> = {
-  quote_accepted: 1, quote_sent: 2, contacted: 3, new_inquiry: 3,
+  won: 1, quote_sent: 2, contacted: 3, new_inquiry: 3,
 }
 export const DIP_THRESHOLD = 0.6
 export const MIN_HISTORY_WEEKS = 4

@@ -332,24 +332,11 @@ export async function POST(
     // gamla quote.total från före tillvalsomräkningen.
     const finalTotal = recomputed ? recomputed.total : (quote.total || 0)
 
-    // Pipeline: move deal to accepted on signature
-    try {
-      const { findDealByQuote, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')
-      const settings = await getAutomationSettings(quote.business_id)
-      if (settings?.auto_move_on_signature) {
-        const deal = await findDealByQuote(quote.business_id, quote.quote_id)
-        if (deal) {
-          await moveDeal({
-            dealId: deal.id,
-            businessId: quote.business_id,
-            toStageSlug: 'quote_accepted',
-            triggeredBy: 'system',
-          })
-        }
-      }
-    } catch (pipelineErr) {
-      console.error('Pipeline trigger error (non-blocking):', pipelineErr)
-    }
+    // V80: den gamla "flytta till accepted"-flytten här togs bort — den var
+    // vestigial (flyttade dealen till det numera borttagna 'quote_accepted'-
+    // steget, för att sedan alltid bli omedelbart överkörd av "Golden Path:
+    // flytta deal till Vunnen" längre ned i samma handler). Den blocket
+    // längre ned är nu den enda sanningen för denna signeringsväg.
 
     // Smart communication + notifications (non-blocking)
     try {

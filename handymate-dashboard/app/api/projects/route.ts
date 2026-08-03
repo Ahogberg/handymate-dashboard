@@ -686,10 +686,12 @@ export async function PUT(request: NextRequest) {
           await moveDeal({
             dealId: linkedDeal.id,
             businessId: business.business_id,
-            // Ingen 'invoiced'-stage finns; projekt klart men betalning kvarstår
-            // → 'quote_accepted'. Riktningsskyddet i moveDeal hindrar att en
-            // redan vunnen deal dras tillbaka. 'won' triggas vid betalning.
-            toStageSlug: 'quote_accepted',
+            // V80: Ingen 'invoiced'-stage finns längre ('quote_accepted' är
+            // borttaget, sql/v80_merge_accepted_into_won.sql) — flytta direkt
+            // till 'won'. Riktningsskyddet i moveDeal hindrar att en redan
+            // vunnen deal dras tillbaka. Betalstatus är fakturamodulens ansvar,
+            // inte pipeline-stegets.
+            toStageSlug: 'won',
             triggeredBy: 'system',
             aiReason: 'Projekt markerat som slutfört',
           })

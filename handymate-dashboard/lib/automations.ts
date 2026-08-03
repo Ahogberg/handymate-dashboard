@@ -10,6 +10,13 @@ export interface AutomationSettings {
   ai_confidence_threshold: number
   // Pipeline
   pipeline_move_on_quote_sent: boolean
+  // V80: död — inget kodpath läser denna flaggan för att faktiskt flytta en
+  // deal (den mappades bara vidare till pipeline_automation.auto_move_on_accept,
+  // en kolumn som inte ens finns i pipeline_automation-schemat, se
+  // syncPipelineSettings() nedan). Steget den en gång syftade på
+  // ('quote_accepted') är borttaget, sql/v80_merge_accepted_into_won.sql.
+  // Ingen UI-rad fanns att ta bort. Lämnad orörd, ej refaktorerad in i
+  // pipeline_automation-systemet (se app/api/automations/route.ts).
   pipeline_move_on_quote_accepted: boolean
   pipeline_move_on_invoice_sent: boolean
   pipeline_move_on_payment: boolean

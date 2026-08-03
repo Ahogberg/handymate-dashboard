@@ -60,7 +60,7 @@ test.describe('projectInflows', () => {
     expect(weeks[0].week_start).toBe('2026-07-06')
     expect(weeks[0].invoiced_kr).toBe(5000)
   })
-  test('deal utanför 5-veckorsfönstret ignoreras; won/lost skickas aldrig in', () => {
+  test('deal utanför 5-veckorsfönstret ignoreras; lost skickas aldrig in, won bara om ofakturerad', () => {
     const weeks = projectInflows({
       unpaidInvoices: [],
       openDeals: [{ id: 'd1', value: 9999, stageSlug: 'quote_sent', expected_close_date: '2026-12-01' }],
@@ -69,13 +69,13 @@ test.describe('projectInflows', () => {
     expect(weeks.every(w => w.potential_kr === 0)).toBe(true)
     expect(weeks).toHaveLength(5)
   })
-  test('deal utan expected_close_date → stage-schablon (quote_accepted +1v)', () => {
+  test('deal utan expected_close_date → stage-schablon (won +1v)', () => {
     const weeks = projectInflows({
       unpaidInvoices: [],
-      openDeals: [{ id: 'd1', value: 10000, stageSlug: 'quote_accepted', expected_close_date: null }],
+      openDeals: [{ id: 'd1', value: 10000, stageSlug: 'won', expected_close_date: null }],
       medianDelay: 0, nowMs: NOW,
     })
-    expect(weeks[1].potential_kr).toBe(10000 * STAGE_WEIGHTS.quote_accepted)
+    expect(weeks[1].potential_kr).toBe(10000 * STAGE_WEIGHTS.won)
   })
 })
 

@@ -247,9 +247,13 @@ export async function POST(request: NextRequest) {
             await moveDeal({
               dealId: deal.id,
               businessId: business.business_id,
-              // Ingen 'invoiced'-stage finns; fakturan är skickad men inte betald
-              // → håll dealen i 'quote_accepted'. 'won' triggas vid betalning.
-              toStageSlug: 'quote_accepted',
+              // V80: Ingen 'invoiced'-stage finns längre ('quote_accepted' är
+              // borttaget, sql/v80_merge_accepted_into_won.sql) — flytta direkt
+              // till 'won'. Betalstatus är fakturamodulens ansvar (invoice.status/
+              // paid_at), inte pipeline-stegets — "Vunnen" betyder numera signerad/
+              // vunnen affär, inte nödvändigtvis betald. De flesta dealsen är redan
+              // i 'won' via Golden Path vid signering — moveDeal() no-opar då.
+              toStageSlug: 'won',
               triggeredBy: 'system',
             })
           }

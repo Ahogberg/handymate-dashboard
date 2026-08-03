@@ -175,10 +175,12 @@ export async function processCallForPipeline(params: {
         .single()
 
       if (deal) {
+        // V80: 'quote_accepted' är borttaget (sql/v80_merge_accepted_into_won.sql)
+        // — AI-detekterat accept under samtal flyttar numera direkt till 'won'.
         await moveDeal({
           dealId: deal.id,
           businessId: params.businessId,
-          toStageSlug: 'quote_accepted',
+          toStageSlug: 'won',
           triggeredBy: 'ai',
           aiConfidence: analysis.intentConfidence,
           aiReason: analysis.reasoning,

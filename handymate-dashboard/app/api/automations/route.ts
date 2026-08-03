@@ -158,6 +158,10 @@ export async function PATCH(request: NextRequest) {
       ai_analyze_calls: settings.ai_analyze_calls,
       auto_create_leads: settings.ai_create_leads,
       auto_move_on_quote: settings.pipeline_move_on_quote_sent,
+      // V80: auto_move_on_accept skrivs till pipeline_automation, en kolumn
+      // som inte finns i det schemat (se sql/pipeline.sql) — redan innan
+      // denna ändring en no-op/tyst-fel-väg. pipeline_move_on_quote_accepted
+      // är död (dokumenterad i lib/automations.ts), rör den inte här.
       auto_move_on_accept: settings.pipeline_move_on_quote_accepted,
       auto_move_on_invoice: settings.pipeline_move_on_invoice_sent,
       auto_move_on_payment: settings.pipeline_move_on_payment,

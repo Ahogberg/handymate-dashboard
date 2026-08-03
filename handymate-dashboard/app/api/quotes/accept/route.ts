@@ -82,24 +82,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Databasfel: ${updateErr.message}` }, { status: 500 })
     }
 
-    // Pipeline: flytta deal till accepted
-    try {
-      const { findDealByQuote, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')
-      const settings = await getAutomationSettings(business.business_id)
-      if (settings?.auto_move_on_signature) {
-        const deal = await findDealByQuote(business.business_id, quoteId)
-        if (deal) {
-          await moveDeal({
-            dealId: deal.id,
-            businessId: business.business_id,
-            toStageSlug: 'quote_accepted',
-            triggeredBy: 'system',
-          })
-        }
-      }
-    } catch (err) {
-      console.error('Pipeline trigger error (non-blocking):', err)
-    }
+    // V80: den gamla "flytta till accepted"-flytten här togs bort — den var
+    // vestigial (flyttade dealen till det numera borttagna 'quote_accepted'-
+    // steget, för att sedan alltid bli omedelbart överkörd av "Golden Path:
+    // flytta deal till Offert accepterad → Vunnen" längre ned i samma
+    // handler). Det blocket längre ned är nu den enda sanningen för denna väg.
 
     // Smart communication + notifications
     try {
@@ -153,7 +140,7 @@ export async function POST(request: NextRequest) {
       console.error('[quotes/accept] fireEvent quote_accepted failed (non-blocking):', quoteId, err)
     }
 
-    // Golden Path: flytta deal till "Offert accepterad" → "Vunnen"
+    // Golden Path: flytta deal till "Vunnen"
     try {
       const { data: linkedDeal } = await supabase
         .from('deal')

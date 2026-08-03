@@ -4544,7 +4544,7 @@ function CallHandlingModeSection({ businessId }: { businessId: string }) {
 function PipelineSettings({ businessId }: { businessId: string }) {
   const [settings, setSettings] = useState({
     auto_create_leads: true,
-    auto_move_on_signature: true,
+    auto_move_on_signature: true, // V80: död — ingen UI-rad längre, se PipelineSettings nedan
     auto_move_on_payment: true,
     auto_move_on_project_complete: true,
     ai_analyze_calls: true,
@@ -4631,9 +4631,14 @@ function PipelineSettings({ businessId }: { businessId: string }) {
         <div className="space-y-4">
           <h3 className="text-sm font-medium text-gray-700">Automatiskt (händer direkt)</h3>
 
+          {/* V80: "Flytta till 'Accepterad' när offert signeras" (auto_move_on_signature)
+              togs bort här — steget 'quote_accepted' är borttaget (sql/v80_merge_
+              accepted_into_won.sql). Dealen flyttar numera alltid direkt till
+              'Vunnen' vid signering (Golden Path), inte längre villkorat av denna
+              flagga. DB-kolumnen pipeline_automation.auto_move_on_signature lämnas
+              orörd (död) — se settings-state nedan. */}
           {[
             { key: 'auto_create_leads', label: 'Skapa lead från nya samtal' },
-            { key: 'auto_move_on_signature', label: 'Flytta till "Accepterad" när offert signeras' },
             { key: 'auto_move_on_payment', label: 'Flytta till "Betalt" när faktura betalas' },
             { key: 'auto_move_on_project_complete', label: 'Flytta till "Faktureras" när projekt markeras klart' },
           ].map(({ key, label }) => (

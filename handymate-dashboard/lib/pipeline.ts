@@ -53,11 +53,13 @@ export interface PipelineActivity {
   created_at: string
 }
 
+// V80: 'quote_accepted' (Offert accepterad) är borttaget — slogs ihop med
+// 'won' (se sql/v80_merge_accepted_into_won.sql). Nya businesses seedas
+// numera direkt med 5 steg.
 export const DEFAULT_STAGES = [
   { slug: 'new_inquiry', name: 'Ny förfrågan', color: '#6B7280', sort_order: 1, is_system: true, is_won: false, is_lost: false },
   { slug: 'contacted', name: 'Kontaktad', color: '#0F766E', sort_order: 2, is_system: true, is_won: false, is_lost: false },
   { slug: 'quote_sent', name: 'Offert skickad', color: '#0D9488', sort_order: 3, is_system: true, is_won: false, is_lost: false },
-  { slug: 'quote_accepted', name: 'Offert accepterad', color: '#0F766E', sort_order: 4, is_system: true, is_won: false, is_lost: false },
   { slug: 'won', name: 'Vunnen', color: '#22C55E', sort_order: 5, is_system: true, is_won: true, is_lost: false },
   { slug: 'lost', name: 'Förlorad', color: '#EF4444', sort_order: 99, is_system: true, is_won: false, is_lost: true },
 ]
@@ -143,9 +145,11 @@ export async function moveDeal(params: {
   if (deal.stage_id === toStage.id) return // Already in this stage
 
   // Riktningsskydd: systemutlösta övergångar får ALDRIG flytta en deal bakåt
-  // (utom till 'lost'). Annars kan en sen händelse — t.ex. "projekt slutfört"
-  // eller "faktura skickad" som mappar till 'quote_accepted' — dra tillbaka en
-  // redan vunnen deal. Användarens manuella drag tillåts korrigera åt båda håll.
+  // (utom till 'lost'). Annars kan en sen händelse — t.ex. "faktura skickad"
+  // eller "projekt slutfört" — dra tillbaka en redan vunnen deal (alla dessa
+  // mappar numera till 'won' själva sedan V80, men skyddet behövs ändå för
+  // ev. framtida mellansteg). Användarens manuella drag tillåts korrigera åt
+  // båda håll.
   if (params.triggeredBy !== 'user' && !toStage.is_lost) {
     const { data: fromStage } = await supabase
       .from('pipeline_stage')
@@ -473,9 +477,9 @@ export async function findDealByInvoice(businessId: string, invoiceId: string): 
   // 2. Fallback via offert-kedjan: invoice.quote_id → deal.quote_id.
   //    INGEN kodväg sätter deal.invoice_id vid fakturaskapande (from-quote/
   //    from-project/auto-invoice m.fl.), så utan detta hittar varken faktura-
-  //    skickad eller faktura-betald sin deal → offert-baserade deals fastnar i
-  //    'quote_accepted' och når ALDRIG 'won' när fakturan betalas (fel win-rate
-  //    + intäktsstatistik). Self-heal:ar genom att persistera kopplingen.
+  //    skickad eller faktura-betald sin deal → offert-baserade deals fastnar
+  //    på sitt tidigare steg och når ALDRIG 'won' (fel win-rate + intäkts-
+  //    statistik). Self-heal:ar genom att persistera kopplingen.
   const { data: inv } = await supabase
     .from('invoice')
     .select('quote_id')
