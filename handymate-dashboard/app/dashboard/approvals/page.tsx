@@ -24,6 +24,7 @@ import {
   Globe,
   ClipboardCheck,
   ClipboardList,
+  Sparkles,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -116,6 +117,8 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   // Tidrapport-förslag (etapp 2a, tasks/easoft-gap-plan.md) — projektnivå,
   // inte person (se lib/egenkontroll/suggest-time-entry.ts).
   tidrapport_forslag: { label: 'Tidrapport', icon: Clock, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
+  // Auto-offertutkast från kvalificerad lead (etapp 2a, tasks/value-chain-plan.md).
+  create_quote_draft: { label: 'Offertutkast', icon: Sparkles, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 

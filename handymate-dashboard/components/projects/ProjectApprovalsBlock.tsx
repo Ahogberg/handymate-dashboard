@@ -88,6 +88,8 @@ const TYPE_LABEL: Record<string, string> = {
   // Tidrapport-förslag (etapp 2a, tasks/easoft-gap-plan.md) — projektnivå,
   // inte person (se lib/egenkontroll/suggest-time-entry.ts).
   tidrapport_forslag: 'Tidrapport',
+  // Auto-offertutkast från kvalificerad lead (etapp 2a, tasks/value-chain-plan.md).
+  create_quote_draft: 'Offertutkast',
 }
 
 export default function ProjectApprovalsBlock({ projectId, onCountChange }: ProjectApprovalsBlockProps) {

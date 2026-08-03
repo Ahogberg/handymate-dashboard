@@ -10,6 +10,7 @@ import { shouldQueueForApproval } from '@/lib/autonomy/agent-gating'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
+import { suggestQuoteDraftForLead } from '@/lib/quotes/suggest-quote-draft'
 
 interface ToolResult {
   success: boolean
@@ -1123,6 +1124,12 @@ async function qualifyLead(
     })
     if (activityError) console.error('[qualifyLead] lead_activities insert (score_updated) failed:', activityError.message)
 
+    // Våg 2a (value-chain-plan.md): score kan knuffa en redan
+    // 'qualified'-lead över tröskeln — fire-and-forget, blockerar aldrig
+    // agentsvaret. Gaten (statuskoll + score-tröskel) körs inuti.
+    suggestQuoteDraftForLead(businessId, existingLead.lead_id).catch(err =>
+      console.error('[qualifyLead] suggestQuoteDraftForLead error (non-blocking):', err))
+
     return { success: true, data: { lead_id: existingLead.lead_id, action: 'updated', score, urgency, job_type: jobType, estimated_value: estimatedValue } }
   }
 
@@ -1179,6 +1186,15 @@ async function updateLeadStatus(
     created_at: new Date().toISOString(),
   })
   if (statusActivityError) console.error('[updateLeadStatus] lead_activities insert failed:', statusActivityError.message)
+
+  // Våg 2a (value-chain-plan.md): detta är det FAKTISKA stället en lead
+  // blir 'qualified' via agentvägen (qualifyLead sätter bara score, aldrig
+  // status — se lib/quotes/suggest-quote-draft.ts filhuvud). Fire-and-
+  // forget, blockerar aldrig agentsvaret. Gaten körs inuti.
+  if (params.status === 'qualified') {
+    suggestQuoteDraftForLead(businessId, params.lead_id as string).catch(err =>
+      console.error('[updateLeadStatus] suggestQuoteDraftForLead error (non-blocking):', err))
+  }
 
   return { success: true, data: { message: `Lead status → ${params.status}`, lead: data } }
 }

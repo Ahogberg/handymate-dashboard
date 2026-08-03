@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { verifyOwnership } from '@/lib/auth/verify-ownership'
+import { suggestQuoteDraftForLead } from '@/lib/quotes/suggest-quote-draft'
 
 // GET /api/leads — fetch leads with pipeline stats
 export async function GET(request: NextRequest) {
@@ -150,6 +151,15 @@ export async function PATCH(request: NextRequest) {
       description: `Status ändrad till ${updates.status}`,
       created_at: new Date().toISOString(),
     })
+  }
+
+  // Våg 2a (value-chain-plan.md): manuell kvalificering i pipeline-UI:t —
+  // det andra (i praktiken vanligaste) stället en lead blir 'qualified',
+  // se lib/quotes/suggest-quote-draft.ts filhuvud. Fire-and-forget,
+  // blockerar aldrig PATCH-svaret. Gaten körs inuti.
+  if (updates.status === 'qualified') {
+    suggestQuoteDraftForLead(business.business_id, lead_id).catch(err =>
+      console.error('[PATCH /api/leads] suggestQuoteDraftForLead error (non-blocking):', err))
   }
 
   return NextResponse.json({ lead: data })
