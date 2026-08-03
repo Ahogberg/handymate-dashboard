@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Send, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
@@ -30,6 +30,8 @@ import { useQuoteItems } from '../_shared/useQuoteItems'
 import { usePriceListLookup } from '../_shared/usePriceListLookup'
 import { ensureProductComponents, type ProductWithComponents } from '../_shared/applyProductToItem'
 import { QuoteQuickstartCard, type QuickstartRow } from '../_shared/QuoteQuickstartCard'
+import { QuoteItemsSection } from '../_shared/QuoteItemsSection'
+import { QuotePreviewPanel } from '../_shared/QuotePreviewPanel'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 
 // Återanvända komponenter från edit-sprinten
@@ -47,11 +49,8 @@ import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
 import { QuoteNewHeader } from './components/QuoteNewHeader'
 import { QuoteNewAIHelper } from './components/QuoteNewAIHelper'
 import { QuoteNewCustomerSection } from './components/QuoteNewCustomerSection'
-import { QuoteNewItemsSection } from './components/QuoteNewItemsSection'
 import { QuoteNewAttachmentsCard } from './components/QuoteNewAttachmentsCard'
-import { QuoteNewTemplatePanel } from './components/QuoteNewTemplatePanel'
 import { QuoteNewStartChooser } from './components/QuoteNewStartChooser'
-import { QuoteNewPreviewPanel } from './components/QuoteNewPreviewPanel'
 import { QuoteNewPriceWarningsBanner } from './components/QuoteNewPriceWarningsBanner'
 import { QuoteNewEfterkalkylBanner, type EfterkalkylInsight } from './components/QuoteNewEfterkalkylBanner'
 
@@ -163,6 +162,24 @@ function convertLegacyItems(
       ),
     )
   })
+}
+
+/**
+ * ETAPP 2b (offert-masterplan.md): stängningsknapp för "Mer"-radens paneler
+ * som saknar egen collapsible-header (Stil/Bilagor/ROT-detaljer — de andra
+ * panelerna har redan open/setOpen inbyggt och behöver den inte).
+ */
+function MerPanelClose({ onClose }: { onClose: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClose}
+      aria-label="Stäng"
+      className="absolute right-3 top-3 z-10 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+    >
+      <X className="w-4 h-4" />
+    </button>
+  )
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -308,11 +325,22 @@ export default function NewQuotePage() {
   // visas bara när ingen styrsignal pekat ut vad offerten redan ska bli.
   const [startChooserDismissed, setStartChooserDismissed] = useState(false)
 
-  // Template panel + preview
-  const [showTemplatePanel, setShowTemplatePanel] = useState(false)
+  // Preview
   const [showPreviewPanel, setShowPreviewPanel] = useState(true)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [previewMode, setPreviewMode] = useState<'live' | 'design' | 'compact'>('live')
+
+  // ETAPP 2b (offert-masterplan.md): canvas-first-layouten. `activePanel`
+  // styr "Mer"-verktygsraden ovanför dokumentet — en sektion synlig i taget,
+  // inte modal (hantverkaren ska se dokumentet samtidigt). `mainView` växlar
+  // huvudytan mellan dokument-canvasen och radeditorn ("Listvy") — canvas
+  // är default när live-läget finns, annars listvy (satt en gång när datan
+  // laddat klart, se effekten nedan).
+  const [activePanel, setActivePanel] = useState<
+    null | 'stil' | 'villkor' | 'betalplan' | 'visning' | 'bilagor' | 'rot'
+  >(null)
+  const [mainView, setMainView] = useState<'document' | 'list'>('document')
+  const mainViewInitialized = useRef(false)
   const [debouncedPreviewData, setDebouncedPreviewData] = useState<QuotePreviewData | null>(null)
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // ETAPP 1f: inline-bekräftelse för "beskrivning saknas" (ersätter den
@@ -600,6 +628,15 @@ export default function NewQuotePage() {
   ])
 
   const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
+
+  // ETAPP 2b: mainView-defaulten sätts EN gång när data laddat klart —
+  // canvas när live-läget finns, annars listvy (se komponentens state ovan).
+  useEffect(() => {
+    if (!loading && !mainViewInitialized.current) {
+      mainViewInitialized.current = true
+      setMainView(liveAvailable ? 'document' : 'list')
+    }
+  }, [loading, liveAvailable])
 
   // ETAPP 2a (offert-masterplan.md), punkt 6: id-baserade liveHandlers —
   // ersätter tidigare index-mutation. Återanvänder useQuoteItems' egna
@@ -1192,7 +1229,6 @@ export default function NewQuotePage() {
       body: JSON.stringify({ id: template.id, increment_usage: true }),
     }).catch(() => {})
 
-    setShowTemplatePanel(false)
     toast.success(`Mall "${template.name}" tillämpad`)
   }
 
@@ -1256,7 +1292,6 @@ export default function NewQuotePage() {
       )
     }
 
-    setShowTemplatePanel(false)
     toast.success(`Mall "${template.name}" tillämpad`)
   }
 
@@ -1585,35 +1620,17 @@ export default function NewQuotePage() {
           }}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(620px,46%)] gap-5 items-start">
-          {/* ── Left Column ───────────────────────────────────────── */}
+        {/* ETAPP 2b (offert-masterplan.md): canvas-first-layouten. Dokumentet
+            är huvudytan (majoritetsbredd) — assistentkolumnen innehåller bara
+            det som inte syns i dokumentet: kund & giltighet, AI-hjälpen,
+            summering + skicka. Allt annat nås via "Mer"-raden ovanför
+            dokumentet. */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,380px)_1fr] gap-5 items-start">
+          {/* ── Assistentkolumnen ────────────────────────────────── */}
           <div className="flex flex-col gap-4">
-            <QuoteNewTemplatePanel
-              open={showTemplatePanel}
-              setOpen={setShowTemplatePanel}
-              onSelect={handleTemplateSelect}
-            />
-
-            {/* Snabbstart-sektion borttagen 2026-05-20 per pilot-feedback —
-                tog upp onödig plats utan att ge värde. QuoteQuickstartCard-
-                komponenten finns kvar i _shared/ om vi vill återintroducera
-                den i framtiden med tydligare värde. */}
-
-            <QuoteNewAIHelper
-              open={showAiHelper}
-              setOpen={setShowAiHelper}
-              generating={generating}
-              photos={photos}
-              maxPhotos={MAX_PHOTOS}
-              onPhotoFile={handlePhotoFile}
-              onRemovePhoto={removePhoto}
-              photoDescription={photoDescription}
-              setPhotoDescription={setPhotoDescription}
-              onAnalyzePhoto={analyzePhoto}
-              aiTextInput={aiTextInput}
-              setAiTextInput={setAiTextInput}
-              onGenerateFromText={() => generateFromText()}
-            />
+            {/* Prisvarningar/efterkalkyl — viktig info, inte begravd */}
+            <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />
+            <QuoteNewEfterkalkylBanner insight={efterkalkylInsight} />
 
             <QuoteNewCustomerSection
               customers={customers}
@@ -1631,117 +1648,20 @@ export default function NewQuotePage() {
               hasItems={items.length > 0}
             />
 
-            <QuoteNewItemsSection
-              items={items}
-              recalculated={recalculated}
-              allCategories={allCategories}
-              customCategories={localCustomCategories}
-              products={products}
-              dndSensors={dndSensors}
-              onDragEnd={handleDragEnd}
-              onAddItem={addItem}
-              onUpdateItem={updateItem}
-              onRemoveItem={removeItem}
-              onMoveItem={moveItem}
-              onSelectProduct={product => { void addFromProduct(product) }}
-              onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
-              onAddBlankRow={description => {
-                setItems(prev => [
-                  ...prev,
-                  {
-                    id: generateItemId(),
-                    item_type: 'item',
-                    description,
-                    quantity: 1,
-                    unit: 'st',
-                    unit_price: 0,
-                    total: 0,
-                    is_rot_eligible: false,
-                    is_rut_eligible: false,
-                    sort_order: prev.length,
-                  },
-                ])
-              }}
-              onOpenGrossistSearch={() => setShowGrossistSearch(true)}
-              onCreateCategory={createCustomCategory}
-              showNewCategoryInput={showNewCategoryInput}
-              setShowNewCategoryInput={setShowNewCategoryInput}
-              newCategoryLabel={newCategoryLabel}
-              setNewCategoryLabel={setNewCategoryLabel}
-              onSaveToProducts={row => setProductModalRow(row)}
-            />
-
-            <QuoteEditRotSection
-              items={items}
-              setItems={setItems}
-              hasRotItems={hasRotItems}
-              personnummer={personnummer}
-              setPersonnummer={setPersonnummer}
-              fastighetsbeteckning={fastighetsbeteckning}
-              setFastighetsbeteckning={setFastighetsbeteckning}
-            />
-
-            <QuoteEditStandardTextsSection
-              open={showStandardTexts}
-              setOpen={setShowStandardTexts}
-              textsByType={textsByType}
-              referencePerson={referencePerson}
-              setReferencePerson={setReferencePerson}
-              customerReference={customerReference}
-              setCustomerReference={setCustomerReference}
-              projectAddress={projectAddress}
-              setProjectAddress={setProjectAddress}
-              notIncluded={notIncluded}
-              setNotIncluded={setNotIncluded}
-              ataTerms={ataTerms}
-              setAtaTerms={setAtaTerms}
-              paymentTermsText={paymentTermsText}
-              setPaymentTermsText={setPaymentTermsText}
-              termsText={termsText}
-              setTermsText={setTermsText}
-            />
-
-            <QuoteNewAttachmentsCard
-              attachments={attachments}
-              setAttachments={setAttachments}
-              uploadingFile={uploadingFile}
-              onFileUpload={handleFileUpload}
-            />
-
-            <QuoteEditPaymentPlanSection
-              open={showPaymentPlan}
-              setOpen={setShowPaymentPlan}
-              paymentPlan={paymentPlan}
-              calculatedPaymentPlan={calculatedPaymentPlan}
-              paymentPlanValid={paymentPlanValid}
-              onAddEntry={addPaymentPlanEntry}
-              onUpdateEntry={updatePaymentPlanEntry}
-              onRemoveEntry={removePaymentPlanEntry}
-              formatCurrency={formatCurrency}
-            />
-
-            <QuoteEditDisplaySettingsSection
-              open={showDisplaySettings}
-              setOpen={setShowDisplaySettings}
-              detailLevel={detailLevel}
-              setDetailLevel={setDetailLevel}
-              showUnitPrices={showUnitPrices}
-              setShowUnitPrices={setShowUnitPrices}
-              showQuantities={showQuantities}
-              setShowQuantities={setShowQuantities}
-            />
-
-            <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />
-            <QuoteNewEfterkalkylBanner insight={efterkalkylInsight} />
-
-            {/* ETAPP 1b (offert-masterplan.md): flyttad hit (var tidigare
-                position 2, direkt under mallpanelen) — ett kosmetiskt val
-                ska inte vara beslut #2 före kunden/raderna. */}
-            <QuoteStylePicker
-              value={templateStyle}
-              onChange={setTemplateStyle}
-              businessDefaultStyle={businessDefaultStyle}
-              accentColor={businessConfig?.accent_color}
+            <QuoteNewAIHelper
+              open={showAiHelper}
+              setOpen={setShowAiHelper}
+              generating={generating}
+              photos={photos}
+              maxPhotos={MAX_PHOTOS}
+              onPhotoFile={handlePhotoFile}
+              onRemovePhoto={removePhoto}
+              photoDescription={photoDescription}
+              setPhotoDescription={setPhotoDescription}
+              onAnalyzePhoto={analyzePhoto}
+              aiTextInput={aiTextInput}
+              setAiTextInput={setAiTextInput}
+              onGenerateFromText={() => generateFromText()}
             />
 
             <QuoteEditTotalsSection
@@ -1753,23 +1673,248 @@ export default function NewQuotePage() {
               hasRutItems={hasRutItems}
               formatCurrency={formatCurrency}
             />
+
+            {/* Primär CTA vid summan — headerns Skicka-knapp behålls också
+                (minsta ingrepp), men det här är där hantverkaren faktiskt
+                tittar när offerten känns klar. */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6">
+              <button
+                type="button"
+                onClick={() => saveQuote(true)}
+                disabled={saving || !selectedCustomer}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 hover:bg-primary-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm"
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {saving ? 'Sparar…' : 'Skicka offert'}
+              </button>
+              {!selectedCustomer && (
+                <p className="mt-2 text-xs text-slate-500 text-center">Välj kund först</p>
+              )}
+              {sendConfirmPending && (
+                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <p className="text-xs text-slate-700 mb-2.5 leading-relaxed">
+                    Beskrivning saknas — skicka ändå?
+                  </p>
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSendConfirmPending(false)}
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white rounded-lg transition-colors"
+                    >
+                      Avbryt
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => saveQuote(true, true)}
+                      className="px-3 py-1.5 text-xs font-semibold bg-primary-700 hover:bg-primary-600 text-white rounded-lg transition-colors"
+                    >
+                      Skicka ändå
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* ── Right Column — Preview-only, fyller viewport ─────── */}
-          <div className="lg:sticky lg:top-[5.5rem] lg:h-[calc(100vh-7rem)]">
-            <QuoteNewPreviewPanel
-              open={showPreviewPanel}
-              setOpen={setShowPreviewPanel}
-              previewMode={previewMode}
-              setPreviewMode={setPreviewMode}
-              liveAvailable={liveAvailable}
-              liveTemplateData={quoteTemplateData}
-              liveHandlers={liveHandlers}
-              templatePreviewPayload={templatePreviewPayload}
-              debouncedPreviewData={debouncedPreviewData}
-              businessName={business.business_name}
-              contactName={business.contact_name}
-            />
+          {/* ── Dokumentpanelen ──────────────────────────────────── */}
+          <div className="flex flex-col gap-3">
+            {/* "Mer"-verktygsrad — Stil/Villkor/Betalplan/Visning/Bilagor/
+                ROT nås härifrån, en panel synlig i taget (inte modal —
+                dokumentet syns hela tiden nedanför). Listvy/Dokument växlar
+                huvudytans innehåll. */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-2 flex flex-wrap items-center gap-1.5">
+              <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Mer</span>
+              {(
+                [
+                  { key: 'stil', label: 'Stil' },
+                  { key: 'villkor', label: 'Villkor & texter' },
+                  { key: 'betalplan', label: 'Betalplan' },
+                  { key: 'visning', label: 'Visning' },
+                  { key: 'bilagor', label: 'Bilagor' },
+                  { key: 'rot', label: 'ROT-detaljer' },
+                ] as const
+              ).map(p => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => setActivePanel(activePanel === p.key ? null : p.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    activePanel === p.key
+                      ? 'bg-primary-700 text-white'
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+              <div className="ml-auto flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                <button
+                  type="button"
+                  onClick={() => setMainView('document')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                    mainView === 'document' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Dokument
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMainView('list')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                    mainView === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Listvy
+                </button>
+              </div>
+            </div>
+
+            {activePanel === 'stil' && (
+              <div className="relative">
+                <MerPanelClose onClose={() => setActivePanel(null)} />
+                <QuoteStylePicker
+                  value={templateStyle}
+                  onChange={setTemplateStyle}
+                  businessDefaultStyle={businessDefaultStyle}
+                  accentColor={businessConfig?.accent_color}
+                />
+              </div>
+            )}
+
+            {activePanel === 'villkor' && (
+              <QuoteEditStandardTextsSection
+                open={true}
+                setOpen={b => setActivePanel(b ? 'villkor' : null)}
+                textsByType={textsByType}
+                referencePerson={referencePerson}
+                setReferencePerson={setReferencePerson}
+                customerReference={customerReference}
+                setCustomerReference={setCustomerReference}
+                projectAddress={projectAddress}
+                setProjectAddress={setProjectAddress}
+                notIncluded={notIncluded}
+                setNotIncluded={setNotIncluded}
+                ataTerms={ataTerms}
+                setAtaTerms={setAtaTerms}
+                paymentTermsText={paymentTermsText}
+                setPaymentTermsText={setPaymentTermsText}
+                termsText={termsText}
+                setTermsText={setTermsText}
+              />
+            )}
+
+            {activePanel === 'betalplan' && (
+              <QuoteEditPaymentPlanSection
+                open={true}
+                setOpen={b => setActivePanel(b ? 'betalplan' : null)}
+                paymentPlan={paymentPlan}
+                calculatedPaymentPlan={calculatedPaymentPlan}
+                paymentPlanValid={paymentPlanValid}
+                onAddEntry={addPaymentPlanEntry}
+                onUpdateEntry={updatePaymentPlanEntry}
+                onRemoveEntry={removePaymentPlanEntry}
+                formatCurrency={formatCurrency}
+              />
+            )}
+
+            {activePanel === 'visning' && (
+              <QuoteEditDisplaySettingsSection
+                open={true}
+                setOpen={b => setActivePanel(b ? 'visning' : null)}
+                detailLevel={detailLevel}
+                setDetailLevel={setDetailLevel}
+                showUnitPrices={showUnitPrices}
+                setShowUnitPrices={setShowUnitPrices}
+                showQuantities={showQuantities}
+                setShowQuantities={setShowQuantities}
+              />
+            )}
+
+            {activePanel === 'bilagor' && (
+              <div className="relative">
+                <MerPanelClose onClose={() => setActivePanel(null)} />
+                <QuoteNewAttachmentsCard
+                  attachments={attachments}
+                  setAttachments={setAttachments}
+                  uploadingFile={uploadingFile}
+                  onFileUpload={handleFileUpload}
+                />
+              </div>
+            )}
+
+            {activePanel === 'rot' && (
+              <div className="relative">
+                <MerPanelClose onClose={() => setActivePanel(null)} />
+                <QuoteEditRotSection
+                  items={items}
+                  setItems={setItems}
+                  hasRotItems={hasRotItems}
+                  personnummer={personnummer}
+                  setPersonnummer={setPersonnummer}
+                  fastighetsbeteckning={fastighetsbeteckning}
+                  setFastighetsbeteckning={setFastighetsbeteckning}
+                />
+              </div>
+            )}
+
+            {/* Huvudyta: dokument-canvas (default) eller listvy (radeditor) */}
+            {mainView === 'list' ? (
+              <QuoteItemsSection
+                items={items}
+                recalculated={recalculated}
+                allCategories={allCategories}
+                customCategories={localCustomCategories}
+                products={products}
+                dndSensors={dndSensors}
+                onDragEnd={handleDragEnd}
+                onAddItem={addItem}
+                onUpdateItem={updateItem}
+                onRemoveItem={removeItem}
+                onMoveItem={moveItem}
+                onSelectProduct={product => { void addFromProduct(product) }}
+                onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
+                onAddBlankRow={description => {
+                  setItems(prev => [
+                    ...prev,
+                    {
+                      id: generateItemId(),
+                      item_type: 'item',
+                      description,
+                      quantity: 1,
+                      unit: 'st',
+                      unit_price: 0,
+                      total: 0,
+                      is_rot_eligible: false,
+                      is_rut_eligible: false,
+                      sort_order: prev.length,
+                    },
+                  ])
+                }}
+                onOpenGrossistSearch={() => setShowGrossistSearch(true)}
+                onCreateCategory={createCustomCategory}
+                showNewCategoryInput={showNewCategoryInput}
+                setShowNewCategoryInput={setShowNewCategoryInput}
+                newCategoryLabel={newCategoryLabel}
+                setNewCategoryLabel={setNewCategoryLabel}
+                onSaveToProducts={row => setProductModalRow(row)}
+              />
+            ) : (
+              <div className="lg:sticky lg:top-[5.5rem] lg:h-[calc(100vh-7rem)]">
+                <QuotePreviewPanel
+                  open={showPreviewPanel}
+                  setOpen={setShowPreviewPanel}
+                  previewMode={previewMode}
+                  setPreviewMode={setPreviewMode}
+                  liveEnabled={liveAvailable}
+                  liveTemplateData={quoteTemplateData}
+                  liveHandlers={liveHandlers}
+                  templatePreviewPayload={templatePreviewPayload}
+                  debouncedPreviewData={debouncedPreviewData}
+                  businessName={business.business_name}
+                  contactName={business.contact_name}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -9,46 +9,58 @@ import type { QuoteTemplateData } from '@/lib/quote-templates/types'
 
 type PreviewMode = 'live' | 'design' | 'compact'
 
-interface QuoteNewPreviewPanelProps {
+interface QuotePreviewPanelProps {
   open: boolean
   setOpen: (b: boolean) => void
   previewMode: PreviewMode
   setPreviewMode: (m: PreviewMode) => void
-  liveAvailable: boolean
-  liveTemplateData: QuoteTemplateData
-  liveHandlers: QuoteDocumentHandlers
+  /** ETAPP 2c (offert-masterplan.md): styr om Live-fliken (redigerbar
+      dokumentcanvas) erbjuds. new-sidan hade tidigare live-läget, edit
+      inte — motorn (QuoteDocument) är stil-agnostisk för valet av data,
+      så det fanns ingen teknisk anledning att neka edit-sidan samma
+      funktion. `liveTemplateData`/`liveHandlers` krävs bara när true. */
+  liveEnabled: boolean
+  liveTemplateData?: QuoteTemplateData
+  liveHandlers?: QuoteDocumentHandlers
   templatePreviewPayload: TemplatePreviewPayload
   debouncedPreviewData: QuotePreviewData | null
   businessName?: string
   contactName?: string
 }
 
-export function QuoteNewPreviewPanel({
+/**
+ * QuotePreviewPanel — ETAPP 2c (offert-masterplan.md): förenar
+ * QuoteNewPreviewPanel och QuoteEditPreviewPanel till EN komponent.
+ * Skillnaden var bara Live-fliken (fanns i new, saknades i edit) — nu
+ * styrd av `liveEnabled` istället för att vara två separata filer som
+ * kunde divergera.
+ */
+export function QuotePreviewPanel({
   open,
   setOpen,
   previewMode,
   setPreviewMode,
-  liveAvailable,
+  liveEnabled,
   liveTemplateData,
   liveHandlers,
   templatePreviewPayload,
   debouncedPreviewData,
   businessName,
   contactName,
-}: QuoteNewPreviewPanelProps) {
+}: QuotePreviewPanelProps) {
   const [fullscreen, setFullscreen] = useState(false)
   const [previewPending, setPreviewPending] = useState(false)
 
   function renderPreviewBody(flexFill: boolean) {
     const sizeCls = flexFill ? 'flex-1 min-h-0' : 'h-full'
-    if (previewMode === 'live' && liveAvailable) {
+    if (previewMode === 'live' && liveEnabled && liveTemplateData && liveHandlers) {
       return (
         <div className={`bg-slate-50 rounded-xl overflow-auto border border-slate-200 ${sizeCls} p-4`}>
           <QuoteDocument data={liveTemplateData} mode="edit" handlers={liveHandlers} />
         </div>
       )
     }
-    if (previewMode === 'design' || (previewMode === 'live' && !liveAvailable)) {
+    if (previewMode === 'design' || (previewMode === 'live' && !liveEnabled)) {
       return (
         <TemplatePreviewFrame
           payload={templatePreviewPayload}
@@ -117,14 +129,14 @@ export function QuoteNewPreviewPanel({
             <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 flex-shrink-0">
               <button
                 type="button"
-                onClick={() => liveAvailable && setPreviewMode('live')}
-                disabled={!liveAvailable}
+                onClick={() => liveEnabled && setPreviewMode('live')}
+                disabled={!liveEnabled}
                 className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   previewMode === 'live'
                     ? 'bg-white text-slate-900 shadow-sm'
                     : 'text-slate-500 hover:text-slate-700'
-                } ${!liveAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
-                title={liveAvailable ? 'Inline-redigera direkt i mallen' : 'Live-redigering för Premium/Friendly kommer i nästa steg'}
+                } ${!liveEnabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                title={liveEnabled ? 'Inline-redigera direkt i mallen' : 'Live-redigering för Premium/Friendly kommer i nästa steg'}
               >
                 Live ✏️
               </button>

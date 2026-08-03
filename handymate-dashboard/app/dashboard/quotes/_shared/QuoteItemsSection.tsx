@@ -7,23 +7,19 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import ItemRow from '@/components/quotes/ItemRow'
 import type { QuoteItem } from '@/lib/types/quote'
 import type { CustomCategory } from '@/lib/constants/categories'
-import { QuoteAddRowCombo } from '../../../_shared/QuoteAddRowCombo'
-import { QuoteProductSearchModal } from '../../../_shared/QuoteProductSearchModal'
-import type { ProductWithComponents } from '../../../_shared/applyProductToItem'
+import { QuoteAddRowCombo } from './QuoteAddRowCombo'
+import { QuoteProductSearchModal } from './QuoteProductSearchModal'
+import type { ProductWithComponents } from './applyProductToItem'
 
 /**
- * QuoteEditItemsSection — IDENTISK till QuoteNewItemsSection per pilot-feedback
- * 2026-05-20. Christoffer: "Specifikation med artiklar ser annorlunda ut när
- * man redigerar offerten jämfört med när man faktiskt skapar offerten första
- * gången — utseendet och funktionaliteten måste vara IDENTISK."
- *
- * Lösning: edit-componentens kropp är en exakt kopia av new-component, plus
- * stöd för inline kategori-skapande som tidigare bara fanns i new. Båda har
- * nu samma UI/UX. TD post-launch: konsolidera till en delad komponent i
- * _shared/ så de inte kan divergera igen.
+ * QuoteItemsSection — ETAPP 2c (offert-masterplan.md): förenar
+ * QuoteNewItemsSection och QuoteEditItemsSection, som var ~91 % identiska
+ * (43 rader diff, per pilot-feedback 2026-05-20-beslutet att specifikationen
+ * MÅSTE se likadan ut i new och edit). Används nu av båda sidorna — divergens
+ * är inte längre möjlig eftersom det bara finns EN komponent.
  */
 
-interface QuoteEditItemsSectionProps {
+interface QuoteItemsSectionProps {
   items: QuoteItem[]
   recalculated: QuoteItem[]
   allCategories: ReturnType<typeof import('@/lib/constants/categories').getAllCategories>
@@ -36,14 +32,14 @@ interface QuoteEditItemsSectionProps {
   onUpdateItem: (id: string, field: keyof QuoteItem, value: any) => void
   onRemoveItem: (id: string) => void
   onMoveItem: (index: number, direction: 'up' | 'down') => void
+  onOpenGrossistSearch: () => void
   /** NY rad från produkt — add-row-combon + snabbvals-knapparna */
   onSelectProduct: (product: ProductWithComponents) => void
   /** Förfyll BEFINTLIG rad från produkt — inline-combon i beskrivningsfältet */
   onSelectProductForRow: (itemId: string, product: ProductWithComponents) => void
   onAddBlankRow: (description: string) => void
-  onOpenGrossistSearch: () => void
   onSaveToProducts?: (item: QuoteItem) => void
-  // Inline-skapande av kategori (valfri — om inte passas saknas funktionen
+  // Inline-skapande av kategori — valfri (om inte passas saknas funktionen
   // men UI:n förblir identisk).
   onCreateCategory?: (label: string, itemId: string) => Promise<void> | void
   showNewCategoryInput?: string | null
@@ -52,7 +48,7 @@ interface QuoteEditItemsSectionProps {
   setNewCategoryLabel?: (s: string) => void
 }
 
-export function QuoteEditItemsSection({
+export function QuoteItemsSection({
   items,
   recalculated,
   allCategories,
@@ -73,7 +69,7 @@ export function QuoteEditItemsSection({
   setShowNewCategoryInput,
   newCategoryLabel,
   setNewCategoryLabel,
-}: QuoteEditItemsSectionProps) {
+}: QuoteItemsSectionProps) {
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false)
   const [showProductBrowse, setShowProductBrowse] = useState(false)
 

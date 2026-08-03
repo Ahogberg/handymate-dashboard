@@ -8,6 +8,8 @@ import { useToast } from '@/components/Toast'
 import ProductSearchModal from '@/components/ProductSearchModal'
 import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import type { QuotePreviewData } from '@/components/quotes/QuotePreview'
+import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates/types'
+import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
 import { supabase } from '@/lib/supabase'
 import {
   calculatePaymentPlan,
@@ -15,6 +17,7 @@ import {
   recalculateItems,
   setItemRotRut,
   legacyItemRotRutType,
+  getItemRotRutType,
 } from '@/lib/quote-calculations'
 import { getAllCategories, type CustomCategory } from '@/lib/constants/categories'
 import {
@@ -29,17 +32,17 @@ import { useQuoteItems } from '../../_shared/useQuoteItems'
 import { usePriceListLookup } from '../../_shared/usePriceListLookup'
 import { ensureProductComponents, type ProductWithComponents } from '../../_shared/applyProductToItem'
 import { QuoteQuickstartCard, type QuickstartRow } from '../../_shared/QuoteQuickstartCard'
+import { QuoteItemsSection } from '../../_shared/QuoteItemsSection'
+import { QuotePreviewPanel } from '../../_shared/QuotePreviewPanel'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 
 import { QuoteEditHeader } from './components/QuoteEditHeader'
 import { QuoteEditCustomerSection } from './components/QuoteEditCustomerSection'
-import { QuoteEditItemsSection } from './components/QuoteEditItemsSection'
 import { QuoteEditRotSection } from './components/QuoteEditRotSection'
 import { QuoteEditStandardTextsSection } from './components/QuoteEditStandardTextsSection'
 import { QuoteEditPaymentPlanSection } from './components/QuoteEditPaymentPlanSection'
 import { QuoteEditDisplaySettingsSection } from './components/QuoteEditDisplaySettingsSection'
 import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
-import { QuoteEditPreviewPanel } from './components/QuoteEditPreviewPanel'
 import { QuoteEditTotalsSection } from './components/QuoteEditTotalsSection'
 import { QuoteEditSaveTemplateModal } from './components/QuoteEditSaveTemplateModal'
 import { QuoteEditMobilePreviewModal } from './components/QuoteEditMobilePreviewModal'
@@ -145,6 +148,27 @@ export default function EditQuotePage() {
   // ─── Loading / global state ─────────────────────────────────────────
   const [customers, setCustomers] = useState<Customer[]>([])
   const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null)
+  // ETAPP 2c (offert-masterplan.md): live-canvasen (quoteTemplateData) behöver
+  // fält som inte ligger på useBusiness()-objektet (logo_url m.fl.) — samma
+  // fält som new-sidan redan hämtar. Hämtas i fetchData().
+  const [businessConfig, setBusinessConfig] = useState<{
+    business_name: string | null
+    contact_name: string | null
+    contact_email: string | null
+    phone_number: string | null
+    address: string | null
+    website: string | null
+    org_number: string | null
+    f_skatt_registered: boolean | null
+    bankgiro: string | null
+    plusgiro: string | null
+    swish_number: string | null
+    vat_number: string | null
+    accent_color: string | null
+    logo_url: string | null
+    tagline: string | null
+    service_area: string | null
+  } | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -222,7 +246,10 @@ export default function EditQuotePage() {
   const [showPreviewPanel, setShowPreviewPanel] = useState(true)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [debouncedPreviewData, setDebouncedPreviewData] = useState<QuotePreviewData | null>(null)
-  const [previewMode, setPreviewMode] = useState<'design' | 'compact'>('design')
+  // ETAPP 2c: edit-sidan får nu samma tre lägen som new (Live/Slutdesign/
+  // Kompakt) — QuoteDocument-motorn är stil-agnostisk för vilken sida som
+  // äger datan, se liveAvailable/quoteTemplateData nedan.
+  const [previewMode, setPreviewMode] = useState<'live' | 'design' | 'compact'>('live')
 
   // ─── Shared hooks ──────────────────────────────────────────────────
   const { products, customCategories, hydrated: priceListHydrated } = usePriceListLookup(business.business_id)
@@ -291,6 +318,11 @@ export default function EditQuotePage() {
   const hasRotItems = items.some(i => i.is_rot_eligible)
   const hasRutItems = items.some(i => i.is_rut_eligible)
 
+  const selectedCustomerObj = useMemo(
+    () => customers.find(c => c.customer_id === selectedCustomer) || null,
+    [customers, selectedCustomer],
+  )
+
   // ─── Custom category creation (speglar new-vyn) ────────────────────
   async function createCustomCategory(label: string, itemId: string) {
     const slug =
@@ -350,11 +382,92 @@ export default function EditQuotePage() {
     showQuantities, localCustomCategories,
   ])
 
-  // Payload till TemplatePreviewFrame
-  const templatePreviewPayload: TemplatePreviewPayload = useMemo(() => {
+  // ETAPP 2c (offert-masterplan.md): EN preview-pipeline — samma mönster som
+  // ETAPP 1a redan gav new-sidan. quoteTemplateData (→ QuoteDocument live-
+  // canvas) och templatePreviewPayload (→ TemplatePreviewFrame/iframen)
+  // byggs nu i EN useMemo med delad amountToPay-formel istället för att
+  // templatePreviewPayload.customer_pays räknades separat (och ofullständigt
+  // vid grön teknik-avdrag — samma bugg som new-sidans E1a-kommentar
+  // beskriver). quote_items i payloaden förblir MEDVETET rå QuoteItem-form
+  // (servern räknar om totalerna själv).
+  const { quoteTemplateData, templatePreviewPayload } = useMemo(() => {
     const validUntil = new Date()
     validUntil.setDate(validUntil.getDate() + (validDays || 30))
-    return {
+    const amountToPay = totals.totalDeduction > 0
+      ? totals.customerPaysAfterDeductions
+      : totals.total
+    const formatDate = (d: Date) =>
+      d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })
+
+    const quoteTemplateData: QuoteTemplateData = {
+      business: {
+        name: businessConfig?.business_name || business.business_name || 'Företag',
+        orgNumber: businessConfig?.org_number || '',
+        address: businessConfig?.address || '',
+        contactName: businessConfig?.contact_name || business.contact_name || '',
+        phone: businessConfig?.phone_number || '',
+        email: businessConfig?.contact_email || business.contact_email || '',
+        website: businessConfig?.website || null,
+        bankgiro: businessConfig?.bankgiro || null,
+        plusgiro: businessConfig?.plusgiro || null,
+        swish: businessConfig?.swish_number || null,
+        fSkatt: !!businessConfig?.f_skatt_registered,
+        momsRegnr: businessConfig?.vat_number || null,
+        accentColor: businessConfig?.accent_color || '#0F766E',
+        logoUrl: businessConfig?.logo_url || null,
+        tagline: businessConfig?.tagline || businessConfig?.service_area || null,
+      },
+      customer: {
+        name: selectedCustomerObj?.name || 'Kund',
+        address: selectedCustomerObj?.address_line || null,
+        postalCode: null,
+        city: null,
+        phone: selectedCustomerObj?.phone_number || null,
+        email: selectedCustomerObj?.email || null,
+        personnummer: personnummer || null,
+        reference: customerReference || null,
+      },
+      quote: {
+        number: quoteNumberRef.current || 'PREVIEW',
+        dealNumber: null,
+        issuedDate: formatDate(new Date()),
+        validUntilDate: formatDate(validUntil),
+        title: title || 'Offert',
+        description: description || null,
+        items: recalculated.map((i): QuoteTemplateItem => {
+          const itemType = ((i.item_type || 'item') as QuoteTemplateItem['itemType'])
+          return {
+            itemType,
+            id: i.id,
+            optionSelected: itemType === 'option' ? i.option_selected === true : undefined,
+            name: i.description || '',
+            description: null,
+            quantity: Number(i.quantity || 0),
+            unit: i.unit || 'st',
+            unitPrice: Number(i.unit_price || 0),
+            total: itemType === 'discount'
+              ? -Math.abs(Number(i.total || 0))
+              : Number(i.total || 0),
+            isRotEligible: !!i.is_rot_eligible,
+            isRutEligible: !!i.is_rut_eligible,
+            rotRutType: i.rot_rut_type ?? (i.is_rot_eligible ? 'rot' : i.is_rut_eligible ? 'rut' : null),
+          }
+        }),
+        subtotalExVat: totals.subtotal,
+        vatAmount: totals.vat,
+        totalIncVat: totals.total,
+        rotDeduction: totals.rotDeduction > 0 ? totals.rotDeduction : undefined,
+        rutDeduction: totals.rutDeduction > 0 ? totals.rutDeduction : undefined,
+        gronDeduction: totals.gronDeduction > 0 ? totals.gronDeduction : undefined,
+        amountToPay,
+        paymentTerms: paymentTermsText || '',
+        warrantyText: null,
+        notIncluded: notIncluded || null,
+        termsText: termsText || null,
+      },
+    }
+
+    const templatePreviewPayload: TemplatePreviewPayload = {
       quote: {
         quote_id: quoteId,
         quote_number: quoteNumberRef.current || undefined,
@@ -374,7 +487,9 @@ export default function EditQuotePage() {
         rut_work_cost: totals.rutWorkCost,
         rut_deduction: totals.rutDeduction,
         rut_customer_pays: totals.rutCustomerPays,
-        customer_pays: totals.rotCustomerPays || totals.rutCustomerPays || totals.total,
+        // Samma amountToPay som quoteTemplateData (var tidigare en egen,
+        // ofullständig formel — se kommentar ovan).
+        customer_pays: amountToPay,
         valid_until: validUntil.toISOString().split('T')[0],
         not_included: notIncluded || null,
         ata_terms: ataTerms || null,
@@ -394,13 +509,52 @@ export default function EditQuotePage() {
       customer_id: selectedCustomer || null,
       template_style: templateStyle,
     }
+
+    return { quoteTemplateData, templatePreviewPayload }
   }, [
-    quoteId, title, description, quoteStatus, totals, validDays, discountPercent, vatRate,
-    notIncluded, ataTerms, paymentTermsText,
+    business, businessConfig, selectedCustomerObj, selectedCustomer, quoteId, title, description,
+    quoteStatus, recalculated, totals, validDays, discountPercent, vatRate,
+    notIncluded, ataTerms, paymentTermsText, termsText,
     referencePerson, customerReference, projectAddress, detailLevel,
     showUnitPrices, showQuantities, personnummer, fastighetsbeteckning,
-    templateStyle, selectedCustomer, recalculated,
+    templateStyle,
   ])
+
+  const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
+
+  // ETAPP 2c: id-baserade liveHandlers — samma mönster som new-sidans E2a-
+  // implementation, återanvänder useQuoteItems' egna updateItem/removeItem/
+  // addItem (samma enda källa som QuoteItemsSection/mobilen redan använder).
+  const liveHandlers: QuoteDocumentHandlers = useMemo(
+    () => ({
+      onTitleChange: setTitle,
+      onDescriptionChange: setDescription,
+      onCustomerNameChange: undefined,
+      onPaymentTermsChange: setPaymentTermsText,
+      onTermsChange: setTermsText,
+      onItemChange: (id, patch) => {
+        if (patch.name !== undefined) updateItem(id, 'description', patch.name)
+        if (patch.quantity !== undefined) updateItem(id, 'quantity', patch.quantity)
+        if (patch.unit !== undefined) updateItem(id, 'unit', patch.unit)
+        if (patch.unitPrice !== undefined) updateItem(id, 'unit_price', patch.unitPrice)
+      },
+      onItemAdd: () => addItem('item'),
+      onItemRemove: id => removeItem(id),
+      onItemRotRutCycle: id => {
+        const item = items.find(i => i.id === id)
+        if (!item) return
+        const current = getItemRotRutType(item)
+        const isGron = current === 'gron_solceller' || current === 'gron_lagring' || current === 'gron_laddpunkt'
+        const next = isGron || current === null ? 'rot' : current === 'rot' ? 'rut' : null
+        updateItem(id, 'rot_rut_type', next)
+      },
+      onOptionDefaultToggle: (id, checked) => {
+        updateItem(id, 'option_default', checked)
+        updateItem(id, 'option_selected', checked)
+      },
+    }),
+    [setTitle, setDescription, setPaymentTermsText, setTermsText, updateItem, addItem, removeItem, items],
+  )
 
   // ═══════════════════════════════════════════════════════════════════
   // Data fetching
@@ -420,7 +574,7 @@ export default function EditQuotePage() {
       fetch('/api/customers').then(r => r.json()),
       supabase
         .from('business_config')
-        .select('pricing_settings, quote_template_style')
+        .select('pricing_settings, quote_template_style, business_name, contact_name, contact_email, phone_number, address, website, org_number, f_skatt_registered, bankgiro, plusgiro, swish_number, vat_number, accent_color, logo_url, tagline, service_area')
         .eq('business_id', business.business_id)
         .single(),
     ])
@@ -429,6 +583,27 @@ export default function EditQuotePage() {
     const defaultStyle = settingsRes.data?.quote_template_style as 'modern' | 'premium' | 'friendly' | undefined
     if (defaultStyle && ['modern', 'premium', 'friendly'].includes(defaultStyle)) {
       setBusinessDefaultStyle(defaultStyle)
+    }
+    if (settingsRes.data) {
+      const cfg = settingsRes.data as Record<string, unknown>
+      setBusinessConfig({
+        business_name: (cfg.business_name as string | null) ?? null,
+        contact_name: (cfg.contact_name as string | null) ?? null,
+        contact_email: (cfg.contact_email as string | null) ?? null,
+        phone_number: (cfg.phone_number as string | null) ?? null,
+        address: (cfg.address as string | null) ?? null,
+        website: (cfg.website as string | null) ?? null,
+        org_number: (cfg.org_number as string | null) ?? null,
+        f_skatt_registered: (cfg.f_skatt_registered as boolean | null) ?? null,
+        bankgiro: (cfg.bankgiro as string | null) ?? null,
+        plusgiro: (cfg.plusgiro as string | null) ?? null,
+        swish_number: (cfg.swish_number as string | null) ?? null,
+        vat_number: (cfg.vat_number as string | null) ?? null,
+        accent_color: (cfg.accent_color as string | null) ?? null,
+        logo_url: (cfg.logo_url as string | null) ?? null,
+        tagline: (cfg.tagline as string | null) ?? null,
+        service_area: (cfg.service_area as string | null) ?? null,
+      })
     }
     setPricingSettings(
       settingsRes.data?.pricing_settings || {
@@ -934,7 +1109,7 @@ export default function EditQuotePage() {
               setDescription={setDescription}
             />
 
-            <QuoteEditItemsSection
+            <QuoteItemsSection
               items={items}
               recalculated={recalculated}
               allCategories={allCategories}
@@ -1040,11 +1215,14 @@ export default function EditQuotePage() {
 
           {/* ── Right Column — Preview-only, fyller viewport ─────── */}
           <div className="lg:sticky lg:top-[5.5rem] lg:h-[calc(100vh-7rem)]">
-            <QuoteEditPreviewPanel
+            <QuotePreviewPanel
               open={showPreviewPanel}
               setOpen={setShowPreviewPanel}
               previewMode={previewMode}
               setPreviewMode={setPreviewMode}
+              liveEnabled={liveAvailable}
+              liveTemplateData={quoteTemplateData}
+              liveHandlers={liveHandlers}
               templatePreviewPayload={templatePreviewPayload}
               debouncedPreviewData={debouncedPreviewData}
               businessName={business.business_name}

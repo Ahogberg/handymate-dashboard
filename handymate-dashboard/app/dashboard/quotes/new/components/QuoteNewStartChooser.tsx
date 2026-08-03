@@ -16,9 +16,8 @@ interface QuoteNewStartChooserProps {
  * Startsteg för ny offert (Etapp 3). Fullskärms-overlay som visas bara när
  * inget annat redan pekat ut vad offerten ska bli (se hasQuoteStartSignal i
  * new/page.tsx) — deal/lead, vald kund, transcript eller förifylld titel
- * gör att den aldrig visas. QuoteNewTemplatePanel (den ihopfällbara panelen
- * i vänsterspalten) är kvar som väg tillbaka till mallarna även efter att
- * den här stängts.
+ * gör att den aldrig visas. ETAPP 2b (offert-masterplan.md): mallpanelen i
+ * vänsterspalten togs bort — det här är nu den enda vägen till mallarna.
  */
 export function QuoteNewStartChooser({ show, onClose, onSelectTemplate, onDescribeWithAI }: QuoteNewStartChooserProps) {
   const [mode, setMode] = useState<'choose' | 'templates'>('choose')
