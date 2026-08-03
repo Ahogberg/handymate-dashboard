@@ -10,7 +10,11 @@ import ProductSearchModal from '@/components/ProductSearchModal'
 import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import type { QuotePreviewData } from '@/components/quotes/QuotePreview'
 import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates/types'
-import { generateItemId, recalculateItems, setItemRotRut, legacyItemRotRutType, applyOptionRowDefaults } from '@/lib/quote-calculations'
+import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
+import {
+  generateItemId, recalculateItems, setItemRotRut, legacyItemRotRutType, applyOptionRowDefaults,
+  getItemRotRutType,
+} from '@/lib/quote-calculations'
 import { compressImageFile } from '@/lib/images/compress-photo'
 import { getAllCategories, type CustomCategory } from '@/lib/constants/categories'
 import {
@@ -502,6 +506,14 @@ export default function NewQuotePage() {
           const itemType = ((i.item_type || 'item') as QuoteTemplateItem['itemType'])
           return {
             itemType,
+            // ETAPP 2a (offert-masterplan.md): id-baserade liveHandlers kräver
+            // radens id i den visningsfärdiga formen — se onItemChange/onItemRemove/
+            // onItemRotRutCycle nedan (ersätter tidigare index-mutation).
+            id: i.id,
+            // ETAPP 2a: tidigare utelämnad här — tillvalsraderna i live-canvasen
+            // visade därför ALLTID ☐ oavsett faktiskt val (kunden/hantverkarens
+            // Förvald-val speglades aldrig). Fix: samma fält som data-builder.ts.
+            optionSelected: itemType === 'option' ? i.option_selected === true : undefined,
             name: i.description || '',
             description: null,
             quantity: Number(i.quantity || 0),
@@ -512,6 +524,7 @@ export default function NewQuotePage() {
               : Number(i.total || 0),
             isRotEligible: !!i.is_rot_eligible,
             isRutEligible: !!i.is_rut_eligible,
+            rotRutType: i.rot_rut_type ?? (i.is_rot_eligible ? 'rot' : i.is_rut_eligible ? 'rut' : null),
           }
         }),
         subtotalExVat: totals.subtotal,
@@ -527,6 +540,10 @@ export default function NewQuotePage() {
             : ''),
         warrantyText: null,
         notIncluded: notIncluded || null,
+        // ETAPP 2a: krävs så canvasens redigerbara villkorstext (handlers.
+        // onTermsChange) speglar/skriver till samma state som templatePreviewPayload
+        // redan skickade (terms_text) — annars visar canvasen alltid tomt.
+        termsText: termsText || null,
       },
     }
 
@@ -584,54 +601,47 @@ export default function NewQuotePage() {
 
   const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
 
-  const liveHandlers = useMemo(
+  // ETAPP 2a (offert-masterplan.md), punkt 6: id-baserade liveHandlers —
+  // ersätter tidigare index-mutation. Återanvänder useQuoteItems' egna
+  // updateItem/removeItem/addItem (samma enda källa som listvyn/mobilen
+  // redan använder) istället för att duplicera setItems-logik här.
+  const liveHandlers: QuoteDocumentHandlers = useMemo(
     () => ({
       onTitleChange: setTitle,
       onDescriptionChange: setDescription,
       onCustomerNameChange: undefined,
       onPaymentTermsChange: setPaymentTermsText,
-      // ModernCanvas renderar ALLA rader (inkl. rubrik/text/delsumma/rabatt)
-      // i samma ordning som items — index i canvasen = index i items-arrayen.
-      // Endast 'item'-rader är redigerbara i canvasen, men vi guardar ändå.
-      onItemChange: (idx: number, updated: any) => {
-        setItems(prev =>
-          prev.map((it, i) =>
-            i === idx && (it.item_type || 'item') === 'item'
-              ? {
-                  ...it,
-                  description: updated.name,
-                  quantity: updated.quantity,
-                  unit_price: updated.unitPrice,
-                  total: updated.total,
-                }
-              : it,
-          ),
-        )
+      onTermsChange: setTermsText,
+      onItemChange: (id, patch) => {
+        if (patch.name !== undefined) updateItem(id, 'description', patch.name)
+        if (patch.quantity !== undefined) updateItem(id, 'quantity', patch.quantity)
+        if (patch.unit !== undefined) updateItem(id, 'unit', patch.unit)
+        if (patch.unitPrice !== undefined) updateItem(id, 'unit_price', patch.unitPrice)
       },
-      onItemAdd: () => {
-        setItems(prev => [
-          ...prev,
-          {
-            id: 'tmp_' + Math.random().toString(36).slice(2, 10),
-            item_type: 'item',
-            description: '',
-            quantity: 1,
-            unit: 'st',
-            unit_price: 0,
-            total: 0,
-            is_rot_eligible: false,
-            is_rut_eligible: false,
-            sort_order: prev.length,
-          } satisfies QuoteItem,
-        ])
+      onItemAdd: () => addItem('item'),
+      // Dokumentmotorn visar ta-bort-knappen på ALLA radtyper med id
+      // (rubrik/text/delsumma/rabatt/tillval/item) — till skillnad från
+      // gamla ModernCanvas som bara kunde ta bort 'item'-rader.
+      onItemRemove: id => removeItem(id),
+      // Cyklar ROT/RUT: null → rot → rut → null. En grön teknik-taggad rad
+      // flyttas medvetet in i cykeln (till 'rot') vid första klicket istället
+      // för att tyst nollställas — se RotBadge-kommentaren i QuoteDocumentRow.
+      onItemRotRutCycle: id => {
+        const item = items.find(i => i.id === id)
+        if (!item) return
+        const current = getItemRotRutType(item)
+        const isGron = current === 'gron_solceller' || current === 'gron_lagring' || current === 'gron_laddpunkt'
+        const next = isGron || current === null ? 'rot' : current === 'rot' ? 'rut' : null
+        updateItem(id, 'rot_rut_type', next)
       },
-      onItemRemove: (idx: number) => {
-        setItems(prev =>
-          prev.filter((it, i) => i !== idx || (it.item_type || 'item') !== 'item'),
-        )
+      // Samma regel som ItemRow.tsx: option_default OCH option_selected
+      // sätts alltid ihop (kunden kan sedan ändra option_selected i portalen).
+      onOptionDefaultToggle: (id, checked) => {
+        updateItem(id, 'option_default', checked)
+        updateItem(id, 'option_selected', checked)
       },
     }),
-    [],
+    [setTitle, setDescription, setPaymentTermsText, setTermsText, updateItem, addItem, removeItem, items],
   )
 
   // ═══════════════════════════════════════════════════════════════════

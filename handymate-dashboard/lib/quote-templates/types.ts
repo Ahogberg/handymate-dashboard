@@ -36,6 +36,13 @@ export interface QuoteTemplateCustomer {
 /** Radtyp — speglar quote_items.item_type i databasen. */
 export type QuoteTemplateItemType = 'item' | 'heading' | 'text' | 'subtotal' | 'discount' | 'option'
 
+/**
+ * Speglar lib/types/quote.ts RotRutType — duplicerad lokalt (istället för
+ * importerad) så mallpaketet (lib/quote-templates) förblir fristående från
+ * app-lagrets typer, samma princip som resten av denna fil.
+ */
+export type QuoteTemplateRotRutType = 'rot' | 'rut' | 'gron_solceller' | 'gron_lagring' | 'gron_laddpunkt' | null
+
 export interface QuoteTemplateItem {
   /**
    * Radtyp. Utelämnad tolkas som 'item' (bakåtkompatibelt med anropare
@@ -46,6 +53,10 @@ export interface QuoteTemplateItem {
    *   mallarna visar "−X kr" så att synliga rader summerar till delsumman
    */
   itemType?: QuoteTemplateItemType
+  /** ETAPP 2a (offert-masterplan.md): källrad-id (quote_items.id) — ENDAST
+      satt/använt i edit-läge (dokumentmotorns id-baserade liveHandlers).
+      Utelämnad i statisk rendering (PDF/kundvy) där den inte behövs. */
+  id?: string
   /** Endast itemType 'option': kundens val — true = ikryssat tillval (☑),
       false/utelämnad = bortvalt (☐). Speglar quote_items.option_selected. */
   optionSelected?: boolean
@@ -57,6 +68,12 @@ export interface QuoteTemplateItem {
   total: number
   isRotEligible?: boolean
   isRutEligible?: boolean
+  /** Rå avdragstyp (inkl. grön teknik-varianter) — ETAPP 2a: dokumentmotorns
+      klickbara ROT/RUT-badge behöver skilja "ingen avdragstyp" från "grön
+      teknik" (isRotEligible/isRutEligible är båda false för grön teknik).
+      Badgen cyklar bara null→rot→rut→null; grön teknik visas men redigeras
+      endast i radeditorn (för många val för en badge). */
+  rotRutType?: QuoteTemplateRotRutType
   /** Endast 'summary'-nivå: gruppsummerad rad (heading + belopp), ingen à-pris/antal.
       Renderas som en sektionsrad med summa till höger. */
   isGroup?: boolean
@@ -121,6 +138,19 @@ export interface QuoteTemplateData {
   /** "Vår referens" — offertens skapare (auto men redigerbar). Renderas i
       kunddokumentets avsändarblock. Utelämnad/null → raden visas ej (legacy). */
   referencePerson?: string | null
+  /**
+   * ETAPP 2a (offert-masterplan.md): styr signatur-CTA-sektionen (behövs
+   * fullt ut av E4/E5). 'active' = "Godkänn offerten digitalt"-yta,
+   * 'signed' = "Signerad {datum}"-kvitto, 'hidden' = sektionen renderas
+   * inte alls. Utelämnad → dokumentmotorn väljer 'signed'/'active' utifrån
+   * isSigned (generisk default). buildQuoteTemplateData sätter EXPLICIT
+   * 'hidden' tills E5 aktiverar kundvyn — ingen beteendeförändring i
+   * befintliga PDF:er/förhandsvisningar av den här etappen.
+   */
+  signatureCta?: 'active' | 'signed' | 'hidden'
+  /** Datum för signering ("13 mars 2026"), formaterat — endast relevant när
+      signatureCta är (eller resolvar till) 'signed'. */
+  signedDate?: string | null
 }
 
 export type TemplateStyle = 'modern' | 'premium' | 'friendly'

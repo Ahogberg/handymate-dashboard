@@ -94,6 +94,9 @@ export function buildQuoteTemplateData(
       }
       return {
         itemType,
+        // ETAPP 2a: id krävs av dokumentmotorns id-baserade liveHandlers i
+        // edit-läge — ofarligt att alltid sätta (oanvänd i statisk rendering).
+        id: i.id,
         // Endast tillvalsrader: kundens val (☑/☐) — quote_items.option_selected
         optionSelected: itemType === 'option' ? i.option_selected === true : undefined,
         name: i.description || '',
@@ -104,6 +107,8 @@ export function buildQuoteTemplateData(
         total,
         isRotEligible: !!i.is_rot_eligible || i.rot_rut_type === 'rot',
         isRutEligible: !!i.is_rut_eligible || i.rot_rut_type === 'rut',
+        // ETAPP 2a: rå typ (inkl. grön teknik) — se kommentar i types.ts.
+        rotRutType: i.rot_rut_type ?? (i.is_rot_eligible ? 'rot' : i.is_rut_eligible ? 'rut' : null),
         // Per-rad-override: visa komponentbeskrivningar (ALDRIG unit_cost) när
         // hantverkaren aktivt slagit på det. Töms i 'summary' (rader visas ej).
         components: extractCustomerComponents(i),
@@ -150,6 +155,7 @@ export function buildQuoteTemplateData(
     // Tillval återbyggs från structured-raderna med fulla fält (kundens val).
     const optionRows: QuoteTemplateItem[] = options.map(o => ({
       itemType: 'option',
+      id: o.id,
       optionSelected: o.option_selected === true,
       name: o.description || '',
       description: o.long_description || null,
@@ -159,6 +165,7 @@ export function buildQuoteTemplateData(
       total: Number(o.total || 0),
       isRotEligible: !!o.is_rot_eligible || o.rot_rut_type === 'rot',
       isRutEligible: !!o.is_rut_eligible || o.rot_rut_type === 'rut',
+      rotRutType: o.rot_rut_type ?? (o.is_rot_eligible ? 'rot' : o.is_rut_eligible ? 'rut' : null),
     }))
     items = [...groupRows, ...optionRows]
   } else if (displayLevel === 'rows') {
@@ -231,6 +238,12 @@ export function buildQuoteTemplateData(
     showQuantities: cols.showQuantities,
     showUnitPrices: cols.showUnitPrices,
     referencePerson: quote.reference_person ?? null,
+    // ETAPP 2a (offert-masterplan.md): signatur-CTA-sektionens struktur
+    // läggs i dokumentmotorn nu, men hålls avstängd i PDF/kundvy tills E5
+    // faktiskt aktiverar den — EXPLICIT 'hidden' (inte utelämnad) så den
+    // aldrig råkar visas via den generiska isSigned-baserade defaulten.
+    signatureCta: 'hidden',
+    signedDate: quote.signed_at ? formatDateLong(quote.signed_at) : null,
     business: {
       name: businessName,
       orgNumber: config?.org_number || business?.org_number || '',

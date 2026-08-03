@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Check, ExternalLink, FileText, Loader2, Palette, Receipt } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
 import { supabase } from '@/lib/supabase'
-import { TEMPLATE_META, type TemplateStyle } from '@/lib/quote-templates'
+import { TEMPLATE_META, type TemplateStyle } from '@/lib/quote-templates/meta'
 import { DualThumbnail } from '@/components/quotes/style-thumbnails'
 
 /**

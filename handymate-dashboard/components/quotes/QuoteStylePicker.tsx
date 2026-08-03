@@ -1,7 +1,7 @@
 'use client'
 
 import { Check, Eye } from 'lucide-react'
-import { TEMPLATE_META, type TemplateStyle } from '@/lib/quote-templates'
+import { TEMPLATE_META, type TemplateStyle } from '@/lib/quote-templates/meta'
 import { MiniDoc } from './style-thumbnails'
 
 interface QuoteStylePickerProps {

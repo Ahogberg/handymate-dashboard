@@ -1,6 +1,6 @@
 'use client'
 
-import type { TemplateStyle } from '@/lib/quote-templates'
+import type { TemplateStyle } from '@/lib/quote-templates/meta'
 
 /**
  * Delade A4-tumnaglar för offertstilarna (Modern/Premium/Friendly).

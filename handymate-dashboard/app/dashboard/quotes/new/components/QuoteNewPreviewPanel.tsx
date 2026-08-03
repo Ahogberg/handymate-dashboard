@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { ChevronDown, Eye, Loader2, Maximize2, X } from 'lucide-react'
 import QuotePreview, { type QuotePreviewData } from '@/components/quotes/QuotePreview'
 import TemplatePreviewFrame, { type TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
-import ModernCanvas, { type ModernCanvasHandlers } from '@/components/quotes/editable/ModernCanvas'
+import QuoteDocument, { type QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
 
 type PreviewMode = 'live' | 'design' | 'compact'
@@ -16,7 +16,7 @@ interface QuoteNewPreviewPanelProps {
   setPreviewMode: (m: PreviewMode) => void
   liveAvailable: boolean
   liveTemplateData: QuoteTemplateData
-  liveHandlers: ModernCanvasHandlers
+  liveHandlers: QuoteDocumentHandlers
   templatePreviewPayload: TemplatePreviewPayload
   debouncedPreviewData: QuotePreviewData | null
   businessName?: string
@@ -44,7 +44,7 @@ export function QuoteNewPreviewPanel({
     if (previewMode === 'live' && liveAvailable) {
       return (
         <div className={`bg-slate-50 rounded-xl overflow-auto border border-slate-200 ${sizeCls} p-4`}>
-          <ModernCanvas data={liveTemplateData} handlers={liveHandlers} />
+          <QuoteDocument data={liveTemplateData} mode="edit" handlers={liveHandlers} />
         </div>
       )
     }
@@ -124,7 +124,7 @@ export function QuoteNewPreviewPanel({
                     ? 'bg-white text-slate-900 shadow-sm'
                     : 'text-slate-500 hover:text-slate-700'
                 } ${!liveAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
-                title={liveAvailable ? 'Inline-redigera direkt i mallen' : 'Live-redigering kommer snart för Premium/Friendly'}
+                title={liveAvailable ? 'Inline-redigera direkt i mallen' : 'Live-redigering för Premium/Friendly kommer i nästa steg'}
               >
                 Live ✏️
               </button>
