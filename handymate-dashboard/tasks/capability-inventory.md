@@ -1,7 +1,32 @@
 # Handymate — Ärlig kapabilitets-inventering
 
 _För pitch-/strategiändamål. Ingen hype — vad som FAKTISKT finns._
-_Genererad 2026-07-01 · **Uppdaterad 2026-08-03** (värdekedjorna stängda, git-verifierad)._
+_Genererad 2026-07-01 · **Uppdaterad 2026-08-04** (offert-sprinten, git-verifierad)._
+
+## ⚡ 2026-08-04: OFFERT-SPRINTEN E1-E5 — "dokumentet ÄR gränssnittet", BYGGT (ej LIVE)
+
+Hela offertupplevelsen ombyggd på en dag (tasks/offert-masterplan.md har
+commit-hashar + uppföljningslista): EN dokumentmotor (QuoteDocument)
+ersätter tre parallella renderare — live-canvas, preview, PDF och
+KUNDENS SIGNERINGSSIDA renderar nu samma dokument. Kunden ser äntligen
+mallen hantverkaren valde (Premium når ytan där affären stängs).
+Skaparen är canvas-first (dokumentet huvudyta, 13 kort → smal assistent-
+kolumn + Mer-rad), mobilen fullvärdig (skalat dokument + bottom-sheet-
+radeditor, 44px+), detaljsidan är ett Offertrum (dokumentet i centrum,
+EN primär åtgärd per status, VERKLIG händelselogg från tracking-datat,
+versionsdiff). ~1700 rader dubblett-/dialektkod bort netto. Fyra äkta
+buggar fixade på vägen (tillvalsrader försvann i hantverkarvyn, ROT-
+toggle-desync, PDF:ns tomma sida 2, publikt prisläckage i rows-läget).
+
+HOTFIX-lärdom: react-dom/server-importen fällde alla Vercel-deployer i
+fem etapper innan den upptäcktes — tsc fångar inte webpack-felklassen;
+next build är nu deploy-gate för lib-ändringar (tasks/lessons.md).
+
+Status BYGGT tills Andreas kört manuella verifieringen (lista i
+masterplanen: livecanvas, mobil på riktig telefon, PDF per stil,
+kundvyns signering end-to-end). Nästa: E6 FAKTURA-SPRINTEN (beslutad —
+motorn generaliseras till pengadokument; fakturan renderas idag av
+gamla jsPDF:en = varumärkes-whiplash i betalögonblicket).
 
 ## ⚡ 2026-08-03: VÄRDEKEDJORNA STÄNGDA — "motorerna fanns, triggrarna saknades", BYGGT (ej LIVE)
 
