@@ -31,15 +31,31 @@ function unitLabel(unit: string | null | undefined): string {
   }
 }
 
-function deriveStatus(invoice: any): { status: InvoiceStatus; daysOverdue: number } {
+/**
+ * FACIT-BUGG (ETAPP 6d, offert-masterplan.md, faktura-sprinten — "6b-
+ * flaggan"): tidigare kortslöt denna funktion vid invoice_type==='reminder'
+ * och returnerade daysOverdue=0 UTAN att någonsin titta på due_date — dvs
+ * INNAN förfallodagarna räknades. En påminnelsefaktura (dokumentet som
+ * SKICKAS som en påminnelse) som faktiskt var långt förfallen fick alltså
+ * daysOverdue=0 → lateInterest (nedan) blev felaktigt 0 kr trots att
+ * fakturan var t.ex. 20 dagar sen.
+ *
+ * Fixen: räkna daysOverdue EN gång, alltid utifrån due_date (oavsett
+ * invoice_type) — grenen på invoice_type väljer bara vilket `status`-namn
+ * som rapporteras (påminnelsefakturor visar 'reminder' i UI:t istället för
+ * 'overdue'), men bär nu med sig den RIKTIGA förfallodagsräkningen istället
+ * för att tvinga fram 0. Ren funktion — se tests/invoice-derive-status.spec.ts.
+ */
+export function deriveStatus(invoice: any): { status: InvoiceStatus; daysOverdue: number } {
   if (invoice.status === 'paid' || invoice.paid_at) return { status: 'paid', daysOverdue: 0 }
-  if (invoice.invoice_type === 'reminder') return { status: 'reminder', daysOverdue: 0 }
 
   const due = invoice.due_date ? new Date(invoice.due_date) : null
-  if (due && due.getTime() < Date.now()) {
-    const days = Math.ceil((Date.now() - due.getTime()) / (1000 * 60 * 60 * 24))
-    return { status: 'overdue', daysOverdue: days }
-  }
+  const daysOverdue = due && due.getTime() < Date.now()
+    ? Math.ceil((Date.now() - due.getTime()) / (1000 * 60 * 60 * 24))
+    : 0
+
+  if (invoice.invoice_type === 'reminder') return { status: 'reminder', daysOverdue }
+  if (daysOverdue > 0) return { status: 'overdue', daysOverdue }
   return { status: 'unpaid', daysOverdue: 0 }
 }
 

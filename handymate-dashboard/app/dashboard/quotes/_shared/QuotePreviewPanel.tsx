@@ -63,8 +63,11 @@ export function QuotePreviewPanel({
       return (
         <div className={`bg-slate-50 rounded-xl overflow-auto border border-slate-200 ${sizeCls} p-4`}>
           <DocumentScaler>
+            {/* ETAPP 6a: se PublicQuoteDocument.tsx-kommentaren — docType
+                sätts inline, liveTemplateData förblir typad QuoteTemplateData
+                (new/edit-sidornas live-state rörs inte). */}
             <QuoteDocument
-              data={liveTemplateData}
+              data={{ ...liveTemplateData, docType: 'quote' }}
               mode="edit"
               handlers={liveHandlers}
               sheetMode={isMobile}

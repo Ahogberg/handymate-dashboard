@@ -81,6 +81,14 @@ export interface QuoteTemplateItem {
       under raden i 'rows'/'full'. ALDRIG interna kostnader — bara beskrivning +
       mängd/enhet. Tomt/utelämnat → ingen spec. */
   components?: QuoteTemplateComponent[]
+  /** ETAPP 6a (offert-masterplan.md, faktura-sprinten): vem som utförde
+      arbetet (invoice_item.performed_by_name, multi-employee-parity-planet).
+      Utelämnad för offertrader (fältet existerar bara på fakturasidan idag)
+      och för äldre fakturarader/rader utan tidrapport-koppling. Renderas
+      diskret (liten sekundärtext) under radens namn av QuoteDocumentRow —
+      docType-agnostisk så samma radkomponent kan visa den oavsett om den
+      körs i offert- eller fakturaläge. */
+  performedByName?: string | null
 }
 
 /** En komponentrad ur component_snapshot som får visas för kunden. */

@@ -38,7 +38,10 @@ export function QuoteDocumentPanel({ data, style, payload }: QuoteDocumentPanelP
     return (
       <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-auto p-4 sm:p-6">
         <DocumentScaler>
-          <QuoteDocument data={data} mode="static" />
+          {/* ETAPP 6a: se motsvarande kommentar i PublicQuoteDocument.tsx —
+              docType sätts inline istället för att typa om denna sidas
+              QuoteTemplateData-prop. */}
+          <QuoteDocument data={{ ...data, docType: 'quote' }} mode="static" />
         </DocumentScaler>
       </div>
     )

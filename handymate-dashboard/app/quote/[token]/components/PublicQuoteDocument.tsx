@@ -37,7 +37,11 @@ export function PublicQuoteDocument({ style, templateData, documentHtml }: Publi
     return (
       <div className="bg-slate-50 rounded-2xl border border-gray-200 overflow-auto p-3 sm:p-6">
         <DocumentScaler>
-          <QuoteDocument data={templateData} mode="static" />
+          {/* ETAPP 6a: QuoteDocument tar nu MoneyDocumentData (docType-union) —
+              denna komponent hanterar bara offerter, docType sätts inline här
+              istället för att typa om templateData-propen (QuoteTemplateData)
+              rakt igenom hela kundvys-kedjan. */}
+          <QuoteDocument data={{ ...templateData, docType: 'quote' }} mode="static" />
         </DocumentScaler>
       </div>
     )
