@@ -141,6 +141,33 @@ export async function GET(request: NextRequest) {
         .order('version_number', { ascending: true })
       versions = versionData || []
 
+      // ETAPP 4 (offert-masterplan.md), punkt 5: "vad ändrades"-raden i
+      // versionsväljaren jämför radantal mellan versioner — item_count per
+      // sibling-version hämtas här (en extra fråga, bara när det faktiskt
+      // finns fler versioner) så klienten kan diffa utan N separata anrop.
+      if (versions.length > 1) {
+        const versionIds = versions.map((v: any) => v.quote_id)
+        const { data: itemRows } = await supabase
+          .from('quote_items')
+          .select('quote_id')
+          .in('quote_id', versionIds)
+        const counts: Record<string, number> = {}
+        for (const row of itemRows || []) {
+          counts[row.quote_id] = (counts[row.quote_id] || 0) + 1
+        }
+        versions = versions.map((v: any) => ({ ...v, item_count: counts[v.quote_id] || 0 }))
+      }
+
+      // ETAPP 4, punkt 3: verklig händelselogg (inte en hårdkodad 5-stegs-
+      // timeline) — de faktiska tracking-events /api/quotes/track redan
+      // loggar (öppningar/stängningar från kundens signeringssida).
+      const { data: trackingEvents } = await supabase
+        .from('quote_tracking_events')
+        .select('event_type, session_id, duration_seconds, created_at')
+        .eq('quote_id', quoteId)
+        .order('created_at', { ascending: true })
+        .limit(50)
+
       return NextResponse.json({
         quote: {
           ...quote,
@@ -148,6 +175,7 @@ export async function GET(request: NextRequest) {
           customer,
         },
         versions: versions.length > 1 ? versions : [],
+        trackingEvents: trackingEvents || [],
       })
     }
 

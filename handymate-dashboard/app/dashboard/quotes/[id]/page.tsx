@@ -1,18 +1,44 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
+import { supabase } from '@/lib/supabase'
+import { buildQuoteTemplateData } from '@/lib/quote-templates/data-builder'
+import type { QuoteTemplateData } from '@/lib/quote-templates/types'
+import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
+import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 import { QuoteHeader } from './components/QuoteHeader'
 import { QuoteCustomerCard } from './components/QuoteCustomerCard'
-import { QuoteDescriptionCard } from './components/QuoteDescriptionCard'
-import { QuoteSpecificationTable } from './components/QuoteSpecificationTable'
+import { QuoteDocumentPanel } from './components/QuoteDocumentPanel'
 import { QuoteSummaryCard } from './components/QuoteSummaryCard'
 import { QuoteSignatureCard } from './components/QuoteSignatureCard'
 import { QuoteStatusTimeline } from './components/QuoteStatusTimeline'
 import { QuoteSendModal } from './components/QuoteSendModal'
-import type { Quote, QuoteVersion, QuoteIntelligence } from './types'
+import { QuoteDeleteConfirmModal } from './components/QuoteDeleteConfirmModal'
+import { QuoteNewVersionModal } from './components/QuoteNewVersionModal'
+import type { Quote, QuoteVersion, QuoteIntelligence, QuoteTrackingEvent } from './types'
+
+interface BusinessConfig {
+  business_name: string | null
+  contact_name: string | null
+  contact_email: string | null
+  phone_number: string | null
+  address: string | null
+  website: string | null
+  org_number: string | null
+  f_skatt_registered: boolean | null
+  bankgiro: string | null
+  plusgiro: string | null
+  swish_number: string | null
+  vat_number: string | null
+  accent_color: string | null
+  logo_url: string | null
+  tagline: string | null
+  service_area: string | null
+  quote_template_style: string | null
+}
 
 export default function QuoteDetailPage() {
   const params = useParams()
@@ -45,6 +71,20 @@ export default function QuoteDetailPage() {
   const [quoteIntelligence, setQuoteIntelligence] = useState<QuoteIntelligence | null>(null)
   const [versions, setVersions] = useState<QuoteVersion[]>([])
   const [creatingVersion, setCreatingVersion] = useState(false)
+  const [trackingEvents, setTrackingEvents] = useState<QuoteTrackingEvent[]>([])
+
+  // ETAPP 4 (offert-masterplan.md), punkt 1: dokumentet i centrum — samma
+  // datakälla som skaparen/edit-sidan (buildQuoteTemplateData behöver
+  // quote + business_config + creator). businessConfig hämtas här på samma
+  // sätt som [id]/edit/page.tsx redan gör.
+  const [businessConfig, setBusinessConfig] = useState<BusinessConfig | null>(null)
+  const [creator, setCreator] = useState<{ name: string | null; phone: string | null; email: string | null } | null>(null)
+
+  // ETAPP 4, punkt 4: prompt()/confirm() ersatta med riktiga dialoger.
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [showNewVersionModal, setShowNewVersionModal] = useState(false)
+  const [newVersionLabel, setNewVersionLabel] = useState('')
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type })
@@ -89,6 +129,32 @@ export default function QuoteDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quoteId])
 
+  // businessConfig — oberoende av quote, hämtas så fort vi vet vilket
+  // business_id (samma select som edit-sidan, minus pricing_settings).
+  useEffect(() => {
+    if (!business.business_id) return
+    supabase
+      .from('business_config')
+      .select(
+        'business_name, contact_name, contact_email, phone_number, address, website, org_number, f_skatt_registered, bankgiro, plusgiro, swish_number, vat_number, accent_color, logo_url, tagline, service_area, quote_template_style',
+      )
+      .eq('business_id', business.business_id)
+      .single()
+      .then(({ data }: { data: any }) => {
+        if (data) setBusinessConfig(data as BusinessConfig)
+      })
+  }, [business.business_id])
+
+  // creator — offert-identitet (v68): skaparens kontaktuppgifter, fallback
+  // till business_config sker inne i buildQuoteTemplateData om null.
+  useEffect(() => {
+    if (!quote?.created_by) {
+      setCreator(null)
+      return
+    }
+    fetchQuoteCreator(supabase, quote.created_by).then(setCreator)
+  }, [quote?.created_by])
+
   async function fetchQuote() {
     try {
       const res = await fetch(`/api/quotes?quoteId=${quoteId}`)
@@ -96,6 +162,7 @@ export default function QuoteDetailPage() {
         const data = await res.json()
         setQuote(data.quote || null)
         setVersions(data.versions || [])
+        setTrackingEvents(data.trackingEvents || [])
         if (data.quote?.sign_token && data.quote?.customer_id) {
           fetch('/api/quotes/sign-link', {
             method: 'POST',
@@ -114,6 +181,33 @@ export default function QuoteDetailPage() {
     }
     setLoading(false)
   }
+
+  // ETAPP 4, punkt 1: stilval — samma precedens som /api/quotes/pdf och
+  // /api/quotes/preview-html (quote.template_style > business default > modern).
+  const templateStyle = useMemo<'modern' | 'premium' | 'friendly'>(() => {
+    const style = quote?.template_style || businessConfig?.quote_template_style
+    return style === 'premium' || style === 'friendly' ? style : 'modern'
+  }, [quote?.template_style, businessConfig?.quote_template_style])
+
+  // Modern: byggs inline genom SAMMA dokumentmotor som skaparen/PDF:en.
+  const templateData: QuoteTemplateData | null = useMemo(() => {
+    if (!quote || !businessConfig) return null
+    return buildQuoteTemplateData(quote, business, businessConfig, creator)
+  }, [quote, business, businessConfig, creator])
+
+  // Premium/Friendly: samma iframe-preview (TemplatePreviewFrame mot
+  // /api/quotes/preview-html) som skaparen använder för dessa stilar —
+  // routen hämtar business_config/creator/kund server-side själv.
+  const previewPayload: TemplatePreviewPayload | null = useMemo(() => {
+    if (!quote) return null
+    const { quote_items, ...quoteRest } = quote as any
+    return {
+      quote: quoteRest,
+      quote_items: quote_items || [],
+      customer_id: quote.customer_id || null,
+      template_style: templateStyle,
+    }
+  }, [quote, templateStyle])
 
   const generatePDF = async () => {
     if (!quote) return
@@ -178,14 +272,17 @@ export default function QuoteDetailPage() {
     setSending(false)
   }
 
-  const deleteQuote = async () => {
-    if (!confirm('Är du säker på att du vill ta bort denna offert?')) return
+  // ETAPP 4, punkt 4: window.confirm() ersatt av QuoteDeleteConfirmModal.
+  const requestDelete = () => setShowDeleteConfirm(true)
 
+  const confirmDeleteQuote = async () => {
+    setDeleting(true)
     try {
       await fetch(`/api/quotes?quoteId=${quoteId}`, { method: 'DELETE' })
       router.push('/dashboard/quotes')
     } catch {
       showToast('Kunde inte ta bort offerten', 'error')
+      setDeleting(false)
     }
   }
 
@@ -211,10 +308,14 @@ export default function QuoteDetailPage() {
     setDuplicating(false)
   }
 
-  const createNewVersion = async () => {
+  // ETAPP 4, punkt 4: window.prompt() ersatt av QuoteNewVersionModal.
+  const requestNewVersion = () => {
+    setNewVersionLabel(`Version ${(versions.length || 1) + 1}`)
+    setShowNewVersionModal(true)
+  }
+
+  const confirmNewVersion = async () => {
     if (!quote) return
-    const label = prompt('Versionsnamn (valfritt):', `Version ${(versions.length || 1) + 1}`)
-    if (label === null) return // cancelled
     setCreatingVersion(true)
     try {
       const res = await fetch('/api/quotes', {
@@ -223,12 +324,13 @@ export default function QuoteDetailPage() {
         body: JSON.stringify({
           duplicate_from: quote.quote_id,
           create_version: true,
-          version_label: label || undefined,
+          version_label: newVersionLabel.trim() || undefined,
         }),
       })
       if (res.ok) {
         const data = await res.json()
         showToast('Ny version skapad!', 'success')
+        setShowNewVersionModal(false)
         router.push(`/dashboard/quotes/${data.quote.quote_id}/edit`)
       } else {
         showToast('Kunde inte skapa version', 'error')
@@ -290,6 +392,8 @@ export default function QuoteDetailPage() {
     }
   }
 
+  // ETAPP 4, punkt 6: enda platsen signeringslänken genereras — kallas nu
+  // från QuoteSignatureCard, inte längre från QuoteHeader.
   const generateSignLink = async () => {
     if (!quote) return
     setGeneratingSignLink(true)
@@ -374,42 +478,47 @@ export default function QuoteDetailPage() {
         </div>
       )}
 
-      <div className="relative max-w-5xl mx-auto">
+      <div className="relative max-w-[1600px] mx-auto">
         <QuoteHeader
           quote={quote}
           quoteId={quoteId}
           versions={versions}
           portalUrl={portalUrl}
           generatingPdf={generatingPdf}
-          generatingSignLink={generatingSignLink}
           duplicating={duplicating}
           creatingVersion={creatingVersion}
           creatingProject={creatingProject}
           creatingInvoice={creatingInvoice}
           onOpenSendModal={onOpenSendModal}
           onGeneratePDF={generatePDF}
-          onGenerateSignLink={generateSignLink}
           onCreateProject={createProjectFromQuote}
           onCreateInvoice={createInvoiceFromQuote}
           onDuplicate={duplicateQuote}
-          onCreateNewVersion={createNewVersion}
           onSaveTemplate={onSaveTemplateClick}
-          onDelete={deleteQuote}
+          onRequestNewVersion={requestNewVersion}
+          onRequestDelete={requestDelete}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            <QuoteCustomerCard quote={quote} />
-            <QuoteDescriptionCard quote={quote} />
-            <QuoteSpecificationTable quote={quote} />
+        {/* ETAPP 4, punkt 1: dokumentet i centrum — bred vänsterkolumn för
+            A4-dokumentet (samma motor/iframe som skaparen/PDF:en), smal
+            sticky sidopanel med kund/summering/signering/händelselogg
+            (punkt 6: kund flyttad hit — dokumentet visar redan mottagaren). */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(320px,380px)] gap-6 items-start">
+          <div className="min-w-0">
+            <QuoteDocumentPanel data={templateData} style={templateStyle} payload={previewPayload} />
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-6 lg:sticky lg:top-6">
+            <QuoteCustomerCard quote={quote} />
             <QuoteSummaryCard quote={quote} />
-            <QuoteSignatureCard quote={quote} portalUrl={portalUrl} onCopySignLink={onCopySignLink} />
-            <QuoteStatusTimeline quote={quote} />
+            <QuoteSignatureCard
+              quote={quote}
+              portalUrl={portalUrl}
+              onCopySignLink={onCopySignLink}
+              onGenerateSignLink={generateSignLink}
+              generatingSignLink={generatingSignLink}
+            />
+            <QuoteStatusTimeline quote={quote} trackingEvents={trackingEvents} />
           </div>
         </div>
       </div>
@@ -429,6 +538,22 @@ export default function QuoteDetailPage() {
         setQuoteIntelligence={setQuoteIntelligence}
         onClose={() => setShowSendModal(false)}
         onSend={sendQuote}
+      />
+
+      <QuoteDeleteConfirmModal
+        show={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDeleteQuote}
+        deleting={deleting}
+      />
+
+      <QuoteNewVersionModal
+        show={showNewVersionModal}
+        onClose={() => setShowNewVersionModal(false)}
+        onConfirm={confirmNewVersion}
+        label={newVersionLabel}
+        setLabel={setNewVersionLabel}
+        creating={creatingVersion}
       />
 
       {/* Save as Template Modal */}

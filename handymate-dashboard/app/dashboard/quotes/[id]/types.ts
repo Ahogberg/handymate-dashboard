@@ -21,6 +21,24 @@ export interface QuoteVersion {
   status: string
   total: number
   created_at: string
+  /** Antal quote_items-rader — endast satt när >1 version finns (se
+      app/api/quotes/route.ts). Används av computeVersionDiff (helpers.ts)
+      för "vad ändrades"-raden i versionsväljaren. */
+  item_count?: number
+}
+
+/**
+ * Ett tracking-event från quote_tracking_events (loggas av /api/quotes/track
+ * när kunden öppnar/stänger signeringssidan — se app/quote/[token]/page.tsx).
+ * Den enda VERKLIGA källan till "händelseloggen" (ETAPP 4, punkt 3) — inga
+ * påminnelse- eller multi-send-events finns i databasen (sent_at skrivs över
+ * vid varje ny utskick, se QuoteEventLog-kommentaren).
+ */
+export interface QuoteTrackingEvent {
+  event_type: string
+  session_id: string | null
+  duration_seconds: number | null
+  created_at: string
 }
 
 export interface PaymentPlanEntry {
@@ -97,6 +115,16 @@ export interface Quote {
   parent_quote_id?: string
   version_label?: string
   sign_token?: string
+  created_by?: string | null
+  template_style?: 'modern' | 'premium' | 'friendly' | null
+  /** Tracking-sammanfattning (v16_quote_tracking.sql) — uppdateras av
+      /api/quotes/track. view_count/first_viewed_at/last_viewed_at räknar
+      ALLA öppningar (även upprepade); trackingEvents (separat prop, se
+      QuoteDetailPage) ger den detaljerade per-händelse-loggen. */
+  view_count?: number
+  first_viewed_at?: string | null
+  last_viewed_at?: string | null
+  total_view_seconds?: number
 }
 
 export interface QuoteIntelligence {

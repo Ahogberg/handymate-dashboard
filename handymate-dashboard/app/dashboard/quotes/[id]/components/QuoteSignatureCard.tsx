@@ -1,6 +1,6 @@
 'use client'
 
-import { CheckCircle, Clock, Link2, PenTool } from 'lucide-react'
+import { CheckCircle, Clock, Link2, Loader2, PenTool } from 'lucide-react'
 import { formatDate } from '../helpers'
 import type { Quote } from '../types'
 
@@ -8,15 +8,25 @@ interface QuoteSignatureCardProps {
   quote: Quote
   portalUrl: string | null
   onCopySignLink: () => void
+  onGenerateSignLink: () => void
+  generatingSignLink: boolean
 }
 
 /**
  * E-signaturens status som ett av tre kort:
  * 1. Signerad: green-50 bg, check-ikon, datum + namn + signaturbild
- * 2. Väntar (sent/opened): amber-50 bg, clock-ikon + signeringslänk
- * 3. Ej skickat (draft): slate-50 bg, "Ej skickat än"
+ * 2. Väntar: amber-50 bg, clock-ikon + signeringslänk (kopiera)
+ * 3. Ingen länk än: slate-50 bg, "Skapa signeringslänk"-CTA
+ *
+ * ETAPP 4 (offert-masterplan.md), punkt 6: kortet är NU den enda platsen
+ * signeringslänken genereras/kopieras — headerns tidigare dubblerande
+ * "Signeringslänk"-knapp är borttagen. Gren 3 anropar onGenerateSignLink
+ * (samma /api/quotes/sign-link "get or create" som headerknappen gjorde
+ * tidigare — flippar draft→sent automatiskt om det behövs, se
+ * app/api/quotes/sign-link/route.ts) — efter lyckat anrop kör page.tsx
+ * fetchQuote() på nytt och kortet flippar automatiskt till gren 2.
  */
-export function QuoteSignatureCard({ quote, portalUrl, onCopySignLink }: QuoteSignatureCardProps) {
+export function QuoteSignatureCard({ quote, portalUrl, onCopySignLink, onGenerateSignLink, generatingSignLink }: QuoteSignatureCardProps) {
   // 1. Signerad
   if (quote.signature_data) {
     return (
@@ -40,8 +50,10 @@ export function QuoteSignatureCard({ quote, portalUrl, onCopySignLink }: QuoteSi
     )
   }
 
-  // 2. Väntar (skickad eller öppnad)
-  if (quote.sign_token && ['sent', 'opened'].includes(quote.status)) {
+  // 2. Väntar på signering — sign_token räcker (sign-link-routen garanterar
+  // redan att status blir 'sent' om den var 'draft', se filkommentaren ovan;
+  // ett statusvillkor här skulle bara riskera att dölja kortet felaktigt).
+  if (quote.sign_token) {
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 sm:p-6">
         <div className="flex items-center gap-3 mb-3">
@@ -77,22 +89,27 @@ export function QuoteSignatureCard({ quote, portalUrl, onCopySignLink }: QuoteSi
     )
   }
 
-  // 3. Ej skickat än (draft)
-  if (quote.status === 'draft') {
-    return (
-      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 sm:p-6">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center flex-shrink-0">
-            <PenTool className="w-4.5 h-4.5" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Signering</p>
-            <p className="text-sm font-medium text-slate-700">Ej skickat än</p>
-          </div>
+  // 3. Ingen signeringslänk skapad än — CTA istället för statisk text
+  // (ETAPP 4, punkt 6: kortet genererar+kopierar, headern gör det inte längre).
+  return (
+    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 sm:p-6">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center flex-shrink-0">
+          <PenTool className="w-4.5 h-4.5" />
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Signering</p>
+          <p className="text-sm font-medium text-slate-700">Ingen signeringslänk skapad än</p>
         </div>
       </div>
-    )
-  }
-
-  return null
+      <button
+        onClick={onGenerateSignLink}
+        disabled={generatingSignLink}
+        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-700 hover:bg-primary-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+      >
+        {generatingSignLink ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+        {generatingSignLink ? 'Skapar länk…' : 'Skapa signeringslänk'}
+      </button>
+    </div>
+  )
 }
