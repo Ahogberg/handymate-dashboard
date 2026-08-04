@@ -27,6 +27,7 @@ import {
   ClipboardList,
   Sparkles,
   FileDiff,
+  Award,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -123,6 +124,8 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   create_quote_draft: { label: 'Offertutkast', icon: Sparkles, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   // ÄTA-kedjan (etapp 2b, tasks/value-chain-plan.md).
   create_ata_draft: { label: 'ÄTA-förslag', icon: FileDiff, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
+  // Certifikatpåminnelsen (R3, tasks/resurs-masterplan.md).
+  cert_expiry_reminder: { label: 'Certifikat', icon: Award, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 

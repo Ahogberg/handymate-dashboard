@@ -7,51 +7,26 @@ import {
   Search,
   X,
   Loader2,
-  Mail,
-  Phone,
   Shield,
   Briefcase,
   ChevronDown,
   ChevronUp,
-  Clock,
   UserPlus,
   Send,
-  AlertTriangle
+  AlertTriangle,
+  Award,
 } from 'lucide-react'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useBusiness } from '@/lib/BusinessContext'
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface TeamMember {
-  id: string
-  business_id: string
-  user_id: string | null
-  role: 'owner' | 'admin' | 'project_manager' | 'employee'
-  name: string
-  email: string
-  phone: string | null
-  title: string | null
-  hourly_cost: number | null
-  hourly_rate: number | null
-  color: string
-  avatar_url: string | null
-  is_active: boolean
-  can_see_all_projects: boolean
-  can_see_financials: boolean
-  can_manage_users: boolean
-  can_approve_time: boolean
-  can_create_invoices: boolean
-  invite_token: string | null
-  invite_expires_at: string | null
-  invited_at: string | null
-  accepted_at: string | null
-  last_login_at: string | null
-  created_at: string
-  specialties?: string[]
-}
+import { supabase } from '@/lib/supabase'
+import { svDateStr } from '@/lib/dates'
+import { startOfWeek, addDays, format as formatDateFns } from 'date-fns'
+import { fetchPersonDays, type PersonDay } from '@/lib/schedule/person-day'
+import { computePersonWeekUtilization, type PersonWeekUtilization } from '@/lib/schedule/utilization'
+import { MemberCard } from './components/MemberCard'
+import { CertificatesPanel } from './components/CertificatesPanel'
+import type { TeamMember, JobType, Certificate, UpcomingTimeOff, WeekShiftSummary } from './components/types'
+import { getInitials, getStatusInfo } from './components/helpers'
 
 type Filter = 'all' | 'active' | 'invited' | 'inactive'
 
@@ -117,39 +92,8 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getInitials(name: string): string {
-  return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-}
-
-function getStatusInfo(member: TeamMember): { label: string; className: string } {
-  if (!member.is_active) return { label: 'Inaktiv', className: 'bg-red-100 text-red-600 border-red-200' }
-  if (member.invite_token && !member.accepted_at) return { label: 'Inbjuden', className: 'bg-amber-100 text-amber-600 border-amber-200' }
-  return { label: 'Aktiv', className: 'bg-emerald-100 text-emerald-600 border-emerald-200' }
-}
-
-function getRoleBadge(role: string): { label: string; className: string } {
-  if (role === 'owner') return { label: 'Ägare', className: 'bg-[#F0FDFA] text-primary-700 border-primary-300' }
-  if (role === 'admin') return { label: 'Admin', className: 'bg-primary-100 text-primary-600 border-primary-600/30' }
-  if (role === 'project_manager') return { label: 'Projektledare', className: 'bg-blue-100 text-blue-600 border-blue-300' }
-  if (role === 'kalkylator') return { label: 'Kalkylator', className: 'bg-amber-100 text-amber-600 border-amber-300' }
-  return { label: 'Anställd', className: 'bg-gray-100 text-gray-500 border-gray-300' }
-}
-
-function formatRelativeDate(dateStr: string | null): string {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
-
-  if (diffMins < 1) return 'Just nu'
-  if (diffMins < 60) return `${diffMins} min sedan`
-  if (diffHours < 24) return `${diffHours} tim sedan`
-  if (diffDays < 7) return `${diffDays} dagar sedan`
-  return date.toLocaleDateString('sv-SE')
-}
+// getInitials/getStatusInfo importeras från ./components/helpers (delas med
+// MemberCard) — se import-blocket överst.
 
 // ---------------------------------------------------------------------------
 // Toggle switch component
@@ -181,12 +125,18 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
 // ---------------------------------------------------------------------------
 
 export default function TeamPage() {
-  const { can, user: currentUser } = useCurrentUser()
+  const { can, user: currentUser, isOwnerOrAdmin } = useCurrentUser()
   const business = useBusiness()
 
   // Data state
   const [members, setMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
+
+  // R3 (tasks/resurs-masterplan.md) — operationell kontext för korten:
+  // persondagen (R1) + beläggning (R2-formeln), certifikat, kommande frånvaro.
+  const [personDays, setPersonDays] = useState<PersonDay[]>([])
+  const [timeOffs, setTimeOffs] = useState<UpcomingTimeOff[]>([])
+  const [certificates, setCertificates] = useState<Certificate[]>([])
 
   // UI state
   const [filter, setFilter] = useState<Filter>('all')
@@ -194,6 +144,7 @@ export default function TeamPage() {
   const [inviteModalOpen, setInviteModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
+  const [editTab, setEditTab] = useState<'profil' | 'certifikat'>('profil')
   const [actionLoading, setActionLoading] = useState(false)
   const [showPermissions, setShowPermissions] = useState(false)
   const [confirmDeactivate, setConfirmDeactivate] = useState(false)
@@ -204,8 +155,8 @@ export default function TeamPage() {
   // Edit form
   const [editForm, setEditForm] = useState<InviteForm>({ ...DEFAULT_INVITE_FORM })
 
-  // Jobbtyper (för specialiteter-multiselect)
-  const [jobTypes, setJobTypes] = useState<Array<{ id: string; name: string; slug: string; color: string }>>([])
+  // Jobbtyper (för specialiteter-multiselect + kortens specialitets-chips)
+  const [jobTypes, setJobTypes] = useState<JobType[]>([])
   const [editSpecialties, setEditSpecialties] = useState<string[]>([])
 
   // Toast
@@ -247,6 +198,78 @@ export default function TeamPage() {
       .catch(() => { /* non-blocking */ })
   }, [business.business_id])
 
+  // Certifikat (R3) — egen fetch, egen felkälla. GET-routen tål att
+  // sql/v84_certifikat.sql inte är körd än (returnerar tom lista) så vi
+  // sväljer fel tyst här också — sidan får aldrig krascha på detta.
+  const fetchCertificates = useCallback(async () => {
+    try {
+      const res = await fetch('/api/team/certificates')
+      if (!res.ok) return
+      const data = await res.json()
+      setCertificates(data.certificates || [])
+    } catch {
+      // Non-blocking — kortens certifikatsektion visar bara ingenting.
+    }
+  }, [])
+
+  useEffect(() => {
+    if (business.business_id) fetchCertificates()
+  }, [business.business_id, fetchCertificates])
+
+  // Innevarande vecka (mån–sön) — samma veckoanatomi som schema-fliken
+  // (R2, lib/schedule/utilization.ts), men alltid "denna vecka" här (Team
+  // har ingen vecko-navigering, det är schema-flikens jobb).
+  const weekDates = useMemo(() => {
+    const monday = startOfWeek(new Date(), { weekStartsOn: 1 })
+    return Array.from({ length: 7 }, (_, i) => formatDateFns(addDays(monday, i), 'yyyy-MM-dd'))
+  }, [])
+
+  // Persondagen (R1) för aktiva medlemmar denna vecka — driver både
+  // beläggnings-% och "veckans pass"-miniatyren på korten.
+  useEffect(() => {
+    const activeIds = members.filter(m => m.is_active).map(m => m.id)
+    if (!business.business_id || activeIds.length === 0) {
+      setPersonDays([])
+      return
+    }
+    let cancelled = false
+    fetchPersonDays(supabase, business.business_id, activeIds, weekDates[0], weekDates[6]).then(days => {
+      if (!cancelled) setPersonDays(days)
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [business.business_id, members, weekDates])
+
+  // Kommande/pågående godkänd frånvaro (time_off_request) — visar bara vad
+  // som FINNS, inget saldosystem (R3-specen är explicit om detta).
+  useEffect(() => {
+    const activeIds = members.filter(m => m.is_active).map(m => m.id)
+    if (!business.business_id || activeIds.length === 0) {
+      setTimeOffs([])
+      return
+    }
+    let cancelled = false
+    supabase
+      .from('time_off_request')
+      .select('id, business_user_id, start_date, end_date, type')
+      .eq('business_id', business.business_id)
+      .eq('status', 'approved')
+      .in('business_user_id', activeIds)
+      .gte('end_date', svDateStr())
+      .order('start_date', { ascending: true })
+      .then(({ data, error }: { data: UpcomingTimeOff[] | null; error: unknown }) => {
+        if (cancelled) return
+        if (error) {
+          console.warn('[team] kunde inte hämta time_off_request (icke-blockerande):', error)
+          setTimeOffs([])
+          return
+        }
+        setTimeOffs(data || [])
+      })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [business.business_id, members])
+
   // ---------------------------------------------------------------------------
   // Filtering
   // ---------------------------------------------------------------------------
@@ -270,6 +293,66 @@ export default function TeamPage() {
     invited: members.filter(m => m.invite_token && !m.accepted_at).length,
     inactive: members.filter(m => !m.is_active).length,
   }), [members])
+
+  // ---------------------------------------------------------------------------
+  // R3 — avledd operationell kontext per medlem (kortgriden)
+  // ---------------------------------------------------------------------------
+
+  const utilizationByMember = useMemo(() => {
+    const map = new Map<string, PersonWeekUtilization>()
+    for (const m of members) {
+      if (!m.is_active) continue
+      map.set(m.id, computePersonWeekUtilization(personDays, m.id, weekDates))
+    }
+    return map
+  }, [members, personDays, weekDates])
+
+  // "Veckans pass" (R3 punkt 1: "antal + timmar räcker") — till skillnad
+  // från beläggnings-%:en räknas HELA veckan (inkl. ev. helgpass), inte
+  // bara vardagarna. Egen, enklare summering — inte samma sak som
+  // utilization-formeln (som medvetet exkluderar helger, se lib/schedule/
+  // utilization.ts filhuvud).
+  const weekShiftsByMember = useMemo(() => {
+    const map = new Map<string, WeekShiftSummary>()
+    for (const m of members) {
+      if (!m.is_active) continue
+      let count = 0
+      let hours = 0
+      for (const date of weekDates) {
+        const day = personDays.find(pd => pd.businessUserId === m.id && pd.date === date)
+        if (!day) continue
+        count += day.shifts.length
+        for (const s of day.shifts) {
+          if (s.allDay) {
+            hours += 8
+          } else {
+            const ms = new Date(s.end).getTime() - new Date(s.start).getTime()
+            if (Number.isFinite(ms) && ms > 0) hours += ms / 3_600_000
+          }
+        }
+      }
+      map.set(m.id, { count, hours })
+    }
+    return map
+  }, [members, personDays, weekDates])
+
+  const upcomingTimeOffByMember = useMemo(() => {
+    const map = new Map<string, UpcomingTimeOff>()
+    for (const t of timeOffs) {
+      if (!map.has(t.business_user_id)) map.set(t.business_user_id, t)
+    }
+    return map
+  }, [timeOffs])
+
+  const certificatesByMember = useMemo(() => {
+    const map = new Map<string, Certificate[]>()
+    for (const c of certificates) {
+      const list = map.get(c.business_user_id) || []
+      list.push(c)
+      map.set(c.business_user_id, list)
+    }
+    return map
+  }, [certificates])
 
   // ---------------------------------------------------------------------------
   // Invite handlers
@@ -358,6 +441,7 @@ export default function TeamPage() {
     setEditSpecialties(member.specialties || [])
     setShowPermissions(false)
     setConfirmDeactivate(false)
+    setEditTab('profil')
     setEditModalOpen(true)
   }
 
@@ -689,6 +773,42 @@ export default function TeamPage() {
               </div>
             </div>
 
+            {/* Tabs — Profil (befintlig redigering, oförändrad) / Certifikat (R3) */}
+            <div className="flex gap-1 mb-6 p-1 bg-gray-50 rounded-xl border border-gray-200/70">
+              <button
+                type="button"
+                onClick={() => setEditTab('profil')}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                  editTab === 'profil' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                Profil
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditTab('certifikat')}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                  editTab === 'certifikat' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                <Award className="w-3.5 h-3.5" />
+                Certifikat
+                {(certificatesByMember.get(editingMember.id)?.length ?? 0) > 0 && (
+                  <span className="text-xs text-gray-400">({certificatesByMember.get(editingMember.id)?.length})</span>
+                )}
+              </button>
+            </div>
+
+            {editTab === 'certifikat' ? (
+              <CertificatesPanel
+                businessUserId={editingMember.id}
+                certificates={certificatesByMember.get(editingMember.id) || []}
+                canManage={isOwnerOrAdmin}
+                onRefetch={fetchCertificates}
+                onToast={showToast}
+              />
+            ) : (
             <div className="space-y-4">
               {/* Email (read-only) */}
               <div>
@@ -893,6 +1013,7 @@ export default function TeamPage() {
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
       )}
@@ -985,86 +1106,29 @@ export default function TeamPage() {
               )}
             </div>
 
-            {/* Members list */}
+            {/* Kortgrid (R3, tasks/resurs-masterplan.md punkt 1) — ett kort per
+                medlem: avatar/roll/kontakt, specialiteter (dispatch-sanningen),
+                beläggning denna vecka, veckans pass, ev. kommande frånvaro,
+                certifikat. Mobil: en kolumn (planens explicita krav). */}
             {filteredMembers.length === 0 ? (
               <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <p className="text-gray-500">Inga teammedlemmar matchar din sökning.</p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {filteredMembers.map(member => {
-                  const status = getStatusInfo(member)
-                  const roleBadge = getRoleBadge(member.role)
-                  const canClick = can('manage_users') || currentUser?.id === member.id
-
-                  return (
-                    <div
-                      key={member.id}
-                      onClick={() => canClick && openEditModal(member)}
-                      className={`bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-5 transition-colors ${
-                        canClick ? 'cursor-pointer hover:border-gray-300 hover:bg-white/80' : ''
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        {/* Avatar */}
-                        <div
-                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-gray-900 text-sm font-semibold shrink-0"
-                          style={{ backgroundColor: member.color }}
-                        >
-                          {getInitials(member.name)}
-                        </div>
-
-                        {/* Name, title, role */}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-gray-900 font-medium truncate">{member.name}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full border shrink-0 ${roleBadge.className}`}>
-                              {roleBadge.label}
-                            </span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full border shrink-0 ${status.className}`}>
-                              {status.label}
-                            </span>
-                          </div>
-                          {member.title && (
-                            <p className="text-gray-400 text-sm mt-0.5 truncate">{member.title}</p>
-                          )}
-                        </div>
-
-                        {/* Contact + last activity (desktop) */}
-                        <div className="hidden md:flex items-center gap-6 shrink-0">
-                          <div className="flex items-center gap-4 text-sm text-gray-500">
-                            <span className="flex items-center gap-1.5 truncate max-w-[200px]">
-                              <Mail className="w-3.5 h-3.5 shrink-0" />
-                              {member.email}
-                            </span>
-                            {member.phone && (
-                              <span className="flex items-center gap-1.5">
-                                <Phone className="w-3.5 h-3.5 shrink-0" />
-                                {member.phone}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap">
-                            <Clock className="w-3.5 h-3.5" />
-                            {formatRelativeDate(member.last_login_at || member.accepted_at)}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Mobile secondary info */}
-                      <div className="mt-3 flex items-center gap-4 text-xs text-gray-400 md:hidden">
-                        <span className="flex items-center gap-1 truncate">
-                          <Mail className="w-3 h-3 shrink-0" />
-                          {member.email}
-                        </span>
-                        <span className="flex items-center gap-1 whitespace-nowrap">
-                          <Clock className="w-3 h-3" />
-                          {formatRelativeDate(member.last_login_at || member.accepted_at)}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {filteredMembers.map(member => (
+                  <MemberCard
+                    key={member.id}
+                    member={member}
+                    jobTypes={jobTypes}
+                    utilization={utilizationByMember.get(member.id)}
+                    weekShifts={weekShiftsByMember.get(member.id)}
+                    upcomingTimeOff={upcomingTimeOffByMember.get(member.id)}
+                    certificates={certificatesByMember.get(member.id) || []}
+                    canOpen={can('manage_users') || currentUser?.id === member.id}
+                    onOpen={() => openEditModal(member)}
+                  />
+                ))}
               </div>
             )}
           </>

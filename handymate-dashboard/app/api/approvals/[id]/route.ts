@@ -1620,6 +1620,18 @@ async function executeApprovalPayload(
         }
       }
 
+      case 'cert_expiry_reminder': {
+        // Certifikatpåminnelsen (R3, tasks/resurs-masterplan.md). Cronen
+        // (app/api/cron/cert-expiry-check) har redan gjort sitt jobb genom
+        // att SKAPA kortet — godkännande är ren kvittens ("sett, hanterar
+        // förnyelsen själv utanför systemet"). Ingen certifikatrad muteras
+        // här; explicit case (istället för att låta den falla igenom till
+        // default) så avsikten är dokumenterad och inte av misstag råkar
+        // matcha default-casets SMS-sniffing om payloaden någon gång får
+        // ett 'message'-fält.
+        return { action: 'cert_expiry_reminder', acknowledged: true }
+      }
+
       case 'automation': {
         // En v3-automationsregel med requires_approval skapar denna approval och
         // lägger rule_action_type/rule_action_config i payloaden. Utan detta case

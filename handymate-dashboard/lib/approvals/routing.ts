@@ -35,6 +35,10 @@ const ROUTING_TABLE: Partial<Record<string, RoutingRole>> = {
   four_eyes_quote: 'owner_admin',
   four_eyes_project_close: 'owner_admin',
   dispatch_suggestion: 'owner_admin',
+  // R3 (tasks/resurs-masterplan.md) — certifikatpåminnelsen. Samma bucket
+  // som dispatch_suggestion: kö-routing fungerar redan för owner_admin,
+  // och kortet redigerar inget som en enskild anställd äger.
+  cert_expiry_reminder: 'owner_admin',
 
   // can_approve_time
   time_attestation: 'can_approve_time',
