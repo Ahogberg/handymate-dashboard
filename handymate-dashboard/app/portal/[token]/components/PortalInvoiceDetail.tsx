@@ -1,6 +1,10 @@
 'use client'
 
-import { ArrowLeft, Clock, Download } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowLeft, Clock, Download, Loader2 } from 'lucide-react'
+import QuoteDocument from '@/components/quotes/document/QuoteDocument'
+import { DocumentScaler } from '@/components/quotes/document/DocumentScaler'
+import type { InvoiceTemplateData } from '@/lib/invoice-templates/types'
 import PortalSwishBlock from './PortalSwishBlock'
 import { formatCurrency, formatDate } from '../helpers'
 import type { Invoice, PaymentInfo } from '../types'
@@ -12,9 +16,16 @@ interface PortalInvoiceDetailProps {
   onBack: () => void
 }
 
+interface InvoiceDocumentResponse {
+  template_data: (InvoiceTemplateData & { docType: 'invoice' }) | null
+  template_style: 'modern' | 'premium' | 'friendly'
+  document_html: string | null
+}
+
 /**
  * Faktura-detaljvy (port av bp-invoice.jsx).
- * Hero-belopp + breakdown (Total / ROT / Att betala) + Swish-block + Bankgiro.
+ * Dokumentkort (motorn) överst + hero-belopp + breakdown (Total / ROT / Att
+ * betala) + Swish-block + Bankgiro (interaktiva lagret).
  *
  * ETAPP 6b (offert-masterplan.md, faktura-sprinten): PDF-nedladdningen var
  * TRASIG sedan starten — länken skickade `?id=` men /api/invoices/pdf
@@ -23,6 +34,20 @@ interface PortalInvoiceDetailProps {
  * token-lös för icke-draft-fakturor (verifierat: getAuthenticatedBusiness
  * saknas → faller tillbaka till statusfilter, ingen extra auth-mekanik
  * behövdes här).
+ *
+ * ETAPP 6e: dokumentmotorn (samma QuoteDocument/DocumentScaler som
+ * Fakturarummet, docType='invoice') hämtas LAZY från
+ * /api/portal/[token]/invoices/[id] (bygger buildInvoiceTemplateData +
+ * ev. Swish-QR server-side) — INTE eagert för alla fakturor i listan (se
+ * kommentar i den routen: Swish-QR-generering per faktura är inte gratis).
+ *
+ * Dubbelvisning, medvetet BEHÅLLEN (inte en bugg): dokumentet renderar
+ * SINA EGNA statiska betalinstruktioner (InvoicePaymentSection — OCR/
+ * bankgiro/Swish som text, "så här ser fakturan faktiskt ut") medan
+ * PortalSwishBlock/bankgiro-kortet nedan är det INTERAKTIVA lagret
+ * (klickbar Swish-deep link, kopierbara fält, "Jag har betalat"-claim).
+ * Samma resonemang som offertens kundvy (PublicQuoteDocument): dokumentet
+ * är fakturans juridiska/visuella sanning, korten är verktyg ovanpå den.
  */
 export default function PortalInvoiceDetail({
   invoice: inv,
@@ -36,6 +61,21 @@ export default function PortalInvoiceDetail({
   const ocrNumber = inv.ocr_number || inv.invoice_number
   const overdue = inv.status === 'overdue'
   const pdfHref = `/api/invoices/pdf?invoiceId=${inv.invoice_id}&format=pdf`
+
+  const [doc, setDoc] = useState<InvoiceDocumentResponse | null>(null)
+  const [docLoading, setDocLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setDoc(null)
+    setDocLoading(true)
+    fetch(`/api/portal/${token}/invoices/${inv.invoice_id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (!cancelled) setDoc(data) })
+      .catch(() => { if (!cancelled) setDoc(null) })
+      .finally(() => { if (!cancelled) setDocLoading(false) })
+    return () => { cancelled = true }
+  }, [token, inv.invoice_id])
 
   return (
     <>
@@ -65,6 +105,53 @@ export default function PortalInvoiceDetail({
       </div>
 
       <div className="bp-body">
+        {/* Dokumentkort — ETAPP 6e: samma dokumentmotor som Fakturarummet/PDF:en,
+            inbäddat som en yta i portalskalet (bp-*-CSS + navigering behålls
+            oförändrat runt kortet). Modern: QuoteDocument static + DocumentScaler
+            (skalar A4 till kortets bredd). Premium/Friendly: färdig HTML-sträng
+            i en sandboxad iframe (samma mönster som PublicQuoteDocument, E5). */}
+        <div style={{ padding: '16px 18px 4px' }}>
+          <div
+            style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-lg)',
+              overflow: 'auto',
+              padding: 10,
+            }}
+          >
+            {docLoading ? (
+              <DocumentSkeleton />
+            ) : doc?.template_style === 'modern' ? (
+              doc.template_data ? (
+                <DocumentScaler>
+                  <QuoteDocument data={doc.template_data} mode="static" />
+                </DocumentScaler>
+              ) : (
+                <DocumentSkeleton />
+              )
+            ) : doc?.document_html ? (
+              <iframe
+                srcDoc={doc.document_html}
+                // sandbox utan allow-scripts — ren statisk rendering, samma
+                // regel som PublicQuoteDocument (app/quote/[token]).
+                sandbox=""
+                title={`Faktura ${inv.invoice_number}`}
+                style={{
+                  width: '100%',
+                  aspectRatio: '210 / 297',
+                  border: 'none',
+                  borderRadius: 8,
+                  background: '#fff',
+                  display: 'block',
+                }}
+              />
+            ) : (
+              <DocumentSkeleton />
+            )}
+          </div>
+        </div>
+
         {/* Hero amount */}
         <div style={{ padding: '24px 18px 18px', textAlign: 'center' }}>
           <div
@@ -241,5 +328,20 @@ export default function PortalInvoiceDetail({
         </div>
       </div>
     </>
+  )
+}
+
+function DocumentSkeleton() {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '48px 0',
+      }}
+    >
+      <Loader2 size={20} className="animate-spin" style={{ color: 'var(--muted)' }} />
+    </div>
   )
 }
