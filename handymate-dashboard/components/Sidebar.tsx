@@ -28,6 +28,7 @@ import {
   CheckSquare,
   Globe,
   HelpCircle,
+  Package,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -80,7 +81,6 @@ const NAV: NavItem[] = [
   { type: 'link', key: 'approvals', label: 'Godkännanden', icon: ClipboardCheck, href: '/dashboard/approvals', hasApprovalBadge: true },
   { type: 'link', key: 'customers', label: 'Kunder', icon: Users, href: '/dashboard/customers', paths: ['/dashboard/customers', '/dashboard/warranties', '/dashboard/customer-portal'] },
   { type: 'link', key: 'pipeline', label: 'Verksamhetsöversikt', icon: TrendingUp, href: '/dashboard/pipeline' },
-  { type: 'link', key: 'calendar', label: 'Kalender', icon: Calendar, href: '/dashboard/calendar' },
   { type: 'link', key: 'agent', label: 'Mitt team', icon: Bot, href: '/dashboard/agent' },
   { type: 'link', key: 'sms_inbox', label: 'SMS', icon: MessageSquare, href: '/dashboard/sms-inbox' },
   {
@@ -94,10 +94,25 @@ const NAV: NavItem[] = [
     ],
   },
   {
-    type: 'group', key: 'planning', label: 'Planering', icon: Calendar,
+    // R0 (tasks/resurs-masterplan.md): "Planering" ersatt av egen huvudflik
+    // "Schema" med profilkort-undersidor. Kalender flyttar IN i gruppen
+    // (routen /dashboard/calendar orörd — bara länken flyttar). Översikt
+    // är R2:s resurstavla (placeholder tills vidare). Team får äntligen
+    // en sidebar-länk (tidigare bara begravd som Settings-tabb).
+    type: 'group', key: 'schema', label: 'Schema', icon: Calendar,
     children: [
-      { label: 'Schema', href: '/dashboard/schedule' },
-      { label: 'Tidrapportering', href: '/dashboard/time' },
+      { label: 'Översikt', href: '/dashboard/schema' },
+      { label: 'Kalender', href: '/dashboard/calendar' },
+      { label: 'Tid', href: '/dashboard/time' },
+      { label: 'Team', href: '/dashboard/team' },
+    ],
+  },
+  {
+    // Fordon + Lager hade ingen naturlig hemvist kvar sedan Planering-
+    // gruppen splittrades upp — inget befintligt "Verktyg"-liknande grupp
+    // fanns i NAV, så minsta vettiga är en ny "Övrigt"-grupp.
+    type: 'group', key: 'misc', label: 'Övrigt', icon: Package,
+    children: [
       { label: 'Fordon', href: '/dashboard/vehicles' },
       { label: 'Lager', href: '/dashboard/planning/inventory' },
     ],
@@ -486,7 +501,11 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   // ── Role-based filtering ──────────────────────────────────────────
   const isEmployee = currentUser?.role === 'employee'
   const HIDDEN_FOR_EMPLOYEE = new Set(['approvals', 'agent', 'settings', 'leads-outbound', 'my_website'])
-  const HIDDEN_CHILDREN_FOR_EMPLOYEE = new Set(['/dashboard/invoices', '/dashboard/invoices/rot-payment', '/dashboard/settings', '/dashboard/settings/my-prices', '/dashboard/settings/products', '/dashboard/settings/pricelist', '/dashboard/billing', '/dashboard/settings?tab=team', '/dashboard/automations', '/dashboard/settings/quote-templates', '/dashboard/settings/quote-texts', '/dashboard/orders', '/dashboard/campaigns', '/dashboard/website', '/dashboard/analytics'])
+  // R0 (resurs-masterplan.md): Team flyttade från Settings?tab=team till en
+  // egen route (/dashboard/team) med sidebar-länk i Schema-gruppen — samma
+  // döljregel för anställda gäller den nya länken (löner/behörigheter är
+  // owner/admin-data, oförändrat sedan innan).
+  const HIDDEN_CHILDREN_FOR_EMPLOYEE = new Set(['/dashboard/invoices', '/dashboard/invoices/rot-payment', '/dashboard/settings', '/dashboard/settings/my-prices', '/dashboard/settings/products', '/dashboard/settings/pricelist', '/dashboard/billing', '/dashboard/team', '/dashboard/automations', '/dashboard/settings/quote-templates', '/dashboard/settings/quote-texts', '/dashboard/orders', '/dashboard/campaigns', '/dashboard/website', '/dashboard/analytics'])
 
   function filterNavForRole(items: NavItem[]): NavItem[] {
     if (!isEmployee) return items

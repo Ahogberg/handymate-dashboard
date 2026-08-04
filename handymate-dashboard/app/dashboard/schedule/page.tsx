@@ -26,6 +26,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
+import { fetchPersonDays, type PersonDay } from '@/lib/schedule/person-day'
 import {
   format,
   startOfWeek,
@@ -214,6 +215,10 @@ export default function SchedulePage() {
 
   // Data state
   const [entries, setEntries] = useState<ScheduleEntry[]>([])
+  // R1 (resurs-masterplan.md): persondagen — booking + schedule_entry
+  // förenat, används ENDAST av utilization-läget (mode === 'utilization')
+  // nedan. Kalendervyn ovan rör detta INTE, den läser fortfarande `entries`.
+  const [personDays, setPersonDays] = useState<PersonDay[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [timeOffRequests, setTimeOffRequests] = useState<TimeOffRequest[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -366,6 +371,31 @@ export default function SchedulePage() {
     }
   }, [business.business_id, dateRange, selectedMembers])
 
+  // R1 (resurs-masterplan.md): beläggningen räknade tidigare ENDAST
+  // schedule_entry (interna pass) — kundbokningar räknades aldrig in i
+  // timmar/dag, se filhuvudets utilizationData. Persondagen (lib/schedule/
+  // person-day.ts) förenar booking + schedule_entry, så vi hämtar den
+  // separat för HELA teamet (inte bara selectedMembers — utilization ska
+  // visa hela teamets beläggning oavsett kalenderfiltret).
+  const fetchPersonDaysForUtilization = useCallback(async () => {
+    if (!business.business_id || teamMembers.length === 0) {
+      setPersonDays([])
+      return
+    }
+    try {
+      const days = await fetchPersonDays(
+        supabase,
+        business.business_id,
+        teamMembers.map((m) => m.id),
+        format(dateRange.start, 'yyyy-MM-dd'),
+        format(dateRange.end, 'yyyy-MM-dd')
+      )
+      setPersonDays(days)
+    } catch {
+      console.error('Could not fetch person days for utilization')
+    }
+  }, [business.business_id, teamMembers, dateRange])
+
   const fetchTimeOff = useCallback(async () => {
     if (!isOwnerOrAdmin) return
     try {
@@ -411,6 +441,14 @@ export default function SchedulePage() {
   useEffect(() => {
     fetchTimeOff()
   }, [fetchTimeOff])
+
+  // Fetch persondagen when the utilization tab is active (calendar mode
+  // never needs it — keeps the extra query off the hot path)
+  useEffect(() => {
+    if (mode === 'utilization') {
+      fetchPersonDaysForUtilization()
+    }
+  }, [mode, fetchPersonDaysForUtilization])
 
   // Fetch Google Calendar connection status
   useEffect(() => {
@@ -736,29 +774,34 @@ export default function SchedulePage() {
   // ---------------------------------------------------------------------------
   // Utilization calculations
   // ---------------------------------------------------------------------------
+  // R1 (resurs-masterplan.md): datakällan är nu persondagen (personDays,
+  // booking + schedule_entry förenat) istället för bara `entries`
+  // (schedule_entry) — kundbokningar räknas ÄNTLIGEN in i timmar/dag.
+  // UI:t (heatmapen nedan) är oförändrat, bara datan under den.
+  //
+  // 8h-dagen är en dokumenterad schablon-konstant (samma antagande som i
+  // den gamla implementationen) — ingen individuell arbetstidsprocent per
+  // person än, det är ett R5-ämne (kapacitet-fyllnad per person).
 
   const utilizationData = useMemo(() => {
     const days = view === 'month' ? monthDays.filter((d) => isSameMonth(d, currentDate)) : weekDays
-    const workingHours = 8
+    const workingHours = 8 // 8h-dagen: schablon-konstant, se kommentar ovan
 
     return teamMembers.map((member) => {
       const dayData = days.map((day) => {
-        const dayEntries = entries.filter(
-          (e) =>
-            e.business_user_id === member.id &&
-            isSameDay(parseISO(e.start_datetime), day) &&
-            e.status !== 'cancelled'
-        )
+        const dateKey = format(day, 'yyyy-MM-dd')
+        const personDay = personDays.find((pd) => pd.businessUserId === member.id && pd.date === dateKey)
+        const shifts = personDay?.shifts || []
 
-        const isTimeOff = dayEntries.some((e) => e.type === 'time_off')
+        const isTimeOff = personDay?.isAbsent ?? false
         const isWeekend = getDay(day) === 0 || getDay(day) === 6
 
         let hours = 0
-        dayEntries.forEach((e) => {
-          if (e.all_day) {
+        shifts.forEach((s) => {
+          if (s.allDay) {
             hours += workingHours
           } else {
-            hours += differenceInMinutes(parseISO(e.end_datetime), parseISO(e.start_datetime)) / 60
+            hours += differenceInMinutes(parseISO(s.end), parseISO(s.start)) / 60
           }
         })
 
@@ -774,7 +817,7 @@ export default function SchedulePage() {
 
       return { member, dayData, totalHours, avgUtilization }
     })
-  }, [teamMembers, entries, weekDays, monthDays, view, currentDate])
+  }, [teamMembers, personDays, weekDays, monthDays, view, currentDate])
 
   const teamUtilization = useMemo(() => {
     if (utilizationData.length === 0) return 0

@@ -12,6 +12,26 @@ interface TeamMember {
   is_active: boolean
 }
 
+/**
+ * skills↔specialties (R1, tasks/resurs-masterplan.md): `specialties[]`
+ * (business_users.specialties TEXT[], sql/v_job_types.sql) har en riktig
+ * skriv-UI (team/page.tsx, kopplad till job_types) — `skills` (JSONB,
+ * sql/v17_dispatch.sql) saknar UI helt och är i praktiken död data.
+ * specialties[] är nu sanningskällan; skills är fallback tills
+ * sql/v83_retire_skills_jsonb.sql är körd (Andreas, manuellt), då har
+ * befintliga skills-värden redan kopierats in i specialties för de
+ * medlemmar som saknade dem. Efter det körs specialties alltid.
+ */
+export function resolveMemberSkills(m: { skills: unknown; specialties?: unknown }): string[] {
+  const specialties = Array.isArray(m.specialties) ? (m.specialties as string[]) : []
+  if (specialties.length > 0) return specialties
+  const skills = Array.isArray(m.skills) ? (m.skills as string[]) : []
+  if (skills.length > 0) {
+    console.warn('[dispatch] specialties[] tom — faller tillbaka på skills-JSONB (kör sql/v83_retire_skills_jsonb.sql för att migrera)')
+  }
+  return skills
+}
+
 interface DispatchResult {
   suggested: boolean
   member?: TeamMember
@@ -20,9 +40,10 @@ interface DispatchResult {
 }
 
 /**
- * Normalisera jobbtyp till skill-nyckel.
+ * Normalisera jobbtyp till skill-nyckel. Ren funktion, exporterad för
+ * facit-test (tests/dispatch-matching.spec.ts).
  */
-function normalizeJobType(input: string): string[] {
+export function normalizeJobType(input: string): string[] {
   const lower = (input || '').toLowerCase()
   const matches: string[] = []
   if (lower.includes('el') || lower.includes('elektr')) matches.push('el')
@@ -76,10 +97,11 @@ export async function suggestDispatch(params: {
 }): Promise<DispatchResult> {
   const supabase = getServerSupabase()
 
-  // 1. Hämta aktiva teammedlemmar med skills
+  // 1. Hämta aktiva teammedlemmar med specialties (+ skills för fallback,
+  // se resolveMemberSkills ovan)
   const { data: members } = await supabase
     .from('business_users')
-    .select('id, name, skills, is_active')
+    .select('id, name, skills, specialties, is_active')
     .eq('business_id', params.businessId)
     .eq('is_active', true)
 
@@ -99,7 +121,7 @@ export async function suggestDispatch(params: {
   }> = []
 
   for (const m of members) {
-    const memberSkills: string[] = Array.isArray(m.skills) ? m.skills : []
+    const memberSkills: string[] = resolveMemberSkills(m)
     let score = 0
     const reasons: string[] = []
 

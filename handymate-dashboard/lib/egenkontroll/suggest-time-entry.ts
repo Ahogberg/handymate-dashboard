@@ -1,24 +1,44 @@
 /**
  * Egenkontroll-agenten — Etapp 2a (v-plan tasks/easoft-gap-plan.md,
  * "Tidrapport-förslag", omskriven 2026-08-02 till PROJEKTNIVÅ efter
- * schemaverifiering; utökad 2026-08-02 med namn-vid-entydig-tilldelning).
+ * schemaverifiering; utökad 2026-08-02 med namn-vid-entydig-tilldelning;
+ * utökad 2026-08-04 (tasks/resurs-masterplan.md, R1-D) med PERSONNIVÅ när
+ * bokningen har en tilldelning).
  *
- * ⚠ VARFÖR PROJEKTNIVÅ, INTE PERSONNIVÅ: `booking` har inget
- * person-tilldelningsfält — en bokning hör till business+kund+ev. projekt,
- * aldrig till en namngiven anställd. Förslaget attribueras därför till
- * PROJEKTET ("Projektet Svensson hade en bokning i går men ingen
- * tidrapport än"), aldrig till en person, ANNARS UPPSTÅR EN GISSNING.
+ * ⚠ HISTORIK — VARFÖR DET STOD "PROJEKTNIVÅ, INTE PERSONNIVÅ" HÄR: när
+ * denna fil först skrevs saknade `booking` ett person-tilldelningsfält.
+ * Det antagandet är sedan Storfirman-Etapp 5 (multi-employee-parity-plan.md)
+ * INAKTUELLT — `booking.assigned_user_id` (sql/v17_dispatch.sql) finns nu.
+ * Grupperingen är FORTFARANDE per projekt+dag (ett kort per saknat projekt,
+ * oförändrat dedup-beteende) — det som är nytt är NAMNET i kortet: har
+ * dagens genomförda bokningar för projektet EN entydig assigned_user_id
+ * (pickUnambiguousBookingAssignee nedan) är namnet ett FAKTUM direkt från
+ * bokningen — ett STARKARE signal än project_assignment eftersom det säger
+ * vem som faktiskt var på JUST DE HÄR besöken, inte bara vem som är
+ * tilldelad projektet i stort. Den signalen provas FÖRST. Saknas den
+ * (0 bokningar har en tilldelning, eller flera olika personer är
+ * tilldelade olika besök samma dag → tvetydigt) faller vi tillbaka på den
+ * gamla project_assignment-logiken. Har INGENDERA ett entydigt svar
+ * attribueras förslaget till projektet, precis som innan.
  *
- * ⚠ NYANS (2a-förfining): `project_assignment` (sql/business_users.sql)
- * kopplar business_user_id ↔ project_id med en riktig, existerande
- * tilldelning — inte en gissning. Om ETT projekt har EXAKT EN tilldelad
- * person där, är namnet ett FAKTUM och får läggas till (payload.
- * assigned_person_name + i titeln). Har projektet 0 eller 2+ tilldelade
- * personer sätts fältet ALDRIG — inget gissat namn, ingen lista av namn,
- * ingen "en av två personer"-formulering. Se pickUnambiguousAssignee/
+ * ⚠ NYANS (2a-förfining, project_assignment-fallbacken): `project_assignment`
+ * (sql/business_users.sql) kopplar business_user_id ↔ project_id med en
+ * riktig, existerande tilldelning — inte en gissning. Om ETT projekt har
+ * EXAKT EN tilldelad person där, är namnet ett FAKTUM och får läggas till
+ * (payload.assigned_person_name + i titeln). Har projektet 0 eller 2+
+ * tilldelade personer sätts fältet ALDRIG — inget gissat namn, ingen lista
+ * av namn, ingen "en av två personer"-formulering. Se pickUnambiguousAssignee/
  * fetchUnambiguousAssigneeName nedan, som är den enda källan till detta
  * namn i hela flödet (server- OCH klientsidan, se app/dashboard/projects/
  * [id]/page.tsx som återanvänder samma helper för projektvyns rad).
+ *
+ * TITEL beror på VILKEN signal som gav namnet:
+ *  - Bokningens tilldelning (starkast): "Ingen tidrapport för {namn} i
+ *    går ({projekt})".
+ *  - project_assignment-fallback (som innan): "Ingen tidrapport för
+ *    {projekt} i går ({namn}) — förbered en?".
+ *  - Ingendera: "Ingen tidrapport för {projekt} i går — förbered en?"
+ *    (oförändrat).
  *
  * Schema, verifierat mot faktisk kod (inte antaget):
  *  - `booking.status` (pending/confirmed/cancelled, se t.ex.
@@ -80,6 +100,9 @@ export interface BookingForTimeMatch {
   job_status: string | null
   scheduled_start: string
   scheduled_end: string | null
+  /** R1-D (resurs-masterplan.md): starkare signal än project_assignment
+      när den finns — se filhuvudet. */
+  assigned_user_id?: string | null
 }
 
 /** Delmängd av time_entry-kolumner som matchningskärnan behöver. */
@@ -99,6 +122,11 @@ export interface MissingTimeEntryProject {
       tidigaste start→senaste slut, som skulle räkna in eventuella luckor
       mellan flera besök samma dag. */
   suggested_minutes: number
+  /** R1-D: assigned_user_id (kan innehålla dubbletter/null-luckor) från
+      alla bidragande bokningar, i den ordning de sågs. Konsumeras av
+      pickUnambiguousBookingAssignee — rå data, inte redan deduplicerad,
+      så anroparen avgör entydighet. */
+  assigned_user_ids: string[]
 }
 
 /** Den enda job_status som räknas som "genomförd" — se filhuvudet. */
@@ -152,6 +180,7 @@ export function findProjectsMissingTimeEntry(
         scheduled_start: b.scheduled_start,
         scheduled_end: end,
         suggested_minutes: minutes,
+        assigned_user_ids: b.assigned_user_id ? [b.assigned_user_id] : [],
       })
       continue
     }
@@ -163,6 +192,7 @@ export function findProjectsMissingTimeEntry(
       existing.scheduled_end = end
     }
     existing.suggested_minutes += minutes
+    if (b.assigned_user_id) existing.assigned_user_ids.push(b.assigned_user_id)
   }
 
   return Array.from(byProject.values())
@@ -172,6 +202,27 @@ function minutesBetween(startIso: string, endIso: string): number {
   const ms = new Date(endIso).getTime() - new Date(startIso).getTime()
   if (!Number.isFinite(ms) || ms <= 0) return 0
   return Math.round(ms / 60000)
+}
+
+// ─────────────────────────────────────────────────────────────────
+// pickUnambiguousBookingAssignee — ren, facit-testbar kärna (R1-D,
+// resurs-masterplan.md). Bokningens EGEN tilldelning — starkare signal
+// än project_assignment, se filhuvudet.
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Väljer den entydiga assigned_user_id bland en dags bidragande bokningar
+ * för ett projekt, om en sådan finns. Ren funktion — ingen I/O.
+ *
+ * Ärlighetsregel, samma som pickUnambiguousAssignee: EXAKT EN DISTINKT
+ * icke-null id → det idet (ett faktum — alla dagens besök för projektet
+ * gjordes av samma person). 0 ELLER 2+ DISTINKTA id:n → null (ingen
+ * gissning när flera olika personer var på olika besök samma dag, eller
+ * ingen av bokningarna hade en tilldelning alls).
+ */
+export function pickUnambiguousBookingAssignee(assignedUserIds: string[]): string | null {
+  const distinct = Array.from(new Set(assignedUserIds.filter((id): id is string => !!id)))
+  return distinct.length === 1 ? distinct[0] : null
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -262,7 +313,7 @@ export async function suggestTimeEntriesForBusiness(businessId: string): Promise
     // ── 1. Gårdagens genomförda bokningar med projekt ─────────────
     const { data: bookings, error: bookingErr } = await supabase
       .from('booking')
-      .select('booking_id, project_id, job_status, scheduled_start, scheduled_end')
+      .select('booking_id, project_id, job_status, scheduled_start, scheduled_end, assigned_user_id')
       .eq('business_id', businessId)
       .eq('job_status', COMPLETED_JOB_STATUS)
       .not('project_id', 'is', null)
@@ -319,6 +370,34 @@ export async function suggestTimeEntriesForBusiness(businessId: string): Promise
       ]),
     )
 
+    // ── 4b. Namn för entydiga BOKNINGS-tilldelningar (R1-D — starkare
+    // signal än project_assignment, se filhuvudet). En batch-fråga för
+    // alla kandidat-id:n istället för en fråga per projekt.
+    const bookingAssigneeByProject = new Map<string, string | null>(
+      missing.map(m => [m.project_id, pickUnambiguousBookingAssignee(m.assigned_user_ids)]),
+    )
+    const candidateUserIds = Array.from(
+      new Set(Array.from(bookingAssigneeByProject.values()).filter((id): id is string => !!id)),
+    )
+    const nameByUserId = new Map<string, string>()
+    if (candidateUserIds.length > 0) {
+      const { data: users, error: usersErr } = await supabase
+        .from('business_users')
+        .select('id, name')
+        .eq('business_id', businessId)
+        .in('id', candidateUserIds)
+
+      if (usersErr) {
+        console.error('[egenkontroll/suggest-time-entry] kunde inte hämta tilldelade personers namn:', usersErr)
+        // Inte fatalt — faller tillbaka på project_assignment-logiken per
+        // projekt nedan, precis som om bokningen saknade tilldelning.
+      } else {
+        for (const u of (users || []) as { id: string; name: string | null }[]) {
+          if (u.name && u.name.trim().length > 0) nameByUserId.set(u.id, u.name.trim())
+        }
+      }
+    }
+
     // ── 5. Ett kort per saknat projekt, dedupat ─────────────────────
     for (const m of missing) {
       const projectName = nameByProject.get(m.project_id) || 'Projektet'
@@ -339,17 +418,32 @@ export async function suggestTimeEntriesForBusiness(businessId: string): Promise
       }
       if (count && count > 0) continue
 
-      // ── 5b. Entydig tilldelning? (2a-förfining, se filhuvudet) ────
-      // Ett FAKTUM från project_assignment, aldrig en gissning — utelämnas
-      // helt (payload.assigned_person_name sätts inte) om 0 eller 2+
-      // personer är tilldelade projektet.
-      const assignedPersonName = await fetchUnambiguousAssigneeName(supabase, businessId, m.project_id)
+      // ── 5b. Entydig tilldelning? Bokningens EGEN tilldelning provas
+      // FÖRST (starkare signal — se filhuvudet), project_assignment är
+      // fallback. Ingendera → inget personnamn alls (ärlighetsregeln,
+      // oförändrat).
+      const bookingAssigneeId = bookingAssigneeByProject.get(m.project_id) ?? null
+      const bookingAssigneeName = bookingAssigneeId ? nameByUserId.get(bookingAssigneeId) ?? null : null
+
+      let assignedPersonName: string | null = null
+      let attributionSource: 'booking' | 'project_assignment' | null = null
+
+      if (bookingAssigneeName) {
+        assignedPersonName = bookingAssigneeName
+        attributionSource = 'booking'
+      } else {
+        assignedPersonName = await fetchUnambiguousAssigneeName(supabase, businessId, m.project_id)
+        if (assignedPersonName) attributionSource = 'project_assignment'
+      }
 
       const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
       const timeSpan = `${svTimeStr(new Date(m.scheduled_start))}–${svTimeStr(new Date(m.scheduled_end))}`
-      const title = assignedPersonName
-        ? `Ingen tidrapport för ${projectName} i går (${assignedPersonName}) — förbered en?`
-        : `Ingen tidrapport för ${projectName} i går — förbered en?`
+      const title =
+        attributionSource === 'booking' && assignedPersonName
+          ? `Ingen tidrapport för ${assignedPersonName} i går (${projectName})`
+          : assignedPersonName
+            ? `Ingen tidrapport för ${projectName} i går (${assignedPersonName}) — förbered en?`
+            : `Ingen tidrapport för ${projectName} i går — förbered en?`
 
       const { error: insertErr } = await supabase.from('pending_approvals').insert({
         id: approvalId,
@@ -369,7 +463,8 @@ export async function suggestTimeEntriesForBusiness(businessId: string): Promise
           scheduled_start: m.scheduled_start,
           scheduled_end: m.scheduled_end,
           suggested_minutes: m.suggested_minutes,
-          ...(assignedPersonName ? { assigned_person_name: assignedPersonName } : {}),
+          ...(assignedPersonName ? { assigned_person_name: assignedPersonName, attribution_source: attributionSource } : {}),
+          ...(attributionSource === 'booking' && bookingAssigneeId ? { assigned_user_id: bookingAssigneeId } : {}),
         },
       })
 

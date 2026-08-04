@@ -1,11 +1,16 @@
 /**
- * Egenkontroll-agenten — Etapp 2a facit-tester (tasks/easoft-gap-plan.md).
+ * Egenkontroll-agenten — Etapp 2a facit-tester (tasks/easoft-gap-plan.md),
+ * utökade R1-D (tasks/resurs-masterplan.md) med bokningens EGEN
+ * tilldelning som starkare signal än project_assignment.
  * Körs: npx playwright test tests/tidrapport-forslag.spec.ts --no-deps
  *
  * Testar de rena, exporterade funktionerna i
  * lib/egenkontroll/suggest-time-entry.ts:
  *   - findProjectsMissingTimeEntry (vilka DISTINKTA project_id som saknar
- *     en matchande time_entry för gårdagens genomförda bokningar)
+ *     en matchande time_entry för gårdagens genomförda bokningar — och nu
+ *     även vilka assigned_user_id:n som bidrog)
+ *   - pickUnambiguousBookingAssignee (R1-D: namn ENDAST vid exakt en
+ *     distinkt assigned_user_id bland dagens bokningar för projektet)
  *   - pickUnambiguousAssignee (2a-förfining: namn ENDAST vid exakt en
  *     tilldelning via project_assignment — aldrig en gissning, aldrig en
  *     lista)
@@ -19,6 +24,7 @@ import { test, expect } from '@playwright/test'
 import {
   findProjectsMissingTimeEntry,
   pickUnambiguousAssignee,
+  pickUnambiguousBookingAssignee,
   type BookingForTimeMatch,
   type TimeEntryForTimeMatch,
   type AssigneeNameRow,
@@ -109,6 +115,54 @@ test.describe('findProjectsMissingTimeEntry — matchningskärna', () => {
   test('tom input → tom output', () => {
     const result = findProjectsMissingTimeEntry([], [], REF_DATE)
     expect(result).toEqual([])
+  })
+})
+
+test.describe('findProjectsMissingTimeEntry — assigned_user_ids (R1-D)', () => {
+  test('bokning med assigned_user_id → id finns med i assigned_user_ids', () => {
+    const result = findProjectsMissingTimeEntry([booking({ assigned_user_id: 'user_lars' })], [], REF_DATE)
+    expect(result[0].assigned_user_ids).toEqual(['user_lars'])
+  })
+
+  test('bokning utan assigned_user_id → tom assigned_user_ids, ingen krasch', () => {
+    const result = findProjectsMissingTimeEntry([booking({ assigned_user_id: null })], [], REF_DATE)
+    expect(result[0].assigned_user_ids).toEqual([])
+  })
+
+  test('flera bokningar samma projekt, samma person → id upprepas (dedup sker i pickUnambiguousBookingAssignee)', () => {
+    const morning = booking({ booking_id: 'm', assigned_user_id: 'user_lars', scheduled_start: `${REF_DATE}T07:00:00.000Z`, scheduled_end: `${REF_DATE}T11:00:00.000Z` })
+    const afternoon = booking({ booking_id: 'a', assigned_user_id: 'user_lars', scheduled_start: `${REF_DATE}T13:00:00.000Z`, scheduled_end: `${REF_DATE}T15:00:00.000Z` })
+    const result = findProjectsMissingTimeEntry([morning, afternoon], [], REF_DATE)
+    expect(result[0].assigned_user_ids).toEqual(['user_lars', 'user_lars'])
+  })
+
+  test('flera bokningar samma projekt, olika personer → båda id:na med (rådata, ej deduplicerad här)', () => {
+    const b1 = booking({ booking_id: 'b1', assigned_user_id: 'user_lars' })
+    const b2 = booking({ booking_id: 'b2', assigned_user_id: 'user_hanna' })
+    const result = findProjectsMissingTimeEntry([b1, b2], [], REF_DATE)
+    expect(result[0].assigned_user_ids.sort()).toEqual(['user_hanna', 'user_lars'])
+  })
+})
+
+test.describe('pickUnambiguousBookingAssignee — bokningens egen tilldelning (R1-D)', () => {
+  test('exakt 1 distinkt id → det idet', () => {
+    expect(pickUnambiguousBookingAssignee(['user_lars'])).toBe('user_lars')
+  })
+
+  test('samma id upprepat (flera bokningar, samma person) → fortfarande entydigt', () => {
+    expect(pickUnambiguousBookingAssignee(['user_lars', 'user_lars', 'user_lars'])).toBe('user_lars')
+  })
+
+  test('0 id:n → null', () => {
+    expect(pickUnambiguousBookingAssignee([])).toBeNull()
+  })
+
+  test('2 distinkta id:n (olika personer på olika besök samma dag) → null, aldrig en gissning', () => {
+    expect(pickUnambiguousBookingAssignee(['user_lars', 'user_hanna'])).toBeNull()
+  })
+
+  test('null-luckor blandat med ett id → filtreras bort, kvar entydigt', () => {
+    expect(pickUnambiguousBookingAssignee(['user_lars'])).toBe('user_lars')
   })
 })
 

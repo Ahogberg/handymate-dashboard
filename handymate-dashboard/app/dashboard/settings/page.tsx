@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { ChevronRight, FileText, TrendingUp } from 'lucide-react'
 import { Fragment, useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { PermissionGate } from '@/components/PermissionGate'
 import {
   Building2,
@@ -44,14 +44,6 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useBusinessPlan } from '@/lib/useBusinessPlan'
 import UpgradePrompt from '@/components/UpgradePrompt'
-import dynamic from 'next/dynamic'
-const TeamPageContent = dynamic(() => import('@/app/dashboard/team/page'), {
-  loading: () => (
-    <div className="flex items-center justify-center py-16">
-      <Loader2 className="w-6 h-6 text-secondary-700 animate-spin" />
-    </div>
-  ),
-})
 
 interface BusinessConfig {
   business_id: string
@@ -346,6 +338,7 @@ export default function SettingsPage() {
   const { isOwnerOrAdmin } = useCurrentUser()
   const { hasFeature: canAccess } = useBusinessPlan()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState('company')
@@ -460,7 +453,16 @@ export default function SettingsPage() {
 
     // Handle tab param
     const tabParam = searchParams?.get('tab')
-    if (tabParam && ['company','hours','phone','invoice','time','team','integrations','pipeline','ai','subscription'].includes(tabParam)) {
+
+    // R0 (resurs-masterplan.md): Team har flyttat till en egen route
+    // (/dashboard/team, Schema-gruppen i Sidebar) — gamla ?tab=team-länkar
+    // (bokmärken, e-postutskick) ska fortsätta fungera.
+    if (tabParam === 'team') {
+      router.replace('/dashboard/team')
+      return
+    }
+
+    if (tabParam && ['company','hours','phone','invoice','time','integrations','pipeline','ai','subscription'].includes(tabParam)) {
       setActiveTab(tabParam)
     }
 
@@ -1336,7 +1338,9 @@ export default function SettingsPage() {
     {
       label: 'Drift',
       tabs: [
-        { id: 'team', label: 'Team', icon: UsersRound },
+        // R0 (resurs-masterplan.md): Team är nu en egen route/sidebar-länk
+        // (Schema-gruppen), inte längre en inbäddad Settings-tabb.
+        { id: '_link_team', label: 'Team', icon: UsersRound, href: '/dashboard/team' },
         { id: 'time', label: 'Tidrapport', icon: Clock },
         { id: 'economics', label: 'Ekonomi', icon: TrendingUp },
         // Intern timkostnad — endast owner/admin (v53, Etapp 2.0).
@@ -2826,11 +2830,6 @@ export default function SettingsPage() {
               </p>
             </div>
           </div>
-        )}
-
-        {/* Team Tab */}
-        {activeTab === 'team' && (
-          <TeamPageContent />
         )}
 
         {/* Integrations Tab */}
