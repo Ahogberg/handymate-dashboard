@@ -35,7 +35,37 @@ Två djupkartläggningar (2026-08-03, verifierade mot kod) ger faktabasen:
    dokumentmotor ersätter de tre parallella renderarna, och kundens
    signeringssida renderar samma dokument.
 
-## ETAPP 1 — Fundament & städning (låg risk, möjliggör allt annat)
+## ✅ SPRINTSTATUS 2026-08-04: E1-E5 KLARA — hela offert-sprinten byggd
+
+Autonom genomkörning på Andreas uppdrag, alla etapper committade/pushade:
+- E1 fundament (86f12d2c, −670 rader) · E2a dokumentmotorn (603c9d65) ·
+  E2b+2c canvas-first + konsolidering (69717023, −560 rader) ·
+  E3 mobilen (53aa779a) · E4 Offertrummet (d9a71751, −480 rader
+  dialektkod) · E5 kundvyn på mallmotorn (87e2eeb4).
+- HOTFIX på vägen (fbe08ec5): react-dom/server-importen fällde ALLA
+  Vercel-deployer sedan E2a — tsc fångar inte webpack-felklassen; ny
+  lärdom i tasks/lessons.md (next build som deploy-gate). E5 byggdes
+  därefter med full next build-verifiering.
+
+**Kända uppföljningar (medvetet EJ byggda, listas för E6/senare):**
+1. E2b-för-edit: edit-sidan har delade komponenter + live-canvas men
+   inte assistentkolumn/Mer-rad-layouten (planens fallback-klausul).
+2. Premium/Friendly-motorvarianter: bara Modern har edit-läge +
+   signatur-CTA; iframe-vägen täcker statisk visning.
+3. Betalplan + ÄTA-villkor finns INTE i buildQuoteTemplateData → syns
+   inte i PDF/kundvy (aldrig gjort det — gammal dialektlucka, E4-fynd).
+4. Grön teknik-avdrag visas inte i statiska mallen (ärvt, speglat).
+5. Tillval-livesynk är Modern-only (iframe-stilarna statiska).
+6. vat_number visas inte i dokumentet (ärvt PDF-gap).
+7. ProductModal-titeln säger fortfarande "prislistan" (terminologirest).
+
+**Andreas manuella verifiering (BYGGT→LIVE kräver):** skapa offert →
+livecanvas alla radtyper → mobil på riktig telefon (bottom-sheet) →
+Visa offert/PDF per stil (Modern/Premium/Friendly — sida 2-brytningar!)
+→ kundvyn: öppna signeringslänk, välj tillval, signera (demokontot) →
+Offertrummets händelselogg visar öppningen.
+
+## ETAPP 1 — Fundament & städning (låg risk, möjliggör allt annat) — ✅ KLAR
 
 **1a. En preview-pipeline.** Slå ihop `liveTemplateData` /
 `templatePreviewPayload` / `debouncedPreviewData` (new/page.tsx:402-616)
@@ -71,7 +101,7 @@ orsak ("Välj kund först" som text under, inte tyst lås). Beskrivnings-
 varningens dubbelklicksvägg (descriptionWarningShownRef) ersätts med
 inline-bekräftelse i samma vy.
 
-## ETAPP 2 — Canvas-first-skaparen (kärnan)
+## ETAPP 2 — Canvas-first-skaparen (kärnan) — ✅ KLAR
 
 **2a. EditableDocument-motorn.** Generalisera ModernCanvas till EN
 komponent som renderar `QuoteTemplateData` redigerbart, med stil som
@@ -102,7 +132,7 @@ preview-panelen och stilväljaren förenas till delade komponenter under
 _shared/ — edit-sidan får samma canvas-first-upplevelse. Mål: ~700
 duplicerade rader bort.
 
-## ETAPP 3 — Mobilen
+## ETAPP 3 — Mobilen — ✅ KLAR
 
 Canvasen PÅ mobilen: fullskärmsdokument med bottom-sheet-verktyg (rad-
 redigering öppnas som sheet med 44px+ fält — dagens 30px-inputs ryker),
@@ -110,7 +140,7 @@ FAB:en ersätts av persistent "Dokument/Detaljer"-växel. ROT per rad,
 kategori, drag-handtag med riktig greppyta. Sticky-headern enradig
 (badges → overflow-meny). Verifieras i mobile-viewport-tester.
 
-## ETAPP 4 — Detaljsidan → "Offertrummet"
+## ETAPP 4 — Detaljsidan → "Offertrummet" — ✅ KLAR
 
 Dokumentet i centrum: inbäddad mall-HTML-preview (samma frame som
 skaparen) ersätter QuoteSpecificationTable-dialekten (fixar även att
@@ -123,7 +153,7 @@ verklig (tracking-datan från /api/quotes/track finns redan — visa
 confirm() ersätts med riktiga dialoger. Versioner: behåll väljaren, lägg
 "vad ändrades"-rad (diff på totaler + radantal — inte full diff).
 
-## ETAPP 5 — Kundvyn på mallmotorn (störst affärsvärde, sist av beroendeskäl)
+## ETAPP 5 — Kundvyn på mallmotorn — ✅ KLAR
 
 Signeringssidan (app/quote/[token], 1300 rader egen rendering) byggs om
 till: EditableDocument i kundläge (läsbart, ej redigerbart) + interaktivt
