@@ -135,3 +135,23 @@ finns, inte att den har rätt form. Nya migrationer på "befintliga"
 tabeller ska verifiera formen, inte anta den. (3) Tysta ignorerade
 DB-fel (catch utan logg / oläst error) gjorde att felet överlevde —
 samma lärdom som setBusinessPreference-fixen.
+
+## 2026-08-04: tsc räcker inte som deploy-gate — next build fångar en annan felklass
+
+**Vad hände:** E2a införde renderToStaticMarkup (react-dom/server) i en
+lib-fil som konsumeras av API-routes. tsc var grönt i fem på varandra
+följande commits — men Next 14:s webpack förbjuder modulnivå-import av
+react-dom/server i app-routern, så ALLA Vercel-deployer sedan E2a
+failade tyst medan prod körde kvar gammal kod. Upptäcktes först när
+Andreas såg failade deployer i Vercel-dashboarden.
+
+**Regel:** (1) tsc och next build fångar OLIKA felklasser — webpack-
+regler (importrestriktioner, bundlingsgränser, client/server-gränser)
+syns bara i next build. (2) Vid ändringar i lib/-filer som konsumeras av
+routes, vid nya importmönster (react-dom/server, server-only-paket) eller
+nya npm-beroenden: kör next build lokalt FÖRE push, även när
+byggagent-instruktionen säger "ingen build" — den regeln finns för att
+undvika onödig tid, inte för att hoppa över deploy-kritisk verifiering.
+(3) Efter push av arkitekturella ändringar: verifiera att Vercel-deployen
+faktiskt blev grön (Andreas dashboard eller vercel ls) innan nästa etapp
+staplas ovanpå — fem etapper hann staplas på en trasig deploy.
