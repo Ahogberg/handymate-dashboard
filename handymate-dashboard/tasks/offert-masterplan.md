@@ -160,8 +160,39 @@ raderas. capability-inventory uppdateras per stängd etapp. En byggagent
 åt gången; jag speccar/granskar/committar — samma disciplin som allt
 annat idag.
 
+## ETAPP 6 — FAKTURA-SPRINTEN (Andreas-beslut 2026-08-04: "samma typ av förbättring för faktura")
+
+**Startas EFTER att E4+E5 är klara och rapporterade — inte parallellt.**
+
+Motivet (etablerat i beslutsdiskussionen): dokumentmotorn är redan betald
+— fakturan har exakt samma form (rader, summering, ROT, kund, PDF,
+portalvy) och är ytan där pengarna byter ägare. Idag renderas fakturans
+PDF av gamla jsPDF-generatorn (lib/pdf-generator.ts) — kunden får en
+magisk Premium-offert och sedan en ful faktura i det känsligaste
+ögonblicket. Snygga fakturor betalas snabbare = pengaloopens tema.
+
+**Skiss (detaljspec skrivs vid start, efter kartläggning av fakturaflödets
+faktiska kod — samma disciplin som offert-sprintens två Explore-pass):**
+- 6a. Generalisera dokumentmotorn: QuoteDocument → pengadokument-motor
+  (dokumenttyp som variant: offert/faktura — fakturaspecifika delar:
+  OCR-nummer, förfallodatum, betalningsuppgifter/Swish-QR, kreditfaktura,
+  påminnelseavgift). Fakturans HTML-mall(ar) i samma stilfamilj
+  (Modern först) — buildInvoiceTemplateData motsvarande data-builder.
+- 6b. Fakturans PDF via Chromium-vägen (samma renderHtmlToPdf som
+  offerten, jsPDF blir fallback även här) — konsekvent varumärke
+  offert→faktura.
+- 6c. Fakturaskaparen/redigeraren canvas-first (samma layout-principer:
+  assistentkolumn + dokument som huvudyta) — kartläggning avgör hur
+  mycket av dagens faktura-UI som återanvänds vs. förenas med offertens
+  delade komponenter.
+- 6d. Fakturadetaljsidan → samma "rum"-behandling som E4 (dokumentet i
+  centrum, åtgärdshierarki, verklig händelselogg — betalningar/
+  påminnelser FINNS i fakturadatat till skillnad från offertens).
+- 6e. Portalens fakturavy + betalsidan på mallmotorn (kundens
+  betalögonblick i samma visuella värld; "jag har betalat"-flödet +
+  Swish-QR integrerade i dokumentvyn).
+
 ## Utanför scope (medvetet)
 
 Nya mallstilar, offert-analytics-dashboard, A/B på kundvyn — efter
-pilotsignal. Fakturans PDF (jsPDF) — separat span senare; offerten är
-säljytan och går först.
+pilotsignal.
