@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/permissions'
 import {
   syncBookingToCalendar,
   updateBookingInCalendar,
@@ -378,7 +379,17 @@ export async function PUT(request: NextRequest) {
     // Manuell tilldelning (valfri) — samma valideringsmönster som
     // app/api/projects/[id]/team/route.ts POST. Skickas inte fältet med
     // alls bevaras nuvarande beteende exakt (fältet rörs inte).
+    //
+    // Rollskydd (R2, tasks/resurs-masterplan.md): resurstavlans drag-drop-
+    // tilldelning skriver hit — "employee ser tavlan men kan INTE dra/
+    // tilldela" måste hålla även om anropet görs direkt mot API:et, inte
+    // bara döljas i UI:t. Gäller ENDAST assigned_user_id-fältet; övriga
+    // fält (status/tid/anteckningar) är oförändrade för alla roller.
     if (body.assigned_user_id !== undefined) {
+      const currentUser = await getCurrentUser(request)
+      if (!currentUser || (currentUser.role !== 'owner' && currentUser.role !== 'admin')) {
+        return NextResponse.json({ error: 'Otillräcklig behörighet för att tilldela bokning' }, { status: 403 })
+      }
       if (body.assigned_user_id === null) {
         updates.assigned_user_id = null
         updates.assigned_to = null
