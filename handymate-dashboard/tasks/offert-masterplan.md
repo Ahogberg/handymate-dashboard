@@ -201,26 +201,84 @@ PDF av gamla jsPDF-generatorn (lib/pdf-generator.ts) — kunden får en
 magisk Premium-offert och sedan en ful faktura i det känsligaste
 ögonblicket. Snygga fakturor betalas snabbare = pengaloopens tema.
 
-**Skiss (detaljspec skrivs vid start, efter kartläggning av fakturaflödets
-faktiska kod — samma disciplin som offert-sprintens två Explore-pass):**
-- 6a. Generalisera dokumentmotorn: QuoteDocument → pengadokument-motor
-  (dokumenttyp som variant: offert/faktura — fakturaspecifika delar:
-  OCR-nummer, förfallodatum, betalningsuppgifter/Swish-QR, kreditfaktura,
-  påminnelseavgift). Fakturans HTML-mall(ar) i samma stilfamilj
-  (Modern först) — buildInvoiceTemplateData motsvarande data-builder.
-- 6b. Fakturans PDF via Chromium-vägen (samma renderHtmlToPdf som
-  offerten, jsPDF blir fallback även här) — konsekvent varumärke
-  offert→faktura.
-- 6c. Fakturaskaparen/redigeraren canvas-first (samma layout-principer:
-  assistentkolumn + dokument som huvudyta) — kartläggning avgör hur
-  mycket av dagens faktura-UI som återanvänds vs. förenas med offertens
-  delade komponenter.
-- 6d. Fakturadetaljsidan → samma "rum"-behandling som E4 (dokumentet i
-  centrum, åtgärdshierarki, verklig händelselogg — betalningar/
-  påminnelser FINNS i fakturadatat till skillnad från offertens).
-- 6e. Portalens fakturavy + betalsidan på mallmotorn (kundens
-  betalögonblick i samma visuella värld; "jag har betalat"-flödet +
-  Swish-QR integrerade i dokumentvyn).
+**DETALJSPEC (2026-08-04, efter kartläggning av fakturaflödets faktiska
+kod — huvudfynd: fakturan har redan en mallmotor på offertens FÖRE-E2a-
+nivå (lib/invoice-templates/, 3 stilar som strängar, används bara för
+HTML-preview — binär PDF är fortfarande jsPDF). E6 är alltså i hög grad
+en upprepning av E2a snarare än nybyggnation.**
+
+**Buggar hittade i kartläggningen (fixas i respektive etapp):**
+- Portalens "Ladda ner PDF" skickar `?id=` men routen läser `invoiceId`
+  → kundens nedladdning har ALLTID gett 400 (PortalInvoiceDetail:220);
+  header-knappen saknar dessutom onClick helt (:47-49). → 6b
+- Detaljsidans timeline läser `invoice.reminder_sent_at` — kolumnen
+  FINNS INTE (heter last_reminder_at) → påminnelser syns aldrig i
+  tidslinjen trots att FULL historik finns i invoice_reminders. → 6d
+- invoices/send POSTar ett MINDRE fältset till jsPDF än pdf-routen →
+  mejlbilagans PDF skiljer sig från nedladdningens (OCR, personnummer,
+  referenser, invoice_type utelämnas). → 6b
+- fortnox_sync_status (v58) visas aldrig i UI — retry-läget osynligt. → 6d
+- performed_by_name (värdekedje-E6-arvet) sätts på rader men renderas
+  ingenstans. → 6a
+- data-builder FILTRERAR BORT heading/text-rader och tappar subtotal/
+  discount-semantik — medan 213 rader DÖD kod i pdf-routen (rad 168-380)
+  är den enda som hanterar radtyperna rätt. Läs den som facit, radera
+  den sedan. → 6a
+- auto-generate sätter aldrig ocr_number. → 6a (createInvoice-kärnan)
+
+**6a — MoneyDocument-motorn + createInvoice()-kärnan (störst, först):**
+QuoteDocument → generaliseras med docType: 'quote'|'invoice'
+(diskriminerad typunion — option är offert-only; subtotal/discount
+finns redan i fakturans radtyper och beräknas i invoice-calculations,
+renderas bara i den döda koden). buildInvoiceTemplateData UTÖKAS (finns,
+194 rader): ta bort heading/text-filtret, lägg subtotal/discount,
+performed_by_name, kreditfaktura-rader. Fakturaunika sektioner i
+motorn: OCR-rad (lib/ocr finns), betalinstruktioner + Swish-QR
+(lib/swish-qr finns, korrekt låst belopp), förfallodatum-prominens +
+late-notice (logik finns i data-builder:32-42), kreditfaktura-läge,
+påminnelseavgift/dröjsmålsränta som totalsrader. Modern först —
+premium/friendly-strängarna behålls tills motorn täcker dem (samma
+asymmetri som offerten). TVÄRGÅENDE i 6a: bryt ut createInvoice()-kärna
+— ÅTTA skapandevägar duplicerar samma sexstegskedja (prefix→nummer→OCR→
+dueDate→insert→bump) utan lås på nummerserien (dubblettnummer-risk!).
+Atomiskt nummeruttag (RPC-migration, Andreas kör) + gemensam helper;
+alla åtta vägar pekas om. ROT-beräkningen enhetligas samtidigt
+(from-project hårdkodar egna satser istället för calculateCappedDeduction).
+
+**6b — Chromium-PDF (minst, störst synlig vinst):**
+Bryt ut renderHtmlToPdf från quotes/pdf-routen till lib/pdf/
+render-html-to-pdf.ts. invoices/pdf format=pdf → Chromium med jsPDF-
+fallback. invoices/send byter till samma väg (fixar fältset-buggen).
+reminder-pdf med i svepet. Portal-PDF-länkbuggen + död onClick fixas.
+
+**6c — Skaparen canvas-first:**
+new (521 rader, 19 useState) + edit (327, 16) förenas ovanpå motorn i
+mode='edit' — samma layoutprinciper som offertens E2b (assistentkolumn +
+dokument huvudyta). invoice-calculations.ts (ren, 161 rader) behålls
+rakt av. RISK: LineItemEditor har fakturaspecifika affordanser (ROT/RUT-
+checkbox per rad, showAdvancedTypes) — fältparitet kartläggs FÖRE
+sammanslagning så inget tappas.
+
+**6d — Fakturarummet (bästa avkastningen — händelsedatat FINNS):**
+Dokumentet i centrum (motorn), åtgärdshierarki (EN primär per status:
+utkast→Skicka, skickad→Påminn/Markera betald, betald→—; kreditera/
+Fortnox/PDF i menyer), VERKLIG tidslinje byggd på invoice_reminders-
+arrayen (redan hämtad! med avgift+metod per påminnelse) + betalningar +
+Fortnox-sync — fixar reminder_sent_at-buggen. fortnox_sync_status
+synlig. De två inline-modalerna (betalning 458-543, kreditering 546-682
+med delkreditering) bryts ut som komponenter — kreditmodalen OFÖRÄNDRAD
+först (mest logikbärande), design sen.
+
+**6e — Portal + betalögonblick:**
+Motorn i portalens fakturavy. claim-paid + apply-payment + Swish-QR-
+kärnorna bärs över ORÖRDA (sunda). Designbeslut: dokumentet som kort i
+portalskalet (bp-*-CSS möter MODERN_DOCUMENT_CSS) — inbäddat kort valt
+för att behålla portalens navigering.
+
+**Ordning:** 6a → 6b → 6c → 6d → 6e. Verifiering per etapp: tsc + FULL
+next build (lessons.md!) + facit-sviter; 6a får paritetstest mot
+frysta invoice-mall-fixtures (samma metodik som E2a); 6e testas mot
+demokontots faktura end-to-end innan gammal rendering raderas.
 
 ## Utanför scope (medvetet)
 
