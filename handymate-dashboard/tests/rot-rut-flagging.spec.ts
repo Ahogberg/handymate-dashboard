@@ -23,6 +23,7 @@ import {
   setItemRotRut,
   legacyItemRotRutType,
   applyGlobalRotToggle,
+  applyGlobalDeductionType,
 } from '../lib/quote-calculations'
 import type { QuoteItem } from '../lib/types/quote'
 
@@ -163,5 +164,75 @@ test.describe('applyGlobalRotToggle — ETAPP 1c-i: global ROT-toggle går via s
     const heading: QuoteItem = { ...baseItem({ unit: 'tim' }), item_type: 'heading' }
     const result = applyGlobalRotToggle([heading], true)
     expect(getItemRotRutType(result[0])).toBeNull()
+  })
+})
+
+test.describe('applyGlobalDeductionType — punkt 5 (offert-feedback 2026-08-04): trevägs Inget avdrag/ROT/RUT-kontrollen', () => {
+  test('(s) ROT: tom tim-rad utan avdragstyp fylls med ROT', () => {
+    const items = [baseItem({ unit: 'tim' })]
+    const result = applyGlobalDeductionType(items, 'rot')
+    expect(getItemRotRutType(result[0])).toBe('rot')
+  })
+
+  test('(t) RUT: tom tim-rad utan avdragstyp fylls med RUT', () => {
+    const items = [baseItem({ unit: 'tim' })]
+    const result = applyGlobalDeductionType(items, 'rut')
+    expect(getItemRotRutType(result[0])).toBe('rut')
+  })
+
+  test('(u) ROT: st-rad (material) rörs inte — bara tim-rader antas vara arbete', () => {
+    const items = [baseItem({ unit: 'st' })]
+    const result = applyGlobalDeductionType(items, 'rot')
+    expect(getItemRotRutType(result[0])).toBeNull()
+  })
+
+  test('(v) RUT valt: befintlig ROT-rad nollställs (INTE konverteras till RUT) — "nollar bara rader av den typ man lämnar"', () => {
+    const rotItem = setItemRotRut(baseItem({ unit: 'tim' }), 'rot')
+    const result = applyGlobalDeductionType([rotItem], 'rut')
+    expect(getItemRotRutType(result[0])).toBeNull()
+    expect(result[0].is_rot_eligible).toBe(false)
+    expect(result[0].is_rut_eligible).toBe(false)
+  })
+
+  test('(w) ROT valt: befintlig RUT-rad nollställs (INTE konverteras till ROT)', () => {
+    const rutItem = setItemRotRut(baseItem({ unit: 'tim' }), 'rut')
+    const result = applyGlobalDeductionType([rutItem], 'rot')
+    expect(getItemRotRutType(result[0])).toBeNull()
+  })
+
+  test('(x) ROT valt: rad som redan är ROT rörs inte (no-op, inte en onödig ny referens av misstag)', () => {
+    const rotItem = setItemRotRut(baseItem({ unit: 'tim' }), 'rot')
+    const result = applyGlobalDeductionType([rotItem], 'rot')
+    expect(getItemRotRutType(result[0])).toBe('rot')
+  })
+
+  test('(y) null ("Inget avdrag"): både ROT- och RUT-rader nollställs', () => {
+    const rotItem = setItemRotRut(baseItem({ id: 'r1', unit: 'tim' }), 'rot')
+    const rutItem = setItemRotRut(baseItem({ id: 'r2', unit: 'tim' }), 'rut')
+    const result = applyGlobalDeductionType([rotItem, rutItem], null)
+    expect(getItemRotRutType(result[0])).toBeNull()
+    expect(getItemRotRutType(result[1])).toBeNull()
+  })
+
+  test('(z) null: rad utan avdragstyp rörs inte (redan inget avdrag, no-op)', () => {
+    const items = [baseItem({ unit: 'tim' })]
+    const result = applyGlobalDeductionType(items, null)
+    expect(getItemRotRutType(result[0])).toBeNull()
+  })
+
+  test('(aa) grön teknik-rader rörs ALDRIG, oavsett vald typ (rot/rut/null)', () => {
+    const gronItem = setItemRotRut(baseItem({ unit: 'tim' }), 'gron_solceller')
+    for (const type of ['rot', 'rut', null] as const) {
+      const result = applyGlobalDeductionType([gronItem], type)
+      expect(getItemRotRutType(result[0])).toBe('gron_solceller')
+    }
+  })
+
+  test('(bb) icke-item-rader (rubrik/delsumma/rabatt/tillval) rörs aldrig', () => {
+    const heading: QuoteItem = { ...baseItem({ unit: 'tim' }), item_type: 'heading' }
+    for (const type of ['rot', 'rut', null] as const) {
+      const result = applyGlobalDeductionType([heading], type)
+      expect(getItemRotRutType(result[0])).toBeNull()
+    }
   })
 })

@@ -8,7 +8,6 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
 import ProductSearchModal from '@/components/ProductSearchModal'
 import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
-import type { QuotePreviewData } from '@/components/quotes/QuotePreview'
 import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates/types'
 import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
 import { RowEditSheet } from '@/components/quotes/document/RowEditSheet'
@@ -327,7 +326,7 @@ export default function NewQuotePage() {
 
   // Preview
   const [showPreviewPanel, setShowPreviewPanel] = useState(true)
-  const [previewMode, setPreviewMode] = useState<'live' | 'design' | 'compact'>('live')
+  const [previewMode, setPreviewMode] = useState<'live' | 'design'>('live')
   // ETAPP 3 (offert-masterplan.md): id på raden vars RowEditSheet (bottom-
   // sheet-radeditorn) är öppen — satt av QuotePreviewPanels onRowTap när
   // hantverkaren trycker på en rad i canvasen under lg. Ersätter
@@ -346,8 +345,6 @@ export default function NewQuotePage() {
   >(null)
   const [mainView, setMainView] = useState<'document' | 'list'>('document')
   const mainViewInitialized = useRef(false)
-  const [debouncedPreviewData, setDebouncedPreviewData] = useState<QuotePreviewData | null>(null)
-  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // ETAPP 1f: inline-bekräftelse för "beskrivning saknas" (ersätter den
   // gamla descriptionWarningShownRef-vägen — se saveQuote/QuoteNewHeader).
   const [sendConfirmPending, setSendConfirmPending] = useState(false)
@@ -447,41 +444,6 @@ export default function NewQuotePage() {
     setNewCategoryLabel('')
   }
 
-  // ─── Debounced QuotePreview data ─────────────────────────────────
-  useEffect(() => {
-    if (previewTimerRef.current) clearTimeout(previewTimerRef.current)
-    previewTimerRef.current = setTimeout(() => {
-      setDebouncedPreviewData({
-        title,
-        customerName: selectedCustomerObj?.name || '',
-        customerAddress: selectedCustomerObj?.address_line || '',
-        validDays,
-        items,
-        discountPercent,
-        vatRate,
-        description,
-        notIncluded,
-        ataTerms,
-        paymentPlan,
-        referencePerson,
-        customerReference,
-        projectAddress,
-        detailLevel,
-        showUnitPrices,
-        showQuantities,
-        customCategories: localCustomCategories,
-      })
-    }, 300)
-    return () => {
-      if (previewTimerRef.current) clearTimeout(previewTimerRef.current)
-    }
-  }, [
-    title, selectedCustomerObj, validDays, items, discountPercent, vatRate, description,
-    notIncluded, ataTerms, paymentPlan,
-    referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices, showQuantities,
-    localCustomCategories,
-  ])
-
   // ─── EN preview-pipeline (ETAPP 1a, offert-masterplan.md) ─────────
   // quoteTemplateData (→ ModernCanvas) och templatePreviewPayload (→
   // TemplatePreviewFrame/iframen) byggdes tidigare i TVÅ separata useMemo
@@ -537,10 +499,11 @@ export default function NewQuotePage() {
         reference: customerReference || null,
       },
       quote: {
-        number: 'PREVIEW',
+        number: 'Utkast',
         dealNumber: null,
         issuedDate: formatDate(new Date()),
         validUntilDate: formatDate(validUntil),
+        validUntilDateISO: validUntil.toISOString().split('T')[0],
         title: title || 'Offert',
         description: description || null,
         items: recalculated.map((i): QuoteTemplateItem => {
@@ -569,6 +532,8 @@ export default function NewQuotePage() {
           }
         }),
         subtotalExVat: totals.subtotal,
+        discountPercent,
+        discountAmount: totals.discountAmount,
         vatAmount: totals.vat,
         totalIncVat: totals.total,
         rotDeduction: totals.rotDeduction > 0 ? totals.rotDeduction : undefined,
@@ -662,6 +627,20 @@ export default function NewQuotePage() {
       onCustomerNameChange: undefined,
       onPaymentTermsChange: setPaymentTermsText,
       onTermsChange: setTermsText,
+      // Dokumentet visar/redigerar ett ABSOLUT datum (native <input type=date>)
+      // men sidans egna state är "giltig i N dagar" (samma fält som
+      // QuoteNewCustomerSection redan exponerar) — räknar om till dagar-
+      // från-idag så de två fälten aldrig kan divergera (en källa).
+      onValidUntilChange: (isoDate: string) => {
+        const picked = new Date(isoDate + 'T00:00:00')
+        if (Number.isNaN(picked.getTime())) return
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const diffDays = Math.round((picked.getTime() - today.getTime()) / 86400000)
+        setValidDays(Math.max(0, diffDays))
+      },
+      onDiscountChange: setDiscountPercent,
+      onNotIncludedChange: setNotIncluded,
       onItemChange: (id, patch) => {
         if (patch.name !== undefined) updateItem(id, 'description', patch.name)
         if (patch.quantity !== undefined) updateItem(id, 'quantity', patch.quantity)
@@ -691,7 +670,10 @@ export default function NewQuotePage() {
         updateItem(id, 'option_selected', checked)
       },
     }),
-    [setTitle, setDescription, setPaymentTermsText, setTermsText, updateItem, addItem, removeItem, items],
+    [
+      setTitle, setDescription, setPaymentTermsText, setTermsText, setValidDays, setDiscountPercent,
+      setNotIncluded, updateItem, addItem, removeItem, items,
+    ],
   )
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1685,6 +1667,8 @@ export default function NewQuotePage() {
               hasRotItems={hasRotItems}
               hasRutItems={hasRutItems}
               formatCurrency={formatCurrency}
+              items={items}
+              setItems={setItems}
             />
 
             {/* Primär CTA vid summan — headerns Skicka-knapp behålls också
@@ -1923,9 +1907,6 @@ export default function NewQuotePage() {
                   liveHandlers={liveHandlers}
                   onRowTap={setSheetItemId}
                   templatePreviewPayload={templatePreviewPayload}
-                  debouncedPreviewData={debouncedPreviewData}
-                  businessName={business.business_name}
-                  contactName={business.contact_name}
                 />
               </div>
             )}

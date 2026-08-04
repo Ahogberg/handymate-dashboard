@@ -96,10 +96,24 @@ export interface QuoteTemplateQuote {
   dealNumber?: string | null
   issuedDate: string
   validUntilDate: string
+  /** ISO-datum (yyyy-mm-dd) för validUntilDate — ENDAST satt av live-canvasens
+      byggare (new/edit-sidorna) så dokumentmotorns EditableDate-fält har ett
+      värde <input type="date"> kan binda till. validUntilDate förblir den
+      formaterade texten som visas/renderas i static-läge/PDF. */
+  validUntilDateISO?: string
   title: string
   description?: string | null
   items: QuoteTemplateItem[]
   subtotalExVat: number
+  /** Global procentrabatt (utöver ev. 'discount'-radtyper) — ENDAST satt av
+      live-canvasens byggare (new/edit-sidorna) så dokumentmotorns
+      Rabatt-rad i summeringen kan visas/redigeras. Utelämnad → raden
+      renderas inte (befintligt static/PDF-beteende oförändrat). */
+  discountPercent?: number
+  /** Beräknat rabattbelopp (kr) för discountPercent — visas i summeringens
+      Rabatt-rad, beräknas aldrig av dokumentmotorn själv (samma princip som
+      totalsumman i övrigt: alltid härledd av anroparen, aldrig av UI:t). */
+  discountAmount?: number
   vatAmount: number
   totalIncVat: number
   rotDeduction?: number

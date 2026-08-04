@@ -25,6 +25,16 @@ export interface QuoteDocumentHandlers {
   onCustomerNameChange?: (v: string) => void
   onPaymentTermsChange?: (v: string) => void
   onTermsChange?: (v: string) => void
+  /** Giltig till-datum — ISO-sträng (yyyy-mm-dd) från EditableDate-fältets
+      native <input type="date">. Anroparen räknar om till sitt eget
+      "giltig i N dagar"-state (se new/edit-sidornas onValidUntilChange). */
+  onValidUntilChange?: (v: string) => void
+  /** Global procentrabatt i summeringen — se QuoteTemplateQuote.discountPercent.
+      Utelämnad → raden renderas inte alls (varken text eller redigerbar). */
+  onDiscountChange?: (v: number) => void
+  /** "Ej inkluderat"-texten i villkorsstycket — multiline, samma mönster som
+      onTermsChange. */
+  onNotIncludedChange?: (v: string) => void
   onItemChange: (id: string, patch: QuoteItemPatch) => void
   /** Lägger till en ny tom 'item'-rad sist — samma beteende som dagens
       "+ Lägg till rad". Radtypsväljare (rubrik/text/etc) ägs av "Mer"-

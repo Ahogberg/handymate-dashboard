@@ -55,21 +55,27 @@ function componentSpec(components: QuoteTemplateItem['components']) {
 
 /** Klickbar ROT/RUT-badge — ENDAST edit-läge (se filkommentaren ovan).
     onCycle utelämnad (sheetMode, ETAPP 3) → badgen visas men reagerar inte
-    på tryck; hela raden är tappbar istället (se onTap på tr-elementen). */
+    på tryck; hela raden är tappbar istället (se onTap på tr-elementen).
+    Punkt 5 (offert-feedback 2026-08-04): "ROT/RUT —" för tom avdragstyp lästes
+    som en död platshållare, inte en klickbar kontroll — badgen ÄNDRAS aldrig
+    tyst till "ROT/RUT —" utan visar nu "+ROT?" (dämpad) så det är tydligt att
+    ett klick FÖRESLÅR nästa steg i cykeln (null→rot→rut→null), inte bara
+    rapporterar ett tomt läge. */
 function RotBadge({ item, onCycle }: { item: QuoteTemplateItem; onCycle?: () => void }) {
   const type = item.rotRutType ?? (item.isRotEligible ? 'rot' : item.isRutEligible ? 'rut' : null)
   const isGron = type === 'gron_solceller' || type === 'gron_lagring' || type === 'gron_laddpunkt'
-  const label = type === 'rot' ? 'ROT' : type === 'rut' ? 'RUT' : isGron ? 'Grön teknik' : 'ROT/RUT —'
+  const isEmpty = type === null && !isGron
+  const label = type === 'rot' ? 'ROT' : type === 'rut' ? 'RUT' : isGron ? 'Grön teknik' : '+ROT?'
   return (
     <span
-      className={`rot-badge${isGron ? ' gron' : ''}`}
+      className={`rot-badge${isGron ? ' gron' : ''}${isEmpty ? ' empty' : ''}`}
       onClick={onCycle}
       style={onCycle ? undefined : { cursor: 'default' }}
       title={!onCycle
         ? undefined
         : isGron
           ? 'Grön teknik väljs i radlistan — klicka för att byta till ROT'
-          : 'Klicka för att växla ROT/RUT'}
+          : 'Klicka för att växla ROT/RUT för raden'}
     >
       {label}
     </span>

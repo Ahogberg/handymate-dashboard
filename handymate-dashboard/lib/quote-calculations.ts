@@ -57,6 +57,40 @@ export function applyGlobalRotToggle(items: QuoteItem[], on: boolean): QuoteItem
 }
 
 /**
+ * Global avdrags-kontroll (offert-feedback 2026-08-04, Andreas skarpa test,
+ * punkt 5): den globala ROT-togglen ovan förstås till en trevägs
+ * "Inget avdrag / ROT / RUT"-kontroll i summeringen. SAMMA försiktiga
+ * semantik som applyGlobalRotToggle — bara utökad till att gälla båda
+ * avdragstyperna symmetriskt:
+ * - Väljer man 'rot' eller 'rut': tomma ('tim'-rader utan avdragstyp) fylls
+ *   med den valda typen. Rader av den ANDRA avdragstypen (den man lämnar)
+ *   nollställs. Rader som redan har den VALDA typen rörs inte (no-op).
+ * - Väljer man null ("Inget avdrag"): både ROT- och RUT-rader nollställs.
+ * - Grön teknik rörs ALDRIG i någon riktning — precis som badgens klick-
+ *   cykel (RotBadge/onItemRotRutCycle) redan respekterar.
+ * - Endast item_type 'item' påverkas (rubrik/delsumma/rabatt/tillval/text
+ *   har ingen avdragstyp att sätta).
+ */
+export function applyGlobalDeductionType(items: QuoteItem[], type: 'rot' | 'rut' | null): QuoteItem[] {
+  return items.map(item => {
+    if (item.item_type !== 'item') return item
+    const current = getItemRotRutType(item)
+    const isGron = current === 'gron_solceller' || current === 'gron_lagring' || current === 'gron_laddpunkt'
+    if (isGron) return item
+
+    if (type === null) {
+      if (current === 'rot' || current === 'rut') return setItemRotRut(item, null)
+      return item
+    }
+
+    const other: RotRutType = type === 'rot' ? 'rut' : 'rot'
+    if (current === other) return setItemRotRut(item, null)
+    if ((current === null || current === undefined) && item.unit === 'tim') return setItemRotRut(item, type)
+    return item
+  })
+}
+
+/**
  * Tillvalsrad-specifika default-fält (B5, kodrevision 2026-08-03): en rad
  * med item_type 'option' behöver option_selected/option_default explicit
  * satta till false (v66-schemat, sql/v66_quote_option_rows.sql) — AI-

@@ -128,6 +128,72 @@ export function EditableText({ value, onChange, className = '', placeholder, mul
   )
 }
 
+interface EditableDateProps extends BaseProps {
+  /** ISO-datum (yyyy-mm-dd) — native <input type="date"> kräver detta format. */
+  value: string
+  /** Formaterad text som visas när fältet inte är i edit-läge (t.ex. "2 september 2026"). */
+  displayValue: string
+  onChange: (value: string) => void
+}
+
+/** Klick öppnar ett native datumväljar-fält — samma klicka-för-att-redigera-
+    mönster som EditableText/EditableNumber, men med <input type="date">
+    istället för fritext så webbläsarens egen datumväljare används. */
+export function EditableDate({ value, displayValue, onChange, className = '', placeholder }: EditableDateProps) {
+  const [editing, setEditing] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.showPicker?.()
+    }
+  }, [editing])
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="date"
+        value={value}
+        onChange={e => { if (e.target.value) onChange(e.target.value) }}
+        onBlur={() => setEditing(false)}
+        onKeyDown={e => { if (e.key === 'Escape' || e.key === 'Enter') setEditing(false) }}
+        className={`editable-input ${className}`}
+        style={{
+          background: '#fffbeb',
+          border: '1px dashed #d97706',
+          borderRadius: 4,
+          padding: '2px 6px',
+          font: 'inherit',
+          color: 'inherit',
+          outline: 'none',
+        }}
+      />
+    )
+  }
+
+  const isEmpty = !displayValue || displayValue.trim() === ''
+  return (
+    <span
+      onClick={() => setEditing(true)}
+      className={`editable-text ${className}`}
+      style={{
+        cursor: 'text',
+        borderRadius: 3,
+        padding: '0 2px',
+        margin: '0 -2px',
+        transition: 'background 0.1s',
+        display: 'inline-block',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(15, 118, 110, 0.08)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+    >
+      {isEmpty ? <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>{placeholder || 'Välj datum'}</span> : displayValue}
+    </span>
+  )
+}
+
 interface EditableNumberProps extends BaseProps {
   value: number
   onChange: (value: number) => void

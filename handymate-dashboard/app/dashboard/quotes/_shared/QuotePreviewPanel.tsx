@@ -2,14 +2,13 @@
 
 import { useState } from 'react'
 import { ChevronDown, Eye, Loader2, Maximize2, X } from 'lucide-react'
-import QuotePreview, { type QuotePreviewData } from '@/components/quotes/QuotePreview'
 import TemplatePreviewFrame, { type TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import QuoteDocument, { type QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
 import { DocumentScaler } from '@/components/quotes/document/DocumentScaler'
 import { useIsMobileViewport } from '@/components/quotes/document/useIsMobileViewport'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
 
-type PreviewMode = 'live' | 'design' | 'compact'
+type PreviewMode = 'live' | 'design'
 
 interface QuotePreviewPanelProps {
   open: boolean
@@ -31,9 +30,6 @@ interface QuotePreviewPanelProps {
       aktivt (QuoteDocument faller tillbaka till vanlig inline-redigering). */
   onRowTap?: (itemId: string) => void
   templatePreviewPayload: TemplatePreviewPayload
-  debouncedPreviewData: QuotePreviewData | null
-  businessName?: string
-  contactName?: string
 }
 
 /**
@@ -53,9 +49,6 @@ export function QuotePreviewPanel({
   liveHandlers,
   onRowTap,
   templatePreviewPayload,
-  debouncedPreviewData,
-  businessName,
-  contactName,
 }: QuotePreviewPanelProps) {
   const [fullscreen, setFullscreen] = useState(false)
   const [previewPending, setPreviewPending] = useState(false)
@@ -81,25 +74,12 @@ export function QuotePreviewPanel({
         </div>
       )
     }
-    if (previewMode === 'design' || (previewMode === 'live' && !liveEnabled)) {
-      return (
-        <TemplatePreviewFrame
-          payload={templatePreviewPayload}
-          className={sizeCls}
-          onPendingChange={setPreviewPending}
-        />
-      )
-    }
     return (
-      debouncedPreviewData && (
-        <div className={`${sizeCls} overflow-auto`}>
-          <QuotePreview
-            data={debouncedPreviewData}
-            businessName={businessName || ''}
-            contactName={contactName || ''}
-          />
-        </div>
-      )
+      <TemplatePreviewFrame
+        payload={templatePreviewPayload}
+        className={sizeCls}
+        onPendingChange={setPreviewPending}
+      />
     )
   }
 
@@ -176,17 +156,6 @@ export function QuotePreviewPanel({
                 }`}
               >
                 Slutdesign
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewMode('compact')}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  previewMode === 'compact'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                Kompakt
               </button>
             </div>
             {renderPreviewBody(true)}

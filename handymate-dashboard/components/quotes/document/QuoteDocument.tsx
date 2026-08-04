@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-import { EditableText } from '@/components/quotes/editable/EditableFields'
+import { EditableText, EditableDate, EditableNumber } from '@/components/quotes/editable/EditableFields'
 import { formatCurrency } from '@/lib/document-html'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
 import { MODERN_DOCUMENT_CSS } from './modern-css'
@@ -96,7 +96,18 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             {data.quote.dealNumber && <div className="doc-ref">Ärende {data.quote.dealNumber}</div>}
             <div className="doc-dates">
               <div><strong>Utfärdad:</strong> {data.quote.issuedDate}</div>
-              <div><strong>Giltig till:</strong> {data.quote.validUntilDate}</div>
+              <div>
+                <strong>Giltig till:</strong>{' '}
+                {mode === 'edit' && handlers?.onValidUntilChange
+                  ? (
+                    <EditableDate
+                      value={data.quote.validUntilDateISO || ''}
+                      displayValue={data.quote.validUntilDate}
+                      onChange={handlers.onValidUntilChange}
+                    />
+                  )
+                  : data.quote.validUntilDate}
+              </div>
             </div>
           </div>
         </header>
@@ -189,6 +200,18 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
         <div className="totals-wrap">
           <div className="totals">
             <div className="total-row"><span className="lbl">Summa exkl. moms</span><span className="val">{formatCurrency(data.quote.subtotalExVat)}</span></div>
+            {data.quote.discountPercent !== undefined ? (
+              <div className="total-row discount">
+                <span className="lbl">
+                  Rabatt (
+                  {mode === 'edit' && handlers?.onDiscountChange
+                    ? <EditableNumber value={data.quote.discountPercent} onChange={handlers.onDiscountChange} width={36} format={v => `${v}`} step={1} min={0} />
+                    : data.quote.discountPercent}
+                  %)
+                </span>
+                <span className="val">−{formatCurrency(data.quote.discountAmount || 0)}</span>
+              </div>
+            ) : null}
             <div className="total-row"><span className="lbl">Moms 25%</span><span className="val">{formatCurrency(data.quote.vatAmount)}</span></div>
             <div className="total-row"><span className="lbl">Summa inkl. moms</span><span className="val">{formatCurrency(data.quote.totalIncVat)}</span></div>
             {data.quote.rotDeduction ? (
@@ -250,7 +273,21 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
               placeholder={defaultTermsText(data)}
               multiline
             />
-            {data.quote.notIncluded && <><br /><br /><strong>Ej inkluderat:</strong> {data.quote.notIncluded}</>}
+            {data.quote.notIncluded || handlers.onNotIncludedChange ? (
+              <>
+                <br /><br /><strong>Ej inkluderat:</strong>{' '}
+                {handlers.onNotIncludedChange
+                  ? (
+                    <EditableText
+                      value={data.quote.notIncluded || ''}
+                      onChange={handlers.onNotIncludedChange}
+                      placeholder="Vad ingår inte i offerten…"
+                      multiline
+                    />
+                  )
+                  : data.quote.notIncluded}
+              </>
+            ) : null}
             {data.quote.warrantyText && <><br /><br /><strong>Garanti:</strong> {data.quote.warrantyText}</>}
           </p>
         ) : (

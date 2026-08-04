@@ -74,11 +74,15 @@ export const MODERN_DOCUMENT_CSS = `
 .quote-document .rot-badge { display: inline-flex; align-items: center; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--qd-accent); background: var(--qd-accent-50); border: 1px dashed var(--qd-accent-100); border-radius: 4px; padding: 1px 6px; cursor: pointer; line-height: 1.6; }
 .quote-document .rot-badge:hover { background: var(--qd-accent-100); }
 .quote-document .rot-badge.gron { color: #64748B; background: transparent; border-color: #E2E8F0; }
+.quote-document .rot-badge.empty { color: #94A3B8; background: transparent; border-color: #E2E8F0; font-weight: 500; text-transform: none; letter-spacing: normal; }
+.quote-document .rot-badge.empty:hover { background: #F8FAFC; color: #64748B; }
 .quote-document .totals-wrap { display: flex; justify-content: flex-end; margin-bottom: 28px; break-inside: avoid; page-break-inside: avoid; }
 .quote-document .totals { width: 50%; min-width: 280px; }
 .quote-document .total-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid #E2E8F0; }
 .quote-document .total-row:last-child { border-bottom: none; }
 .quote-document .total-row.rot { color: var(--qd-accent); font-weight: 600; }
+.quote-document .total-row.discount { color: #B45309; }
+.quote-document .total-row.discount .val { color: #B45309; }
 .quote-document .total-row.grand { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; padding: 14px 0 6px; border-top: 1.5px solid #0F172A; border-bottom: none; margin-top: 6px; }
 .quote-document .total-row .lbl { color: #64748B; }
 .quote-document .total-row.grand .lbl { color: #0F172A; }

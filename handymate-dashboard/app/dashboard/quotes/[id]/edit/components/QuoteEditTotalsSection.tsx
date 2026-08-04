@@ -1,5 +1,8 @@
 'use client'
 
+import type { QuoteItem } from '@/lib/types/quote'
+import { applyGlobalDeductionType } from '@/lib/quote-calculations'
+
 interface QuoteTotals {
   laborTotal: number
   materialTotal: number
@@ -27,6 +30,12 @@ interface QuoteEditTotalsSectionProps {
   hasRotItems: boolean
   hasRutItems: boolean
   formatCurrency: (n: number) => string
+  /** Punkt 5 (offert-feedback 2026-08-04): den globala Inget avdrag/ROT/RUT-
+      kontrollen körs direkt mot radlistan via applyGlobalDeductionType — EN
+      källa som "Mer → ROT-detaljer"-panelens toggle nu synkar mot istället
+      för en egen divergerande on/off-switch. */
+  items: QuoteItem[]
+  setItems: React.Dispatch<React.SetStateAction<QuoteItem[]>>
 }
 
 export function QuoteEditTotalsSection({
@@ -37,12 +46,56 @@ export function QuoteEditTotalsSection({
   hasRotItems,
   hasRutItems,
   formatCurrency,
+  items,
+  setItems,
 }: QuoteEditTotalsSectionProps) {
+  // Prioriterar ROT om båda skulle förekomma samtidigt (blandat läge från
+  // per-rad-badgens fria cykling) — samma prioritetsordning som
+  // getItemRotRutType redan använder (ROT kollas först).
+  const activeDeductionType: 'rot' | 'rut' | null = hasRotItems ? 'rot' : hasRutItems ? 'rut' : null
+
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6">
       <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-4">
         Summering <span className="normal-case font-medium text-slate-400">(exkl. moms)</span>
       </p>
+
+      {/* Avdrags-kontroll (punkt 5): tydlig, ETT klick — ersätter den tidigare
+          gömda vägen via "Mer → ROT-detaljer". */}
+      <div className="mb-4">
+        <p className="text-xs font-medium text-slate-500 mb-1.5">Avdrag</p>
+        <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+          {([
+            { type: null, label: 'Inget avdrag' },
+            { type: 'rot' as const, label: 'ROT' },
+            { type: 'rut' as const, label: 'RUT' },
+          ]).map(opt => {
+            const active = activeDeductionType === opt.type
+            return (
+              <button
+                key={opt.label}
+                type="button"
+                onClick={() => setItems(prev => applyGlobalDeductionType(prev, opt.type))}
+                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
+        {activeDeductionType === 'rot' && totals.rotDeduction > 0 && (
+          <p className="mt-2 text-sm font-semibold text-primary-700">
+            ROT-avdrag: −{formatCurrency(totals.rotDeduction)}
+          </p>
+        )}
+        {activeDeductionType === 'rut' && totals.rutDeduction > 0 && (
+          <p className="mt-2 text-sm font-semibold text-primary-700">
+            RUT-avdrag: −{formatCurrency(totals.rutDeduction)}
+          </p>
+        )}
+      </div>
 
       <div className="space-y-2">
         <Row label="Arbete" value={formatCurrency(totals.laborTotal)} />

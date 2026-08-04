@@ -36,7 +36,10 @@ export async function POST(request: NextRequest) {
 
     // Säkra fallback-fält som mallen förväntar sig
     if (!quote.created_at) quote.created_at = new Date().toISOString()
-    if (!quote.quote_number) quote.quote_number = quote.quote_number ?? 'PREVIEW'
+    // Kunden/hantverkaren ska ALDRIG se "PREVIEW" — ett osparat utkast visar
+    // "Utkast" tills servern tilldelar ett riktigt nummer vid spar
+    // (getNextQuoteNumber/generateQuoteNumber i /api/quotes, se route.ts).
+    if (!quote.quote_number) quote.quote_number = 'Utkast'
 
     // Hämta kund om customer_id finns men customer-objektet saknas
     if (body.customer_id && !quote.customer) {

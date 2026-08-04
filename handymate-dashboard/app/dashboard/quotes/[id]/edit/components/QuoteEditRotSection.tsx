@@ -2,7 +2,7 @@
 
 import { Sparkles } from 'lucide-react'
 import type { QuoteItem } from '@/lib/types/quote'
-import { applyGlobalRotToggle } from '@/lib/quote-calculations'
+import { applyGlobalDeductionType } from '@/lib/quote-calculations'
 
 interface QuoteEditRotSectionProps {
   items: QuoteItem[]
@@ -23,13 +23,16 @@ export function QuoteEditRotSection({
   fastighetsbeteckning,
   setFastighetsbeteckning,
 }: QuoteEditRotSectionProps) {
-  // ETAPP 1c-i (offert-masterplan.md): går nu via applyGlobalRotToggle
-  // (lib/quote-calculations) — F1:s enda källa för rot_rut_type/boolean-
-  // synk. Tidigare satte denna funktion bara is_rot_eligible direkt, vilket
-  // varken satte rot_rut_type eller nollställde is_rut_eligible → rader
-  // kunde bli både ROT och RUT samtidigt. RUT-rader rörs aldrig av denna toggle.
+  // Punkt 5 (offert-feedback 2026-08-04): denna switch var tidigare en EGEN
+  // on/off-toggle (applyGlobalRotToggle) som kunde divergera från
+  // Summeringens nya ROT/RUT-kontroll (QuoteEditTotalsSection) — två vägar
+  // till samma tillstånd som lätt tappade synk. Nu EN källa:
+  // applyGlobalDeductionType, samma funktion som Summeringens kontroll
+  // anropar. Switchen här slår av/på ROT specifikt (RUT rörs aldrig av
+  // DENNA switch, exakt som tidigare — panelen heter "ROT-avdrag" och visar
+  // bara ROT-fälten); RUT väljs via Summeringens kontroll.
   const toggle = () => {
-    setItems(prev => applyGlobalRotToggle(prev, !hasRotItems))
+    setItems(prev => applyGlobalDeductionType(prev, hasRotItems ? null : 'rot'))
   }
 
   return (

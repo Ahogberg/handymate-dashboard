@@ -7,7 +7,6 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
 import ProductSearchModal from '@/components/ProductSearchModal'
 import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
-import type { QuotePreviewData } from '@/components/quotes/QuotePreview'
 import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates/types'
 import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
 import { RowEditSheet } from '@/components/quotes/document/RowEditSheet'
@@ -244,11 +243,10 @@ export default function EditQuotePage() {
 
   // Preview
   const [showPreviewPanel, setShowPreviewPanel] = useState(true)
-  const [debouncedPreviewData, setDebouncedPreviewData] = useState<QuotePreviewData | null>(null)
-  // ETAPP 2c: edit-sidan får nu samma tre lägen som new (Live/Slutdesign/
-  // Kompakt) — QuoteDocument-motorn är stil-agnostisk för vilken sida som
-  // äger datan, se liveAvailable/quoteTemplateData nedan.
-  const [previewMode, setPreviewMode] = useState<'live' | 'design' | 'compact'>('live')
+  // ETAPP 2c: edit-sidan får nu samma två lägen som new (Live/Slutdesign) —
+  // QuoteDocument-motorn är stil-agnostisk för vilken sida som äger datan,
+  // se liveAvailable/quoteTemplateData nedan.
+  const [previewMode, setPreviewMode] = useState<'live' | 'design'>('live')
   // ETAPP 3 (offert-masterplan.md): id på raden vars RowEditSheet
   // (bottom-sheet-radeditorn) är öppen — se sheetItem/allCategories nedan.
   // AVVIKELSE (rapporterad): edit-sidan fick — till skillnad från new-sidan
@@ -366,39 +364,6 @@ export default function EditQuotePage() {
     setNewCategoryLabel('')
   }
 
-  // ─── Debounced preview data ──────────────────────────────────────
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const selectedCust = customers.find(c => c.customer_id === selectedCustomer)
-      setDebouncedPreviewData({
-        title,
-        customerName: selectedCust?.name || '',
-        customerAddress: selectedCust?.address_line || '',
-        validDays,
-        items: recalculated,
-        discountPercent,
-        vatRate,
-        description,
-        notIncluded,
-        ataTerms,
-        paymentPlan: calculatedPaymentPlan,
-        referencePerson,
-        customerReference,
-        projectAddress,
-        detailLevel,
-        showUnitPrices,
-        showQuantities,
-        customCategories: localCustomCategories,
-      })
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [
-    title, selectedCustomer, customers, validDays, recalculated, discountPercent, vatRate, description,
-    notIncluded, ataTerms, calculatedPaymentPlan,
-    referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices,
-    showQuantities, localCustomCategories,
-  ])
-
   // ETAPP 2c (offert-masterplan.md): EN preview-pipeline — samma mönster som
   // ETAPP 1a redan gav new-sidan. quoteTemplateData (→ QuoteDocument live-
   // canvas) och templatePreviewPayload (→ TemplatePreviewFrame/iframen)
@@ -445,10 +410,11 @@ export default function EditQuotePage() {
         reference: customerReference || null,
       },
       quote: {
-        number: quoteNumberRef.current || 'PREVIEW',
+        number: quoteNumberRef.current || 'Utkast',
         dealNumber: null,
         issuedDate: formatDate(new Date()),
         validUntilDate: formatDate(validUntil),
+        validUntilDateISO: validUntil.toISOString().split('T')[0],
         title: title || 'Offert',
         description: description || null,
         items: recalculated.map((i): QuoteTemplateItem => {
@@ -471,6 +437,8 @@ export default function EditQuotePage() {
           }
         }),
         subtotalExVat: totals.subtotal,
+        discountPercent,
+        discountAmount: totals.discountAmount,
         vatAmount: totals.vat,
         totalIncVat: totals.total,
         rotDeduction: totals.rotDeduction > 0 ? totals.rotDeduction : undefined,
@@ -549,6 +517,19 @@ export default function EditQuotePage() {
       onCustomerNameChange: undefined,
       onPaymentTermsChange: setPaymentTermsText,
       onTermsChange: setTermsText,
+      // Samma resonemang som new-sidan: dokumentet redigerar ett ABSOLUT
+      // datum, sidans state är "giltig i N dagar" — räknas om så fälten
+      // aldrig kan divergera.
+      onValidUntilChange: (isoDate: string) => {
+        const picked = new Date(isoDate + 'T00:00:00')
+        if (Number.isNaN(picked.getTime())) return
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const diffDays = Math.round((picked.getTime() - today.getTime()) / 86400000)
+        setValidDays(Math.max(0, diffDays))
+      },
+      onDiscountChange: setDiscountPercent,
+      onNotIncludedChange: setNotIncluded,
       onItemChange: (id, patch) => {
         if (patch.name !== undefined) updateItem(id, 'description', patch.name)
         if (patch.quantity !== undefined) updateItem(id, 'quantity', patch.quantity)
@@ -570,7 +551,10 @@ export default function EditQuotePage() {
         updateItem(id, 'option_selected', checked)
       },
     }),
-    [setTitle, setDescription, setPaymentTermsText, setTermsText, updateItem, addItem, removeItem, items],
+    [
+      setTitle, setDescription, setPaymentTermsText, setTermsText, setValidDays, setDiscountPercent,
+      setNotIncluded, updateItem, addItem, removeItem, items,
+    ],
   )
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1227,6 +1211,8 @@ export default function EditQuotePage() {
               hasRotItems={hasRotItems}
               hasRutItems={hasRutItems}
               formatCurrency={formatCurrency}
+              items={items}
+              setItems={setItems}
             />
           </div>
 
@@ -1242,9 +1228,6 @@ export default function EditQuotePage() {
               liveHandlers={liveHandlers}
               onRowTap={setSheetItemId}
               templatePreviewPayload={templatePreviewPayload}
-              debouncedPreviewData={debouncedPreviewData}
-              businessName={business.business_name}
-              contactName={business.contact_name}
             />
           </div>
         </div>
