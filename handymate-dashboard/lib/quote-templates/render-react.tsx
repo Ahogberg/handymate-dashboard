@@ -1,5 +1,15 @@
 /** @jsxImportSource react */
-import { renderToStaticMarkup } from 'react-dom/server'
+// HOTFIX 2026-08-04: Next 14 förbjuder modulnivå-import av
+// 'react-dom/server' i app-routern (webpack-fel som fällde ALLA
+// Vercel-deployer sedan E2a — tsc fångar det inte, bara next build).
+// Dokumenterad workaround: server.browser-builden exporterar samma
+// renderToStaticMarkup och fungerar i Node-runtime. Otypad subpath —
+// därav ts-ignore + lokal typning mot huvudmodulens signatur.
+// @ts-ignore -- react-dom/server.browser saknar typdeklarationer
+import { renderToStaticMarkup as renderToStaticMarkupUntyped } from 'react-dom/server.browser'
+import type { ReactElement } from 'react'
+
+const renderToStaticMarkup = renderToStaticMarkupUntyped as unknown as (element: ReactElement) => string
 import QuoteDocument from '@/components/quotes/document/QuoteDocument'
 import { escapeHtml } from '@/lib/document-html'
 import type { QuoteTemplateData } from './types'

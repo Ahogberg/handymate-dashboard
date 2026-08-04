@@ -3,6 +3,10 @@ import { getServerSupabase } from '@/lib/supabase'
 import { syncFortnoxPaymentsForBusiness } from '@/lib/fortnox/sync-payments'
 
 export const maxDuration = 300
+// Cron-route: får ALDRIG prerendras vid build (utan denna försöker Next
+// statiskt exportera GET:en, vilket exekverar handlern vid byggtillfället —
+// lokalt kastar den då på saknade env-vars, se build-loggen 2026-08-04).
+export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/cron/fortnox-sync
