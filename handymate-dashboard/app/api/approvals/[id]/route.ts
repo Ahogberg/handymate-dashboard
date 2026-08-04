@@ -6,6 +6,7 @@ import { recordLearningEvent } from '@/lib/agent/learning-engine'
 import { sendSmsViaElks } from '@/lib/sms-send'
 import { classifyExecutionResult } from '@/lib/approvals/execution-outcome'
 import { canActOnApproval } from '@/lib/approvals/routing'
+import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -980,17 +981,78 @@ async function executeApprovalPayload(
       case 'quote_addition': {
         // Audit-4 Fix DEF (2026-06-02): cookie-forwarding
         const pl = payload as any
+        const textDescription = pl.description || pl.job_description || pl.customer_reply_pending
         const res = await fetch(`${appUrl}/api/quotes/ai-generate`, {
           method: 'POST',
           headers: forwardHeaders(),
           body: JSON.stringify({
-            textDescription: pl.description || pl.job_description || pl.customer_reply_pending,
+            textDescription,
             customerId: pl.entity?.customerId,
             businessId,
           }),
         })
         const r = await classifyResponse(res)
-        return { action: 'create_quote_draft', ...r }
+        if (!r.ok) {
+          return { action: 'create_quote_draft', ...r }
+        }
+
+        // 2026-08-04 ("kritisk söm"-fixen): ai-generate returnerar bara ett
+        // GENERERAT offertobjekt — sparar ingenting. Utan denna persistering
+        // godkände hantverkaren kortet och INGET utkast skapades. Bygger nu
+        // strukturerade quote_items (samma semantik som klientens
+        // convertLegacyItems, se lib/quotes/generated-to-quote-items.ts) och
+        // POSTar till POST /api/quotes så offerten faktiskt sparas.
+        const generated = (r.metadata as any)?.quote
+        if (!generated) {
+          return { action: 'create_quote_draft', ok: false, error: 'AI-genereringen gav inget offertunderlag.' }
+        }
+
+        const quoteItems = generatedQuoteToQuoteItems(
+          generated.items,
+          generated.options,
+          generated.suggestedDeductionType,
+        )
+        if (quoteItems.length === 0) {
+          return { action: 'create_quote_draft', ok: false, error: 'AI-genereringen gav inga rader att spara.' }
+        }
+
+        const leadId = pl.lead_id || pl.entity?.leadId || undefined
+
+        const createRes = await fetch(`${appUrl}/api/quotes`, {
+          method: 'POST',
+          headers: forwardHeaders(),
+          body: JSON.stringify({
+            customer_id: pl.entity?.customerId || null,
+            title: generated.jobTitle || 'Offert',
+            description: generated.jobDescription || '',
+            quote_items: quoteItems,
+            rot_rut_type:
+              generated.suggestedDeductionType && generated.suggestedDeductionType !== 'none'
+                ? generated.suggestedDeductionType
+                : null,
+            ai_generated: true,
+            ai_confidence: generated.confidence ?? null,
+            source_transcript: textDescription || null,
+            ...(leadId ? { lead_id: leadId } : {}),
+            ...(pl.deal_id ? { deal_id: pl.deal_id } : {}),
+          }),
+        })
+        const createR = await classifyResponse(createRes)
+        if (!createR.ok) {
+          // Ai-generate lyckades men sparandet failade — misslyckande, aldrig
+          // en tyst success (godkännandet får inte se ut som att offerten
+          // skapades när den inte gjorde det).
+          return { action: 'create_quote_draft', ...createR }
+        }
+
+        const savedQuote = (createR.metadata as any)?.quote
+        return {
+          action: 'create_quote_draft',
+          ok: true,
+          quote_id: savedQuote?.quote_id,
+          quote_number: savedQuote?.quote_number,
+          total: savedQuote?.total,
+        }
       }
 
       case 'create_ata_draft': {
@@ -1006,7 +1068,95 @@ async function executeApprovalPayload(
           }),
         })
         const r = await classifyResponse(res)
-        return { action: 'create_ata_draft', ...r }
+        if (!r.ok) {
+          return { action: 'create_ata_draft', ...r }
+        }
+
+        // 2026-08-04 ("kritisk söm"-fixen): samma persistering som
+        // create_quote_draft ovan — ai-generate returnerar bara ett
+        // GENERERAT offertobjekt, sparar ingenting.
+        const generated = (r.metadata as any)?.quote
+        if (!generated) {
+          return { action: 'create_ata_draft', ok: false, error: 'AI-genereringen gav inget ÄTA-underlag.' }
+        }
+
+        const quoteItems = generatedQuoteToQuoteItems(
+          generated.items,
+          generated.options,
+          generated.suggestedDeductionType,
+        )
+        if (quoteItems.length === 0) {
+          return { action: 'create_ata_draft', ok: false, error: 'AI-genereringen gav inga rader att spara.' }
+        }
+
+        // KÄND BEGRÄNSNING (verifierad 2026-08-04, sql/projects.sql): quotes-
+        // tabellen har ingen project_id-kolumn — POST /api/quotes-kontraktet
+        // stödjer alltså ingen riktig koppling offert↔projekt. Bästa
+        // tillgängliga: slå upp projektets namn och skriv det i offertens
+        // beskrivning så sambandet syns för hantverkaren, och fall tillbaka
+        // på projektets kund om kortet saknar entity.customerId. Ingen rad i
+        // project_change skapas — hantverkaren måste fortfarande skapa den
+        // riktiga ÄTA:n (POST /api/ata) manuellt utifrån AI-förslaget.
+        let projectLabel = pl.project_id ? `projekt ${pl.project_id}` : null
+        let fallbackCustomerId: string | null = null
+        if (pl.project_id) {
+          try {
+            const supabasePr = await getSupabase()
+            const { data: project } = await supabasePr
+              .from('project')
+              .select('name, project_number, customer_id')
+              .eq('project_id', pl.project_id)
+              .eq('business_id', businessId)
+              .maybeSingle()
+            if (project) {
+              projectLabel = project.project_number
+                ? `${project.project_number} — ${project.name}`
+                : project.name || projectLabel
+              fallbackCustomerId = project.customer_id || null
+            }
+          } catch (projErr) {
+            console.error('[approvals] create_ata_draft: kunde inte slå upp projekt:', projErr)
+          }
+        }
+
+        const description = [
+          generated.jobDescription || '',
+          projectLabel ? `(ÄTA för ${projectLabel})` : null,
+        ]
+          .filter(Boolean)
+          .join('\n\n')
+
+        const createRes = await fetch(`${appUrl}/api/quotes`, {
+          method: 'POST',
+          headers: forwardHeaders(),
+          body: JSON.stringify({
+            customer_id: pl.entity?.customerId || fallbackCustomerId || null,
+            title: `ÄTA: ${generated.jobTitle || 'Tilläggsarbete'}`,
+            description,
+            quote_items: quoteItems,
+            rot_rut_type:
+              generated.suggestedDeductionType && generated.suggestedDeductionType !== 'none'
+                ? generated.suggestedDeductionType
+                : null,
+            ai_generated: true,
+            ai_confidence: generated.confidence ?? null,
+            source_transcript: pl.description || null,
+          }),
+        })
+        const createR = await classifyResponse(createRes)
+        if (!createR.ok) {
+          return { action: 'create_ata_draft', ...createR }
+        }
+
+        const savedQuote = (createR.metadata as any)?.quote
+        return {
+          action: 'create_ata_draft',
+          ok: true,
+          quote_id: savedQuote?.quote_id,
+          quote_number: savedQuote?.quote_number,
+          total: savedQuote?.total,
+          project_link_limitation: 'quotes saknar project_id — kopplingen är endast textuell i beskrivningen',
+        }
       }
 
       case 'send_matte_customer_reply': {

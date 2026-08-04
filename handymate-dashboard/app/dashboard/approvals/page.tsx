@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import {
   Bot,
   CheckCircle,
@@ -183,6 +184,11 @@ export default function ApprovalsPage() {
   const [rejectedActions, setRejectedActions] = useState<Record<string, Set<string>>>({})
   const [confirmModal, setConfirmModal] = useState<{ approval: Approval; editedPayload?: Record<string, unknown> } | null>(null)
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null)
+  // 2026-08-04 ("kritisk söm"-fixen): create_quote_draft/quote_addition/
+  // create_ata_draft skapar nu ett riktigt offertutkast vid godkännande
+  // (app/api/approvals/[id]/route.ts) — visa en direktlänk till det istället
+  // för bara "Godkänt", annars vet hantverkaren inte var utkastet hamnade.
+  const [feedbackLink, setFeedbackLink] = useState<string | null>(null)
 
   useEffect(() => {
     if (!business?.business_id) return
@@ -273,11 +279,17 @@ export default function ApprovalsPage() {
 
         // Visa feedback baserat på vad som hände
         if (action === 'approve') {
+          setFeedbackLink(null)
           if (approvedItem?.approval_type === 'quote_nudge') {
             setFeedbackMsg('Påminnelse noterad — ring kunden när du har möjlighet')
           } else {
             const exec = result?.execution
-            if (exec?.sms_sent) {
+            if (exec?.quote_id) {
+              setFeedbackMsg(
+                approvedItem?.approval_type === 'create_ata_draft' ? 'ÄTA-utkast skapat!' : 'Offertutkast skapat!',
+              )
+              setFeedbackLink(`/dashboard/quotes/${exec.quote_id}`)
+            } else if (exec?.sms_sent) {
               setFeedbackMsg('SMS skickat!')
             } else if (exec?.acknowledged) {
               setFeedbackMsg('Godkänt')
@@ -287,7 +299,12 @@ export default function ApprovalsPage() {
               setFeedbackMsg('Godkänt')
             }
           }
-          setTimeout(() => setFeedbackMsg(null), 4000)
+          // Länken (offertutkastet) får stå kvar längre — 4s räcker inte att
+          // hinna klicka, en enkel textbekräftelse gör.
+          setTimeout(() => {
+            setFeedbackMsg(null)
+            setFeedbackLink(null)
+          }, result?.execution?.quote_id ? 10000 : 4000)
         }
       }
     } finally {
@@ -373,8 +390,13 @@ export default function ApprovalsPage() {
             </div>
           </div>
           {feedbackMsg && (
-            <div className="px-4 py-2 bg-primary-50 border border-[#E2E8F0] rounded-lg text-sm text-primary-700 font-medium">
-              ✓ {feedbackMsg}
+            <div className="px-4 py-2 bg-primary-50 border border-[#E2E8F0] rounded-lg text-sm text-primary-700 font-medium flex items-center gap-2">
+              <span>✓ {feedbackMsg}</span>
+              {feedbackLink && (
+                <Link href={feedbackLink} className="underline hover:text-primary-900">
+                  Öppna utkastet
+                </Link>
+              )}
             </div>
           )}
           <button
