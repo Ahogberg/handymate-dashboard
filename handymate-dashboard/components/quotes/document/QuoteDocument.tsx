@@ -6,9 +6,9 @@ import { MODERN_DOCUMENT_CSS } from './modern-css'
 import { QuoteDocumentRow } from './QuoteDocumentRow'
 import { SignatureCta } from './SignatureCta'
 import { mixWithWhite } from './format'
-import type { QuoteDocumentHandlers, QuoteDocumentMode } from './types'
+import type { QuoteDocumentHandlers, QuoteDocumentMode, QuoteDocumentMobileProps } from './types'
 
-export type { QuoteDocumentHandlers, QuoteItemPatch, QuoteDocumentMode } from './types'
+export type { QuoteDocumentHandlers, QuoteItemPatch, QuoteDocumentMode, QuoteDocumentMobileProps } from './types'
 
 /**
  * EN redigerbar dokumentmotor (ETAPP 2a, offert-masterplan.md) som renderar
@@ -29,7 +29,7 @@ export type { QuoteDocumentHandlers, QuoteItemPatch, QuoteDocumentMode } from '.
  * Premium/Friendly: FÖRBERETT via `style`-prop men bara 'modern' är
  * implementerat i denna etapp — se offert-masterplan.md ETAPP 2a.
  */
-export interface QuoteDocumentProps {
+export interface QuoteDocumentProps extends QuoteDocumentMobileProps {
   data: QuoteTemplateData
   mode: QuoteDocumentMode
   /** Endast prep för E2a-scope — bara 'modern' renderar fullt idag. */
@@ -37,7 +37,7 @@ export interface QuoteDocumentProps {
   handlers?: QuoteDocumentHandlers
 }
 
-export default function QuoteDocument({ data, mode, handlers }: QuoteDocumentProps) {
+export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTap }: QuoteDocumentProps) {
   const accent = data.business.accentColor
   const accent50 = mixWithWhite(accent, 0.92)
   const accent100 = mixWithWhite(accent, 0.82)
@@ -169,6 +169,8 @@ export default function QuoteDocument({ data, mode, handlers }: QuoteDocumentPro
                 showPrice={showPrice}
                 colCount={colCount}
                 handlers={handlers}
+                sheetMode={sheetMode}
+                onTap={sheetMode && onRowTap && item.id ? () => onRowTap(item.id!) : undefined}
               />
             ))}
           </tbody>

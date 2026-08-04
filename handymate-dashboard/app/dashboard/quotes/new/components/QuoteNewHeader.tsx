@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Bookmark, Loader2, Send, Sparkles } from 'lucide-react'
 
@@ -31,6 +32,16 @@ interface QuoteNewHeaderProps {
  * Sticky header för ny offert. Visar AI-status (genererad, säkerhet,
  * foto-räknare, prisvarning) som badges + action-knappar (Skicka,
  * Spara utkast, Spara som mall). Backdrop-blur säkerställer läsbarhet.
+ *
+ * ETAPP 3 (offert-masterplan.md), punkt 4: under `sm` visades de tre
+ * AI-badgarna (aiGenerated/aiPriceWarning/aiPhotoCount) inline och kunde
+ * tillsammans med Tillbaka-länken + titeln + Spara/Skicka-knapparna
+ * wrappa headern till två rader (kartlagt vid uppstart av denna etapp).
+ * De tre badgarna slås nu ihop till EN kompakt `MobileInfoChip` under
+ * `sm` (samma information, bakom ett tryck) — vid `sm+` renderas de
+ * exakt som innan (`hidden sm:...`-varianterna). Spara utkast/Skicka
+ * offert kortas till korta etiketter under `sm` (samma knappar, samma
+ * handlers) så de alltid får plats — kravet var att de ALLTID ska synas.
  */
 export function QuoteNewHeader({
   aiGenerated,
@@ -50,20 +61,21 @@ export function QuoteNewHeader({
 }: QuoteNewHeaderProps) {
   return (
     <div className="sticky top-0 z-30 -mx-4 sm:-mx-6 mb-6 px-4 sm:px-6 py-3 bg-slate-50/95 backdrop-blur-md border-b border-slate-200">
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 flex-nowrap sm:flex-wrap">
         <Link
           href="/dashboard/quotes"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors shrink-0"
+          aria-label="Tillbaka till offertlistan"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Offerter
+          <span className="hidden sm:inline">Offerter</span>
         </Link>
-        <div className="h-4 w-px bg-slate-300" aria-hidden />
-        <h1 className="font-heading text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+        <div className="h-4 w-px bg-slate-300 shrink-0" aria-hidden />
+        <h1 className="font-heading text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">
           Ny offert
         </h1>
         {aiGenerated && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-primary-50 text-primary-700 border border-primary-100">
+          <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-primary-50 text-primary-700 border border-primary-100">
             <Sparkles className="w-3 h-3" />
             AI-genererad{aiConfidence ? ` · ${aiConfidence}%` : ''}
           </span>
@@ -71,7 +83,7 @@ export function QuoteNewHeader({
         {aiPriceWarning && (
           <a
             href={aiPriceWarning.link}
-            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100 transition-colors"
+            className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100 transition-colors"
           >
             {aiPriceWarning.message.length > 40
               ? 'Priser saknas — uppdatera prislista →'
@@ -79,10 +91,16 @@ export function QuoteNewHeader({
           </a>
         )}
         {aiPhotoCount > 1 && (
-          <span className="text-[11px] text-slate-400">Baserad på {aiPhotoCount} foton</span>
+          <span className="hidden sm:inline text-[11px] text-slate-400">Baserad på {aiPhotoCount} foton</span>
         )}
+        <MobileInfoChip
+          aiGenerated={aiGenerated}
+          aiConfidence={aiConfidence}
+          aiPriceWarning={aiPriceWarning}
+          aiPhotoCount={aiPhotoCount}
+        />
 
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
+        <div className="ml-auto flex items-center gap-2 flex-nowrap">
           {hasItems && (
             <button
               type="button"
@@ -97,19 +115,21 @@ export function QuoteNewHeader({
             type="button"
             onClick={onSaveDraft}
             disabled={saving}
-            className="px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors disabled:opacity-50"
+            className="px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 whitespace-nowrap"
           >
-            Spara utkast
+            <span className="hidden sm:inline">Spara utkast</span>
+            <span className="sm:hidden">Spara</span>
           </button>
           <div className="relative flex flex-col items-end gap-1">
             <button
               type="button"
               onClick={onSendQuote}
               disabled={saving || !canSend}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-700 hover:bg-primary-600 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-700 hover:bg-primary-600 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm whitespace-nowrap"
             >
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-              {saving ? 'Sparar…' : 'Skicka offert'}
+              <span className="hidden sm:inline">{saving ? 'Sparar…' : 'Skicka offert'}</span>
+              <span className="sm:hidden">{saving ? 'Sparar…' : 'Skicka'}</span>
             </button>
             {/* ETAPP 1f: disabled Skicka-knapp får alltid en synlig orsak
                 istället för ett tyst lås. */}
@@ -142,6 +162,67 @@ export function QuoteNewHeader({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * ETAPP 3 (offert-masterplan.md), punkt 4: samlar aiGenerated/aiPriceWarning/
+ * aiPhotoCount till EN liten tryckbar chip under `sm` (de tre fälten är
+ * `hidden sm:...` ovan — vid `sm+` renderas de precis som innan, den här
+ * komponenten är själv `sm:hidden` och tar aldrig plats där). Amber om det
+ * finns en prisvarning (viktigast), annars primary för ren AI-status.
+ */
+function MobileInfoChip({
+  aiGenerated,
+  aiConfidence,
+  aiPriceWarning,
+  aiPhotoCount,
+}: {
+  aiGenerated: boolean
+  aiConfidence: number | null
+  aiPriceWarning: { message: string; link: string } | null
+  aiPhotoCount: number
+}) {
+  const [open, setOpen] = useState(false)
+  const hasInfo = aiGenerated || !!aiPriceWarning || aiPhotoCount > 1
+  if (!hasInfo) return null
+
+  return (
+    <div className="relative sm:hidden shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-label="AI-information om offerten"
+        className={`inline-flex items-center justify-center min-w-[32px] min-h-[32px] rounded-full border transition-colors ${
+          aiPriceWarning
+            ? 'bg-amber-50 text-amber-700 border-amber-100'
+            : 'bg-primary-50 text-primary-700 border-primary-100'
+        }`}
+      >
+        <Sparkles className="w-3.5 h-3.5" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full mt-2 z-40 w-64 bg-white border border-slate-200 rounded-xl shadow-lg p-3 space-y-2">
+            {aiGenerated && (
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-primary-700">
+                <Sparkles className="w-3 h-3" />
+                AI-genererad{aiConfidence ? ` · ${aiConfidence}%` : ''}
+              </p>
+            )}
+            {aiPriceWarning && (
+              <a href={aiPriceWarning.link} className="block text-xs font-semibold text-amber-700">
+                {aiPriceWarning.message}
+              </a>
+            )}
+            {aiPhotoCount > 1 && (
+              <p className="text-xs text-slate-500">Baserad på {aiPhotoCount} foton</p>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }

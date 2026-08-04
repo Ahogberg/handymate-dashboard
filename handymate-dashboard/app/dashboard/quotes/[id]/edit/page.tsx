@@ -10,6 +10,7 @@ import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreview
 import type { QuotePreviewData } from '@/components/quotes/QuotePreview'
 import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates/types'
 import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
+import { RowEditSheet } from '@/components/quotes/document/RowEditSheet'
 import { supabase } from '@/lib/supabase'
 import {
   calculatePaymentPlan,
@@ -45,7 +46,6 @@ import { QuoteEditDisplaySettingsSection } from './components/QuoteEditDisplaySe
 import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
 import { QuoteEditTotalsSection } from './components/QuoteEditTotalsSection'
 import { QuoteEditSaveTemplateModal } from './components/QuoteEditSaveTemplateModal'
-import { QuoteEditMobilePreviewModal } from './components/QuoteEditMobilePreviewModal'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -244,12 +244,23 @@ export default function EditQuotePage() {
 
   // Preview
   const [showPreviewPanel, setShowPreviewPanel] = useState(true)
-  const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [debouncedPreviewData, setDebouncedPreviewData] = useState<QuotePreviewData | null>(null)
   // ETAPP 2c: edit-sidan får nu samma tre lägen som new (Live/Slutdesign/
   // Kompakt) — QuoteDocument-motorn är stil-agnostisk för vilken sida som
   // äger datan, se liveAvailable/quoteTemplateData nedan.
   const [previewMode, setPreviewMode] = useState<'live' | 'design' | 'compact'>('live')
+  // ETAPP 3 (offert-masterplan.md): id på raden vars RowEditSheet
+  // (bottom-sheet-radeditorn) är öppen — se sheetItem/allCategories nedan.
+  // AVVIKELSE (rapporterad): edit-sidan fick — till skillnad från new-sidan
+  // — ALDRIG E2b:s assistentkolumn/"Mer"-verktygsrad/mainView-växel (bara
+  // E2c:s delade datakomponenter landade här). Att bygga om hela
+  // formulärstacken till canvas-first-layouten är E2b-arbete, inte E3
+  // (mobilen) — ingen mainView-växel läggs till här. QuotePreviewPanel (nu
+  // synlig i alla brytpunkter istället för `hidden lg:flex`) är fortfarande
+  // sista elementet i formulärflödet på mobil, precis som innan E3 — canvasen
+  // är nu NÅBAR och REDIGERBAR där (sheet-radeditor + skalning), men inte
+  // "primär yta överst" som på new-sidan. Se rapporten för rekommendation.
+  const [sheetItemId, setSheetItemId] = useState<string | null>(null)
 
   // ─── Shared hooks ──────────────────────────────────────────────────
   const { products, customCategories, hydrated: priceListHydrated } = usePriceListLookup(business.business_id)
@@ -262,6 +273,12 @@ export default function EditQuotePage() {
   }, [priceListHydrated, customCategories])
 
   const allCategories = useMemo(() => getAllCategories(localCustomCategories), [localCustomCategories])
+
+  // ETAPP 3: raden RowEditSheet visar — se new/page.tsx för samma mönster.
+  const sheetItem = useMemo(
+    () => items.find(i => i.id === sheetItemId) ?? null,
+    [items, sheetItemId],
+  )
 
   const vatRate = pricingSettings?.vat_rate ?? 25
   const { recalculated, totals, calculatedPaymentPlan, paymentPlanValid } = useQuoteCalculations(
@@ -1223,6 +1240,7 @@ export default function EditQuotePage() {
               liveEnabled={liveAvailable}
               liveTemplateData={quoteTemplateData}
               liveHandlers={liveHandlers}
+              onRowTap={setSheetItemId}
               templatePreviewPayload={templatePreviewPayload}
               debouncedPreviewData={debouncedPreviewData}
               businessName={business.business_name}
@@ -1232,13 +1250,14 @@ export default function EditQuotePage() {
         </div>
       </div>
 
-      {/* Mobile preview button + modal */}
-      <QuoteEditMobilePreviewModal
-        open={showPreviewModal}
-        setOpen={setShowPreviewModal}
-        data={debouncedPreviewData}
-        businessName={business.business_name}
-        contactName={business.contact_name}
+      {/* ETAPP 3: bottom-sheet-radeditorn (mobil) — se sheetItem/sheetItemId
+          ovan. Ersätter QuoteEditMobilePreviewModal/FAB:en (borttagen). */}
+      <RowEditSheet
+        item={sheetItem}
+        allCategories={allCategories}
+        onUpdate={updateItem}
+        onRemove={removeItem}
+        onClose={() => setSheetItemId(null)}
       />
 
       {/* Modals */}

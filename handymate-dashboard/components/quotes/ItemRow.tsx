@@ -164,15 +164,20 @@ export default function ItemRow({
     >
 
       {/* ── Mobile layout (< md) ─────────────────────────────── */}
+      {/* ETAPP 3 (offert-masterplan.md), punkt 3: alla träffytor ≥44px
+          (drag-handtaget ≥40px per plan-ordalydelsen) — dagens ~30px-fält
+          (w-14/w-16/w-20, text-xs py-1.5) var precis vad kartläggningen
+          flaggade. Fälten bytte inte bredd (samma rad-layout), bara höjd/
+          textstorlek/knapparnas tappyta. */}
       <div className="md:hidden p-3 space-y-2">
         {/* Row 1: Description */}
         <div className="flex items-center gap-2">
           <button
             {...attributes}
             {...listeners}
-            className="cursor-grab active:cursor-grabbing p-0.5 text-gray-300 touch-none shrink-0"
+            className="cursor-grab active:cursor-grabbing min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-300 touch-none shrink-0"
           >
-            <GripVertical className="w-4 h-4" />
+            <GripVertical className="w-5 h-5" />
           </button>
           {badge && (
             <span className={`shrink-0 px-1.5 py-0.5 text-[9px] rounded font-semibold uppercase tracking-wider ${badge.cls}`}>
@@ -185,7 +190,7 @@ export default function ItemRow({
               onChangeText={text => onUpdate(item.id, 'description', text)}
               onSelectProduct={product => onSelectProduct!(item.id, product)}
               placeholder="Beskrivning eller sök produkt…"
-              inputClassName="w-full min-w-0 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
+              inputClassName="w-full min-w-0 min-h-[44px] px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600"
             />
           ) : (
             <input
@@ -193,7 +198,7 @@ export default function ItemRow({
               value={item.description}
               onChange={(e) => onUpdate(item.id, 'description', e.target.value)}
               placeholder={item.item_type === 'heading' ? 'Rubriktext' : item.item_type === 'text' ? 'Fritext...' : 'Beskrivning'}
-              className={`flex-1 min-w-0 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 ${
+              className={`flex-1 min-w-0 min-h-[44px] px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 ${
                 item.item_type === 'heading' ? 'font-bold' : ''} ${item.item_type === 'text' ? 'italic' : ''}`}
             />
           )}
@@ -203,21 +208,25 @@ export default function ItemRow({
               onClick={() => onSaveToProducts!(item)}
               aria-label={isSavedToProducts ? 'Sparad i produktbanken' : 'Spara i produktbanken'}
               title={isSavedToProducts ? 'Sparad i produktbanken' : 'Spara i produktbanken'}
-              className={`p-1 shrink-0 transition-colors ${
+              className={`min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 transition-colors ${
                 isSavedToProducts
                   ? 'text-primary-700'
                   : 'text-slate-300 hover:text-primary-700'
               }`}
             >
               {isSavedToProducts ? (
-                <BookmarkCheck className="w-3.5 h-3.5" />
+                <BookmarkCheck className="w-4 h-4" />
               ) : (
-                <Bookmark className="w-3.5 h-3.5" />
+                <Bookmark className="w-4 h-4" />
               )}
             </button>
           )}
-          <button onClick={() => onRemove(item.id)} className="p-1 text-gray-300 hover:text-red-500 shrink-0">
-            <Trash2 className="w-3.5 h-3.5" />
+          <button
+            onClick={() => onRemove(item.id)}
+            aria-label="Ta bort rad"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-300 hover:text-red-500 shrink-0"
+          >
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
 
@@ -226,24 +235,23 @@ export default function ItemRow({
           <div className="flex items-center gap-1.5">
             <input type="number" value={item.quantity} onChange={(e) => onUpdate(item.id, 'quantity', parseFloat(e.target.value) || 0)}
               onFocus={(e) => e.target.select()}
-              className="w-14 px-1.5 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-600" min={0} step="any" />
+              className="w-14 min-h-[44px] px-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary-600" min={0} step="any" />
             <select value={item.unit} onChange={(e) => onUpdate(item.id, 'unit', e.target.value)}
-              className="w-16 px-1 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-primary-600">
+              className="w-16 min-h-[44px] px-1 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600">
               {UNIT_OPTIONS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
             </select>
             <input type="number" value={item.unit_price} onChange={(e) => onUpdate(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
               onFocus={(e) => e.target.select()}
               title={priceMissingStyle ? 'AI hittade inget pris i produktbanken — fyll i manuellt' : undefined}
-              className={`w-20 px-1.5 py-1.5 border rounded-lg text-gray-900 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary-600 ${
+              className={`w-20 min-h-[44px] px-1.5 border rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-1 focus:ring-primary-600 ${
                 priceMissingStyle ? 'bg-amber-50 border-amber-300 ring-1 ring-amber-300' : 'bg-white border-gray-200'
               }`} min={0} step="any" />
             <span className="flex-1 text-right text-xs font-medium text-gray-900 whitespace-nowrap">{formatCurrency(displayTotal)}</span>
           </div>
         )}
-        {/* Row 2b: Kategori + ROT/RUT — ETAPP 1c-ii (offert-masterplan.md):
-            fanns tidigare bara i desktop-gridden, saknades helt i
-            mobilstacken. ≥40px träffyta (min-h-[40px]) — hantverkaren
-            använder mobilen på bygget. */}
+        {/* Row 2b: Kategori + ROT/RUT — ETAPP 1c-ii gav 40px, ETAPP 3
+            (offert-masterplan.md) skärper till ≥44px (samma krav som
+            resten av mobilfälten). */}
         {isEditable && (
           <div className="grid grid-cols-2 gap-1.5">
             <CategorySelect
@@ -261,7 +269,7 @@ export default function ItemRow({
             <select
               value={item.rot_rut_type || (item.is_rot_eligible ? 'rot' : item.is_rut_eligible ? 'rut' : '')}
               onChange={(e) => onUpdate(item.id, 'rot_rut_type', e.target.value || null)}
-              className="w-full min-h-[40px] text-sm border border-gray-300 rounded-lg px-2 py-2.5 text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 cursor-pointer"
+              className="w-full min-h-[44px] text-sm border border-gray-300 rounded-lg px-2 py-2.5 text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 cursor-pointer"
             >
               <option value="">ROT/RUT —</option><option value="rot">ROT</option><option value="rut">RUT</option>
               <optgroup label="Grön teknik">
@@ -273,12 +281,12 @@ export default function ItemRow({
           </div>
         )}
         {showSaveToProductsNudge && (
-          <label className="flex items-center gap-1.5 w-fit cursor-pointer select-none pl-6">
+          <label className="flex items-center gap-1.5 min-h-[44px] w-fit cursor-pointer select-none pl-6">
             <input
               type="checkbox"
               checked={item.save_to_products ?? true}
               onChange={(e) => onUpdate(item.id, 'save_to_products', e.target.checked)}
-              className="w-3.5 h-3.5 rounded border-gray-300 accent-primary-700 cursor-pointer"
+              className="w-4 h-4 rounded border-gray-300 accent-primary-700 cursor-pointer"
             />
             <span className="text-xs font-medium text-primary-700">Spara i produktbanken</span>
           </label>
@@ -289,12 +297,12 @@ export default function ItemRow({
 
         {/* Row 3: Förvald — endast tillvalsrader */}
         {isOption && (
-          <label className="flex items-center gap-1.5 w-fit cursor-pointer select-none">
+          <label className="flex items-center gap-1.5 min-h-[44px] w-fit cursor-pointer select-none">
             <input
               type="checkbox"
               checked={item.option_default ?? false}
               onChange={(e) => toggleOptionDefault(e.target.checked)}
-              className="w-3.5 h-3.5 rounded border-gray-300 accent-teal-600 cursor-pointer"
+              className="w-4 h-4 rounded border-gray-300 accent-teal-600 cursor-pointer"
             />
             <span className="text-xs font-medium text-teal-700">Förvald</span>
           </label>
@@ -480,11 +488,12 @@ function CategorySelect({
   newCategoryLabel?: string
   setNewCategoryLabel?: (label: string) => void
   /** Desktop-gridden (default true) håller sig till den kompakta text-xs/
-      py-1.5-storleken. Mobilstacken (ETAPP 1c-ii) sätter false för en
-      ≥40px träffyta — samma val, samma handlers, bara större yta. */
+      py-1.5-storleken. Mobilstacken (ETAPP 1c-ii, skärpt till ≥44px i
+      ETAPP 3) sätter false för en större träffyta — samma val, samma
+      handlers, bara större yta. */
   compact?: boolean
 }) {
-  const sizeCls = compact ? 'px-1.5 py-1.5 text-xs' : 'px-3 py-2.5 text-sm min-h-[40px]'
+  const sizeCls = compact ? 'px-1.5 py-1.5 text-xs' : 'px-3 py-2.5 text-sm min-h-[44px]'
 
   if (isCreatingCategory && onCreateCategory && setShowNewCategoryInput && setNewCategoryLabel) {
     return (

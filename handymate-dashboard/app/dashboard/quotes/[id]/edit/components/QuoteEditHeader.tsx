@@ -27,10 +27,10 @@ export function QuoteEditHeader({
 }: QuoteEditHeaderProps) {
   return (
     <header className="sticky top-0 z-30 -mx-4 sm:-mx-6 mb-6 px-4 sm:px-6 py-3 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200">
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 flex-nowrap sm:flex-wrap">
         <Link
           href="/dashboard/quotes"
-          className="p-2 -ml-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+          className="p-2 -ml-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors shrink-0"
           aria-label="Tillbaka till offertlistan"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -40,15 +40,17 @@ export function QuoteEditHeader({
             Redigerar offert
           </h1>
           {quoteNumber && (
-            <span className="text-xs font-medium text-slate-500 font-mono">{quoteNumber}</span>
+            <span className="hidden sm:inline text-xs font-medium text-slate-500 font-mono">{quoteNumber}</span>
           )}
         </div>
 
         {/* Auto-save indicator */}
         <AutoSaveIndicator status={autoSaveStatus} />
 
-        {/* Action buttons — sticky CTAs i headern */}
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
+        {/* Action buttons — sticky CTAs i headern. ETAPP 3 (offert-
+            masterplan.md): korta etiketter under sm — Spara/Skicka ska
+            ALLTID synas, samma knappar/handlers. */}
+        <div className="ml-auto flex items-center gap-2 flex-nowrap">
           {hasItems && (
             <button
               type="button"
@@ -63,18 +65,20 @@ export function QuoteEditHeader({
             type="button"
             onClick={onSaveDraft}
             disabled={saving}
-            className="px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors disabled:opacity-50"
+            className="px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 whitespace-nowrap"
           >
-            Spara utkast
+            <span className="hidden sm:inline">Spara utkast</span>
+            <span className="sm:hidden">Spara</span>
           </button>
           <button
             type="button"
             onClick={onSendQuote}
             disabled={saving || !canSend}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-700 hover:bg-primary-600 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-700 hover:bg-primary-600 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm whitespace-nowrap"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-            {saving ? 'Sparar…' : 'Skicka offert'}
+            <span className="hidden sm:inline">{saving ? 'Sparar…' : 'Skicka offert'}</span>
+            <span className="sm:hidden">{saving ? 'Sparar…' : 'Skicka'}</span>
           </button>
         </div>
       </div>

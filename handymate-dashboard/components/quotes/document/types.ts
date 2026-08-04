@@ -40,3 +40,19 @@ export interface QuoteDocumentHandlers {
       BÅDA option_default och option_selected (samma regel som ItemRow). */
   onOptionDefaultToggle: (id: string, checked: boolean) => void
 }
+
+/**
+ * ETAPP 3 (offert-masterplan.md): mobilens radredigering. I A4-skala blir
+ * EditableText/EditableNumber-fälten för små för touch (dagens 30px-inputs
+ * var precis det kartläggningen flaggade) — sheetMode stänger AV inline-
+ * redigeringen av radens värdefält (namn/antal/enhet/à-pris/ROT-cykel/
+ * Förvald-toggle visas som ren text) och gör HELA raden tappbar istället.
+ * `onRowTap` är en separat prop (inte en del av QuoteDocumentHandlers) för
+ * att handlers-typen ska förbli en ren datamutations-kontrakt — detta är en
+ * UI-navigeringsangelägenhet (öppna bottom-sheet), inte en datamutation.
+ * Ta bort-knappen (DeleteButton) fungerar oförändrat i båda lägena.
+ */
+export interface QuoteDocumentMobileProps {
+  sheetMode?: boolean
+  onRowTap?: (itemId: string) => void
+}

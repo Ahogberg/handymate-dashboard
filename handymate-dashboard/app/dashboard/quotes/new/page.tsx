@@ -11,6 +11,7 @@ import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreview
 import type { QuotePreviewData } from '@/components/quotes/QuotePreview'
 import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates/types'
 import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
+import { RowEditSheet } from '@/components/quotes/document/RowEditSheet'
 import {
   generateItemId, recalculateItems, setItemRotRut, legacyItemRotRutType, applyOptionRowDefaults,
   getItemRotRutType,
@@ -40,7 +41,6 @@ import { QuoteEditStandardTextsSection } from '../[id]/edit/components/QuoteEdit
 import { QuoteEditPaymentPlanSection } from '../[id]/edit/components/QuoteEditPaymentPlanSection'
 import { QuoteEditDisplaySettingsSection } from '../[id]/edit/components/QuoteEditDisplaySettingsSection'
 import { QuoteEditTotalsSection } from '../[id]/edit/components/QuoteEditTotalsSection'
-import { QuoteEditMobilePreviewModal } from '../[id]/edit/components/QuoteEditMobilePreviewModal'
 import { QuoteEditSaveTemplateModal } from '../[id]/edit/components/QuoteEditSaveTemplateModal'
 
 import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
@@ -327,8 +327,13 @@ export default function NewQuotePage() {
 
   // Preview
   const [showPreviewPanel, setShowPreviewPanel] = useState(true)
-  const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [previewMode, setPreviewMode] = useState<'live' | 'design' | 'compact'>('live')
+  // ETAPP 3 (offert-masterplan.md): id på raden vars RowEditSheet (bottom-
+  // sheet-radeditorn) är öppen — satt av QuotePreviewPanels onRowTap när
+  // hantverkaren trycker på en rad i canvasen under lg. Ersätter
+  // QuoteEditMobilePreviewModal/FAB:en (borttagen) — dokumentet syns nu
+  // direkt i huvudytan på mobil istället för bakom en separat modal-knapp.
+  const [sheetItemId, setSheetItemId] = useState<string | null>(null)
 
   // ETAPP 2b (offert-masterplan.md): canvas-first-layouten. `activePanel`
   // styr "Mer"-verktygsraden ovanför dokumentet — en sektion synlig i taget,
@@ -365,6 +370,14 @@ export default function NewQuotePage() {
   const allCategories = useMemo(
     () => getAllCategories(localCustomCategories),
     [localCustomCategories],
+  )
+
+  // ETAPP 3: raden RowEditSheet visar — härledd (inte egen kopia) så
+  // sheeten alltid speglar senaste values medan hantverkaren redigerar,
+  // och stängs automatiskt om raden tas bort (items.find → undefined).
+  const sheetItem = useMemo(
+    () => items.find(i => i.id === sheetItemId) ?? null,
+    [items, sheetItemId],
   )
 
   const vatRate = pricingSettings?.vat_rate ?? 25
@@ -1908,6 +1921,7 @@ export default function NewQuotePage() {
                   liveEnabled={liveAvailable}
                   liveTemplateData={quoteTemplateData}
                   liveHandlers={liveHandlers}
+                  onRowTap={setSheetItemId}
                   templatePreviewPayload={templatePreviewPayload}
                   debouncedPreviewData={debouncedPreviewData}
                   businessName={business.business_name}
@@ -1919,13 +1933,17 @@ export default function NewQuotePage() {
         </div>
       </div>
 
-      {/* Mobile preview button + modal */}
-      <QuoteEditMobilePreviewModal
-        open={showPreviewModal}
-        setOpen={setShowPreviewModal}
-        data={debouncedPreviewData}
-        businessName={business.business_name}
-        contactName={business.contact_name}
+      {/* ETAPP 3: bottom-sheet-radeditorn (mobil) — se sheetItem/sheetItemId
+          ovan. Ersätter QuoteEditMobilePreviewModal/FAB:en (borttagen):
+          dokumentet syns nu direkt i huvudytan på mobil (QuotePreviewPanel
+          är inte längre `hidden lg:flex`) istället för bakom en separat
+          modal-knapp. */}
+      <RowEditSheet
+        item={sheetItem}
+        allCategories={allCategories}
+        onUpdate={updateItem}
+        onRemove={removeItem}
+        onClose={() => setSheetItemId(null)}
       />
 
       {/* Grossist search modal */}

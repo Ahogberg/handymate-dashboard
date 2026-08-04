@@ -5,6 +5,8 @@ import { ChevronDown, Eye, Loader2, Maximize2, X } from 'lucide-react'
 import QuotePreview, { type QuotePreviewData } from '@/components/quotes/QuotePreview'
 import TemplatePreviewFrame, { type TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import QuoteDocument, { type QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
+import { DocumentScaler } from '@/components/quotes/document/DocumentScaler'
+import { useIsMobileViewport } from '@/components/quotes/document/useIsMobileViewport'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
 
 type PreviewMode = 'live' | 'design' | 'compact'
@@ -22,6 +24,12 @@ interface QuotePreviewPanelProps {
   liveEnabled: boolean
   liveTemplateData?: QuoteTemplateData
   liveHandlers?: QuoteDocumentHandlers
+  /** ETAPP 3 (offert-masterplan.md): tryck på en rad i canvasen UNDER lg
+      (sheetMode sätts automatiskt här utifrån viewport-bredden, se
+      useIsMobileViewport) — sidan (new/edit) öppnar sin RowEditSheet med
+      raden. Krävs bara för Live-fliken; utelämnad → sheetMode blir aldrig
+      aktivt (QuoteDocument faller tillbaka till vanlig inline-redigering). */
+  onRowTap?: (itemId: string) => void
   templatePreviewPayload: TemplatePreviewPayload
   debouncedPreviewData: QuotePreviewData | null
   businessName?: string
@@ -43,6 +51,7 @@ export function QuotePreviewPanel({
   liveEnabled,
   liveTemplateData,
   liveHandlers,
+  onRowTap,
   templatePreviewPayload,
   debouncedPreviewData,
   businessName,
@@ -50,13 +59,25 @@ export function QuotePreviewPanel({
 }: QuotePreviewPanelProps) {
   const [fullscreen, setFullscreen] = useState(false)
   const [previewPending, setPreviewPending] = useState(false)
+  // ETAPP 3: samma brytpunkt som DocumentScaler — under lg stängs radernas
+  // inline-fält av till förmån för RowEditSheet (30px-fält klarar inte
+  // 44px-kravet i A4-skala, se offert-masterplan.md).
+  const isMobile = useIsMobileViewport()
 
   function renderPreviewBody(flexFill: boolean) {
     const sizeCls = flexFill ? 'flex-1 min-h-0' : 'h-full'
     if (previewMode === 'live' && liveEnabled && liveTemplateData && liveHandlers) {
       return (
         <div className={`bg-slate-50 rounded-xl overflow-auto border border-slate-200 ${sizeCls} p-4`}>
-          <QuoteDocument data={liveTemplateData} mode="edit" handlers={liveHandlers} />
+          <DocumentScaler>
+            <QuoteDocument
+              data={liveTemplateData}
+              mode="edit"
+              handlers={liveHandlers}
+              sheetMode={isMobile}
+              onRowTap={onRowTap}
+            />
+          </DocumentScaler>
         </div>
       )
     }
@@ -84,7 +105,12 @@ export function QuotePreviewPanel({
 
   return (
     <>
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden hidden lg:flex lg:flex-col h-full">
+      {/* ETAPP 3 (offert-masterplan.md): panelen var tidigare `hidden lg:flex`
+          — dokumentet syntes ALDRIG i huvudytan under lg (bara FAB:ens
+          statiska, oredigerbara modal). "Dokumentet ÄR gränssnittet" gäller
+          mobilen lika mycket som desktop — panelen är nu synlig i alla
+          brytpunkter, oförändrad vid lg+. */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col h-full">
         <div className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50/50 transition-colors">
           <button
             type="button"

@@ -28,3 +28,23 @@ export function mixWithWhite(hex: string, whitePct: number): string {
   const mix = (c: number) => Math.round(c + (255 - c) * whitePct)
   return `#${mix(r).toString(16).padStart(2, '0')}${mix(g).toString(16).padStart(2, '0')}${mix(b).toString(16).padStart(2, '0')}`
 }
+
+/** 210mm i px vid 96dpi (96/25.4*210) — samma bredd som modern-css.ts:s
+    `.quote-document .page { width: 210mm }`. ETAPP 3 (offert-masterplan.md):
+    DocumentScaler.tsx skalar mobilcanvasen mot denna bredd. */
+export const A4_WIDTH_PX = (96 / 25.4) * 210
+
+/**
+ * Ren skalberäkning (facit-testad, tests/facit-document-scale.spec.ts):
+ * hur mycket ett `contentWidthPx`-brett dokument måste skalas ned för att
+ * få plats i en `containerWidthPx`-bred container — ALDRIG uppskalat
+ * (max 1, "läsbarhet före pixelperfektion" — vi förstorar aldrig dokumentet
+ * bara för att containern råkar vara bredare än A4). Ogiltig/saknad
+ * containerbredd (0, negativ, NaN — t.ex. innan layout mätts) → 1 (ingen
+ * skalning) så anroparen aldrig krymper till ett sönderräknat värde.
+ */
+export function computeFitScale(containerWidthPx: number, contentWidthPx: number = A4_WIDTH_PX): number {
+  if (!Number.isFinite(containerWidthPx) || containerWidthPx <= 0) return 1
+  if (!Number.isFinite(contentWidthPx) || contentWidthPx <= 0) return 1
+  return Math.min(1, containerWidthPx / contentWidthPx)
+}

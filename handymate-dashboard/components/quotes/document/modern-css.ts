@@ -111,4 +111,11 @@ export const MODERN_DOCUMENT_CSS = `
 .quote-document .row-action button { background: transparent; border: none; cursor: pointer; padding: 2px 4px; color: #94a3b8; font-size: 14px; line-height: 1; }
 .quote-document .row-action button:hover { color: #ef4444; }
 .quote-document .opt-toggle { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 500; color: var(--qd-accent); cursor: pointer; user-select: none; }
+/* ETAPP 3 (offert-masterplan.md): sheetMode — hela raden är tappbar (öppnar
+   RowEditSheet). .row-action (Ta bort-×) döljs annars bara vid :hover, som
+   ALDRIG triggas på touch — måste vara synlig här så knappen går att träffa. */
+.quote-document tbody tr.row-tap { cursor: pointer; }
+.quote-document tbody tr.row-tap:active { background: rgba(15, 118, 110, 0.08) !important; }
+.quote-document tbody tr.row-tap .row-action { opacity: 1; }
+.quote-document tbody tr.row-tap .row-action button { padding: 8px; font-size: 15px; }
 `
