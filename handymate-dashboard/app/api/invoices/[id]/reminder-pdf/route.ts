@@ -4,10 +4,27 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { generateOCR } from '@/lib/ocr'
 import { generateSwishQR } from '@/lib/swish-qr'
 import { buildInvoiceTemplateData, selectInvoiceTemplate } from '@/lib/invoice-templates'
+import { buildInvoicePdfBuffer } from '@/lib/invoices/build-invoice-pdf'
+
+// Chromium-rendering (format=pdf-grenen, ETAPP 6b) kräver Node-runtime och
+// en generösare timeout — samma mönster som quotes/pdf och invoices/pdf.
+export const runtime = 'nodejs'
+export const maxDuration = 30
 
 /**
- * GET - Generate reminder PDF (HTML preview) for an overdue invoice
- * Shows original amount, reminder fee, penalty interest, and new total
+ * GET - Generate reminder PDF (HTML preview, default) eller riktig binär
+ * PDF (?format=pdf, ETAPP 6b) för en försenad faktura. Visar ursprungligt
+ * belopp, påminnelseavgift, dröjsmålsränta och nytt totalbelopp.
+ *
+ * HTML-läget (default) BEHÅLLS OFÖRÄNDRAT — det är vad
+ * app/dashboard/invoices/[id]/page.tsx ("Visa påminnelse-PDF"-länken,
+ * target="_blank") faktiskt använder idag.
+ *
+ * format=pdf har INGEN jsPDF-fallback (medvetet val, ETAPP 6b): jsPDF-
+ * generatorn (lib/pdf-generator.ts) saknar helt stöd för dröjsmålsränta/
+ * påminnelseavgift-rader — den kan alltså inte producera en KORREKT
+ * påminnelse-PDF. Hellre ett tydligt fel än en felaktig PDF som saknar
+ * avgifterna kunden faktiskt ska betala.
  */
 export async function GET(
   request: NextRequest,
@@ -75,6 +92,32 @@ export async function GET(
       tmp.invoice.amountToPay,
       invoice.invoice_number,
     )
+
+    // format=pdf (ETAPP 6b): riktig binär PDF via samma delade helper som
+    // invoices/pdf och invoices/send — swishQrOverride skickas in eftersom
+    // beloppet för en påminnelse (inkl. dröjsmålsränta + avgift) redan är
+    // uträknat ovan (tvåstegs-beräkningen som HTML-läget alltid gjort).
+    const format = request.nextUrl.searchParams.get('format') || 'html'
+    if (format === 'pdf') {
+      const pdfBuffer = await buildInvoicePdfBuffer(invoice, config, {
+        swishQrOverride: swishQR,
+        logTag: 'invoices/reminder-pdf',
+      })
+      if (!pdfBuffer) {
+        // Medvetet ingen jsPDF-fallback — se filens header-kommentar.
+        console.error('[invoices/reminder-pdf] Chromium-rendering misslyckades — ingen jsPDF-fallback finns för påminnelser (saknar ränte-/avgiftsstöd)')
+        return NextResponse.json(
+          { error: 'Kunde inte generera påminnelse-PDF just nu. Försök igen om en stund.' },
+          { status: 502 },
+        )
+      }
+      return new NextResponse(pdfBuffer, {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `inline; filename="paminnelse-${invoice.invoice_number}.pdf"`,
+        },
+      })
+    }
 
     const templateData = buildInvoiceTemplateData(invoice, config, swishQR)
     const renderFn = selectInvoiceTemplate(config?.quote_template_style)

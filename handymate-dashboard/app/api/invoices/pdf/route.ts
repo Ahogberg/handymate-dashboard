@@ -8,7 +8,13 @@ import {
   buildInvoiceTemplateData,
   selectInvoiceTemplate,
 } from '@/lib/invoice-templates'
+import { buildInvoicePdfBuffer } from '@/lib/invoices/build-invoice-pdf'
 
+// Chromium-rendering kräver Node-runtime (inte Edge) och tål kallstart —
+// @sparticuz/chromium packar upp binären vid första anropet. Samma mönster
+// som quotes/pdf (ETAPP 6b, offert-masterplan.md).
+export const runtime = 'nodejs'
+export const maxDuration = 30
 export const dynamic = 'force-dynamic'
 
 /**
@@ -67,6 +73,31 @@ export async function GET(request: NextRequest) {
 
     // Binary PDF
     if (format === 'pdf') {
+      // ── Primär väg (ETAPP 6b, offert-masterplan.md): samma mall-HTML
+      // som HTML-vyn nedan (buildInvoiceTemplateData + selectInvoiceTemplate)
+      // → Chromium → PDF. Exakt match mot vad kunden/hantverkaren ser i
+      // "Visa faktura" — samma princip som offertens PDF-väg (ETAPP 1-2).
+      try {
+        const styleOverride = request.nextUrl.searchParams.get('style')
+        const pdfFromHtml = await buildInvoicePdfBuffer(invoice, businessConfig, {
+          styleOverride,
+          logTag: 'invoices/pdf',
+        })
+        if (pdfFromHtml) {
+          return new NextResponse(pdfFromHtml, {
+            headers: {
+              'Content-Type': 'application/pdf',
+              'Content-Disposition': `inline; filename="faktura-${invoice.invoice_number}.pdf"`,
+            },
+          })
+        }
+      } catch (err) {
+        console.error('[invoices/pdf] HTML→PDF-vägen kastade — faller tillbaka till jsPDF:', err)
+      }
+
+      // ── Fallback: gamla jsPDF-renderaren (fail-safe, samma logg-taggmönster
+      // som offerten — greppbar i Vercel-loggarna) ─────────────────────────
+      console.error('[invoices/pdf] FALLBACK-JSPDF AKTIV — Chromium-rendering misslyckades, fakturan laddas ner med den äldre jsPDF-renderaren')
       const payAmount = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
       const swishQR = await generateSwishQR(
         businessConfig?.swish_number,
@@ -160,5 +191,9 @@ export async function GET(request: NextRequest) {
 // ovan har alltid gått via buildInvoiceTemplateData/selectInvoiceTemplate)
 // raderade. De var facit för subtotal/discount-radsemantiken — porterad
 // till lib/invoice-templates/data-builder.ts (items-mappningen) innan
-// radering, se den filens kommentarer. Den binära PDF-vägen (format=pdf,
-// jsPDF via lib/pdf-generator.ts) ovan är ORÖRD — Chromium-PDF är ETAPP 6b.
+// radering, se den filens kommentarer.
+//
+// ETAPP 6b: den binära PDF-vägen (format=pdf) går nu PRIMÄRT via samma
+// mall-HTML→Chromium-väg som offerten (buildInvoicePdfBuffer, delad med
+// invoices/send + invoices/[id]/reminder-pdf) — jsPDF (lib/pdf-generator.ts)
+// är fail-safe-fallback, precis som quotes/pdf.

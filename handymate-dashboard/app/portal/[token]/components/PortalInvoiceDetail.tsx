@@ -15,6 +15,14 @@ interface PortalInvoiceDetailProps {
 /**
  * Faktura-detaljvy (port av bp-invoice.jsx).
  * Hero-belopp + breakdown (Total / ROT / Att betala) + Swish-block + Bankgiro.
+ *
+ * ETAPP 6b (offert-masterplan.md, faktura-sprinten): PDF-nedladdningen var
+ * TRASIG sedan starten — länken skickade `?id=` men /api/invoices/pdf
+ * läser `invoiceId` (alltid 400) och saknade dessutom `format=pdf` (hade
+ * annars gett HTML, inte en nedladdningsbar fil). Routen är redan publik/
+ * token-lös för icke-draft-fakturor (verifierat: getAuthenticatedBusiness
+ * saknas → faller tillbaka till statusfilter, ingen extra auth-mekanik
+ * behövdes här).
  */
 export default function PortalInvoiceDetail({
   invoice: inv,
@@ -27,6 +35,7 @@ export default function PortalInvoiceDetail({
   const toPay = inv.customer_pays || (total - rot)
   const ocrNumber = inv.ocr_number || inv.invoice_number
   const overdue = inv.status === 'overdue'
+  const pdfHref = `/api/invoices/pdf?invoiceId=${inv.invoice_id}&format=pdf`
 
   return (
     <>
@@ -44,9 +53,15 @@ export default function PortalInvoiceDetail({
           <div className="bp-brand-name">Faktura #{inv.invoice_number}</div>
           <div className="bp-brand-sub">{inv.status === 'paid' ? 'Betald' : 'Att betala'}</div>
         </div>
-        <button type="button" className="bp-icon-btn" aria-label="Ladda ner">
+        <a
+          href={pdfHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bp-icon-btn"
+          aria-label="Ladda ner PDF"
+        >
           <Download size={18} />
-        </button>
+        </a>
       </div>
 
       <div className="bp-body">
@@ -217,7 +232,7 @@ export default function PortalInvoiceDetail({
         <div style={{ padding: '0 18px 24px' }}>
           <a
             className="bp-cta ghost"
-            href={`/api/invoices/pdf?id=${inv.invoice_id}`}
+            href={pdfHref}
             target="_blank"
             rel="noopener noreferrer"
           >

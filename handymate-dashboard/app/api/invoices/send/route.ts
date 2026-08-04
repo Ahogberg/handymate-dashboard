@@ -6,8 +6,16 @@ import { checkSmsRateLimitDb, checkEmailRateLimitDb } from '@/lib/rate-limit-db'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { generateOCR } from '@/lib/ocr'
 import { generateInvoicePDF } from '@/lib/pdf-generator'
+import { generateSwishQR } from '@/lib/swish-qr'
+import { buildInvoicePdfBuffer } from '@/lib/invoices/build-invoice-pdf'
 import { randomUUID } from 'crypto'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+
+// Chromium-rendering (buildInvoicePdfBuffer → renderHtmlToPdf) kräver
+// Node-runtime och en generösare timeout än default — samma mönster som
+// quotes/pdf och invoices/pdf (ETAPP 6b, offert-masterplan.md).
+export const runtime = 'nodejs'
+export const maxDuration = 30
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
@@ -53,7 +61,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Hämta faktura med kundinfo och verifiera ägarskap
+    // Hämta faktura med kundinfo och verifiera ägarskap. ETAPP 6b: samma
+    // kundfält som invoices/pdf redan hämtar (address_line/personal_number/
+    // property_designation) — mall-motorn (buildInvoiceTemplateData) läser
+    // dem för PDF-bilagan, precis som den redan gör för nedladdningen.
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoice')
       .select(`
@@ -61,7 +72,11 @@ export async function POST(request: NextRequest) {
         customer:customer_id (
           name,
           phone_number,
-          email
+          email,
+          address_line,
+          personal_number,
+          property_designation,
+          customer_number
         )
       `)
       .eq('invoice_id', invoice_id)
@@ -114,35 +129,67 @@ export async function POST(request: NextRequest) {
         const pdfUrl = `${APP_URL}/api/invoices/pdf?invoiceId=${invoice_id}`
         const amountToPay = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
 
-        // Generera PDF-bilaga
-        const pdfBuffer = generateInvoicePDF(
-          {
-            invoice_number: invoice.invoice_number,
-            invoice_date: invoice.invoice_date,
-            due_date: invoice.due_date,
-            status: invoice.status,
-            items: invoice.items || [],
-            subtotal: invoice.subtotal,
-            vat_rate: invoice.vat_rate,
-            vat_amount: invoice.vat_amount,
-            total: invoice.total,
-            rot_rut_type: invoice.rot_rut_type,
-            rot_rut_deduction: invoice.rot_rut_deduction,
-            customer_pays: invoice.customer_pays,
-            is_credit_note: invoice.is_credit_note,
-            credit_reason: invoice.credit_reason,
-            customer: invoice.customer,
-          },
-          {
-            business_name: businessConfig?.business_name || business?.business_name,
-            org_number: businessConfig?.org_number,
-            contact_email: businessConfig?.contact_email,
-            contact_phone: businessConfig?.contact_phone,
-            address: businessConfig?.address,
-            bankgiro: businessConfig?.bankgiro,
-            f_skatt_registered: businessConfig?.f_skatt_registered,
-          }
-        )
+        // ── Generera PDF-bilaga ────────────────────────────────────────
+        // ETAPP 6b (offert-masterplan.md, faktura-sprinten): samma mall-
+        // HTML→Chromium-väg som invoices/pdf (buildInvoicePdfBuffer, EN
+        // källa) — tidigare byggde denna route en EGEN, avkortad jsPDF-data
+        // (saknade OCR/personnummer/fastighetsbeteckning/referenser) så
+        // mejlbilagan skiljde sig från nedladdningen. Fallbacken nedan
+        // används bara om Chromium-rendering misslyckas.
+        let pdfBuffer: Buffer
+        try {
+          const pdfFromHtml = await buildInvoicePdfBuffer(invoice, businessConfig, {
+            logTag: 'invoices/send',
+          })
+          if (!pdfFromHtml) throw new Error('renderHtmlToPdf returnerade null')
+          pdfBuffer = pdfFromHtml
+        } catch (htmlPdfErr) {
+          console.error('[invoices/send] HTML→PDF-vägen misslyckades — faller tillbaka till jsPDF:', htmlPdfErr)
+          console.error('[invoices/send] FALLBACK-JSPDF AKTIV — Chromium-rendering misslyckades, mejlbilagan skickas med den äldre jsPDF-renderaren')
+          const swishQR = await generateSwishQR(
+            businessConfig?.swish_number,
+            amountToPay || invoice.total,
+            invoice.invoice_number,
+          )
+          pdfBuffer = generateInvoicePDF(
+            {
+              invoice_number: invoice.invoice_number,
+              invoice_date: invoice.invoice_date,
+              due_date: invoice.due_date,
+              status: invoice.status,
+              items: invoice.items || [],
+              subtotal: invoice.subtotal,
+              vat_rate: invoice.vat_rate,
+              vat_amount: invoice.vat_amount,
+              total: invoice.total,
+              rot_rut_type: invoice.rot_rut_type,
+              rot_rut_deduction: invoice.rot_rut_deduction,
+              customer_pays: invoice.customer_pays,
+              is_credit_note: invoice.is_credit_note,
+              credit_reason: invoice.credit_reason,
+              original_invoice_id: invoice.original_invoice_id,
+              personnummer: invoice.personnummer,
+              fastighetsbeteckning: invoice.fastighetsbeteckning,
+              customer: invoice.customer,
+              ocr_number: invoice.ocr_number || generateOCR(invoice.invoice_number || ''),
+              our_reference: invoice.our_reference,
+              your_reference: invoice.your_reference,
+              invoice_type: invoice.invoice_type || 'standard',
+            },
+            {
+              business_name: businessConfig?.business_name || business?.business_name,
+              org_number: businessConfig?.org_number,
+              contact_email: businessConfig?.contact_email,
+              contact_phone: businessConfig?.contact_phone,
+              address: businessConfig?.address,
+              bankgiro: businessConfig?.bankgiro,
+              plusgiro: businessConfig?.plusgiro,
+              swish_number: businessConfig?.swish_number,
+              swish_qr: swishQR || undefined,
+              f_skatt_registered: businessConfig?.f_skatt_registered,
+            }
+          )
+        }
 
         await resend.emails.send({
           from: `${business?.business_name || 'Handymate'} <faktura@${process.env.RESEND_DOMAIN || 'handymate.se'}>`,

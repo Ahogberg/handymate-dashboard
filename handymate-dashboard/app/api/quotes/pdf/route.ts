@@ -5,7 +5,7 @@ import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { selectTemplate, buildQuoteTemplateData } from '@/lib/quote-templates'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 import { generateQuotePDF, type QuotePdfData, type BusinessPdfData } from '@/lib/pdf-generator'
-import { stripPrintBar } from '@/lib/document-html'
+import { renderHtmlToPdf } from '@/lib/pdf/render-html-to-pdf'
 
 // Chromium-rendering kräver Node-runtime (inte Edge) och tål kallstart —
 // @sparticuz/chromium packar upp binären vid första anropet.
@@ -27,57 +27,12 @@ export const maxDuration = 30
  * korrekt PDF än ingen alls. OBS: detta reverserar även den tidigare
  * "arkivkopia"-designen (jsPDF renderade ALLA rader oavsett visningsnivå)
  * — exakt-match-kravet innebär att HTML-vyns visningsregler vinner.
+ *
+ * ETAPP 6b (offert-masterplan.md, faktura-sprinten): själva Chromium-
+ * körningen är utbruten till lib/pdf/render-html-to-pdf.ts (identisk
+ * logik) så att faktura-PDF-vägen kan återanvända den — se den filens
+ * kommentarer för den fulla motiveringen.
  */
-async function renderHtmlToPdf(html: string): Promise<Buffer | null> {
-  try {
-    const puppeteer = await import('puppeteer-core')
-    let executablePath: string | undefined
-    let args: string[] = []
-
-    // Lokal dev (Windows/Mac): peka på en installerad Chrome via env.
-    // Vercel/Linux: @sparticuz/chromium packar upp sin egen binär.
-    if (process.env.CHROME_EXECUTABLE_PATH) {
-      executablePath = process.env.CHROME_EXECUTABLE_PATH
-    } else {
-      const chromium = (await import('@sparticuz/chromium')).default
-      executablePath = await chromium.executablePath()
-      args = chromium.args
-    }
-
-    const browser = await puppeteer.launch({
-      executablePath,
-      args: [...args, '--no-sandbox', '--disable-setuid-sandbox'],
-      headless: true,
-    })
-    try {
-      const page = await browser.newPage()
-      // ETAPP 1d (offert-masterplan.md): mallarna äger sin egen dokument-
-      // marginal via inbyggd CSS-padding (se .page/.header/.body i
-      // modern/premium/friendly.ts) — .page renderas redan i fullt A4-mått
-      // (210×297mm). Chromium-marginalen måste därför vara 0 på alla sidor;
-      // tidigare {top:12mm, bottom:14mm} lades OVANPÅ mallens egen padding
-      // och dubbelräknade marginalen, vilket knuffade sidans sista del ut
-      // på en nästan tom sida 2. .print-bar (Stäng/Skriv ut) är avsedd för
-      // "Visa offert" i en riktig flik, inte för denna PDF-väg — strippas
-      // explicit (se stripPrintBar-kommentar).
-      const printHtml = stripPrintBar(html)
-      // 'load' väntar in bilder/loggor (mallens externa <img>-resurser);
-      // 'networkidle0' finns inte i denna puppeteer-versions setContent-typ.
-      await page.setContent(printHtml, { waitUntil: 'load', timeout: 15000 })
-      const pdf = await page.pdf({
-        format: 'a4',
-        printBackground: true,
-        margin: { top: '0mm', bottom: '0mm', left: '0mm', right: '0mm' },
-      })
-      return Buffer.from(pdf)
-    } finally {
-      await browser.close()
-    }
-  } catch (err) {
-    console.error('[quotes/pdf] Chromium-rendering misslyckades — faller tillbaka till jsPDF:', err)
-    return null
-  }
-}
 
 /**
  * Bygg ett PDF-svar (application/pdf, attachment) från en hämtad quote + config
@@ -91,7 +46,7 @@ async function buildQuotePdfResponse(quote: any, config: any, creator: any): Pro
     const templateData = buildQuoteTemplateData(quote, config, config, creator)
     const renderFn = selectTemplate(quote.template_style || config?.quote_template_style)
     const html = renderFn(templateData)
-    const pdfFromHtml = await renderHtmlToPdf(html)
+    const pdfFromHtml = await renderHtmlToPdf(html, 'quotes/pdf')
     if (pdfFromHtml) {
       return new NextResponse(pdfFromHtml, {
         headers: {
