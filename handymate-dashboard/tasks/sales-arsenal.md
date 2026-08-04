@@ -71,6 +71,18 @@ Kategoriterm: **AI-team för hantverkare.**
 
 ## Konkurrent-motdrag (förberedda svar)
 
+- **NY fällefråga (research 2026-08-04, tasks/competitive-easoft-ai-2026-08.md):**
+  "Fråga Easoft om deras AI är en produkt eller en workshop för 1 500 €."
+  Deras AI-agenter = betald konsultworkshop + skräddarsydda byggen via
+  extern partner (Serviceform), inga skärmdumpar, inga kundcase, noll
+  AI-omnämnanden i recensioner. VÅRA agenter är levererad produkt med
+  godkännandekö och lärande — visa kön live i demon.
+- **BEVAKNINGSPUNKT (inte panikanledning): EG Intelligence.** Easofts
+  moderbolag EG A/S bygger koncern-AI med telefonsvars-/bokningsagent
+  för hantverkare på 2026-roadmapen (47k kunder). Ej bekräftat live i
+  Easoft-produkten per aug 2026. Vår replik om det landar: "de rullar ut
+  en generisk koncernagent — vår kan redan ROT, Fortnox och din
+  produktbank." Bevaka H2 2026.
 - **"Har inte Easoft/Bygglet redan AI?"** → Easoft har själva publicerat
   "Tio tidsbovar för byggföretag" (easoft.se/blogg, läst 2026-08-02) —
   exakt de tio problemen vi säger att teamet löser. Deras lösning för
