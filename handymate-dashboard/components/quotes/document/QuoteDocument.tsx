@@ -118,7 +118,22 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
                 ) : data.invoice.status === 'overdue' ? (
                   <div className="due-overdue"><strong>Förfallodatum:</strong> {data.invoice.dueDate} · {data.invoice.daysOverdue} dagar försenad</div>
                 ) : (
-                  <div><strong>Förfallodatum:</strong> {data.invoice.dueDate}</div>
+                  <div>
+                    <strong>Förfallodatum:</strong>{' '}
+                    {/* ETAPP 6c: redigerbart ENDAST i det vanliga (ej betald/
+                        försenad) läget — ett utkast är aldrig försenad, och en
+                        redan betald faktura ska inte kunna få nytt förfallodatum
+                        härifrån. */}
+                    {mode === 'edit' && handlers?.onDueDateChange && data.invoice.dueDateISO
+                      ? (
+                        <EditableDate
+                          value={data.invoice.dueDateISO}
+                          displayValue={data.invoice.dueDate}
+                          onChange={handlers.onDueDateChange}
+                        />
+                      )
+                      : data.invoice.dueDate}
+                  </div>
                 )}
               </div>
             </div>
@@ -159,6 +174,20 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
               {data.business.email && <><br />{data.business.email}</>}
             </div>
             {!isInvoice && data.referencePerson && <div className="party-meta">Vår referens: {data.referencePerson}</div>}
+            {/* ETAPP 6c (offert-masterplan.md, faktura-sprinten): "Vår
+                referens" saknades helt i motorn trots att gamla premium.ts
+                renderade den (verifierat mot frusen fixture) — lades bara
+                aldrig med när Modern-motorn byggdes i 6a. Redigerbar i
+                edit-läge, annars ren text (utelämnad helt om tom och inte
+                redigerbar — ingen tom rad i PDF/kundvy). */}
+            {isInvoice && (data.invoice.ourReference || (mode === 'edit' && handlers?.onOurReferenceChange)) && (
+              <div className="party-meta">
+                Vår referens:{' '}
+                {mode === 'edit' && handlers?.onOurReferenceChange
+                  ? <EditableText value={data.invoice.ourReference || ''} onChange={handlers.onOurReferenceChange} placeholder="Namn" />
+                  : data.invoice.ourReference}
+              </div>
+            )}
           </div>
           <div>
             <div className="party-label">Mottagare</div>
@@ -172,6 +201,16 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
               {[data.customer.phone, data.customer.email].filter(Boolean).join(' · ')}
               {data.customer.personnummer && <><br />Personnr: {data.customer.personnummer}</>}
             </div>
+            {/* Er referens (kundens referens) — samma resonemang som Vår
+                referens ovan. */}
+            {isInvoice && (data.invoice.yourReference || (mode === 'edit' && handlers?.onYourReferenceChange)) && (
+              <div className="party-meta">
+                Er referens:{' '}
+                {mode === 'edit' && handlers?.onYourReferenceChange
+                  ? <EditableText value={data.invoice.yourReference || ''} onChange={handlers.onYourReferenceChange} placeholder="Kundens referens" />
+                  : data.invoice.yourReference}
+              </div>
+            )}
           </div>
         </section>
 
@@ -233,7 +272,13 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
           <div className="options-note">Välj dina tillval i kundportalen innan du signerar.</div>
         )}
 
-        {!isInvoice && mode === 'edit' && handlers && (
+        {/* ETAPP 6c (offert-masterplan.md, faktura-sprinten): tidigare
+            `!isInvoice`-gated — fakturans canvas kunde alltså ALDRIG lägga
+            till rader (6a-rapportens "bara static i praktiken"-fynd hade
+            sin rot delvis här). onItemAdd är docType-agnostisk (samma
+            useInvoiceItems/useQuoteItems-mönster), så knappen fungerar för
+            båda dokumenttyperna nu. */}
+        {mode === 'edit' && handlers && (
           <button type="button" onClick={handlers.onItemAdd} className="add-row-btn">
             + Lägg till rad
           </button>

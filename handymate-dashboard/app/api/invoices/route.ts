@@ -131,6 +131,7 @@ export async function POST(request: NextRequest) {
       is_credit_note = false,
       original_invoice_id,
       credit_reason,
+      template_style,
     } = body
 
     const business_id = business.business_id
@@ -318,6 +319,7 @@ export async function POST(request: NextRequest) {
       fastighetsbeteckning: fastighetsbeteckning || null,
       introductionText: introduction_text || null,
       conclusionText: conclusion_text || null,
+      templateStyle: template_style || null,
       selectClause: `*, customer:customer_id ( customer_id, name, phone_number, email, address_line )`,
     })
 
@@ -391,6 +393,8 @@ export async function PUT(request: NextRequest) {
       'personnummer', 'fastighetsbeteckning', 'internal_notes',
       'subtotal', 'vat_amount', 'total', 'rot_rut_deduction', 'customer_pays',
       'discount_percent', 'discount_amount',
+      // ETAPP 6c (offert-masterplan.md, faktura-sprinten): sql/v82.
+      'template_style',
     ]
 
     for (const field of allowedFields) {

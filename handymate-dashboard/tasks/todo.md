@@ -1,108 +1,66 @@
-# Idag-vy-omdesign — desktop + mobil (2026-07-11)
+# ETAPP 6c — Fakturaskaparen canvas-first
 
-Källor: `Idag-vy.html` (desktop-design) + `Idag-mobil.html` (mobil-design), båda Claude Design-exporter i repo-roten.
-Utvärderingar: se minnesanteckning idag-vy-redesign (4 desktop-risker + 6 mobil-punkter).
-Beslut från Andreas: Christoffer (pilot) äger lanseringsgrindarna → omdesignen byggs nu.
+Verifierat mot kod 2026-08-04 (efter 6a 76e298e9 + 6b 1f6c2a87). Baseline-tester
+gröna (74/74) innan start.
 
-## Designbeslut (låsta)
+## Fynd under kartläggning (styr scope)
+- `+ Lägg till rad` i QuoteDocument.tsx är gated `!isInvoice` — fakturan kan
+  aldrig lägga till rader i canvas idag. Måste tas bort.
+- QuoteDocumentRow.tsx är REDAN docType-agnostisk (ingen isInvoice-gren) —
+  radredigering (namn/antal/enhet/á-pris/ROT-badge/heading/text/subtotal/
+  discount) fungerar redan för invoice mode='edit'. Bara QuoteDocument.tsx
+  (header: due date, referenser) behöver utökas.
+- "Vår referens" renderas INTE i motorn idag trots att gamla premium.ts
+  gjorde det (parity-testet missar det pga en fras-sammanslagningslucka i
+  testmetodiken — verifierat, inte en bugg i testet jag behöver fixa).
+  "Er referens"/kundens referens likaså saknas. Lägg till i parties-sektionen.
+- `invoice.payment_terms_text` LÄSES i data-builder.ts men KOLUMNEN FINNS
+  INTE i `invoice`-tabellen (bara på `quotes`, sql/quote_overhaul.sql) — grep
+  bekräftar. Bygg INGEN UI för betalvillkor-text (skulle brytas vid save).
+  Textblock-panelen = bara introduction_text + conclusion_text (bekräftat
+  existerande kolumner, redan i POST/PUT).
+- Ingen `template_style`-kolumn finns för invoice (bara business-default via
+  quote_template_style). Lägger till egen kolumn (v82) + trådar igenom
+  create-invoice/POST/PUT/build-invoice-pdf/pdf-route så Stil-valet faktiskt
+  persisteras (annars är stilväljaren meningslös — matchar offertens mönster).
+- RowEditSheet tar QuoteItem (kategori/grön teknik-fält som inte finns på
+  faktura) — bygger tunn InvoiceRowEditSheet istället för att återanvända.
+- QuoteStylePicker hårdkodar "Offertstil" + länk till /api/quotes/pdf +
+  kind="quote" i MiniDoc-anropet. MiniDoc stödjer redan kind='invoice'
+  (DualThumbnail bevisar det) — generaliserar QuoteStylePicker med kind-prop.
 
-- Hierarki: bevisband → agentremsa/teamrad → godkänn-kö ("Väntar på dig") → Klart idag → drill-down-kort
-- Max 2 fulla kort i kön — resten kompakta rader som expanderas vid tryck (REGEL, inte data-flagga)
-- Ingen svepgodkänning någonstans — pengabeslut kräver explicit tryck (mobilens ApprovalCard har swipe idag: TAS BORT)
-- Ångra = klientfördröjd POST: godkännandet skickas efter 5 s snackbar-fönster; Ångra avbryter timern.
-  Stängd flik = ärendet ligger kvar orört i kön (ärligt, ingen backend-ombyggnad)
-- Inget fejkat: bevisband + agentremsa/teamrad drivs av /api/dashboard/team-activity (agent_runs m.m.)
-- Inget nytt röstbygge: desktop får ingen mic-knapp; mobilen behåller befintliga /matte/voice via dockad Matte-rad
-- "Pipeline"-etikett → "Verksamhetsöversikt" (matchar sidebar)
-- Desktop-avatarer: initialer + agentfärg (som PendingApprovalsBlock); mobil: porträtt från assets/ai-team/
-- Typsnitt: desktop använder befintliga font-heading (Space Grotesk) / font-body (DM Sans) ur tailwind.config;
-  mobil använder systemfont + SpaceGrotesk för stora tal (tokens.ts-konvention)
-- autonomy_offer ("Förtroende") renderas som eget kort-läge: "Ja, kör automatiskt" / "Fortsätt fråga"
-  (backend helt klar: grantAutonomy/revokeAutonomy i /api/approvals/[id])
-- CashRadarCard + WeeklyValueDigest BEHÅLLS (lanseringskritiska, nyss byggda) — flyttas under drill-raden
-- Onboarding/setup-banners behålls under kärnstacken (kö-kort-idén = senare iteration)
+## Plan — KLART 2026-08-04
+1. [x] Motor: types.ts — onDueDateChange/onOurReferenceChange/onYourReferenceChange
+2. [x] Motor: lib/invoice-templates/types.ts — dueDateISO? på InvoiceTemplateInvoice
+3. [x] Motor: QuoteDocument.tsx — editable due date, Vår/Er referens, ta bort
+   isInvoice-gate på "+ Lägg till rad"
+4. [x] QuoteStylePicker.tsx — kind-prop (quote/invoice) + invoiceId-länk
+5. [x] sql/v82_invoice_template_style.sql + create-invoice.ts + POST/PUT +
+   build-invoice-pdf.ts + pdf/route.ts (style-precedence)
+6. [x] app/dashboard/invoices/_shared/useInvoiceItems.ts
+7. [x] app/dashboard/invoices/_shared/InvoiceRowEditSheet.tsx
+8. [x] app/dashboard/invoices/_shared/InvoiceRotMomsSection.tsx
+9. [x] app/dashboard/invoices/_shared/InvoiceTextsSection.tsx
+10. [x] app/dashboard/invoices/_shared/InvoiceEditor.tsx (huvudkomponenten)
+11. [x] app/dashboard/invoices/new/page.tsx — tunn wrapper
+12. [x] app/dashboard/invoices/[id]/edit/page.tsx — tunn wrapper + autosave
+13. [x] tsc rent + next build grön + facit-sviterna (74/74) — INGEN commit
+   (per uppdrag), Andreas kör sql/v82 manuellt.
 
-## Datakällor (verifierade av utforskning)
-
-| Yta | Källa |
-|-----|-------|
-| Bevisband-siffror | GET /api/dashboard/team-activity → summary (total_calls, total_sms, total_quotes, ...) |
-| Agentremsa (desktop) | Befintlig TeamActivityStrip (team-activity + /api/observations) — redan riktig data |
-| Kön | supabase pending_approvals + POST /api/approvals/[id] {action} |
-| Klart idag | KOLLA: /api/automations/activity shape; fallback customer_activity. Godkända läggs till klient-side |
-| Dagens plan / Nästa bokning | booking-tabellen (dashboard: scheduled_start+customer(name); mobil: fetchTodayBookings) |
-| Jag är på väg | Desktop: OnMyWayButton (finns, död import idag). Mobil: sendOnMyWay (finns i today.tsx) |
-| Verksamhetsöversikt-kort | GET /api/pipeline/stats (totalValue, totalDeals, newLeadsToday); mobil: fetchPipeline |
-| Fakturor-kort | NY endpoint GET /api/dashboard/economy-summary (unpaid count/amount + fakturerat månad) — delas desktop+mobil |
-| KPI-fot | GET /api/dashboard/stats |
-
-## Checklista
-
-### Förarbete
-- [ ] Kolla /api/automations/activity response-shape (Klart idag-källa)
-- [ ] Kolla om POST /api/approvals/[id] stödjer redigerad message (annars: "Ändra" → /dashboard/approvals)
-- [ ] Kolla ActivityLog-shape i mobilens fetchRecentActivity (AUTO-badge-underlag)
-
-### Backend (dashboard-repo)
-- [ ] GET /api/dashboard/economy-summary — getAuthenticatedBusiness + invoice-queries (samma som page.tsx inline idag)
-
-### Desktop (feat/idag-vy-redesign)
-- [ ] IdagProofBand — bevisband av team-activity summary + pending-count; neutral fallback när allt är 0
-- [ ] IdagQueue — max 2 fulla kort + kompakta rader; Godkänn/Ändra/Avvisa; autonomy_offer-läge; 5s ångra-snackbar
-- [ ] IdagDoneList — Klart idag, AUTO-badge, klientpåfyllnad vid godkännande
-- [ ] Drill-rad: Dagens plan / Verksamhetsöversikt / Fakturor
-- [ ] KPI-fot (vecka)
-- [ ] Ny sektionsordning i page.tsx; död state rensas (speedData, insights, seasonSummary, profitProjects, scheduleToday)
-- [ ] Säljtratt/Ekonomi/Senaste aktivitet/Att göra idag utgår från startsidan (finns kvar på undersidor)
-- [ ] Skeletons för nya sektioner
-
-### Mobil (handymate-mobile, branch från fix/b2-mobile-execution-read — beror på omergade approvals/Matte-commits)
-- [ ] lib/api.ts: fetchTeamActivity + fetchEconomySummary
-- [ ] ProofBand-komponent
-- [ ] NextBookingCard med inline "Jag är på väg — skicka SMS till kunden" (återanvänd sendOnMyWay-flödet)
-- [ ] Kö: max 2 fulla ApprovalCard + ny ApprovalCompactRow; ta bort swipe ur ApprovalCard
-- [ ] TeamRow (6 porträtt + senaste verkliga händelse)
-- [ ] DoneList (hopfällbar, AUTO-badge, auto-expanderad när kön är tom)
-- [ ] Tiles: Verksamhetsöversikt (fetchPipeline) + Fakturor (economy-summary)
-- [ ] MatteDockBar ersätter MatteCTA + mic-block (input → /matte, håll mic → /matte/voice)
-- [ ] Ångra-snackbar med fördröjd respondToApproval
-- [ ] home.tsx ny ordning; tomt läge per Frame B
-
-### Verifiering
-- [ ] Dashboard: npx tsc --noEmit → 0 fel
-- [ ] Dashboard: npx next build → ren
-- [ ] Mobil: npx tsc --noEmit → 0 fel
-- [ ] UI-svep: inga engelska termer, teal-tema, 44px touch targets (mobil)
-
-## Review (2026-07-11 — bygget klart, väntar merge-beslut)
-
-**Desktop** (`feat/idag-vy-redesign`, 2 commits): IdagCore + bantad page.tsx
-(~1340 → ~470 rader) + economy-summary-endpoint. `tsc` 0 fel, `next build` ren
-(enda felet = förbyggt fortnox-sync-env-problem, ej relaterat).
-
-**Mobil** (`handymate-mobile` `feat/idag-hemskarm` från `fix/b2-mobile-execution-read`,
-1 commit): 6 nya komponenter + omgjord home.tsx + api-fetchers. `tsc` 0 fel.
-Svepgodkänning borttagen ur ApprovalCard (designbeslut).
-
-**Buggfynd på vägen:** mobilens "Ändra"-flöde hade ALDRIG fungerat —
-`updateApprovalText` PATCH:ade en POST-only-route (405 i prod). Omskriven till
-`action: 'edit'` + `edited_payload`; approvals-skärmens dubbel-anrop
-(edit + approve → 409) fixat. Samma klass som FK-embed-lärdomen: tyst fel,
-grönt UI.
-
-**Avvikelser från checklistan:** OnMyWayButton på desktop-drillkortet skippad
-(bokningsrader länkar till detaljsidan där knappen finns); "Senare idag"-sektion
-behållen på mobilen (designen visade bara nästa bokning, men att dölja dagens
-övriga bokningar vore funktionsregression).
-
-**Status:**
-- [x] Desktop MERGAD till main 2026-07-11 (00833e82) → prod. Andreas beslut:
-      merge före A-testet så testet körs mot ytan kunderna möter.
-      Inkl. UI-svep från prod-genomgången: radar-cold-start borttagen +
-      "en vanlig vecka"-etikett (bd32ab59), veckovärdet döljs utan pengar/jobb
-      (af24d721).
-- [ ] Visuell genomgång av NYA vyn = sker via A-testet mot prod
-- [ ] Mobil: `fix/b2-mobile-execution-read` måste mergas före/med
-      `feat/idag-hemskarm` (byggd ovanpå) — EJ mergad än
-- [ ] EAS-bygge efter mobil-merge för att nå telefoner
-- [ ] Sekvensering: A-test + B7 Stripe-köp är högsta prio (inventeringen 2026-07-11)
+## Review — avvikelser/kända begränsningar
+- Live-canvasen visar ALDRIG Swish-QR (kräver server-anrop) — bara statisk
+  PDF/kundvy gör det. Samma begränsning offerten aldrig hade eftersom
+  offerten aldrig visade QR i canvasen heller (ny feature i 6a/6b för
+  fakturan specifikt).
+- Premium/Friendly-förhandsgranskning i 'new'-läget (ingen sparad faktura
+  ännu) visar en platshållare istället för en riktig iframe — "befintlig
+  invoice-HTML-väg" (spec-ordval) är en GET mot en sparad DB-rad, det finns
+  inget drafts-endpoint att POSTa oscarad state mot (till skillnad från
+  offertens /api/quotes/preview-html). Att bygga ett sådant är utanför
+  denna etapps scope — dokumenterat, inte tyst byggt runt.
+- Betalvillkor-text (payment_terms_text) är INTE en Textblock-editerbar
+  fält — kolumnen finns inte i invoice-tabellen (grep-verifierad mot
+  sql/), bara på quotes. Att bygga UI för den hade brutit save.
+- ROT/RUT-badgens klick i canvas är EN global av/på-cykel (mirrorar
+  LineItemEditor-checkboxen), INTE offertens fria rot/rut/grön-cykel —
+  fakturan har ett enda globalt rot_rut_type, ingen grön teknik-koncept.

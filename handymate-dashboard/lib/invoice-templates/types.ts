@@ -54,6 +54,12 @@ export interface InvoiceTemplateInvoice {
   number: string
   invoiceDate: string             // formatterad sv-SE
   dueDate: string                 // formatterad sv-SE
+  /** ETAPP 6c (offert-masterplan.md, faktura-sprinten): ISO-datum
+      (yyyy-mm-dd) för EditableDate-fältet i dokumentmotorns edit-läge —
+      speglar quote.validUntilDateISO. Utelämnad av buildInvoiceTemplateData
+      (statisk rendering/PDF behöver aldrig ett redigerbart datumfält) —
+      satt bara av fakturaskaparens klientbyggda liveTemplateData. */
+  dueDateISO?: string
   paidDate?: string | null
   status: InvoiceStatus
   daysOverdue: number             // 0 om inte försenad

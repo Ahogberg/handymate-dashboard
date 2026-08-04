@@ -1,27 +1,15 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
 import { InvoiceItem } from '@/lib/types/invoice'
-import { calculateInvoiceTotals, recalculateItems, createDefaultInvoiceItem } from '@/lib/invoice-calculations'
-import { generateOCR } from '@/lib/ocr'
-import LineItemEditor from '@/components/invoices/LineItemEditor'
-import InvoiceSummary from '@/components/invoices/InvoiceSummary'
+import { recalculateItems, createDefaultInvoiceItem } from '@/lib/invoice-calculations'
 import Link from 'next/link'
-
-interface Customer {
-  customer_id: string
-  name: string
-  phone_number: string
-  email: string | null
-  address_line: string | null
-  personal_number?: string
-  property_designation?: string
-}
+import { InvoiceEditor, type InvoiceEditorCustomer, type InvoiceStyle } from '../_shared/InvoiceEditor'
 
 interface TimeEntry {
   time_entry_id?: string
@@ -37,6 +25,17 @@ interface TimeEntry {
   invoice_id: string | null
 }
 
+function toISODate(d: Date): string {
+  return d.toISOString().split('T')[0]
+}
+
+/**
+ * ETAPP 6c (offert-masterplan.md, faktura-sprinten): tunn wrapper ovanpå
+ * InvoiceEditor (_shared) — äger datahämtning (kunder, tidrapporter,
+ * offert-import) och skapandet (POST /api/invoices). All redigeringsyta
+ * (canvas, Mer-raden, summeringen) bor i InvoiceEditor, delad med
+ * [id]/edit/page.tsx.
+ */
 export default function NewInvoicePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -45,37 +44,41 @@ export default function NewInvoicePage() {
 
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
-  const [customers, setCustomers] = useState<Customer[]>([])
+  const [customers, setCustomers] = useState<InvoiceEditorCustomer[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
+  const [defaultPaymentDays, setDefaultPaymentDays] = useState(30)
 
-  // Form state
+  // ─── Editor-state (kontrollerat, se InvoiceEditor) ──────────────────
   const [customerId, setCustomerId] = useState(searchParams?.get('customerId') || '')
   const [items, setItems] = useState<InvoiceItem[]>([])
   const [vatRate, setVatRate] = useState(25)
-  const [rotRutType, setRotRutType] = useState<string>('')
-  const [dueDays, setDueDays] = useState(30)
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0])
-  const [ourReference, setOurReference] = useState('')
-  const [yourReference, setYourReference] = useState('')
+  const [rotRutType, setRotRutType] = useState('')
   const [personalNumber, setPersonalNumber] = useState('')
   const [propertyDesignation, setPropertyDesignation] = useState('')
+  const [invoiceDate, setInvoiceDate] = useState(toISODate(new Date()))
+  const [dueDate, setDueDate] = useState('')
+  const [ourReference, setOurReference] = useState('')
+  const [yourReference, setYourReference] = useState('')
+  const [introductionText, setIntroductionText] = useState('')
+  const [conclusionText, setConclusionText] = useState('')
+  const [templateStyle, setTemplateStyle] = useState<InvoiceStyle | null>(null)
 
-  // Business config
-  const [invoicePrefix, setInvoicePrefix] = useState('FV')
-  const [nextNumber, setNextNumber] = useState(1)
+  // Förfallodatum sätts en gång från fakturadatum + företagets standard —
+  // rörs sedan fritt av kortet/dokumentets EditableDate (samma modell som
+  // offertens validDays, fast som ett absolut datum istället för ett antal
+  // dagar — se InvoiceEditor-kommentaren).
+  const dueDateInitialized = useRef(false)
 
   // Time entry selection modal
   const [selectedTimeEntries, setSelectedTimeEntries] = useState<string[]>([])
   const [showTimeEntries, setShowTimeEntries] = useState(false)
 
-  // Pre-population from URL params
   const fromQuoteId = searchParams?.get('fromQuote')
   const fromTimeEntriesCustomer = searchParams?.get('fromTimeEntries')
 
   useEffect(() => {
-    if (business.business_id) {
-      fetchData()
-    }
+    if (business.business_id) fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [business.business_id])
 
   async function fetchData() {
@@ -89,27 +92,29 @@ export default function NewInvoicePage() {
         .order('work_date', { ascending: false }),
       supabase
         .from('business_config')
-        .select('default_payment_days, invoice_prefix, next_invoice_number, default_hourly_rate')
+        .select('default_payment_days')
         .eq('business_id', business.business_id)
-        .single()
+        .single(),
     ])
 
     setCustomers(customersApiRes?.customers || customersApiRes?.data || [])
     setTimeEntries(timeRes.data || [])
+    const paymentDays = configRes.data?.default_payment_days || 30
+    setDefaultPaymentDays(paymentDays)
 
-    if (configRes.data) {
-      setDueDays(configRes.data.default_payment_days || 30)
-      setInvoicePrefix(configRes.data.invoice_prefix || 'FV')
-      setNextNumber(configRes.data.next_invoice_number || 1)
+    // Förfallodatum sätts EN gång, HÄR (inte i en separat effekt beroende
+    // på defaultPaymentDays) — annars hinner ett effekt-varv köra med
+    // 30-dagars-defaulten INNAN business_config svarat, och den låsta
+    // dueDateInitialized-ref:en blockerar sedan omräkning med rätt värde.
+    if (!dueDateInitialized.current) {
+      dueDateInitialized.current = true
+      const d = new Date(invoiceDate + 'T00:00:00')
+      d.setDate(d.getDate() + paymentDays)
+      setDueDate(toISODate(d))
     }
 
-    if (fromQuoteId) {
-      await loadFromQuote(fromQuoteId)
-    }
-
-    if (fromTimeEntriesCustomer) {
-      setCustomerId(fromTimeEntriesCustomer)
-    }
+    if (fromQuoteId) await loadFromQuote(fromQuoteId)
+    if (fromTimeEntriesCustomer) setCustomerId(fromTimeEntriesCustomer)
 
     setLoading(false)
   }
@@ -119,7 +124,7 @@ export default function NewInvoicePage() {
       const res = await fetch(`/api/invoices/from-quote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quote_id: quoteId, dry_run: true })
+        body: JSON.stringify({ quote_id: quoteId, dry_run: true }),
       })
       if (res.ok) {
         const data = await res.json()
@@ -130,35 +135,27 @@ export default function NewInvoicePage() {
         if (data.fastighetsbeteckning) setPropertyDesignation(data.fastighetsbeteckning)
       }
     } catch {
-      // Silently fail – user can add items manually
+      // Tyst — hantverkaren kan lägga till rader manuellt
     }
   }
 
   useEffect(() => {
-    if (customerId) {
-      const customer = customers.find(c => c.customer_id === customerId)
-      if (customer?.personal_number) setPersonalNumber(customer.personal_number)
-      if (customer?.property_designation) setPropertyDesignation(customer.property_designation)
-    }
+    if (!customerId) return
+    const customer = customers.find(c => c.customer_id === customerId)
+    if (customer?.personal_number) setPersonalNumber(customer.personal_number)
+    if (customer?.property_designation) setPropertyDesignation(customer.property_designation)
   }, [customerId, customers])
 
-  const handleItemsChange = useCallback((newItems: InvoiceItem[]) => {
-    setItems(newItems)
-  }, [])
-
-  const addTimeEntriesToInvoice = () => {
-    const selected = timeEntries.filter(te =>
-      selectedTimeEntries.includes(te.time_entry_id || te.entry_id || '')
-    )
+  function addTimeEntriesToInvoice() {
+    const selected = timeEntries.filter(te => selectedTimeEntries.includes(te.time_entry_id || te.entry_id || ''))
     const newItems: InvoiceItem[] = []
 
     for (const entry of selected) {
       const hours = entry.hours_worked || (entry.duration_minutes ? entry.duration_minutes / 60 : 0)
       const rate = entry.hourly_rate || 500
-      newItems.push(createDefaultInvoiceItem('item', items.length + newItems.length))
-      const idx = newItems.length - 1
-      newItems[idx] = {
-        ...newItems[idx],
+      const laborItem = createDefaultInvoiceItem('item', items.length + newItems.length)
+      newItems.push({
+        ...laborItem,
         description: entry.description || `Arbete ${new Date(entry.work_date).toLocaleDateString('sv-SE')}`,
         quantity: Math.round(hours * 100) / 100,
         unit: 'timmar',
@@ -167,7 +164,7 @@ export default function NewInvoicePage() {
         type: 'labor',
         is_rot_eligible: rotRutType === 'rot',
         is_rut_eligible: rotRutType === 'rut',
-      }
+      })
 
       if (entry.materials_cost && entry.materials_cost > 0) {
         const matItem = createDefaultInvoiceItem('item', items.length + newItems.length)
@@ -182,30 +179,27 @@ export default function NewInvoicePage() {
         })
       }
 
-      if (!customerId && entry.customer_id) {
-        setCustomerId(entry.customer_id)
-      }
+      if (!customerId && entry.customer_id) setCustomerId(entry.customer_id)
     }
 
-    setItems(recalculateItems([...items, ...newItems]))
+    setItems(prev => recalculateItems([...prev, ...newItems]))
     setShowTimeEntries(false)
     setSelectedTimeEntries([])
   }
 
-  const handleFieldChange = (field: string, value: string) => {
-    if (field === 'personalNumber') setPersonalNumber(value)
-    if (field === 'propertyDesignation') setPropertyDesignation(value)
-  }
-
-  const handleCreate = async () => {
+  async function handleCreate() {
     if (items.length === 0) {
       toast.warning('Lägg till minst en rad')
       return
     }
-
     setCreating(true)
-
     try {
+      const invoiceDateObj = new Date(invoiceDate + 'T00:00:00')
+      const dueDateObj = dueDate ? new Date(dueDate + 'T00:00:00') : null
+      const dueDays = dueDateObj
+        ? Math.round((dueDateObj.getTime() - invoiceDateObj.getTime()) / 86400000)
+        : defaultPaymentDays
+
       const response = await fetch('/api/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -221,9 +215,12 @@ export default function NewInvoicePage() {
           your_reference: yourReference || null,
           personnummer: personalNumber || null,
           fastighetsbeteckning: propertyDesignation || null,
+          introduction_text: introductionText || null,
+          conclusion_text: conclusionText || null,
+          template_style: templateStyle,
           time_entry_ids: selectedTimeEntries.length > 0 ? selectedTimeEntries : undefined,
           quote_id: fromQuoteId || undefined,
-        })
+        }),
       })
 
       if (!response.ok) throw new Error('Kunde inte skapa faktura')
@@ -238,39 +235,57 @@ export default function NewInvoicePage() {
     }
   }
 
-  const totals = calculateInvoiceTotals(items, 0, vatRate)
-
   if (loading) {
     return (
-      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-[#0F766E] animate-spin" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
 
+  const sourceInfo = (fromQuoteId || timeEntries.length > 0) && (
+    <div className="bg-white border border-slate-200 rounded-2xl p-4">
+      {fromQuoteId ? (
+        <div className="px-3 py-2.5 border border-primary-200 rounded-xl bg-primary-50">
+          <div className="text-xs font-semibold text-slate-900">Importerad från offert</div>
+          <div className="text-xs text-slate-500 mt-0.5">Rader hämtade automatiskt — redigera fritt nedan.</div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowTimeEntries(true)}
+          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-left hover:border-primary-700 hover:bg-primary-50 transition-colors"
+        >
+          <div className="text-xs font-semibold text-slate-900">Från tidrapport</div>
+          <div className="text-xs text-slate-500 mt-0.5">Fakturera {timeEntries.length} ofakturerade tidrapporter</div>
+        </button>
+      )}
+    </div>
+  )
+
   return (
-    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
-      {/* Time Entry Selection Modal */}
+    <div className="min-h-screen bg-slate-50">
       {showTimeEntries && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 p-4">
-          <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-8 py-7 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="bg-white rounded-2xl px-6 py-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl">
             <div className="flex items-center justify-between mb-5">
-              <span className="text-[16px] font-medium text-[#1E293B]">Välj tidrapporter</span>
+              <span className="font-heading text-base font-bold text-slate-900">Välj tidrapporter</span>
               <button
+                type="button"
                 onClick={() => { setShowTimeEntries(false); setSelectedTimeEntries([]) }}
-                className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#94A3B8] hover:text-[#1E293B] flex items-center justify-center text-[16px]"
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                ×
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {timeEntries.filter(te => !customerId || te.customer_id === customerId).length === 0 ? (
-              <p className="text-[#94A3B8] py-8 text-center text-[13px]">Inga ofakturerade tidrapporter</p>
+              <p className="text-slate-400 py-8 text-center text-sm">Inga ofakturerade tidrapporter</p>
             ) : (
               <div className="space-y-2">
                 {timeEntries
                   .filter(te => !customerId || te.customer_id === customerId)
-                  .map((entry) => {
+                  .map(entry => {
                     const entryId = entry.time_entry_id || entry.entry_id || ''
                     const hours = entry.hours_worked || (entry.duration_minutes ? entry.duration_minutes / 60 : 0)
                     const laborCost = hours * (entry.hourly_rate || 500)
@@ -279,52 +294,48 @@ export default function NewInvoicePage() {
                     return (
                       <label
                         key={entryId}
-                        className={`flex items-center gap-4 p-4 rounded-lg border-thin cursor-pointer transition-all ${
+                        className={`flex items-center gap-4 p-3.5 rounded-xl border cursor-pointer transition-all ${
                           selectedTimeEntries.includes(entryId)
-                            ? 'bg-[#F0FDFA] border-[#0F766E]'
-                            : 'bg-[#F8FAFC] border-[#E2E8F0] hover:border-[#CBD5E1]'
+                            ? 'bg-primary-50 border-primary-700'
+                            : 'bg-slate-50 border-slate-200 hover:border-slate-300'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={selectedTimeEntries.includes(entryId)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedTimeEntries([...selectedTimeEntries, entryId])
-                            } else {
-                              setSelectedTimeEntries(selectedTimeEntries.filter(id => id !== entryId))
-                            }
+                          onChange={e => {
+                            setSelectedTimeEntries(prev =>
+                              e.target.checked ? [...prev, entryId] : prev.filter(id => id !== entryId),
+                            )
                           }}
-                          className="w-4 h-4 rounded border-[#E2E8F0] text-[#0F766E] focus:ring-[#0F766E]"
+                          className="w-4 h-4 rounded border-slate-300 text-primary-700 focus:ring-primary-600"
                         />
                         <div className="flex-1">
-                          <p className="text-[13px] font-medium text-[#1E293B]">
+                          <p className="text-sm font-medium text-slate-900">
                             {new Date(entry.work_date).toLocaleDateString('sv-SE')} — {hours.toFixed(1)}h
                           </p>
-                          <p className="text-[12px] text-[#94A3B8]">
-                            {entry.customer?.name || 'Ingen kund'} — {entry.description || 'Ingen beskrivning'}
-                          </p>
+                          <p className="text-xs text-slate-500">{entry.customer?.name || 'Ingen kund'} — {entry.description || 'Ingen beskrivning'}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-[13px] font-medium text-[#1E293B]">{totalCost.toLocaleString('sv-SE')} kr</p>
-                        </div>
+                        <div className="text-sm font-medium text-slate-900">{totalCost.toLocaleString('sv-SE')} kr</div>
                       </label>
                     )
                   })}
               </div>
             )}
 
-            <div className="flex gap-2 mt-6 pt-5 border-t border-thin border-[#E2E8F0]">
+            <div className="flex gap-2 mt-6 pt-5 border-t border-slate-100">
               <button
+                type="button"
                 onClick={() => { setShowTimeEntries(false); setSelectedTimeEntries([]) }}
-                className="px-4 py-2.5 bg-transparent text-[#64748B] border-thin border-[#E2E8F0] rounded-lg text-[13px] cursor-pointer"
+                className="px-4 py-2.5 text-slate-600 border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-50"
               >
                 Avbryt
               </button>
               <button
+                type="button"
                 onClick={addTimeEntriesToInvoice}
                 disabled={selectedTimeEntries.length === 0}
-                className="flex-1 py-2.5 bg-[#0F766E] text-white border-none rounded-lg text-[14px] font-medium cursor-pointer disabled:opacity-50"
+                className="flex-1 py-2.5 bg-primary-700 hover:bg-primary-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
               >
                 Lägg till ({selectedTimeEntries.length})
               </button>
@@ -333,188 +344,49 @@ export default function NewInvoicePage() {
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center">
-            <Link href="/dashboard/invoices" className="text-[13px] text-[#64748B] hover:text-[#1E293B] transition-colors">
-              ← Fakturor
-            </Link>
-            <span className="text-[18px] font-medium text-[#1E293B] ml-3">Ny faktura</span>
-          </div>
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        <div className="flex items-center mb-5">
+          <Link href="/dashboard/invoices" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">
+            ← Fakturor
+          </Link>
+          <span className="font-heading text-lg font-bold text-slate-900 ml-3">Ny faktura</span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5 items-start">
-          {/* Main Content */}
-          <div className="flex flex-col gap-4">
-            {/* Kund och datum */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
-              <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Kund och datum</div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[12px] text-[#64748B] mb-1">Kund *</label>
-                  <select
-                    value={customerId}
-                    onChange={(e) => setCustomerId(e.target.value)}
-                    className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                  >
-                    <option value="">Välj kund...</option>
-                    {customers.map(c => (
-                      <option key={c.customer_id} value={c.customer_id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[12px] text-[#64748B] mb-1">Fakturadatum</label>
-                  <input
-                    type="date"
-                    value={invoiceDate}
-                    onChange={(e) => setInvoiceDate(e.target.value)}
-                    className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[12px] text-[#64748B] mb-1">Betalningsvillkor</label>
-                  <select
-                    value={dueDays}
-                    onChange={(e) => setDueDays(Number(e.target.value))}
-                    className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                  >
-                    <option value={14}>14 dagar</option>
-                    <option value={30}>30 dagar</option>
-                    <option value={60}>60 dagar</option>
-                    <option value={0}>Förskott</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Importera rader */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
-              <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Importera rader</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {fromQuoteId ? (
-                  <div className="px-4 py-3 border-thin border-[#0F766E] rounded-lg bg-[#F0FDFA] text-left">
-                    <div className="text-[13px] font-medium text-[#1E293B]">Importerad från offert</div>
-                    <div className="text-[12px] text-[#94A3B8]">Rader hämtade automatiskt</div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => router.push('/dashboard/quotes')}
-                    className="px-4 py-4 border-thin border-[#E2E8F0] rounded-lg bg-[#F8FAFC] cursor-pointer text-left hover:border-[#0F766E] hover:bg-[#F0FDFA] transition-colors"
-                  >
-                    <div className="text-[13px] font-medium text-[#1E293B]">Från offert</div>
-                    <div className="text-[12px] text-[#94A3B8]">Hämta rader från godkänd offert</div>
-                  </button>
-                )}
-                <button
-                  onClick={() => setShowTimeEntries(true)}
-                  className="px-4 py-4 border-thin border-[#E2E8F0] rounded-lg bg-[#F8FAFC] cursor-pointer text-left hover:border-[#0F766E] hover:bg-[#F0FDFA] transition-colors"
-                >
-                  <div className="text-[13px] font-medium text-[#1E293B]">Från tidrapport</div>
-                  <div className="text-[12px] text-[#94A3B8]">Fakturera rapporterade timmar</div>
-                </button>
-              </div>
-            </div>
-
-            {/* Fakturarader */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
-              <LineItemEditor
-                items={items}
-                onChange={handleItemsChange}
-                rotRutType={rotRutType || undefined}
-              />
-            </div>
-
-            {/* ROT-avdrag */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[13px] text-[#1E293B]">ROT-avdrag</span>
-                  {!rotRutType && (
-                    <div className="text-[12px] text-[#94A3B8] mt-1">Slå på för att aktivera ROT-beräkning</div>
-                  )}
-                </div>
-                <div
-                  className={`w-9 h-5 rounded-full relative cursor-pointer transition-colors ${rotRutType ? 'bg-[#0F766E]' : 'bg-[#CBD5E1]'}`}
-                  onClick={() => setRotRutType(rotRutType ? '' : 'rot')}
-                >
-                  <div className={`absolute w-3.5 h-3.5 bg-white rounded-full top-[3px] transition-all ${rotRutType ? 'left-[19px]' : 'left-[3px]'}`} />
-                </div>
-              </div>
-              {rotRutType && (
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[12px] text-[#64748B] mb-1">Typ</label>
-                    <select
-                      value={rotRutType}
-                      onChange={(e) => setRotRutType(e.target.value)}
-                      className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                    >
-                      <option value="rot">ROT-avdrag (30%)</option>
-                      <option value="rut">RUT-avdrag (50%)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[12px] text-[#64748B] mb-1">Personnummer</label>
-                    <input
-                      type="text"
-                      value={personalNumber}
-                      onChange={(e) => setPersonalNumber(e.target.value)}
-                      placeholder="YYYYMMDD-XXXX"
-                      className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                    />
-                  </div>
-                  {rotRutType === 'rot' && (
-                    <div className="sm:col-span-2">
-                      <label className="block text-[12px] text-[#64748B] mb-1">Fastighetsbeteckning</label>
-                      <input
-                        type="text"
-                        value={propertyDesignation}
-                        onChange={(e) => setPropertyDesignation(e.target.value)}
-                        placeholder="T.ex. Stockholm Söder 1:23"
-                        className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                      />
-                    </div>
-                  )}
-                  <p className="text-[12px] text-[#0F766E] sm:col-span-2">
-                    {rotRutType === 'rot'
-                      ? 'Kunden betalar 70% — Skatteverket betalar resterande 30% direkt till dig.'
-                      : 'Kunden betalar 50% — Skatteverket betalar resterande 50% direkt till dig.'}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="flex flex-col gap-3 lg:sticky lg:top-4">
-            <InvoiceSummary
-              totals={totals}
-              vatRate={vatRate}
-              rotRutType={rotRutType || undefined}
-              personalNumber={personalNumber}
-              propertyDesignation={propertyDesignation}
-              onFieldChange={handleFieldChange}
-            />
-
-            <button
-              onClick={handleCreate}
-              disabled={creating || items.length === 0}
-              className="w-full py-3 bg-[#0F766E] text-white border-none rounded-lg text-[14px] font-medium cursor-pointer disabled:opacity-50"
-            >
-              {creating ? 'Skapar...' : 'Skapa faktura'}
-            </button>
-            <button
-              className="w-full py-2.5 bg-transparent text-[#64748B] border-thin border-[#E2E8F0] rounded-lg text-[13px] cursor-pointer hover:bg-[#F8FAFC]"
-              onClick={() => {
-                toast.info('Utkast sparas automatiskt')
-              }}
-            >
-              Spara utkast
-            </button>
-          </div>
-        </div>
+        <InvoiceEditor
+          mode="new"
+          customers={customers}
+          customerId={customerId}
+          setCustomerId={setCustomerId}
+          items={items}
+          setItems={setItems}
+          vatRate={vatRate}
+          setVatRate={setVatRate}
+          rotRutType={rotRutType}
+          setRotRutType={setRotRutType}
+          personalNumber={personalNumber}
+          setPersonalNumber={setPersonalNumber}
+          propertyDesignation={propertyDesignation}
+          setPropertyDesignation={setPropertyDesignation}
+          invoiceDate={invoiceDate}
+          setInvoiceDate={setInvoiceDate}
+          dueDate={dueDate}
+          setDueDate={setDueDate}
+          ourReference={ourReference}
+          setOurReference={setOurReference}
+          yourReference={yourReference}
+          setYourReference={setYourReference}
+          introductionText={introductionText}
+          setIntroductionText={setIntroductionText}
+          conclusionText={conclusionText}
+          setConclusionText={setConclusionText}
+          templateStyle={templateStyle}
+          setTemplateStyle={setTemplateStyle}
+          saving={creating}
+          onSave={handleCreate}
+          saveLabel="Skapa faktura"
+          savingLabel="Skapar…"
+          sourceInfo={sourceInfo}
+        />
       </div>
     </div>
   )

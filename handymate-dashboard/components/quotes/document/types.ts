@@ -70,6 +70,15 @@ export interface QuoteDocumentHandlers {
   /** Endast 'option'-rader: hantverkarens "Förvald"-toggle. Sätter alltid
       BÅDA option_default och option_selected (samma regel som ItemRow). */
   onOptionDefaultToggle: (id: string, checked: boolean) => void
+  /** ETAPP 6c (offert-masterplan.md, faktura-sprinten): faktura-ENDAST
+      fält — förfallodatum + referenser. Optional så offertens liveHandlers
+      (som aldrig sätter dessa) förblir giltiga utan ändring. ISO-sträng
+      (yyyy-mm-dd) från EditableDate, samma mönster som onValidUntilChange
+      men UTAN dagar-omräkning (fakturans state äger redan ett absolut
+      due_date, till skillnad från offertens "giltig i N dagar"). */
+  onDueDateChange?: (v: string) => void
+  onOurReferenceChange?: (v: string) => void
+  onYourReferenceChange?: (v: string) => void
 }
 
 /**

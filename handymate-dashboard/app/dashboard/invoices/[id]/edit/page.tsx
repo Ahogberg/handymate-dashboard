@@ -1,22 +1,22 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import {
-  ArrowLeft,
-  Loader2,
-  Save,
-  AlertTriangle
-} from 'lucide-react'
+import { ArrowLeft, Loader2, Save } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
 import { InvoiceItem, Invoice } from '@/lib/types/invoice'
-import { calculateInvoiceTotals, recalculateItems } from '@/lib/invoice-calculations'
-import LineItemEditor from '@/components/invoices/LineItemEditor'
-import InvoiceSummary from '@/components/invoices/InvoiceSummary'
+import { calculateInvoiceTotals } from '@/lib/invoice-calculations'
 import Link from 'next/link'
+import { InvoiceEditor, type InvoiceEditorCustomer, type InvoiceStyle } from '../../_shared/InvoiceEditor'
 
+/**
+ * ETAPP 6c (offert-masterplan.md, faktura-sprinten): tunn wrapper ovanpå
+ * InvoiceEditor (_shared) — speglar new/page.tsx men laddar en befintlig
+ * (draft-)faktura + autosparar. Endast utkast kan redigeras (oförändrat
+ * beteende — se fetchInvoice).
+ */
 export default function EditInvoicePage() {
   const params = useParams()
   const router = useRouter()
@@ -27,55 +27,48 @@ export default function EditInvoicePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [invoice, setInvoice] = useState<Invoice | null>(null)
+  const [customers, setCustomers] = useState<InvoiceEditorCustomer[]>([])
 
-  // Form state
+  const [customerId, setCustomerId] = useState('')
   const [items, setItems] = useState<InvoiceItem[]>([])
   const [vatRate, setVatRate] = useState(25)
-  const [rotRutType, setRotRutType] = useState<string>('')
-  const [dueDate, setDueDate] = useState('')
+  const [rotRutType, setRotRutType] = useState('')
+  const [personalNumber, setPersonalNumber] = useState('')
+  const [propertyDesignation, setPropertyDesignation] = useState('')
   const [invoiceDate, setInvoiceDate] = useState('')
+  const [dueDate, setDueDate] = useState('')
   const [ourReference, setOurReference] = useState('')
   const [yourReference, setYourReference] = useState('')
   const [introductionText, setIntroductionText] = useState('')
   const [conclusionText, setConclusionText] = useState('')
-  const [personalNumber, setPersonalNumber] = useState('')
-  const [propertyDesignation, setPropertyDesignation] = useState('')
+  const [templateStyle, setTemplateStyle] = useState<InvoiceStyle | null>(null)
 
-  // Auto-save debounce
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const initialLoadDone = useRef(false)
 
   useEffect(() => {
     if (business.business_id && invoiceId) {
       fetchInvoice()
+      fetchCustomers()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [business.business_id, invoiceId])
 
-  // Auto-save with 5s debounce
-  useEffect(() => {
-    if (!hasUnsavedChanges || !invoice) return
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(() => {
-      handleSave(true)
-    }, 5000)
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+  async function fetchCustomers() {
+    try {
+      const res = await fetch('/api/customers')
+      const data = await res.json()
+      setCustomers(data?.customers || [])
+    } catch {
+      // silent — kundlistan är inte kritisk för att redigera fakturarader
     }
-  }, [items, vatRate, rotRutType, dueDate, invoiceDate, ourReference, yourReference, introductionText, conclusionText, personalNumber, propertyDesignation, hasUnsavedChanges])
+  }
 
   async function fetchInvoice() {
     const { data, error } = await supabase
       .from('invoice')
-      .select(`
-        *,
-        customer:customer_id (
-          customer_id,
-          name,
-          phone_number,
-          email,
-          address_line
-        )
-      `)
+      .select(`*, customer:customer_id ( customer_id, name, phone_number, email, address_line )`)
       .eq('invoice_id', invoiceId)
       .single()
 
@@ -92,7 +85,6 @@ export default function EditInvoicePage() {
     }
 
     setInvoice(data)
-    // Parse items – backwards compat: old items lack item_type
     const parsedItems: InvoiceItem[] = (data.items || []).map((item: any, i: number) => ({
       id: item.id || `legacy_${i}`,
       item_type: item.item_type || 'item',
@@ -108,8 +100,10 @@ export default function EditInvoicePage() {
       type: item.type,
       cost_price: item.cost_price,
       article_number: item.article_number,
+      performed_by_name: item.performed_by_name ?? null,
     }))
     setItems(parsedItems)
+    setCustomerId(data.customer_id || '')
     setVatRate(data.vat_rate || 25)
     setRotRutType(data.rot_rut_type || '')
     setDueDate(data.due_date || '')
@@ -120,15 +114,37 @@ export default function EditInvoicePage() {
     setConclusionText(data.conclusion_text || '')
     setPersonalNumber(data.personnummer || data.rot_personal_number || '')
     setPropertyDesignation(data.fastighetsbeteckning || data.rot_property_designation || '')
+    const style = data.template_style as InvoiceStyle | null | undefined
+    if (style && ['modern', 'premium', 'friendly'].includes(style)) setTemplateStyle(style)
     setLoading(false)
+    setTimeout(() => { initialLoadDone.current = true }, 500)
   }
 
-  const handleItemsChange = useCallback((newItems: InvoiceItem[]) => {
-    setItems(newItems)
-    setHasUnsavedChanges(true)
-  }, [])
+  const buildPayload = useCallback(
+    () => ({
+      invoice_id: invoiceId,
+      customer_id: customerId || null,
+      items,
+      vat_rate: vatRate,
+      rot_rut_type: rotRutType || null,
+      due_date: dueDate,
+      invoice_date: invoiceDate,
+      our_reference: ourReference,
+      your_reference: yourReference,
+      introduction_text: introductionText,
+      conclusion_text: conclusionText,
+      personnummer: personalNumber,
+      fastighetsbeteckning: propertyDesignation,
+      template_style: templateStyle,
+    }),
+    [
+      invoiceId, customerId, items, vatRate, rotRutType, dueDate, invoiceDate,
+      ourReference, yourReference, introductionText, conclusionText,
+      personalNumber, propertyDesignation, templateStyle,
+    ],
+  )
 
-  const handleSave = async (silent = false) => {
+  const handleSave = useCallback(async (silent = false) => {
     if (!invoice) return
     setSaving(true)
     setHasUnsavedChanges(false)
@@ -140,24 +156,13 @@ export default function EditInvoicePage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          invoice_id: invoiceId,
-          items,
-          vat_rate: vatRate,
-          rot_rut_type: rotRutType || null,
-          due_date: dueDate,
-          invoice_date: invoiceDate,
-          our_reference: ourReference,
-          your_reference: yourReference,
-          introduction_text: introductionText,
-          conclusion_text: conclusionText,
-          personnummer: personalNumber,
-          fastighetsbeteckning: propertyDesignation,
+          ...buildPayload(),
           subtotal: totals.subtotal,
           vat_amount: totals.vat,
           total: totals.total,
           rot_rut_deduction: rotRutType === 'rot' ? totals.rotDeduction : rotRutType === 'rut' ? totals.rutDeduction : 0,
           customer_pays: rotRutType === 'rot' ? totals.rotCustomerPays : rotRutType === 'rut' ? totals.rutCustomerPays : totals.total,
-        })
+        }),
       })
 
       if (!response.ok) throw new Error('Kunde inte spara')
@@ -168,159 +173,99 @@ export default function EditInvoicePage() {
     } finally {
       setSaving(false)
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoice, items, vatRate, rotRutType, buildPayload])
 
-  const handleFieldChange = (field: string, value: string) => {
-    if (field === 'personalNumber') setPersonalNumber(value)
-    if (field === 'propertyDesignation') setPropertyDesignation(value)
+  // Auto-save — 5s debounce, samma mönster som tidigare (utökat med de nya
+  // fälten: referenser/texter/stil rör nu också hasUnsavedChanges).
+  useEffect(() => {
+    if (!initialLoadDone.current) return
     setHasUnsavedChanges(true)
-  }
-
-  const totals = calculateInvoiceTotals(items, 0, vatRate)
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => { handleSave(true) }, 5000)
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    customerId, items, vatRate, rotRutType, dueDate, invoiceDate, ourReference,
+    yourReference, introductionText, conclusionText, personalNumber,
+    propertyDesignation, templateStyle,
+  ])
 
   if (loading) {
     return (
-      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
-      </div>
-
-      <div className="relative max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-4">
-            <Link href={`/dashboard/invoices/${invoiceId}`} className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
+    <div className="min-h-screen bg-slate-50">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        <div className="flex items-center justify-between gap-4 mb-5">
+          <div className="flex items-center gap-3">
+            <Link href={`/dashboard/invoices/${invoiceId}`} className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="font-heading text-lg font-bold text-slate-900">
                 Redigera faktura #{invoice?.invoice_number}
               </h1>
-              <p className="text-sm text-gray-500">
+              <p className="text-xs text-slate-500">
                 {invoice?.customer?.name || 'Ingen kund'}
-                {hasUnsavedChanges && <span className="ml-2 text-amber-500">Osparade ändringar</span>}
+                {hasUnsavedChanges && <span className="ml-2 text-amber-600">Osparade ändringar</span>}
+                {saving && <span className="ml-2 text-slate-400">Sparar…</span>}
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={() => handleSave(false)}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-700 hover:bg-primary-600 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Spara
           </button>
         </div>
 
-        {/* Layout: editor + sidebar */}
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left: Main editor */}
-          <div className="flex-1 min-w-0 space-y-6">
-            {/* Dates & references */}
-            <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Fakturadatum</label>
-                  <input
-                    type="date"
-                    value={invoiceDate}
-                    onChange={(e) => { setInvoiceDate(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Förfallodatum</label>
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => { setDueDate(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Vår referens</label>
-                  <input
-                    type="text"
-                    value={ourReference}
-                    onChange={(e) => { setOurReference(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Er referens</label>
-                  <input
-                    type="text"
-                    value={yourReference}
-                    onChange={(e) => { setYourReference(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* VAT & ROT/RUT */}
-            <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Momssats</label>
-                  <select
-                    value={vatRate}
-                    onChange={(e) => { setVatRate(Number(e.target.value)); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
-                  >
-                    <option value={25}>25%</option>
-                    <option value={12}>12%</option>
-                    <option value={6}>6%</option>
-                    <option value={0}>0% (momsfri)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">ROT/RUT-avdrag</label>
-                  <select
-                    value={rotRutType}
-                    onChange={(e) => { setRotRutType(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
-                  >
-                    <option value="">Inget avdrag</option>
-                    <option value="rot">ROT-avdrag (30%)</option>
-                    <option value="rut">RUT-avdrag (50%)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Line items */}
-            <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
-              <LineItemEditor
-                items={items}
-                onChange={handleItemsChange}
-                rotRutType={rotRutType || undefined}
-              />
-            </div>
-          </div>
-
-          {/* Right: Sidebar */}
-          <div className="lg:w-80 flex-shrink-0">
-            <div className="lg:sticky lg:top-8">
-              <InvoiceSummary
-                totals={totals}
-                vatRate={vatRate}
-                rotRutType={rotRutType || undefined}
-                personalNumber={personalNumber}
-                propertyDesignation={propertyDesignation}
-                onFieldChange={handleFieldChange}
-              />
-            </div>
-          </div>
-        </div>
+        <InvoiceEditor
+          mode="edit"
+          invoiceId={invoiceId}
+          invoiceNumber={invoice?.invoice_number}
+          ocrNumber={invoice?.ocr_number}
+          customers={customers}
+          customerId={customerId}
+          setCustomerId={setCustomerId}
+          items={items}
+          setItems={setItems}
+          vatRate={vatRate}
+          setVatRate={setVatRate}
+          rotRutType={rotRutType}
+          setRotRutType={setRotRutType}
+          personalNumber={personalNumber}
+          setPersonalNumber={setPersonalNumber}
+          propertyDesignation={propertyDesignation}
+          setPropertyDesignation={setPropertyDesignation}
+          invoiceDate={invoiceDate}
+          setInvoiceDate={setInvoiceDate}
+          dueDate={dueDate}
+          setDueDate={setDueDate}
+          ourReference={ourReference}
+          setOurReference={setOurReference}
+          yourReference={yourReference}
+          setYourReference={setYourReference}
+          introductionText={introductionText}
+          setIntroductionText={setIntroductionText}
+          conclusionText={conclusionText}
+          setConclusionText={setConclusionText}
+          templateStyle={templateStyle}
+          setTemplateStyle={setTemplateStyle}
+          saving={saving}
+          onSave={() => handleSave(false)}
+          saveLabel="Spara"
+          savingLabel="Sparar…"
+        />
       </div>
     </div>
   )

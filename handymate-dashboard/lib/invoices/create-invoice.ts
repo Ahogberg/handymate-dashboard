@@ -68,6 +68,10 @@ export interface CreateInvoiceInput {
   conclusionText?: string | null
   ourReference?: string | null
   yourReference?: string | null
+  /** ETAPP 6c (offert-masterplan.md, faktura-sprinten): sql/v82 — per-
+      faktura stilöverstyrning (speglar quotes.template_style). Utelämnad/
+      null → business_config.quote_template_style (oförändrat beteende). */
+  templateStyle?: 'modern' | 'premium' | 'friendly' | null
   /**
    * Kringgår RPC:n helt — ENDAST för kreditfakturor (invoices/credit),
    * som har en egen KF-YYYY-NNN-serie räknad på `COUNT(*) WHERE
@@ -207,6 +211,7 @@ export async function createInvoice(
     our_reference: input.ourReference ?? null,
     your_reference: input.yourReference ?? null,
   }
+  if (input.templateStyle !== undefined) row.template_style = input.templateStyle
   if (input.discountPercent !== undefined) row.discount_percent = input.discountPercent
   if (input.discountAmount !== undefined) row.discount_amount = input.discountAmount
   // booking_id (v74) är inte en kolumn alla vägar bryr sig om — sätts bara

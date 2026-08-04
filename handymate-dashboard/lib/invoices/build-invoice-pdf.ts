@@ -60,7 +60,13 @@ export async function buildInvoicePdfBuffer(
   }
 
   const templateData = buildInvoiceTemplateData(invoice, config, swishQR)
-  const renderFn = selectInvoiceTemplate(opts?.styleOverride || config?.quote_template_style)
+  // ETAPP 6c (offert-masterplan.md, faktura-sprinten): sql/v82 —
+  // invoice.template_style (satt av fakturaskaparens Stil-väljare) slår
+  // business-defaulten, precis som quote.template_style redan gör för
+  // offerten. ?style=-query (settings-preview) vinner fortfarande över allt.
+  const renderFn = selectInvoiceTemplate(
+    opts?.styleOverride || invoice.template_style || config?.quote_template_style,
+  )
   const html = renderFn(templateData)
 
   return renderHtmlToPdf(html, opts?.logTag || 'invoices/pdf')
