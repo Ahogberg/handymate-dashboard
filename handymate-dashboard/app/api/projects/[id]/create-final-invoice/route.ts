@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
-import { generateOCR } from '@/lib/ocr'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
+import { createInvoice } from '@/lib/invoices/create-invoice'
 
 export const dynamic = 'force-dynamic'
 
@@ -374,54 +374,44 @@ export async function POST(
       fastighetsbeteckning = fastighetsbeteckning ?? customerRow?.property_designation ?? null
     }
 
-    // ── 8. Generera invoice_number + OCR ────────────────────────
-    const prefix = businessConfig?.invoice_prefix || 'FV'
-    const nextNum = businessConfig?.next_invoice_number || 1
-    const year = new Date().getFullYear()
-    const invoiceNumber = `${prefix}-${year}-${String(nextNum).padStart(3, '0')}`
-    const ocrNumber = generateOCR(String(nextNum))
-
+    // ── 8-10. Skapa faktura ──────────────────────────────────────
+    // ETAPP 6a (offert-masterplan.md): gemensam kärna för nummer/OCR/datum/
+    // insert/bump — se lib/invoices/create-invoice.ts. Stänger den TD-29-
+    // dokumenterade dubblettrisken ("Inte atomic — om två requests kör
+    // samtidigt kan vi få samma nummer") som stod härifrån, förutsatt att
+    // sql/v81_invoice_number_rpc.sql är körd.
     const dueDays = businessConfig?.default_payment_days || 30
-    const invoiceDate = new Date()
-    const dueDate = new Date(invoiceDate)
-    dueDate.setDate(dueDate.getDate() + dueDays)
-
-    // ── 9. INSERT invoice ───────────────────────────────────────
-    // v52 (2026-05-20) la till invoice.project_id. Lars marginal-analys
-    // läser invoice WHERE project_id direkt.
-    const { data: invoice, error: insertError } = await supabase
-      .from('invoice')
-      .insert({
-        business_id: business.business_id,
-        customer_id: project.customer_id,
-        project_id: projectId,
-        quote_id: project.quote_id || null,
-        invoice_number: invoiceNumber,
-        invoice_type: 'final',
-        status: 'draft',
+    let invoice: { invoice_id: string; invoice_number: string }
+    try {
+      const created = await createInvoice(supabase, {
+        businessId: business.business_id,
+        customerId: project.customer_id,
         items,
         subtotal,
-        vat_rate: vatRate,
-        vat_amount: vatAmount,
+        vatRate,
+        vatAmount,
         total,
-        rot_rut_type: rotRutType,
-        rot_rut_deduction: rotRutDeduction,
-        customer_pays: customerPays,
+        rotRutType: rotRutType,
+        rotRutDeduction,
+        customerPays,
+        projectId: projectId,
+        quoteId: project.quote_id || null,
+        invoiceType: 'final',
+        status: 'draft',
+        dueDays,
         personnummer,
         fastighetsbeteckning,
-        invoice_date: invoiceDate.toISOString().split('T')[0],
-        due_date: dueDate.toISOString().split('T')[0],
-        ocr_number: ocrNumber,
-        introduction_text: quote?.introduction_text || null,
-        conclusion_text: quote?.conclusion_text || null,
-        bankgiro_number: businessConfig?.bankgiro || null,
-        plusgiro_number: businessConfig?.plusgiro || null,
-        bank_account: businessConfig?.bank_account_number || null,
+        introductionText: quote?.introduction_text || null,
+        conclusionText: quote?.conclusion_text || null,
+        selectClause: 'invoice_id, invoice_number',
+        extraFields: {
+          bankgiro_number: businessConfig?.bankgiro || null,
+          plusgiro_number: businessConfig?.plusgiro || null,
+          bank_account: businessConfig?.bank_account_number || null,
+        },
       })
-      .select('invoice_id, invoice_number')
-      .single()
-
-    if (insertError) {
+      invoice = created.invoice
+    } catch (insertError: any) {
       console.error('[create-final-invoice] insert error:', insertError)
       return NextResponse.json(
         {
@@ -433,19 +423,6 @@ export async function POST(
         },
         { status: 500 },
       )
-    }
-
-    // ── 10. Bump next_invoice_number ────────────────────────────
-    // Inte atomic — om två requests kör samtidigt kan vi få samma
-    // nummer. Lågt-concurrency pilot OK; produktion behöver sequence
-    // eller advisory lock (samma anti-pattern som app/api/invoices/route.ts).
-    const { error: bumpError } = await supabase
-      .from('business_config')
-      .update({ next_invoice_number: nextNum + 1 })
-      .eq('business_id', business.business_id)
-
-    if (bumpError) {
-      console.warn('[create-final-invoice] next_invoice_number bump failed (invoice already created):', bumpError)
     }
 
     // ── 11. UPDATE project_change → status='invoiced' ───────────

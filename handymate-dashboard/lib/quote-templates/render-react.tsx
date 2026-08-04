@@ -37,7 +37,12 @@ import type { QuoteTemplateData } from './types'
  */
 export function renderModernHtml(data: QuoteTemplateData): string {
   const accent = data.business.accentColor
-  const bodyHtml = renderToStaticMarkup(<QuoteDocument mode="static" data={data} />)
+  // ETAPP 6a (offert-masterplan.md): QuoteDocument tar nu MoneyDocumentData
+  // (docType-union, delad med fakturans renderModernInvoiceHtml) — docType
+  // sätts inline här istället för att ändra denna funktions publika
+  // signatur (fortsatt QuoteTemplateData, oförändrad importyta för de 6+
+  // ställen som anropar renderModernHtml/buildQuoteTemplateData).
+  const bodyHtml = renderToStaticMarkup(<QuoteDocument mode="static" data={{ ...data, docType: 'quote' }} />)
 
   return `<!DOCTYPE html>
 <html lang="sv">

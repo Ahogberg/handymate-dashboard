@@ -11,17 +11,44 @@ export const renderPremium: InvoiceTemplateRenderFn = (data: InvoiceTemplateData
   const isOverdue = data.invoice.status === 'overdue'
   const isPaid = data.invoice.status === 'paid'
 
-  const itemsHtml = data.invoice.items.map(item => `
+  // ETAPP 6a (offert-masterplan.md, faktura-sprinten): buildInvoiceTemplateData
+  // filtrerar inte längre bort heading/text/subtotal/discount-rader — denna
+  // mall (kvar som sträng, inte migrerad till dokumentmotorn i 6a) måste
+  // därför gren-hantera radtyperna själv, samma mönster som
+  // lib/quote-templates/premium.ts redan gjorde för offertens rader.
+  const itemsHtml = data.invoice.items.map(item => {
+    const itemType = item.itemType || 'item'
+    if (itemType === 'heading') {
+      return `<div class="item-heading" style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:var(--dark);padding:10px 16px 4px;">${escapeHtml(item.name)}</div>`
+    }
+    if (itemType === 'text') {
+      return `<div class="item-text" style="color:var(--muted);font-size:12px;padding:6px 16px;">${escapeHtml(item.name)}</div>`
+    }
+    if (itemType === 'subtotal') {
+      return `<div class="item-subtotal" style="display:flex;justify-content:flex-end;gap:16px;padding:8px 16px;font-weight:600;color:var(--dark);border-top:1px solid var(--line);"><span>${escapeHtml(item.name || 'Delsumma')}</span><span>${formatCurrency(item.total)}</span></div>`
+    }
+    if (itemType === 'discount') {
+      return `
+      <div class="item">
+        <div><div class="item-name" style="color:var(--amber);">${escapeHtml(item.name || 'Rabatt')}</div></div>
+        <div class="num">${formatNumber(item.quantity)} ${escapeHtml(item.unit)}</div>
+        <div class="num">${formatCurrency(Math.abs(item.unitPrice))}</div>
+        <div class="num" style="color:var(--amber);">−${formatCurrency(Math.abs(item.total))}</div>
+      </div>`
+    }
+    return `
     <div class="item">
       <div>
         <div class="item-name">${escapeHtml(item.name)}</div>
         ${item.description ? `<div class="item-desc">${escapeHtml(item.description)}</div>` : ''}
+        ${item.performedByName ? `<div class="item-desc" style="opacity:0.7;">Utfört av ${escapeHtml(item.performedByName)}</div>` : ''}
       </div>
       <div class="num">${formatNumber(item.quantity)} ${escapeHtml(item.unit)}</div>
       <div class="num">${formatCurrency(item.unitPrice)}</div>
       <div class="num">${formatCurrency(item.total)}</div>
     </div>
-  `).join('')
+  `
+  }).join('')
 
   const rotRow = data.invoice.rotDeduction
     ? `<div class="total-row rot"><span class="lbl">ROT-avdrag (30% av arbete)</span><span class="val">−${formatCurrency(data.invoice.rotDeduction)}</span></div>`

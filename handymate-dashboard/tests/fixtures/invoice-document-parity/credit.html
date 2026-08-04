@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Faktura FV-2026-0043 · Bygg &amp; Co AB</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --teal: #0F766E;
+  --teal-50: #ecf4f3;
+  --teal-100: #d4e6e5;
+  --bg: #F8FAFC;
+  --ink: #0F172A;
+  --muted: #64748B;
+  --border: #E2E8F0;
+  --row-alt: #F8FAFC;
+  --danger: #DC2626;
+  --danger-50: #FEF2F2;
+  --danger-100: #FEE2E2;
+  --success: #16A34A;
+  --success-50: #F0FDF4;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.5; padding: 32px 16px; }
+.page { width: 210mm; min-height: 297mm; padding: 22mm 20mm; margin: 0 auto; background: #fff; box-shadow: 0 16px 40px rgba(15,23,42,0.10); display: flex; flex-direction: column; }
+.header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark { width: 44px; height: 44px; border-radius: 10px; background: var(--teal); color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; overflow: hidden; }
+.brand-mark img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.brand-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px; color: var(--ink); letter-spacing: -0.01em; }
+.brand-meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.doc-meta { text-align: right; }
+.doc-label-row { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+.doc-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.16em; color: var(--muted); }
+.status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; background: var(--danger-50); color: var(--danger); border: 1px solid var(--danger-100); }
+.status-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); }
+.status-badge.paid { background: var(--success-50); color: var(--success); border-color: #BBF7D0; }
+.status-badge.paid .dot { background: var(--success); }
+.doc-number { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 26px; color: var(--ink); letter-spacing: -0.02em; margin-top: 6px; }
+.doc-dates { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.7; }
+.doc-dates strong { color: var(--ink); font-weight: 600; }
+.doc-dates .due-overdue { color: var(--danger); font-weight: 600; }
+.accent { height: 2px; background: var(--teal); margin: 20px 0 28px; opacity: 0.85; }
+.parties { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 28px; }
+.party-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--teal); margin-bottom: 6px; }
+.party-name { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; color: var(--ink); }
+.party-line { font-size: 13px; color: var(--ink); margin-top: 2px; }
+.party-meta { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.6; }
+.refs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 24px; overflow: hidden; }
+.refs > div { padding: 10px 14px; }
+.refs > div + div { border-left: 1px solid var(--border); }
+.refs .l { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); }
+.refs .v { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--ink); margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.quote-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 22px; color: var(--ink); letter-spacing: -0.015em; margin-bottom: 4px; }
+.quote-sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+thead th { text-align: left; padding: 10px 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); border-bottom: 1.5px solid var(--ink); }
+thead th.num { text-align: right; }
+tbody td { padding: 12px; vertical-align: top; font-size: 13px; }
+tbody tr:nth-child(even) { background: var(--row-alt); }
+.item-name { font-weight: 600; color: var(--ink); }
+.item-desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.totals-wrap { display: flex; justify-content: flex-end; margin-bottom: 24px; }
+.totals { width: 50%; min-width: 280px; }
+.total-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
+.total-row:last-child { border-bottom: none; }
+.total-row.rot { color: var(--teal); font-weight: 600; }
+.total-row.late { color: var(--danger); font-weight: 600; }
+.total-row.grand { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; padding: 14px 0 6px; border-top: 1.5px solid var(--ink); border-bottom: none; margin-top: 6px; }
+.total-row .lbl { color: var(--muted); }
+.total-row.grand .lbl { color: var(--ink); }
+.total-row .val { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.total-row.rot .val { color: var(--teal); }
+.total-row.late .val { color: var(--danger); }
+.late-notice { background: var(--danger-50); border: 1px solid var(--danger-100); border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; display: flex; gap: 12px; align-items: flex-start; }
+.late-notice .icon { width: 24px; height: 24px; border-radius: 50%; background: var(--danger); color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+.late-notice .title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: var(--danger); margin-bottom: 2px; }
+.late-notice .text { font-size: 12px; color: var(--ink); line-height: 1.6; }
+.pay-box { border: 1px solid var(--teal-100); background: var(--teal-50); border-radius: 10px; padding: 18px; display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; margin-bottom: 22px; }
+.pay-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--teal); margin-bottom: 6px; }
+.pay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; font-size: 12px; }
+.pay-grid .l { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
+.pay-grid .v { font-family: 'Space Grotesk', sans-serif; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.swish-mark { background: #fff; border: 1px solid var(--teal-100); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 110px; }
+.swish-mark .label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.14em; }
+.swish-mark .num { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; color: var(--ink); letter-spacing: -0.01em; }
+.terms { font-size: 11px; color: var(--muted); line-height: 1.7; margin-bottom: 24px; }
+.terms strong { color: var(--ink); font-weight: 600; }
+.footer { margin-top: auto; padding-top: 18px; border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; font-size: 10px; color: var(--muted); }
+.footer .l { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 2px; }
+.footer .v { color: var(--ink); font-weight: 500; font-size: 11px; }
+.print-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; justify-content: center; gap: 12px; z-index: 100; }
+.print-btn { background: var(--teal); color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.print-btn.secondary { background: #f3f4f6; color: #374151; }
+@media print {
+  body { background: #fff; padding: 0; }
+  .page { box-shadow: none; margin: 0; width: 210mm; min-height: 297mm; }
+  .print-bar { display: none; }
+  @page { size: A4; margin: 0; }
+}
+</style>
+</head>
+<body>
+<div class="print-bar">
+  <button class="print-btn secondary" onclick="window.close()">Stäng</button>
+  <button class="print-btn" onclick="window.print()">Skriv ut / Spara som PDF</button>
+</div>
+<div class="page">
+  <header class="header">
+    <div class="brand">
+      <div class="brand-mark">B</div>
+      <div>
+        <div class="brand-name">Bygg &amp; Co AB</div>
+        <div class="brand-meta">Din lokala hantverkare</div>
+      </div>
+    </div>
+    <div class="doc-meta">
+      <div class="doc-label-row">
+        <div class="doc-label">Kreditfaktura</div>
+        
+      </div>
+      <div class="doc-number">FV-2026-0043</div>
+      <div class="doc-dates">
+        <div><strong>Fakturadatum:</strong> 3 augusti 2026</div>
+        <div><strong>Förfallodatum:</strong> 2 september 2026</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="accent"></div>
+
+  <section class="parties">
+    <div>
+      <div class="party-label">Avsändare</div>
+      <div class="party-name">Bygg &amp; Co AB</div>
+      <div class="party-line">Verkstadsgatan 4, 123 45 Storstad</div>
+      <div class="party-meta">Anna Andersson · 070-1234567<br/>anna@byggco.se</div>
+    </div>
+    <div>
+      <div class="party-label">Mottagare</div>
+      <div class="party-name">Kalle Kund</div>
+      <div class="party-line">Kundvägen 1</div><div class="party-line">123 45 Storstad</div>
+      <div class="party-meta">070-9876543 · kalle@kund.se<br/>Personnr: 19800101-1234</div>
+    </div>
+  </section>
+
+  <div class="refs">
+    <div>
+      <div class="l">OCR-nummer</div>
+      <div class="v">4202 6000 2</div>
+    </div>
+    <div><div class="l">Bankgiro</div><div class="v">123-4567</div></div>
+    <div><div class="l">Vår referens</div><div class="v">Anna Andersson</div></div>
+  </div>
+
+  <h1 class="quote-title">Kreditfaktura — Badrumsrenovering</h1>
+  <p class="quote-sub">Slutfaktura för utfört arbete enligt offert.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Beskrivning</th>
+        <th class="num">Antal</th>
+        <th class="num">Á-pris</th>
+        <th class="num">Summa</th>
+      </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td>
+        <div class="item-name">Rivning badrum</div>
+        <div class="item-desc">Bilning golv + väggar</div>
+      </td>
+      <td class="num">8 tim</td>
+      <td class="num">−650 kr</td>
+      <td class="num">−5 200 kr</td>
+    </tr>
+  
+    <tr>
+      <td>
+        <div class="item-name">Kakel 30x60</div>
+        
+      </td>
+      <td class="num">12 m2</td>
+      <td class="num">−450 kr</td>
+      <td class="num">−5 400 kr</td>
+    </tr>
+  
+    <tr>
+      <td>
+        <div class="item-name">Blandare</div>
+        
+      </td>
+      <td class="num">1 st</td>
+      <td class="num">−1 800 kr</td>
+      <td class="num">−1 800 kr</td>
+    </tr>
+  </tbody>
+  </table>
+
+  <div class="totals-wrap">
+    <div class="totals">
+      <div class="total-row"><span class="lbl">Summa exkl. moms</span><span class="val">−12 400 kr</span></div>
+      <div class="total-row"><span class="lbl">Moms 25%</span><span class="val">−3 100 kr</span></div>
+      <div class="total-row"><span class="lbl">Summa inkl. moms</span><span class="val">−15 500 kr</span></div>
+      <div class="total-row rot"><span class="lbl">ROT-avdrag (30% av arbete)</span><span class="val">−−1 560 kr</span></div>
+      
+      
+      
+      <div class="total-row grand"><span class="lbl">Att betala</span><span class="val">−13 940 kr</span></div>
+    </div>
+  </div>
+
+  
+
+  
+  <div class="pay-box">
+    <div>
+      <div class="pay-title">Betalning</div>
+      <div class="pay-grid">
+        <div class="l">Bankgiro</div><div class="v">123-4567</div>
+        <div class="l">OCR</div><div class="v">4202 6000 2</div>
+        <div class="l">Belopp</div><div class="v">−13 940 kr</div>
+        <div class="l">Förfaller</div><div class="v">2 september 2026</div>
+      </div>
+    </div>
+    
+  </div>
+
+  <p class="terms">
+    <strong>Betalningsvillkor.</strong> 30 dagar netto. Vid försenad betalning tillkommer dröjsmålsränta enligt räntelagen samt påminnelseavgift om 60 kr. ROT-avdraget förutsätter Skatteverkets godkännande; vid avslag faktureras mellanskillnaden separat. Reklamation ska ske inom 10 dagar från fakturadatum.<br/><br/>Tack för förtroendet!
+  </p>
+
+  <footer class="footer">
+    <div><div class="l">Org.nr</div><div class="v">556677-8899</div></div>
+    <div><div class="l">Bankgiro</div><div class="v">123-4567</div></div>
+    <div><div class="l">F-skatt</div><div class="v">Innehas</div></div>
+    <div><div class="l">Moms</div><div class="v">SE556677889901</div></div>
+  </footer>
+</div>
+</body>
+</html>

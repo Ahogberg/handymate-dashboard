@@ -1,5 +1,7 @@
-import type { InvoiceStatus, InvoiceTemplateData, InvoiceTemplateItem } from './types'
+import type { InvoiceStatus, InvoiceTemplateData, InvoiceTemplateItem, InvoiceTemplateItemType } from './types'
 import { formatDateLong } from '@/lib/document-html'
+
+const KNOWN_ITEM_TYPES: InvoiceTemplateItemType[] = ['item', 'heading', 'text', 'subtotal', 'discount']
 
 const DEFAULT_ACCENT = '#0F766E'
 
@@ -46,24 +48,59 @@ function deriveStatus(invoice: any): { status: InvoiceStatus; daysOverdue: numbe
  * Beräknar status, dröjsmålsränta, slutbelopp.
  *
  * @param swishQrDataUrl  Base64 QR-bild från /lib/swish-qr.ts (frivilligt — om null skippar mallen Swish-QR-rendering).
+ *
+ * ETAPP 6a: returnerar `InvoiceTemplateData & { docType: 'invoice' }` —
+ * docType-diskriminanten som dokumentmotorn (components/quotes/document/
+ * QuoteDocument.tsx, MoneyDocumentData-unionen) kräver. Strukturellt
+ * kompatibel med InvoiceTemplateData (premium.ts/friendly.ts's
+ * InvoiceTemplateRenderFn-parameter) — extra-fältet stör inte de gamla
+ * mallsträngarna, de läser bara det de känner till.
  */
 export function buildInvoiceTemplateData(
   invoice: any,
   config: any,
   swishQrDataUrl?: string | null,
-): InvoiceTemplateData {
+): InvoiceTemplateData & { docType: 'invoice' } {
   // ── Items ──────────────────────────────────────────────────────
+  // ETAPP 6a (offert-masterplan.md, faktura-sprinten): tidigare filtrerade
+  // denna funktion bort heading/text-rader helt och behandlade ALLA rader
+  // som 'item' (kvantitet × à-pris) — subtotal/discount-rader fick alltså
+  // fel belopp (t.ex. en delsumma-rad visade "0 × 0 kr = <lagrad total>"
+  // istället för sin egen semantik). FACIT för rätt semantik var den döda
+  // koden i den gamla app/api/invoices/pdf/route.ts (renderInvoiceItems,
+  // nu raderad efter att pariteten verifierats — se
+  // tests/invoice-document-parity.spec.ts): subtotal-rader behåller sin
+  // LAGRADE total (inte kvantitet×pris), discount-rader normaliseras till
+  // NEGATIV total (mallarna visar "−X kr" oavsett lagrat tecken) — exakt
+  // samma normalisering som offertens data-builder redan gjorde för
+  // 'discount' (se buildQuoteTemplateData ovan i systran-filen).
   const rawItems: any[] = invoice.items || []
-  const items: InvoiceTemplateItem[] = rawItems
-    .filter(i => i.item_type !== 'heading' && i.item_type !== 'text')
-    .map(i => ({
+  const items: InvoiceTemplateItem[] = rawItems.map(i => {
+    const itemType: InvoiceTemplateItemType =
+      KNOWN_ITEM_TYPES.includes(i.item_type) ? i.item_type : 'item'
+    const quantity = Number(i.quantity ?? i.qty ?? 0)
+    const unitPrice = Number(i.unit_price ?? i.price ?? 0)
+    let total = Number(i.total ?? (quantity * unitPrice))
+    if (itemType === 'discount') {
+      total = -Math.abs(total)
+    } else if (itemType === 'heading' || itemType === 'text') {
+      total = 0
+    }
+    return {
+      itemType,
+      id: i.id,
       name: i.description || i.name || '',
       description: i.long_description || null,
-      quantity: Number(i.quantity || i.qty || 1),
+      quantity: itemType === 'item' || itemType === 'discount' ? (quantity || 1) : quantity,
       unit: unitLabel(i.unit),
-      unitPrice: Number(i.unit_price || i.price || 0),
-      total: Number(i.total || (Number(i.quantity || i.qty || 1) * Number(i.unit_price || i.price || 0))),
-    }))
+      unitPrice,
+      total,
+      // Etapp 6 (multi-employee-parity-plan.md): vem som utförde arbetet —
+      // sattes redan på raden av from-time-entries/create-invoice-kärnan
+      // men renderades ingenstans innan denna etapp (masterplan-fyndet).
+      performedByName: i.performed_by_name ?? null,
+    }
+  })
 
   // ── Status + sen-dagar ─────────────────────────────────────────
   const { status, daysOverdue } = deriveStatus(invoice)
@@ -131,7 +168,12 @@ export function buildInvoiceTemplateData(
   else if (invoice.invoice_type === 'reminder') title = `Påminnelse — ${title}`
   else if (invoice.invoice_type === 'partial') title = `Delfaktura ${invoice.partial_number || ''} — ${title}`
 
+  // ── Rabatt (global %) ────────────────────────────────────────────
+  const discountPercent = invoice.discount_percent ? Number(invoice.discount_percent) : undefined
+  const discountAmount = invoice.discount_amount ? Number(invoice.discount_amount) : undefined
+
   return {
+    docType: 'invoice',
     business: {
       name: config?.business_name || 'Företag',
       orgNumber: config?.org_number || '',
@@ -171,6 +213,8 @@ export function buildInvoiceTemplateData(
       description: invoice.introduction_text || invoice.description || null,
       items,
       subtotalExVat,
+      discountPercent,
+      discountAmount,
       vatAmount,
       vatRate,
       totalIncVat,
@@ -187,7 +231,20 @@ export function buildInvoiceTemplateData(
       quoteReference: invoice.quote_number || null,
       ourReference: invoice.our_reference || config?.contact_name || null,
       yourReference: invoice.your_reference || null,
+      bankgiro: invoice.bankgiro_number || config?.bankgiro || null,
+      plusgiro: invoice.plusgiro_number || config?.plusgiro || null,
+      // Kreditfaktura — ETAPP 6a punkt (d): facit är den döda koden i den
+      // gamla pdf-routen (generateInvoiceHTML), som skickade BÅDE
+      // is_credit_note/credit_reason (renderades) OCH original_invoice_id
+      // (accepterades av lib/pdf-generator.ts men aldrig renderades där
+      // heller — se rapporten). Vi läser samma kolumn
+      // (invoice.original_invoice_id, INTE credit_for_invoice_id — se
+      // types.ts-kommentaren för varför) men gör ingen extra join för att
+      // slå upp originalfakturans NUMMER; fältet bär det råa id:t tills
+      // ett eventuellt fast-follow lägger till uppslaget.
       isCreditNote: !!invoice.is_credit_note,
+      creditReason: invoice.credit_reason || null,
+      originalInvoiceId: invoice.original_invoice_id || invoice.credit_for_invoice_id || null,
     },
     swishQrDataUrl: swishQrDataUrl || null,
   }

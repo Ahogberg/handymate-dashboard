@@ -1,4 +1,9 @@
-import { renderModern } from './modern'
+// ETAPP 6a (offert-masterplan.md, faktura-sprinten): modern.ts (mallsträngen)
+// pensionerad — renderModernInvoiceHtml (render-react.tsx) kör dokument-
+// motorn (QuoteDocument, docType='invoice') genom renderToStaticMarkup
+// istället. Premium/Friendly fortsätter via sina mallsträngar (samma
+// asymmetri som offerten hade efter E2a).
+import { renderModernInvoiceHtml } from './render-react'
 import { renderPremium } from './premium'
 import { renderFriendly } from './friendly'
 import type {
@@ -12,12 +17,14 @@ export type {
   InvoiceTemplateStyle,
   InvoiceTemplateMeta,
   InvoiceTemplateRenderFn,
+  InvoiceTemplateItem,
+  InvoiceTemplateItemType,
   InvoiceStatus,
 } from './types'
 export { buildInvoiceTemplateData } from './data-builder'
 
 export const INVOICE_TEMPLATES: Record<InvoiceTemplateStyle, InvoiceTemplateRenderFn> = {
-  modern: renderModern,
+  modern: renderModernInvoiceHtml,
   premium: renderPremium,
   friendly: renderFriendly,
 }

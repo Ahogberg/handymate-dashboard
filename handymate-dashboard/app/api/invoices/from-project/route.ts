@@ -3,6 +3,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
+import { createInvoice } from '@/lib/invoices/create-invoice'
 
 export const dynamic = 'force-dynamic'
 
@@ -166,16 +167,13 @@ export async function POST(request: NextRequest) {
     .single()
   const linkedQuoteId = projectRow?.quote_id || null
 
-  // Hämta invoice-nummer
+  // Betalkonton + betalningsvillkor (nummer/OCR sköts nu av createInvoice-kärnan)
   const { data: config } = await supabase
     .from('business_config')
-    .select('invoice_prefix, next_invoice_number, bankgiro_number, plusgiro, swish_number, default_payment_days')
+    .select('bankgiro_number, plusgiro, swish_number, default_payment_days')
     .eq('business_id', business.business_id)
     .single()
 
-  const prefix = config?.invoice_prefix || 'FV'
-  const seqNum = config?.next_invoice_number || 1
-  const invoiceNumber = `${prefix}-${new Date().getFullYear()}-${String(seqNum).padStart(3, '0')}`
   const invoiceId = `inv_${Date.now().toString(36)}${Math.random().toString(36).substr(2, 6)}`
 
   // Beräkna summor
@@ -229,52 +227,61 @@ export async function POST(request: NextRequest) {
     sort_order: idx,
   }))
 
-  const dueDate = new Date()
-  dueDate.setDate(dueDate.getDate() + (payment_days || config?.default_payment_days || 30))
+  const dueDays = payment_days || config?.default_payment_days || 30
 
-  // Skapa faktura
-  const { data: invoice, error } = await supabase
-    .from('invoice')
-    .insert({
-      invoice_id: invoiceId,
-      business_id: business.business_id,
-      customer_id: customer_id || null,
-      project_id,
-      quote_id: linkedQuoteId,
-      invoice_number: invoiceNumber,
-      invoice_type: 'standard',
-      status: 'draft',
+  // ETAPP 6a (offert-masterplan.md): gemensam kärna för nummer/OCR/datum/
+  // insert/bump. invoice_id BEHÅLLS explicit (extraFields) — bara för att
+  // vara identisk med tidigare beteende, inte för att kärnan kräver det
+  // (andra vägar låter DB:ns default generera id:t). OBS dokumenterad
+  // bieffekt: kärnan sätter ALLTID legacy-fältet rot_rut_deduction (som
+  // lib/invoice-templates/data-builder.ts faktiskt läser för att visa
+  // ROT/RUT-raden i dokumentet/PDF:en) — denna väg satte tidigare BARA de
+  // uppdelade rot_deduction/rut_deduction-kolumnerna, aldrig den legacy-
+  // kombinerade. Fakturor skapade härifrån visade alltså ALDRIG ett
+  // ROT/RUT-avdrag i PDF:en. Se rapporten — trolig bugfix, inte en
+  // avsiktlig ändring i denna etapp.
+  let invoiceNumber: string
+  try {
+    const created = await createInvoice(supabase, {
+      businessId: business.business_id,
+      customerId: customer_id || null,
       items: invoiceItems,
       subtotal,
-      vat_rate: vat_rate,
-      vat_amount: vatAmount,
+      vatRate: vat_rate,
+      vatAmount,
       total,
-      discount_percent: discount_percent,
-      discount_amount: discountAmount,
-      customer_pays: customerPays,
-      rot_rut_type: rot_rut_type || null,
-      rot_work_cost: rotWorkCost || null,
-      rot_deduction: rotDeduction || null,
-      rot_customer_pays: rot_rut_type === 'rot' ? customerPays : null,
-      rut_work_cost: rutWorkCost || null,
-      rut_deduction: rutDeduction || null,
-      rut_customer_pays: rot_rut_type === 'rut' ? customerPays : null,
-      rot_personal_number: rot_personal_number || null,
-      rot_property_designation: rot_property_designation || null,
-      invoice_date: new Date().toISOString().split('T')[0],
-      due_date: dueDate.toISOString().split('T')[0],
-      introduction_text: introduction_text || null,
-      conclusion_text: conclusion_text || null,
-      bankgiro_number: config?.bankgiro_number || null,
-      // OBS: plusgiro/swish_number finns INTE som kolumner på invoice (PDF/utskick
-      // läser betalkonton från business_config) — tidigare kastade hela inserten.
+      discountPercent: discount_percent,
+      discountAmount,
+      rotRutType: (rot_rut_type as 'rot' | 'rut' | undefined) || null,
+      rotRutDeduction: rot_rut_type === 'rot' ? rotDeduction : rot_rut_type === 'rut' ? rutDeduction : 0,
+      customerPays,
+      projectId: project_id,
+      quoteId: linkedQuoteId,
+      invoiceType: 'standard',
+      status: 'draft',
+      dueDays,
+      introductionText: introduction_text || null,
+      conclusionText: conclusion_text || null,
+      selectClause: 'invoice_id',
+      extraFields: {
+        invoice_id: invoiceId,
+        rot_work_cost: rotWorkCost || null,
+        rot_deduction: rotDeduction || null,
+        rot_customer_pays: rot_rut_type === 'rot' ? customerPays : null,
+        rut_work_cost: rutWorkCost || null,
+        rut_deduction: rutDeduction || null,
+        rut_customer_pays: rot_rut_type === 'rut' ? customerPays : null,
+        rot_personal_number: rot_personal_number || null,
+        rot_property_designation: rot_property_designation || null,
+        bankgiro_number: config?.bankgiro_number || null,
+        // OBS: plusgiro/swish_number finns INTE som kolumner på invoice
+        // (PDF/utskick läser betalkonton från business_config).
+      },
     })
-    .select('invoice_id')
-    .single()
-
-  if (error) {
-    console.error('Create invoice error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    invoiceNumber = created.invoiceNumber
+  } catch (err: any) {
+    console.error('Create invoice error:', err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 
   // Markera tidposter som fakturerade
@@ -292,12 +299,6 @@ export async function POST(request: NextRequest) {
       .update({ invoiced: true, invoice_id: invoiceId })
       .in('material_id', source_material_ids)
   }
-
-  // Inkrementera invoice-nummer
-  await supabase
-    .from('business_config')
-    .update({ next_invoice_number: seqNum + 1 })
-    .eq('business_id', business.business_id)
 
   return NextResponse.json({ invoice_id: invoiceId, invoice_number: invoiceNumber })
 }

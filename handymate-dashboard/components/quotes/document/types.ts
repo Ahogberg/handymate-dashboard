@@ -4,6 +4,27 @@
  * QuoteDocumentRow.tsx/SignatureCta.tsx kan importera varandras typer utan
  * en cirkulär modulgraf.
  */
+import type { QuoteTemplateData } from '@/lib/quote-templates/types'
+import type { InvoiceTemplateData } from '@/lib/invoice-templates/types'
+
+/**
+ * ETAPP 6a (offert-masterplan.md, faktura-sprinten): docType-diskriminerad
+ * union — dokumentmotorn (QuoteDocument.tsx) generaliseras till att rendera
+ * BÅDE offerter och fakturor. QuoteTemplateData/InvoiceTemplateData
+ * (lib/quote-templates, lib/invoice-templates) förblir OFÖRÄNDRADE som
+ * fristående typer (minsta churn — 25+ befintliga call sites importerar
+ * dem redan) — unionen lägger bara till diskriminanten `docType` ovanpå.
+ * buildQuoteTemplateData sätter `docType: 'quote'`, buildInvoiceTemplateData
+ * sätter `docType: 'invoice'` (se respektive data-builder.ts).
+ *
+ * Filnamnet/komponentnamnen (QuoteDocument.tsx, QuoteDocumentRow.tsx)
+ * BEHÅLLS medvetet trots generaliseringen — en mappflytt/omdöpning till
+ * "MoneyDocument" hade krävt att ändra importvägen på 19+ ställen för noll
+ * funktionell vinst. Se rapporten för det beslutet.
+ */
+export type MoneyDocumentData =
+  | (QuoteTemplateData & { docType: 'quote' })
+  | (InvoiceTemplateData & { docType: 'invoice' })
 
 /** Fält som canvasen kan patcha på en rad — id-baserat, INTE index-baserat
     (ETAPP 2a ersätter new/page.tsx:s tidigare index-mutation). Sparse-patch:

@@ -2,7 +2,22 @@
  * Gemensamt data-shape för alla faktura-mallar.
  * Speglar quote-templates/types.ts men med faktura-specifika fält
  * (status, OCR, förfallodatum, sen-notis, dröjsmålsränta).
+ *
+ * ETAPP 6a (offert-masterplan.md, faktura-sprinten): InvoiceTemplateItem
+ * ÄTERANVÄNDER nu QuoteTemplateItem rakt av (samma fält-shape: itemType,
+ * id, name, description, quantity, unit, unitPrice, total, performedByName
+ * m.fl.) istället för en egen smalare flat item-typ. Det är vad som gör det
+ * möjligt för dokumentmotorn (components/quotes/document/QuoteDocument.tsx
+ * + QuoteDocumentRow.tsx) att rendera BÅDE offert- och fakturarader genom
+ * SAMMA radkomponent utan typcasting — 'option' är fortfarande giltigt i
+ * unionen (QuoteTemplateItemType) men produceras aldrig av
+ * buildInvoiceTemplateData, och isRotEligible/rotRutType/components/
+ * optionSelected är helt enkelt outnyttjade på fakturasidan (harmlöst).
  */
+import type { QuoteTemplateItem, QuoteTemplateItemType } from '@/lib/quote-templates/types'
+
+export type InvoiceTemplateItemType = Exclude<QuoteTemplateItemType, 'option'>
+export type InvoiceTemplateItem = QuoteTemplateItem
 
 export interface InvoiceTemplateBusiness {
   name: string
@@ -33,15 +48,6 @@ export interface InvoiceTemplateCustomer {
   reference?: string | null
 }
 
-export interface InvoiceTemplateItem {
-  name: string
-  description?: string | null
-  quantity: number
-  unit: string
-  unitPrice: number
-  total: number
-}
-
 export type InvoiceStatus = 'unpaid' | 'paid' | 'overdue' | 'reminder'
 
 export interface InvoiceTemplateInvoice {
@@ -58,6 +64,12 @@ export interface InvoiceTemplateInvoice {
   items: InvoiceTemplateItem[]
 
   subtotalExVat: number
+  /** Global procentrabatt — ETAPP 6a: fakturan kan ärva discount_percent/
+      discount_amount från invoice-raden (samma fält som offertens
+      discountPercent/discountAmount). Utelämnad → raden renderas inte
+      (samma princip som QuoteTemplateQuote). */
+  discountPercent?: number
+  discountAmount?: number
   vatAmount: number
   vatRate: number
   totalIncVat: number
@@ -81,8 +93,22 @@ export interface InvoiceTemplateInvoice {
   ourReference?: string | null
   yourReference?: string | null
 
-  // Kreditfaktura
+  // Betalinstruktioner (ETAPP 6a: OCR-raden + bankgiro/plusgiro renderas
+  // av InvoicePaymentSection.tsx i dokumentmotorn — samma fält som
+  // Swish-blocket redan använde via business.bankgiro/plusgiro).
+  bankgiro?: string | null
+  plusgiro?: string | null
+
+  // Kreditfaktura — ETAPP 6a: facit är den döda koden i den gamla
+  // app/api/invoices/pdf/route.ts (generateInvoiceHTML/renderInvoiceItems,
+  // nu raderad) som läste invoice.credit_reason för notisen bredvid
+  // titeln. originalInvoiceId speglar invoice.original_invoice_id (INTE
+  // credit_for_invoice_id — se datab-builder-kommentaren för varför den
+  // kolumnen valdes) men renderas idag inte som en uppslagen fakturareferens
+  // (kräver en extra join som data-builder medvetet INTE gör — se rapporten).
   isCreditNote?: boolean
+  creditReason?: string | null
+  originalInvoiceId?: string | null
 }
 
 export interface InvoiceTemplateData {

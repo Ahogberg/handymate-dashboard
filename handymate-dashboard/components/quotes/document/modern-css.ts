@@ -124,4 +124,34 @@ export const MODERN_DOCUMENT_CSS = `
 .quote-document tbody tr.row-tap:active { background: rgba(15, 118, 110, 0.08) !important; }
 .quote-document tbody tr.row-tap .row-action { opacity: 1; }
 .quote-document tbody tr.row-tap .row-action button { padding: 8px; font-size: 15px; }
+
+/* ETAPP 6a (offert-masterplan.md, faktura-sprinten): fakturaunika tillägg.
+   Delar teal/typografitokens med resten av .quote-document ovan — samma
+   scope-princip (motorn används nu av BÅDE offert- och fakturaläge). */
+.quote-document .item-performed-by { color: #94A3B8; font-size: 10px; margin-top: 2px; }
+.quote-document .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; background: #FEF2F2; color: #DC2626; border: 1px solid #FEE2E2; }
+.quote-document .status-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #DC2626; }
+.quote-document .status-badge.paid { background: #F0FDF4; color: #16A34A; border-color: #BBF7D0; }
+.quote-document .status-badge.paid .dot { background: #16A34A; }
+.quote-document .status-badge.credit { background: var(--qd-accent-50); color: var(--qd-accent); border-color: var(--qd-accent-100); }
+.quote-document .status-badge.credit .dot { background: var(--qd-accent); }
+.quote-document .doc-dates .due-overdue { color: #DC2626; font-weight: 600; }
+.quote-document .refs { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #E2E8F0; border-radius: 8px; margin-bottom: 24px; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
+.quote-document .refs > div { padding: 10px 14px; }
+.quote-document .refs > div + div { border-left: 1px solid #E2E8F0; }
+.quote-document .refs .l { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: #64748B; }
+.quote-document .refs .v { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: #0F172A; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.quote-document .total-row.late { color: #DC2626; font-weight: 600; }
+.quote-document .total-row.late .val { color: #DC2626; }
+.quote-document .late-notice { background: #FEF2F2; border: 1px solid #FEE2E2; border-radius: 10px; padding: 14px 18px; margin-bottom: 24px; display: flex; gap: 12px; align-items: flex-start; break-inside: avoid; page-break-inside: avoid; }
+.quote-document .late-notice .icon { width: 24px; height: 24px; border-radius: 50%; background: #DC2626; color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+.quote-document .late-notice .title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: #DC2626; margin-bottom: 2px; }
+.quote-document .late-notice .text { font-size: 12px; color: #0F172A; line-height: 1.6; }
+.quote-document .paid-banner { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 10px; padding: 18px; margin-bottom: 24px; text-align: center; break-inside: avoid; page-break-inside: avoid; }
+.quote-document .paid-banner .title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: #16A34A; }
+.quote-document .paid-banner .sub { font-size: 12px; color: #64748B; margin-top: 4px; }
+.quote-document .credit-banner { background: var(--qd-accent-50); border: 1px solid var(--qd-accent-100); border-radius: 10px; padding: 16px 18px; margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid; }
+.quote-document .credit-banner .title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: var(--qd-accent); margin-bottom: 2px; }
+.quote-document .credit-banner .text { font-size: 12px; color: #0F172A; line-height: 1.6; }
+.quote-document .pay-box .swish-mark img { width: 64px; height: 64px; border-radius: 4px; margin-bottom: 4px; }
 `

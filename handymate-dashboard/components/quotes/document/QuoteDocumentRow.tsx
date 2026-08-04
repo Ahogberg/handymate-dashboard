@@ -260,6 +260,11 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
           {isEdit && <>{' '}<RotBadge item={item} onCycle={fieldsEditable ? () => handlers!.onItemRotRutCycle(item.id!) : undefined} /></>}
         </div>
         {item.description ? <div className="item-desc">{item.description}</div> : null}
+        {/* ETAPP 6a (offert-masterplan.md, faktura-sprinten): performed_by_name
+            (multi-employee-parity-planet) renderas diskret under raden —
+            docType-agnostiskt fält (alltid undefined för offertrader idag,
+            eftersom offertens data-builder aldrig sätter det). */}
+        {item.performedByName ? <div className="item-performed-by">Utfört av {item.performedByName}</div> : null}
         {componentSpec(item.components)}
       </td>
       {qtyCell}

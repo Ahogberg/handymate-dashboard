@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { generateOCR } from '@/lib/ocr'
+import { createInvoice } from '@/lib/invoices/create-invoice'
 
 /**
  * POST - Skapa kreditfaktura (hel eller delkredit)
@@ -106,45 +107,38 @@ export async function POST(request: NextRequest) {
       customerPays = total - rotRutDeduction
     }
 
-    const { data: creditNote, error: creditError } = await supabase
-      .from('invoice')
-      .insert({
-        business_id,
-        customer_id: original.customer_id,
-        invoice_number: creditNumber,
-        invoice_type: 'credit',
-        status: 'sent',
-        items: creditItems,
-        subtotal,
-        vat_rate: vatRate,
-        vat_amount: vatAmount,
-        total,
-        rot_rut_type: original.rot_rut_type,
-        rot_rut_deduction: rotRutDeduction,
-        customer_pays: customerPays,
-        personnummer: original.personnummer,
-        fastighetsbeteckning: original.fastighetsbeteckning,
-        invoice_date: invoiceDate.toISOString().split('T')[0],
-        due_date: invoiceDate.toISOString().split('T')[0],
+    // ETAPP 6a (offert-masterplan.md): kreditfakturan har en EGEN nummerserie
+    // (KF-YYYY-NNN, räknad på COUNT(*) ovan) — INTE business_config.
+    // next_invoice_number-serien som RPC:n (sql/v81) atomiserar. numberOverride
+    // kringgår därför RPC:n medvetet (se create-invoice.ts-kommentaren) —
+    // resten av sexstegskedjan (datum/insert) delas ändå med de andra sju
+    // vägarna. dueDays=0 speglar oförändrat beteende (due_date = invoiceDate).
+    const { invoice: creditNote } = await createInvoice(supabase, {
+      businessId: business_id,
+      customerId: original.customer_id,
+      items: creditItems,
+      subtotal,
+      vatRate,
+      vatAmount,
+      total,
+      rotRutType: original.rot_rut_type,
+      rotRutDeduction,
+      customerPays,
+      invoiceType: 'credit',
+      status: 'sent',
+      dueDays: 0,
+      invoiceDate,
+      personnummer: original.personnummer,
+      fastighetsbeteckning: original.fastighetsbeteckning,
+      numberOverride: { invoiceNumber: creditNumber, ocrNumber },
+      selectClause: `*, customer:customer_id ( customer_id, name, phone_number, email, address_line )`,
+      extraFields: {
         is_credit_note: true,
         original_invoice_id,
         credit_for_invoice_id: original_invoice_id,
         credit_reason: credit_reason || null,
-        ocr_number: ocrNumber,
-      })
-      .select(`
-        *,
-        customer:customer_id (
-          customer_id,
-          name,
-          phone_number,
-          email,
-          address_line
-        )
-      `)
-      .single()
-
-    if (creditError) throw creditError
+      },
+    })
 
     // Markera originalfaktura som krediterad (only if full credit)
     if (credit_type === 'full') {

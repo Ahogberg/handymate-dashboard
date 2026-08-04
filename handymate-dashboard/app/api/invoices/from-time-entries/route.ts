@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { generateOCR } from '@/lib/ocr'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
+import { createInvoice } from '@/lib/invoices/create-invoice'
 
 /**
  * POST - Skapa faktura från tidrapporter
@@ -110,22 +110,15 @@ export async function POST(request: NextRequest) {
     const vatAmount = subtotal * (vatRate / 100)
     const total = subtotal + vatAmount
 
-    // Hämta prefix + nummer
+    // Betalningsvillkor (nummer/OCR sköts nu av createInvoice-kärnan)
     const { data: config } = await supabase
       .from('business_config')
-      .select('invoice_prefix, next_invoice_number, default_payment_days')
+      .select('default_payment_days')
       .eq('business_id', business_id)
       .single()
 
-    const prefix = config?.invoice_prefix || 'FV'
-    const nextNum = config?.next_invoice_number || 1
-    const year = new Date().getFullYear()
-    const invoiceNumber = `${prefix}-${year}-${String(nextNum).padStart(3, '0')}`
-    const ocrNumber = generateOCR(String(nextNum))
     const dueDays = config?.default_payment_days || 30
     const invoiceDate = new Date()
-    const dueDate = new Date(invoiceDate)
-    dueDate.setDate(dueDate.getDate() + dueDays)
 
     // Resolve customer_id from entries if not provided
     const resolvedCustomerId = customer_id || timeEntries?.[0]?.customer_id || null
@@ -154,47 +147,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: invoice, error: insertError } = await supabase
-      .from('invoice')
-      .insert({
-        business_id,
-        customer_id: resolvedCustomerId,
-        invoice_number: invoiceNumber,
-        invoice_type: 'standard',
-        status: 'draft',
-        items,
-        subtotal,
-        vat_rate: vatRate,
-        vat_amount: vatAmount,
-        total,
-        rot_rut_type: rot_rut_type || null,
-        rot_rut_deduction: rotRutDeduction,
-        customer_pays: customerPays,
-        personnummer,
-        fastighetsbeteckning,
-        invoice_date: invoiceDate.toISOString().split('T')[0],
-        due_date: dueDate.toISOString().split('T')[0],
-        ocr_number: ocrNumber,
-      })
-      .select(`
-        *,
-        customer:customer_id (
-          customer_id,
-          name,
-          phone_number,
-          email,
-          address_line
-        )
-      `)
-      .single()
-
-    if (insertError) throw insertError
-
-    // Increment next number
-    await supabase
-      .from('business_config')
-      .update({ next_invoice_number: nextNum + 1 })
-      .eq('business_id', business_id)
+    // ETAPP 6a (offert-masterplan.md): gemensam kärna för nummer/OCR/
+    // datum/insert/bump — se lib/invoices/create-invoice.ts.
+    const { invoice } = await createInvoice(supabase, {
+      businessId: business_id,
+      customerId: resolvedCustomerId,
+      items,
+      subtotal,
+      vatRate,
+      vatAmount,
+      total,
+      rotRutType: (rot_rut_type as 'rot' | 'rut' | undefined) || null,
+      rotRutDeduction,
+      customerPays,
+      invoiceType: 'standard',
+      status: 'draft',
+      dueDays,
+      invoiceDate,
+      personnummer,
+      fastighetsbeteckning,
+      selectClause: `*, customer:customer_id ( customer_id, name, phone_number, email, address_line )`,
+    })
 
     // Markera tidrapporter som fakturerade
     await supabase

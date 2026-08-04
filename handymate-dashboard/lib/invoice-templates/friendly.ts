@@ -15,17 +15,46 @@ export const renderFriendly: InvoiceTemplateRenderFn = (data: InvoiceTemplateDat
   const isOverdue = data.invoice.status === 'overdue'
   const isPaid = data.invoice.status === 'paid'
 
-  const itemsHtml = data.invoice.items.map((item, i) => `
+  // ETAPP 6a (offert-masterplan.md, faktura-sprinten): se motsvarande
+  // kommentar i premium.ts — buildInvoiceTemplateData skickar nu även
+  // heading/text/subtotal/discount-rader, denna sträng-mall grenar därför
+  // radtypen själv istället för att anta att alla rader är 'item'.
+  let itemNum = 0
+  const itemsHtml = data.invoice.items.map(item => {
+    const itemType = item.itemType || 'item'
+    if (itemType === 'heading') {
+      return `<div style="font-weight:700;font-size:14px;color:var(--ink);padding:10px 4px 2px;">${escapeHtml(item.name)}</div>`
+    }
+    if (itemType === 'text') {
+      return `<div style="color:var(--muted);font-size:12px;padding:4px;">${escapeHtml(item.name)}</div>`
+    }
+    if (itemType === 'subtotal') {
+      return `<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 4px;font-weight:600;color:var(--ink);border-top:1px solid rgba(15,23,42,0.08);"><span>${escapeHtml(item.name || 'Delsumma')}</span><span>${formatCurrency(item.total)}</span></div>`
+    }
+    if (itemType === 'discount') {
+      return `
+      <div class="item-card">
+        <div class="item-num">−</div>
+        <div class="item-body">
+          <div class="name">${escapeHtml(item.name || 'Rabatt')}</div>
+        </div>
+        <div class="item-amt">−${formatCurrency(Math.abs(item.total))}</div>
+      </div>`
+    }
+    itemNum += 1
+    return `
     <div class="item-card">
-      <div class="item-num">${i + 1}</div>
+      <div class="item-num">${itemNum}</div>
       <div class="item-body">
         <div class="name">${escapeHtml(item.name)}</div>
         ${item.description ? `<div class="desc">${escapeHtml(item.description)}</div>` : ''}
+        ${item.performedByName ? `<div class="desc" style="opacity:0.75;">Utfört av ${escapeHtml(item.performedByName)}</div>` : ''}
         <div class="qty">${formatNumber(item.quantity)} ${escapeHtml(item.unit)} á ${formatCurrency(item.unitPrice)}</div>
       </div>
       <div class="item-amt">${formatCurrency(item.total)}</div>
     </div>
-  `).join('')
+  `
+  }).join('')
 
   const customerLines = [
     [data.customer.address, data.customer.postalCode, data.customer.city].filter(Boolean).join(', '),

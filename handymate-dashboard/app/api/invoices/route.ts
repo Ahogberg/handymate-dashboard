@@ -4,8 +4,8 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
-import { generateOCR } from '@/lib/ocr'
 import { InvoiceItem } from '@/lib/types/invoice'
+import { createInvoice } from '@/lib/invoices/create-invoice'
 
 /**
  * GET - Lista fakturor för ett företag
@@ -275,25 +275,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Hämta business_config för prefix + next_number
-    const { data: config } = await supabase
-      .from('business_config')
-      .select('invoice_prefix, next_invoice_number')
-      .eq('business_id', business_id)
-      .single()
-
-    const prefix = config?.invoice_prefix || 'FV'
-    const nextNum = config?.next_invoice_number || 1
-    const year = new Date().getFullYear()
-    const invoiceNumber = `${prefix}-${year}-${String(nextNum).padStart(3, '0')}`
-
-    // Generate OCR
-    const ocrNumber = generateOCR(String(nextNum))
-
-    // Beräkna förfallodatum
     const invoiceDateVal = providedInvoiceDate ? new Date(providedInvoiceDate) : new Date()
-    const dueDate = new Date(invoiceDateVal)
-    dueDate.setDate(dueDate.getDate() + due_days)
 
     // Härd: om client skickade quote_id men inte project_id, försök
     // backlinka via project.quote_id (samma mönster som from-quote/1.3b).
@@ -310,53 +292,34 @@ export async function POST(request: NextRequest) {
       if (projectMatch) resolvedProjectId = projectMatch.project_id
     }
 
-    const { data: invoice, error: insertError } = await supabase
-      .from('invoice')
-      .insert({
-        business_id,
-        customer_id,
-        quote_id,
-        project_id: resolvedProjectId,
-        invoice_number: invoiceNumber,
-        invoice_type: invoice_type || 'standard',
-        status: 'draft',
-        items,
-        subtotal,
-        vat_rate,
-        vat_amount: vatAmount,
-        total,
-        rot_rut_type,
-        rot_rut_deduction: rotRutDeduction,
-        customer_pays: customerPays,
-        invoice_date: invoiceDateVal.toISOString().split('T')[0],
-        due_date: dueDate.toISOString().split('T')[0],
-        ocr_number: ocrNumber,
-        our_reference: our_reference || null,
-        your_reference: your_reference || null,
-        personnummer: personnummer || null,
-        fastighetsbeteckning: fastighetsbeteckning || null,
-        introduction_text: introduction_text || null,
-        conclusion_text: conclusion_text || null,
-      })
-      .select(`
-        *,
-        customer:customer_id (
-          customer_id,
-          name,
-          phone_number,
-          email,
-          address_line
-        )
-      `)
-      .single()
-
-    if (insertError) throw insertError
-
-    // Increment next_invoice_number
-    await supabase
-      .from('business_config')
-      .update({ next_invoice_number: nextNum + 1 })
-      .eq('business_id', business_id)
+    // ETAPP 6a (offert-masterplan.md): gemensam kärna för nummer/OCR/
+    // datum/insert/bump — se lib/invoices/create-invoice.ts. Totals-/ROT-
+    // beräkningen ovan är OFÖRÄNDRAD (kärnan tar bara emot färdiga värden).
+    const { invoice } = await createInvoice(supabase, {
+      businessId: business_id,
+      customerId: customer_id,
+      items,
+      subtotal,
+      vatRate: vat_rate,
+      vatAmount,
+      total,
+      rotRutType: rot_rut_type ?? null,
+      rotRutDeduction,
+      customerPays,
+      projectId: resolvedProjectId,
+      quoteId: quote_id,
+      invoiceType: invoice_type || 'standard',
+      status: 'draft',
+      dueDays: due_days,
+      invoiceDate: invoiceDateVal,
+      ourReference: our_reference || null,
+      yourReference: your_reference || null,
+      personnummer: personnummer || null,
+      fastighetsbeteckning: fastighetsbeteckning || null,
+      introductionText: introduction_text || null,
+      conclusionText: conclusion_text || null,
+      selectClause: `*, customer:customer_id ( customer_id, name, phone_number, email, address_line )`,
+    })
 
     // Markera tidrapporter som fakturerade
     if (time_entry_ids && time_entry_ids.length > 0) {

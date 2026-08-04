@@ -9,8 +9,8 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
-import { generateOCR } from '@/lib/ocr'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
+import { createInvoice } from '@/lib/invoices/create-invoice'
 
 interface AutoInvoiceResult {
   success: boolean
@@ -197,59 +197,48 @@ export async function autoInvoiceOnComplete(
     // 7. Hämta config
     const { data: config } = await supabase
       .from('business_config')
-      .select('invoice_prefix, next_invoice_number, default_payment_days, auto_invoice_on_complete, business_name, personal_phone, swish_number')
+      .select('default_payment_days, auto_invoice_on_complete, business_name, personal_phone, swish_number')
       .eq('business_id', businessId)
       .single()
 
     const autoSend = config?.auto_invoice_on_complete === true
-    const prefix = config?.invoice_prefix || 'FV'
-    const nextNum = config?.next_invoice_number || 1
-    const year = new Date().getFullYear()
-    const invoiceNumber = `${prefix}-${year}-${String(nextNum).padStart(3, '0')}`
-    const ocrNumber = generateOCR(String(nextNum))
     const dueDays = config?.default_payment_days || 30
     const invoiceDate = new Date()
     const dueDate = new Date(invoiceDate)
     dueDate.setDate(dueDate.getDate() + dueDays)
 
-    // 8. Skapa faktura
+    // 8. Skapa faktura — ETAPP 6a (offert-masterplan.md): gemensam kärna
+    // för nummer/OCR/datum/insert/bump, se lib/invoices/create-invoice.ts.
     const invoiceStatus = autoSend ? 'sent' : 'draft'
-    const { data: invoice, error: insertErr } = await supabase
-      .from('invoice')
-      .insert({
-        business_id: businessId,
-        customer_id: project.customer_id,
-        project_id: projectId,
-        quote_id: project.quote_id || null,
-        invoice_number: invoiceNumber,
-        invoice_type: 'standard',
-        status: invoiceStatus,
+    let invoice: { invoice_id: string; invoice_number: string; total: number; status: string }
+    let invoiceNumber: string
+    try {
+      const created = await createInvoice(supabase, {
+        businessId,
+        customerId: project.customer_id,
         items: allItems,
         subtotal,
-        vat_rate: vatRate,
-        vat_amount: vatAmount,
+        vatRate,
+        vatAmount,
         total,
-        rot_rut_type: rotRutType,
-        rot_rut_deduction: rotRutDeduction,
-        customer_pays: customerPays || total,
+        rotRutType: (rotRutType as 'rot' | 'rut' | null) || null,
+        rotRutDeduction,
+        customerPays: customerPays || total,
+        projectId,
+        quoteId: project.quote_id || null,
+        invoiceType: 'standard',
+        status: invoiceStatus,
+        dueDays,
+        invoiceDate,
         personnummer,
         fastighetsbeteckning,
-        invoice_date: invoiceDate.toISOString().split('T')[0],
-        due_date: dueDate.toISOString().split('T')[0],
-        ocr_number: ocrNumber,
+        selectClause: 'invoice_id, invoice_number, total, status',
       })
-      .select('invoice_id, invoice_number, total, status')
-      .single()
-
-    if (insertErr) {
+      invoice = created.invoice
+      invoiceNumber = created.invoiceNumber
+    } catch (insertErr: any) {
       return { success: false, error: insertErr.message }
     }
-
-    // Increment fakturanummer
-    await supabase
-      .from('business_config')
-      .update({ next_invoice_number: nextNum + 1 })
-      .eq('business_id', businessId)
 
     // Markera ÄTA som fakturerade
     if (atas && atas.length > 0) {

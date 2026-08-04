@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { createInvoice } from '@/lib/invoices/create-invoice'
 
 /**
  * POST - Auto-generera fakturor från ofakturerade tidrapporter.
@@ -178,44 +179,42 @@ async function generateInvoicesForBusiness(params: {
         continue
       }
 
-      // Generate invoice number
-      const { count: invoiceCount } = await supabase
-        .from('invoice')
-        .select('*', { count: 'exact', head: true })
-        .eq('business_id', params.businessId)
-
-      const invoiceNumber = `${new Date().getFullYear()}-${String((invoiceCount || 0) + 1).padStart(4, '0')}`
-
-      // Calculate due date
-      const dueDate = new Date()
-      dueDate.setDate(dueDate.getDate() + (business.default_payment_days || 30))
-
-      // Create invoice
-      const { data: invoice, error: insertError } = await supabase
-        .from('invoice')
-        .insert({
-          business_id: params.businessId,
-          customer_id: customerId,
-          invoice_number: invoiceNumber,
-          status: 'draft',
+      // ETAPP 6a (offert-masterplan.md): gemensam kärna för nummer/OCR/
+      // datum/insert/bump — se lib/invoices/create-invoice.ts. FIXAR TVÅ
+      // BUGGAR som fanns här innan: (1) ocr_number sattes ALDRIG (kunden
+      // kunde inte betala med OCR-referens), (2) fakturanumret följde en
+      // egen serie (`${year}-NNNN`, räknad på ett rått COUNT(*) över ALLA
+      // fakturor oavsett år) istället för samma prefix-YYYY-NNN-serie +
+      // business_config.next_invoice_number som resten av appen använder
+      // — två auto-genererade fakturor för samma kund kunde alltså få
+      // "2026-0001" HÄR och "FV-2026-014" på en manuellt skapad faktura,
+      // en förvirrande dubbel-numrering. Nu enhetligt.
+      const dueDays = business.default_payment_days || 30
+      let invoiceId: string
+      let invoiceNumber: string
+      try {
+        const created = await createInvoice(supabase, {
+          businessId: params.businessId,
+          customerId,
           items,
           subtotal,
-          vat_rate: vatRate,
-          vat_amount: vat,
+          vatRate,
+          vatAmount: vat,
           total,
-          customer_pays: total,
-          due_date: dueDate.toISOString().split('T')[0],
-          // OBS: kolumnerna 'vat'/'source'/'notes' finns inte i invoice-schemat
-          // och fick varje insert att kasta (auto-fakturering skapade 0 fakturor
-          // men rapporterade success). vat → vat_amount; source/notes borttagna.
+          customerPays: total,
+          status: 'draft',
+          dueDays,
+          selectClause: 'invoice_id',
         })
-        .select('invoice_id')
-        .single()
-
-      if (insertError) {
+        invoiceId = created.invoice.invoice_id
+        invoiceNumber = created.invoiceNumber
+      } catch (insertError: any) {
         result.errors.push(`${customerName}: ${insertError.message}`)
         continue
       }
+      const invoice = { invoice_id: invoiceId }
+      const dueDate = new Date()
+      dueDate.setDate(dueDate.getDate() + dueDays)
 
       // Mark time entries as invoiced
       const entryIds = entries.map((e: any) => e.time_entry_id)
