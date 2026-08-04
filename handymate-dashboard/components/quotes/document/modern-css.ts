@@ -98,6 +98,8 @@ export const MODERN_DOCUMENT_CSS = `
 .quote-document .footer .l { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: #64748B; margin-bottom: 2px; }
 .quote-document .footer .v { color: #0F172A; font-weight: 500; font-size: 11px; }
 .quote-document .signature-cta { border: 1px solid var(--qd-accent-100); background: var(--qd-accent-50); border-radius: 10px; padding: 18px 20px; text-align: center; margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid; }
+.quote-document .signature-cta.signature-cta--link { display: block; text-decoration: none; cursor: pointer; transition: background-color 120ms ease; }
+.quote-document .signature-cta.signature-cta--link:hover { background: var(--qd-accent-100); }
 .quote-document .signature-cta .sig-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: var(--qd-accent); }
 .quote-document .signature-cta .sig-sub { font-size: 11px; color: #64748B; margin-top: 4px; }
 .quote-document .signature-cta.signed { background: #F0FDF4; border-color: #BBF7D0; }

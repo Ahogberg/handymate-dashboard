@@ -346,7 +346,7 @@ export default function PortalQuoteSigningModal({
                 <div style={{ marginBottom: 18 }}>
                   <a
                     className="bp-cta ghost"
-                    href={`/api/quotes/pdf?token=${quote.sign_token}`}
+                    href={`/quote/${quote.sign_token}`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >

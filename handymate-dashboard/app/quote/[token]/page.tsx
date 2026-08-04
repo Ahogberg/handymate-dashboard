@@ -13,53 +13,20 @@ import {
   PenTool,
   Calendar,
   User,
-  Hammer,
   Package,
-  Wrench,
   XCircle,
   Clock,
 } from 'lucide-react'
 import {
   calculatePublicQuoteTotals,
   calculatePublicQuoteTotalsFromBase,
+  type PublicStructuredItem,
 } from '@/lib/quote-calculations'
-import type { QuoteTotals } from '@/lib/types/quote'
+import { applyLiveSelectionToTemplateData } from '@/lib/quotes/public-document'
+import { PublicQuoteDocument } from './components/PublicQuoteDocument'
+import type { QuoteTemplateData } from '@/lib/quote-templates/types'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-
-interface QuoteItem {
-  description: string
-  quantity: number
-  unit: string
-  unit_price: number
-  total: number
-  type?: 'labor' | 'material' | 'service'
-}
-
-// Rader från quote_items-tabellen (moderna offerter) — renderas i sort_order
-interface StructuredQuoteItem {
-  id: string
-  item_type: 'item' | 'heading' | 'text' | 'subtotal' | 'discount' | 'option'
-  group_name?: string | null
-  description: string | null
-  quantity: number | null
-  unit: string | null
-  unit_price: number | null
-  total: number | null
-  sort_order: number
-  is_rot_eligible?: boolean | null
-  is_rut_eligible?: boolean | null
-  rot_rut_type?: 'rot' | 'rut' | null
-  /** Endast 'option'-rader: kundens val (☑/☐) — quote_items.option_selected */
-  option_selected?: boolean | null
-  /** Endast 'option'-rader: hantverkarens Förvald-toggle */
-  option_default?: boolean | null
-  /** Produktbank (v67): arbetsandel i kr — live-totalen för tillval behöver den. */
-  labor_amount?: number | null
-  /** Per-rad-override: komponentspec som får visas för kunden (ej kostnader). */
-  show_components_to_customer?: boolean | null
-  component_snapshot?: { components?: Array<{ description?: string; quantity_per_unit?: number; unit?: string }> } | null
-}
 
 interface BusinessInfo {
   name: string
@@ -76,14 +43,10 @@ interface QuoteData {
   quote_id: string
   title?: string
   description?: string
-  items: QuoteItem[]
-  structured_items?: StructuredQuoteItem[]
-  /** Visningsnivå (Del C) — server-filtrerad. */
-  display_level?: 'summary' | 'rows' | 'full'
-  /** Endast 'summary': gruppsummor (heading + belopp). */
-  display_groups?: Array<{ heading: string; total: number }>
-  /** Endast summary/rows med tillval: bas-totaler (icke-tillvalsrader). */
-  base_totals?: QuoteTotals
+  structured_items?: PublicStructuredItem[]
+  /** Bas-totaler (icke-tillvalsrader) — endast satt när à-priserna strippats
+      ur svaret (summary/rows-nivå med tillval). */
+  base_totals?: ReturnType<typeof calculatePublicQuoteTotals>
   labor_total: number
   material_total: number
   subtotal: number
@@ -108,6 +71,12 @@ interface QuoteData {
     email?: string
     address_line?: string
   }
+  /** ETAPP 5 (offert-masterplan.md): dokumentet ÄR gränssnittet — samma
+      templateData/HTML som PDF:en/"Visa offert" bygger på. Se
+      app/api/quotes/public/[token]/route.ts. */
+  template_data?: QuoteTemplateData | null
+  template_style?: 'modern' | 'premium' | 'friendly'
+  document_html?: string | null
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -118,29 +87,6 @@ const formatSEK = (amount: number) =>
     currency: 'SEK',
     maximumFractionDigits: 0,
   }).format(amount)
-
-/**
- * Per-rad-override (show_components_to_customer): komponentspec under raden.
- * ALDRIG interna kostnader — bara beskrivning + mängd per enhet + enhet.
- */
-function renderComponentSpec(item: StructuredQuoteItem) {
-  if (item.show_components_to_customer !== true) return null
-  const comps = item.component_snapshot?.components
-  if (!Array.isArray(comps) || comps.length === 0) return null
-  return (
-    <ul className="mt-1.5 space-y-0.5">
-      {comps.map((c, i) => (
-        <li key={i} className="text-xs text-gray-400 flex gap-1.5">
-          <span className="text-primary-700">–</span>
-          <span>
-            {c.description}
-            {c.quantity_per_unit ? ` · ${c.quantity_per_unit} ${c.unit || ''}` : ''}
-          </span>
-        </li>
-      ))}
-    </ul>
-  )
-}
 
 const DECLINE_REASONS = [
   { value: 'too_expensive', label: 'Priset är för högt' },
@@ -211,7 +157,7 @@ export default function QuoteSignPage() {
 
         // Initiera tillvalsvalen från lagrat option_selected (Förvald-toggle
         // vid skapande, kundens val efter signering).
-        const optionIds = ((quoteData.structured_items || []) as StructuredQuoteItem[])
+        const optionIds = ((quoteData.structured_items || []) as PublicStructuredItem[])
           .filter((i) => i.item_type === 'option' && i.option_selected === true)
           .map((i) => i.id)
         setSelectedOptions(new Set(optionIds))
@@ -420,6 +366,28 @@ export default function QuoteSignPage() {
       if (!res.ok) {
         setErrorMessage(data.error || 'Kunde inte spara signaturen')
       } else {
+        // ETAPP 5 (offert-masterplan.md), punkt 4: dokumentet (visas kvar på
+        // 'success'-skärmen) ska speglas som signerat direkt, utan att vänta
+        // på en ny GET-runda — servern är fortfarande den auktoritativa
+        // sanningen (redan skriven ovan), detta är bara den lokala vyn.
+        const signedDate = new Date().toLocaleDateString('sv-SE', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })
+        setQuote((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: 'accepted',
+                signed_at: new Date().toISOString(),
+                signed_by_name: name.trim(),
+                template_data: prev.template_data
+                  ? { ...prev.template_data, isSigned: true, signatureCta: 'signed', signedDate }
+                  : prev.template_data,
+              }
+            : prev
+        )
         setState('success')
       }
     } catch {
@@ -459,31 +427,7 @@ export default function QuoteSignPage() {
     }
   }
 
-  // ── Group items by type ────────────────────────────────────────────────────
-
-  function groupItems(items: QuoteItem[]) {
-    const groups: Record<string, QuoteItem[]> = {
-      labor: [],
-      material: [],
-      service: [],
-    }
-
-    for (const item of items) {
-      const type = item.type || 'service'
-      if (!groups[type]) groups[type] = []
-      groups[type].push(item)
-    }
-
-    return groups
-  }
-
-  const groupLabels: Record<string, { label: string; icon: React.ReactNode }> = {
-    labor: { label: 'Arbete', icon: <Hammer className="w-4 h-4" /> },
-    material: { label: 'Material', icon: <Package className="w-4 h-4" /> },
-    service: { label: 'Tjänster', icon: <Wrench className="w-4 h-4" /> },
-  }
-
-  // ── Shared centered layout ─────────────────────────────────────────────────
+  // ── Shared centered layout (loading/error/enkla bekräftelser) ─────────────
 
   function CenteredLayout({ children }: { children: React.ReactNode }) {
     return (
@@ -540,46 +484,6 @@ export default function QuoteSignPage() {
     )
   }
 
-  // ── Render: Already signed ─────────────────────────────────────────────────
-
-  if (state === 'already_signed' && quote) {
-    return (
-      <CenteredLayout>
-        <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8 text-center">
-          <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-7 h-7 text-emerald-600" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Offerten är redan signerad</h2>
-          <div className="space-y-2 text-sm text-gray-500">
-            {quote.signed_by_name && (
-              <p>
-                Signerad av: <span className="text-gray-900">{quote.signed_by_name}</span>
-              </p>
-            )}
-            {quote.signed_at && (
-              <p>
-                Datum:{' '}
-                <span className="text-gray-900">
-                  {new Date(quote.signed_at).toLocaleDateString('sv-SE', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </p>
-            )}
-            <p>
-              Belopp:{' '}
-              <span className="text-gray-900 font-semibold">{formatSEK(quote.total)}</span>
-            </p>
-          </div>
-        </div>
-      </CenteredLayout>
-    )
-  }
-
   // ── Render: Already declined ───────────────────────────────────────────────
 
   if (state === 'already_declined') {
@@ -591,49 +495,6 @@ export default function QuoteSignPage() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Offerten har avböjts</h2>
           <p className="text-gray-500 text-sm">Denna offert har redan avböjts.</p>
-        </div>
-      </CenteredLayout>
-    )
-  }
-
-  // ── Render: Success (just signed) ──────────────────────────────────────────
-
-  if (state === 'success') {
-    return (
-      <CenteredLayout>
-        <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8 text-center">
-          <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-10 h-10 text-emerald-600" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">
-            <span className="text-primary-700">Tack!</span>
-          </h2>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Offerten är godkänd</h3>
-          <p className="text-gray-500 text-sm mb-4">
-            Din signatur har sparats.{' '}
-            {business?.name || 'Företaget'} kommer att kontakta dig med nästa steg.
-          </p>
-          {quote && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-300/50">
-              <p className="text-gray-500 text-sm">
-                Offert: <span className="text-gray-900">{quote.title || quote.quote_id}</span>
-              </p>
-              <p className="text-gray-500 text-sm">
-                Belopp:{' '}
-                <span className="text-gray-900 font-semibold">
-                  {formatSEK(quote.customer_pays ?? quote.total)}
-                </span>
-              </p>
-              <a
-                href={`/api/quotes/pdf?token=${token}&format=pdf`}
-                download
-                className="mt-3 w-full py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
-              >
-                <FileText className="w-4 h-4" />
-                Ladda ner PDF
-              </a>
-            </div>
-          )}
         </div>
       </CenteredLayout>
     )
@@ -658,33 +519,23 @@ export default function QuoteSignPage() {
     )
   }
 
-  // ── Render: Viewing ────────────────────────────────────────────────────────
+  // ── Gemensamt: 'viewing' / 'already_signed' / 'success' ────────────────────
+  // Alla tre visar SAMMA dokument (mallmotorn) — ETAPP 5, "dokumentet ÄR
+  // gränssnittet". 'viewing' lägger till det interaktiva lagret (tillval,
+  // signaturkort, avböj); de andra två är read-only bekräftelser.
 
   if (!quote) return null
 
   const structuredItems = quote.structured_items || []
-  const itemGroups = groupItems(quote.items || [])
+  const templateStyle = quote.template_style || 'modern'
   const canSubmit = !!(name.trim() && hasDrawn && termsAccepted && !submitting)
-
-  // Visningsnivå (Del C) — server-filtrerad. 'summary' → gruppsummor + tillval;
-  // 'rows' → rader utan à-pris/antal; 'full' (default) → som tidigare.
-  const displayLevel = quote.display_level ?? 'full'
-  const displayGroups = quote.display_groups ?? []
-  // Har vi något att rendera i den strukturerade vyn? (grupper ELLER rader)
-  const hasStructuredView = structuredItems.length > 0 || displayGroups.length > 0
-  // Rad för rad / full: dölj à-pris + antal när nivån säger så.
-  const showRowColumns = displayLevel === 'full'
 
   // ── Tillval: live-total på klienten via SAMMA motor som servern ────────────
   // Endast visning — servern räknar alltid om själv vid signering.
   // Låst läge (signerad offert): visa lagrat option_selected, ingen toggling.
   const optionsLocked = !!quote.signed_at
-  const hasOptionRows = structuredItems.some((i) => i.item_type === 'option')
-  // Live-total i alla tre nivåer:
-  // - 'full' (eller summary/rows utan tillval): fulla rader finns → summera direkt.
-  // - summary/rows MED tillval: à-priser strippade ur svaret → använd serverns
-  //   base_totals (icke-tillvalsrader) + tillvalsdeltan. Servern räknar alltid
-  //   om auktoritativt vid signering; detta är endast visning.
+  const optionRows = structuredItems.filter((i) => i.item_type === 'option')
+  const hasOptionRows = optionRows.length > 0
   const liveTotals = !hasOptionRows
     ? null
     : quote.base_totals
@@ -701,23 +552,28 @@ export default function QuoteSignPage() {
           quote.discount_percent ?? 0,
           quote.vat_rate ?? 25
         )
-  const dispLaborTotal = liveTotals ? liveTotals.laborTotal : quote.labor_total
-  const dispMaterialTotal = liveTotals ? liveTotals.materialTotal : quote.material_total
-  const dispSubtotal = liveTotals
-    ? liveTotals.subtotal
-    : quote.subtotal || quote.labor_total + quote.material_total
-  const dispDiscountAmount = liveTotals ? liveTotals.discountAmount : quote.discount_amount ?? 0
-  const dispVatAmount = liveTotals ? liveTotals.vat : quote.vat_amount ?? 0
   const dispTotal = liveTotals ? liveTotals.total : quote.total
-  // ROT/RUT-boxen: samma kombinerade avdrag som serverns rot_rut_deduction-kolumn
   const dispRotRutDeduction = liveTotals
     ? liveTotals.rotDeduction + liveTotals.rutDeduction
     : quote.rot_rut_deduction || 0
   const dispCustomerPays = liveTotals
-    ? dispRotRutDeduction > 0
-      ? liveTotals.total - dispRotRutDeduction
-      : liveTotals.total
+    ? liveTotals.customerPaysAfterDeductions
     : quote.customer_pays ?? quote.total - (quote.rot_rut_deduction || 0)
+
+  // ETAPP 5, punkt 3: kundens tillvalsval uppdaterar HELA Modern-dokumentet
+  // (rader + summering) live — Premium/Friendly (iframe mot serverns
+  // färdig-renderade HTML) förblir statiska tills E2a:s motor täcker fler
+  // stilar, se PublicQuoteDocument-kommentaren och not-texten i tillvalskortet.
+  const liveTemplateData =
+    quote.template_data && liveTotals
+      ? applyLiveSelectionToTemplateData(quote.template_data, selectedOptions, liveTotals)
+      : quote.template_data ?? null
+
+  // ROT-boxen: dokumentet visar redan avdragsbeloppet + personnummer i sin
+  // egen summering/mottagarblock (se QuoteDocument.tsx / premium.ts/
+  // friendly.ts) — bara fastighetsbeteckning saknas där, så den separata
+  // boxen visas bara när den faktiskt tillför information.
+  const showRotBox = !!quote.rot_rut_type && dispRotRutDeduction > 0 && !!quote.fastighetsbeteckning
 
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">
@@ -756,11 +612,35 @@ export default function QuoteSignPage() {
           <h1 className="text-3xl font-bold">
             <span className="text-primary-700">{business?.name || 'Offert'}</span>
           </h1>
-          <p className="text-gray-500 mt-1 text-sm">Offert</p>
+          <p className="text-gray-500 mt-1 text-sm">
+            {state === 'success'
+              ? 'Offerten är godkänd'
+              : state === 'already_signed'
+                ? 'Offerten är signerad'
+                : 'Offert'}
+          </p>
         </div>
 
+        {/* Confirmation banner (success / already signed) */}
+        {(state === 'success' || state === 'already_signed') && (
+          <div className="mb-6 p-5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-3">
+            <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center shrink-0">
+              <CheckCircle className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-emerald-800">
+                {state === 'success' ? 'Tack! Din signatur har sparats.' : 'Offerten är redan signerad.'}
+              </p>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                {quote.signed_by_name && `Signerad av ${quote.signed_by_name}. `}
+                {business?.name || 'Företaget'} kommer att kontakta dig med nästa steg.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Validity countdown banner */}
-        {daysLeft !== null && daysLeft <= 7 && (
+        {state === 'viewing' && daysLeft !== null && daysLeft <= 7 && (
           <div
             className={`mb-4 p-3 rounded-xl flex items-center gap-2 text-sm font-medium ${
               daysLeft <= 2
@@ -775,117 +655,64 @@ export default function QuoteSignPage() {
           </div>
         )}
 
-        {/* Quote Details Card */}
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-6">
-          {/* Title & Description */}
-          <div className="mb-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center">
-                <FileText className="w-5 h-5 text-primary-700" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">
-                  {quote.title || `Offert ${quote.quote_id}`}
-                </h2>
-                {quote.valid_until && (
-                  <p className="text-gray-400 text-xs flex items-center gap-1 mt-0.5">
-                    <Calendar className="w-3 h-3" />
-                    Giltig t.o.m.{' '}
-                    {new Date(quote.valid_until).toLocaleDateString('sv-SE', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                  </p>
-                )}
-              </div>
-            </div>
-            {quote.description && (
-              <p className="text-gray-500 text-sm mt-3 leading-relaxed whitespace-pre-line">{quote.description}</p>
-            )}
-          </div>
+        {/* Dokumentet — ETAPP 5: samma mall hantverkaren valde (Modern/Premium/
+            Friendly), inte en egen tolkning. */}
+        <div className="mb-6">
+          <PublicQuoteDocument
+            style={templateStyle}
+            templateData={liveTemplateData}
+            documentHtml={quote.document_html ?? null}
+          />
+        </div>
 
-          {/* Items: quote_items-rader i sort_order (moderna offerter) */}
-          {hasStructuredView ? (
-            <div className="bg-gray-100/30 rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-200/50">
-              {/* Summary: gruppsummor (heading + belopp) före tillvalen */}
-              {displayGroups.map((g, idx) => (
-                <div key={`grp-${idx}`} className="px-4 py-3 flex justify-between gap-4 text-sm font-medium">
-                  <span className="text-gray-900">{g.heading}</span>
-                  <span className="text-gray-900 shrink-0">{formatSEK(g.total)}</span>
+        {state === 'viewing' && (
+          <>
+            {/* Anpassa din offert — tillval */}
+            {hasOptionRows && (
+              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center">
+                    <Package className="w-5 h-5 text-primary-700" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Anpassa din offert</h3>
+                    <p className="text-gray-400 text-xs">
+                      {optionsLocked
+                        ? 'Dina valda tillval'
+                        : templateStyle === 'modern'
+                          ? 'Kryssa i det du vill ha med — dokumentet ovan uppdateras direkt'
+                          : 'Kryssa i det du vill ha med — summan nedan uppdateras direkt'}
+                    </p>
+                  </div>
                 </div>
-              ))}
-              {structuredItems.map((item, idx) => {
-                const key = item.id || idx
-                switch (item.item_type) {
-                  case 'heading':
-                    return (
-                      <div key={key} className="px-4 py-3 bg-gray-50 text-sm font-semibold text-gray-900">
-                        {item.description}
-                      </div>
-                    )
-                  case 'text':
-                    return (
-                      <div key={key} className="px-4 py-2.5 text-xs text-gray-500 leading-relaxed whitespace-pre-line">
-                        {item.description}
-                      </div>
-                    )
-                  case 'subtotal':
-                    return (
-                      <div key={key} className="px-4 py-3 flex justify-between gap-4 text-sm font-medium">
-                        <span className="text-gray-500">{item.description || 'Delsumma'}</span>
-                        <span className="text-gray-900 shrink-0">{formatSEK(item.total || 0)}</span>
-                      </div>
-                    )
-                  case 'discount':
-                    return (
-                      <div key={key} className="px-4 py-3 flex justify-between gap-4 text-sm">
-                        <span className="text-gray-500">{item.description || 'Rabatt'}</span>
-                        <span className="text-emerald-600 font-medium shrink-0">
-                          −{formatSEK(Math.abs(item.total || 0))}
-                        </span>
-                      </div>
-                    )
-                  case 'option': {
-                    // Kryssbar tillvalsrad. Låst (visar lagrat val) när offerten
-                    // redan är signerad. ☑ = valt (räknas i totalen), ☐ = bortvalt.
+
+                <div className="space-y-2 mb-5">
+                  {optionRows.map((item) => {
                     const selected = optionsLocked
                       ? item.option_selected === true
                       : selectedOptions.has(item.id)
                     return (
                       <button
-                        key={key}
+                        key={item.id}
                         type="button"
                         disabled={optionsLocked}
                         onClick={() => toggleOption(item.id)}
                         aria-pressed={selected}
-                        className={`w-full text-left px-4 py-3 flex justify-between gap-4 text-sm transition-colors ${
-                          optionsLocked ? 'cursor-default' : 'cursor-pointer hover:bg-primary-50/40 active:bg-primary-50/60'
-                        }`}
+                        className={`w-full text-left px-4 py-3 rounded-xl border flex justify-between gap-4 text-sm transition-colors ${
+                          selected ? 'border-primary-200 bg-primary-50/40' : 'border-gray-200 bg-gray-50'
+                        } ${optionsLocked ? 'cursor-default' : 'cursor-pointer hover:bg-primary-50/60 active:bg-primary-50/80'}`}
                       >
-                        <div className="min-w-0 flex items-start gap-2">
+                        <div className="min-w-0 flex items-start gap-3">
                           <span
                             className={`mt-0.5 shrink-0 rounded border flex items-center justify-center ${
-                              selected
-                                ? 'bg-primary-700 border-primary-700'
-                                : 'bg-white border-gray-300'
+                              selected ? 'bg-primary-700 border-primary-700' : 'bg-white border-gray-300'
                             }`}
                             style={{ width: 18, height: 18 }}
                           >
                             {selected && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
                           </span>
                           <div>
-                            <p className={selected ? 'text-gray-900' : 'text-gray-500'}>
-                              {item.description}
-                              <span className={`ml-2 inline-block align-[1px] text-[10px] font-semibold uppercase tracking-wide rounded px-1.5 py-px ${selected ? 'bg-primary-50 text-primary-700' : 'bg-gray-100 text-gray-400'}`}>
-                                Tillval
-                              </span>
-                            </p>
-                            {(item.quantity || 0) > 0 && (
-                              <p className="text-xs text-gray-400 mt-0.5">
-                                {item.quantity} {item.unit || 'st'} × {formatSEK(item.unit_price || 0)}
-                              </p>
-                            )}
+                            <p className={selected ? 'text-gray-900' : 'text-gray-500'}>{item.description}</p>
                             {!optionsLocked && (
                               <p className="text-[11px] text-primary-700/70 mt-0.5">
                                 {selected ? 'Tryck för att välja bort' : 'Tryck för att lägga till'}
@@ -894,398 +721,285 @@ export default function QuoteSignPage() {
                           </div>
                         </div>
                         <span className={`font-medium shrink-0 ${selected ? 'text-gray-900' : 'text-gray-400'}`}>
-                          {selected ? '' : '+'}{formatSEK(item.total || 0)}
+                          {selected ? '' : '+'}
+                          {formatSEK(item.total || 0)}
                         </span>
                       </button>
                     )
-                  }
-                  default:
-                    return (
-                      <div key={key} className="px-4 py-3 flex justify-between gap-4 text-sm">
-                        <div className="min-w-0">
-                          <p className="text-gray-900">{item.description}</p>
-                          {/* à-pris/antal endast i 'full'; i 'rows' är fälten strippade */}
-                          {showRowColumns && (item.quantity || 0) > 0 && (
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              {item.quantity} {item.unit || 'st'} × {formatSEK(item.unit_price || 0)}
-                            </p>
-                          )}
-                          {renderComponentSpec(item)}
-                        </div>
-                        <span className="text-gray-900 font-medium shrink-0">{formatSEK(item.total || 0)}</span>
-                      </div>
-                    )
-                }
-              })}
-            </div>
-          ) : (
-          <div className="space-y-6">
-            {Object.entries(itemGroups).map(([type, items]) => {
-              if (items.length === 0) return null
-              const group = groupLabels[type] || { label: type, icon: null }
+                  })}
+                </div>
 
-              return (
-                <div key={type}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-primary-700">{group.icon}</span>
-                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                      {group.label}
-                    </h3>
-                  </div>
-                  <div className="bg-gray-100/30 rounded-xl border border-gray-200 overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="text-left px-4 py-3 text-gray-400 font-medium">
-                            Beskrivning
-                          </th>
-                          <th className="text-right px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">
-                            Antal
-                          </th>
-                          <th className="text-right px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">
-                            Á-pris
-                          </th>
-                          <th className="text-right px-4 py-3 text-gray-400 font-medium">Summa</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {items.map((item, idx) => (
-                          <tr
-                            key={idx}
-                            className={idx < items.length - 1 ? 'border-b border-gray-200/50' : ''}
-                          >
-                            <td className="px-4 py-3 text-gray-900">
-                              {item.description}
-                              <span className="sm:hidden block text-xs text-gray-400 mt-0.5">
-                                {item.quantity} {item.unit} x {formatSEK(item.unit_price)}
-                              </span>
-                            </td>
-                            <td className="text-right px-4 py-3 text-gray-700 hidden sm:table-cell">
-                              {item.quantity} {item.unit}
-                            </td>
-                            <td className="text-right px-4 py-3 text-gray-700 hidden sm:table-cell">
-                              {formatSEK(item.unit_price)}
-                            </td>
-                            <td className="text-right px-4 py-3 text-gray-900 font-medium">
-                              {formatSEK(item.total)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          )}
-
-          {/* Summary */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <div className="space-y-2">
-              {dispLaborTotal > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Arbete</span>
-                  <span className="text-gray-700">{formatSEK(dispLaborTotal)}</span>
-                </div>
-              )}
-              {dispMaterialTotal > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Material</span>
-                  <span className="text-gray-700">{formatSEK(dispMaterialTotal)}</span>
-                </div>
-              )}
-              {(dispLaborTotal > 0 || dispMaterialTotal > 0) && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Delsumma</span>
-                  <span className="text-gray-700">{formatSEK(dispSubtotal)}</span>
-                </div>
-              )}
-              {dispDiscountAmount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Rabatt</span>
-                  <span className="text-emerald-600">-{formatSEK(dispDiscountAmount)}</span>
-                </div>
-              )}
-              {dispVatAmount > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">
-                    Moms{quote.vat_rate ? ` (${quote.vat_rate}%)` : ''}
+                <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+                  <span className="text-sm font-medium text-gray-500">
+                    {dispRotRutDeduction > 0 ? 'Du betalar (efter avdrag)' : 'Du betalar'}
                   </span>
-                  <span className="text-gray-700">{formatSEK(dispVatAmount)}</span>
+                  <span className="text-lg font-bold text-gray-900">{formatSEK(dispCustomerPays || dispTotal)}</span>
                 </div>
-              )}
-              <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-300">
-                <span className="text-gray-900">Totalt</span>
-                <span className="text-gray-900">{formatSEK(dispTotal)}</span>
-              </div>
-            </div>
-          </div>
 
-          {/* ROT/RUT box */}
-          {quote.rot_rut_type && dispRotRutDeduction > 0 && (
-            <div className="mt-6 p-5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
-              <h4 className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">
-                {quote.rot_rut_type === 'rot' ? 'ROT-avdrag' : 'RUT-avdrag'}
-              </h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Totalt belopp</span>
-                  <span className="text-gray-700">{formatSEK(dispTotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">
-                    {quote.rot_rut_type === 'rot' ? 'ROT-avdrag' : 'RUT-avdrag'}
-                  </span>
-                  <span className="text-emerald-600">-{formatSEK(dispRotRutDeduction)}</span>
-                </div>
-                <div className="flex justify-between text-base font-bold pt-2 border-t border-emerald-500/20">
-                  <span className="text-gray-900">Du betalar</span>
-                  <span className="text-emerald-600">{formatSEK(dispCustomerPays)}</span>
-                </div>
-                {quote.personnummer && (
-                  <div className="flex justify-between pt-2 text-xs">
-                    <span className="text-gray-400">Personnummer</span>
-                    <span className="text-gray-500">{quote.personnummer}</span>
-                  </div>
-                )}
-                {quote.fastighetsbeteckning && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Fastighetsbeteckning</span>
-                    <span className="text-gray-500">{quote.fastighetsbeteckning}</span>
-                  </div>
+                {templateStyle !== 'modern' && !optionsLocked && (
+                  <p className="mt-3 text-xs text-gray-400 leading-relaxed">
+                    Dokumentet ovan uppdateras inte automatiskt när du kryssar i tillval — den slutgiltiga
+                    sammanställningen ser du här, och den riktiga totalen räknas alltid om vid signering.
+                  </p>
                 )}
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Attachments */}
-        {quote.attachments && quote.attachments.length > 0 && (
-          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Bifogade dokument</h3>
-            <div className="space-y-2">
-              {quote.attachments.map((att, i) => (
-                <a
-                  key={i}
-                  href={att.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
-                >
-                  <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center shrink-0">
-                    <FileText className="w-4 h-4 text-primary-700" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm text-gray-900 truncate">{att.name}</p>
-                    {att.size && <p className="text-xs text-gray-400">{(att.size / 1024).toFixed(0)} KB</p>}
-                  </div>
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Signature Card */}
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-4">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center">
-              <PenTool className="w-5 h-5 text-primary-700" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">Signera offerten</h3>
-              <p className="text-gray-400 text-xs">Skriv ditt namn och rita din signatur nedan</p>
-            </div>
-          </div>
-
-          {/* Name input */}
-          <div className="mb-5">
-            <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-              <User className="w-4 h-4" />
-              Namn
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ditt fullständiga namn"
-              required
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 transition-all"
-            />
-          </div>
-
-          {/* Signature canvas */}
-          <div className="mb-3">
-            <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-              <PenTool className="w-4 h-4" />
-              Signatur
-            </label>
-            <div className="relative">
-              <canvas
-                ref={canvasRef}
-                className="w-full bg-gray-100 border border-gray-300 rounded-xl cursor-crosshair touch-none"
-                style={{ height: '150px' }}
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
-                onTouchStart={startDrawing}
-                onTouchMove={draw}
-                onTouchEnd={stopDrawing}
-                onTouchCancel={stopDrawing}
-              />
-              {!hasDrawn && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <p className="text-gray-400 text-sm">Rita din signatur här</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Clear button */}
-          <div className="flex justify-end mb-5">
-            <button
-              type="button"
-              onClick={clearCanvas}
-              className="flex items-center gap-2 px-4 py-2 text-sm text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-300 rounded-lg transition-all"
-            >
-              <Eraser className="w-4 h-4" />
-              Rensa
-            </button>
-          </div>
-
-          {/* Terms checkbox */}
-          <label className="flex items-start gap-3 mb-5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={termsAccepted}
-              onChange={(e) => setTermsAccepted(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-primary-700"
-            />
-            <span className="text-sm text-gray-500 leading-relaxed">
-              Jag har läst och godkänner offerten och förstår att min digitala signatur är bindande.
-            </span>
-          </label>
-
-          {/* Error message */}
-          {errorMessage && (
-            <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-600 text-sm mb-4">
-              {errorMessage}
-            </div>
-          )}
-
-          {/* Submit button */}
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="w-full py-4 bg-primary-700 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {submitting && !showDeclineForm ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Signerar...
-              </>
-            ) : (
-              <>
-                <CheckCircle className="w-5 h-5" />
-                Godkänn offert
-              </>
             )}
-          </button>
 
-          {/* PDF download */}
-          <a
-            href={`/api/quotes/pdf?token=${token}&format=pdf`}
-            download
-            className="w-full py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 mt-3"
-          >
-            <FileText className="w-4 h-4" />
-            Ladda ner offert som PDF
-          </a>
-
-          {/* Validation hint */}
-          {!canSubmit && !submitting && (
-            <p className="mt-3 text-center text-gray-400 text-xs">
-              {!name.trim()
-                ? 'Fyll i ditt namn'
-                : !hasDrawn
-                  ? 'Rita din signatur'
-                  : 'Bekräfta att du godkänner villkoren'}{' '}
-              för att fortsätta
-            </p>
-          )}
-        </div>
-
-        {/* Decline section */}
-        {!showDeclineForm ? (
-          <div className="text-center mb-8">
-            <button
-              type="button"
-              onClick={() => setShowDeclineForm(true)}
-              className="text-sm text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
-            >
-              Vill du avböja offerten?
-            </button>
-          </div>
-        ) : (
-          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
-                <XCircle className="w-5 h-5 text-gray-400" />
+            {/* ROT/RUT — endast när dokumentet inte redan täcker informationen */}
+            {showRotBox && (
+              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-6">
+                <h4 className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">
+                  {quote.rot_rut_type === 'rot' ? 'ROT-avdrag' : 'RUT-avdrag'}
+                </h4>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Fastighetsbeteckning</span>
+                  <span className="text-gray-500">{quote.fastighetsbeteckning}</span>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-semibold text-gray-900">Avböj offerten</h3>
-                <p className="text-gray-400 text-xs">Hjälp oss förstå varför</p>
-              </div>
-            </div>
+            )}
 
-            <div className="space-y-2 mb-5">
-              {DECLINE_REASONS.map((r) => (
-                <label
-                  key={r.value}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <input
-                    type="radio"
-                    name="decline_reason"
-                    value={r.value}
-                    checked={declineReason === r.value}
-                    onChange={() => setDeclineReason(r.value)}
-                    className="h-4 w-4 accent-gray-600"
-                  />
-                  <span className="text-sm text-gray-700">{r.label}</span>
+            {/* Attachments */}
+            {quote.attachments && quote.attachments.length > 0 && (
+              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-6">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Bifogade dokument</h3>
+                <div className="space-y-2">
+                  {quote.attachments.map((att, i) => (
+                    <a
+                      key={i}
+                      href={att.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center shrink-0">
+                        <FileText className="w-4 h-4 text-primary-700" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm text-gray-900 truncate">{att.name}</p>
+                        {att.size && <p className="text-xs text-gray-400">{(att.size / 1024).toFixed(0)} KB</p>}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Signature Card — ankarpunkt för dokumentets "Godkänn offerten
+                digitalt"-yta (SignatureCta.tsx, id="signature-card"). */}
+            <div id="signature-card" className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-4 scroll-mt-4">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center">
+                  <PenTool className="w-5 h-5 text-primary-700" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Signera offerten</h3>
+                  <p className="text-gray-400 text-xs">Skriv ditt namn och rita din signatur nedan</p>
+                </div>
+              </div>
+
+              {/* Name input */}
+              <div className="mb-5">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                  <User className="w-4 h-4" />
+                  Namn
                 </label>
-              ))}
-            </div>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ditt fullständiga namn"
+                  required
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 transition-all"
+                />
+              </div>
 
-            <div className="flex gap-3">
+              {/* Signature canvas */}
+              <div className="mb-3">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                  <PenTool className="w-4 h-4" />
+                  Signatur
+                </label>
+                <div className="relative">
+                  <canvas
+                    ref={canvasRef}
+                    className="w-full bg-gray-100 border border-gray-300 rounded-xl cursor-crosshair touch-none"
+                    style={{ height: '150px' }}
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                    onTouchStart={startDrawing}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDrawing}
+                    onTouchCancel={stopDrawing}
+                  />
+                  {!hasDrawn && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <p className="text-gray-400 text-sm">Rita din signatur här</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Clear button */}
+              <div className="flex justify-end mb-5">
+                <button
+                  type="button"
+                  onClick={clearCanvas}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-300 rounded-lg transition-all"
+                >
+                  <Eraser className="w-4 h-4" />
+                  Rensa
+                </button>
+              </div>
+
+              {/* Terms checkbox */}
+              <label className="flex items-start gap-3 mb-5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-primary-700"
+                />
+                <span className="text-sm text-gray-500 leading-relaxed">
+                  Jag har läst och godkänner offerten och förstår att min digitala signatur är bindande.
+                </span>
+              </label>
+
+              {/* Error message */}
+              {errorMessage && (
+                <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-600 text-sm mb-4">
+                  {errorMessage}
+                </div>
+              )}
+
+              {/* Submit button */}
               <button
                 type="button"
-                onClick={() => {
-                  setShowDeclineForm(false)
-                  setDeclineReason('')
-                }}
-                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-gray-700 transition-colors"
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className="w-full py-4 bg-primary-700 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Avbryt
-              </button>
-              <button
-                type="button"
-                onClick={handleDecline}
-                disabled={!declineReason || submitting}
-                className="flex-1 py-3 bg-gray-800 hover:bg-gray-900 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {submitting ? (
+                {submitting && !showDeclineForm ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Skickar...
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Signerar...
                   </>
                 ) : (
-                  'Bekräfta avböjande'
+                  <>
+                    <CheckCircle className="w-5 h-5" />
+                    Godkänn offert
+                  </>
                 )}
               </button>
+
+              {/* PDF download */}
+              <a
+                href={`/api/quotes/pdf?token=${token}&format=pdf`}
+                download
+                className="w-full py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 mt-3"
+              >
+                <FileText className="w-4 h-4" />
+                Ladda ner offert som PDF
+              </a>
+
+              {/* Validation hint */}
+              {!canSubmit && !submitting && (
+                <p className="mt-3 text-center text-gray-400 text-xs">
+                  {!name.trim()
+                    ? 'Fyll i ditt namn'
+                    : !hasDrawn
+                      ? 'Rita din signatur'
+                      : 'Bekräfta att du godkänner villkoren'}{' '}
+                  för att fortsätta
+                </p>
+              )}
             </div>
+
+            {/* Decline section */}
+            {!showDeclineForm ? (
+              <div className="text-center mb-8">
+                <button
+                  type="button"
+                  onClick={() => setShowDeclineForm(true)}
+                  className="text-sm text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
+                >
+                  Vill du avböja offerten?
+                </button>
+              </div>
+            ) : (
+              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 mb-8">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
+                    <XCircle className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900">Avböj offerten</h3>
+                    <p className="text-gray-400 text-xs">Hjälp oss förstå varför</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 mb-5">
+                  {DECLINE_REASONS.map((r) => (
+                    <label
+                      key={r.value}
+                      className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="radio"
+                        name="decline_reason"
+                        value={r.value}
+                        checked={declineReason === r.value}
+                        onChange={() => setDeclineReason(r.value)}
+                        className="h-4 w-4 accent-gray-600"
+                      />
+                      <span className="text-sm text-gray-700">{r.label}</span>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDeclineForm(false)
+                      setDeclineReason('')
+                    }}
+                    className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-gray-700 transition-colors"
+                  >
+                    Avbryt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDecline}
+                    disabled={!declineReason || submitting}
+                    className="flex-1 py-3 bg-gray-800 hover:bg-gray-900 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Skickar...
+                      </>
+                    ) : (
+                      'Bekräfta avböjande'
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {(state === 'success' || state === 'already_signed') && (
+          <div className="text-center mb-8">
+            <a
+              href={`/api/quotes/pdf?token=${token}&format=pdf`}
+              download
+              className="inline-flex items-center gap-2 px-5 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-white transition-colors bg-white/60"
+            >
+              <FileText className="w-4 h-4" />
+              Ladda ner offert som PDF
+            </a>
           </div>
         )}
 

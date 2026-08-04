@@ -3,6 +3,15 @@ import { getServerSupabase } from '@/lib/supabase'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { calculateQuoteTotals } from '@/lib/quote-calculations'
 import { resolveDisplayLevel, groupItemsForSummary } from '@/lib/quotes/display-level'
+import { buildQuoteTemplateData, selectTemplate } from '@/lib/quote-templates'
+import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
+import { sanitizeTemplateDataForPublic } from '@/lib/quotes/public-document'
+import { stripPrintBar } from '@/lib/document-html'
+
+// ETAPP 5 (offert-masterplan.md): dokument-HTML-rendering (Premium/Friendly)
+// kräver Node-runtime (react-dom/server via lib/quote-templates, samma som
+// PDF-routen) — Edge-runtimet saknar det.
+export const runtime = 'nodejs'
 
 /**
  * GET /api/quotes/public/[token] - Hämta offert via publik signeringslänk
@@ -53,10 +62,25 @@ export async function GET(
     }
     ;(quote as any).customer = customer
 
-    // Fetch business info
+    // Resolva deal-nummer om offerten är kopplad till ett ärende — samma
+    // uppslag som /api/quotes/pdf redan gör för ?token=-vägen, så
+    // dokumentets "Ärende #X"-rad matchar mellan PDF och kundvyn.
+    if (quote.deal_id) {
+      const { data: deal } = await supabase
+        .from('deal')
+        .select('deal_number')
+        .eq('id', quote.deal_id)
+        .maybeSingle()
+      if (deal?.deal_number != null) (quote as any).deal_number = deal.deal_number
+    }
+
+    // Fetch business info — ETAPP 5 (offert-masterplan.md): utökat med samma
+    // fält som /api/quotes/pdf hämtar (adress/bankgiro/plusgiro/swish/
+    // webbplats/mallval) — behövs av buildQuoteTemplateData för att bygga
+    // samma dokument som PDF:en/"Visa offert".
     const { data: business } = await supabase
       .from('business_config')
-      .select('business_name, contact_name, contact_email, phone_number, org_number, f_skatt_registered, logo_url, accent_color')
+      .select('business_name, contact_name, contact_email, phone_number, address, service_area, website, org_number, f_skatt_registered, logo_url, accent_color, bankgiro, plusgiro, default_quote_terms, swish_number, quote_template_style')
       .eq('business_id', quote.business_id)
       .single()
 
@@ -128,14 +152,57 @@ export async function GET(
       })
     }
 
+    // ── ETAPP 5 (offert-masterplan.md): dokumentet ÄR gränssnittet ────────────
+    // Bygg SAMMA templateData som PDF:en/"Visa offert" redan använder
+    // (buildQuoteTemplateData — kundvänd sedan tidigare, se lib/quote-
+    // templates/data-builder.ts) så kundens signeringssida kan rendera
+    // hantverkarens FAKTISKA mallval istället för en fjärde egen tolkning.
+    // quote.quote_items sätts till de RÅA (osanerade) structuredItems —
+    // buildQuoteTemplateData tillämpar sin egen displayLevel-logik internt
+    // (samma resolveDisplayLevel-källa som ovan); JSON-svaret saneras separat
+    // nedan (sanitizeTemplateDataForPublic) eftersom 'rows'-nivån bara döljer
+    // kolumner VISUELLT i mallen — de råa värdena får inte läcka i nätverks-
+    // svaret som denna funktion serialiserar till klienten.
+    ;(quote as any).quote_items = rawItems
+    const creator = await fetchQuoteCreator(supabase, quote.created_by)
+    const templateStyle = (quote.template_style || business?.quote_template_style || 'modern') as
+      | 'modern' | 'premium' | 'friendly'
+    let publicTemplateData: ReturnType<typeof buildQuoteTemplateData> | null = null
+    let documentHtml: string | null = null
+    try {
+      const templateData = buildQuoteTemplateData(quote, business, business, creator)
+      // Signatur-CTA: data-builder sätter alltid 'hidden' (PDF/förhands-
+      // granskning ska förbli oförändrade) — den publika kundvyn är den ENDA
+      // ytan som ska visa den, som 'active' (ej signerad) eller 'signed'.
+      templateData.signatureCta = alreadySigned ? 'signed' : 'active'
+      publicTemplateData = sanitizeTemplateDataForPublic(templateData)
+      // Premium/Friendly saknar (ännu) en React-motor (ETAPP 2a tog bara
+      // Modern, se offert-masterplan.md) — rendera samma statiska HTML-sträng
+      // som PDF:en/"Visa offert" använder. .print-bar strippas (samma regel
+      // som preview-html-routen) — sidan har egna PDF-/signeringsknappar.
+      if (templateStyle !== 'modern') {
+        const renderFn = selectTemplate(templateStyle)
+        documentHtml = stripPrintBar(renderFn(templateData))
+      }
+    } catch (docErr) {
+      // Dokumentbygget får ALDRIG blockera hela svaret — utan templateData
+      // faller sidan tillbaka på ett tomt dokument (hellre en trasig yta än
+      // en 500:a som stoppar kunden från att signera).
+      console.error('[quote/public] Kunde inte bygga dokumentmotor-data:', docErr)
+    }
+
     return NextResponse.json({
       quote: {
         ...quote,
         business_id: undefined, // Don't expose
+        quote_items: undefined, // internt fält för buildQuoteTemplateData — ersätts av structured_items nedan
         structured_items: responseItems,
         display_level: displayLevel,
         display_groups: displayGroups,
         base_totals: baseTotals,
+        template_data: publicTemplateData,
+        template_style: templateStyle,
+        document_html: documentHtml,
       },
       business: {
         name: business?.business_name || '',

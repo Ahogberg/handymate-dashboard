@@ -28,11 +28,19 @@ export function SignatureCta({ mode, cta, isSigned, signedDate }: SignatureCtaPr
         </div>
       )
     }
+    // ETAPP 5 (offert-masterplan.md), punkt 2: i kundläget är denna yta en
+    // ankarpunkt — ett klick scrollar ner till det RIKTIGA signaturkortet
+    // (canvas + namn + villkor) längre ner på sidan (id="signature-card",
+    // se app/quote/[token]/page.tsx). Vanlig <a href="#…">-navigering är
+    // medvetet valt framför en onClick-handler: fungerar identiskt oavsett
+    // om komponenten körs client-side (interaktiv) eller genom
+    // renderToStaticMarkup (PDF/mall-HTML, där cta ändå alltid är 'hidden'
+    // — se buildQuoteTemplateData — så länken där aldrig renderas i praktiken).
     return (
-      <div className="signature-cta">
+      <a href="#signature-card" className="signature-cta signature-cta--link">
         <div className="sig-title">Godkänn offerten digitalt</div>
         <div className="sig-sub">Signera direkt i webbläsaren — inga utskrifter behövs.</div>
-      </div>
+      </a>
     )
   }
 
