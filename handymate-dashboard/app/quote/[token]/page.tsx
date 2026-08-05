@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
+import { DECLINE_REASONS as DECLINE_REASON_OPTIONS } from '@/lib/quotes/decline-reasons'
 import {
   Loader2,
   Check,
@@ -88,12 +89,12 @@ const formatSEK = (amount: number) =>
     maximumFractionDigits: 0,
   }).format(amount)
 
-const DECLINE_REASONS = [
-  { value: 'too_expensive', label: 'Priset är för högt' },
-  { value: 'chose_other', label: 'Valde en annan leverantör' },
-  { value: 'no_longer_needed', label: 'Behovet finns inte längre' },
-  { value: 'other', label: 'Annat skäl' },
-]
+// Taxonomin ägs av lib/quotes/decline-reasons.ts så kundvyn, portalen och
+// förlustanalysen räknar på exakt samma kategorier. Den lokala listan hade
+// bland annat 'no_longer_needed', som analysen inte kände igen — de svaren
+// hamnade i "skäl saknas". 'not_now' ersätter den och är dessutom mer värd:
+// en uppskjuten affär är en återaktiveringskandidat, inte en förlust.
+const DECLINE_REASONS = DECLINE_REASON_OPTIONS.map(r => ({ value: r.code, label: r.label }))
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -409,7 +410,9 @@ export default function QuoteSignPage() {
       const res = await fetch(`/api/quotes/public/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'decline', reason: declineReason }),
+        // reason_code är det som gör förlusten räknebar; reason lämnas kvar
+        // för bakåtkompatibilitet med äldre klienter.
+        body: JSON.stringify({ action: 'decline', reason_code: declineReason, reason: declineReason }),
       })
 
       if (res.ok) {
