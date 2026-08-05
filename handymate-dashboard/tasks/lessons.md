@@ -186,3 +186,30 @@ Driftlarmet sveper BARA automation_activity — inte v3_automation_logs.
    leads har CHECK — update med ogiltigt värde failar tyst).
 5. En modul är inte "klar" när den kompilerar — den är klar när dess
    loggrader bevisligen dyker upp i rätt tabell. Verifiera första körningen.
+
+## 2026-08-05: Verifiera hela kedjan, inte bara funktionen du byggde
+
+**Vad hände:** Efter offert-ombyggnaden beställde Andreas en verifiering av
+händelsespårningen. Mina egna ändringar var rena — men verifieringen hittade
+fyra äldre hål, varav två gjorde två av de planerade funktionerna omöjliga att
+bygga ("kunden läser nu" krävde att `opened` faktiskt sattes; förlustanalysen
+krävde att `declined_at` sparades). Dessutom var min egen dolj-rad-funktion
+läckande: raden filtrerades i renderingen men låg kvar i JSON-svaret, och
+fältet fanns inte ens med i select:en — så läckagefixen var verkningslös.
+
+**Regler:**
+1. När en ny funktion bygger på befintlig data: verifiera att datat FAKTISKT
+   skrivs, i alla vägar in. "Kolumnen finns" är inte samma sak som "den fylls".
+2. Ett löfte i UI ("dold för kunden") måste hålla mot DevTools, inte bara mot
+   ögat. Filtrera i DATAT, inte bara i renderingen — och kontrollera att
+   fältet finns i select:en, annars är filtret en no-op.
+3. När samma händelse kan nås från flera ytor (signering, portal, internt):
+   lägg kedjan i EN delad funktion från början. Portalens accept saknade
+   projekt, deal och bekräftelse i månader för att den var en egen kopia.
+4. En status som inte klassificeras någonstans blir osynlig. `pending_approval`
+   fanns i varken OPEN/WON/LOST → offerten försvann ur uppföljning, expiry och
+   kundportal. Facit-testa att varje SKRIVEN status är klassificerad eller
+   medvetet undantagen.
+5. Facit-testa funktionens LÖFTE, inte bara dess kod: "dold rad finns inte i
+   datat", "saknat inköpspris ger aldrig 100 % marginal", "vi påstår aldrig en
+   trend på under 5 observationer".
