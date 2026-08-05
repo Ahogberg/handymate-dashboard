@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 
 /**
  * GET /api/portal - Kundportal: hämta kundens data via token
@@ -131,7 +132,7 @@ export async function POST(request: NextRequest) {
         .eq('quote_id', quote_id)
         .eq('customer_id', customer.customer_id)
         .eq('business_id', customer.business_id)
-        .in('status', ['sent', 'opened'])
+        .in('status', [...OPEN_QUOTE_STATUSES])
 
       if (error) throw error
 
@@ -193,7 +194,7 @@ export async function POST(request: NextRequest) {
         .eq('quote_id', quote_id)
         .eq('customer_id', customer.customer_id)
         .eq('business_id', customer.business_id)
-        .in('status', ['sent', 'opened'])
+        .in('status', [...OPEN_QUOTE_STATUSES])
 
       if (error) throw error
 

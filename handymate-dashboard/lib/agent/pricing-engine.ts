@@ -179,10 +179,13 @@ export async function updatePricingIntelligence(businessId: string): Promise<{
     }
 
     // 3. Auto-klassificera outcome från status
-    //    accepted = won, rejected/expired = lost
-    const needOutcome = allQuotes.filter((q: QuoteRecord) => !q.outcome && (q.status === 'accepted' || q.status === 'rejected' || q.status === 'expired'))
+    //    accepted/signed = won, declined/expired = lost
+    //    VP3 (gap 6-bis): filtret sa 'rejected' — en status som ALDRIG skrivs
+    //    till quotes (värdet heter 'declined'). Prisintelligensen hade därför
+    //    aldrig sett en aktivt avböjd offert, bara vinster och utgångna.
+    const needOutcome = allQuotes.filter((q: QuoteRecord) => !q.outcome && (q.status === 'accepted' || q.status === 'signed' || q.status === 'declined' || q.status === 'expired'))
     for (const q of needOutcome) {
-      const outcome = q.status === 'accepted' ? 'won' : 'lost'
+      const outcome = q.status === 'accepted' || q.status === 'signed' ? 'won' : 'lost'
       await supabase
         .from('quotes')
         .update({ outcome, outcome_at: new Date().toISOString() })

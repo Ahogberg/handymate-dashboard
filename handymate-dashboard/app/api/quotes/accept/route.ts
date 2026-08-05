@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
+import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
       quote.customer = null
     }
 
-    if (!['sent', 'opened'].includes(quote.status)) {
+    if (!(OPEN_QUOTE_STATUSES as readonly string[]).includes(quote.status)) {
       return NextResponse.json({ error: 'Offerten kan inte accepteras i nuvarande status' }, { status: 400 })
     }
 

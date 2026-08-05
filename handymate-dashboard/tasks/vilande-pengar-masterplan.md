@@ -66,7 +66,7 @@ per kund; 10 hanna-outbound saknar agents_globally_paused-kontrollen.
   där confirmed_kr räknas — schablondelarna captured/tid orörda men
   TYDLIGT separerade i UI-copy).
 
-## VP3 — Väck de döda + en tyst-kund-primitiv — EJ PÅBÖRJAD
+## VP3 — Väck de döda + en tyst-kund-primitiv — KLAR 2026-08-05
 
 - **proactive-care + warranty-followup** (gap 3): tabellnamnen rättas
   (project/customer/warranty singular), felen LARMAR via driftlarm-

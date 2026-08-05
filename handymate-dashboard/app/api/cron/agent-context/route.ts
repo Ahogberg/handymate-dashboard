@@ -35,10 +35,10 @@ export async function POST(request: NextRequest) {
 async function runAgentContext() {
   const supabase = getServerSupabase()
 
-  // Hämta alla aktiva företag
+  // Hämta alla aktiva företag (+ paus-flaggan för outbound-stegen nedan)
   const { data: businesses, error } = await supabase
     .from('business_config')
-    .select('business_id')
+    .select('business_id, agents_globally_paused')
 
   if (error || !businesses) {
     console.error('[AgentContext Cron] Failed to fetch businesses:', error)
@@ -100,20 +100,34 @@ async function runAgentContext() {
       ltvResult = { success: false, error: err.message }
     }
 
+    // Kill-switch (VP3): agents_globally_paused stoppar de två OUTBOUND-
+    // stegen (garanti + proaktiv kundvård skapar kundriktade kort) — samma
+    // gate som hanna-outbound/kapacitet-fyllnad. Cronens övriga steg
+    // (context/rapport/LTV/prissättning) är interna och påverkas inte.
+    const outboundPaused = (biz as any).agents_globally_paused === true
+
     // Garantiuppföljning (12 mån efter avslutat jobb)
     let warrantyResult: { success: boolean; followupsCreated?: number; error?: string } = { success: false, error: 'Skipped' }
-    try {
-      warrantyResult = await checkWarrantyFollowups(biz.business_id)
-    } catch (err: any) {
-      warrantyResult = { success: false, error: err.message }
+    if (outboundPaused) {
+      warrantyResult = { success: true, followupsCreated: 0, error: 'Skipped — agents paused' }
+    } else {
+      try {
+        warrantyResult = await checkWarrantyFollowups(biz.business_id)
+      } catch (err: any) {
+        warrantyResult = { success: false, error: err.message }
+      }
     }
 
     // Proaktiv kundvård (jobbtyp-baserad livscykelkontakt)
     let proactiveCareResult: { success: boolean; contactsCreated?: number; error?: string } = { success: false, error: 'Skipped' }
-    try {
-      proactiveCareResult = await checkProactiveCare(biz.business_id)
-    } catch (err: any) {
-      proactiveCareResult = { success: false, error: err.message }
+    if (outboundPaused) {
+      proactiveCareResult = { success: true, contactsCreated: 0, error: 'Skipped — agents paused' }
+    } else {
+      try {
+        proactiveCareResult = await checkProactiveCare(biz.business_id)
+      } catch (err: any) {
+        proactiveCareResult = { success: false, error: err.message }
+      }
     }
 
     // Bokningspåminnelser (SMS 24h före)

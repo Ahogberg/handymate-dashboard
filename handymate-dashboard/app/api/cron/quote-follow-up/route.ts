@@ -6,6 +6,7 @@ import { isAutonomous } from '@/lib/autonomy/earned-autonomy'
 import { sendSmsViaElks } from '@/lib/sms-send'
 import { getBusinessPlanFromConfig } from '@/lib/auth'
 import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
+import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 
 /**
  * GET /api/cron/quote-follow-up - Automatisk uppföljning av offerter via AI agent.
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     const { data: expiredQuotes } = await supabase
       .from('quotes')
       .update({ status: 'expired' })
-      .in('status', ['sent', 'opened']) // 'opened' missades förut → öppnade-men-obesvarade offerter blev aldrig expired
+      .in('status', [...OPEN_QUOTE_STATUSES]) // 'opened' missades förut → öppnade-men-obesvarade offerter blev aldrig expired
       .lt('valid_until', today)
       .select('quote_id')
 
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
           quote_id, business_id, customer_id, title, total, customer_pays, valid_until,
           customer:customer_id (name, phone_number)
         `)
-        .in('status', ['sent', 'opened'])
+        .in('status', [...OPEN_QUOTE_STATUSES])
         .eq('valid_until', threeDaysFromNow)  // Exakt 3 dagar kvar
 
       // Samla unika business_ids för att kolla toggles en gång per företag
@@ -262,7 +263,7 @@ export async function GET(request: NextRequest) {
       // VP2 (gap 4): 'opened' ingick inte — en kund som ÖPPNAT sin offert men
       // inte svarat är en varmare kandidat än en som aldrig öppnat, ändå
       // följdes den aldrig upp. Nudge- och expired-delarna hade redan båda.
-      .in('status', ['sent', 'opened'])
+      .in('status', [...OPEN_QUOTE_STATUSES])
       .gte('valid_until', today)
 
     if (error) throw error

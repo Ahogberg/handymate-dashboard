@@ -155,7 +155,9 @@ export async function collectMonthlyData(
   const lostLeads = (leads || []).filter(l => l.status === 'lost').length
   const conversionRate = newLeads > 0 ? Math.round((wonLeads / newLeads) * 100) : 0
 
-  const quotesSent = (quotes || []).filter(q => q.sent_at || ['sent', 'opened', 'accepted', 'rejected'].includes(q.status)).length
+  // VP3 (gap 6-bis): 'rejected' skrivs aldrig till quotes — värdet heter
+  // 'declined' (och 'signed'/'expired' hörde också till "skickad någon gång").
+  const quotesSent = (quotes || []).filter(q => q.sent_at || ['sent', 'opened', 'accepted', 'signed', 'declined', 'expired'].includes(q.status)).length
   const quotesAccepted = (quotes || []).filter(q => q.status === 'accepted').length
   const quotesOpen = (quotes || []).filter(q => ['sent', 'opened'].includes(q.status)).length
   const avgQuoteAmount = quotesSent > 0

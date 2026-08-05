@@ -10,6 +10,7 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { deriveAutonomyKey, isAutonomous as isAutonomyGranted } from '@/lib/autonomy/earned-autonomy'
+import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 
 // ── Types ───────────────────────────────────────────────
 
@@ -1084,7 +1085,9 @@ async function queryThresholdEntities(
           .from('quotes')
           .select('quote_id, customer_id, total, sent_at, status')
           .eq('business_id', businessId)
-          .eq('status', 'sent')
+          // VP3 (gap 6-bis): 'opened' ingick inte — en öppnad-men-obesvarad
+          // offert triggade aldrig days_since_sent-regler.
+          .in('status', [...OPEN_QUOTE_STATUSES])
           .lte('sent_at', cutoffDate.toISOString())
 
         return (data || []).map((q: Record<string, unknown>) => ({

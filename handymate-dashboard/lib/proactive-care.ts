@@ -3,9 +3,22 @@
  *
  * Reaches out to past customers based on job type lifecycle.
  * Each job type has a natural "time to next contact" cycle.
+ *
+ * VP3 (gap 3, tasks/vilande-pengar-masterplan.md): väckt från död. Modulen
+ * frågade `projects`/`customers` (tabellerna heter `project`/`customer`,
+ * PK `project_id`/`customer_id`) och hade dessutom en customer-embed som
+ * PostgREST avvisar (FK saknas i prod — samma PGRST200-prejudikat som
+ * lib/project-stages/automation-engine.ts). Varje körning har alltså
+ * felat tyst sedan modulen skrevs. Nu: rätt tabellnamn, separat batch-
+ * hämtning av kunder, fel LARMAR via logAutomationActivity (driftlarm-
+ * cronen sveper automation_activity status='failed'), VP1:s frekvenstak
+ * före kortskapande, och månader räknas via tyst-kund-primitiven.
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { canContactCustomer } from '@/lib/outbound/frequency-guard'
+import { logAutomationActivity } from '@/lib/automations'
+import { monthsSinceLastJob } from '@/lib/customers/quiet-customer'
 
 // Job type → months until proactive contact
 const JOB_LIFECYCLE: Record<string, {
@@ -167,28 +180,54 @@ export async function checkProactiveCare(businessId: string): Promise<{
       return { success: false, contactsCreated: 0, error: 'Business not found' }
     }
 
-    // Hämta alla avslutade projekt med kund
+    // Hämta alla avslutade projekt (kunder batch-hämtas separat — ingen
+    // embed: project→customer-FK:n saknas i prod, PostgREST ger PGRST200)
     const { data: projects, error: projError } = await supabase
-      .from('projects')
-      .select(`
-        id,
-        name,
-        description,
-        status,
-        completed_at,
-        customer_id,
-        customer:customers(id, name, phone_number, email)
-      `)
+      .from('project')
+      .select('project_id, name, description, status, completed_at, customer_id')
       .eq('business_id', businessId)
       .eq('status', 'completed')
       .not('completed_at', 'is', null)
 
     if (projError) {
+      // Larma: driftlarm-cronen sveper automation_activity status='failed'.
+      // Tidigare returnerades felet tyst och ingen märkte att motorn var död.
+      await logAutomationActivity({
+        businessId,
+        automationType: 'proactive_care',
+        action: 'fetch_projects',
+        description: `Proaktiv kundvård kunde inte hämta projekt: ${projError.message}`,
+        status: 'failed',
+      }).catch(() => { /* best-effort */ })
       return { success: false, contactsCreated: 0, error: projError.message }
     }
 
     if (!projects || projects.length === 0) {
       return { success: true, contactsCreated: 0 }
+    }
+
+    // Batch-hämta kunder för projekten
+    const customerIds = Array.from(
+      new Set(projects.map(p => p.customer_id).filter((id): id is string => !!id))
+    )
+    const customerMap = new Map<string, { customer_id: string; name: string | null; phone_number: string | null }>()
+    if (customerIds.length > 0) {
+      const { data: customers, error: custError } = await supabase
+        .from('customer')
+        .select('customer_id, name, phone_number')
+        .eq('business_id', businessId)
+        .in('customer_id', customerIds)
+      if (custError) {
+        await logAutomationActivity({
+          businessId,
+          automationType: 'proactive_care',
+          action: 'fetch_customers',
+          description: `Proaktiv kundvård kunde inte hämta kunder: ${custError.message}`,
+          status: 'failed',
+        }).catch(() => { /* best-effort */ })
+        return { success: false, contactsCreated: 0, error: custError.message }
+      }
+      for (const c of customers || []) customerMap.set(String(c.customer_id), c)
     }
 
     const now = new Date()
@@ -198,7 +237,7 @@ export async function checkProactiveCare(businessId: string): Promise<{
       // Max 3 proactive contacts per business per day
       if (contactsCreated >= 3) break
 
-      const customer = project.customer as any
+      const customer = project.customer_id ? customerMap.get(String(project.customer_id)) : undefined
       if (!customer?.phone_number) continue
       if (!project.completed_at) continue
 
@@ -206,11 +245,10 @@ export async function checkProactiveCare(businessId: string): Promise<{
       const jobType = matchJobType(project.name, project.description)
       const lifecycle = JOB_LIFECYCLE[jobType] || JOB_LIFECYCLE['default']
 
-      // Calculate months since completion
-      const completedDate = new Date(project.completed_at)
-      const monthsSince = Math.floor(
-        (now.getTime() - completedDate.getTime()) / (30.44 * 24 * 60 * 60 * 1000)
-      )
+      // Månader sedan avslut — via tyst-kund-primitiven (30-dagarsmånad,
+      // samma beräkning som hanna-outbound; tidigare 30.44 här — förenat i VP3)
+      const monthsSince = monthsSinceLastJob(project.completed_at, now.getTime())
+      if (monthsSince === null) continue
 
       // Check if enough months have passed
       if (monthsSince < lifecycle.months) continue
@@ -225,7 +263,7 @@ export async function checkProactiveCare(businessId: string): Promise<{
         .eq('business_id', businessId)
         .eq('approval_type', 'proactive_care')
         .gte('created_at', sixtyDaysAgo)
-        .contains('payload', { project_id: project.id, customer_id: customer.id })
+        .contains('payload', { project_id: project.project_id, customer_id: customer.customer_id })
 
       if (existingApprovalCount && existingApprovalCount > 0) continue
 
@@ -236,10 +274,15 @@ export async function checkProactiveCare(businessId: string): Promise<{
         .eq('business_id', businessId)
         .eq('rule_name', 'proactive_customer_care')
         .gte('created_at', sixtyDaysAgo)
-        .contains('context', { project_id: project.id })
+        .contains('context', { project_id: project.project_id })
         .limit(1)
 
       if (existingLog && existingLog.length > 0) continue
+
+      // VP1:s gemensamma frekvenstak (gap 9) — max ett outbound-kort per
+      // kund per fönster, oavsett producent. Ovanpå 60-dagars-deduparna.
+      const freq = await canContactCustomer(supabase, businessId, String(customer.customer_id))
+      if (!freq.allowed) continue
 
       // Generate suggested SMS
       const suggestedSms = await generateProactiveSms({
@@ -262,11 +305,14 @@ export async function checkProactiveCare(businessId: string): Promise<{
         title: `Proaktiv kontakt: ${customer.name} — ${lifecycle.suggestedService}`,
         description: `${lifecycle.reason}. Senaste jobb: ${project.name} (${monthsSince} månader sedan)`,
         payload: {
-          agent_id: 'hanna',
-          customer_id: customer.id,
+          // 'agent' (inte 'agent_id') — exekveringen läser pl.agent och
+          // VP2-attributionen läser payload.agent; med gamla fältnamnet
+          // blev korten agent-lösa i båda. Samma fält som hanna-outbound.
+          agent: 'hanna',
+          customer_id: customer.customer_id,
           customer_name: customer.name,
           customer_phone: customer.phone_number,
-          project_id: project.id,
+          project_id: project.project_id,
           project_name: project.name,
           months_since: monthsSince,
           job_type: jobType,
@@ -281,14 +327,15 @@ export async function checkProactiveCare(businessId: string): Promise<{
       // Log to v3_automation_logs
       await supabase.from('v3_automation_logs').insert({
         business_id: businessId,
+        agent_id: 'hanna',
         rule_name: 'proactive_customer_care',
         trigger_type: 'cron',
         action_type: 'create_approval',
         status: 'success',
         context: {
-          customer_id: customer.id,
+          customer_id: customer.customer_id,
           customer_name: customer.name,
-          project_id: project.id,
+          project_id: project.project_id,
           project_name: project.name,
           job_type: jobType,
           months_since: monthsSince,
@@ -302,6 +349,13 @@ export async function checkProactiveCare(businessId: string): Promise<{
     return { success: true, contactsCreated }
   } catch (err: any) {
     console.error('[proactive-care] Error:', err)
+    await logAutomationActivity({
+      businessId,
+      automationType: 'proactive_care',
+      action: 'check_proactive_care',
+      description: `Proaktiv kundvård kraschade: ${err?.message || String(err)}`,
+      status: 'failed',
+    }).catch(() => { /* best-effort */ })
     return { success: false, contactsCreated, error: err.message }
   }
 }

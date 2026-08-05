@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { AGENT_CAPABILITIES, isValidAgentId, type AgentId } from '@/lib/agent/capabilities'
+import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 import {
   getOrCreateThread,
   executeHandoff,
@@ -55,7 +56,7 @@ async function getBusinessContext(businessId: string) {
     supabase.from('quotes')
       .select('quote_id, quote_number, total, sent_at')
       .eq('business_id', businessId)
-      .eq('status', 'sent')
+      .in('status', [...OPEN_QUOTE_STATUSES])
       .order('sent_at', { ascending: false })
       .limit(5),
     supabase.from('invoice')

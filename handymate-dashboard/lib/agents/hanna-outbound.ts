@@ -24,8 +24,14 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { canContactCustomer } from '@/lib/outbound/frequency-guard'
+import {
+  HANNA_OUTBOUND_QUIET_DAYS,
+  fetchQuietCustomers,
+  monthsSinceLastJob,
+} from '@/lib/customers/quiet-customer'
 
-const INACTIVE_MONTHS = 6
+// Tyst-kund-tröskeln (6 mån = 180 dgr) ligger i lib/customers/quiet-customer.ts
+// (VP3 gap 6) — EN delad definition, medvetet olika trösklar per konsument.
 const DRIP_PER_DAY = 5
 const DEDUP_DAYS = 90
 const CANDIDATE_POOL = 40
@@ -49,7 +55,6 @@ export async function runHannaOutbound(
   businessId: string
 ): Promise<HannaRunResult> {
   const now = Date.now()
-  const cutoffIso = new Date(now - INACTIVE_MONTHS * 30 * 24 * 3600_000).toISOString()
   const dedupIso = new Date(now - DEDUP_DAYS * 24 * 3600_000).toISOString()
 
   // Företagsnamn för SMS-signatur.
@@ -67,17 +72,12 @@ export async function runHannaOutbound(
     .eq('business_id', businessId)
     .is('last_job_date', null)
 
-  // Kandidater: bekräftade tidigare kunder, inaktiva ≥ INACTIVE_MONTHS, med telefon.
-  // Mest inaktiva först.
-  const { data: candidates } = await supabase
-    .from('customer')
-    .select('customer_id, name, phone_number, last_job_date')
-    .eq('business_id', businessId)
-    .not('last_job_date', 'is', null)
-    .lte('last_job_date', cutoffIso)
-    .not('phone_number', 'is', null)
-    .order('last_job_date', { ascending: true })
-    .limit(CANDIDATE_POOL)
+  // Kandidater: bekräftade tidigare kunder, tysta ≥ 180 dgr, med telefon.
+  // Mest inaktiva först — via delade tyst-kund-primitiven (VP3 gap 6).
+  const candidates = await fetchQuietCustomers(supabase, businessId, {
+    thresholdDays: HANNA_OUTBOUND_QUIET_DAYS,
+    limit: CANDIDATE_POOL,
+  })
 
   if (!candidates?.length) {
     return { business_id: businessId, proposed: 0, historyless: historyless || 0, skipped_recent: 0 }
@@ -143,7 +143,7 @@ export async function runHannaOutbound(
     } catch { /* generiskt om okänt */ }
 
     const firstName = String(c.name || '').split(' ')[0] || 'där'
-    const monthsInactive = Math.floor((now - new Date(c.last_job_date as string).getTime()) / (30 * 24 * 3600_000))
+    const monthsInactive = monthsSinceLastJob(c.last_job_date, now) ?? 0
     const sms = `Hej ${firstName}! Det var ett tag sedan vi hjälpte dig${service ? ` med ${service}` : ''}. Hör gärna av dig om du behöver hjälp igen — vi finns här. /${businessName}`
 
     const { error } = await supabase.from('pending_approvals').insert({

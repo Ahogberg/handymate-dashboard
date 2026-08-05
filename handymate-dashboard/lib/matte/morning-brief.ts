@@ -5,6 +5,7 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { assembleCashRadar } from '@/lib/cash-radar-data'
 import { svDateStr, svDateStrPlusDays } from '@/lib/dates'
+import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 
 export interface BriefDetail {
   text: string
@@ -80,7 +81,7 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
       .order('score', { ascending: false }).limit(10),
     supabase.from('quotes')
       .select('quote_id, title, total, created_at')
-      .eq('business_id', businessId).eq('status', 'sent')
+      .eq('business_id', businessId).in('status', [...OPEN_QUOTE_STATUSES])
       .lt('created_at', new Date(Date.now() - 5 * 86400000).toISOString())
       .limit(5),
     supabase.from('booking')

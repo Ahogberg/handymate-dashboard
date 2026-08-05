@@ -37,8 +37,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /** approval_type-värden som räknas som "outbound-förslag" för guarden —
-    täcker alla fyra producenter (se filkommentaren ovan). */
-export const OUTBOUND_APPROVAL_TYPES = ['send_sms', 'proactive_care'] as const
+    täcker alla fyra producenter (se filkommentaren ovan).
+    VP3: + 'warranty_followup' — motorn väcktes (den var död pga fel
+    tabellnamn) och dess kort ska både konsultera och synas i taket. */
+export const OUTBOUND_APPROVAL_TYPES = ['send_sms', 'proactive_care', 'warranty_followup'] as const
 
 /** Hur många dagar tillbaka som räknas som "nyligen kontaktad". */
 export const FREQUENCY_WINDOW_DAYS = 7

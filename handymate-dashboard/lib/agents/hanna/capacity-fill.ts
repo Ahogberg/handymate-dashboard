@@ -51,6 +51,12 @@ import { fetchPersonDays } from '@/lib/schedule/person-day'
 import { computePersonWeekUtilization } from '@/lib/schedule/utilization'
 import { computeFreeCapacity } from '@/lib/capacity/free-capacity'
 import { canContactCustomer } from '@/lib/outbound/frequency-guard'
+import {
+  CAPACITY_FILL_QUIET_DAYS,
+  fetchQuietCustomers,
+  daysSinceLastJob,
+} from '@/lib/customers/quiet-customer'
+import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 
 // ─────────────────────────────────────────────────────────────────
 // Konstanter
@@ -58,8 +64,11 @@ import { canContactCustomer } from '@/lib/outbound/frequency-guard'
 
 /** Offerter äldre än detta (dagar sedan sent_at) utan svar räknas som kandidater. */
 export const UNSOLD_QUOTE_MIN_DAYS = 7
-/** Kunder inaktiva minst detta antal dagar räknas som "tidigare kund" att väcka. */
-export const PAST_CUSTOMER_INACTIVE_DAYS = 90
+/** Kunder inaktiva minst detta antal dagar räknas som "tidigare kund" att
+    väcka. Definitionen ägs av tyst-kund-primitiven (VP3 gap 6) — tröskeln
+    90 dgr är medvetet snävare än hanna-outbounds 180 (fylla en tunn vecka
+    kräver färskare relation än en kall återaktivering). */
+export const PAST_CUSTOMER_INACTIVE_DAYS = CAPACITY_FILL_QUIET_DAYS
 /** Max antal förslag per företag och körning. */
 export const MAX_CANDIDATES_PER_BUSINESS = 3
 /** Hoppa kund som redan fått NÅGOT förslag senaste N dagarna (dedup). */
@@ -67,7 +76,9 @@ const DEDUP_WINDOW_DAYS = 7
 const QUOTE_POOL = 20
 const CUSTOMER_POOL = 20
 
-const UNSOLD_QUOTE_STATUSES = new Set(['sent', 'opened'])
+// Delade kanoniska statusar (VP3 gap 6-bis) — setet är exakt {sent, opened},
+// samma som tidigare (facit-testat i tests/kapacitet-fyllnad.spec.ts).
+const UNSOLD_QUOTE_STATUSES = new Set<string>(OPEN_QUOTE_STATUSES)
 
 // ─────────────────────────────────────────────────────────────────
 // SMS-meddelande — deterministiskt, exporterat, testbart
@@ -416,7 +427,7 @@ export async function runCapacityFill(
     .from('quotes')
     .select('quote_id, status, total, sent_at, customer_id, title')
     .eq('business_id', businessId)
-    .in('status', ['sent', 'opened'])
+    .in('status', [...OPEN_QUOTE_STATUSES])
     .not('sent_at', 'is', null)
     .order('total', { ascending: false })
     .limit(QUOTE_POOL)
@@ -485,20 +496,19 @@ export async function runCapacityFill(
 
   // ── 3. Om färre än MAX: fyll på med tidigare kunder ──────────────
   if (candidates.length < MAX_CANDIDATES_PER_BUSINESS) {
-    const cutoffIso = new Date(now - PAST_CUSTOMER_INACTIVE_DAYS * 24 * 3600_000).toISOString()
-    const { data: custData } = await supabase
-      .from('customer')
-      .select('customer_id, name, phone_number, last_job_date, lifetime_value')
-      .eq('business_id', businessId)
-      .not('last_job_date', 'is', null)
-      .lte('last_job_date', cutoffIso)
-      .not('phone_number', 'is', null)
-      .order('last_job_date', { ascending: true })
-      .limit(CUSTOMER_POOL)
+    // Tysta tidigare kunder via delade primitiven (VP3 gap 6) — samma
+    // villkor som förr (last_job_date satt, ≤ cutoff, telefon, mest
+    // inaktiva först), tröskeln 90 dgr bevarad.
+    const custData = await fetchQuietCustomers(supabase, businessId, {
+      thresholdDays: PAST_CUSTOMER_INACTIVE_DAYS,
+      limit: CUSTOMER_POOL,
+      includeLifetimeValue: true,
+      now: new Date(now),
+    })
 
     const alreadyPicked = new Set(candidates.map(c => c.customer_id))
 
-    const pastCustomerCandidatesRaw: PastCustomerCandidate[] = ((custData || []) as PastCustomerRow[])
+    const pastCustomerCandidatesRaw: PastCustomerCandidate[] = (custData as PastCustomerRow[])
       .filter(c => !alreadyPicked.has(c.customer_id))
       .map((c): PastCustomerCandidate | null => {
         const phoneE164 = toE164(c.phone_number)
@@ -508,9 +518,7 @@ export async function runCapacityFill(
           customer_name: c.name || '',
           customer_phone_e164: phoneE164,
           job_type: null, // fylls i per-vald-kandidat nedan, inte för hela poolen
-          days_since_last_job: Math.floor(
-            (now - new Date(c.last_job_date as string).getTime()) / 86400000,
-          ),
+          days_since_last_job: daysSinceLastJob(c.last_job_date, now) ?? 0,
           lifetime_value: Number(c.lifetime_value) || 0,
         }
       })

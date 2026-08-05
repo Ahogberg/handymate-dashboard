@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { createHash } from 'crypto'
+import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 
 // 1x1 transparent GIF
 const PIXEL = Buffer.from(
@@ -81,7 +82,7 @@ export async function GET(req: NextRequest) {
       }
 
       // Trigga nudge vid 3+ visningar utan svar
-      if (newViewCount >= 3 && ['sent', 'opened'].includes(quote.status)) {
+      if (newViewCount >= 3 && (OPEN_QUOTE_STATUSES as readonly string[]).includes(quote.status)) {
         try {
           const { createQuoteNudge } = await import('@/lib/autopilot/quote-nudge')
           await createQuoteNudge(quote.business_id, quoteId, newViewCount)

@@ -1,5 +1,6 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { getClaudeModel } from '@/lib/ai/get-model'
+import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 import {
   getCommunicationSettings,
   resolveMessageVariables,
@@ -336,7 +337,7 @@ async function buildCustomerState(
     .select('quote_id, total, updated_at')
     .eq('business_id', businessId)
     .eq('customer_id', customerId)
-    .eq('status', 'sent')
+    .in('status', [...OPEN_QUOTE_STATUSES])
     .order('updated_at', { ascending: false })
     .limit(1)
     .single()
