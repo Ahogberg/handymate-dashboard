@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { generateMorningBrief } from '@/lib/matte/morning-brief'
+import { generateMorningBrief, MORNING_BRIEF_VERSION } from '@/lib/matte/morning-brief'
 import { getServerSupabase } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
@@ -23,7 +23,12 @@ export async function GET(request: NextRequest) {
   if (cached?.value) {
     try {
       const brief = JSON.parse(cached.value)
-      if (brief.date === today) return NextResponse.json(brief)
+      // version-kollen: en cache byggd med äldre brief-logik (t.ex. dagens
+      // 05:30-cron före en deploy) ska regenereras, inte serveras hela
+      // dagen — se MORNING_BRIEF_VERSION i lib/matte/morning-brief.ts.
+      if (brief.date === today && brief.version === MORNING_BRIEF_VERSION) {
+        return NextResponse.json(brief)
+      }
     } catch { /* regenerera */ }
   }
 

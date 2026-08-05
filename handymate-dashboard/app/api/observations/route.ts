@@ -57,7 +57,37 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({ observations: data || [] })
+    // Agera-återvändsgränds-fixen (2026-08-05, Andreas fynd): en observation
+    // lever längre (dedup-fönster i dagar) än sin länkade approval (3 dagars
+    // expiry, eller redan hanterad från annan yta). UI:t visar Agera-knappen
+    // när related_approval_id finns — utan denna koll leder den då till en
+    // tom kö utan kort att agera på. Nolla länken när approvalen inte längre
+    // är pending; ett fel i kollen får aldrig fälla svaret (degradera till
+    // ofiltrerat, dvs. dagens beteende).
+    let observations = data || []
+    try {
+      const linkedIds = observations
+        .map((o: any) => o.related_approval_id)
+        .filter((id: any): id is string => Boolean(id))
+      if (linkedIds.length > 0) {
+        const { data: pendingRows } = await supabase
+          .from('pending_approvals')
+          .select('id')
+          .eq('business_id', business.business_id)
+          .eq('status', 'pending')
+          .in('id', linkedIds)
+        const pendingSet = new Set((pendingRows || []).map((r: any) => r.id))
+        observations = observations.map((o: any) =>
+          o.related_approval_id && !pendingSet.has(o.related_approval_id)
+            ? { ...o, related_approval_id: null }
+            : o,
+        )
+      }
+    } catch (linkErr) {
+      console.warn('[observations/GET] approval-länkkoll hoppades över:', linkErr)
+    }
+
+    return NextResponse.json({ observations })
   } catch (err: any) {
     console.error('[observations/GET] unexpected error:', err)
     return NextResponse.json(

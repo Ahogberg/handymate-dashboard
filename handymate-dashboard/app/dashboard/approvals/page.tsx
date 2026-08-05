@@ -291,6 +291,23 @@ export default function ApprovalsPage() {
     }
   }
 
+  // Agera-länkarna (#approval-<id> från insiktskorten/IdagCore) ska landa
+  // PÅ kortet — browserns egen hash-scroll hinner köra innan listan är
+  // hämtad, så vi scrollar själva när approvals väl finns. Highlight i
+  // samma stil som TeamActivityStrips scrollIntoView-mönster.
+  useEffect(() => {
+    const hash = window.location.hash
+    if (!hash.startsWith('#approval-') || approvals.length === 0) return
+    const target = document.getElementById(hash.slice(1))
+    if (!target) return
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    target.classList.add('ring-2', 'ring-primary-400', 'ring-offset-2')
+    const timer = setTimeout(() => {
+      target.classList.remove('ring-2', 'ring-primary-400', 'ring-offset-2')
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [approvals])
+
   // Typer som INTE behöver bekräftelse (rena acknowledgements)
   const SKIP_CONFIRM = ['time_attestation', 'low_stock_alert', 'profitability_warning', 'dispatch_suggestion', 'quote_nudge', 'egenkontroll_foto', 'egenkontroll_avvikelse', 'checklist_forslag', 'tidrapport_forslag']
 
@@ -595,7 +612,7 @@ export default function ApprovalsPage() {
                 const activeCount = pendingActions.filter(a => !rejectedSet.has(a.id)).length
 
                 return (
-                  <div key={approval.id} className={`border-2 rounded-xl transition-all ${
+                  <div key={approval.id} id={`approval-${approval.id}`} className={`border-2 rounded-xl transition-all ${
                     approval.status === 'pending' ? 'border-primary-200 bg-primary-50/30' : 'border-gray-100 opacity-75'
                   }`}>
                     <div className="p-5">
@@ -743,6 +760,7 @@ export default function ApprovalsPage() {
               return (
                 <div
                   key={approval.id}
+                  id={`approval-${approval.id}`}
                   className={`bg-white border rounded-xl transition-all ${
                     approval.status === 'pending'
                       ? 'border-gray-200'

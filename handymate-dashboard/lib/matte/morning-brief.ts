@@ -20,11 +20,22 @@ export interface AgentBrief {
   details: BriefDetail[]
 }
 
+/**
+ * Bumpa när brief-LOGIKEN ändras (queries, grenar, texter) så att dagens
+ * redan cachade brief ogiltigförklaras och genereras om vid nästa läsning —
+ * annars serveras gårdagens-logik-brief ända tills morgon-cronen kör igen.
+ * (Upptäckt 2026-08-05: overdue-fixen syntes inte förrän dagen efter
+ * eftersom GET:en serverade 05:30-cronens cache byggd med gammal kod.)
+ */
+export const MORNING_BRIEF_VERSION = 2
+
 export interface MorningBrief {
   date: string
   greeting: string
   agents: AgentBrief[]
   generatedAt: string
+  /** Se MORNING_BRIEF_VERSION — saknas i äldre cachade briefs (→ regenerera). */
+  version?: number
 }
 
 export async function generateMorningBrief(businessId: string): Promise<MorningBrief> {
@@ -127,6 +138,7 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
     greeting: `God morgon, ${firstName}!`,
     agents: [matteBrief, karinBrief, danielBrief, larsBrief, hannaBrief],
     generatedAt: new Date().toISOString(),
+    version: MORNING_BRIEF_VERSION,
   }
 
   // Cache
