@@ -155,3 +155,34 @@ undvika onödig tid, inte för att hoppa över deploy-kritisk verifiering.
 (3) Efter push av arkitekturella ändringar: verifiera att Vercel-deployen
 faktiskt blev grön (Andreas dashboard eller vercel ls) innan nästa etapp
 staplas ovanpå — fem etapper hann staplas på en trasig deploy.
+
+## 2026-08-05: Tyst döda automationer — Supabase kastar inte, larmar gör vi själva
+
+**Vad hände:** proactive-care + warranty-followup hade varit döda sedan de
+skrevs (fel tabellnamn projects/customers + embed utan FK). Ingen märkte det
+på månader. Full audit hittade därefter ~15 ytterligare bevisbart trasiga
+punkter i samma felklass (fel tabellnamn, inserts mot NOT NULL utan värde,
+okända kolumnnamn, statusvärden som aldrig skrivs, CHECK-brott).
+
+**Varför det var osynligt:** Supabase-js returnerar { data, error } och
+kastar ALDRIG — kod som inte läser error misslyckas spårlöst. Cron-svaret
+är ändå HTTP 200. console.log/console.error syns bara i Vercels loggkonsol.
+Driftlarmet sveper BARA automation_activity — inte v3_automation_logs.
+
+**Regler:**
+1. Varje ny .from('tabell') måste verifieras mot sql/-facit (eller körande
+   kod som bevisligen använder samma tabell) INNAN den skrivs. Tabellnamnen
+   är blandade singular/plural (customer, project, booking, invoice,
+   warranty MEN quotes, leads, work_orders) — gissa aldrig.
+2. Läs ALLTID error på inserts/updates i flöden utan användare (cron,
+   agenter, webhooks) — och rapportera fel via logAutomationActivity
+   (status:'failed'), aldrig bara console.log. Det är enda kanalen
+   driftlarmet ser.
+3. PostgREST-embeds (alias:tabell(...)) kräver FK i PROD — anta aldrig att
+   FK finns; kolla sql/v71 eller använd separat batch-hämtning (mönstret i
+   lib/agents/hanna/avtal-forslag.ts).
+4. Statusvärden: kontrollera vad som faktiskt SKRIVS innan filter byggs
+   (quotes: declined inte rejected; booking: completed skrivs aldrig;
+   leads har CHECK — update med ogiltigt värde failar tyst).
+5. En modul är inte "klar" när den kompilerar — den är klar när dess
+   loggrader bevisligen dyker upp i rätt tabell. Verifiera första körningen.

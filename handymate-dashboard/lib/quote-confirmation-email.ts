@@ -107,20 +107,24 @@ export async function sendQuoteSignedConfirmation(
       projectId = project?.project_id || null
     } catch { /* non-blocking */ }
 
-    await supabase.from('v3_automation_logs').insert({
+    // Sanering 2026-08-05: inserten hade kolumner som inte finns
+    // (action_taken/customer_id/success) och saknade NOT NULL-fälten
+    // action_type/status → den har failat på varje offertsignering.
+    const { error: logErr } = await supabase.from('v3_automation_logs').insert({
       business_id: businessId,
       rule_name: 'quote_signed_confirmation',
       trigger_type: 'event',
-      action_taken: `Bekräftelsemail skickat till ${customer.email}`,
-      customer_id: quote.customer_id,
-      success: result.success,
+      action_type: 'send_email',
+      status: result.success ? 'success' : 'failed',
       error_message: result.error || null,
       context: {
         project_id: projectId,
         customer_id: quote.customer_id,
         quote_id: quote.quote_id,
+        action_taken: `Bekräftelsemail skickat till ${customer.email}`,
       },
     })
+    if (logErr) console.warn('[quote-confirmation-email] v3-logg insert misslyckades:', logErr.message)
   } catch { /* non-blocking */ }
 
   return result

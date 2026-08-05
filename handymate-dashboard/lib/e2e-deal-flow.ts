@@ -1068,12 +1068,29 @@ async function getDealData(
   dealId: string
 ): Promise<any | null> {
   const supabase = getServerSupabase()
+  // Sanering 2026-08-05: deal.customer_id saknar FK (verifierat i prod via
+  // pg_constraint — pipeline.sql deklarerar kolumnen utan REFERENCES), så
+  // embedden `customer:customer(*)` avvisade HELA queryn (PGRST200) och
+  // deal-flödet hittade aldrig sin deal. Kunden hämtas separat i stället.
   const { data } = await supabase
     .from('deal')
-    .select('*, customer:customer(*)')
+    .select('*')
     .eq('id', dealId)
     .eq('business_id', businessId)
     .single()
+  if (!data) return null
+
+  if (data.customer_id) {
+    const { data: customer } = await supabase
+      .from('customer')
+      .select('*')
+      .eq('customer_id', data.customer_id)
+      .eq('business_id', businessId)
+      .maybeSingle()
+    ;(data as any).customer = customer || null
+  } else {
+    ;(data as any).customer = null
+  }
   return data
 }
 

@@ -65,7 +65,7 @@ export async function GET(_request: NextRequest, { params }: { params: { token: 
       // Project photos
       projectIds.length > 0
         ? supabase
-            .from('project_photo')
+            .from('project_photos')
             .select('id, project_id, caption, uploaded_at')
             .in('project_id', projectIds)
             .gte('uploaded_at', sinceIso)
@@ -86,7 +86,7 @@ export async function GET(_request: NextRequest, { params }: { params: { token: 
       // Tracker stage completions
       projectIds.length > 0
         ? supabase
-            .from('project_tracker_stage')
+            .from('project_stages')
             .select('project_id, stage, label, completed_at')
             .in('project_id', projectIds)
             .not('completed_at', 'is', null)

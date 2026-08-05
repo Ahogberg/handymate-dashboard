@@ -172,7 +172,8 @@ async function logProjectStageEvent(
       rule_name: `Projekt: ${stage?.name || stageId}`,
       trigger_type: 'project_stage_change',
       action_type: 'advance_stage',
-      status: 'completed',
+      // Sanering 2026-08-05: 'completed' → 'success' (kanoniska värdet).
+      status: 'success',
       agent_id: 'lars', // Projektledaren ansvarar för stage-flödet
       context: {
         project_id: project.project_id,

@@ -197,7 +197,9 @@ export async function deliverInvoiceReminder(
   if (updErr) console.error('[invoice-reminder-send] invoice update failed (räknare ej uppdaterad):', invoiceId, updErr)
 
   // ── Logga aktivitet ──
-  await supabase.from('activity').insert({
+  // Sanering 2026-08-05: tabellen heter customer_activity — gamla namnet
+  // activity finns inte, så påminnelser syntes aldrig i kundtidslinjen.
+  await supabase.from('customer_activity').insert({
     business_id: businessId,
     customer_id: customerId,
     activity_type: 'auto_reminder_sent',

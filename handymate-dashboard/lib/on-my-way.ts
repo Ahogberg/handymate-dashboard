@@ -159,15 +159,21 @@ export async function sendOnMyWaySms(args: OnMyWaySmsArgs): Promise<OnMyWaySmsRe
 
   // Logga (non-blocking)
   try {
-    await supabase.from('v3_automation_logs').insert({
+    // Sanering 2026-08-05: action_taken/success finns inte som kolumner och
+    // NOT NULL-fälten action_type/status saknades → varje insert failade.
+    const { error: logErr } = await supabase.from('v3_automation_logs').insert({
       business_id: businessId,
       rule_name: 'on_my_way_sms',
       trigger_type: 'manual',
-      action_taken: `På väg-SMS till ${customerName || customerPhone}${eta ? ` (ETA ${eta})` : ''}`,
-      success: smsSuccess,
+      action_type: 'send_sms',
+      status: smsSuccess ? 'success' : 'failed',
       error_message: smsError || null,
       agent_id: 'lars',
+      context: {
+        action_taken: `På väg-SMS till ${customerName || customerPhone}${eta ? ` (ETA ${eta})` : ''}`,
+      },
     })
+    if (logErr) console.warn('[on-my-way] v3-logg insert misslyckades:', logErr.message)
   } catch {
     // non-blocking
   }

@@ -284,9 +284,11 @@ export default function CustomerDetailPage() {
       .order('scheduled_start', { ascending: false })
 
     // Hämta projektbokningar som inte redan finns via customer_id
+    // Sanering 2026-08-05: tabellen heter project (PK project_id) — det
+    // gamla namnet projects gjorde att projektbokningar aldrig hittades.
     const projectIds = (await supabase
-      .from('projects')
-      .select('id')
+      .from('project')
+      .select('id:project_id')
       .eq('customer_id', customerId)
     ).data?.map((p: any) => p.id) || []
 
@@ -303,10 +305,10 @@ export default function CustomerDetailPage() {
     const allBookings = [...(bookingData || []), ...projectBookings]
       .sort((a: any, b: any) => new Date(b.scheduled_start).getTime() - new Date(a.scheduled_start).getTime())
 
-    // Hämta projekt
+    // Hämta projekt (project, inte projects; budget-kolumnen heter budget_amount)
     const { data: projectData } = await supabase
-      .from('projects')
-      .select('id, name, status, created_at, completed_at, budget')
+      .from('project')
+      .select('id:project_id, name, status, created_at, completed_at, budget:budget_amount')
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
 

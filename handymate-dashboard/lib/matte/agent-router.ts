@@ -27,7 +27,9 @@ export async function routeToAgentWithContext(
     rule_name: 'matte_agent_routing',
     trigger_type: 'matte_routed',
     action_type: `route_to_${agentId}`,
-    status: 'completed',
+    // Sanering 2026-08-05: 'completed' → 'success' — värde-/scoreboard-
+    // filtren läser bara 'success', så raderna var osynliga överallt.
+    status: 'success',
     context: {
       intent: decision.intent,
       confidence: decision.confidence,

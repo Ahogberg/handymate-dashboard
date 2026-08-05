@@ -400,9 +400,11 @@ export async function GET(
 
   // ── 11. projects — Projekt-händelser ──────────────────────────
   if (filter === 'all' || filter === 'projects') {
+    // Sanering 2026-08-05: project (PK project_id, budget_amount) — gamla
+    // namnet projects gjorde att projekt-händelser aldrig syntes i timelinen.
     const { data: projects } = await supabase
-      .from('projects')
-      .select('id, name, status, created_at, completed_at, budget')
+      .from('project')
+      .select('id:project_id, name, status, created_at, completed_at, budget:budget_amount')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })

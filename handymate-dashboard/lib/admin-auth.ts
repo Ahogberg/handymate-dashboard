@@ -57,13 +57,17 @@ export async function logAdminAction(
   try {
     const supabase = getSupabaseAdmin()
 
-    await supabase.from('admin_audit_log').insert({
+    // Sanering 2026-08-05: tabellen heter admin_actions_log (sql/admin_tables.sql)
+    // — det gamla namnet admin_audit_log finns inte, så varje insert har
+    // failat tyst och admin-audit-spåret var helt tomt i prod.
+    const { error } = await supabase.from('admin_actions_log').insert({
       action,
       admin_user_id: adminUserId,
       target_business_id: targetBusinessId,
       details,
       created_at: new Date().toISOString()
     })
+    if (error) console.error('Failed to log admin action:', error.message)
   } catch (error) {
     // Log to console but don't fail the request
     console.error('Failed to log admin action:', error)

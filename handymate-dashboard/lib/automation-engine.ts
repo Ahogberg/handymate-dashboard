@@ -610,18 +610,24 @@ async function handleRejectLead(
   if (!leadId) return { success: false, error: 'lead_id saknas i kontext' }
 
   // Update lead status
-  await supabase
+  // Sanering 2026-08-05: 'rejected' bröt mot leads status-CHECK
+  // (new/contacted/qualified/quote_sent/won/lost) → updaten failade tyst
+  // och funktionen returnerade ändå success. 'lost' är kanoniska värdet.
+  const { error: rejectErr } = await supabase
     .from('leads')
-    .update({ status: 'rejected', updated_at: new Date().toISOString() })
+    .update({ status: 'lost', updated_at: new Date().toISOString() })
     .eq('lead_id', leadId)
     .eq('business_id', businessId)
+  if (rejectErr) {
+    return { success: false, error: `Lead-status kunde inte uppdateras: ${rejectErr.message}` }
+  }
 
   // Send rejection SMS if template provided and phone available
   if (config.sms_template && context.phone) {
     await handleSendSms(supabase, businessId, { template: config.sms_template }, context)
   }
 
-  return { success: true, data: { lead_id: leadId, status: 'rejected' } }
+  return { success: true, data: { lead_id: leadId, status: 'lost' } }
 }
 
 async function handleGenerateQuote(

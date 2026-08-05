@@ -400,17 +400,10 @@ export async function POST(request: NextRequest) {
         .select('*')
         .eq('customer_id', quote.customer_id)
         .single()
-      if (!c) {
-        // Försök med customers-tabellen
-        const { data: c2 } = await supabase
-          .from('customers')
-          .select('*')
-          .eq('id', quote.customer_id)
-          .single()
-        customer = c2
-      } else {
-        customer = c
-      }
+      // Sanering 2026-08-05: den gamla fallbacken mot "customers" var död —
+      // tabellen finns inte (heter customer) — och slukade bara det riktiga
+      // felmeddelandet när kunduppslaget misslyckades.
+      customer = c
     }
     // Sätt customer på quote-objektet för bakåtkompatibilitet
     ;(quote as any).customer = customer

@@ -132,7 +132,11 @@ export async function GET(request: NextRequest) {
           .from('v3_automation_logs')
           .select('agent_id, action_type, rule_name, context, created_at')
           .eq('business_id', business.business_id)
-          .eq('status', 'completed')
+          // Sanering 2026-08-05: filtrerade 'completed' som nästan inget
+          // skrev (kanoniska värdet är 'success') → AI-aktivitetsraden på
+          // dealkorten var i praktiken alltid tom. Båda tas med så gamla
+          // 'completed'-rader fortsatt syns.
+          .in('status', ['success', 'completed'])
           .order('created_at', { ascending: false })
           .limit(500)
 

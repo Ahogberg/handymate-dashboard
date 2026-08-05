@@ -268,14 +268,17 @@ export async function POST(
     if (action === 'reject' && approval.approval_type === 'lead_review') {
       const leadId = (approval.payload as Record<string, unknown>)?.lead_id as string | undefined
       if (leadId) {
-        try {
-          await supabase
-            .from('leads')
-            .update({ status: 'declined', updated_at: new Date().toISOString() })
-            .eq('lead_id', leadId)
-            .eq('business_id', business.business_id)
-        } catch (err) {
-          console.error('[approvals/lead_review] Failed to mark lead declined:', err)
+        // Sanering 2026-08-05: 'declined' bröt mot leads status-CHECK
+        // (new/contacted/qualified/quote_sent/won/lost) → updaten failade
+        // tyst och leaden låg kvar som aktiv. 'lost' är det kanoniska
+        // avvisad-värdet. Supabase kastar inte — läs error explicit.
+        const { error: leadErr } = await supabase
+          .from('leads')
+          .update({ status: 'lost', updated_at: new Date().toISOString() })
+          .eq('lead_id', leadId)
+          .eq('business_id', business.business_id)
+        if (leadErr) {
+          console.error('[approvals/lead_review] Failed to mark lead lost:', leadErr.message)
         }
       }
     }
@@ -1062,16 +1065,25 @@ async function executeApprovalPayload(
           messageType: 'warranty_followup',
         })
 
-        // Logga i automation_logs
+        // Sanering 2026-08-05: skrev till "automation_logs" som inte finns
+        // (heter v3_automation_logs) med kolumner (input/output) som inte
+        // heller finns — exekveringsloggen försvann tyst. Nu samma form som
+        // proactive_care-caset ovan, inkl. approval_id (VP2-attribution).
         const supabaseW = await getSupabase()
-        await supabaseW.from('automation_logs').insert({
+        const { error: wLogErr } = await supabaseW.from('v3_automation_logs').insert({
           business_id: businessId,
+          agent_id: pl.agent || null,
           rule_name: 'warranty_followup',
           trigger_type: 'approval_executed',
-          status: r.sms_sent ? 'completed' : 'failed',
-          input: { project_id: pl.project_id, customer_name: pl.customer_name },
-          output: { sms_sent: r.sms_sent, error: r.error },
+          action_type: 'send_sms',
+          approval_id: approvalId,
+          status: r.sms_sent ? 'success' : 'failed',
+          error_message: r.sms_sent ? null : (r.error || null),
+          context: { project_id: pl.project_id, customer_id: pl.customer_id, customer_name: pl.customer_name },
         })
+        if (wLogErr) {
+          console.warn('[approvals/warranty_followup] v3-logg insert misslyckades (icke-blockerande):', wLogErr.message)
+        }
 
         return { action: 'warranty_followup', sms_sent: r.sms_sent, error: r.error, customer: pl.customer_name }
       }

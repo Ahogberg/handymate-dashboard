@@ -4156,7 +4156,7 @@ export default function ProjectDetailPage() {
                             onClick={async () => {
                               const lines = woDetail.materials_needed.split('\n').filter((l: string) => l.trim())
                               const asChecklist = lines.map((l: string) => `[ ] ${l.replace(/^[-•*]\s*/, '')}`).join('\n')
-                              await supabase.from('work_order').update({ materials_needed: asChecklist }).eq('id', woDetail.id)
+                              await supabase.from('work_orders').update({ materials_needed: asChecklist }).eq('id', woDetail.id)
                               fetchWorkOrders()
                             }}
                             className="text-[10px] text-primary-700 hover:underline"
@@ -4184,7 +4184,7 @@ export default function ProjectDetailPage() {
                                       lines[idx] = isChecked
                                         ? lines[idx].replace('[x]', '[ ]')
                                         : lines[idx].replace('[ ]', '[x]')
-                                      await supabase.from('work_order').update({ materials_needed: lines.join('\n') }).eq('id', woDetail.id)
+                                      await supabase.from('work_orders').update({ materials_needed: lines.join('\n') }).eq('id', woDetail.id)
                                       fetchWorkOrders()
                                     }
                                   }}

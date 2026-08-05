@@ -244,7 +244,8 @@ async function logMatteAction(
       rule_name: `matte_${signal.channel}_intelligence`,
       trigger_type: `${signal.channel}_received`,
       action_type: decision.intent,
-      status: 'completed',
+      // Sanering 2026-08-05: 'completed' → 'success' (kanoniska värdet).
+      status: 'success',
       context: {
         intent: decision.intent,
         confidence: decision.confidence,

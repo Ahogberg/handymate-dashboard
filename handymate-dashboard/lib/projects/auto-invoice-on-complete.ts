@@ -351,7 +351,7 @@ export async function autoInvoiceOnComplete(
 
     // 13. Logga aktivitet
     try {
-      await supabase.from('activity').insert({
+      await supabase.from('customer_activity').insert({
         business_id: businessId,
         customer_id: project.customer_id,
         activity_type: 'invoice_created',

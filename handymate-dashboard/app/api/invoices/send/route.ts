@@ -273,9 +273,9 @@ export async function POST(request: NextRequest) {
         results.errors.push(`Status: ${statusErr.message}`)
       }
 
-      // Logga aktivitet
+      // Logga aktivitet (customer_activity — gamla namnet activity fanns inte)
       await supabase
-        .from('activity')
+        .from('customer_activity')
         .insert({
           business_id: invoice.business_id,
           customer_id: invoice.customer_id,

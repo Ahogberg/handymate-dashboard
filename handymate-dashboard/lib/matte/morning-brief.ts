@@ -75,9 +75,11 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
       .lte('due_date', svDateStrPlusDays(3))
       .limit(5),
     supabase.from('leads')
-      .select('lead_id, name, job_type, score, pipeline_stage')
+      // Sanering 2026-08-05: kolumnen heter pipeline_stage_key — det gamla
+      // namnet fällde hela queryn → leads-sektionen i briefen var alltid tom.
+      .select('lead_id, name, job_type, score, pipeline_stage_key')
       .eq('business_id', businessId)
-      .not('status', 'in', '("won","lost","completed")')
+      .not('status', 'in', '("won","lost")')
       .order('score', { ascending: false }).limit(10),
     supabase.from('quotes')
       .select('quote_id, title, total, created_at')
@@ -209,7 +211,7 @@ function buildDanielBrief(leads: any[], staleQuotes: any[]): AgentBrief {
   }
   if (leads.length > 0) return {
     agentId: 'daniel', quote: `${leads.length} aktiva leads`, badge: `${leads.length}`, badgeType: 'neutral',
-    details: leads.slice(0, 3).map((l: any) => ({ text: `${l.name || 'Lead'} — ${l.pipeline_stage || '—'}`, urgency: 'low' as const, link: `/dashboard/pipeline?lead=${l.lead_id}` })),
+    details: leads.slice(0, 3).map((l: any) => ({ text: `${l.name || 'Lead'} — ${l.pipeline_stage_key || '—'}`, urgency: 'low' as const, link: `/dashboard/pipeline?lead=${l.lead_id}` })),
   }
   return { agentId: 'daniel', quote: 'Inga leads just nu.', badge: 'Tomt', badgeType: 'neutral', details: [] }
 }

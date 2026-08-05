@@ -139,17 +139,25 @@ export async function resolveEntity(
           .eq('business_id', businessId)
           .eq('customer_id', customerId)
           .not('status', 'eq', 'cancelled')
-          .not('status', 'eq', 'completed')
+          // Sanering 2026-08-05: booking.status blir aldrig 'completed' —
+          // avslut markeras i job_status (complete-job-routen). Det gamla
+          // filtret var dött → avslutade jobb listades som aktiva i Mattes
+          // kontext. or-formen behövs: neq exkluderar null i SQL-semantik.
+          .or('job_status.is.null,job_status.neq.completed')
           .order('scheduled_start', { ascending: false })
           .limit(3)
       : Promise.resolve({ data: [] as any[] }),
 
     supabase
       .from('leads')
-      .select('lead_id, job_type, status, pipeline_stage, estimated_value')
+      // Sanering 2026-08-05: kolumnen heter pipeline_stage_key — det gamla
+      // namnet pipeline_stage fällde hela queryn → Mattes deal-kontext var
+      // alltid tom. ('completed' i status-filtret var också dött — CHECK:en
+      // har bara new/contacted/qualified/quote_sent/won/lost.)
+      .select('lead_id, job_type, status, pipeline_stage_key, estimated_value')
       .eq('business_id', businessId)
       .eq(customerId ? 'customer_id' : 'lead_id', (customerId ?? leadId)!)
-      .not('status', 'in', '("won","lost","completed")')
+      .not('status', 'in', '("won","lost")')
       .order('created_at', { ascending: false })
       .limit(3),
 
@@ -190,7 +198,7 @@ export async function resolveEntity(
     activeDeals: (deals.data || []).map((l: any) => ({
       id: l.lead_id,
       title: l.job_type || 'Ärende',
-      pipelineStage: l.pipeline_stage || l.status,
+      pipelineStage: l.pipeline_stage_key || l.status,
       estimatedValue: l.estimated_value,
     })),
     recentInvoices: (invoices.data || []).map((i: any) => ({

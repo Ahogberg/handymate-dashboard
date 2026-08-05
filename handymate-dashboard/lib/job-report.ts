@@ -146,19 +146,23 @@ export async function triggerJobReport(
 
   // Log
   try {
-    await supabase.from('v3_automation_logs').insert({
+    // Sanering 2026-08-05: action_taken/success finns inte som kolumner och
+    // NOT NULL-fälten action_type/status saknades → varje insert failade.
+    const { error: logErr } = await supabase.from('v3_automation_logs').insert({
       business_id: businessId,
       rule_name: 'job_report_followup',
       trigger_type: 'event',
-      action_taken: `Jobbrapport förberedd för ${project.name}`,
-      success: true,
+      action_type: 'create_approval',
+      status: 'success',
       agent_id: 'lars',
       context: {
         project_id: projectId,
         customer_id: (customer as any)?.customer_id || null,
         project_name: project.name,
+        action_taken: `Jobbrapport förberedd för ${project.name}`,
       },
     })
+    if (logErr) console.warn('[job-report] v3-logg insert misslyckades:', logErr.message)
   } catch { /* non-blocking */ }
 
   return { success: true }
@@ -344,18 +348,21 @@ export async function approveJobReport(
     }
 
     // Log
-    await supabase.from('v3_automation_logs').insert({
+    // Sanering 2026-08-05: samma trasiga insert-form som ovan — rättad.
+    const { error: sendLogErr } = await supabase.from('v3_automation_logs').insert({
       business_id: businessId,
       rule_name: 'job_report_followup',
       trigger_type: 'event',
-      action_taken: `Jobbrapport skickad till ${reportData.customerEmail || 'kund'}`,
-      success: true,
+      action_type: 'send_email',
+      status: 'success',
       agent_id: 'lars',
       context: {
         project_id: reportData.projectId || null,
         project_name: reportData.projectName,
+        action_taken: `Jobbrapport skickad till ${reportData.customerEmail || 'kund'}`,
       },
     })
+    if (sendLogErr) console.warn('[job-report] v3-logg insert misslyckades:', sendLogErr.message)
 
     return { success: true, pdfUrl }
   } catch (err: any) {
