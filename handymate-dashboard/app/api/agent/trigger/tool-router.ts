@@ -16,6 +16,7 @@ import { fetchPersonDays } from '@/lib/schedule/person-day'
 import { computePersonWeekUtilization } from '@/lib/schedule/utilization'
 import { svDateStr, svDateStrPlusDays } from '@/lib/dates'
 import { mondayOfWeek } from '@/lib/capacity/week-capacity'
+import { computeFreeCapacity } from '@/lib/capacity/free-capacity'
 
 interface ToolResult {
   success: boolean
@@ -653,15 +654,24 @@ async function getPersonSchedule(
   }
 
   const allDates = datesInRange(from, to)
-  const personDays = await fetchPersonDays(supabase, businessId, targetMembers.map((m) => m.id), from, to)
+  const memberIds = targetMembers.map((m) => m.id)
+  const personDays = await fetchPersonDays(supabase, businessId, memberIds, from, to)
+
+  // Fas 1 (kapacitets-primitiven) — ledig/bokningsbar kapacitet ur SAMMA
+  // personDays som redan hämtats ovan, ingen extra DB-runda.
+  const freeCapacity = computeFreeCapacity(personDays, memberIds, { from, to })
 
   const people = targetMembers.map((m) => {
     const util = computePersonWeekUtilization(personDays, m.id, allDates)
+    const personFree = freeCapacity.people.find((p) => p.businessUserId === m.id)
     const days = allDates.map((date) => {
       const day = personDays.find((pd) => pd.businessUserId === m.id && pd.date === date)
+      const freeDay = personFree?.days.find((d) => d.date === date)
       return {
         date,
         is_absent: day?.isAbsent ?? false,
+        free_hours: freeDay?.freeHours ?? 0,
+        bookable_hours: freeDay?.bookableHours ?? 0,
         shifts: (day?.shifts || []).map((s) => ({
           source: s.source,
           type: s.type,
@@ -678,6 +688,7 @@ async function getPersonSchedule(
       name: m.name,
       utilization_pct: Math.round(util.utilizationPct),
       total_hours: util.totalHours,
+      total_bookable_hours: personFree?.totalBookableHours ?? 0,
       days,
     }
   })

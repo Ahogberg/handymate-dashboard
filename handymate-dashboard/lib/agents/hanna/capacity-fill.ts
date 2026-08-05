@@ -49,6 +49,7 @@ import { getWeekCapacity, mondayOfWeek, THIN_WEEK_UTILIZATION_THRESHOLD } from '
 import { daysSinceSent, extractFirstName } from '@/lib/agents/daniel/unopened-quotes'
 import { fetchPersonDays } from '@/lib/schedule/person-day'
 import { computePersonWeekUtilization } from '@/lib/schedule/utilization'
+import { computeFreeCapacity } from '@/lib/capacity/free-capacity'
 
 // ─────────────────────────────────────────────────────────────────
 // Konstanter
@@ -211,6 +212,17 @@ export interface PersonWeekSnapshot {
   business_user_id: string
   name: string
   utilization_pct: number
+  /**
+   * Fas 1 (kapacitets-primitiven, tasks/vad-kan-vi-kopiera-snug-phoenix.md):
+   * summan av personens bokningsbara timmar för veckan ur
+   * lib/capacity/free-capacity.ts (computeFreeCapacity) — låter
+   * beskrivningen säga t.ex. "Micke har 12 bokningsbara timmar nästa
+   * vecka" istället för bara beläggnings-%. Frivilligt fält (bara satt av
+   * computeNextWeekPersonBreakdown) så befintliga testfixturer i
+   * tests/kapacitet-fyllnad-per-person.spec.ts som inte sätter fältet
+   * fortsätter kompilera oförändrade.
+   */
+  bookable_hours?: number
 }
 
 /** Max antal namn i den textformaterade sammanfattningen (approval-
@@ -272,20 +284,22 @@ export async function computeNextWeekPersonBreakdown(
   const weekDates = Array.from({ length: 7 }, (_, i) =>
     svDateStrPlusDays(i, new Date(`${weekStart}T12:00:00Z`)),
   )
-  const personDays = await fetchPersonDays(
-    supabase,
-    businessId,
-    (members as { id: string; name: string | null }[]).map((m) => m.id),
-    weekStart,
-    weekDates[6],
-  )
+  const memberIds = (members as { id: string; name: string | null }[]).map((m) => m.id)
+  const personDays = await fetchPersonDays(supabase, businessId, memberIds, weekStart, weekDates[6])
+
+  // Fas 1 — bookableHours per person ur SAMMA personDays som redan hämtats
+  // ovan (ingen extra DB-runda). Kärnan körs en gång för hela veckan, inte
+  // per medlem, samma "hämta en gång, dela ut" -mönster som utilization.
+  const freeCapacity = computeFreeCapacity(personDays, memberIds, { from: weekStart, to: weekDates[6] })
 
   return (members as { id: string; name: string | null }[]).map((m) => {
     const util = computePersonWeekUtilization(personDays, m.id, weekDates)
+    const personFree = freeCapacity.people.find((p) => p.businessUserId === m.id)
     return {
       business_user_id: m.id,
       name: m.name || 'Namnlös',
       utilization_pct: Math.round(util.utilizationPct),
+      bookable_hours: personFree ? personFree.totalBookableHours : 0,
     }
   })
 }

@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
       bookingStart,
       bookingEnd,
       existingShifts,
+      isAbsent: personDays[0]?.isAbsent ?? false,
     })
 
     return NextResponse.json({

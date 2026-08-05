@@ -21,7 +21,9 @@
  */
 
 import { normalizeJobType, resolveMemberSkills } from '@/lib/dispatch'
-import type { PersonDayShift } from './person-day'
+import { svDateStr } from '@/lib/dates'
+import type { PersonDay, PersonDayShift } from './person-day'
+import { computeFreeCapacity } from '@/lib/capacity/free-capacity'
 
 export interface DispatchAssessment {
   jobSkills: string[]
@@ -34,6 +36,13 @@ export interface DispatchAssessment {
   /** Pass som tidsmässigt krockar med bokningens fönster denna dag. */
   conflictingShifts: PersonDayShift[]
   hasConflict: boolean
+  /**
+   * Fas 1 (kapacitets-primitiven): kandidatens lediga timmar bokningsdagen,
+   * ur lib/capacity/free-capacity.ts (computeFreeCapacity) — "ledig 6 h den
+   * dagen" i resurstavlans bedömning. Beräknad från SAMMA existingShifts
+   * (+ isAbsent) anroparen redan har, inget extra DB-anrop härifrån.
+   */
+  freeHoursForDay: number
 }
 
 /** Halvöppet intervall — samma konvention som overlaps() i person-day.ts
@@ -58,6 +67,10 @@ export function assessDispatchCandidate(params: {
    *  routen — så en omtilldelning till samma person inte krockar med sig
    *  själv). */
   existingShifts: PersonDayShift[]
+  /** true om kandidatens dag är en frånvarodag (personDay.isAbsent) —
+   *  ger freeHoursForDay: 0 oavsett existingShifts, samma regel som
+   *  free-capacity-kärnan. Default false (okänt/inte skickat). */
+  isAbsent?: boolean
 }): DispatchAssessment {
   const jobSkills = normalizeJobType(params.jobText)
   const memberSkills = resolveMemberSkills(params.member)
@@ -67,6 +80,20 @@ export function assessDispatchCandidate(params: {
 
   const conflictingShifts = params.existingShifts.filter((s) => overlapsWindow(s, params.bookingStart, params.bookingEnd))
 
+  // Fas 1 — ledig-timmar-för-dagen ur kärnan. Bygger en syntetisk PersonDay
+  // av redan tillgänglig data (ingen ny hämtning) och kör den genom SAMMA
+  // computeFreeCapacity som alla andra kanaler — inget eget uträkningssätt
+  // här.
+  const date = svDateStr(new Date(params.bookingStart))
+  const syntheticPersonDay: PersonDay = {
+    businessUserId: '__candidate__',
+    date,
+    shifts: params.existingShifts,
+    isAbsent: params.isAbsent ?? false,
+  }
+  const freeCapacity = computeFreeCapacity([syntheticPersonDay], ['__candidate__'], { from: date, to: date })
+  const freeHoursForDay = freeCapacity.people[0]?.days[0]?.freeHours ?? 0
+
   return {
     jobSkills,
     memberSkills,
@@ -75,5 +102,6 @@ export function assessDispatchCandidate(params: {
     isGeneralist,
     conflictingShifts,
     hasConflict: conflictingShifts.length > 0,
+    freeHoursForDay,
   }
 }

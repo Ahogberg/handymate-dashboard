@@ -23,7 +23,7 @@
  *    beläggd" (t.ex. genom att exkludera isAbsent-dagar ur workdayCount).
  */
 
-import type { PersonDay } from './person-day'
+import type { PersonDay, PersonDayShift } from './person-day'
 
 /** Schablon-konstanten som beläggningsberäkningen (och R1-heatmapen) bygger på. */
 export const STANDARD_WORKDAY_HOURS = 8
@@ -50,10 +50,36 @@ export interface PersonWeekUtilization {
 
 /** Veckodag via Intl-oberoende UTC-ankring vid middag — vi behöver bara
  * VILKEN veckodag datumet är, inte klockslaget, så DST spelar ingen roll
- * (samma ankringsmönster som fetchPersonDays i person-day.ts). */
-function isWeekendDate(date: string): boolean {
+ * (samma ankringsmönster som fetchPersonDays i person-day.ts). Exporterad
+ * (Fas 1, kapacitets-primitiven) så lib/capacity/free-capacity.ts kan
+ * återanvända SAMMA helgregel istället för att duplicera den. */
+export function isWeekendDate(date: string): boolean {
   const dow = new Date(`${date}T12:00:00Z`).getUTCDay()
   return dow === 0 || dow === 6
+}
+
+/**
+ * Summerar passtimmar för EN dags shifts — den delade timberäkningskärnan.
+ * Heldagspass räknas som STANDARD_WORKDAY_HOURS, övriga som (end-start)/h.
+ * Ogiltiga/negativa intervall bidrar med 0 (samma tolerans som tidigare
+ * inline-loopen i computePersonWeekUtilization).
+ *
+ * Exporterad (Fas 1, kapacitets-primitiven, tasks/vad-kan-vi-kopiera-...-
+ * plan.md) så lib/capacity/free-capacity.ts kan återanvända EXAKT samma
+ * timberäkning som beläggningen — duplicera aldrig denna logik på ett
+ * tredje ställe.
+ */
+export function sumShiftHours(shifts: PersonDayShift[]): number {
+  let hours = 0
+  for (const s of shifts) {
+    if (s.allDay) {
+      hours += STANDARD_WORKDAY_HOURS
+    } else {
+      const ms = new Date(s.end).getTime() - new Date(s.start).getTime()
+      if (Number.isFinite(ms) && ms > 0) hours += ms / 3_600_000
+    }
+  }
+  return hours
 }
 
 /**
@@ -71,16 +97,7 @@ export function computePersonWeekUtilization(
   const days: UtilizationDay[] = weekDates.map((date) => {
     const personDay = personDays.find((pd) => pd.businessUserId === businessUserId && pd.date === date)
     const shifts = personDay?.shifts || []
-
-    let hours = 0
-    for (const s of shifts) {
-      if (s.allDay) {
-        hours += STANDARD_WORKDAY_HOURS
-      } else {
-        const ms = new Date(s.end).getTime() - new Date(s.start).getTime()
-        if (Number.isFinite(ms) && ms > 0) hours += ms / 3_600_000
-      }
-    }
+    const hours = sumShiftHours(shifts)
 
     return {
       date,
