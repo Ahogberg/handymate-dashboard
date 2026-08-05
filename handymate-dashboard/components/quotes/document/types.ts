@@ -62,6 +62,13 @@ export interface QuoteDocumentHandlers {
       verktygsraden (E2b), inte av canvasen. */
   onItemAdd: () => void
   onItemRemove: (id: string) => void
+  /** Flyttar raden ett steg upp eller ned. Canvasen kunde tidigare inte
+      ändra radordning alls — på mobilen, där canvasen är huvudytan, gick
+      det inte att flytta en rad utan att lämna vyn. dnd-kit används
+      MEDVETET inte här: DocumentScaler CSS-transformerar hela A4:an, vilket
+      gör pointer-koordinater opålitliga, och ett draghandtag i ~47 % skala
+      är precis det träffyteproblem sheetMode finns för att lösa. */
+  onItemMove?: (id: string, direction: 'up' | 'down') => void
   /** Cyklar radens ROT/RUT-badge: null → rot → rut → null. Grön teknik
       lämnas till radeditorn (listvyn) — badgen kan inte välja KATEGORI,
       men ett klick på en grön-taggad rad flyttar den medvetet ut ur grön

@@ -29,6 +29,11 @@ interface QuotePreviewPanelProps {
       raden. Krävs bara för Live-fliken; utelämnad → sheetMode blir aldrig
       aktivt (QuoteDocument faller tillbaka till vanlig inline-redigering). */
   onRowTap?: (itemId: string) => void
+  /** Mobilens "+ Lägg till rad". Sidan öppnar sin AddRowSheet (sök i
+      artikelbanken) i stället för att lägga en tom rad — den tomma raden var
+      ~9 interaktioner från färdig, sökningen är 2-3. Utelämnad → knappen
+      faller tillbaka på liveHandlers.onItemAdd. */
+  onAddRowTap?: () => void
   templatePreviewPayload: TemplatePreviewPayload
 }
 
@@ -48,6 +53,7 @@ export function QuotePreviewPanel({
   liveTemplateData,
   liveHandlers,
   onRowTap,
+  onAddRowTap,
   templatePreviewPayload,
 }: QuotePreviewPanelProps) {
   const [fullscreen, setFullscreen] = useState(false)
@@ -74,6 +80,19 @@ export function QuotePreviewPanel({
               onRowTap={onRowTap}
             />
           </DocumentScaler>
+
+          {/* Mobilens "+ Lägg till rad" ligger UTANFÖR DocumentScaler och är
+              därmed oskalad — inuti A4:an blev träffytan ~15px vid 375px
+              skärm. QuoteDocument döljer sin egen knapp i sheetMode. */}
+          {isMobile && (
+            <button
+              type="button"
+              onClick={onAddRowTap || liveHandlers.onItemAdd}
+              className="mt-3 w-full min-h-[44px] flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-dashed border-slate-300 text-primary-700 text-[15px] font-semibold rounded-xl hover:bg-primary-50/50 active:bg-primary-50 transition-colors"
+            >
+              + Lägg till rad
+            </button>
+          )}
         </div>
       )
     }

@@ -89,6 +89,12 @@ export interface QuoteTemplateItem {
       docType-agnostisk så samma radkomponent kan visa den oavsett om den
       körs i offert- eller fakturaläge. */
   performedByName?: string | null
+  /** Dold för kunden (quote_items.is_hidden, v90): raden utelämnas ur ALL
+      statisk rendering — PDF, kundvy, förhandsgranskning — men priset ingår
+      i summan oförändrat. I edit-läge renderas raden ghostad med en
+      "Dold"-markering så hantverkaren ser vad kunden inte ser.
+      Filtreringen sker i respektive renderare, aldrig i beräkningarna. */
+  isHidden?: boolean
 }
 
 /** En komponentrad ur component_snapshot som får visas för kunden. */

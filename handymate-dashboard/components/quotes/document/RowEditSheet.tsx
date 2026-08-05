@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Check, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Trash2, X } from 'lucide-react'
 import type { QuoteItem, QuoteItemType } from '@/lib/types/quote'
 import { UNIT_OPTIONS } from '@/components/quotes/ItemRow'
 
@@ -11,6 +11,11 @@ interface RowEditSheetProps {
   allCategories: { slug: string; label: string }[]
   onUpdate: (id: string, field: keyof QuoteItem, value: any) => void
   onRemove: (id: string) => void
+  /** Radordning. Canvasen har ingen drag-and-drop (DocumentScaler skalar A4:an,
+      vilket gör draghandtag opålitliga och alldeles för små för touch) — det
+      här är mobilens enda väg att flytta en rad utan att lämna vyn.
+      Utelämnad → knapparna renderas inte. */
+  onMove?: (id: string, direction: 'up' | 'down') => void
   onClose: () => void
 }
 
@@ -42,7 +47,7 @@ const FIELD_CLS =
  * enda källa som QuoteItemsSection — så sheeten återanvänder dem rakt av
  * istället för att uppfinna en egen datavåg.
  */
-export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onClose }: RowEditSheetProps) {
+export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, onClose }: RowEditSheetProps) {
   useEffect(() => {
     if (!item) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -197,7 +202,55 @@ export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onClose 
               <span className="text-sm font-medium text-teal-700">Förvald — ikryssat när kunden öppnar offerten</span>
             </label>
           )}
+
+          {/* Dölj för kund (v90): raden syns inte i kundens dokument men
+              priset ingår i summan oförändrat. */}
+          <label className="flex items-center gap-2.5 min-h-[44px] cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={item.is_hidden ?? false}
+              onChange={e => onUpdate(item.id, 'is_hidden', e.target.checked)}
+              className="w-5 h-5 rounded border-slate-300 accent-slate-600 cursor-pointer"
+            />
+            <span className="text-sm font-medium text-slate-700">Dölj för kund — priset ingår ändå i summan</span>
+          </label>
+
+          {/* show_components_to_customer har funnits i databasen och i alla
+              renderare sedan v67 men aldrig haft något gränssnitt. */}
+          {isEditable && item.component_snapshot && (
+            <label className="flex items-center gap-2.5 min-h-[44px] cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={item.show_components_to_customer ?? false}
+                onChange={e => onUpdate(item.id, 'show_components_to_customer', e.target.checked)}
+                className="w-5 h-5 rounded border-slate-300 accent-primary-700 cursor-pointer"
+              />
+              <span className="text-sm font-medium text-slate-700">Visa vad som ingår för kunden</span>
+            </label>
+          )}
         </div>
+
+        {onMove && (
+          <div className="flex items-center gap-2 px-5 py-3 border-t border-slate-100 shrink-0">
+            <span className="text-xs font-medium text-slate-500">Flytta raden</span>
+            <button
+              type="button"
+              onClick={() => onMove(item.id, 'up')}
+              aria-label="Flytta upp"
+              className="ml-auto inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 active:bg-slate-100 transition-colors"
+            >
+              <ArrowUp className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onMove(item.id, 'down')}
+              aria-label="Flytta ned"
+              className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 active:bg-slate-100 transition-colors"
+            >
+              <ArrowDown className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center gap-2 px-5 py-3.5 border-t border-slate-100 shrink-0">
           <button

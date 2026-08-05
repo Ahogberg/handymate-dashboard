@@ -120,6 +120,26 @@ export function useQuoteItems(
     [setItems],
   )
 
+  /**
+   * Samma flytt som moveItem men slår upp raden på id. Ytor som bara känner
+   * till EN rad (canvasens radaktioner, RowEditSheet på mobilen) har inget
+   * index att räkna med — de vet bara vilken rad hantverkaren tryckte på.
+   */
+  const moveItemById = useCallback(
+    (id: string, direction: 'up' | 'down') => {
+      setItems(prev => {
+        const index = prev.findIndex(item => item.id === id)
+        if (index === -1) return prev
+        const targetIdx = direction === 'up' ? index - 1 : index + 1
+        if (targetIdx < 0 || targetIdx >= prev.length) return prev
+        const newArr = [...prev]
+        ;[newArr[index], newArr[targetIdx]] = [newArr[targetIdx], newArr[index]]
+        return newArr.map((item, i) => ({ ...item, sort_order: i }))
+      })
+    },
+    [setItems],
+  )
+
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
@@ -222,6 +242,7 @@ export function useQuoteItems(
     updateItem,
     removeItem,
     moveItem,
+    moveItemById,
     dndSensors,
     handleDragEnd,
     addFromGrossist,

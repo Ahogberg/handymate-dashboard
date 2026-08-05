@@ -562,6 +562,8 @@ export async function POST(request: NextRequest) {
           estimated_hours: item.estimated_hours ?? null,
           component_snapshot: item.component_snapshot ?? null,
           show_components_to_customer: item.show_components_to_customer ?? false,
+          // Dold för kunden — priset ingår ändå i summan (v90).
+          is_hidden: item.is_hidden ?? false,
           sort_order: idx,
         }
       })
@@ -852,6 +854,8 @@ export async function PUT(request: NextRequest) {
           estimated_hours: item.estimated_hours ?? null,
           component_snapshot: item.component_snapshot ?? null,
           show_components_to_customer: item.show_components_to_customer ?? false,
+          // Dold för kunden — priset ingår ändå i summan (v90).
+          is_hidden: item.is_hidden ?? false,
           sort_order: idx,
         }
       })

@@ -409,6 +409,8 @@ interface QuoteItemRow {
   is_rot_eligible?: boolean
   is_rut_eligible?: boolean
   option_selected?: boolean | null
+  /** Dold för kunden (v90) — raden utelämnas ur PDF:en, priset ingår i summan. */
+  is_hidden?: boolean | null
 }
 
 export interface QuotePdfData {
@@ -652,6 +654,10 @@ export function generateQuotePDF(quote: QuotePdfData, business: BusinessPdfData)
 
     // Ej valda tillval hör inte till kundens aktuella kopia — exkludera dem.
     if (itemType === 'option' && item.option_selected === false) continue
+
+    // Dold rad (v90): utelämnas ur kundens PDF, men priset ingår i summan
+    // (totalerna räknas separat och rör aldrig fältet).
+    if (item.is_hidden === true) continue
 
     if (itemType === 'heading') {
       tableBody.push([{ content: item.description, colSpan: 5, styles: { fontStyle: 'bold', textColor: TEXT_PRIMARY } }])

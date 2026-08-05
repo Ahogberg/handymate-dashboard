@@ -108,7 +108,14 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
   const tapMode = isEdit && !!sheetMode && !!onTap
   const fieldsEditable = isEdit && !tapMode
   const itemType = item.itemType || 'item'
+
+  // Dold rad (v90): kunden ska inte se den — men priset ingår i summan, så
+  // beräkningarna rör den aldrig. I edit-läge visas den ghostad med en
+  // markering, annars vet hantverkaren inte vad kunden faktiskt får se.
+  if (item.isHidden && mode !== 'edit') return null
+
   const rowTapProps = tapMode ? { onClick: onTap, className: 'row-tap' } : {}
+  const hiddenRowClass = item.isHidden ? 'row-hidden' : undefined
 
   const qtyCell = showQty ? (
     <td className="num">
@@ -146,7 +153,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
   // ── Rubrik ────────────────────────────────────────────────────
   if (itemType === 'heading') {
     return (
-      <tr {...rowTapProps} className={['row-heading', rowTapProps.className].filter(Boolean).join(' ') || undefined}>
+      <tr {...rowTapProps} className={['row-heading', rowTapProps.className, hiddenRowClass].filter(Boolean).join(' ') || undefined}>
         <td colSpan={colCount}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             {fieldsEditable
@@ -162,7 +169,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
   // ── Fritext ───────────────────────────────────────────────────
   if (itemType === 'text') {
     return (
-      <tr {...rowTapProps} className={['row-text', rowTapProps.className].filter(Boolean).join(' ') || undefined}>
+      <tr {...rowTapProps} className={['row-text', rowTapProps.className, hiddenRowClass].filter(Boolean).join(' ') || undefined}>
         <td colSpan={colCount}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             {fieldsEditable
@@ -178,7 +185,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
   // ── Delsumma ──────────────────────────────────────────────────
   if (itemType === 'subtotal') {
     return (
-      <tr {...rowTapProps} className={['row-subtotal', rowTapProps.className].filter(Boolean).join(' ') || undefined}>
+      <tr {...rowTapProps} className={['row-subtotal', rowTapProps.className, hiddenRowClass].filter(Boolean).join(' ') || undefined}>
         <td colSpan={colCount - 1}>
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
             <DeleteButton id={item.id} handlers={isEdit ? handlers : undefined} />
@@ -195,7 +202,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
   // ── Rabatt ────────────────────────────────────────────────────
   if (itemType === 'discount') {
     return (
-      <tr {...rowTapProps} className={['row-discount', isEdit ? 'row-hover' : '', rowTapProps.className].filter(Boolean).join(' ') || undefined}>
+      <tr {...rowTapProps} className={['row-discount', isEdit ? 'row-hover' : '', rowTapProps.className, hiddenRowClass].filter(Boolean).join(' ') || undefined}>
         <td style={isEdit ? { position: 'relative' } : undefined}>
           <DeleteButton id={item.id} handlers={isEdit ? handlers : undefined} />
           <div className="item-name">
@@ -215,7 +222,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
   if (itemType === 'option') {
     const box = item.optionSelected ? '☑' : '☐'
     return (
-      <tr {...rowTapProps} className={[`row-option${item.optionSelected ? '' : ' unselected'}`, isEdit ? 'row-hover' : '', rowTapProps.className].filter(Boolean).join(' ') || undefined}>
+      <tr {...rowTapProps} className={[`row-option${item.optionSelected ? '' : ' unselected'}`, isEdit ? 'row-hover' : '', rowTapProps.className, hiddenRowClass].filter(Boolean).join(' ') || undefined}>
         <td style={isEdit ? { position: 'relative' } : undefined}>
           <DeleteButton id={item.id} handlers={isEdit ? handlers : undefined} />
           <div className="item-name">
@@ -237,6 +244,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
               </label>
             )}
             {isEdit && <>{' '}<RotBadge item={item} onCycle={fieldsEditable ? () => handlers!.onItemRotRutCycle(item.id!) : undefined} /></>}
+            {item.isHidden && <>{' '}<span className="hidden-badge" title="Raden syns inte för kunden — priset ingår ändå i summan">Dold</span></>}
           </div>
           {item.description ? <div className="item-desc">{item.description}</div> : null}
           {componentSpec(item.components)}
@@ -250,7 +258,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
 
   // ── Vanlig rad ('item') ──────────────────────────────────────
   return (
-    <tr {...rowTapProps} className={[isEdit ? 'row-hover' : '', rowTapProps.className].filter(Boolean).join(' ') || undefined}>
+    <tr {...rowTapProps} className={[isEdit ? 'row-hover' : '', rowTapProps.className, hiddenRowClass].filter(Boolean).join(' ') || undefined}>
       <td style={isEdit ? { position: 'relative' } : undefined}>
         <DeleteButton id={item.id} handlers={isEdit ? handlers : undefined} />
         <div className="item-name">
@@ -258,6 +266,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
             ? <EditableText value={item.name} onChange={v => handlers!.onItemChange(item.id!, { name: v })} placeholder="Rubrik" />
             : item.name}
           {isEdit && <>{' '}<RotBadge item={item} onCycle={fieldsEditable ? () => handlers!.onItemRotRutCycle(item.id!) : undefined} /></>}
+          {item.isHidden && <>{' '}<span className="hidden-badge" title="Raden syns inte för kunden — priset ingår ändå i summan">Dold</span></>}
         </div>
         {item.description ? <div className="item-desc">{item.description}</div> : null}
         {/* ETAPP 6a (offert-masterplan.md, faktura-sprinten): performed_by_name

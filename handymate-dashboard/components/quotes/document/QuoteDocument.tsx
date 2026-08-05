@@ -278,7 +278,11 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             sin rot delvis här). onItemAdd är docType-agnostisk (samma
             useInvoiceItems/useQuoteItems-mönster), så knappen fungerar för
             båda dokumenttyperna nu. */}
-        {mode === 'edit' && handlers && (
+        {/* I sheetMode (mobil) renderas knappen i stället OSKALAD utanför
+            dokumentet av QuotePreviewPanel. Inuti den skalade A4:an blev
+            träffytan ~15px vid 375px skärmbredd — långt under 44px-kravet,
+            och just på den yta som är hantverkarens huvudvy. */}
+        {mode === 'edit' && handlers && !sheetMode && (
           <button type="button" onClick={handlers.onItemAdd} className="add-row-btn">
             + Lägg till rad
           </button>

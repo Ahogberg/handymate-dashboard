@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Loader2, Search } from 'lucide-react'
 import type { ProductWithComponents } from './applyProductToItem'
+import { useProductSearch } from './useProductSearch'
 
 interface QuoteAddRowComboProps {
   /** Triggas när användaren väljer en sparad produkt från dropdown —
@@ -23,28 +24,13 @@ interface QuoteAddRowComboProps {
  */
 export function QuoteAddRowCombo({ onSelectProduct, onAddBlankRow }: QuoteAddRowComboProps) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<ProductWithComponents[]>([])
-  const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Debounce-fetch
-  useEffect(() => {
-    if (!query.trim()) {
-      setResults([])
-      return
-    }
-    const timer = setTimeout(() => {
-      setLoading(true)
-      fetch(`/api/products?search=${encodeURIComponent(query.trim())}&include=components`)
-        .then(r => r.json())
-        .then(data => setResults(data.products || []))
-        .catch(() => setResults([]))
-        .finally(() => setLoading(false))
-    }, 200)
-    return () => clearTimeout(timer)
-  }, [query])
+  // Delad sökning (_shared/useProductSearch) — samma hook som inline-combon,
+  // AddRowSheet och RowEditSheet, så sökförbättringar slår igenom överallt.
+  const { results, loading } = useProductSearch(query)
 
   function handleSelect(p: ProductWithComponents) {
     onSelectProduct(p)

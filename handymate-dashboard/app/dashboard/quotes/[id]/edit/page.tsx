@@ -10,6 +10,7 @@ import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreview
 import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates/types'
 import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
 import { RowEditSheet } from '@/components/quotes/document/RowEditSheet'
+import { AddRowSheet } from '@/components/quotes/document/AddRowSheet'
 import { supabase } from '@/lib/supabase'
 import {
   calculatePaymentPlan,
@@ -271,6 +272,9 @@ export default function EditQuotePage() {
   // är nu NÅBAR och REDIGERBAR där (sheet-radeditor + skalning), men inte
   // "primär yta överst" som på new-sidan. Se rapporten för rekommendation.
   const [sheetItemId, setSheetItemId] = useState<string | null>(null)
+  // Mobilens "lägg till rad"-sheet: sök i artikelbanken i stället för att få
+  // en tom rad att fylla i för hand (samma helper som new-sidan).
+  const [addRowSheetOpen, setAddRowSheetOpen] = useState(false)
 
   // ─── Shared hooks ──────────────────────────────────────────────────
   const { products, customCategories, hydrated: priceListHydrated } = usePriceListLookup(business.business_id)
@@ -303,6 +307,7 @@ export default function EditQuotePage() {
     updateItem,
     removeItem,
     moveItem,
+    moveItemById,
     dndSensors,
     handleDragEnd,
     addFromGrossist,
@@ -325,6 +330,26 @@ export default function EditQuotePage() {
     },
     [applyProductToRow],
   )
+
+  // Tom rad med beskrivningen redan ifylld — delas av listvyns combobox och
+  // mobilens AddRowSheet (samma helper som new-sidan).
+  const addBlankRowWithDescription = useCallback((description: string) => {
+    setItems(prev => [
+      ...prev,
+      {
+        id: generateItemId(),
+        item_type: 'item',
+        description,
+        quantity: 1,
+        unit: 'st',
+        unit_price: 0,
+        total: 0,
+        is_rot_eligible: false,
+        is_rut_eligible: false,
+        sort_order: prev.length,
+      },
+    ])
+  }, [])
 
   // ─── Derived: standard texts grouped by type ──────────────────────
   const textsByType = useMemo(() => {
@@ -1136,23 +1161,7 @@ export default function EditQuotePage() {
               onMoveItem={moveItem}
               onSelectProduct={product => { void addFromProduct(product) }}
               onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
-              onAddBlankRow={description => {
-                setItems(prev => [
-                  ...prev,
-                  {
-                    id: generateItemId(),
-                    item_type: 'item',
-                    description,
-                    quantity: 1,
-                    unit: 'st',
-                    unit_price: 0,
-                    total: 0,
-                    is_rot_eligible: false,
-                    is_rut_eligible: false,
-                    sort_order: prev.length,
-                  },
-                ])
-              }}
+              onAddBlankRow={addBlankRowWithDescription}
               onOpenGrossistSearch={() => setShowGrossistSearch(true)}
               onCreateCategory={createCustomCategory}
               showNewCategoryInput={showNewCategoryInput}
@@ -1239,6 +1248,7 @@ export default function EditQuotePage() {
               liveTemplateData={quoteTemplateData}
               liveHandlers={liveHandlers}
               onRowTap={setSheetItemId}
+              onAddRowTap={() => setAddRowSheetOpen(true)}
               templatePreviewPayload={templatePreviewPayload}
             />
           </div>
@@ -1252,7 +1262,18 @@ export default function EditQuotePage() {
         allCategories={allCategories}
         onUpdate={updateItem}
         onRemove={removeItem}
+        onMove={moveItemById}
         onClose={() => setSheetItemId(null)}
+      />
+
+      {/* Mobilens "lägg till rad" — söker i artikelbanken i stället för att
+          ge en tom rad. Öppnas av den oskalade knappen under dokumentet. */}
+      <AddRowSheet
+        open={addRowSheetOpen}
+        onSelectProduct={product => { void addFromProduct(product) }}
+        onAddBlankRow={addBlankRowWithDescription}
+        onAddHeading={() => addItem('heading')}
+        onClose={() => setAddRowSheetOpen(false)}
       />
 
       {/* Modals */}

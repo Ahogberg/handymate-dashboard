@@ -14,7 +14,9 @@ export const renderPremium: TemplateRenderFn = (data: QuoteTemplateData): string
   const priceCell = (p: number) => (showPrice ? `<div class="num">${formatCurrency(p)}</div>` : '')
   const gridCols = `1fr${showQty ? ' 80px' : ''}${showPrice ? ' 110px' : ''} 120px`
 
-  const itemsHtml = data.quote.items.map(item => {
+  // Dolda rader (v90) utelämnas ur kundens dokument — priset ingår ändå i
+  // summan, som räknas separat i quote-calculations och aldrig rör fältet.
+  const itemsHtml = data.quote.items.filter(item => !item.isHidden).map(item => {
     const itemType = item.itemType || 'item'
     if (itemType === 'heading') {
       return `<div class="item-heading">${escapeHtml(item.name)}</div>`

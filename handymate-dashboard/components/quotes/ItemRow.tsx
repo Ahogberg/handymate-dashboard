@@ -307,6 +307,18 @@ export default function ItemRow({
             <span className="text-xs font-medium text-teal-700">Förvald</span>
           </label>
         )}
+
+        {/* Dölj för kund (v90) — raden försvinner ur kundens dokument men
+            priset ingår i summan. */}
+        <label className="flex items-center gap-1.5 min-h-[44px] w-fit cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={item.is_hidden ?? false}
+            onChange={(e) => onUpdate(item.id, 'is_hidden', e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 accent-slate-600 cursor-pointer"
+          />
+          <span className="text-xs font-medium text-slate-600">Dölj för kund — priset ingår ändå</span>
+        </label>
       </div>
 
       {/* ── Desktop layout (≥ md) ────────────────────────────── */}

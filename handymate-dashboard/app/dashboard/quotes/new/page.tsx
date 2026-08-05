@@ -11,6 +11,7 @@ import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreview
 import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates/types'
 import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
 import { RowEditSheet } from '@/components/quotes/document/RowEditSheet'
+import { AddRowSheet } from '@/components/quotes/document/AddRowSheet'
 import {
   generateItemId, recalculateItems, setItemRotRut, legacyItemRotRutType, applyOptionRowDefaults,
   getItemRotRutType, resolveLegacyItemFields,
@@ -340,6 +341,9 @@ export default function NewQuotePage() {
   // QuoteEditMobilePreviewModal/FAB:en (borttagen) — dokumentet syns nu
   // direkt i huvudytan på mobil istället för bakom en separat modal-knapp.
   const [sheetItemId, setSheetItemId] = useState<string | null>(null)
+  // Mobilens "lägg till rad"-sheet: sök i artikelbanken i stället för att få
+  // en tom rad att fylla i för hand (~9 interaktioner → 2-3).
+  const [addRowSheetOpen, setAddRowSheetOpen] = useState(false)
 
   // ETAPP 2b (offert-masterplan.md): canvas-first-layouten. `activePanel`
   // styr "Mer"-verktygsraden ovanför dokumentet — en sektion synlig i taget,
@@ -397,6 +401,7 @@ export default function NewQuotePage() {
     updateItem,
     removeItem,
     moveItem,
+    moveItemById,
     dndSensors,
     handleDragEnd,
     addFromGrossist,
@@ -1311,6 +1316,27 @@ export default function NewQuotePage() {
     [addFromProductBank],
   )
 
+  // Tom rad med beskrivningen redan ifylld — delas av listvyns combobox och
+  // mobilens AddRowSheet, så "hittade ingen artikel" beter sig likadant på
+  // båda ytorna.
+  const addBlankRowWithDescription = useCallback((description: string) => {
+    setItems(prev => [
+      ...prev,
+      {
+        id: generateItemId(),
+        item_type: 'item',
+        description,
+        quantity: 1,
+        unit: 'st',
+        unit_price: 0,
+        total: 0,
+        is_rot_eligible: false,
+        is_rut_eligible: false,
+        sort_order: prev.length,
+      },
+    ])
+  }, [])
+
   // Förfyll BEFINTLIG rad (inline-combon i beskrivningsfältet) — combon
   // söker med include=components så inget extra API-anrop behövs, men
   // ensureProductComponents är en billig no-op-vakt om komponenter saknas.
@@ -1877,23 +1903,7 @@ export default function NewQuotePage() {
                 onMoveItem={moveItem}
                 onSelectProduct={product => { void addFromProduct(product) }}
                 onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
-                onAddBlankRow={description => {
-                  setItems(prev => [
-                    ...prev,
-                    {
-                      id: generateItemId(),
-                      item_type: 'item',
-                      description,
-                      quantity: 1,
-                      unit: 'st',
-                      unit_price: 0,
-                      total: 0,
-                      is_rot_eligible: false,
-                      is_rut_eligible: false,
-                      sort_order: prev.length,
-                    },
-                  ])
-                }}
+                onAddBlankRow={addBlankRowWithDescription}
                 onOpenGrossistSearch={() => setShowGrossistSearch(true)}
                 onCreateCategory={createCustomCategory}
                 showNewCategoryInput={showNewCategoryInput}
@@ -1913,6 +1923,7 @@ export default function NewQuotePage() {
                   liveTemplateData={quoteTemplateData}
                   liveHandlers={liveHandlers}
                   onRowTap={setSheetItemId}
+                  onAddRowTap={() => setAddRowSheetOpen(true)}
                   templatePreviewPayload={templatePreviewPayload}
                 />
               </div>
@@ -1931,7 +1942,18 @@ export default function NewQuotePage() {
         allCategories={allCategories}
         onUpdate={updateItem}
         onRemove={removeItem}
+        onMove={moveItemById}
         onClose={() => setSheetItemId(null)}
+      />
+
+      {/* Mobilens "lägg till rad" — söker i artikelbanken i stället för att
+          ge en tom rad. Öppnas av den oskalade knappen under dokumentet. */}
+      <AddRowSheet
+        open={addRowSheetOpen}
+        onSelectProduct={product => { void addFromProduct(product) }}
+        onAddBlankRow={addBlankRowWithDescription}
+        onAddHeading={() => addItem('heading')}
+        onClose={() => setAddRowSheetOpen(false)}
       />
 
       {/* Grossist search modal */}

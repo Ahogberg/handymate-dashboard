@@ -45,6 +45,14 @@ export interface QuoteItem {
   component_snapshot?: any | null
   /** Per-rad-override: visa komponentbeskrivningarna för kunden (default false). */
   show_components_to_customer?: boolean
+  /** Dold för kunden — raden syns INTE i kundens dokument (förhandsgranskning,
+      PDF, kundvy) men PRISET INGÅR I SUMMAN oförändrat. Avsett för marginal-
+      och detaljrader hantverkaren inte vill specificera utåt.
+      Beräkningarna i lib/quote-calculations.ts rör den ALDRIG — hade raden
+      exkluderats ur summan hade det bara varit "ta bort rad light", och
+      kunden hade kunnat räkna ihop raderna och få en annan totalsumma.
+      Beslut av Andreas 2026-08-05. */
+  is_hidden?: boolean
   /** P4 (UX-revision 2026-08-03): true om raden kom från AI:n utan träff i
       produktbanken (unitPrice 0 eller note "PRIS SAKNAS" — se
       lib/ai-quote-generator.ts). Sätts ENDAST vid AI-konvertering

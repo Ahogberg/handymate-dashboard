@@ -26,7 +26,10 @@ export const renderFriendly: TemplateRenderFn = (data: QuoteTemplateData): strin
   // Löpande numrering räknar bara riktiga artikelrader — rubriker,
   // fritext, delsummor och rabatter får ingen siffra.
   let itemNo = 0
-  const itemsHtml = data.quote.items.map(item => {
+  // Dolda rader (v90) utelämnas ur kundens dokument — priset ingår ändå i
+  // summan. Filtreras FÖRE numreringen så kunden aldrig ser ett hopp i
+  // radnumren där en dold rad legat.
+  const itemsHtml = data.quote.items.filter(item => !item.isHidden).map(item => {
     const itemType = item.itemType || 'item'
     if (itemType === 'heading') {
       return `<div class="group-heading">${escapeHtml(item.name)}</div>`

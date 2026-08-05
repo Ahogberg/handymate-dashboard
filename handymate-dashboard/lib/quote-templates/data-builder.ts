@@ -112,6 +112,9 @@ export function buildQuoteTemplateData(
         // Per-rad-override: visa komponentbeskrivningar (ALDRIG unit_cost) när
         // hantverkaren aktivt slagit på det. Töms i 'summary' (rader visas ej).
         components: extractCustomerComponents(i),
+        // Dold för kunden (v90) — renderarna utelämnar raden i static-läge,
+        // men den ingår i summan som vanligt.
+        isHidden: i.is_hidden === true,
       }
     })
   } else {
