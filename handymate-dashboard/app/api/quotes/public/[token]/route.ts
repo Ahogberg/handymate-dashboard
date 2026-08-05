@@ -275,9 +275,17 @@ export async function POST(
 
     // ── Decline ───────────────────────────────────────────────────────────────
     if (action === 'decline') {
-      if (!reason) {
+      // Strukturerat skäl (reason_code) + valfri fritext. Koden är det som gör
+      // förlusten räknebar — fritext ensam går inte att gruppera på, och de
+      // flesta kunder orkar inte skriva något alls.
+      const { parseDeclineReasonCode, buildLostReason } = await import('@/lib/quotes/decline-reasons')
+      const reasonCode = parseDeclineReasonCode((body as any).reason_code)
+
+      if (!reasonCode && !reason) {
         return NextResponse.json({ error: 'Ange ett skäl för avböjandet' }, { status: 400 })
       }
+
+      const lostReason = buildLostReason(reasonCode, reason)
 
       // Skriv garanterat giltiga kolumner först (status + declined_at). Tidigare
       // skrevs lost_reason i samma update — den kolumnen saknas i schemat → hela
@@ -294,10 +302,10 @@ export async function POST(
 
       // lost_reason är en valfri kolumn (sql/add_quote_lost_reason.sql) — best
       // effort, blockera aldrig avböjningen om kolumnen inte finns.
-      if (reason) {
+      if (lostReason) {
         const { error: reasonErr } = await supabase
           .from('quotes')
-          .update({ lost_reason: reason })
+          .update({ lost_reason: lostReason })
           .eq('sign_token', token)
         if (reasonErr) console.warn('[quote decline] lost_reason ej sparat (kör add_quote_lost_reason.sql):', reasonErr.message)
       }

@@ -222,7 +222,10 @@ export async function POST(request: NextRequest) {
       // avböjande syntes aldrig i offertens tidslinje (som villkorar på
       // declined_at) och räknades aldrig i förlustanalysen. Skälet är
       // frivilligt i portalen — men fältet ska finnas när det ges.
-      const declineReason = typeof body.reason === 'string' ? body.reason.trim() : ''
+      const { parseDeclineReasonCode, buildLostReason } = await import('@/lib/quotes/decline-reasons')
+      const declineCode = parseDeclineReasonCode(body.reason_code)
+      const declineFreeText = typeof body.reason === 'string' ? body.reason.trim() : ''
+      const declineReason = buildLostReason(declineCode, declineFreeText)
 
       const { data: declinedRows, error } = await supabase
         .from('quotes')
@@ -260,8 +263,8 @@ export async function POST(request: NextRequest) {
         business_id: customer.business_id,
         activity_type: 'quote_declined',
         title: 'Offert avböjd via kundportal',
-        description: declineReason
-          ? `Kund avböjde offert ${quote_id}: ${declineReason}`
+        description: declineFreeText
+          ? `Kund avböjde offert ${quote_id}: ${declineFreeText}`
           : `Kund avböjde offert ${quote_id}`,
         created_by: 'portal',
       })
