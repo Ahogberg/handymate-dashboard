@@ -69,6 +69,9 @@ export interface QuoteDocumentHandlers {
       gör pointer-koordinater opålitliga, och ett draghandtag i ~47 % skala
       är precis det träffyteproblem sheetMode finns för att lösa. */
   onItemMove?: (id: string, direction: 'up' | 'down') => void
+  /** Tar bort en reservation ur offertens snapshot (×-knappen i
+      villkorssektionen). Utelämnad → reservationerna renderas som ren text. */
+  onReservationRemove?: (index: number) => void
   /** Cyklar radens ROT/RUT-badge: null → rot → rut → null. Grön teknik
       lämnas till radeditorn (listvyn) — badgen kan inte välja KATEGORI,
       men ett klick på en grön-taggad rad flyttar den medvetet ut ur grön

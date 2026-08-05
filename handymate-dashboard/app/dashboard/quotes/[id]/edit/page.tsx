@@ -11,6 +11,9 @@ import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates
 import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
 import { RowEditSheet } from '@/components/quotes/document/RowEditSheet'
 import { AddRowSheet } from '@/components/quotes/document/AddRowSheet'
+import { useReservationSuggestions } from '../../_shared/useReservationSuggestions'
+import { ReservationSuggestionBanner, ReservationMutedNotice } from '../../_shared/ReservationSuggestionBanner'
+import { ReservationReviewSheet } from '../../_shared/ReservationReviewSheet'
 import { supabase } from '@/lib/supabase'
 import {
   calculatePaymentPlan,
@@ -315,6 +318,12 @@ export default function EditQuotePage() {
     addFromProductBank,
   } = useQuoteItems(items, setItems, localCustomCategories, !!pricingSettings)
 
+  // Reservationsmotorn (v91) — samma delade hook som new-sidan.
+  // loadedReservations sätts när offerten hämtats, så redan tillagda
+  // förbehåll varken föreslås igen eller tappas vid spar.
+  const [loadedReservations, setLoadedReservations] = useState<Array<{ reservation_id?: string | null; title: string; content: string }>>([])
+  const reservations = useReservationSuggestions(items, loadedReservations)
+
   // Produktbank: NY rad (add-row-combo/snabbval) resp. förfyllnad av
   // BEFINTLIG rad (inline-combon) — komponenterna hämtas lazily vid behov,
   // sedan samma applyProductToItem-väg som new-vyn.
@@ -517,6 +526,7 @@ export default function EditQuotePage() {
         ata_terms: ataTerms || null,
         payment_terms_text: paymentTermsText || null,
         terms_text: termsText || null,
+        reservations_snapshot: reservations.snapshot,
         reference_person: referencePerson || null,
         customer_reference: customerReference || null,
         project_address: projectAddress || null,
@@ -575,6 +585,8 @@ export default function EditQuotePage() {
       },
       onItemAdd: () => addItem('item'),
       onItemRemove: id => removeItem(id),
+      onItemMove: moveItemById,
+      onReservationRemove: reservations.removeReservation,
       onItemRotRutCycle: id => {
         const item = items.find(i => i.id === id)
         if (!item) return
@@ -590,7 +602,8 @@ export default function EditQuotePage() {
     }),
     [
       setTitle, setDescription, setPaymentTermsText, setTermsText, setValidDays, setDiscountPercent,
-      setNotIncluded, updateItem, addItem, removeItem, items,
+      setNotIncluded, updateItem, addItem, removeItem, items, moveItemById,
+      reservations.removeReservation,
     ],
   )
 
@@ -745,6 +758,10 @@ export default function EditQuotePage() {
       setAtaTerms(quote.ata_terms || '')
       setPaymentTermsText(quote.payment_terms_text || '')
       setTermsText((quote as any).terms_text || '')
+      // Reservationer (v91): läs in de frysta förbehållen så de renderas i
+      // canvasen och följer med vid nästa spar.
+      const savedReservations = (quote as any).reservations_snapshot
+      if (Array.isArray(savedReservations)) setLoadedReservations(savedReservations)
 
       const hasAnyStandardText =
         quote.not_included ||
@@ -847,6 +864,7 @@ export default function EditQuotePage() {
         ata_terms: ataTerms || null,
         payment_terms_text: paymentTermsText || null,
         terms_text: termsText || null,
+        reservations_snapshot: reservations.snapshot.length > 0 ? reservations.snapshot : null,
         payment_plan: paymentPlan.length > 0 ? calculatePaymentPlan(totals.total, paymentPlan) : null,
         reference_person: referencePerson || null,
         customer_reference: customerReference || null,
@@ -869,6 +887,9 @@ export default function EditQuotePage() {
       // termsText ingår i payloaden (terms_text) — utan den här memoiserar
       // buildPayload en gammal villkorstext och sparar den tyst.
       termsText,
+      // Samma skäl: utan snapshoten i deps sparar autosparen bort en nyss
+      // tillagd reservation.
+      reservations.snapshot,
     ],
   )
 
@@ -1135,6 +1156,19 @@ export default function EditQuotePage() {
 
             {/* Snabbstart-sektion borttagen 2026-05-20 per pilot-feedback. */}
 
+            {/* Reservationsmotorn: tyst räknare, aldrig en avbrytande dialog. */}
+            <ReservationSuggestionBanner
+              count={reservations.suggestions.length}
+              onReview={() => reservations.setReviewOpen(true)}
+            />
+            {reservations.mutedNotice && (
+              <ReservationMutedNotice
+                title={reservations.mutedNotice.title}
+                onUndo={() => reservations.unmute(reservations.mutedNotice!.id)}
+                onClose={reservations.dismissMutedNotice}
+              />
+            )}
+
             <QuoteEditCustomerSection
               customers={customers}
               selectedCustomer={selectedCustomer}
@@ -1274,6 +1308,15 @@ export default function EditQuotePage() {
         onAddBlankRow={addBlankRowWithDescription}
         onAddHeading={() => addItem('heading')}
         onClose={() => setAddRowSheetOpen(false)}
+      />
+
+      {/* Granskningsvyn för reservationsförslag — samma som new-sidan. */}
+      <ReservationReviewSheet
+        open={reservations.reviewOpen}
+        suggestions={reservations.suggestions}
+        onAccept={reservations.acceptSuggestions}
+        onSkipAll={reservations.dismissAll}
+        onClose={() => reservations.setReviewOpen(false)}
       />
 
       {/* Modals */}

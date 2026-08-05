@@ -451,6 +451,8 @@ export interface QuotePdfData {
   conclusion_text?: string | null
   not_included?: string | null
   payment_terms_text?: string | null
+  /** Reservationer (v91) — frysta förbehåll på offerten. */
+  reservations_snapshot?: Array<{ title: string; content: string }> | null
 }
 
 export interface BusinessPdfData {
@@ -768,8 +770,19 @@ export function generateQuotePDF(quote: QuotePdfData, business: BusinessPdfData)
   // ── Villkorstexter (liten stil) ──
   // Inlednings-/avslutningstext (quote.introduction_text/conclusion_text)
   // renderas INTE längre — redundanta mot beskrivningen (pilot-beslut 2026-07).
+  // Reservationer (v91) sammanfogas till ETT textblock — jsPDF-vägen har
+  // ingen listrendering, och splitTextToSize sköter radbrytningen. Blocket
+  // hamnar före betalningsvillkoren, samma ordning som i de andra mallarna.
+  const reservationsText = Array.isArray(quote.reservations_snapshot) && quote.reservations_snapshot.length > 0
+    ? quote.reservations_snapshot
+        .filter((r: any) => r && r.title && r.content)
+        .map((r: any) => `• ${r.title}. ${r.content}`)
+        .join('\n')
+    : null
+
   const terms: Array<[string, string | null | undefined]> = [
     ['Ingår ej', quote.not_included],
+    ['Reservationer', reservationsText],
     ['Betalningsvillkor', quote.payment_terms_text],
   ]
   for (const [label, text] of terms) {

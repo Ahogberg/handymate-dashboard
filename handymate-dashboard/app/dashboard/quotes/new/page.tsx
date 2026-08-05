@@ -32,6 +32,9 @@ import { usePriceListLookup } from '../_shared/usePriceListLookup'
 import { ensureProductComponents, type ProductWithComponents } from '../_shared/applyProductToItem'
 import { QuoteQuickstartCard, type QuickstartRow } from '../_shared/QuoteQuickstartCard'
 import { QuoteItemsSection } from '../_shared/QuoteItemsSection'
+import { useReservationSuggestions } from '../_shared/useReservationSuggestions'
+import { ReservationSuggestionBanner, ReservationMutedNotice } from '../_shared/ReservationSuggestionBanner'
+import { ReservationReviewSheet } from '../_shared/ReservationReviewSheet'
 import { QuotePreviewPanel } from '../_shared/QuotePreviewPanel'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 
@@ -409,6 +412,12 @@ export default function NewQuotePage() {
     addFromProductBank,
   } = useQuoteItems(items, setItems, localCustomCategories, !!pricingSettings)
 
+  // Reservationsmotorn (v91): matchar raderna mot reservationsbiblioteket och
+  // föreslår förbehåll — utan att någonsin avbryta. Delad hook så new och edit
+  // beter sig identiskt. Måste ligga före liveHandlers/quoteTemplateData som
+  // båda läser snapshoten.
+  const reservations = useReservationSuggestions(items)
+
   // ─── Derived: standard texts grouped by type ──────────────────────
   const textsByType = useMemo(() => {
     const map: Record<string, QuoteStandardText[]> = {
@@ -591,6 +600,7 @@ export default function NewQuotePage() {
         ata_terms: ataTerms || null,
         payment_terms_text: paymentTermsText || null,
         terms_text: termsText || null,
+        reservations_snapshot: reservations.snapshot,
         reference_person: referencePerson || null,
         customer_reference: customerReference || null,
         project_address: projectAddress || null,
@@ -611,7 +621,7 @@ export default function NewQuotePage() {
   }, [
     business, businessConfig, selectedCustomerObj, selectedCustomer, title, description,
     recalculated, totals, validDays, discountPercent, vatRate,
-    notIncluded, ataTerms, paymentTermsText, termsText,
+    notIncluded, ataTerms, paymentTermsText, termsText, reservations.snapshot,
     referencePerson, customerReference, projectAddress, detailLevel,
     showUnitPrices, showQuantities, personnummer, fastighetsbeteckning,
     templateStyle, dealIdFromQuery,
@@ -681,10 +691,13 @@ export default function NewQuotePage() {
         updateItem(id, 'option_default', checked)
         updateItem(id, 'option_selected', checked)
       },
+      onItemMove: moveItemById,
+      onReservationRemove: reservations.removeReservation,
     }),
     [
       setTitle, setDescription, setPaymentTermsText, setTermsText, setValidDays, setDiscountPercent,
-      setNotIncluded, updateItem, addItem, removeItem, items,
+      setNotIncluded, updateItem, addItem, removeItem, items, moveItemById,
+      reservations.removeReservation,
     ],
   )
 
@@ -1525,6 +1538,7 @@ export default function NewQuotePage() {
           ata_terms: ataTerms || null,
           payment_terms_text: paymentTermsText || null,
           terms_text: termsText || null,
+          reservations_snapshot: reservations.snapshot.length > 0 ? reservations.snapshot : null,
           payment_plan: paymentPlan.length > 0 ? calculatedPaymentPlan : null,
           reference_person: referencePerson || null,
           customer_reference: customerReference || null,
@@ -1659,6 +1673,20 @@ export default function NewQuotePage() {
             {/* Prisvarningar/efterkalkyl — viktig info, inte begravd */}
             <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />
             <QuoteNewEfterkalkylBanner insight={efterkalkylInsight} />
+
+            {/* Reservationsmotorn: tyst räknare, aldrig en avbrytande dialog.
+                15 matchande artiklar ger fortfarande EN banner med en siffra. */}
+            <ReservationSuggestionBanner
+              count={reservations.suggestions.length}
+              onReview={() => reservations.setReviewOpen(true)}
+            />
+            {reservations.mutedNotice && (
+              <ReservationMutedNotice
+                title={reservations.mutedNotice.title}
+                onUndo={() => reservations.unmute(reservations.mutedNotice!.id)}
+                onClose={reservations.dismissMutedNotice}
+              />
+            )}
 
             <QuoteNewCustomerSection
               customers={customers}
@@ -1954,6 +1982,16 @@ export default function NewQuotePage() {
         onAddBlankRow={addBlankRowWithDescription}
         onAddHeading={() => addItem('heading')}
         onClose={() => setAddRowSheetOpen(false)}
+      />
+
+      {/* Granskningsvyn för reservationsförslag — förbockade, redigerbara,
+          med raderna som utlöste dem som motivering. */}
+      <ReservationReviewSheet
+        open={reservations.reviewOpen}
+        suggestions={reservations.suggestions}
+        onAccept={reservations.acceptSuggestions}
+        onSkipAll={reservations.dismissAll}
+        onClose={() => reservations.setReviewOpen(false)}
       />
 
       {/* Grossist search modal */}

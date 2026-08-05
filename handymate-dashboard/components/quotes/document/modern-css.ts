@@ -76,6 +76,13 @@ export const MODERN_DOCUMENT_CSS = `
    inte får se, utan att raden försvinner ur hans egen översikt. */
 .quote-document tbody tr.row-hidden td { opacity: 0.45; }
 .quote-document tbody tr.row-hidden td:first-child { border-left: 2px dashed #94A3B8; }
+/* Reservationer (v91) — eget block efter villkorsstycket. Punktlista så varje
+   förbehåll går att peka på, i stället för att drunkna i löpande text. */
+.quote-document .reservations { margin: 0 0 24px; break-inside: avoid; page-break-inside: avoid; }
+.quote-document .reservations-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12px; color: #0F172A; margin: 0 0 6px; }
+.quote-document .reservations ul { margin: 0; padding-left: 16px; }
+.quote-document .reservations li { font-size: 11px; line-height: 1.65; color: #475569; margin-bottom: 5px; }
+.quote-document .reservations li strong { color: #0F172A; font-weight: 600; }
 .quote-document .hidden-badge { display: inline-block; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 4px; padding: 1px 6px; vertical-align: 1px; }
 .quote-document .rot-badge { display: inline-flex; align-items: center; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--qd-accent); background: var(--qd-accent-50); border: 1px dashed var(--qd-accent-100); border-radius: 4px; padding: 1px 6px; cursor: pointer; line-height: 1.6; }
 .quote-document .rot-badge:hover { background: var(--qd-accent-100); }

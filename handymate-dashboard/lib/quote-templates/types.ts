@@ -104,6 +104,12 @@ export interface QuoteTemplateComponent {
   unit: string
 }
 
+/** En reservation som frysts på offerten (quotes.reservations_snapshot, v91). */
+export interface QuoteTemplateReservation {
+  title: string
+  content: string
+}
+
 export interface QuoteTemplateQuote {
   number: string
   /** Ärende-/dealreferens från säljtratten — visas som "Ärende #1003" på offerten */
@@ -144,6 +150,10 @@ export interface QuoteTemplateQuote {
       i templates (Offerten gäller till X. Tilläggsarbete debiteras...).
       Pilot-feedback 2026-05-20. */
   termsText?: string | null
+  /** Reservationer (v91) — förbehåll som frysts på offerten. Renderas som en
+      punktlista i villkorssektionen, efter "Ej inkluderat". Tom/utelämnad →
+      inget block alls. */
+  reservations?: QuoteTemplateReservation[] | null
 }
 
 /** Visningsnivå — speglar lib/quotes/display-level.ts DisplayLevel. */

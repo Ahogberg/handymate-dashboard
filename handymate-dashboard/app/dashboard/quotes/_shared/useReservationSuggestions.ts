@@ -1,0 +1,134 @@
+'use client'
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { QuoteItem } from '@/lib/types/quote'
+import {
+  matchReservations,
+  appendToSnapshot,
+  removeFromSnapshot,
+  type ReservationWithTriggers,
+  type ReservationSnapshotEntry,
+  type ReservationSuggestion,
+} from '@/lib/reservations/match'
+
+/**
+ * Reservationsmotorns editor-sida — delad av BÅDA offertytorna (new och edit).
+ *
+ * Byggd som en hook från start eftersom inkopplingen i två sidfiler på ~1300
+ * respektive ~2000 rader är den enda verkliga integrationsrisken i etapp 3;
+ * själva matchningen är trivial och ren (lib/reservations/match.ts).
+ *
+ * Biblioteket hämtas EN gång vid mount. Matchningen körs sedan lokalt i en
+ * useMemo över raderna — motorn gör aldrig ett serveranrop medan hantverkaren
+ * skriver.
+ */
+export function useReservationSuggestions(items: QuoteItem[], initialSnapshot?: ReservationSnapshotEntry[] | null) {
+  const [library, setLibrary] = useState<ReservationWithTriggers[]>([])
+  const [snapshot, setSnapshot] = useState<ReservationSnapshotEntry[]>(initialSnapshot || [])
+  // Avvisade i den här sessionen — medvetet INTE i databasen. Ett "hoppa över"
+  // ska gälla den här offerten, inte tysta reservationen för all framtid; det
+  // gör inlärningen (tre avvisningar i rad) i stället.
+  const [dismissedIds, setDismissedIds] = useState<string[]>([])
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [mutedNotice, setMutedNotice] = useState<{ id: string; title: string } | null>(null)
+
+  useEffect(() => {
+    let active = true
+    fetch('/api/reservations?include=triggers')
+      .then(r => (r.ok ? r.json() : { reservations: [] }))
+      .then(data => {
+        if (active) setLibrary(data.reservations || [])
+      })
+      .catch(() => {
+        if (active) setLibrary([])
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  // Ladda om snapshoten när offerten hämtats klart (edit-sidan sätter items
+  // och reservations_snapshot asynkront).
+  useEffect(() => {
+    if (initialSnapshot && initialSnapshot.length > 0) setSnapshot(initialSnapshot)
+  }, [initialSnapshot])
+
+  const suggestions: ReservationSuggestion[] = useMemo(
+    () => matchReservations(items, library, { alreadyAdded: snapshot, dismissedIds }),
+    [items, library, snapshot, dismissedIds],
+  )
+
+  const sendDecisions = useCallback(
+    (decisions: Array<{ reservation_id: string; decision: 'accepted' | 'rejected' }>) => {
+      if (decisions.length === 0) return
+      fetch('/api/reservations/decisions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decisions }),
+      })
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => {
+          const mutedId: string | undefined = data?.muted?.[0]
+          if (!mutedId) return
+          const reservation = library.find(r => r.id === mutedId)
+          if (reservation) setMutedNotice({ id: mutedId, title: reservation.title })
+        })
+        .catch(() => { /* inlärningen är en bekvämlighet — aldrig blockerande */ })
+    },
+    [library],
+  )
+
+  /** Lägger till valda förslag och registrerar utfallet för de övriga. */
+  const acceptSuggestions = useCallback(
+    (accepted: Array<{ reservation_id: string; title: string; content: string }>, rejectedIds: string[]) => {
+      if (accepted.length > 0) {
+        setSnapshot(prev => appendToSnapshot(prev, accepted))
+      }
+      if (rejectedIds.length > 0) {
+        setDismissedIds(prev => Array.from(new Set([...prev, ...rejectedIds])))
+      }
+      sendDecisions([
+        ...accepted.map(a => ({ reservation_id: a.reservation_id, decision: 'accepted' as const })),
+        ...rejectedIds.map(id => ({ reservation_id: id, decision: 'rejected' as const })),
+      ])
+      setReviewOpen(false)
+    },
+    [sendDecisions],
+  )
+
+  /** "Hoppa över" — allt i vyn avvisas för den här offerten. */
+  const dismissAll = useCallback(() => {
+    const ids = suggestions.map(s => s.reservation.id)
+    setDismissedIds(prev => Array.from(new Set([...prev, ...ids])))
+    sendDecisions(ids.map(id => ({ reservation_id: id, decision: 'rejected' as const })))
+    setReviewOpen(false)
+  }, [suggestions, sendDecisions])
+
+  const removeReservation = useCallback((index: number) => {
+    setSnapshot(prev => removeFromSnapshot(prev, index))
+  }, [])
+
+  /** Ångra en automatisk tystning. */
+  const unmute = useCallback((reservationId: string) => {
+    fetch('/api/reservations', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: reservationId, suggest_enabled: true }),
+    }).catch(() => { /* icke-blockerande */ })
+    setMutedNotice(null)
+  }, [])
+
+  return {
+    suggestions,
+    snapshot,
+    setSnapshot,
+    reviewOpen,
+    setReviewOpen,
+    acceptSuggestions,
+    dismissAll,
+    removeReservation,
+    mutedNotice,
+    dismissMutedNotice: () => setMutedNotice(null),
+    unmute,
+  }
+}

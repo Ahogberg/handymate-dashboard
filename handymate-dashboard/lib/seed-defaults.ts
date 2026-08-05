@@ -2,6 +2,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getDefaultStandardTexts } from '@/lib/quote-standard-text-defaults'
 import { getChecklistsForBranch } from '@/lib/checklist-defaults'
 import { getDefaultPriceList, getDefaultProducts } from '@/lib/product-defaults'
+import { getDefaultReservations } from '@/lib/reservation-defaults'
 import { getDefaultQuoteTemplates, normalizeTemplateBranch } from '@/lib/quote-template-defaults'
 import { getDefaultAgreementTypes } from '@/lib/agreement-type-defaults'
 
@@ -28,6 +29,7 @@ export async function seedAllDefaults(
     seedChecklistTemplates(supabase, businessId, branch),
     seedProducts(supabase, businessId, branch),
     seedPriceList(supabase, businessId, branch),
+    seedReservations(supabase, businessId, branch),
     seedQuoteTemplates(supabase, businessId, branch),
     seedAgreementTypes(supabase, businessId, branch),
   ])
@@ -284,6 +286,69 @@ async function seedProducts(supabase: SupabaseClient, businessId: string, branch
   if (error) {
     console.error('[seedProducts] insert misslyckades:', businessId, error.message)
     throw error
+  }
+}
+
+/**
+ * Seedar reservationsbiblioteket (reservation_texts + reservation_triggers).
+ *
+ * Utan seed blir reservationsmotorn en tom yta ingen fyller — hantverkare
+ * skriver aldrig egna förbehåll. Texterna är neutrala formuleringsmallar,
+ * se lib/reservation-defaults.ts för hållningen.
+ *
+ * FAIL-SAFE mot att v91 inte körts: saknas tabellen loggas det och seeden
+ * hoppas över, precis som seedAgreementTypes gör mot v74 — annars skulle ett
+ * saknat schema blockera hela onboardingen.
+ */
+async function seedReservations(supabase: SupabaseClient, businessId: string, branch: string) {
+  const { data: existing, error: existErr } = await supabase
+    .from('reservation_texts')
+    .select('id')
+    .eq('business_id', businessId)
+    .limit(1)
+
+  if (existErr) {
+    console.warn('[seedReservations] hoppar över (tabellen saknas?):', existErr.message)
+    return
+  }
+  if (existing && existing.length > 0) return
+
+  const defaults = getDefaultReservations(branch)
+  if (defaults.length === 0) return
+
+  const rows = defaults.map((r, i) => ({
+    id: `res_${businessId}_${i}`,
+    business_id: businessId,
+    title: r.title,
+    content: r.content,
+    source: 'system',
+    system_key: r.system_key,
+    sort_order: i,
+  }))
+
+  const { error: insertErr } = await supabase.from('reservation_texts').insert(rows)
+  if (insertErr) {
+    console.error('[seedReservations] insert misslyckades:', businessId, insertErr.message)
+    return
+  }
+
+  // Triggers refererar raden via samma index — id:na är deterministiska ovan.
+  const triggerRows = defaults.flatMap((r, i) =>
+    r.triggers.map((t, j) => ({
+      id: `restrig_${businessId}_${i}_${j}`,
+      business_id: businessId,
+      reservation_id: `res_${businessId}_${i}`,
+      trigger_type: t.type,
+      category_slug: t.type === 'category' ? t.value : null,
+      keyword: t.type === 'keyword' ? t.value.toLowerCase() : null,
+    })),
+  )
+
+  if (triggerRows.length > 0) {
+    const { error: trigErr } = await supabase.from('reservation_triggers').insert(triggerRows)
+    if (trigErr) {
+      console.error('[seedReservations] triggers misslyckades:', businessId, trigErr.message)
+    }
   }
 }
 

@@ -495,6 +495,9 @@ export async function POST(request: NextRequest) {
       ata_terms: body.ata_terms || null,
       payment_terms_text: body.payment_terms_text || null,
       terms_text: body.terms_text || null,
+      // Reservationer (v91): frysta förbehåll. Sparas som de såg ut när de
+      // lades till — biblioteksändringar rör aldrig en skapad offert.
+      reservations_snapshot: Array.isArray(body.reservations_snapshot) ? body.reservations_snapshot : null,
       payment_plan: body.payment_plan || [],
       // Offert-identitet (v68): spåra vem som SKAPADE offerten så kunddokumentet
       // kan visa skaparens namn/tel/mail (fallback till ägaren när null).
@@ -719,6 +722,8 @@ export async function PUT(request: NextRequest) {
     if (body.conclusion_text !== undefined) updates.conclusion_text = body.conclusion_text
     if (body.not_included !== undefined) updates.not_included = body.not_included
     if (body.terms_text !== undefined) updates.terms_text = body.terms_text
+    // Reservationer (v91) — frysta förbehåll, se POST-grenen.
+    if (body.reservations_snapshot !== undefined) updates.reservations_snapshot = body.reservations_snapshot
     if (body.ata_terms !== undefined) updates.ata_terms = body.ata_terms
     if (body.payment_terms_text !== undefined) updates.payment_terms_text = body.payment_terms_text
     if (body.payment_plan !== undefined) updates.payment_plan = body.payment_plan

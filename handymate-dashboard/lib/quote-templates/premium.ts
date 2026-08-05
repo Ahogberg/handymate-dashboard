@@ -14,6 +14,14 @@ export const renderPremium: TemplateRenderFn = (data: QuoteTemplateData): string
   const priceCell = (p: number) => (showPrice ? `<div class="num">${formatCurrency(p)}</div>` : '')
   const gridCols = `1fr${showQty ? ' 80px' : ''}${showPrice ? ' 110px' : ''} 120px`
 
+  // Reservationer (v91) — frysta förbehåll, punktlista efter "Ej inkluderat".
+  const reservations = data.quote.reservations || []
+  const reservationsHtml = reservations.length > 0
+    ? `<p><strong>Reservationer.</strong></p><ul class="reservations-list">${reservations
+        .map(r => `<li><strong>${escapeHtml(r.title)}.</strong> ${escapeHtml(r.content)}</li>`)
+        .join('')}</ul>`
+    : ''
+
   // Dolda rader (v90) utelämnas ur kundens dokument — priset ingår ändå i
   // summan, som räknas separat i quote-calculations och aldrig rör fältet.
   const itemsHtml = data.quote.items.filter(item => !item.isHidden).map(item => {
@@ -164,6 +172,9 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 .terms-card p { font-size: 11px; color: var(--muted); line-height: 1.7; white-space: pre-line; }
 .terms-card p strong { color: var(--ink); }
 .terms-card p + p { margin-top: 8px; }
+.terms-card .reservations-list { margin: 6px 0 0; padding-left: 16px; }
+.terms-card .reservations-list li { font-size: 11px; color: var(--muted); line-height: 1.7; margin-bottom: 5px; }
+.terms-card .reservations-list li strong { color: var(--ink); }
 .totals-stack { display: flex; flex-direction: column; }
 .total-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; }
 .total-row .lbl { color: var(--muted); }
@@ -265,6 +276,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
           : `<strong>Giltighet.</strong> Offerten gäller till ${escapeHtml(data.quote.validUntilDate)}. Tilläggsarbete debiteras enligt löpande räkning efter skriftligt godkännande.`}</p>
         ${data.quote.warrantyText ? `<p><strong>Garanti.</strong> ${escapeHtml(data.quote.warrantyText)}</p>` : ''}
         ${data.quote.notIncluded ? `<p><strong>Ej inkluderat.</strong> ${escapeHtml(data.quote.notIncluded)}</p>` : ''}
+        ${reservationsHtml}
       </div>
       <div class="totals-stack">
         <div class="total-row sub"><span class="lbl">Summa exkl. moms</span><span class="val">${formatCurrency(data.quote.subtotalExVat)}</span></div>

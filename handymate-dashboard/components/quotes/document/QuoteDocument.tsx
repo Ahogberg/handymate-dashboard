@@ -462,6 +462,34 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
           </p>
         )}
 
+        {/* Reservationer (v91) — förbehåll som frysts på offerten. Ligger
+            EFTER villkorsstycket, som ett eget block med punktlista: en
+            reservation ska gå att peka på ("den där reservationen gäller nu"),
+            inte drunkna i ett löpande villkorsstycke. */}
+        {!isInvoice && data.quote.reservations && data.quote.reservations.length > 0 && (
+          <div className="reservations">
+            <p className="reservations-title">Reservationer</p>
+            <ul>
+              {data.quote.reservations.map((reservation, idx) => (
+                <li key={idx}>
+                  <strong>{reservation.title}.</strong> {reservation.content}
+                  {mode === 'edit' && handlers?.onReservationRemove && (
+                    <button
+                      type="button"
+                      className="row-action"
+                      onClick={() => handlers.onReservationRemove!(idx)}
+                      title="Ta bort reservationen"
+                      aria-label={`Ta bort ${reservation.title}`}
+                    >
+                      ×
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {!isInvoice && (
           <SignatureCta mode={mode} cta={resolvedCta} isSigned={!!data.isSigned} signedDate={data.signedDate} />
         )}

@@ -217,6 +217,11 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .footer-card .l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 2px; }
 .footer-card .v { color: var(--ink); font-weight: 600; font-size: 12px; }
 .terms { font-size: 11px; color: var(--muted); padding: 0 8px; line-height: 1.7; white-space: pre-line; }
+.reservations { padding: 0 8px; margin-bottom: 12px; break-inside: avoid; page-break-inside: avoid; }
+.reservations-title { font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+.reservations ul { margin: 0; padding-left: 16px; }
+.reservations li { font-size: 11px; color: var(--muted); line-height: 1.7; margin-bottom: 5px; }
+.reservations li strong { color: var(--ink); }
 .print-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--bg); padding: 12px 24px; display: flex; align-items: center; justify-content: center; gap: 12px; z-index: 100; }
 .print-btn { background: var(--teal); color: #fff; border: none; padding: 10px 24px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .print-btn.secondary { background: #f3f4f6; color: #374151; }
@@ -305,6 +310,12 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
     ${data.business.swish ? `<div class="card pay-card"><div class="pay-icon">S</div><div><div class="l">Swish företag</div><div class="v">${escapeHtml(data.business.swish)}</div></div></div>` : ''}
     ${data.business.bankgiro ? `<div class="card pay-card"><div class="pay-icon">BG</div><div><div class="l">Bankgiro · ${escapeHtml(data.quote.paymentTerms)}</div><div class="v">${escapeHtml(data.business.bankgiro)}</div></div></div>` : ''}
   </section>
+
+  ${(data.quote.reservations && data.quote.reservations.length > 0)
+    ? `<section class="reservations"><p class="reservations-title">Reservationer</p><ul>${data.quote.reservations
+        .map(r => `<li><strong>${escapeHtml(r.title)}.</strong> ${escapeHtml(r.content)}</li>`)
+        .join('')}</ul></section>`
+    : ''}
 
   <p class="terms">${data.quote.termsText
     ? escapeHtml(data.quote.termsText)

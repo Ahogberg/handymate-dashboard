@@ -305,6 +305,14 @@ export function buildQuoteTemplateData(
       conclusionText: quote.conclusion_text || null,
       notIncluded: quote.not_included || null,
       termsText: quote.terms_text || null,
+      // Reservationer (v91): frysta på offerten, aldrig lästa ur biblioteket
+      // vid renderingstillfället — en ändrad bibliotekstext får inte ändra en
+      // redan skickad offert.
+      reservations: Array.isArray(quote.reservations_snapshot)
+        ? quote.reservations_snapshot
+            .filter((r: any) => r && typeof r.title === 'string' && typeof r.content === 'string')
+            .map((r: any) => ({ title: r.title, content: r.content }))
+        : null,
     },
   }
 }
