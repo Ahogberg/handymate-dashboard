@@ -191,6 +191,22 @@ export const toolDefinitions = [
       required: ["customer_id", "work_date", "start_time", "end_time"],
     },
   },
+  // R5 (tasks/resurs-masterplan.md) — persondagen som agentverktyg. Läser
+  // SAMMA sammanslagningskälla som resurstavlan (lib/schedule/person-day.ts,
+  // "en dag, en sanning") — ingen egen datakälla.
+  {
+    name: "get_person_schedule",
+    description: "Hämta schemat (persondagen) för en eller flera teammedlemmar: kundbokningar och interna pass/frånvaro sammanslagna per dag, med krockflaggor och veckobeläggning i procent. Ange person som namn (delsträngsmatchning, t.ex. \"Micke\" matchar \"Mikael Andersson\") eller \"alla\" för hela teamet. Matchar namnet flera medlemmar returneras en lista med alternativ istället för en gissning — fråga då hantverkaren vilken person som avses.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        person: { type: "string", description: "Namn (helt eller del av) på teammedlemmen, eller \"alla\" för samtliga aktiva. Utelämnas = alla." },
+        from_date: { type: "string", description: "YYYY-MM-DD. Utelämnas = måndag innevarande vecka." },
+        to_date: { type: "string", description: "YYYY-MM-DD. Utelämnas = söndag samma vecka som from_date (eller innevarande vecka)." },
+      },
+      required: [],
+    },
+  },
   // Communications
   {
     name: "send_sms",

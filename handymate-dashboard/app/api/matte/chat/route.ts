@@ -183,6 +183,8 @@ const CURATED_TOOL_NAMES = [
   'get_daily_stats', 'create_approval_request', 'check_pending_approvals',
   'get_project_profitability', 'get_pricing_suggestion', 'check_fortnox_status',
   'get_efterkalkyl_insight', 'run_customer_base_sweep', 'book_site_visit',
+  // R5 (tasks/resurs-masterplan.md) — persondagen/beläggning per person.
+  'get_person_schedule',
 ]
 
 const TOOLS: any[] = [

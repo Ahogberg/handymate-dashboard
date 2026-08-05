@@ -32,12 +32,23 @@
  * en LLM — samma motivering som buildUnopenedNudgeMessage i
  * lib/agents/daniel/unopened-quotes.ts: en mall-imitation av en LLM
  * driftar över tid, en testad helper är truth-source.
+ *
+ * Per-person-medveten (R5, tasks/resurs-masterplan.md): allt ovan är
+ * OFÖRÄNDRAT — business-aggregatet (getWeekCapacity/computeWeekCapacity)
+ * avgör fortfarande ensamt OM och NÄR ett förslag skapas. Det som är NYTT
+ * är en per-medlem-beläggningsbild för samma vecka (computeNextWeekPerson-
+ * Breakdown, identifyThinPeople, formatPersonUtilizationBreakdown, se
+ * längre ner i filen) som ADDERAS till varje skapat förslags description/
+ * payload — så owner/admin ser VEM som har luckor, inte bara att veckan
+ * totalt sett är tunn.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { svDateStr, svDateStrPlusDays } from '@/lib/dates'
-import { getWeekCapacity, mondayOfWeek } from '@/lib/capacity/week-capacity'
+import { getWeekCapacity, mondayOfWeek, THIN_WEEK_UTILIZATION_THRESHOLD } from '@/lib/capacity/week-capacity'
 import { daysSinceSent, extractFirstName } from '@/lib/agents/daniel/unopened-quotes'
+import { fetchPersonDays } from '@/lib/schedule/person-day'
+import { computePersonWeekUtilization } from '@/lib/schedule/utilization'
 
 // ─────────────────────────────────────────────────────────────────
 // Konstanter
@@ -178,6 +189,105 @@ export function excludeByCustomerId<T extends { customer_id: string }>(
 ): T[] {
   if (excludeCustomerIds.size === 0) return candidates
   return candidates.filter(c => !excludeCustomerIds.has(c.customer_id))
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Per-person-medveten kapacitet (R5, tasks/resurs-masterplan.md, Etapp 8
+// ur multi-employee-parity-plan.md). ADDERAS ovanpå business-aggregatet
+// ovan (computeWeekCapacity/getWeekCapacity i lib/capacity/week-capacity.ts)
+// — ändrar INTE thin_week-tröskeln, cron-schemat eller OM/NÄR Hanna
+// föreslår kontaktkandidater. Aggregatet är fortfarande den enda
+// utlösaren (se guard-returnerna i runCapacityFill nedan, oförändrade).
+// Det nya är en per-medlem-beläggningsbild för SAMMA vecka, byggd på
+// persondagen (lib/schedule/person-day.ts, R1) via SAMMA
+// computePersonWeekUtilization som resurstavlan (R2) — ingen ny
+// beräkningslogik, bara återanvänd på en ny plats. Facit-testas separat
+// i tests/kapacitet-fyllnad-per-person.spec.ts (tests/kapacitet-
+// fyllnad.spec.ts, som bevisar business-aggregatet är oförändrat, rörs
+// inte).
+// ─────────────────────────────────────────────────────────────────
+
+export interface PersonWeekSnapshot {
+  business_user_id: string
+  name: string
+  utilization_pct: number
+}
+
+/** Max antal namn i den textformaterade sammanfattningen (approval-
+ * beskrivningen) — en lista med alla anställda vore för brytt för en rad.
+ * Tunnast beläggning listas alltid först, se formatPersonUtilizationBreakdown. */
+export const PERSON_BREAKDOWN_MAX_NAMES = 3
+
+/**
+ * Filtrerar fram personer vars veckobeläggning är under tröskeln — samma
+ * THIN_WEEK_UTILIZATION_THRESHOLD (40%) som business-aggregatet använder
+ * (medvetet samma tal, se export-kommentaren i week-capacity.ts), applicerad
+ * per person istället för på hela företaget. Sorterad tunnast-först. Ren
+ * funktion, ingen I/O.
+ */
+export function identifyThinPeople(
+  people: PersonWeekSnapshot[],
+  threshold: number = THIN_WEEK_UTILIZATION_THRESHOLD,
+): PersonWeekSnapshot[] {
+  return [...people]
+    .filter((p) => p.utilization_pct < threshold)
+    .sort((a, b) => a.utilization_pct - b.utilization_pct)
+}
+
+/**
+ * Formaterar en kort, läsbar per-person-sammanfattning för approval-
+ * beskrivningen, t.ex. "Micke 20%, Johan 35%" — visar VEM som har luckor,
+ * inte bara att veckan totalt sett är tunn. Tom sträng om inga personer
+ * (t.ex. inga aktiva teammedlemmar än, eller ingen under tröskeln).
+ */
+export function formatPersonUtilizationBreakdown(people: PersonWeekSnapshot[]): string {
+  if (people.length === 0) return ''
+  return [...people]
+    .sort((a, b) => a.utilization_pct - b.utilization_pct)
+    .slice(0, PERSON_BREAKDOWN_MAX_NAMES)
+    .map((p) => `${p.name} ${p.utilization_pct}%`)
+    .join(', ')
+}
+
+/**
+ * I/O-wrappern: hämtar aktiva teammedlemmar + persondagen för samma vecka
+ * som business-aggregatet redan beräknat (weekStart) och kör var och en
+ * genom computePersonWeekUtilization. Kastar aldrig — ett DB-fel behandlas
+ * som "ingen per-person-data denna körning" (tom lista), samma fail-safe-
+ * hållning som resten av filen; anroparen (runCapacityFill) degraderar
+ * redan tyst till aggregat-only om detta ger [].
+ */
+export async function computeNextWeekPersonBreakdown(
+  supabase: SupabaseClient,
+  businessId: string,
+  weekStart: string,
+): Promise<PersonWeekSnapshot[]> {
+  const { data: members, error } = await supabase
+    .from('business_users')
+    .select('id, name')
+    .eq('business_id', businessId)
+    .eq('is_active', true)
+  if (error || !members || members.length === 0) return []
+
+  const weekDates = Array.from({ length: 7 }, (_, i) =>
+    svDateStrPlusDays(i, new Date(`${weekStart}T12:00:00Z`)),
+  )
+  const personDays = await fetchPersonDays(
+    supabase,
+    businessId,
+    (members as { id: string; name: string | null }[]).map((m) => m.id),
+    weekStart,
+    weekDates[6],
+  )
+
+  return (members as { id: string; name: string | null }[]).map((m) => {
+    const util = computePersonWeekUtilization(personDays, m.id, weekDates)
+    return {
+      business_user_id: m.id,
+      name: m.name || 'Namnlös',
+      utilization_pct: Math.round(util.utilizationPct),
+    }
+  })
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -436,6 +546,21 @@ export async function runCapacityFill(
     }
   }
 
+  // ── 3b. Per-person-beläggning för SAMMA vecka (R5) — ADDERAS till
+  // beskrivningen/payloaden nedan, ändrar INGET av ovanstående (candidates,
+  // thin_week-avgörandet skedde redan på aggregatet). Körs bara här (inte
+  // tidigare i funktionen) så vi inte gör en extra DB-runda i de fall som
+  // redan avslutats ovan (not_configured/not_thin/no_candidates).
+  let personBreakdownText = ''
+  let thinPeopleForPayload: PersonWeekSnapshot[] = []
+  try {
+    const personBreakdown = await computeNextWeekPersonBreakdown(supabase, businessId, weekStart)
+    thinPeopleForPayload = identifyThinPeople(personBreakdown)
+    personBreakdownText = formatPersonUtilizationBreakdown(thinPeopleForPayload)
+  } catch (err: any) {
+    console.error('[kapacitet-fyllnad] per-person-beläggning misslyckades, degraderar till aggregat-only:', businessId, err?.message || String(err))
+  }
+
   // ── 4. Skapa ETT pending_approval per kandidat ───────────────────
   let approvalsCreated = 0
   for (const c of candidates) {
@@ -453,7 +578,11 @@ export async function runCapacityFill(
       title: `Fyll nästa vecka — ${customerLabel}`,
       description:
         `Nästa vecka har ${capacity.open_hours ?? '?'} lediga timmar. ` +
-        `Hanna föreslår att höra av sig till ${customerLabel} om ledig tid.`,
+        `Hanna föreslår att höra av sig till ${customerLabel} om ledig tid.` +
+        // R5 (tasks/resurs-masterplan.md) — vem som har luckor, inte bara
+        // att veckan är tunn. Bara internt (owner/admin, denna beskrivning
+        // syns aldrig i kundens SMS ovan).
+        (personBreakdownText ? ` (${personBreakdownText})` : ''),
       status: 'pending',
       risk_level: 'low',
       payload: {
@@ -464,6 +593,9 @@ export async function runCapacityFill(
         routed_agent: 'hanna',
         trigger: 'capacity_fill',
         ...(c.source === 'unsold_quote' ? { quote_id: c.quote_id, related_id: c.quote_id } : {}),
+        // R5 — per-person-beläggning, tom lista om inga aktiva medlemmar är
+        // under tröskeln (eller om beräkningen degraderade, se ovan).
+        ...(thinPeopleForPayload.length > 0 ? { person_breakdown: thinPeopleForPayload } : {}),
       },
     })
     if (!error) {

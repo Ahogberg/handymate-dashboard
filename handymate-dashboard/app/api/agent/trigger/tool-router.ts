@@ -12,6 +12,10 @@ import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
 import { suggestQuoteDraftForLead } from '@/lib/quotes/suggest-quote-draft'
 import { suggestAtaDraft } from '@/lib/ata/suggest-ata-draft'
+import { fetchPersonDays } from '@/lib/schedule/person-day'
+import { computePersonWeekUtilization } from '@/lib/schedule/utilization'
+import { svDateStr, svDateStrPlusDays } from '@/lib/dates'
+import { mondayOfWeek } from '@/lib/capacity/week-capacity'
 
 interface ToolResult {
   success: boolean
@@ -89,6 +93,8 @@ export async function executeTool(
         return await updateProject(supabase, businessId, input)
       case 'log_time':
         return await logTime(supabase, businessId, input)
+      case 'get_person_schedule':
+        return await getPersonSchedule(supabase, businessId, input)
       case 'send_sms':
         return await sendSms(supabase, businessId, input, context)
       case 'send_email':
@@ -530,6 +536,155 @@ async function checkCalendar(
       google_events: googleEvents,
       google_calendar_connected: !!context.googleConnection?.sync_enabled,
     },
+  }
+}
+
+// ── Schema (R5, tasks/resurs-masterplan.md) ──────────────────────
+// get_person_schedule läser SAMMA sammanslagningskälla som resurstavlan
+// (lib/schedule/person-day.ts fetchPersonDays + lib/schedule/utilization.ts
+// computePersonWeekUtilization) — ingen ny logik här, bara I/O-inramning +
+// namnmatchning för agentens fritext-input.
+
+/** Max antal dagar per förfrågan — skydd mot orimligt stora payloads. */
+const MAX_PERSON_SCHEDULE_RANGE_DAYS = 62
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+interface PersonScheduleMember {
+  id: string
+  name: string
+}
+
+type PersonScheduleResolution =
+  | { mode: 'all' }
+  | { mode: 'single'; member: PersonScheduleMember }
+  | { mode: 'ambiguous'; alternatives: string[] }
+  | { mode: 'none' }
+
+/**
+ * Namnmatchning för get_person_schedule — samma "aldrig gissa"-princip som
+ * pickUnambiguousAssignee/pickUnambiguousBookingAssignee (lib/egenkontroll/
+ * suggest-time-entry.ts): en entydig träff är ett faktum och används direkt,
+ * en tvetydig träff listas som alternativ istället för att gissas, ingen
+ * träff är ingen träff — aldrig en tyst första-bästa-match.
+ */
+function resolvePersonScheduleQuery(
+  query: string,
+  members: PersonScheduleMember[],
+): PersonScheduleResolution {
+  const q = query.trim().toLowerCase()
+  if (!q || q === 'alla' || q === 'alla medlemmar' || q === 'alla teammedlemmar' || q === 'hela teamet') {
+    return { mode: 'all' }
+  }
+
+  const exact = members.filter((m) => m.name.trim().toLowerCase() === q)
+  if (exact.length === 1) return { mode: 'single', member: exact[0] }
+
+  const partial = members.filter((m) => m.name.toLowerCase().includes(q))
+  if (partial.length === 1) return { mode: 'single', member: partial[0] }
+  if (partial.length > 1) return { mode: 'ambiguous', alternatives: partial.map((m) => m.name) }
+
+  return { mode: 'none' }
+}
+
+/** Alla YYYY-MM-DD-datum i intervallet [from, to], inklusive. Ankrar på
+ * UTC-middag samma "säkra ankare"-mönster som resten av schema-modulen. */
+function datesInRange(from: string, to: string): string[] {
+  const dates: string[] = []
+  let cursor = from
+  let guard = 0
+  while (cursor <= to && guard <= MAX_PERSON_SCHEDULE_RANGE_DAYS + 1) {
+    dates.push(cursor)
+    cursor = svDateStrPlusDays(1, new Date(`${cursor}T12:00:00Z`))
+    guard++
+  }
+  return dates
+}
+
+async function getPersonSchedule(
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+): Promise<ToolResult> {
+  const { data: membersData, error: membersError } = await supabase
+    .from('business_users')
+    .select('id, name')
+    .eq('business_id', businessId)
+    .eq('is_active', true)
+
+  if (membersError) return { success: false, error: membersError.message }
+
+  const activeMembers: PersonScheduleMember[] = (membersData || []).map((m: any) => ({
+    id: m.id,
+    name: m.name || 'Namnlös',
+  }))
+  if (activeMembers.length === 0) {
+    return { success: false, error: 'Inga aktiva teammedlemmar hittades.' }
+  }
+
+  const personQuery = typeof params.person === 'string' && params.person.trim() ? params.person : 'alla'
+  const resolution = resolvePersonScheduleQuery(personQuery, activeMembers)
+
+  if (resolution.mode === 'none') {
+    return { success: false, error: `Ingen aktiv teammedlem matchar "${personQuery}".` }
+  }
+  if (resolution.mode === 'ambiguous') {
+    return {
+      success: true,
+      data: {
+        ambiguous: true,
+        query: personQuery,
+        alternatives: resolution.alternatives,
+        message: `Flera teammedlemmar matchar "${personQuery}": ${resolution.alternatives.join(', ')}. Fråga hantverkaren vilken person som avses innan du fortsätter.`,
+      },
+    }
+  }
+  const targetMembers = resolution.mode === 'all' ? activeMembers : [resolution.member]
+
+  // ── Datumintervall — default innevarande vecka (mån–sön) ────────────
+  const rawFrom = typeof params.from_date === 'string' && DATE_RE.test(params.from_date) ? params.from_date : null
+  const rawTo = typeof params.to_date === 'string' && DATE_RE.test(params.to_date) ? params.to_date : null
+  const from = rawFrom || mondayOfWeek(svDateStr())
+  const to = rawTo || svDateStrPlusDays(6, new Date(`${from}T12:00:00Z`))
+
+  if (to < from) {
+    return { success: false, error: `to_date (${to}) kan inte vara före from_date (${from}).` }
+  }
+  const spanDays = Math.round((new Date(`${to}T12:00:00Z`).getTime() - new Date(`${from}T12:00:00Z`).getTime()) / 86_400_000) + 1
+  if (spanDays > MAX_PERSON_SCHEDULE_RANGE_DAYS) {
+    return { success: false, error: `Datumintervallet är för stort (${spanDays} dagar, max ${MAX_PERSON_SCHEDULE_RANGE_DAYS}).` }
+  }
+
+  const allDates = datesInRange(from, to)
+  const personDays = await fetchPersonDays(supabase, businessId, targetMembers.map((m) => m.id), from, to)
+
+  const people = targetMembers.map((m) => {
+    const util = computePersonWeekUtilization(personDays, m.id, allDates)
+    const days = allDates.map((date) => {
+      const day = personDays.find((pd) => pd.businessUserId === m.id && pd.date === date)
+      return {
+        date,
+        is_absent: day?.isAbsent ?? false,
+        shifts: (day?.shifts || []).map((s) => ({
+          source: s.source,
+          type: s.type,
+          title: s.title,
+          start: s.start,
+          end: s.end,
+          all_day: s.allDay,
+          conflict: s.conflict,
+        })),
+      }
+    })
+    return {
+      business_user_id: m.id,
+      name: m.name,
+      utilization_pct: Math.round(util.utilizationPct),
+      total_hours: util.totalHours,
+      days,
+    }
+  })
+
+  return {
+    success: true,
+    data: { query: personQuery, range: { from, to }, people },
   }
 }
 

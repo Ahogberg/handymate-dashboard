@@ -30,8 +30,13 @@ export const DEFAULT_BOOKING_CAP_PCT = 80
 export const DEFAULT_BOOKING_HOURS = 2
 /** Gissning när ingen inställning finns: 40 h/vecka per aktiv teammedlem. */
 export const FALLBACK_HOURS_PER_MEMBER = 40
-/** Under denna beläggning räknas veckan som "tunn" (Hannas framtida trigger). */
-const THIN_WEEK_UTILIZATION_THRESHOLD = 40
+/** Under denna beläggning räknas veckan som "tunn" (Hannas trigger).
+ * Exporterad (R5, tasks/resurs-masterplan.md) så per-person-kapacitetslagret
+ * i lib/agents/hanna/capacity-fill.ts kan återanvända SAMMA tal för att
+ * klassa en enskild persons vecka som tunn, istället för att duplicera
+ * magiska "40" på två ställen som kan glida isär. Ren export — värdet och
+ * business-aggregatets beteende är oförändrat. */
+export const THIN_WEEK_UTILIZATION_THRESHOLD = 40
 
 const EXCLUDED_STATUSES = new Set(['cancelled', 'no_show'])
 

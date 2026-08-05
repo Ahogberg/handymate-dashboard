@@ -153,6 +153,8 @@ Skriv alltid på svenska.`,
       // Våg 2d (tasks/value-chain-plan.md) — enskild-projekt-efterkalkyl,
       // läses direkt vid job_completed-triggern (se nedan).
       'get_project_outcome',
+      // R5 (tasks/resurs-masterplan.md) — persondagen/beläggning per person.
+      'get_person_schedule',
       'send_agent_message', 'get_agent_messages',
     ],
     // job_completed: matchAgentByPrefix routar EN agent per trigger via

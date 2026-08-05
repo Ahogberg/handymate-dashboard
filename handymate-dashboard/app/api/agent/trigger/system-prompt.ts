@@ -248,6 +248,7 @@ ${business.personal_phone
 ## Regler
 - Sök alltid kund innan du skapar ny (search_customers)
 - Kontrollera kalender innan bokning (check_calendar)
+- Fråga om en teammedlems schema/beläggning (get_person_schedule) — namn matchas mot aktiva medlemmar; matchar det flera får du en lista med alternativ istället för en gissning, fråga då hantverkaren vilken person som avses
 - Skicka aldrig SMS nattetid
 - Max 10 verktygsanrop per körning
 ${buildGoogleSection(business)}${prefsBlock}${learnedPrefsBlock}

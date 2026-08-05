@@ -5,6 +5,11 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { resolveMemberSkills } from '@/lib/skills'
+import { fetchPersonDays } from '@/lib/schedule/person-day'
+import { computePersonWeekUtilization } from '@/lib/schedule/utilization'
+import { classifyCertStatus } from '@/lib/certifikat/status'
+import { svDateStr, svDateStrPlusDays } from '@/lib/dates'
+import { mondayOfWeek } from '@/lib/capacity/week-capacity'
 
 interface TeamMember {
   id: string
@@ -68,6 +73,84 @@ function addressProximity(addr1: string | null, addr2: string | null): number {
   const words2 = addr2.toLowerCase().split(/[\s,]+/).filter(w => w.length > 3)
   const shared = words1.filter(w => words2.includes(w)).length
   return Math.min(shared * 0.3, 0.8)
+}
+
+// ─────────────────────────────────────────────────────────────────
+// R5 (tasks/resurs-masterplan.md) — resursplaneringskortets berikning:
+// cert-data + veckobeläggning för den föreslagna personen. Byggs INNAN
+// pending_approvals-inserten (inte fire-and-forget — kortet ska ha datat
+// redan vid skapande, planens explicita krav) men får ALDRIG stoppa
+// kortskapandet: varje delfråga fångar sina egna fel och degraderar tyst
+// till null/tom lista, precis som app/api/team/certificates hanterar en
+// ännu ej körd v84-migration.
+// ─────────────────────────────────────────────────────────────────
+
+interface DispatchCandidateEnrichment {
+  /** Innevarande veckas beläggning (%) för kandidaten, samma beräkning som
+   *  resurstavlan (lib/schedule/utilization.ts). Null om beräkningen
+   *  misslyckades — INTE 0, för att aldrig visa en falsk "helt ledig". */
+  week_utilization_pct: number | null
+  /** Null = certifikat kunde inte hämtas (t.ex. v84 ej körd) — skiljs
+   *  medvetet från "hämtat men tomt" (valid:[] betyder faktiskt inga cert). */
+  certificates: {
+    valid: string[]
+    expiring_soon: Array<{ cert_type: string; valid_until: string }>
+  } | null
+}
+
+function isMissingTableError(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false
+  return (
+    error.code === '42P01' ||
+    error.code === 'PGRST205' ||
+    /relation .* does not exist/i.test(error.message || '')
+  )
+}
+
+async function buildDispatchCandidateEnrichment(
+  supabase: ReturnType<typeof getServerSupabase>,
+  businessId: string,
+  memberId: string,
+): Promise<DispatchCandidateEnrichment> {
+  let weekUtilizationPct: number | null = null
+  try {
+    const monday = mondayOfWeek(svDateStr())
+    const weekDates = Array.from({ length: 7 }, (_, i) => svDateStrPlusDays(i, new Date(`${monday}T12:00:00Z`)))
+    const personDays = await fetchPersonDays(supabase, businessId, [memberId], monday, weekDates[6])
+    const util = computePersonWeekUtilization(personDays, memberId, weekDates)
+    weekUtilizationPct = Math.round(util.utilizationPct)
+  } catch (err) {
+    console.error('[dispatch] kunde inte beräkna veckobeläggning för förslagskortet, degraderar:', err)
+  }
+
+  let certificates: DispatchCandidateEnrichment['certificates'] = null
+  try {
+    const { data, error } = await supabase
+      .from('employee_certificate')
+      .select('cert_type, valid_until')
+      .eq('business_id', businessId)
+      .eq('business_user_id', memberId)
+
+    if (error) {
+      if (!isMissingTableError(error)) {
+        console.error('[dispatch] kunde inte hämta certifikat för förslagskortet:', error)
+      }
+      // Tabell saknas (v84 ej körd) — certificates förblir null, degraderar.
+    } else {
+      const valid: string[] = []
+      const expiringSoon: Array<{ cert_type: string; valid_until: string }> = []
+      for (const c of (data || []) as { cert_type: string; valid_until: string | null }[]) {
+        const status = classifyCertStatus(c.valid_until)
+        if (status === 'valid' || status === 'no_expiry') valid.push(c.cert_type)
+        else if (status === 'expiring_soon' && c.valid_until) expiringSoon.push({ cert_type: c.cert_type, valid_until: c.valid_until })
+      }
+      certificates = { valid, expiring_soon: expiringSoon }
+    }
+  } catch (err) {
+    console.error('[dispatch] certifikat-hämtning för förslagskortet kastade, degraderar:', err)
+  }
+
+  return { week_utilization_pct: weekUtilizationPct, certificates }
 }
 
 /**
@@ -186,8 +269,11 @@ export async function suggestDispatch(params: {
     return { suggested: false }
   }
 
-  // 4. Skapa approval
+  // 4. Skapa approval — berika payloaden med cert/beläggning för kortet
+  // (R5, tasks/resurs-masterplan.md) INNAN insert, se
+  // buildDispatchCandidateEnrichment ovan för degraderingsprincipen.
   const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+  const enrichment = await buildDispatchCandidateEnrichment(supabase, params.businessId, best.member.id)
 
   await supabase.from('pending_approvals').insert({
     id: approvalId,
@@ -216,6 +302,9 @@ export async function suggestDispatch(params: {
         score: s.score,
         reasons: s.reasons,
       })),
+      // R5 (tasks/resurs-masterplan.md) — se buildDispatchCandidateEnrichment.
+      week_utilization_pct: enrichment.week_utilization_pct,
+      certificates: enrichment.certificates,
     },
     expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
   })
