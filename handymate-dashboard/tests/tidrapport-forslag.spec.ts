@@ -25,6 +25,7 @@ import {
   findProjectsMissingTimeEntry,
   pickUnambiguousAssignee,
   pickUnambiguousBookingAssignee,
+  resolveTimeEntryBusinessUserId,
   type BookingForTimeMatch,
   type TimeEntryForTimeMatch,
   type AssigneeNameRow,
@@ -194,5 +195,36 @@ test.describe('pickUnambiguousAssignee — namn-kärna (2a-förfining)', () => {
   test('exakt 1 tilldelad men namnet är tomt/whitespace → inget namn', () => {
     const assignments: AssigneeNameRow[] = [{ name: '   ' }]
     expect(pickUnambiguousAssignee(assignments)).toBeNull()
+  })
+})
+
+test.describe('resolveTimeEntryBusinessUserId — godkännande-exekverarens payload-kontrakt (Fas 0.2)', () => {
+  // Löneunderlags-luckan (planen vad-kan-vi-kopiera-snug-phoenix.md, Fas 0
+  // punkt 2): executeApprovalPayload's 'tidrapport_forslag'-case satte
+  // tidigare INTE business_user_id på den auto-skapade time_entry:n, trots
+  // att payload bär assigned_user_id sedan R1-D. Dessa tester låser fast
+  // kontraktet mellan payload-formen suggestTimeEntriesForBusiness skapar
+  // och det executeApprovalPayload nu faktiskt läser.
+  test('payload med assigned_user_id (attributionSource "booking") → det id:t väljs', () => {
+    expect(resolveTimeEntryBusinessUserId({ assigned_user_id: 'bu_lars' })).toBe('bu_lars')
+  })
+
+  test('payload utan assigned_user_id (project_assignment-fallback eller ingen tilldelning) → null, ingen gissning', () => {
+    expect(resolveTimeEntryBusinessUserId({})).toBeNull()
+  })
+
+  test('payload.assigned_user_id explicit null → null', () => {
+    expect(resolveTimeEntryBusinessUserId({ assigned_user_id: null })).toBeNull()
+  })
+
+  test('payload själv null/undefined (defensivt, ska aldrig krascha exekveraren) → null', () => {
+    expect(resolveTimeEntryBusinessUserId(null)).toBeNull()
+    expect(resolveTimeEntryBusinessUserId(undefined)).toBeNull()
+  })
+
+  test('payload med assigned_person_name men UTAN assigned_user_id (project_assignment-fallbacket bär aldrig id:t) → null', () => {
+    expect(
+      resolveTimeEntryBusinessUserId({ assigned_person_name: 'Hanna Berg' } as any),
+    ).toBeNull()
   })
 })

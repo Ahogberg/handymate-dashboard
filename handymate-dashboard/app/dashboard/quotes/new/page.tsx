@@ -13,7 +13,7 @@ import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDo
 import { RowEditSheet } from '@/components/quotes/document/RowEditSheet'
 import {
   generateItemId, recalculateItems, setItemRotRut, legacyItemRotRutType, applyOptionRowDefaults,
-  getItemRotRutType,
+  getItemRotRutType, resolveLegacyItemFields,
 } from '@/lib/quote-calculations'
 import { compressImageFile } from '@/lib/images/compress-photo'
 import { getAllCategories, type CustomCategory } from '@/lib/constants/categories'
@@ -121,16 +121,22 @@ function normalizeUnit(unit: string): string {
  * lib/ai-quote-generator.ts). Default false så mall-anropen (handleTemplateSelect)
  * är oförändrade — en avsiktligt $0-radad mallrad ("Framkörning ingår") ska
  * INTE amber-markeras som "AI gissade fel pris".
+ *
+ * Fält-mappningen (namn/pris) görs av resolveLegacyItemFields
+ * (lib/quote-calculations.ts) — se den funktionens kommentar för varför:
+ * ai-generate skickar description/unitPrice, inte name/unit_price, och utan
+ * fallback blev raden NaN för AI-genererade förslag.
  */
 function convertLegacyItems(
   legacyItems: Array<{
     id: string
     type: 'labor' | 'material' | 'service'
-    name: string
+    name?: string
     description?: string
-    quantity: number
+    quantity?: number
     unit: string
-    unit_price: number
+    unit_price?: number
+    unitPrice?: number
     total: number
     note?: string | null
     fromPriceList?: boolean
@@ -140,18 +146,19 @@ function convertLegacyItems(
   sourceIsAi: boolean = false,
 ): QuoteItem[] {
   return legacyItems.map((item, idx) => {
+    const { description, quantity, unitPrice } = resolveLegacyItemFields(item)
     const priceMissing =
-      sourceIsAi && (item.unit_price === 0 || !!(item.note && item.note.includes('PRIS SAKNAS')))
+      sourceIsAi && (unitPrice === 0 || !!(item.note && item.note.includes('PRIS SAKNAS')))
     return applyOptionRowDefaults(
       setItemRotRut(
         {
           id: generateItemId(),
           item_type: itemType,
-          description: item.name || item.description || '',
-          quantity: item.quantity,
+          description,
+          quantity,
           unit: normalizeUnit(item.unit),
-          unit_price: item.unit_price,
-          total: item.quantity * item.unit_price,
+          unit_price: unitPrice,
+          total: quantity * unitPrice,
           is_rot_eligible: false,
           is_rut_eligible: false,
           sort_order: idx,

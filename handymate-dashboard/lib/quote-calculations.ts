@@ -129,6 +129,37 @@ export function legacyItemRotRutType(
 }
 
 /**
+ * Ren mappning: legacy-radens beskrivning + styckpris, med fallback mellan de
+ * TVÅ fältformer en "legacy AI/mall-rad" kan komma i. `convertLegacyItems`
+ * (app/dashboard/quotes/new/page.tsx + app/dashboard/quotes/[id]/edit/page.tsx)
+ * läste tidigare BARA item.name/item.unit_price — men ai-generate
+ * (lib/ai-quote-generator.ts, GeneratedQuoteItem) skickar description/
+ * unitPrice, inte name/unit_price. Resultat: unit_price blev `undefined` för
+ * AI-genererade rader och total = quantity * undefined = NaN, maskerat av
+ * `quote: any`-typningen på anropssidan (bara "läkt" av att editorns egen
+ * quantity×unit_price-omräkning körs om innan visning).
+ *
+ * Samma mappningsprincip som lib/quotes/generated-to-quote-items.ts
+ * (mapGeneratedItemToQuoteItem): description/unitPrice PRIMÄRT (vad
+ * ai-generate faktiskt skickar), name/unit_price som FALLBACK (mall-rader).
+ * `?? 0`/`|| 0` på båda numeriska fälten — NaN får aldrig uppstå, även med
+ * helt tomma/saknade fält.
+ */
+export function resolveLegacyItemFields(item: {
+  name?: string | null
+  description?: string | null
+  quantity?: number | null
+  unit_price?: number | null
+  unitPrice?: number | null
+}): { description: string; quantity: number; unitPrice: number } {
+  return {
+    description: item.description || item.name || '',
+    quantity: item.quantity || 0,
+    unitPrice: item.unitPrice ?? item.unit_price ?? 0,
+  }
+}
+
+/**
  * Grön teknik-avdrag (Skatteverket 2026, Fas 1) — TRE kategorier, var och en
  * en % av HELA radtotalen (arbete + material) — TILL SKILLNAD FRÅN ROT/RUT
  * som bara räknar arbetsandelen. Ett tak på 50 000 kr/år, tillämpat per

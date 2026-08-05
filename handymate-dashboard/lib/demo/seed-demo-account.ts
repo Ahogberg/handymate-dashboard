@@ -24,7 +24,22 @@ import type { QuoteItem } from '@/lib/types/quote'
  *
  * Tabeller som seedas (samma set som raderas, i beroendeordning vid radering):
  *   pending_approvals, agent_runs, pipeline_activity, quote_items, invoice,
- *   project_checklist, project, quotes, deal, customer
+ *   project_checklist, project, quotes, deal, customer, booking,
+ *   schedule_entry
+ *
+ * Fas 0.2 (planen vad-kan-vi-kopiera-snug-phoenix.md, R2-DoD
+ * tasks/resurs-masterplan.md): booking + schedule_entry seedas nu också —
+ * resurstavlan (/dashboard/schema) ska demoa beläggnings-%, obemannat-
+ * spåret och en konflikt utan tomma kolumner. Extra teammedlemmar
+ * (business_users) seedas MEDVETET INTE här — det är STRUKTURELL data,
+ * samma undantag som business_config/business_users/auth i filhuvudet
+ * ovan (destruktiv delete→insert på en auth-kopplad tabell varje reset
+ * vore farligt — kan radera den inloggade presentatörens egen rad).
+ * Läggs till EN GÅNG av Andreas via sql/demo_seed_flerpersons.sql (samma
+ * engångs-riggningsmönster som sql/demo-konto-setup.sql). Bookings/
+ * schedule_entry läser bara vilka AKTIVA business_users som råkar finnas
+ * just nu (ingen hård koppling till den SQL-filen) — degraderar snyggt
+ * till färre personer på tavlan om filen inte körts än, kraschar aldrig.
  */
 
 export interface DemoResetSummary {
@@ -35,6 +50,8 @@ export interface DemoResetSummary {
   projects: number
   approvals: number
   agentRuns: number
+  bookings: number
+  scheduleEntries: number
 }
 
 export interface DemoResetError {
@@ -104,6 +121,12 @@ export async function resetDemoAccount(
   await supabase.from('quotes').delete().eq('business_id', businessId)
   await supabase.from('deal').delete().eq('business_id', businessId)
   await supabase.from('customer').delete().eq('business_id', businessId)
+  // Fas 0.2: booking.customer_id har INGEN FK-constraint (verifierat mot
+  // sql/v71_add_missing_fks.sql — saknas i den listan), så gårdagens
+  // demo-bokningar skulle annars bli hängande orphans mot nya kund-id:n
+  // varje reset istället för att städas undan som allt annat här.
+  await supabase.from('booking').delete().eq('business_id', businessId)
+  await supabase.from('schedule_entry').delete().eq('business_id', businessId)
 
   // ── 2. Pipeline-steg måste finnas (no-op om redan seedade) ──
   await ensureDefaultStages(businessId)
@@ -567,6 +590,132 @@ export async function resetDemoAccount(
   if (checklistErr) return { error: `Kunde inte skapa checklista (Anna): ${checklistErr.message}` }
 
   // ══════════════════════════════════════════════════════════
+  // 6c. VECKANS SCHEMA (R2-DoD, tasks/resurs-masterplan.md) — bookings
+  //     (assigned_user_id satta + en obemannad) + schedule_entry (internt +
+  //     en frånvaro) för INNEVARANDE vecka, så resurstavlan
+  //     (/dashboard/schema) demoar beläggnings-%, obemannat-spåret och en
+  //     billig konflikt direkt. Läser bara AKTIVA business_users som
+  //     faktiskt finns — se filhuvudets kommentar om varför extra
+  //     teammedlemmar seedas separat (sql/demo_seed_flerpersons.sql), inte
+  //     här.
+  // ══════════════════════════════════════════════════════════
+  const { data: teamRows } = await supabase
+    .from('business_users')
+    .select('id, name')
+    .eq('business_id', businessId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+  const team = (teamRows || []) as { id: string; name: string }[]
+
+  // Måndagen i INNEVARANDE vecka, relativt NU — resurstavlan öppnas alltid
+  // på innevarande vecka vid inloggning, så veckans bokningar måste ligga
+  // där oavsett vilken dag demot körs (samma "allt relativt NU"-princip
+  // som resten av filen).
+  function mondayThisWeek(): Date {
+    const d = new Date()
+    const dow = d.getDay() // 0=sön..6=lör
+    const diffToMonday = dow === 0 ? -6 : 1 - dow
+    d.setDate(d.getDate() + diffToMonday)
+    d.setHours(0, 0, 0, 0)
+    return d
+  }
+  function weekDateTime(dayOffset: number, hour: number, minute = 0): string {
+    const d = mondayThisWeek()
+    d.setDate(d.getDate() + dayOffset)
+    d.setHours(hour, minute, 0, 0)
+    return d.toISOString()
+  }
+
+  type SeedBooking = {
+    customerKey: string
+    notes: string
+    start: string
+    end: string
+    /** Index i team[] (modulo teamets storlek) — null = medvetet obemannad. */
+    memberIdx: number | null
+    projectId?: string | null
+    kind?: 'standard' | 'service' | 'offer' | 'emergency'
+  }
+  const bookingSeeds: SeedBooking[] = [
+    { customerKey: 'anna', notes: 'Badrumsrenovering – dag 5', start: weekDateTime(0, 8), end: weekDateTime(0, 16), memberIdx: 0, projectId: annaProject.project_id },
+    { customerKey: 'fastighets', notes: 'Eldragning garage', start: weekDateTime(1, 8), end: weekDateTime(1, 15), memberIdx: 1 },
+    // Onsdag: samma person (memberIdx 2) som interndagen nedan → medveten,
+    // billig konflikt (09–14 offertbesök krockar med 08–10 "Hämta material")
+    // så konflikt-flaggningen (lib/schedule/person-day.ts flagConflicts)
+    // har något att visa i demot utan extra kod.
+    { customerKey: 'brf', notes: 'Offertbesök – takläckage', start: weekDateTime(2, 9), end: weekDateTime(2, 14), memberIdx: 2, kind: 'offer' },
+    // Medvetet obemannad — demoar "obemannat"-spåret på resurstavlan.
+    { customerKey: 'mikael', notes: 'Altanbygge – grundläggning', start: weekDateTime(3, 8), end: weekDateTime(3, 16), memberIdx: null },
+    { customerKey: 'johan', notes: 'Fönsterbyte – mätbesök', start: weekDateTime(4, 8), end: weekDateTime(4, 12), memberIdx: 0, kind: 'offer' },
+  ]
+
+  let bookingsCreated = 0
+  for (const b of bookingSeeds) {
+    const assignedMember = b.memberIdx !== null && team.length > 0 ? team[b.memberIdx % team.length] : null
+    const { error: bookErr } = await supabase.from('booking').insert({
+      booking_id: genId('book'),
+      business_id: businessId,
+      customer_id: customers[b.customerKey].customer_id,
+      scheduled_start: b.start,
+      scheduled_end: b.end,
+      status: 'confirmed',
+      notes: b.notes,
+      assigned_user_id: assignedMember?.id ?? null,
+      assigned_to: assignedMember?.name ?? null,
+      project_id: b.projectId ?? null,
+      kind: b.kind || 'standard',
+      created_at: new Date().toISOString(),
+    })
+    if (bookErr) {
+      // Non-fatal: samma grad som agent_runs nedan — en trasig bokningsrad
+      // ska aldrig stoppa hela demo-resetten.
+      console.error('[demo-reset] booking insert failed (non-blocking):', bookErr.message)
+    } else {
+      bookingsCreated++
+    }
+  }
+
+  let scheduleEntriesCreated = 0
+  if (team.length > 0) {
+    // Samma person som onsdagens offertbesök (memberIdx 2 ovan) — se den
+    // medvetna konflikt-kommentaren där.
+    const internalMember = team[2 % team.length]
+    const { error: internalErr } = await supabase.from('schedule_entry').insert({
+      id: genId('sce'),
+      business_id: businessId,
+      business_user_id: internalMember.id,
+      project_id: null,
+      title: 'Hämta material — Bygghandeln',
+      start_datetime: weekDateTime(2, 8),
+      end_datetime: weekDateTime(2, 10),
+      all_day: false,
+      type: 'internal',
+      status: 'scheduled',
+    })
+    if (internalErr) console.error('[demo-reset] schedule_entry (internal) insert failed (non-blocking):', internalErr.message)
+    else scheduleEntriesCreated++
+  }
+  if (team.length > 1) {
+    // En frånvaro (heldag, torsdag) — annan person än onsdagens konflikt,
+    // så de två demo-poängen (konflikt / frånvaro) syns på olika personer.
+    const absentMember = team[1 % team.length]
+    const { error: absenceErr } = await supabase.from('schedule_entry').insert({
+      id: genId('sce'),
+      business_id: businessId,
+      business_user_id: absentMember.id,
+      project_id: null,
+      title: 'Semester',
+      start_datetime: weekDateTime(3, 0, 0),
+      end_datetime: weekDateTime(3, 23, 59),
+      all_day: true,
+      type: 'time_off',
+      status: 'scheduled',
+    })
+    if (absenceErr) console.error('[demo-reset] schedule_entry (frånvaro) insert failed (non-blocking):', absenceErr.message)
+    else scheduleEntriesCreated++
+  }
+
+  // ══════════════════════════════════════════════════════════
   // 7. FAKTUROR (3 st): betald, skickad ej förfallen, förfallen 8 dagar
   // ══════════════════════════════════════════════════════════
   type SeedInvoiceItem = { id: string; item_type: string; description: string; quantity: number; unit: string; unit_price: number; total: number; type: string; is_rot_eligible: boolean; is_rut_eligible: boolean; sort_order: number }
@@ -870,6 +1019,8 @@ export async function resetDemoAccount(
     projects: 2,
     approvals: approvalSeeds.length,
     agentRuns: agentRunsErr ? 0 : agentRunSeeds.length,
+    bookings: bookingsCreated,
+    scheduleEntries: scheduleEntriesCreated,
   }
 }
 

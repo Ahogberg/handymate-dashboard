@@ -18,6 +18,7 @@ import {
   setItemRotRut,
   legacyItemRotRutType,
   getItemRotRutType,
+  resolveLegacyItemFields,
 } from '@/lib/quote-calculations'
 import { getAllCategories, type CustomCategory } from '@/lib/constants/categories'
 import {
@@ -89,37 +90,48 @@ function formatCurrency(amount: number) {
  * offertens faktiska rot_rut_type, så en gammal RUT- eller nybygge-offert
  * (utan avdrag) kunde visas med ROT-flaggat arbete vid laddning. Default
  * null håller anrop utan känd avdragstyp oförändrade (ingen avdragstyp).
+ *
+ * Fält-mappningen (namn/pris) görs av resolveLegacyItemFields
+ * (lib/quote-calculations.ts, samma helper som quotes/new/page.tsx) — den
+ * läser description/unitPrice PRIMÄRT (vad ai-generate faktiskt skickar),
+ * name/unit_price som fallback, `?? 0`/`|| 0` på de numeriska fälten så en
+ * rad aldrig kan bli NaN här heller, även om denna funktion idag bara
+ * anropas med redan strukturerade legacy-rader (quote.items, unit_price
+ * satt) — samma mappningsprincip hålls konsekvent mellan de två
+ * duplicerade convertLegacyItems-funktionerna.
  */
 function convertLegacyItems(
   legacyItems: Array<{
     id: string
     type: 'labor' | 'material' | 'service'
-    name: string
+    name?: string
     description?: string
-    quantity: number
+    quantity?: number
     unit: string
-    unit_price: number
+    unit_price?: number
+    unitPrice?: number
     total: number
   }>,
   suggestedDeductionType: 'rot' | 'rut' | 'none' | null | undefined = null,
 ): QuoteItem[] {
-  return legacyItems.map((item, idx) =>
-    setItemRotRut(
+  return legacyItems.map((item, idx) => {
+    const { description, quantity, unitPrice } = resolveLegacyItemFields(item)
+    return setItemRotRut(
       {
         id: generateItemId(),
         item_type: 'item' as const,
-        description: item.name || item.description || '',
-        quantity: item.quantity,
+        description,
+        quantity,
         unit: normalizeUnit(item.unit),
-        unit_price: item.unit_price,
-        total: item.quantity * item.unit_price,
+        unit_price: unitPrice,
+        total: quantity * unitPrice,
         is_rot_eligible: false,
         is_rut_eligible: false,
         sort_order: idx,
       },
       legacyItemRotRutType(item.type, suggestedDeductionType),
-    ),
-  )
+    )
+  })
 }
 
 function normalizeUnit(unit: string): string {

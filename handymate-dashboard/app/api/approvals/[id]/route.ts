@@ -7,6 +7,7 @@ import { sendSmsViaElks } from '@/lib/sms-send'
 import { classifyExecutionResult } from '@/lib/approvals/execution-outcome'
 import { canActOnApproval } from '@/lib/approvals/routing'
 import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
+import { resolveTimeEntryBusinessUserId } from '@/lib/egenkontroll/suggest-time-entry'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -1686,11 +1687,19 @@ async function executeApprovalPayload(
           return { action: 'tidrapport_forslag', skipped: 'no project_id or booking_date' }
         }
 
+        // R1-D (resurs-masterplan.md): se resolveTimeEntryBusinessUserId
+        // (lib/egenkontroll/suggest-time-entry.ts) för fullständig motivering
+        // — payload.assigned_user_id är redan ett business_users.id, satt
+        // bara när attributionSource var bokningens EGEN tilldelning. Saknas
+        // fältet: null, exakt tidigare beteende (ingen gissning).
+        const assignedUserIdTe = resolveTimeEntryBusinessUserId(plTe)
+
         const supabaseTe = getServerSupabase()
         const entryIdTe = 'te_' + Math.random().toString(36).substr(2, 9)
         const { error: insertTeErr } = await supabaseTe.from('time_entry').insert({
           time_entry_id: entryIdTe,
           business_id: businessId,
+          business_user_id: assignedUserIdTe,
           project_id: projectIdTe,
           work_date: bookingDate,
           duration_minutes: suggestedMinutes,

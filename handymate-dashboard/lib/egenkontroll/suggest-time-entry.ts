@@ -226,6 +226,33 @@ export function pickUnambiguousBookingAssignee(assignedUserIds: string[]): strin
 }
 
 // ─────────────────────────────────────────────────────────────────
+// resolveTimeEntryBusinessUserId — Fas 0.2 uppföljningsfix (planen
+// vad-kan-vi-kopiera-snug-phoenix.md). Ren, facit-testbar kärna för
+// godkännande-exekveraren (app/api/approvals/[id]/route.ts, case
+// 'tidrapport_forslag').
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Väljer vilket business_users.id den auto-skapade time_entry:n vid
+ * tidrapport_forslag-godkännande ska stämplas med.
+ *
+ * payload.assigned_user_id är REDAN ett business_users.id (samma id
+ * booking.assigned_user_id lagrar, se app/api/bookings/route.ts som
+ * validerar/sätter det direkt mot business_users.id — ingen
+ * auth-user_id-omväg som i 'time_attestation'-caset). Fältet sätts av
+ * suggestTimeEntriesForBusiness ENDAST när attributionSource === 'booking'
+ * (bokningens EGEN tilldelning, se filhuvudet) — payload bär ALDRIG
+ * assigned_user_id för project_assignment-fallbacket (bara det rena
+ * visningsnamnet assigned_person_name). Saknas fältet: null, exakt tidigare
+ * beteende — ingen gissning här heller.
+ */
+export function resolveTimeEntryBusinessUserId(
+  payload: { assigned_user_id?: string | null } | null | undefined,
+): string | null {
+  return payload?.assigned_user_id || null
+}
+
+// ─────────────────────────────────────────────────────────────────
 // pickUnambiguousAssignee — ren, facit-testbar namn-kärna (2a-förfining)
 // ─────────────────────────────────────────────────────────────────
 

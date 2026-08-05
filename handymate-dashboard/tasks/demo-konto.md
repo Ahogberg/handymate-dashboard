@@ -26,6 +26,28 @@ vilket datum det faktiskt är).
 Kör om steg 3 inför varje demo — tar någon sekund, raderar gårdagens
 demo-data och skapar ny.
 
+## Flerpersons-schema (Fas 0.2, R2-DoD) — engångstillägg för resurstavlan
+
+`sql/demo_seed_flerpersons.sql` lägger till 3 extra teammedlemmar
+(business_users: Erik Nilsson/snickare, Sara Lindberg/elektriker, Mattias
+Karlsson/VVS-tekniker, olika `specialties[]`) på demokontot, så
+`/dashboard/schema` (resurstavlan) har fler än en person att visa
+beläggnings-%/obemannat-spår/konflikt på. Körs **EN GÅNG** manuellt i
+Supabase SQL Editor (idempotent — säkert att köra om). Rörs INTE av
+"Återställ demon"-knappen (se säkerhetsmodellen ovan — business_users är
+medvetet undantaget).
+
+`resetDemoAccount()` seedar sedan (varje reset, precis som allt annat)
+en vecka av `booking` + `schedule_entry` för INNEVARANDE vecka: 4
+bookings tilldelade befintliga aktiva teammedlemmar (round-robin, oavsett
+om SQL-filen ovan körts eller ej) + 1 medvetet obemannad, samt en intern
+schedule_entry och en heldags-frånvaro. Interndagen och onsdagens
+offertbesök läggs på SAMMA person med avsiktligt överlappande tider — en
+billig, avsiktlig konflikt så konflikt-flaggningen (`lib/schedule/
+person-day.ts`) har något att visa utan extra kod. Har SQL-filen inte
+körts än degraderar detta bara snyggt (alla bookings/schema hamnar på
+ägarens enda business_users-rad) — kraschar aldrig.
+
 ## Säkerhetsmodell
 
 Resetten är destruktiv (delete → insert) så den skyddas av två lager:
