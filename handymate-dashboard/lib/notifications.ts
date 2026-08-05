@@ -176,6 +176,33 @@ export async function notifyQuoteSigned(params: {
   })
 }
 
+/**
+ * Kunden har just öppnat offerten.
+ *
+ * Den här notisen är hela poängen med öppningsspårningen: en hantverkare som
+ * hör av sig MEDAN kunden sitter med offerten framför sig har ett helt annat
+ * läge än en som ringer tre dagar senare. Skickas bara vid FÖRSTA öppningen —
+ * en notis per omläsning vore brus, och brus stängs av.
+ */
+export async function notifyQuoteOpened(params: {
+  businessId: string
+  customerName: string
+  quoteId: string
+  quoteTitle?: string | null
+  total?: number | null
+}): Promise<void> {
+  await createNotification({
+    businessId: params.businessId,
+    type: 'quote_opened',
+    title: `${params.customerName} läser din offert nu`,
+    message: params.total
+      ? `${params.quoteTitle || 'Offert'} · ${params.total.toLocaleString('sv-SE')} kr — bra läge att höra av sig`
+      : 'Bra läge att höra av sig',
+    link: `/dashboard/quotes/${params.quoteId}`,
+    metadata: { quote_id: params.quoteId },
+  })
+}
+
 export async function notifyMissedCall(params: {
   businessId: string
   phoneNumber: string

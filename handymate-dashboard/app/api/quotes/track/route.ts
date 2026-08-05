@@ -48,46 +48,27 @@ export async function GET(req: NextRequest) {
       return new Response(PIXEL, { headers: pixelHeaders })
     }
 
-    // Logga tracking event
-    await supabase.from('quote_tracking_events').insert({
-      quote_id: quoteId,
-      business_id: quote.business_id,
-      event_type: event,
-      session_id: sessionId,
-      duration_seconds: duration > 0 ? duration : null,
-      ip_hash: hashIP(req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || ''),
-      user_agent: (req.headers.get('user-agent') || '').slice(0, 200),
-    })
-
-    // Uppdatera sammanfattning på quote
+    // Öppningar går genom den delade vägen (lib/quotes/track-open.ts) så att
+    // pixeln, kundvyn och portalen registrerar EXAKT samma sak. Övriga
+    // event-typer loggas som förut direkt här.
     if (event === 'opened') {
-      const newViewCount = (quote.view_count || 0) + 1
-      await supabase.from('quotes').update({
-        view_count: newViewCount,
-        first_viewed_at: quote.first_viewed_at || new Date().toISOString(),
-        last_viewed_at: new Date().toISOString(),
-        status: quote.status === 'sent' ? 'opened' : quote.status,
-      }).eq('quote_id', quoteId)
-
-      // V3 Automation Engine: fire quote_opened event (bara första gången)
-      if (newViewCount === 1) {
-        try {
-          const { fireEvent } = await import('@/lib/automation-engine')
-          await fireEvent(supabase, 'quote_opened', quote.business_id, {
-            quote_id: quoteId,
-            customer_id: quote.customer_id,
-            quote_title: quote.title,
-          })
-        } catch { /* non-blocking */ }
-      }
-
-      // Trigga nudge vid 3+ visningar utan svar
-      if (newViewCount >= 3 && (OPEN_QUOTE_STATUSES as readonly string[]).includes(quote.status)) {
-        try {
-          const { createQuoteNudge } = await import('@/lib/autopilot/quote-nudge')
-          await createQuoteNudge(quote.business_id, quoteId, newViewCount)
-        } catch { /* non-blocking */ }
-      }
+      const { registerQuoteOpen } = await import('@/lib/quotes/track-open')
+      await registerQuoteOpen(supabase, quoteId, {
+        sessionId,
+        ipHash: hashIP(req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || ''),
+        userAgent: req.headers.get('user-agent'),
+        source: 'pixel',
+      })
+    } else {
+      await supabase.from('quote_tracking_events').insert({
+        quote_id: quoteId,
+        business_id: quote.business_id,
+        event_type: event,
+        session_id: sessionId,
+        duration_seconds: duration > 0 ? duration : null,
+        ip_hash: hashIP(req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || ''),
+        user_agent: (req.headers.get('user-agent') || '').slice(0, 200),
+      })
     }
 
     // Om closed event med duration — uppdatera total view time

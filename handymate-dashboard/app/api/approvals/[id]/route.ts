@@ -264,6 +264,26 @@ export async function POST(
       console.error('[approvals] earned-autonomy hook error (non-blocking):', autonomyErr)
     }
 
+    // Reject-side-effect: en avslagen fyra-ögon-offert måste tillbaka till
+    // 'draft'. Utan detta fastnar den i 'pending_approval' — en status som
+    // varken uppföljningen, expiry-cronen eller kundportalen känner igen, så
+    // offerten blir osynlig för alla utom den som råkar leta efter den.
+    // Godkännandevägen återställer redan (case 'four_eyes_quote').
+    if (action === 'reject' && approval.approval_type === 'four_eyes_quote') {
+      const rejectedQuoteId = (approval.payload as Record<string, unknown>)?.quote_id as string | undefined
+      if (rejectedQuoteId) {
+        const { error: resetErr } = await supabase
+          .from('quotes')
+          .update({ status: 'draft' })
+          .eq('quote_id', rejectedQuoteId)
+          .eq('business_id', business.business_id)
+          .eq('status', 'pending_approval')
+        if (resetErr) {
+          console.error('[approvals/four_eyes_quote] kunde inte återställa offerten till utkast:', resetErr.message)
+        }
+      }
+    }
+
     // Reject-side-effect för specifika types som behöver mer än status-flip
     if (action === 'reject' && approval.approval_type === 'lead_review') {
       const leadId = (approval.payload as Record<string, unknown>)?.lead_id as string | undefined

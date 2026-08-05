@@ -80,6 +80,21 @@ export default function PortalQuoteSigningModal({
     return () => { cancelled = true }
   }, [quote.sign_token])
 
+  // Registrera att kunden öppnat offerten.
+  //
+  // Utskicket länkar kunden till PORTALEN, men portalen loggade tidigare
+  // ingenting — "öppnad" berodde helt på spårningspixeln i mejlet. Skickades
+  // offerten via SMS, eller blockerade kundens mejlklient bilder, blev en
+  // offert som lästs och signerats aldrig markerad som öppnad. Samma
+  // spårningsväg som den fristående kundvyn använder, så räkningen sker på
+  // exakt ett ställe.
+  useEffect(() => {
+    if (!quote.quote_id) return
+    const sessionId = `portal_${quote.quote_id}`
+    fetch(`/api/quotes/track?q=${encodeURIComponent(quote.quote_id)}&e=opened&s=${sessionId}`)
+      .catch(() => { /* spårning får aldrig störa signeringen */ })
+  }, [quote.quote_id])
+
   const optionRows = structuredItems.filter(i => i.item_type === 'option')
   const liveTotals =
     optionRows.length === 0

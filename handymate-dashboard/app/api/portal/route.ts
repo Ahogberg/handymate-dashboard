@@ -106,7 +106,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { token, action, quote_id } = await request.json()
+    const body = await request.json()
+    const { token, action, quote_id } = body
 
     if (!token) {
       return NextResponse.json({ error: 'Token krävs' }, { status: 400 })
@@ -126,15 +127,29 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'accept_quote' && quote_id) {
-      const { error } = await supabase
+      // .select() krävs för att veta om NÅGON rad faktiskt uppdaterades.
+      // Utan den svarade routen "success" även när offerten redan var
+      // accepterad eller avböjd — och alla nedströmshändelser (projekt, deal,
+      // bekräftelse) fyrades av en gång till på samma offert.
+      const { data: updatedRows, error } = await supabase
         .from('quotes')
         .update({ status: 'accepted', accepted_at: new Date().toISOString() })
         .eq('quote_id', quote_id)
         .eq('customer_id', customer.customer_id)
         .eq('business_id', customer.business_id)
         .in('status', [...OPEN_QUOTE_STATUSES])
+        .select('quote_id, quote_number, title, total')
 
       if (error) throw error
+
+      if (!updatedRows || updatedRows.length === 0) {
+        return NextResponse.json(
+          { error: 'Offerten går inte att acceptera — den är redan besvarad eller har gått ut.' },
+          { status: 409 },
+        )
+      }
+
+      const acceptedQuote = updatedRows[0]
 
       // Log activity
       await supabase.from('customer_activity').insert({
@@ -184,19 +199,82 @@ export async function POST(request: NextRequest) {
         await triggerAutopilot(customer.business_id, quote_id)
       } catch { /* non-blocking */ }
 
+      // Samma avslutskedja som kundens signering: bekräftelse, projekt och
+      // deal→vunnen. Låg tidigare bara i signeringsvägen, vilket gjorde
+      // portal-accept till en halv accept — vunnen offert utan jobb.
+      const { finalizeAcceptedQuote } = await import('@/lib/quotes/finalize-accepted')
+      await finalizeAcceptedQuote(supabase, {
+        businessId: customer.business_id,
+        quoteId: quote_id,
+        quoteNumber: (acceptedQuote as any)?.quote_number || null,
+        quoteTitle: (acceptedQuote as any)?.title || null,
+        customerId: customer.customer_id,
+        customerName: customer.name || null,
+        total: (acceptedQuote as any)?.total ?? null,
+        source: 'kundportal',
+      })
+
       return NextResponse.json({ success: true })
     }
 
     if (action === 'decline_quote' && quote_id) {
-      const { error } = await supabase
+      // declined_at OCH lost_reason sattes inte här tidigare. Följden: kundens
+      // avböjande syntes aldrig i offertens tidslinje (som villkorar på
+      // declined_at) och räknades aldrig i förlustanalysen. Skälet är
+      // frivilligt i portalen — men fältet ska finnas när det ges.
+      const declineReason = typeof body.reason === 'string' ? body.reason.trim() : ''
+
+      const { data: declinedRows, error } = await supabase
         .from('quotes')
-        .update({ status: 'declined' })
+        .update({ status: 'declined', declined_at: new Date().toISOString() })
         .eq('quote_id', quote_id)
         .eq('customer_id', customer.customer_id)
         .eq('business_id', customer.business_id)
         .in('status', [...OPEN_QUOTE_STATUSES])
+        .select('quote_id')
 
       if (error) throw error
+
+      if (!declinedRows || declinedRows.length === 0) {
+        return NextResponse.json(
+          { error: 'Offerten går inte att avböja — den är redan besvarad eller har gått ut.' },
+          { status: 409 },
+        )
+      }
+
+      // Separat, best-effort: lost_reason är en valfri kolumn (samma mönster
+      // som kundvyns avböjande) och får aldrig fälla själva avböjandet.
+      if (declineReason) {
+        const { error: reasonErr } = await supabase
+          .from('quotes')
+          .update({ lost_reason: declineReason })
+          .eq('quote_id', quote_id)
+          .eq('business_id', customer.business_id)
+        if (reasonErr) {
+          console.warn('[portal] lost_reason kunde inte sparas (icke-blockerande):', reasonErr.message)
+        }
+      }
+
+      await supabase.from('customer_activity').insert({
+        customer_id: customer.customer_id,
+        business_id: customer.business_id,
+        activity_type: 'quote_declined',
+        title: 'Offert avböjd via kundportal',
+        description: declineReason
+          ? `Kund avböjde offert ${quote_id}: ${declineReason}`
+          : `Kund avböjde offert ${quote_id}`,
+        created_by: 'portal',
+      })
+
+      try {
+        const { triggerEventCommunication } = await import('@/lib/smart-communication')
+        await triggerEventCommunication({
+          businessId: customer.business_id,
+          event: 'quote_declined',
+          customerId: customer.customer_id,
+          context: { quoteId: quote_id },
+        })
+      } catch { /* non-blocking */ }
 
       return NextResponse.json({ success: true })
     }

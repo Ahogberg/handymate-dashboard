@@ -46,7 +46,10 @@ export async function GET(
     // sidan noll rader. Exponeras som structured_items vid sidan av legacy items.
     const { data: structuredItems } = await supabase
       .from('quote_items')
-      .select('id, item_type, group_name, description, quantity, unit, unit_price, total, sort_order, is_rot_eligible, is_rut_eligible, rot_rut_type, option_selected, option_default, labor_amount, material_amount, estimated_hours, component_snapshot, show_components_to_customer')
+      // is_hidden MÅSTE med i select:en — annars kan varken filtreringen nedan
+      // eller data-buildern veta att raden är dold, och den skulle skickas ut
+      // till kunden i klartext trots att hantverkaren dolt den.
+      .select('id, item_type, group_name, description, quantity, unit, unit_price, total, sort_order, is_rot_eligible, is_rut_eligible, rot_rut_type, option_selected, option_default, labor_amount, material_amount, estimated_hours, component_snapshot, show_components_to_customer, is_hidden')
       .eq('quote_id', quote.quote_id)
       .order('sort_order', { ascending: true })
 
@@ -479,97 +482,22 @@ export async function POST(
       await triggerAutopilot(quote.business_id, quote.quote_id)
     } catch { /* non-blocking */ }
 
-    // Bekräftelsemail till kund (non-blocking)
-    try {
-      const { sendQuoteSignedConfirmation } = await import('@/lib/quote-confirmation-email')
-      await sendQuoteSignedConfirmation(quote.business_id, quote.quote_id)
-    } catch { /* non-blocking */ }
-
-    // Auto-skapa projekt från signerad offert (non-blocking).
-    // Om creation failar: skapa pending_approval så Christoffer SER problemet i UI
-    // istället för att det försvinner. Kund-signeringen får inte faila — men
-    // hantverkaren MÅSTE få veta att projekt-skapande misslyckades och kräver
-    // manuell uppföljning (kunden har redan fått bekräftelse via SMS).
-    try {
-      const { createProjectFromQuote } = await import('@/lib/projects/create-from-quote')
-      const result = await createProjectFromQuote(quote.business_id, quote.quote_id)
-      if (result.success) {
-        console.log(`[quote/public] Auto-created project ${result.project_id} from quote ${quote.quote_id}`)
-      } else {
-        // High-severity log så Vercel-loggar fångar det
-        console.error(
-          `[quote/public] CRITICAL: Auto-project creation failed for quote ${quote.quote_id}: ${result.error}`,
-        )
-        // Skapa pending_approval (egen try/catch så insert-fel inte bryter kund-signering)
-        try {
-          await supabase.from('pending_approvals').insert({
-            business_id: quote.business_id,
-            approval_type: 'manual_project_create',
-            title: `Skapa projekt manuellt — ${(quote as any).title || quote.quote_id}`,
-            description: `Offerten är signerad av kund (${(quote.customer as any)?.name || 'okänd'}) men automatisk projekt-skapande misslyckades: ${result.error || 'okänt fel'}. Kunden har fått bekräftelse — skapa projektet manuellt eller kontakta support.`,
-            payload: {
-              quote_id: quote.quote_id,
-              quote_number: (quote as any).quote_number || null,
-              quote_title: (quote as any).title || null,
-              customer_id: quote.customer_id,
-              customer_name: (quote.customer as any)?.name || null,
-              customer_phone: (quote.customer as any)?.phone_number || null,
-              total: finalTotal || null,
-              signed_at: new Date().toISOString(),
-              error: result.error || 'unknown',
-            },
-            status: 'pending',
-            risk_level: 'high',
-          })
-        } catch (approvalErr) {
-          console.error('[quote/public] Failed to create manual_project_create approval:', approvalErr)
-        }
-      }
-    } catch (projErr) {
-      // Thrown exception (separat från result.success === false)
-      console.error('[quote/public] Auto project creation exception (non-blocking):', projErr)
-      try {
-        await supabase.from('pending_approvals').insert({
-          business_id: quote.business_id,
-          approval_type: 'manual_project_create',
-          title: `Skapa projekt manuellt — ${(quote as any).title || quote.quote_id}`,
-          description: `Offerten är signerad av kund men automatisk projekt-skapande kastade ett undantag. Kunden har fått bekräftelse — skapa projektet manuellt eller kontakta support.`,
-          payload: {
-            quote_id: quote.quote_id,
-            quote_number: (quote as any).quote_number || null,
-            customer_id: quote.customer_id,
-            customer_name: (quote.customer as any)?.name || null,
-            signed_at: new Date().toISOString(),
-            error: projErr instanceof Error ? projErr.message : String(projErr),
-          },
-          status: 'pending',
-          risk_level: 'high',
-        })
-      } catch (approvalErr) {
-        console.error('[quote/public] Failed to create manual_project_create approval after exception:', approvalErr)
-      }
-    }
-
-    // Golden Path: flytta deal till "Vunnen"
-    try {
-      const { data: linkedDeal } = await supabase
-        .from('deal')
-        .select('id')
-        .eq('business_id', quote.business_id)
-        .eq('quote_id', quote.quote_id)
-        .maybeSingle()
-
-      if (linkedDeal) {
-        const { moveDeal } = await import('@/lib/pipeline')
-        await moveDeal({
-          dealId: linkedDeal.id,
-          businessId: quote.business_id,
-          toStageSlug: 'won',
-          triggeredBy: 'system',
-          aiReason: 'Offert signerad av kund — deal vunnen',
-        })
-      }
-    } catch { /* non-blocking */ }
+    // Bekräftelse, projekt och deal→vunnen ligger i lib/quotes/finalize-accepted.ts
+    // så att portalens "Acceptera"-knapp gör EXAKT samma sak. Tidigare låg
+    // kedjan bara här, och portalvägen gav en vunnen offert utan projekt.
+    // Allt är non-blocking — kunden har redan signerat.
+    const { finalizeAcceptedQuote } = await import('@/lib/quotes/finalize-accepted')
+    await finalizeAcceptedQuote(supabase, {
+      businessId: quote.business_id,
+      quoteId: quote.quote_id,
+      quoteNumber: (quote as any).quote_number || null,
+      quoteTitle: (quote as any).title || null,
+      customerId: quote.customer_id,
+      customerName: (quote.customer as any)?.name || null,
+      customerPhone: (quote.customer as any)?.phone_number || null,
+      total: finalTotal ?? null,
+      source: 'signering',
+    })
 
     return NextResponse.json({ success: true })
 
