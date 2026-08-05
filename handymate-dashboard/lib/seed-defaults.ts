@@ -1,7 +1,7 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { getDefaultStandardTexts } from '@/lib/quote-standard-text-defaults'
 import { getChecklistsForBranch } from '@/lib/checklist-defaults'
-import { getDefaultPriceList } from '@/lib/price-list-defaults'
+import { getDefaultPriceList, getDefaultProducts } from '@/lib/product-defaults'
 import { getDefaultQuoteTemplates, normalizeTemplateBranch } from '@/lib/quote-template-defaults'
 import { getDefaultAgreementTypes } from '@/lib/agreement-type-defaults'
 
@@ -26,6 +26,7 @@ export async function seedAllDefaults(
     seedPipelineStages(supabase, businessId),
     seedQuoteStandardTexts(supabase, businessId, branch),
     seedChecklistTemplates(supabase, businessId, branch),
+    seedProducts(supabase, businessId, branch),
     seedPriceList(supabase, businessId, branch),
     seedQuoteTemplates(supabase, businessId, branch),
     seedAgreementTypes(supabase, businessId, branch),
@@ -235,6 +236,55 @@ async function seedChecklistTemplates(supabase: SupabaseClient, businessId: stri
       is_default: true,
     }))
   )
+}
+
+/**
+ * Seedar produktbanken (`products`) — den tabell offert-editorn, produktbanks-
+ * UI:t och AI-offertgeneratorn faktiskt läser.
+ *
+ * Utan denna fick varje ny kund en TOM produktbank: AI:n satte unit_price 0 med
+ * "PRIS SAKNAS", och telefonagenten (som läser price_list) svarade med andra
+ * priser än offerten. Båda tabellerna genereras nu ur lib/product-defaults.ts.
+ *
+ * Idempotent — hoppar helt om businessen redan har produkter, så en kund som
+ * hunnit lägga upp eget sortiment aldrig får seed-rader ovanpå.
+ */
+async function seedProducts(supabase: SupabaseClient, businessId: string, branch: string) {
+  const { data: existing } = await supabase
+    .from('products')
+    .select('id')
+    .eq('business_id', businessId)
+    .limit(1)
+
+  if (existing && existing.length > 0) return
+
+  const products = getDefaultProducts(branch)
+  const { error } = await supabase.from('products').insert(
+    products.map((p, i) => ({
+      id: `prod_${businessId}_${i}`,
+      business_id: businessId,
+      name: p.name,
+      description: p.description || null,
+      sku: p.sku,
+      unit: p.unit,
+      category: p.category,
+      sales_price: p.unit_price,
+      // Inköpspris lämnas tomt — vi känner inte hantverkarens inköpsavtal, och
+      // 0 skulle se ut som 100 % marginal i efterkalkylen.
+      purchase_price: null,
+      default_labor_share: p.labor_share,
+      rot_eligible: p.deduction === 'rot',
+      rut_eligible: p.deduction === 'rut',
+      is_active: true,
+      // Löpande arbete är det hantverkaren når oftast — snabbvalsknapparna i
+      // offerten visar favoriter först.
+      is_favorite: p.category === 'arbete' && p.unit === 'tim',
+    }))
+  )
+  if (error) {
+    console.error('[seedProducts] insert misslyckades:', businessId, error.message)
+    throw error
+  }
 }
 
 async function seedPriceList(supabase: SupabaseClient, businessId: string, branch: string) {

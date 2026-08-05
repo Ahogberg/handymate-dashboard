@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { expandSynonyms, rankBySearchMatch } from '@/lib/products/search-ranking'
 
 /**
  * GET /api/products?search=&category=&category_id=&favorites=&include=components
@@ -26,41 +27,60 @@ export async function GET(request: NextRequest) {
     // så att aktiv-togglen kan slås PÅ igen. Offertsöket skickar aldrig flaggan.
     const includeInactive = request.nextUrl.searchParams.get('include_inactive') === 'true'
 
-    let query = supabase
-      .from('products')
-      .select('*')
-      .eq('business_id', business.business_id)
-      .order('is_favorite', { ascending: false })
-      .order('name')
+    // Tokeniserad sökning: "fasad mål" ska hitta "Fasadmålning". Tidigare
+    // matchades HELA söksträngen som en sammanhängande substräng, så all
+    // flerordssökning gav noll träffar om orden inte stod i exakt samma
+    // ordning. Tecken som PostgREST använder i sin filtersyntax strippas.
+    const cleanedSearch = (search || '').replace(/[,.()]/g, ' ').trim()
+    const tokens = cleanedSearch.split(/\s+/).filter(Boolean).slice(0, 6)
 
-    if (!includeInactive) {
-      query = query.eq('is_active', true)
-    }
+    const buildQuery = (useTokens: boolean) => {
+      let q = supabase
+        .from('products')
+        .select('*')
+        .eq('business_id', business!.business_id)
+        .order('is_favorite', { ascending: false })
+        .order('name')
 
-    if (search) {
-      // Namn ELLER artikelnr — samma pass-through-mönster som
-      // app/api/suppliers/products/route.ts. Kommatecken skulle bryta
-      // PostgREST:s or-syntax → strippas ur söktermen.
-      const q = search.replace(/,/g, ' ').trim()
-      if (q) {
-        query = query.or(`name.ilike.%${q}%,sku.ilike.%${q}%`)
+      if (!includeInactive) q = q.eq('is_active', true)
+
+      if (cleanedSearch) {
+        if (useTokens && tokens.length > 1) {
+          // Alla token måste finnas i namnet, ELLER så matchar artikelnumret.
+          const nameAnd = tokens.map(t => `name.ilike.%${t}%`).join(',')
+          q = q.or(`and(${nameAnd}),sku.ilike.%${cleanedSearch}%`)
+        } else if (useTokens && tokens.length === 1) {
+          // Ett ord → ta med synonymerna. "eluttag" hittar "Vägguttag".
+          const alternatives = expandSynonyms(tokens[0])
+          const nameOr = alternatives.map(t => `name.ilike.%${t}%`).join(',')
+          q = q.or(`${nameOr},sku.ilike.%${cleanedSearch}%`)
+        } else {
+          q = q.or(`name.ilike.%${cleanedSearch}%,sku.ilike.%${cleanedSearch}%`)
+        }
+        q = q.limit(50)
       }
-    }
-    if (category) {
-      query = query.eq('category', category)
-    }
-    if (categoryId) {
-      query = query.eq('category_id', categoryId)
-    }
-    if (favorites === 'true') {
-      query = query.eq('is_favorite', true)
+
+      if (category) q = q.eq('category', category)
+      if (categoryId) q = q.eq('category_id', categoryId)
+      if (favorites === 'true') q = q.eq('is_favorite', true)
+
+      return q
     }
 
-    const { data, error } = await query
+    let { data, error } = await buildQuery(true)
+
+    // Skyddsnät: den nästlade and()-syntaxen är PostgREST-standard men beror på
+    // klientversionen. Faller den bort görs om sökningen på hela strängen —
+    // sämre träffbild, men aldrig ett trasigt sökfält för hantverkaren.
+    if (error && tokens.length > 0) {
+      console.warn('[products] tokeniserad sökning misslyckades, faller tillbaka:', error.message)
+      ;({ data, error } = await buildQuery(false))
+    }
 
     if (error) throw error
 
-    let products = data || []
+    // Bäst träff överst — databasen kan bara sortera på favorit/namn.
+    let products = cleanedSearch ? rankBySearchMatch(data || [], cleanedSearch) : (data || [])
 
     // include=components → hämta komponenterna för träffarna och bifoga
     if (include === 'components' && products.length > 0) {
