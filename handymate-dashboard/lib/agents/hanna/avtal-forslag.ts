@@ -47,6 +47,7 @@ import { getClaudeModel } from '@/lib/ai/get-model'
 import { normalizeSwedishPhone } from '@/lib/phone-normalize'
 import { extractFirstName } from '@/lib/agents/daniel/unopened-quotes'
 import { priceInclVatPerVisit, type PriceItemLike } from '@/lib/agreements/pricing'
+import { canContactCustomer } from '@/lib/outbound/frequency-guard'
 
 // ─────────────────────────────────────────────────────────────────
 // Konstanter
@@ -553,10 +554,22 @@ export interface InsertAvtalForslagApprovalParams {
  * review-requests/capacity-fill). Delad mellan cron och svep — payloaden
  * är identisk oavsett vilken väg som skapade kortet (bara project_id/
  * quote_id skiljer beroende på källa).
+ *
+ * VP1 (gap 9, tasks/vilande-pengar-masterplan.md): gemensamt frekvenstak
+ * kollas HÄR — den enda insert-platsen, delad av BÅDE cronen och svepet —
+ * ovanpå denna filens egna dedup-spärrar (getDedupExcludedCustomerIds).
+ * Hindrar att kunden också fick ett kort från hanna-outbound/capacity-fill
+ * samma vecka. skipped: 'frequency_guard' signalerar till anroparen att
+ * detta INTE är ett DB-fel (result.errors ska inte räknas upp).
  */
 export async function insertAvtalForslagApproval(
   params: InsertAvtalForslagApprovalParams,
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; skipped?: 'frequency_guard' }> {
+  const freq = await canContactCustomer(params.supabase, params.businessId, params.customer.customer_id, params.now)
+  if (!freq.allowed) {
+    return { error: null, skipped: 'frequency_guard' }
+  }
+
   const expiresAt = new Date(params.now.getTime() + APPROVAL_EXPIRES_DAYS * 86400000)
   const customerLabel = params.customer.name || 'kunden'
   const toPhone = normalizeSwedishPhone(params.customer.phone_number)
@@ -607,6 +620,9 @@ export interface AvtalForslagResult {
     no_phone: number
     already_pending: number
     no_match: number
+    /** VP1 gap 9 — blockerad av det delade frekvenstaket (lib/outbound/frequency-guard.ts),
+        dvs kunden fick redan ett kort från EN ANNAN producent nyligen. */
+    frequency_guard: number
   }
   errors: number
 }
@@ -628,6 +644,7 @@ function emptyResult(businessId: string): AvtalForslagResult {
       no_phone: 0,
       already_pending: 0,
       no_match: 0,
+      frequency_guard: 0,
     },
     errors: 0,
   }
@@ -796,7 +813,7 @@ export async function runAvtalForslagForBusiness(
 
         const { matchedTypeIds, smsText, primaryType } = outcome.matched
 
-        const { error: insertErr } = await insertAvtalForslagApproval({
+        const { error: insertErr, skipped: insertSkipped } = await insertAvtalForslagApproval({
           supabase,
           businessId,
           customer: { customer_id: customerRow.customer_id, name: customerRow.name, phone_number: customerRow.phone_number },
@@ -807,6 +824,11 @@ export async function runAvtalForslagForBusiness(
           sourceRefs: { project_id: project.project_id },
           now,
         })
+
+        if (insertSkipped === 'frequency_guard') {
+          result.skipped.frequency_guard++
+          continue
+        }
 
         if (insertErr) {
           console.error('[avtal-forslag] approval insert error:', {

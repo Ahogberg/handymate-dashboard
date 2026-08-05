@@ -50,6 +50,7 @@ import { daysSinceSent, extractFirstName } from '@/lib/agents/daniel/unopened-qu
 import { fetchPersonDays } from '@/lib/schedule/person-day'
 import { computePersonWeekUtilization } from '@/lib/schedule/utilization'
 import { computeFreeCapacity } from '@/lib/capacity/free-capacity'
+import { canContactCustomer } from '@/lib/outbound/frequency-guard'
 
 // ─────────────────────────────────────────────────────────────────
 // Konstanter
@@ -578,6 +579,13 @@ export async function runCapacityFill(
   // ── 4. Skapa ETT pending_approval per kandidat ───────────────────
   let approvalsCreated = 0
   for (const c of candidates) {
+    // VP1 (gap 9, tasks/vilande-pengar-masterplan.md): gemensamt frekvenstak
+    // ovanpå denna funktions egna DEDUP_WINDOW_DAYS-spärr — hindrar att
+    // kunden också fick ett kort från hanna-outbound/avtal-forslag/
+    // kundbas-svep samma vecka.
+    const freq = await canContactCustomer(supabase, businessId, c.customer_id)
+    if (!freq.allowed) continue
+
     const serviceHint = c.source === 'unsold_quote' ? c.title : c.job_type
     const message = buildCapacityFillMessage({
       customerFirstName: c.customer_name,

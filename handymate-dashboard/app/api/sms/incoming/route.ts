@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { triggerAgentFireAndForget, makeIdempotencyKey } from '@/lib/agent-trigger'
 import { createHash } from 'crypto'
 import { verifyElksSignature } from '@/lib/elks-signature'
+import { sendSmsViaElks, findCustomerByPhone, parseOptOutCommand } from '@/lib/sms-send'
 
 /**
  * Incoming SMS webhook from 46elks.
@@ -91,6 +92,62 @@ export async function POST(request: NextRequest) {
 
     if (!business) {
       return NextResponse.json({ success: true, handled: false })
+    }
+
+    // ── Opt-out/spärrlista (VP1, gap 7 — tasks/vilande-pengar-masterplan.md) ──
+    // STOPP/STOP/SLUTA flaggar kunden så inga fler agent-SMS går ut
+    // (sendSmsViaElks kollar flaggan vid varje utskick). START/STARTA häver
+    // den. Rör INTE övrig inbound-logik — kommandot hanteras helt separat
+    // och triggar aldrig AI-agenten eller loggas i sms_conversation (det är
+    // ett systemkommando, inte en konversation att svara AI-mässigt på).
+    const optOutCommand = parseOptOutCommand(message)
+    const isStopCommand = optOutCommand === 'stop'
+    const isStartCommand = optOutCommand === 'start'
+
+    if (isStopCommand || isStartCommand) {
+      try {
+        const matchedCustomer = await findCustomerByPhone(supabase, business.business_id, from)
+        if (matchedCustomer) {
+          const confirmMessage = isStopCommand
+            ? 'Du får inga fler SMS från oss. Svara START för att ändra dig.'
+            : 'Du får SMS från oss igen. Tack!'
+
+          // Skicka bekräftelsen FÖRE opt-out-flaggan sätts — annars
+          // blockerar sendSmsViaElks:s egen opt-out-koll bekräftelsen
+          // själv i STOPP-fallet (kunden hinner sättas som avböjd innan
+          // "du får inga fler SMS"-svaret går ut).
+          const { data: bizCfg } = await supabase
+            .from('business_config')
+            .select('business_name')
+            .eq('business_id', business.business_id)
+            .maybeSingle()
+
+          await sendSmsViaElks({
+            supabase,
+            businessId: business.business_id,
+            businessName: bizCfg?.business_name || business.business_name,
+            to: from,
+            message: confirmMessage,
+            customerId: matchedCustomer.customer_id,
+            messageType: isStopCommand ? 'opt_out_confirm' : 'opt_in_confirm',
+          })
+
+          await supabase
+            .from('customer')
+            .update({
+              sms_opt_out: isStopCommand,
+              sms_opt_out_at: isStopCommand ? new Date().toISOString() : null,
+              sms_opt_out_source: isStopCommand ? 'sms_stop' : null,
+            })
+            .eq('customer_id', matchedCustomer.customer_id)
+            .eq('business_id', business.business_id)
+        }
+      } catch (err) {
+        // Tål att sql/v86 inte körts (kolumn saknas) eller andra DB-fel —
+        // loggar men svarar ändå 200 så 46elks inte retryar i onödan.
+        console.error('[SMS Incoming] STOPP/START-hantering misslyckades (icke-blockerande):', err)
+      }
+      return new NextResponse('OK')
     }
 
     // Store inbound message in sms_conversation

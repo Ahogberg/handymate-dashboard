@@ -216,6 +216,10 @@ export interface KundbasSweepResult {
   skipped_recent: number
   skipped_no_phone: number
   skipped_no_match: number
+  /** VP1 gap 9 (tasks/vilande-pengar-masterplan.md) — blockerad av det
+      delade frekvenstaket (lib/outbound/frequency-guard.ts), dvs kunden
+      fick redan ett kort från EN ANNAN producent nyligen. */
+  skipped_frequency_guard: number
   ai_calls: number
   ai_fallback_used: number
   cost_usd: number
@@ -241,6 +245,7 @@ function emptyResult(businessId: string): KundbasSweepResult {
     skipped_recent: 0,
     skipped_no_phone: 0,
     skipped_no_match: 0,
+    skipped_frequency_guard: 0,
     ai_calls: 0,
     ai_fallback_used: 0,
     cost_usd: 0,
@@ -356,7 +361,7 @@ export async function runKundbasSweepForBusiness(
 
         const { matchedTypeIds, smsText, primaryType } = outcome.matched
 
-        const { error: insertErr } = await insertAvtalForslagApproval({
+        const { error: insertErr, skipped: insertSkipped } = await insertAvtalForslagApproval({
           supabase,
           businessId,
           customer: { customer_id: customerRow.customer_id, name: customerRow.name, phone_number: customerRow.phone_number },
@@ -367,6 +372,11 @@ export async function runKundbasSweepForBusiness(
           sourceRefs: { project_id: candidate.project_id, quote_id: candidate.quote_id },
           now,
         })
+
+        if (insertSkipped === 'frequency_guard') {
+          result.skipped_frequency_guard++
+          continue
+        }
 
         if (insertErr) {
           console.error('[kundbas-svep] approval insert error:', {
@@ -423,6 +433,7 @@ export function summarizeSweepResult(result: KundbasSweepResult): string {
   if (result.skipped_recent > 0) reasons.push(`${result.skipped_recent} kontaktades nyligen`)
   if (result.skipped_no_phone > 0) reasons.push(`${result.skipped_no_phone} saknar telefonnummer`)
   if (result.skipped_no_match > 0) reasons.push(`${result.skipped_no_match} matchade ingen tjänst i katalogen`)
+  if (result.skipped_frequency_guard > 0) reasons.push(`${result.skipped_frequency_guard} fick redan ett annat förslag nyligen`)
 
   if (reasons.length === 0) {
     return 'Inga nya förslag just nu.'

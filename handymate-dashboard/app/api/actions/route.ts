@@ -209,13 +209,44 @@ export async function POST(request: NextRequest) {
         if (price_list_id !== undefined) updateData.price_list_id = price_list_id || null
         if (data.default_payment_days !== undefined) updateData.default_payment_days = data.default_payment_days ? parseInt(data.default_payment_days) : 30
         if (data.invoice_email !== undefined) updateData.invoice_email = data.invoice_email
+        // VP1 (gap 7, tasks/vilande-pengar-masterplan.md): manuell opt-out-
+        // toggle från kundkortet. editForm skickar alltid med sms_opt_out
+        // (defaultar till false i startEditing) — det innebär att fältet
+        // finns med på VARJE kundredigering, inte bara när hantverkaren
+        // faktiskt togglar den. sql/v86_customer_optout.sql lägger
+        // kolumnerna, men körs manuellt av Andreas — om deploy hinner före
+        // migrationen får INTE hela kundsparandet krascha, se fail-soft-
+        // retryn nedan.
+        if (data.sms_opt_out !== undefined) {
+          const optOut = !!data.sms_opt_out
+          updateData.sms_opt_out = optOut
+          updateData.sms_opt_out_at = optOut ? new Date().toISOString() : null
+          updateData.sms_opt_out_source = optOut ? 'manual' : null
+        }
 
         const { error } = await supabase
           .from('customer')
           .update(updateData)
           .eq('customer_id', customerId)
 
-        if (error) throw error
+        if (error) {
+          const missingOptOutColumn =
+            'sms_opt_out' in updateData && /column .*sms_opt_out.* does not exist/i.test(error.message || '')
+          if (missingOptOutColumn) {
+            console.warn(
+              '[actions/update_customer] sms_opt_out-kolumner saknas (sql/v86 ej körd) — sparar övriga fält utan dem:',
+              error.message,
+            )
+            const { sms_opt_out, sms_opt_out_at, sms_opt_out_source, ...rest } = updateData
+            const { error: retryError } = await supabase
+              .from('customer')
+              .update(rest)
+              .eq('customer_id', customerId)
+            if (retryError) throw retryError
+            return NextResponse.json({ success: true, sms_opt_out_saved: false })
+          }
+          throw error
+        }
         return NextResponse.json({ success: true })
       }
 

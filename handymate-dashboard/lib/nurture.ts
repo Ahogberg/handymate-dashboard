@@ -6,6 +6,9 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { resolveSenderId } from '@/lib/sms/sender-id'
+import { sendSmsViaElks } from '@/lib/sms-send'
+import { getBusinessPlanFromConfig } from '@/lib/auth'
+import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -701,54 +704,66 @@ async function sendNurtureSMS(params: {
 }): Promise<{ success: boolean; error?: string }> {
   if (!params.to) return { success: false, error: 'Inget telefonnummer' }
 
-  const ELKS_API_USER = process.env.ELKS_API_USER
-  const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
-  if (!ELKS_API_USER || !ELKS_API_PASSWORD) {
-    return { success: false, error: '46elks inte konfigurerat' }
+  const supabase = getServerSupabase()
+
+  // VP1 (gap 8, tasks/vilande-pengar-masterplan.md): nurture-utskick gick
+  // tidigare via en egen inline-46elks-fetch, helt förbi SMS-kvoten/
+  // hardCap. Kollar kvoten FÖRE sändning — samma kontroll som /api/sms/send
+  // och den delade sendSms-helpern i app/api/approvals/[id]/route.ts.
+  const { data: bizConfig } = await supabase
+    .from('business_config')
+    .select('subscription_plan')
+    .eq('business_id', params.businessId)
+    .maybeSingle()
+  const plan = getBusinessPlanFromConfig(bizConfig || {})
+
+  const quota = await checkSmsAllowance(params.businessId, plan)
+  if (!quota.allowed) {
+    return { success: false, error: quota.error || 'SMS-kvoten för månaden är nådd' }
   }
 
   // Avsändar-ID = hantverkarens företagsnamn (ej hårdkodat 'Handymate' — det
   // såg ut som spam och bröt white-label).
-  const fromName = await resolveSenderId(getServerSupabase(), { businessId: params.businessId })
+  const fromName = await resolveSenderId(supabase, { businessId: params.businessId })
+
+  // sendSmsViaElks ersätter den tidigare egna inline-46elks-fetchen — ger
+  // opt-out-kollen (VP1 gap 7) och sms_log-loggning gratis, ingen
+  // beteendeändring i själva SMS-innehållet/avsändaren.
+  const result = await sendSmsViaElks({
+    supabase,
+    businessId: params.businessId,
+    businessName: fromName,
+    to: params.to,
+    message: params.message,
+    customerId: params.customerId,
+    messageType: 'nurture_sequence',
+  })
+
+  if (!result.success) {
+    return { success: false, error: result.error || 'SMS failed' }
+  }
 
   try {
-    const response = await fetch('https://api.46elks.com/a1/sms', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        from: fromName,
-        to: params.to,
-        message: params.message,
-      }).toString(),
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      return { success: false, error: `SMS failed: ${errorText}` }
-    }
-
-    // Log to communication_log
-    try {
-      const supabase = getServerSupabase()
-      await supabase.from('communication_log').insert({
-        business_id: params.businessId,
-        customer_id: params.customerId,
-        channel: 'sms',
-        direction: 'outbound',
-        subject: 'Nurture SMS',
-        message: params.message,
-        status: 'sent',
-        metadata: { source: 'nurture_sequence' },
-      })
-    } catch { /* non-blocking */ }
-
-    return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message }
+    await trackSmsSent(params.businessId, plan)
+  } catch (trackErr) {
+    console.error('[nurture] trackSmsSent misslyckades (icke-blockerande):', trackErr)
   }
+
+  // Log to communication_log
+  try {
+    await supabase.from('communication_log').insert({
+      business_id: params.businessId,
+      customer_id: params.customerId,
+      channel: 'sms',
+      direction: 'outbound',
+      subject: 'Nurture SMS',
+      message: params.message,
+      status: 'sent',
+      metadata: { source: 'nurture_sequence' },
+    })
+  } catch { /* non-blocking */ }
+
+  return { success: true }
 }
 
 async function sendNurtureEmail(params: {

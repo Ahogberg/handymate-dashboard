@@ -31,7 +31,7 @@ definitioner; 7 ingen opt-out/spärrlista för kunder; 8 agent-SMS går
 förbi kvot/hardCap; 9 fyra kort-producenter utan gemensamt frekvenstak
 per kund; 10 hanna-outbound saknar agents_globally_paused-kontrollen.
 
-## VP1 — Säkerhetsfundamentet (före all skalning) — EJ PÅBÖRJAD
+## VP1 — Säkerhetsfundamentet (före all skalning) — KLAR 2026-08-05 (v86 körd)
 
 - **Opt-out/spärrlista** (gap 7): kolumn på customer (sql/v86, Andreas
   kör; koden tål okörd migration) + kontroll i sendSmsViaElks-vägen för

@@ -8,6 +8,8 @@ import { classifyExecutionResult } from '@/lib/approvals/execution-outcome'
 import { canActOnApproval } from '@/lib/approvals/routing'
 import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
 import { resolveTimeEntryBusinessUserId } from '@/lib/egenkontroll/suggest-time-entry'
+import { getBusinessPlanFromConfig } from '@/lib/auth'
+import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -507,10 +509,38 @@ async function executeApprovalPayload(
     return businessNameCache
   }
 
+  // VP1 (gap 8, tasks/vilande-pengar-masterplan.md): agentvägens SMS gick
+  // tidigare helt förbi SMS-kvoten/hardCap som /api/sms/send redan
+  // kontrollerar. Planen (subscription_plan) hämtas lazy + cachas EN gång
+  // per execution, samma mönster som businessNameCache ovan.
+  let businessPlanCache: ReturnType<typeof getBusinessPlanFromConfig> | undefined = undefined
+  async function getBusinessPlan() {
+    if (businessPlanCache === undefined) {
+      const supabase = await getSupabase()
+      const { data } = await supabase
+        .from('business_config')
+        .select('subscription_plan')
+        .eq('business_id', businessId)
+        .maybeSingle()
+      businessPlanCache = getBusinessPlanFromConfig(data || {})
+    }
+    return businessPlanCache
+  }
+
   /**
    * Skicka SMS via sendSmsViaElks. Använder cachad supabase + business_name.
    * Returnerar standardiserad shape som varje case spreader in i sin
    * return-value: { sms_sent, sms_id?, elks_id?, error?, sms_status? }.
+   *
+   * VP1 (gap 8): kollar SMS-kvoten/hardCap FÖRE sändning — vid tak blockas
+   * med ett ärligt fel ("SMS-kvoten för månaden är nådd") istället för att
+   * skicka förbi kvoten. Detta är EN delad plats (alla approval-execution-
+   * cases som skickar SMS går via denna helper — send_sms/quote_nudge/
+   * proactive_care/warranty_followup/review_request/booking-förslag/
+   * customer_reactivation/autopilot_package customer_sms/default-fallback)
+   * så kvoten omfattar dem alla utan att varje case behöver egen kod.
+   * trackSmsSent räknas upp EFTER lyckad sändning, icke-blockerande om
+   * uppräkningen själv skulle faila.
    */
   async function sendSms(opts: {
     to: string
@@ -527,6 +557,13 @@ async function executeApprovalPayload(
   }> {
     const supabase = await getSupabase()
     const businessName = await getBusinessName()
+    const plan = await getBusinessPlan()
+
+    const quota = await checkSmsAllowance(businessId, plan)
+    if (!quota.allowed) {
+      return { sms_sent: false, error: quota.error || 'SMS-kvoten för månaden är nådd' }
+    }
+
     const result = await sendSmsViaElks({
       supabase,
       businessId,
@@ -537,6 +574,15 @@ async function executeApprovalPayload(
       relatedId: opts.relatedId,
       messageType: opts.messageType,
     })
+
+    if (result.success) {
+      try {
+        await trackSmsSent(businessId, plan)
+      } catch (trackErr) {
+        console.error('[approvals] trackSmsSent misslyckades (icke-blockerande):', trackErr)
+      }
+    }
+
     return {
       sms_sent: result.success,
       sms_id: result.smsId,
@@ -690,13 +736,13 @@ async function executeApprovalPayload(
 
       case 'review_request': {
         // A4 — auto-recensionsbegäran efter projekt-completion.
-        // SMS direkt via 46elks (sendSmsViaElks) — inte internal fetch
+        // Går via den delade sendSms-helpern (Audit-3 Fix A-mönstret,
+        // samma som send_sms/proactive_care nedan) — inte internal fetch
         // mot /api/sms/send (TD-lärdom: relativ URL fungerar inte server-
         // side i Next-routes, plus rate-limit/billing/auth-check är inte
-        // relevant för system-triggade SMS).
-        const { sendSmsViaElks } = await import('@/lib/sms-send')
-        const supabase = (await import('@/lib/supabase')).getServerSupabase()
-
+        // relevant för system-triggade SMS). VP1 (gap 8): helpern kollar
+        // nu SMS-kvoten/hardCap — tidigare gick denna case direkt via
+        // sendSmsViaElks och förbi kvoten helt.
         const phone = payload.to as string | undefined
         const message = payload.message as string | undefined
         const customerId = (payload.customer_id as string | undefined) || null
@@ -706,18 +752,7 @@ async function executeApprovalPayload(
           return { action: 'review_request', error: 'payload saknar to eller message' }
         }
 
-        // Hämta business_name för SMS-sender (max 11 tecken på 46elks-from).
-        // Best-effort — sendSmsViaElks default:ar till 'Handymate' om saknas.
-        const { data: bizCfg } = await supabase
-          .from('business_config')
-          .select('business_name')
-          .eq('business_id', businessId)
-          .maybeSingle()
-
-        const smsResult = await sendSmsViaElks({
-          supabase,
-          businessId,
-          businessName: bizCfg?.business_name || null,
+        const r = await sendSms({
           to: phone,
           message,
           customerId,
@@ -725,12 +760,12 @@ async function executeApprovalPayload(
           messageType: 'review_request',
         })
 
-        if (!smsResult.success) {
+        if (!r.sms_sent) {
           return {
             action: 'review_request',
             sms_sent: false,
-            error: smsResult.error || 'SMS kunde inte skickas',
-            sms_status: smsResult.status,
+            error: r.error || 'SMS kunde inte skickas',
+            sms_status: r.sms_status,
           }
         }
 
@@ -738,6 +773,7 @@ async function executeApprovalPayload(
         // Non-blocking om UPDATE failar — SMS är redan ute, customer.flag
         // är spam-skydd. Logga warning men håll success-state.
         if (customerId) {
+          const supabase = await getSupabase()
           const { error: updateErr } = await supabase
             .from('customer')
             .update({ review_request_sent_at: new Date().toISOString() })
@@ -752,8 +788,8 @@ async function executeApprovalPayload(
         return {
           action: 'review_request',
           sms_sent: true,
-          sms_id: smsResult.smsId,
-          elks_id: smsResult.elksId,
+          sms_id: r.sms_id,
+          elks_id: r.elks_id,
         }
       }
 

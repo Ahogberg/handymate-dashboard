@@ -476,6 +476,7 @@ test.describe('summarizeSweepResult — svensk klarspråks-sammanfattning', () =
       skipped_recent: 0,
       skipped_no_phone: 0,
       skipped_no_match: 0,
+      skipped_frequency_guard: 0,
       ai_calls: 0,
       ai_fallback_used: 0,
       cost_usd: 0,

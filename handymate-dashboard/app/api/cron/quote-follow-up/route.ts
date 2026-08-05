@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { triggerAgentInternal, makeIdempotencyKey } from '@/lib/agent-trigger'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
-import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { isAutonomous } from '@/lib/autonomy/earned-autonomy'
+import { sendSmsViaElks } from '@/lib/sms-send'
+import { getBusinessPlanFromConfig } from '@/lib/auth'
+import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
 
 /**
  * GET /api/cron/quote-follow-up - Automatisk uppföljning av offerter via AI agent.
@@ -127,10 +129,11 @@ export async function GET(request: NextRequest) {
         // V3-dedup: motorn äger detta företags offertuppföljning → cron rör inte.
         if (nudgeV3Handles.has(q.business_id)) continue
 
-        // Hämta företagsnamn + svarsnummer
+        // Hämta företagsnamn + svarsnummer + plan (plan behövs för
+        // SMS-kvot-kollen på den autonoma sändvägen längre ner, VP1 gap 8).
         const { data: biz } = await supabase
           .from('business_config')
-          .select('business_name, display_name, assigned_phone_number')
+          .select('business_name, display_name, assigned_phone_number, subscription_plan')
           .eq('business_id', q.business_id)
           .single()
 
@@ -184,38 +187,43 @@ export async function GET(request: NextRequest) {
         }
 
         // Autonom → skicka SMS direkt (inte via agent — detta är tidskänsligt)
-        if (process.env.ELKS_API_USER) {
-          try {
-            const smsRes = await fetch('https://api.46elks.com/a1/sms', {
-              method: 'POST',
-              headers: {
-                'Authorization': 'Basic ' + Buffer.from(`${process.env.ELKS_API_USER}:${process.env.ELKS_API_PASSWORD}`).toString('base64'),
-                'Content-Type': 'application/x-www-form-urlencoded',
-              },
-              body: new URLSearchParams({
-                from: sanitizeSenderId(businessName),
-                to: customer.phone_number,
-                message,
-              }).toString(),
+        //
+        // VP1/VP2-förberedelse (gap 8, tasks/vilande-pengar-masterplan.md):
+        // bytt HELA den tidigare inline-46elks-fetchen mot sendSmsViaElks —
+        // samma meddelande/logg som förut (message_type 'quote_expiry_nudge',
+        // related_id=quote_id) men nu med opt-out-kollen (gap 7) och
+        // SMS-kvoten/hardCap (gap 8) som denna sändväg tidigare gick förbi
+        // helt. Kvoten kollas explicit FÖRST så ett kvot-fullt läge loggas
+        // tydligt istället för att bara tyst hoppas över.
+        try {
+          const plan = getBusinessPlanFromConfig(biz || {})
+          const quota = await checkSmsAllowance(q.business_id, plan)
+          if (!quota.allowed) {
+            console.warn('[quote-follow-up] expiry-nudge skippad — SMS-kvoten nådd:', q.business_id, q.quote_id, quota.error)
+          } else {
+            const smsResult = await sendSmsViaElks({
+              supabase,
+              businessId: q.business_id,
+              businessName,
+              to: customer.phone_number,
+              message,
+              customerId: q.customer_id,
+              relatedId: q.quote_id,
+              messageType: 'quote_expiry_nudge',
             })
-
-            if (smsRes.ok) {
+            if (smsResult.success) {
               expiryNudgesSent++
-              await supabase.from('sms_log').insert({
-                sms_id: 'sms_' + Math.random().toString(36).slice(2, 12),
-                business_id: q.business_id,
-                customer_id: q.customer_id,
-                direction: 'outbound',
-                phone_to: customer.phone_number,
-                message_type: 'quote_expiry_nudge',
-                related_id: q.quote_id,
-                status: 'sent',
-                sent_at: new Date().toISOString(),
-              })
+              try {
+                await trackSmsSent(q.business_id, plan)
+              } catch (trackErr) {
+                console.error('[quote-follow-up] trackSmsSent misslyckades (icke-blockerande):', trackErr)
+              }
+            } else {
+              console.error('[quote-follow-up] expiry-nudge SMS send failed (non-blocking):', q.business_id, q.quote_id, smsResult.error)
             }
-          } catch (err) {
-            console.error('[quote-follow-up] expiry-nudge SMS send failed (non-blocking):', q.business_id, q.quote_id, err)
           }
+        } catch (err) {
+          console.error('[quote-follow-up] expiry-nudge SMS send failed (non-blocking):', q.business_id, q.quote_id, err)
         }
       }
     } catch (nudgeErr) {

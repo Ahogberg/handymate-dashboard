@@ -23,6 +23,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { canContactCustomer } from '@/lib/outbound/frequency-guard'
 
 const INACTIVE_MONTHS = 6
 const DRIP_PER_DAY = 5
@@ -111,11 +112,21 @@ export async function runHannaOutbound(
   }
 
   const fresh = candidates.filter(c => !contacted.has(String(c.customer_id)))
-  const skipped_recent = candidates.length - fresh.length
+  let skipped_recent = candidates.length - fresh.length
   const batch = fresh.slice(0, DRIP_PER_DAY)
 
   let proposed = 0
   for (const c of batch) {
+    // VP1 (gap 9, tasks/vilande-pengar-masterplan.md): gemensamt frekvenstak
+    // ovanpå denna funktions egna DEDUP_DAYS-spärr — hindrar att kunden
+    // också fick ett kort från capacity-fill/avtal-forslag/kundbas-svep
+    // samma vecka. Räknas mot samma skipped_recent-siffra i svaret.
+    const freq = await canContactCustomer(supabase, businessId, c.customer_id)
+    if (!freq.allowed) {
+      skipped_recent++
+      continue
+    }
+
     // Skräddarsy efter senaste tjänsten om vi har den.
     let service: string | null = null
     try {

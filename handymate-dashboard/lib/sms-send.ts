@@ -32,6 +32,101 @@ export interface SendSmsResult {
   error?: string
 }
 
+export type OptOutCommand = 'stop' | 'start' | null
+
+/**
+ * Ren tolkning av inkommande SMS-kommandon för opt-out/opt-in (VP1, gap 7 —
+ * tasks/vilande-pengar-masterplan.md). Trimmad, case-insensitiv, exakt
+ * matchning — "stoppa lite" eller "stopp tack" ska INTE tolkas som
+ * kommandot (kunden kanske faktiskt skriver en mening). Facit-testad i
+ * tests/frequency-guard.spec.ts.
+ */
+export function parseOptOutCommand(message: string): OptOutCommand {
+  const normalized = (message || '').trim().toUpperCase()
+  if (normalized === 'STOPP' || normalized === 'STOP' || normalized === 'SLUTA') return 'stop'
+  if (normalized === 'START' || normalized === 'STARTA') return 'start'
+  return null
+}
+
+/**
+ * Slår upp en kund via telefonnummer när customer_id inte är känt av
+ * callern. Kunddata lagras i blandade format (E.164 eller lokalt
+ * 0-prefix) — provar båda vanligaste formerna istället för en full
+ * tabellscan. Delad mellan opt-out-kollen nedan och STOPP/START-
+ * hanteringen i app/api/sms/incoming/route.ts.
+ *
+ * Fail-soft: ett DB-fel på en kandidat (t.ex. kolumn saknas om sql/v86
+ * inte körts) hoppar tyst vidare till nästa kandidat/null — kraschar
+ * aldrig anroparen.
+ */
+export async function findCustomerByPhone(
+  supabase: SupabaseClient,
+  businessId: string,
+  phoneE164: string,
+): Promise<{ customer_id: string; sms_opt_out?: boolean } | null> {
+  const local = phoneE164.startsWith('+46') ? '0' + phoneE164.slice(3) : null
+  const candidates = [phoneE164, ...(local ? [local] : [])]
+
+  for (const candidate of candidates) {
+    try {
+      const { data, error } = await supabase
+        .from('customer')
+        .select('customer_id, sms_opt_out')
+        .eq('business_id', businessId)
+        .eq('phone_number', candidate)
+        .maybeSingle()
+      if (error) {
+        console.warn('[findCustomerByPhone] uppslag misslyckades (icke-blockerande):', error.message)
+        continue
+      }
+      if (data) return data
+    } catch (err: any) {
+      console.warn('[findCustomerByPhone] uppslag kastade (icke-blockerande):', err?.message || err)
+    }
+  }
+  return null
+}
+
+/**
+ * Opt-out-spärr (VP1, gap 7 — tasks/vilande-pengar-masterplan.md): en kund
+ * som svarat STOPP/STOP/SLUTA eller manuellt markerats som avböjd på
+ * kundkortet ska ALDRIG få ett agent-SMS, oavsett vilken väg som utlöste
+ * sändningen — sendSmsViaElks är den gemensamma nämnaren för alla
+ * system-/agent-triggade utskick, så kollen sitter här en gång.
+ *
+ * Fail-open (tillåter sändning) på ALLA fel, inklusive "kolumn saknas" om
+ * sql/v86_customer_optout.sql inte körts än — en opt-out-koll får aldrig
+ * krascha eller tyst blockera ett SMS-utskick pga migrations-status.
+ */
+async function isCustomerOptedOut(
+  supabase: SupabaseClient,
+  businessId: string,
+  customerId: string | null | undefined,
+  phoneE164: string,
+): Promise<boolean> {
+  try {
+    if (customerId) {
+      const { data, error } = await supabase
+        .from('customer')
+        .select('sms_opt_out')
+        .eq('customer_id', customerId)
+        .eq('business_id', businessId)
+        .maybeSingle()
+      if (error) {
+        console.warn('[sendSmsViaElks] opt-out-uppslag (customer_id) misslyckades, tillåter sändning:', error.message)
+        return false
+      }
+      return data?.sms_opt_out === true
+    }
+
+    const match = await findCustomerByPhone(supabase, businessId, phoneE164)
+    return match?.sms_opt_out === true
+  } catch (err: any) {
+    console.warn('[sendSmsViaElks] opt-out-uppslag kastade, tillåter sändning:', err?.message || err)
+    return false
+  }
+}
+
 /**
  * Skickar SMS direkt mot 46elks och loggar till sms_log.
  *
@@ -68,44 +163,49 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
   let errorMsg: string | undefined
   let success = false
 
-  try {
-    const response = await fetch('https://api.46elks.com/a1/sms', {
-      method: 'POST',
-      headers: {
-        Authorization:
-          'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        from: fromName,
-        to: phone,
-        message,
-      }),
-    })
-
-    status = response.status
-    const responseText = await response.text()
-    let result: any = null
+  const optedOut = await isCustomerOptedOut(supabase, businessId, customerId, phone)
+  if (optedOut) {
+    errorMsg = 'Kunden har avböjt SMS'
+  } else {
     try {
-      result = JSON.parse(responseText)
-    } catch {
-      // 46elks returnerar ibland plaintext på fel — det är OK
-    }
-
-    if (response.ok) {
-      success = true
-      elksId = result?.id || undefined
-    } else {
-      errorMsg = result?.message || responseText.substring(0, 300) || `HTTP ${status}`
-      console.error('[sendSmsViaElks] 46elks error:', {
-        status,
-        body: (errorMsg || '').substring(0, 200),
-        to: phone,
+      const response = await fetch('https://api.46elks.com/a1/sms', {
+        method: 'POST',
+        headers: {
+          Authorization:
+            'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          from: fromName,
+          to: phone,
+          message,
+        }),
       })
+
+      status = response.status
+      const responseText = await response.text()
+      let result: any = null
+      try {
+        result = JSON.parse(responseText)
+      } catch {
+        // 46elks returnerar ibland plaintext på fel — det är OK
+      }
+
+      if (response.ok) {
+        success = true
+        elksId = result?.id || undefined
+      } else {
+        errorMsg = result?.message || responseText.substring(0, 300) || `HTTP ${status}`
+        console.error('[sendSmsViaElks] 46elks error:', {
+          status,
+          body: (errorMsg || '').substring(0, 200),
+          to: phone,
+        })
+      }
+    } catch (err: any) {
+      errorMsg = err?.message || 'fetch exception'
+      console.error('[sendSmsViaElks] fetch exception:', err)
     }
-  } catch (err: any) {
-    errorMsg = err?.message || 'fetch exception'
-    console.error('[sendSmsViaElks] fetch exception:', err)
   }
 
   // Logga i sms_log (även misslyckanden för audit-spår). Non-blocking.
