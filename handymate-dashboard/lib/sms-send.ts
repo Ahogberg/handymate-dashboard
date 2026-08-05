@@ -18,6 +18,13 @@ export interface SendSmsArgs {
   relatedId?: string | null
   /** Lös enum för audit/filter — t.ex. 'ata_send', 'on_my_way', 'reminder'. */
   messageType?: string | null
+  /**
+   * VP2 (gap 1, tasks/vilande-pengar-masterplan.md): pending_approvals.id för
+   * kortet som utlöste utskicket. Lagras som trigger_type='approval' +
+   * trigger_id i sms_log (kolumnerna finns sedan sql/sms_tables.sql men var
+   * oanvända) — ingen migration behövs. Ger attributionskedjan kort→SMS.
+   */
+  approvalId?: string | null
 }
 
 export interface SendSmsResult {
@@ -143,7 +150,7 @@ async function isCustomerOptedOut(
  * system-flow ska räknas mot kvoten, gör det manuellt på callsite.
  */
 export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> {
-  const { supabase, businessId, businessName, to, message, customerId, relatedId, messageType } = args
+  const { supabase, businessId, businessName, to, message, customerId, relatedId, messageType, approvalId } = args
 
   if (!ELKS_API_USER || !ELKS_API_PASSWORD) {
     return { success: false, error: '46elks credentials not configured' }
@@ -223,6 +230,8 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
       error_message: errorMsg || null,
       message_type: messageType || null,
       related_id: relatedId || null,
+      trigger_type: approvalId ? 'approval' : null,
+      trigger_id: approvalId || null,
       sent_at: success ? new Date().toISOString() : null,
     })
     if (insertErr) {

@@ -64,7 +64,7 @@ export default function WeeklyValueDigest() {
         <div className="sm:border-r sm:border-primary-100 sm:pr-4">
           <div className="text-2xl sm:text-3xl font-extrabold text-primary-700">{kr(data.confirmed_kr)} kr</div>
           <div className="text-sm font-medium text-gray-700">intjänat</div>
-          <div className="text-xs text-gray-400">bekräftat · offert + faktura efter påminnelse</div>
+          <div className="text-xs text-gray-400">verifierat · accepterade offerter &amp; betalda fakturor efter teamets utskick</div>
         </div>
 
         {/* Nivå 2 — fångad potential */}

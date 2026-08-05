@@ -315,19 +315,23 @@ export async function GET(request: NextRequest) {
       })
 
       // Logga till v3_automation_logs (best-effort, non-blocking)
-      try {
-        await supabase.from('v3_automation_logs').insert({
-          business_id: biz.business_id,
-          rule_name: 'review_request_cron',
-          action_type: 'create_approval',
-          status: 'success',
-          metadata: {
-            project_id: project.project_id,
-            customer_id: customer.customer_id,
-          },
-        })
-      } catch (logErr) {
-        console.warn('[cron/review-requests] automation_log insert failed (non-blocking):', logErr)
+      // VP2 (gap 4-bifynd): inserten skrev `metadata:` (kolumnen finns inte —
+      // heter `context`) och saknade trigger_type (NOT NULL) → den har tyst
+      // failat sedan den skrevs. Supabase kastar inte på insert-fel, så
+      // catch-blocket fångade aldrig något — felet syntes aldrig.
+      const { error: apprLogErr } = await supabase.from('v3_automation_logs').insert({
+        business_id: biz.business_id,
+        rule_name: 'review_request_cron',
+        trigger_type: 'cron',
+        action_type: 'create_approval',
+        status: 'success',
+        context: {
+          project_id: project.project_id,
+          customer_id: customer.customer_id,
+        },
+      })
+      if (apprLogErr) {
+        console.warn('[cron/review-requests] automation_log insert failed (non-blocking):', apprLogErr.message)
       }
     }
   }

@@ -221,6 +221,27 @@ export async function GET(request: NextRequest) {
             } else {
               console.error('[quote-follow-up] expiry-nudge SMS send failed (non-blocking):', q.business_id, q.quote_id, smsResult.error)
             }
+
+            // VP2 (gap 4): nudge-vägen loggade tidigare INGENTING till
+            // v3_automation_logs — nu utfall EFTER sändningen, ärlig status.
+            const { error: nudgeLogErr } = await supabase.from('v3_automation_logs').insert({
+              business_id: q.business_id,
+              rule_id: null,
+              rule_name: 'Offert-förfallonudge (cron)',
+              trigger_type: 'cron',
+              action_type: 'send_sms',
+              status: smsResult.success ? 'success' : 'failed',
+              error_message: smsResult.success ? null : (smsResult.error || 'SMS-sändning misslyckades'),
+              context: {
+                quote_id: q.quote_id,
+                customer_id: q.customer_id,
+                channel: 'sms',
+                nudge: 'expiry',
+              },
+            })
+            if (nudgeLogErr) {
+              console.warn('[quote-follow-up] nudge v3-logg insert failed (non-blocking):', nudgeLogErr.message)
+            }
           }
         } catch (err) {
           console.error('[quote-follow-up] expiry-nudge SMS send failed (non-blocking):', q.business_id, q.quote_id, err)
@@ -238,7 +259,10 @@ export async function GET(request: NextRequest) {
         sent_at, valid_until, follow_up_count, last_follow_up_at,
         customer:customer_id (name, phone_number, email)
       `)
-      .eq('status', 'sent')
+      // VP2 (gap 4): 'opened' ingick inte — en kund som ÖPPNAT sin offert men
+      // inte svarat är en varmare kandidat än en som aldrig öppnat, ändå
+      // följdes den aldrig upp. Nudge- och expired-delarna hade redan båda.
+      .in('status', ['sent', 'opened'])
       .gte('valid_until', today)
 
     if (error) throw error
@@ -304,35 +328,17 @@ export async function GET(request: NextRequest) {
       else if (daysSinceSent >= followupDays * 3 && followUpCount === 2) channel = 'sms'
       else continue
 
-      // Update follow-up count
-      await supabase.from('quotes').update({
-        follow_up_count: followUpCount + 1,
-        last_follow_up_at: now.toISOString(),
-      }).eq('quote_id', quote.quote_id)
-
-      // Log to automation logs
-      await supabase.from('v3_automation_logs').insert({
-        business_id: quote.business_id,
-        rule_id: null,
-        rule_name: 'Offertuppföljning (cron)',
-        action_type: `send_${channel}`,
-        status: 'success',
-        context: {
-          quote_id: quote.quote_id,
-          customer_id: quote.customer_id,
-          days_since_sent: daysSinceSent,
-          follow_up_round: followUpCount + 1,
-          channel,
-        },
-      })
-
+      // VP2 (gap 4): kandidatloopen SAMLAR bara — follow_up_count-uppräkning
+      // och v3-loggen flyttade till steg 5, EFTER agent-triggern, så loggat
+      // status speglar faktiskt utfall. Tidigare loggades 'success' (och
+      // räknaren steg) innan något skickats — och inserten saknade dessutom
+      // trigger_type (NOT NULL) så den har i praktiken tyst failat hela tiden.
       const list = byBusiness.get(quote.business_id) || []
       list.push({ quote, daysSinceSent, channel })
       byBusiness.set(quote.business_id, list)
-      followUpsSent++
     }
 
-    // 5. Trigger agent per business
+    // 5. Trigger agent per business, logga utfall EFTER köningen
     let agentTriggered = 0
     for (const [businessId, items] of Array.from(byBusiness)) {
       const quoteList = items.map((item: any) => {
@@ -351,6 +357,40 @@ export async function GET(request: NextRequest) {
         makeIdempotencyKey('qfu', businessId, today)
       )
       if (result.success) agentTriggered++
+
+      // Utfall per kandidat: räknare + logg EFTER köningen, med ärlig status.
+      // follow_up_count stegas BARA vid lyckad köning — vid fail får nästa
+      // cron-körning ett nytt försök istället för att ronden "förbrukas".
+      for (const item of items) {
+        const followUpCount = item.quote.follow_up_count || 0
+        if (result.success) {
+          await supabase.from('quotes').update({
+            follow_up_count: followUpCount + 1,
+            last_follow_up_at: now.toISOString(),
+          }).eq('quote_id', item.quote.quote_id)
+          followUpsSent++
+        }
+
+        const { error: logErr } = await supabase.from('v3_automation_logs').insert({
+          business_id: businessId,
+          rule_id: null,
+          rule_name: 'Offertuppföljning (cron)',
+          trigger_type: 'cron',
+          action_type: `send_${item.channel}`,
+          status: result.success ? 'success' : 'failed',
+          error_message: result.success ? null : 'Agent-köning misslyckades',
+          context: {
+            quote_id: item.quote.quote_id,
+            customer_id: item.quote.customer_id,
+            days_since_sent: item.daysSinceSent,
+            follow_up_round: followUpCount + 1,
+            channel: item.channel,
+          },
+        })
+        if (logErr) {
+          console.warn('[quote-follow-up] v3_automation_logs insert failed (non-blocking):', logErr.message)
+        }
+      }
     }
 
     return NextResponse.json({

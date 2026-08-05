@@ -47,7 +47,7 @@ per kund; 10 hanna-outbound saknar agents_globally_paused-kontrollen.
 - **Paus-kontrollen** (gap 10): agents_globally_paused in i
   hanna-outbound-cronen (mönstret från kapacitet-fyllnad).
 
-## VP2 — Attributionsryggraden (ärliga kronor) — EJ PÅBÖRJAD
+## VP2 — Attributionsryggraden (ärliga kronor) — KLAR 2026-08-05
 
 - **approval_id nedströms** (gap 1): utskicks-cases stämplar approval_id
   i v3_automation_logs (kolumnen finns, fylls inte); sms_log får

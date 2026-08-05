@@ -412,7 +412,7 @@ async function fetchBusinessName(
  * har pilot-data om vilka edge-cases som faktiskt händer.
  */
 async function executeApprovalPayload(
-  approval: { approval_type: string; payload: Record<string, unknown>; business_id: string; package_data?: any },
+  approval: { id: string; approval_type: string; payload: Record<string, unknown>; business_id: string; package_data?: any },
   businessId: string,
   actionOverrides?: Record<string, string>,
   cookieHeader?: string | null,
@@ -420,6 +420,9 @@ async function executeApprovalPayload(
 ): Promise<Record<string, unknown>> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   const { approval_type, payload } = approval
+  // VP2 (gap 1): kortets id stämplas nedströms (sms_log via sendSms-closuren,
+  // v3_automation_logs i case:en som loggar) — attributionskedjan kort→utfall.
+  const approvalId = approval.id
 
   /**
    * Audit-4 Fix DEF (2026-06-02): bygger headers som forwardar
@@ -573,6 +576,7 @@ async function executeApprovalPayload(
       customerId: opts.customerId,
       relatedId: opts.relatedId,
       messageType: opts.messageType,
+      approvalId,
     })
 
     if (result.success) {
@@ -1022,6 +1026,9 @@ async function executeApprovalPayload(
           rule_name: 'proactive_customer_care',
           trigger_type: 'approval_executed',
           action_type: 'send_sms',
+          // VP2 (gap 1): kolumnen fanns sedan sql/v3_automation_logs.sql men
+          // fylldes aldrig — utan den kan inget utfall attribueras till kortet.
+          approval_id: approvalId,
           status: r.sms_sent ? 'success' : 'failed',
           context: {
             customer_id: pl.customer_id,

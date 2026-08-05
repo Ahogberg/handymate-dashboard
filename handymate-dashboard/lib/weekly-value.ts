@@ -1,12 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getRecoveredRevenue } from './value/recovered-revenue'
 
 /**
  * "Din vecka med Handymate" — ETT ärligt veckovärde i tre nivåer, lett av den
  * HÅRDASTE siffran (bekräftade kronor), inte den mjukaste (tid). Epistemisk
  * hygien (samma princip som saved-scoreboard — vi hittar inte på kr):
- *   - confirmed_kr  BEKRÄFTAT: offert signerad efter uppföljning + faktura
- *     betald inom 7 dagar efter påminnelse. Riktiga belopp ur quotes/invoice.
- *     (Samma attribueringslogik som /api/automation/value, batchad.)
+ *   - confirmed_kr  BEKRÄFTAT: räknas av attributionskärnan i
+ *     lib/value/recovered-revenue.ts (VP2 gap 2) — verifierade händelser
+ *     (offert accepterad/faktura betald) attribuerade till godkända
+ *     outbound-kort inom fönster, dubbelattribution förbjuden. Ersätter den
+ *     tidigare logg-baserade beräkningen som saknade både tidsfönster och
+ *     dubbelräkningsspärr (en offert accepterad månader efter ett utskick
+ *     räknades ändå, och offert + dess faktura kunde räknas dubbelt).
  *   - captured      POTENTIAL: leads fångade senaste 7 dagarna × estimated_value
  *     (konservativ schablon när värde saknas). Märks tydligt som potential.
  *   - time_minutes  UPPSKATTNING: viktad per åtgärdstyp (mer trovärdig än platt
@@ -103,72 +108,18 @@ export async function getWeeklyValue(supabase: SupabaseClient, businessId: strin
     capturedKr += v > 0 ? v : DEFAULT_LEAD_VALUE
   }
 
-  // ── Nivå 1: bekräftade kronor ──
-  // Samla quote/invoice-id:n ur loggarna och batch-hämta (undviker N+1).
-  const quoteIds = new Set<string>()
-  const invoiceRemindedAt = new Map<string, number>() // invoiceId → tidigaste påminnelse (ms)
-  for (const l of logs) {
-    const ctx = (l.context || {}) as Record<string, any>
-    const res = (l.result || {}) as Record<string, any>
-    const qid = ctx.quote_id || res.quote_id
-    if (qid && (l.rule_name === 'quote_followup' || l.action_type === 'send_sms')) {
-      quoteIds.add(String(qid))
-    }
-    const iid = ctx.invoice_id || res.invoice_id
-    if (iid && l.rule_name === 'invoice_reminder') {
-      const t = new Date(l.created_at).getTime()
-      const prev = invoiceRemindedAt.get(String(iid))
-      if (prev == null || t < prev) invoiceRemindedAt.set(String(iid), t)
-    }
-  }
-
-  let confirmedKr = 0
-  const confirmedItems: Array<{ label: string; amount: number }> = []
-
-  if (quoteIds.size > 0) {
-    const { data: quotes } = await supabase
-      .from('quotes')
-      .select('quote_id, status, total, title')
-      .eq('business_id', businessId)
-      .in('quote_id', Array.from(quoteIds))
-    for (const q of quotes || []) {
-      if (q.status === 'accepted') {
-        const amount = Number(q.total) || 0
-        confirmedKr += amount
-        confirmedItems.push({
-          label: `Offert signerad efter påminnelse${q.title ? ': ' + q.title : ''}`,
-          amount,
-        })
-      }
-    }
-  }
-
-  if (invoiceRemindedAt.size > 0) {
-    const { data: invoices } = await supabase
-      .from('invoice')
-      .select('invoice_id, status, total, paid_at, invoice_number')
-      .eq('business_id', businessId)
-      .in('invoice_id', Array.from(invoiceRemindedAt.keys()))
-    for (const inv of invoices || []) {
-      if (inv.status === 'paid' && inv.paid_at) {
-        const paid = new Date(inv.paid_at).getTime()
-        const reminded = invoiceRemindedAt.get(inv.invoice_id) as number
-        const days = (paid - reminded) / (24 * 3600_000)
-        if (days >= 0 && days <= 7) {
-          const amount = Number(inv.total) || 0
-          confirmedKr += amount
-          confirmedItems.push({
-            label: `Faktura ${inv.invoice_number || ''} betald efter påminnelse`.trim(),
-            amount,
-          })
-        }
-      }
-    }
-  }
+  // ── Nivå 1: bekräftade kronor (VP2 — attributionskärnan) ──
+  // Händelser (accepterad offert / betald faktura) senaste 7 dagarna,
+  // attribuerade till godkända outbound-kort. Bokningsattributioner (0 kr)
+  // hålls utanför radlistan — de är händelser, inte kronor.
+  const recovered = await getRecoveredRevenue(supabase, businessId, { sinceDays: ROLLING_DAYS })
+  const confirmedItems: Array<{ label: string; amount: number }> = recovered.attributions
+    .filter((a) => a.amount_kr > 0)
+    .map((a) => ({ label: a.label, amount: Math.round(a.amount_kr) }))
 
   return {
     range_days: ROLLING_DAYS,
-    confirmed_kr: Math.round(confirmedKr),
+    confirmed_kr: recovered.total_recovered_kr,
     confirmed_items: confirmedItems,
     captured_count: capturedCount,
     captured_kr: Math.round(capturedKr),
