@@ -20,12 +20,27 @@ import type { QuoteTotals } from '@/lib/types/quote'
  * som skrivs ut i markupen, ingen separat sanering behövs.
  */
 export function sanitizeTemplateDataForPublic(data: QuoteTemplateData): QuoteTemplateData {
-  if (data.displayLevel !== 'rows') return data
+  // Dolda rader (v90) måste bort ur SJÄLVA DATAT, inte bara ur renderingen.
+  // Renderarna hoppar över dem, men objektet serialiseras också som JSON till
+  // klienten — en kund som öppnar devtools kunde annars läsa beskrivning och
+  // belopp på en rad hantverkaren uttryckligen dolt. Löftet "syns inte för
+  // kunden" måste hålla mot verktygen, inte bara mot ögat.
+  //
+  // Totalerna påverkas inte: de är färdigräknade fält på data.quote
+  // (subtotalExVat/totalIncVat/…) som byggts ur den OFILTRERADE radlistan —
+  // den dolda radens pris ingår i summan precis som avsett.
+  const visibleItems = data.quote.items.filter(item => !item.isHidden)
+
+  if (data.displayLevel !== 'rows') {
+    if (visibleItems.length === data.quote.items.length) return data
+    return { ...data, quote: { ...data.quote, items: visibleItems } }
+  }
+
   return {
     ...data,
     quote: {
       ...data.quote,
-      items: data.quote.items.map(item =>
+      items: visibleItems.map(item =>
         item.itemType === 'option' ? item : { ...item, quantity: 0, unitPrice: 0 },
       ),
     },

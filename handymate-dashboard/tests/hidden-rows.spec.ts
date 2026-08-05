@@ -12,7 +12,9 @@
  */
 import { test, expect } from '@playwright/test'
 import { calculateQuoteTotals, recalculateItems } from '../lib/quote-calculations'
+import { sanitizeTemplateDataForPublic } from '../lib/quotes/public-document'
 import type { QuoteItem } from '../lib/types/quote'
+import type { QuoteTemplateData } from '../lib/quote-templates/types'
 
 function row(overrides: Partial<QuoteItem> = {}): QuoteItem {
   return {
@@ -82,6 +84,43 @@ test.describe('dold rad — summan är oförändrad', () => {
     expect(recalculated.find(i => i.id === 'b')?.is_hidden).toBeFalsy()
     // ...och radtotalen räknas som vanligt även för den dolda raden.
     expect(recalculated.find(i => i.id === 'a')?.total).toBe(1000)
+  })
+})
+
+test.describe('dold rad — läcker inte i det publika svaret', () => {
+  function templateData(displayLevel: 'full' | 'rows' | 'summary'): QuoteTemplateData {
+    return {
+      displayLevel,
+      quote: {
+        items: [
+          { id: 'a', name: 'Rivning', quantity: 1, unit: 'st', unitPrice: 12000, total: 12000 },
+          { id: 'b', name: 'Påslag risk', quantity: 1, unit: 'st', unitPrice: 4000, total: 4000, isHidden: true },
+        ],
+        subtotalExVat: 16000,
+      },
+    } as unknown as QuoteTemplateData
+  }
+
+  test('dold rad finns inte kvar i datat som skickas till kunden', () => {
+    for (const level of ['full', 'rows', 'summary'] as const) {
+      const sanitized = sanitizeTemplateDataForPublic(templateData(level))
+      const names = sanitized.quote.items.map(i => i.name)
+      expect(names, `displayLevel ${level} läcker den dolda raden`).not.toContain('Påslag risk')
+      expect(names).toContain('Rivning')
+    }
+  })
+
+  test('totalsumman rörs inte av saneringen — priset ingår fortfarande', () => {
+    const sanitized = sanitizeTemplateDataForPublic(templateData('full'))
+    expect(sanitized.quote.subtotalExVat).toBe(16000)
+  })
+
+  test('en offert helt utan dolda rader returneras oförändrad (samma referens)', () => {
+    const data = {
+      displayLevel: 'full',
+      quote: { items: [{ id: 'a', name: 'Rivning', quantity: 1, unit: 'st', unitPrice: 1, total: 1 }] },
+    } as unknown as QuoteTemplateData
+    expect(sanitizeTemplateDataForPublic(data)).toBe(data)
   })
 })
 

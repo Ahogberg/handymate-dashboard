@@ -136,6 +136,16 @@ export async function GET(
     // slagit på show_components_to_customer — ALDRIG interna kostnader.
     // labor_amount BEHÅLLS (ROT-arbetsbasen, inte en dold à-pris) — klientens
     // live-total i 'full' + tillvalsdeltan i summary/rows behöver den.
+    // Dolda rader (v90) bort ur svaret. Görs EFTER baseTotals/displayGroups
+    // ovan, som medvetet räknas på den ofiltrerade listan — priset ingår i
+    // summan, det är bara raden som inte ska synas. Utan detta låg
+    // beskrivning och belopp öppet i JSON-svaret för den som tittar i
+    // devtools, och "dold för kund" hade bara varit sant mot ögat.
+    if (responseItems) {
+      responseItems = responseItems.filter((it: any) => it?.is_hidden !== true)
+      if (responseItems.length === 0) responseItems = undefined
+    }
+
     if (responseItems) {
       responseItems = responseItems.map((it: any) => {
         const { material_amount, estimated_hours, component_snapshot, ...safe } = it
