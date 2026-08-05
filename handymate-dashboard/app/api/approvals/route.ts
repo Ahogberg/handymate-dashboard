@@ -51,6 +51,18 @@ export async function GET(request: NextRequest) {
     // Supabase med .in('status', [...]) för sin "Hanterade"-flik.
     if (status === 'resolved') {
       query = query.in('status', RESOLVED_STATUSES)
+    } else if (status === 'execution_failed') {
+      // Fas 0-härdning (exec-chain-arvet): pseudo-status för godkända rader
+      // vars exekvering misslyckades. Utan denna vy är ett fel som klienten
+      // missade (mobilkrasch, stängd flik) osynligt för alltid — raden är
+      // 'approved' och syns inte i någon kö. 'retrying' tas med: en
+      // strandad omkörning (server dog) ska också gå att se och köra om
+      // (retry-endpointen släpper igenom den efter 10 min).
+      const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      query = query
+        .eq('status', 'approved')
+        .in('payload->execution_result->>outcome', ['failed', 'retrying'])
+        .gte('resolved_at', sevenDaysAgoIso)
     } else {
       query = query.eq('status', status)
     }

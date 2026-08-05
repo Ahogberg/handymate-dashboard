@@ -192,6 +192,15 @@ export default function ApprovalsPage() {
   // (app/api/approvals/[id]/route.ts) — visa en direktlänk till det istället
   // för bara "Godkänt", annars vet hantverkaren inte var utkastet hamnade.
   const [feedbackLink, setFeedbackLink] = useState<string | null>(null)
+  // Fas 0-härdning (exec-chain-arvet 2026-08-05): tidigare visade sidan
+  // "Godkänt" ÄVEN när utförandet misslyckats (fallback-grenen) och kortet
+  // försvann ur kön — felet fanns bara i DB:n där ingen såg det. Nu: ärligt
+  // felbesked som står kvar tills det stängs + "Försök igen", och en sektion
+  // för misslyckade utföranden (fångar även fel vars HTTP-svar aldrig nådde
+  // klienten — mobilkrasch, stängd flik).
+  const [failedFeedback, setFailedFeedback] = useState<{ id: string; text: string } | null>(null)
+  const [failedExecutions, setFailedExecutions] = useState<Approval[]>([])
+  const [retryLoading, setRetryLoading] = useState<string | null>(null)
 
   useEffect(() => {
     if (!business?.business_id) return
@@ -236,8 +245,49 @@ export default function ApprovalsPage() {
         const result = await res.json().catch(() => null)
         setApprovals(result?.approvals || [])
       }
+      // Misslyckade utföranden (senaste 7 dagarna) — egen pseudo-status i
+      // GET-routen. Hämtas tyst; ett fel här får aldrig störa huvudkön.
+      const failedRes = await fetch(`/api/approvals?status=execution_failed&limit=20`, {
+        headers: {
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+      }).catch(() => null)
+      if (failedRes?.ok) {
+        const failedResult = await failedRes.json().catch(() => null)
+        setFailedExecutions(failedResult?.approvals || [])
+      }
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleRetry(id: string) {
+    setRetryLoading(id)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/approvals/${id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ action: 'retry' }),
+      })
+      const result = await res.json().catch(() => null)
+      if (res.ok && result?.execution_outcome?.outcome === 'success') {
+        setFailedFeedback(null)
+        setFailedExecutions(prev => prev.filter(a => a.id !== id))
+        setFeedbackMsg('Utfört!')
+        setTimeout(() => setFeedbackMsg(null), 4000)
+      } else if (res.status === 409) {
+        setFailedFeedback({ id, text: 'Omkörning pågår redan — vänta en stund' })
+      } else {
+        const errText = result?.execution_outcome?.error_text || result?.error || 'Handlingen kunde inte utföras'
+        setFailedFeedback({ id, text: `Misslyckades igen: ${errText}` })
+        fetchApprovals()
+      }
+    } finally {
+      setRetryLoading(null)
     }
   }
 
@@ -283,6 +333,17 @@ export default function ApprovalsPage() {
         // Visa feedback baserat på vad som hände
         if (action === 'approve') {
           setFeedbackLink(null)
+          // Ärlighets-grenen FÖRST (Fas 0-härdningen): säg aldrig "Godkänt"
+          // när utförandet misslyckades. Server-klassningen
+          // (classifyExecutionResult) är facit — inte klientens fälttolkning.
+          if (result?.execution_outcome?.outcome === 'failed') {
+            setFailedFeedback({
+              id,
+              text: `Godkänt — men utförandet misslyckades: ${result.execution_outcome.error_text || 'okänt fel'}`,
+            })
+            fetchApprovals()
+            return
+          }
           if (approvedItem?.approval_type === 'quote_nudge') {
             setFeedbackMsg('Påminnelse noterad — ring kunden när du har möjlighet')
           } else {
@@ -402,6 +463,25 @@ export default function ApprovalsPage() {
               )}
             </div>
           )}
+          {failedFeedback && (
+            <div className="px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-medium flex items-center gap-3">
+              <span>{failedFeedback.text}</span>
+              <button
+                onClick={() => handleRetry(failedFeedback.id)}
+                disabled={retryLoading === failedFeedback.id}
+                className="px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 whitespace-nowrap"
+              >
+                {retryLoading === failedFeedback.id ? 'Försöker...' : 'Försök igen'}
+              </button>
+              <button
+                onClick={() => setFailedFeedback(null)}
+                className="text-red-400 hover:text-red-700"
+                aria-label="Stäng"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <button
             onClick={fetchApprovals}
             className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all"
@@ -440,6 +520,48 @@ export default function ApprovalsPage() {
           ))}
         </div>
       </div>
+
+      {/* Misslyckade utföranden (Fas 0-härdningen) — godkända rader vars
+          exekvering gick fel, oavsett från vilken yta godkännandet gjordes.
+          Renderas bara när sådana finns; annars noll visuellt brus. */}
+      {activeTab === 'pending' && failedExecutions.length > 0 && (
+        <div className="px-4 sm:px-8 pb-4">
+          <div className="bg-white rounded-2xl border border-red-200 overflow-hidden">
+            <div className="px-4 py-3 bg-red-50 border-b border-red-200">
+              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                Godkända men ej utförda ({failedExecutions.length})
+              </p>
+              <p className="text-xs text-red-600 mt-0.5">
+                Du godkände dessa, men handlingen gick inte igenom — inget har skickats till kunden.
+              </p>
+            </div>
+            <div className="divide-y divide-red-100">
+              {failedExecutions.map(item => {
+                const execResult = item.payload?.execution_result as { error_text?: string | null; outcome?: string } | undefined
+                return (
+                  <div key={item.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{item.title}</p>
+                      <p className="text-xs text-red-600 truncate">
+                        {execResult?.outcome === 'retrying'
+                          ? 'Omkörning avbröts — försök igen'
+                          : execResult?.error_text || 'Handlingen kunde inte utföras'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleRetry(item.id)}
+                      disabled={retryLoading === item.id}
+                      className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {retryLoading === item.id ? 'Försöker...' : 'Försök igen'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="px-4 sm:px-8 pb-8">

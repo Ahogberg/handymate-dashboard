@@ -44,8 +44,8 @@ export async function POST(
 
     const body = await request.json()
     const { action, edited_payload, reject_reason, action_overrides } = body
-    if (!action || !['approve', 'reject', 'edit'].includes(action)) {
-      return NextResponse.json({ error: 'action must be approve, reject or edit' }, { status: 400 })
+    if (!action || !['approve', 'reject', 'edit', 'retry'].includes(action)) {
+      return NextResponse.json({ error: 'action must be approve, reject, edit or retry' }, { status: 400 })
     }
 
     const supabase = getServerSupabase()
@@ -77,6 +77,92 @@ export async function POST(
         { error: 'Du saknar behörighet att agera på detta godkännande' },
         { status: 403 },
       )
+    }
+
+    // Fas 0-härdning (exec-chain-arvet, plan 2026-08-05): omkörning av en
+    // godkänd rad vars exekvering misslyckades. Status-flippen till
+    // 'approved' skedde redan vid godkännandet — det som körs om är ENDAST
+    // payload-exekveringen. Utan detta är en misslyckad exekvering en
+    // återvändsgränd: raden är godkänd, inget gick ut, och det enda sättet
+    // att försöka igen är att agenten råkar skapa ett nytt kort.
+    if (action === 'retry') {
+      const prevExec = (approval.payload as Record<string, any> | null)?.execution_result
+      const retryableOutcome = prevExec?.outcome === 'failed' || prevExec?.outcome === 'retrying'
+      if (approval.status !== 'approved' || !retryableOutcome) {
+        return NextResponse.json(
+          { error: 'Endast godkända rader med misslyckat utförande kan köras om' },
+          { status: 409 },
+        )
+      }
+
+      // Dubbelklicksskydd, samma CAS-princip som pending→approved-flippen:
+      // bara den request som lyckas flippa outcome 'failed'→'retrying' får
+      // exekvera. 'retrying' med executed_at äldre än 10 min räknas som
+      // strandad (servern dog mitt i) och får också flippas — ISO-8601-
+      // strängar jämför korrekt lexikografiskt, så .lt på JSONB-textvärdet
+      // är en riktig tidsjämförelse.
+      const staleCutoffIso = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      const { data: casRows, error: casError } = await supabase
+        .from('pending_approvals')
+        .update({
+          payload: {
+            ...approval.payload,
+            execution_result: { ...prevExec, outcome: 'retrying', executed_at: new Date().toISOString() },
+          },
+        })
+        .eq('id', params.id)
+        .eq('business_id', business.business_id)
+        .eq('status', 'approved')
+        .or(
+          `payload->execution_result->>outcome.eq.failed,and(payload->execution_result->>outcome.eq.retrying,payload->execution_result->>executed_at.lt.${staleCutoffIso})`,
+        )
+        .select('id')
+      if (casError || !casRows || casRows.length === 0) {
+        return NextResponse.json({ error: 'Omkörning pågår redan' }, { status: 409 })
+      }
+
+      const retryCookieHeader = request.headers.get('cookie')
+      const retryAuthHeader = request.headers.get('authorization')
+      let retryResult: Record<string, unknown> | null = null
+      try {
+        retryResult = await executeApprovalPayload(
+          approval,
+          business.business_id,
+          undefined,
+          retryCookieHeader,
+          retryAuthHeader,
+        )
+      } catch (execErr: any) {
+        console.error(`[approvals/${params.id}] retry: executeApprovalPayload kastade okontrollerat:`, execErr)
+        retryResult = { error: String(execErr?.message || execErr), ok: false }
+      }
+
+      const retryClassified = classifyExecutionResult(retryResult)
+      const { error: retryPersistError } = await supabase
+        .from('pending_approvals')
+        .update({
+          payload: {
+            ...approval.payload,
+            execution_result: {
+              outcome: retryClassified.outcome,
+              error_text: retryClassified.error_text,
+              executed_at: new Date().toISOString(),
+              retried: true,
+            },
+          },
+        })
+        .eq('id', params.id)
+        .eq('business_id', business.business_id)
+      if (retryPersistError) {
+        console.error(`[approvals/${params.id}] retry: kunde inte spara execution_result:`, retryPersistError)
+      }
+
+      return NextResponse.json({
+        success: true,
+        action,
+        execution: retryResult,
+        execution_outcome: { outcome: retryClassified.outcome, error_text: retryClassified.error_text },
+      })
     }
 
     if (approval.status !== 'pending') {
@@ -193,6 +279,10 @@ export async function POST(
 
     // If approved or edited, execute the payload action
     let executionResult: Record<string, unknown> | null = null
+    // Fas 0-härdning: den klassade bedömningen följer med i HTTP-svaret så
+    // klienterna slipper tolka execution-objektets fältvarianter själva —
+    // approvals/page.tsx sa tidigare "Godkänt" även när utförandet misslyckats.
+    let executionOutcome: { outcome: string; error_text: string | null } | null = null
     if (action === 'approve' || action === 'edit') {
       // Defense-in-depth: approval hämtades redan med .eq('business_id', business.business_id)
       // så detta ska aldrig kunna trigga, men explicit check förebygger framtida regressioner
@@ -242,7 +332,9 @@ export async function POST(
       // schema-ändring. Utan detta finns felet BARA i HTTP-svaret ovan; om
       // klienten missar det (mobilkrasch, stängd flik) är det osynligt för
       // alltid och hantverkaren tror felaktigt att handlingen gick igenom.
-      const { outcome, error_text } = classifyExecutionResult(executionResult)
+      const classified = classifyExecutionResult(executionResult)
+      const { outcome, error_text } = classified
+      executionOutcome = classified
       const { error: persistError } = await supabase
         .from('pending_approvals')
         .update({
@@ -270,6 +362,7 @@ export async function POST(
       success: true,
       action,
       execution: executionResult,
+      execution_outcome: executionOutcome,
     })
   } catch (error: any) {
     console.error('POST /api/approvals/[id] error:', error)
