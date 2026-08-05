@@ -10,6 +10,7 @@ import { KostnadCard } from './economy/KostnadCard'
 import { FaktureringsstatusCard } from './economy/FaktureringsstatusCard'
 import { AtaCard } from './economy/AtaCard'
 import { EfterkalkylCard } from './economy/EfterkalkylCard'
+import { PerPersonCard } from './economy/PerPersonCard'
 
 /**
  * ProjectEconomicsCard (Etapp 2.2, v53 2026-05-21).
@@ -212,6 +213,11 @@ export function ProjectEconomicsCard({ projectId, refreshKey = 0, onInvoiceProje
       {/* Efterkalkyl: offererat vs utfall, självförsörjande — visar sig
           bara när projektet är completed OCH en frusen outcome-rad finns. */}
       <EfterkalkylCard projectId={projectId} />
+
+      {/* Lönsamhet per person (R4-E) — självförsörjande, owner/admin-gated
+          både klient- och serversida. Visar sig bara när projektet har
+          fakturarader med kopplad utförare. */}
+      <PerPersonCard projectId={projectId} refreshKey={refreshKey} />
 
       {/* Footer: uppdaterad-tidstämpel + refresh */}
       <div className="flex items-center justify-end gap-2 text-[10px] text-slate-400">

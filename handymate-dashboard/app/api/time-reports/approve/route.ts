@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
         time_entry_id, work_date, duration_minutes, break_minutes,
         hourly_rate, is_billable, approval_status, work_category,
         overtime_minutes, description,
+        start_latitude, start_longitude, start_address,
         business_user:business_user_id (id, name, color, email),
         customer:customer_id (customer_id, name)
       `)

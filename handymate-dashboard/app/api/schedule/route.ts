@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/permissions'
+import { notifyScheduleAssignment } from '@/lib/notifications/schedule-push'
 
 /**
  * GET /api/schedule - Lista schema-poster
@@ -238,6 +239,18 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (insertError) throw insertError
+
+    // R4-D (resurs-masterplan.md): riktad mobilpush när passet skapas för
+    // NÅGON ANNAN än den som skapar det. Fire-and-forget (aldrig await) —
+    // en push-fail får aldrig blockera schemaläggningen.
+    if (business_user_id !== currentUser?.id) {
+      void notifyScheduleAssignment({
+        businessId: business.business_id,
+        businessUserId: business_user_id,
+        title,
+        startDatetime: start_datetime,
+      })
+    }
 
     return NextResponse.json({
       entry,

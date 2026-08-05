@@ -6,6 +6,7 @@ import {
   X,
   Loader2,
   AlertTriangle,
+  MapPin,
 } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
 
@@ -174,6 +175,22 @@ export default function ApproveView() {
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-gray-900">{fmtH(entry.duration_minutes)}</span>
                                 <span className="text-xs text-gray-500">{entry.work_date}</span>
+                                {/* R4-C (resurs-masterplan.md): opt-in GPS-badge — visas ENDAST
+                                    när koordinater redan finns på posten (ingen ny insamling
+                                    här). Integritetsmedvetet: bara en länk, ingen inbäddad karta. */}
+                                {entry.start_latitude != null && entry.start_longitude != null && (
+                                  <a
+                                    href={`https://maps.google.com/?q=${entry.start_latitude},${entry.start_longitude}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={e => e.stopPropagation()}
+                                    title={entry.start_address || 'Visa på karta'}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] rounded-full bg-gray-100 text-gray-500 hover:text-[#0F766E] hover:bg-[#F0FDFA]"
+                                  >
+                                    <MapPin className="w-3 h-3" />
+                                    Plats registrerad
+                                  </a>
+                                )}
                               </div>
                               {entry.description && (
                                 <p className="text-xs text-gray-500 truncate">{entry.description}</p>

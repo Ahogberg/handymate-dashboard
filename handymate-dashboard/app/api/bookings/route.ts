@@ -8,6 +8,7 @@ import {
   deleteBookingFromCalendar,
 } from '@/lib/google-calendar-sync'
 import { computeBookingDayProgress, fetchProjectBookings } from '@/lib/bookings/day-progress'
+import { notifyBookingAssignment } from '@/lib/notifications/schedule-push'
 
 /**
  * GET - Lista bokningar för ett företag
@@ -376,6 +377,14 @@ export async function PUT(request: NextRequest) {
     if (body.status !== undefined) updates.status = body.status
     if (body.notes !== undefined) updates.notes = body.notes
 
+    // R4-D (resurs-masterplan.md): tidigare tilldelning + handlande person,
+    // så vi efter en lyckad uppdatering kan avgöra om detta var en FAKTISK
+    // ändring till en ANNAN person (för riktad push) — inte bara ett PUT
+    // som råkar skicka med samma assigned_user_id, och aldrig vid
+    // självtilldelning.
+    let previousAssignedUserId: string | null = null
+    let assigningActorId: string | null = null
+
     // Manuell tilldelning (valfri) — samma valideringsmönster som
     // app/api/projects/[id]/team/route.ts POST. Skickas inte fältet med
     // alls bevaras nuvarande beteende exakt (fältet rörs inte).
@@ -390,6 +399,16 @@ export async function PUT(request: NextRequest) {
       if (!currentUser || (currentUser.role !== 'owner' && currentUser.role !== 'admin')) {
         return NextResponse.json({ error: 'Otillräcklig behörighet för att tilldela bokning' }, { status: 403 })
       }
+      assigningActorId = currentUser.id
+
+      const { data: prevBooking } = await supabase
+        .from('booking')
+        .select('assigned_user_id')
+        .eq('booking_id', booking_id)
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+      previousAssignedUserId = prevBooking?.assigned_user_id ?? null
+
       if (body.assigned_user_id === null) {
         updates.assigned_user_id = null
         updates.assigned_to = null
@@ -420,6 +439,22 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (error) throw error
+
+    // R4-D: riktad mobilpush till den NYTILLDELADE teknikern — fire-and-
+    // forget (aldrig await), pushar aldrig vid självtilldelning eller när
+    // tilldelningen inte faktiskt ändrades.
+    if (
+      updates.assigned_user_id &&
+      updates.assigned_user_id !== previousAssignedUserId &&
+      updates.assigned_user_id !== assigningActorId
+    ) {
+      void notifyBookingAssignment({
+        businessId: business.business_id,
+        businessUserId: updates.assigned_user_id,
+        customerId: booking.customer_id,
+        scheduledStart: booking.scheduled_start,
+      })
+    }
 
     // Sync ändringar till Google Calendar (non-blocking)
     if (booking.google_event_id && booking.google_calendar_id) {

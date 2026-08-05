@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, type BusinessUser } from '@/lib/permissions'
+import { notifyScheduleAssignment } from '@/lib/notifications/schedule-push'
 
 /**
  * Ägarskapskontroll för schema-poster.
@@ -126,6 +127,22 @@ export async function PATCH(
       .single()
 
     if (updateError) throw updateError
+
+    // R4-D (resurs-masterplan.md): riktad mobilpush vid OMTILLDELNING till
+    // en ANNAN person än den som gör ändringen. Fire-and-forget (aldrig
+    // await) — en push-fail får aldrig blockera schema-skrivvägen.
+    if (
+      updates.business_user_id &&
+      updates.business_user_id !== existing.business_user_id &&
+      updates.business_user_id !== currentUser?.id
+    ) {
+      void notifyScheduleAssignment({
+        businessId: business.business_id,
+        businessUserId: updates.business_user_id,
+        title: entry.title,
+        startDatetime: entry.start_datetime,
+      })
+    }
 
     return NextResponse.json({ entry })
 

@@ -1,22 +1,10 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import {
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  Edit2,
-  Trash2,
-  Check,
-  X,
-  MapPin,
-  Download,
-} from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
-import Link from 'next/link'
-import TimerWidget from '@/components/time/TimerWidget'
 import TimeEntryModal from '@/components/time/TimeEntryModal'
 import TravelSection from '@/components/time/TravelSection'
 import {
@@ -25,82 +13,32 @@ import {
   endOfWeek,
   startOfMonth,
   endOfMonth,
-  addWeeks,
-  subWeeks,
   addDays,
   parseISO,
-  isSameDay,
   getISOWeek
 } from 'date-fns'
-import { sv } from 'date-fns/locale'
-import { calculateWeeklyOvertime, formatMinutes } from '@/lib/overtime'
+import { calculateWeeklyOvertime } from '@/lib/overtime'
+import TodayToolbar from './today/TodayToolbar'
+import TodayCheckIn from './today/TodayCheckIn'
+import TodaySummary from './today/TodaySummary'
+import TodayEntries from './today/TodayEntries'
+import type { TimeEntry, TeamMemberBasic, WorkType, Customer, Booking, Stats } from './today/types'
 
-interface TimeEntry {
-  time_entry_id: string
-  booking_id: string | null
-  customer_id: string | null
-  work_type_id: string | null
-  business_user_id: string | null
-  description: string | null
-  work_date: string
-  start_time: string | null
-  end_time: string | null
-  duration_minutes: number
-  hourly_rate: number | null
-  is_billable: boolean
-  invoiced: boolean
-  invoice_id: string | null
-  approval_status?: 'pending' | 'approved' | 'rejected'
-  rejection_reason?: string | null
-  break_minutes?: number
-  created_at: string
-  start_latitude?: number | null
-  start_longitude?: number | null
-  start_address?: string | null
-  end_latitude?: number | null
-  end_longitude?: number | null
-  end_address?: string | null
-  customer?: { customer_id: string; name: string }
-  booking?: { booking_id: string; notes: string }
-  work_type?: { work_type_id: string; name: string; multiplier: number }
-  business_user?: { id: string; name: string; color: string } | null
-}
-
-interface TeamMemberBasic {
-  id: string
-  name: string
-  color: string
-}
-
-interface WorkType {
-  work_type_id: string
-  name: string
-  multiplier: number
-  billable_default: boolean
-  sort_order: number
-}
-
-interface Customer {
-  customer_id: string
-  name: string
-}
-
-interface Booking {
-  booking_id: string
-  notes: string
-  customer_id: string
-  customer?: { name: string }
-}
-
-interface Stats {
-  totalMinutesWeek: number
-  billableMinutesWeek: number
-  totalMinutesMonth: number
-  entriesThisWeek: number
-  uninvoicedMinutes: number
-  uninvoicedRevenue: number
-}
-
+/**
+ * TodayView — container (R4-A/B, tasks/resurs-masterplan.md).
+ *
+ * Ren refaktor 2026-08: 1030-raders komponenten delades i presentations-
+ * komponenter under ./today/ (TodayToolbar, TodayCheckIn, TodaySummary,
+ * TodayEntries). Allt state (entries, filter, urval, formulär, vy-läge)
+ * bor kvar HÄR — samma state-flöde som innan, bara lyft till containern
+ * och skickat ner som props. Noll beteendeförändring.
+ *
+ * R4-B: TravelSection (traktamente/resor) flyttad in i huvudflödet —
+ * renderas nu inline mellan sammanfattningen och dagens poster-lista
+ * istället för som en fristående sektion efter allt annat (Easoft-
+ * mönstret, se resurs-masterplan.md). Ren placeringsändring — TravelSection
+ * själv är orörd.
+ */
 export default function TodayView() {
   const business = useBusiness()
   const { user: currentUser, isOwnerOrAdmin } = useCurrentUser()
@@ -122,7 +60,7 @@ export default function TodayView() {
   const [viewMode, setViewMode] = useState<'week' | 'list'>('week')
   const [currentWeek, setCurrentWeek] = useState(new Date())
 
-  // Timer handled by TimerWidget component
+  // Timer handled by TimerWidget
 
   // Modal
   const [showModal, setShowModal] = useState(false)
@@ -300,14 +238,6 @@ export default function TodayView() {
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type })
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000)
-  }
-
-  const fmtDuration = (min: number) => {
-    const h = Math.floor(min / 60)
-    const m = min % 60
-    if (h === 0) return `${m}m`
-    if (m === 0) return `${h}h`
-    return `${h}h ${m}m`
   }
 
   // Timer functions moved to TimerWidget
@@ -515,29 +445,6 @@ export default function TodayView() {
     }
   }
 
-  // Quick-add presets (mobile)
-  const quickAdd = (minutes: number) => {
-    setEditingEntry(null)
-    setFormData({
-      customer_id: '',
-      booking_id: '',
-      work_type_id: '',
-      project_id: '',
-      work_category: 'work',
-      description: '',
-      internal_notes: '',
-      work_date: format(new Date(), 'yyyy-MM-dd'),
-      start_time: '',
-      end_time: '',
-      duration_hours: Math.floor(minutes / 60),
-      duration_minutes: minutes % 60,
-      break_minutes: 0,
-      hourly_rate: '',
-      is_billable: true
-    })
-    setShowModal(true)
-  }
-
   // Week grid data
   const weekGrid = useMemo(() => {
     const gridMap: Record<string, { label: string; entries: Record<string, TimeEntry[]> }> = {}
@@ -642,389 +549,64 @@ export default function TodayView() {
         onWorkTypeChange={handleWorkTypeChange}
       />
 
-      {/* Toolbar — person-filter + CSV-export + lägg till */}
-      <div className="flex items-center justify-end gap-2 flex-wrap mb-4">
-        {isOwnerOrAdmin && teamMembers.length > 1 && (
-          <select
-            value={filterPerson}
-            onChange={e => setFilterPerson(e.target.value)}
-            className="px-3 py-[7px] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] bg-white focus:outline-none focus:border-[#0F766E]"
-          >
-            <option value="">Alla i teamet</option>
-            {teamMembers.map(m => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
-          </select>
-        )}
+      <TodayToolbar
+        isOwnerOrAdmin={isOwnerOrAdmin}
+        teamMembers={teamMembers}
+        filterPerson={filterPerson}
+        setFilterPerson={setFilterPerson}
+        weekStart={weekStart}
+        weekEnd={weekEnd}
+        onAddClick={() => openAddModal()}
+      />
 
-        <a
-          href={`/api/time-entry/report?startDate=${format(weekStart, 'yyyy-MM-dd')}&endDate=${format(weekEnd, 'yyyy-MM-dd')}&format=csv&groupBy=day`}
-          className="px-[14px] py-[7px] bg-transparent border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#64748B] hover:text-[#1E293B]"
-        >
-          CSV
-        </a>
+      <TodayCheckIn onCheckInOut={handleTimerCheckInOut} />
 
-        <Link href="/dashboard/time/allowances"
-          className="px-[14px] py-[7px] bg-transparent border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#64748B] hover:text-[#1E293B]">
-          Ersättningar
-        </Link>
+      <TodaySummary stats={stats} weekOvertime={weekOvertime} />
 
-        <button onClick={() => openAddModal()}
-          className="px-4 py-[8px] bg-[#0F766E] text-white border-none rounded-lg text-[13px] font-medium cursor-pointer hover:bg-[#0F766E]/90">
-          + Lägg till
-        </button>
-      </div>
-
-      {/* Stämpelklocka — inline card */}
-      <TimerWidget onCheckInOut={handleTimerCheckInOut} />
-
-      {/* Metrics — gray cards, no icons */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <div className="bg-[#F1F5F9] rounded-lg px-4 py-[14px]">
-          <div className="text-[10px] tracking-[0.08em] uppercase text-[#94A3B8] mb-[6px]">Vecka totalt</div>
-          <div className="text-[20px] font-medium text-[#1E293B]">{fmtDuration(stats.totalMinutesWeek)}</div>
-        </div>
-        <div className="bg-[#F1F5F9] rounded-lg px-4 py-[14px]">
-          <div className="text-[10px] tracking-[0.08em] uppercase text-[#94A3B8] mb-[6px]">Fakturerbart</div>
-          <div className="text-[20px] font-medium text-[#0F766E]">{fmtDuration(stats.billableMinutesWeek)}</div>
-        </div>
-        <div className="bg-[#F1F5F9] rounded-lg px-4 py-[14px]">
-          <div className="text-[10px] tracking-[0.08em] uppercase text-[#94A3B8] mb-[6px]">Ofakturerat</div>
-          <div className="text-[20px] font-medium text-[#1E293B]">{Math.round(stats.uninvoicedRevenue).toLocaleString('sv-SE')} kr</div>
-        </div>
-        <div className="bg-[#F1F5F9] rounded-lg px-4 py-[14px]">
-          <div className="text-[10px] tracking-[0.08em] uppercase text-[#94A3B8] mb-[6px]">Månad totalt</div>
-          <div className="text-[20px] font-medium text-[#1E293B]">{fmtDuration(stats.totalMinutesMonth)}</div>
-        </div>
-      </div>
-
-      {/* Övertidsindikator */}
-      {weekOvertime && weekOvertime.total_overtime_minutes > 0 && (
-        <div className="bg-orange-50 border-thin border-orange-200 rounded-lg px-4 py-3 mb-6 flex items-center justify-between">
-          <div>
-            <span className="text-[13px] font-medium text-orange-700">Övertid vecka {weekOvertime.week_number}</span>
-            <span className="text-[12px] text-orange-600 ml-2">
-              {weekOvertime.daily_overtime_minutes > 0 && `Daglig: ${formatMinutes(weekOvertime.daily_overtime_minutes)}`}
-              {weekOvertime.daily_overtime_minutes > 0 && weekOvertime.weekly_overtime_minutes > 0 && ' · '}
-              {weekOvertime.weekly_overtime_minutes > 0 && `Vecko: ${formatMinutes(weekOvertime.weekly_overtime_minutes)}`}
-            </span>
-          </div>
-          <span className="text-[16px] font-medium text-orange-700">{formatMinutes(weekOvertime.total_overtime_minutes)}</span>
-        </div>
-      )}
-
-      {/* Week nav */}
-      <div className="flex items-center justify-between mb-[14px]">
-        <div className="flex items-center">
-          <div className="flex gap-1 mr-[10px]">
-            <button onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
-              className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#64748B] flex items-center justify-center cursor-pointer hover:text-[#1E293B]">
-              <ChevronLeft className="w-[14px] h-[14px]" />
-            </button>
-            <button onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
-              className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#64748B] flex items-center justify-center cursor-pointer hover:text-[#1E293B]">
-              <ChevronRight className="w-[14px] h-[14px]" />
-            </button>
-          </div>
-          <button onClick={() => setCurrentWeek(new Date())}
-            className="text-[14px] font-medium text-[#1E293B] bg-transparent border-none cursor-pointer hover:text-[#0F766E]">
-            V{weekNumber} · {format(weekStart, 'd MMMM', { locale: sv })} – {format(weekEnd, 'd MMMM', { locale: sv })}
-          </button>
-        </div>
-        <div className="flex gap-1">
-          <button onClick={() => setViewMode('week')}
-            className={`px-3 py-[5px] text-[12px] rounded-full border-thin cursor-pointer ${
-              viewMode === 'week' ? 'bg-[#F1F5F9] text-[#1E293B] border-[#E2E8F0]' : 'bg-transparent text-[#64748B] border-[#E2E8F0]'
-            }`}>
-            Vecka
-          </button>
-          <button onClick={() => setViewMode('list')}
-            className={`px-3 py-[5px] text-[12px] rounded-full border-thin cursor-pointer ${
-              viewMode === 'list' ? 'bg-[#F1F5F9] text-[#1E293B] border-[#E2E8F0]' : 'bg-transparent text-[#64748B] border-[#E2E8F0]'
-            }`}>
-            Lista
-          </button>
-        </div>
-      </div>
-
-      {/* WEEK GRID VIEW */}
-      {viewMode === 'week' && (
-        <div className="bg-white border-thin border-[#E2E8F0] rounded-xl overflow-hidden mb-6">
-          {/* Grid header */}
-          <div className="grid grid-cols-[180px_repeat(7,1fr)_72px] border-b border-thin border-[#E2E8F0]">
-            <div className="px-4 py-[10px] text-[10px] tracking-[0.07em] uppercase text-[#CBD5E1] text-left">Projekt</div>
-            {weekDates.map((date, i) => {
-              const isToday = isSameDay(date, new Date())
-              return (
-                <div key={i} className={`px-2 py-[10px] text-[10px] tracking-[0.07em] uppercase text-center ${isToday ? 'text-[#0F766E]' : 'text-[#CBD5E1]'}`}>
-                  {format(date, 'EEE', { locale: sv }).toUpperCase()} {format(date, 'd')}
-                </div>
-              )
-            })}
-            <div className="px-2 py-[10px] text-[10px] tracking-[0.07em] uppercase text-[#CBD5E1] text-center">Summa</div>
-          </div>
-
-          {/* Grid rows */}
-          {weekGrid.length === 0 ? (
-            <div className="py-12 text-center text-[13px] text-[#94A3B8]">
-              <p>Inga tidposter denna vecka</p>
-              <p className="text-[12px] text-[#CBD5E1] mt-1">Klicka på en cell eller &quot;Lägg till&quot; för att registrera tid</p>
-            </div>
-          ) : (
-            <>
-              {weekGrid.map(row => (
-                <div key={row.customerId} className="grid grid-cols-[180px_repeat(7,1fr)_72px] border-b border-thin border-[#E2E8F0] last:border-b-0 min-h-[50px] items-center">
-                  <div className="px-4 text-[13px] font-medium text-[#1E293B] min-h-[50px] flex items-center">{row.label}</div>
-                  {row.days.map((day, i) => {
-                    const isToday = isSameDay(day.date, new Date())
-                    return (
-                      <div
-                        key={i}
-                        onClick={() => day.entries.length > 0 ? openEditModal(day.entries[0]) : openAddModal(day.dayKey, row.customerId !== 'none' ? row.customerId : undefined)}
-                        className={`px-2 min-h-[50px] flex items-center justify-center cursor-pointer text-[13px] hover:bg-[#F8FAFC] ${isToday ? 'bg-[#F0FDFA]' : ''}`}
-                      >
-                        {day.totalMinutes > 0 ? (
-                          <span className="bg-[#CCFBF1] text-[#0F766E] text-[12px] font-medium px-[10px] py-[3px] rounded-full">
-                            {fmtDuration(day.totalMinutes)}
-                          </span>
-                        ) : (
-                          <span className="text-[#CBD5E1] text-[18px] hover:text-[#0F766E]">+</span>
-                        )}
-                      </div>
-                    )
-                  })}
-                  <div className="px-2 min-h-[50px] flex items-center justify-center text-[13px] font-medium text-[#1E293B]">
-                    {fmtDuration(row.totalMinutes)}
-                  </div>
-                </div>
-              ))}
-
-              {/* Add new customer/project row */}
-              <div className="grid grid-cols-[180px_repeat(7,1fr)_72px] min-h-[50px] items-center">
-                <div
-                  onClick={() => openAddModal()}
-                  className="px-4 text-[12px] text-[#CBD5E1] min-h-[50px] flex items-center cursor-pointer hover:text-[#0F766E]"
-                >
-                  + Ny kund / projekt
-                </div>
-                {weekDates.map((_, i) => (
-                  <div key={i} onClick={() => openAddModal(format(weekDates[i], 'yyyy-MM-dd'))}
-                    className="min-h-[50px] flex items-center justify-center cursor-pointer text-[#CBD5E1] text-[18px] hover:text-[#0F766E] hover:bg-[#F0FDFA]">
-                    +
-                  </div>
-                ))}
-                <div className="min-h-[50px] flex items-center justify-center text-[13px] text-[#CBD5E1]">—</div>
-              </div>
-            </>
-          )}
-
-          {/* Column totals footer */}
-          {weekGrid.length > 0 && (
-            <div className="grid grid-cols-[180px_repeat(7,1fr)_72px] border-t border-thin border-[#E2E8F0] bg-[#F8FAFC]">
-              <div className="px-4 py-[10px] text-[13px] font-medium text-[#64748B]">Summa</div>
-              {columnTotals.map((total, i) => (
-                <div key={i} className="px-2 py-[10px] text-center text-[13px] font-medium text-[#1E293B]">
-                  {total > 0 ? fmtDuration(total) : '–'}
-                </div>
-              ))}
-              <div className="px-2 py-[10px] text-center text-[13px] font-medium text-[#0F766E]">
-                {fmtDuration(grandTotal)}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* LIST VIEW */}
-      {(viewMode === 'list' || viewMode === 'week') && (
-        <div className={`${viewMode === 'week' ? 'sm:hidden' : ''} bg-white border-thin border-[#E2E8F0] rounded-xl`}>
-          {/* Filters header */}
-          <div className="px-4 py-3 border-b border-thin border-[#E2E8F0]">
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] font-medium text-[#1E293B]">
-                Tidposter <span className="text-[#94A3B8] font-normal ml-1">({filteredEntries.length})</span>
-              </span>
-              <div className="flex items-center gap-2">
-                {selectedIds.size > 0 && (
-                  <>
-                    <button onClick={() => handleBulkApproval('approve')} disabled={approvingIds}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#CCFBF1] border-thin border-[#0F766E] rounded-lg text-[12px] text-[#0F766E] disabled:opacity-50">
-                      {approvingIds ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                      Godkänn ({selectedIds.size})
-                    </button>
-                    <button onClick={() => handleBulkApproval('reject')} disabled={approvingIds}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border-thin border-red-200 rounded-lg text-[12px] text-red-600 disabled:opacity-50">
-                      <X className="w-3 h-3" />
-                      Avslå
-                    </button>
-                    <button onClick={handleBulkMarkInvoiced} disabled={bulkLoading}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#CCFBF1] border-thin border-[#0F766E] rounded-lg text-[12px] text-[#0F766E] disabled:opacity-50">
-                      {bulkLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                      Fakturera ({selectedIds.size})
-                    </button>
-                  </>
-                )}
-                <button onClick={() => setShowFilters(!showFilters)}
-                  className={`px-3 py-[5px] text-[12px] border-thin rounded-lg cursor-pointer ${showFilters ? 'bg-[#CCFBF1] text-[#0F766E] border-[#0F766E]' : 'bg-transparent text-[#64748B] border-[#E2E8F0]'}`}>
-                  Filter
-                </button>
-              </div>
-            </div>
-
-            {showFilters && (
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-3">
-                <select value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)}
-                  className="px-3 py-[7px] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] bg-white focus:outline-none focus:border-[#0F766E]">
-                  <option value="">Alla kunder</option>
-                  {customers.map(c => <option key={c.customer_id} value={c.customer_id}>{c.name}</option>)}
-                </select>
-                <select value={filterWorkType} onChange={e => setFilterWorkType(e.target.value)}
-                  className="px-3 py-[7px] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] bg-white focus:outline-none focus:border-[#0F766E]">
-                  <option value="">Alla arbetstyper</option>
-                  {workTypes.map(wt => <option key={wt.work_type_id} value={wt.work_type_id}>{wt.name}</option>)}
-                </select>
-                <select value={filterInvoiced} onChange={e => setFilterInvoiced(e.target.value as any)}
-                  className="px-3 py-[7px] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] bg-white focus:outline-none focus:border-[#0F766E]">
-                  <option value="all">Alla</option>
-                  <option value="no">Ej fakturerade</option>
-                  <option value="yes">Fakturerade</option>
-                </select>
-                <select value={filterApproval} onChange={e => setFilterApproval(e.target.value as any)}
-                  className="px-3 py-[7px] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] bg-white focus:outline-none focus:border-[#0F766E]">
-                  <option value="all">Alla status</option>
-                  <option value="pending">Väntar godkännande</option>
-                  <option value="approved">Godkända</option>
-                  <option value="rejected">Avslagna</option>
-                </select>
-              </div>
-            )}
-          </div>
-
-          {/* List items */}
-          <div>
-            {filteredEntries.length === 0 ? (
-              <div className="py-8 text-center text-[13px] text-[#94A3B8]">
-                Inga tidposter denna vecka
-              </div>
-            ) : (
-              <>
-                {viewMode === 'list' && filteredEntries.some(e => !e.invoiced) && (
-                  <div className="px-4 py-2 border-b border-thin border-[#E2E8F0]">
-                    <button onClick={selectAll} className="flex items-center gap-2 text-[12px] text-[#94A3B8] hover:text-[#1E293B]">
-                      <div className={`w-4 h-4 rounded border-thin ${selectedIds.size === filteredEntries.filter(e => !e.invoiced).length && selectedIds.size > 0 ? 'bg-[#0F766E] border-[#0F766E]' : 'border-[#E2E8F0]'} flex items-center justify-center`}>
-                        {selectedIds.size === filteredEntries.filter(e => !e.invoiced).length && selectedIds.size > 0 && <Check className="w-3 h-3 text-white" />}
-                      </div>
-                      Välj alla ej fakturerade
-                    </button>
-                  </div>
-                )}
-
-                {filteredEntries.map(entry => {
-                  const catLabel = ({ work: 'Arbete', travel: 'Restid', material_pickup: 'Material', meeting: 'Möte', admin: 'Admin' } as Record<string, string>)[(entry as any).work_category] || 'Arbete'
-                  return (
-                    <div key={entry.time_entry_id} className="px-4 py-3 border-b border-thin border-[#F1F5F9] last:border-b-0 hover:bg-[#F8FAFC]">
-                      <div className="flex items-start gap-3">
-                        {viewMode === 'list' && !entry.invoiced && (
-                          <button onClick={() => toggleSelect(entry.time_entry_id)} className="mt-1 flex-shrink-0">
-                            <div className={`w-4 h-4 rounded border-thin ${selectedIds.has(entry.time_entry_id) ? 'bg-[#0F766E] border-[#0F766E]' : 'border-[#E2E8F0] hover:border-[#94A3B8]'} flex items-center justify-center`}>
-                              {selectedIds.has(entry.time_entry_id) && <Check className="w-3 h-3 text-white" />}
-                            </div>
-                          </button>
-                        )}
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[13px] font-medium text-[#1E293B]">
-                              {fmtDuration(entry.duration_minutes)}
-                            </span>
-                            <span className="text-[11px] text-[#94A3B8]">{catLabel}</span>
-                            {entry.work_type && (
-                              <span className="px-2 py-0.5 text-[11px] rounded-full bg-[#CCFBF1] text-[#0F766E]">
-                                {entry.work_type.name}
-                              </span>
-                            )}
-                            {entry.invoiced ? (
-                              <span className="px-2 py-0.5 text-[11px] rounded-full bg-[#CCFBF1] text-[#0F766E]">
-                                Fakturerad
-                              </span>
-                            ) : entry.is_billable ? (
-                              <span className="px-2 py-0.5 text-[11px] rounded-full bg-amber-50 text-amber-600">
-                                Ofakturerad
-                              </span>
-                            ) : null}
-                            {entry.approval_status === 'pending' && (
-                              <span className="px-2 py-0.5 text-[11px] rounded-full bg-yellow-50 text-yellow-600">
-                                Väntar
-                              </span>
-                            )}
-                            {entry.approval_status === 'approved' && (
-                              <span className="px-2 py-0.5 text-[11px] rounded-full bg-[#CCFBF1] text-[#0F766E]">
-                                Godkänd
-                              </span>
-                            )}
-                            {entry.approval_status === 'rejected' && (
-                              <span className="px-2 py-0.5 text-[11px] rounded-full bg-red-50 text-red-600" title={entry.rejection_reason || ''}>
-                                Avslagen
-                              </span>
-                            )}
-                          </div>
-                          {entry.description && (
-                            <p className="text-[12px] text-[#64748B] mt-1 truncate">{entry.description}</p>
-                          )}
-                          <div className="flex items-center gap-3 mt-1 text-[11px] text-[#94A3B8] flex-wrap">
-                            <span>{format(parseISO(entry.work_date), 'EEE d MMM', { locale: sv })}</span>
-                            {isOwnerOrAdmin && entry.business_user && (
-                              <span className="flex items-center gap-1">
-                                <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: entry.business_user.color }} />
-                                {entry.business_user.name}
-                              </span>
-                            )}
-                            {entry.customer && <span>{entry.customer.name}</span>}
-                            {(entry as any).start_latitude && (
-                              <a
-                                href={`https://www.google.com/maps?q=${(entry as any).start_latitude},${(entry as any).start_longitude}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-[#0F766E] hover:underline"
-                                title={entry.start_address || 'Visa på karta'}
-                                onClick={e => e.stopPropagation()}
-                              >
-                                <MapPin className="w-3 h-3" />
-                                GPS
-                              </a>
-                            )}
-                            {entry.hourly_rate && <span>{entry.hourly_rate.toLocaleString('sv-SE')} kr/tim</span>}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          {!entry.invoiced && (
-                            <>
-                              <button onClick={() => openEditModal(entry)}
-                                className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#94A3B8] hover:text-[#1E293B] flex items-center justify-center">
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => handleDelete(entry.time_entry_id)}
-                                className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#94A3B8] hover:text-red-500 flex items-center justify-center">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Reseersättning & traktamente */}
-      <div className="mt-6">
+      {/* Reseersättning & traktamente — R4-B: flyttad in i huvudflödet som
+          inline-sektion i dagens rapportflöde (Easoft-mönstret), istället
+          för en fristående sektion efter poster-listan. */}
+      <div className="mb-6">
         <TravelSection currentWeek={currentWeek} />
       </div>
+
+      <TodayEntries
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        currentWeek={currentWeek}
+        setCurrentWeek={setCurrentWeek}
+        weekStart={weekStart}
+        weekEnd={weekEnd}
+        weekNumber={weekNumber}
+        weekDates={weekDates}
+        weekGrid={weekGrid}
+        columnTotals={columnTotals}
+        grandTotal={grandTotal}
+        openAddModal={openAddModal}
+        openEditModal={openEditModal}
+        handleDelete={handleDelete}
+        filteredEntries={filteredEntries}
+        customers={customers}
+        workTypes={workTypes}
+        filterCustomer={filterCustomer}
+        setFilterCustomer={setFilterCustomer}
+        filterWorkType={filterWorkType}
+        setFilterWorkType={setFilterWorkType}
+        filterInvoiced={filterInvoiced}
+        setFilterInvoiced={setFilterInvoiced}
+        filterApproval={filterApproval}
+        setFilterApproval={setFilterApproval}
+        showFilters={showFilters}
+        setShowFilters={setShowFilters}
+        isOwnerOrAdmin={isOwnerOrAdmin}
+        selectedIds={selectedIds}
+        toggleSelect={toggleSelect}
+        selectAll={selectAll}
+        bulkLoading={bulkLoading}
+        approvingIds={approvingIds}
+        handleBulkMarkInvoiced={handleBulkMarkInvoiced}
+        handleBulkApproval={handleBulkApproval}
+      />
     </div>
   )
 }

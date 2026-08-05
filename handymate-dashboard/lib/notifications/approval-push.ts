@@ -179,7 +179,7 @@ function buildPushTemplate(
  * DB-anropet failar — alla dessa fall ska falla tillbaka till oförändrat
  * businessblast i sendApprovalPush, inte kasta/blockera pushen.
  */
-async function resolveTargetUserId(businessUserId?: string | null): Promise<string | null> {
+export async function resolveTargetUserId(businessUserId?: string | null): Promise<string | null> {
   if (!businessUserId) return null
 
   try {
