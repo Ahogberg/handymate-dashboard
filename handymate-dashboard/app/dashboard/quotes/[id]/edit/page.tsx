@@ -14,6 +14,7 @@ import { AddRowSheet } from '@/components/quotes/document/AddRowSheet'
 import { useReservationSuggestions } from '../../_shared/useReservationSuggestions'
 import { ReservationSuggestionBanner, ReservationMutedNotice } from '../../_shared/ReservationSuggestionBanner'
 import { ReservationReviewSheet } from '../../_shared/ReservationReviewSheet'
+import { QuoteMarginCard } from '../../_shared/QuoteMarginCard'
 import { supabase } from '@/lib/supabase'
 import {
   calculatePaymentPlan,
@@ -1168,6 +1169,9 @@ export default function EditQuotePage() {
                 onClose={reservations.dismissMutedNotice}
               />
             )}
+
+            {/* Marginalen medan priset sätts — samma kort som new-sidan. */}
+            <QuoteMarginCard items={recalculated} />
 
             <QuoteEditCustomerSection
               customers={customers}

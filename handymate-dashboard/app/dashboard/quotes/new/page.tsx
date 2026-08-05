@@ -35,6 +35,7 @@ import { QuoteItemsSection } from '../_shared/QuoteItemsSection'
 import { useReservationSuggestions } from '../_shared/useReservationSuggestions'
 import { ReservationSuggestionBanner, ReservationMutedNotice } from '../_shared/ReservationSuggestionBanner'
 import { ReservationReviewSheet } from '../_shared/ReservationReviewSheet'
+import { QuoteMarginCard } from '../_shared/QuoteMarginCard'
 import { QuotePreviewPanel } from '../_shared/QuotePreviewPanel'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 
@@ -1687,6 +1688,10 @@ export default function NewQuotePage() {
                 onClose={reservations.dismissMutedNotice}
               />
             )}
+
+            {/* Marginalen medan priset sätts — självgardande, syns bara när
+                minst en rad har ett känt inköpspris. */}
+            <QuoteMarginCard items={recalculated} />
 
             <QuoteNewCustomerSection
               customers={customers}
