@@ -34,7 +34,7 @@ kapacitet-fyllnad, tidrapportförslag förstärks — byggs aldrig förbi).
 - Kapacitet per person = multi-employee-parity-planens Etapp 8
   ("FRAMTIDA EGEN PLAN") — realiseras i R5.
 
-## R0 — Navigations-/strukturskifte — EJ PÅBÖRJAD
+## R0 — Navigations-/strukturskifte — KLAR (0404741f)
 
 Ny huvudflik **"Schema"** ersätter Planering-gruppens splittring:
 - Undersidor: Översikt (R2:s resurstavla, ny), Kalender (dagens
@@ -45,7 +45,7 @@ Ny huvudflik **"Schema"** ersätter Planering-gruppens splittring:
   time/weekly m.fl.). Sidebar.tsx enda navkällan.
 - Settings?tab=team blir redirect till nya Team-ytan.
 
-## R1 — Datafundamentet: en persondag — EJ PÅBÖRJAD
+## R1 — Datafundamentet: en persondag — KLAR (0404741f)
 
 - **lib/schedule/person-day.ts**: förenad läsning booking
   (assigned_user_id) + schedule_entry per person/datumintervall. Ren
@@ -64,7 +64,7 @@ Ny huvudflik **"Schema"** ersätter Planering-gruppens splittring:
   (redirect). Verifieras mot payroll-exporten (får inte ändra löne-
   underlaget — facit-test på exportens urval före/efter).
 
-## R2 — Resursöversikten (nya flikens hjärta) — EJ PÅBÖRJAD
+## R2 — Resursöversikten (nya flikens hjärta) — KLAR (950a1b40)
 
 - **Veckotavla per person**: rader=anställda, kolumner=dagar; renderar
   persondagen (R1); beläggnings-% per person/vecka (KPI Easoft saknar);
@@ -79,7 +79,7 @@ Ny huvudflik **"Schema"** ersätter Planering-gruppens splittring:
   (bottom-sheet-mönstret från offert-E3) — INTE krympt tavla. Detta är
   vinstytan mot deras sågade mobilkalender.
 
-## R3 — Teamfliken: profilkort med operationell kontext — EJ PÅBÖRJAD
+## R3 — Teamfliken: profilkort med operationell kontext — KLAR (986cafc5)
 
 - Kortgrid: avatar/roll/kontakt, specialiteter (=dispatch-sanningen
   efter R1), aktuell beläggning, veckans pass, frånvarosaldo.
@@ -90,7 +90,7 @@ Ny huvudflik **"Schema"** ersätter Planering-gruppens splittring:
   owner_admin).
 - Redigering: team/page.tsx-logiken bryts ut ur Settings-inbäddningen.
 
-## R4 — Tidsflödet poleras — EJ PÅBÖRJAD
+## R4 — Tidsflödet poleras — KLAR (7e4158d8)
 
 - TodayView (1030 rader) delas upp i komponenter.
 - Traktamente/resor (TravelSection) in i huvudflödet inline (som
@@ -106,7 +106,7 @@ Ny huvudflik **"Schema"** ersätter Planering-gruppens splittring:
   project_outcome + internal_hourly_cost finns. Ingen smygintroduktion:
   egen sektion med tydlig behörighetsgräns.
 
-## R5 — Agentlagret — EJ PÅBÖRJAD
+## R5 — Agentlagret — KLAR (672ed83d)
 
 - Nytt verktyg **get_person_schedule** (persondagen; BÅDA tool-filerna;
   Lars + Matte).
@@ -128,3 +128,21 @@ drag-drop testas mot dev-server. Nya migrationer (v83 skills-pensionering,
 v84 certifikat) på Andreas körlista med deploy-först-ordning där det
 krävs. BYGGT→LIVE kräver Andreas skarptest per sprintslut; demokontot
 seedas med flerpersons-schema för demo (R2-DoD).
+
+## SPRINTSTATUS 2026-08-05: R0-R5 BYGGT (ej skarptestat)
+
+Alla sex etapper committade och deployade (0404741f → 672ed83d).
+SQL körd: v83 (2026-08-04). KVAR för Andreas: **sql/v84_certifikat.sql**
+(certifikattabellen — API/kort/cron degraderar snyggt tills den körts)
++ skarptest enligt slutrapporten.
+
+Kända uppföljningar (medvetna, ej byggda):
+- Approvals-executorn sätter inte business_user_id på auto-skapad
+  time_entry vid tidrapport_forslag-godkännande trots att payload nu
+  bär assigned_user_id — personattributionen syns i kortet men slår
+  inte igenom i löneunderlaget. Egen liten uppföljningssprint.
+- skills-JSONB-kolumnen ligger kvar odroppade (medvetet — v83
+  dokumenterar); drop + dispatch-fallback-borttagning i städsprint.
+- Demokontot bör seedas med flerpersons-schema för säljdemos (R2-DoD).
+- Claude Design-polish per R2/R3-yta kvarstår som möjlighet — byggt i
+  designsystemet men inte designgranskad.
