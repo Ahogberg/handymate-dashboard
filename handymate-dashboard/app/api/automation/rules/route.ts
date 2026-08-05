@@ -93,6 +93,12 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) {
+    // v85: UNIQUE(business_id, name) — en regel med samma namn finns redan
+    // för företaget (t.ex. dubblett-städning körd, eller namnkrock mot en
+    // systemregel).
+    if (error.code === '23505') {
+      return NextResponse.json({ error: 'Du har redan en regel med det namnet.' }, { status: 409 })
+    }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 

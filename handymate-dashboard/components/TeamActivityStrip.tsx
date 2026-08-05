@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Sparkles, Check, X, ArrowRight, Loader2 } from 'lucide-react'
 import { getAgentById } from '@/lib/agents/team'
+import type { AgentBrief, MorningBrief } from '@/lib/matte/morning-brief'
 
 interface AgentActivity {
   id: string
@@ -85,6 +86,7 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
   const [loading, setLoading] = useState(true)
   const [observations, setObservations] = useState<Observation[]>([])
   const [dismissing, setDismissing] = useState<Set<string>>(new Set())
+  const [brief, setBrief] = useState<MorningBrief | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -105,6 +107,20 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
         if (cancelled) return
         setLoading(false)
       })
+
+    // Morgonbriefen (tidigare egen MorningBriefWidget-sektion, nu ihopslagen
+    // med agentremsan) berikar idle-statusraden med Mattes per-agent-
+    // lägesrapport — t.ex. "Ekonomin ser bra ut idag" i stället för den
+    // generiska Standby-texten. Helt fristående från laddningen ovan: ett
+    // fel/timeout här får ALDRIG blockera eller krascha resten av remsan
+    // (fail-safe: ingen brief → dagens vanliga idle-beteende).
+    fetch('/api/morning-brief')
+      .then(r => (r.ok ? r.json() : null))
+      .then(briefData => {
+        if (!cancelled && briefData?.agents) setBrief(briefData as MorningBrief)
+      })
+      .catch(() => { /* fail-safe: ingen brief tillgänglig, standardbeteende gäller */ })
+
     return () => {
       cancelled = true
     }
@@ -174,6 +190,14 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
     }
   }
 
+  // Morgonbriefens per-agent-citat, keyed på agentId — används bara för
+  // idle-rader (se render nedan) så en agent med riktig aktivitet aldrig
+  // tappar sin faktiska statusrad till förmån för briefen.
+  const briefByAgent = new Map<string, AgentBrief>()
+  if (brief) {
+    for (const ab of brief.agents) briefByAgent.set(ab.agentId, ab)
+  }
+
   return (
     <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 mb-6">
       <div className="flex items-center justify-between mb-3">
@@ -192,6 +216,16 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
           const isDismissing = obs ? dismissing.has(obs.id) : false
           const typeLabel = obs ? (TYPE_LABEL[obs.knowledge_type] || 'Notering') : null
           const typeBadge = obs ? (TYPE_BADGE_CLASS[obs.knowledge_type] || 'bg-slate-100 text-slate-600') : null
+
+          // Idle agent utan observation men med en dagsfärsk brief-rad
+          // (/api/morning-brief) → visa Mattes lägesrapport i stället för
+          // den generiska "Standby"-statusen. Aldrig för agenter med riktig
+          // aktivitet eller en aktiv observation — de har redan bättre data.
+          const agentBrief = activity.idle && !obs ? briefByAgent.get(activity.id) : undefined
+          const briefUrgent = !!agentBrief && (
+            agentBrief.badgeType === 'danger' ||
+            agentBrief.details.some(d => d.urgency === 'high')
+          )
 
           return (
             <div
@@ -222,10 +256,13 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-semibold text-gray-900 leading-tight">{agent.name}</p>
-                  {activity.idle && !obs && (
+                  {activity.idle && !obs && !agentBrief && (
                     <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full">
                       Standby
                     </span>
+                  )}
+                  {agentBrief && briefUrgent && (
+                    <span className="w-2 h-2 rounded-full bg-red-500 inline-block" title="Kräver uppmärksamhet" />
                   )}
                   {obs && typeLabel && typeBadge && (
                     <span className={`inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${typeBadge}`}>
@@ -283,6 +320,8 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
                       </button>
                     </div>
                   </>
+                ) : agentBrief ? (
+                  <p className="text-xs text-gray-600 leading-snug mt-0.5">{agentBrief.quote}</p>
                 ) : (
                   <p className="text-xs text-gray-600 leading-snug mt-0.5">
                     {activity.stat && (

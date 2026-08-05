@@ -45,9 +45,12 @@ BEGIN
      false, true, true),
 
     -- 7. Faktura eskalering dag 7
+    -- Titel/beskrivning interpolerade (v85, dashboard-städpaketet del A) —
+    -- {{invoice_number}}/{{customer_name}} fylls i av handleCreateApproval
+    -- (lib/automation-engine.ts) från payloaden queryThresholdEntities bygger.
     (p_business_id, 'Faktura eskalering dag 7', 'Striktare påminnelse efter 7 dagar — kräver godkännande', true, true,
      'threshold', '{"entity": "invoice", "field": "days_overdue", "operator": ">=", "value": 7}',
-     'create_approval', '{"title": "Försenad faktura — åtgärd krävs", "description": "Fakturan har varit obetald i 7+ dagar. Godkänn för att skicka formell påminnelse."}',
+     'create_approval', '{"title": "Faktura {{invoice_number}} — obetald 7+ dagar", "description": "Fakturan till {{customer_name}} har varit obetald i minst 7 dagar. Godkänn för att skicka formell påminnelse."}',
      true, true, true),
 
     -- 8. Bokningspåminnelse

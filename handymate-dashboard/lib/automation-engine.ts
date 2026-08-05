@@ -185,6 +185,38 @@ function deriveAgentId(ruleName: string, actionType: string, triggerType: string
   return 'matte'
 }
 
+/**
+ * {{key}}-interpolation delad mellan handleSendSms och handleCreateApproval.
+ * Ersätter bara nycklar som faktiskt finns i kontext (sträng/nummer) — gamla
+ * statiska texter utan platshållare, eller platshållare för nycklar som
+ * saknas i kontext, lämnas orörda i stället för att krascha eller radera dem.
+ */
+export function interpolateTemplate(template: string, context: ExecutionContext): string {
+  let result = template
+  for (const [key, value] of Object.entries(context)) {
+    if (typeof value === 'string' || typeof value === 'number') {
+      result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value))
+    }
+  }
+  return result
+}
+
+/**
+ * Ren nyckel-logik för godkännande-dedupe (v85): utan entity_id i kontext
+ * kan vi inte deduplicera pålitligt — då ska inget kort skapas alls (se
+ * handleCreateApproval). rule_action_type faller tillbaka på config.approval_type
+ * och sist 'automation', vilket matchar defaulten som faktiskt sparas på raden.
+ */
+export function deriveApprovalDedupeKey(
+  context: ExecutionContext,
+  config: Record<string, unknown>
+): { entityId: string; ruleActionType: string } | null {
+  const entityId = (context.entity_id as string) || (context.id as string)
+  if (!entityId) return null
+  const ruleActionType = (context.rule_action_type as string) || (config.approval_type as string) || 'automation'
+  return { entityId, ruleActionType }
+}
+
 async function updateRuleStats(
   supabase: SupabaseClient,
   ruleId: string,
@@ -218,14 +250,7 @@ async function handleSendSms(
   context: ExecutionContext
 ): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
   const template = config.template as string || ''
-  let message = template
-
-  // Template variable replacement
-  for (const [key, value] of Object.entries(context)) {
-    if (typeof value === 'string' || typeof value === 'number') {
-      message = message.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value))
-    }
-  }
+  let message = interpolateTemplate(template, context)
 
   // Get business name for template
   const { data: business } = await supabase
@@ -409,28 +434,39 @@ async function handleCreateApproval(
   supabase: SupabaseClient,
   businessId: string,
   config: Record<string, unknown>,
-  context: ExecutionContext
+  context: ExecutionContext,
+  ruleName?: string
 ): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
-  const title = (config.title as string) || 'Godkännande krävs'
-  const description = (config.description as string) || ''
+  // {{key}}-interpolation, samma mönster som handleSendSms — se A i
+  // dashboard-städpaketet: gamla statiska titlar/beskrivningar utan
+  // platshållare rör sig inte, saknade nycklar lämnas orörda.
+  const title = interpolateTemplate((config.title as string) || 'Godkännande krävs', context)
+  const description = interpolateTemplate((config.description as string) || '', context)
 
-  // Dedup: kolla om en pending approval redan finns för samma entity + titel
-  const entityId = (context.entity_id as string) || (context.id as string)
-  if (entityId) {
-    const { count } = await supabase
-      .from('pending_approvals')
-      .select('*', { count: 'exact', head: true })
-      .eq('business_id', businessId)
-      .eq('title', title)
-      .eq('status', 'pending')
-      .contains('payload', { entity_id: entityId })
+  // Dedup: entity_id + rule_action_type (inte titel — titeln kan nu
+  // interpoleras och skiljer sig därför per instans av samma regel).
+  // Saknas entity_id kan vi inte deduplicera pålitligt — skapa hellre
+  // inget kort än ett dubblett-spam-kort utan spårbar identitet.
+  const dedupeKey = deriveApprovalDedupeKey(context, config)
+  if (!dedupeKey) {
+    console.warn('[automation-engine] handleCreateApproval: entity_id saknas i kontext — inget godkännandekort skapas', { businessId, title })
+    return { success: true, data: { skipped: true, reason: 'entity_id saknas — inget kort skapat' } }
+  }
+  const { entityId, ruleActionType } = dedupeKey
 
-    if ((count || 0) > 0) {
-      return { success: true, data: { skipped: true, reason: 'Approval redan skapad för denna entitet' } }
-    }
+  const { count } = await supabase
+    .from('pending_approvals')
+    .select('*', { count: 'exact', head: true })
+    .eq('business_id', businessId)
+    .eq('status', 'pending')
+    .contains('payload', { entity_id: entityId, rule_action_type: ruleActionType })
+
+  if ((count || 0) > 0) {
+    return { success: true, data: { skipped: true, reason: 'Approval redan skapad för denna entitet' } }
   }
 
   const id = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+  const routedAgent = deriveAgentId(ruleName || title, '', '')
 
   const { error } = await supabase.from('pending_approvals').insert({
     id,
@@ -438,7 +474,7 @@ async function handleCreateApproval(
     approval_type: (config.approval_type as string) || 'automation',
     title,
     description,
-    payload: context,
+    payload: { ...context, rule_action_type: ruleActionType, routed_agent: routedAgent },
     status: 'pending',
     risk_level: 'medium',
     expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
@@ -741,7 +777,7 @@ async function executeAction(
     case 'run_agent':
       return handleRunAgent(supabase, businessId, actionConfig, context, ruleName)
     case 'create_approval':
-      return handleCreateApproval(supabase, businessId, actionConfig, context)
+      return handleCreateApproval(supabase, businessId, actionConfig, context, ruleName)
     case 'update_status':
       return handleUpdateStatus(supabase, businessId, actionConfig, context)
     case 'notify_owner':
@@ -879,7 +915,7 @@ export async function executeRule(
       rule_action_config: typedRule.action_config,
       // Stämpla nyckeln → streak-räkning kan mappa raden (autonomyKeyFromApproval)
       ...(autonomyKey ? { autonomy_key: autonomyKey } : {}),
-    })
+    }, typedRule.name)
 
     await logExecution(supabase, {
       businessId: typedRule.business_id,
@@ -898,13 +934,16 @@ export async function executeRule(
     return { status: 'pending_approval', data: approvalResult.data }
   }
 
-  // 7. Execute action
+  // 7. Execute action. Stämpla rule_action_type på en lokal kopia (inte
+  // execContext själv — muta aldrig caller-ägd context) så direkta
+  // create_approval-regler (t.ex. "Faktura eskalering dag 7", som aldrig
+  // passerar approval-grenen ovan) ändå har nyckeln dedupe-logiken kräver.
   const result = await executeAction(
     supabase,
     typedRule.business_id,
     typedRule.action_type,
     typedRule.action_config,
-    execContext,
+    { ...execContext, rule_action_type: typedRule.action_type },
     typedRule.name
   )
 
@@ -1062,9 +1101,13 @@ async function queryThresholdEntities(
       // days_overdue: invoices past due date
       if (field === 'days_overdue') {
         const cutoffDate = new Date(now.getTime() - value * 24 * 60 * 60 * 1000)
+        // customer:customer_id(name) — bevisat säker embed på invoice-tabellen
+        // (samma join används redan i app/api/cron/check-overdue/route.ts).
+        // Utan invoice_number/customer_name blir godkännande-korten (del A)
+        // opersonliga generiska titlar i stället för "Faktura 1042 — ...".
         const { data } = await supabase
           .from('invoice')
-          .select('invoice_id, customer_id, total, due_date, status')
+          .select('invoice_id, invoice_number, customer_id, total, due_date, status, customer:customer_id(name)')
           .eq('business_id', businessId)
           .in('status', ['sent', 'overdue'])
           .lte('due_date', cutoffDate.toISOString().slice(0, 10))
@@ -1072,6 +1115,8 @@ async function queryThresholdEntities(
         return (data || []).map((inv: Record<string, unknown>) => ({
           id: inv.invoice_id,
           customer_id: inv.customer_id,
+          customer_name: (inv.customer as { name?: string } | null)?.name || null,
+          invoice_number: inv.invoice_number,
           total: inv.total,
           due_date: inv.due_date,
           days_overdue: Math.floor((now.getTime() - new Date(inv.due_date as string).getTime()) / (24 * 60 * 60 * 1000)),

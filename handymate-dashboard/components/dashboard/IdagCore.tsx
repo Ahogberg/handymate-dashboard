@@ -719,13 +719,11 @@ function ProofBand({
       <span className="font-heading text-3xl font-bold leading-none text-primary-700 min-w-[30px] text-center">
         {pending == null ? '·' : pending > 0 ? pending : <Check className="w-6 h-6 inline" strokeWidth={2.5} />}
       </span>
+      {/* "N saker väntar på ditt OK"-klausulen borttagen (dashboard-
+          städpaketet del D) — kön-badgen direkt nedanför ("Väntar på dig")
+          äger den räkningen redan. Bannern rapporterar bara utfört arbete. */}
       <p className="text-sm text-gray-600 leading-snug">
         {activityText}
-        {pending != null && (
-          <b className="text-gray-900">
-            {' '}— {pending === 0 ? 'allt är klart.' : pending === 1 ? '1 sak väntar på ditt OK.' : `${pending} saker väntar på ditt OK.`}
-          </b>
-        )}
       </p>
     </div>
   )

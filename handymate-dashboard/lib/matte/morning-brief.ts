@@ -49,9 +49,12 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
     todayBookings, profWarnings,
     inactiveCustomers, pendingApprovals,
   ] = await Promise.all([
+    // check-overdue-cronen flippar status till 'overdue' när förfallodatum
+    // passerar — filtrerade vi bara på 'sent' missade Karin exakt de
+    // fakturor hon skulle varna för (v85, dashboard-städpaketet del F).
     supabase.from('invoice')
       .select('invoice_id, invoice_number, total, due_date')
-      .eq('business_id', businessId).eq('status', 'sent')
+      .eq('business_id', businessId).in('status', ['sent', 'overdue'])
       .lt('due_date', today).limit(5),
     supabase.from('invoice')
       .select('invoice_id, total, due_date')
@@ -234,11 +237,14 @@ function buildHannaBrief(inactive: any[]): AgentBrief {
 
 function buildMatteBrief(approvals: any[], agentBriefs: AgentBrief[]): AgentBrief {
   const urgentCount = agentBriefs.reduce((sum, b) => sum + b.details.filter(d => d.urgency === 'high').length, 0) + approvals.length
-  const details: BriefDetail[] = [
-    ...approvals.slice(0, 3).map((a: any) => ({ text: a.title, urgency: 'high' as const, link: `/dashboard/approvals` })),
-    ...agentBriefs.filter(b => b.badgeType === 'danger' || b.badgeType === 'warning')
-      .map(b => ({ text: b.quote, urgency: b.badgeType === 'danger' ? 'high' as const : 'medium' as const })),
-  ].slice(0, 5)
+  // Approval-detaljerna listas inte längre här — godkänn-kön (IdagCore) äger
+  // den ytan och skulle bara dubblera samma kort. approvals.length lever
+  // kvar i urgentCount ovan så one-linern ("N saker kräver din uppmärksamhet")
+  // fortfarande räknar rätt.
+  const details: BriefDetail[] = agentBriefs
+    .filter(b => b.badgeType === 'danger' || b.badgeType === 'warning')
+    .map(b => ({ text: b.quote, urgency: b.badgeType === 'danger' ? 'high' as const : 'medium' as const }))
+    .slice(0, 5)
 
   if (urgentCount > 0) return {
     agentId: 'matte', quote: `${urgentCount} sak${urgentCount > 1 ? 'er' : ''} kräver din uppmärksamhet`,

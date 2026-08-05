@@ -102,12 +102,20 @@ async function seedV3AutomationRules(supabase: SupabaseClient, businessId: strin
       requires_approval: false,
     },
     {
-      name: 'Påminn om förfallen faktura',
-      description: 'Föreslår en betalningspåminnelse när en faktura är 7+ dagar försenad. Kräver ditt godkännande innan den skickas.',
+      // "Faktura eskalering dag 7" — kanonisk 7-dagarsregel (matchar
+      // sql/v3_seed_rules.sql). Ersatte tidigare "Påminn om förfallen
+      // faktura" (v85, dashboard-städpaketet del B): två regler seedade
+      // samma 7-dagarströskel via olika vägar (denna fil vs v3_seed_rules.sql
+      // körd manuellt), vilket gav hantverkaren två godkännandekort för
+      // samma faktura. create_approval (inte send_sms) så titel/beskrivning
+      // interpoleras med {{invoice_number}}/{{customer_name}} av
+      // handleCreateApproval (lib/automation-engine.ts).
+      name: 'Faktura eskalering dag 7',
+      description: 'Striktare påminnelse efter 7 dagar — kräver godkännande',
       trigger_type: 'threshold',
       trigger_config: { entity: 'invoice', field: 'days_overdue', operator: '>=', value: 7 },
-      action_type: 'send_sms',
-      action_config: { template: 'Hej! En vänlig påminnelse om en faktura från {{business_name}} som har förfallit. Hör gärna av dig om du har frågor.' },
+      action_type: 'create_approval',
+      action_config: { title: 'Faktura {{invoice_number}} — obetald 7+ dagar', description: 'Fakturan till {{customer_name}} har varit obetald i minst 7 dagar. Godkänn för att skicka formell påminnelse.' },
       requires_approval: true,
     },
     {

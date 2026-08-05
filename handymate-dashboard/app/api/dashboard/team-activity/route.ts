@@ -91,12 +91,12 @@ export async function GET(request: NextRequest) {
         action: lisaCalls.length && lisaSms.length
           ? `samtal & SMS besvarade · ${lisaCalls.length} samtal, ${lisaSms.length} SMS`
           : lisaCalls.length
-            ? 'samtal besvarade'
+            ? 'samtal hanterade'
             : 'SMS besvarade',
         meta: lisaLatest ? formatTime(lisaLatest.created_at) : null,
         idle: false,
       }
-    : { id: 'lisa', stat: null, action: 'På plats — redo att ta samtal och SMS', meta: null, idle: true }
+    : { id: 'lisa', stat: null, action: 'Vakar över telefonen — kopplar samtal, tar meddelanden och SMS:ar vid missat', meta: null, idle: true }
 
   // ── DANIEL: Säljare (offerter) ────────────────────────────
   const sentQuotes = quotes.filter(q => q.sent_at && new Date(q.sent_at) >= new Date(sinceIso))

@@ -60,6 +60,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     .single()
 
   if (error) {
+    // v85: UNIQUE(business_id, name) — namnbyte kolliderar med en befintlig regel.
+    if (error.code === '23505') {
+      return NextResponse.json({ error: 'Du har redan en regel med det namnet.' }, { status: 409 })
+    }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 

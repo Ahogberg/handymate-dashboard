@@ -20,7 +20,6 @@ import IdagCore from '@/components/dashboard/IdagCore'
 import WeeklyValueDigest from '@/components/dashboard/WeeklyValueDigest'
 import CashRadarCard from '@/components/dashboard/CashRadarCard'
 import IdentityPill from '@/components/IdentityPill'
-import MorningBriefWidget from '@/components/dashboard/MorningBriefWidget'
 import { AgentReadinessCard } from '@/components/dashboard/AgentReadinessCard'
 
 /**
@@ -269,7 +268,9 @@ export default function DashboardPage() {
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
     const economicsPromise = Promise.all([
       supabase.from('invoice').select('total_amount:total').eq('business_id', business.business_id).neq('status', 'draft').gte('created_at', startOfMonth),
-      supabase.from('invoice').select('id:invoice_id, total_amount:total').eq('business_id', business.business_id).eq('status', 'sent'),
+      // 'overdue' också — check-overdue-cronen flippar status när
+      // förfallodatum passerar, .eq('sent') missade exakt de förfallna.
+      supabase.from('invoice').select('id:invoice_id, total_amount:total').eq('business_id', business.business_id).in('status', ['sent', 'overdue']),
       supabase.from('business_config').select('overhead_monthly_sek, margin_target_percent').eq('business_id', business.business_id).single(),
     ]).then(([invRes, unpaidRes, bizRes]) => {
       const invoiced = (invRes.data || []).reduce((s: number, i: any) => s + (Number(i.total_amount) || 0), 0)
@@ -393,13 +394,11 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Morgonbriefen — Matte talar först. Rik per-agent-lägesrapport
-            (lib/matte/morning-brief.ts), kontext INNAN kön (IdagCore) som
-            förblir den primära interaktionen. Renderar inget vid cold start
-            utan signal (se MorningBriefWidget). */}
-        <div className="mb-6">
-          <MorningBriefWidget />
-        </div>
+        {/* Morgonbriefen har flyttat in i agentremsan (TeamActivityStrip,
+            del av IdagCore nedan) — samma yta som tidigare var två staplade
+            "Ditt AI-team idag"-sektioner är nu en. Fristående montering av
+            MorningBriefWidget borttagen (dashboard-städpaketet del D);
+            komponentfilen ligger kvar orörd om den behövs igen. */}
 
         {/* Kärnstacken: bevisband → agentremsa → godkänn-kö → Klart idag →
             drill-rad → KPI-fot. Se IdagCore för detaljer. */}
