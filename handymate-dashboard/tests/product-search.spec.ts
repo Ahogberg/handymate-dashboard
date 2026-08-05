@@ -103,9 +103,12 @@ test.describe('rankBySearchMatch — ordning och renhet', () => {
 })
 
 test.describe('branschsortimentet — ingen kund startar tom', () => {
-  test('alla branscher ger minst 8 artiklar', () => {
+  test('alla branscher ger minst 12 artiklar', () => {
+    // En artikelbank med en handfull rader känns tom och gör AI-offerten
+    // tunn. Tröskeln höjdes efter att städ, flytt, vent, lås och "övrigt"
+    // visat sig ligga under de andra branscherna.
     for (const branch of getSeededBranches()) {
-      expect(getDefaultProducts(branch).length, `${branch} har för få artiklar`).toBeGreaterThanOrEqual(8)
+      expect(getDefaultProducts(branch).length, `${branch} har för få artiklar`).toBeGreaterThanOrEqual(12)
     }
   })
 
