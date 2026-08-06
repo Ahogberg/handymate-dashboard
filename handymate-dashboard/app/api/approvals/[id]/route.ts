@@ -1357,30 +1357,77 @@ async function executeApprovalPayload(
        * SMS. Utan svarstext görs ingenting mer än kvitteringen — vi hittar
        * aldrig på ett svar åt honom.
        */
-      case 'customer_quote_question': {
+      /**
+       * Hantverkarens svar på ett kundmeddelande — både offertfrågor och
+       * vanliga portalmeddelanden.
+       *
+       * Svaret skrivs i kundens portaltråd (där hela samtalet bor) och kunden
+       * får ett kort SMS som drar tillbaka hen dit. Tidigare skickades hela
+       * svaret som SMS, vilket splittrade samtalet: frågan i portalen, svaret
+       * i telefonen, utan sammanhang.
+       *
+       * Texten kommer ur `payload.message` — den förifyllda mallen som
+       * hantverkaren skrivit klart i "Redigera"-rutan. Är den orörd (bara
+       * mallen) skickas inget; vi hittar aldrig på ett svar åt honom.
+       */
+      case 'customer_quote_question':
+      case 'customer_message': {
         const pl = payload as any
-        const reply = typeof pl.reply === 'string' ? pl.reply.trim() : ''
+        const reply = typeof pl.message === 'string' ? pl.message.trim() : ''
+        const { buildReplyDraft } = await import('@/lib/portal/customer-thread')
+        const untouchedDraft = buildReplyDraft(pl.customer_name || '').trim()
+        const isUnansweredDraft = !reply || reply === untouchedDraft
 
-        if (!reply || !pl.customer_phone) {
+        if (isUnansweredDraft || !pl.customer_id) {
           return {
-            action: 'customer_quote_question',
+            action: approval_type,
             acknowledged: true,
             customer: pl.customer_name || null,
             question: pl.question || null,
           }
         }
 
-        const r = await sendSms({
-          to: pl.customer_phone,
+        const supabaseMsg = await getSupabase()
+        const { sendCustomerReply, buildReplyNotificationSms } = await import('@/lib/portal/customer-thread')
+        const written = await sendCustomerReply(supabaseMsg, {
+          businessId,
+          customerId: pl.customer_id,
           message: reply,
-          customerId: pl.customer_id || null,
-          relatedId: pl.quote_id || null,
-          messageType: 'quote_question_reply',
         })
+
+        if (!written) {
+          return { action: approval_type, error: 'Svaret kunde inte sparas i kundens tråd' }
+        }
+
+        // Avisering: kort SMS med portallänken. Går via sendSms-closuren så
+        // VP1:s kvot och opt-out gäller — en kund som sagt STOPP får inget.
+        let smsSent = false
+        let smsError: string | undefined
+        if (pl.customer_phone) {
+          try {
+            const { getOrCreatePortalLink } = await import('@/lib/portal-link')
+            const portalUrl = await getOrCreatePortalLink(supabaseMsg, pl.customer_id, 'messages')
+            if (portalUrl) {
+              const r = await sendSms({
+                to: pl.customer_phone,
+                message: buildReplyNotificationSms(await getBusinessName(), portalUrl),
+                customerId: pl.customer_id,
+                relatedId: pl.quote_id || null,
+                messageType: 'portal_reply_notice',
+              })
+              smsSent = r.sms_sent
+              smsError = r.error
+            }
+          } catch (err: any) {
+            smsError = err?.message || 'avisering misslyckades'
+          }
+        }
+
         return {
-          action: 'customer_quote_question',
-          sms_sent: r.sms_sent,
-          error: r.error,
+          action: approval_type,
+          reply_saved: true,
+          sms_sent: smsSent,
+          error: smsError,
           customer: pl.customer_name || null,
         }
       }

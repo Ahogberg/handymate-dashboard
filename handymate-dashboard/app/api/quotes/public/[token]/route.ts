@@ -350,44 +350,33 @@ export async function POST(
         aboutRow = item?.description || null
       }
 
-      const customerName = (quote.customer as any)?.name || 'Kunden'
-      const { error: approvalErr } = await supabase.from('pending_approvals').insert({
-        id: `appr_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-        business_id: quote.business_id,
-        approval_type: 'customer_quote_question',
-        title: aboutRow
-          ? `${customerName} frågar om "${aboutRow}"`
-          : `${customerName} har en fråga om offerten`,
-        description: questionText,
-        payload: {
-          agent: 'daniel',
-          quote_id: quote.quote_id,
-          quote_number: (quote as any).quote_number || null,
-          quote_title: (quote as any).title || null,
-          customer_id: quote.customer_id,
-          customer_name: customerName,
-          customer_phone: (quote.customer as any)?.phone_number || null,
-          item_id: aboutItemId,
-          item_description: aboutRow,
-          question: questionText,
-        },
-        status: 'pending',
-        risk_level: 'low',
-      })
-
-      if (approvalErr) {
-        console.error('[quote/public] kundfråga kunde inte sparas:', approvalErr.message)
-        return NextResponse.json({ error: 'Kunde inte skicka frågan — försök igen' }, { status: 500 })
+      // Går genom den delade vägen (lib/portal/customer-thread.ts) så frågan
+      // hamnar i kundens portaltråd OCH som kort hos hantverkaren. Kunden ska
+      // kunna se vad hen frågat, och svaret kommer tillbaka i samma tråd —
+      // ett samtal, inte två system.
+      if (!quote.customer_id) {
+        return NextResponse.json({ error: 'Offerten saknar kundkoppling' }, { status: 400 })
       }
 
-      try {
-        const { sendApprovalPush } = await import('@/lib/notifications/approval-push')
-        void sendApprovalPush({
-          business_id: quote.business_id,
-          approval_type: 'customer_quote_question',
-          payload: { customer_name: customerName, question: questionText },
-        })
-      } catch { /* non-blocking */ }
+      const { receiveCustomerMessage } = await import('@/lib/portal/customer-thread')
+      const result = await receiveCustomerMessage(supabase, {
+        businessId: quote.business_id,
+        customerId: quote.customer_id,
+        customerName: (quote.customer as any)?.name || null,
+        customerPhone: (quote.customer as any)?.phone_number || null,
+        message: questionText,
+        quote: {
+          quoteId: quote.quote_id,
+          quoteNumber: (quote as any).quote_number || null,
+          quoteTitle: (quote as any).title || null,
+          itemId: aboutItemId,
+          itemDescription: aboutRow,
+        },
+      })
+
+      if (!result.threadWritten && !result.approvalCreated) {
+        return NextResponse.json({ error: 'Kunde inte skicka frågan — försök igen' }, { status: 500 })
+      }
 
       return NextResponse.json({ success: true })
     }

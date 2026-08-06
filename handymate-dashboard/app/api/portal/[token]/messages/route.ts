@@ -5,7 +5,7 @@ async function getCustomerFromToken(token: string) {
   const supabase = getServerSupabase()
   const { data } = await supabase
     .from('customer')
-    .select('customer_id, business_id, portal_enabled')
+    .select('customer_id, business_id, portal_enabled, name, phone_number')
     .eq('portal_token', token)
     .single()
   if (!data || !data.portal_enabled) return null
@@ -58,20 +58,24 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
     const supabase = getServerSupabase()
 
-    const { data, error } = await supabase
-      .from('customer_message')
-      .insert({
-        business_id: customer.business_id,
-        customer_id: customer.customer_id,
-        direction: 'inbound',
-        message: message.trim()
-      })
-      .select()
-      .single()
+    // Tidigare skrevs meddelandet bara till tabellen och stannade där: ingen
+    // vy i dashboarden, ingen notis, ingen kö. Kundens meddelanden var ett
+    // svart hål — skrev en pilotkund något såg hantverkaren det aldrig.
+    // Nu går allt genom den delade vägen: tråd + kort i godkännande-kön + push.
+    const { receiveCustomerMessage } = await import('@/lib/portal/customer-thread')
+    const result = await receiveCustomerMessage(supabase, {
+      businessId: customer.business_id,
+      customerId: customer.customer_id,
+      customerName: (customer as any).name,
+      customerPhone: (customer as any).phone_number,
+      message,
+    })
 
-    if (error) throw error
+    if (!result.threadWritten) {
+      return NextResponse.json({ error: 'Kunde inte skicka meddelande' }, { status: 500 })
+    }
 
-    return NextResponse.json({ success: true, message: data })
+    return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('Portal message send error:', error)
     return NextResponse.json({ error: 'Kunde inte skicka meddelande' }, { status: 500 })
