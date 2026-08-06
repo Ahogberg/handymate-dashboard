@@ -53,25 +53,41 @@ v91 (reservationer).
   (≥5 avböjda, ≥40 % andel OCH ≥3 i kategorin)
 - Kundvyn och portalen skickar nu samma reason_code
 
+**Idé 4 — signera → boka** (`0ae7c46f`)
+- Lediga starttider ur kapacitetsmotorn direkt i signeringsbekräftelsen
+- Föreslår aldrig en dag utan verklig ledig kapacitet; högst ett förslag
+  per vecka; minst tre dagars framförhållning
+- Kundens val blir ett ÖNSKEMÅL i godkännande-kön, inte en bokning rakt in
+  i kalendern — kunden får veta att tiden är preliminär
+
+**Idé 5 — kundens fråga** (`a82d63d7`)
+- Fråga direkt i offerten → kort i godkännande-kön + push
+- Handlaren ligger före status-guarderna: en fråga är aldrig skadlig
+- Nytt approval_type customer_quote_question; godkännande = "jag har sett
+  den". Svarstext skickas som SMS, utan text görs inget mer
+
+**Idé 6 — referensfoton** (`a82d63d7`)
+- 'after'-foton från egna avslutade projekt i kundvyn
+- Rubriken säger "Liknande jobb" BARA vid verkligt ordöverlapp, annars
+  "Tidigare jobb" — stoppord kan aldrig skapa falsk likhet
+
+**Artikelbanken påfylld** (`1b319665`) — alla branscher 12–24 artiklar
+(städ, flytt, vent, lås och övrigt låg på 8–15). Facit-tröskeln höjd till 12.
+
 ## KVAR ATT BYGGA
 
-**Idé 2b — förlustanalysens yta.** Motorn och datat finns; det som saknas är
-kortet som visar `summarizeDeclineReasons` + `buildDeclineInsight` för
-hantverkaren. Naturlig plats: /dashboard/analytics eller ett kort på
-offertlistan. Litet jobb nu när aggregeringen är facit-testad.
-
-**Idé 4 — signera → boka direkt.** Kapacitetsmotorn (lib/capacity) finns.
-Efter signering: "Vi har plats vecka 38 — passar det?" i signeringsflödet.
-
-**Idé 5 — kundens fråga per rad.** Kunden trycker på en rad i kundvyn och
-frågar; frågan landar som kort i godkännande-kön. Gör offerten till en kanal.
-
-**Idé 6 — automatiska referensfoton.** project_photos finns. Bifoga 2–3 foton
-från tidigare liknande jobb i kundvyn.
+**Idé 2b — förlustanalysens yta.** Motorn och datat finns
+(`summarizeDeclineReasons` + `buildDeclineInsight`, facit-testade); det som
+saknas är kortet som visar det. Naturlig plats: /dashboard/analytics eller
+offertlistan. Litet jobb.
 
 **Etapp 4 — offertkoll före utskick.** Regelbaserad checklista i
 skickadialogen: rader på 0 kr, osedda reservationsförslag, ROT utan
 personnummer, passerat giltighetsdatum, betalplan som inte summerar.
+
+**Idé 5b — fråga per RAD.** Backend tar redan emot `item_id` och visar radens
+beskrivning i kortets titel. Kundvyn skickar i dag bara en allmän fråga —
+en liten frågeknapp per rad i dokumentet återstår.
 
 ## ÖPPNA PUNKTER
 
