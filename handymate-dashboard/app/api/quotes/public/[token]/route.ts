@@ -90,6 +90,10 @@ export async function GET(
     // Check if already signed
     const alreadySigned = quote.status === 'accepted' && quote.signed_at
 
+    // Referensfoton — fail-soft, en bonus som aldrig får fälla offertvyn.
+    const { getReferencePhotos } = await import('@/lib/quotes/reference-photos')
+    const referencePhotos = await getReferencePhotos(supabase, quote.business_id, (quote as any).title)
+
     // ── Visningsnivå (Del C) — filtrera SERVER-SIDE innan svaret ──────────────
     // Kunden får ALDRIG à-priser den inte ska se ur nätverkssvaret.
     // 'summary' → gruppsummor (display_groups) + endast tillval i structured_items
@@ -228,6 +232,10 @@ export async function GET(
         accent_color: business?.accent_color || null,
       },
       alreadySigned,
+      // Referensfoton från hantverkarens egna avslutade jobb. Kunden jämför
+      // två-tre offerter — vår ska vara den enda som visar hur det blev.
+      // null när det inte finns något att visa; aldrig ett tomt block.
+      reference_photos: referencePhotos,
     })
 
   } catch (error: any) {
@@ -264,6 +272,78 @@ export async function POST(
         { status: 404 }
       )
     }
+
+    // ── Kundens fråga ─────────────────────────────────────────────────────────
+    // Offerten slutar vara ett dokument och blir en kanal. En kund som undrar
+    // vad en rad innebär hör oftast inte av sig alls — hen tackar nej i
+    // tysthet. Frågan landar som ett kort i godkännande-kön, med raden som
+    // kontext, så hantverkaren kan svara på det som faktiskt oroar.
+    //
+    // Ligger FÖRE status-guarderna nedan: en fråga är aldrig skadlig, och de
+    // guarderna finns för att skydda mot dubbla BESLUT — inte mot samtal.
+    if (action === 'question') {
+      const questionText = typeof body.question === 'string' ? body.question.trim() : ''
+      if (!questionText) {
+        return NextResponse.json({ error: 'Skriv din fråga först' }, { status: 400 })
+      }
+      if (questionText.length > 1000) {
+        return NextResponse.json({ error: 'Frågan är för lång — korta ner den lite.' }, { status: 400 })
+      }
+
+      const aboutItemId = typeof body.item_id === 'string' ? body.item_id : null
+      let aboutRow: string | null = null
+      if (aboutItemId) {
+        const { data: item } = await supabase
+          .from('quote_items')
+          .select('description')
+          .eq('id', aboutItemId)
+          .eq('quote_id', quote.quote_id)
+          .maybeSingle()
+        aboutRow = item?.description || null
+      }
+
+      const customerName = (quote.customer as any)?.name || 'Kunden'
+      const { error: approvalErr } = await supabase.from('pending_approvals').insert({
+        id: `appr_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        business_id: quote.business_id,
+        approval_type: 'customer_quote_question',
+        title: aboutRow
+          ? `${customerName} frågar om "${aboutRow}"`
+          : `${customerName} har en fråga om offerten`,
+        description: questionText,
+        payload: {
+          agent: 'daniel',
+          quote_id: quote.quote_id,
+          quote_number: (quote as any).quote_number || null,
+          quote_title: (quote as any).title || null,
+          customer_id: quote.customer_id,
+          customer_name: customerName,
+          customer_phone: (quote.customer as any)?.phone_number || null,
+          item_id: aboutItemId,
+          item_description: aboutRow,
+          question: questionText,
+        },
+        status: 'pending',
+        risk_level: 'low',
+      })
+
+      if (approvalErr) {
+        console.error('[quote/public] kundfråga kunde inte sparas:', approvalErr.message)
+        return NextResponse.json({ error: 'Kunde inte skicka frågan — försök igen' }, { status: 500 })
+      }
+
+      try {
+        const { sendApprovalPush } = await import('@/lib/notifications/approval-push')
+        void sendApprovalPush({
+          business_id: quote.business_id,
+          approval_type: 'customer_quote_question',
+          payload: { customer_name: customerName, question: questionText },
+        })
+      } catch { /* non-blocking */ }
+
+      return NextResponse.json({ success: true })
+    }
+
 
     if (quote.status === 'accepted' && quote.signed_at) {
       return NextResponse.json({ error: 'Offerten är redan signerad' }, { status: 400 })

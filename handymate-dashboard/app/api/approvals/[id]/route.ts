@@ -1348,6 +1348,43 @@ async function executeApprovalPayload(
         return { action: 'low_stock_alert', acknowledged: true }
       }
 
+      /**
+       * Kundens fråga om en offert (idé 5). Kortet är en NOTIS, inte en
+       * åtgärd — hantverkaren ringer eller skriver själv. Godkännandet
+       * betyder "jag har sett och tagit hand om den".
+       *
+       * Har hantverkaren skrivit ett svar i redigeringsläget skickas det som
+       * SMS. Utan svarstext görs ingenting mer än kvitteringen — vi hittar
+       * aldrig på ett svar åt honom.
+       */
+      case 'customer_quote_question': {
+        const pl = payload as any
+        const reply = typeof pl.reply === 'string' ? pl.reply.trim() : ''
+
+        if (!reply || !pl.customer_phone) {
+          return {
+            action: 'customer_quote_question',
+            acknowledged: true,
+            customer: pl.customer_name || null,
+            question: pl.question || null,
+          }
+        }
+
+        const r = await sendSms({
+          to: pl.customer_phone,
+          message: reply,
+          customerId: pl.customer_id || null,
+          relatedId: pl.quote_id || null,
+          messageType: 'quote_question_reply',
+        })
+        return {
+          action: 'customer_quote_question',
+          sms_sent: r.sms_sent,
+          error: r.error,
+          customer: pl.customer_name || null,
+        }
+      }
+
       case 'four_eyes_quote': {
         const pl = payload as any
         if (!pl.quote_id) return { action: 'four_eyes_quote', skipped: 'no quote_id' }

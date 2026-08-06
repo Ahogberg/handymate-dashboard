@@ -113,6 +113,13 @@ export default function QuoteSignPage() {
 
   const [state, setState] = useState<PageState>('loading')
   const [quote, setQuote] = useState<QuoteData | null>(null)
+  // Referensfoton från hantverkarens egna avslutade jobb (idé 6).
+  const [referencePhotos, setReferencePhotos] = useState<
+    { heading: string; isSimilar: boolean; photos: { url: string; caption: string | null }[] } | null
+  >(null)
+  // Kundens fråga om offerten (idé 5) — landar som kort i godkännande-kön.
+  const [questionText, setQuestionText] = useState('')
+  const [questionState, setQuestionState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [business, setBusiness] = useState<BusinessInfo | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [name, setName] = useState('')
@@ -146,6 +153,7 @@ export default function QuoteSignPage() {
         }
 
         const { quote: quoteData, business: businessData, alreadySigned } = data
+        setReferencePhotos(data.reference_photos || null)
 
         // Redirect till kundportalen om kunden har portal_token — all offerthantering sker där
         if (quoteData?.customer?.portal_token) {
@@ -395,6 +403,32 @@ export default function QuoteSignPage() {
       setErrorMessage('Något gick fel. Försök igen.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // ── Kundens fråga (idé 5) ──────────────────────────────────────────────────
+  // En kund som undrar något hör oftast inte av sig alls — hen tackar nej i
+  // tysthet. Frågan landar direkt i hantverkarens godkännande-kö.
+
+  async function handleAskQuestion() {
+    const text = questionText.trim()
+    if (!text || questionState === 'sending') return
+
+    setQuestionState('sending')
+    try {
+      const res = await fetch(`/api/quotes/public/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'question', question: text }),
+      })
+      if (res.ok) {
+        setQuestionState('sent')
+        setQuestionText('')
+      } else {
+        setQuestionState('error')
+      }
+    } catch {
+      setQuestionState('error')
     }
   }
 
@@ -916,6 +950,73 @@ export default function QuoteSignPage() {
                       : 'Bekräfta att du godkänner villkoren'}{' '}
                   för att fortsätta
                 </p>
+              )}
+            </div>
+
+            {/* Referensfoton (idé 6) — bevis utan arbete. Kunden jämför
+                två-tre offerter; vår är den enda som visar hur det blev. */}
+            {referencePhotos && referencePhotos.photos.length > 0 && (
+              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 mb-8">
+                <h3 className="text-base font-semibold text-gray-900 mb-1">{referencePhotos.heading}</h3>
+                <p className="text-gray-400 text-xs mb-4">Foton från våra egna avslutade projekt</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {referencePhotos.photos.map((p, i) => (
+                    <figure key={i} className="min-w-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={p.url}
+                        alt={p.caption || 'Foto från ett tidigare jobb'}
+                        loading="lazy"
+                        className="w-full h-40 object-cover rounded-xl border border-gray-100 bg-gray-50"
+                      />
+                      {p.caption && (
+                        <figcaption className="mt-1.5 text-xs text-gray-500">{p.caption}</figcaption>
+                      )}
+                    </figure>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Kundens fråga (idé 5) — offerten blir en kanal, inte ett
+                dokument. Frågan landar direkt i hantverkarens kö. */}
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 mb-8">
+              <h3 className="text-base font-semibold text-gray-900 mb-1">Undrar du något?</h3>
+              <p className="text-gray-400 text-xs mb-4">
+                Skriv din fråga här så återkommer vi — du behöver inte bestämma dig nu.
+              </p>
+
+              {questionState === 'sent' ? (
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                  <CheckCircle className="w-5 h-5 text-gray-500 shrink-0 mt-0.5" />
+                  <p className="text-sm text-gray-700">
+                    Tack — din fråga är skickad. Vi hör av oss så snart vi kan.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <textarea
+                    value={questionText}
+                    onChange={(e) => setQuestionText(e.target.value)}
+                    rows={3}
+                    maxLength={1000}
+                    placeholder="Till exempel: vad ingår i rivningen?"
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  />
+                  {questionState === 'error' && (
+                    <p className="mt-2 text-xs text-red-600">
+                      Frågan kunde inte skickas. Försök igen.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleAskQuestion}
+                    disabled={!questionText.trim() || questionState === 'sending'}
+                    className="mt-3 min-h-[44px] px-5 bg-gray-900 hover:bg-gray-800 disabled:opacity-40 text-white text-sm font-semibold rounded-xl transition-colors"
+                  >
+                    {questionState === 'sending' ? 'Skickar…' : 'Skicka fråga'}
+                  </button>
+                </>
               )}
             </div>
 
