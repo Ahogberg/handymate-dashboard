@@ -48,7 +48,11 @@ export default function CustomerPortalPage() {
     if (t === 'review') return { tab: 'home' as BottomTab, sub: 'review' as SubRoute }
     if (t === 'messages') return { tab: 'home' as BottomTab, sub: 'messages' as SubRoute }
     if (t === 'projects' || t === 'project') return { tab: 'project' as BottomTab, sub: null }
-    if (t === 'invoices' || t === 'quotes' || t === 'docs') return { tab: 'docs' as BottomTab, sub: null }
+    // ?tab=quotes kommer från offert-SMS:et och länken i utskicksmejlet —
+    // kunden ska landa PÅ offerten, inte i dokumentlistan där hen måste leta
+    // reda på den själv.
+    if (t === 'quotes') return { tab: 'docs' as BottomTab, sub: 'quote' as SubRoute }
+    if (t === 'invoices' || t === 'docs') return { tab: 'docs' as BottomTab, sub: null }
     if (t === 'contact') return { tab: 'contact' as BottomTab, sub: null }
     return { tab: 'home' as BottomTab, sub: null }
   })()

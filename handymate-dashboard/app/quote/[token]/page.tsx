@@ -175,8 +175,15 @@ export default function QuoteSignPage() {
         const { quote: quoteData, business: businessData, alreadySigned } = data
         setReferencePhotos(data.reference_photos || null)
 
-        // Redirect till kundportalen om kunden har portal_token — all offerthantering sker där
-        if (quoteData?.customer?.portal_token) {
+        // Redirect till kundportalen om kunden har portal_token — all
+        // offerthantering sker där.
+        //
+        // UNDANTAG ?portal=1: portalens "Läs offerten"-länk pekar hit för att
+        // visa själva dokumentet. Utan undantaget studsade den direkt tillbaka
+        // till portalen och kunden kunde ALDRIG läsa offerten — bara ladda ner
+        // den som PDF.
+        const cameFromPortal = new URLSearchParams(window.location.search).get('portal') === '1'
+        if (quoteData?.customer?.portal_token && !cameFromPortal) {
           window.location.replace(`/portal/${quoteData.customer.portal_token}?tab=quotes`)
           return
         }

@@ -19,6 +19,18 @@ interface PortalQuoteSigningModalProps {
   onClose: () => void
 }
 
+interface ReferencePhotos {
+  heading: string
+  isSimilar: boolean
+  photos: { url: string; caption: string | null }[]
+}
+
+interface BookingSuggestion {
+  date: string
+  week: number
+  bookableHours: number
+}
+
 /**
  * Bottom-sheet signing-modal (port av Claude Designs BPSignModal).
  * Två-stegs flöde: Granska (med villkors-checkbox) → Signera (canvas + namn).
@@ -50,6 +62,51 @@ export default function PortalQuoteSigningModal({
   // är à-priserna strippade och klienten kan inte summera basen själv.
   const [baseTotals, setBaseTotals] = useState<QuoteTotals | null>(null)
 
+  // Referensfoton från hantverkarens egna avslutade jobb. Fanns redan i GET-
+  // svaret men lästes aldrig — kunden såg dem alltså aldrig.
+  const [referencePhotos, setReferencePhotos] = useState<ReferencePhotos | null>(null)
+
+  // Kundens fråga om offerten — landar i portaltråden och som kort i kön.
+  const [questionText, setQuestionText] = useState('')
+  const [questionState, setQuestionState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+
+  // Efter signering: föreslagna starttider ur kapacitetsmotorn.
+  const [signed, setSigned] = useState(false)
+  const [bookingSuggestions, setBookingSuggestions] = useState<BookingSuggestion[]>([])
+  const [bookingState, setBookingState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+
+  async function askQuestion() {
+    const text = questionText.trim()
+    if (!text || questionState === 'sending') return
+    setQuestionState('sending')
+    try {
+      const res = await fetch(`/api/quotes/public/${quote.sign_token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'question', question: text }),
+      })
+      setQuestionState(res.ok ? 'sent' : 'error')
+      if (res.ok) setQuestionText('')
+    } catch {
+      setQuestionState('error')
+    }
+  }
+
+  async function requestBooking(date: string) {
+    if (bookingState === 'sending') return
+    setBookingState('sending')
+    try {
+      const res = await fetch(`/api/quotes/public/${quote.sign_token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'request_booking', date }),
+      })
+      setBookingState(res.ok ? 'sent' : 'error')
+    } catch {
+      setBookingState('error')
+    }
+  }
+
   useEffect(() => {
     if (step === 1) setTimeout(() => canvasRef.current?.init(), 100)
   }, [step])
@@ -75,6 +132,7 @@ export default function PortalQuoteSigningModal({
           vatRate: data.quote.vat_rate ?? 25,
         })
         setBaseTotals(data.quote.base_totals ?? null)
+        setReferencePhotos(data.reference_photos ?? null)
       })
       .catch(() => { /* tillval visas ej — signering fungerar ändå */ })
     return () => { cancelled = true }
@@ -147,11 +205,20 @@ export default function PortalQuoteSigningModal({
           selected_option_ids: Array.from(selectedOptions),
         }),
       })
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
         alert(data.error || 'Kunde inte signera offerten')
       } else {
-        onSigned(quote.quote_id)
+        // Serverns svar bär föreslagna starttider ur kapacitetsmotorn. Tidigare
+        // kastades responskroppen bort, så kunden gick därifrån utan datum och
+        // bokningen blev ett telefonsamtal som skulle jagas.
+        const suggestions = (data.booking_suggestions || []) as BookingSuggestion[]
+        if (suggestions.length > 0) {
+          setBookingSuggestions(suggestions)
+          setSigned(true)
+        } else {
+          onSigned(quote.quote_id)
+        }
       }
     } catch {
       alert('Kunde inte signera offerten')
@@ -215,7 +282,92 @@ export default function PortalQuoteSigningModal({
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 18 }}>
-          {step === 0 ? (
+          {/* Kvittensvy efter signering: föreslagna starttider ur
+              kapacitetsmotorn. Signeringen är det enda ögonblick då kunden är
+              maximalt engagerad — går hen därifrån utan datum blir bokningen
+              ett telefonsamtal som ska jagas. */}
+          {signed ? (
+            <>
+              <div
+                style={{
+                  padding: 16,
+                  background: 'var(--green-50, #ecfdf5)',
+                  borderRadius: 'var(--r-lg)',
+                  marginBottom: 18,
+                  display: 'flex',
+                  gap: 12,
+                }}
+              >
+                <Check size={20} style={{ flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>Tack — offerten är signerad.</div>
+                  <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 2, lineHeight: 1.45 }}>
+                    Vi hör av oss med nästa steg.
+                  </div>
+                </div>
+              </div>
+
+              {bookingState === 'sent' ? (
+                <div
+                  style={{
+                    padding: 14,
+                    background: 'var(--bg)',
+                    borderRadius: 'var(--r-md)',
+                    fontSize: 13,
+                    color: 'var(--ink-2)',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  Tack — vi har fått ditt önskemål och bekräftar tiden så snart vi kan.
+                  <strong> Den är preliminär tills dess.</strong>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
+                    När vill du att vi börjar?
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.45 }}>
+                    Tiderna nedan har vi ledigt. Välj en så återkommer vi med bekräftelse — det är
+                    ett önskemål, inte en bokad tid.
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {bookingSuggestions.map(s => {
+                      const d = new Date(`${s.date}T12:00:00Z`)
+                      const weekday = d.toLocaleDateString('sv-SE', { weekday: 'long', timeZone: 'Europe/Stockholm' })
+                      const dayMonth = d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', timeZone: 'Europe/Stockholm' })
+                      return (
+                        <button
+                          key={s.date}
+                          type="button"
+                          onClick={() => requestBooking(s.date)}
+                          disabled={bookingState === 'sending'}
+                          style={{
+                            textAlign: 'left',
+                            padding: '12px 14px',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--r-md)',
+                            background: '#fff',
+                            cursor: 'pointer',
+                            minHeight: 44,
+                          }}
+                        >
+                          <div style={{ fontSize: 14, fontWeight: 700 }}>Vecka {s.week}</div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, textTransform: 'capitalize' }}>
+                            {weekday} {dayMonth}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {bookingState === 'error' && (
+                    <p style={{ fontSize: 12, color: '#b91c1c', marginTop: 10 }}>
+                      Önskemålet kunde inte skickas. Hör av dig till oss i stället.
+                    </p>
+                  )}
+                </>
+              )}
+            </>
+          ) : step === 0 ? (
             <>
               <div
                 style={{
@@ -357,11 +509,51 @@ export default function PortalQuoteSigningModal({
                 </div>
               )}
 
+              {/* Referensfoton — kunden jämför två-tre offerter; vår ska vara
+                  den enda som visar hur jobbet faktiskt blev. */}
+              {referencePhotos && referencePhotos.photos.length > 0 && (
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
+                    {referencePhotos.heading}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>
+                    Foton från våra egna avslutade projekt
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                    {referencePhotos.photos.map((p, i) => (
+                      <figure key={i} style={{ margin: 0, minWidth: 0 }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={p.url}
+                          alt={p.caption || 'Foto från ett tidigare jobb'}
+                          loading="lazy"
+                          style={{
+                            width: '100%',
+                            height: 84,
+                            objectFit: 'cover',
+                            borderRadius: 'var(--r-md)',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg)',
+                          }}
+                        />
+                        {p.caption && (
+                          <figcaption style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
+                            {p.caption}
+                          </figcaption>
+                        )}
+                      </figure>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {quote.sign_token && (
                 <div style={{ marginBottom: 18 }}>
                   <a
                     className="bp-cta ghost"
-                    href={`/quote/${quote.sign_token}`}
+                    /* ?portal=1 — utan den redirectar /quote/[token] tillbaka
+                       hit och kunden hamnar i en loop utan att se dokumentet. */
+                    href={`/quote/${quote.sign_token}?portal=1`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -422,6 +614,67 @@ export default function PortalQuoteSigningModal({
                   Jag har läst offerten och godkänner villkoren
                 </span>
               </label>
+
+              {/* Kundens fråga — en kund som undrar något hör oftast inte av
+                  sig alls, hen tackar nej i tysthet. Frågan landar i
+                  portaltråden och som ett kort hos hantverkaren. */}
+              <div style={{ marginTop: 18 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>Undrar du något?</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>
+                  Skriv din fråga så återkommer vi — du behöver inte bestämma dig nu.
+                </div>
+
+                {questionState === 'sent' ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 10,
+                      padding: 12,
+                      background: 'var(--bg)',
+                      borderRadius: 'var(--r-md)',
+                      fontSize: 13,
+                      color: 'var(--ink-2)',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    <Check size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                    Tack — din fråga är skickad. Du hittar den i dina meddelanden.
+                  </div>
+                ) : (
+                  <>
+                    <textarea
+                      value={questionText}
+                      onChange={e => setQuestionText(e.target.value)}
+                      rows={3}
+                      maxLength={1000}
+                      placeholder="Till exempel: vad ingår i rivningen?"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--r-md)',
+                        fontSize: 14,
+                        fontFamily: 'inherit',
+                        resize: 'vertical',
+                      }}
+                    />
+                    {questionState === 'error' && (
+                      <p style={{ fontSize: 12, color: '#b91c1c', marginTop: 6 }}>
+                        Frågan kunde inte skickas. Försök igen.
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      className="bp-cta ghost"
+                      onClick={askQuestion}
+                      disabled={!questionText.trim() || questionState === 'sending'}
+                      style={{ marginTop: 10 }}
+                    >
+                      {questionState === 'sending' ? 'Skickar…' : 'Skicka fråga'}
+                    </button>
+                  </>
+                )}
+              </div>
             </>
           ) : (
             <>
@@ -523,7 +776,15 @@ export default function PortalQuoteSigningModal({
         </div>
 
         <div style={{ padding: 18, borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
-          {step === 0 ? (
+          {signed ? (
+            <button
+              type="button"
+              className="bp-cta bee"
+              onClick={() => onSigned(quote.quote_id)}
+            >
+              {bookingState === 'sent' ? 'Klart' : 'Stäng — jag väljer tid senare'}
+            </button>
+          ) : step === 0 ? (
             <button
               type="button"
               className="bp-cta bee"
