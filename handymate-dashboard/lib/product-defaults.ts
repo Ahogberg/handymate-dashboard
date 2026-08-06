@@ -65,6 +65,89 @@ const BRANCH_PRODUCTS: Record<string, ProductDefault[]> = {
     { sku: 'HM-EL-055', name: 'Elkabel EKK 3x1,5', unit: 'lpm', unit_price: 28, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
     { sku: 'HM-EL-056', name: 'Elcentral 12 moduler', unit: 'st', unit_price: 2800, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
     { sku: 'HM-EL-057', name: 'Laddbox 11 kW', unit: 'st', unit_price: 9500, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+
+    // ─── Utökningen 2026-08-06: prislös långsvans ──────────────────────────
+    // Raderna ovan behåller sina startpriser — tjugo artiklar granskar
+    // hantverkaren på tio minuter. Långsvansen nedan seedas PRISLÖS, för ett
+    // ogranskat gissat pris är sämre än inget: systemet quotar det med full
+    // självsäkerhet i offerten, telefonagenten och storefronten. Priset sätts
+    // första gången artikeln används (lib/products/pricing-state.ts).
+    { sku: 'HM-EL-004', name: 'Lärling', description: 'Medhjälpare på plats', unit: 'tim', unit_price: 0, category: 'arbete', legacy_category: 'labor', labor_share: 1, deduction: 'rot' },
+    { sku: 'HM-EL-005', name: 'Projektering och elritning', unit: 'tim', unit_price: 0, category: 'arbete', legacy_category: 'labor', labor_share: 1, deduction: null },
+    { sku: 'HM-EL-006', name: 'Dokumentation och egenkontroll', unit: 'tim', unit_price: 0, category: 'arbete', legacy_category: 'labor', labor_share: 1, deduction: 'rot' },
+
+    { sku: 'HM-EL-020', name: 'Installation utomhusbelysning', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.7, deduction: 'rot' },
+    { sku: 'HM-EL-021', name: 'Installation motorvärmaruttag', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-EL-022', name: 'Byte av strömbrytare', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.8, deduction: 'rot' },
+    { sku: 'HM-EL-023', name: 'Byte av vägguttag', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.8, deduction: 'rot' },
+    { sku: 'HM-EL-024', name: 'Installation dimmer', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-EL-025', name: 'Installation golvvärmetermostat', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-EL-026', name: 'Installation köksfläkt', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.7, deduction: 'rot' },
+    { sku: 'HM-EL-027', name: 'Inkoppling spis och häll', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.8, deduction: 'rot' },
+    { sku: 'HM-EL-028', name: 'Inkoppling torktumlare', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.8, deduction: 'rot' },
+    { sku: 'HM-EL-029', name: 'Installation badrumsfläkt', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-EL-030', name: 'Installation brandvarnare', description: 'Seriekopplad, 230 V', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-EL-031', name: 'Installation porttelefon', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-EL-032', name: 'Installation nätverksuttag', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.7, deduction: 'rot' },
+    { sku: 'HM-EL-033', name: 'Dragning av nätverkskabel', unit: 'lpm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.7, deduction: 'rot' },
+    { sku: 'HM-EL-034', name: 'Installation TV-uttag', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.7, deduction: 'rot' },
+    { sku: 'HM-EL-035', name: 'Installation utomhusuttag', description: 'IP44, fasadmonterat', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.65, deduction: 'rot' },
+    { sku: 'HM-EL-036', name: 'Installation rörelsevakt', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-EL-037', name: 'Installation trappbelysning', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.65, deduction: 'rot' },
+    { sku: 'HM-EL-038', name: 'Installation solcellsanläggning', description: 'Montage och inkoppling, per kvadratmeter panel', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.5, deduction: 'rot' },
+    { sku: 'HM-EL-039', name: 'Installation batterilager', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.4, deduction: 'rot' },
+    { sku: 'HM-EL-040', name: 'Byte av mätarskåp', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.5, deduction: 'rot' },
+    { sku: 'HM-EL-041', name: 'Installation huvudbrytare', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-EL-042', name: 'Installation överspänningsskydd', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.5, deduction: 'rot' },
+    { sku: 'HM-EL-043', name: 'Elanslutning värmepump', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.7, deduction: 'rot' },
+    { sku: 'HM-EL-044', name: 'Installation bastuaggregat', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-EL-045', name: 'Förläggning av markkabel', unit: 'lpm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-EL-046', name: 'Håltagning och infräsning', unit: 'lpm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.85, deduction: 'rot' },
+    { sku: 'HM-EL-047', name: 'Provning och mätning av installation', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.9, deduction: 'rot' },
+    { sku: 'HM-EL-048', name: 'Termografering av elcentral', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.9, deduction: 'rot' },
+    { sku: 'HM-EL-049', name: 'Installation smart hem-styrning', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+
+    { sku: 'HM-EL-058', name: 'Dimmer', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-059', name: 'Rörelsevakt', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-060', name: 'Utomhusuttag IP44', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-061', name: 'Motorvärmaruttag', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-062', name: 'Nätverksuttag CAT6', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-063', name: 'Nätverkskabel CAT6', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-064', name: 'TV-uttag', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-065', name: 'Antennkabel', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-066', name: 'Brandvarnare 230 V', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-067', name: 'Badrumsfläkt', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-068', name: 'Köksfläkt', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-069', name: 'Utomhusarmatur', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-070', name: 'LED-list', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-071', name: 'Drivdon för LED', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-072', name: 'Transformator 12 V', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-073', name: 'Golvvärmetermostat', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-074', name: 'Golvvärmekabel', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-075', name: 'Automatsäkring 10 A', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-076', name: 'Automatsäkring 16 A', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-077', name: 'Mätarskåp', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-078', name: 'Huvudbrytare', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-079', name: 'Överspänningsskydd', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-080', name: 'Kabelkanal', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-081', name: 'Installationsrör VP20', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-082', name: 'Markkabel EKKJ 4x10', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-083', name: 'Kopplingsdosa', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-084', name: 'Apparatdosa', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-085', name: 'Kabelskydd', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-086', name: 'Solcellspanel', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-087', name: 'Växelriktare', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-088', name: 'Batterilager 10 kWh', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-089', name: 'Laddbox 22 kW', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-090', name: 'Laddstolpe', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-091', name: 'Bastuaggregat', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-092', name: 'Bastustyrning', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-093', name: 'Porttelefon', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-094', name: 'Smart strömbrytare', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-095', name: 'Styrenhet för smart hem', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-096', name: 'Kabelstege', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-097', name: 'Buntband', unit: 'paket', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-EL-098', name: 'Märkbrickor', unit: 'paket', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
   ],
 
   plumber: [
@@ -147,6 +230,81 @@ const BRANCH_PRODUCTS: Record<string, ProductDefault[]> = {
     { sku: 'HM-BYG-054', name: 'Cementbruk', unit: 'säck', unit_price: 110, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
     { sku: 'HM-BYG-080', name: 'Container 10 kbm', description: 'Hyra inkl. hämtning', unit: 'st', unit_price: 4500, category: 'hyra', legacy_category: 'service', labor_share: 0, deduction: null },
     { sku: 'HM-BYG-081', name: 'Byggställning', description: 'Hyra per vecka', unit: 'vecka', unit_price: 4500, category: 'hyra', legacy_category: 'service', labor_share: 0, deduction: null },
+
+    // ─── Utökningen 2026-08-06: prislös långsvans ──────────────────────────
+    // Se kommentaren i electrician-blocket. Raderna ovan behåller sina
+    // startpriser; långsvansen nedan seedas prislös och priset sätts första
+    // gången artikeln används.
+    { sku: 'HM-BYG-003', name: 'Byggledning och arbetsledning', unit: 'tim', unit_price: 0, category: 'arbete', legacy_category: 'labor', labor_share: 1, deduction: 'rot' },
+    { sku: 'HM-BYG-004', name: 'Lärling', description: 'Medhjälpare på plats', unit: 'tim', unit_price: 0, category: 'arbete', legacy_category: 'labor', labor_share: 1, deduction: 'rot' },
+    { sku: 'HM-BYG-005', name: 'Maskinförare', unit: 'tim', unit_price: 0, category: 'arbete', legacy_category: 'labor', labor_share: 1, deduction: 'rot' },
+    { sku: 'HM-BYG-006', name: 'Projektering och bygglovsritning', unit: 'tim', unit_price: 0, category: 'arbete', legacy_category: 'labor', labor_share: 1, deduction: null },
+
+    { sku: 'HM-BYG-018', name: 'Tillbyggnad', description: 'Stomme och tätt hus, per kvadratmeter', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.5, deduction: 'rot' },
+    { sku: 'HM-BYG-019', name: 'Uppbyggnad garage', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.5, deduction: 'rot' },
+    { sku: 'HM-BYG-020', name: 'Uppbyggnad altan', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.55, deduction: 'rot' },
+    { sku: 'HM-BYG-021', name: 'Byggnation carport', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.5, deduction: 'rot' },
+    { sku: 'HM-BYG-022', name: 'Uppbyggnad friggebod', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.5, deduction: 'rot' },
+    { sku: 'HM-BYG-023', name: 'Inredning av vind', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-BYG-024', name: 'Inredning av källare', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-BYG-025', name: 'Rivning av innervägg', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.85, deduction: 'rot' },
+    { sku: 'HM-BYG-026', name: 'Uppsättning gipsvägg', description: 'Enkelt gipsad regelvägg', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-BYG-027', name: 'Undertak', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-BYG-028', name: 'Isolering av vindsbjälklag', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.5, deduction: 'rot' },
+    { sku: 'HM-BYG-029', name: 'Tilläggsisolering fasad', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.5, deduction: 'rot' },
+    { sku: 'HM-BYG-030', name: 'Byte av fönster', description: 'Demontering och montering, per fönster', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-BYG-031', name: 'Byte av ytterdörr', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-BYG-032', name: 'Montering innerdörr', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.7, deduction: 'rot' },
+    { sku: 'HM-BYG-033', name: 'Grundläggning plintar', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-BYG-034', name: 'Schaktning', unit: 'kbm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-BYG-035', name: 'Återfyllning och packning', unit: 'kbm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-BYG-036', name: 'Fuktspärr och tätskikt grund', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-BYG-037', name: 'Gjutning av golv', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.5, deduction: 'rot' },
+    { sku: 'HM-BYG-038', name: 'Avjämning av golv', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.55, deduction: 'rot' },
+    { sku: 'HM-BYG-039', name: 'Murning', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-BYG-040', name: 'Putsning av fasad', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.65, deduction: 'rot' },
+    { sku: 'HM-BYG-041', name: 'Montering av fasadpanel', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+    { sku: 'HM-BYG-042', name: 'Byte av syllar', unit: 'lpm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.7, deduction: 'rot' },
+    { sku: 'HM-BYG-043', name: 'Uppbyggnad takstolar', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.55, deduction: 'rot' },
+    { sku: 'HM-BYG-044', name: 'Byggstädning', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.9, deduction: 'rot' },
+    { sku: 'HM-BYG-045', name: 'Etablering av arbetsplats', description: 'Skydd, avspärrning och dammskydd', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.8, deduction: 'rot' },
+    { sku: 'HM-BYG-046', name: 'Fuktmätning och besiktning', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.9, deduction: 'rot' },
+    { sku: 'HM-BYG-047', name: 'Asbestsanering', description: 'Utförs av behörig entreprenör', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.7, deduction: 'rot' },
+    { sku: 'HM-BYG-048', name: 'Håltagning i betong', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.8, deduction: 'rot' },
+    { sku: 'HM-BYG-049', name: 'Avväxling och balkmontage', unit: 'st', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.6, deduction: 'rot' },
+
+    { sku: 'HM-BYG-055', name: 'Regel 45x95', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-056', name: 'Regel 45x145', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-057', name: 'Reglar för golvbjälklag', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-058', name: 'Plywood 12 mm', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-059', name: 'OSB-skiva 12 mm', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-060', name: 'Våtrumsskiva', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-061', name: 'Gipsskiva 13 mm brandklassad', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-062', name: 'Isolering 145 mm', unit: 'kvm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-063', name: 'Lösull', unit: 'kbm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-064', name: 'Ångspärr', unit: 'kvm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-065', name: 'Vindskyddsduk', unit: 'kvm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-066', name: 'Fasadpanel granrå', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-067', name: 'Trall 28x120', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-068', name: 'Impregnerat virke', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-069', name: 'Limträbalk', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-070', name: 'Stålbalk HEB', unit: 'lpm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-071', name: 'Betongplint', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-072', name: 'Makadam', unit: 'ton', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-073', name: 'Cellplast 100 mm', unit: 'kvm', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-074', name: 'Avjämningsmassa', unit: 'säck', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-075', name: 'Fönster', description: 'Treglas, standardmått', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-076', name: 'Ytterdörr', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-077', name: 'Innerdörr med karm', unit: 'st', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-078', name: 'Spik och skruv', unit: 'paket', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-079', name: 'Byggplast och skyddstäckning', unit: 'rulle', unit_price: 0, category: 'material', legacy_category: 'material', labor_share: 0, deduction: null },
+
+    { sku: 'HM-BYG-082', name: 'Container 20 kbm', description: 'Hyra inkl. hämtning', unit: 'st', unit_price: 0, category: 'hyra', legacy_category: 'service', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-083', name: 'Minigrävare', description: 'Hyra per dag', unit: 'dag', unit_price: 0, category: 'hyra', legacy_category: 'service', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-084', name: 'Bygghiss', description: 'Hyra per vecka', unit: 'vecka', unit_price: 0, category: 'hyra', legacy_category: 'service', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-085', name: 'Byggtork', description: 'Hyra per vecka', unit: 'vecka', unit_price: 0, category: 'hyra', legacy_category: 'service', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-086', name: 'Bodetablering', description: 'Hyra per månad', unit: 'månad', unit_price: 0, category: 'hyra', legacy_category: 'service', labor_share: 0, deduction: null },
+    { sku: 'HM-BYG-087', name: 'Byggel och provisoriskström', description: 'Per månad', unit: 'månad', unit_price: 0, category: 'hyra', legacy_category: 'service', labor_share: 0, deduction: null },
   ],
 
   roofing: [
@@ -366,7 +524,20 @@ export interface PriceListEntry {
  * offerten aldrig kan säga olika priser för samma artikel.
  */
 export function getDefaultPriceList(branch: string | string[]): PriceListEntry[] {
-  return getDefaultProducts(branch).map(p => ({
+  return getDefaultProducts(branch)
+    // PRISLÖSA ARTIKLAR SLÄPPS IGENOM HIT — de skulle bli "noll kronor" i luren.
+    //
+    // Produktbanken kan visa "Sätt pris" i stället för ett belopp; en röst kan
+    // inte. Telefonagenten läser den här listan och skulle annars säga att
+    // jobbet är gratis, vilket är värre än att inte veta. Utan raden svarar
+    // den att den återkommer med pris — sant, och möjligt att rätta.
+    //
+    // Kvarstående glapp: när hantverkaren sätter ett standardpris uppdateras
+    // `products`, inte `price_list`. Artikeln blir alltså inte automatiskt
+    // känd för telefonen. Det gapet fanns före den här ändringen också och
+    // hör hemma i synkroniseringen mellan tabellerna, inte här.
+    .filter(p => p.unit_price > 0)
+    .map(p => ({
     category: p.legacy_category,
     name: p.name,
     unit: p.unit,

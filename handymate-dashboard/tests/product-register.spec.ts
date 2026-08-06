@@ -19,6 +19,7 @@
 import { test, expect } from '@playwright/test'
 import {
   getDefaultProducts,
+  getDefaultPriceList,
   getSeededBranches,
   resolveBranches,
   type ProductDefault,
@@ -225,6 +226,33 @@ test.describe('SANITY — vakten läser faktiskt registret', () => {
 
   test('okänd bransch faller tillbaka på ett bibliotek, inte på tomhet', () => {
     expect(getDefaultProducts('finns-inte').length).toBeGreaterThan(0)
+  })
+})
+
+test.describe('prislösa artiklar når aldrig telefonen', () => {
+  test('price_list innehåller inga nollpriser', () => {
+    // Produktbanken kan visa "Sätt pris" i stället för ett belopp; en röst
+    // kan inte. Telefonagenten läser price_list och skulle säga att jobbet är
+    // gratis — värre än att inte veta.
+    for (const branch of getSeededBranches()) {
+      const noll = getDefaultPriceList(branch).filter(e => !(e.unit_price > 0))
+      expect(noll.map(e => e.name), `${branch} skickar nollpriser till telefonagenten`).toEqual([])
+    }
+  })
+
+  test('men produktbanken behåller dem', () => {
+    // Filtret får bara gälla price_list. Försvinner de ur products är hela
+    // långsvansen borta och hantverkaren skriver fritext igen.
+    const prislosa = getDefaultProducts('electrician').filter(p => p.unit_price === 0)
+    expect(prislosa.length).toBeGreaterThan(0)
+  })
+
+  test('varje bransch har kvar något att säga i luren', () => {
+    // Om filtret någon gång tömmer listan blir telefonagenten stum om priser
+    // utan att något kastar.
+    for (const branch of getSeededBranches()) {
+      expect(getDefaultPriceList(branch).length, `${branch} har tom prislista`).toBeGreaterThan(0)
+    }
   })
 })
 
