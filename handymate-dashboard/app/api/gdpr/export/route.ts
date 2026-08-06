@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 
 /**
  * GET /api/gdpr/export - Exportera all affärsdata (GDPR Art. 20)
@@ -23,6 +24,13 @@ export async function GET(request: NextRequest) {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rollgrind (2026-08-06, behörighetskontraktet): getAuthenticatedBusiness
+    // avgör vilket FÖRETAG anropet gäller — inte vad användaren får se i det.
+    const currentUser = await getCurrentUser(request, business.business_id)
+    if (!currentUser || !isOwnerOrAdmin(currentUser)) {
+      return NextResponse.json({ error: 'Endast ägare eller administratör' }, { status: 403 })
     }
 
     const includeSensitive = request.nextUrl.searchParams.get('include_sensitive') === 'true'

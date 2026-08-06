@@ -118,10 +118,20 @@ async function extractUserId(request: NextRequest): Promise<string | null> {
 
 /**
  * Hämta aktuell BusinessUser från request.
- * Söker först i business_users med user_id.
- * Om inget hittas returneras null.
+ *
+ * `businessId` bör alltid skickas med (från getAuthenticatedBusiness). Utan
+ * det använde funktionen `.single()`, som FELAR när en användare finns i flera
+ * företag — vilket gav null, och därmed 403 för en behörig användare. Tyst och
+ * svårfelsökt: rätt person nekas åtkomst och loggen säger bara "otillräckliga
+ * behörigheter". Rättat 2026-08-06 i samband med behörighetskontraktet.
+ *
+ * Parametern är optional för att inte bryta de 31 befintliga anropsställena;
+ * de fungerar som förut när användaren bara tillhör ett företag.
  */
-export async function getCurrentUser(request: NextRequest): Promise<BusinessUser | null> {
+export async function getCurrentUser(
+  request: NextRequest,
+  businessId?: string,
+): Promise<BusinessUser | null> {
   try {
     const userId = await extractUserId(request)
     if (!userId) return null
@@ -129,16 +139,22 @@ export async function getCurrentUser(request: NextRequest): Promise<BusinessUser
     const supabase = getSupabase()
 
     // Hitta business_user med detta user_id
-    const { data: businessUser, error } = await supabase
+    let query = supabase
       .from('business_users')
       .select('*')
       .eq('user_id', userId)
       .eq('is_active', true)
-      .single()
 
-    if (error || !businessUser) return null
+    if (businessId) query = query.eq('business_id', businessId)
 
-    return businessUser as BusinessUser
+    // maybeSingle i stället för single: flera träffar utan businessId-filter
+    // ska ge "vet inte" (null), inte ett kastat fel som fångas av catch och
+    // ser ut som ett systemfel.
+    const { data: rows, error } = await query.limit(2)
+
+    if (error || !rows || rows.length !== 1) return null
+
+    return rows[0] as BusinessUser
   } catch (error) {
     console.error('getCurrentUser error:', error)
     return null

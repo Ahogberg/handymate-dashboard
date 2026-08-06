@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { getCurrentUser } from '@/lib/permissions'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { applyInvoicePayment } from '@/lib/invoices/apply-payment'
 
 /**
@@ -22,7 +22,13 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const currentUser = await getCurrentUser(request)
+    // Rollgrind (2026-08-06, behörighetskontraktet): getAuthenticatedBusiness
+    // avgör vilket FÖRETAG anropet gäller — inte vad användaren får se i det.
+    const currentUser = await getCurrentUser(request, business.business_id)
+    if (!currentUser || !hasPermission(currentUser, 'create_invoices')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+    }
+
     const body = await request.json().catch(() => ({}))
 
     const result = await applyInvoicePayment({

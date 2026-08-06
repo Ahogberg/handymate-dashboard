@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,13 @@ export async function POST(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Rollgrind (2026-08-06, behörighetskontraktet): getAuthenticatedBusiness
+    // avgör vilket FÖRETAG anropet gäller — inte vad användaren får se i det.
+    const currentUser = await getCurrentUser(request, business.business_id)
+    if (!currentUser || !isOwnerOrAdmin(currentUser)) {
+      return NextResponse.json({ error: 'Endast ägare eller administratör' }, { status: 403 })
+    }
 
     const { planId } = await request.json()
     if (!planId) return NextResponse.json({ error: 'Missing planId' }, { status: 400 })

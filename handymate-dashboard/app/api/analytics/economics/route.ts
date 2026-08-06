@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 
 export async function GET(req: NextRequest) {
   const business = await getAuthenticatedBusiness(req)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Rollgrind (2026-08-06, behörighetskontraktet): getAuthenticatedBusiness
+  // avgör vilket FÖRETAG anropet gäller — inte vad användaren får se i det.
+  const currentUser = await getCurrentUser(req, business.business_id)
+  if (!currentUser || !hasPermission(currentUser, 'see_financials')) {
+    return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+  }
 
   const supabase = getServerSupabase()
   const businessId = business.business_id

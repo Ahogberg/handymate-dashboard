@@ -4,6 +4,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { createInvoice } from '@/lib/invoices/create-invoice'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,13 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Rollgrind (2026-08-06, behörighetskontraktet): getAuthenticatedBusiness
+  // avgör vilket FÖRETAG anropet gäller — inte vad användaren får se i det.
+  const currentUser = await getCurrentUser(request, business.business_id)
+  if (!currentUser || !hasPermission(currentUser, 'create_invoices')) {
+    return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+  }
 
   const projectId = request.nextUrl.searchParams.get('project_id')
   if (!projectId) return NextResponse.json({ error: 'project_id krävs' }, { status: 400 })
@@ -132,6 +140,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Rollgrind (2026-08-06, behörighetskontraktet): getAuthenticatedBusiness
+  // avgör vilket FÖRETAG anropet gäller — inte vad användaren får se i det.
+  const currentUser = await getCurrentUser(request, business.business_id)
+  if (!currentUser || !hasPermission(currentUser, 'create_invoices')) {
+    return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+  }
 
   const body = await request.json()
   const {
