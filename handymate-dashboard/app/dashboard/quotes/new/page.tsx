@@ -29,7 +29,7 @@ import {
 import { useQuoteCalculations } from '../_shared/useQuoteCalculations'
 import { useQuoteItems } from '../_shared/useQuoteItems'
 import { usePriceListLookup } from '../_shared/usePriceListLookup'
-import { ensureProductComponents, type ProductWithComponents } from '../_shared/applyProductToItem'
+import { ensureProductComponents, applyProductToItem, type ProductWithComponents } from '../_shared/applyProductToItem'
 import { QuoteQuickstartCard, type QuickstartRow } from '../_shared/QuoteQuickstartCard'
 import { QuoteItemsSection } from '../_shared/QuoteItemsSection'
 import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/business/quote-surface-select'
@@ -1114,6 +1114,44 @@ export default function NewQuotePage() {
   // AI helpers
   // ═══════════════════════════════════════════════════════════════════
 
+  /**
+   * ETAPP B1 (2026-08-06): låter en AI-rad ärva allt en produktkopplad rad har.
+   *
+   * Serversidan har redan avgjort VILKEN artikel raden hör till (och avvisat
+   * osäkra träffar — se lib/products/match-generated-items.ts). Här görs
+   * kopplingen verklig genom exakt samma applyProductToItem som snabbvalen och
+   * artikelsöket använder, så en AI-byggd rad blir identisk med en handplockad:
+   * fryst komponent-snapshot, arbetsandel, ROT/RUT-flagga, artikelnummer och
+   * inköpspris. Det är kopplingen som väcker marginalkortet och gör att
+   * reservationsmotorns produkttriggers börjar träffa.
+   *
+   * TVÅ FÄLT BEHÅLLS FRÅN AI:N MEDVETET:
+   * - beskrivningen, eftersom den är jobbspecifik ("Rivning badrum, plan 2")
+   *   medan artikelnamnet är generiskt ("Rivning badrum"). Att skriva över den
+   *   hade gjort offerten fattigare, inte rikare.
+   * - kvantiteten, eftersom AI:n läst den ur beskrivningen (12 fönster).
+   * Priset tas däremot ALLTID från artikeln — det är hela poängen med att ha
+   * en produktbank.
+   */
+  function linkAiItemsToProducts(rows: QuoteItem[], rawRows: any[]): QuoteItem[] {
+    if (products.length === 0) return rows
+    const byId = new Map(products.map(p => [p.id, p]))
+    let linked = 0
+    const result = rows.map((row, i) => {
+      const productId = rawRows[i]?.linkedProductId
+      if (!productId) return row
+      const product = byId.get(productId)
+      if (!product) return row
+      linked++
+      const applied = applyProductToItem(row, product, row.quantity)
+      return { ...applied, description: row.description || applied.description }
+    })
+    if (linked > 0) {
+      console.log(`[quotes/new] ${linked} AI-rader kopplade till produktbanken`)
+    }
+    return result
+  }
+
   function applyAiResult(quote: any) {
     setTitle(quote.jobTitle || '')
     setDescription(quote.jobDescription || '')
@@ -1123,15 +1161,27 @@ export default function NewQuotePage() {
     // lämna is_rot_eligible kvar TRUE samtidigt som is_rut_eligible sattes
     // TRUE (RUT-jobb fick ROT eftersom getItemRotRutType kollar ROT först),
     // och 'none' ROT-flaggade ändå allt arbete via convertLegacyItems.
-    const converted = convertLegacyItems(quote.items || [], quote.suggestedDeductionType, 'item', true)
+    const converted = linkAiItemsToProducts(
+      convertLegacyItems(quote.items || [], quote.suggestedDeductionType, 'item', true),
+      quote.items || [],
+    )
     // B5: AI:ns föreslagna tillval (0-3 st, tomt om inget genuint relevant)
     // läggs efter grundraderna som avbockade item_type 'option'-rader.
-    const options = convertLegacyItems(quote.options || [], quote.suggestedDeductionType, 'option', true)
+    const options = linkAiItemsToProducts(
+      convertLegacyItems(quote.options || [], quote.suggestedDeductionType, 'option', true),
+      quote.options || [],
+    )
     const combined = [
       ...converted,
       ...options.map((o, idx) => ({ ...o, sort_order: converted.length + idx })),
     ]
     setItems(combined)
+
+    // B3: AI:ns förslag på vad som INTE ingår. Fylls bara i när fältet är tomt
+    // — hantverkarens egen text får aldrig skrivas över av ett förslag.
+    if (Array.isArray(quote.notIncludedSuggestions) && quote.notIncludedSuggestions.length > 0) {
+      setNotIncluded(prev => (prev.trim() ? prev : quote.notIncludedSuggestions.join('\n')))
+    }
     setAiGenerated(true)
     setAiConfidence(quote.confidence || null)
 

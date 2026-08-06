@@ -1,5 +1,11 @@
 # Lessons Learned
 
+## PowerShell Get-Content → Set-Content förstör svenska tecken i UTF-8-filer
+- **Symtom (2026-08-06):** Ett `(Get-Content $f -Raw) -replace ... | Set-Content -Encoding utf8`-anrop på en testfil förvandlade alla å/ä/ö till `Ã¥`/`Ã¤`/`Ã¶` genom hela filen. Filen såg oförändrad ut i git-diffen tills man tittade på tecknen.
+- **Root cause:** `Get-Content` i Windows PowerShell 5.1 läser en UTF-8-fil UTAN BOM som ANSI (systemets kodsida). Varje flerbytetecken blir då två felaktiga tecken. `Set-Content -Encoding utf8` skriver sedan tillbaka de felaktiga tecknen som giltig UTF-8 — dubbelkodningen är permanent och inget verktyg klagar.
+- **Regel:** Använd ALDRIG en Get-Content/Set-Content-rundtur för att redigera projektfiler. Använd Edit-verktyget (eller Write för hela filer) — de hanterar UTF-8 korrekt. PowerShell är för att KÖRA saker, inte för att redigera filer.
+- **Kopplar till:** den befintliga Unicode-regeln i CLAUDE.md ("spara alltid filer med UTF-8, riktiga svenska tecken") — det här är det vanligaste sättet att bryta mot den utan att märka det.
+
 ## business_config.business_id är TEXT, inte UUID
 - **Fel 1:** `REFERENCES business_config(id)` → kolumnen heter `business_id`
 - **Fel 2:** `business_id UUID REFERENCES business_config(business_id)` → typerna matchar inte (uuid vs text)

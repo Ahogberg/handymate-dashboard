@@ -44,7 +44,10 @@ export async function POST(request: NextRequest) {
     const [priceListResult, templatesResult, customerPriceList] = await Promise.all([
       supabase
         .from('products')
-        .select('name, unit, sales_price, category')
+        // ETAPP B1 (2026-08-06): id hämtas nu också. Utan det kan raderna inte
+        // kopplas till produktbanken, och då saknar de komponent-snapshot,
+        // arbetsandel, ROT-split och inköpspris.
+        .select('id, name, unit, sales_price, category')
         .eq('business_id', business.business_id)
         .eq('is_active', true)
         .order('is_favorite', { ascending: false })
@@ -61,6 +64,7 @@ export async function POST(request: NextRequest) {
     ])
 
     const priceListData = (priceListResult.data || []).map(p => ({
+      id: p.id,
       name: p.name,
       unit: p.unit,
       unit_price: p.sales_price,

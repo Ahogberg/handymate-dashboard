@@ -1,11 +1,16 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getServerSupabase } from '@/lib/supabase'
+import { matchGeneratedItem, type MatchableProduct } from '@/lib/products/match-generated-items'
 
 export interface PriceListItem {
   name: string
   unit: string
   unit_price: number
   category: string
+  /** Artikelns id i produktbanken (etapp B1, 2026-08-06). Optional eftersom
+      äldre anropare (app/api/quotes/generate) bara skickar namn och pris —
+      utan id hoppas handtagen över och matchningen faller tillbaka på namn. */
+  id?: string
 }
 
 export interface QuoteTemplate {
@@ -38,6 +43,20 @@ export interface GeneratedQuoteItem {
   confidence: number
   note?: string | null
   fromPriceList?: boolean
+  /**
+   * Artikeln i produktbanken som raden kopplats till (etapp B1, 2026-08-06).
+   * Utan den får raden ingen komponent-snapshot, ingen arbetsandel, ingen
+   * ROT-split och inget inköpspris — och reservationsmotorn, som matchar på
+   * produkt och kategori, triggar knappt alls.
+   *
+   * Sätts av matchGeneratedItems och är null när ingen SÄKER träff fanns.
+   * Null är ett fullgott svar: raden står då kvar som "PRIS SAKNAS", precis
+   * som före B1. En felkopplad artikel hade i stället gett fel inköpspris och
+   * fel ROT-flagga utan att synas någonstans i gränssnittet.
+   */
+  linkedProductId?: string | null
+  /** Hur träffen gjordes — loggas så träffkvaliteten kan mätas. */
+  productMatchType?: 'handle' | 'exact' | 'fuzzy' | null
 }
 
 export interface GeneratedQuote {
@@ -58,6 +77,17 @@ export interface GeneratedQuote {
   similarHistoricalQuotes: Array<{ id: string; title: string; total: number }>
   priceListEmpty: boolean
   missingPriceCount: number
+  /**
+   * Förslag på vad som INTE ingår (etapp B3, 2026-08-06). Det här är det enda
+   * villkorsfältet som genereras av AI:n, och skälet är att det är genuint
+   * jobbspecifikt: reservationer, betalvillkor och giltighet kommer från
+   * regelmotorer och hantverkarens egna standardtexter, medan "ej inkluderat"
+   * beror på exakt vad jobbet omfattar — och är precis det Christoffer säger
+   * att han glömmer. Presenteras som FÖRSLAG att bocka i, aldrig som färdig
+   * text: en påhittad avgränsning i en offert är ett löfte hantverkaren inte
+   * gett.
+   */
+  notIncludedSuggestions: string[]
 }
 
 export interface ImageAnalysis {
@@ -115,7 +145,24 @@ export function buildPriceContext(
     lines.push('\nAnvänd ALLTID dessa priser när du skapar offertrader.')
     lines.push('Avvik inte från priserna om inte användaren ber om det.')
   } else if (priceList && priceList.length > 0) {
+    // ETAPP B1 (2026-08-06): varje artikel får ett kort handtag ([P1], [P2] …)
+    // som modellen ombeds eka tillbaka i "productRef". Handtaget är NYCKELN
+    // till att raden kan kopplas till produktbanken och därmed ärva
+    // komponent-snapshot, arbetsandel, ROT-split och inköpspris.
+    //
+    // Handtagens ordning MÅSTE vara densamma som listan som skickas till
+    // matchGeneratedItems — därför numreras de här efter samma indexordning
+    // som `priceList` kom in i, inte efter kategorigrupperingen nedan.
+    const handleOf = new Map<PriceListItem, string>()
+    priceList.forEach((item, index) => {
+      if (item.id) handleOf.set(item, `P${index + 1}`)
+    })
+    const useHandles = handleOf.size > 0
+
     lines.push('HANTVERKARENS PRISLISTA (använd dessa priser exakt):')
+    if (useHandles) {
+      lines.push('Varje artikel har ett handtag inom hakparentes, t.ex. [P4]. Ange handtaget i fältet "productRef" på raden där du använt artikeln.')
+    }
     // Gruppera per kategori
     const byCategory: Record<string, PriceListItem[]> = {}
     for (const item of priceList) {
@@ -126,7 +173,8 @@ export function buildPriceContext(
     for (const [category, items] of Object.entries(byCategory)) {
       lines.push(`\n  ${category}:`)
       for (const item of items) {
-        lines.push(`  - ${item.name}: ${item.unit_price} kr/${item.unit}`)
+        const handle = handleOf.get(item)
+        lines.push(`  - ${handle ? `[${handle}] ` : ''}${item.name}: ${item.unit_price} kr/${item.unit}`)
       }
     }
   } else {
@@ -439,8 +487,10 @@ REGLER FÖR PRISSÄTTNING:
 8. Inkludera alltid "Småmaterial" (skruv, borrspets, tejp, etc.) — ${hasPriceList ? 'använd pris från prislistan om det finns, annars 0 kr med markering' : '0 kr med markering'}
 9. Alla priser exkl moms
 10. Var realistisk med tidsuppskattningar (hellre lite för mycket tid än för lite)
-11. Max 8 rader i "items" — var konkret och specifik
-12. I fältet "options": föreslå 0-3 GENUINT relevanta TILLÄGGSARBETEN kunden kan välja till utöver grundofferten (t.ex. "demontering och bortforsling av gammalt kök" vid ett kökbyte, eller "målning av foder" vid ett fönsterbyte). Samma fältformat som "items". Hitta ALDRIG på tillägg bara för att fylla listan — en tom lista ([]) är RÄTT svar när inget genuint relevant tillägg finns.
+11. STRUKTUR PÅ RADERNA — styr efter innehåll, inte efter antal: en arbetsrad per moment, en materialrad per huvudmaterial, och slå ihop förbrukningsmaterial (skruv, tejp, borrspets) till EN "Småmaterial"-rad. Högst 12 rader i "items". Färre välavgränsade rader är bättre än många små.
+12. I fältet "productRef": om du använt en artikel ur prislistan, skriv dess handtag (t.ex. "P4"). Gissa ALDRIG ett handtag — utelämna fältet eller sätt null när du inte använt någon artikel ur listan. Ett felaktigt handtag är värre än inget.
+13. I fältet "notIncludedSuggestions": 0-4 KORTA punkter om vad som rimligen INTE ingår i just det här jobbet (t.ex. "Målning efter kaklingen", "Bygglov och myndighetsavgifter", "Bortforsling av rivningsmassor"). Skriv bara sådant som är genuint relevant för beskrivningen — hitta ALDRIG på avgränsningar för att fylla listan. Tom lista ([]) är RÄTT svar när inget särskilt behöver avgränsas.
+14. I fältet "options": föreslå 0-3 GENUINT relevanta TILLÄGGSARBETEN kunden kan välja till utöver grundofferten (t.ex. "demontering och bortforsling av gammalt kök" vid ett kökbyte, eller "målning av foder" vid ett fönsterbyte). Samma fältformat som "items". Hitta ALDRIG på tillägg bara för att fylla listan — en tom lista ([]) är RÄTT svar när inget genuint relevant tillägg finns.
 
 Svara ENDAST med JSON (ingen markdown):
 {
@@ -453,12 +503,13 @@ Svara ENDAST med JSON (ingen markdown):
     "ceiling_area_m2": null
   },
   "items": [
-    {"description": "Arbete - beskrivning", "quantity": 8, "unit": "timmar", "unitPrice": ${input.hourlyRate}, "type": "labor", "confidence": 90, "fromPriceList": false, "note": null},
-    {"description": "Materialnamn", "quantity": 1, "unit": "st", "unitPrice": 0, "type": "material", "confidence": 70, "fromPriceList": false, "note": "PRIS SAKNAS — fyll i manuellt"}
+    {"description": "Arbete - beskrivning", "quantity": 8, "unit": "timmar", "unitPrice": ${input.hourlyRate}, "type": "labor", "confidence": 90, "fromPriceList": false, "productRef": null, "note": null},
+    {"description": "Materialnamn", "quantity": 1, "unit": "st", "unitPrice": 0, "type": "material", "confidence": 70, "fromPriceList": false, "productRef": null, "note": "PRIS SAKNAS — fyll i manuellt"}
   ],
   "options": [
-    {"description": "Genuint relevant tilläggsarbete (eller utelämna helt om inget passar)", "quantity": 1, "unit": "st", "unitPrice": 0, "type": "labor", "confidence": 60, "fromPriceList": false, "note": null}
+    {"description": "Genuint relevant tilläggsarbete (eller utelämna helt om inget passar)", "quantity": 1, "unit": "st", "unitPrice": 0, "type": "labor", "confidence": 60, "fromPriceList": false, "productRef": null, "note": null}
   ],
+  "notIncludedSuggestions": ["Kort punkt om vad som inte ingår (eller [] om inget behöver avgränsas)"],
   "suggestedDeductionType": "rot",
   "confidence": 75,
   "reasoning": "Kort förklaring av bedömningen och använda mått"
@@ -485,7 +536,11 @@ Svara ENDAST med JSON (ingen markdown):
 
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 2000,
+    // ETAPP B2 (2026-08-06): höjd från 2000. Radgränsen gick från 8 till 12 och
+    // svaret bär nu även productRef och notIncludedSuggestions. Vid trunkering
+    // blir JSON:en ogiltig och användaren får det obegripliga felet "Kunde inte
+    // generera offertförslag" — utan någon ledtråd om att det var längden.
+    max_tokens: 3000,
     system: systemPrompt,
     messages: [{ role: 'user', content: userContent }]
   })
@@ -494,10 +549,28 @@ Svara ENDAST med JSON (ingen markdown):
   const jsonMatch = text.match(/\{[\s\S]*\}/)
 
   if (!jsonMatch) {
-    throw new Error('Kunde inte generera offertförslag')
+    // Vanligaste orsaken är att svaret trunkerats (stop_reason 'max_tokens') —
+    // då finns ingen avslutande klammer och regexen hittar inget. Tidigare
+    // fick användaren bara "Kunde inte generera offertförslag" utan ledtråd.
+    console.error('[ai-quote-generator] Inget JSON i svaret. stop_reason:', response.stop_reason, '| längd:', text.length)
+    throw new Error(
+      response.stop_reason === 'max_tokens'
+        ? 'Offertförslaget blev för långt och kunde inte läsas. Försök med en kortare beskrivning.'
+        : 'Kunde inte generera offertförslag',
+    )
   }
 
-  const parsed = JSON.parse(jsonMatch[0])
+  let parsed: any
+  try {
+    parsed = JSON.parse(jsonMatch[0])
+  } catch (err: any) {
+    console.error('[ai-quote-generator] Ogiltig JSON. stop_reason:', response.stop_reason, '|', err.message)
+    throw new Error(
+      response.stop_reason === 'max_tokens'
+        ? 'Offertförslaget blev för långt och kunde inte läsas. Försök med en kortare beskrivning.'
+        : 'Kunde inte tolka offertförslaget',
+    )
+  }
 
   // Map items with IDs
   const items: GeneratedQuoteItem[] = (parsed.items || []).map((item: any, i: number) => ({
@@ -528,6 +601,47 @@ Svara ENDAST med JSON (ingen markdown):
     ...(item.fromPriceList !== undefined ? { fromPriceList: item.fromPriceList } : {})
   }))
 
+  // ETAPP B1: koppla raderna till produktbanken INNAN resultatet lämnar
+  // generatorn. Görs här och inte hos anroparen så att alla fyra vägar in
+  // (UI-knappen, godkännande-kön, ÄTA-förslaget, förslagsmotorn) får
+  // kopplingen — en av dem hade annars blivit kvar utan, och det är exakt så
+  // de tysta luckorna uppstår.
+  type IndexedProduct = MatchableProduct & { promptIndex: number }
+  const matchableProducts: IndexedProduct[] = []
+  ;(input.priceList || []).forEach((p, index) => {
+    if (p.id) {
+      matchableProducts.push({ id: p.id, name: p.name, unit: p.unit, category: p.category, promptIndex: index })
+    }
+  })
+
+  if (matchableProducts.length > 0) {
+    // Handtagen numrerades i buildPriceContext efter priceList:ans indexordning.
+    // Här måste samma numrering återskapas, annars pekar [P4] på fel artikel —
+    // därför byggs handtagsmappen från originalindexet, inte från den filtrerade
+    // listans position.
+    const handles = new Map<string, MatchableProduct>()
+    for (const p of matchableProducts) {
+      handles.set(`P${p.promptIndex + 1}`, p)
+    }
+
+    const applyMatches = (list: GeneratedQuoteItem[], raw: any[]) => {
+      list.forEach((item, i) => {
+        const found = matchGeneratedItem(
+          { description: item.description, unit: item.unit, productRef: raw[i]?.productRef },
+          matchableProducts,
+          handles,
+        )
+        item.linkedProductId = found?.productId ?? null
+        item.productMatchType = found?.matchType ?? null
+      })
+    }
+    applyMatches(items, parsed.items || [])
+    applyMatches(options, (parsed.options || []).slice(0, 3))
+
+    const hits = items.filter(i => i.linkedProductId).length
+    console.log(`[ai-quote-generator] Produktkoppling: ${hits}/${items.length} rader kopplade`)
+  }
+
   const missingPriceCount = items.filter(i => i.unitPrice === 0 || i.note?.includes('PRIS SAKNAS')).length
   const laborCost = items.filter(i => i.type === 'labor').reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)
   const materialCost = items.filter(i => i.type !== 'labor').reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)
@@ -550,6 +664,15 @@ Svara ENDAST med JSON (ingen markdown):
       total: q.total
     })),
     priceListEmpty: !hasPriceList,
-    missingPriceCount
+    missingPriceCount,
+    // B3: defensiv — modellen instrueras till 0-4 korta punkter, men det är
+    // en instruktion, inte en garanti. Tomma strängar filtreras bort så
+    // gränssnittet aldrig visar en tom bock att kryssa i.
+    notIncludedSuggestions: Array.isArray(parsed.notIncludedSuggestions)
+      ? parsed.notIncludedSuggestions
+          .filter((s: any) => typeof s === 'string' && s.trim().length > 0)
+          .map((s: string) => s.trim())
+          .slice(0, 4)
+      : [],
   }
 }

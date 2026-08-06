@@ -23,7 +23,7 @@
  *   npx playwright test tests/quote-ata-payment-plan.spec.ts --no-deps
  */
 import { test, expect } from '@playwright/test'
-import { selectTemplate } from '../lib/quote-templates'
+import { selectTemplate, buildQuoteTemplateData } from '../lib/quote-templates'
 import type { QuoteTemplateData } from '../lib/quote-templates/types'
 
 const STYLES = ['modern', 'premium', 'friendly'] as const
@@ -73,9 +73,6 @@ function visibleText(html: string): string {
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
-    .replace(/&auml;/g, 'ä')
-    .replace(/&aring;/g, 'å')
-    .replace(/&ouml;/g, 'ö')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -87,7 +84,7 @@ for (const style of STYLES) {
       expect(text).toContain(ATA_TEXT)
     })
 
-    test('rubriken är utskriven, inte branschförkortningen "ÄTA"', () => {
+    test('rubriken är utskriven, inte branschförkortningen ÄTA', () => {
       // Kunden är en privatperson som renoverar badrum. "ÄTA" är jargong hen
       // inte nödvändigtvis kan, och ett villkor som inte förstås är inget
       // villkor. CLAUDE.md: inga tekniska termer synliga för slutanvändaren.
@@ -111,13 +108,14 @@ for (const style of STYLES) {
 
     test('beloppen når kunden — en betalplan utan kronor är meningslös', () => {
       const text = visibleText(selectTemplate(style)(fixture()))
-      // Svensk tusenavgränsare är hårt mellanslag; jämför på siffrorna.
-      const digitsOnly = text.replace(/[\s  ]/g, '')
+      // Svensk tusenavgränsare är ett icke-brytande mellanslag; jämför på
+      // siffrorna så testet inte går sönder på formateringsdetaljer.
+      const digitsOnly = text.replace(/\D/g, '')
       expect(digitsOnly).toContain('7800')
       expect(digitsOnly).toContain('18200')
     })
 
-    test('valfri förfallobeskrivning visas när den finns och utelämnas annars', () => {
+    test('valfri förfallobeskrivning visas när den finns', () => {
       const text = visibleText(selectTemplate(style)(fixture()))
       expect(text).toContain('Faktureras direkt')
     })
@@ -127,7 +125,7 @@ for (const style of STYLES) {
       expect(text).not.toContain('Betalplan')
     })
 
-    test('en plan i rena kronor visar aldrig "0 %"', () => {
+    test('en plan i rena kronor visar aldrig noll procent', () => {
       // percent: 0 är giltigt — hantverkaren kan dela upp i fasta belopp.
       // Att då skriva ut "0 %" ser ut som ett räknefel i kundens ögon.
       const text = visibleText(selectTemplate(style)(fixture({
@@ -143,14 +141,14 @@ for (const style of STYLES) {
 }
 
 test.describe('data-buildern — vägen från databasen till dokumentet', () => {
-  test('ata_terms och payment_plan mappas från råa databasfältet', async () => {
-    const { buildQuoteTemplateData } = await import('../lib/quote-templates')
+  test('ata_terms och payment_plan mappas från de råa databasfälten', () => {
     const data = buildQuoteTemplateData(
       {
         quote_number: 'OF-1', title: 'Jobb', items: [], quote_items: [],
         ata_terms: ATA_TEXT,
         payment_plan: [{ label: 'Förskott', percent: 50, amount: 5000, due_description: 'Vid start' }],
       } as any,
+      null as any,
       null as any,
     )
     expect(data.quote.ataTerms).toBe(ATA_TEXT)
@@ -162,27 +160,27 @@ test.describe('data-buildern — vägen från databasen till dokumentet', () => 
   test('en trasig rad i payment_plan fäller inte hela offerten', () => {
     // Samma defensiva hållning som reservationssnapshoten: hellre en rad
     // mindre i betalplanen än ett dokument som inte går att rendera.
-    const { buildQuoteTemplateData } = require('../lib/quote-templates')
     const data = buildQuoteTemplateData(
       {
         quote_number: 'OF-1', title: 'Jobb', items: [], quote_items: [],
         payment_plan: [
           { label: 'Bra rad', percent: 50, amount: 5000 },
-          { percent: 50, amount: 5000 },          // saknar label
-          { label: 'Saknar belopp', percent: 50 }, // saknar amount
+          { percent: 50, amount: 5000 },
+          { label: 'Saknar belopp', percent: 50 },
           null,
         ],
       } as any,
+      null as any,
       null as any,
     )
     expect(data.quote.paymentPlan).toHaveLength(1)
     expect(data.quote.paymentPlan![0].label).toBe('Bra rad')
   })
 
-  test('saknade fält blir null, aldrig undefined-strängar i dokumentet', () => {
-    const { buildQuoteTemplateData } = require('../lib/quote-templates')
+  test('saknade fält blir null, aldrig strängen undefined i dokumentet', () => {
     const data = buildQuoteTemplateData(
       { quote_number: 'OF-1', title: 'Jobb', items: [], quote_items: [] } as any,
+      null as any,
       null as any,
     )
     expect(data.quote.ataTerms).toBeNull()

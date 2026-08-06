@@ -51,6 +51,9 @@ export interface GeneratedQuoteItemInput {
   type: 'labor' | 'material' | 'service'
   note?: string | null
   fromPriceList?: boolean
+  /** Artikeln i produktbanken raden kopplats till (etapp B1, 2026-08-06).
+      Null när ingen säker träff fanns — se lib/products/match-generated-items.ts. */
+  linkedProductId?: string | null
 }
 
 /** Samma enhetsnormalisering som convertLegacyItems (app/dashboard/quotes/new/page.tsx). */
@@ -94,6 +97,11 @@ export function mapGeneratedItemToQuoteItem(
         is_rot_eligible: false,
         is_rut_eligible: false,
         sort_order: sortOrder,
+        // ETAPP B1: kopplingen till produktbanken följer med in i den sparade
+        // raden. Utan den blir en godkänd AI-offert lika tom under ytan som
+        // före B1 — ingen arbetsandel, inget inköpspris, inga produkttriggers
+        // för reservationsmotorn.
+        ...(item.linkedProductId ? { linked_product_id: item.linkedProductId } : {}),
       },
       legacyItemRotRutType(item.type, suggestedDeductionType),
     ),

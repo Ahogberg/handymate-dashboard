@@ -247,7 +247,9 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
     const [priceListResult, templatesResult] = await Promise.all([
       supabase
         .from('products')
-        .select('name, unit, sales_price, category')
+        // ETAPP B1 (2026-08-06): id krävs för produktkopplingen — se
+        // lib/products/match-generated-items.ts.
+        .select('id, name, unit, sales_price, category')
         .eq('business_id', businessId)
         .eq('is_active', true)
         .order('is_favorite', { ascending: false })
@@ -261,6 +263,7 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
     ])
 
     const priceList: PriceListItem[] = (priceListResult.data || []).map((p: any) => ({
+      id: p.id,
       name: p.name,
       unit: p.unit,
       unit_price: p.sales_price,
@@ -334,11 +337,27 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
         ...(lead.customer_id ? { entity: { customerId: lead.customer_id } } : {}),
         job_type: lead.job_type,
         estimated_value: lead.estimated_value,
-        // Förhandsvisning för kortet i kön — INTE vad exekveraren läser
-        // (den genererar om från payload.description ovan).
+        // ETAPP B4 (2026-08-06): det HÄR är nu vad exekveraren materialiserar.
+        //
+        // Tidigare bar payloaden bara `description` (rå fritext) och den här
+        // previewen — och exekveraren körde en HELT NY AI-generering på
+        // fritexten. Hantverkaren såg alltså rader och en summa från
+        // generering A, godkände, och fick generering B sparad: andra rader,
+        // andra priser, ibland en annan ROT/RUT-typ. Kortets rubrik kom från A
+        // medan offerten kom från B. Ett godkännande som inte betyder "spara
+        // det jag ser" är inte ett godkännande.
+        //
+        // Fälten nedan är exakt vad executeApprovalPayload behöver för att
+        // skapa offerten utan att fråga modellen igen. `description` ligger
+        // kvar som reserv: saknas previewen (äldre kort som ligger i kön när
+        // det här deployas) faller exekveraren tillbaka på omgenerering.
         preview: {
           job_title: generated.jobTitle,
+          job_description: generated.jobDescription,
           items: generated.items,
+          options: generated.options,
+          suggested_deduction_type: generated.suggestedDeductionType,
+          not_included_suggestions: generated.notIncludedSuggestions,
           total_before_vat: generated.totalBeforeVat,
           confidence: generated.confidence,
           reasoning: generated.reasoning,

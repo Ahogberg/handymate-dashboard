@@ -1151,29 +1151,58 @@ async function executeApprovalPayload(
         // Audit-4 Fix DEF (2026-06-02): cookie-forwarding
         const pl = payload as any
         const textDescription = pl.description || pl.job_description || pl.customer_reply_pending
-        const res = await fetch(`${appUrl}/api/quotes/ai-generate`, {
-          method: 'POST',
-          headers: forwardHeaders(),
-          body: JSON.stringify({
-            textDescription,
-            customerId: pl.entity?.customerId,
-            businessId,
-          }),
-        })
-        const r = await classifyResponse(res)
-        if (!r.ok) {
-          return { action: 'create_quote_draft', ...r }
-        }
 
-        // 2026-08-04 ("kritisk söm"-fixen): ai-generate returnerar bara ett
-        // GENERERAT offertobjekt — sparar ingenting. Utan denna persistering
-        // godkände hantverkaren kortet och INGET utkast skapades. Bygger nu
-        // strukturerade quote_items (samma semantik som klientens
-        // convertLegacyItems, se lib/quotes/generated-to-quote-items.ts) och
-        // POSTar till POST /api/quotes så offerten faktiskt sparas.
-        const generated = (r.metadata as any)?.quote
-        if (!generated) {
-          return { action: 'create_quote_draft', ok: false, error: 'AI-genereringen gav inget offertunderlag.' }
+        // ═══ ETAPP B4 (2026-08-06): GODKÄNNANDET SPARAR DET HANTVERKAREN SÅG ═══
+        //
+        // Tidigare kördes ALLTID en ny AI-generering här, på samma fritext som
+        // förslagsmotorn redan genererat ifrån. Hantverkaren såg alltså rader
+        // och summa från generering A i kortet, tryckte Godkänn, och fick
+        // generering B sparad — andra rader, andra priser, ibland en annan
+        // ROT/RUT-typ. Kortets rubrik kom från A, offerten från B.
+        //
+        // Nu materialiseras `payload.preview` när den finns. Omgenerering är
+        // kvar som RESERV för de kort som aldrig bär ett genererat resultat:
+        // matte-korten (quote_request/quote_addition) och äldre kort som redan
+        // låg i kön när det här deployades.
+        const preview = pl.preview
+        const previewUsable =
+          preview && Array.isArray(preview.items) && preview.items.length > 0
+
+        let generated: any
+        if (previewUsable) {
+          generated = {
+            jobTitle: preview.job_title,
+            jobDescription: preview.job_description ?? '',
+            items: preview.items,
+            options: Array.isArray(preview.options) ? preview.options : [],
+            suggestedDeductionType: preview.suggested_deduction_type ?? 'none',
+            confidence: preview.confidence,
+          }
+        } else {
+          const res = await fetch(`${appUrl}/api/quotes/ai-generate`, {
+            method: 'POST',
+            headers: forwardHeaders(),
+            body: JSON.stringify({
+              textDescription,
+              customerId: pl.entity?.customerId,
+              businessId,
+            }),
+          })
+          const r = await classifyResponse(res)
+          if (!r.ok) {
+            return { action: 'create_quote_draft', ...r }
+          }
+
+          // 2026-08-04 ("kritisk söm"-fixen): ai-generate returnerar bara ett
+          // GENERERAT offertobjekt — sparar ingenting. Utan denna persistering
+          // godkände hantverkaren kortet och INGET utkast skapades. Bygger
+          // strukturerade quote_items (samma semantik som klientens
+          // convertLegacyItems, se lib/quotes/generated-to-quote-items.ts) och
+          // POSTar till POST /api/quotes så offerten faktiskt sparas.
+          generated = (r.metadata as any)?.quote
+          if (!generated) {
+            return { action: 'create_quote_draft', ok: false, error: 'AI-genereringen gav inget offertunderlag.' }
+          }
         }
 
         const quoteItems = generatedQuoteToQuoteItems(
@@ -1202,6 +1231,13 @@ async function executeApprovalPayload(
             ai_generated: true,
             ai_confidence: generated.confidence ?? null,
             source_transcript: textDescription || null,
+            // B3: AI:ns förslag på vad som inte ingår följer med in i utkastet.
+            // Hantverkaren ser dem i redigeraren och kan stryka det som inte
+            // stämmer — men slipper börja från ett tomt fält, vilket är det
+            // enskilda villkorsfält piloten oftast glömmer.
+            ...(Array.isArray(preview?.not_included_suggestions) && preview.not_included_suggestions.length > 0
+              ? { not_included: preview.not_included_suggestions.join('\n') }
+              : {}),
             ...(leadId ? { lead_id: leadId } : {}),
             ...(pl.deal_id ? { deal_id: pl.deal_id } : {}),
           }),
