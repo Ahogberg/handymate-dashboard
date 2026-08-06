@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
+import { canTouchRecord, canCreateForOwner } from '@/lib/auth/record-ownership'
 
 /**
  * GET - Lista resor per person/projekt/period
@@ -88,6 +89,23 @@ export async function POST(request: NextRequest) {
       description,
     } = body
 
+    // ÄGARKONTROLL (2026-08-06): business_user_id kom rakt ur bodyn, så vem
+    // som helst kunde registrera en resa i en kollegas namn. Utelämnat fält
+    // blir anroparen själv — det normala fallet och ett steg mindre för
+    // hantverkaren. Någon annans id kräver behörighet.
+    const currentUser = await getCurrentUser(request, business.business_id)
+    const ownerId = business_user_id || currentUser?.id || null
+    if (!canCreateForOwner({
+      recordOwnerId: business_user_id,
+      currentUserId: currentUser?.id,
+      hasFallbackPermission: !!currentUser && hasPermission(currentUser, 'see_financials'),
+    })) {
+      return NextResponse.json(
+        { error: 'Du kan bara registrera resor i ditt eget namn' },
+        { status: 403 },
+      )
+    }
+
     const businessId = business.business_id
 
     // Hämta standard milersättning om ej angiven
@@ -107,7 +125,9 @@ export async function POST(request: NextRequest) {
       .from('travel_entry')
       .insert({
         business_id: businessId,
-        business_user_id: business_user_id || null,
+        // ÄGARKONTROLL (2026-08-06): utan den här raden kunde vem som helst
+        // registrera en resa på en kollega — fältet kom rakt ur bodyn.
+        business_user_id: ownerId,
         time_entry_id: time_entry_id || null,
         project_id: project_id || null,
         customer_id: customer_id || null,
@@ -153,6 +173,29 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Missing id' }, { status: 400 })
     }
 
+    // ÄGARKONTROLL (2026-08-06): egen post ELLER see_financials.
+    // Skrivvägarna filtrerade tidigare bara på business_id, så vilken
+    // anställd som helst kunde ändra eller radera en kollegas post.
+    // Grinden får inte vara ren behörighet — då hade den anställde inte
+    // kunnat rätta sin EGEN registrering.
+    {
+      const currentUser = await getCurrentUser(request, business.business_id)
+      const { data: owned } = await getServerSupabase()
+        .from('travel_entry')
+        .select('business_user_id')
+        .eq('id', id)
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+      if (!owned) return NextResponse.json({ error: 'Hittades inte' }, { status: 404 })
+      if (!canTouchRecord({
+        recordOwnerId: owned.business_user_id,
+        currentUserId: currentUser?.id,
+        hasFallbackPermission: !!currentUser && hasPermission(currentUser, 'see_financials'),
+      })) {
+        return NextResponse.json({ error: 'Du kan bara ändra dina egna registreringar' }, { status: 403 })
+      }
+    }
+
     // Recalculate total if distance or rate changed
     const updates: Record<string, any> = { ...fields }
     if (fields.distance_km != null || fields.mileage_rate != null) {
@@ -193,6 +236,27 @@ export async function DELETE(request: NextRequest) {
 
     if (!entryId) {
       return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    }
+
+    // ÄGARKONTROLL (2026-08-06): egen post ELLER see_financials.
+    // Skrivvägarna filtrerade tidigare bara på business_id, så vilken
+    // anställd som helst kunde radera en kollegas reseregistrering.
+    {
+      const currentUser = await getCurrentUser(request, business.business_id)
+      const { data: owned } = await supabase
+        .from('travel_entry')
+        .select('business_user_id')
+        .eq('id', entryId)
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+      if (!owned) return NextResponse.json({ error: 'Hittades inte' }, { status: 404 })
+      if (!canTouchRecord({
+        recordOwnerId: owned.business_user_id,
+        currentUserId: currentUser?.id,
+        hasFallbackPermission: !!currentUser && hasPermission(currentUser, 'see_financials'),
+      })) {
+        return NextResponse.json({ error: 'Du kan bara ändra dina egna registreringar' }, { status: 403 })
+      }
     }
 
     const { error } = await supabase

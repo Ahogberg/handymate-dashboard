@@ -3,6 +3,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { verifyOwnership } from '@/lib/auth/verify-ownership'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
+import { canTouchRecord, canCreateForOwner } from '@/lib/auth/record-ownership'
 
 /**
  * GET /api/allowances?startDate=&endDate=&projectId=
@@ -99,6 +100,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // ÄGARKONTROLL (2026-08-06): body.business_user_id gick rakt in i posten,
+    // så vem som helst kunde registrera traktamente på en kollega. Utelämnat
+    // fält blir anroparen själv — det normala fallet.
+    const currentUser = await getCurrentUser(request, business.business_id)
+    const allowanceOwnerId = body.business_user_id || currentUser?.id || null
+    if (!canCreateForOwner({
+      recordOwnerId: body.business_user_id,
+      currentUserId: currentUser?.id,
+      hasFallbackPermission: !!currentUser && hasPermission(currentUser, 'see_financials'),
+    })) {
+      return NextResponse.json(
+        { error: 'Du kan bara registrera traktamente i ditt eget namn' },
+        { status: 403 },
+      )
+    }
+
     // Get the type to calculate amount
     const { data: aType } = await supabase
       .from('allowance_types')
@@ -113,7 +130,7 @@ export async function POST(request: NextRequest) {
       .from('allowance_reports')
       .insert({
         business_id: business.business_id,
-        business_user_id: body.business_user_id || null,
+        business_user_id: allowanceOwnerId,
         allowance_type_id: body.allowance_type_id,
         project_id: body.project_id || null,
         report_date: body.report_date || new Date().toISOString().split('T')[0],
@@ -168,6 +185,29 @@ export async function DELETE(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: 'id krävs' }, { status: 400 })
+    }
+
+    // ÄGARKONTROLL (2026-08-06): egen post ELLER see_financials.
+    // Skrivvägarna filtrerade tidigare bara på business_id, så vilken
+    // anställd som helst kunde ändra eller radera en kollegas post.
+    // Grinden får inte vara ren behörighet — då hade den anställde inte
+    // kunnat rätta sin EGEN registrering.
+    {
+      const currentUser = await getCurrentUser(request, business.business_id)
+      const { data: owned } = await getServerSupabase()
+        .from('allowance_reports')
+        .select('business_user_id')
+        .eq('id', id)
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+      if (!owned) return NextResponse.json({ error: 'Hittades inte' }, { status: 404 })
+      if (!canTouchRecord({
+        recordOwnerId: owned.business_user_id,
+        currentUserId: currentUser?.id,
+        hasFallbackPermission: !!currentUser && hasPermission(currentUser, 'see_financials'),
+      })) {
+        return NextResponse.json({ error: 'Du kan bara ändra dina egna registreringar' }, { status: 403 })
+      }
     }
 
     // Don't allow deleting invoiced reports

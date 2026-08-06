@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
+import { canTouchRecord } from '@/lib/auth/record-ownership'
 
 /**
  * GET /api/vehicle-reports - Lista körrapporter
@@ -147,6 +148,29 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'ID krävs' }, { status: 400 })
     }
 
+    // ÄGARKONTROLL (2026-08-06): egen post ELLER see_financials.
+    // Skrivvägarna filtrerade tidigare bara på business_id, så vilken
+    // anställd som helst kunde ändra eller radera en kollegas post.
+    // Grinden får inte vara ren behörighet — då hade den anställde inte
+    // kunnat rätta sin EGEN registrering.
+    {
+      const currentUser = await getCurrentUser(request, business.business_id)
+      const { data: owned } = await getServerSupabase()
+        .from('vehicle_reports')
+        .select('business_user_id')
+        .eq('id', id)
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+      if (!owned) return NextResponse.json({ error: 'Hittades inte' }, { status: 404 })
+      if (!canTouchRecord({
+        recordOwnerId: owned.business_user_id,
+        currentUserId: currentUser?.id,
+        hasFallbackPermission: !!currentUser && hasPermission(currentUser, 'see_financials'),
+      })) {
+        return NextResponse.json({ error: 'Du kan bara ändra dina egna registreringar' }, { status: 403 })
+      }
+    }
+
     const allowedFields = [
       'vehicle_id', 'project_id', 'lead_id', 'report_date',
       'start_address', 'end_address', 'distance', 'distance_unit',
@@ -197,6 +221,29 @@ export async function DELETE(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: 'ID krävs' }, { status: 400 })
+    }
+
+    // ÄGARKONTROLL (2026-08-06): egen post ELLER see_financials.
+    // Skrivvägarna filtrerade tidigare bara på business_id, så vilken
+    // anställd som helst kunde ändra eller radera en kollegas post.
+    // Grinden får inte vara ren behörighet — då hade den anställde inte
+    // kunnat rätta sin EGEN registrering.
+    {
+      const currentUser = await getCurrentUser(request, business.business_id)
+      const { data: owned } = await getServerSupabase()
+        .from('vehicle_reports')
+        .select('business_user_id')
+        .eq('id', id)
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+      if (!owned) return NextResponse.json({ error: 'Hittades inte' }, { status: 404 })
+      if (!canTouchRecord({
+        recordOwnerId: owned.business_user_id,
+        currentUserId: currentUser?.id,
+        hasFallbackPermission: !!currentUser && hasPermission(currentUser, 'see_financials'),
+      })) {
+        return NextResponse.json({ error: 'Du kan bara ändra dina egna registreringar' }, { status: 403 })
+      }
     }
 
     const { error } = await supabase
