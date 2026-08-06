@@ -120,6 +120,26 @@ export default function QuoteSignPage() {
   // Kundens fråga om offerten (idé 5) — landar som kort i godkännande-kön.
   const [questionText, setQuestionText] = useState('')
   const [questionState, setQuestionState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  // Föreslagna starttider efter signering (idé 4).
+  const [bookingSuggestions, setBookingSuggestions] = useState<
+    { date: string; week: number; bookableHours: number }[]
+  >([])
+  const [bookingState, setBookingState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+
+  async function handleRequestBooking(date: string) {
+    if (bookingState === 'sending') return
+    setBookingState('sending')
+    try {
+      const res = await fetch(`/api/quotes/public/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'request_booking', date }),
+      })
+      setBookingState(res.ok ? 'sent' : 'error')
+    } catch {
+      setBookingState('error')
+    }
+  }
   const [business, setBusiness] = useState<BusinessInfo | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [name, setName] = useState('')
@@ -397,6 +417,9 @@ export default function QuoteSignPage() {
               }
             : prev
         )
+        // Föreslagna starttider (idé 4) — bara dagar med verklig ledig
+        // kapacitet. Tom lista → inget bokningserbjudande visas.
+        setBookingSuggestions(data.booking_suggestions || [])
         setState('success')
       }
     } catch {
@@ -673,6 +696,62 @@ export default function QuoteSignPage() {
                 {business?.name || 'Företaget'} kommer att kontakta dig med nästa steg.
               </p>
             </div>
+          </div>
+        )}
+
+        {/* Boka direkt efter signering (idé 4). Signeringen är det enda
+            ögonblick då kunden är maximalt engagerad — går hen därifrån utan
+            datum blir bokningen ett telefonsamtal som ska jagas. Visas bara
+            när kapacitetsmotorn hittat dagar med verkligt utrymme. */}
+        {state === 'success' && bookingSuggestions.length > 0 && (
+          <div className="mb-6 bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+            {bookingState === 'sent' ? (
+              <div className="flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Tack — vi har fått ditt önskemål.</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {business?.name || 'Vi'} bekräftar tiden så snart som möjligt. Den är preliminär tills dess.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-1">
+                  <Calendar className="w-5 h-5 text-gray-400 shrink-0" />
+                  <h3 className="text-base font-semibold text-gray-900">När vill du att vi börjar?</h3>
+                </div>
+                <p className="text-gray-400 text-xs mb-4 sm:pl-8">
+                  Tiderna nedan har vi ledigt. Välj en så återkommer vi med bekräftelse.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:pl-8">
+                  {bookingSuggestions.map((s) => {
+                    const d = new Date(`${s.date}T12:00:00Z`)
+                    const weekday = d.toLocaleDateString('sv-SE', { weekday: 'long', timeZone: 'Europe/Stockholm' })
+                    const dayMonth = d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', timeZone: 'Europe/Stockholm' })
+                    return (
+                      <button
+                        key={s.date}
+                        type="button"
+                        onClick={() => handleRequestBooking(s.date)}
+                        disabled={bookingState === 'sending'}
+                        className="min-h-[44px] px-4 py-3 text-left border border-gray-200 rounded-xl hover:border-gray-400 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                      >
+                        <span className="block text-sm font-semibold text-gray-900">Vecka {s.week}</span>
+                        <span className="block text-xs text-gray-500 mt-0.5 capitalize">
+                          {weekday} {dayMonth}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                {bookingState === 'error' && (
+                  <p className="mt-3 text-xs text-red-600 sm:pl-8">
+                    Önskemålet kunde inte skickas. Hör av dig till oss i stället.
+                  </p>
+                )}
+              </>
+            )}
           </div>
         )}
 

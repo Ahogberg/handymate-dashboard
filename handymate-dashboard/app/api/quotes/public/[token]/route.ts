@@ -273,6 +273,54 @@ export async function POST(
       )
     }
 
+    // ── Kunden väljer en föreslagen tid (idé 4) ───────────────────────────────
+    // Skapar INTE en bokning rakt in i kalendern — det vore att låta en kund
+    // skriva i hantverkarens schema. I stället ett önskemål i godkännande-kön
+    // som hantverkaren bekräftar. Kunden får besked om att det är preliminärt.
+    if (action === 'request_booking') {
+      const requestedDate = typeof body.date === 'string' ? body.date.trim() : ''
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
+        return NextResponse.json({ error: 'Ogiltigt datum' }, { status: 400 })
+      }
+
+      const customerName = (quote.customer as any)?.name || 'Kunden'
+      const { error: bookingApprovalErr } = await supabase.from('pending_approvals').insert({
+        id: `appr_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        business_id: quote.business_id,
+        approval_type: 'new_booking_request',
+        title: `${customerName} vill boka ${requestedDate}`,
+        description: `Kunden signerade offerten och önskar start ${requestedDate}. Bekräfta så läggs den i kalendern.`,
+        payload: {
+          agent: 'lars',
+          quote_id: quote.quote_id,
+          quote_title: (quote as any).title || null,
+          customer_id: quote.customer_id,
+          customer_name: customerName,
+          customer_phone: (quote.customer as any)?.phone_number || null,
+          requested_date: requestedDate,
+          source: 'quote_signing',
+        },
+        status: 'pending',
+        risk_level: 'low',
+      })
+
+      if (bookingApprovalErr) {
+        console.error('[quote/public] bokningsönskemål kunde inte sparas:', bookingApprovalErr.message)
+        return NextResponse.json({ error: 'Kunde inte skicka önskemålet — hör av dig till oss i stället' }, { status: 500 })
+      }
+
+      try {
+        const { sendApprovalPush } = await import('@/lib/notifications/approval-push')
+        void sendApprovalPush({
+          business_id: quote.business_id,
+          approval_type: 'new_booking_request',
+          payload: { customer_name: customerName, requested_date: requestedDate },
+        })
+      } catch { /* non-blocking */ }
+
+      return NextResponse.json({ success: true })
+    }
+
     // ── Kundens fråga ─────────────────────────────────────────────────────────
     // Offerten slutar vara ett dokument och blir en kanal. En kund som undrar
     // vad en rad innebär hör oftast inte av sig alls — hen tackar nej i
@@ -587,7 +635,18 @@ export async function POST(
       source: 'signering',
     })
 
-    return NextResponse.json({ success: true })
+    // Signeringen är det enda ögonblick då kunden är maximalt engagerad. Går
+    // hen därifrån utan datum blir bokningen ett telefonsamtal som ska jagas.
+    // Föreslår BARA dagar med verklig ledig kapacitet — ett förslag som inte
+    // håller är ett löfte hantverkaren måste ta tillbaka.
+    const { getBookingSuggestionsForBusiness } = await import('@/lib/quotes/booking-suggestions')
+    const bookingSuggestions = await getBookingSuggestionsForBusiness(
+      supabase,
+      quote.business_id,
+      new Date().toISOString().slice(0, 10),
+    )
+
+    return NextResponse.json({ success: true, booking_suggestions: bookingSuggestions })
 
   } catch (error: any) {
     console.error('Quote public POST error:', error)
