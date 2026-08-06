@@ -15,8 +15,20 @@ type SupabaseClient = ReturnType<typeof getServerSupabase>
 export async function seedAllDefaults(
   supabase: SupabaseClient,
   businessId: string,
-  branch: string
+  branch: string,
+  /**
+   * Ytterligare branscher (v93). Bee arbetar både som elektriker och med bygg.
+   *
+   * Bara SORTIMENTEN slås ihop — artiklar och prislista, där en halv bank för
+   * ett helt jobb är ett verkligt problem. Mallar, checklistor, standardtexter
+   * och avtalstyper följer huvudbranschen: två uppsättningar offertmallar
+   * eller dubbla checklistor gör valet svårare, inte lättare, och det är ett
+   * val hantverkaren gör per jobb ändå.
+   */
+  secondaryBranches: string[] = []
 ) {
+  const productBranches = [branch, ...secondaryBranches.filter(b => b && b !== branch)]
+
   const results = await Promise.allSettled([
     // OBS: legacy seedAutomationRules (automation_rules/automation_queue) är
     // borttaget — det systemet är inert (ingen incheckad konsument: ingen
@@ -27,8 +39,8 @@ export async function seedAllDefaults(
     seedPipelineStages(supabase, businessId),
     seedQuoteStandardTexts(supabase, businessId, branch),
     seedChecklistTemplates(supabase, businessId, branch),
-    seedProducts(supabase, businessId, branch),
-    seedPriceList(supabase, businessId, branch),
+    seedProducts(supabase, businessId, productBranches),
+    seedPriceList(supabase, businessId, productBranches),
     seedReservations(supabase, businessId, branch),
     seedQuoteTemplates(supabase, businessId, branch),
     seedAgreementTypes(supabase, businessId, branch),
@@ -251,7 +263,7 @@ async function seedChecklistTemplates(supabase: SupabaseClient, businessId: stri
  * Idempotent — hoppar helt om businessen redan har produkter, så en kund som
  * hunnit lägga upp eget sortiment aldrig får seed-rader ovanpå.
  */
-async function seedProducts(supabase: SupabaseClient, businessId: string, branch: string) {
+async function seedProducts(supabase: SupabaseClient, businessId: string, branch: string | string[]) {
   const { data: existing } = await supabase
     .from('products')
     .select('id')
@@ -352,7 +364,7 @@ async function seedReservations(supabase: SupabaseClient, businessId: string, br
   }
 }
 
-async function seedPriceList(supabase: SupabaseClient, businessId: string, branch: string) {
+async function seedPriceList(supabase: SupabaseClient, businessId: string, branch: string | string[]) {
   const { data: existing } = await supabase
     .from('price_list')
     .select('id')

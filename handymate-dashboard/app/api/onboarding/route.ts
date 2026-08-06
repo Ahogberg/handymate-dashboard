@@ -170,6 +170,8 @@ export async function POST(request: NextRequest) {
       contact_email,
       phone_number,
       branch,
+      // Fler branscher än en (v93). Bee är både elektriker och bygg.
+      secondary_branches,
       org_number,
       address,
       service_area,
@@ -221,6 +223,17 @@ export async function POST(request: NextRequest) {
     if (contact_email) updates.contact_email = contact_email
     if (phone_number) updates.phone_number = phone_number
     if (branch) updates.branch = branch
+    // Huvudbranschen får aldrig ligga i listan också — CHECK-villkoret i v93
+    // avvisar raden, och den som läser raden ska se avsikten direkt.
+    //
+    // Sätts BARA när det finns något att spara: kolumnen kommer med v93, som
+    // körs manuellt, och en update som nämner en okänd kolumn avvisas i sin
+    // helhet. Villkoret gör att vanlig onboarding fungerar oförändrat före
+    // migrationen.
+    const extraBranches: string[] = Array.isArray(secondary_branches)
+      ? secondary_branches.filter((b: unknown): b is string => typeof b === 'string' && !!b && b !== branch)
+      : []
+    if (extraBranches.length > 0) updates.secondary_branches = extraBranches
     if (org_number !== undefined) updates.org_number = org_number
     if (address !== undefined) updates.address = address
     if (service_area !== undefined) updates.service_area = service_area
@@ -246,7 +259,8 @@ export async function POST(request: NextRequest) {
     const seedResult = await seedAllDefaults(
       supabase,
       business.business_id,
-      branch || 'other'
+      branch || 'other',
+      extraBranches
     )
 
     return NextResponse.json({ success: true, seeded: seedResult })

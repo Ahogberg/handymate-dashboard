@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdmin } from '@/lib/admin-auth'
 import { getServerSupabase } from '@/lib/supabase'
-import { getDefaultProducts } from '@/lib/product-defaults'
+import { getDefaultProducts, resolveBranches } from '@/lib/product-defaults'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,7 +44,11 @@ export async function POST(request: NextRequest) {
     // Onboarding skriver branschen till `branch` (app/api/onboarding/route.ts:223);
     // `industry` finns också på tabellen och används av äldre kod — ta den som
     // fallback så konton som bara har den ena ändå får rätt sortiment.
-    let bizQuery = supabase.from('business_config').select('business_id, branch, industry')
+    // `*` i stället för en kolumnlista: `secondary_branches` kommer med v93,
+    // som körs manuellt i Supabase, och PostgREST avvisar HELA frågan om en
+    // uppräknad kolumn inte finns. Med `*` fungerar rutten både före och efter
+    // migrationen — resolveBranches läser fältet defensivt.
+    let bizQuery = supabase.from('business_config').select('*')
     if (onlyBusinessId) bizQuery = bizQuery.eq('business_id', onlyBusinessId)
 
     const { data: businesses, error: bizErr } = await bizQuery
@@ -68,9 +72,11 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      const bizRow = biz as { branch?: string | null; industry?: string | null }
-      const branch = bizRow.branch || bizRow.industry || 'other'
-      const products = getDefaultProducts(branch)
+      // Flera branscher slås ihop och dedupliceras på sku (v93) — Bee är
+      // både elektriker och bygg och ska ha båda sortimenten.
+      const branches = resolveBranches(biz as Parameters<typeof resolveBranches>[0])
+      const branch = branches.join(' + ')
+      const products = getDefaultProducts(branches)
 
       if (dryRun) {
         results.push({ business_id: biz.business_id, branch, seeded: products.length, skipped: 'torrkörning' })

@@ -8,6 +8,12 @@ export interface OnboardingFormData {
   // ── Step 2: Företaget + konto ────────────────────────────
   companyName?: string
   trade?: string
+  /**
+   * Ytterligare branscher utöver huvudbranschen (v93). Verkligheten är sällan
+   * en bransch — Bee arbetar både som elektriker och med bygg — och med bara
+   * en får han en halv artikelbank för ett helt jobb.
+   */
+  secondaryTrades?: string[]
   orgNumber?: string
   fSkatt?: boolean
   area?: string

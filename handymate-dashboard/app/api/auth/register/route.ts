@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
     }
 
-    const { email, password, businessName, displayName, contactName, phone, branch, serviceArea } = body
+    const { email, password, businessName, displayName, contactName, phone, branch, secondaryBranches, serviceArea } = body
 
     if (!email || !password || !businessName || !contactName) {
       return NextResponse.json({ error: 'Fyll i alla obligatoriska fält' }, { status: 400 })
@@ -55,6 +55,10 @@ export async function POST(request: NextRequest) {
 
     const knowledgeBase = getKnowledgeForBranch(branch)
 
+    const extraBranches: string[] = Array.isArray(secondaryBranches)
+      ? secondaryBranches.filter((b: unknown): b is string => typeof b === 'string' && !!b && b !== branch)
+      : []
+
     const supabaseAdmin = getServerSupabase()
     const { error: businessError } = await supabaseAdmin
       .from('business_config')
@@ -67,6 +71,15 @@ export async function POST(request: NextRequest) {
         contact_email: email,
         phone_number: phone,
         branch: branch,
+        // Fler branscher än en (v93) — sortimenten slås ihop vid seedning.
+        // Huvudbranschen får aldrig ligga här också; CHECK-villkoret avvisar det.
+        //
+        // Fältet tas med BARA när det finns något att spara. Kolumnen kommer
+        // med v93, som körs manuellt i Supabase — och en insert som nämner en
+        // kolumn som ännu inte finns avvisas i sin helhet. Villkoret gör att
+        // vanlig registrering fungerar oförändrat både före och efter
+        // migrationen.
+        ...(extraBranches.length > 0 ? { secondary_branches: extraBranches } : {}),
         service_area: serviceArea || null,
         subscription_status: 'trial',
         subscription_plan: 'starter',

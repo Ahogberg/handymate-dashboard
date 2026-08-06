@@ -297,10 +297,55 @@ const BRANCH_PRODUCTS: Record<string, ProductDefault[]> = {
 /**
  * Branschsortimentet inkl. de gemensamma raderna (framkörning, bortforsling,
  * deponiavgift). Okänd bransch faller tillbaka på 'other'.
+ *
+ * ═══ FLERA BRANSCHER ═══
+ *
+ * Tar emot en eller flera branscher. Verkligheten är sällan en bransch: Bee
+ * arbetar både som elektriker och med bygg, och att tvinga fram ett val hade
+ * gett en halv artikelbank åt en hantverkare som gör hela jobbet.
+ *
+ * Sammanslagningen dedupliceras på `sku` — seed-idempotensnyckeln. Två
+ * branscher kan mycket väl dela en artikel (bygg och snickeri delar
+ * bortforsling), och då ska den bara finnas en gång; en dubblett hade fått
+ * omseedning att skriva över fel rad och kundens egna priser att hamna på fel
+ * artikel. FÖRSTA förekomsten vinner, så ordningen på branscherna avgör —
+ * huvudbranschen ska stå först.
+ *
+ * Fallbacken till 'other' gäller bara om INGEN av branscherna kändes igen. En
+ * kund med ['electrician', 'nonsens'] ska få elsortimentet, inte spädas ut
+ * med allmängods.
  */
-export function getDefaultProducts(branch: string): ProductDefault[] {
-  const base = BRANCH_PRODUCTS[branch] || BRANCH_PRODUCTS.other
-  return [...base, ...COMMON_EXTRAS]
+export function getDefaultProducts(branch: string | string[]): ProductDefault[] {
+  const branches = (Array.isArray(branch) ? branch : [branch]).filter(Boolean)
+  const known = branches.filter(b => BRANCH_PRODUCTS[b])
+  const bases = known.length > 0 ? known.map(b => BRANCH_PRODUCTS[b]) : [BRANCH_PRODUCTS.other]
+
+  const bySku = new Map<string, ProductDefault>()
+  for (const p of [...bases.flat(), ...COMMON_EXTRAS]) {
+    if (!bySku.has(p.sku)) bySku.set(p.sku, p)
+  }
+  return Array.from(bySku.values())
+}
+
+/**
+ * Kundens branscher, i den ordning sortimenten ska slås ihop.
+ *
+ * Huvudbranschen först — vid dubbletter på `sku` vinner första förekomsten,
+ * så det är huvudbranschens variant av en delad artikel som blir kundens.
+ *
+ * `branch` är den kanoniska kolumnen; `industry` finns kvar på tabellen och
+ * används av äldre kod, så den tas som reserv (samma ordning som
+ * backfill-rutten redan använder). `secondary_branches` kom med v93 och kan
+ * saknas på rader som seedats innan dess — därför den defensiva läsningen.
+ */
+export function resolveBranches(row: {
+  branch?: string | null
+  industry?: string | null
+  secondary_branches?: string[] | null
+}): string[] {
+  const primary = row.branch || row.industry || 'other'
+  const extras = (row.secondary_branches ?? []).filter(b => b && b !== primary)
+  return [primary, ...extras]
 }
 
 /** Alla branschnycklar som har ett eget sortiment (exkl. 'other'-fallbacken). */
@@ -320,7 +365,7 @@ export interface PriceListEntry {
  * price_list härleds ur samma data som produktbanken, så telefonagenten och
  * offerten aldrig kan säga olika priser för samma artikel.
  */
-export function getDefaultPriceList(branch: string): PriceListEntry[] {
+export function getDefaultPriceList(branch: string | string[]): PriceListEntry[] {
   return getDefaultProducts(branch).map(p => ({
     category: p.legacy_category,
     name: p.name,

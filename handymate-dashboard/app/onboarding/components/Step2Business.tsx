@@ -386,6 +386,7 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
             contactName: data.contactName,
             phone: cleanPhone,
             branch: data.trade,
+            secondaryBranches: (data.secondaryTrades || []).filter(s => s && s !== data.trade),
             serviceArea: data.area,
             orgNumber: data.orgNumber || null,
             bankgiro: data.paymentMethod === 'bankgiro' ? data.paymentNumber?.trim() : null,
@@ -658,7 +659,13 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
                   type="button"
                   key={t.id}
                   className={`ob-tile ${data.trade === t.id ? 'selected' : ''}`}
-                  onClick={() => update({ trade: t.id })}
+                  onClick={() => update({
+                    trade: t.id,
+                    // Huvudbranschen får aldrig ligga kvar bland de extra —
+                    // CHECK-villkoret i v93 avvisar raden, och en bransch som
+                    // står två gånger är otydlig för den som läser den.
+                    secondaryTrades: (data.secondaryTrades || []).filter(s => s !== t.id),
+                  })}
                 >
                   <span className="ob-tile-icon">
                     <TIcon size={22} />
@@ -669,6 +676,48 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
             })}
           </div>
         </div>
+
+        {/* Fler branscher — frivilligt, och visas först när huvudbranschen är
+            vald så att valet inte konkurrerar med det viktigare. Sortimenten
+            slås ihop; en hantverkare som gör både el och bygg ska inte behöva
+            fylla halva artikelbanken för hand. */}
+        {data.trade && (
+          <div className="ob-field">
+            <label className="ob-label">Gör du mer än så? (frivilligt)</label>
+            <p style={{ margin: '0 0 8px', fontSize: 13, color: '#64748b' }}>
+              Välj till fler områden så får du färdiga priser och artiklar för dem också.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {TRADES.filter(t => t.id !== data.trade).map(t => {
+                const vald = (data.secondaryTrades || []).includes(t.id)
+                return (
+                  <button
+                    type="button"
+                    key={t.id}
+                    onClick={() => update({
+                      secondaryTrades: vald
+                        ? (data.secondaryTrades || []).filter(s => s !== t.id)
+                        : [...(data.secondaryTrades || []), t.id],
+                    })}
+                    style={{
+                      minHeight: 44,
+                      padding: '8px 14px',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      fontWeight: vald ? 600 : 400,
+                      border: `1px solid ${vald ? '#0F766E' : '#e2e8f0'}`,
+                      background: vald ? '#f0fdfa' : '#fff',
+                      color: vald ? '#0F766E' : '#334155',
+                    }}
+                  >
+                    {t.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Org number */}
         <div className="ob-field">

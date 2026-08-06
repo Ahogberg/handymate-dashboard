@@ -20,6 +20,7 @@ import { test, expect } from '@playwright/test'
 import {
   getDefaultProducts,
   getSeededBranches,
+  resolveBranches,
   type ProductDefault,
 } from '../lib/product-defaults'
 import { unitFamily } from '../lib/products/match-generated-items'
@@ -224,5 +225,76 @@ test.describe('SANITY — vakten läser faktiskt registret', () => {
 
   test('okänd bransch faller tillbaka på ett bibliotek, inte på tomhet', () => {
     expect(getDefaultProducts('finns-inte').length).toBeGreaterThan(0)
+  })
+})
+
+test.describe('flera branscher — verkligheten är sällan en bransch', () => {
+  test('två branscher ger båda sortimenten', () => {
+    // Bee arbetar både som elektriker och med bygg. Ett påtvingat val hade
+    // gett en halv artikelbank åt en hantverkare som gör hela jobbet.
+    const bada = getDefaultProducts(['electrician', 'construction'])
+    const bara = getDefaultProducts('electrician')
+    expect(bada.length).toBeGreaterThan(bara.length)
+    expect(bada.some(p => p.sku.startsWith('HM-EL-'))).toBe(true)
+    expect(bada.some(p => p.sku.startsWith('HM-BYG-'))).toBe(true)
+  })
+
+  test('sammanslagningen ger aldrig dubbletter på sku', () => {
+    // sku är seed-idempotensnyckeln. En dubblett får omseedning att skriva
+    // över fel rad och kundens egna priser att hamna på fel artikel.
+    for (const par of [
+      ['electrician', 'construction'],
+      ['carpenter', 'construction'],
+      ['plumber', 'electrician', 'construction'],
+    ]) {
+      const skus = getDefaultProducts(par).map(p => p.sku)
+      expect(new Set(skus).size, `Dubbletter i ${par.join(' + ')}`).toBe(skus.length)
+    }
+  })
+
+  test('de gemensamma raderna kommer med exakt en gång', () => {
+    const skus = getDefaultProducts(['electrician', 'construction']).map(p => p.sku)
+    expect(skus.filter(s => s === 'HM-GEN-901')).toHaveLength(1)
+  })
+
+  test('en okänd extrabransch späder inte ut den kända', () => {
+    // ['electrician', 'nonsens'] ska ge elsortimentet — inte elsortimentet
+    // plus allmängodset ur 'other'-fallbacken.
+    const blandat = getDefaultProducts(['electrician', 'finns-inte'])
+    const rent = getDefaultProducts('electrician')
+    expect(blandat.map(p => p.sku).sort()).toEqual(rent.map(p => p.sku).sort())
+  })
+
+  test('tom lista faller tillbaka, den kraschar inte', () => {
+    expect(getDefaultProducts([]).length).toBeGreaterThan(0)
+  })
+})
+
+test.describe('branschupplösningen — vilken kolumn som gäller', () => {
+  test('branch går före industry', () => {
+    expect(resolveBranches({ branch: 'electrician', industry: 'plumber' })).toEqual(['electrician'])
+  })
+
+  test('industry är reserv för konton som bara har den', () => {
+    expect(resolveBranches({ branch: null, industry: 'plumber' })).toEqual(['plumber'])
+  })
+
+  test('utan bransch alls blir det other, inte tomt', () => {
+    expect(resolveBranches({})).toEqual(['other'])
+  })
+
+  test('huvudbranschen står först — den vinner vid delade artiklar', () => {
+    const b = resolveBranches({ branch: 'electrician', secondary_branches: ['construction'] })
+    expect(b[0]).toBe('electrician')
+    expect(b).toContain('construction')
+  })
+
+  test('huvudbranschen upprepas aldrig om den råkat hamna i listan', () => {
+    expect(resolveBranches({ branch: 'electrician', secondary_branches: ['electrician', 'construction'] }))
+      .toEqual(['electrician', 'construction'])
+  })
+
+  test('rader seedade före v93 saknar kolumnen — det får inte krascha', () => {
+    expect(resolveBranches({ branch: 'electrician', secondary_branches: null })).toEqual(['electrician'])
   })
 })
