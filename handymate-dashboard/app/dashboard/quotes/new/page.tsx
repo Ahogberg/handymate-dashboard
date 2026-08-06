@@ -72,7 +72,15 @@ import {
   getCompletedCount,
   recordCompletedQuickQuote,
   shouldSkipSequence,
+  shouldAskPreferred,
+  getPreferredStart,
+  setPreferredStart,
+  recordEscape,
+  hasBeenAskedPreferred,
+  markAskedPreferred,
+  type EscapeRoute,
 } from '@/lib/quotes/quick-preferences'
+import { QuickStartPreferenceBanner } from './components/quick/QuickStartPreferenceBanner'
 import { QuoteNewPriceWarningsBanner } from './components/QuoteNewPriceWarningsBanner'
 import { QuoteNewEfterkalkylBanner, type EfterkalkylInsight } from './components/QuoteNewEfterkalkylBanner'
 
@@ -1915,11 +1923,56 @@ export default function NewQuotePage() {
    */
   const coldStart = !hasQuoteStartSignal
   useEffect(() => {
-    if (!loading && coldStart && quickMode === null && !quickStartDoneRef.current) {
-      quickStartDoneRef.current = true
-      setQuickMode('intake')
-    }
+    if (loading || !coldStart || quickMode !== null || quickStartDoneRef.current) return
+    quickStartDoneRef.current = true
+
+    // Etapp D2: hantverkarens egen vana väger tyngre än vårt default. Den som
+    // svarat ja på "vill du alltid börja så här?" slipper mellansteget.
+    const preferred = getPreferredStart()
+    if (preferred === 'editor') return          // stanna i offertskaparen
+    if (preferred === 'template') { setTemplatePickerOpen(true); return }
+    setQuickMode('intake')
   }, [loading, coldStart, quickMode])
+
+  /**
+   * Etapp D2: den väg ut ur Snabbofferten som hantverkaren just tagit för
+   * tredje gången. Sätts av utgångarna nedan och visar frågan EN gång.
+   */
+  const [askPreferredFor, setAskPreferredFor] = useState<EscapeRoute | null>(null)
+
+  /**
+   * Hantverkarens sparade startläge. Läses en gång efter montering — inte i
+   * en useState-initierare, eftersom localStorage inte finns under
+   * serverrenderingen och värdena då skulle skilja sig mellan server och
+   * klient.
+   *
+   * Används bara för att kunna ta sig TILLBAKA till Snabbofferten. Den som
+   * svarat "börja alltid i offertskaparen" hade annars ingen väg dit igen —
+   * och banderollen lovar uttryckligen att man kan ändra sig.
+   */
+  const [preferredStart, setPreferredStartState] = useState<'quick' | 'editor' | 'template'>('quick')
+  useEffect(() => { setPreferredStartState(getPreferredStart()) }, [])
+
+  /**
+   * Tar hand om en väg ut ur Snabbofferten: räknar, och frågar vid tredje.
+   *
+   * `carryText` finns för att inget skrivet ska gå förlorat. Skriver man halva
+   * beskrivningen i intaget och sedan byter till offertskaparen låg texten
+   * tidigare kvar i quickInput utan att någonsin tillämpas — och eftersom det
+   * inte finns någon väg tillbaka till intaget var den i praktiken tappad.
+   */
+  function leaveQuickMode(route: EscapeRoute, carryText: boolean) {
+    if (carryText) {
+      const typed = quickInput.trim()
+      // Skriver aldrig över något som redan står där.
+      if (typed && !description.trim()) setDescription(typed)
+      if (typed && !sourceTranscript) setSourceTranscript(typed)
+    }
+    const count = recordEscape(route)
+    if (shouldAskPreferred(count, hasBeenAskedPreferred(route))) {
+      setAskPreferredFor(route)
+    }
+  }
 
   if (loading) {
     return (
@@ -1959,9 +2012,11 @@ export default function NewQuotePage() {
         // "Öppna fullständiga editorn" strax intill, alltså samma sorts
         // dubblett vi nyss städade bort.
         onClose={() => router.push('/dashboard/quotes')}
-        onOpenFullEditor={() => setQuickMode(null)}
+        onOpenFullEditor={() => { leaveQuickMode('editor', true); setQuickMode(null) }}
         building={false}
-        onUseTemplate={() => setTemplatePickerOpen(true)}
+        // Ingen carryText här: mallen sätter sin egen titel och beskrivning,
+        // så texten hade skrivits över i nästa andetag ändå.
+        onUseTemplate={() => { leaveQuickMode('template', false); setTemplatePickerOpen(true) }}
         hasContent={items.length > 0}
       />
       </>
@@ -2059,6 +2114,46 @@ export default function NewQuotePage() {
                 onOpenFullEditor={() => setQuickMode(null)}
                 sending={saving}
               />
+            )}
+
+            {/* Etapp D2: "vill du alltid börja så här?" — ställs en gång, när
+                hantverkaren tagit samma väg ut för tredje gången. Banderoll
+                och inte dialog: frågan dyker upp precis när han är på väg att
+                börja jobba, och ska gå att ignorera helt. */}
+            {askPreferredFor && (
+              <QuickStartPreferenceBanner
+                route={askPreferredFor}
+                onAccept={() => {
+                  setPreferredStart(askPreferredFor)
+                  markAskedPreferred(askPreferredFor)
+                  setAskPreferredFor(null)
+                  toast.success('Sparat — vi börjar här nästa gång.')
+                }}
+                onDecline={() => {
+                  // Ett nej är också ett svar. Markeras som ställd så frågan
+                  // aldrig kommer tillbaka.
+                  markAskedPreferred(askPreferredFor)
+                  setAskPreferredFor(null)
+                }}
+              />
+            )}
+
+            {/* Vägen TILLBAKA till Snabbofferten. Syns bara för den som valt
+                bort den, och bara innan offerten fått innehåll — annars vore
+                det en knapp som slänger arbete. Utan den här raden vore
+                banderollens "du kan alltid ändra dig" ett tomt löfte. */}
+            {preferredStart !== 'quick' && quickMode === null && items.length === 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPreferredStart('quick')
+                  setPreferredStartState('quick')
+                  setQuickMode('intake')
+                }}
+                className="w-full px-4 py-3 bg-white border border-slate-200 hover:border-primary-700 rounded-2xl text-sm font-medium text-primary-700 transition-colors text-left"
+              >
+                Beskriv jobbet i stället — vi bygger utkastet
+              </button>
             )}
 
             {/* Prisvarningar/efterkalkyl — viktig info, inte begravd */}

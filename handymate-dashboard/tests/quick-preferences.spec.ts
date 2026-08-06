@@ -15,6 +15,8 @@ import {
   shouldAskPreferred,
   SKIP_SEQUENCE_AFTER,
   ASK_PREFERRED_AFTER,
+  ESCAPE_LABELS,
+  type EscapeRoute,
 } from '../lib/quotes/quick-preferences'
 
 test.describe('när sekvensen slutar vara startläget', () => {
@@ -65,5 +67,32 @@ test.describe('trösklarna hänger ihop', () => {
     // Annars hade vi frågat "vill du alltid börja så här?" om ett flöde
     // hantverkaren redan slutat se.
     expect(ASK_PREFERRED_AFTER).toBeLessThan(SKIP_SEQUENCE_AFTER)
+  })
+})
+
+test.describe('vägarna ut ur Snabbofferten', () => {
+  const routes: EscapeRoute[] = ['editor', 'template']
+
+  test('varje väg har en svensk etikett som går att sätta in i en mening', () => {
+    // Frågan lyder "Vill du alltid börja <etikett>?" — etiketten måste alltså
+    // vara en fras, inte ett systemnamn.
+    for (const route of routes) {
+      const label = ESCAPE_LABELS[route]
+      expect(label?.length, `${route} saknar etikett`).toBeGreaterThan(0)
+      expect(label.startsWith('i ') || label.startsWith('med '), `"${label}" läser sig inte i meningen`).toBe(true)
+    }
+  })
+
+  test('räknarna är oberoende — tre mallval frågar inte om editorn', () => {
+    // Trösklarna är per väg. Skulle de dela räknare hade tre mallval plus noll
+    // editorbesök triggat frågan om editorn, vilket vore obegripligt.
+    expect(shouldAskPreferred(ASK_PREFERRED_AFTER, false)).toBe(true)
+    expect(shouldAskPreferred(0, false)).toBe(false)
+  })
+
+  test('ett NEJ räknas som svar — frågan kommer inte tillbaka', () => {
+    // markAskedPreferred sätts oavsett hur hantverkaren svarade. Att fråga om
+    // igen efter ett nej är exakt det tjat vi försöker undvika.
+    expect(shouldAskPreferred(ASK_PREFERRED_AFTER, true)).toBe(false)
   })
 })
