@@ -36,6 +36,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
 import { checkCostGuards, type CostGuardBusiness } from '@/lib/agents/shared/cost-guard'
 import {
   assessPhotoAgainstChecklist,
@@ -263,6 +264,13 @@ export async function analyzeProjectPhoto(input: AnalyzeProjectPhotoInput): Prom
             risk_level: 'low',
             payload: {
               routed_agent: 'lars',
+              // SPÅR 1.1 (2026-08-06): beslutsposten — se lib/ai/decision-record.ts.
+              ...withDecisionRecord({}, buildDecisionRecord({
+                model: result.model || 'okänd',
+                prompt: 'photoAssessment',
+                input: photoRef,
+                now: new Date(),
+              })),
               project_id: projectId,
               checklist_id: checklist.id,
               photo_ref: photoRef,
@@ -298,6 +306,13 @@ export async function analyzeProjectPhoto(input: AnalyzeProjectPhotoInput): Prom
             risk_level: 'low',
             payload: {
               routed_agent: 'lars',
+              // SPÅR 1.1 (2026-08-06): beslutsposten — se lib/ai/decision-record.ts.
+              ...withDecisionRecord({}, buildDecisionRecord({
+                model: result.model || 'okänd',
+                prompt: 'photoAssessment',
+                input: photoRef,
+                now: new Date(),
+              })),
               project_id: projectId,
               checklist_id: checklist.id,
               photo_ref: photoRef,

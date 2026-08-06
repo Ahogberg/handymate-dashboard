@@ -45,7 +45,22 @@ export async function recordLearningEvent(
       })
 
     if (error) {
-      console.error('[LearningEngine] Insert error:', error)
+      // LARM, inte en notis (spår 1.1, 2026-08-06).
+      //
+      // Den här inserten failade TYST i månader: reference_id var deklarerad
+      // UUID medan koden skickar TEXT (`appr_<tid>_<slump>`), så Postgres
+      // avvisade varje rad. Felet loggades här — men anroparen kontrollerade
+      // aldrig returvärdet, så ingen såg det. Röret lagades i v78, men all
+      // inlärningsdata före 2026-08-03 är borta för alltid.
+      //
+      // Prefixet gör raden sökbar i loggen, och formuleringen säger vad som
+      // går förlorat i stället för bara att något gick fel.
+      console.error(
+        '[LearningEngine] LARM: inlärningshändelsen sparades INTE — ' +
+          'agentens förslag och hantverkarens svar går förlorade för mätning. ' +
+          `Orsak: ${error.message}`,
+        { eventType, referenceId, referenceType },
+      )
       return { success: false, error: error.message }
     }
 

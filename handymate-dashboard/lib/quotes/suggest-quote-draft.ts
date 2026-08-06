@@ -74,6 +74,7 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { checkCostGuards, type CostGuardBusiness } from '@/lib/agents/shared/cost-guard'
 import { generateQuoteFromInput, type PriceListItem, type QuoteTemplate } from '@/lib/ai-quote-generator'
+import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
 
 // ─────────────────────────────────────────────────────────────────
 // Trösklar
@@ -351,6 +352,19 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
         // skapa offerten utan att fråga modellen igen. `description` ligger
         // kvar som reserv: saknas previewen (äldre kort som ligger i kön när
         // det här deployas) faller exekveraren tillbaka på omgenerering.
+        // SPÅR 1.1 (2026-08-06): beslutsposten — vilken modell och vilken
+        // promptversion som producerade förslaget, plus en hash av underlaget.
+        // Utan den går det inte att svara på om vår AI blir bättre; med den
+        // kan accept-graden grupperas per promptversion.
+        //
+        // Ligger under _decision och läses aldrig av gränssnittet, som plockar
+        // payloadens fält vid namn (verifierat i approvals/page.tsx).
+        ...withDecisionRecord({}, buildDecisionRecord({
+          model: generated.model,
+          prompt: 'quoteDraftSuggestion',
+          input: textDescription,
+          now: new Date(),
+        })),
         preview: {
           job_title: generated.jobTitle,
           job_description: generated.jobDescription,

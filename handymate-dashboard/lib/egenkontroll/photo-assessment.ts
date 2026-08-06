@@ -72,6 +72,14 @@ export interface PhotoAssessmentResult {
   bedömningar: PunktBedömning[]
   usage?: AssessmentUsage
   estimated_cost_usd?: number
+  /**
+   * Modellen som FAKTISKT bedömde bilden (spår 1.1, 2026-08-06).
+   *
+   * Returneras i stället för att anroparen läser getClaudeModel på nytt —
+   * modellvalet kan ändras här utan att anroparen märker det, och en
+   * beslutspost som påstår fel modell är värre än ingen alls.
+   */
+  model?: string
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -314,13 +322,16 @@ export async function assessPhotoAgainstChecklist(
   const { systemPrompt, userText } = buildAssessmentPrompt(items, input.photoContext)
   const caller = opts.caller ?? defaultAnthropicCaller
 
+  // EN källa för modellvalet, så beslutsposten kan bära den som faktiskt kördes.
+  const model = getClaudeModel('live-customer')
+
   try {
     const response = await caller({
       // Fotobedömning kräver vision-kvalitet (planens ord) — samma
       // taskType som annan kund-synlig, kvalitetskritisk analys.
       // Kostnadsmässigt klassas anropet som bakgrund i cost-guard-lagret
       // (etapp 1b), det är en separat axel från modellvalet här.
-      model: getClaudeModel('live-customer'),
+      model,
       max_tokens: 2000,
       temperature: 0.1,
       system: systemPrompt,
@@ -344,6 +355,7 @@ export async function assessPhotoAgainstChecklist(
       bedömningar,
       usage,
       estimated_cost_usd: usage ? estimateCostUsd(usage) : undefined,
+      model,
     }
   } catch (err) {
     console.error('[egenkontroll/photo-assessment] anrop misslyckades (fail-safe)', err)

@@ -214,36 +214,43 @@ export async function POST(
     try {
       const agentSuggestion = approval.payload as Record<string, unknown>
 
-      if (action === 'approve') {
-        await recordLearningEvent(
-          business.business_id,
-          'approval_accepted',
-          params.id,
-          'approval',
-          agentSuggestion,
-          null
-        )
-      } else if (action === 'edit') {
-        await recordLearningEvent(
-          business.business_id,
-          'approval_edited',
-          params.id,
-          'approval',
-          agentSuggestion,
-          edited_payload || {}
-        )
-      } else if (action === 'reject') {
-        await recordLearningEvent(
-          business.business_id,
-          'approval_rejected',
-          params.id,
-          'approval',
-          agentSuggestion,
-          reject_reason ? { reason: reject_reason } : null
+      // SPÅR 1.1 (2026-08-06): RETURVÄRDET KONTROLLERAS NU.
+      //
+      // recordLearningEvent kastar aldrig — den fångar internt och returnerar
+      // { success, error }. Den gamla koden ignorerade svaret och lät ett
+      // try/catch ta hand om "fel", vilket betydde att en misslyckad insert
+      // var helt osynlig här. Kombinerat med UUID/TEXT-buggen i reference_id
+      // förlorades all inlärningsdata i månader utan att någon märkte det.
+      //
+      // Fortfarande non-blocking — ett förlorat inlärningshändelse får aldrig
+      // fälla ett godkännande — men nu SYNLIGT non-blocking.
+      const learning =
+        action === 'approve'
+          ? await recordLearningEvent(
+              business.business_id, 'approval_accepted', params.id, 'approval', agentSuggestion, null,
+            )
+          : action === 'edit'
+            ? await recordLearningEvent(
+                business.business_id, 'approval_edited', params.id, 'approval', agentSuggestion,
+                edited_payload || {},
+              )
+            : action === 'reject'
+              ? await recordLearningEvent(
+                  business.business_id, 'approval_rejected', params.id, 'approval', agentSuggestion,
+                  reject_reason ? { reason: reject_reason } : null,
+                )
+              : null
+
+      if (learning && !learning.success) {
+        console.error(
+          `[approvals/${params.id}] LARM: inlärningshändelsen (${action}) sparades inte — ` +
+            `mätningen av agentens träffsäkerhet tappar den här datapunkten. ${learning.error}`,
         )
       }
-    } catch {
-      // Non-blocking — learning event failure should not break approval flow
+    } catch (err) {
+      // Skulle något ändå kasta får det inte fälla godkännandet — men det ska
+      // synas. Tyst catch var halva orsaken till att buggen levde så länge.
+      console.error('[approvals] LARM: inlärningshändelsen kastade oväntat:', err)
     }
 
     // Förtjänad autonomi (non-blocking): godkännande av allowlistad typ kan

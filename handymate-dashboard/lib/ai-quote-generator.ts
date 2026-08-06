@@ -88,6 +88,14 @@ export interface GeneratedQuote {
    * gett.
    */
   notIncludedSuggestions: string[]
+  /**
+   * Modellen som FAKTISKT producerade svaret (spår 1.1, 2026-08-06).
+   *
+   * Returneras i stället för att anroparen läser konstanten, så beslutsposten
+   * inte kan påstå fel modell om den här filen byter modell utan att
+   * anroparen märker det. Se lib/ai/decision-record.ts.
+   */
+  model: string
 }
 
 export interface ImageAnalysis {
@@ -534,8 +542,12 @@ Svara ENDAST med JSON (ingen markdown):
     text: `Skapa ett offertförslag för:\n\n${fullDescription}`
   })
 
+  // EN källa för modellvalet, så beslutsposten (lib/ai/decision-record.ts)
+  // aldrig kan påstå en annan modell än den som faktiskt kördes.
+  const MODEL = 'claude-sonnet-4-6'
+
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: MODEL,
     // ETAPP B2 (2026-08-06): höjd från 2000. Radgränsen gick från 8 till 12 och
     // svaret bär nu även productRef och notIncludedSuggestions. Vid trunkering
     // blir JSON:en ogiltig och användaren får det obegripliga felet "Kunde inte
@@ -674,5 +686,6 @@ Svara ENDAST med JSON (ingen markdown):
           .map((s: string) => s.trim())
           .slice(0, 4)
       : [],
+    model: MODEL,
   }
 }
