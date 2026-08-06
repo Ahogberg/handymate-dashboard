@@ -74,6 +74,29 @@ v91 (reservationer).
 **Artikelbanken påfylld** (`1b319665`) — alla branscher 12–24 artiklar
 (städ, flytt, vent, lås och övrigt låg på 8–15). Facit-tröskeln höjd till 12.
 
+**Logotypen — rotorsakad och fixad** (`3e90c982`)
+- Fyra klient-selecter begärde `vat_number`, en kolumn som inte finns.
+  PostgREST 400:ar HELA frågan → businessConfig null → logotypen försvann.
+- Commit 69b4bc5b (2026-05-15), som skulle laga loggan, la in `logo_url` och
+  `vat_number` i SAMMA select. Fixen kunde aldrig fungera.
+- Ytorna använder nu `select('*')` via delad konstant + felloggning.
+  Vaktpost i tests/business-config-select.spec.ts, verifierad genom att
+  tillfälligt återinföra en kolumnlista.
+- sql/v92: vat_number-kolumnen + publik läsning av business-assets-bucketen.
+
+**Portalen — gårdagens funktioner nåbara** (`22afa179`)
+- Referensfoton, frågeruta och bokningsförslag var OÅTKOMLIGA: alla kunder
+  redirectas till portalen, som inte visade något av det.
+- "Läs offerten" var en redirect-loop; `?tab=quotes` landade i dokumentlistan.
+
+**Kundtråden som kanal** (`8da7c2f7`)
+- lib/portal/customer-thread.ts: tråden är källan, godkännande-kön är
+  åtgärdsytan. Portalchatt och offertfråga går genom samma väg.
+- Svaret skrivs i tråden + kort SMS med portallänk (inte hela svaret).
+- Svarsrutan i kön var död kod — payloaden saknade `message`, så
+  "Redigera" renderades aldrig. Nu förifylld mall som hantverkaren skriver
+  klart; orörd mall skickar ingenting.
+
 ## KVAR ATT BYGGA
 
 **Idé 2b — förlustanalysens yta.** Motorn och datat finns

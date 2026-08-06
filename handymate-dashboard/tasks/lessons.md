@@ -213,3 +213,40 @@ fältet fanns inte ens med i select:en — så läckagefixen var verkningslös.
 5. Facit-testa funktionens LÖFTE, inte bara dess kod: "dold rad finns inte i
    datat", "saknat inköpspris ger aldrig 100 % marginal", "vi påstår aldrig en
    trend på under 5 observationer".
+
+## 2026-08-06: En kolumnlista i en klient-select är en tickande bomb
+
+**Vad hände:** Bees logotyp syntes aldrig på offerter, trots två tidigare
+"fixar". Rotorsaken var att fyra klient-selecter mot business_config begärde
+`vat_number` — en kolumn ingen migration skapat. PostgREST 400:ar HELA frågan
+när en kolumn saknas, så businessConfig blev null och logotypen föll tillbaka
+på initialbokstaven. Commit 69b4bc5b, som SKULLE laga loggan, la in `logo_url`
+och `vat_number` i samma select — fixen kunde aldrig fungera.
+
+**Varför det överlevde tre månader:** ingen läste `.error`; företagsnamnet kom
+från en annan källa och såg rätt ut, så felet framstod som "bara loggan";
+och inställningssidan använder `select('*')` → loggan syntes ALLTID där.
+
+**Regler:**
+1. Klient-selecter (anon-nyckeln) mot konfigurationstabeller: använd
+   `select('*')`. En kolumnlista gör att ett enda felstavat eller
+   icke-existerande fält tystar HELA svaret. Kostnaden för extra kolumner på
+   en enradstabell är noll jämfört med den risken.
+2. Läs alltid `.error` på Supabase-anrop i UI-flöden. `{ data }` ensamt döljer
+   400:or som ser ut som "tom data".
+3. När en fix inte biter: misstänk att fixen själv införde problemet. Läs
+   diffen på den påstådda fixen innan du bygger en till.
+4. Asymmetri är en ledtråd: "syns i inställningarna men inte i offerten" pekar
+   på olika DATAVÄGAR, inte på rendering.
+5. Verifiera vaktposter genom att återinföra buggen och se testet bli rött.
+
+## 2026-08-06: Bygg inte på en yta kunden aldrig når
+
+**Vad hände:** Tre nya kundfunktioner (referensfoton, frågeruta,
+bokningsförslag) byggdes i app/quote/[token] — en sida som redirectar alla
+kunder med portal_token till portalen FÖRE rendering. Eftersom quotes/send
+alltid skapar en token nådde ingen kund funktionerna.
+
+**Regel:** innan en kundvänd funktion byggs, spåra vilken URL kunden FAKTISKT
+får i sitt SMS/mejl och följ alla redirects. "Sidan finns" är inte samma sak
+som "kunden hamnar där".
