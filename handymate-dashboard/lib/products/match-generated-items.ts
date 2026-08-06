@@ -72,7 +72,10 @@ const UNIT_FAMILIES: Record<string, string> = {
   st: 'each', styck: 'each', stk: 'each',
   m2: 'area', 'm²': 'area', kvm: 'area',
   m: 'length', lpm: 'length', löpm: 'length', meter: 'length',
-  m3: 'volume', 'm³': 'volume',
+  // kbm saknades tidigare (upptäckt av tests/product-register.spec.ts
+  // 2026-08-06): registret använder 'kbm' medan AI:n skriver 'm3', så en
+  // volymrad kunde aldrig fuzzy-matcha en volymartikel i banken.
+  m3: 'volume', 'm³': 'volume', kbm: 'volume',
   kg: 'weight', ton: 'weight',
   l: 'volume_l', liter: 'volume_l',
 }
