@@ -352,7 +352,9 @@ export default function NewQuotePage() {
 
   // Startsteg (Etapp 3): "Börja tomt / Använd mall / Beskriv med AI" —
   // visas bara när ingen styrsignal pekat ut vad offerten redan ska bli.
-  const [startChooserDismissed, setStartChooserDismissed] = useState(false)
+  /** Mallväljaren, öppnad från Snabboffertens intag. Ersätter startväljaren
+      som helhet — se kommentaren vid showTemplatePicker nedan. */
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
 
   // Preview
   const [showPreviewPanel, setShowPreviewPanel] = useState(true)
@@ -393,6 +395,10 @@ export default function NewQuotePage() {
   // "Öppna i fullständiga editorn" är därför bokstavligen quickMode = null:
   // samma offert, samma state, andra verktyget. Inget behöver överföras.
   const [quickMode, setQuickMode] = useState<'intake' | 'building' | 'review' | 'overview' | null>(null)
+  /** Snabbofferten öppnas automatiskt EN gång vid kallstart. Utan den här
+      vakten hade "Öppna fullständiga editorn" (som sätter quickMode = null)
+      studsat tillbaka in i intaget direkt. */
+  const quickStartDoneRef = useRef(false)
   const [quickSection, setQuickSection] = useState<QuoteSection>('inkluderat')
   const [quickApproved, setQuickApproved] = useState<QuoteSection[]>([])
   const [quickInput, setQuickInput] = useState('')
@@ -1889,7 +1895,31 @@ export default function NewQuotePage() {
     searchParams?.get('customerId') || searchParams?.get('customer_id') ||
     searchParams?.get('title')
   )
-  const showStartChooser = !hasQuoteStartSignal && !startChooserDismissed
+  /**
+   * KALLSTART GÅR DIREKT TILL SNABBOFFERTEN (2026-08-06).
+   *
+   * Tidigare låg en fullskärmsväljare med fyra alternativ först. Två av dem
+   * var samma sak: "Beskriv jobbet med AI" och "Snabboffert" postade båda till
+   * /api/quotes/ai-generate och körde applyAiResult — Snabbofferten är en
+   * strikt förbättring med röst, kundval och sektionsgranskning. Ett tredje,
+   * "Börja från tom offert", erbjöd piloten exakt den yta han beskrev som "för
+   * mycket, rörigt".
+   *
+   * Kvar blir ETT beslut — beskriva eller återanvända — och det behöver ingen
+   * egen skärm. Mallvalet och den fullständiga editorn ligger som länkar i
+   * intaget, där de kostar noll tills de behövs.
+   *
+   * Villkoret är detsamma som styrde väljaren: kommer man från en affär, lead,
+   * kund eller ett transkript vet vi redan vad offerten gäller och ska inte
+   * fråga om något.
+   */
+  const coldStart = !hasQuoteStartSignal
+  useEffect(() => {
+    if (!loading && coldStart && quickMode === null && !quickStartDoneRef.current) {
+      quickStartDoneRef.current = true
+      setQuickMode('intake')
+    }
+  }, [loading, coldStart, quickMode])
 
   if (loading) {
     return (
@@ -1902,6 +1932,16 @@ export default function NewQuotePage() {
   // ═══ SNABBOFFERTEN: intag och byggkänsla är fullskärmslägen ══════════
   if (quickMode === 'intake') {
     return (
+      <>
+      {/* Mallistan ligger ÖVER intaget, som blir kvar monterat under. Stänger
+          man den utan att välja något är man tillbaka där man var — annars
+          hade ett ångrat mallval landat i den fullständiga editorn, alltså
+          precis den yta man försökte undvika. */}
+      <QuoteNewStartChooser
+        show={templatePickerOpen}
+        onClose={() => setTemplatePickerOpen(false)}
+        onSelectTemplate={t => { handleTemplateSelect(t); setQuickMode(null) }}
+      />
       <QuickIntake
         customers={customers}
         selectedCustomer={selectedCustomer}
@@ -1913,10 +1953,18 @@ export default function NewQuotePage() {
         onRemovePhoto={removePhoto}
         maxPhotos={MAX_PHOTOS}
         onBuild={() => { void buildQuickDraft() }}
-        onClose={() => setQuickMode(null)}
+        // "Tillbaka" lämnar offerten. Intaget är sedan startväljaren togs bort
+        // det FÖRSTA man ser vid kallstart, så det finns ingenting bakom det i
+        // sidan — hade den bara satt quickMode = null vore den identisk med
+        // "Öppna fullständiga editorn" strax intill, alltså samma sorts
+        // dubblett vi nyss städade bort.
+        onClose={() => router.push('/dashboard/quotes')}
         onOpenFullEditor={() => setQuickMode(null)}
         building={false}
+        onUseTemplate={() => setTemplatePickerOpen(true)}
+        hasContent={items.length > 0}
       />
+      </>
     )
   }
 
@@ -1932,12 +1980,12 @@ export default function NewQuotePage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Mallväljaren. Öppnas bara från Snabboffertens intag — den är inte
+          längre ett startval utan en av två utgångar därifrån. */}
       <QuoteNewStartChooser
-        show={showStartChooser}
-        onClose={() => setStartChooserDismissed(true)}
+        show={templatePickerOpen}
+        onClose={() => setTemplatePickerOpen(false)}
         onSelectTemplate={handleTemplateSelect}
-        onDescribeWithAI={() => setShowAiHelper(true)}
-        onQuickQuote={() => setQuickMode('intake')}
       />
 
       {/* Granskningsbaren är fäst i nederkanten och täcker sidans slut — utan

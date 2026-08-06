@@ -49,6 +49,19 @@ interface QuickIntakeProps {
   /** "Öppna fullständiga editorn" — samma offert, andra verktyget. */
   onOpenFullEditor: () => void
   building: boolean
+  /**
+   * "Använd en mall i stället". Sedan startväljaren togs bort (2026-08-06) är
+   * mallvalet en av två utgångar härifrån, inte ett eget startval.
+   */
+  onUseTemplate: () => void
+  /**
+   * true när offerten redan har rader. Mallänken DÖLJS då: handleTemplateSelect
+   * skriver över titel, beskrivning och rader, så en mall vald efter att AI
+   * byggt ett utkast hade raderat arbetet utan förvarning. Att dölja länken
+   * gör krocken omöjlig i stället för att varna om den — ett beslut mindre i
+   * ett flöde vi försöker tömma på beslut.
+   */
+  hasContent: boolean
 }
 
 export function QuickIntake({
@@ -65,6 +78,8 @@ export function QuickIntake({
   onClose,
   onOpenFullEditor,
   building,
+  onUseTemplate,
+  hasContent,
 }: QuickIntakeProps) {
   const recording = useAudioRecording()
   const [transcribing, setTranscribing] = useState(false)
@@ -265,13 +280,27 @@ export function QuickIntake({
             {building && <Loader2 className="w-5 h-5 animate-spin" />}
             {building ? 'Bygger…' : 'Bygg utkast'}
           </button>
-          <button
-            type="button"
-            onClick={onOpenFullEditor}
-            className="w-full mt-3 py-3 text-sm text-slate-500 hover:text-slate-900 transition-colors"
-          >
-            Öppna fullständiga editorn i stället
-          </button>
+          {/* De två utgångarna. De ersätter startväljarens fyra kort och
+              kostar ingenting förrän de behövs. Mallänken försvinner så fort
+              offerten har innehåll — se hasContent. */}
+          <div className="mt-4 flex flex-col items-center gap-1">
+            {!hasContent && (
+              <button
+                type="button"
+                onClick={onUseTemplate}
+                className="w-full py-3 text-sm font-medium text-primary-700 hover:text-primary-600 transition-colors"
+              >
+                Använd en mall i stället
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onOpenFullEditor}
+              className="w-full py-3 text-sm text-slate-500 hover:text-slate-900 transition-colors"
+            >
+              Öppna fullständiga editorn
+            </button>
+          </div>
         </div>
       </div>
     </div>
