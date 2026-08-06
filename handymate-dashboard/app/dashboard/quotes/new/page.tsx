@@ -57,6 +57,22 @@ import { QuoteNewAIHelper } from './components/QuoteNewAIHelper'
 import { QuoteNewCustomerSection } from './components/QuoteNewCustomerSection'
 import { QuoteNewAttachmentsCard } from './components/QuoteNewAttachmentsCard'
 import { QuoteNewStartChooser } from './components/QuoteNewStartChooser'
+import { QuickIntake } from './components/quick/QuickIntake'
+import { QuickBuilding } from './components/quick/QuickBuilding'
+import { QuickReviewBar } from './components/quick/QuickReviewBar'
+import { QuickReceipt } from './components/quick/QuickReceipt'
+import {
+  sectionHandlers,
+  sectionSummary,
+  nextSection,
+  SECTION_ORDER,
+  type QuoteSection,
+} from '@/lib/quotes/section-handlers'
+import {
+  getCompletedCount,
+  recordCompletedQuickQuote,
+  shouldSkipSequence,
+} from '@/lib/quotes/quick-preferences'
 import { QuoteNewPriceWarningsBanner } from './components/QuoteNewPriceWarningsBanner'
 import { QuoteNewEfterkalkylBanner, type EfterkalkylInsight } from './components/QuoteNewEfterkalkylBanner'
 
@@ -367,6 +383,20 @@ export default function NewQuotePage() {
   const [sendConfirmPending, setSendConfirmPending] = useState(false)
   const dealLookupDoneRef = useRef(false)
 
+  // ═══ SNABBOFFERTEN (etapp C, 2026-08-06) ═══════════════════════════
+  //
+  // Ett LÄGE i den här sidan, inte en egen route. Allt Snabbofferten behöver —
+  // items-state, saveQuote, reservationshooken, produktlistan — finns redan
+  // här. En egen sida hade tvingat fram en andra spar-väg, och två spar-vägar
+  // är exakt hur den här kodbasen redan skaffat sig tysta luckor.
+  //
+  // "Öppna i fullständiga editorn" är därför bokstavligen quickMode = null:
+  // samma offert, samma state, andra verktyget. Inget behöver överföras.
+  const [quickMode, setQuickMode] = useState<'intake' | 'building' | 'review' | 'overview' | null>(null)
+  const [quickSection, setQuickSection] = useState<QuoteSection>('inkluderat')
+  const [quickApproved, setQuickApproved] = useState<QuoteSection[]>([])
+  const [quickInput, setQuickInput] = useState('')
+
   // ─── Shared hooks ──────────────────────────────────────────────────
   const {
     products,
@@ -471,6 +501,46 @@ export default function NewQuotePage() {
       hasRotItems, hasRutItems, personnummer, fastighetsbeteckning,
     ],
   )
+
+  // ═══ SNABBOFFERTEN: sammanfattning per sektion ══════════════════════
+  //
+  // Räknas för ALLA fyra sektionerna samtidigt eftersom kvittot (C4) visar
+  // dem alla på en gång. Att räkna en i taget hade krävt fyra memon som
+  // ändå beror på samma state.
+  //
+  // itemsWithoutPrice räknar bara riktiga 'item'/'option'-rader: en rubrik
+  // eller fritextrad har aldrig ett pris, och att flagga dem hade gett en
+  // varning på varenda välbyggd offert.
+  const quickSummaries = useMemo(() => {
+    const priceable = items.filter(i => {
+      const t = i.item_type || 'item'
+      return t === 'item' || t === 'option'
+    })
+    const input = {
+      itemCount: items.length,
+      itemsWithoutPrice: priceable.filter(i => !i.unit_price).length,
+      notIncludedFilled: notIncluded.trim().length > 0,
+      reservationCount: reservations.snapshot.length,
+      reservationSuggestions: reservations.suggestions.length,
+      amountToPay:
+        totals.gronBase > 0
+          ? totals.customerPaysAfterDeductions
+          : hasRotItems
+            ? totals.rotCustomerPays
+            : hasRutItems
+              ? totals.rutCustomerPays
+              : totals.total,
+      deductionMissingPersonnummer: hasRotItems && !personnummer.trim(),
+      paymentPlanValid,
+      hasPaymentPlan: paymentPlan.length > 0,
+    }
+    return Object.fromEntries(
+      SECTION_ORDER.map(s => [s, sectionSummary(s, input)]),
+    ) as Record<QuoteSection, ReturnType<typeof sectionSummary>>
+  }, [
+    items, notIncluded, reservations.snapshot.length, reservations.suggestions.length,
+    totals, hasRotItems, hasRutItems, personnummer, paymentPlanValid, paymentPlan.length,
+  ])
 
   const selectedCustomerObj = useMemo(
     () => customers.find(c => c.customer_id === selectedCustomer) || null,
@@ -1315,6 +1385,90 @@ export default function NewQuotePage() {
     setGenerating(false)
   }
 
+  // ═══ SNABBOFFERTEN: bygg utkastet ═══════════════════════════════════
+  //
+  // Samma generator som AI-hjälpen — skillnaden är vad som händer EFTERÅT:
+  // här landar man i sektionsgranskningen i stället för i den fulla editorn.
+  //
+  // Vid fel går vi tillbaka till intaget med texten kvar. Att slänga
+  // hantverkaren in i en tom editor efter ett misslyckat AI-anrop hade
+  // betytt att han fick skriva om hela beskrivningen.
+  async function buildQuickDraft() {
+    const inputText = quickInput.trim()
+    if (!inputText) return
+    setQuickMode('building')
+    try {
+      const body: Record<string, unknown> = { textDescription: inputText }
+      if (photos.length > 0) body.images = photos.map(p => p.split(',')[1])
+      if (selectedCustomer) body.customerId = selectedCustomer
+
+      const response = await fetch('/api/quotes/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await response.json()
+      if (!data.success) {
+        toast.error(data.error || 'Kunde inte bygga utkastet')
+        setQuickMode('intake')
+        return
+      }
+
+      setSourceTranscript(inputText)
+      applyAiResult(data.quote)
+      setAiPriceWarning(data.priceWarning || null)
+
+      // Fotona sparas som bilagor i stället för att slängas — samma väg som
+      // AI-hjälpen (B6). Fail-soft: en misslyckad uppladdning får aldrig
+      // fälla ett utkast som redan lyckats.
+      if (photos.length > 0) {
+        const uploaded = await Promise.all(photos.map((p, i) => uploadPhotoAsAttachment(p, i)))
+        const ok = uploaded.filter((a): a is { name: string; url: string; size: number } => !!a)
+        if (ok.length > 0) setAttachments(prev => [...prev, ...ok])
+        setPhotos([])
+      }
+
+      // ETAPP D: efter fem genomförda snabbofferter landar utkastet direkt i
+      // översikten. Granskningen finns kvar — den slutar bara vara startläget,
+      // och kvittots amber-chips leder tillbaka in i den vid behov.
+      setQuickSection('inkluderat')
+      setQuickApproved([])
+      setQuickMode(shouldSkipSequence(getCompletedCount()) ? 'overview' : 'review')
+    } catch (err) {
+      console.error('[Snabboffert] Kunde inte bygga utkastet:', err)
+      toast.error('Nätverksfel — försök igen')
+      setQuickMode('intake')
+    }
+  }
+
+  // ETAPP C3: scrolla fram sektionen som granskas. scroll-margin-top i
+  // modern-css.ts ger plats åt den sticky baren, annars hamnar sektionens
+  // överkant under den. Körs efter render (requestAnimationFrame) eftersom
+  // data-section-attributet sätts i samma renderpass som byter fokus.
+  //
+  // Misslyckas uppslaget händer ingenting alls — en sektion kan sakna
+  // element (inga reservationer → inget reservationsblock), och det är ett
+  // helt normalt tillstånd, inte ett fel att larma om.
+  useEffect(() => {
+    if (quickMode !== 'review') return
+    const frame = requestAnimationFrame(() => {
+      const target = document.querySelector(`[data-section="${quickSection}"]`)
+      target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [quickMode, quickSection])
+
+  /** Godkänner sektionen och glider vidare; sista sektionen leder till helheten. */
+  function approveQuickSection() {
+    setQuickApproved(prev => (prev.includes(quickSection) ? prev : [...prev, quickSection]))
+    const next = nextSection(quickSection)
+    if (next) {
+      setQuickSection(next)
+    } else {
+      setQuickMode('overview')
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════
   // Template handlers
   // ═══════════════════════════════════════════════════════════════════
@@ -1745,6 +1899,37 @@ export default function NewQuotePage() {
     )
   }
 
+  // ═══ SNABBOFFERTEN: intag och byggkänsla är fullskärmslägen ══════════
+  if (quickMode === 'intake') {
+    return (
+      <QuickIntake
+        customers={customers}
+        selectedCustomer={selectedCustomer}
+        onSelectCustomer={setSelectedCustomer}
+        value={quickInput}
+        onChange={setQuickInput}
+        photos={photos}
+        onPhotoFile={file => { void handlePhotoFile(file) }}
+        onRemovePhoto={removePhoto}
+        maxPhotos={MAX_PHOTOS}
+        onBuild={() => { void buildQuickDraft() }}
+        onClose={() => setQuickMode(null)}
+        onOpenFullEditor={() => setQuickMode(null)}
+        building={false}
+      />
+    )
+  }
+
+  if (quickMode === 'building') {
+    return (
+      <QuickBuilding
+        businessName={businessConfig?.business_name || business.business_name || 'Ditt företag'}
+        customerName={selectedCustomerObj?.name || null}
+        issuedDate={new Date().toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })}
+      />
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <QuoteNewStartChooser
@@ -1752,9 +1937,15 @@ export default function NewQuotePage() {
         onClose={() => setStartChooserDismissed(true)}
         onSelectTemplate={handleTemplateSelect}
         onDescribeWithAI={() => setShowAiHelper(true)}
+        onQuickQuote={() => setQuickMode('intake')}
       />
 
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
+      {/* Granskningsbaren är sticky och täcker sidans nederkant — utan
+          utrymme nedtill hamnar summeringen under den och går inte att nå. */}
+      <div
+        className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6"
+        style={quickMode === 'review' ? { paddingBottom: 260 } : undefined}
+      >
         <QuoteNewHeader
           aiGenerated={aiGenerated}
           aiConfidence={aiConfidence}
@@ -1790,6 +1981,36 @@ export default function NewQuotePage() {
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,380px)_1fr] lg:grid-rows-[auto_1fr] gap-5 items-start">
           {/* ── Assistentkolumnen, del 1: varningar + kund ────────── */}
           <div className="order-1 lg:order-none lg:col-start-1 lg:row-start-1 flex flex-col gap-4">
+            {/* ETAPP C4: kvittot när alla sektioner är genomgångna. Ligger
+                överst i kolumnen så det är det första man ser när
+                granskningen är klar — svaret på "har jag fått med allt?". */}
+            {quickMode === 'overview' && (
+              <QuickReceipt
+                summaries={quickSummaries}
+                approved={quickApproved}
+                amountToPay={formatCurrency(
+                  totals.gronBase > 0
+                    ? totals.customerPaysAfterDeductions
+                    : hasRotItems
+                      ? totals.rotCustomerPays
+                      : hasRutItems
+                        ? totals.rutCustomerPays
+                        : totals.total,
+                )}
+                customerName={selectedCustomerObj?.name || null}
+                onGoToSection={section => { setQuickSection(section); setQuickMode('review') }}
+                onSend={() => {
+                  // Räknas när offerten FAKTISKT skickas, aldrig när utkastet
+                  // byggdes. En påbörjad och övergiven snabboffert är inte
+                  // erfarenhet — den ska inte snabba på flödet nästa gång.
+                  recordCompletedQuickQuote()
+                  void saveQuote(true)
+                }}
+                onOpenFullEditor={() => setQuickMode(null)}
+                sending={saving}
+              />
+            )}
+
             {/* Prisvarningar/efterkalkyl — viktig info, inte begravd */}
             <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />
             <QuoteNewEfterkalkylBanner insight={efterkalkylInsight} />
@@ -2067,8 +2288,16 @@ export default function NewQuotePage() {
                   setPreviewMode={setPreviewMode}
                   liveEnabled={liveAvailable}
                   liveTemplateData={quoteTemplateData}
-                  liveHandlers={liveHandlers}
-                  onRowTap={setSheetItemId}
+                  // ETAPP C3: i granskningsläget skickas bara den fokuserade
+                  // sektionens handlers in — dokumentmotorn renderar då resten
+                  // som ren text. focusSection sköter dimningen. Två oberoende
+                  // spakar: dimning utan handler-gating hade sett låst ut men
+                  // fortfarande varit redigerbart.
+                  liveHandlers={
+                    quickMode === 'review' ? sectionHandlers(quickSection, liveHandlers) : liveHandlers
+                  }
+                  focusSection={quickMode === 'review' ? quickSection : null}
+                  onRowTap={quickMode === 'review' && quickSection !== 'inkluderat' ? undefined : setSheetItemId}
                   onAddRowTap={() => setAddRowSheetOpen(true)}
                   templatePreviewPayload={templatePreviewPayload}
                 />
@@ -2101,6 +2330,58 @@ export default function NewQuotePage() {
         onAddHeading={() => addItem('heading')}
         onClose={() => setAddRowSheetOpen(false)}
       />
+
+      {/* ETAPP C3: Snabboffertens granskningsbar. Sticky nederst, med
+          tappbara progressprickar och "Hoppa till översikt" — granskningen är
+          navigering, inte grindar. Varje sektion får sitt eget verktyg som
+          barn: det som sektionen faktiskt behöver, inte en generisk meny. */}
+      {quickMode === 'review' && (
+        <QuickReviewBar
+          section={quickSection}
+          summary={quickSummaries[quickSection]}
+          approved={quickApproved}
+          onSelectSection={setQuickSection}
+          onApprove={approveQuickSection}
+          onSkipToOverview={() => setQuickMode('overview')}
+        >
+          {quickSection === 'inkluderat' && (
+            <button
+              type="button"
+              onClick={() => setAddRowSheetOpen(true)}
+              className="w-full min-h-[44px] flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-dashed border-slate-300 text-primary-700 text-sm font-semibold rounded-xl hover:bg-primary-50/50 transition-colors"
+            >
+              + Lägg till rad
+            </button>
+          )}
+          {quickSection === 'reservationer' && reservations.suggestions.length > 0 && (
+            <button
+              type="button"
+              onClick={() => reservations.setReviewOpen(true)}
+              className="w-full min-h-[44px] flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-amber-300 text-amber-800 text-sm font-semibold rounded-xl hover:bg-amber-50 transition-colors"
+            >
+              Se {reservations.suggestions.length} förslag
+            </button>
+          )}
+          {quickSection === 'exkluderat' && (
+            <textarea
+              value={notIncluded}
+              onChange={e => setNotIncluded(e.target.value)}
+              rows={2}
+              placeholder="Vad ingår INTE? T.ex. målning, bygglov, bortforsling…"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 bg-white focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors resize-none"
+            />
+          )}
+          {quickSection === 'prisbild' && hasRotItems && !personnummer.trim() && (
+            <input
+              type="text"
+              value={personnummer}
+              onChange={e => setPersonnummer(e.target.value)}
+              placeholder="Kundens personnummer — krävs för ROT-avdraget"
+              className="w-full px-3 py-2.5 border border-amber-300 rounded-xl text-sm text-slate-900 placeholder:text-amber-700/60 bg-white focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors"
+            />
+          )}
+        </QuickReviewBar>
+      )}
 
       {/* Granskningsvyn för reservationsförslag — förbockade, redigerbara,
           med raderna som utlöste dem som motivering. */}

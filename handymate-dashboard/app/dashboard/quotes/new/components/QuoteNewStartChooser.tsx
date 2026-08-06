@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, FilePlus2, FileStack, Loader2, Sparkles } from 'lucide-react'
+import { ArrowLeft, FilePlus2, FileStack, Loader2, Sparkles, Zap } from 'lucide-react'
 import TemplateSelector from '@/components/quotes/TemplateSelector'
 import type { QuoteTemplate } from '@/lib/types/quote'
 
@@ -10,6 +10,9 @@ interface QuoteNewStartChooserProps {
   onClose: () => void
   onSelectTemplate: (template: QuoteTemplate) => void
   onDescribeWithAI: () => void
+  /** ETAPP C (Snabbofferten): AI bygger utkastet, hantverkaren granskar
+      sektionsvis. Visuellt primär — se kommentaren vid knappen. */
+  onQuickQuote?: () => void
 }
 
 /**
@@ -19,7 +22,7 @@ interface QuoteNewStartChooserProps {
  * gör att den aldrig visas. ETAPP 2b (offert-masterplan.md): mallpanelen i
  * vänsterspalten togs bort — det här är nu den enda vägen till mallarna.
  */
-export function QuoteNewStartChooser({ show, onClose, onSelectTemplate, onDescribeWithAI }: QuoteNewStartChooserProps) {
+export function QuoteNewStartChooser({ show, onClose, onSelectTemplate, onDescribeWithAI, onQuickQuote }: QuoteNewStartChooserProps) {
   const [mode, setMode] = useState<'choose' | 'templates'>('choose')
   const [templateCount, setTemplateCount] = useState<number | null>(null)
   const [seeding, setSeeding] = useState(false)
@@ -77,6 +80,31 @@ export function QuoteNewStartChooser({ show, onClose, onSelectTemplate, onDescri
             </div>
 
             <div className="flex flex-col gap-3">
+              {/* ETAPP C (Snabbofferten, 2026-08-06): FÖRST och visuellt
+                  primär — teal fyllning mot de andras vita kort.
+                  Piloten Christoffer sa att den vanliga editorn är "för
+                  mycket, rörigt, man får inte med allt". Det här är svaret,
+                  och då ska det inte ligga som tredje alternativ i en
+                  likadan-ser-ut-lista. De andra vägarna är kvar oförändrade
+                  — vi tar inte bort något som fungerar för någon. */}
+              {onQuickQuote && (
+                <button
+                  type="button"
+                  onClick={() => { onQuickQuote(); onClose() }}
+                  className="flex items-center gap-4 p-5 bg-primary-700 hover:bg-primary-600 border-2 border-primary-700 rounded-2xl text-left transition-all active:scale-[0.99] shadow-sm"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-white/15 text-white flex items-center justify-center flex-shrink-0">
+                    <Zap className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-heading text-base font-bold text-white">Snabboffert</p>
+                    <p className="text-sm text-white/80 mt-0.5">
+                      Berätta om jobbet — vi bygger utkastet, du granskar del för del
+                    </p>
+                  </div>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => setMode('templates')}

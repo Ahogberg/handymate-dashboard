@@ -38,9 +38,29 @@ export interface QuoteItemPatch {
 
 export type QuoteDocumentMode = 'static' | 'edit'
 
+/**
+ * ETAPP C3 (Snabbofferten, 2026-08-06): SAMTLIGA handlers är optionella.
+ *
+ * Dokumentmotorn gatar redan varje redigerbart fält på att motsvarande handler
+ * finns — saknas den renderas fältet som ren text i stället. Det betyder att
+ * ett PARTIELLT handlers-objekt ger "bara den här sektionen är redigerbar,
+ * resten är läsbar" utan en enda ändring i renderingslogiken.
+ *
+ * Tidigare var sex av fälten obligatoriska (titel, beskrivning, radändring,
+ * radtillägg, radborttagning, ROT-cykel, tillvalsförval), vilket tvingade
+ * varje anropare att skicka allt. Sektionsfokus hade då krävt att skicka in
+ * no-op-funktioner — och en no-op ser ut som en fungerande handler för
+ * dokumentmotorn, så fältet hade renderats redigerbart men inte gjort något.
+ * Att göra fälten optionella är alltså inte bara bekvämare, det är det enda
+ * sättet att uttrycka "det här fältet ska INTE gå att redigera nu".
+ *
+ * Befintliga anropare (new/edit-sidornas liveHandlers) skickar fortfarande
+ * allt och påverkas inte. Se lib/quotes/section-handlers.ts för hur
+ * delmängderna byggs.
+ */
 export interface QuoteDocumentHandlers {
-  onTitleChange: (v: string) => void
-  onDescriptionChange: (v: string) => void
+  onTitleChange?: (v: string) => void
+  onDescriptionChange?: (v: string) => void
   /** Endast satt på ytor där kundnamnet får redigeras inline (idag ingen —
       kunden väljs via en separat selector). undefined → namnet är text. */
   onCustomerNameChange?: (v: string) => void
@@ -56,12 +76,12 @@ export interface QuoteDocumentHandlers {
   /** "Ej inkluderat"-texten i villkorsstycket — multiline, samma mönster som
       onTermsChange. */
   onNotIncludedChange?: (v: string) => void
-  onItemChange: (id: string, patch: QuoteItemPatch) => void
+  onItemChange?: (id: string, patch: QuoteItemPatch) => void
   /** Lägger till en ny tom 'item'-rad sist — samma beteende som dagens
       "+ Lägg till rad". Radtypsväljare (rubrik/text/etc) ägs av "Mer"-
       verktygsraden (E2b), inte av canvasen. */
-  onItemAdd: () => void
-  onItemRemove: (id: string) => void
+  onItemAdd?: () => void
+  onItemRemove?: (id: string) => void
   /** Flyttar raden ett steg upp eller ned. Canvasen kunde tidigare inte
       ändra radordning alls — på mobilen, där canvasen är huvudytan, gick
       det inte att flytta en rad utan att lämna vyn. dnd-kit används
@@ -76,10 +96,10 @@ export interface QuoteDocumentHandlers {
       lämnas till radeditorn (listvyn) — badgen kan inte välja KATEGORI,
       men ett klick på en grön-taggad rad flyttar den medvetet ut ur grön
       teknik och in i cykeln (aldrig tyst). */
-  onItemRotRutCycle: (id: string) => void
+  onItemRotRutCycle?: (id: string) => void
   /** Endast 'option'-rader: hantverkarens "Förvald"-toggle. Sätter alltid
       BÅDA option_default och option_selected (samma regel som ItemRow). */
-  onOptionDefaultToggle: (id: string, checked: boolean) => void
+  onOptionDefaultToggle?: (id: string, checked: boolean) => void
   /** ETAPP 6c (offert-masterplan.md, faktura-sprinten): faktura-ENDAST
       fält — förfallodatum + referenser. Optional så offertens liveHandlers
       (som aldrig sätter dessa) förblir giltiga utan ändring. ISO-sträng

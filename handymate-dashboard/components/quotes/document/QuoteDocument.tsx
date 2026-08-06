@@ -42,9 +42,29 @@ export interface QuoteDocumentProps extends QuoteDocumentMobileProps {
   /** Endast prep för E2a/6a-scope — bara 'modern' renderar fullt idag. */
   style?: 'modern'
   handlers?: QuoteDocumentHandlers
+  /**
+   * ETAPP C3 (Snabbofferten, 2026-08-06): sektionen som granskas just nu.
+   *
+   * Satt → alla andra sektioner dimmas och blir icke-klickbara, den fokuserade
+   * lyfts fram. Det är en REN visningsangelägenhet: vilka FÄLT som går att
+   * redigera styrs av vilka handlers som skickas in (se
+   * lib/quotes/section-handlers.ts). Två oberoende spakar, med flit — dimning
+   * utan handler-gating hade sett låst ut men fortfarande varit redigerbart.
+   *
+   * Implementeras med opacity och pointer-events, ALDRIG med transform:
+   * DocumentScaler CSS-transformerar redan hela A4:an, och en andra transform
+   * i kedjan gör pointer-koordinater opålitliga (samma skäl som dnd-kit
+   * väljs bort i QuoteDocumentRow).
+   *
+   * null/utelämnad → allt tänt, dagens beteende exakt.
+   */
+  focusSection?: DocumentSection | null
 }
 
-export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTap }: QuoteDocumentProps) {
+/** Sektionerna hantverkaren granskar en i taget, i Andreas taxonomi. */
+export type DocumentSection = 'inkluderat' | 'exkluderat' | 'reservationer' | 'prisbild'
+
+export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTap, focusSection }: QuoteDocumentProps) {
   const accent = data.business.accentColor
   const accent50 = mixWithWhite(accent, 0.92)
   const accent100 = mixWithWhite(accent, 0.82)
@@ -75,9 +95,18 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
   // (isSigned-baserad) om data.signatureCta är utelämnad.
   const resolvedCta = !isInvoice ? (data.signatureCta ?? (data.isSigned ? 'signed' : 'active')) : 'hidden'
 
+  // ETAPP C3: sektionsattributet sätts ALLTID (även utan fokus) så att
+  // scrollIntoView och Claude Designs animeringar har stabila hakar att peka
+  // på — attributet är gratis i static-läget och ändrar ingen rendering.
+  const section = (name: DocumentSection) => ({
+    'data-section': name,
+    'data-dimmed': focusSection && focusSection !== name ? 'true' : undefined,
+  })
+
   return (
     <div
       className="quote-document quote-document--modern"
+      data-focus-section={focusSection || undefined}
       style={{
         ['--qd-accent' as any]: accent,
         ['--qd-accent-50' as any]: accent50,
@@ -218,17 +247,21 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             (samma placering som de gamla mallsträngarna hade) — se
             InvoicePaymentSection, som renderar refs-blocket internt. */}
 
-        {/* Titel + beskrivning */}
+        {/* Titel + beskrivning.
+            ETAPP C3: gatas på sin EGEN handler (tidigare bara på `handlers`
+            som helhet). Det är vad som gör att en sektionsgranskning kan säga
+            "just nu redigeras bara raderna" — titeln renderas då som text i
+            stället för som ett redigerbart fält. */}
         <h1 className="quote-title">
           {isInvoice ? data.invoice.title : (
-            mode === 'edit' && handlers
+            mode === 'edit' && handlers?.onTitleChange
               ? <EditableText value={data.quote.title} onChange={handlers.onTitleChange} placeholder="Offerttitel" />
               : data.quote.title
           )}
         </h1>
         {isInvoice ? (
           data.invoice.description && <p className="quote-sub">{data.invoice.description}</p>
-        ) : mode === 'edit' && handlers ? (
+        ) : mode === 'edit' && handlers?.onDescriptionChange ? (
           <p className="quote-sub">
             <EditableText
               value={data.quote.description || ''}
@@ -242,8 +275,9 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
         )}
 
         {/* Items-tabell — delad mellan offert och faktura (QuoteDocumentRow
-            är docType-agnostisk sedan ETAPP 6a). */}
-        <table>
+            är docType-agnostisk sedan ETAPP 6a).
+            Sektionen "Inkluderat" i snabboffertens granskning. */}
+        <table {...section('inkluderat')}>
           <thead>
             <tr>
               <th>Beskrivning</th>
@@ -288,8 +322,10 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
           </button>
         )}
 
-        {/* Totaler */}
-        <div className="totals-wrap">
+        {/* Totaler — sektionen "Prisbild" i snabboffertens granskning.
+            Betalplanen nedan bär samma sektion: för hantverkaren är "vad det
+            kostar" och "när det betalas" en och samma fråga. */}
+        <div className="totals-wrap" {...section('prisbild')}>
           <div className="totals">
             {isInvoice ? (
               <>
@@ -383,7 +419,7 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             Procenten visas bara när den finns; en plan i rena kronor är fullt
             giltig och ska inte tvingas visa "0 %". */}
         {!isInvoice && data.quote.paymentPlan && data.quote.paymentPlan.length > 0 && (
-          <div className="payment-plan">
+          <div className="payment-plan" {...section('prisbild')}>
             <p className="payment-plan-title">Betalplan</p>
             <table>
               <tbody>
@@ -457,7 +493,7 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             {data.invoice.conclusionText && <><br /><br />{data.invoice.conclusionText}</>}
           </p>
         ) : mode === 'edit' && handlers?.onTermsChange ? (
-          <p className="terms">
+          <p className="terms" {...section('exkluderat')}>
             <strong>Villkor.</strong>{' '}
             <EditableText
               value={data.quote.termsText || ''}
@@ -487,7 +523,7 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             {data.quote.ataTerms && <><br /><br /><strong>Ändringar och tilläggsarbeten:</strong> {data.quote.ataTerms}</>}
           </p>
         ) : (
-          <p className="terms">
+          <p className="terms" {...section('exkluderat')}>
             <strong>Villkor.</strong> {data.quote.termsText || defaultTermsText(data)}
             {data.quote.notIncluded && <><br /><br /><strong>Ej inkluderat:</strong> {data.quote.notIncluded}</>}
             {data.quote.warrantyText && <><br /><br /><strong>Garanti:</strong> {data.quote.warrantyText}</>}
@@ -506,7 +542,7 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             reservation ska gå att peka på ("den där reservationen gäller nu"),
             inte drunkna i ett löpande villkorsstycke. */}
         {!isInvoice && data.quote.reservations && data.quote.reservations.length > 0 && (
-          <div className="reservations">
+          <div className="reservations" {...section('reservationer')}>
             <p className="reservations-title">Reservationer</p>
             <ul>
               {data.quote.reservations.map((reservation, idx) => (

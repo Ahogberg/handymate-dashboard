@@ -1,126 +1,125 @@
-# Offertflödet — status 2026-08-05
+# Offertflödet — status 2026-08-06
 
-Alla SQL körda av Andreas: v88 (kategoristädning), v89 (RLS), v90 (dold rad),
-v91 (reservationer).
+SQL körda av Andreas: v88 (kategoristädning), v89 (RLS), v90 (dold rad),
+v91 (reservationer). **Kvar att köra: v87 (deal-FK) och v92 (vat_number +
+business-assets-bucket).**
 
-## KLART OCH DEPLOYAT
+---
 
-**Etapp 1 — artikelbanken** (`2a5e24ed`)
-- lib/product-defaults.ts äger branschsortimentet, genererar både `products`
-  och `price_list` → telefonen och offerten kan inte säga olika pris
-- 13 branscher × 9–24 artiklar (var 3–6), med artikelnummer, arbetsandel, ROT/RUT
-- seedProducts i onboarding + admin-rutt för backfill (torrkörning som default)
-- Tokeniserad sökning: "fasad mål" hittar Fasadmålning. Synonymer + rankning
-- sql/v88 kategoristädning, v89 RLS (separat p.g.a. anon-klient-risken)
+## SNABBOFFERT-SPRINTEN (2026-08-06) — ETAPP A–D KLARA
 
-**Etapp 2 — rad-UX på mobilen** (`58bcfa60`)
-- AddRowSheet: sök i artikelbanken från canvasen (~9 → 2–3 interaktioner)
-- Delad useProductSearch i alla fyra sökytor
-- "+ Lägg till rad" ut ur den skalade A4:an (träffyta ~15px → 44px)
-- Flytta rad via moveItemById + upp/ned i RowEditSheet
-- Dölj rad (v90): osynlig för kund, priset ingår i summan
-- show_components_to_customer fick sitt första gränssnitt
+Bakgrund: piloten Christoffer om offertskaparen — **"för mycket, rörigt, man
+får inte med allt — blir galen."** Kartläggningen visade ~33 kontroller på en
+TOM offert, sju av fjorton fält bara bakom "Mer"-raden, och flera fält som
+samlades in men aldrig nådde kunden.
 
-**Etapp 3 — reservationsmotorn** (`1713f84c`)
-- v91: reservation_texts + reservation_triggers (produkt/kategori/nyckelord)
-- Dedupe gratis via union per reservation
-- Snapshot på quotes.reservations_snapshot — offerten juridiskt fristående
-- Tyst banner → granskningsvy med förbockade, redigerbara förslag
-- Inlärning: tystas efter 3 avvisningar i rad, med Ångra
-- Rendering i alla fyra vägarna (canvas/Modern, premium, friendly, jsPDF)
-- 27 seedade reservationer, facit-test vaktar att vi aldrig åberopar ABS 18
+### Etapp A — kvickfixar (`43957504`, i prod)
 
-**Trackingfixar + idé 1** (`6450f971`, `d918c765`)
-- ÖPPNAD sattes nästan aldrig — portalen loggade inget. Nu delad
-  lib/quotes/track-open.ts som pixeln OCH portalen använder
-- PORTALENS ACCEPT var stympad (inget projekt, ingen deal, ingen bekräftelse).
-  Nu delad lib/quotes/finalize-accepted.ts i båda vägarna + 409 vid 0 rader
-- PORTALENS AVBÖJANDE tappade declined_at och skäl — lagat
-- FYRA-ÖGON-AVSLAG lämnade offerten i pending_approval (osynlig) — återställs
-  nu till utkast
-- is_hidden saknades i select:en → gårdagens läckagefix var verkningslös
-- **Idé 1:** notifyQuoteOpened — "Anna läser din offert nu", bara första gången
+- **A1 Dokumentet först på mobil.** Gridden delad i två barn med explicit
+  `lg:col-start/row-start`: mobilen får kund → dokument → AI/summering/skicka,
+  desktop byte-identisk. Kundvalet kvar överst (enda hårda valideringen).
+- **A2 En sanning per kontroll.** Skicka bort ur summeringen (headern är
+  sticky och vinner). Giltighetsfältet bort ur kundsektionen. ROT-togglen
+  BEHÖLLS — de tre ROT-ytorna gör tre olika saker (bulk, per rad,
+  personnummer); det dubbla var BELOPPET, som nu bara står i summeringen.
+- **A3 Statusprickar på Mer-raden.** `lib/quotes/panel-status.ts`, 21 tester.
+  Amber används sparsamt: bara ROT utan personnummer och betalplan som inte
+  summerar.
+- **A4 Tre fält som aldrig nådde kunden.** `ata_terms`, `payment_plan` och —
+  värst — `reservations` i live-läget (`onReservationRemove` fanns, listan
+  skickades aldrig in). Renderat i alla vägar: QuoteDocument, premium,
+  friendly, jsPDF. Plus: publika token-routen läste business_config med en
+  kolumnlista som utelämnade `vat_number`/`tagline`.
 
-**Idé 3 — marginalen live** (`e0e91b76`)
-- QuoteMarginCard i assistentkolumnen på båda editorytorna
-- Saknat inköpspris räknas ALDRIG som noll (hade gett falska 100 %)
-- Självgardande: syns bara när minst en rad har känt inköpspris
+### Etapp B — datafundamentet (`875b496f`, i prod)
 
-**Idé 2 — strukturerat nej** (`53335950`, `b640025e`)
-- lib/quotes/decline-reasons.ts: fyra val, kod + valfri fritext
-- 'not_now' matar återaktiveringsmotorn i stället för att skrivas av
-- buildDeclineInsight påstår aldrig en trend på tunt underlag
-  (≥5 avböjda, ≥40 % andel OCH ≥3 i kategorin)
-- Kundvyn och portalen skickar nu samma reason_code
+- **B1 AI-rader kopplas till produktbanken.** Handtag ([P1], [P2]) i prompten,
+  `lib/products/match-generated-items.ts` med hallucinationsvakt. Hellre missa
+  än gissa: handtag kräver namnöverlapp, fuzzy kräver samma enhetsfamilj,
+  oavgjort är ingen träff. Matchningen körs INNE i generatorn så alla fyra
+  anropsvägar får den.
+- **B2** Radgräns 8 → 12 (styrt på struktur, inte antal), max_tokens
+  2000 → 3000, och trunkering skiljs nu från andra fel i felmeddelandet.
+- **B3** `notIncludedSuggestions` — enda AI-genererade villkorsfältet, för att
+  det är genuint jobbspecifikt. Fylls bara i när fältet är tomt.
+- **B4** Godkännandet materialiserar `payload.preview` i stället för att
+  generera om. Hantverkaren såg A och fick B sparad. Omgenerering kvar som
+  reserv för matte-kort, ÄTA-förslag och äldre kort i kön.
 
-**Idé 4 — signera → boka** (`0ae7c46f`)
-- Lediga starttider ur kapacitetsmotorn direkt i signeringsbekräftelsen
-- Föreslår aldrig en dag utan verklig ledig kapacitet; högst ett förslag
-  per vecka; minst tre dagars framförhållning
-- Kundens val blir ett ÖNSKEMÅL i godkännande-kön, inte en bokning rakt in
-  i kalendern — kunden får veta att tiden är preliminär
+### Etapp C — Snabbofferten (denna commit)
 
-**Idé 5 — kundens fråga** (`a82d63d7`)
-- Fråga direkt i offerten → kort i godkännande-kön + push
-- Handlaren ligger före status-guarderna: en fråga är aldrig skadlig
-- Nytt approval_type customer_quote_question; godkännande = "jag har sett
-  den". Svarstext skickas som SMS, utan text görs inget mer
+Ett LÄGE i `new/page.tsx`, inte en ny route — allt den behöver finns redan där.
+"Öppna i fullständiga editorn" är bokstavligen `quickMode = null`.
 
-**Idé 6 — referensfoton** (`a82d63d7`)
-- 'after'-foton från egna avslutade projekt i kundvyn
-- Rubriken säger "Liknande jobb" BARA vid verkligt ordöverlapp, annars
-  "Tidigare jobb" — stoppord kan aldrig skapa falsk likhet
+- **Mekaniken:** samtliga `QuoteDocumentHandlers` är nu optionella, så ett
+  partiellt objekt uttrycker "bara den här sektionen är redigerbar".
+  `data-section`-attribut + `focusSection` sköter dimningen (opacity +
+  pointer-events, ALDRIG transform — DocumentScaler transformerar redan).
+- **C1 Intag:** `QuickIntake` — tre kontroller mot editorns ~33. Rösten via ny
+  delad `hooks/useAudioRecording.ts` (webm→mp4-fallback för iOS) och den
+  färdiga men oanvända `/api/matte/transcribe`. Transkriptet landar
+  redigerbart, aldrig som svart låda. Kund är frivillig med flit.
+- **C2 Byggkänsla:** `QuickBuilding` — dokumentskelett med det som redan är
+  känt + skimmer, ärlig statusrad i tre lägen, och ett "tar längre än
+  vanligt"-läge efter 25 s.
+- **C3 Sektionsgranskning:** `lib/quotes/section-handlers.ts` (50 tester) +
+  `QuickReviewBar`. Progressprickarna är tappbara och "Hoppa till översikt"
+  finns alltid — granskningen är navigering, inte grindar.
+- **C4 Kvitto:** `QuickReceipt` — bock per sektion, amber-chips som är
+  ingångar tillbaka. Skicka spärras ALDRIG av amber; produkten föreslår,
+  hantverkaren beslutar.
 
-**Artikelbanken påfylld** (`1b319665`) — alla branscher 12–24 artiklar
-(städ, flytt, vent, lås och övrigt låg på 8–15). Facit-tröskeln höjd till 12.
+### Etapp D — inlärning
 
-**Logotypen — rotorsakad och fixad** (`3e90c982`)
-- Fyra klient-selecter begärde `vat_number`, en kolumn som inte finns.
-  PostgREST 400:ar HELA frågan → businessConfig null → logotypen försvann.
-- Commit 69b4bc5b (2026-05-15), som skulle laga loggan, la in `logo_url` och
-  `vat_number` i SAMMA select. Fixen kunde aldrig fungera.
-- Ytorna använder nu `select('*')` via delad konstant + felloggning.
-  Vaktpost i tests/business-config-select.spec.ts, verifierad genom att
-  tillfälligt återinföra en kolumnlista.
-- sql/v92: vat_number-kolumnen + publik läsning av business-assets-bucketen.
+`lib/quotes/quick-preferences.ts` (12 tester). Efter fem genomförda
+snabbofferter landar utkastet direkt i översikten. Räknas när offerten
+FAKTISKT skickas, aldrig när utkastet byggdes.
 
-**Portalen — gårdagens funktioner nåbara** (`22afa179`)
-- Referensfoton, frågeruta och bokningsförslag var OÅTKOMLIGA: alla kunder
-  redirectas till portalen, som inte visade något av det.
-- "Läs offerten" var en redirect-loop; `?tab=quotes` landade i dokumentlistan.
-
-**Kundtråden som kanal** (`8da7c2f7`)
-- lib/portal/customer-thread.ts: tråden är källan, godkännande-kön är
-  åtgärdsytan. Portalchatt och offertfråga går genom samma väg.
-- Svaret skrivs i tråden + kort SMS med portallänk (inte hela svaret).
-- Svarsrutan i kön var död kod — payloaden saknade `message`, så
-  "Redigera" renderades aldrig. Nu förifylld mall som hantverkaren skriver
-  klart; orörd mall skickar ingenting.
+---
 
 ## KVAR ATT BYGGA
 
-**Idé 2b — förlustanalysens yta.** Motorn och datat finns
-(`summarizeDeclineReasons` + `buildDeclineInsight`, facit-testade); det som
-saknas är kortet som visar det. Naturlig plats: /dashboard/analytics eller
-offertlistan. Litet jobb.
+**Claude Design.** Fyra nya ytor väntar på visuell design och animering:
+intagsskärmen (C1), reveal-koreografin (C2), granskningsbaren (C3) och
+kvittokortet (C4). Ramarna: ren CSS (framer-motion finns inte i projektet),
+teal `#0F766E`, bottom sheet-mönstret från RowEditSheet, 44px träffytor.
+Mekaniken är byggd först med flit — DOM-strukturen är nu bestämd, så designen
+läggs ovanpå en fungerande yta i stället för att gissa mot en mockup.
+
+**Idé 2b — förlustanalysens yta.** Motorn finns (`summarizeDeclineReasons` +
+`buildDeclineInsight`, facit-testade); kortet som visar det saknas. Naturlig
+plats: /dashboard/analytics eller offertlistan. Litet jobb.
 
 **Etapp 4 — offertkoll före utskick.** Regelbaserad checklista i
-skickadialogen: rader på 0 kr, osedda reservationsförslag, ROT utan
-personnummer, passerat giltighetsdatum, betalplan som inte summerar.
+skickadialogen. Överlappar nu delvis med C4:s kvitto — värt att omvärdera
+scopet innan det byggs.
 
-**Idé 5b — fråga per RAD.** Backend tar redan emot `item_id` och visar radens
-beskrivning i kortets titel. Kundvyn skickar i dag bara en allmän fråga —
-en liten frågeknapp per rad i dokumentet återstår.
+**Idé 5b — fråga per RAD.** Backend tar redan emot `item_id`. Kundvyn skickar
+i dag bara en allmän fråga.
+
+**Etapp D2 — "vill du alltid börja så här?"** Trösklarna och lagringen finns
+(`shouldAskPreferred`, `setPreferredStart`), dialogen är inte byggd.
+
+---
 
 ## ÖPPNA PUNKTER
 
+- **v87 och v92 behöver köras** i Supabase SQL Editor.
+- **Scroll och dimning på iOS Safari** inuti DocumentScalers transform är
+  fortfarande otestat på riktig telefon — det är den största kvarvarande
+  osäkerheten i C3.
+- **Fuzzy-matchningens falska positiver:** tröskeln är satt konservativt
+  (0,6 Jaccard + enhetsfamilj) och `matchType` loggas, men träffkvaliteten
+  behöver mätas på verklig data innan tröskeln sänks.
 - **v89 (RLS) behöver ögonkontroll:** logga in som ägare OCH som anställd,
   öppna Ny offert och kontrollera att snabbvalsknapparna visar artiklar.
-  Blir de tomma finns återställningen i filhuvudet på sql/v89_products_rls.sql.
-- **Backfill av produktbanken** för befintliga konton körs via
-  POST /api/admin/backfill-products (dryRun: true först).
+- **Backfill av produktbanken** via POST /api/admin/backfill-products
+  (dryRun: true först).
 - **Prisnivåerna i seed-datan** behöver Christoffers branschkoll.
-- **`signed` skrivs aldrig** till quotes.status — WON_QUOTE_STATUSES har en
-  död medlem. Ofarligt men värt att städa.
-- **E2E-sviten** (comprehensive/navigation/api/buttons/sms/quote, 127 tester)
-  kräver inloggad session och kan inte köras med --no-deps.
+- **`create_quote` i agentens tool-router** godtar modellens priser
+  okontrollerat — bör pekas om till `generateQuoteFromInput` nu när B1 finns.
+- **Grön teknik-avdraget** renderas bara i edit-läget (masterplan-lucka 4).
+- **`signed` skrivs aldrig** till quotes.status — död medlem i
+  WON_QUOTE_STATUSES.
+- **E2E-sviten** (127 tester) kräver inloggad session, kan inte köras
+  med `--no-deps`.

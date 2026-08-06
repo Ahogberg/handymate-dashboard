@@ -7,6 +7,7 @@ import QuoteDocument, { type QuoteDocumentHandlers } from '@/components/quotes/d
 import { DocumentScaler } from '@/components/quotes/document/DocumentScaler'
 import { useIsMobileViewport } from '@/components/quotes/document/useIsMobileViewport'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
+import type { QuoteSection } from '@/lib/quotes/section-handlers'
 
 type PreviewMode = 'live' | 'design'
 
@@ -35,6 +36,9 @@ interface QuotePreviewPanelProps {
       faller tillbaka på liveHandlers.onItemAdd. */
   onAddRowTap?: () => void
   templatePreviewPayload: TemplatePreviewPayload
+  /** ETAPP C3 (Snabbofferten): sektionen som granskas — dimmar de andra.
+      Ren visning; vilka fält som går att redigera styrs av liveHandlers. */
+  focusSection?: QuoteSection | null
 }
 
 /**
@@ -55,6 +59,7 @@ export function QuotePreviewPanel({
   onRowTap,
   onAddRowTap,
   templatePreviewPayload,
+  focusSection,
 }: QuotePreviewPanelProps) {
   const [fullscreen, setFullscreen] = useState(false)
   const [previewPending, setPreviewPending] = useState(false)
@@ -78,13 +83,18 @@ export function QuotePreviewPanel({
               handlers={liveHandlers}
               sheetMode={isMobile}
               onRowTap={onRowTap}
+              focusSection={focusSection}
             />
           </DocumentScaler>
 
           {/* Mobilens "+ Lägg till rad" ligger UTANFÖR DocumentScaler och är
               därmed oskalad — inuti A4:an blev träffytan ~15px vid 375px
-              skärm. QuoteDocument döljer sin egen knapp i sheetMode. */}
-          {isMobile && (
+              skärm. QuoteDocument döljer sin egen knapp i sheetMode.
+              ETAPP C3: göms när en ANNAN sektion än Inkluderat granskas —
+              knappen ligger utanför dokumentet och nås därför inte av
+              dimningen, så utan detta hade man kunnat lägga till en rad
+              mitt i prisgranskningen. */}
+          {isMobile && (!focusSection || focusSection === 'inkluderat') && (
             <button
               type="button"
               onClick={onAddRowTap || liveHandlers.onItemAdd}

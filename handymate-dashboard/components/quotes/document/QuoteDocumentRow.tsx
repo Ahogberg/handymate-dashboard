@@ -86,12 +86,17 @@ function RotBadge({ item, onCycle }: { item: QuoteTemplateItem; onCycle?: () => 
     sheetMode (ETAPP 3, punkt 2): stopPropagation krävs i sheetMode så ett
     tryck på × inte OCKSÅ bubblar upp till radens onTap och öppnar sheeten. */
 function DeleteButton({ id, handlers }: { id: string | undefined; handlers?: QuoteDocumentHandlers }) {
-  if (!id || !handlers) return null
+  // ETAPP C3: gatas på sin EGEN handler. I sektionsgranskningen får bara den
+  // fokuserade sektionen redigeras — utan den här kontrollen hade ×-knappen
+  // renderats även när onItemRemove inte skickats med, och ett tryck hade
+  // kraschat i stället för att vara overkställt.
+  const onRemove = handlers?.onItemRemove
+  if (!id || !onRemove) return null
   return (
     <span className="row-action">
       <button
         type="button"
-        onClick={e => { e.stopPropagation(); handlers.onItemRemove(id) }}
+        onClick={e => { e.stopPropagation(); onRemove(id) }}
         title="Ta bort rad"
       >
         ×
@@ -106,8 +111,17 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
   // A4-skala) — hela raden blir tappbar istället (öppnar RowEditSheet via
   // onTap). Delete-knappen är undantaget (se DeleteButton-kommentaren).
   const tapMode = isEdit && !!sheetMode && !!onTap
-  const fieldsEditable = isEdit && !tapMode
+  // ETAPP C3: fältredigering kräver att onItemChange FAKTISKT skickats med.
+  // Sektionsgranskningen skickar ett partiellt handlers-objekt, och utan den
+  // här kontrollen hade fälten sett redigerbara ut i en sektion som inte är i
+  // fokus — ett löfte gränssnittet inte kan hålla.
+  const canEditFields = !!handlers?.onItemChange
+  const fieldsEditable = isEdit && !tapMode && canEditFields
   const itemType = item.itemType || 'item'
+  // Non-null-assertion nedan är säker: varje användning ligger bakom
+  // fieldsEditable, som just kontrollerat att handlern finns.
+  const patch = (id: string, p: Parameters<NonNullable<QuoteDocumentHandlers['onItemChange']>>[1]) =>
+    handlers!.onItemChange!(id, p)
 
   // Dold rad (v90): kunden ska inte se den — men priset ingår i summan, så
   // beräkningarna rör den aldrig. I edit-läge visas den ghostad med en
@@ -123,13 +137,13 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
         <>
           <EditableNumber
             value={item.quantity}
-            onChange={v => handlers!.onItemChange(item.id!, { quantity: v })}
+            onChange={v => patch(item.id!, { quantity: v })}
             width={50}
             format={formatNumber}
           />{' '}
           <EditableSelect
             value={item.unit}
-            onChange={v => handlers!.onItemChange(item.id!, { unit: v })}
+            onChange={v => patch(item.id!, { unit: v })}
             options={UNIT_OPTIONS}
           />
         </>
@@ -157,7 +171,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
         <td colSpan={colCount}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             {fieldsEditable
-              ? <EditableText value={item.name} onChange={v => handlers!.onItemChange(item.id!, { name: v })} placeholder="Rubriktext" />
+              ? <EditableText value={item.name} onChange={v => patch(item.id!, { name: v })} placeholder="Rubriktext" />
               : item.name}
             <DeleteButton id={item.id} handlers={isEdit ? handlers : undefined} />
           </div>
@@ -173,7 +187,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
         <td colSpan={colCount}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             {fieldsEditable
-              ? <EditableText value={item.name} onChange={v => handlers!.onItemChange(item.id!, { name: v })} placeholder="Fritext…" />
+              ? <EditableText value={item.name} onChange={v => patch(item.id!, { name: v })} placeholder="Fritext…" />
               : item.name}
             <DeleteButton id={item.id} handlers={isEdit ? handlers : undefined} />
           </div>
@@ -190,7 +204,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
             <DeleteButton id={item.id} handlers={isEdit ? handlers : undefined} />
             {fieldsEditable
-              ? <EditableText value={item.name || 'Delsumma'} onChange={v => handlers!.onItemChange(item.id!, { name: v })} placeholder="Delsumma" />
+              ? <EditableText value={item.name || 'Delsumma'} onChange={v => patch(item.id!, { name: v })} placeholder="Delsumma" />
               : (item.name || 'Delsumma')}
           </div>
         </td>
@@ -207,12 +221,12 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
           <DeleteButton id={item.id} handlers={isEdit ? handlers : undefined} />
           <div className="item-name">
             {fieldsEditable
-              ? <EditableText value={item.name || 'Rabatt'} onChange={v => handlers!.onItemChange(item.id!, { name: v })} placeholder="Rabatt" />
+              ? <EditableText value={item.name || 'Rabatt'} onChange={v => patch(item.id!, { name: v })} placeholder="Rabatt" />
               : (item.name || 'Rabatt')}
           </div>
         </td>
         {showQty ? <td className="num">{formatNumber(item.quantity)} {item.unit}</td> : null}
-        {priceCell(Math.abs(item.unitPrice), fieldsEditable ? v => handlers!.onItemChange(item.id!, { unitPrice: v }) : undefined)}
+        {priceCell(Math.abs(item.unitPrice), fieldsEditable ? v => patch(item.id!, { unitPrice: v }) : undefined)}
         <td className="num">−{formatCurrency(Math.abs(item.total))}</td>
       </tr>
     )
@@ -228,7 +242,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
           <div className="item-name">
             <span className="opt-box" title={item.optionSelected ? 'Ikryssat av kunden' : 'Ej ikryssat'}>{box}</span>{' '}
             {fieldsEditable
-              ? <EditableText value={item.name} onChange={v => handlers!.onItemChange(item.id!, { name: v })} placeholder="Tillval" />
+              ? <EditableText value={item.name} onChange={v => patch(item.id!, { name: v })} placeholder="Tillval" />
               : item.name}{' '}
             <span className="opt-badge">Tillval</span>
             {isEdit && (
@@ -237,20 +251,20 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
                   type="checkbox"
                   checked={item.optionSelected ?? false}
                   disabled={tapMode}
-                  onChange={e => handlers!.onOptionDefaultToggle(item.id!, e.target.checked)}
+                  onChange={e => handlers!.onOptionDefaultToggle!(item.id!, e.target.checked)}
                   style={{ width: 12, height: 12 }}
                 />
                 Förvald
               </label>
             )}
-            {isEdit && <>{' '}<RotBadge item={item} onCycle={fieldsEditable ? () => handlers!.onItemRotRutCycle(item.id!) : undefined} /></>}
+            {isEdit && <>{' '}<RotBadge item={item} onCycle={fieldsEditable ? () => handlers!.onItemRotRutCycle!(item.id!) : undefined} /></>}
             {item.isHidden && <>{' '}<span className="hidden-badge" title="Raden syns inte för kunden — priset ingår ändå i summan">Dold</span></>}
           </div>
           {item.description ? <div className="item-desc">{item.description}</div> : null}
           {componentSpec(item.components)}
         </td>
         {qtyCell}
-        {priceCell(item.unitPrice, fieldsEditable ? v => handlers!.onItemChange(item.id!, { unitPrice: v }) : undefined)}
+        {priceCell(item.unitPrice, fieldsEditable ? v => patch(item.id!, { unitPrice: v }) : undefined)}
         <td className="num">{formatCurrency(item.total)}</td>
       </tr>
     )
@@ -263,9 +277,9 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
         <DeleteButton id={item.id} handlers={isEdit ? handlers : undefined} />
         <div className="item-name">
           {fieldsEditable
-            ? <EditableText value={item.name} onChange={v => handlers!.onItemChange(item.id!, { name: v })} placeholder="Rubrik" />
+            ? <EditableText value={item.name} onChange={v => patch(item.id!, { name: v })} placeholder="Rubrik" />
             : item.name}
-          {isEdit && <>{' '}<RotBadge item={item} onCycle={fieldsEditable ? () => handlers!.onItemRotRutCycle(item.id!) : undefined} /></>}
+          {isEdit && <>{' '}<RotBadge item={item} onCycle={fieldsEditable ? () => handlers!.onItemRotRutCycle!(item.id!) : undefined} /></>}
           {item.isHidden && <>{' '}<span className="hidden-badge" title="Raden syns inte för kunden — priset ingår ändå i summan">Dold</span></>}
         </div>
         {item.description ? <div className="item-desc">{item.description}</div> : null}
@@ -277,7 +291,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
         {componentSpec(item.components)}
       </td>
       {qtyCell}
-      {priceCell(item.unitPrice, fieldsEditable ? v => handlers!.onItemChange(item.id!, { unitPrice: v }) : undefined)}
+      {priceCell(item.unitPrice, fieldsEditable ? v => patch(item.id!, { unitPrice: v }) : undefined)}
       <td className="num">{formatCurrency(item.total)}</td>
     </tr>
   )
