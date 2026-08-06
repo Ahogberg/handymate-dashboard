@@ -4,6 +4,8 @@ import { AlertTriangle, Check, Loader2, Send } from 'lucide-react'
 import {
   SECTION_ORDER,
   SECTION_LABELS,
+  sectionReviewState,
+  unreviewedCount,
   type QuoteSection,
   type SectionSummary,
 } from '@/lib/quotes/section-handlers'
@@ -51,6 +53,7 @@ export function QuickReceipt({
   const attentions = SECTION_ORDER
     .map(s => ({ section: s, attention: summaries[s].attention }))
     .filter((a): a is { section: QuoteSection; attention: string } => !!a.attention)
+  const unreviewed = unreviewedCount(summaries, approved)
 
   return (
     // Kortet monteras samtidigt som dokumentet tänds (sektion → översikt delar
@@ -65,7 +68,7 @@ export function QuickReceipt({
       <div className="space-y-2 mb-4">
         {SECTION_ORDER.map((section, i) => {
           const summary = summaries[section]
-          const isDone = approved.includes(section)
+          const state = sectionReviewState(summary, approved.includes(section))
           return (
             <button
               key={section}
@@ -74,25 +77,31 @@ export function QuickReceipt({
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left transition-colors"
             >
               {/* Prickas av i läsordning — svaret på "har jag fått med allt?".
-                  Ingen konfetti: att skicka en offert är vardag, inte en bragd. */}
+                  Ingen konfetti: att skicka en offert är vardag, inte en bragd.
+
+                  TRE tillstånd, inte två (spår A, 2026-08-06). En sektion
+                  hantverkaren aldrig öppnat visade tidigare en grå BOCK —
+                  samma symbol som en granskad, bara blekare. Att den var
+                  dämpad gjorde bara lögnen tystare. Nu en TOM RING: den
+                  säger "här finns inget svar än", vilket är sant. */}
               <span
                 style={{ animationDelay: `${i * 60 + 150}ms` }}
                 className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 anim-pop transition-colors duration-base ease-standard ${
-                  summary.attention
+                  state === 'behover-ogon'
                     ? 'bg-amber-100 text-amber-700'
-                    : isDone
+                    : state === 'granskad'
                       ? 'bg-primary-100 text-primary-700'
-                      : 'bg-slate-100 text-slate-400'
+                      : 'border-2 border-slate-300'
                 }`}
               >
-                {summary.attention
-                  ? <AlertTriangle className="w-3 h-3" />
-                  : <Check className="w-3 h-3" />}
+                {state === 'behover-ogon' && <AlertTriangle className="w-3 h-3" />}
+                {state === 'granskad' && <Check className="w-3 h-3" />}
+                {/* 'ogranskad' bär medvetet ingen ikon alls. */}
               </span>
               <span className="flex-1 min-w-0">
                 <span className="block text-sm font-semibold text-slate-900">{SECTION_LABELS[section]}</span>
-                <span className="block text-xs text-slate-500 truncate">
-                  {summary.attention || summary.text}
+                <span className={`block text-xs truncate ${state === 'ogranskad' ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {state === 'ogranskad' ? 'Inte granskad' : (summary.attention || summary.text)}
                 </span>
               </span>
             </button>
@@ -105,6 +114,20 @@ export function QuickReceipt({
           {attentions.length === 1
             ? 'En sak är värd en extra titt innan du skickar — tryck på den för att gå dit.'
             : `${attentions.length} saker är värda en extra titt innan du skickar — tryck på dem för att gå dit.`}
+        </p>
+      )}
+
+      {/* Det som INTE granskats sägs rakt ut. Neutral ton, inte varnande:
+          att hoppa över en del kan vara ett helt medvetet val — men då ska
+          det vara ett val, inte något som passerade obemärkt.
+
+          Spärrar INTE Skicka. Amber betyder "titta här", inte "du får inte",
+          och det gäller även här. */}
+      {unreviewed > 0 && (
+        <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 mb-4">
+          {unreviewed === 1
+            ? 'Du har inte tittat på en av delarna. Tryck på den om du vill gå igenom den först.'
+            : `Du har inte tittat på ${unreviewed} av delarna. Tryck på dem om du vill gå igenom dem först.`}
         </p>
       )}
 

@@ -129,6 +129,57 @@ export interface SectionSummary {
 const formatSek = (amount: number): string => `${Math.round(amount).toLocaleString('sv-SE')} kr`
 
 /**
+ * Vad kvittot ska visa för en sektion (spår A, 2026-08-06).
+ *
+ * ═══ VARFÖR DET HÄR ÄR EN EGEN FUNKTION ═══
+ *
+ * Kvittot hade två tillstånd men behövde tre, och det saknade tredje var det
+ * enda stället i gränssnittet som påstod något som inte stämde: en sektion
+ * hantverkaren ALDRIG öppnat visade en grå BOCK — samma symbol som en
+ * granskad, bara blekare. Mitt i beslutet att skicka.
+ *
+ * "Bocken var grå" är inte en ursäkt. En bock betyder klart. Att den var
+ * dämpad gjorde bara lögnen tystare.
+ *
+ * Beslutet bor här och inte i JSX för att det ska gå att facit-testa. Vilket
+ * ikon och vilken färg som hör till varje tillstånd är däremot en ren
+ * visningsfråga och stannar i komponenten.
+ */
+export type SectionReviewState =
+  /** Något behöver ögon. Väger tyngst — även om sektionen är godkänd. */
+  | 'behover-ogon'
+  /** Hantverkaren har sagt "ser bra ut". */
+  | 'granskad'
+  /** Aldrig öppnad. Får ALDRIG se ut som godkänd. */
+  | 'ogranskad'
+
+export function sectionReviewState(
+  summary: SectionSummary,
+  isApproved: boolean,
+): SectionReviewState {
+  // Ordningen är avsiktlig: en godkänd sektion där något SEDAN blivit fel —
+  // en rad utan pris tillagd efteråt — ska visa varningen, inte bocken.
+  if (summary.attention) return 'behover-ogon'
+  return isApproved ? 'granskad' : 'ogranskad'
+}
+
+/**
+ * Hur många sektioner hantverkaren aldrig öppnat.
+ *
+ * Räknar INTE de som bär en varning: de syns redan, och att räkna dem två
+ * gånger hade gjort siffran obegriplig ("2 saker behöver ögon" + "3 delar
+ * ogranskade" om samma sektion låg i båda).
+ */
+export function unreviewedCount(
+  summaries: Record<QuoteSection, SectionSummary>,
+  approved: QuoteSection[],
+): number {
+  return SECTION_ORDER.filter(
+    s => sectionReviewState(summaries[s], approved.includes(s)) === 'ogranskad',
+  ).length
+}
+
+/**
  * Sammanfattningen som visas i granskningsbaren för en sektion.
  *
  * `attention` används lika sparsamt som i Mer-radens statusprickar (se

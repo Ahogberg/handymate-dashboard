@@ -73,11 +73,50 @@ export function itemMatchesReservation(item: MatchableItem, reservation: Reserva
       return !!trigger.category_slug && !!item.category_slug && trigger.category_slug === item.category_slug
     }
     if (trigger.trigger_type === 'keyword') {
-      const keyword = (trigger.keyword || '').trim().toLowerCase()
-      return keyword.length > 0 && description.includes(keyword)
+      return keywordMatches(description, trigger.keyword)
     }
     return false
   })
+}
+
+/**
+ * Nyckelordsmatchning MED ordgräns (2026-08-06).
+ *
+ * ═══ VARFÖR DEN HÄR FIXEN ÄR VIKTIGARE ÄN DEN SER UT ═══
+ *
+ * Tidigare `description.includes(keyword)`. Nyckelorden i seeden är generiska
+ * ENSKILDA ord — 'arbete', 'installation', 'jobb', 'timme' — och tre av de
+ * seedade reservationerna triggar alla på 'arbete'.
+ *
+ * Samtidigt skriver applyProductToItem om radens beskrivning till
+ * PRODUKTNAMNET när en artikel väljs ur banken. Merparten av artiklarna i
+ * kategorin "arbete" bär ordet i namnet. Nettot: nästan varje offert drog in
+ * samma tre förbehåll, plus allt annat där ordet råkade ingå i ett längre ord
+ * ('el' i "Elitfönster", 'arbete' i "Elarbetenpaket").
+ *
+ * Och det gick inte att bara leva med, för inlärningen hade avvecklat motorn
+ * åt oss: tre avvisningar i rad sätter suggest_enabled = false. Ett
+ * över-träffande förslag som hantverkaren avvisar tre gånger tystas alltså
+ * permanent — reservationerna hade slagit av sig själva, en efter en, och
+ * ingen hade kopplat det till matchningen.
+ *
+ * Ordgräns i stället för delsträng. Svenska bokstäver måste med i klassen:
+ * \b i JavaScript bygger på [A-Za-z0-9_], så "å" räknas som en gräns och
+ * "påbörjat" hade matchat nyckelordet "börjat" utan den här hanteringen.
+ */
+const ORDTECKEN = 'a-zA-ZåäöÅÄÖéèüÉÈÜ0-9'
+
+export function keywordMatches(description: string, keyword: string | null | undefined): boolean {
+  const k = (keyword || '').trim().toLowerCase()
+  if (!k) return false
+  const text = (description || '').toLowerCase()
+  // Escapa regex-tecken — ett nyckelord är fri text från hantverkaren och kan
+  // innehålla punkt, parentes eller plus.
+  const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  // Gräns = strängslut eller ett tecken som inte är ett ordtecken. Byggd för
+  // hand i stället för \b, av skälet i kommentaren ovan.
+  const pattern = new RegExp(`(^|[^${ORDTECKEN}])${escaped}([^${ORDTECKEN}]|$)`, 'i')
+  return pattern.test(text)
 }
 
 /**

@@ -41,6 +41,66 @@ function item(overrides: Partial<MatchableItem> = {}): MatchableItem {
   return { id: 'qi_1', description: 'Rivning badrum', item_type: 'item', ...overrides }
 }
 
+test.describe('ORDGRÄNS — nyckelord matchar ord, inte delsträngar (2026-08-06)', () => {
+  // Tidigare description.includes(). Nyckelorden i seeden är generiska
+  // ENSKILDA ord — 'arbete', 'installation', 'jobb', 'timme' — och tre
+  // reservationer triggar alla på 'arbete'. Samtidigt skriver
+  // applyProductToItem om beskrivningen till PRODUKTNAMNET, och merparten av
+  // artiklarna i kategorin "arbete" bär ordet i namnet.
+  //
+  // Nettot: nästan varje offert drog in samma tre förbehåll. Och det gick
+  // inte att leva med, för inlärningen tystar ett förslag efter tre
+  // avvisningar i rad — motorn hade avvecklat sig själv, en reservation i
+  // taget, utan att någon kopplat det till matchningen.
+
+  test('delsträng i ett längre ord matchar INTE', () => {
+    const el = reservation({ triggers: [{ trigger_type: 'keyword', keyword: 'el' }] })
+    expect(itemMatchesReservation(item({ description: 'Elitfönster 3-glas' }), el)).toBe(false)
+    expect(itemMatchesReservation(item({ description: 'Elarbeten paket' }), el)).toBe(false)
+    // Men som eget ord ska det träffa.
+    expect(itemMatchesReservation(item({ description: 'El och VVS' }), el)).toBe(true)
+  })
+
+  test('det verkliga fallet: "arbete" drog in tre förbehåll på varje offert', () => {
+    const arbete = reservation({ triggers: [{ trigger_type: 'keyword', keyword: 'arbete' }] })
+    // Produktbanksnamn som applyProductToItem skriver in i beskrivningen.
+    expect(itemMatchesReservation(item({ description: 'Elarbetenpaket' }), arbete)).toBe(false)
+    expect(itemMatchesReservation(item({ description: 'Snickeriarbeten' }), arbete)).toBe(false)
+    // Ett faktiskt ord ska fortfarande träffa.
+    expect(itemMatchesReservation(item({ description: 'Arbete enligt offert' }), arbete)).toBe(true)
+  })
+
+  test('svenska tecken räknas som ordtecken, inte som gräns', () => {
+    // \b i JavaScript bygger på [A-Za-z0-9_], så "å/ä/ö" hade räknats som
+    // gräns och "påbörjat" matchat nyckelordet "börjat".
+    const borjat = reservation({ triggers: [{ trigger_type: 'keyword', keyword: 'börjat' }] })
+    expect(itemMatchesReservation(item({ description: 'Påbörjat arbete' }), borjat)).toBe(false)
+    expect(itemMatchesReservation(item({ description: 'Har börjat rivning' }), borjat)).toBe(true)
+  })
+
+  test('skiljetecken är en giltig gräns', () => {
+    const riv = reservation({ triggers: [{ trigger_type: 'keyword', keyword: 'rivning' }] })
+    for (const d of ['Rivning, badrum', 'Badrum (rivning)', 'Rivning.', 'Rivning/demontering', 'Rivning – plan 2']) {
+      expect(itemMatchesReservation(item({ description: d }), riv), d).toBe(true)
+    }
+  })
+
+  test('flerordsnyckelord fungerar', () => {
+    const res = reservation({ triggers: [{ trigger_type: 'keyword', keyword: 'dolda fel' }] })
+    expect(itemMatchesReservation(item({ description: 'Åtgärd av dolda fel i vägg' }), res)).toBe(true)
+    expect(itemMatchesReservation(item({ description: 'Dolda felaktigheter' }), res)).toBe(false)
+  })
+
+  test('regex-tecken i nyckelordet kraschar inte', () => {
+    // Nyckelord är fri text från hantverkaren via bibliotekssidan.
+    for (const k of ['el (fas)', 'v.v.s', 'a+b', 'rör*', '[kakel]']) {
+      expect(() => itemMatchesReservation(item({ description: 'x' }), reservation({
+        triggers: [{ trigger_type: 'keyword', keyword: k }],
+      }))).not.toThrow()
+    }
+  })
+})
+
 test.describe('itemMatchesReservation — de tre triggertyperna', () => {
   test('nyckelord matchar var som helst i beskrivningen, oavsett versaler', () => {
     expect(itemMatchesReservation(item({ description: 'RIVNING av badrum' }), reservation())).toBe(true)

@@ -26,7 +26,10 @@ import {
   SECTION_ORDER,
   SECTION_LABELS,
   SECTION_HINTS,
+  sectionReviewState,
+  unreviewedCount,
   type QuoteSection,
+  type SectionSummary,
 } from '../lib/quotes/section-handlers'
 import type { QuoteDocumentHandlers } from '../components/quotes/document/types'
 
@@ -200,6 +203,56 @@ test.describe('SPARSAMHET — tomt är inte fel', () => {
     for (const section of SECTION_ORDER) {
       expect(sectionSummary(section, baseSummary).attention, section).toBeNull()
     }
+  })
+})
+
+test.describe('KVITTOTS TRE TILLSTÅND — det får aldrig ljuga om vad man sett', () => {
+  // Buggen: en sektion hantverkaren ALDRIG öppnat visade en grå bock, samma
+  // symbol som en granskad. Det enda stället i gränssnittet som påstod något
+  // osant — och det satt mitt i beslutet att skicka.
+  const rent: SectionSummary = { text: '8 rader · 46 500 kr', attention: null }
+  const varning: SectionSummary = { text: '8 rader', attention: 'Personnummer saknas' }
+
+  test('aldrig öppnad är OGRANSKAD, inte godkänd', () => {
+    expect(sectionReviewState(rent, false)).toBe('ogranskad')
+  })
+
+  test('godkänd är granskad', () => {
+    expect(sectionReviewState(rent, true)).toBe('granskad')
+  })
+
+  test('en varning väger tyngre än ett godkännande', () => {
+    // Godkänd sektion där något SEDAN blivit fel — en rad utan pris tillagd
+    // efteråt — ska visa varningen, inte bocken.
+    expect(sectionReviewState(varning, true)).toBe('behover-ogon')
+  })
+
+  test('varning på ogranskad sektion visar också varningen', () => {
+    expect(sectionReviewState(varning, false)).toBe('behover-ogon')
+  })
+})
+
+test.describe('räknaren över vad man hoppat över', () => {
+  const alla = (attention: string | null = null): Record<QuoteSection, SectionSummary> =>
+    Object.fromEntries(SECTION_ORDER.map(s => [s, { text: 'x', attention }])) as any
+
+  test('inget godkänt = alla fyra ogranskade', () => {
+    expect(unreviewedCount(alla(), [])).toBe(4)
+  })
+
+  test('allt godkänt = noll', () => {
+    expect(unreviewedCount(alla(), [...SECTION_ORDER])).toBe(0)
+  })
+
+  test('räknar inte dem som redan bär en varning', () => {
+    // De syns redan. Att räkna dem två gånger hade gjort siffran obegriplig:
+    // "2 saker behöver ögon" plus "4 delar ogranskade" om samma sektion låg
+    // i båda.
+    expect(unreviewedCount(alla('något saknas'), [])).toBe(0)
+  })
+
+  test('delvis granskat räknas rätt', () => {
+    expect(unreviewedCount(alla(), ['inkluderat', 'prisbild'])).toBe(2)
   })
 })
 
