@@ -94,26 +94,134 @@ export const MODERN_DOCUMENT_CSS = `
 .quote-document .payment-plan .pp-due { color: #94A3B8; font-weight: 400; }
 .quote-document .payment-plan .pp-percent { text-align: right; white-space: nowrap; padding-right: 14px; font-variant-numeric: tabular-nums; }
 .quote-document .payment-plan .pp-amount { text-align: right; white-space: nowrap; color: #0F172A; font-weight: 600; font-variant-numeric: tabular-nums; }
-/* ── Sektionsfokus (etapp C3, Snabbofferten) ──────────────────────────────
+/* ══ Sektionsfokus (etapp C3, Snabbofferten) ═══════════════════════════════
    Hantverkaren granskar en sektion i taget. De andra dimmas och slutar ta
-   emot tryck, så ett felträff i ett dokument i 0,36 skala inte kan ändra
+   emot tryck, så ett felträff i ett dokument i ~0,4 skala inte kan ändra
    något i en sektion som inte granskas.
+
+   ── ALLT NEDAN ÄR GATAT PÅ .quote-document--interactive ──
+   Klassen sätts bara när mode === 'edit' (se QuoteDocument.tsx). Den här
+   filen renderar även kundens skarpa PDF via Chromium, och granskningsvyns
+   regler har ingenting där att göra. Gaten tillkom 2026-08-06 när Claude
+   Designs lyft skulle appliceras — utan den hade en 30px skugga och
+   position:relative hamnat på fyra block i kundens dokument.
 
    MEDVETET INGEN transform här. DocumentScaler CSS-transformerar redan hela
    A4:an, och en andra transform i kedjan gör pointer-koordinater opålitliga
-   (samma skäl som dnd-kit väljs bort i QuoteDocumentRow). Lyftet görs med
-   bakgrund och ram i stället — det syns lika tydligt och rör inte geometrin.
+   (samma skäl som dnd-kit väljs bort i QuoteDocumentRow).
 
-   scroll-margin-top ger plats åt den sticky granskningsbaren när en sektion
-   scrollas fram, annars hamnar sektionens överkant under baren. */
-.quote-document [data-section] { transition: opacity .25s ease; scroll-margin-top: 96px; }
-.quote-document [data-section][data-dimmed='true'] { opacity: .28; pointer-events: none; }
-.quote-document[data-focus-section] [data-section]:not([data-dimmed]) {
-  position: relative;
-  z-index: 1;
+   RÄTTELSE om scroll-margin-top (2026-08-06): den kompenserar INTE
+   granskningsbaren. Baren är fixed bottom-0, och scroll-margin-top kan per
+   definition inte kompensera något som sitter i nederkanten — den justerar
+   elementets ÖVERKANT mot scrollportens överkant. Det värdet faktiskt
+   kompenserar är den sticky headern (QuoteNewHeader, sticky top-0), och
+   bara när SIDAN är det som scrollar. Vid lg scrollar dokumentrutan internt
+   (QuotePreviewPanel, overflow-auto + höjdbegränsad) och där täcker ingenting
+   överkanten — värdet ska vara litet. Den tidigare kommentaren här påstod fel. */
+.quote-document--interactive [data-section] {
+  transition: opacity .25s ease;
+  scroll-margin-top: 96px;
 }
+@media (min-width: 1024px) {
+  /* Dokumentrutan scrollar internt vid lg — ingen sticky header täcker dess
+     överkant, så 96px hade parkerat den fokuserade sektionen i ett dött glapp. */
+  .quote-document--interactive [data-section] { scroll-margin-top: 16px; }
+}
+.quote-document--interactive [data-section][data-dimmed='true'] {
+  opacity: var(--qk-dim, .28);
+  pointer-events: none;
+}
+
+/* ── Lyftet: den fokuserade sektionen ────────────────────────────────────
+   "Det här är din yta just nu — resten väntar." En vit halo med hårfin
+   teal-ring och mjuk skugga lyfter sektionen ur papperet utan att rama in
+   den. Symmetrisk in- och utfasning, så ett sektionsbyte läses som att
+   ljuset flyttas, inte som att kort byts.
+
+   VARFÖR box-shadow PÅ ELEMENTET och inte en ::after med z-index:-1:
+   en negativt staplad pseudo behöver att föräldern har en egen
+   stackningskontext, annars målas den BAKOM .page:s vita bakgrund och blir
+   osynlig. Kontexten skulle ha kommit från z-index:1 på den fokuserade
+   sektionen — men z-index är inte transitionerbar, så när fokus släpper
+   kollapsar kontexten samma frame och halon SLOCKNAR i stället för att tona
+   ut. Elementets egen box-shadow målas i dess bakgrundssteg, alltså efter
+   .page:s bakgrund, och är fullt transitionerbar åt båda hållen. Ingen
+   stackningskontext, ingen position:relative, ingen pseudo på ett <table>.
+
+   Måtten delas med --qd-scale (publicerad av DocumentScaler) så halon har
+   samma SKÄRMstorlek oavsett hur hårt A4:an är nedskalad. Utan det blir
+   ringen en subpixelhårlinje på telefon. Vid lg är variabeln osatt och
+   fallbacken 1 gäller. */
+.quote-document--interactive [data-section] {
+  box-shadow: 0 0 0 0 rgba(255,255,255,0), 0 0 0 0 rgba(15,118,110,0), 0 0 0 0 rgba(15,118,110,0);
+  border-radius: calc(12px / var(--qd-scale, 1));
+  transition: opacity .25s ease, box-shadow .25s cubic-bezier(.2,.8,.2,1);
+}
+.quote-document--interactive[data-focus-section] [data-section]:not([data-dimmed='true']) {
+  box-shadow:
+    0 0 0 calc(12px / var(--qd-scale, 1)) #fff,
+    0 0 0 calc(13px / var(--qd-scale, 1)) var(--qd-accent-100),
+    0 calc(10px / var(--qd-scale, 1)) calc(30px / var(--qd-scale, 1)) rgba(15,118,110,.10);
+}
+
+/* Tom sektion — reservationslistan kan sakna innehåll, vilket är ett
+   normaltillstånd. Utan den här raden fanns inget att lyfta och hela
+   dokumentet låg dimmat. Se platshållaren i QuoteDocument.tsx. */
+.quote-document--interactive .section-empty {
+  font-size: 11px;
+  color: #94A3B8;
+  font-style: italic;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .quote-document [data-section] { transition: none; }
+  .quote-document--interactive [data-section] { transition: none; }
+}
+
+/* ══ Utkastet landar — revealen (etapp C2) ═════════════════════════════════
+   "AI:n byggde det här av din beskrivning" — innehållet kommer i läsordning,
+   rad för rad, i stället för att bara finnas. Total budget ~1,2 s.
+
+   Gatad på .quick-reveal, en klass som BARA snabboffertens granskningsvy
+   sätter (QuotePreviewPanel, opt-in-prop). Medvetet INTE gatad på
+   [data-focus-section]: det attributet försvinner vid översikten och skulle
+   spela om hela revealen varje gång hantverkaren går tillbaka till en sektion.
+
+   Keyframen saknar 'to' med flit — elementet landar på sitt underliggande
+   opacity-värde (1, eller dimningens .28) utan hopp när animationen släpper.
+
+   ENDAST opacity. DocumentScaler äger transform-kedjan, och dess
+   ResizeObserver mäter scrollHeight under animationen — animeras height eller
+   margin låser den in fel höjd mitt i sekvensen. */
+@keyframes qd-reveal { from { opacity: 0 } }
+.quick-reveal .quote-document .quote-title { animation: qd-reveal .4s cubic-bezier(.2,.8,.2,1) backwards; }
+/* Sektionsattributet bärs sedan 2026-08-06 av wrappern runt titel/beskrivning/
+   tabell, inte av tabellen — därav den nedstigande selektorn. Betalplanens
+   inre tabell ligger i en egen sektion och träffas inte. */
+.quick-reveal .quote-document [data-section='inkluderat'] table tbody tr {
+  animation: qd-reveal .35s cubic-bezier(.2,.8,.2,1) backwards;
+  animation-delay: calc(120ms + var(--qd-row, 0) * 60ms);
+}
+.quick-reveal .quote-document [data-section='inkluderat'] table tbody tr:nth-child(2)  { --qd-row: 1; }
+.quick-reveal .quote-document [data-section='inkluderat'] table tbody tr:nth-child(3)  { --qd-row: 2; }
+.quick-reveal .quote-document [data-section='inkluderat'] table tbody tr:nth-child(4)  { --qd-row: 3; }
+.quick-reveal .quote-document [data-section='inkluderat'] table tbody tr:nth-child(5)  { --qd-row: 4; }
+.quick-reveal .quote-document [data-section='inkluderat'] table tbody tr:nth-child(6)  { --qd-row: 5; }
+.quick-reveal .quote-document [data-section='inkluderat'] table tbody tr:nth-child(7)  { --qd-row: 6; }
+.quick-reveal .quote-document [data-section='inkluderat'] table tbody tr:nth-child(8)  { --qd-row: 7; }
+.quick-reveal .quote-document [data-section='inkluderat'] table tbody tr:nth-child(9)  { --qd-row: 8; }
+.quick-reveal .quote-document [data-section='inkluderat'] table tbody tr:nth-child(10) { --qd-row: 9; }
+.quick-reveal .quote-document [data-section='inkluderat'] table tbody tr:nth-child(n+11) { --qd-row: 10; }
+.quick-reveal .quote-document .totals-wrap  { animation: qd-reveal .4s cubic-bezier(.2,.8,.2,1) 400ms backwards; }
+.quick-reveal .quote-document .terms        { animation: qd-reveal .4s cubic-bezier(.2,.8,.2,1) 520ms backwards; }
+.quick-reveal .quote-document .reservations { animation: qd-reveal .4s cubic-bezier(.2,.8,.2,1) 640ms backwards; }
+.quick-reveal .quote-document .payment-plan { animation: qd-reveal .4s cubic-bezier(.2,.8,.2,1) 700ms backwards; }
+@media (prefers-reduced-motion: reduce) {
+  .quick-reveal .quote-document .quote-title,
+  .quick-reveal .quote-document [data-section='inkluderat'] table tbody tr,
+  .quick-reveal .quote-document .totals-wrap,
+  .quick-reveal .quote-document .terms,
+  .quick-reveal .quote-document .reservations,
+  .quick-reveal .quote-document .payment-plan { animation: none; }
 }
 .quote-document .hidden-badge { display: inline-block; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 4px; padding: 1px 6px; vertical-align: 1px; }
 .quote-document .rot-badge { display: inline-flex; align-items: center; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--qd-accent); background: var(--qd-accent-50); border: 1px dashed var(--qd-accent-100); border-radius: 4px; padding: 1px 6px; cursor: pointer; line-height: 1.6; }

@@ -19,6 +19,39 @@ h1, h2, h3, h4, h5, h6 {
   font-family: 'Space Grotesk', system-ui, sans-serif;
 }
 
+/* ══ Rörelse-tokens (2026-08-06) ═══════════════════════════════════════════
+   Fanns tidigare bara i app/onboarding/onboarding.css och var därmed
+   otillgängliga i offertflödet. Neutrala namn nu när de gäller globalt;
+   onboardingens --ob-t-* är alias mot dessa. --ob-t-bounce stannar lokal —
+   produkten ska inte studsa utanför onboardingen. */
+:root {
+  --motion-fast: 150ms;
+  --motion-base: 250ms;
+  --motion-slow: 400ms;
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Enter-animationer för ytor UTANFÖR .quote-document.
+   qk-rise och qk-pop använder translate/scale och får ALDRIG användas inuti
+   dokumentet — DocumentScaler äger transform-kedjan där, och en andra
+   transform gör pointer-koordinater opålitliga. Dokumentets egen reveal
+   (qd-reveal i modern-css.ts) rör bara opacity av exakt det skälet.
+
+   Klasser i stället för Tailwind-arbitrary så reduced-motion-skyddet bor på
+   ETT ställe. Obs: tailwindcss-animate är inte installerat, så animate-in,
+   fade-in och zoom-in är döda klasser — använd dessa. */
+@keyframes qk-fade { from { opacity: 0 } }
+@keyframes qk-rise { from { opacity: 0; translate: 0 8px } }
+@keyframes qk-pop  { from { opacity: 0; scale: .94 } }
+
+.anim-fade { animation: qk-fade var(--motion-base) var(--ease-standard) backwards; }
+.anim-rise { animation: qk-rise var(--motion-slow) var(--ease-standard) backwards; }
+.anim-pop  { animation: qk-pop  var(--motion-base) var(--ease-standard) backwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade, .anim-rise, .anim-pop { animation: none; }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

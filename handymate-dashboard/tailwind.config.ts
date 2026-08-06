@@ -43,6 +43,17 @@ const config: Config = {
           light: '#2a4a5a',
         },
       },
+      // Rörelse-tokens som Tailwind-klasser (2026-08-06) — samma värden som
+      // CSS-variablerna i app/globals.css, så transitions och animationer
+      // delar tempo oavsett vilken av de två vägarna man använder.
+      transitionTimingFunction: {
+        standard: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+      },
+      transitionDuration: {
+        fast: '150ms',
+        base: '250ms',
+        slow: '400ms',
+      },
     },
   },
   plugins: [],

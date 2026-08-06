@@ -61,11 +61,18 @@ export function QuickBuilding({ businessName, customerName, issuedDate }: QuickB
 
       <div className="max-w-xl mx-auto min-h-screen flex flex-col px-4 py-8 sm:py-12">
         {/* Statusraden — det enda som faktiskt säger något */}
+        {/* key= gör varje textbyte till en remount så anim-fade körs.
+            Statusraden är ärlig — den beskriver vad som faktiskt sker — och en
+            mjuk övergång gör att bytet läses som ett STEG i ett förlopp i
+            stället för som ett ryck. */}
         <div className="mb-6">
-          <p className="font-heading text-xl font-bold text-slate-900 tracking-tight">
+          <p
+            key={slow ? 'slow' : stage.text}
+            className="font-heading text-xl font-bold text-slate-900 tracking-tight anim-fade"
+          >
             {slow ? 'Tar längre än vanligt…' : stage.text}
           </p>
-          <p className="text-sm text-slate-500 mt-1">
+          <p key={slow ? 'sub-slow' : 'sub-normal'} className="text-sm text-slate-500 mt-1 anim-fade">
             {slow
               ? 'Vi väntar fortfarande på svaret. Du kan lämna sidan — utkastet går förlorat, men inget har sparats.'
               : 'Du får granska allt innan något skickas.'}

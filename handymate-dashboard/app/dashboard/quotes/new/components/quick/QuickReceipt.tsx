@@ -53,14 +53,17 @@ export function QuickReceipt({
     .filter((a): a is { section: QuoteSection; attention: string } => !!a.attention)
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
+    // Kortet monteras samtidigt som dokumentet tänds (sektion → översikt delar
+    // DOM-träd), så entrén säger "nytt element" medan dokumentets dimning
+    // släpper via sin egen transition.
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm anim-rise">
       <div className="flex items-baseline justify-between mb-4">
         <p className="font-heading text-lg font-bold text-slate-900 tracking-tight">Offerten är klar</p>
         <p className="font-heading text-lg font-bold text-primary-700 tabular-nums">{amountToPay}</p>
       </div>
 
       <div className="space-y-2 mb-4">
-        {SECTION_ORDER.map(section => {
+        {SECTION_ORDER.map((section, i) => {
           const summary = summaries[section]
           const isDone = approved.includes(section)
           return (
@@ -70,8 +73,11 @@ export function QuickReceipt({
               onClick={() => onGoToSection(section)}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left transition-colors"
             >
+              {/* Prickas av i läsordning — svaret på "har jag fått med allt?".
+                  Ingen konfetti: att skicka en offert är vardag, inte en bragd. */}
               <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+                style={{ animationDelay: `${i * 60 + 150}ms` }}
+                className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 anim-pop transition-colors duration-base ease-standard ${
                   summary.attention
                     ? 'bg-amber-100 text-amber-700'
                     : isDone

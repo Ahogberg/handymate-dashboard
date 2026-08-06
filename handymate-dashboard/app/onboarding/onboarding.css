@@ -41,9 +41,14 @@
   --ob-sh-lg: 0 12px 32px rgba(15,23,42,0.10), 0 4px 8px rgba(15,23,42,0.04);
   --ob-sh-glow: 0 0 0 4px rgba(13,148,136,0.12);
 
-  --ob-t-fast: 180ms cubic-bezier(0.4, 0, 0.2, 1);
-  --ob-t-base: 240ms cubic-bezier(0.4, 0, 0.2, 1);
-  --ob-t-slow: 420ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Alias mot de globala rörelse-tokens i app/globals.css (2026-08-06).
+     Värdena bodde tidigare bara här, vilket gjorde dem otillgängliga för
+     offertflödet. Namnen behålls så onboardingens egen CSS inte behöver
+     röras. --ob-t-bounce har ingen global motsvarighet med flit: studsen
+     hör hemma i onboardingen, inte i produkten i övrigt. */
+  --ob-t-fast: var(--motion-fast) var(--ease-standard);
+  --ob-t-base: var(--motion-base) var(--ease-standard);
+  --ob-t-slow: var(--motion-slow) var(--ease-standard);
   --ob-t-bounce: 520ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 

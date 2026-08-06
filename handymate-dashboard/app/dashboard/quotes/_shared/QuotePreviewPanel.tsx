@@ -39,6 +39,17 @@ interface QuotePreviewPanelProps {
   /** ETAPP C3 (Snabbofferten): sektionen som granskas — dimmar de andra.
       Ren visning; vilka fält som går att redigera styrs av liveHandlers. */
   focusSection?: QuoteSection | null
+  /**
+   * ETAPP C2 (Snabbofferten): spela reveal-animationen när dokumentet monteras.
+   *
+   * Opt-in med default av, så redigeringssidan och det vanliga new-flödet —
+   * som delar den här komponenten — aldrig får den. Anroparen ska sätta den på
+   * "är vi i snabbofferten över huvud taget", INTE på "är vi i
+   * granskningssteget": en CSS-animation startar om när animation-name
+   * introduceras på ett redan monterat element, så en propp som slår av och på
+   * vid översikt → sektion hade spelat om revealen varje gång.
+   */
+  quickReveal?: boolean
 }
 
 /**
@@ -60,9 +71,15 @@ export function QuotePreviewPanel({
   onAddRowTap,
   templatePreviewPayload,
   focusSection,
+  quickReveal,
 }: QuotePreviewPanelProps) {
   const [fullscreen, setFullscreen] = useState(false)
   const [previewPending, setPreviewPending] = useState(false)
+  // Fångat vid montering och därefter oföränderligt. Två skäl: proppen får
+  // aldrig kunna starta om animationen mitt i granskningen, och
+  // renderPreviewBody anropas på TVÅ ställen (inline och fullskärm) — utan
+  // den här låsningen hade revealen spelats om när fullskärmsläget öppnas.
+  const [revealOnMount] = useState(() => !!quickReveal)
   // ETAPP 3: samma brytpunkt som DocumentScaler — under lg stängs radernas
   // inline-fält av till förmån för RowEditSheet (30px-fält klarar inte
   // 44px-kravet i A4-skala, se offert-masterplan.md).
@@ -71,8 +88,12 @@ export function QuotePreviewPanel({
   function renderPreviewBody(flexFill: boolean) {
     const sizeCls = flexFill ? 'flex-1 min-h-0' : 'h-full'
     if (previewMode === 'live' && liveEnabled && liveTemplateData && liveHandlers) {
+      // Reveal-klassen ligger på den BEFINTLIGA diven nedan, inte på en ny
+      // wrapper: ett extra element hade ändrat trädformen, fått React att
+      // montera om DocumentScaler + QuoteDocument, och ett pågående inline-fält
+      // hade tappat fokus och markör mitt i redigeringen.
       return (
-        <div className={`bg-slate-50 rounded-xl overflow-auto border border-slate-200 ${sizeCls} p-4`}>
+        <div className={`bg-slate-50 rounded-xl overflow-auto border border-slate-200 ${sizeCls} p-4${revealOnMount ? ' quick-reveal' : ''}`}>
           <DocumentScaler>
             {/* ETAPP 6a: se PublicQuoteDocument.tsx-kommentaren — docType
                 sätts inline, liveTemplateData förblir typad QuoteTemplateData

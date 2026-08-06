@@ -105,7 +105,15 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
 
   return (
     <div
-      className="quote-document quote-document--modern"
+      // ETAPP C3-fix (2026-08-06): `quote-document--interactive` gatar hela
+      // sektionsfokus-blocket i modern-css.ts mot edit-läget.
+      //
+      // Den här filen renderar BÅDE hantverkarens redigerbara canvas och
+      // kundens skarpa PDF (via renderToStaticMarkup → Chromium). Utan gaten
+      // hamnar granskningsvyns dimning, lyft och scroll-margin i det dokument
+      // kunden faktiskt får — regler den aldrig använder men som ändå kan
+      // påverka sidbrytning och rendering. Static-läget ska bära noll av det.
+      className={`quote-document quote-document--modern${mode === 'edit' ? ' quote-document--interactive' : ''}`}
       data-focus-section={focusSection || undefined}
       style={{
         ['--qd-accent' as any]: accent,
@@ -247,6 +255,20 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             (samma placering som de gamla mallsträngarna hade) — se
             InvoicePaymentSection, som renderar refs-blocket internt. */}
 
+        {/* ETAPP C3-fix (2026-08-06): titel, beskrivning OCH radtabellen ligger
+            i EN sektionswrapper.
+
+            Sektionen "Inkluderat" äger onTitleChange och onDescriptionChange
+            (lib/quotes/section-handlers.ts), men attributet satt tidigare bara
+            på tabellen. Titel och beskrivning var alltså redigerbara, odimmade
+            och utanför markeringen — granskningsvyn påstod en avgränsning som
+            inte stämde. Dimning, scrollmål och lyft måste beskriva SAMMA yta
+            som är redigerbar, annars ljuger gränssnittet om var man befinner sig.
+
+            Wrappern renderas ALLTID, inte bara i granskningsläget: två olika
+            DOM-former för samma dokument är dyrare att resonera om än en extra
+            div. Den är ostilad och påverkar inte layouten. */}
+        <div {...section('inkluderat')}>
         {/* Titel + beskrivning.
             ETAPP C3: gatas på sin EGEN handler (tidigare bara på `handlers`
             som helhet). Det är vad som gör att en sektionsgranskning kan säga
@@ -275,9 +297,9 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
         )}
 
         {/* Items-tabell — delad mellan offert och faktura (QuoteDocumentRow
-            är docType-agnostisk sedan ETAPP 6a).
-            Sektionen "Inkluderat" i snabboffertens granskning. */}
-        <table {...section('inkluderat')}>
+            är docType-agnostisk sedan ETAPP 6a). Sektionsattributet bärs av
+            wrappern ovan, inte av tabellen. */}
+        <table>
           <thead>
             <tr>
               <th>Beskrivning</th>
@@ -316,17 +338,25 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             dokumentet av QuotePreviewPanel. Inuti den skalade A4:an blev
             träffytan ~15px vid 375px skärmbredd — långt under 44px-kravet,
             och just på den yta som är hantverkarens huvudvy. */}
-        {mode === 'edit' && handlers && !sheetMode && (
+        {mode === 'edit' && handlers?.onItemAdd && !sheetMode && (
           <button type="button" onClick={handlers.onItemAdd} className="add-row-btn">
             + Lägg till rad
           </button>
         )}
+        </div>{/* /sektion: inkluderat — omsluter titel, beskrivning, rader och
+                  "+ Lägg till rad", alltså exakt det sektionen får redigera. */}
 
         {/* Totaler — sektionen "Prisbild" i snabboffertens granskning.
             Betalplanen nedan bär samma sektion: för hantverkaren är "vad det
             kostar" och "när det betalas" en och samma fråga. */}
-        <div className="totals-wrap" {...section('prisbild')}>
-          <div className="totals">
+        {/* ETAPP C3-fix (2026-08-06): sektionen sitter på .totals, inte på
+            .totals-wrap. Wrappern är ett fullbrett flexbarn medan .totals bara
+            är 50 % och högerjusterad — ett lyft på wrappern hade blivit en till
+            hälften tom låda. Dimningen blir visuellt identisk (wrappern har
+            inget eget innehåll) och pointer-events:none hamnar där rabattfältet
+            faktiskt är. */}
+        <div className="totals-wrap">
+          <div className="totals" {...section('prisbild')}>
             {isInvoice ? (
               <>
                 <div className="total-row"><span className="lbl">Summa exkl. moms</span><span className="val">{formatCurrency(data.invoice.subtotalExVat)}</span></div>
@@ -562,6 +592,23 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* ETAPP C3-fix (2026-08-06): platshållare när listan är tom.
+
+            En offert utan förbehåll är helt normal — men i granskningsläget
+            renderades då INGET element med data-section="reservationer", vilket
+            gav fyra dimmade sektioner och noll upplyfta: hela dokumentet låg på
+            .28 och scrollIntoView hade inget mål. Sektionen gick att granska
+            utan att något visade var man var.
+
+            Renderas BARA när focusSection är satt, så kundens dokument och den
+            fullständiga editorn är opåverkade. */}
+        {!isInvoice && focusSection && !(data.quote.reservations && data.quote.reservations.length > 0) && (
+          <div className="reservations" {...section('reservationer')}>
+            <p className="reservations-title">Reservationer</p>
+            <p className="section-empty">Inga förbehåll ännu — förslag läggs till här.</p>
           </div>
         )}
 

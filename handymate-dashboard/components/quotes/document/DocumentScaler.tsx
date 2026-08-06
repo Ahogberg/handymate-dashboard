@@ -56,7 +56,23 @@ export function DocumentScaler({ children }: { children: React.ReactNode }) {
 
   return (
     <div ref={containerRef} className="w-full overflow-hidden" style={{ height: contentHeight ? contentHeight * scale : undefined }}>
-      <div ref={contentRef} style={{ width: A4_WIDTH_PX, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+      <div
+        ref={contentRef}
+        style={{
+          width: A4_WIDTH_PX,
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
+          // ETAPP C3-fix (2026-08-06): skalan publiceras som CSS-variabel så
+          // dokumentets egen CSS kan kompensera för den.
+          //
+          // Allt som ritas inuti transformen krymper med den. På en 375px-skärm
+          // är skalan ~0,43, vilket gör en 1px ring till en subpixelhårlinje —
+          // sektionslyftet, den enda övergången som ses fyra gånger per offert,
+          // hade alltså knappt synts på just den enhet flödet är byggt för.
+          // Mått som ska ha konstant SKÄRMstorlek delas med variabeln.
+          ['--qd-scale' as any]: scale,
+        }}
+      >
         {children}
       </div>
     </div>

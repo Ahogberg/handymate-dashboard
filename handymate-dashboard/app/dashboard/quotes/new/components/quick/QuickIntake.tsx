@@ -155,37 +155,43 @@ export function QuickIntake({
             onClick={() => (isRecording ? recording.stop() : recording.start())}
             disabled={transcribing || voiceUnavailable}
             title={isRecording ? 'Stoppa inspelningen' : 'Prata in beskrivningen'}
-            className={`absolute right-3 bottom-3 w-11 h-11 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 ${
+            // Ytans mest laddade kontroll: den byter BETYDELSE, inte bara
+            // färg. transition-all plus en mjuk röd ring säger "live" med ljus
+            // i stället för med ett hårt byte. Ikonerna bär anim-fade eftersom
+            // varje skepnad är ett nytt element — ingen state behövs.
+            className={`absolute right-3 bottom-3 w-11 h-11 rounded-full flex items-center justify-center transition-all duration-base ease-standard disabled:opacity-40 ${
               isRecording
-                ? 'bg-red-600 hover:bg-red-500 text-white'
+                ? 'bg-red-600 hover:bg-red-500 text-white ring-4 ring-red-100'
                 : 'bg-primary-50 hover:bg-primary-100 text-primary-700'
             }`}
           >
             {transcribing
-              ? <Loader2 className="w-5 h-5 animate-spin" />
+              ? <Loader2 className="w-5 h-5 animate-spin anim-fade" />
               : isRecording
-                ? <Square className="w-4 h-4" fill="currentColor" />
-                : <Mic className="w-5 h-5" />}
+                ? <Square className="w-4 h-4 anim-fade" fill="currentColor" />
+                : <Mic className="w-5 h-5 anim-fade" />}
           </button>
         </div>
 
-        {/* Rösttillståndet — alltid uttalat, aldrig tyst */}
+        {/* Rösttillståndet — alltid uttalat, aldrig tyst.
+            Höjden är reserverad (min-h), så tillstånden kan tona in och ut
+            utan att knuffa resten av skärmen. */}
         <div className="mt-2 min-h-[20px]">
           {isRecording && (
-            <p className="text-sm text-red-600 font-medium flex items-center gap-2">
+            <p className="text-sm text-red-600 font-medium flex items-center gap-2 anim-fade">
               <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
               Lyssnar… {recording.durationLabel}
             </p>
           )}
-          {transcribing && <p className="text-sm text-slate-500">Skriver ner…</p>}
-          {voiceError && <p className="text-sm text-amber-700">{voiceError}</p>}
+          {transcribing && <p className="text-sm text-slate-500 anim-fade">Skriver ner…</p>}
+          {voiceError && <p className="text-sm text-amber-700 anim-fade">{voiceError}</p>}
           {recording.state === 'denied' && (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 anim-fade">
               Mikrofonen är blockerad i webbläsaren. Skriv i rutan i stället.
             </p>
           )}
           {recording.state === 'unsupported' && (
-            <p className="text-sm text-slate-500">Inspelning fungerar inte här — skriv i rutan i stället.</p>
+            <p className="text-sm text-slate-500 anim-fade">Inspelning fungerar inte här — skriv i rutan i stället.</p>
           )}
         </div>
 
@@ -204,7 +210,7 @@ export function QuickIntake({
           />
           <div className="flex flex-wrap items-center gap-2">
             {photos.map((photo, i) => (
-              <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200">
+              <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 anim-pop">
                 <img src={photo} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
                 <button
                   type="button"
@@ -252,7 +258,9 @@ export function QuickIntake({
             type="button"
             onClick={onBuild}
             disabled={!canBuild}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-4 bg-primary-700 hover:bg-primary-600 text-white text-base font-semibold rounded-2xl transition-colors disabled:opacity-40 shadow-sm"
+            // Släppet av opacity-40 ska glida när knappen blir tillgänglig,
+            // inte slå om — det är ögonblicket beskrivningen räcker till.
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-4 bg-primary-700 hover:bg-primary-600 text-white text-base font-semibold rounded-2xl transition-[background-color,opacity] duration-base ease-standard disabled:opacity-40 shadow-sm"
           >
             {building && <Loader2 className="w-5 h-5 animate-spin" />}
             {building ? 'Bygger…' : 'Bygg utkast'}

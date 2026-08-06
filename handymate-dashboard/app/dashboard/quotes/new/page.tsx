@@ -1940,11 +1940,13 @@ export default function NewQuotePage() {
         onQuickQuote={() => setQuickMode('intake')}
       />
 
-      {/* Granskningsbaren är sticky och täcker sidans nederkant — utan
-          utrymme nedtill hamnar summeringen under den och går inte att nå. */}
+      {/* Granskningsbaren är fäst i nederkanten och täcker sidans slut — utan
+          utrymme nedtill hamnar summeringen under den och går inte att nå.
+          Höjden var tidigare en hårdkodad gissning (260px); baren mäter och
+          publicerar nu sin faktiska höjd som --qk-review-bar-h. */}
       <div
         className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6"
-        style={quickMode === 'review' ? { paddingBottom: 260 } : undefined}
+        style={quickMode === 'review' ? { paddingBottom: 'calc(var(--qk-review-bar-h, 220px) + 1.5rem)' } : undefined}
       >
         <QuoteNewHeader
           aiGenerated={aiGenerated}
@@ -2297,6 +2299,10 @@ export default function NewQuotePage() {
                     quickMode === 'review' ? sectionHandlers(quickSection, liveHandlers) : liveHandlers
                   }
                   focusSection={quickMode === 'review' ? quickSection : null}
+                  // Gaten är "är vi i snabbofferten alls", inte "är vi i
+                  // granskningssteget". Med det senare hade klassen lagts till
+                  // på nytt vid översikt → sektion och revealen spelats om.
+                  quickReveal={quickMode !== null}
                   onRowTap={quickMode === 'review' && quickSection !== 'inkluderat' ? undefined : setSheetItemId}
                   onAddRowTap={() => setAddRowSheetOpen(true)}
                   templatePreviewPayload={templatePreviewPayload}

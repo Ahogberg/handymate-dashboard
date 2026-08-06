@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { AlertTriangle, ArrowRight, Check } from 'lucide-react'
 import {
   SECTION_ORDER,
@@ -51,8 +52,36 @@ export function QuickReviewBar({
 }: QuickReviewBarProps) {
   const isLast = SECTION_ORDER.indexOf(section) === SECTION_ORDER.length - 1
 
+  // Baren äger sin höjd och publicerar den; sidan läser den (2026-08-06).
+  //
+  // Tidigare fanns tre oberoende gissningar på samma tal — paddingBottom: 260
+  // i page.tsx, scroll-margin-top: 96px i modern-css, och barens faktiska
+  // innehållsstyrda höjd. Den som gissade fel gjorde summeringen onåbar.
+  //
+  // Skriver DIREKT på documentElement, aldrig via React-state: en
+  // ResizeObserver som triggar en rerender som kan påverka barens höjd är en
+  // loop, och Next-overlayen visar dessutom "ResizeObserver loop"-varningen
+  // som en röd ruta även när den är harmlös.
+  const barRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = barRef.current
+    if (!el) return
+    const publish = () => {
+      document.documentElement.style.setProperty('--qk-review-bar-h', `${el.offsetHeight}px`)
+    }
+    publish()
+    const ro = new ResizeObserver(publish)
+    ro.observe(el)
+    return () => {
+      ro.disconnect()
+      // Måste städas — annars läcker värdet in i översiktsläget där baren är
+      // borta och paddingen skulle reservera plats för ingenting.
+      document.documentElement.style.removeProperty('--qk-review-bar-h')
+    }
+  }, [])
+
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_16px_rgba(15,23,42,0.06)]">
+    <div ref={barRef} className="fixed inset-x-0 bottom-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_16px_rgba(15,23,42,0.06)]">
       <div className="max-w-3xl mx-auto px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {/* Progressprickar — tappbara, aldrig en grind */}
         <div className="flex items-center justify-center gap-2 mb-3">
@@ -80,7 +109,12 @@ export function QuickReviewBar({
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex-1 min-w-0">
+          {/* Reserverad minsta höjd: rymmer namn + sammanfattning + varningsrad,
+              så baren inte hoppar när en varning dyker upp eller försvinner.
+              key= gör varje sektionsbyte till en remount så anim-fade körs på
+              det nya innehållet. */}
+          <div className="flex-1 min-w-0 min-h-[56px]">
+            <div key={section} className="anim-fade">
             <p className="font-heading text-base font-bold text-slate-900 tracking-tight leading-tight">
               {SECTION_LABELS[section]}
             </p>
@@ -91,6 +125,7 @@ export function QuickReviewBar({
                 <span className="truncate">{summary.attention}</span>
               </p>
             )}
+            </div>
           </div>
 
           <button
@@ -104,9 +139,25 @@ export function QuickReviewBar({
           </button>
         </div>
 
-        <p className="text-xs text-slate-400 mt-2">{SECTION_HINTS[section]}</p>
+        <p key={section} className="text-xs text-slate-400 mt-2 anim-fade">{SECTION_HINTS[section]}</p>
 
-        {children && <div className="mt-3">{children}</div>}
+        {/* Verktygsslotten glider 0 → naturlig höjd i stället för att monteras
+            villkorligt. Sektionernas verktyg är olika höga — en textarea vid
+            Ej inkluderat, en knapp vid Inkluderat, ingenting vid Prisbild — och
+            barens höjd hoppade därför okontrollerat vid varje sektionsbyte.
+            Eftersom baren är fäst nedtill flyttade sig hela sidans bottenkant.
+
+            Utgående innehåll försvinner direkt: en exit-animation kräver att
+            React behåller det gamla elementet, alltså state eller ett bibliotek.
+            Höjdglidningen räcker för att bytet ska läsas som en rörelse. */}
+        <div
+          className="grid transition-[grid-template-rows] duration-slow ease-standard motion-reduce:transition-none"
+          style={{ gridTemplateRows: children ? '1fr' : '0fr' }}
+        >
+          <div className="overflow-hidden min-h-0">
+            {children ? <div className="mt-3">{children}</div> : null}
+          </div>
+        </div>
 
         <button
           type="button"
