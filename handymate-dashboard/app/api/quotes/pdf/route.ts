@@ -144,7 +144,16 @@ async function buildQuotePdfResponse(quote: any, config: any, creator: any): Pro
           const mime = format === 'PNG' ? 'image/png' : 'image/jpeg'
           businessData.logo_base64 = `data:${mime};base64,${base64}`
           businessData.logo_format = format
+        } else {
+          // SVG och WEBP tillåts vid uppladdning men kan inte ritas av jsPDF.
+          // Tystnad här gjorde att en hantverkare med SVG-logga fick en
+          // logglös PDF utan att någon kunde se varför.
+          console.warn(
+            `[quotes/pdf] Loggan hoppas över i jsPDF-fallbacken — formatet ${contentType || 'okänt'} stöds inte. Ladda upp PNG eller JPG för att den ska synas även här.`,
+          )
         }
+      } else {
+        console.warn('[quotes/pdf] Loggan kunde inte hämtas:', logoRes.status, config.logo_url)
       }
     } catch (err) {
       console.error('[quotes/pdf] Kunde inte hämta logga för PDF:', err)

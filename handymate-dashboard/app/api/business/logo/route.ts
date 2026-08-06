@@ -51,11 +51,31 @@ export async function POST(request: NextRequest) {
     .from('business-assets')
     .getPublicUrl(filePath)
 
-  // Save URL in business_config
-  await supabase
+  // Save URL in business_config.
+  // .select() krävs för att veta att raden FAKTISKT uppdaterades — utan den
+  // svarade routen 200 med URL:en även om noll rader träffades, och
+  // inställningssidan visade loggan från sitt lokala state. Hantverkaren såg
+  // en lyckad uppladdning medan kolumnen var tom.
+  const { data: updated, error: updateError } = await supabase
     .from('business_config')
     .update({ logo_url: urlData.publicUrl })
     .eq('business_id', business.business_id)
+    .select('business_id')
+
+  if (updateError) {
+    console.error('[business/logo] kunde inte spara logo_url:', updateError.message)
+    return NextResponse.json(
+      { error: 'Bilden laddades upp men kunde inte sparas på företaget. Försök igen.' },
+      { status: 500 },
+    )
+  }
+  if (!updated || updated.length === 0) {
+    console.error('[business/logo] logo_url uppdaterade 0 rader för', business.business_id)
+    return NextResponse.json(
+      { error: 'Bilden laddades upp men kunde inte kopplas till ditt företag. Kontakta support.' },
+      { status: 500 },
+    )
+  }
 
   return NextResponse.json({ logo_url: urlData.publicUrl })
 }

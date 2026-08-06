@@ -11,6 +11,7 @@ import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates
 import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
 import { RowEditSheet } from '@/components/quotes/document/RowEditSheet'
 import { AddRowSheet } from '@/components/quotes/document/AddRowSheet'
+import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/business/quote-surface-select'
 import { useReservationSuggestions } from '../../_shared/useReservationSuggestions'
 import { ReservationSuggestionBanner, ReservationMutedNotice } from '../../_shared/ReservationSuggestionBanner'
 import { ReservationReviewSheet } from '../../_shared/ReservationReviewSheet'
@@ -626,11 +627,13 @@ export default function EditQuotePage() {
       fetch('/api/customers').then(r => r.json()),
       supabase
         .from('business_config')
-        .select('pricing_settings, quote_template_style, business_name, contact_name, contact_email, phone_number, address, website, org_number, f_skatt_registered, bankgiro, plusgiro, swish_number, vat_number, accent_color, logo_url, tagline, service_area')
+        // '*' är MEDVETET — se lib/business/quote-surface-select.ts.
+        .select(QUOTE_SURFACE_BUSINESS_SELECT)
         .eq('business_id', business.business_id)
         .single(),
     ])
 
+    logBusinessConfigError('EditQuote', settingsRes.error)
     setCustomers(customersApiRes?.customers || customersApiRes?.data || [])
     const defaultStyle = settingsRes.data?.quote_template_style as 'modern' | 'premium' | 'friendly' | undefined
     if (defaultStyle && ['modern', 'premium', 'friendly'].includes(defaultStyle)) {

@@ -9,6 +9,7 @@ import { buildQuoteTemplateData } from '@/lib/quote-templates/data-builder'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
 import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
+import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/business/quote-surface-select'
 import { QuoteHeader } from './components/QuoteHeader'
 import { QuoteCustomerCard } from './components/QuoteCustomerCard'
 import { QuoteDocumentPanel } from './components/QuoteDocumentPanel'
@@ -135,12 +136,14 @@ export default function QuoteDetailPage() {
     if (!business.business_id) return
     supabase
       .from('business_config')
-      .select(
-        'business_name, contact_name, contact_email, phone_number, address, website, org_number, f_skatt_registered, bankgiro, plusgiro, swish_number, vat_number, accent_color, logo_url, tagline, service_area, quote_template_style',
-      )
+      // '*' är MEDVETET — se lib/business/quote-surface-select.ts. Med en
+      // kolumnlista 400:ade hela frågan och dokumentpanelen fastnade i en
+      // spinner eftersom templateData aldrig kunde byggas.
+      .select(QUOTE_SURFACE_BUSINESS_SELECT)
       .eq('business_id', business.business_id)
       .single()
-      .then(({ data }: { data: any }) => {
+      .then(({ data, error }: { data: any; error: any }) => {
+        logBusinessConfigError('QuoteDetail', error)
         if (data) setBusinessConfig(data as BusinessConfig)
       })
   }, [business.business_id])
