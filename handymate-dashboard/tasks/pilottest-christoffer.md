@@ -74,6 +74,26 @@ Du hamnar i den gamla vyn, direkt.
 **Priserna.** Raderna hämtas från din produktbank. Ligger de rätt för din
 bransch, eller behöver de justeras?
 
+**Artiklar utan pris.** Produktbanken är nyss utökad — ett nittiotal artiklar
+per bransch i stället för tjugo. De nya har med flit *inget* pris: vi vill
+hellre att det står tomt än att vi gissar fel åt dig, för ett gissat pris
+läser systemet som sanning och säger det vidare till kunden i offerten och i
+telefon.
+
+Så här ska det gå till, och det är det vi vill att du kollar:
+
+1. Du väljer en artikel som saknar pris — den står som **"Sätt pris"** i
+   listan i stället för ett belopp.
+2. Du skriver in ditt pris på raden.
+3. Du får frågan **"Spara som standardpris"**. Klickar du där gäller priset
+   nästa gång också.
+4. Behöver du avvika en enskild gång ändrar du bara på raden och struntar i
+   frågan. Vill du ändra standarden i efterhand gör du det under
+   Inställningar → Produkter & priser.
+
+Fungerar det som du förväntar dig? Och särskilt: **kommer frågan när den ska,
+och tiger den när den ska?** Den ska inte dyka upp när priset redan stämmer.
+
 **Vad AI:n missar.** Vad glömde den som du fick lägga till för hand? Det är den
 mest användbara informationen vi kan få.
 

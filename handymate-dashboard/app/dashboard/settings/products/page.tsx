@@ -21,6 +21,7 @@ import { CategoryTree, type CategoryFilter } from './components/CategoryTree'
 import { ProductEditorModal } from './components/ProductEditorModal'
 import { ProductCsvImportModal } from './components/ProductCsvImportModal'
 import type { ComponentPayload, ProductCategory, ProductRow } from './types'
+import { priceLabel, priceState } from '@/lib/products/pricing-state'
 
 const MIGRATION_FLAG = 'hm_produktbank_migration_seen'
 
@@ -439,8 +440,16 @@ export default function ProductsPage() {
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-500 mt-0.5">
-                          {product.sales_price.toLocaleString('sv-SE')} kr/{formatUnit(product.unit)}
+                        {/* En prislös artikel säger "Sätt pris", aldrig "0 kr" —
+                            samma språk som i offertens artikelväljare. Två ytor
+                            som beskriver samma tillstånd olika gör att man
+                            slutar lita på båda. Se lib/products/pricing-state.ts. */}
+                        <p
+                          className={`text-sm mt-0.5 ${
+                            priceState(product.sales_price) === 'osatt' ? 'text-primary-700 font-medium' : 'text-gray-500'
+                          }`}
+                        >
+                          {priceLabel(product.sales_price, formatUnit(product.unit))}
                         </p>
                       </button>
 

@@ -62,7 +62,12 @@ export function ProductEditorModal({
   const [description, setDescription] = useState(product?.description ?? '')
   const [sku, setSku] = useState(product?.sku ?? '')
   const [unit, setUnit] = useState(product?.unit ?? 'st')
-  const [salesPrice, setSalesPrice] = useState(product?.sales_price?.toString() ?? '')
+  // Noll betyder "aldrig prissatt", inte "kostar noll" — fältet ska då stå
+  // tomt. Med en nolla i rutan får hantverkaren rensa den innan han skriver,
+  // och artikeln påstår sig vara gratis medan han tittar på den.
+  const [salesPrice, setSalesPrice] = useState(
+    product?.sales_price ? product.sales_price.toString() : ''
+  )
   const [vatRate, setVatRate] = useState(product?.vat_rate?.toString() ?? '0.25')
   const [rotEligible, setRotEligible] = useState(product?.rot_eligible ?? false)
   const [rutEligible, setRutEligible] = useState(product?.rut_eligible ?? false)
@@ -125,7 +130,11 @@ export function ProductEditorModal({
       onError('Produkten behöver ett namn')
       return
     }
-    const sales = parseFloat(salesPrice)
+    // Tomt prisfält betyder "inte prissatt än" — ett giltigt tillstånd sedan
+    // registret började seedas prislöst. Utan det här skulle hantverkaren
+    // blockeras från att ens byta namn på en artikel han inte satt pris på.
+    // Skräp i fältet ska däremot fortfarande stoppas.
+    const sales = salesPrice.trim() === '' ? 0 : parseFloat(salesPrice)
     if (Number.isNaN(sales) || sales < 0) {
       onError('Ange ett giltigt pris')
       return
@@ -264,16 +273,17 @@ export function ProductEditorModal({
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className={LABEL_CLS}>
-                Pris (exkl. moms) <span className="text-red-600 normal-case font-medium">*</span>
-              </label>
+              {/* Inte längre obligatoriskt: en artikel utan pris är ett
+                  giltigt tillstånd — priset sätts första gången den används.
+                  Stjärnan hade lovat en spärr som inte finns. */}
+              <label className={LABEL_CLS}>Pris (exkl. moms)</label>
               <div className="relative">
                 <input
                   type="number"
                   min="0"
                   value={salesPrice}
                   onChange={e => setSalesPrice(e.target.value)}
-                  placeholder="0"
+                  placeholder="Inget pris satt"
                   className={`${INPUT_CLS} pr-8`}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">kr</span>
