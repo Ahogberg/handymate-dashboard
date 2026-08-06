@@ -136,6 +136,10 @@
     {
       "path": "/api/cron/cert-expiry-check",
       "schedule": "35 6 * * *"
+    },
+    {
+      "path": "/api/cron/missed-revenue",
+      "schedule": "40 6 * * *"
     }
   ]
 }
