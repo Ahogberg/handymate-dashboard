@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Heading1, Loader2, Plus, Search, Star, X } from 'lucide-react'
 import type { ProductWithComponents } from '@/app/dashboard/quotes/_shared/applyProductToItem'
 import { useFavoriteProducts, useProductSearch } from '@/app/dashboard/quotes/_shared/useProductSearch'
+import { priceLabel, priceState } from '@/lib/products/pricing-state'
 
 interface AddRowSheetProps {
   open: boolean
@@ -154,8 +155,19 @@ export function AddRowSheet({ open, onSelectProduct, onAddBlankRow, onAddHeading
                       </span>
                       {product.sku && <span className="block text-[11px] text-slate-400 truncate mt-0.5">{product.sku}</span>}
                     </span>
-                    <span className="text-sm font-semibold text-slate-700 tabular-nums whitespace-nowrap">
-                      {product.sales_price?.toLocaleString('sv-SE')} kr/{product.unit}
+                    {/* En prislös artikel säger "Sätt pris", aldrig "0 kr" —
+                        det senare hade påstått att den är gratis. Priset
+                        förtjänas av användning: hantverkaren skriver in det
+                        första gången och får då frågan om det ska bli hans
+                        standard. Se lib/products/pricing-state.ts. */}
+                    <span
+                      className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
+                        priceState(product.sales_price) === 'osatt'
+                          ? 'text-primary-700 font-medium'
+                          : 'text-slate-700'
+                      }`}
+                    >
+                      {priceLabel(product.sales_price, product.unit)}
                     </span>
                   </button>
                 </li>

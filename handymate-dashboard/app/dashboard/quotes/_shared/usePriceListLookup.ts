@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { type CustomCategory } from '@/lib/constants/categories'
 import type { ProductWithComponents } from './applyProductToItem'
@@ -67,5 +67,19 @@ export function usePriceListLookup(businessId: string | undefined | null) {
     }
   }, [businessId])
 
-  return { priceList, products, customCategories, hydrated }
+  /**
+   * Uppdaterar EN artikels pris lokalt (2026-08-06).
+   *
+   * Används när hantverkaren sparat ett standardpris ur offertflödet. En full
+   * omhämtning hade fungerat men kostar en rundtur och byter ut hela listan —
+   * vilket i sin tur remonterar väljarna mitt i redigeringen. Skrivningen har
+   * redan bekräftats av servern innan den här anropas, så den lokala
+   * uppdateringen kan inte gå isär med databasen.
+   */
+  const setLocalPrice = useCallback((productId: string, salesPrice: number) => {
+    setProducts(prev => prev.map(p => (p.id === productId ? { ...p, sales_price: salesPrice } : p)))
+    setPriceList(prev => prev.map(p => (p.id === productId ? { ...p, unit_price: salesPrice } : p)))
+  }, [])
+
+  return { priceList, products, customCategories, hydrated, setLocalPrice }
 }

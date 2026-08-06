@@ -282,7 +282,7 @@ export default function EditQuotePage() {
   const [addRowSheetOpen, setAddRowSheetOpen] = useState(false)
 
   // ─── Shared hooks ──────────────────────────────────────────────────
-  const { products, customCategories, hydrated: priceListHydrated } = usePriceListLookup(business.business_id)
+  const { products, customCategories, hydrated: priceListHydrated, setLocalPrice } = usePriceListLookup(business.business_id)
 
   // Custom categories är lokalt state eftersom vi tillåter inline-skapande;
   // initieras från hook-resultatet när det finns (samma mönster som new-vyn)
@@ -998,6 +998,29 @@ export default function EditQuotePage() {
   // Spara i prislistan — POST /api/products + uppdatera linked_product_id
   // ═══════════════════════════════════════════════════════════════════
 
+  /**
+   * Sparar radens pris som artikelns standardpris (2026-08-06).
+   *
+   * Samma mekanik som på new-sidan — se kommentaren där för varför registret
+   * seedas prislöst. Fail-soft: misslyckas skrivningen står priset kvar på
+   * raden och offerten är oförändrad, men det SÄGS.
+   */
+  async function saveStandardPrice(productId: string, price: number) {
+    try {
+      const res = await fetch('/api/products', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: productId, sales_price: price }),
+      })
+      if (!res.ok) throw new Error(`status ${res.status}`)
+      toast.success('Sparat som standardpris')
+      setLocalPrice(productId, price)
+    } catch (err) {
+      console.error('[quotes/edit] kunde inte spara standardpris:', err)
+      toast.error('Kunde inte spara standardpriset — priset står kvar på raden')
+    }
+  }
+
   async function saveItemToProducts(payload: ProductSavePayload) {
     if (!productModalRow) return
     setSavingProduct(true)
@@ -1323,6 +1346,14 @@ export default function EditQuotePage() {
         onRemove={removeItem}
         onMove={moveItemById}
         onClose={() => setSheetItemId(null)}
+        // Priset förtjänas av användning — samma mekanik som på new-sidan.
+        // Uppslaget görs mot listan sidan redan har; sheeten hämtar inget.
+        linkedProductPrice={
+          sheetItem?.linked_product_id
+            ? products.find(p => p.id === sheetItem.linked_product_id)?.sales_price ?? null
+            : null
+        }
+        onSaveAsStandard={(productId, price) => { void saveStandardPrice(productId, price) }}
       />
 
       {/* Mobilens "lägg till rad" — söker i artikelbanken i stället för att

@@ -73,18 +73,26 @@ test.describe('sku — seed-idempotensnyckeln', () => {
 })
 
 test.describe('prissättning — det svåra, och det som kunden faktiskt bedömer', () => {
-  test('varje artikel har ett pris över noll', () => {
-    // En artikel utan pris ser i offerten ut som "PRIS SAKNAS" och tvingar
-    // hantverkaren att fylla i för hand — då är den värre än ingen artikel.
-    const utan = allProducts().filter(p => !(p.unit_price > 0))
-    expect(utan.map(p => p.sku), 'Artiklar utan pris').toEqual([])
+  test('noll är tillåtet — men då exakt noll', () => {
+    // Registret får seedas PRISLÖST. Ett gissat pris är sämre än inget, för
+    // systemet quotar det med full självsäkerhet i offerten, telefonagenten
+    // och storefronten. Priset förtjänas i stället av användning: hantverkaren
+    // skriver in det första gången och får då frågan om det ska bli standard
+    // (lib/products/pricing-state.ts).
+    //
+    // Men noll måste vara ETT MEDVETET tillstånd, inte en glidning. Ett
+    // negativt pris eller ett öresbelopp är alltid ett skrivfel — och de
+    // fångas här, eftersom gränssnittet läser allt ≤ 0 som "osatt" och därmed
+    // skulle dölja dem.
+    const glidande = allProducts().filter(p => p.unit_price !== 0 && p.unit_price < 1)
+    expect(glidande.map(p => `${p.sku} ${p.unit_price}`), 'Priser som varken är noll eller ett riktigt pris').toEqual([])
   })
 
   test('inga orimliga prisnivåer', () => {
     // Trubbig sanity, inte en åsikt om marknaden: en artikel över 500 000 kr
-    // eller under 1 kr är nästan säkert ett skrivfel med en nolla för mycket
-    // eller för lite. Christoffers branschkoll är den riktiga valideringen.
-    const orimliga = allProducts().filter(p => p.unit_price < 1 || p.unit_price > 500_000)
+    // är nästan säkert ett skrivfel med en nolla för mycket. Christoffers
+    // branschkoll är den riktiga valideringen.
+    const orimliga = allProducts().filter(p => p.unit_price > 500_000)
     expect(orimliga.map(p => `${p.sku} ${p.unit_price}`), 'Prisnivåer som ser ut som skrivfel').toEqual([])
   })
 })

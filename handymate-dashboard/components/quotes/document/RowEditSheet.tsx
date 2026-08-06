@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { ArrowDown, ArrowUp, Check, Trash2, X } from 'lucide-react'
 import type { QuoteItem, QuoteItemType } from '@/lib/types/quote'
 import { UNIT_OPTIONS } from '@/components/quotes/ItemRow'
+import { standardPriceOffer } from '@/lib/products/pricing-state'
 
 interface RowEditSheetProps {
   /** null → sheeten är stängd (inget att redigera). */
@@ -17,6 +18,15 @@ interface RowEditSheetProps {
       Utelämnad → knapparna renderas inte. */
   onMove?: (id: string, direction: 'up' | 'down') => void
   onClose: () => void
+  /**
+   * Artikelns nuvarande standardpris ur banken, för raden som redigeras.
+   * Utelämnad → erbjudandet visas aldrig. Anroparen slår upp det ur den
+   * produktlista den redan har (usePriceListLookup), så sheeten inte behöver
+   * hämta något själv.
+   */
+  linkedProductPrice?: number | null
+  /** Skriver radens pris till artikeln som nytt standardpris. */
+  onSaveAsStandard?: (productId: string, price: number) => void
 }
 
 const TYPE_LABEL: Record<QuoteItemType, string> = {
@@ -47,7 +57,7 @@ const FIELD_CLS =
  * enda källa som QuoteItemsSection — så sheeten återanvänder dem rakt av
  * istället för att uppfinna en egen datavåg.
  */
-export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, onClose }: RowEditSheetProps) {
+export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, onClose, linkedProductPrice, onSaveAsStandard }: RowEditSheetProps) {
   useEffect(() => {
     if (!item) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -65,6 +75,14 @@ export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, 
   const isEditable = item.item_type === 'item' || item.item_type === 'discount' || item.item_type === 'option'
   const isOption = item.item_type === 'option'
   const label = TYPE_LABEL[item.item_type]
+
+  // Beslutet om vi ska erbjuda "Sätt som standard" ligger i en ren funktion —
+  // den tiger i tre fall som är lätta att få fel i JSX. Se pricing-state.ts.
+  const standardOffer = standardPriceOffer({
+    linkedProductId: item.linked_product_id,
+    rowPrice: item.unit_price,
+    productPrice: linkedProductPrice,
+  })
 
   const toggleOptionDefault = (checked: boolean) => {
     onUpdate(item.id, 'option_default', checked)
@@ -145,6 +163,23 @@ export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, 
                   step="any"
                   className={FIELD_CLS}
                 />
+                {/* Priset förtjänas av användning (2026-08-06). Registret
+                    seedas prislöst — ett ogissat pris är bättre än ett gissat,
+                    eftersom systemet quotar det med full självsäkerhet i
+                    offerten, telefonagenten och storefronten.
+
+                    Erbjudandet visas BARA när det finns något att spara: rad
+                    kopplad till banken, pris ifyllt, och skilt från artikelns.
+                    Se lib/products/pricing-state.ts för när vi tiger. */}
+                {standardOffer.show && onSaveAsStandard && (
+                  <button
+                    type="button"
+                    onClick={() => onSaveAsStandard(item.linked_product_id!, item.unit_price)}
+                    className="mt-2 w-full min-h-[44px] px-3 py-2 text-[13px] font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-100 rounded-xl transition-colors"
+                  >
+                    {standardOffer.label}
+                  </button>
+                )}
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Kategori</label>
