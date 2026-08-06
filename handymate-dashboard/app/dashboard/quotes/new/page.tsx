@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2, Send, X } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
@@ -37,6 +37,7 @@ import { useReservationSuggestions } from '../_shared/useReservationSuggestions'
 import { ReservationSuggestionBanner, ReservationMutedNotice } from '../_shared/ReservationSuggestionBanner'
 import { ReservationReviewSheet } from '../_shared/ReservationReviewSheet'
 import { QuoteMarginCard } from '../_shared/QuoteMarginCard'
+import { panelStatus } from '@/lib/quotes/panel-status'
 import { QuotePreviewPanel } from '../_shared/QuotePreviewPanel'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 
@@ -436,6 +437,41 @@ export default function NewQuotePage() {
   const hasRotItems = items.some(i => i.is_rot_eligible)
   const hasRutItems = items.some(i => i.is_rut_eligible)
 
+  // Statusprickar för Mer-raden — sju offertfält bor bara bakom den, och utan
+  // markering måste hantverkaren öppna varje panel för att veta vad som är
+  // ifyllt. Det var halva "man får inte med allt".
+  const merPanelStatus = useMemo(
+    () =>
+      panelStatus({
+        notIncluded,
+        termsText,
+        ataTerms,
+        paymentTermsText,
+        referencePerson,
+        customerReference,
+        projectAddress,
+        paymentPlanCount: paymentPlan.length,
+        paymentPlanValid,
+        detailLevel,
+        showUnitPrices,
+        showQuantities,
+        attachmentCount: attachments.length,
+        templateStyle,
+        hasRotItems,
+        hasRutItems,
+        personnummer,
+        fastighetsbeteckning,
+      }),
+    [
+      notIncluded, termsText, ataTerms, paymentTermsText,
+      referencePerson, customerReference, projectAddress,
+      paymentPlan.length, paymentPlanValid,
+      detailLevel, showUnitPrices, showQuantities,
+      attachments.length, templateStyle,
+      hasRotItems, hasRutItems, personnummer, fastighetsbeteckning,
+    ],
+  )
+
   const selectedCustomerObj = useMemo(
     () => customers.find(c => c.customer_id === selectedCustomer) || null,
     [customers, selectedCustomer],
@@ -573,6 +609,25 @@ export default function NewQuotePage() {
         // onTermsChange) speglar/skriver till samma state som templatePreviewPayload
         // redan skickade (terms_text) — annars visar canvasen alltid tomt.
         termsText: termsText || null,
+        // ETAPP A4 (2026-08-06): tre fält som samlades in men aldrig nådde
+        // live-dokumentet.
+        //
+        // reservations var det allvarligaste: handlers.onReservationRemove
+        // fanns redan, men eftersom listan aldrig skickades in renderades
+        // blocket aldrig och ×-knappen var oåtkomlig. Hantverkaren bockade i
+        // förbehåll i granskningsvyn och såg dem sedan inte i offerten förrän
+        // efter sparning — precis den sorts tysta lucka som gjorde att
+        // Christoffer inte litade på att "man får med allt".
+        reservations: reservations.snapshot.length > 0 ? reservations.snapshot : null,
+        ataTerms: ataTerms || null,
+        paymentPlan: paymentPlan.length > 0
+          ? calculatedPaymentPlan.map(p => ({
+              label: p.label,
+              percent: p.percent,
+              amount: p.amount,
+              dueDescription: p.due_description || null,
+            }))
+          : null,
       },
     }
 
@@ -627,6 +682,9 @@ export default function NewQuotePage() {
     referencePerson, customerReference, projectAddress, detailLevel,
     showUnitPrices, showQuantities, personnummer, fastighetsbeteckning,
     templateStyle, dealIdFromQuery,
+    // A4: betalplanen renderas nu i dokumentet — utan dessa beror memon inte
+    // på den och blocket hade legat kvar med gamla siffror efter en ändring.
+    paymentPlan.length, calculatedPaymentPlan,
   ])
 
   const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
@@ -1672,9 +1730,16 @@ export default function NewQuotePage() {
             det som inte syns i dokumentet: kund & giltighet, AI-hjälpen,
             summering + skicka. Allt annat nås via "Mer"-raden ovanför
             dokumentet. */}
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,380px)_1fr] gap-5 items-start">
-          {/* ── Assistentkolumnen ────────────────────────────────── */}
-          <div className="flex flex-col gap-4">
+        {/* MOBILORDNING (pilotfeedback 2026-08-06): assistentkolumnen låg
+            först i DOM:en, så dokumentet hamnade efter ~25 kontroller — man
+            fick scrolla förbi allt för att se offerten. Nu är kolumnen delad:
+            kund och varningar ligger kvar överst (kundvalet är enda hårda
+            valideringen och får inte hamna under dokumentet), medan
+            AI-hjälpen, summeringen och Skicka flyttas NEDANFÖR dokumentet på
+            mobil. Desktop är oförändrad — grid-placeringen sätts explicit. */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,380px)_1fr] lg:grid-rows-[auto_1fr] gap-5 items-start">
+          {/* ── Assistentkolumnen, del 1: varningar + kund ────────── */}
+          <div className="order-1 lg:order-none lg:col-start-1 lg:row-start-1 flex flex-col gap-4">
             {/* Prisvarningar/efterkalkyl — viktig info, inte begravd */}
             <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />
             <QuoteNewEfterkalkylBanner insight={efterkalkylInsight} />
@@ -1712,7 +1777,12 @@ export default function NewQuotePage() {
               setItems={setItems}
               hasItems={items.length > 0}
             />
+          </div>
 
+          {/* ── Assistentkolumnen, del 2: verktyg och avslut ───────
+              Ligger EFTER dokumentet på mobil (order-3) men i samma
+              vänsterkolumn på desktop. */}
+          <div className="order-3 lg:order-none lg:col-start-1 lg:row-start-2 flex flex-col gap-4">
             <QuoteNewAIHelper
               open={showAiHelper}
               setOpen={setShowAiHelper}
@@ -1741,50 +1811,14 @@ export default function NewQuotePage() {
               setItems={setItems}
             />
 
-            {/* Primär CTA vid summan — headerns Skicka-knapp behålls också
-                (minsta ingrepp), men det här är där hantverkaren faktiskt
-                tittar när offerten känns klar. */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6">
-              <button
-                type="button"
-                onClick={() => saveQuote(true)}
-                disabled={saving || !selectedCustomer}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 hover:bg-primary-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                {saving ? 'Sparar…' : 'Skicka offert'}
-              </button>
-              {!selectedCustomer && (
-                <p className="mt-2 text-xs text-slate-500 text-center">Välj kund först</p>
-              )}
-              {sendConfirmPending && (
-                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                  <p className="text-xs text-slate-700 mb-2.5 leading-relaxed">
-                    Beskrivning saknas — skicka ändå?
-                  </p>
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSendConfirmPending(false)}
-                      className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white rounded-lg transition-colors"
-                    >
-                      Avbryt
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => saveQuote(true, true)}
-                      className="px-3 py-1.5 text-xs font-semibold bg-primary-700 hover:bg-primary-600 text-white rounded-lg transition-colors"
-                    >
-                      Skicka ändå
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* DUBBLETT BORTTAGEN (2026-08-06): Skicka fanns både här och i
+                den sticky headern. Headern vinner — den är alltid synlig,
+                vilket blev avgörande när summeringen flyttade under
+                dokumentet på mobil. En sanning per kontroll. */}
           </div>
 
-          {/* ── Dokumentpanelen ──────────────────────────────────── */}
-          <div className="flex flex-col gap-3">
+          {/* ── Dokumentpanelen — huvudytan, näst överst på mobil ── */}
+          <div className="order-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 flex flex-col gap-3">
             {/* "Mer"-verktygsrad — Stil/Villkor/Betalplan/Visning/Bilagor/
                 ROT nås härifrån, en panel synlig i taget (inte modal —
                 dokumentet syns hela tiden nedanför). Listvy/Dokument växlar
@@ -1800,20 +1834,45 @@ export default function NewQuotePage() {
                   { key: 'bilagor', label: 'Bilagor' },
                   { key: 'rot', label: 'ROT-detaljer' },
                 ] as const
-              ).map(p => (
-                <button
-                  key={p.key}
-                  type="button"
-                  onClick={() => setActivePanel(activePanel === p.key ? null : p.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                    activePanel === p.key
-                      ? 'bg-primary-700 text-white'
-                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
+              ).map(p => {
+                // Statusprick: sju av offertens fält bor bara här, och utan
+                // markering måste man öppna varje panel för att veta vad som
+                // är ifyllt. Amber används sparsamt — bara vid verkliga fel.
+                const status = merPanelStatus[p.key]
+                const isActive = activePanel === p.key
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => setActivePanel(isActive ? null : p.key)}
+                    title={status.state === 'attention' ? `${p.label} — ${status.hint}` : undefined}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 ${
+                      isActive
+                        ? 'bg-primary-700 text-white'
+                        : status.state === 'attention'
+                          ? 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+                          : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    }`}
+                  >
+                    {status.state !== 'empty' && (
+                      <span
+                        aria-hidden
+                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          isActive
+                            ? 'bg-white/80'
+                            : status.state === 'attention'
+                              ? 'bg-amber-500'
+                              : 'bg-primary-600'
+                        }`}
+                      />
+                    )}
+                    {p.label}
+                    {status.hint && status.state !== 'attention' && (
+                      <span className={isActive ? 'text-white/70' : 'text-slate-400'}>{status.hint}</span>
+                    )}
+                  </button>
+                )
+              })}
               <div className="ml-auto flex items-center gap-1 bg-slate-100 rounded-lg p-1">
                 <button
                   type="button"

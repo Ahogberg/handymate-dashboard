@@ -453,6 +453,15 @@ export interface QuotePdfData {
   payment_terms_text?: string | null
   /** Reservationer (v91) — frysta förbehåll på offerten. */
   reservations_snapshot?: Array<{ title: string; content: string }> | null
+  /** ÄTA-villkor (etapp A4) — vad som gäller vid ändringar och tilläggsarbeten. */
+  ata_terms?: string | null
+  /** Betalplan (etapp A4) — frysta delbetalningar. */
+  payment_plan?: Array<{
+    label: string
+    percent: number
+    amount: number
+    due_description?: string | null
+  }> | null
 }
 
 export interface BusinessPdfData {
@@ -780,9 +789,28 @@ export function generateQuotePDF(quote: QuotePdfData, business: BusinessPdfData)
         .join('\n')
     : null
 
+  // Betalplan (etapp A4, 2026-08-06): samma sammanfogning till ett textblock
+  // som reservationerna, av samma skäl — jsPDF-vägen har ingen tabellrendering
+  // här. Procenten utelämnas när den är 0: en plan i rena kronor är giltig och
+  // ska inte visa "0 %".
+  const paymentPlanText = Array.isArray(quote.payment_plan) && quote.payment_plan.length > 0
+    ? quote.payment_plan
+        .filter((p: any) => p && p.label && Number.isFinite(Number(p.amount)))
+        .map((p: any) => {
+          const due = p.due_description ? ` — ${p.due_description}` : ''
+          const pct = Number(p.percent) > 0 ? ` (${Number(p.percent)} %)` : ''
+          return `• ${p.label}${due}${pct}: ${formatSEK(Number(p.amount))}`
+        })
+        .join('\n')
+    : null
+
   const terms: Array<[string, string | null | undefined]> = [
     ['Ingår ej', quote.not_included],
     ['Reservationer', reservationsText],
+    ['Betalplan', paymentPlanText],
+    // ÄTA-villkor (etapp A4): fältet fanns i databasen men ingen renderare
+    // läste det. Utskriven rubrik i stället för branschförkortningen "ÄTA".
+    ['Ändringar och tilläggsarbeten', quote.ata_terms],
     ['Betalningsvillkor', quote.payment_terms_text],
   ]
   for (const [label, text] of terms) {

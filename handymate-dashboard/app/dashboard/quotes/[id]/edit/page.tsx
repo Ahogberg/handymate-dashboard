@@ -497,6 +497,20 @@ export default function EditQuotePage() {
         warrantyText: null,
         notIncluded: notIncluded || null,
         termsText: termsText || null,
+        // ETAPP A4 (2026-08-06): samma tre fält som new/page.tsx — insamlade
+        // men aldrig renderade i live-dokumentet. Reservationerna var värst:
+        // onReservationRemove fanns, men listan skickades aldrig in, så
+        // blocket och dess ×-knapp var oåtkomliga.
+        reservations: reservations.snapshot.length > 0 ? reservations.snapshot : null,
+        ataTerms: ataTerms || null,
+        paymentPlan: paymentPlan.length > 0
+          ? calculatedPaymentPlan.map(p => ({
+              label: p.label,
+              percent: p.percent,
+              amount: p.amount,
+              dueDescription: p.due_description || null,
+            }))
+          : null,
       },
     }
 
@@ -552,6 +566,10 @@ export default function EditQuotePage() {
     referencePerson, customerReference, projectAddress, detailLevel,
     showUnitPrices, showQuantities, personnummer, fastighetsbeteckning,
     templateStyle,
+    // A4: reservations.snapshot lästes redan inne i memon (templatePreviewPayload)
+    // men saknades i beroendelistan — dokumentet uppdaterades inte när ett
+    // förbehåll lades till eller togs bort. Betalplanen renderas nu också.
+    reservations.snapshot, paymentPlan.length, calculatedPaymentPlan,
   ])
 
   const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'

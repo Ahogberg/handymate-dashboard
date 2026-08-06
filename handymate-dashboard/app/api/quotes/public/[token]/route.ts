@@ -7,6 +7,7 @@ import { buildQuoteTemplateData, selectTemplate } from '@/lib/quote-templates'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 import { sanitizeTemplateDataForPublic } from '@/lib/quotes/public-document'
 import { stripPrintBar } from '@/lib/document-html'
+import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/business/quote-surface-select'
 
 // ETAPP 5 (offert-masterplan.md): dokument-HTML-rendering (Premium/Friendly)
 // kräver Node-runtime (react-dom/server via lib/quote-templates, samma som
@@ -81,11 +82,18 @@ export async function GET(
     // fält som /api/quotes/pdf hämtar (adress/bankgiro/plusgiro/swish/
     // webbplats/mallval) — behövs av buildQuoteTemplateData för att bygga
     // samma dokument som PDF:en/"Visa offert".
-    const { data: business } = await supabase
+    // Kolumnlistan är borttagen (2026-08-06, samma rotorsak som logotypsbuggen
+    // — se lib/business/quote-surface-select.ts). Den här listan 400:ade aldrig,
+    // men den utelämnade `vat_number` och `tagline`, som buildQuoteTemplateData
+    // läser. Följden var att KUNDENS offert saknade momsregistreringsnummer och
+    // företagets tagline medan hantverkarens live-canvas (som läser '*') visade
+    // dem — en tyst divergens mellan det man ser och det man skickar.
+    const { data: business, error: businessError } = await supabase
       .from('business_config')
-      .select('business_name, contact_name, contact_email, phone_number, address, service_area, website, org_number, f_skatt_registered, logo_url, accent_color, bankgiro, plusgiro, default_quote_terms, swish_number, quote_template_style')
+      .select(QUOTE_SURFACE_BUSINESS_SELECT)
       .eq('business_id', quote.business_id)
       .single()
+    logBusinessConfigError('quotes/public/[token]', businessError)
 
     // Check if already signed
     const alreadySigned = quote.status === 'accepted' && quote.signed_at

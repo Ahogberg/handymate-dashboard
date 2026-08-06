@@ -28,8 +28,10 @@ interface QuoteNewCustomerSectionProps {
   customers: Customer[]
   selectedCustomer: string
   setSelectedCustomer: (id: string) => void
-  validDays: number
-  setValidDays: (n: number) => void
+  /** @deprecated Giltighetstiden sätts i dokumentet ("Giltig till"-datumet).
+      Propparna finns kvar för anropskompatibilitet men används inte längre. */
+  validDays?: number
+  setValidDays?: (n: number) => void
   title: string
   setTitle: (s: string) => void
   description: string
@@ -52,8 +54,6 @@ export function QuoteNewCustomerSection({
   customers,
   selectedCustomer,
   setSelectedCustomer,
-  validDays,
-  setValidDays,
   title,
   setTitle,
   description,
@@ -130,21 +130,10 @@ export function QuoteNewCustomerSection({
               </div>
             )}
           </div>
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-              Giltighetstid
-            </label>
-            <select
-              value={validDays}
-              onChange={e => setValidDays(parseInt(e.target.value))}
-              className={INPUT_CLS}
-            >
-              <option value={14}>14 dagar</option>
-              <option value={30}>30 dagar</option>
-              <option value={60}>60 dagar</option>
-              <option value={90}>90 dagar</option>
-            </select>
-          </div>
+          {/* DUBBLETT BORTTAGEN (2026-08-06): giltighetstiden fanns både här
+              och som "Giltig till"-datum i dokumentet. Dokumentet är
+              sanningen (masterplanens princip 1) och visar dessutom det
+              faktiska datumet i stället för ett antal dagar. */}
         </div>
 
         <div>

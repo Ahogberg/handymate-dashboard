@@ -154,6 +154,24 @@ export interface QuoteTemplateQuote {
       punktlista i villkorssektionen, efter "Ej inkluderat". Tom/utelämnad →
       inget block alls. */
   reservations?: QuoteTemplateReservation[] | null
+  /** ÄTA-villkor (etapp A4, 2026-08-06) — vad som gäller vid ändringar och
+      tilläggsarbeten. Fältet har funnits i databasen och i redigeraren sedan
+      länge men renderades ALDRIG i kunddokumentet: hantverkaren fyllde i det
+      och kunden såg det aldrig. Renderas nu sist i villkorsstycket. */
+  ataTerms?: string | null
+  /** Betalplan (etapp A4) — samma lucka som ataTerms. Delbetalningar frysta
+      på offerten; renderas som en liten tabell efter summeringen. Tom/
+      utelämnad → inget block alls. */
+  paymentPlan?: QuoteTemplatePaymentPlanEntry[] | null
+}
+
+/** En rad i betalplanen som den visas för kunden. Speglar PaymentPlanEntry i
+    lib/types/quote.ts, men med bara de fält dokumentet faktiskt renderar. */
+export interface QuoteTemplatePaymentPlanEntry {
+  label: string
+  percent: number
+  amount: number
+  dueDescription?: string | null
 }
 
 /** Visningsnivå — speglar lib/quotes/display-level.ts DisplayLevel. */

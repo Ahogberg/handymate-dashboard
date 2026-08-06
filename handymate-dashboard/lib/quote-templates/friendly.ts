@@ -221,6 +221,11 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .reservations-title { font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
 .reservations ul { margin: 0; padding-left: 16px; }
 .reservations li { font-size: 11px; color: var(--muted); line-height: 1.7; margin-bottom: 5px; }
+/* Betalplan (etapp A4) — samma indrag som villkoren, håller ihop över sidbrytning. */
+.payment-plan { padding: 0 8px; margin-bottom: 12px; break-inside: avoid; page-break-inside: avoid; }
+.payment-plan-title { font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+.pp-row { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; color: var(--muted); line-height: 1.7; }
+.pp-amount { color: var(--ink); font-weight: 600; white-space: nowrap; }
 .reservations li strong { color: var(--ink); }
 .print-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--bg); padding: 12px 24px; display: flex; align-items: center; justify-content: center; gap: 12px; z-index: 100; }
 .print-btn { background: var(--teal); color: #fff; border: none; padding: 10px 24px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; }
@@ -317,9 +322,15 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
         .join('')}</ul></section>`
     : ''}
 
+  ${(data.quote.paymentPlan && data.quote.paymentPlan.length > 0)
+    ? `<section class="payment-plan"><p class="payment-plan-title">Betalplan</p>${data.quote.paymentPlan
+        .map(p => `<div class="pp-row"><span class="pp-label">${escapeHtml(p.label)}${p.dueDescription ? ` — ${escapeHtml(p.dueDescription)}` : ''}${p.percent > 0 ? ` (${p.percent} %)` : ''}</span><span class="pp-amount">${formatCurrency(p.amount)}</span></div>`)
+        .join('')}</section>`
+    : ''}
+
   <p class="terms">${data.quote.termsText
     ? escapeHtml(data.quote.termsText)
-    : `Offerten gäller till ${escapeHtml(data.quote.validUntilDate)}. ${data.quote.rotDeduction ? 'ROT-avdrag förutsätter att kund äger fastigheten och har utrymme i avdrag. ' : ''}Eventuellt tilläggsarbete debiteras enligt löpande räkning.`}${data.quote.warrantyText ? ' Garanti: ' + escapeHtml(data.quote.warrantyText) + '.' : ''}${data.quote.notIncluded ? ' Ej inkluderat: ' + escapeHtml(data.quote.notIncluded) + '.' : ''}</p>
+    : `Offerten gäller till ${escapeHtml(data.quote.validUntilDate)}. ${data.quote.rotDeduction ? 'ROT-avdrag förutsätter att kund äger fastigheten och har utrymme i avdrag. ' : ''}Eventuellt tilläggsarbete debiteras enligt löpande räkning.`}${data.quote.warrantyText ? ' Garanti: ' + escapeHtml(data.quote.warrantyText) + '.' : ''}${data.quote.notIncluded ? ' Ej inkluderat: ' + escapeHtml(data.quote.notIncluded) + '.' : ''}${data.quote.ataTerms ? ' Ändringar och tilläggsarbeten: ' + escapeHtml(data.quote.ataTerms) + '.' : ''}</p>
 
   <section class="card footer-card">
     ${data.business.orgNumber ? `<div><div class="l">Org.nr</div><div class="v">${escapeHtml(data.business.orgNumber)}</div></div>` : ''}

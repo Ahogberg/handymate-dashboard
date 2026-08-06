@@ -22,6 +22,16 @@ export const renderPremium: TemplateRenderFn = (data: QuoteTemplateData): string
         .join('')}</ul>`
     : ''
 
+  // Betalplan (etapp A4, 2026-08-06) — låg tidigare bara i databasen, ingen
+  // renderare läste den. Ligger sist i totalstacken: efter "Att betala" är
+  // nästa fråga "när betalar jag vad?".
+  const paymentPlan = data.quote.paymentPlan || []
+  const paymentPlanHtml = paymentPlan.length > 0
+    ? `<div class="payment-plan"><div class="payment-plan-title">Betalplan</div>${paymentPlan
+        .map(p => `<div class="total-row sub"><span class="lbl">${escapeHtml(p.label)}${p.dueDescription ? ` — ${escapeHtml(p.dueDescription)}` : ''}${p.percent > 0 ? ` (${p.percent} %)` : ''}</span><span class="val">${formatCurrency(p.amount)}</span></div>`)
+        .join('')}</div>`
+    : ''
+
   // Dolda rader (v90) utelämnas ur kundens dokument — priset ingår ändå i
   // summan, som räknas separat i quote-calculations och aldrig rör fältet.
   const itemsHtml = data.quote.items.filter(item => !item.isHidden).map(item => {
@@ -185,6 +195,9 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 .total-grand { margin-top: 10px; padding: 18px 20px; background: var(--dark); color: #fff; display: flex; justify-content: space-between; align-items: center; }
 .total-grand .lbl { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.7); }
 .total-grand .val { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800; letter-spacing: -0.01em; color: #fff; }
+/* Betalplan (etapp A4) — under "Att betala", håller ihop över sidbrytning. */
+.payment-plan { margin-top: 14px; break-inside: avoid; page-break-inside: avoid; }
+.payment-plan-title { font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
 .pay-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid; }
 .pay-card { border: 1px solid var(--line); background: #fff; padding: 14px 16px; break-inside: avoid; page-break-inside: avoid; }
 .pay-card .l { font-family: 'Syne', sans-serif; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.2em; color: var(--amber); margin-bottom: 4px; }
@@ -276,6 +289,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
           : `<strong>Giltighet.</strong> Offerten gäller till ${escapeHtml(data.quote.validUntilDate)}. Tilläggsarbete debiteras enligt löpande räkning efter skriftligt godkännande.`}</p>
         ${data.quote.warrantyText ? `<p><strong>Garanti.</strong> ${escapeHtml(data.quote.warrantyText)}</p>` : ''}
         ${data.quote.notIncluded ? `<p><strong>Ej inkluderat.</strong> ${escapeHtml(data.quote.notIncluded)}</p>` : ''}
+        ${data.quote.ataTerms ? `<p><strong>Ändringar och tilläggsarbeten.</strong> ${escapeHtml(data.quote.ataTerms)}</p>` : ''}
         ${reservationsHtml}
       </div>
       <div class="totals-stack">
@@ -285,6 +299,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
         ${rotRow}
         ${rutRow}
         <div class="total-grand"><span class="lbl">Att betala</span><span class="val">${formatCurrency(data.quote.amountToPay)}</span></div>
+        ${paymentPlanHtml}
       </div>
     </div>
 

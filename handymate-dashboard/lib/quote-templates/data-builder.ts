@@ -313,6 +313,21 @@ export function buildQuoteTemplateData(
             .filter((r: any) => r && typeof r.title === 'string' && typeof r.content === 'string')
             .map((r: any) => ({ title: r.title, content: r.content }))
         : null,
+      // Etapp A4 (2026-08-06): ÄTA-villkor och betalplan renderades aldrig i
+      // kunddokumentet trots att båda fanns i databasen och i redigeraren.
+      // Samma defensiva filtrering som reservationerna — en trasig rad i
+      // payment_plan får inte krascha hela offerten.
+      ataTerms: quote.ata_terms || null,
+      paymentPlan: Array.isArray(quote.payment_plan)
+        ? quote.payment_plan
+            .filter((p: any) => p && typeof p.label === 'string' && Number.isFinite(Number(p.amount)))
+            .map((p: any) => ({
+              label: p.label,
+              percent: Number(p.percent) || 0,
+              amount: Number(p.amount),
+              dueDescription: p.due_description || null,
+            }))
+        : null,
     },
   }
 }

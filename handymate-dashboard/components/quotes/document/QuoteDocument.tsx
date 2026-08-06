@@ -374,6 +374,34 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
           </div>
         </div>
 
+        {/* Betalplan (etapp A4, 2026-08-06). Fältet har funnits i databasen och
+            i redigeraren sedan länge men renderades ALDRIG för kunden — att
+            fylla i en delbetalningsplan var bortkastat arbete. Ligger direkt
+            efter summeringen: kunden har precis sett totalen och frågan som
+            följer är "när betalar jag vad?".
+
+            Procenten visas bara när den finns; en plan i rena kronor är fullt
+            giltig och ska inte tvingas visa "0 %". */}
+        {!isInvoice && data.quote.paymentPlan && data.quote.paymentPlan.length > 0 && (
+          <div className="payment-plan">
+            <p className="payment-plan-title">Betalplan</p>
+            <table>
+              <tbody>
+                {data.quote.paymentPlan.map((part, idx) => (
+                  <tr key={idx}>
+                    <td className="pp-label">
+                      {part.label}
+                      {part.dueDescription ? <span className="pp-due"> — {part.dueDescription}</span> : null}
+                    </td>
+                    <td className="pp-percent">{part.percent > 0 ? `${part.percent} %` : ''}</td>
+                    <td className="pp-amount">{formatCurrency(part.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Faktura-snapshot (invoice.bankgiro_number/plusgiro_number, satt vid
             skapandet av vissa av de åtta vägarna) föredras framför företagets
             LEVANDE inställning — historisk korrekthet om kontot bytts sedan
@@ -453,12 +481,23 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
               </>
             ) : null}
             {data.quote.warrantyText && <><br /><br /><strong>Garanti:</strong> {data.quote.warrantyText}</>}
+            {/* ÄTA (etapp A4): renderades aldrig — se kommentaren i static-
+                grenen nedan. Båda grenarna får samma tillägg så de inte kan
+                divergera. */}
+            {data.quote.ataTerms && <><br /><br /><strong>Ändringar och tilläggsarbeten:</strong> {data.quote.ataTerms}</>}
           </p>
         ) : (
           <p className="terms">
             <strong>Villkor.</strong> {data.quote.termsText || defaultTermsText(data)}
             {data.quote.notIncluded && <><br /><br /><strong>Ej inkluderat:</strong> {data.quote.notIncluded}</>}
             {data.quote.warrantyText && <><br /><br /><strong>Garanti:</strong> {data.quote.warrantyText}</>}
+            {/* ÄTA-villkor (etapp A4, 2026-08-06). quotes.ata_terms har funnits
+                i databasen och som eget fält i redigeraren, men ingen renderare
+                läste det — hantverkaren skrev vad som gäller vid tilläggsarbete
+                och kunden fick aldrig se det. Sist i villkorsstycket, med
+                utskriven rubrik i stället för förkortningen "ÄTA" som är
+                branschjargong kunden inte nödvändigtvis kan. */}
+            {data.quote.ataTerms && <><br /><br /><strong>Ändringar och tilläggsarbeten:</strong> {data.quote.ataTerms}</>}
           </p>
         )}
 

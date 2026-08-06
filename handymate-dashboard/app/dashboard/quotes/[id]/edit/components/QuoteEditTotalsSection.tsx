@@ -61,9 +61,23 @@ export function QuoteEditTotalsSection({
       </p>
 
       {/* Avdrags-kontroll (punkt 5): tydlig, ETT klick — ersätter den tidigare
-          gömda vägen via "Mer → ROT-detaljer". */}
+          gömda vägen via "Mer → ROT-detaljer".
+
+          Etapp A2 (2026-08-06): planen sa "gör togglen till ren visning", men
+          kartläggningen visade att de tre ROT-ytorna gör TRE olika saker —
+          den här sätter avdraget på ALLA rader i ett klick, per-rad-badgen
+          styr enskilda rader, och Mer-panelen samlar in personnumret. Att
+          ta bort bulkåtgärden hade tvingat fram radvis cykling på varje rad.
+          Det som faktiskt var dubbelt var BELOPPET: det stod både här och i
+          summeringsraderna nedan. Beloppet hör hemma i summeringen — här
+          står bara vad kontrollen gör. */}
       <div className="mb-4">
-        <p className="text-xs font-medium text-slate-500 mb-1.5">Avdrag</p>
+        <div className="flex items-baseline justify-between mb-1.5">
+          <p className="text-xs font-medium text-slate-500">Avdrag</p>
+          {activeDeductionType && (
+            <p className="text-xs text-slate-400">Ändra per rad i offerten</p>
+          )}
+        </div>
         <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
           {([
             { type: null, label: 'Inget avdrag' },
@@ -85,16 +99,6 @@ export function QuoteEditTotalsSection({
             )
           })}
         </div>
-        {activeDeductionType === 'rot' && totals.rotDeduction > 0 && (
-          <p className="mt-2 text-sm font-semibold text-primary-700">
-            ROT-avdrag: −{formatCurrency(totals.rotDeduction)}
-          </p>
-        )}
-        {activeDeductionType === 'rut' && totals.rutDeduction > 0 && (
-          <p className="mt-2 text-sm font-semibold text-primary-700">
-            RUT-avdrag: −{formatCurrency(totals.rutDeduction)}
-          </p>
-        )}
       </div>
 
       <div className="space-y-2">
