@@ -162,6 +162,16 @@ export default function OnboardingPage() {
         config.default_hourly_rate = data.priceMax
           ? Math.round(((data.priceMin || 0) + data.priceMax) / 2)
           : null
+
+        // Skatterytmen (v94) — det Karins bolagskalender räknar deadlines ur.
+        // Bara det som faktiskt besvarats skickas: `undefined` betyder att
+        // frågan hoppades över, och då ska kalendern säga att uppgiften
+        // saknas i stället för att anta något.
+        if (data.vatPeriod) config.vat_period = data.vatPeriod
+        if (typeof data.isEmployer === 'boolean') config.is_employer = data.isEmployer
+        // 0 = "brutet år" i knappvalet — månaden fylls i under Bolagsprofil.
+        if (data.fiscalYearEndMonth) config.fiscal_year_end_month = data.fiscalYearEndMonth
+        config.company_profile_source = 'user'
       }
 
       if (step === 3 && data.lisaNumber) {

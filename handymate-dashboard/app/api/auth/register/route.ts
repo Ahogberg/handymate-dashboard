@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
     }
 
-    const { email, password, businessName, displayName, contactName, phone, branch, secondaryBranches, serviceArea } = body
+    const { email, password, businessName, displayName, contactName, phone, branch, secondaryBranches, fSkatt, serviceArea } = body
 
     if (!email || !password || !businessName || !contactName) {
       return NextResponse.json({ error: 'Fyll i alla obligatoriska fält' }, { status: 400 })
@@ -71,6 +71,8 @@ export async function POST(request: NextRequest) {
         contact_email: email,
         phone_number: phone,
         branch: branch,
+        // Se kommentaren i Step2Business: värdet frågades men skickades aldrig.
+        f_skatt_registered: fSkatt !== false,
         // Fler branscher än en (v93) — sortimenten slås ihop vid seedning.
         // Huvudbranschen får aldrig ligga här också; CHECK-villkoret avvisar det.
         //

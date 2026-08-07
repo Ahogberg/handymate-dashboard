@@ -14,6 +14,18 @@ export interface OnboardingFormData {
    * en får han en halv artikelbank för ett helt jobb.
    */
   secondaryTrades?: string[]
+  /**
+   * Skatterytmen (v94) — det Karins bolagskalender räknar deadlines ur.
+   *
+   * Alla tre är frivilliga. `undefined` betyder att frågan hoppades över, och
+   * då pekar kalendern ut vad som saknas i stället för att anta något — en
+   * tom kalender som betyder "vi vet inte" får aldrig se ut som en som
+   * betyder "allt är lugnt".
+   */
+  vatPeriod?: string
+  isEmployer?: boolean
+  /** 12 = kalenderår · 0 = brutet år, månaden fylls i under Bolagsprofil. */
+  fiscalYearEndMonth?: number
   orgNumber?: string
   fSkatt?: boolean
   area?: string

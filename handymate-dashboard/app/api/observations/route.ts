@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +22,21 @@ export async function GET(request: NextRequest) {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // ═══ ROLLGRIND (2026-08-07) ═══
+    //
+    // Rutten körde tidigare bara getAuthenticatedBusiness — som faller
+    // tillbaka på business_users-uppslagning och alltså släpper in ANSTÄLLDA.
+    // Karins observationer handlar om ekonomi (marginaler, obetalda fakturor,
+    // förfallna kundfordringar) och Lars om projektlönsamhet. Allt det har
+    // legat öppet för hela personalen.
+    //
+    // Det blir värre i samma sekund bolagskalendern börjar skriva hit —
+    // moms, preliminärskatt och bokslut är inget en montör ska se i förbifarten.
+    const currentUser = await getCurrentUser(request, business.business_id)
+    if (!currentUser || !isOwnerOrAdmin(currentUser)) {
+      return NextResponse.json({ error: 'Endast ägare och administratör' }, { status: 403 })
     }
 
     const supabase = getServerSupabase()

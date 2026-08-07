@@ -156,6 +156,11 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
 
   'Ekonomi och lönsamhet': [
     {
+      route: 'observations',
+      requires: 'owner-admin',
+      why: 'Karins observationer om marginaler, obetalda fakturor och förfallna kundfordringar — plus bolagskalenderns moms, preliminärskatt och bokslut. Låg öppen för alla anställda fram till 2026-08-07.',
+    },
+    {
       route: 'analytics/economics',
       requires: 'see_financials',
       why: 'Fakturerat, obetalt, overhead, margin_target_percent, arbetskostnad — hela företagets resultat.',

@@ -275,6 +275,100 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
             </p>
           </div>
         </section>
+
+        {/* ── Skatterytmen ─────────────────────────────────────────────────
+             Tre frågor, inget mer. Det är EXAKT det som styr när momsen och
+             arbetsgivardeklarationen förfaller — resten av företagsprofilen
+             kan Karin räkna ut eller hämta.
+
+             Placerade HÄR och inte i steg 1: det steget har redan tretton
+             fält varav elva obligatoriska, och är det som avgör om någon
+             slutför registreringen. "Hur du jobbar" rymmer "hur du beskattas"
+             utan att göra vare sig steget eller frågan konstig.
+
+             Alla tre är frivilliga. Svarar man inte visar kalendern vad som
+             saknas i stället för att gissa — en tom kalender som betyder "vi
+             vet inte" får aldrig se ut som en som betyder "allt är lugnt". */}
+        <section>
+          <label className="ob-label">Din skatterytm</label>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ob-muted)', lineHeight: 1.5 }}>
+            Karin håller koll på moms och deklarationer åt dig. Tre frågor så hon räknar rätt —
+            du kan ändra dem senare.
+          </p>
+
+          <div style={{ marginBottom: 14 }}>
+            <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+              Hur ofta redovisar du moms?
+            </span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {[
+                { v: 'quarter', l: 'Varje kvartal' },
+                { v: 'month', l: 'Varje månad' },
+                { v: 'year', l: 'En gång om året' },
+                { v: 'none', l: 'Inte momsregistrerad' },
+              ].map(o => (
+                <button
+                  key={o.v}
+                  type="button"
+                  onClick={() => update({ vatPeriod: o.v })}
+                  className={`ob-chip ${data.vatPeriod === o.v ? 'selected' : ''}`}
+                  style={{ minHeight: 44 }}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+              Betalar du ut lön?
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[
+                { v: true, l: 'Ja, jag har anställda' },
+                { v: false, l: 'Nej' },
+              ].map(o => (
+                <button
+                  key={String(o.v)}
+                  type="button"
+                  onClick={() => update({ isEmployer: o.v })}
+                  className={`ob-chip ${data.isEmployer === o.v ? 'selected' : ''}`}
+                  style={{ minHeight: 44 }}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+              Följer ditt räkenskapsår kalenderåret?
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[
+                { v: 12, l: 'Ja, januari–december' },
+                { v: 0, l: 'Nej, brutet år' },
+              ].map(o => (
+                <button
+                  key={o.v}
+                  type="button"
+                  onClick={() => update({ fiscalYearEndMonth: o.v })}
+                  className={`ob-chip ${data.fiscalYearEndMonth === o.v ? 'selected' : ''}`}
+                  style={{ minHeight: 44 }}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+            {data.fiscalYearEndMonth === 0 && (
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--ob-muted)', lineHeight: 1.5 }}>
+                Du fyller i vilken månad ditt bokslut ligger under Inställningar → Bolagsprofil.
+              </p>
+            )}
+          </div>
+        </section>
       </div>
 
       <div className="ob-footer">

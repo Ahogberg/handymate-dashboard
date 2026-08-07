@@ -116,6 +116,20 @@ export async function PUT(request: NextRequest) {
         'phone_setup_type',
         'welcome_tour_seen',
         'website_url',
+        // ── Företagsprofilen (v94) ────────────────────────────────────────
+        // Karins bolagskalender räknar sina deadlines ur de här fyra.
+        //
+        // OBS: den här listan är den tysta fällan. `fSkatt` har funnits i
+        // onboardingens form-state sedan start men aldrig stått här — och
+        // har därför ALDRIG sparats. `f_skatt_registered` står på false för
+        // varje kund i produktion medan faktura- och ROT-koden läser den.
+        // Ett fält som inte står här försvinner utan att något klagar.
+        'vat_period',
+        'is_employer',
+        'fiscal_year_end_month',
+        'company_form',
+        'f_skatt_registered',
+        'company_profile_source',
       ] as const
       for (const col of ALLOWED_COLUMNS) {
         if (col in config) updates[col] = (config as Record<string, unknown>)[col]

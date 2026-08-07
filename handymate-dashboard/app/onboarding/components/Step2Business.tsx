@@ -22,6 +22,7 @@ import OnboardingHeader from './OnboardingHeader'
 import type { OnboardingFormData } from '../types-redesign'
 import { TRADES } from '../constants'
 import { normalizeWebsiteUrl, type ScrapedExtraction } from '@/lib/onboarding/website-scrape'
+import { checkOrgNumber } from '@/lib/karin/org-number'
 import { readStep2Draft, writeStep2Draft, clearStep2Draft } from '../step2-draft'
 
 interface Step2Props {
@@ -305,7 +306,9 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
   const validBusiness = !!(
     data.companyName?.trim() &&
     data.trade &&
-    data.orgNumber?.length === 11 &&
+    // Längdkontrollen släppte igenom feltryck. checkOrgNumber räknar
+    // kontrollsiffran — se lib/karin/org-number.ts.
+    checkOrgNumber(data.orgNumber).valid &&
     data.area?.trim() &&
     data.paymentMethod &&
     data.paymentNumber?.trim()
@@ -387,6 +390,13 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
             phone: cleanPhone,
             branch: data.trade,
             secondaryBranches: (data.secondaryTrades || []).filter(s => s && s !== data.trade),
+            // F-skattsedeln har frågats i onboardingen sedan start (växeln
+            // ovan) men värdet har ALDRIG skickats någonstans — kolumnen
+            // f_skatt_registered stod därför på false för varje kund i
+            // produktion, medan faktura- och ROT-koden läser den. Rättat
+            // 2026-08-07; Karins bolagskalender behöver fältet dessutom för
+            // att veta om preliminärskatten gäller.
+            fSkatt: data.fSkatt !== false,
             serviceArea: data.area,
             orgNumber: data.orgNumber || null,
             bankgiro: data.paymentMethod === 'bankgiro' ? data.paymentNumber?.trim() : null,
