@@ -5,6 +5,7 @@ import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { calculateQuoteTotals } from '@/lib/quote-calculations'
 import { applyAnnualCap } from '@/lib/quotes/apply-annual-cap'
 import { resolveReferencePerson } from '@/lib/quotes/resolve-reference-person'
+import { lockedChanges, lockedChangeMessage } from '@/lib/quotes/lifecycle'
 import type { QuoteItem } from '@/lib/types/quote'
 
 /**
@@ -684,6 +685,29 @@ export async function PUT(request: NextRequest) {
 
     if (!existing) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
+    }
+
+    // ═══ LIVSCYKELSPÄRR (2026-08-07) ═══
+    //
+    // Statusen hämtades förut bara för att sätta `sent_at`. Ingen gren avvisade
+    // `accepted` eller `signed`, så en offert kunden sagt ja till kunde skrivas
+    // om i efterhand — priser, rader, villkor — medan `signature_data` och
+    // `signed_at` stod kvar orörda. Kundens signeringslänk läser den muterbara
+    // raden, så signaturen pekade på ett annat innehåll än det som signerades.
+    //
+    // Endast det KOMMERSIELLA innehållet låses. Status, projekt- och
+    // affärskoppling får ändras vidare — annars går arbetsflödet efter accept
+    // sönder och folk kringgår spärren i stället för att versionera.
+    const lasta = lockedChanges(existing.status, Object.keys(body))
+    if (lasta.length > 0) {
+      return NextResponse.json(
+        {
+          error: lockedChangeMessage(existing.status),
+          locked_fields: lasta,
+          quote_status: existing.status,
+        },
+        { status: 409 },
+      )
     }
 
     const updates: Record<string, any> = {
