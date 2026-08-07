@@ -462,6 +462,8 @@ async function executeQuoteGeneration(
       const laborTotal = items.filter((i: any) => i.type === 'labor').reduce((s: number, i: any) => s + i.total, 0)
       const materialTotal = items.filter((i: any) => i.type !== 'labor').reduce((s: number, i: any) => s + i.total, 0)
       const subtotal = laborTotal + materialTotal
+      const vatAmount = Math.round(subtotal * 0.25 * 100) / 100
+      const total = Math.round((subtotal + vatAmount) * 100) / 100
 
       const { data: quote, error: quoteErr } = await supabase
         .from('quotes')
@@ -473,10 +475,10 @@ async function executeQuoteGeneration(
           items,
           labor_total: laborTotal,
           material_total: materialTotal,
-          total: subtotal,
+          subtotal,
           vat_rate: 25,
-          vat: Math.round(subtotal * 0.25),
-          total_with_vat: Math.round(subtotal * 1.25),
+          vat_amount: vatAmount,
+          total,
           rot_rut_type: aiQuote.suggestedDeductionType !== 'none' ? aiQuote.suggestedDeductionType : null,
           status: 'draft',
           valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -493,9 +495,9 @@ async function executeQuoteGeneration(
       // Länka offert till deal
       await supabase.from('deal').update({ quote_id: quote!.quote_id }).eq('id', dealId)
 
-      await logDealFlowActivity(businessId, dealId, `AI-offert genererad: ${aiQuote.jobTitle} (${Math.round(subtotal)} kr exkl moms)`)
+      await logDealFlowActivity(businessId, dealId, `AI-offert genererad: ${aiQuote.jobTitle} (${Math.round(total)} kr inkl moms)`)
 
-      return { executed: true, data: { quote_id: quote!.quote_id, total: subtotal } }
+      return { executed: true, data: { quote_id: quote!.quote_id, total } }
     } catch (aiErr: any) {
       console.error('[DealFlow] AI-offertgenerering misslyckades:', aiErr.message)
       return { executed: false, reason: `AI-offertgenerering misslyckades: ${aiErr.message}` }
