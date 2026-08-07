@@ -33,15 +33,13 @@ const BASE_TABLES = [
 ]
 
 /** Skapade manuellt i Supabase-dashboarden — bekräftat i bruk, men utan
-    migrationsfil. TODO: skriv ikapp sql-filer; case_record är trolig död
-    kvarleva (1 referens, inget skapar/läser rader) — utred och ta bort. */
+    migrationsfil. TODO: skriv ikapp sql-filer. */
 const MANUAL_TABLES = [
   'customer_activity',
   'sms_campaign',
   'sms_campaign_recipient',
   'material_order',
   'human_followup_queue',
-  'case_record',
 ]
 
 function walk(dir: string, out: string[] = []): string[] {

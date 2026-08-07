@@ -102,21 +102,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true })
       }
 
-      case 'update_case_status': {
-        const { caseId, status } = data
-        
-        const { error } = await supabase
-          .from('case_record')
-          .update({
-            status: status,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('case_id', caseId)
-
-        if (error) throw error
-        return NextResponse.json({ success: true })
-      }
-
       case 'create_customer': {
         const { name, phone_number, email, address_line, personal_number, property_designation,
                 customer_type, org_number, contact_person, invoice_address, visit_address, reference, apartment_count,
