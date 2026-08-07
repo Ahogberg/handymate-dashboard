@@ -43,16 +43,12 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
       .order('created_at', { ascending: false })
 
     if (projectsError) {
+      // Detaljerna stannar i loggen. Rutten är öppen för vem som helst med en
+      // portallänk, och `message`/`code`/`details`/`hint` från PostgREST
+      // beskriver tabeller, kolumner och policyer — samma sorts inre detaljer
+      // som inte ska nå kunden.
       console.error('[portal/projects] query error:', projectsError)
-      return NextResponse.json(
-        {
-          error: projectsError.message,
-          code: projectsError.code,
-          details: projectsError.details,
-          hint: projectsError.hint,
-        },
-        { status: 500 },
-      )
+      return NextResponse.json({ error: 'Kunde inte hämta projekten just nu' }, { status: 500 })
     }
 
     // Sortering: aktiva projekt först (planning/active/in_progress/etc),
@@ -122,35 +118,19 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
           .limit(12),
       ])
 
-      // DEBUG (TD-22 audit): ÄTA-4 saknas i API-respons trots att SQL-
-      // simulering returnerar 4 rader. Loggar exakt vad Supabase-klienten
-      // ser per projekt så vi kan skilja klient vs server-bug.
-      console.log('[portal/projects] ata fetch:', {
-        project_id: p.project_id,
-        count: ataRes.data?.length ?? 0,
-        ata_numbers: ataRes.data?.map((a: any) => a.ata_number) ?? [],
-        ata_change_ids: ataRes.data?.map((a: any) => a.change_id) ?? [],
-        error_message: ataRes.error?.message,
-        error_code: ataRes.error?.code,
-        error_details: ataRes.error?.details,
-      })
-
-      // Separat count-query — om count_from_server > rows_received är det
-      // klienten som tappar rader. Om count = rows_received är det server
-      // som faktiskt returnerar färre rader. { head: true } skickar bara
-      // count-header, ingen data.
-      const { count: ataCountFromServer, error: ataCountError } = await supabase
-        .from('project_change')
-        .select('*', { count: 'exact', head: true })
-        .eq('project_id', p.project_id)
-        .in('status', ['sent', 'signed', 'approved'])
-
-      console.log('[portal/projects] ata count check:', {
-        project_id: p.project_id,
-        rows_received: ataRes.data?.length ?? 0,
-        count_from_server: ataCountFromServer,
-        count_error: ataCountError?.message,
-      })
+      // Felsökningen från TD-22:s ÄTA-jakt är borttagen (2026-08-07). Den
+      // loggade hela ÄTA-listan per projekt vid VARJE kundvisning och körde
+      // dessutom en extra count-fråga per projekt bara för att jämföra
+      // radantal — en N+1 på en kundvänd route, kvar långt efter att jakten
+      // var över.
+      //
+      // Ett verkligt fel ska däremot inte förbli tyst: en misslyckad
+      // ÄTA-hämtning gav förut en tom lista utan spår.
+      if (ataRes.error) {
+        console.error('[portal/projects] ÄTA-hämtning misslyckades:', ataRes.error.message, {
+          project_id: p.project_id,
+        })
+      }
 
       return {
         ...p,
