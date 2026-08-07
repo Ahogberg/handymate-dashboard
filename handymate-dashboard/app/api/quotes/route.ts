@@ -3,55 +3,9 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { calculateQuoteTotals } from '@/lib/quote-calculations'
-import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
+import { applyAnnualCap } from '@/lib/quotes/apply-annual-cap'
 import { resolveReferencePerson } from '@/lib/quotes/resolve-reference-person'
 import type { QuoteItem } from '@/lib/types/quote'
-
-/**
- * Årstakskontroll (kodrevision 2026-08-03, Fix 3): calculateQuoteTotals
- * applicerar bara det statiska 30%/50%-taket PER OFFERT — inte kundens
- * redan förbrukade ROT/RUT-utrymme i år. app/api/invoices/from-quote och
- * agentens tool-router (app/api/agent/trigger/tool-router.ts) gör redan
- * denna kontroll; offert-skapande/uppdatering gjorde det INTE, vilket kunde
- * utlova ett fullt avdrag i offerten som sedan kapades på fakturan —
- * chockfaktura för kunden. Körs bara när offerten har en customer_id;
- * offerter utan kund behåller det statiska (okapade) beloppet.
- */
-async function applyAnnualCap(
-  businessId: string,
-  customerId: string | null | undefined,
-  vatRate: number,
-  totals: { rotWorkCost: number; rutWorkCost: number; subtotal: number; afterDiscount: number; total: number },
-  current: { rotDeduction: number; rotCustomerPays: number; rutDeduction: number; rutCustomerPays: number },
-): Promise<{ rotDeduction: number; rotCustomerPays: number; rutDeduction: number; rutCustomerPays: number; capped: boolean; warning?: string }> {
-  if (!customerId) return { ...current, capped: false }
-
-  const discountFactor = totals.subtotal > 0 ? totals.afterDiscount / totals.subtotal : 1
-  let { rotDeduction, rotCustomerPays, rutDeduction, rutCustomerPays } = current
-  let capped = false
-  let warning: string | undefined
-
-  if (totals.rotWorkCost > 0) {
-    const cap = await calculateCappedDeduction(customerId, businessId, 'rot', totals.rotWorkCost, { vatRate, discountFactor })
-    if (cap.capped) {
-      capped = true
-      warning = cap.warning
-      rotDeduction = cap.deduction
-      rotCustomerPays = totals.total - rotDeduction
-    }
-  }
-  if (totals.rutWorkCost > 0) {
-    const cap = await calculateCappedDeduction(customerId, businessId, 'rut', totals.rutWorkCost, { vatRate, discountFactor })
-    if (cap.capped) {
-      capped = true
-      warning = warning ? `${warning} ${cap.warning}` : cap.warning
-      rutDeduction = cap.deduction
-      rutCustomerPays = totals.total - rutDeduction
-    }
-  }
-
-  return { rotDeduction, rotCustomerPays, rutDeduction, rutCustomerPays, capped, warning }
-}
 
 /**
  * Produktbank (v67): invariant-backstopp för arbete/material-spliten.

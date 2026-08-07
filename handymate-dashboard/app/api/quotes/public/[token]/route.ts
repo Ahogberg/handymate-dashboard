@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { calculateQuoteTotals } from '@/lib/quote-calculations'
+import { applyAnnualCap } from '@/lib/quotes/apply-annual-cap'
 import { resolveDisplayLevel, groupItemsForSummary } from '@/lib/quotes/display-level'
 import { buildQuoteTemplateData, selectTemplate } from '@/lib/quote-templates'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
@@ -521,7 +522,27 @@ export async function POST(
         ...r,
         option_selected: r.item_type === 'option' ? chosen.has(r.id) : r.option_selected,
       }))
-      recomputed = calculateQuoteTotals(effectiveItems as any, quote.discount_percent ?? 0, quote.vat_rate ?? 25)
+      const vatRate = quote.vat_rate ?? 25
+      const uncapped = calculateQuoteTotals(effectiveItems as any, quote.discount_percent ?? 0, vatRate)
+      const cap = await applyAnnualCap(
+        quote.business_id,
+        quote.customer_id,
+        vatRate,
+        uncapped,
+        {
+          rotDeduction: uncapped.rotDeduction,
+          rotCustomerPays: uncapped.rotCustomerPays,
+          rutDeduction: uncapped.rutDeduction,
+          rutCustomerPays: uncapped.rutCustomerPays,
+        },
+      )
+      recomputed = {
+        ...uncapped,
+        rotDeduction: cap.rotDeduction,
+        rotCustomerPays: cap.rotCustomerPays,
+        rutDeduction: cap.rutDeduction,
+        rutCustomerPays: cap.rutCustomerPays,
+      }
       // Juridiskt spår: valda/bortvalda tillval med belopp vid signeringsögonblicket
       signedOptions = optionRows.map(r => ({
         id: r.id, name: r.description, total: r.total, selected: chosen.has(r.id),
