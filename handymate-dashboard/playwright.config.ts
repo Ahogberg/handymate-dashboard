@@ -5,6 +5,9 @@ try { require('dotenv').config({ path: '.env.test' }) } catch { /* dotenv option
 
 export default defineConfig({
   testDir: './tests',
+  // Riktiga DB-integrationstester är destruktiva och körs endast via
+  // playwright.integration.config.ts / npm run test:tenant-isolation.
+  testIgnore: /.*\.integration\.spec\.ts/,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
