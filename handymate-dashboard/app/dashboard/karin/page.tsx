@@ -8,6 +8,7 @@ import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useToast } from '@/components/Toast'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import type { CalendarEvent, MonthGroup } from '@/lib/karin/calendar'
+import type { Kvittens } from '@/lib/karin/handled-store'
 
 /**
  * Karins bolagskalender (2026-08-07).
@@ -79,7 +80,7 @@ export default function KarinKalenderPage() {
   const [data, setData] = useState<CalendarResponse | null>(null)
   const [laddar, setLaddar] = useState(true)
   const [fel, setFel] = useState<string | null>(null)
-  const [hanterade, setHanterade] = useState<Set<string>>(new Set())
+  const [kvittenser, setKvittenser] = useState<Map<string, Kvittens>>(new Map())
 
   // Lager två av rollskyddet. API:et är lager tre — en sida som bara döljer
   // sig är ingen spärr.
@@ -94,12 +95,14 @@ export default function KarinKalenderPage() {
       .then(d => {
         if (!aktiv) return
         setData(d)
-        // Serverns hanterat-lista är sanningen; lokal state är bara ekot.
-        const fransServer: string[] = (d.months || [])
-          .flatMap((m: { events: CalendarEvent[] }) => m.events)
-          .filter((e: CalendarEvent) => e.handled)
-          .map((e: CalendarEvent) => e.id)
-        if (fransServer.length > 0) setHanterade(new Set(fransServer))
+        // Serverns kvittenser är sanningen; lokal state är bara ekot.
+        const fransServer: Array<[string, Kvittens]> = [
+          ...(d.months || []).flatMap((m: { events: CalendarEvent[] }) => m.events),
+          ...(d.attention || []),
+        ]
+          .filter((e: any) => e?.kvittens)
+          .map((e: any) => [e.id, e.kvittens as Kvittens])
+        if (fransServer.length > 0) setKvittenser(new Map(fransServer))
       })
       .catch(() => { if (aktiv) setFel('Kunde inte hämta kalendern just nu.') })
       .finally(() => { if (aktiv) setLaddar(false) })
@@ -115,28 +118,41 @@ export default function KarinKalenderPage() {
   }
 
   /**
-   * Markerar hanterat och SPARAR det.
+   * Kvitterar, skjuter upp eller ångrar — och SPARAR det.
    *
-   * Optimistiskt: raden försvinner direkt. Misslyckas skrivningen kommer den
-   * tillbaka och det sägs — en knapp som ser ut att ha gjort något den inte
-   * gjort är värre än en som är trög.
+   * Optimistiskt: raden ändras direkt. Misslyckas skrivningen återställs den och
+   * det sägs — en knapp som ser ut att ha gjort något den inte gjort är värre än
+   * en som är trög.
+   *
+   * Ingen av åtgärderna påstår att något är inlämnat, och ingen av dem tystar de
+   * sista dagarna före förfall. Se lib/karin/handled-store.ts.
    */
-  async function markeraHanterad(id: string) {
-    setHanterade(prev => new Set(prev).add(id))
+  async function sattKvittens(id: string, action: 'acknowledge' | 'snooze' | 'undo', until?: string) {
+    const innan = kvittenser
+    const nasta = new Map(innan)
+    if (action === 'undo') nasta.delete(id)
+    else nasta.set(id, { id, state: action === 'snooze' ? 'snoozed' : 'acknowledged', actor: null, at: new Date().toISOString(), until })
+    setKvittenser(nasta)
+
     try {
       const res = await fetch('/api/karin/calendar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event_id: id, handled: true }),
+        body: JSON.stringify({ event_id: id, action, until }),
       })
       if (!res.ok) throw new Error(String(res.status))
+      if (action === 'undo') toast.success('Ångrat — påminnelserna är igång igen')
     } catch {
-      setHanterade(prev => { const n = new Set(prev); n.delete(id); return n })
+      setKvittenser(innan)
       toast.error('Kunde inte spara — försök igen')
     }
   }
 
-  const attention = (data?.attention || []).filter(e => !hanterade.has(e.id))
+  // Kvitterade lämnar uppmärksamhetskön — men de försvinner INTE ur
+  // månadslistan nedanför, där de får sin etikett och sin ångra-knapp. En post
+  // som försvinner helt går inte att ångra, och det var precis den fällan som
+  // gjorde den gamla knappen farlig.
+  const attention = (data?.attention || []).filter(e => !kvittenser.has(e.id))
 
   return (
     <div className="bg-[#F8FAFC] min-h-screen">
@@ -205,7 +221,8 @@ export default function KarinKalenderPage() {
                     <EventCard
                       key={e.id}
                       event={e}
-                      onHandled={() => { void markeraHanterad(e.id) }}
+                      onHandled={() => { void sattKvittens(e.id, 'acknowledge') }}
+                      onSnooze={() => { void sattKvittens(e.id, 'snooze', snoozeDatum(e.due_date)) }}
                     />
                   ))}
                 </div>
@@ -241,7 +258,12 @@ export default function KarinKalenderPage() {
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">{m.label}</h3>
                     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100">
                       {m.events.map(e => (
-                        <MonthRow key={e.id} event={e} handled={hanterade.has(e.id)} />
+                        <MonthRow
+                          key={e.id}
+                          event={e}
+                          kvittens={kvittenser.get(e.id)}
+                          onUndo={() => { void sattKvittens(e.id, 'undo') }}
+                        />
                       ))}
                     </div>
                   </div>
@@ -264,7 +286,24 @@ export default function KarinKalenderPage() {
   )
 }
 
-function EventCard({ event, onHandled }: { event: CalendarEvent; onHandled: () => void }) {
+/**
+ * Hur långt "Påminn senare" skjuter fram.
+ *
+ * En vecka, eller halvvägs till förfall om det är närmare än så. Servern kapar
+ * ändå allt som skulle sträcka sig in i de sista dagarna — det här är bara ett
+ * rimligt förval, inte spärren.
+ */
+function snoozeDatum(forfall: string): string {
+  const idag = new Date()
+  const due = new Date(`${forfall}T00:00:00Z`)
+  const dagarKvar = Math.round((due.getTime() - idag.getTime()) / 86400000)
+  const fram = Math.max(1, Math.min(7, Math.floor(dagarKvar / 2)))
+  const d = new Date(idag)
+  d.setDate(d.getDate() + fram)
+  return d.toISOString().slice(0, 10)
+}
+
+function EventCard({ event, onHandled, onSnooze }: { event: CalendarEvent; onHandled: () => void; onSnooze: () => void }) {
   const forfallen = dagarKvar(event.due_date) < 0
 
   return (
@@ -299,13 +338,28 @@ function EventCard({ event, onHandled }: { event: CalendarEvent; onHandled: () =
       )}
 
       <div className="flex items-center gap-2 flex-wrap">
+        {/*
+          "Kvittera" betyder "jag har sett den" — inte "den är inlämnad". Ordvalet
+          är medvetet: Karin kan inte veta om deklarationen är gjord, och en knapp
+          som hette "Klart" hade påstått det.
+
+          Påminnelserna återkommer ändå de sista dagarna före förfall, oavsett
+          vilken av knapparna som tryckts.
+        */}
         <button
           type="button"
           onClick={onHandled}
           className="inline-flex items-center gap-1.5 h-[38px] px-4 bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold rounded-xl transition-colors"
         >
           <Check className="w-4 h-4" />
-          Markera hanterad
+          Kvittera
+        </button>
+        <button
+          type="button"
+          onClick={onSnooze}
+          className="inline-flex items-center gap-1.5 h-[38px] px-4 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
+        >
+          Påminn senare
         </button>
         <a
           href={event.source_url}
@@ -321,21 +375,44 @@ function EventCard({ event, onHandled }: { event: CalendarEvent; onHandled: () =
   )
 }
 
-function MonthRow({ event, handled }: { event: CalendarEvent; handled: boolean }) {
+/**
+ * En rad i månadslistan.
+ *
+ * Här — inte i uppmärksamhetskön — bor ångra-knappen. En kvitterad post lämnar
+ * kön men blir kvar här med sin etikett, så beslutet alltid går att ta tillbaka.
+ * Etiketterna säger vad ägaren gjort ("Kvitterad", "Påminner igen"), aldrig att
+ * skyldigheten är uppfylld.
+ */
+function MonthRow({ event, kvittens, onUndo }: {
+  event: CalendarEvent
+  kvittens?: Kvittens
+  onUndo: () => void
+}) {
   const dag = new Date(event.due_date + 'T12:00:00').getDate()
 
   return (
-    <div className={`flex items-center gap-3 px-4 py-3 ${handled ? 'opacity-50' : ''}`}>
+    <div className={`flex items-center gap-3 px-4 py-3 ${kvittens ? 'opacity-60' : ''}`}>
       <span className="font-heading text-[13px] font-semibold text-primary-700 w-6 shrink-0 tabular-nums">{dag}</span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-medium text-slate-900 truncate">{event.title}</span>
         <span className="block text-xs text-slate-400 truncate">
           {event.authority} · {event.period_label}
+          {kvittens?.actor && ` · av ${kvittens.actor}`}
         </span>
       </span>
-      {handled ? (
-        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary-700 bg-primary-50 rounded-full px-2 py-0.5 shrink-0">
-          <Check className="w-3 h-3" /> Hanterad
+      {kvittens ? (
+        <span className="flex items-center gap-2 shrink-0">
+          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary-700 bg-primary-50 rounded-full px-2 py-0.5">
+            <Check className="w-3 h-3" />
+            {kvittens.state === 'snoozed' ? 'Påminner igen' : 'Kvitterad'}
+          </span>
+          <button
+            type="button"
+            onClick={onUndo}
+            className="text-xs text-slate-500 hover:text-primary-700 underline underline-offset-2 transition-colors"
+          >
+            Ångra
+          </button>
         </span>
       ) : (
         <span className="text-xs text-slate-400 shrink-0 whitespace-nowrap">{nedrakning(event.due_date)}</span>

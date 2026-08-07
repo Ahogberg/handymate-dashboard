@@ -1,8 +1,15 @@
 /**
- * Facit för hanterat-markeringarna (2026-08-07).
+ * Facit för Karins kvittenser (N4, 2026-08-07).
  *
- * Två saker vaktas: att en trasig preferens aldrig fäller kalendern, och att
- * listan gallras så den inte växer för alltid.
+ * ═══ FELET SOM VAKTAS ═══
+ *
+ * Tidigare fanns ett enda läge, "hanterad", och deadline-cronen gjorde
+ * `if (hanterade.has(e.id)) continue`. Påminnelserna går ut 14 dagar, 3 dagar och
+ * på dagen — en bock fjorton dagar i förväg tystade alltså ALLA tre. Ägaren kunde
+ * bocka av en momsdeklaration och sedan aldrig höra talas om den igen.
+ *
+ * Det viktigaste testet i filen är därför `sista anflygningen går inte att tysta`.
+ * Går det sönder är avbockningsknappen livsfarlig igen.
  *
  * Körs utan browser/session:
  *   npx playwright test tests/karin-handled-store.spec.ts --no-deps
@@ -10,103 +17,163 @@
 import { test, expect } from '@playwright/test'
 import {
   dateFromEventId,
+  parseEntries,
   parseHandled,
-  pruneHandled,
-  applyHandledChange,
+  suppresses,
+  pruneEntries,
+  applyKvittens,
+  serializeEntries,
+  SISTA_ANFLYGNING_DAGAR,
+  type Kvittens,
 } from '../lib/karin/handled-store'
 
-const IDAG = new Date('2026-08-07T12:00:00')
+/** Momsdeklaration 12 augusti 2026 — id:t bär datumet, det är hela poängen. */
+const MOMS = 'regel:moms:2026-08-12'
+const d = (s: string) => new Date(`${s}T09:00:00Z`)
 
-test.describe('datumet ligger i id:t', () => {
-  test('plockas ut ur ett regelhändelse-id', () => {
-    // Hela poängen med ett stabilt id i stället för ett slumpat.
-    expect(dateFromEventId('regel:moms:2026-08-12')).toBe('2026-08-12')
-    expect(dateFromEventId('regel:arsredovisning:2027-07-30')).toBe('2027-07-30')
-  })
-
-  test('id utan datum ger null i stället för att gissa', () => {
-    expect(dateFromEventId('egen:nagot')).toBeNull()
-    expect(dateFromEventId('')).toBeNull()
-  })
+const kvittens = (över: Partial<Kvittens> = {}): Kvittens => ({
+  id: MOMS,
+  state: 'acknowledged',
+  actor: 'andreas',
+  at: '2026-07-20T09:00:00.000Z',
+  ...över,
 })
 
-test.describe('EN TRASIG PREFERENS FÄLLER ALDRIG KALENDERN', () => {
-  test('skräp ger tom mängd, inte ett fel', () => {
-    // En kalender som vägrar rendera för att en preferens är korrupt är sämre
-    // än en som glömt vad du bockat av.
-    for (const raw of ['inte json', '{"a":1}', '42', '"text"', 'null', '']) {
-      expect(parseHandled(raw).size, raw).toBe(0)
+test.describe('den bärande invarianten', () => {
+  test('sista anflygningen går inte att tysta', () => {
+    // Tre dagar före förfall och närmare: ingenting tystar. Det är den regel som
+    // gör knappen säker att ha över huvud taget.
+    for (const dag of ['2026-08-09', '2026-08-10', '2026-08-11', '2026-08-12']) {
+      expect(suppresses(kvittens(), d(dag)), `${dag} skulle tystas`).toBe(false)
     }
   })
 
-  test('null och undefined kraschar inte', () => {
-    expect(parseHandled(null).size).toBe(0)
-    expect(parseHandled(undefined).size).toBe(0)
+  test('en kvittens tystar de tidiga påminnelserna', () => {
+    // Fjorton dagar ut ska bocken göra nytta — annars är den meningslös.
+    expect(suppresses(kvittens(), d('2026-07-29'))).toBe(true)
   })
 
-  test('en giltig lista läses', () => {
-    const s = parseHandled('["regel:moms:2026-08-12","regel:agi:2026-08-17"]')
-    expect(s.size).toBe(2)
-    expect(s.has('regel:moms:2026-08-12')).toBe(true)
+  test('snooze kan inte sträckas in i sista anflygningen', () => {
+    // Ber någon om att bli påmind efter deadline kapas datumet i stället för att
+    // avvisas. Avsikten är rimlig; bortre gränsen är inte förhandlingsbar.
+    const ut = applyKvittens([], MOMS, { state: 'snoozed', actor: 'a', until: '2026-08-20' }, d('2026-07-01'))
+    expect(ut[0].until).toBe('2026-08-09')
+    expect(suppresses(ut[0], d('2026-08-09'))).toBe(false)
   })
 
-  test('icke-strängar i listan sållas bort', () => {
-    expect(parseHandled('["ok", 42, null, {"a":1}]').size).toBe(1)
-  })
-})
-
-test.describe('GALLRINGEN — annars växer listan för alltid', () => {
-  test('gamla markeringar faller bort', () => {
-    // Tolv AGI om året plus fyra moms blir hundratals rader på några år.
-    const kvar = pruneHandled(['regel:moms:2020-02-12', 'regel:moms:2026-08-12'], IDAG)
-    expect(kvar).toEqual(['regel:moms:2026-08-12'])
-  })
-
-  test('nyligen passerade behålls', () => {
-    // Precis passerat är fortfarande intressant — man vill se att man bockat av.
-    const kvar = pruneHandled(['regel:agi:2026-07-13'], IDAG)
-    expect(kvar).toHaveLength(1)
-  })
-
-  test('framtida behålls alltid', () => {
-    expect(pruneHandled(['regel:moms:2027-05-12'], IDAG)).toHaveLength(1)
-  })
-
-  test('id utan datum behålls — vi slänger inte det vi inte förstår', () => {
-    expect(pruneHandled(['egen:vad-som-helst'], IDAG)).toEqual(['egen:vad-som-helst'])
+  test('gränsen är tre dagar', () => {
+    expect(SISTA_ANFLYGNING_DAGAR).toBe(3)
   })
 })
 
-test.describe('att bocka av och ångra', () => {
-  test('lägger till', () => {
-    const ut = applyHandledChange(new Set(), 'regel:moms:2026-08-12', true, IDAG)
-    expect(ut).toContain('regel:moms:2026-08-12')
+test.describe('snooze', () => {
+  test('tystar fram till datumet och släpper sedan', () => {
+    const k = kvittens({ state: 'snoozed', until: '2026-08-01' })
+    expect(suppresses(k, d('2026-07-31'))).toBe(true)
+    expect(suppresses(k, d('2026-08-01'))).toBe(false)
   })
 
-  test('tar bort', () => {
-    const ut = applyHandledChange(new Set(['regel:moms:2026-08-12']), 'regel:moms:2026-08-12', false, IDAG)
-    expect(ut).toEqual([])
+  test('snooze utan datum tystar ingenting', () => {
+    // Hellre en påminnelse för mycket än en evig tystnad från en trasig post.
+    expect(suppresses(kvittens({ state: 'snoozed' }), d('2026-07-01'))).toBe(false)
+  })
+})
+
+test.describe('ångra', () => {
+  test('tar bort posten helt', () => {
+    const efter = applyKvittens([kvittens()], MOMS, null, d('2026-07-25'))
+    expect(efter).toEqual([])
   })
 
-  test('att bocka av två gånger ger ingen dubblett', () => {
-    let ut = applyHandledChange(new Set(), 'a:2026-08-12', true, IDAG)
-    ut = applyHandledChange(new Set(ut), 'a:2026-08-12', true, IDAG)
-    expect(ut).toEqual(['a:2026-08-12'])
+  test('en ny kvittens ersätter den gamla i stället för att dubbleras', () => {
+    const ett = applyKvittens([], MOMS, { state: 'acknowledged', actor: 'a' }, d('2026-07-20'))
+    const två = applyKvittens(ett, MOMS, { state: 'snoozed', actor: 'b', until: '2026-08-01' }, d('2026-07-21'))
+    expect(två).toHaveLength(1)
+    expect(två[0].state).toBe('snoozed')
+  })
+})
+
+test.describe('aktör och tidpunkt bevaras', () => {
+  test('vem och när sparas', () => {
+    const ut = applyKvittens([], MOMS, { state: 'acknowledged', actor: 'andreas' }, d('2026-07-20'))
+    expect(ut[0].actor).toBe('andreas')
+    expect(ut[0].at).toBe('2026-07-20T09:00:00.000Z')
   })
 
-  test('gallrar i samma veva', () => {
-    const ut = applyHandledChange(new Set(['regel:moms:2019-02-12']), 'regel:moms:2026-08-12', true, IDAG)
-    expect(ut).toEqual(['regel:moms:2026-08-12'])
+  test('okänd aktör är null, inte en gissning', () => {
+    const ut = applyKvittens([], MOMS, { state: 'acknowledged', actor: null }, d('2026-07-20'))
+    expect(ut[0].actor).toBeNull()
+  })
+})
+
+test.describe('inget läge påstår att något är inlämnat', () => {
+  test('endast två lägen finns', () => {
+    // Ett `completed` hade påstått att en deklaration är inlämnad. Det kan vi inte
+    // verifiera — Skatteverket berättar det inte för oss.
+    const ut = applyKvittens([], MOMS, { state: 'acknowledged', actor: 'a' }, d('2026-07-01'))
+    expect(['acknowledged', 'snoozed']).toContain(ut[0].state)
   })
 
-  test('originalet muteras inte', () => {
-    const original = new Set(['regel:moms:2026-08-12'])
-    applyHandledChange(original, 'regel:agi:2026-08-17', true, IDAG)
-    expect(original.size).toBe(1)
+  test('okänt läge i lagrad data läses som kvitterat, aldrig som klart', () => {
+    const raw = JSON.stringify([{ id: MOMS, state: 'completed', actor: 'a', at: '' }])
+    expect(parseEntries(raw)[0].state).toBe('acknowledged')
+  })
+})
+
+test.describe('gamla formatet', () => {
+  test('en ren stränglista läses som kvittenser', () => {
+    const ut = parseEntries(JSON.stringify([MOMS]))
+    expect(ut).toHaveLength(1)
+    expect(ut[0].state).toBe('acknowledged')
+    expect(ut[0].actor).toBeNull()
   })
 
-  test('resultatet är sorterat — stabil lagring över omskrivningar', () => {
-    const ut = applyHandledChange(new Set(['b:2026-08-12', 'a:2026-08-12']), 'c:2026-08-12', true, IDAG)
-    expect(ut).toEqual([...ut].sort())
+  test('gamla poster blir automatiskt säkrare än de var', () => {
+    // De kunde tidigare tysta även förfallodagen. Nu gäller invarianten dem också.
+    const gammal = parseEntries(JSON.stringify([MOMS]))[0]
+    expect(suppresses(gammal, d('2026-08-11'))).toBe(false)
+  })
+})
+
+test.describe('cron-kontraktet', () => {
+  test('parseHandled ger de id:n som ska tystas just nu', () => {
+    // Deadline-cronen anropar parseHandled(raw) och frågar .has(id). Ändras den
+    // formen måste cronen röras — och den ligger i en annan arbetsström.
+    const raw = serializeEntries([kvittens()])
+    expect(parseHandled(raw, d('2026-07-29')).has(MOMS)).toBe(true)
+    expect(parseHandled(raw, d('2026-08-11')).has(MOMS)).toBe(false)
+  })
+
+  test('utan tidsargument används nutid', () => {
+    expect(() => parseHandled(serializeEntries([kvittens()]))).not.toThrow()
+  })
+})
+
+test.describe('tolerans', () => {
+  test('trasigt innehåll ger tom lista, inte ett fel', () => {
+    for (const raw of ['inte json', '{}', 'null', '[1,2,3]', '', null, undefined]) {
+      expect(parseEntries(raw as any)).toEqual([])
+    }
+  })
+
+  test('poster utan id hoppas över', () => {
+    expect(parseEntries(JSON.stringify([{ state: 'acknowledged' }, { id: '' }]))).toEqual([])
+  })
+})
+
+test.describe('gallring', () => {
+  test('gamla datum gallras bort', () => {
+    const gammal = kvittens({ id: 'regel:moms:2025-01-12' })
+    expect(pruneEntries([gammal], d('2026-08-07'))).toEqual([])
+  })
+
+  test('id utan datum behålls alltid', () => {
+    const utan = kvittens({ id: 'egen:nagot' })
+    expect(pruneEntries([utan], d('2026-08-07'))).toHaveLength(1)
+  })
+
+  test('datum bara ur id:t', () => {
+    expect(dateFromEventId(MOMS)).toBe('2026-08-12')
+    expect(dateFromEventId('egen:nagot')).toBeNull()
   })
 })

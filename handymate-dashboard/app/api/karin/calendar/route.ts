@@ -5,7 +5,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { materializeObligations, missingProfileFields } from '@/lib/karin/obligations'
 import { obligationToEvent, sortByUrgency, needsAttention, groupByMonth } from '@/lib/karin/calendar'
 import type { CompanyProfile } from '@/lib/karin/obligation-rules'
-import { HANDLED_KEY, parseHandled, applyHandledChange } from '@/lib/karin/handled-store'
+import { HANDLED_KEY, parseEntries, applyKvittens, serializeEntries, suppresses, type Kvittens, type KvittensAndring } from '@/lib/karin/handled-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     // ingen egen tabell behövs, och därmed ingen migration som måste köras
     // manuellt innan funktionen fungerar. Ett fel här får aldrig fälla
     // kalendern: då visas allt som ohanterat, vilket är det säkra hållet.
-    let hanterade = new Set<string>()
+    let kvittenser: Kvittens[] = []
     try {
       const { data: pref } = await supabase
         .from('business_preferences')
@@ -83,14 +83,24 @@ export async function GET(request: NextRequest) {
         .eq('business_id', business.business_id)
         .eq('key', HANDLED_KEY)
         .maybeSingle()
-      hanterade = parseHandled((pref as { value?: string } | null)?.value)
+      kvittenser = parseEntries((pref as { value?: string } | null)?.value)
     } catch (e) {
-      console.warn('[karin/calendar] kunde inte läsa hanterat-listan:', e)
+      console.warn('[karin/calendar] kunde inte läsa kvittenserna:', e)
     }
 
+    const perId = new Map(kvittenser.map(k => [k.id, k]))
+
+    // `kvittens` bär vad ägaren gjorde, av vem och när — så vyn kan visa det och
+    // erbjuda ångra. `handled` är enbart "tystas den just nu?", och är avsiktligt
+    // INTE samma sak: en kvitterad post som gått in i sista anflygningen har en
+    // kvittens men tystas inte längre.
     const events = materializeObligations(profile, idag, till)
       .map(obligationToEvent)
-      .map(e => (hanterade.has(e.id) ? { ...e, handled: true } : e))
+      .map(e => {
+        const k = perId.get(e.id)
+        if (!k) return e
+        return { ...e, kvittens: k, handled: suppresses(k, idag) }
+      })
     const sorterade = sortByUrgency(events, idag)
 
     return NextResponse.json({
@@ -109,14 +119,21 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * POST /api/karin/calendar — markera en händelse som hanterad, eller ångra.
+ * POST /api/karin/calendar — kvittera, skjut upp eller ångra.
  *
- * Body: `{ event_id: string, handled: boolean }`
+ * Body: `{ event_id: string, action: 'acknowledge' | 'snooze' | 'undo', until?: 'YYYY-MM-DD' }`
  *
- * Lagras i `business_preferences` under en enda nyckel. Listan gallras vid
- * varje skrivning så den inte växer för alltid — tolv arbetsgivardeklarationer
- * om året blir hundratals rader på några år, och de allra flesta pekar på
- * datum som passerat för länge sedan.
+ * Det gamla formatet `{ event_id, handled: boolean }` accepteras fortfarande och
+ * tolkas som kvittera respektive ångra.
+ *
+ * ═══ INGEN ÅTGÄRD PÅSTÅR ATT NÅGOT ÄR INLÄMNAT ═══
+ *
+ * Det finns med flit inget `completed`. Vi kan inte verifiera att en deklaration
+ * lämnats in — och de sista dagarna före förfall går inte att tysta med någon av
+ * åtgärderna. Se lib/karin/handled-store.ts.
+ *
+ * Lagras i `business_preferences` under en enda nyckel. Listan gallras vid varje
+ * skrivning så den inte växer för alltid.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -142,15 +159,40 @@ export async function POST(request: NextRequest) {
       .eq('key', HANDLED_KEY)
       .maybeSingle()
 
-    const nuvarande = parseHandled((pref as { value?: string } | null)?.value)
-    const nasta = applyHandledChange(nuvarande, eventId, body?.handled !== false, new Date())
+    // Åtgärden. Gamla `handled`-formatet mappas så en klient som inte hunnit
+    // uppdateras inte går sönder.
+    const action: string = typeof body?.action === 'string'
+      ? body.action
+      : body?.handled === false ? 'undo' : 'acknowledge'
+
+    // Aktören sparas för att en tystad påminnelse ska gå att härleda till en
+    // människa. Utan den är en avbockning ett påstående utan avsändare.
+    const actor = currentUser.name || currentUser.email || currentUser.user_id || null
+
+    let andring: KvittensAndring
+    if (action === 'undo') {
+      andring = null
+    } else if (action === 'snooze') {
+      const until = body?.until
+      if (typeof until !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(until)) {
+        return NextResponse.json({ error: 'until krävs som YYYY-MM-DD' }, { status: 400 })
+      }
+      andring = { state: 'snoozed', actor, until }
+    } else if (action === 'acknowledge') {
+      andring = { state: 'acknowledged', actor }
+    } else {
+      return NextResponse.json({ error: 'okänd åtgärd' }, { status: 400 })
+    }
+
+    const nuvarande = parseEntries((pref as { value?: string } | null)?.value)
+    const nasta = applyKvittens(nuvarande, eventId, andring, new Date())
 
     const { error } = await supabase
       .from('business_preferences')
       .upsert({
         business_id: business.business_id,
         key: HANDLED_KEY,
-        value: JSON.stringify(nasta),
+        value: serializeEntries(nasta),
         source: 'user',
         updated_at: new Date().toISOString(),
       }, { onConflict: 'business_id,key' })
