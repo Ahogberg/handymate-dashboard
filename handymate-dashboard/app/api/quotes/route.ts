@@ -274,6 +274,8 @@ export async function POST(request: NextRequest) {
         not_included: source.not_included,
         ata_terms: source.ata_terms,
         payment_terms_text: source.payment_terms_text,
+        terms_text: source.terms_text,
+        reservations_snapshot: source.reservations_snapshot,
         payment_plan: source.payment_plan,
         reference_person: source.reference_person,
         customer_reference: source.customer_reference,
@@ -281,6 +283,10 @@ export async function POST(request: NextRequest) {
         detail_level: source.detail_level,
         show_unit_prices: source.show_unit_prices,
         show_quantities: source.show_quantities,
+        template_style: source.template_style,
+        attachments: source.attachments,
+        deal_id: source.deal_id,
+        lead_id: source.lead_id,
         rot_work_cost: source.rot_work_cost,
         rot_deduction: source.rot_deduction,
         rot_customer_pays: source.rot_customer_pays,
@@ -301,11 +307,24 @@ export async function POST(request: NextRequest) {
       if (dupErr) throw dupErr
 
       // Duplicate quote_items
-      const { data: sourceItems } = await supabase
+      const { data: sourceItems, error: sourceItemsErr } = await supabase
         .from('quote_items')
         .select('*')
         .eq('quote_id', body.duplicate_from)
         .order('sort_order')
+
+      if (sourceItemsErr) {
+        console.error('Read source quote_items error:', sourceItemsErr)
+        await supabase
+          .from('quotes')
+          .delete()
+          .eq('quote_id', newId)
+          .eq('business_id', businessId)
+        return NextResponse.json(
+          { error: 'Kunde inte läsa originaloffertens rader — försök igen' },
+          { status: 500 }
+        )
+      }
 
       if (sourceItems && sourceItems.length > 0) {
         const dupItems = sourceItems.map((item: any) => ({
@@ -313,7 +332,19 @@ export async function POST(request: NextRequest) {
           id: 'qi_' + Math.random().toString(36).substr(2, 12),
           quote_id: newId,
         }))
-        await supabase.from('quote_items').insert(dupItems)
+        const { error: dupItemsErr } = await supabase.from('quote_items').insert(dupItems)
+        if (dupItemsErr) {
+          console.error('Duplicate quote_items error:', dupItemsErr)
+          await supabase
+            .from('quotes')
+            .delete()
+            .eq('quote_id', newId)
+            .eq('business_id', businessId)
+          return NextResponse.json(
+            { error: 'Kunde inte kopiera offertens rader — försök igen' },
+            { status: 500 }
+          )
+        }
       }
 
       return NextResponse.json({ quote: newQuote })
