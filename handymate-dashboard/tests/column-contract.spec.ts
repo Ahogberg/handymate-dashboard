@@ -1,5 +1,5 @@
 /**
- * Kolumnkontraktet — varje `.select()` mot en verifierbar tabell (2026-08-07).
+ * Kolumnkontraktet — varje select/filter/order mot en verifierbar tabell (2026-08-07).
  *
  * ═══ VARFÖR DEN FINNS ═══
  *
@@ -68,7 +68,7 @@ function buildColumnFacit(): Map<string, Set<string>> {
     const sql = fs.readFileSync(path.join(sqlDir, f), 'utf8')
 
     // CREATE TABLE t ( ... ) — kroppen parsas rad för rad.
-    const skapa = /CREATE TABLE (?:IF NOT EXISTS )?"?([a-z0-9_]+)"?\s*\(([\s\S]*?)\n\s*\);/gi
+    const skapa = /CREATE TABLE (?:IF NOT EXISTS )?(?:"?[a-z0-9_]+"?\.)?"?([a-z0-9_]+)"?\s*\(([\s\S]*?)\n\s*\);/gi
     for (const m of Array.from(sql.matchAll(skapa))) {
       const tabell = m[1].toLowerCase()
       const kolumner = facit.get(tabell) || new Set<string>()
@@ -93,7 +93,7 @@ function buildColumnFacit(): Map<string, Set<string>> {
   // kolumner som finns, vilket är precis det som gör en vakt värdelös.
   for (const f of filer) {
     const sql = fs.readFileSync(path.join(sqlDir, f), 'utf8')
-    const satser = /ALTER TABLE\s+(?:IF EXISTS\s+)?"?([a-z0-9_]+)"?\b([\s\S]*?);/gi
+    const satser = /ALTER TABLE\s+(?:IF EXISTS\s+)?(?:"?[a-z0-9_]+"?\.)?"?([a-z0-9_]+)"?\b([\s\S]*?);/gi
     for (const s of Array.from(sql.matchAll(satser))) {
       const tabell = s[1].toLowerCase()
       if (!facit.has(tabell)) continue // ingen CREATE TABLE → inte verifierbar
@@ -158,7 +158,30 @@ const KANDA_LUCKOR = new Set([
   'review_request.review_text',
 ])
 
-interface Ref { tabell: string; kolumn: string; fil: string }
+/**
+ * Kolumner som verifierades read-only mot `information_schema.columns` i
+ * produktion 2026-08-07, men där repots historiska CREATE TABLE-filer beskriver
+ * en äldre tabellform. Migrationerna har körts manuellt, så sql/ är inte bevis
+ * för att de här kolumnerna saknas.
+ *
+ * Listan är avsiktligt explicit och storlekslåst nedan. Den ska ersättas av ett
+ * versionshanterat basschema, inte bli en allmän undantagsventil.
+ */
+const PRODUKTIONSVERIFIERADE_KOLUMNER = new Set([
+  'project_checklist.order_id',
+  'project_log.date',
+  'project_log.order_id',
+])
+
+const FILTER_METHODS = ['eq', 'neq', 'gt', 'lt', 'in', 'is', 'contains', 'order'] as const
+type FilterMethod = typeof FILTER_METHODS[number]
+
+interface Ref {
+  tabell: string
+  kolumn: string
+  fil: string
+  metod: 'select' | FilterMethod
+}
 
 function collectSelectRefs(): Ref[] {
   const ut: Ref[] = []
@@ -177,11 +200,173 @@ function collectSelectRefs(): Ref[] {
       if (tr[2].includes('.from(')) continue
       const tabell = tr[1].toLowerCase()
       for (const kol of parseSelect(tr[3])) {
-        ut.push({ tabell, kolumn: kol, fil: path.relative(ROOT, fil).replace(/\\/g, '/') })
+        ut.push({
+          tabell,
+          kolumn: kol,
+          fil: path.relative(ROOT, fil).replace(/\\/g, '/'),
+          metod: 'select',
+        })
       }
     }
   }
   return ut
+}
+
+interface Binding { variabel: string; tabell: string; index: number }
+
+function skipTrivia(source: string, start: number): number {
+  let index = start
+  while (index < source.length) {
+    if (/\s/.test(source[index])) {
+      index++
+      continue
+    }
+    if (source.startsWith('//', index)) {
+      index = source.indexOf('\n', index + 2)
+      if (index === -1) return source.length
+      continue
+    }
+    if (source.startsWith('/*', index)) {
+      const end = source.indexOf('*/', index + 2)
+      return end === -1 ? source.length : skipTrivia(source, end + 2)
+    }
+    break
+  }
+  return index
+}
+
+function readCall(source: string, openParen: number): { args: string; end: number } | null {
+  let depth = 0
+  let quote: "'" | '"' | '`' | null = null
+  let escaped = false
+
+  for (let index = openParen; index < source.length; index++) {
+    const char = source[index]
+    if (quote) {
+      if (escaped) {
+        escaped = false
+      } else if (char === '\\') {
+        escaped = true
+      } else if (char === quote) {
+        quote = null
+      }
+      continue
+    }
+    if (char === "'" || char === '"' || char === '`') {
+      quote = char
+    } else if (char === '(') {
+      depth++
+    } else if (char === ')' && --depth === 0) {
+      return { args: source.slice(openParen + 1, index), end: index + 1 }
+    }
+  }
+  return null
+}
+
+function firstLiteralArgument(args: string): string | null {
+  const start = skipTrivia(args, 0)
+  const quote = args[start]
+  if (quote !== "'" && quote !== '"' && quote !== '`') return null
+
+  let value = ''
+  let escaped = false
+  for (let index = start + 1; index < args.length; index++) {
+    const char = args[index]
+    if (escaped) {
+      value += char
+      escaped = false
+    } else if (char === '\\') {
+      escaped = true
+    } else if (char === quote) {
+      return value
+    } else {
+      value += char
+    }
+  }
+  return null
+}
+
+function walkMethodChain(
+  source: string,
+  start: number,
+  visit: (method: string, firstArgument: string | null) => void,
+): void {
+  let index = start
+  while (index < source.length) {
+    index = skipTrivia(source, index)
+    if (source[index] !== '.') return
+    index = skipTrivia(source, index + 1)
+
+    const nameMatch = /^[a-z_$][a-z0-9_$]*/i.exec(source.slice(index))
+    if (!nameMatch) return
+    const method = nameMatch[0]
+    index = skipTrivia(source, index + method.length)
+    if (source[index] !== '(') return
+
+    const call = readCall(source, index)
+    if (!call) return
+    visit(method, firstLiteralArgument(call.args))
+    index = call.end
+  }
+}
+
+function collectFilterRefsFromSource(innehall: string, fil: string): Ref[] {
+  const ut: Ref[] = []
+  const seen = new Set<string>()
+  const methods = FILTER_METHODS.join('|')
+
+  const add = (tabell: string, kolumn: string, metod: FilterMethod) => {
+    const normalized = kolumn.toLowerCase()
+    const key = `${tabell}.${normalized}.${metod}.${fil}`
+    if (seen.has(key)) return
+    seen.add(key)
+    ut.push({ tabell, kolumn: normalized, fil, metod })
+  }
+
+  // Direkt kedja: supabase.from('t').select(...).eq('kolumn', ...).
+  // Följ bara faktiska metodanrop i samma kedja. Ett godtyckligt textfönster
+  // kan annars koppla en senare, fristående query till fel tabell.
+  const fromRe = /\.from\(\s*'([a-z0-9_]+)'\s*\)/g
+  const fromMatches = Array.from(innehall.matchAll(fromRe))
+  for (const match of fromMatches) {
+    const start = match.index! + match[0].length
+    walkMethodChain(innehall, start, (method, column) => {
+      const normalizedMethod = method.toLowerCase()
+      if (column && FILTER_METHODS.includes(normalizedMethod as FilterMethod)) {
+        add(match[1].toLowerCase(), column, normalizedMethod as FilterMethod)
+      }
+    })
+  }
+
+  // Query-builder-variabler: detta är exakt formen som släppte igenom
+  // project.invoice_id: `let query = supabase.from('project')`, därefter
+  // `query = query.eq('invoice_id', ...)` på en annan rad.
+  const bindings: Binding[] = []
+  const bindingRe = /\b(?:const|let|var)\s+([a-z_$][a-z0-9_$]*)\s*=\s*[a-z_$][a-z0-9_$.]*\.from\(\s*'([a-z0-9_]+)'\s*\)/gi
+  for (const binding of Array.from(innehall.matchAll(bindingRe))) {
+    bindings.push({ variabel: binding[1], tabell: binding[2].toLowerCase(), index: binding.index! })
+  }
+
+  const variableMethodRe = new RegExp(
+    `\\b([a-z_$][a-z0-9_$]*)\\s*\\.\\s*(${methods})\\(\\s*['\"\`]([a-z_][a-z0-9_]*)['\"\`]`,
+    'gi',
+  )
+  for (const call of Array.from(innehall.matchAll(variableMethodRe))) {
+    const binding = bindings
+      .filter(candidate => candidate.variabel === call[1] && candidate.index <= call.index!)
+      .at(-1)
+    if (binding) add(binding.tabell, call[3], call[2].toLowerCase() as FilterMethod)
+  }
+
+  return ut
+}
+
+function collectFilterRefs(roots = [path.join(ROOT, 'app'), path.join(ROOT, 'lib')]): Ref[] {
+  const filer = roots.flatMap(root => walk(root))
+  return filer.flatMap(fil => collectFilterRefsFromSource(
+    fs.readFileSync(fil, 'utf8'),
+    path.relative(ROOT, fil).replace(/\\/g, '/'),
+  ))
 }
 
 test.describe('kolumnkontraktet', () => {
@@ -199,17 +384,20 @@ test.describe('kolumnkontraktet', () => {
     expect(buildColumnFacit().get('project_change')?.has('id')).toBe(false)
   })
 
-  test('varje selectad kolumn finns i tabellen', () => {
+  test('varje selectad, filtrerad och sorterad kolumn finns i tabellen', () => {
     const facit = buildColumnFacit()
-    const refs = collectSelectRefs()
-    expect(refs.length, 'inga select-anrop hittades — parsern är trasig').toBeGreaterThan(50)
+    const refs = [...collectSelectRefs(), ...collectFilterRefs()]
+    expect(refs.length, 'inga kolumnreferenser hittades — parsern är trasig').toBeGreaterThan(100)
 
     const fel: string[] = []
     for (const r of refs) {
       const kolumner = facit.get(r.tabell)
       if (!kolumner) continue // tabellen saknar CREATE TABLE — inte verifierbar
       if (KANDA_LUCKOR.has(`${r.tabell}.${r.kolumn}`)) continue
-      if (!kolumner.has(r.kolumn)) fel.push(`${r.fil}: ${r.tabell}.${r.kolumn}`)
+      if (PRODUKTIONSVERIFIERADE_KOLUMNER.has(`${r.tabell}.${r.kolumn}`)) continue
+      if (!kolumner.has(r.kolumn)) {
+        fel.push(`${r.fil}: ${r.tabell}.${r.kolumn} (${r.metod})`)
+      }
     }
 
     expect(fel, 'Kolumner som inte finns — PostgREST 400:ar HELA frågan').toEqual([])
@@ -219,6 +407,20 @@ test.describe('kolumnkontraktet', () => {
     // Undantagslistan är en skuld, inte en ventil. Växer den har någon skrivit
     // upp en ny död kolumn i stället för att laga den.
     expect(KANDA_LUCKOR.size, 'Ny post i KANDA_LUCKOR — laga kolumnen i stället').toBeLessThanOrEqual(2)
+  })
+
+  test('produktionsverifierade legacy-kolumner blir inte fler', () => {
+    expect(Array.from(PRODUKTIONSVERIFIERADE_KOLUMNER).sort()).toEqual([
+      'project_checklist.order_id',
+      'project_log.date',
+      'project_log.order_id',
+    ])
+  })
+
+  test('app/dashboard/quotes ingår i filtervakten', () => {
+    const refs = collectFilterRefs([path.join(ROOT, 'app', 'dashboard', 'quotes')])
+    expect(refs.length, 'inga offertfilter hittades — quotes-trädet skannas inte').toBeGreaterThan(10)
+    expect(new Set(refs.map(ref => ref.metod))).toEqual(new Set(['eq', 'order']))
   })
 })
 
@@ -244,5 +446,43 @@ test.describe('parsern', () => {
 
   test('blanksteg och radbrytningar tolereras', () => {
     expect(parseSelect('\n  a,\n  b\n')).toEqual(['a', 'b'])
+  })
+
+  test('alla filtermetoder och order plockar första argumentets kolumn', () => {
+    const source = `
+      const result = supabase.from('project_change')
+        .eq('project_id', 'p1')
+        .neq('status', 'draft')
+        .gt('amount', 0)
+        .lt('hours', 10)
+        .in('change_type', ['addition'])
+        .is('approved_at', null)
+        .contains('items', [{ id: 'x' }])
+        .order('created_at')
+    `
+    expect(collectFilterRefsFromSource(source, 'fixture.ts').map(ref => `${ref.metod}:${ref.kolumn}`))
+      .toEqual([
+        'eq:project_id',
+        'neq:status',
+        'gt:amount',
+        'lt:hours',
+        'in:change_type',
+        'is:approved_at',
+        'contains:items',
+        'order:created_at',
+      ])
+  })
+
+  test('query-builder på annan rad behåller sin tabellkoppling', () => {
+    const source = `
+      let query = supabase.from('project').select('project_id')
+      query = query.eq('invoice_id', invoiceId)
+    `
+    expect(collectFilterRefsFromSource(source, 'fixture.ts')).toContainEqual({
+      tabell: 'project',
+      kolumn: 'invoice_id',
+      fil: 'fixture.ts',
+      metod: 'eq',
+    })
   })
 })

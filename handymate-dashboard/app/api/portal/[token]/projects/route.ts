@@ -99,7 +99,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
           // Aliasen behåller formen `nextVisit` skickas ut i; filter och
           // sortering måste däremot använda de riktiga namnen.
           .select('title, start_time:start_datetime, end_time:end_datetime')
-          .eq('customer_id', customer.customer_id)
+          .eq('project_id', p.project_id)
           .gte('start_datetime', new Date().toISOString())
           .order('start_datetime', { ascending: true })
           .limit(1),

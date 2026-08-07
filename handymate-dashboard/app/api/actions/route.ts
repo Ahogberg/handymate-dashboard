@@ -273,14 +273,13 @@ export async function POST(request: NextRequest) {
 
         // Rensa icke-blockerande relaterad data
         // - Radera: dokument, aktivitet, taggar (historiskt irrelevant när kund försvinner)
-        // - Sätt null: leads, email-konversationer, automationsregler (bevara historik, lossa koppling)
+        // - Sätt null: leads och email-konversationer (bevara historik, lossa koppling)
         const cleanupOps = [
           () => supabase.from('customer_document').delete().eq('customer_id', customerId),
           () => supabase.from('customer_activity').delete().eq('customer_id', customerId),
           () => supabase.from('customer_tag_assignment').delete().eq('customer_id', customerId),
           () => supabase.from('leads').update({ customer_id: null }).eq('customer_id', customerId),
           () => supabase.from('email_conversations').update({ customer_id: null }).eq('customer_id', customerId),
-          () => supabase.from('automation_rules').update({ customer_id: null }).eq('customer_id', customerId),
         ]
         await Promise.all(cleanupOps.map(async (op) => {
           try { await op() } catch { /* non-blocking — tabell kanske saknas */ }
