@@ -11,6 +11,7 @@ import { resolveTimeEntryBusinessUserId } from '@/lib/egenkontroll/suggest-time-
 import { getBusinessPlanFromConfig } from '@/lib/auth'
 import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { classify, nonExecutableResult } from '@/lib/approvals/action-contract'
 
 export const dynamic = 'force-dynamic'
 
@@ -768,6 +769,12 @@ async function executeApprovalPayload(
         }
       }
 
+      // `scheduled_review_request` och `yearly_followup` har samma payload-form
+      // (to + message) och skickades tidigare via SMS-gissningen i default.
+      // De hör hit — en explicit hanterare i stället för fältgissning, så
+      // beteendet bevaras utan att kön behöver gissa något.
+      case 'scheduled_review_request':
+      case 'yearly_followup':
       case 'review_request': {
         // A4 — auto-recensionsbegäran efter projekt-completion.
         // Går via den delade sendSms-helpern (Audit-3 Fix A-mönstret,
@@ -1954,24 +1961,41 @@ async function executeApprovalPayload(
       }
 
       default: {
-        // Smart fallback: om payload har SMS-data → skicka SMS
-        const pl = payload as any
-        const smsMessage = pl.message || pl.suggested_sms || pl.sms_text
-        const smsTo = pl.to || pl.customer_phone || pl.entity?.phone
+        // ═══ OKÄND TYP FAILAR STÄNGT (N5, 2026-08-07) ═══
+        //
+        // Här stod tidigare en gissning: om payloaden råkade ha något som såg ut
+        // som ett meddelande och något som såg ut som ett telefonnummer
+        // (`pl.message || pl.suggested_sms || pl.sms_text` mot
+        // `pl.to || pl.customer_phone || pl.entity?.phone`) skickades ett riktigt
+        // SMS till kunden — för en korttyp ingen skrivit en hanterare för.
+        // Annars returnerades "Godkänt utan specifik åtgärd", en tyst
+        // nollhandling som såg ut som att något hänt.
+        //
+        // Elva av producenternas korttyper hamnade här, bland dem
+        // `manual_project_create` (ett reparationskort som aldrig skulle prata
+        // med kunden) och `missad_intakt` (som intäktsåtervinningen bygger på).
+        //
+        // Nu avgör kontraktet. Ett kort som bara berättar något kvitteras ärligt,
+        // ett som kräver granskning säger det, och en typ vi inte känner igen
+        // går inte att godkänna alls.
+        const klass = classify(approval_type)
 
-        if (smsMessage && smsTo) {
-          // Audit-3 Fix A (2026-06-01)
-          const r = await sendSms({
-            to: smsTo,
-            message: smsMessage,
-            customerId: pl.customer_id || pl.entity?.customerId || null,
-            messageType: approval_type,
-          })
-          return { action: approval_type, sms_sent: r.sms_sent, error: r.error, fallback: true }
+        if (klass === null) {
+          throw new Error(
+            `Kortet "${approval_type}" saknar beskrivning av vad ett godkännande ska göra. Det går därför inte att godkänna härifrån.`,
+          )
         }
 
-        // Om inget SMS-data → bara bekräfta (acknowledgement)
-        return { action: approval_type, acknowledged: true, note: 'Godkänt utan specifik åtgärd' }
+        if (klass === 'EXECUTABLE_ACTION') {
+          // Klassad som utförande men utan gren ovan — någon har lagt till en typ
+          // i kontraktet utan att skriva hanteraren. Failar hellre stängt än
+          // låtsas att den utfördes.
+          throw new Error(
+            `Kortet "${approval_type}" ska utföra något, men åtgärden är inte färdigbyggd. Ingenting har skickats.`,
+          )
+        }
+
+        return nonExecutableResult(approval_type)
       }
     }
   } catch (err: any) {
