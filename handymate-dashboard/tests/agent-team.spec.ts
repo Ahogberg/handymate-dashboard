@@ -4,7 +4,7 @@
  * ═══ VARFÖR DEN HÄR VAKTEN FINNS ═══
  *
  * Teamet låg i FYRA kopior: lib/agents/team.ts, agentPersonas.ts, en inlinead
- * karta i approvals/page.tsx och en till i MorningBriefWidget.tsx. De hann gå
+ * karta i approvals/page.tsx och en till i den gamla morgonbriefen. De hann gå
  * isär precis som kopior gör:
  *
  * - **Lisa saknades helt i morgonbriefen.** Telefonisten — agenten som fångar

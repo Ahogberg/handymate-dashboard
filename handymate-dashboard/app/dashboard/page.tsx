@@ -119,8 +119,8 @@ export default function DashboardPage() {
       setShowWelcome(true)
     }
     // Morgonrapporten (SMS/push, lib/agent/morning-report.ts) skriver även
-    // morning_report_latest för en textpopup — nu ersatt av MorningBriefWidget
-    // (rikare, per-agent). SMS/push-utskicket i cron:en är orört.
+    // morning_report_latest för en textpopup — nu ersatt av agentremsans
+    // rikare lägesrapport per person. SMS/push-utskicket i cron:en är orört.
   }, [])
 
   const closeWelcome = () => {
@@ -396,9 +396,8 @@ export default function DashboardPage() {
 
         {/* Morgonbriefen har flyttat in i agentremsan (TeamActivityStrip,
             del av IdagCore nedan) — samma yta som tidigare var två staplade
-            "Ditt AI-team idag"-sektioner är nu en. Fristående montering av
-            MorningBriefWidget borttagen (dashboard-städpaketet del D);
-            komponentfilen ligger kvar orörd om den behövs igen. */}
+            "Ditt AI-team idag"-sektioner är nu en. Den fristående
+            morgonbriefen togs bort i dashboard-städpaketet del D. */}
 
         {/* Kärnstacken: bevisband → agentremsa → godkänn-kö → Klart idag →
             drill-rad → KPI-fot. Se IdagCore för detaljer. */}

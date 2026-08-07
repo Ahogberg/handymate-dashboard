@@ -4,8 +4,8 @@
  * ═══ VARFÖR DEN INTE LÄNGRE ÄGER SIN DATA (spår D1, 2026-08-06) ═══
  *
  * Teamet fanns i fyra kopior: `lib/agents/team.ts`, den här filen, en inlinead
- * karta i `app/dashboard/approvals/page.tsx` och en till i
- * `MorningBriefWidget.tsx`. Kopiorna hade hunnit gå isär på precis det sätt
+ * karta i `app/dashboard/approvals/page.tsx` och en till i den gamla
+ * morgonbriefen. Kopiorna hade hunnit gå isär på precis det sätt
  * kopior gör:
  *
  * - **Lisa saknades helt i morgonbriefen.** Hantverkarens telefonist syntes

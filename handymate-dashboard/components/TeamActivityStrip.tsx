@@ -108,7 +108,7 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
         setLoading(false)
       })
 
-    // Morgonbriefen (tidigare egen MorningBriefWidget-sektion, nu ihopslagen
+    // Morgonbriefen (tidigare en egen sektion, nu ihopslagen
     // med agentremsan) berikar idle-statusraden med Mattes per-agent-
     // lägesrapport — t.ex. "Ekonomin ser bra ut idag" i stället för den
     // generiska Standby-texten. Helt fristående från laddningen ovan: ett
