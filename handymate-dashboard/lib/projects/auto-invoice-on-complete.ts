@@ -209,7 +209,21 @@ export async function autoInvoiceOnComplete(
 
     // 8. Skapa faktura — ETAPP 6a (offert-masterplan.md): gemensam kärna
     // för nummer/OCR/datum/insert/bump, se lib/invoices/create-invoice.ts.
-    const invoiceStatus = autoSend ? 'sent' : 'draft'
+    //
+    // ═══ SKAPAS ALLTID SOM UTKAST (N3, 2026-08-07) ═══
+    //
+    // Raden löd tidigare `autoSend ? 'sent' : 'draft'`. Fakturan märktes alltså
+    // skickad INNAN sändningen ens försökts — och sändningen nedan misslyckades
+    // alltid, eftersom /api/invoices/send kräver getAuthenticatedBusiness och det
+    // här är ett serveranrop utan session. Felet swaljdes av en tom catch, och
+    // hantverkaren fick SMS om att fakturan gått iväg.
+    //
+    // Auto-sändningen har alltså aldrig fungerat, och produkten har sagt motsatsen.
+    //
+    // Nu skapas fakturan som utkast. Blir den skickad är det sändrutten som sätter
+    // om statusen, och först då säger vi det. Ett leveransfel kan inte längre
+    // producera vare sig `sent`-status eller "skickad"-copy.
+    const invoiceStatus = 'draft'
     let invoice: { invoice_id: string; invoice_number: string; total: number; status: string }
     let invoiceNumber: string
     try {
@@ -288,21 +302,43 @@ export async function autoInvoiceOnComplete(
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
     const dueDateStr = dueDate.toLocaleDateString('sv-SE')
 
-    // 10. Om auto-send: skicka till kund via /api/invoices/send
+    // 10. Om auto-send: försök skicka till kund via /api/invoices/send.
+    //
+    // Svaret LÄSES nu. Tidigare stod här ett `await fetch(...)` vars resultat
+    // kastades bort och en tom catch — vilket är hur ett alltid misslyckande
+    // anrop kunde se ut som en lyckad sändning i månader.
+    //
+    // KÄND BEGRÄNSNING: rutten kräver getAuthenticatedBusiness och det här är ett
+    // serveranrop utan session, så den svarar 401. `_internal_business_id`
+    // konsumeras inte av rutten — fältet var en verkningslös lösning på just det
+    // problemet. Anropet ligger kvar för att intentionen ska vara synlig och för
+    // att det börjar fungera den dag rutten får en server-till-server-väg. Men
+    // det får inte längre PÅSTÅ något: misslyckas det förblir fakturan ett utkast
+    // och hantverkaren får veta det.
+    let levererad = false
     if (autoSend && customer?.email) {
       try {
-        await fetch(`${appUrl}/api/invoices/send`, {
+        const res = await fetch(`${appUrl}/api/invoices/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             invoice_id: invoice.invoice_id,
             send_email: true,
             send_sms: !!customer.phone_number,
-            _internal_business_id: businessId,
           }),
         })
-      } catch {
-        // Non-blocking — fakturan är skapad även om send misslyckas
+        levererad = res.ok
+        if (!res.ok) {
+          console.error('[auto-invoice] sändningen nekades:', res.status, {
+            invoice_id: invoice.invoice_id,
+            project_id: projectId,
+          })
+        }
+      } catch (sendErr: any) {
+        console.error('[auto-invoice] sändningen failade:', sendErr?.message || sendErr, {
+          invoice_id: invoice.invoice_id,
+          project_id: projectId,
+        })
       }
     }
 
@@ -312,11 +348,16 @@ export async function autoInvoiceOnComplete(
         const amountStr = total.toLocaleString('sv-SE')
         const customerName = customer?.name || 'kund'
 
+        // Grenar på vad som FAKTISKT hände, inte på vad inställningen önskade.
+        // Tidigare stod "skickad till kund" så fort auto-send var påslaget —
+        // även när sändningen aldrig gick igenom.
+        const invoiceUrl = `${appUrl}/dashboard/invoices/${invoice.invoice_id}`
         let smsMessage: string
-        if (autoSend) {
+        if (levererad) {
           smsMessage = `✅ Faktura ${invoiceNumber} på ${amountStr} kr skickad till ${customerName}. Betalning förfaller ${dueDateStr}. // Handymate`
+        } else if (autoSend) {
+          smsMessage = `⚠️ ${project.name} är klart och faktura på ${amountStr} kr är skapad — men den kunde inte skickas automatiskt. Granska och skicka själv: ${invoiceUrl}`
         } else {
-          const invoiceUrl = `${appUrl}/dashboard/invoices/${invoice.invoice_id}`
           smsMessage = `✅ ${project.name} är klart! Faktura på ${amountStr} kr är skapad som utkast — granska och skicka: ${invoiceUrl}`
         }
 
@@ -334,8 +375,13 @@ export async function autoInvoiceOnComplete(
       // Non-blocking
     }
 
-    // 12. Om draft: skapa pending_approval
-    if (!autoSend) {
+    // 12. Ligger fakturan kvar som utkast: skapa pending_approval.
+    //
+    // Villkoret var `!autoSend`. Det räckte så länge auto-sändning antogs lyckas —
+    // men när den misslyckas blir fakturan ett utkast som ingen får ett kort om,
+    // och då ligger pengarna och väntar utan att någon vet. `!levererad` täcker
+    // båda fallen: avstängd auto-sändning och misslyckad sådan.
+    if (!levererad) {
       try {
         // Tidigare bugg: insert med fel kolumnnamn (type/context istället för
         // approval_type/payload) + approval_type NOT NULL utan default →
@@ -346,7 +392,9 @@ export async function autoInvoiceOnComplete(
           business_id: businessId,
           approval_type: 'review_auto_invoice',
           title: `Granska faktura — ${project.name}`,
-          description: `Faktura ${invoiceNumber} på ${total.toLocaleString('sv-SE')} kr skapades automatiskt från avslutat projekt. Granska och skicka till ${customer?.name || 'kund'}.`,
+          description: autoSend
+            ? `Faktura ${invoiceNumber} på ${total.toLocaleString('sv-SE')} kr skapades automatiskt från avslutat projekt, men kunde inte skickas. Granska och skicka till ${customer?.name || 'kund'}.`
+            : `Faktura ${invoiceNumber} på ${total.toLocaleString('sv-SE')} kr skapades automatiskt från avslutat projekt. Granska och skicka till ${customer?.name || 'kund'}.`,
           risk_level: 'medium',
           status: 'pending',
           payload: {
@@ -385,11 +433,12 @@ export async function autoInvoiceOnComplete(
         business_id: businessId,
         customer_id: project.customer_id,
         activity_type: 'invoice_created',
-        description: `Faktura ${invoiceNumber} skapades automatiskt från projekt "${project.name}"${autoSend ? ' och skickades till kund' : ' (utkast)'}`,
+        // Loggen säger vad som hände, inte vad som var påslaget.
+        description: `Faktura ${invoiceNumber} skapades automatiskt från projekt "${project.name}"${levererad ? ' och skickades till kund' : ' (utkast)'}`,
         metadata: {
           invoice_id: invoice.invoice_id,
           project_id: projectId,
-          auto_sent: autoSend,
+          auto_sent: levererad,
           has_ata: ataItems.length > 0,
         },
       })
@@ -400,7 +449,9 @@ export async function autoInvoiceOnComplete(
       invoice_id: invoice.invoice_id,
       invoice_number: invoiceNumber,
       total,
-      status: invoiceStatus as 'draft' | 'sent',
+      // Returnerar det faktiska sluttillståndet. Anroparen får inte veta "sent"
+      // om ingenting lämnat huset — det var precis den lögnen som fanns här.
+      status: (levererad ? 'sent' : 'draft') as 'draft' | 'sent',
     }
   } catch (err: any) {
     console.error('[autoInvoiceOnComplete] Error:', err)
