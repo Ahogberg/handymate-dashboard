@@ -74,6 +74,10 @@ const NAV: NavItem[] = [
     type: 'group', key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard,
     children: [
       { label: 'Översikt', href: '/dashboard', exact: true },
+      // Jarvis-first-hemskärmen (2026-08-07). Ligger BREDVID Översikt medan
+      // den utvärderas — Översikt är kvar som standardvy tills Christoffer
+      // sagt att den nya är bättre. Posten tas bort när routen byts.
+      { label: 'Hem (ny)', href: '/dashboard/hem', exact: true },
       { label: 'Analys', href: '/dashboard/analytics', featureGate: 'lead_intelligence' },
       { label: 'Månadsrapport', href: '/dashboard/monthly-review' },
     ],

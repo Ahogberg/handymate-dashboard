@@ -17,6 +17,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 import TeamActivityStrip, { TeamActivitySummary } from '@/components/TeamActivityStrip'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
+import { approvalPreview, isEditable, buildApprovalEdit } from '@/lib/jarvis/approval-preview'
 
 /**
  * IdagCore — kärnstacken i nya Idag-vyn (2026-07-11, från Idag-vy.html-designen).
@@ -99,21 +100,6 @@ function getAgentKey(approval: Approval): string {
   return 'matte'
 }
 
-function getPreview(approval: Approval): string {
-  const pl = approval.payload as any
-  if (approval.approval_type === 'lead_review' && pl.parsed) {
-    const parts = [pl.parsed.name, pl.parsed.phone].filter(Boolean).join(' · ')
-    return parts || approval.description || ''
-  }
-  if (approval.approval_type === 'publish_microsite' && pl.preview) {
-    const parts = [pl.preview.headline, pl.preview.description].filter(Boolean)
-    return parts.join(' — ').slice(0, 200)
-  }
-  if (pl.message) return String(pl.message).slice(0, 200)
-  if (pl.sms_text) return String(pl.sms_text).slice(0, 200)
-  return ''
-}
-
 function getRecipient(approval: Approval): string {
   const pl = approval.payload as any
   if (pl.customer_name) return String(pl.customer_name)
@@ -122,13 +108,6 @@ function getRecipient(approval: Approval): string {
   return ''
 }
 
-// Nyckeln i payload som "Ändra" redigerar. Bara meddelandetexter är
-// redigerbara inline — övriga typer saknar Ändra-knapp.
-function getEditableKey(approval: Approval): 'message' | 'sms_text' | null {
-  if (typeof approval.payload?.message === 'string') return 'message'
-  if (typeof approval.payload?.sms_text === 'string') return 'sms_text'
-  return null
-}
 
 const TYPE_LABEL: Record<string, string> = {
   send_sms: 'SMS',
@@ -270,7 +249,7 @@ export default function IdagCore({
         if (cancelled || !res?.data) { setDoneLoaded(true); return }
         const midnight = new Date()
         midnight.setHours(0, 0, 0, 0)
-        const rows: DoneRow[] = (res.data as Array<{ id: string; type: string; action?: string; description?: string; status: string; created_at: string; source: string }>)
+        const rows: DoneRow[] = (res.data as Array<{ id: string; type: string; action?: string; description?: string; status: string; created_at: string; source: string; auto?: boolean; agent_id?: string }>)
           .filter(a => new Date(a.created_at) >= midnight && a.status !== 'failed' && a.description)
           .slice(0, 12)
           .map(a => ({
@@ -278,7 +257,9 @@ export default function IdagCore({
             time: formatClock(a.created_at),
             agent: doneRowAgent(a),
             text: String(a.description),
-            auto: true,
+            // AUTO kommer nu från servern (v3_automation_logs.approval_id), inte
+            // från en klientgissning. Ett märke som gissar är värre än inget.
+            auto: a.auto !== false,
           }))
         setDoneRows(rows)
         setDoneLoaded(true)
@@ -306,8 +287,11 @@ export default function IdagCore({
       const { data: { session } } = await supabase.auth.getSession()
       const body: Record<string, unknown> = { action }
       if (action === 'edit') {
-        const key = getEditableKey(approval)
-        if (key && editedText != null) body.edited_payload = { [key]: editedText }
+        // Fragmentet byggs av lib/jarvis/approval-preview: servern gör en
+        // SHALLOW merge, så nästlade källor (fakturapåminnelsens
+        // delivery.messages.sms) måste skicka hela delvägen återuppbyggd.
+        const fragment = editedText != null ? buildApprovalEdit(approval, editedText) : null
+        if (fragment) body.edited_payload = fragment
       }
       const res = await fetch(`/api/approvals/${approval.id}`, {
         method: 'POST',
@@ -426,7 +410,7 @@ export default function IdagCore({
 
   function startEdit(approval: Approval) {
     setEditingId(approval.id)
-    setEditText(getPreview(approval))
+    setEditText(approvalPreview(approval).text)
   }
 
   const visible = approvals.filter(a => !hiddenIds.has(a.id))
@@ -707,13 +691,17 @@ function ProofBand({
 
   const isNewAccount = !!createdAt && (Date.now() - new Date(createdAt).getTime()) < NEW_ACCOUNT_MAX_AGE_MS
 
+  // "Senaste dygnet", inte "Sedan igår kväll" (2026-08-07): datan är ett
+  // RULLANDE dygn (/api/dashboard/team-activity, HOURS_BACK = 24), inte tiden
+  // sedan gårdagskvällen. Gränssnittet får inte påstå ett tidsfönster det
+  // inte mäter — läser man bandet 16:00 räknade det från 16:00 igår.
   const activityText = parts.length === 0
     ? isNewAccount
       ? 'Ditt team lär känna företaget. Om ett par dagar börjar du se dem jobba här.'
-      : 'Teamet är på plats — inget nytt att hantera sedan igår kväll.'
+      : 'Teamet är på plats — inget nytt att hantera det senaste dygnet.'
     : parts.length === 1
-      ? `Sedan igår kväll ${parts[0]} teamet`
-      : `Sedan igår kväll ${parts.slice(0, -1).join(', ')} och ${parts[parts.length - 1]} teamet`
+      ? `Senaste dygnet ${parts[0]} teamet`
+      : `Senaste dygnet ${parts.slice(0, -1).join(', ')} och ${parts[parts.length - 1]} teamet`
 
   return (
     <div className="mb-4 flex items-center gap-3.5 px-4 py-3.5 rounded-xl border border-primary-100 bg-gradient-to-br from-[#f0fdf9] to-[#f8fafc]">
@@ -755,9 +743,9 @@ function QueueCard({
   const agentKey = getAgentKey(approval)
   const agent = AGENT_INFO[agentKey]
   const isAutonomy = approval.approval_type === 'autonomy_offer'
-  const preview = getPreview(approval)
+  const preview = approvalPreview(approval).text
   const recipient = getRecipient(approval)
-  const editable = getEditableKey(approval) != null
+  const editable = isEditable(approval)
   const label = TYPE_LABEL[approval.approval_type] || approval.approval_type
 
   return (

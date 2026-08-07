@@ -51,7 +51,37 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(20)
 
+    // ═══ v3_automation_logs — där regelmotorn FAKTISKT skriver ═══
+    //
+    // Rutten läste tidigare inte den här tabellen alls, trots att
+    // lib/automation-engine.ts:logExecution är enda vägen regelmotorn loggar.
+    // "Klart idag" visade alltså inte det mesta av vad automationerna gjort.
+    //
+    // `approval_id` är dessutom det enda fältet i hela kodbasen som skiljer
+    // "gjort helt automatiskt" från "gjort efter ditt OK". Utan det var
+    // AUTO-märket i gränssnittet en klientgissning — se `auto` nedan.
+    const { data: ruleLogs, error: ruleErr } = await supabase
+      .from('v3_automation_logs')
+      .select('id, rule_name, action_type, status, approval_id, agent_id, created_at')
+      .eq('business_id', business.business_id)
+      .eq('status', 'success')
+      .gte('created_at', weekAgo.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(30)
+
+    if (ruleErr) {
+      // Tabellen kan saknas på äldre konton. Loggen är en bekvämlighet —
+      // resten av svaret ska inte falla med den.
+      console.warn('[automations/activity] v3_automation_logs hoppades över:', ruleErr.message)
+    }
+
     // Merge and sort all activities
+    //
+    // `auto` = utfördes UTAN att någon godkände. Bara v3_automation_logs kan
+    // svara på det säkert (approval_id), så där härleds det. För de tre
+    // äldre källorna finns inget godkännande-fält alls — men de skrivs bara
+    // av automationsvägar, så true är sant för dem. Gränssnittet ska aldrig
+    // gissa: bocken är reserverad för mänskliga beslut.
     const merged = [
       ...(data || []).map((a: any) => ({
         id: a.id,
@@ -61,6 +91,18 @@ export async function GET(request: NextRequest) {
         status: a.status,
         created_at: a.created_at,
         source: 'automation' as const,
+        auto: true,
+      })),
+      ...(ruleLogs || []).map((a: any) => ({
+        id: a.id,
+        type: a.action_type,
+        action: a.action_type,
+        description: a.rule_name,
+        status: a.status,
+        created_at: a.created_at,
+        source: 'rule' as const,
+        agent_id: a.agent_id || undefined,
+        auto: !a.approval_id,
       })),
       ...(pipelineActivities || []).map((a: any) => ({
         id: a.id,
@@ -70,6 +112,7 @@ export async function GET(request: NextRequest) {
         status: 'success' as const,
         created_at: a.created_at,
         source: 'pipeline' as const,
+        auto: true,
       })),
       ...(commLogs || []).map((a: any) => ({
         id: a.id,
@@ -79,6 +122,7 @@ export async function GET(request: NextRequest) {
         status: a.status === 'sent' || a.status === 'delivered' ? 'success' : a.status === 'failed' ? 'failed' : 'skipped',
         created_at: a.created_at,
         source: 'communication' as const,
+        auto: true,
       })),
     ]
 
