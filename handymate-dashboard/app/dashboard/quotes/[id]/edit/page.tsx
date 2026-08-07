@@ -752,6 +752,9 @@ export default function EditQuotePage() {
           is_rut_eligible: item.is_rut_eligible || false,
           option_selected: item.option_selected ?? false,
           option_default: item.option_default ?? false,
+          // Dolda marginalrader måste överleva laddning -> autosave. Utan
+          // mappningen blir undefined false i PUT-rutten och raden publiceras.
+          is_hidden: item.is_hidden ?? false,
           category_slug: item.category_slug || undefined,
           linked_product_id: item.linked_product_id || undefined,
           // Produktbank (v67): snapshot-fälten MÅSTE följa med genom edit-
