@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import TeamActivityStrip, { TeamActivitySummary } from '@/components/TeamActivityStrip'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
+import { AgentAvatar } from '@/components/agents/AgentAvatar'
 
 /**
  * IdagCore — kärnstacken i nya Idag-vyn (2026-07-11, från Idag-vy.html-designen).
@@ -875,19 +876,3 @@ function QueueCard({
   )
 }
 
-function AgentAvatar({ agentKey, size = 'md' }: { agentKey: string; size?: 'sm' | 'md' }) {
-  const agent = AGENT_INFO[agentKey]
-  const cls = size === 'sm' ? 'w-7 h-7 text-[10px]' : 'w-9 h-9 text-xs'
-  if (!agent) {
-    return (
-      <div className={`${cls} rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0`}>
-        <Bot className="w-4 h-4 text-gray-500" />
-      </div>
-    )
-  }
-  return (
-    <div className={`${cls} rounded-full ${agent.color} flex items-center justify-center flex-shrink-0 text-white font-bold`}>
-      {agent.initials}
-    </div>
-  )
-}

@@ -1,15 +1,28 @@
 /**
- * agentPersonas — delad agent-metadata (Projektvy Fas 1, 2026-07-31).
+ * agentPersonas — HÄRLEDD vy av teamet, inte en egen källa.
  *
- * Extraherad ur IdagCore.tsx (AGENT_INFO) så samma persona-kartan kan
- * återanvändas av ProjectApprovalsBlock.tsx (projekt-detaljvyns
- * godkänn-kort) utan att duplicera färger/initialer/namn. IdagCore.tsx
- * importerar nu härifrån istället för att äga sin egen kopia — ingen
- * annan ändring i IdagCore.
+ * ═══ VARFÖR DEN INTE LÄNGRE ÄGER SIN DATA (spår D1, 2026-08-06) ═══
+ *
+ * Teamet fanns i fyra kopior: `lib/agents/team.ts`, den här filen, en inlinead
+ * karta i `app/dashboard/approvals/page.tsx` och en till i
+ * `MorningBriefWidget.tsx`. Kopiorna hade hunnit gå isär på precis det sätt
+ * kopior gör:
+ *
+ * - **Lisa saknades helt i morgonbriefen.** Hantverkarens telefonist syntes
+ *   alltså inte i den vy som ska sammanfatta vad teamet gjort.
+ * - **Lars var oliv** (#3B6D11) i briefen men smaragd (#059669) överallt
+ *   annars, och **Hanna var rosa** (#993556) i briefen men lila (#9333ea)
+ *   överallt annars. Samma agent, olika person beroende på var man tittade.
+ *
+ * Filen finns kvar för att `AGENT_INFO`-formen används av IdagCore och
+ * ProjectApprovalsBlock — men den HÄRLEDS nu ur TEAM. En agent som läggs till
+ * i teamet dyker upp här av sig själv, och kan aldrig få en annan färg.
  *
  * Persona-färgerna är de enda tillåtna icke-teal-accenterna i UI:t
- * (se handoff/projektvy/HANDOFF.md och DESIGN-NOTES.md).
+ * (se docs/HANDYMATE_DESIGN_SYSTEM.md, avsnittet om agentytor).
  */
+import { TEAM } from '@/lib/agents/team'
+
 export interface AgentPersona {
   name: string
   role: string
@@ -18,11 +31,9 @@ export interface AgentPersona {
   dot: string
 }
 
-export const AGENT_INFO: Record<string, AgentPersona> = {
-  matte: { name: 'Matte', role: 'Chefsassistent', color: 'bg-primary-700', dot: '#0f766e', initials: 'M' },
-  karin: { name: 'Karin', role: 'Ekonom', color: 'bg-blue-600', dot: '#2563eb', initials: 'K' },
-  hanna: { name: 'Hanna', role: 'Marknadschef', color: 'bg-purple-600', dot: '#9333ea', initials: 'H' },
-  daniel: { name: 'Daniel', role: 'Säljare', color: 'bg-amber-600', dot: '#d97706', initials: 'D' },
-  lars: { name: 'Lars', role: 'Projektledare', color: 'bg-emerald-600', dot: '#059669', initials: 'L' },
-  lisa: { name: 'Lisa', role: 'Kundservice', color: 'bg-sky-500', dot: '#0ea5e9', initials: 'Li' },
-}
+export const AGENT_INFO: Record<string, AgentPersona> = Object.fromEntries(
+  TEAM.map(a => [
+    a.id,
+    { name: a.name, role: a.role, color: a.color, initials: a.initials, dot: a.dot },
+  ]),
+)

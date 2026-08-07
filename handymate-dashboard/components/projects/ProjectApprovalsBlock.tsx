@@ -5,6 +5,7 @@ import { Check, Loader2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
+import { AgentAvatar } from '@/components/agents/AgentAvatar'
 
 /**
  * ProjectApprovalsBlock (Projektvy Fas 1, 2026-07-31).
@@ -209,13 +210,14 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
         return (
           <div key={approval.id} className="rounded-xl border border-[#E2E8F0] bg-gradient-to-br from-primary-50/60 to-white p-4">
             <div className="flex items-center gap-2.5 mb-2">
-              <div
-                className={`w-[30px] h-[30px] rounded-full ${agent.color} flex items-center justify-center flex-shrink-0 text-white text-xs font-bold`}
-              >
-                {agent.initials}
-              </div>
+              {/* SPÅR D2 (2026-08-06): kortet var identiskt med IdagCore:s
+                  godkännandekort så när som på två oavsiktliga skillnader —
+                  30 px avatar mot 36, och "har förberett" mot "föreslår".
+                  Samma agent som gör samma sak ska heta samma sak.
+                  Verbet bär rösten: berättar / föreslår / frågar. */}
+              <AgentAvatar agentKey={agentKey} />
               <span className="text-xs text-gray-500 flex-1 min-w-0 truncate">
-                <b className="font-semibold text-gray-900">{agent.name}</b> har förberett
+                <b className="font-semibold text-gray-900">{agent.name}</b> · {agent.role} föreslår
               </span>
               <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-primary-50 text-primary-700 whitespace-nowrap">
                 Skickas efter ditt OK

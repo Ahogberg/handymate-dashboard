@@ -31,17 +31,11 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 
-// Agent avatar lookup
+// SPÅR D1 (2026-08-06): kartan låg inlinead här och var en av fyra kopior av
+// teamet som hunnit gå isär. Härleds nu ur den enda källan (lib/agents/team.ts).
 const AVATAR_BASE = 'https://pktaqedooyzgvzwipslu.supabase.co/storage/v1/object/sign/team-avatars'
-const AGENT_INFO: Record<string, { name: string; role: string; color: string; initials: string }> = {
-  matte: { name: 'Matte', role: 'Chefsassistent', color: 'bg-primary-700', initials: 'M' },
-  karin: { name: 'Karin', role: 'Ekonom', color: 'bg-blue-600', initials: 'K' },
-  hanna: { name: 'Hanna', role: 'Marknadschef', color: 'bg-purple-600', initials: 'H' },
-  daniel: { name: 'Daniel', role: 'Säljare', color: 'bg-amber-600', initials: 'D' },
-  lars: { name: 'Lars', role: 'Projektledare', color: 'bg-emerald-600', initials: 'L' },
-  lisa: { name: 'Lisa', role: 'Kundservice', color: 'bg-sky-500', initials: 'Li' },
-}
 
 function getAgentFromApproval(approval: Approval): { name: string; role: string; color: string; initials: string } | null {
   // Explicit routing via payload (cron-skapade approvals sätter detta)

@@ -105,6 +105,10 @@ export function QuotePreviewPanel({
               sheetMode={isMobile}
               onRowTap={onRowTap}
               focusSection={focusSection}
+              // SPÅR B1: desktopens knapp inuti dokumentet gick tidigare till
+              // onItemAdd och gav en tom rad — artikelbanken nåddes inte alls
+              // från standardvyn. Nu samma väg som mobilens knapp nedan.
+              onAddRow={onAddRowTap}
             />
           </DocumentScaler>
 

@@ -57,6 +57,48 @@ export function useProductSearch(query: string, opts: { debounceMs?: number; min
 }
 
 /**
+ * HELA artikelbanken — underlaget för att BLÄDDRA, inte söka (spår B2).
+ *
+ * AddRowSheet visade tidigare favoriterna och ett sökfält. Sökning som enda
+ * väg in förutsätter att hantverkaren vet vad artikeln HETER; bläddring gör
+ * det inte, och efter utökningen 2026-08-06 (95 artiklar för el, 84 för bygg)
+ * är det skillnaden mellan en bank han använder och en han gissar sig förbi.
+ *
+ * Utan `search` sätter GET /api/products ingen limit, så ett anrop räcker —
+ * och `include=components` gör att raden kan byggas med fryst
+ * component_snapshot direkt vid val, utan en extra rundtur.
+ *
+ * Favoriterna plockas ur samma svar (`is_favorite`) i stället för ett eget
+ * anrop: två hämtningar av samma tabell kunde dessutom hinna gå isär.
+ */
+export function useAllProducts(enabled: boolean) {
+  const [products, setProducts] = useState<ProductWithComponents[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!enabled) return
+    let active = true
+    setLoading(true)
+    fetch('/api/products?include=components')
+      .then(r => (r.ok ? r.json() : { products: [] }))
+      .then(data => {
+        if (active) setProducts(data.products || [])
+      })
+      .catch(() => {
+        if (active) setProducts([])
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [enabled])
+
+  return { products, loading }
+}
+
+/**
  * Favoritartiklarna — det hantverkaren når oftast. Visas överst i AddRowSheet
  * innan något sökts, så vanligaste raden är ett tryck bort.
  */

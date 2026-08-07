@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { TEAM } from '@/lib/agents/team'
 import { useBusiness } from '@/lib/BusinessContext'
 
 interface BriefDetail { text: string; urgency: 'low' | 'medium' | 'high'; link?: string }
@@ -24,13 +25,15 @@ function hasSignal(brief: MorningBrief): boolean {
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 
-const AGENTS: Record<string, { name: string; initials: string; bg: string; text: string }> = {
-  matte:  { name: 'Matte', initials: 'M', bg: '#E1F5EE', text: '#0F6E56' },
-  karin:  { name: 'Karin', initials: 'K', bg: '#E6F1FB', text: '#185FA5' },
-  daniel: { name: 'Daniel', initials: 'D', bg: '#FAEEDA', text: '#854F0B' },
-  lars:   { name: 'Lars', initials: 'L', bg: '#EAF3DE', text: '#3B6D11' },
-  hanna:  { name: 'Hanna', initials: 'H', bg: '#FBEAF0', text: '#993556' },
-}
+/**
+ * SPÅR D1 (2026-08-06): kartan låg hårdkodad här och hade gått isär från
+ * resten av produkten på tre sätt — **Lisa saknades helt**, Lars var oliv i
+ * stället för smaragd, och Hanna var rosa i stället för lila. Samma agent,
+ * olika person beroende på var man tittade. Härleds nu ur den enda källan.
+ */
+const AGENTS: Record<string, { name: string; initials: string; bg: string; text: string }> = Object.fromEntries(
+  TEAM.map(a => [a.id, { name: a.name, initials: a.initials, bg: a.softBg, text: a.softText }]),
+)
 
 const STATUS_DOT: Record<string, string> = {
   danger: '#EF4444',
@@ -96,7 +99,7 @@ export default function MorningBriefWidget() {
       </div>
 
       {/* Agent-kort — grid för att ge varje agent mer plats */}
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         {brief.agents.map(agent => {
           const conf = AGENTS[agent.agentId] || AGENTS.matte
           const isActive = selected === agent.agentId

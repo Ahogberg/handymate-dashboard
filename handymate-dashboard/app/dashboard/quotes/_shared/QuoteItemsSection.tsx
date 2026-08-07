@@ -34,7 +34,8 @@ interface QuoteItemsSectionProps {
   onMoveItem: (index: number, direction: 'up' | 'down') => void
   onOpenGrossistSearch: () => void
   /** NY rad från produkt — add-row-combon + snabbvals-knapparna */
-  onSelectProduct: (product: ProductWithComponents) => void
+  /** Antalet är valfritt (spår B3) — listvyns ytor lägger alltid till en enhet. */
+  onSelectProduct: (product: ProductWithComponents, quantity?: number) => void
   /** Förfyll BEFINTLIG rad från produkt — inline-combon i beskrivningsfältet */
   onSelectProductForRow: (itemId: string, product: ProductWithComponents) => void
   onAddBlankRow: (description: string) => void

@@ -206,10 +206,14 @@ export function useQuoteItems(
    * snabbvals-knapparna) — samma förfyllnings-väg som inline-combon.
    */
   const addFromProductBank = useCallback(
-    (product: ProductWithComponents) => {
+    // SPÅR B3: antalet kommer med redan vid valet. Vägen till "8 timmar" var
+    // tidigare välj artikel → raden får 1 → tryck raden → RowEditSheet →
+    // skriv antal → stäng: fyra extra interaktioner för det vanligaste fallet.
+    // Utelämnat antal ger 1, precis som förut.
+    (product: ProductWithComponents, quantity = 1) => {
       setItems(prev => {
         const base = createDefaultItem('item', prev.length)
-        return [...prev, applyProductToItem(base, product, 1)]
+        return [...prev, applyProductToItem(base, product, quantity > 0 ? quantity : 1)]
       })
     },
     [setItems],

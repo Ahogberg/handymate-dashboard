@@ -73,7 +73,7 @@ export function ReservationMutedNotice({ title, onUndo, onClose }: MutedNoticePr
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm text-slate-700">
-            Okej — jag slutar föreslå «{title}». Du kan ändra det under Inställningar → Reservationer.
+            Okej — jag slutar föreslå «{title}». Du kan ändra det under Inställningar → Förbehåll.
           </p>
           <button
             type="button"

@@ -141,6 +141,40 @@ export async function PUT(request: NextRequest) {
       .eq('business_id', business.business_id)
     if (error) throw error
 
+    // Triggrarna ersätts som en HELHET när de skickas med (spår C3).
+    //
+    // Delvisa uppdateringar hade krävt id:n på klientsidan och gett en tyst
+    // asymmetri: en borttagen trigger är inte samma sak som en utelämnad.
+    // Utelämnat fält → triggrarna rörs inte alls, så en ren titeländring
+    // aldrig råkar radera kopplingarna.
+    if (Array.isArray(body.triggers)) {
+      const { error: delErr } = await supabase
+        .from('reservation_triggers')
+        .delete()
+        .eq('reservation_id', body.id)
+        .eq('business_id', business.business_id)
+      if (delErr) throw delErr
+
+      const triggers: Array<{ trigger_type: string; category_slug?: string; keyword?: string; product_id?: string }> =
+        body.triggers
+      if (triggers.length > 0) {
+        const { error: insErr } = await supabase.from('reservation_triggers').insert(
+          triggers.map((t, i) => ({
+            // Tidsstämpel i nyckeln så en omskrivning aldrig krockar med de
+            // rader som just raderats i samma anrop.
+            id: `restrig_${body.id}_${Date.now()}_${i}`,
+            business_id: business.business_id,
+            reservation_id: body.id,
+            trigger_type: t.trigger_type,
+            category_slug: t.trigger_type === 'category' ? t.category_slug : null,
+            keyword: t.trigger_type === 'keyword' ? (t.keyword || '').toLowerCase() : null,
+            product_id: t.trigger_type === 'product' ? t.product_id : null,
+          })),
+        )
+        if (insErr) throw insErr
+      }
+    }
+
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('PUT reservations error:', error)

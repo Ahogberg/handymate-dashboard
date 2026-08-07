@@ -460,6 +460,70 @@ Fill: `linear-gradient(90deg, var(--bee-500), var(--bee-600))`, animation `bp-gr
 
 ---
 
+## 4b. Agentytor — när teamet syns
+
+*Tillagt 2026-08-06 (spår D3). Avsnittet saknades helt, och dess frånvaro
+förklarar varför teamet hann ligga i fyra kopior med olika färger.*
+
+### Den enda källan
+
+`lib/agents/team.ts` — namn, roll, initialer, `color` (Tailwind-klass), `dot`
+(hex), `softBg`/`softText` (avatar på ljus yta). `components/dashboard/agentPersonas.ts`
+härleder `AGENT_INFO` ur den. **Skriv aldrig en egen agentkarta.**
+
+| Agent | Roll | Färg |
+|---|---|---|
+| Matte | Chefsassistent | `#0f766e` |
+| Karin | Ekonom | `#2563eb` |
+| Hanna | Marknadschef | `#9333ea` |
+| Daniel | Säljare | `#d97706` |
+| Lars | Projektledare | `#059669` |
+| Lisa | Kundservice & Telefonist | `#0ea5e9` |
+
+### Undantaget från "max 2 accentfärger"
+
+Regeln i avsnitt 1 gäller inte agentytor — men bara för att en snävare regel
+tar över:
+
+> **Färgen bor i avataren, ingen annanstans.**
+> Teal är chrome. Per-agent-färgen får förekomma på exakt två ställen:
+> avatarcirkeln och prickar i en händelselogg. Aldrig som kortram,
+> bakgrund, rubrikfärg eller knapp.
+
+Med den regeln blir sex agenter i följd sex små ansikten i ett lugnt flöde —
+inte sex färgade kort. Hannas lila finns i persondata och bryter inte mot
+"aldrig lila", eftersom den aldrig når en temayta.
+
+Använd `<AgentAvatar agentKey={...} size="sm|md|lg" />`
+([components/agents/AgentAvatar.tsx](../components/agents/AgentAvatar.tsx)) —
+28 px i listrader, 36 px i kort, 44 px i rubrikytor. Okänd agent ger en
+neutral robotikon, aldrig en gissad färg.
+
+### Rösten bärs av verbet, inte av färgen
+
+Tre lägen, med varsin anatomi. Det fungerar även för färgblinda och i solljus
+på ett tak.
+
+| Läge | Byline | Form | Knappar |
+|---|---|---|---|
+| **berättar** | "Lisa · Kundservice" | platt rad, ingen ram | inga — högst en textlänk |
+| **föreslår** | "Karin · Ekonom **föreslår**" | vitt kort med ram, resultatet läsbart på plats | Godkänn / Ändra / Avvisa |
+| **frågar** | "Lars · Projektledare **frågar**" | vitt kort med ram | likvärdiga svarsalternativ — **aldrig Godkänn** |
+
+En fråga är inte ett godkännande. Har systemet inget färdigt svar ska det inte
+låtsas ha ett.
+
+### Bocken och amber ljuger aldrig
+
+- **Bocken** är reserverad för mänskliga beslut. Maskinens eget arbete får en
+  neutral etikett, aldrig en bock. Samma princip som kvittots tre tillstånd
+  ([lib/quotes/section-handlers.ts](../lib/quotes/section-handlers.ts)): en
+  sektion som aldrig granskats bär ingen ikon alls.
+- **Amber** betyder att pengar eller tid går förlorade om ingen tittar. En ny
+  lead är en nyhet, inte en varning. Blir allt gult slutar man läsa gult.
+
+---
+
 ## 5. Anti-mönster — vad vi INTE gör
 
 ✗ **Färg på element bara för att det är "kul"** — varje färgad pixel ska kommunicera något.

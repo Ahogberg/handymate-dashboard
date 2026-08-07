@@ -59,12 +59,25 @@ export interface QuoteDocumentProps extends QuoteDocumentMobileProps {
    * null/utelämnad → allt tänt, dagens beteende exakt.
    */
   focusSection?: DocumentSection | null
+  /**
+   * SPÅR B1 (2026-08-06): vad "+ Lägg till rad" ska göra.
+   *
+   * Utan den här gick knappen till `handlers.onItemAdd` och gav en TOM rad —
+   * beskrivning, antal, enhet, à-pris, kategori och ROT för hand, med priset i
+   * huvudet. Artikelbanken nåddes bara via listvyns combobox, som inte finns
+   * på mobil och inte är standardvyn på desktop. Bläddra-först-ytan
+   * (AddRowSheet) fanns alltså men var osynlig ≥1024px.
+   *
+   * Satt → knappen öppnar sheeten på BÅDA breddena. Utelämnad → tom rad som
+   * förut, så fakturans canvas och andra anropare inte påverkas.
+   */
+  onAddRow?: () => void
 }
 
 /** Sektionerna hantverkaren granskar en i taget, i Andreas taxonomi. */
 export type DocumentSection = 'inkluderat' | 'exkluderat' | 'reservationer' | 'prisbild'
 
-export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTap, focusSection }: QuoteDocumentProps) {
+export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTap, focusSection, onAddRow }: QuoteDocumentProps) {
   const accent = data.business.accentColor
   const accent50 = mixWithWhite(accent, 0.92)
   const accent100 = mixWithWhite(accent, 0.82)
@@ -338,8 +351,10 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             dokumentet av QuotePreviewPanel. Inuti den skalade A4:an blev
             träffytan ~15px vid 375px skärmbredd — långt under 44px-kravet,
             och just på den yta som är hantverkarens huvudvy. */}
-        {mode === 'edit' && handlers?.onItemAdd && !sheetMode && (
-          <button type="button" onClick={handlers.onItemAdd} className="add-row-btn">
+        {/* SPÅR B1: onAddRow öppnar artikelbanken; onItemAdd ger en tom rad.
+            Fallbacken behålls för anropare som inte skickar in någon sheet. */}
+        {mode === 'edit' && (onAddRow || handlers?.onItemAdd) && !sheetMode && (
+          <button type="button" onClick={onAddRow || handlers?.onItemAdd} className="add-row-btn">
             + Lägg till rad
           </button>
         )}

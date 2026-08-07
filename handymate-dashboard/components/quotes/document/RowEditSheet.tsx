@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { ArrowDown, ArrowUp, Check, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bookmark, Check, Trash2, X } from 'lucide-react'
 import type { QuoteItem, QuoteItemType } from '@/lib/types/quote'
 import { UNIT_OPTIONS } from '@/components/quotes/ItemRow'
 import { standardPriceOffer } from '@/lib/products/pricing-state'
@@ -27,6 +27,18 @@ interface RowEditSheetProps {
   linkedProductPrice?: number | null
   /** Skriver radens pris till artikeln som nytt standardpris. */
   onSaveAsStandard?: (productId: string, price: number) => void
+  /**
+   * SPÅR B4 (2026-08-06): spara raden som en ny artikel i banken.
+   *
+   * Bokmärkesknappen fanns bara i ItemRow, alltså bara i LISTVYN — som inte
+   * finns på mobil och inte är standardvyn på desktop. En hantverkare som
+   * skrev en fritextrad han använder varje vecka hade därför ingen väg att
+   * spara den från den yta han faktiskt arbetar i. Sheeten nås från canvasen
+   * på båda breddena.
+   *
+   * Utelämnad → knappen renderas inte.
+   */
+  onSaveToBank?: (item: QuoteItem) => void
 }
 
 const TYPE_LABEL: Record<QuoteItemType, string> = {
@@ -57,7 +69,7 @@ const FIELD_CLS =
  * enda källa som QuoteItemsSection — så sheeten återanvänder dem rakt av
  * istället för att uppfinna en egen datavåg.
  */
-export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, onClose, linkedProductPrice, onSaveAsStandard }: RowEditSheetProps) {
+export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, onClose, linkedProductPrice, onSaveAsStandard, onSaveToBank }: RowEditSheetProps) {
   useEffect(() => {
     if (!item) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -296,6 +308,22 @@ export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, 
             <Trash2 className="w-4 h-4" />
             Ta bort
           </button>
+
+          {/* SPÅR B4: bara för riktiga rader med en beskrivning, och bara när
+              raden inte redan kommer ur banken. Samma villkor som ItemRow —
+              en knapp som erbjuder att spara något redan sparat lär bort
+              uppmärksamhet, precis som standardpriserbjudandet ovan. */}
+          {onSaveToBank && item.item_type === 'item' && item.description.trim() !== '' && !item.linked_product_id && (
+            <button
+              type="button"
+              onClick={() => { onSaveToBank(item); onClose() }}
+              className="inline-flex items-center gap-1.5 px-4 min-h-[44px] text-sm font-semibold text-primary-700 hover:bg-primary-50 rounded-xl transition-colors"
+            >
+              <Bookmark className="w-4 h-4" />
+              Spara i banken
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onClose}

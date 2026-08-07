@@ -1605,8 +1605,8 @@ export default function NewQuotePage() {
   // hämtas lazily om de saknas (snabbvalens produkter laddas utan) och raden
   // förfylls via applyProductToItem — snapshot/split/timmar fryses in.
   const addFromProduct = useCallback(
-    async (product: ProductWithComponents) => {
-      addFromProductBank(await ensureProductComponents(product))
+    async (product: ProductWithComponents, quantity = 1) => {
+      addFromProductBank(await ensureProductComponents(product), quantity)
     },
     [addFromProductBank],
   )
@@ -2445,7 +2445,7 @@ export default function NewQuotePage() {
                 onUpdateItem={updateItem}
                 onRemoveItem={removeItem}
                 onMoveItem={moveItem}
-                onSelectProduct={product => { void addFromProduct(product) }}
+                onSelectProduct={(product, quantity) => { void addFromProduct(product, quantity) }}
                 onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
                 onAddBlankRow={addBlankRowWithDescription}
                 onOpenGrossistSearch={() => setShowGrossistSearch(true)}
@@ -2509,13 +2509,16 @@ export default function NewQuotePage() {
             : null
         }
         onSaveAsStandard={(productId, price) => { void saveStandardPrice(productId, price) }}
+        onSaveToBank={row => setProductModalRow(row)}
       />
 
       {/* Mobilens "lägg till rad" — söker i artikelbanken i stället för att
           ge en tom rad. Öppnas av den oskalade knappen under dokumentet. */}
       <AddRowSheet
         open={addRowSheetOpen}
-        onSelectProduct={product => { void addFromProduct(product) }}
+        // SPÅR C2: förbehållen syns i väljaren, innan raden läggs till.
+        reservationCount={product => reservations.countForProduct(product)}
+        onSelectProduct={(product, quantity) => { void addFromProduct(product, quantity) }}
         onAddBlankRow={addBlankRowWithDescription}
         onAddHeading={() => addItem('heading')}
         onClose={() => setAddRowSheetOpen(false)}

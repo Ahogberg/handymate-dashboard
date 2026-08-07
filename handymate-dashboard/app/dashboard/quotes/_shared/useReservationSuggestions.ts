@@ -58,6 +58,42 @@ export function useReservationSuggestions(items: QuoteItem[], initialSnapshot?: 
     [items, library, snapshot, dismissedIds],
   )
 
+  /**
+   * SPÅR C2 (2026-08-06): hur många förbehåll en artikel skulle dra med sig,
+   * innan den lagts till.
+   *
+   * Motorn kunde redan matcha på artikel-id (match.ts:70) — det som saknades
+   * var att köra den i FÖRVÄG och visa svaret där artikeln väljs. Det är exakt
+   * det Andreas menar med att förbehållen ska kännas av per automatik.
+   *
+   * Räknar bara det som faktiskt vore NYTT: reservationer som redan ligger på
+   * offerten eller avvisats i den här sessionen räknas inte. "1 förbehåll
+   * följer med" om det redan står i offerten hade varit en osanning på den
+   * plats där hantverkaren fattar beslutet.
+   *
+   * Kategoritriggrar kan inte fånga något här, och det är avsiktligt:
+   * applyProductToItem sätter ingen `category_slug`, och produktens `category`
+   * ('arbete') och offertradens slug ('arbete_el') är olika vokabulärer utan
+   * härledbar mappning. Att gissa hade gett en siffra som ser exakt ut men
+   * pekar fel. Produkt- och nyckelordstriggrar är de som verkligen utlöser.
+   */
+  const countForProduct = useCallback(
+    (product: { id: string; name: string }) => {
+      const hypotetisk = {
+        id: `forhandsgranskning_${product.id}`,
+        description: product.name,
+        linked_product_id: product.id,
+        category_slug: null,
+        item_type: 'item',
+      }
+      return matchReservations([hypotetisk], library, {
+        alreadyAdded: snapshot,
+        dismissedIds,
+      }).length
+    },
+    [library, snapshot, dismissedIds],
+  )
+
   const sendDecisions = useCallback(
     (decisions: Array<{ reservation_id: string; decision: 'accepted' | 'rejected' }>) => {
       if (decisions.length === 0) return
@@ -120,6 +156,7 @@ export function useReservationSuggestions(items: QuoteItem[], initialSnapshot?: 
 
   return {
     suggestions,
+    countForProduct,
     snapshot,
     setSnapshot,
     reviewOpen,

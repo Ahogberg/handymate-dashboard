@@ -31,6 +31,7 @@ import {
   Trash2,
   Pencil,
   Package,
+  ShieldCheck,
   Briefcase,
   CalendarDays,
   UsersRound,
@@ -1678,6 +1679,24 @@ export default function SettingsPage() {
                 <div>
                   <p className="font-medium text-gray-900">Produkter & priser</p>
                   <p className="text-sm text-gray-400">Produktbank med kategorier, priser och komponentkalkyler</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-secondary-700 transition-colors" />
+            </Link>
+
+            {/* Länk till förbehållsbiblioteket — ReservationSuggestionBanner
+                hänvisade hit i klartext långt innan sidan fanns. */}
+            <Link
+              href="/dashboard/settings/reservations"
+              className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-300 hover:border-primary-300 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-[#F0FDFA] border border-[#E2E8F0]">
+                  <ShieldCheck className="w-5 h-5 text-primary-700" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Förbehåll</p>
+                  <p className="text-sm text-gray-400">Villkor som föreslås automatiskt i offerten</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-secondary-700 transition-colors" />

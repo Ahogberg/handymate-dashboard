@@ -28,7 +28,7 @@ export interface AgentBrief {
  * (Upptäckt 2026-08-05: overdue-fixen syntes inte förrän dagen efter
  * eftersom GET:en serverade 05:30-cronens cache byggd med gammal kod.)
  */
-export const MORNING_BRIEF_VERSION = 2
+export const MORNING_BRIEF_VERSION = 3
 
 export interface MorningBrief {
   date: string
@@ -60,6 +60,7 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
     openLeads, staleQuotes,
     todayBookings, profWarnings,
     inactiveCustomers, pendingApprovals,
+    recentCalls,
   ] = await Promise.all([
     // check-overdue-cronen flippar status till 'overdue' när förfallodatum
     // passerar — filtrerade vi bara på 'sent' missade Karin exakt de
@@ -107,6 +108,14 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
       .select('id, title')
       .eq('business_id', businessId).eq('status', 'pending')
       .order('created_at', { ascending: false }).limit(10),
+    // Lisas underlag: samtalen sedan igår. Ett rullande dygn, inte
+    // kalenderdygn — en brief som läses 07:00 ska visa gårdagskvällens
+    // samtal, inte ett tomt fönster.
+    supabase.from('call_recording')
+      .select('recording_id, phone_number, transcript_summary, created_at')
+      .eq('business_id', businessId)
+      .gte('created_at', new Date(Date.now() - 86400000).toISOString())
+      .order('created_at', { ascending: false }).limit(5),
   ])
 
   const karinBrief = buildKarinBrief(overdueInvoices.data || [], pendingInvoices.data || [])
@@ -134,12 +143,13 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
   const danielBrief = buildDanielBrief(openLeads.data || [], staleQuotes.data || [])
   const larsBrief = buildLarsBrief(todayBookings.data || [], profWarnings.data || [])
   const hannaBrief = buildHannaBrief(inactiveCustomers.data || [])
-  const matteBrief = buildMatteBrief(pendingApprovals.data || [], [karinBrief, danielBrief, larsBrief, hannaBrief])
+  const lisaBrief = buildLisaBrief(recentCalls.data || [])
+  const matteBrief = buildMatteBrief(pendingApprovals.data || [], [karinBrief, danielBrief, larsBrief, hannaBrief, lisaBrief])
 
   const brief: MorningBrief = {
     date: today,
     greeting: `God morgon, ${firstName}!`,
-    agents: [matteBrief, karinBrief, danielBrief, larsBrief, hannaBrief],
+    agents: [matteBrief, karinBrief, danielBrief, larsBrief, hannaBrief, lisaBrief],
     generatedAt: new Date().toISOString(),
     version: MORNING_BRIEF_VERSION,
   }
@@ -248,6 +258,36 @@ function buildHannaBrief(inactive: any[]): AgentBrief {
     details: inactive.slice(0, 3).map((c: any) => ({ text: `${c.name} — inaktiv 6+ månader`, urgency: 'low' as const, link: `/dashboard/customers/${c.customer_id}` })),
   }
   return { agentId: 'hanna', quote: 'Inga reaktiveringsmöjligheter just nu.', badge: 'OK', badgeType: 'neutral', details: [] }
+}
+
+/**
+ * Lisas brief — samtalen som kom in medan hantverkaren jobbade.
+ *
+ * SPÅR D1 (2026-08-06): Lisa saknades HELT i morgonbriefen. Telefonisten —
+ * den agent som fångar det hantverkaren annars hade missat — syntes alltså
+ * inte i den vy som ska sammanfatta vad teamet gjort. Det var inte ett
+ * designbeslut; kartan över agenter i widgeten hade fem poster och
+ * sammanställningen här byggde aldrig en sjätte.
+ *
+ * Ett besvarat samtal är en GOD nyhet, inte en åtgärd: Lisa tog det, och
+ * hantverkaren behöver bara veta att det hänt. Därför 'success' och låg
+ * brådska — inte en varning som tränar bort uppmärksamhet.
+ */
+function buildLisaBrief(calls: any[]): AgentBrief {
+  if (calls.length > 0) return {
+    agentId: 'lisa',
+    quote: calls.length === 1 ? 'Jag tog ett samtal åt dig' : `Jag tog ${calls.length} samtal åt dig`,
+    badge: 'Hanterat',
+    badgeType: 'success',
+    details: calls.slice(0, 3).map((c: any) => ({
+      text: c.transcript_summary?.trim()
+        ? `${c.phone_number || 'Okänt nummer'} — ${String(c.transcript_summary).slice(0, 90)}`
+        : `${c.phone_number || 'Okänt nummer'} ringde`,
+      urgency: 'low' as const,
+      link: '/dashboard/calls',
+    })),
+  }
+  return { agentId: 'lisa', quote: 'Inga samtal sedan igår.', badge: 'OK', badgeType: 'neutral', details: [] }
 }
 
 function buildMatteBrief(approvals: any[], agentBriefs: AgentBrief[]): AgentBrief {
