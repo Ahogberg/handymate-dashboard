@@ -9,6 +9,7 @@ import { useJobbuddy } from '@/lib/JobbuddyContext'
 import { AgentDecisionCard, CardFactBox } from '@/components/agents/AgentDecisionCard'
 import { AgentNewsRow } from '@/components/agents/AgentNewsRow'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
+import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { QuoteDraftDetail, QuoteToolExit } from '@/components/jarvis/QuoteDraftDetail'
 import { approvalPreview, isEditable, buildApprovalEdit } from '@/lib/jarvis/approval-preview'
 import {
@@ -266,12 +267,15 @@ export default function JarvisHome({
       .then(d => {
         if (!active || !d?.summary) return
         const s = d.summary
+        // Substantivfraser, inte verbfraser. "Senaste dygnet tog 7 samtal …
+        // teamet" är svengelska med subjektet på fel plats; en uppräkning
+        // slipper böjningen helt och läses snabbare.
         const delar: string[] = []
-        if (s.total_calls > 0) delar.push(`tog ${s.total_calls} samtal`)
-        if (s.total_sms > 0) delar.push(`skickade ${s.total_sms} SMS`)
-        if (s.total_quotes > 0) delar.push(`förberedde ${s.total_quotes} offert${s.total_quotes > 1 ? 'er' : ''}`)
-        if (s.total_bookings_updated > 0) delar.push(`uppdaterade ${s.total_bookings_updated} bokning${s.total_bookings_updated > 1 ? 'ar' : ''}`)
-        if (delar.length === 0 && s.total_automations > 0) delar.push(`utförde ${s.total_automations} åtgärd${s.total_automations > 1 ? 'er' : ''}`)
+        if (s.total_calls > 0) delar.push(`${s.total_calls} samtal`)
+        if (s.total_sms > 0) delar.push(`${s.total_sms} SMS`)
+        if (s.total_quotes > 0) delar.push(`${s.total_quotes} offert${s.total_quotes > 1 ? 'er' : ''}`)
+        if (s.total_bookings_updated > 0) delar.push(`${s.total_bookings_updated} bokning${s.total_bookings_updated > 1 ? 'ar' : ''}`)
+        if (delar.length === 0 && s.total_automations > 0) delar.push(`${s.total_automations} åtgärd${s.total_automations > 1 ? 'er' : ''}`)
         setProof(delar.length ? delar.join(', ').replace(/,([^,]*)$/, ' och$1') : null)
       })
       .catch(() => { /* bandet är inte kritiskt */ })
@@ -370,13 +374,15 @@ export default function JarvisHome({
     <div className="max-w-[1180px] mx-auto px-4 sm:px-8 pt-6 sm:pt-7 pb-9">
       <div className="grid lg:grid-cols-[1fr_320px] gap-6 lg:gap-7">
         {/* ── Huvudspalten ─────────────────────────────────────────────── */}
-        <div className="min-w-0">
+        <div className="min-w-0 lg:row-start-1 lg:col-start-1">
           <h1 className="font-heading text-[22px] sm:text-[26px] font-bold tracking-[-0.02em] text-slate-900 m-0">
             {greetingName ? `God morgon, ${greetingName}` : 'God morgon'}
           </h1>
           <p className="mt-1.5 text-sm text-slate-500 leading-normal">
             {new Date().toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
-            {proof && <> · Senaste dygnet {proof} teamet.</>}
+            {/* Tidsfönstret är ett RULLANDE dygn (team-activity, HOURS_BACK=24).
+                Texten säger det den mäter — inte "sedan igår kväll". */}
+            {proof && <> · Teamet har senaste dygnet hanterat <b className="font-semibold text-slate-800">{proof}</b>.</>}
           </p>
 
           {feedback && (
@@ -397,7 +403,8 @@ export default function JarvisHome({
                 {beslut}
               </span>
             )}
-            <span className="ml-auto text-xs text-slate-400">Allt annat sköter teamet själva</span>
+            {/* Göms under sm — vid 390px trängde den ut rubriken. */}
+            <span className="ml-auto text-xs text-slate-400 hidden sm:inline">Allt annat sköter teamet själva</span>
           </div>
 
           {!queueLoaded ? (
@@ -523,22 +530,10 @@ export default function JarvisHome({
             </div>
           )}
 
-          {/* ── Skrivraden. Sist, inte först — allt ovanför klaras utan
-                 tangentbord. Öppnar befintliga Jobbkompisen. ── */}
-          <button
-            type="button"
-            onClick={() => openJobbkompisen(true)}
-            className="mt-5 w-full flex items-center gap-2.5 h-12 pl-[18px] pr-2 bg-white border border-slate-200 rounded-full text-sm text-slate-400 hover:border-slate-300 transition-colors"
-          >
-            <span className="flex-1 text-left truncate">Skriv till teamet — eller tryck. Allt ovanför klaras utan tangentbord.</span>
-            <span className="w-9 h-9 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center shrink-0">
-              <Mic className="w-4 h-4" />
-            </span>
-          </button>
         </div>
 
         {/* ── Högerspalten — gräv-ingångarna ───────────────────────────── */}
-        <aside className="flex flex-col gap-3 min-w-0">
+        <aside className="flex flex-col gap-3 min-w-0 lg:row-start-1 lg:col-start-2">
           <RailCard title="Dagens plan" href="/dashboard/schedule">
             {!bookingsLoaded ? (
               <div className="h-16 bg-slate-50 rounded-lg animate-pulse" />
@@ -586,6 +581,27 @@ export default function JarvisHome({
             )}
           </RailCard>
         </aside>
+
+        {/* ── Skrivraden ───────────────────────────────────────────────────
+             SIST, inte först. Allt ovanför klaras utan tangentbord — en
+             textruta som svarar hade varit en sämre meny med extra
+             skrivarbete. Öppnar befintliga Jobbkompisen (riktiga Matte, med
+             röst), så ingen ny chattbackend behövs.
+
+             Eget rutnätsbarn i stället för sist i huvudspalten: på mobil
+             hamnar den då efter gräv-korten, som en hantverkare på bygget har
+             mer nytta av än en skrivrad. På desktop ligger den kvar under
+             huvudspalten precis som i mockupen. */}
+        <button
+          type="button"
+          onClick={() => openJobbkompisen(true)}
+          className="lg:row-start-2 lg:col-start-1 w-full flex items-center gap-2.5 h-12 pl-[18px] pr-2 bg-white border border-slate-200 rounded-full text-sm text-slate-400 hover:border-slate-300 transition-colors"
+        >
+          <span className="flex-1 text-left truncate">Skriv till teamet — eller tryck. Allt ovanför klaras utan tangentbord.</span>
+          <span className="w-9 h-9 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center shrink-0">
+            <Mic className="w-4 h-4" />
+          </span>
+        </button>
       </div>
 
       {/* Ångra-snackbaren. POST:en har INTE gått iväg än. */}
@@ -681,7 +697,10 @@ function ApprovalCard({
         className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 min-h-[44px] flex items-center gap-3 text-left hover:border-primary-200 transition-colors"
       >
         <AgentAvatar agentKey={agentKey} size="sm" />
-        <span className="flex-1 min-w-0 text-sm text-slate-600 truncate">{approval.title}</span>
+        <span className="flex-1 min-w-0 text-sm text-slate-600 truncate">
+          <b className="font-semibold text-slate-900">{AGENT_INFO[agentKey]?.name || 'Teamet'}</b>
+          {' · '}{approval.title}
+        </span>
         <ChevronDown className="w-4 h-4 text-slate-300 shrink-0" />
       </button>
     )
@@ -704,18 +723,22 @@ function ApprovalCard({
       // Godkänn på samma kort gör valet oklart.
       actionsHidden={editing}
       expanded={detailOpen}
-      // Uppfällt läge byter ut tidsstämpeln mot vägen tillbaka — kortet växer
-      // på sin plats, inget navigeras bort, ingenting tappas.
+      // Kortet växer på sin plats i stället för att navigera bort — inget
+      // tappas, och bakgrunden ligger kvar. Tidsstämpeln står kvar i hopfällt
+      // läge; uppfällt tar "Fäll ihop" dess plats, som i mockupen.
       headerSlot={
         summary?.ready ? (
-          <button
-            type="button"
-            onClick={onToggleDetail}
-            className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 min-h-[32px] px-1 whitespace-nowrap"
-          >
-            {detailOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            {detailOpen ? 'Fäll ihop' : 'Läs raderna'}
-          </button>
+          <span className="inline-flex items-center gap-2 shrink-0">
+            {!detailOpen && <span className="text-xs text-slate-400 hidden sm:inline">{timeAgo(approval.created_at)}</span>}
+            <button
+              type="button"
+              onClick={onToggleDetail}
+              className="inline-flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-primary-700 min-h-[32px] px-1 whitespace-nowrap transition-colors"
+            >
+              {detailOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              {detailOpen ? 'Fäll ihop' : 'Läs raderna'}
+            </button>
+          </span>
         ) : undefined
       }
     >
