@@ -600,7 +600,8 @@ export default function NewQuotePage() {
   // räknar om totalerna själv och behöver de råa fälten (rot_rut_type,
   // option_selected, labor_amount m.fl.) som inte finns kvar i den
   // visningsfärdiga QuoteTemplateData-formen.
-  const dealIdFromQuery = searchParams?.get('deal_id') || searchParams?.get('lead_id') || null
+  const dealIdFromQuery = searchParams?.get('deal_id') || null
+  const leadIdFromQuery = searchParams?.get('lead_id') || null
   const { quoteTemplateData, templatePreviewPayload } = useMemo(() => {
     const validUntil = new Date()
     validUntil.setDate(validUntil.getDate() + (validDays || 30))
@@ -860,7 +861,7 @@ export default function NewQuotePage() {
     const customerId = searchParams?.get('customerId') || searchParams?.get('customer_id')
     const prefillTitle = searchParams?.get('title')
     const prefillDescription = searchParams?.get('description')
-    const dealId = searchParams?.get('deal_id') || searchParams?.get('lead_id')
+    const dealId = searchParams?.get('deal_id')
     if (transcript) {
       setSourceTranscript(transcript)
       setAiTextInput(transcript)
@@ -1868,7 +1869,8 @@ export default function NewQuotePage() {
           template_id: templateId || null,
           template_style: templateStyle,
           attachments: attachments.length > 0 ? attachments : [],
-          deal_id: searchParams?.get('deal_id') || searchParams?.get('lead_id') || null,
+          deal_id: dealIdFromQuery,
+          lead_id: leadIdFromQuery,
         }),
       })
       const data = await res.json()
