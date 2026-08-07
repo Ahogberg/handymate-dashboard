@@ -18,6 +18,7 @@ import TeamActivityStrip, { TeamActivitySummary } from '@/components/TeamActivit
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { approvalPreview, isEditable, buildApprovalEdit } from '@/lib/jarvis/approval-preview'
+import { cardContext } from '@/lib/jarvis/card-context'
 
 /**
  * IdagCore — kärnstacken i nya Idag-vyn (2026-07-11, från Idag-vy.html-designen).
@@ -107,7 +108,6 @@ function getRecipient(approval: Approval): string {
   if (pl.to) return String(pl.to)
   return ''
 }
-
 
 const TYPE_LABEL: Record<string, string> = {
   send_sms: 'SMS',
@@ -320,6 +320,7 @@ export default function IdagCore({
           granted?: boolean
           error?: string
           sms_sent?: boolean
+          reply_saved?: boolean
           ok?: boolean
           reason?: 'fail' | 'four_eyes_required' | 'permission_denied' | 'rate_limited'
         }
@@ -352,8 +353,24 @@ export default function IdagCore({
         showFeedback(`Saknar behörighet: ${errText}`, true)
       } else if (reason === 'rate_limited') {
         showFeedback(`För många försök: ${errText}`, true)
-      } else if (execution && (execution.error || execution.sms_sent === false || execution.ok === false)) {
+      } else if (execution && (execution.error || (execution.sms_sent === false && !execution.reply_saved) || execution.ok === false)) {
         showFeedback(`Handling misslyckades: ${errText}`, true)
+      } else if (execution?.reply_saved && execution.sms_sent === false) {
+        // Svaret ligger i kundens tråd — bara AVISERINGEN uteblev, vilket är
+        // väntat när kunden saknar mobilnummer. Tidigare läste kön
+        // `sms_sent: false` som ett misslyckat utförande och sa "Handling
+        // misslyckades" om något som faktiskt gått igenom. En falsk
+        // misslyckandesignal är värre än ingen signal: hantverkaren skickar om,
+        // och kunden får svaret två gånger.
+        showFeedback('Svaret ligger i kundens portal. Kunden saknar mobilnummer, så ingen avisering gick ut.', false, 7000)
+        setDoneRows(prev => [{
+          key: `local-${approval.id}`,
+          time: 'nyss',
+          agent: agentKey,
+          text: `svarade: ${approval.title}`,
+          auto: false,
+          fresh: true,
+        }, ...prev])
       } else if (execution?.action === 'autonomy_offer' && execution.granted === true) {
         showFeedback('Självständighet beviljad — teamet sköter detta framöver. Du kan alltid ta tillbaka ratten.', false, 8000)
         setDoneRows(prev => [{
@@ -745,6 +762,7 @@ function QueueCard({
   const isAutonomy = approval.approval_type === 'autonomy_offer'
   const preview = approvalPreview(approval).text
   const recipient = getRecipient(approval)
+  const context = cardContext(approval.payload)
   const editable = isEditable(approval)
   const label = TYPE_LABEL[approval.approval_type] || approval.approval_type
 
@@ -764,10 +782,18 @@ function QueueCard({
       </div>
 
       <h3 className="text-[15px] font-semibold text-gray-900 leading-snug mb-1">{approval.title}</h3>
+
+      {/* Vem och vad — ALLTID, inte bara när beskrivningen saknas. Utan den
+          fick hantverkaren "Kunden har en fråga om offerten" utan att veta
+          vilken kund eller vilken offert. */}
+      {context && (
+        <p className="text-[12px] text-gray-400 mb-1 truncate" title={context}>{context}</p>
+      )}
+
       {approval.description && (
         <p className="text-[13px] text-gray-500 leading-relaxed mb-2">{approval.description}</p>
       )}
-      {recipient && !approval.description && (
+      {recipient && !approval.description && !context && (
         <p className="text-[13px] text-gray-500 mb-2">Till: {recipient}</p>
       )}
 

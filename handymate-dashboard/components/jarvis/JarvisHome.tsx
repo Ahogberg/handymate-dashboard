@@ -21,6 +21,7 @@ import {
   typeLabel,
 } from '@/lib/jarvis/approval-view'
 import { quoteDraftSummary } from '@/lib/jarvis/quote-preview-summary'
+import { cardContext } from '@/lib/jarvis/card-context'
 import type { CardAction } from '@/lib/jarvis/voice'
 
 /**
@@ -719,6 +720,9 @@ function ApprovalCard({
       typeLabel={typeLabel(approval.approval_type)}
       timeLabel={timeAgo(approval.created_at)}
       title={approval.title}
+      // Vem och vad — alltid. Utan den fick hantverkaren "Kunden har en fråga
+      // om offerten" utan att veta vilken kund eller vilken offert.
+      context={cardContext(approval.payload)}
       description={approval.description}
       attention={needsAttention(approval)}
       approveLabel={approveLabel(approval.approval_type)}

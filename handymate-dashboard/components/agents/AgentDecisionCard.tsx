@@ -15,6 +15,8 @@ interface AgentDecisionCardProps {
   /** "14 min sen". Utelämnad i expanderat läge, där Fäll ihop tar platsen. */
   timeLabel?: string
   title: string
+  /** Vem och vad kortet gäller — kund, projekt eller offert. */
+  context?: string
   description?: string | null
   /**
    * Amber vänsterkant. **Endast** när pengar eller tid går förlorade om ingen
@@ -68,6 +70,7 @@ export function AgentDecisionCard({
   typeLabel,
   timeLabel,
   title,
+  context,
   description,
   attention,
   children,
@@ -117,6 +120,9 @@ export function AgentDecisionCard({
       <h3 className={`font-semibold text-slate-900 leading-snug ${expanded ? 'text-[17px] mb-0.5' : 'text-[15px] mb-0.5'}`}>
         {title}
       </h3>
+      {context && (
+        <p className="text-xs text-slate-400 mb-1 truncate" title={context}>{context}</p>
+      )}
       {description && <p className="text-[13px] text-slate-500 leading-relaxed mb-2.5">{description}</p>}
 
       {children}

@@ -281,6 +281,30 @@ export async function POST(
       )
     }
 
+    // ── Kunden måste hämtas även här (2026-08-07) ─────────────────────────
+    //
+    // GET-grenen hämtar kunden separat och hänger på den som `quote.customer`
+    // (rad 56-66) eftersom FK-relationen kan saknas. POST-grenen gjorde bara
+    // `select('*')` — som inte innehåller någon kund — men läser ändå
+    // `quote.customer?.name` och `quote.customer?.phone_number` på fyra
+    // ställen nedan.
+    //
+    // Följden syntes hos piloten som tre olika fel med samma orsak:
+    //   1. korten sa "Hej Kunden!" i stället för kundens namn,
+    //   2. `customer_phone` blev null, så aviseringen hoppades över,
+    //   3. och eftersom kön tolkade uteblivet SMS som misslyckande fick
+    //      hantverkaren "Handling misslyckades" trots att svaret sparats.
+    let customerRow: any = null
+    if (quote.customer_id) {
+      const { data: c } = await supabase
+        .from('customer')
+        .select('name, phone_number, email')
+        .eq('customer_id', quote.customer_id)
+        .maybeSingle()
+      customerRow = c
+    }
+    ;(quote as any).customer = customerRow
+
     // ── Kunden väljer en föreslagen tid (idé 4) ───────────────────────────────
     // Skapar INTE en bokning rakt in i kalendern — det vore att låta en kund
     // skriva i hantverkarens schema. I stället ett önskemål i godkännande-kön
