@@ -192,7 +192,6 @@ export default function EditQuotePage() {
   // ─── Auto-save state ────────────────────────────────────────────────
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const formDataRef = useRef<any>(null)
   const initialLoadDone = useRef(false)
   const quoteNumberRef = useRef<string>('')
 
@@ -916,12 +915,6 @@ export default function EditQuotePage() {
   )
 
   useEffect(() => {
-    if (initialLoadDone.current) {
-      formDataRef.current = buildPayload()
-    }
-  }, [buildPayload])
-
-  useEffect(() => {
     if (!initialLoadDone.current) return
 
     if (autoSaveTimerRef.current) {
@@ -945,17 +938,6 @@ export default function EditQuotePage() {
     paymentTermsText, termsText, paymentPlan, detailLevel, showUnitPrices, showQuantities,
     templateStyle,
   ])
-
-  useEffect(() => {
-    function handleBeforeUnload() {
-      if (formDataRef.current && initialLoadDone.current) {
-        const payload = JSON.stringify(formDataRef.current)
-        navigator.sendBeacon('/api/quotes', payload)
-      }
-    }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [])
 
   async function performAutoSave() {
     if (!initialLoadDone.current) return
