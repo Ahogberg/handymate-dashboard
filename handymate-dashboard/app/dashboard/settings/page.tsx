@@ -45,6 +45,8 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useBusinessPlan } from '@/lib/useBusinessPlan'
 import { isLaunchHidden, launchGateForPath } from '@/lib/launch-visibility'
+import { visibleAreas, allEntries } from '@/lib/settings/areas'
+import { SettingsHub, SettingsAreaView } from '@/components/settings/SettingsHub'
 import UpgradePrompt from '@/components/UpgradePrompt'
 
 interface BusinessConfig {
@@ -344,6 +346,17 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState('company')
+
+  /**
+   * Etapp 2: hubben. `?area=` styr vilket av de sex områdena som visas; utan den
+   * visas översikten. `?tab=` fortsätter fungera och öppnar sitt område.
+   *
+   * Innehållsrenderingen nedan är orörd — det här är en navigationsomläggning,
+   * inte en flytt av formulärkod. Att göra båda på en gång vore att riskera
+   * sparlogiken i en 4800-raders fil.
+   */
+  const [aktivtOmrade, setAktivtOmrade] = useState<string | null>(null)
+  const [visaAvancerat, setVisaAvancerat] = useState(false)
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
 
   const [config, setConfig] = useState<BusinessConfig | null>(null)
@@ -464,8 +477,19 @@ export default function SettingsPage() {
       return
     }
 
+    // Etapp 2: `?area=` öppnar ett område direkt. Görs före tab-hanteringen så
+    // en länk med både area och tab landar rätt.
+    const areaParam = searchParams?.get('area')
+    if (areaParam) setAktivtOmrade(areaParam)
+
     if (tabParam && ['company','hours','phone','invoice','time','integrations','pipeline','ai','subscription'].includes(tabParam)) {
       setActiveTab(tabParam)
+      // En gammal ?tab=-länk ska öppna sitt område, annars hamnar man på hubben
+      // med en osynligt vald flik.
+      if (!areaParam) {
+        const hem = omradeForTab(tabParam)
+        if (hem) setAktivtOmrade(hem)
+      }
     }
 
     // Handle Google Calendar OAuth callback
@@ -1392,6 +1416,35 @@ export default function SettingsPage() {
 
   const tabs = tabGroups.flatMap(g => g.tabs)
 
+  // ── Etapp 2: de sex områdena ────────────────────────────────────────
+  const omraden = visibleAreas({ isOwnerOrAdmin })
+  const omrade = omraden.find(a => a.key === aktivtOmrade) || null
+
+  /** Området en inbyggd flik hör hemma i — så `?tab=` landar rätt. */
+  function omradeForTab(tabId: string): string | null {
+    for (const a of omraden) {
+      if (a.groups.some(g => g.entries.some(e => e.id === tabId))) return a.key
+    }
+    return null
+  }
+
+  function oppnaOmrade(key: string) {
+    setAktivtOmrade(key)
+    setVisaAvancerat(false)
+    router.replace(`/dashboard/settings?area=${key}`, { scroll: false })
+  }
+
+  function oppnaPost(id: string) {
+    // Klick på en redan öppen rad fäller ihop den.
+    setActiveTab(prev => (prev === id ? '' : id))
+  }
+
+  function tillbakaTillHubben() {
+    setAktivtOmrade(null)
+    setActiveTab('')
+    router.replace('/dashboard/settings', { scroll: false })
+  }
+
   const currentPlan = config.subscription_plan || 'Starter'
 
   return (
@@ -1426,11 +1479,48 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        {/* Layout: vertical sidebar + content */}
-        <div className="flex flex-col lg:flex-row gap-6">
+        {/*
+          ═══ ETAPP 2: HUBBEN ═══
 
-        {/* Settings sidebar nav */}
-        <nav className="lg:w-56 shrink-0">
+          Utan valt område visas de sex korten. Med ett område visas dess poster,
+          och den gamla layouten nedan bär fortfarande innehållet för den
+          inbyggda flik som är öppen.
+
+          Layouten döljs i stället för att tas bort: innehållsblocken är tusentals
+          rader JSX vars struktur inte ska röras i samma steg som navigationen.
+          Att slå ihop dem vore att riskera sparlogiken i en enda commit.
+        */}
+        {!omrade && (
+          <SettingsHub
+            areas={omraden}
+            onOpenArea={oppnaOmrade}
+            businessName={config.business_name || null}
+          />
+        )}
+
+        {omrade && (
+          <SettingsAreaView
+            area={omrade}
+            areas={omraden}
+            activeTab={activeTab}
+            onOpenEntry={oppnaPost}
+            onOpenArea={oppnaOmrade}
+            onBack={tillbakaTillHubben}
+            visaAvancerat={visaAvancerat}
+            onToggleAvancerat={() => setVisaAvancerat(v => !v)}
+          />
+        )}
+
+        {/* Layout: vertical sidebar + content */}
+        <div className={`flex flex-col lg:flex-row gap-6 ${omrade && activeTab ? 'mt-6' : 'hidden'}`}>
+
+        {/*
+          Den gamla menyn med 27 poster. Ersatt av SettingsAreaView ovan, men
+          behållen i DOM:en tills innehållsblocken flyttats — flera av dem läser
+          `tabs`/`tabGroups` indirekt via activeTab, och att rycka bort noden i
+          samma steg som navigationen läggs om vore två ändringar i en.
+        */}
+        <nav className="hidden">
           {/* Mobile: horizontal scroll tabs */}
           {/*
             ═══ LÄNKPOSTERNA SLÄNGDES BORT PÅ MOBIL (rättat 2026-08-07) ═══
