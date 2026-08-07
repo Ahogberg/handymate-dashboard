@@ -10,6 +10,7 @@ import type { CustomCategory } from '@/lib/constants/categories'
 import { QuoteAddRowCombo } from './QuoteAddRowCombo'
 import { QuoteProductSearchModal } from './QuoteProductSearchModal'
 import type { ProductWithComponents } from './applyProductToItem'
+import { isLaunchHidden } from '@/lib/launch-visibility'
 
 /**
  * QuoteItemsSection — ETAPP 2c (offert-masterplan.md): förenar
@@ -184,16 +185,24 @@ export function QuoteItemsSection({
                     {opt.label}
                   </button>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenGrossistSearch()
-                    setShowAdvancedTypes(false)
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                >
-                  Sök grossist
-                </button>
+                {/*
+                  Lanseringsgrind (2026-08-07). Grossistfunktionen är dold i menyn och
+                  dess rutter är grindade i middleware. Att lämna kvar knappen här hade
+                  gjort döljningen kosmetisk — kunden kunde fortfarande öppna en
+                  halvfärdig sökruta mitt i offertskaparen. Samma nyckel som allt annat.
+                */}
+                {!isLaunchHidden('wholesaler') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenGrossistSearch()
+                      setShowAdvancedTypes(false)
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    Sök grossist
+                  </button>
+                )}
               </div>
             </>
           )}

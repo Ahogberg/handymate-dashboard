@@ -44,6 +44,7 @@ import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useBusinessPlan } from '@/lib/useBusinessPlan'
+import { isLaunchHidden, launchGateForPath } from '@/lib/launch-visibility'
 import UpgradePrompt from '@/components/UpgradePrompt'
 
 interface BusinessConfig {
@@ -1314,7 +1315,7 @@ export default function SettingsPage() {
     )
   }
 
-  const tabGroups: { label: string; tabs: { id: string; label: string; icon: any; href?: string }[] }[] = [
+  const tabGroupsRaw: { label: string; tabs: { id: string; label: string; icon: any; href?: string }[] }[] = [
     {
       label: 'Företag',
       tabs: [
@@ -1375,6 +1376,20 @@ export default function SettingsPage() {
       ],
     },
   ]
+  /**
+   * Lanseringsgrind på hubben (2026-08-07).
+   *
+   * Samma nyckelkälla som sidomenyn och som routegrinden i middleware — annars kan
+   * en funktion vara dold i menyn men fullt synlig här, vilket är precis den sortens
+   * halvdöljning som gör att kunden hamnar i en ofärdig vy.
+   *
+   * Härleds ur `href` i stället för ett eget fält, så listan inte kan gå isär.
+   * En grupp som blir tom faller bort.
+   */
+  const tabGroups = tabGroupsRaw
+    .map(g => ({ ...g, tabs: g.tabs.filter(t => !isLaunchHidden(launchGateForPath(t.href || ''))) }))
+    .filter(g => g.tabs.length > 0)
+
   const tabs = tabGroups.flatMap(g => g.tabs)
 
   const currentPlan = config.subscription_plan || 'Starter'
@@ -1417,21 +1432,49 @@ export default function SettingsPage() {
         {/* Settings sidebar nav */}
         <nav className="lg:w-56 shrink-0">
           {/* Mobile: horizontal scroll tabs */}
+          {/*
+            ═══ LÄNKPOSTERNA SLÄNGDES BORT PÅ MOBIL (rättat 2026-08-07) ═══
+
+            Raden nedan filtrerade tidigare bort varje post vars id bär länk-prefixet,
+            alltså alla poster som navigerar till en egen sida. De försvann ur mobilmenyn:
+            HELA gruppen Försäljning (Dokumentstil, Offertmallar, Standardtexter,
+            Prislista, Prisstruktur, Offertkategorier), sju av tio under Drift, och
+            Bolagsprofil — den Karins bolagskalender räknar sina datum ur.
+
+            En hantverkare med telefon kunde alltså inte nå någon offertinställning
+            över huvud taget, trots att CLAUDE.md säger att komponenter ska vara
+            mobiloptimerade eftersom hantverkare använder telefon på bygget.
+
+            Desktopmenyn nedan hanterade redan båda fallen (`tab.href ? Link : button`).
+            Mobilen gör nu samma sak i stället för att filtrera.
+          */}
           <div className="lg:hidden flex overflow-x-auto gap-1.5 pb-2 -mx-2 px-2 scrollbar-hide">
-            {tabs.filter(t => !t.id.startsWith('_link_')).map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-primary-700 text-white'
-                    : 'bg-white text-gray-500 border border-[#E2E8F0]'
-                }`}
-              >
-                <tab.icon className="w-3.5 h-3.5 mr-1" />
-                {tab.label}
-              </button>
-            ))}
+            {tabs.map((tab) =>
+              tab.href ? (
+                <Link
+                  key={tab.id}
+                  href={tab.href}
+                  className="flex items-center px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all bg-white text-gray-500 border border-[#E2E8F0]"
+                >
+                  <tab.icon className="w-3.5 h-3.5 mr-1" />
+                  {tab.label}
+                  <ChevronRight className="w-3 h-3 text-gray-300 ml-1" />
+                </Link>
+              ) : (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-primary-700 text-white'
+                      : 'bg-white text-gray-500 border border-[#E2E8F0]'
+                  }`}
+                >
+                  <tab.icon className="w-3.5 h-3.5 mr-1" />
+                  {tab.label}
+                </button>
+              )
+            )}
           </div>
 
           {/* Desktop: vertical grouped menu */}

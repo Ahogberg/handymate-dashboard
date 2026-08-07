@@ -75,6 +75,7 @@ import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import ProductSearchModal from '@/components/ProductSearchModal'
+import { isLaunchHidden } from '@/lib/launch-visibility'
 import { SelectedProduct } from '@/lib/suppliers/types'
 import { DEFAULT_TASKS, TASK_CATEGORIES } from '@/lib/task-defaults'
 import TaskPresetPicker from '@/components/TaskPresetPicker'
@@ -3108,12 +3109,23 @@ export default function ProjectDetailPage() {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Material ({materials.length})</h3>
               <div className="flex gap-2">
-                <button
-                  onClick={() => setShowProductSearch(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-xl text-sm hover:opacity-90"
-                >
-                  <Plus className="w-4 h-4" /> Lägg till material
-                </button>
+                {/*
+                  Lanseringsgrind (2026-08-07). Knappen öppnar ProductSearchModal som
+                  söker UTESLUTANDE hos grossister (/api/grossist). Med grossistmenyn
+                  dold hade den lett till "Anslut en grossist i inställningarna" — en
+                  hänvisning till en sida kunden inte längre kan nå.
+
+                  Material kan fortfarande läggas till: snabbknapparna ur produktbanken
+                  ovanför den här listan är en egen väg som inte rör grossister.
+                */}
+                {!isLaunchHidden('wholesaler') && (
+                  <button
+                    onClick={() => setShowProductSearch(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-xl text-sm hover:opacity-90"
+                  >
+                    <Plus className="w-4 h-4" /> Lägg till material
+                  </button>
+                )}
                 {(materialSummary?.uninvoiced_count || 0) > 0 && (
                   <button
                     onClick={handleInvoiceMaterials}

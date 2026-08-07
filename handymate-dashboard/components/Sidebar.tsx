@@ -34,6 +34,7 @@ import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useBusiness } from '@/lib/BusinessContext'
 import { hasFeature, PlanType, getPlanLabel } from '@/lib/feature-gates'
+import { isLaunchHidden, isComingSoon, COMING_SOON_LABEL } from '@/lib/launch-visibility'
 
 interface SidebarProps {
   businessName: string
@@ -62,11 +63,13 @@ interface NavChild {
   href: string
   exact?: boolean
   featureGate?: string
+  /** Lanseringsnyckel — se lib/launch-visibility.ts. INTE samma sak som featureGate. */
+  launchGate?: string
   dotKey?: string
 }
 
 type NavItem =
-  | { type: 'link'; key: string; label: string; icon: any; href: string; exact?: boolean; paths?: string[]; hasBadge?: boolean; hasApprovalBadge?: boolean; featureGate?: string }
+  | { type: 'link'; key: string; label: string; icon: any; href: string; exact?: boolean; paths?: string[]; hasBadge?: boolean; hasApprovalBadge?: boolean; featureGate?: string; launchGate?: string }
   | { type: 'group'; key: string; label: string; icon: any; children: NavChild[] }
 
 const NAV: NavItem[] = [
@@ -120,17 +123,25 @@ const NAV: NavItem[] = [
     // Fordon + Lager hade ingen naturlig hemvist kvar sedan Planering-
     // gruppen splittrades upp — inget befintligt "Verktyg"-liknande grupp
     // fanns i NAV, så minsta vettiga är en ny "Övrigt"-grupp.
+    //
+    // Båda barnen är lanseringsdolda (2026-08-07), vilket gör att hela gruppen
+    // faller bort av sig själv — filtreringen nedan tar bort en grupp som
+    // blivit tom. Ingen specialregel för just "Övrigt".
     type: 'group', key: 'misc', label: 'Övrigt', icon: Package,
     children: [
-      { label: 'Fordon', href: '/dashboard/vehicles' },
-      { label: 'Lager', href: '/dashboard/planning/inventory' },
+      { label: 'Fordon', href: '/dashboard/vehicles', launchGate: 'vehicles' },
+      { label: 'Lager', href: '/dashboard/planning/inventory', launchGate: 'inventory' },
     ],
   },
   {
     type: 'group', key: 'marketing', label: 'Kampanjer', icon: Megaphone,
     children: [
       { label: 'SMS-kampanjer', href: '/dashboard/campaigns' },
-      { label: 'Utskick (Leads)', href: '/dashboard/marketing/leads', featureGate: 'leads_outbound' },
+      // launchGate, INTE featureGate (2026-08-07). Posten låg tidigare bakom
+      // `featureGate: 'leads_outbound'` och visades därför med hänglås och
+      // texten "Ingår i Business" — ett löfte om att pengar låser upp den.
+      // Funktionen är inte klar, så det var osant. Nu "Kommer snart".
+      { label: 'Utskick (Leads)', href: '/dashboard/marketing/leads', launchGate: 'leads_outbound' },
     ],
   },
 ]
@@ -141,8 +152,8 @@ const BOTTOM_NAV: NavItem[] = [
   // Hemsida-förgreningen (Del 5): /dashboard/website fanns bara i employee-
   // döljlistan tidigare — ägaren kunde alltså aldrig hitta microsajt-
   // editorn. Synlig post nära "AI på hemsidan".
-  { type: 'link', key: 'my_website', label: 'Min hemsida', icon: Globe, href: '/dashboard/website' },
-  { type: 'link', key: 'website_widget', label: 'AI på hemsidan', icon: Globe, href: '/dashboard/settings/website-widget' },
+  { type: 'link', key: 'my_website', label: 'Min hemsida', icon: Globe, href: '/dashboard/website', launchGate: 'my_website' },
+  { type: 'link', key: 'website_widget', label: 'AI på hemsidan', icon: Globe, href: '/dashboard/settings/website-widget', launchGate: 'website_widget' },
   { type: 'link', key: 'referral', label: 'Bjud in en vän', icon: Gift, href: '/dashboard/referral' },
   { type: 'link', key: 'help', label: 'Hjälp', icon: HelpCircle, href: '/dashboard/help' },
 ]
@@ -438,13 +449,31 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       const active = isLinkActive(item)
       const Icon = item.icon
       const locked = item.featureGate ? !hasFeature(plan, item.featureGate) : false
+      const kommerSnart = isComingSoon(item.launchGate)
+
+      // "Kommer snart" är ingen ingång. Renderas som text, inte länk — annars
+      // hade klicket studsat mot routegrinden i middleware och tagit användaren
+      // till en annan sida utan förklaring.
+      const Wrapper: any = kommerSnart ? 'div' : Link
+      const wrapperProps = kommerSnart
+        ? { className: `${navClass(false)} opacity-60 cursor-default` }
+        : {
+            href: item.href,
+            className: `${navClass(active)} ${active ? 'nav-active-indicator' : ''} ${locked ? 'opacity-50' : ''}`,
+            title: locked ? `Ingår i ${getPlanLabel(plan === 'starter' ? 'professional' : 'business')}` : undefined,
+          }
+
       return (
-        <Link key={item.key} href={item.href} className={`${navClass(active)} ${active ? 'nav-active-indicator' : ''} ${locked ? 'opacity-50' : ''}`} title={locked ? `Ingår i ${getPlanLabel(plan === 'starter' ? 'professional' : 'business')}` : undefined}>
+        <Wrapper key={item.key} {...wrapperProps}>
           <div className="flex items-center gap-3">
             <Icon className={`w-5 h-5 ${active ? 'text-primary-300' : ''}`} />
             <span className="text-sm">{item.label}</span>
           </div>
-          {locked ? (
+          {kommerSnart ? (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-white/10 text-primary-300/80 whitespace-nowrap">
+              {COMING_SOON_LABEL}
+            </span>
+          ) : locked ? (
             <Lock className="w-3.5 h-3.5 text-primary-300/40" />
           ) : item.hasBadge && pendingCount > 0 ? (
             <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-primary-700 text-white rounded-full animate-pulse">
@@ -455,7 +484,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
               {approvalCount > 99 ? '99+' : approvalCount}
             </span>
           ) : null}
-        </Link>
+        </Wrapper>
       )
     }
 
@@ -489,16 +518,37 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
             {item.children.map(child => {
               const childActive = isPathActive(child.href, child.exact)
               const childLocked = child.featureGate ? !hasFeature(plan, child.featureGate) : false
+              const barnKommerSnart = isComingSoon(child.launchGate)
+
+              // Samma resonemang som för toppnivåposten: ingen klickbar länk till
+              // något som inte finns.
+              const ChildWrapper: any = barnKommerSnart ? 'div' : Link
+              const childProps = barnKommerSnart
+                ? { className: `${subNavClass(false)} opacity-60 cursor-default` }
+                : {
+                    href: child.href,
+                    className: `${subNavClass(childActive)} ${childLocked ? 'opacity-50' : ''}`,
+                    title: childLocked ? `Ingår i ${getPlanLabel(plan === 'starter' ? 'professional' : 'business')}` : undefined,
+                  }
+
               return (
-                <Link key={child.href} href={child.href} className={`${subNavClass(childActive)} ${childLocked ? 'opacity-50' : ''}`} title={childLocked ? `Ingår i ${getPlanLabel(plan === 'starter' ? 'professional' : 'business')}` : undefined}>
+                <ChildWrapper key={child.href} {...childProps}>
                   <span className="flex items-center gap-2">
                     {child.label}
-                    {childLocked && <Lock className="w-3 h-3 text-primary-300/40" />}
+                    {/* "Kommer snart" ersätter hänglåset — aldrig båda. Ett lås säger
+                        "betala mer", markeringen säger "inte byggd än". */}
+                    {barnKommerSnart ? (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-white/10 text-primary-300/80 whitespace-nowrap">
+                        {COMING_SOON_LABEL}
+                      </span>
+                    ) : childLocked ? (
+                      <Lock className="w-3 h-3 text-primary-300/40" />
+                    ) : null}
                     {child.dotKey === 'automation_failed' && automationFailed && (
                       <span className="w-2 h-2 rounded-full bg-red-500 inline-block" title="Misslyckad automation" />
                     )}
                   </span>
-                </Link>
+                </ChildWrapper>
               )
             })}
           </div>
@@ -526,6 +576,28 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
    * länk.
    */
   const OWNER_ADMIN_ONLY_CHILDREN = new Set(['/dashboard/karin'])
+
+  /**
+   * Lanseringsfilter — gäller ALLA roller, även ägaren.
+   *
+   * Ligger avsiktligt utanför `filterNavForRole`: den funktionen returnerar tidigt för
+   * ägare och admin (`if (!isEmployee && owa) return items`), så ett lanseringsfilter
+   * därinne hade hoppats över för just dem som oftast tittar.
+   *
+   * Bara `hidden` tas bort här. `soon` ska synas — den är hela poängen med markeringen.
+   * En grupp vars samtliga barn är dolda faller bort av sig själv.
+   */
+  function filterLaunchGates(items: NavItem[]): NavItem[] {
+    return items
+      .filter(item => !(item.type === 'link' && isLaunchHidden(item.launchGate)))
+      .map(item => {
+        if (item.type !== 'group') return item
+        const kvar = item.children.filter(c => !isLaunchHidden(c.launchGate))
+        if (kvar.length === 0) return null
+        return { ...item, children: kvar }
+      })
+      .filter(Boolean) as NavItem[]
+  }
 
   function filterNavForRole(items: NavItem[]): NavItem[] {
     const owa = isOwnerOrAdmin
@@ -633,12 +705,12 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
       {/* Main navigation */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        {filterNavForRole(NAV).map(item => renderNavItem(item))}
+        {filterLaunchGates(filterNavForRole(NAV)).map(item => renderNavItem(item))}
       </nav>
 
       {/* Bottom section: Inställningar + Bjud in kollega */}
       <div className="p-3 pt-0 space-y-0.5 border-t border-white/10">
-        {filterNavForRole(BOTTOM_NAV).map(item => renderNavItem(item))}
+        {filterLaunchGates(filterNavForRole(BOTTOM_NAV)).map(item => renderNavItem(item))}
       </div>
 
       {/* User Menu */}
