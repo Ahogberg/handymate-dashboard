@@ -1,0 +1,126 @@
+/**
+ * Facit för hur ett godkännande presenteras (2026-08-07).
+ *
+ * Två invarianter som lätt glider isär när nya ärendetyper läggs till:
+ *
+ * 1. **Amber används bara när det är sant.** Vänsterkanten betyder att pengar
+ *    eller tid går förlorade om ingen tittar. Blir allt gult slutar man läsa
+ *    gult — samma sparsamhetsprincip som i offertflödets granskning.
+ * 2. **Knapptexten säger vad som faktiskt händer.** "Godkänn & skicka" på ett
+ *    ärende som bara skapar ett utkast är en osanning på själva knappen.
+ *
+ * Körs utan browser/session:
+ *   npx playwright test tests/approval-view.spec.ts --no-deps
+ */
+import { test, expect } from '@playwright/test'
+import {
+  agentForApproval,
+  approveLabel,
+  deepLinkFor,
+  needsAttention,
+  typeLabel,
+  TYPE_LABEL,
+} from '../lib/jarvis/approval-view'
+import { TEAM } from '../lib/agents/team'
+
+test.describe('AMBER BARA NÄR DET ÄR SANT', () => {
+  test('förfallen faktura och betalning bär amber', () => {
+    expect(needsAttention({ approval_type: 'invoice_reminder' })).toBe(true)
+    expect(needsAttention({ approval_type: 'confirm_payment' })).toBe(true)
+  })
+
+  test('en ny lead är en nyhet, inte en varning', () => {
+    expect(needsAttention({ approval_type: 'lead_review' })).toBe(false)
+  })
+
+  test('en offert är rutin', () => {
+    expect(needsAttention({ approval_type: 'create_quote_draft' })).toBe(false)
+    expect(needsAttention({ approval_type: 'send_quote' })).toBe(false)
+  })
+
+  test('högst en fjärdedel av typerna får bära amber', () => {
+    // Trubbig vakt mot att listan sväller. Sväller den ändå är det ett
+    // medvetet beslut någon måste ta, inte en glidning.
+    const alla = Object.keys(TYPE_LABEL)
+    const ambrade = alla.filter(t => needsAttention({ approval_type: t }))
+    expect(ambrade.length / alla.length, `Amber på ${ambrade.join(', ')}`).toBeLessThanOrEqual(0.25)
+  })
+
+  test('risk_level styr inte amber', () => {
+    // Frestande att koppla dit, men det hade gett amber på var tredje kort.
+    expect(needsAttention({ approval_type: 'send_sms', risk_level: 'high' })).toBe(false)
+  })
+})
+
+test.describe('KNAPPEN SÄGER VAD SOM HÄNDER', () => {
+  test('offertutkastet SKAPAR, det skickar inte', () => {
+    // Exekveraren POST:ar till /api/quotes och returnerar ett quote_id.
+    // Något utskick sker aldrig.
+    const label = approveLabel('create_quote_draft')
+    expect(label).toBe('Skapa offerten')
+    expect(label.toLowerCase()).not.toContain('skicka')
+  })
+
+  test('det som verkligen skickar får säga skicka', () => {
+    expect(approveLabel('send_quote').toLowerCase()).toContain('skicka')
+    expect(approveLabel('invoice_reminder').toLowerCase()).toContain('skicka')
+    expect(approveLabel('send_sms').toLowerCase()).toContain('skicka')
+  })
+
+  test('okänd typ faller tillbaka på ett neutralt ord', () => {
+    // Bättre att säga för lite än att lova fel.
+    expect(approveLabel('nagot_helt_nytt')).toBe('Godkänn')
+  })
+})
+
+test.describe('agentroutingen', () => {
+  test('explicit routing i payloaden går alltid först', () => {
+    expect(agentForApproval({ approval_type: 'send_invoice', payload: { routed_agent: 'lisa' } })).toBe('lisa')
+  })
+
+  test('okänd routad agent ignoreras — typen får avgöra', () => {
+    // Annars hade ett stavfel i payloaden gett ett kort utan avatar.
+    expect(agentForApproval({ approval_type: 'send_invoice', payload: { routed_agent: 'finns-inte' } })).toBe('karin')
+  })
+
+  test('varje typ i etikettkartan landar på en agent som finns', () => {
+    const kanda = new Set(TEAM.map(a => a.id))
+    for (const t of Object.keys(TYPE_LABEL)) {
+      expect(kanda.has(agentForApproval({ approval_type: t })), `${t} routades till en okänd agent`).toBe(true)
+    }
+  })
+
+  test('fakturor till Karin, offerter till Daniel, samtal till Lisa', () => {
+    expect(agentForApproval({ approval_type: 'invoice_reminder' })).toBe('karin')
+    expect(agentForApproval({ approval_type: 'create_quote_draft' })).toBe('daniel')
+    expect(agentForApproval({ approval_type: 'send_sms' })).toBe('lisa')
+    expect(agentForApproval({ approval_type: 'create_booking' })).toBe('lars')
+  })
+})
+
+test.describe('etiketten', () => {
+  test('varje känd typ har en svensk etikett utan tekniska ord', () => {
+    for (const [key, label] of Object.entries(TYPE_LABEL)) {
+      expect(label.length, `${key} saknar etikett`).toBeGreaterThan(2)
+      expect(/[_]/.test(label), `${key} bär en teknisk etikett: ${label}`).toBe(false)
+      expect(/\b(agent|webhook|token|payload|trigger|run)\b/i.test(label), `${key}: ${label}`).toBe(false)
+    }
+  })
+
+  test('okänd typ visar aldrig sitt tekniska namn', () => {
+    // "egenkontroll_nytt_falt" i gränssnittet är obegripligt för en hantverkare.
+    expect(typeLabel('nagot_tekniskt_namn')).toBe('Förslag')
+  })
+})
+
+test.describe('djuplänken', () => {
+  test('leder till rätt sida när id:t finns', () => {
+    expect(deepLinkFor({ approval_type: 'invoice_reminder', payload: { invoice_id: 'inv_1' } })?.href)
+      .toContain('/dashboard/invoices/inv_1')
+  })
+
+  test('utan id blir det ingen länk — aldrig en trasig', () => {
+    expect(deepLinkFor({ approval_type: 'invoice_reminder', payload: {} })).toBeNull()
+    expect(deepLinkFor({ approval_type: 'create_quote_draft', payload: {} })).toBeNull()
+  })
+})

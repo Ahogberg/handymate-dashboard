@@ -152,10 +152,21 @@ test.describe('branschsortimentet — ingen kund startar tom', () => {
     }
   })
 
-  test('alla priser är positiva — en artikel på 0 kr ser ut som ett fel i offerten', () => {
+  test('priset är antingen satt eller exakt noll — aldrig ett öresbelopp', () => {
+    // OMSKRIVEN 2026-08-06: testet krävde tidigare pris > 0 på varje artikel.
+    // Den invarianten gäller inte längre. Registret utökades till ~90 artiklar
+    // per bransch, och långsvansen seedas PRISLÖS med flit: ett ogranskat
+    // gissat pris är sämre än inget, för systemet quotar det med full
+    // självsäkerhet i offerten, telefonagenten och storefronten. Priset
+    // förtjänas i stället av användning (lib/products/pricing-state.ts).
+    //
+    // Kvar att vakta: noll ska vara ett MEDVETET tillstånd. Ett negativt tal
+    // eller ett öresbelopp är alltid ett skrivfel — och de skulle döljas,
+    // eftersom gränssnittet läser allt ≤ 0 som "osatt".
     for (const branch of getSeededBranches()) {
       for (const row of getDefaultProducts(branch)) {
-        expect(row.unit_price, `${row.sku} saknar pris`).toBeGreaterThan(0)
+        if (row.unit_price === 0) continue
+        expect(row.unit_price, `${row.sku} har ett pris som varken är noll eller ett riktigt pris`).toBeGreaterThanOrEqual(1)
       }
     }
   })
@@ -170,13 +181,23 @@ test.describe('branschsortimentet — ingen kund startar tom', () => {
   })
 
   test('price_list härleds ur samma data — telefonen kan inte säga ett annat pris', () => {
+    // OMSKRIVEN 2026-08-06: listorna är inte längre lika långa. Prislösa
+    // artiklar filtreras bort ur price_list innan seedning — produktbanken kan
+    // visa "Sätt pris" i stället för ett belopp, en röst kan inte.
+    // Telefonagenten läser den här tabellen och hade sagt att jobbet är
+    // gratis, vilket är värre än att inte veta.
+    //
+    // Invarianten som står kvar är den som faktiskt betyder något: varje rad
+    // som NÅR telefonen ska ha samma namn och samma pris som i banken.
     for (const branch of getSeededBranches()) {
       const products = getDefaultProducts(branch)
       const priceList = getDefaultPriceList(branch)
-      expect(priceList.length).toBe(products.length)
-      for (let i = 0; i < products.length; i++) {
-        expect(priceList[i].name).toBe(products[i].name)
-        expect(priceList[i].unit_price).toBe(products[i].unit_price)
+      const prissatta = products.filter(p => p.unit_price > 0)
+
+      expect(priceList.length, `${branch}: prislistan speglar inte de prissatta artiklarna`).toBe(prissatta.length)
+      for (let i = 0; i < prissatta.length; i++) {
+        expect(priceList[i].name).toBe(prissatta[i].name)
+        expect(priceList[i].unit_price).toBe(prissatta[i].unit_price)
       }
     }
   })

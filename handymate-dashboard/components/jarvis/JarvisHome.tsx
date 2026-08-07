@@ -608,7 +608,12 @@ export default function JarvisHome({
 function RailCard({ title, href, children }: { title: string; href: string; children: React.ReactNode }) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-4">
-      <Link href={href} className="flex items-center justify-between text-sm font-semibold text-slate-900 mb-3 min-h-[24px]">
+      {/* Rubriken ÄR ingången till sidan. 44px träffyta, uttagen med negativ
+          marginal så kortet inte växer av det. */}
+      <Link
+        href={href}
+        className="flex items-center justify-between text-sm font-semibold text-slate-900 mb-2 min-h-[44px] -mt-2 -mx-1 px-1"
+      >
         {title}
         <ChevronRight className="w-4 h-4 text-slate-300" />
       </Link>

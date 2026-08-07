@@ -42,10 +42,12 @@ export function AgentNewsRow({ agentKey, children, link, secondaryLink }: AgentN
       <p className="m-0 flex-1 min-w-0 text-[13px] text-slate-600 leading-relaxed">
         <b className="font-semibold text-slate-900">{agent?.name || 'Teamet'}</b> {children}
       </p>
+      {/* 44px träffyta på mobil — hantverkaren har arbetshandskar på.
+          Höjden tas ut med negativ marginal så raden inte blir högre av det. */}
       {link && (
         <Link
           href={link.href}
-          className="shrink-0 inline-flex items-center gap-1 text-[13px] font-medium text-primary-700 hover:text-primary-800 min-h-[44px] sm:min-h-0 items-center"
+          className="shrink-0 inline-flex items-center gap-1 min-h-[44px] -my-2 px-1 text-[13px] font-medium text-primary-700 hover:text-primary-800"
         >
           {link.icon}
           {link.label}
@@ -54,7 +56,7 @@ export function AgentNewsRow({ agentKey, children, link, secondaryLink }: AgentN
       {secondaryLink && (
         <Link
           href={secondaryLink.href}
-          className="shrink-0 text-[13px] font-medium text-slate-400 hover:text-slate-600 min-h-[44px] sm:min-h-0 inline-flex items-center"
+          className="shrink-0 inline-flex items-center min-h-[44px] -my-2 px-1 text-[13px] font-medium text-slate-400 hover:text-slate-600"
         >
           {secondaryLink.label}
         </Link>
