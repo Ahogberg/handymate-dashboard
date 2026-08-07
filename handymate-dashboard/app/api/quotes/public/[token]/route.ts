@@ -497,11 +497,12 @@ export async function POST(
     // offertens egna option-rader — okända id:n → 400.
     const selectedOptionIds: string[] = Array.isArray(body.selected_option_ids)
       ? body.selected_option_ids.map(String) : []
-    const { data: allRows } = await supabase
+    const { data: allRows, error: rowsError } = await supabase
       .from('quote_items')
       .select('id, item_type, description, quantity, unit, unit_price, total, is_rot_eligible, is_rut_eligible, rot_rut_type, sort_order, option_selected, option_default, labor_amount, material_amount')
       .eq('quote_id', quote.quote_id)
       .order('sort_order', { ascending: true })
+    if (rowsError) throw rowsError
     const optionRows = (allRows || []).filter(r => r.item_type === 'option')
     const validIds = new Set(optionRows.map(r => r.id))
     if (selectedOptionIds.some(id => !validIds.has(id))) {
@@ -511,12 +512,6 @@ export async function POST(
     let recomputed: ReturnType<typeof calculateQuoteTotals> | null = null
     if (optionRows.length > 0) {
       const chosen = new Set(selectedOptionIds)
-      // Skriv kundens val per option-rad
-      for (const r of optionRows) {
-        await supabase.from('quote_items')
-          .update({ option_selected: chosen.has(r.id) })
-          .eq('id', r.id).eq('quote_id', quote.quote_id)
-      }
       // Räkna om med EN summa-sanning
       const effectiveItems = (allRows || []).map(r => ({
         ...r,
@@ -549,42 +544,57 @@ export async function POST(
       }))
     }
 
-    const updateFields: Record<string, any> = {
-      status: 'accepted',
-      signed_at: new Date().toISOString(),
-      signed_by_name: name,
-      signed_by_ip: ip,
-      signature_data,
-      accepted_at: new Date().toISOString(),
-    }
+    let signedTotals: Record<string, any> | null = null
     if (recomputed) {
       // Samma kolumnmappning som quotes-POST:ens insertData
       // (app/api/quotes/route.ts) — inkl. legacy-kompat-fälten.
       const rotRutDeduction = recomputed.rotDeduction + recomputed.rutDeduction
-      updateFields.labor_total = recomputed.laborTotal
-      updateFields.material_total = recomputed.materialTotal
-      updateFields.subtotal = recomputed.subtotal
-      updateFields.discount_amount = recomputed.discountAmount
-      updateFields.vat_amount = recomputed.vat
-      updateFields.total = recomputed.total
-      updateFields.rot_work_cost = recomputed.rotWorkCost || null
-      updateFields.rot_deduction = recomputed.rotDeduction || null
-      updateFields.rot_customer_pays = recomputed.rotCustomerPays || null
-      updateFields.rut_work_cost = recomputed.rutWorkCost || null
-      updateFields.rut_deduction = recomputed.rutDeduction || null
-      updateFields.rut_customer_pays = recomputed.rutCustomerPays || null
-      updateFields.rot_rut_eligible = recomputed.rotWorkCost + recomputed.rutWorkCost
-      updateFields.rot_rut_deduction = rotRutDeduction
-      updateFields.customer_pays = rotRutDeduction > 0 ? recomputed.total - rotRutDeduction : recomputed.total
-      updateFields.signed_options = signedOptions
+      signedTotals = {
+        labor_total: recomputed.laborTotal,
+        material_total: recomputed.materialTotal,
+        subtotal: recomputed.subtotal,
+        discount_amount: recomputed.discountAmount,
+        vat_amount: recomputed.vat,
+        total: recomputed.total,
+        rot_work_cost: recomputed.rotWorkCost || null,
+        rot_deduction: recomputed.rotDeduction || null,
+        rot_customer_pays: recomputed.rotCustomerPays || null,
+        rut_work_cost: recomputed.rutWorkCost || null,
+        rut_deduction: recomputed.rutDeduction || null,
+        rut_customer_pays: recomputed.rutCustomerPays || null,
+        rot_rut_eligible: recomputed.rotWorkCost + recomputed.rutWorkCost,
+        rot_rut_deduction: rotRutDeduction,
+        customer_pays: rotRutDeduction > 0 ? recomputed.total - rotRutDeduction : recomputed.total,
+      }
     }
 
+    const signedAt = new Date().toISOString()
     const { error: updateError } = await supabase
-      .from('quotes')
-      .update(updateFields)
-      .eq('sign_token', token)
+      .rpc('sign_quote_with_options', {
+        p_quote_id: quote.quote_id,
+        p_business_id: quote.business_id,
+        p_sign_token: token,
+        p_selected_option_ids: selectedOptionIds,
+        p_signed_at: signedAt,
+        p_signed_by_name: name,
+        p_signed_by_ip: ip,
+        p_signature_data: signature_data,
+        p_totals: signedTotals,
+        p_signed_options: signedOptions,
+      })
 
-    if (updateError) throw updateError
+    if (updateError) {
+      if (updateError.message?.includes('QUOTE_ALREADY_SIGNED')) {
+        return NextResponse.json({ error: 'Offerten är redan signerad' }, { status: 400 })
+      }
+      if (updateError.message?.includes('QUOTE_ALREADY_DECLINED')) {
+        return NextResponse.json({ error: 'Offerten är redan avböjd' }, { status: 400 })
+      }
+      if (updateError.message?.includes('QUOTE_EXPIRED')) {
+        return NextResponse.json({ error: 'Offerten har gått ut. Kontakta oss för en uppdaterad offert.' }, { status: 400 })
+      }
+      throw updateError
+    }
 
     // Notiser/events nedan skall visa det signerade beloppet — inte det
     // gamla quote.total från före tillvalsomräkningen.
