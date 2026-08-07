@@ -11,6 +11,7 @@ import { AgentNewsRow } from '@/components/agents/AgentNewsRow'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { QuoteDraftDetail, QuoteToolExit } from '@/components/jarvis/QuoteDraftDetail'
+import { KarinCalendarWidget } from '@/components/karin/KarinCalendarWidget'
 import { approvalPreview, isEditable, buildApprovalEdit } from '@/lib/jarvis/approval-preview'
 import {
   agentForApproval,
@@ -580,6 +581,11 @@ export default function JarvisHome({
               <div className="h-10 bg-slate-50 rounded-lg animate-pulse" />
             )}
           </RailCard>
+
+          {/* Karins bolagskalender. Renderar ingenting för anställda, och
+              inget när profilen saknar uppgifter — en widget som säger
+              "inget på gång" när vi inte vet vore osann. */}
+          <KarinCalendarWidget />
         </aside>
 
         {/* ── Skrivraden ───────────────────────────────────────────────────

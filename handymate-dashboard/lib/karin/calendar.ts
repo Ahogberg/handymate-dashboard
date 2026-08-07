@@ -31,6 +31,8 @@ export type EventSource =
 export interface CalendarEvent {
   id: string
   source: EventSource
+  /** Regelns kod för regelhändelser, null för egna poster och kostnader. */
+  rule_code: string | null
   title: string
   /** Myndighet, motpart eller tom sträng för egna händelser. */
   authority: string
@@ -56,6 +58,7 @@ export function obligationToEvent(o: Obligation): CalendarEvent {
     // överleva att sidan laddas om.
     id: `regel:${o.rule_code}:${o.due_date}`,
     source: 'regel',
+    rule_code: o.rule_code,
     title: o.title,
     authority: o.authority,
     category: o.category,

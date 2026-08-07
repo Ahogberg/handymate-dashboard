@@ -138,6 +138,10 @@
       "schedule": "35 6 * * *"
     },
     {
+      "path": "/api/cron/karin-deadlines",
+      "schedule": "25 6 * * *"
+    },
+    {
       "path": "/api/cron/missed-revenue",
       "schedule": "40 6 * * *"
     }

@@ -84,7 +84,6 @@ const GET_APIS = [
   { path: '/api/warranties', name: 'Garantier' },
   { path: '/api/time-entry?limit=5', name: 'Tidrapporter' },
   { path: '/api/allowances', name: 'Ersättningar' },
-  { path: '/api/dashboard/today', name: 'Att göra idag' },
   { path: '/api/morning-brief', name: 'Morgonrapport' },
   { path: '/api/automation/settings', name: 'Automationsinställningar' },
 ]

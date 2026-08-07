@@ -1319,6 +1319,13 @@ export default function SettingsPage() {
       label: 'Företag',
       tabs: [
         { id: 'company', label: 'Företag', icon: Building2 },
+        // Bolagsprofilen — bolagsform, momsperiod, räkenskapsår. Uppgifterna
+        // Karin räknar sina myndighetsdatum ur. Endast ägare/admin: samma
+        // mönster som intern timkostnad nedan, och här gömmer vi länken så
+        // övriga inte ens ser att sidan finns.
+        ...(isOwnerOrAdmin
+          ? [{ id: '_link_bolagsprofil', label: 'Bolagsprofil', icon: Building2, href: '/dashboard/settings/bolagsprofil' }]
+          : []),
         { id: 'hours', label: 'Öppettider', icon: Clock },
         { id: 'invoice', label: 'Faktura', icon: Receipt },
         { id: 'phone', label: 'Telefoni', icon: PhoneCall },

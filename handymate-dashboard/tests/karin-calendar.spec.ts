@@ -25,6 +25,7 @@ function handelse(over: Partial<CalendarEvent> = {}): CalendarEvent {
   return {
     id: 'regel:moms:2026-08-12',
     source: 'regel',
+    rule_code: 'moms',
     title: 'Momsdeklaration',
     authority: 'Skatteverket',
     category: 'moms',

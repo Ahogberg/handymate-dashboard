@@ -80,6 +80,11 @@ const NAV: NavItem[] = [
       { label: 'Hem (ny)', href: '/dashboard/hem', exact: true },
       { label: 'Analys', href: '/dashboard/analytics', featureGate: 'lead_intelligence' },
       { label: 'Månadsrapport', href: '/dashboard/monthly-review' },
+      // Karins bolagskalender (2026-08-07). Ligger bredvid Månadsrapport —
+      // samma sorts ägaröverblick. Döljs för alla utom ägare och admin via
+      // OWNER_ADMIN_ONLY_CHILDREN nedan; moms och bokslut är inget en montör
+      // ska se i förbifarten.
+      { label: 'Bolagskalender', href: '/dashboard/karin' },
     ],
   },
   { type: 'link', key: 'approvals', label: 'Godkännanden', icon: ClipboardCheck, href: '/dashboard/approvals', hasApprovalBadge: true },
@@ -161,7 +166,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   const [notifLoading, setNotifLoading] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const notifRef = useRef<HTMLDivElement>(null)
-  const { user: currentUser } = useCurrentUser()
+  const { user: currentUser, isOwnerOrAdmin } = useCurrentUser()
 
   // ── Route helpers ──────────────────────────────────────────────────
   function isPathActive(href: string, exact?: boolean): boolean {
@@ -511,13 +516,28 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   // owner/admin-data, oförändrat sedan innan).
   const HIDDEN_CHILDREN_FOR_EMPLOYEE = new Set(['/dashboard/invoices', '/dashboard/invoices/rot-payment', '/dashboard/settings', '/dashboard/settings/my-prices', '/dashboard/settings/products', '/dashboard/settings/pricelist', '/dashboard/billing', '/dashboard/team', '/dashboard/automations', '/dashboard/settings/quote-templates', '/dashboard/settings/quote-texts', '/dashboard/orders', '/dashboard/campaigns', '/dashboard/website', '/dashboard/analytics'])
 
+  /**
+   * Rutter som kräver ÄGARE eller ADMIN, inte bara "inte anställd".
+   *
+   * De två filtren ovan reagerar enbart på `role === 'employee'`. Bolagskalendern
+   * är grindad på `isOwnerOrAdmin` i både sidan och API:et — utan den här listan
+   * hade en roll däremellan (t.ex. project_manager) sett länken, klickat, och
+   * blivit redirectad. En länk som leder till en stängd dörr är sämre än ingen
+   * länk.
+   */
+  const OWNER_ADMIN_ONLY_CHILDREN = new Set(['/dashboard/karin'])
+
   function filterNavForRole(items: NavItem[]): NavItem[] {
-    if (!isEmployee) return items
+    const owa = isOwnerOrAdmin
+    if (!isEmployee && owa) return items
     return items
-      .filter(item => !HIDDEN_FOR_EMPLOYEE.has(item.key))
+      .filter(item => !(isEmployee && HIDDEN_FOR_EMPLOYEE.has(item.key)))
       .map(item => {
         if (item.type === 'group') {
-          const filtered = item.children.filter(c => !HIDDEN_CHILDREN_FOR_EMPLOYEE.has(c.href))
+          const filtered = item.children.filter(c =>
+            !(isEmployee && HIDDEN_CHILDREN_FOR_EMPLOYEE.has(c.href)) &&
+            !(!owa && OWNER_ADMIN_ONLY_CHILDREN.has(c.href)),
+          )
           if (filtered.length === 0) return null
           return { ...item, children: filtered }
         }
