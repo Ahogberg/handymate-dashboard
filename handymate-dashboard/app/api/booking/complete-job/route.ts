@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
 
         // 1. Markera projektet som slutfört
         try {
-          await supabase
+          const { error: projectCompletionError } = await supabase
             .from('project')
             .update({
               status: 'completed',
@@ -106,6 +106,11 @@ export async function POST(request: NextRequest) {
             })
             .eq('project_id', existing.project_id)
             .eq('business_id', business.business_id)
+
+          if (projectCompletionError) {
+            throw projectCompletionError
+          }
+
           projectCompleted = true
         } catch (projErr) {
           console.error('[booking/complete-job] project completion failed:', projErr)

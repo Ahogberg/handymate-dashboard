@@ -476,9 +476,25 @@ export async function findProjectForEntity(opts: {
   dealId?: string
 }): Promise<{ project_id: string } | null> {
   const supabase = getServerSupabase()
+
+  if (opts.invoiceId) {
+    const { data: invoice, error } = await supabase
+      .from('invoice')
+      .select('project_id')
+      .eq('business_id', opts.businessId)
+      .eq('invoice_id', opts.invoiceId)
+      .maybeSingle()
+
+    if (error) {
+      console.error('[project-stages] findProjectForEntity invoice lookup failed:', error)
+      return null
+    }
+
+    return invoice?.project_id ? { project_id: invoice.project_id } : null
+  }
+
   let query = supabase.from('project').select('project_id').eq('business_id', opts.businessId)
-  if (opts.invoiceId) query = query.eq('invoice_id', opts.invoiceId)
-  else if (opts.quoteId) query = query.eq('quote_id', opts.quoteId)
+  if (opts.quoteId) query = query.eq('quote_id', opts.quoteId)
   else if (opts.dealId) query = query.eq('deal_id', opts.dealId)
   else return null
 

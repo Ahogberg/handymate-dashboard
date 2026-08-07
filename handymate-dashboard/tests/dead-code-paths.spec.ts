@@ -1,0 +1,41 @@
+import { test, expect } from '@playwright/test'
+import fs from 'fs'
+import path from 'path'
+
+const ROOT = path.resolve(__dirname, '..')
+
+test('fakturabetalning hittar projekt via invoice.project_id', () => {
+  const source = fs.readFileSync(
+    path.join(ROOT, 'lib', 'project-stages', 'automation-engine.ts'),
+    'utf8',
+  )
+  const finder = source.slice(source.indexOf('export async function findProjectForEntity'))
+  const invoiceBranch = finder.slice(
+    finder.indexOf('if (opts.invoiceId)'),
+    finder.indexOf("let query = supabase.from('project')"),
+  )
+
+  expect(invoiceBranch).toContain(".from('invoice')")
+  expect(invoiceBranch).toContain(".select('project_id')")
+  expect(invoiceBranch).toContain(".eq('business_id', opts.businessId)")
+  expect(invoiceBranch).toContain(".eq('invoice_id', opts.invoiceId)")
+  expect(finder).not.toMatch(/from\('project'\)[\s\S]{0,250}?eq\('invoice_id'/)
+})
+
+test('complete-job sätter inte project_completed=true vid Supabase-fel', () => {
+  const source = fs.readFileSync(
+    path.join(ROOT, 'app', 'api', 'booking', 'complete-job', 'route.ts'),
+    'utf8',
+  )
+  const projectUpdate = source.slice(
+    source.indexOf('// 1. Markera projektet som slutfört'),
+    source.indexOf('// 2. Trigga auto-faktura'),
+  )
+
+  expect(projectUpdate).toContain('const { error: projectCompletionError } = await supabase')
+  expect(projectUpdate).toContain('if (projectCompletionError)')
+  expect(projectUpdate).toContain('throw projectCompletionError')
+  expect(projectUpdate.indexOf('throw projectCompletionError')).toBeLessThan(
+    projectUpdate.indexOf('projectCompleted = true'),
+  )
+})
