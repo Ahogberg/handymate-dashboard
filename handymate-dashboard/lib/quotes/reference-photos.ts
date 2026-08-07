@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
- * Referensfoton i kundens offert — bevis utan arbete.
+ * Referensfoton i kundens offert — förberedd men avstängd.
  *
  * Kunden samlar två-tre offerter och jämför. Vår ska vara den enda som visar
  * hur jobbet faktiskt blev. Hantverkaren har redan fotona (project_photos från
@@ -11,7 +11,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * faktiskt överlappar projektets. Utan överlapp visas fotona som "tidigare
  * jobb" — vilket är sant — i stället för att antyda en likhet som inte finns.
  *
- * Matchningen är en ren funktion, facit-testad i tests/reference-photos.spec.ts.
+ * Matchningen behålls för en framtida samtyckesmodell och är facit-testad i
+ * tests/reference-photos.spec.ts. Själva hämtningen är fail-closed tills
+ * project_photos har en uttrycklig publicerings-/samtyckesflagga.
  */
 
 export interface ReferencePhotoCandidate {
@@ -77,52 +79,17 @@ export function selectReferencePhotos(
 }
 
 /**
- * Hämtar färdiga referensfoton för en offert. Fail-soft: fotona är en bonus,
- * de får aldrig hindra kunden från att se sin offert.
+ * Stoppgap 2026-08-07: project_photos saknar helt samtyckes-/publiceringsfält.
+ * Att välja företagets senaste `type='after'`-bilder innebär därför att en
+ * tidigare kunds projekt kan visas för en annan kund utan godkännande.
  *
- * Endast 'after'-foton — pågående och före-bilder är inte säljande bevis.
+ * Funktionen är avsiktligt DB-fri och returnerar alltid null tills Andreas har
+ * beslutat modellen och en separat migration infört en explicit opt-in-flagga.
  */
 export async function getReferencePhotos(
-  supabase: SupabaseClient,
-  businessId: string,
-  quoteTitle: string | null | undefined,
+  _supabase: SupabaseClient,
+  _businessId: string,
+  _quoteTitle: string | null | undefined,
 ): Promise<ReferencePhotoSelection | null> {
-  try {
-    const { data, error } = await supabase
-      .from('project_photos')
-      .select('url, caption, uploaded_at, project_id')
-      .eq('business_id', businessId)
-      .eq('type', 'after')
-      .not('url', 'is', null)
-      .order('uploaded_at', { ascending: false })
-      .limit(40)
-
-    if (error || !data || data.length === 0) return null
-
-    // Projektnamnen hämtas separat — project↔project_photos har ingen FK, och
-    // en embed skulle avvisa hela queryn (PGRST200).
-    const projectIds = Array.from(new Set(data.map((p: any) => p.project_id).filter(Boolean)))
-    const nameById = new Map<string, string>()
-    if (projectIds.length > 0) {
-      const { data: projects } = await supabase
-        .from('project')
-        .select('project_id, name')
-        .eq('business_id', businessId)
-        .in('project_id', projectIds)
-      for (const p of projects || []) nameById.set(String(p.project_id), p.name || '')
-    }
-
-    const candidates: ReferencePhotoCandidate[] = data.map((p: any) => ({
-      url: p.url,
-      caption: p.caption,
-      projectName: p.project_id ? nameById.get(String(p.project_id)) || null : null,
-      uploadedAt: p.uploaded_at,
-    }))
-
-    const selection = selectReferencePhotos(candidates, quoteTitle)
-    return selection.photos.length > 0 ? selection : null
-  } catch (err) {
-    console.warn('[reference-photos] kunde inte hämta foton (icke-blockerande):', err)
-    return null
-  }
+  return null
 }

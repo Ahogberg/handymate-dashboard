@@ -15,6 +15,7 @@ import {
   meaningfulWords,
   looksSimilar,
   selectReferencePhotos,
+  getReferencePhotos,
   MAX_REFERENCE_PHOTOS,
 } from '../lib/quotes/reference-photos'
 
@@ -22,6 +23,15 @@ const photo = (projectName: string | null, url = 'https://x/1.jpg', caption: str
   url,
   caption,
   projectName,
+})
+
+test('publik referensfotohämtning är fail-closed och gör ingen DB-fråga', async () => {
+  const supabase = new Proxy({}, {
+    get() {
+      throw new Error('DB får inte anropas utan publiceringssamtycke')
+    },
+  })
+  await expect(getReferencePhotos(supabase as any, 'biz-1', 'Badrum')).resolves.toBeNull()
 })
 
 test.describe('meaningfulWords', () => {
