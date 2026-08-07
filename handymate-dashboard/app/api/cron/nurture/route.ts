@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getDueEnrollments, processEnrollmentStep } from '@/lib/nurture'
 import { getServerSupabase } from '@/lib/supabase'
 
@@ -15,8 +16,7 @@ import { getServerSupabase } from '@/lib/supabase'
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!verifyCronSecret(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

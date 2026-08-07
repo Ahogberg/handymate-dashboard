@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { generateMonthlyReview, buildMonthlyReviewSms } from '@/lib/matte/monthly-review'
@@ -16,11 +17,7 @@ export const maxDuration = 60
  */
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization') || ''
-  const cronSecret = request.headers.get('x-cron-secret') || ''
-  const expected = process.env.CRON_SECRET
-
-  if (!expected || (authHeader !== `Bearer ${expected}` && cronSecret !== expected)) {
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

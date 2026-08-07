@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { evaluateThresholds, executeCronRules } from '@/lib/automation-engine'
 import { checkProfitabilityWarnings } from '@/lib/profitability'
@@ -8,8 +9,7 @@ import { checkProfitabilityWarnings } from '@/lib/profitability'
  * Daglig cron (04:00): kör threshold- och cron-regler för alla företag.
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

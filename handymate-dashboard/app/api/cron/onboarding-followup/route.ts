@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { getWeeklyValue, type WeeklyValue } from '@/lib/weekly-value'
 import { sendEmail, logEmail } from '@/lib/email'
@@ -17,16 +18,14 @@ import { setBusinessPreference, deleteBusinessPreference } from '@/lib/business-
  * Om ALLA tre siffror är noll: mjuk tomt-vecka-variant istället för listan.
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   return runDay7Followup()
 }
 
 export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   return runDay7Followup()

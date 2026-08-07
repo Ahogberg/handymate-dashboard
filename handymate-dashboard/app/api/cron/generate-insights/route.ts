@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -23,8 +24,7 @@ export const maxDuration = 60
 export async function GET(request: Request) {
   // Auth: cron-routen var helt öppen — vem som helst kunde trigga Claude-anrop
   // (kostnad) + push-spam. Kräv CRON_SECRET som övriga cron-jobb.
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getAgentRunner, SUPPORTED_AGENTS } from '@/lib/agents/registry'
@@ -44,11 +45,11 @@ export async function GET(request: NextRequest) {
   }
 
   // Auth: Bearer CRON_SECRET ELLER inloggad session
-  const authHeader = request.headers.get('authorization')
+  const hasCronAuth = verifyCronSecret(request)
   let businessId: string | null = null
   let businessName = 'företaget'
 
-  if (authHeader === `Bearer ${process.env.CRON_SECRET}`) {
+  if (hasCronAuth) {
     if (!requestedBizId) {
       return NextResponse.json(
         { error: 'business_id query-param krävs när Bearer CRON_SECRET används' },

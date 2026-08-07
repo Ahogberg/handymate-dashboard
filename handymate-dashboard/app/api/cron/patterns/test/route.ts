@@ -23,6 +23,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { runPatternsForBusiness } from '@/lib/patterns/run-patterns'
@@ -33,10 +34,10 @@ export async function GET(request: NextRequest) {
   const url = request.nextUrl
   const requestedBizId = url.searchParams.get('business_id')
 
-  const authHeader = request.headers.get('authorization')
+  const hasCronAuth = verifyCronSecret(request)
   let businessId: string | null = null
 
-  if (authHeader === `Bearer ${process.env.CRON_SECRET}`) {
+  if (hasCronAuth) {
     if (!requestedBizId) {
       return NextResponse.json(
         { error: 'business_id query-param krävs när Bearer CRON_SECRET används' },
