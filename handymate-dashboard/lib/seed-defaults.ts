@@ -166,7 +166,10 @@ async function seedV3AutomationRules(supabase: SupabaseClient, businessId: strin
 async function seedLeadScoringRules(supabase: SupabaseClient, businessId: string) {
   const { data: existing } = await supabase
     .from('lead_scoring_rules')
-    .select('id')
+    // PK heter `rule_id` (sql/leads_pipeline.sql:112). Med `id` gav frågan
+    // 42703, data blev null, och kontrollen "finns redan regler?" svarade
+    // alltid nej — seed-RPC:n kördes om vid varje anrop.
+    .select('rule_id')
     .eq('business_id', businessId)
     .limit(1)
 

@@ -83,16 +83,25 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
           .order('sort_order', { ascending: true }),
         supabase
           .from('project_log')
-          .select('description, created_at')
+          // `description:work_description` — ALIAS. Byggdagboken har
+          // `work_description`/`notes`, aldrig `description`
+          // (sql/rot_rut_documents.sql:64). Frågan gav 42703, så kundens
+          // portal har aldrig visat senaste dagboksanteckningen.
+          .select('description:work_description, created_at')
           .eq('project_id', p.project_id)
           .order('created_at', { ascending: false })
           .limit(1),
         supabase
           .from('schedule_entry')
-          .select('title, start_time, end_time')
+          // Kolumnerna heter `start_datetime`/`end_datetime`
+          // (sql/schedule_tables.sql:8). Frågan bad om `start_time`/`end_time`
+          // — 42703 — så kundportalen har aldrig visat nästa besök.
+          // Aliasen behåller formen `nextVisit` skickas ut i; filter och
+          // sortering måste däremot använda de riktiga namnen.
+          .select('title, start_time:start_datetime, end_time:end_datetime')
           .eq('customer_id', customer.customer_id)
-          .gte('start_time', new Date().toISOString())
-          .order('start_time', { ascending: true })
+          .gte('start_datetime', new Date().toISOString())
+          .order('start_datetime', { ascending: true })
           .limit(1),
         supabase
           .from('project_change')

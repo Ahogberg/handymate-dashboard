@@ -61,7 +61,10 @@ export async function GET(request: NextRequest) {
       // SMS this month
       supabase
         .from('sms_log')
-        .select('id', { count: 'exact', head: true })
+        // `*` i stället för `id` — tabellens PK heter `sms_id`, och en ren
+        // huvudräkning behöver ändå ingen kolumn. Med `id` svarade PostgREST
+        // 42703 och SMS-siffran i adminvyn blev tyst noll.
+        .select('*', { count: 'exact', head: true })
         .gte('created_at', monthStart)
         .lte('created_at', monthEnd),
 

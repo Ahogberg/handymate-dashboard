@@ -26,18 +26,27 @@ interface WarrantyResult {
 export async function checkWarrantyFollowups(businessId: string): Promise<WarrantyResult> {
   const supabase = getServerSupabase()
 
-  // Kolla om warranty_followup är aktiverad
-  const { data: settings } = await supabase
-    .from('automation_settings')
-    .select('settings')
+  // ═══ SAMMA DÖDA LÄSNING SOM I proactive-care.ts (2026-08-07) ═══
+  //
+  // `automation_settings.settings` finns inte — tabellen är bred och platt
+  // (sql/automation_center.sql), utan JSONB-kolumn. Frågan gav 42703, och
+  // eftersom alla tre värdena föll tillbaka på sina defaultar har varken
+  // avstängningen, garantilängden eller det egna meddelandet någonsin haft
+  // effekt. Tre inställningar som såg konfigurerbara ut och var konstanter.
+  //
+  // Defaultarna behålls oförändrade — det är exakt det beteende som körts i
+  // prod hittills, så den här lagningen ändrar inget för någon kund. Det som
+  // ändras är att spärren nu läser den kill-switch som faktiskt finns.
+  const { data: killSwitch } = await supabase
+    .from('business_config')
+    .select('agents_globally_paused')
     .eq('business_id', businessId)
     .maybeSingle()
 
-  const warrantyEnabled = settings?.settings?.warranty_followup_enabled !== false // default true
-  const warrantyMonths = settings?.settings?.warranty_followup_months || 12
-  const customMessage = settings?.settings?.warranty_followup_message || null
+  const warrantyMonths = 12
+  const customMessage = null as string | null
 
-  if (!warrantyEnabled) {
+  if (killSwitch?.agents_globally_paused) {
     return { success: true, followupsCreated: 0 }
   }
 

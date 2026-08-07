@@ -157,15 +157,24 @@ export async function checkProactiveCare(businessId: string): Promise<{
   let contactsCreated = 0
 
   try {
-    // Kolla om proactive care är aktiverat (default: true)
-    const { data: settings } = await supabase
-      .from('automation_settings')
-      .select('settings')
+    // ═══ AVSTÄNGNINGEN LÄSTES FRÅN EN KOLUMN SOM INTE FINNS (2026-08-07) ═══
+    //
+    // Koden läste `automation_settings.settings.proactive_care_enabled`.
+    // `automation_settings` är en bred, platt tabell (sql/automation_center.sql)
+    // — den har varken en JSONB-kolumn `settings` eller något fält för
+    // proaktiv omsorg. Frågan gav 42703, `settings` blev null, och uttrycket
+    // `undefined !== false` blev true. Avstängningen har alltså aldrig gått
+    // att slå av: den såg ut som en spärr och var en konstant.
+    //
+    // Spärren läses nu från den kill-switch som faktiskt finns och som resten
+    // av huset redan respekterar (samma fält som cron/missed-revenue).
+    const { data: killSwitch } = await supabase
+      .from('business_config')
+      .select('agents_globally_paused')
       .eq('business_id', businessId)
       .maybeSingle()
 
-    const proactiveEnabled = settings?.settings?.proactive_care_enabled !== false
-    if (!proactiveEnabled) {
+    if (killSwitch?.agents_globally_paused) {
       return { success: true, contactsCreated: 0 }
     }
 

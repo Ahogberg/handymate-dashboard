@@ -54,7 +54,13 @@ export async function GET(request: NextRequest) {
       supabase.from('invoice').select('*').eq('business_id', bid),
       supabase.from('booking').select('*').eq('business_id', bid),
       supabase.from('time_entry').select('*').eq('business_id', bid),
-      supabase.from('call_recording').select('recording_id, phone_from, phone_to, direction, duration_seconds, transcript_summary, sentiment, created_at').eq('business_id', bid),
+      // `phone_from`/`phone_to`/`sentiment` finns inte på call_recording
+      // (sql/new_tables.sql:37) — numret ligger i `phone_number`, riktningen i
+      // `direction`, och någon sentimentkolumn har aldrig funnits. Frågan gav
+      // 42703, vilket betyder att ett registerutdrag enligt GDPR tyst har
+      // saknat samtliga samtalsinspelningar. Det är den allvarligaste
+      // konsekvensen av felklassen: utdraget såg komplett ut och var det inte.
+      supabase.from('call_recording').select('recording_id, phone_number, direction, duration_seconds, transcript_summary, created_at').eq('business_id', bid),
       supabase.from('project').select('*').eq('business_id', bid),
     ])
 

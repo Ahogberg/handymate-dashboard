@@ -372,7 +372,11 @@ export async function GET(
   if (filter === 'all' || filter === 'time') {
     const { data: timeEntries } = await supabase
       .from('time_entry')
-      .select('time_entry_id, work_date, start_time, end_time, duration_minutes, hourly_rate, is_billable, notes, created_at')
+      // `notes:description` — ALIAS. Tabellen har `description`, aldrig `notes`
+      // (sql/new_tables.sql:14). Frågan bad om `notes`, PostgREST svarade 42703,
+      // och eftersom `error` inte plockas ut nedan blev `data` null och hela
+      // tidrapporterings-sektionen tyst tom. Inte ett fel i loggen på månader.
+      .select('time_entry_id, work_date, start_time, end_time, duration_minutes, hourly_rate, is_billable, notes:description, created_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('work_date', { ascending: false })
@@ -435,21 +439,29 @@ export async function GET(
     // Project log entries (byggdagbok)
     const projectIds = (projects || []).map((p: any) => p.id)
     if (projectIds.length > 0) {
-      const { data: logEntries } = await supabase
+      // Byggdagboken har `work_description`/`notes` och `log_date` — aldrig
+      // `entry` eller `logged_at` (sql/rot_rut_documents.sql:64). Frågan bad om
+      // de senare och gav 42703, så byggdagboken har aldrig synts i timelinen.
+      // Samma fel som saneringen ovan rättade för `projects` → `project` den
+      // 5 augusti, i samma fil, utan att grannarna kontrollerades.
+      const { data: logEntries, error: logErr } = await supabase
         .from('project_log')
-        .select('id, entry, project_id, logged_at')
+        .select('id, work_description, notes, project_id, log_date, created_at')
         .in('project_id', projectIds)
-        .order('logged_at', { ascending: false })
+        .order('log_date', { ascending: false })
         .limit(20)
+
+      if (logErr) console.error('[timeline] byggdagbok:', logErr.message)
 
       for (const le of logEntries || []) {
         const proj = (projects || []).find((p: any) => p.id === le.project_id)
+        const text = le.work_description || le.notes || null
         events.push({
           id: `plog_${le.id}`,
           type: 'project_log',
           title: `Byggdagbok: ${proj?.name || 'Projekt'}`,
-          description: le.entry ? le.entry.substring(0, 150) : null,
-          timestamp: le.logged_at,
+          description: text ? String(text).substring(0, 150) : null,
+          timestamp: le.log_date || le.created_at,
           metadata: { project_id: le.project_id },
         })
       }
@@ -480,21 +492,45 @@ export async function GET(
     // Pipeline activity log
     const dealIds = (dealRows || []).map((d: any) => d.id)
     if (dealIds.length > 0) {
-      const { data: pipelineActs } = await supabase
-        .from('pipeline_activity')
-        .select('id, deal_id, from_stage, to_stage, note, created_at')
-        .in('deal_id', dealIds)
-        .order('created_at', { ascending: false })
-        .limit(30)
+      // Kolumnerna heter `from_stage_id`/`to_stage_id`/`description`
+      // (sql/pipeline.sql:52). Frågan bad om `from_stage`/`to_stage`/`note`
+      // och gav 42703 — pipeline-händelser har aldrig synts i timelinen.
+      //
+      // Stegnamnen hämtas separat i stället för som embed. En embed hade krävt
+      // en FK som inte är bekräftat körd i prod, och en PGRST200 hade fällt
+      // frågan lika tyst som den bugg som just rättades här.
+      const [actsRes, stagesRes] = await Promise.all([
+        supabase
+          .from('pipeline_activity')
+          .select('id, deal_id, from_stage_id, to_stage_id, description, created_at')
+          .in('deal_id', dealIds)
+          .order('created_at', { ascending: false })
+          .limit(30),
+        supabase
+          .from('pipeline_stage')
+          .select('id, name')
+          .eq('business_id', businessId),
+      ])
 
-      for (const pa of pipelineActs || []) {
+      if (actsRes.error) console.error('[timeline] ärendehändelser:', actsRes.error.message)
+
+      const stegNamn = new Map<string, string>(
+        (stagesRes.data || []).map((s: any) => [s.id, s.name]),
+      )
+
+      for (const pa of actsRes.data || []) {
+        // Bara faktiska stegbyten är en "flytt". Övriga aktiviteter saknar
+        // stegfält och ska inte renderas som "? → ?".
+        if (!pa.from_stage_id && !pa.to_stage_id) continue
+        const fran = stegNamn.get(pa.from_stage_id) || 'Nytt'
+        const till = stegNamn.get(pa.to_stage_id) || 'Okänt steg'
         events.push({
           id: `pa_${pa.id}`,
           type: 'pipeline_stage_changed',
-          title: `Ärende flyttat: ${pa.from_stage || '?'} → ${pa.to_stage || '?'}`,
-          description: pa.note || null,
+          title: `Ärende flyttat: ${fran} → ${till}`,
+          description: pa.description || null,
           timestamp: pa.created_at,
-          metadata: { deal_id: pa.deal_id, from_stage: pa.from_stage, to_stage: pa.to_stage },
+          metadata: { deal_id: pa.deal_id, from_stage: fran, to_stage: till },
         })
       }
     }

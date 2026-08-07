@@ -67,7 +67,9 @@ export async function generateAgentContext(businessId: string): Promise<{
       // Väntande approvals
       supabase
         .from('pending_approvals')
-        .select('approval_id', { count: 'exact', head: true })
+        // Tabellens PK heter `id` (sql/v15_autopilot.sql). `approval_id` finns
+        // inte — 42703 — så agenten har alltid trott att kön är tom.
+        .select('*', { count: 'exact', head: true })
         .eq('business_id', businessId)
         .eq('status', 'pending'),
 

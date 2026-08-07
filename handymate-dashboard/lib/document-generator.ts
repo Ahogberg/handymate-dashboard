@@ -391,7 +391,12 @@ export async function fetchResolveContext(
   if (projectId) {
     const { data: project } = await supabase
       .from('project')
-      .select('project_id, name, address')
+      // `address` finns inte på project (sql/projects.sql:8). Kolumnen fällde
+      // hela frågan, så VARKEN adress eller projektnamn nådde dokumenten —
+      // `project_name` blev tomt av en kolumn som aldrig behövdes.
+      // Projektadressen bor på kunden (`customer.visit_address`) respektive
+      // offerten (`quotes.project_address`); den kopplingen är inte dragen här.
+      .select('project_id, name')
       .eq('project_id', projectId)
       .single()
     if (project) context.project = project

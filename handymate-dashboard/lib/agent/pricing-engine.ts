@@ -137,7 +137,10 @@ export async function updatePricingIntelligence(businessId: string): Promise<{
       const quoteIds = unclassified.map((q: QuoteRecord) => q.quote_id)
       const { data: items } = await supabase
         .from('quote_items')
-        .select('quote_id, description, name')
+        // `name` finns inte på quote_items (sql/quote_overhaul.sql) — raden
+        // heter `description`. Den enda kolumnen som inte fanns fällde HELA
+        // frågan med 42703, så prismotorn har aldrig sett en enda offertrad.
+        .select('quote_id, description')
         .in('quote_id', quoteIds)
 
       const itemsByQuote: Record<string, Array<{ description?: string; name?: string }>> = {}

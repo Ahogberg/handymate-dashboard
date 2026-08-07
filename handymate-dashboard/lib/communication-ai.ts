@@ -324,7 +324,11 @@ async function buildCustomerState(
   // Deal info
   const { data: deal } = await supabase
     .from('deal')
-    .select('stage_slug')
+    // `stage_slug` finns inte — steget ligger i `stage_id` mot pipeline_stage
+    // (sql/pipeline.sql:30). Frågan gav 42703, så agenten har alltid sett
+    // "Pipeline-steg: Okänt" oavsett var ärendet stod.
+    // Embedden är samma som timeline-rutten redan använder mot samma relation.
+    .select('stage:pipeline_stage(name)')
     .eq('business_id', businessId)
     .eq('customer_id', customerId)
     .order('created_at', { ascending: false })
@@ -433,7 +437,7 @@ async function buildCustomerState(
     customerId,
     customerName: customer?.name || 'Kund',
     customerPhone: customer?.phone_number || null,
-    dealStage: deal?.stage_slug || null,
+    dealStage: (deal?.stage as any)?.name || null,
     daysSinceContact,
     daysSinceMessage,
     messageCountThisWeek: messageCount || 0,

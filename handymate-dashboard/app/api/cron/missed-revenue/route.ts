@@ -62,12 +62,32 @@ export async function GET(request: NextRequest) {
         // hade fällt hela svepet tyst.
         const [atasRes, matsRes, projRes, invRes, openRes] = await Promise.all([
           supabase.from('project_change')
-            .select('id, project_id, description, amount, signed_at, invoiced_at')
+            // ═══ `id:change_id` — ALIAS, INTE ETT SKRIVFEL (2026-08-07) ═══
+            //
+            // Tabellens primärnyckel heter `change_id` (sql/projects.sql:71).
+            // Ingen migration lägger till någon `id`-kolumn, och all annan kod
+            // i repot använder `change_id`.
+            //
+            // Frågan selectade tidigare `id` rakt av. PostgREST svarade 42703,
+            // felkontrollen nedan kastade, och catchen hoppade över HELA
+            // företagets svep — alla tre reglerna, inte bara ÄTA-regeln.
+            // Svepet har alltså aldrig skapat ett enda kort sedan det
+            // skeppades. Verifierat mot produktionsschemat 2026-08-07:
+            //   SELECT column_name FROM information_schema.columns
+            //   WHERE table_name='project_change' AND column_name IN ('id','change_id')
+            //   → change_id
+            //
+            // Aliaset gör att den rena funktionen (som tar `AtaRow.id`) och
+            // dess 228 facit står orörda.
+            .select('id:change_id, project_id, description, amount, signed_at, invoiced_at')
             .eq('business_id', businessId)
             .not('signed_at', 'is', null)
             .is('invoiced_at', null),
           supabase.from('project_material')
-            .select('id, project_id, total_sell, invoiced')
+            // Samma sak här: PK heter `material_id` (sql/supplier_connections.sql:84).
+            // Att bara laga ÄTA-frågan ovan hade inte hjälpt — Promise.all
+            // läser båda, och EN 42703 fäller hela företagets svep.
+            .select('id:material_id, project_id, total_sell, invoiced')
             .eq('business_id', businessId)
             .eq('invoiced', false),
           supabase.from('project')

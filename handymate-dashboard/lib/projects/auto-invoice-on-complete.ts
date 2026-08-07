@@ -240,12 +240,42 @@ export async function autoInvoiceOnComplete(
       return { success: false, error: insertErr.message }
     }
 
-    // Markera ÄTA som fakturerade
+    // ── Markera ÄTA som fakturerade ──────────────────────────────────────
+    //
+    // Satte tidigare BARA `status`. Intäktssvepet (lib/value/missed-revenue.ts:117)
+    // tittar enbart på `invoiced_at`, aldrig på status — så varje ÄTA som
+    // fakturerats den här vägen larmades tre dygn senare som "inte fakturerad".
+    // Ett kort som uppmanar hantverkaren att fakturera samma arbete en gång
+    // till är värre än inget kort alls.
+    //
+    // Detta syntes aldrig i drift eftersom svepet samtidigt var en no-op
+    // (fel kolumnnamn, se cron-rutten). Båda lagas i samma commit — lagar man
+    // bara svepet byter man en tyst nolla mot falska larm.
+    //
+    // `create-final-invoice/route.ts:436-444` gjorde redan rätt; den här vägen
+    // gör nu likadant. Även `business_id` läggs till: en `.in()` på id:n utan
+    // företagsfilter förlitade sig på att id:n är globalt unika.
     if (atas && atas.length > 0) {
-      await supabase
+      const { error: ataErr } = await supabase
         .from('project_change')
-        .update({ status: 'invoiced' })
+        .update({
+          status: 'invoiced',
+          invoice_id: invoice?.invoice_id ?? null,
+          invoiced_at: new Date().toISOString(),
+        })
+        .eq('business_id', businessId)
         .in('change_id', atas.map(a => a.change_id))
+
+      // Fakturan finns redan. Misslyckas markeringen är det ÄTA:n som blir
+      // fel, inte fakturan — och då ska det synas i loggen i stället för att
+      // dyka upp som ett falskt intäktsfynd tre dygn senare.
+      if (ataErr) {
+        console.error('[auto-invoice] kunde inte markera ÄTA som fakturerade:', ataErr.message, {
+          project_id: projectId,
+          invoice_id: invoice?.invoice_id,
+          ata_count: atas.length,
+        })
+      }
     }
 
     // 9. Hämta kundinfo
