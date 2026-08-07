@@ -6,6 +6,7 @@ import { resolveDisplayLevel, groupItemsForSummary } from '@/lib/quotes/display-
 import { buildQuoteTemplateData, selectTemplate } from '@/lib/quote-templates'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 import { sanitizeTemplateDataForPublic } from '@/lib/quotes/public-document'
+import { buildPublicQuoteDto } from '@/lib/quotes/public-dto'
 import { stripPrintBar } from '@/lib/document-html'
 import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/business/quote-surface-select'
 
@@ -207,7 +208,7 @@ export async function GET(
       // som preview-html-routen) — sidan har egna PDF-/signeringsknappar.
       if (templateStyle !== 'modern') {
         const renderFn = selectTemplate(templateStyle)
-        documentHtml = stripPrintBar(renderFn(templateData))
+        documentHtml = stripPrintBar(renderFn(publicTemplateData))
       }
     } catch (docErr) {
       // Dokumentbygget får ALDRIG blockera hela svaret — utan templateData
@@ -217,18 +218,17 @@ export async function GET(
     }
 
     return NextResponse.json({
-      quote: {
-        ...quote,
-        business_id: undefined, // Don't expose
-        quote_items: undefined, // internt fält för buildQuoteTemplateData — ersätts av structured_items nedan
-        structured_items: responseItems,
-        display_level: displayLevel,
-        display_groups: displayGroups,
-        base_totals: baseTotals,
-        template_data: publicTemplateData,
-        template_style: templateStyle,
-        document_html: documentHtml,
-      },
+      quote: buildPublicQuoteDto({
+        quote,
+        customer,
+        structuredItems: responseItems,
+        displayLevel,
+        displayGroups,
+        baseTotals,
+        templateData: publicTemplateData,
+        templateStyle,
+        documentHtml,
+      }),
       business: {
         name: business?.business_name || '',
         contact_name: business?.contact_name || '',

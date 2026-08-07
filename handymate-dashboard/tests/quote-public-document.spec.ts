@@ -97,6 +97,14 @@ test.describe('applyLiveSelectionToTemplateData', () => {
 })
 
 test.describe('sanitizeTemplateDataForPublic', () => {
+  test('personnummer tas bort ur publik template-data utan att mutera input', () => {
+    const data = baseData([], 'full')
+    data.customer.personnummer = '198001011234'
+    const result = sanitizeTemplateDataForPublic(data)
+    expect(result.customer.personnummer).toBeNull()
+    expect(data.customer.personnummer).toBe('198001011234')
+  })
+
   test("displayLevel 'full' — items lämnas helt orörda", () => {
     const items: QuoteTemplateItem[] = [
       { itemType: 'item', id: 'i1', name: 'Kakel', quantity: 12, unit: 'm2', unitPrice: 450, total: 5400 },

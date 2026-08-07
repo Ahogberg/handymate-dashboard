@@ -30,14 +30,22 @@ export function sanitizeTemplateDataForPublic(data: QuoteTemplateData): QuoteTem
   // (subtotalExVat/totalIncVat/…) som byggts ur den OFILTRERADE radlistan —
   // den dolda radens pris ingår i summan precis som avsett.
   const visibleItems = data.quote.items.filter(item => !item.isHidden)
+  // En publik signeringslänk är en bearer-länk. Personnumret behövs internt
+  // för ROT/RUT-underlag men ska varken ligga i JSON-dokumentet eller i den
+  // serverrenderade Premium/Friendly-HTML som byggs från detta objekt.
+  const hasPersonalNumber = !!data.customer?.personnummer
+  const publicCustomer = hasPersonalNumber
+    ? { ...data.customer, personnummer: null }
+    : data.customer
 
   if (data.displayLevel !== 'rows') {
-    if (visibleItems.length === data.quote.items.length) return data
-    return { ...data, quote: { ...data.quote, items: visibleItems } }
+    if (visibleItems.length === data.quote.items.length && !hasPersonalNumber) return data
+    return { ...data, customer: publicCustomer, quote: { ...data.quote, items: visibleItems } }
   }
 
   return {
     ...data,
+    customer: publicCustomer,
     quote: {
       ...data.quote,
       items: visibleItems.map(item =>
