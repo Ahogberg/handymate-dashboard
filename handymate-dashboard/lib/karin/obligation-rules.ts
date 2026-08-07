@@ -139,8 +139,13 @@ export const OBLIGATION_RULES: Record<string, ObligationRule> = {
     applies_to: 'Alla företag — datumet beror på bolagsform och räkenskapsår',
     legal_basis: 'Aktiebolag: datum styrs av räkenskapsårets slutmånad. Enskild firma redovisas i ägarens inkomstdeklaration, som lämnas i maj.',
     source_url: 'https://www.skatteverket.se/foretag/skatterochavdrag/deklarerasomforetag.4.html',
-    version: 1,
-    // Medel: pappersdeklaration och digital deklaration har olika datum.
+    version: 2,
+    // Medel — men av rätt skäl sedan 2026-08-07.
+    //
+    // Datumtabellen är verifierad mot Skatteverket och papper och digitalt har
+    // samma datum; den ursprungliga motiveringen ("olika datum") var fel.
+    // Osäkerheten som finns kvar är verklig: byter bolaget räkenskapsår eller
+    // avvecklas kan sista dagen flyttas, och det syns inte i profilen.
     confidence: 'medel',
   },
 

@@ -236,6 +236,46 @@ test.describe('DATUMEN — årsbundna för aktiebolag', () => {
     expect(stamma.due_date < arsred.due_date, 'stämman måste ligga före inlämningen').toBe(true)
   })
 
+  test('HELA deklarationstabellen stämmer mot Skatteverket', () => {
+    // Verifierad 2026-08-07 mot Skatteverkets publicerade tabell. Det här är
+    // den regel jag skrev ur minnet och som därför var mest värd att kolla —
+    // datumen visade sig stämma, men motiveringstexten var fel.
+    //
+    // bokslut jan–apr → 1 dec samma år · maj–jun → 15 jan året efter
+    // jul–aug → 1 apr året efter    · sep–dec → 1 aug året efter
+    const facit: Array<[number, string]> = [
+      [1, '2026-12-01'], [4, '2026-12-01'],
+      [5, '2027-01-15'], [6, '2027-01-15'],
+      [7, '2027-04-01'], [8, '2027-04-01'],
+      [9, '2027-08-02'], [12, '2027-08-02'],
+    ]
+    for (const [manad, forvantat] of facit) {
+      const alla = materializeObligations(
+        { ...BEE, fiscal_year_end_month: manad },
+        ymd(2026, 1, 1), ymd(2027, 12, 31),
+      ).filter(o => o.rule_code === 'inkomstdeklaration')
+      expect(alla.some(o => o.due_date === forvantat), `bokslut i månad ${manad} → ${forvantat}`).toBe(true)
+    }
+  })
+
+  test('kalenderår 2025 ger 3 augusti 2026 — Skatteverkets egen kontrollpunkt', () => {
+    // 1 augusti 2026 är en lördag. Skatteverket anger måndag 3 augusti.
+    // Att vår förskjutning landar exakt där är det starkaste enskilda beviset
+    // för att helgdagslogiken fungerar mot verkligheten.
+    const dec = materializeObligations(BEE, ymd(2026, 1, 1), ymd(2026, 12, 31))
+      .find(o => o.rule_code === 'inkomstdeklaration')!
+    expect(dec.due_date).toBe('2026-08-03')
+    expect(dec.period_label).toBe('räkenskapsåret 2025')
+  })
+
+  test('förklaringen påstår inget om papper kontra digitalt', () => {
+    // Den gjorde det, och det var fel — papper och digitalt har samma datum.
+    // Texten hantverkaren läser får inte bära ett påstående vi inte kan hålla.
+    const dec = materializeObligations(BEE, ymd(2026, 1, 1), ymd(2026, 12, 31))
+      .find(o => o.rule_code === 'inkomstdeklaration')!
+    expect(/papper/i.test(dec.why), dec.why).toBe(false)
+  })
+
   test('aktiebolagets deklarationsdatum styrs av bokslutsmånaden', () => {
     // Kalenderår → 1 augusti året efter (digital inlämning).
     const dec = materializeObligations(BEE, AR_2026.from, AR_2026.to).find(o => o.rule_code === 'inkomstdeklaration')!

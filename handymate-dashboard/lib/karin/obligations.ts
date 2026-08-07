@@ -212,9 +212,21 @@ export function materializeObligations(
       // Inkomstdeklaration.
       if (ruleApplies('inkomstdeklaration', profile)) {
         if (profile.company_form === 'ab') {
-          // Datumet styrs av räkenskapsårets slutmånad. Datumen nedan är de
-          // som gäller vid DIGITAL inlämning, vilket är vad alla använder —
-          // pappersdeklaration har en månad tidigare.
+          // Datumet styrs av räkenskapsårets slutmånad.
+          //
+          // VERIFIERAT 2026-08-07 mot Skatteverkets publicerade tabell:
+          //   bokslut jan–apr → 1 december samma år
+          //   bokslut maj–jun → 15 januari året efter
+          //   bokslut jul–aug → 1 april året efter
+          //   bokslut sep–dec → 1 augusti året efter
+          //
+          // Kontrollpunkt: kalenderår 2025 ger 1 augusti 2026, som är en
+          // lördag och förskjuts till måndag 3 augusti — exakt det datum
+          // Skatteverket anger. Förskjutningen är alltså med i facit.
+          //
+          // Papper och digitalt har SAMMA datum i tabellen. En tidigare
+          // version av den här koden påstod att papper låg en månad före;
+          // det var fel och stod dessutom i texten hantverkaren läser.
           const tabell: Record<number, { manad: number; dag: number; ar: number }> = {
             1: { manad: 12, dag: 1, ar: 0 }, 2: { manad: 12, dag: 1, ar: 0 },
             3: { manad: 12, dag: 1, ar: 0 }, 4: { manad: 12, dag: 1, ar: 0 },
@@ -228,7 +240,7 @@ export function materializeObligations(
             rule_code: 'inkomstdeklaration',
             due: ymd(ar + t.ar, t.manad, t.dag),
             period_label: `räkenskapsåret ${ar}`,
-            why: `Aktiebolagets deklarationsdatum styrs av räkenskapsårets slutmånad (${MANADER[bokslutManad - 1]}). Datumet gäller digital inlämning — på papper är det en månad tidigare.`,
+            why: `Aktiebolagets deklarationsdatum styrs av räkenskapsårets slutmånad (${MANADER[bokslutManad - 1]}). Byter du räkenskapsår eller avvecklar bolaget kan datumet flyttas.`,
             prepareDays: 30,
           })
         } else {
