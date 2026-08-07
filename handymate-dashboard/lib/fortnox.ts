@@ -164,17 +164,30 @@ export async function refreshAccessToken(refreshToken: string): Promise<FortnoxT
 export async function getFortnoxConfig(businessId: string): Promise<FortnoxConfig | null> {
   const supabase = getSupabase()
 
-  const { data, error } = await supabase
+  const [{ data: credentials, error: credentialsError }, { data: metadata, error: metadataError }] = await Promise.all([
+    supabase
+      .from('business_integration_credentials')
+      .select('fortnox_access_token, fortnox_refresh_token, fortnox_token_expires_at')
+      .eq('business_id', businessId)
+      .maybeSingle(),
+    supabase
     .from('business_config')
-    .select('fortnox_access_token, fortnox_refresh_token, fortnox_token_expires_at, fortnox_connected_at, fortnox_company_name')
-    .eq('business_id', businessId)
-    .single()
+      .select('fortnox_connected_at, fortnox_company_name')
+      .eq('business_id', businessId)
+      .maybeSingle(),
+  ])
 
-  if (error || !data) {
+  if (credentialsError || metadataError || !metadata) {
     return null
   }
 
-  return data as FortnoxConfig
+  return {
+    fortnox_access_token: credentials?.fortnox_access_token ?? null,
+    fortnox_refresh_token: credentials?.fortnox_refresh_token ?? null,
+    fortnox_token_expires_at: credentials?.fortnox_token_expires_at ?? null,
+    fortnox_connected_at: metadata.fortnox_connected_at ?? null,
+    fortnox_company_name: metadata.fortnox_company_name ?? null,
+  }
 }
 
 /**
@@ -188,10 +201,22 @@ export async function saveFortnoxTokens(
   const supabase = getSupabase()
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
 
+  const { error: credentialError } = await supabase
+    .from('business_integration_credentials')
+    .upsert({
+      business_id: businessId,
+      fortnox_access_token: tokens.access_token,
+      fortnox_refresh_token: tokens.refresh_token,
+      fortnox_token_expires_at: expiresAt,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'business_id' })
+
+  if (credentialError) {
+    console.error('Save Fortnox credentials error:', credentialError)
+    throw new Error('Failed to save Fortnox tokens')
+  }
+
   const updateData: Record<string, unknown> = {
-    fortnox_access_token: tokens.access_token,
-    fortnox_refresh_token: tokens.refresh_token,
-    fortnox_token_expires_at: expiresAt,
     fortnox_connected: true,
   }
 
@@ -222,12 +247,19 @@ export async function saveFortnoxTokens(
 export async function clearFortnoxConnection(businessId: string): Promise<void> {
   const supabase = getSupabase()
 
+  const { error: credentialError } = await supabase
+    .from('business_integration_credentials')
+    .delete()
+    .eq('business_id', businessId)
+
+  if (credentialError) {
+    console.error('Clear Fortnox credentials error:', credentialError)
+    throw new Error('Failed to clear Fortnox connection')
+  }
+
   const { error } = await supabase
     .from('business_config')
     .update({
-      fortnox_access_token: null,
-      fortnox_refresh_token: null,
-      fortnox_token_expires_at: null,
       fortnox_connected_at: null,
       fortnox_company_name: null,
       fortnox_connected: false,

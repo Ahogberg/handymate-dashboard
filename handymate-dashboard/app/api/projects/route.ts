@@ -5,6 +5,7 @@ import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { getNextProjectNumber, bumpCounter } from '@/lib/numbering'
 import { getQuoteBudgetDerivation } from '@/lib/quotes/get-quote-budget-derivation'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
+import { verifyOwnership } from '@/lib/auth/verify-ownership'
 
 /**
  * GET - Lista projekt för ett företag
@@ -258,6 +259,23 @@ export async function POST(request: NextRequest) {
     const supabase = getServerSupabase()
     const body = await request.json()
     const businessId = business.business_id
+
+    // customer_id kommer direkt från request-body vid manuellt skapande.
+    // Service role kringgår RLS, så länken måste verifieras före varje insert.
+    const customerOwnership = await verifyOwnership(supabase, businessId, [
+      {
+        table: 'customer',
+        idColumn: 'customer_id',
+        idValue: body.customer_id,
+        label: 'kund',
+      },
+    ])
+    if (!customerOwnership.ok) {
+      return NextResponse.json(
+        { error: 'Kunden tillhör inte företaget' },
+        { status: 403 },
+      )
+    }
 
     let projectData: any = {
       business_id: businessId,
@@ -724,11 +742,27 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Missing projectId' }, { status: 400 })
     }
 
+    // Parent-first: inget barn får röras förrän projektets tenant är bevisad.
+    const { data: ownedProject, error: ownershipError } = await supabase
+      .from('project')
+      .select('project_id')
+      .eq('project_id', projectId)
+      .eq('business_id', business.business_id)
+      .maybeSingle()
+
+    if (ownershipError) throw ownershipError
+    if (!ownedProject) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    }
+
     // Check for linked time entries
-    const { count } = await supabase
+    const { count, error: timeEntryError } = await supabase
       .from('time_entry')
       .select('*', { count: 'exact', head: true })
       .eq('project_id', projectId)
+      .eq('business_id', business.business_id)
+
+    if (timeEntryError) throw timeEntryError
 
     if (count && count > 0) {
       return NextResponse.json(
@@ -738,13 +772,55 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete all child records first (order matters for FK constraints)
-    await supabase.from('project_document').delete().eq('project_id', projectId)
-    await supabase.from('project_log').delete().eq('order_id', projectId)
-    await supabase.from('project_checklist').delete().eq('project_id', projectId)
-    await supabase.from('project_assignment').delete().eq('project_id', projectId)
-    await supabase.from('project_material').delete().eq('project_id', projectId)
-    await supabase.from('project_milestone').delete().eq('project_id', projectId)
-    await supabase.from('project_change').delete().eq('project_id', projectId)
+    const { error: documentError } = await supabase
+      .from('project_document')
+      .delete()
+      .eq('project_id', projectId)
+      .eq('business_id', business.business_id)
+    if (documentError) throw documentError
+
+    const { error: logError } = await supabase
+      .from('project_log')
+      .delete()
+      .eq('order_id', projectId)
+      .eq('business_id', business.business_id)
+    if (logError) throw logError
+
+    // Produktionen har legacy-kolumnen order_id på project_checklist.
+    const { error: checklistError } = await supabase
+      .from('project_checklist')
+      .delete()
+      .eq('order_id', projectId)
+      .eq('business_id', business.business_id)
+    if (checklistError) throw checklistError
+
+    const { error: assignmentError } = await supabase
+      .from('project_assignment')
+      .delete()
+      .eq('project_id', projectId)
+      .eq('business_id', business.business_id)
+    if (assignmentError) throw assignmentError
+
+    const { error: materialError } = await supabase
+      .from('project_material')
+      .delete()
+      .eq('project_id', projectId)
+      .eq('business_id', business.business_id)
+    if (materialError) throw materialError
+
+    const { error: milestoneError } = await supabase
+      .from('project_milestone')
+      .delete()
+      .eq('project_id', projectId)
+      .eq('business_id', business.business_id)
+    if (milestoneError) throw milestoneError
+
+    const { error: changeError } = await supabase
+      .from('project_change')
+      .delete()
+      .eq('project_id', projectId)
+      .eq('business_id', business.business_id)
+    if (changeError) throw changeError
 
     const { error } = await supabase
       .from('project')

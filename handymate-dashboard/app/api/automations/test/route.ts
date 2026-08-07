@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { logAutomationActivity } from '@/lib/automations'
+import { getFortnoxConfig } from '@/lib/fortnox'
 
 export async function POST(request: NextRequest) {
   try {
@@ -90,13 +91,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'fortnox': {
-        const { getServerSupabase } = await import('@/lib/supabase')
-        const supabase = getServerSupabase()
-        const { data: config } = await supabase
-          .from('business_config')
-          .select('fortnox_access_token')
-          .eq('business_id', business.business_id)
-          .single()
+        const config = await getFortnoxConfig(business.business_id)
 
         result = {
           success: !!config?.fortnox_access_token,

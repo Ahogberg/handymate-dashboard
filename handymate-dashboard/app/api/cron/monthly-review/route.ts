@@ -12,7 +12,7 @@ export const maxDuration = 60
  *
  * POST /api/cron/monthly-review
  *   Manuell trigger från dashboard.
- *   Body: { business_id?: string, month?: "YYYY-MM-01" }
+ *   Body: { month?: "YYYY-MM-01" }
  */
 
 export async function GET(request: NextRequest) {
@@ -95,7 +95,8 @@ export async function POST(request: NextRequest) {
 
   const supabase = getServerSupabase()
   const body = await request.json().catch(() => ({}))
-  const businessId = body.business_id || business.business_id
+  // Den manuella vägen får aldrig välja tenant ur request-body.
+  const businessId = business.business_id
   const monthDate = body.month ? new Date(body.month) : undefined
 
   try {

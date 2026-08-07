@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness, checkFeatureAccess } from '@/lib/auth'
 import { getAutomationSettings, updateAutomationSettings } from '@/lib/automations'
+import { getFortnoxConfig } from '@/lib/fortnox'
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,9 +24,10 @@ export async function GET(request: NextRequest) {
     // Get business config (only query columns that definitely exist)
     const { data: config } = await supabase
       .from('business_config')
-      .select('assigned_phone_number, fortnox_access_token')
+      .select('assigned_phone_number')
       .eq('business_id', business.business_id)
       .single()
+    const fortnoxConfig = await getFortnoxConfig(business.business_id)
 
     // Check Google Calendar separately (uses calendar_connection table)
     let googleCalendarConnected = false
@@ -42,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     const integrations = {
       phone_connected: !!config?.assigned_phone_number,
-      fortnox_connected: !!config?.fortnox_access_token,
+      fortnox_connected: !!fortnoxConfig?.fortnox_access_token,
       google_calendar_connected: googleCalendarConnected,
     }
 

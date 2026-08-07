@@ -43,6 +43,7 @@ export async function GET(
         .from('customer')
         .select('customer_id, name, phone_number, email, address_line')
         .eq('customer_id', project.customer_id)
+        .eq('business_id', business.business_id)
         .single()
       customer = data
     }
@@ -53,6 +54,7 @@ export async function GET(
       .from('project_milestone')
       .select('*')
       .eq('project_id', projectId)
+      .eq('business_id', business.business_id)
       .order('sort_order')
 
     // Fetch changes (ÄTA)
@@ -60,6 +62,7 @@ export async function GET(
       .from('project_change')
       .select('*')
       .eq('project_id', projectId)
+      .eq('business_id', business.business_id)
       .order('created_at', { ascending: false })
 
     // Fetch time entries
@@ -67,6 +70,7 @@ export async function GET(
       .from('time_entry')
       .select('*')
       .eq('project_id', projectId)
+      .eq('business_id', business.business_id)
       .order('work_date', { ascending: false })
 
     // Fetch project materials
@@ -74,6 +78,7 @@ export async function GET(
       .from('project_material')
       .select('*')
       .eq('project_id', projectId)
+      .eq('business_id', business.business_id)
       .order('created_at', { ascending: false })
 
     // Fetch linked quote if exists
@@ -83,6 +88,7 @@ export async function GET(
         .from('quotes')
         .select('quote_id, title, total, status')
         .eq('quote_id', project.quote_id)
+        .eq('business_id', business.business_id)
         .single()
       quote = data
     }

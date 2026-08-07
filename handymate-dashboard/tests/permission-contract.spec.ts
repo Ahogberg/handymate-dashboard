@@ -38,6 +38,7 @@
 import { test, expect } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
+import { verifyOwnership } from '../lib/auth/verify-ownership'
 
 const ROOT = path.join(__dirname, '..')
 const API_DIR = path.join(ROOT, 'app', 'api')
@@ -385,5 +386,181 @@ test.describe('regression — de här får aldrig bli ogrindade igen', () => {
           `Den får aldrig bli ogrindad igen.`,
       ).toBe(true)
     }
+  })
+})
+
+test.describe('N2 — service-role-vägar verifierar tenant explicit', () => {
+  const projectsRoute = fs.readFileSync(routeFile('projects'), 'utf8')
+  const projectDetailRoute = fs.readFileSync(routeFile('projects/[id]'), 'utf8')
+  const ataRoute = fs.readFileSync(routeFile('ata'), 'utf8')
+  const monthlyReviewRoute = fs.readFileSync(routeFile('cron/monthly-review'), 'utf8')
+
+  test('projekt-DELETE verifierar parent före första barnradering', () => {
+    const deleteHandler = projectsRoute.slice(projectsRoute.indexOf('export async function DELETE'))
+    const ownershipCheck = deleteHandler.indexOf(".from('project')")
+    const firstChildDelete = deleteHandler.indexOf(".from('project_document')")
+
+    expect(ownershipCheck).toBeGreaterThanOrEqual(0)
+    expect(firstChildDelete).toBeGreaterThan(ownershipCheck)
+    expect(deleteHandler.slice(ownershipCheck, firstChildDelete)).toContain(
+      ".eq('business_id', business.business_id)",
+    )
+    expect(deleteHandler.slice(ownershipCheck, firstChildDelete)).toContain('if (!ownedProject)')
+  })
+
+  test('varje projektbarn raderas med business_id-filter och rätt legacy-nyckel', () => {
+    const deleteHandler = projectsRoute.slice(projectsRoute.indexOf('export async function DELETE'))
+    const children = [
+      ['project_document', 'project_id'],
+      ['project_log', 'order_id'],
+      ['project_checklist', 'order_id'],
+      ['project_assignment', 'project_id'],
+      ['project_material', 'project_id'],
+      ['project_milestone', 'project_id'],
+      ['project_change', 'project_id'],
+    ] as const
+
+    for (const [table, linkColumn] of children) {
+      const query = new RegExp(
+        `\\.from\\('${table}'\\)[\\s\\S]{0,300}?\\.delete\\(\\)[\\s\\S]{0,300}?` +
+          `\\.eq\\('${linkColumn}', projectId\\)[\\s\\S]{0,200}?` +
+          `\\.eq\\('business_id', business\\.business_id\\)`,
+      )
+      expect(deleteHandler, `${table} saknar tenant-filter`).toMatch(query)
+    }
+  })
+
+  test('projektdetaljens samtliga barnhämtningar är tenant-filtrerade', () => {
+    for (const table of [
+      'customer',
+      'project_milestone',
+      'project_change',
+      'time_entry',
+      'project_material',
+      'quotes',
+    ]) {
+      expect(projectDetailRoute, `${table} saknar business_id`).toMatch(
+        new RegExp(
+          `\\.from\\('${table}'\\)[\\s\\S]{0,350}?` +
+            `\\.eq\\('business_id', business\\.business_id\\)`,
+        ),
+      )
+    }
+  })
+
+  test('manuellt projekt och ÄTA verifierar body-ID:n före insert', () => {
+    const projectPost = projectsRoute.slice(
+      projectsRoute.indexOf('export async function POST'),
+      projectsRoute.indexOf('export async function PUT'),
+    )
+    const ataPost = ataRoute.slice(ataRoute.indexOf('export async function POST'))
+
+    expect(projectPost.indexOf('verifyOwnership(')).toBeGreaterThanOrEqual(0)
+    expect(projectPost.indexOf(".from('project')")).toBeGreaterThan(
+      projectPost.indexOf('verifyOwnership('),
+    )
+    expect(projectPost).toContain('idValue: body.customer_id')
+
+    expect(ataPost.indexOf('verifyOwnership(')).toBeGreaterThanOrEqual(0)
+    expect(ataPost.indexOf(".from('project_change')")).toBeGreaterThan(
+      ataPost.indexOf('verifyOwnership('),
+    )
+    expect(ataPost).toContain('idValue: projectId')
+    expect(ataPost).toContain('idValue: customerId')
+  })
+
+  test('monthly-review kan inte välja business_id ur request-body', () => {
+    const post = monthlyReviewRoute.slice(monthlyReviewRoute.indexOf('export async function POST'))
+    expect(post).toContain('const businessId = business.business_id')
+    expect(post).not.toMatch(/body\.business_id/)
+  })
+
+  test('ownership-helpern failar stängt för tenant B:s id', async () => {
+    const rows = {
+      customer: [
+        { customer_id: 'customer-a', business_id: 'tenant-a' },
+        { customer_id: 'customer-b', business_id: 'tenant-b' },
+      ],
+    }
+
+    const fakeSupabase = {
+      from(table: keyof typeof rows) {
+        const filters: Record<string, string> = {}
+        const builder = {
+          select() { return builder },
+          eq(column: string, value: string) {
+            filters[column] = value
+            return builder
+          },
+          async maybeSingle() {
+            const data = rows[table].find(row =>
+              Object.entries(filters).every(([column, value]) =>
+                row[column as keyof typeof row] === value,
+              ),
+            )
+            return { data: data ?? null, error: null }
+          },
+        }
+        return builder
+      },
+    }
+
+    const owned = await verifyOwnership(fakeSupabase as any, 'tenant-a', [{
+      table: 'customer',
+      idColumn: 'customer_id',
+      idValue: 'customer-a',
+      label: 'kund',
+    }])
+    const crossTenant = await verifyOwnership(fakeSupabase as any, 'tenant-a', [{
+      table: 'customer',
+      idColumn: 'customer_id',
+      idValue: 'customer-b',
+      label: 'kund',
+    }])
+
+    expect(owned).toEqual({ ok: true, missing: [] })
+    expect(crossTenant).toEqual({ ok: false, missing: ['kund'] })
+  })
+})
+
+test.describe('N2 — v96 är fail-closed och håller credentials server-only', () => {
+  const migration = fs.readFileSync(path.join(ROOT, 'sql', 'v96_tenant_rls_and_credentials.sql'), 'utf8')
+  const fortnox = fs.readFileSync(path.join(ROOT, 'lib', 'fortnox.ts'), 'utf8')
+
+  test('alla ekonomitabeller får medlems- och service-role-policy', () => {
+    for (const table of [
+      'project',
+      'project_change',
+      'project_material',
+      'time_entry',
+      'supplier_invoices',
+      'business_config',
+    ]) {
+      expect(migration).toContain(`'${table}'`)
+    }
+    expect(migration).toContain('TO authenticated USING (public.is_business_member(business_id))')
+    expect(migration).toContain('TO service_role USING (true) WITH CHECK (true)')
+    expect(migration).not.toMatch(/TO\s+public\s+USING\s*\(true\)/i)
+  })
+
+  test('anon och farliga tabellprivilegier tas bort', () => {
+    expect(migration).toContain('REVOKE ALL ON TABLE public.%I FROM PUBLIC, anon, authenticated')
+    expect(migration).toContain('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.%I TO authenticated')
+    expect(migration).not.toMatch(/GRANT[^;]*TRUNCATE[^;]*authenticated/i)
+  })
+
+  test('Fortnox-hemligheter flyttas och kan bara läsas av service_role', () => {
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS public.business_integration_credentials')
+    expect(migration).toContain(
+      'REVOKE ALL ON TABLE public.business_integration_credentials FROM PUBLIC, anon, authenticated',
+    )
+    expect(migration).toContain('GRANT ALL ON TABLE public.business_integration_credentials TO service_role')
+    expect(migration).toContain('DROP COLUMN IF EXISTS fortnox_access_token')
+    expect(migration).toContain('DROP COLUMN IF EXISTS fortnox_refresh_token')
+
+    expect(fortnox).toContain(".from('business_integration_credentials')")
+    expect(fortnox).not.toMatch(
+      /\.from\('business_config'\)[\s\S]{0,250}?\.select\([^)]*fortnox_(?:access|refresh)_token/,
+    )
   })
 })

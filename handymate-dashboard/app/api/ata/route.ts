@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { maybeStripAtaList } from '@/lib/ata/strip-prices'
+import { verifyOwnership } from '@/lib/auth/verify-ownership'
 import { randomUUID } from 'crypto'
 
 /**
@@ -60,6 +61,29 @@ export async function POST(request: NextRequest) {
 
     if (!projectId || !description || !changeType) {
       return NextResponse.json({ error: 'projectId, description och changeType krävs' }, { status: 400 })
+    }
+
+    // Både projekt och valfri kund kommer från request-body. Service role
+    // kringgår RLS, därför verifieras båda länkarna före insert.
+    const ownership = await verifyOwnership(supabase, business.business_id, [
+      {
+        table: 'project',
+        idColumn: 'project_id',
+        idValue: projectId,
+        label: 'projekt',
+      },
+      {
+        table: 'customer',
+        idColumn: 'customer_id',
+        idValue: customerId,
+        label: 'kund',
+      },
+    ])
+    if (!ownership.ok) {
+      return NextResponse.json(
+        { error: 'Projekt eller kund tillhör inte företaget' },
+        { status: 403 },
+      )
     }
 
     // Calculate total from items if provided

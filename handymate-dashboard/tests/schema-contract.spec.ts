@@ -58,7 +58,9 @@ function buildSchemaFacit(): Set<string> {
   for (const file of fs.readdirSync(sqlDir)) {
     if (!file.endsWith('.sql')) continue
     const content = fs.readFileSync(path.join(sqlDir, file), 'utf8')
-    for (const m of Array.from(content.matchAll(/CREATE TABLE (?:IF NOT EXISTS )?"?([a-z0-9_]+)"?/gi))) {
+    for (const m of Array.from(content.matchAll(
+      /CREATE TABLE (?:IF NOT EXISTS )?(?:"?[a-z0-9_]+"?\.)?"?([a-z0-9_]+)"?/gi,
+    ))) {
       facit.add(m[1].toLowerCase())
     }
     // RENAME flyttar namnet: nya namnet in (gamla behålls inte — koden ska
