@@ -1,5 +1,6 @@
 ﻿'use client'
 
+import { logBusinessConfigError } from '@/lib/business/quote-surface-select'
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -109,11 +110,16 @@ export default function NewOrderPage() {
       .limit(500)
 
     // Fetch business address for default delivery
-    const { data: businessData } = await supabase
+    const { data: businessData, error: businessConfigError } = await supabase
       .from('business_config')
       .select('address')
       .eq('business_id', business.business_id)
       .single()
+
+    // Utan adressen går beställningen iväg med tom leveransadress, och
+    // grossisten vet inte vart materialet ska. Efter v96 kan läsningen nekas
+    // för en anställd vars inbjudan aldrig kopplats till en inloggning.
+    logBusinessConfigError('NewOrder', businessConfigError)
 
     setSuppliers(suppliersData || [])
     setProducts(productsData || [])

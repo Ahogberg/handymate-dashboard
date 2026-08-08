@@ -1,5 +1,6 @@
 'use client'
 
+import { logBusinessConfigError } from '@/lib/business/quote-surface-select'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, X } from 'lucide-react'
@@ -99,6 +100,12 @@ export default function NewInvoicePage() {
 
     setCustomers(customersApiRes?.customers || customersApiRes?.data || [])
     setTimeEntries(timeRes.data || [])
+
+    // Tystnaden var halva risken: misslyckas läsningen faller betalningsvillkoret
+    // tillbaka på 30 dagar utan att någon får veta det. Efter v96 kan den nekas
+    // på riktigt — en anställd vars inbjudan aldrig kopplats till en inloggning
+    // passerar inte is_business_member.
+    logBusinessConfigError('NewInvoice', configRes.error)
     const paymentDays = configRes.data?.default_payment_days || 30
     setDefaultPaymentDays(paymentDays)
 
