@@ -163,6 +163,102 @@ test.describe('bruset uppströms — fem rader om samma tio offerter', () => {
   })
 })
 
+test.describe('regel 3: ett ärende per kort', () => {
+  const { groupApprovals, groupTitle, groupTotalKr } = require('../lib/jarvis/group-approvals')
+  const kort = (id: string, typ: string, tid: string, payload: any = {}) => ({
+    id, approval_type: typ, title: `Kort ${id}`, description: null,
+    payload, risk_level: 'low', created_at: tid,
+  })
+
+  test('två förfallna fakturor samma dygn blir ETT beslut', () => {
+    const g = groupApprovals([
+      kort('a', 'invoice_reminder', '2026-08-08T09:00:00Z'),
+      kort('b', 'invoice_reminder', '2026-08-08T14:00:00Z'),
+    ])
+    expect(g).toHaveLength(1)
+    expect(g[0].merged).toBe(true)
+    expect(g[0].members).toHaveLength(2)
+    // Äldst representerar gruppen — det kortet har väntat längst.
+    expect(g[0].primary.id).toBe('a')
+  })
+
+  test('olika dygn slås INTE ihop', () => {
+    const g = groupApprovals([
+      kort('a', 'invoice_reminder', '2026-08-07T09:00:00Z'),
+      kort('b', 'invoice_reminder', '2026-08-08T09:00:00Z'),
+    ])
+    expect(g).toHaveLength(2)
+  })
+
+  test('olika typ slås INTE ihop', () => {
+    const g = groupApprovals([
+      kort('a', 'invoice_reminder', '2026-08-08T09:00:00Z'),
+      kort('b', 'send_sms', '2026-08-08T09:30:00Z'),
+    ])
+    expect(g).toHaveLength(2)
+  })
+
+  test('utkastkort slås ALDRIG ihop — de bär olika innehåll', () => {
+    // Två offertutkast är två olika offerter med egna rader och belopp.
+    // Att slå ihop dem hade dolt exakt det regel 1 kräver ska synas.
+    for (const typ of ['create_quote_draft', 'create_ata_draft', 'review_auto_invoice']) {
+      const g = groupApprovals([
+        kort('a', typ, '2026-08-08T09:00:00Z'),
+        kort('b', typ, '2026-08-08T09:30:00Z'),
+      ])
+      expect(g, `${typ} slogs ihop`).toHaveLength(2)
+    }
+  })
+
+  test('summan visas bara när ALLA medlemmar bär ett belopp', () => {
+    const grupp = {
+      primary: kort('a', 'invoice_reminder', '2026-08-08T09:00:00Z', { amount_kr: 3813 }),
+      members: [
+        kort('a', 'invoice_reminder', '2026-08-08T09:00:00Z', { amount_kr: 3813 }),
+        kort('b', 'invoice_reminder', '2026-08-08T10:00:00Z', { amount_kr: 3813 }),
+      ],
+      merged: true,
+    }
+    const belopp = (a: any) => (a.payload.amount_kr as number) ?? null
+    expect(groupTotalKr(grupp, belopp)).toBe(7626)
+
+    // Saknar ett kort belopp är summan en gissning som ser exakt ut.
+    const halvt = { ...grupp, members: [grupp.members[0], kort('c', 'invoice_reminder', '2026-08-08T11:00:00Z')] }
+    expect(groupTotalKr(halvt, belopp)).toBeNull()
+  })
+
+  test('rubriken säger antalet, och beloppet bara när det finns', () => {
+    const grupp = {
+      primary: kort('a', 'invoice_reminder', '2026-08-08T09:00:00Z'),
+      members: [kort('a', 'invoice_reminder', '2026-08-08T09:00:00Z'), kort('b', 'invoice_reminder', '2026-08-08T10:00:00Z')],
+      merged: true,
+    }
+    expect(groupTitle(grupp, 7626)).toContain('2 fakturor har förfallit')
+    // sv-SE formaterar med HÅRT mellanslag (U+00A0) — samma fälla som
+    // formatKr-testerna i moments-sviten. Jämför mot samma formaterare.
+    const formaterat = new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(7626)
+    expect(groupTitle(grupp, 7626)).toContain(` kr`)
+    expect(groupTitle(grupp, null)).toBe('2 fakturor har förfallit')
+    // Ensamt kort behåller sin egen rubrik.
+    expect(groupTitle({ ...grupp, merged: false }, null)).toBe('Kort a')
+  })
+
+  test('ytan räknar beslut, inte databasrader, och döljer inte källraderna', () => {
+    const s = kod('components/jarvis/JarvisHome.tsx')
+    expect(s).toContain('const grupper = groupApprovals(synliga)')
+    expect(s, 'räknaren räknar fortfarande rader').toContain('grupper.length + reschedules.length')
+    // Sammanslagning får aldrig betyda att information försvinner.
+    expect(s).toContain('group!.map(m =>')
+  })
+
+  test('ett godkännande på en grupp utför VARJE medlem', () => {
+    const s = kod('components/jarvis/JarvisHome.tsx')
+    expect(s).toContain('for (const m of medlemmar) await executeSend(m, action, editedText)')
+    // Och ångrar man gruppen ska alla korten tillbaka, inte bara ett.
+    expect(s).toContain('pendingTimers.current.forEach((timer, id)')
+  })
+})
+
 test.describe('ytan använder härledningen', () => {
   const s = kod('components/jarvis/JarvisHome.tsx')
 
@@ -185,7 +281,7 @@ test.describe('ytan använder härledningen', () => {
     const i = s.indexOf('setSnack({')
     expect(i).toBeGreaterThan(-1)
     const block = s.slice(i, i + 500)
-    expect(block).toContain('mayExecute(approval.approval_type)')
+    expect(block).toContain('mayExecute(forsta.approval_type)')
     expect(block).toContain('Behandlar:')
   })
 

@@ -823,26 +823,27 @@ async function executeReviewRequest(
         dealId,
       })
     } catch {
-      // Fallback: skicka direkt (om nurture inte finns)
-      const ELKS_USER = process.env.ELKS_API_USER
-      const ELKS_PASS = process.env.ELKS_API_PASSWORD
-
-      if (ELKS_USER && ELKS_PASS) {
-        try {
-          await fetch('https://api.46elks.com/a1/sms', {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Basic ' + Buffer.from(`${ELKS_USER}:${ELKS_PASS}`).toString('base64'),
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-              from: sanitizeSenderId(businessName),
-              to: customer.phone_number,
-              message: `Hej ${customerName}! Tack för att du anlitade ${businessName}. Vi hoppas du är nöjd! En kort recension hjälper oss och andra kunder.\n${suffix}`,
-            }).toString(),
-          })
-        } catch { /* fire-and-forget */ }
-      }
+      // Fallback: skicka direkt (om nurture inte finns).
+      //
+      // ═══ RÄTTELSE (etapp 0, 2026-08-08) ═══
+      //
+      // Den här filen undantogs först från strypunkten som "testharness" —
+      // fel läsning av namnet. "E2E" betyder end-to-end DEAL FLOW, hela
+      // affärslivscykeln, och den anropas från app/api/deals/[id]/flow.
+      // Det här är alltså ett riktigt kundutskick i produktion, och det
+      // kringgick opt-out precis som de andra 23.
+      const { sendSmsViaElks } = await import('@/lib/sms-send')
+      const r = await sendSmsViaElks({
+        supabase,
+        businessId,
+        businessName,
+        to: customer.phone_number,
+        message: `Hej ${customerName}! Tack för att du anlitade ${businessName}. Vi hoppas du är nöjd! En kort recension hjälper oss och andra kunder.\n${suffix}`,
+        customerId: deal.customer_id || null,
+        relatedId: dealId,
+        messageType: 'deal_flow_review_request',
+      })
+      if (!r.success) console.error('[deal-flow] recensionsbegäran misslyckades:', r.error)
     }
 
     await logDealFlowActivity(businessId, dealId, 'Recensionsbegäran skickad till kund')

@@ -31,6 +31,7 @@ import { cardContext } from '@/lib/jarvis/card-context'
 import type { CardAction } from '@/lib/jarvis/voice'
 import { voiceFor, reviewAlternatives, doneRowText } from '@/lib/jarvis/card-voice'
 import { mayExecute } from '@/lib/approvals/action-contract'
+import { groupApprovals, groupTitle, groupTotalKr } from '@/lib/jarvis/group-approvals'
 
 /**
  * JarvisHome — teamets rapportbord (2026-08-07).
@@ -366,37 +367,79 @@ export default function JarvisHome({
     }
   }
 
-  function queueAction(approval: Approval, action: 'approve' | 'reject' | 'edit', editedText?: string) {
+  /**
+   * Kör åtgärden på ett kort — eller på en hel sammanslagen grupp.
+   *
+   * En grupp är ETT beslut men flera åtgärder: två förfallna fakturor slås
+   * ihop till ett kort, och ett godkännande skickar båda påminnelserna. Varje
+   * medlem exekveras för sig och får sin egen rad i Klart idag — ett beslut,
+   * men N saker hände, och loggen ska visa vad som faktiskt gjordes.
+   */
+  function queueAction(
+    target: Approval | Approval[],
+    action: 'approve' | 'reject' | 'edit',
+    editedText?: string,
+  ) {
+    const medlemmar = Array.isArray(target) ? target : [target]
+    if (medlemmar.length === 0) return
+    const forsta = medlemmar[0]
+
     setEditingId(null)
-    setHiddenIds(prev => new Set(prev).add(approval.id))
+    setHiddenIds(prev => {
+      const n = new Set(prev)
+      medlemmar.forEach(m => n.add(m.id))
+      return n
+    })
+
+    const flera = medlemmar.length > 1
     setSnack({
-      approvalId: approval.id,
+      approvalId: forsta.id,
       // Ångra-rutan sa "Skickar: …" även för kort som inte kan skicka något.
       // Samma lögn som Klart idag-raden, bara några sekunder tidigare.
       text: action === 'reject'
-        ? 'Förslaget avvisas'
-        : mayExecute(approval.approval_type)
-          ? `Skickar: ${approval.title.slice(0, 60)}`
-          : `Behandlar: ${approval.title.slice(0, 60)}`,
+        ? flera ? `${medlemmar.length} förslag avvisas` : 'Förslaget avvisas'
+        : mayExecute(forsta.approval_type)
+          ? flera ? `Skickar ${medlemmar.length} st` : `Skickar: ${forsta.title.slice(0, 60)}`
+          : flera ? `Behandlar ${medlemmar.length} st` : `Behandlar: ${forsta.title.slice(0, 60)}`,
     })
+
     const timer = setTimeout(() => {
       setSnack(null)
-      void executeSend(approval, action, editedText)
+      // Sekventiellt: varje utskick ska hinna få sitt eget svar läst innan
+      // nästa, så en delvis lyckad grupp syns som just delvis lyckad.
+      void (async () => {
+        for (const m of medlemmar) await executeSend(m, action, editedText)
+      })()
     }, UNDO_WINDOW_MS)
-    pendingTimers.current.set(approval.id, timer)
+
+    // Ångra-knappen adresserar gruppen via första kortets id; alla timers
+    // pekar på samma timeout så en ångring stoppar hela gruppen.
+    medlemmar.forEach(m => pendingTimers.current.set(m.id, timer))
   }
 
   function undo(approvalId: string) {
     const t = pendingTimers.current.get(approvalId)
     if (t) clearTimeout(t)
-    pendingTimers.current.delete(approvalId)
-    setHiddenIds(prev => { const n = new Set(prev); n.delete(approvalId); return n })
+    // En sammanslagen grupp delar EN timeout över flera id:n. Ångrar man
+    // gruppen måste alla dess kort tillbaka, inte bara det man klickade på —
+    // annars försvinner resten tyst utan att någonsin ha skickats.
+    const gruppens: string[] = []
+    pendingTimers.current.forEach((timer, id) => { if (timer === t) gruppens.push(id) })
+    gruppens.forEach(id => pendingTimers.current.delete(id))
+    if (gruppens.length === 0) pendingTimers.current.delete(approvalId)
+
+    setHiddenIds(prev => {
+      const n = new Set(prev)
+      ;(gruppens.length ? gruppens : [approvalId]).forEach(id => n.delete(id))
+      return n
+    })
     setSnack(null)
   }
 
-  function onCardAction(approval: Approval, action: CardAction) {
-    if (action.id === 'approve') return queueAction(approval, 'approve')
-    if (action.id === 'reject') return queueAction(approval, 'reject')
+  function onCardAction(approval: Approval, action: CardAction, group?: Approval[]) {
+    const mal = group && group.length > 1 ? group : approval
+    if (action.id === 'approve') return queueAction(mal, 'approve')
+    if (action.id === 'reject') return queueAction(mal, 'reject')
     // 'open' finns bara på kort som INTE får utföras med ett klick
     // (REVIEW_REQUIRED m.fl., se lib/jarvis/card-voice.ts). Det öppnar
     // detaljvyn i stället för att skicka något — vilket är exakt vad serverns
@@ -414,7 +457,11 @@ export default function JarvisHome({
   }
 
   const synliga = approvals.filter(a => !hiddenIds.has(a.id))
-  const beslut = synliga.length + reschedules.length
+  // Räknaren visar BESLUT, inte databasrader. Två förfallna fakturor från
+  // samma agent samma dygn är ett beslut — "4" när tre av korten är samma
+  // ärende läser som att man ligger efter mer än man gör.
+  const grupper = groupApprovals(synliga)
+  const beslut = grupper.length + reschedules.length
   const koTom = queueLoaded && beslut === 0
 
   // Observationer vars ärende redan står som kort ovanför filtreras bort —
@@ -481,22 +528,29 @@ export default function JarvisHome({
             <EmptyQueue lastResolvedAt={lastResolvedAt} />
           ) : (
             <div className="space-y-2.5">
-              {synliga.map((approval, i) => (
+              {grupper.map((grupp, i) => {
+                const approval = grupp.primary
+                return (
                 <ApprovalCard
                   key={approval.id}
                   approval={approval}
+                  // Sammanslagen grupp: samma agent, samma typ, samma dygn.
+                  // Två förfallna fakturor är ETT beslut, inte två identiska
+                  // kort — men källraderna ligger kvar synliga i kortet.
+                  group={grupp.merged ? grupp.members : undefined}
                   expanded={i < MAX_FULL_CARDS || expandedIds.has(approval.id)}
                   editing={editingId === approval.id}
                   editText={editText}
                   onEditText={setEditText}
                   onExpand={() => setExpandedIds(prev => new Set(prev).add(approval.id))}
-                  onAction={a => onCardAction(approval, a)}
+                  onAction={a => onCardAction(approval, a, grupp.members)}
                   detailOpen={detailIds.has(approval.id)}
                   onToggleDetail={() => setDetailIds(prev => { const n = new Set(prev); n.has(approval.id) ? n.delete(approval.id) : n.add(approval.id); return n })}
                   onSaveEdit={() => queueAction(approval, 'edit', editText)}
                   onCancelEdit={() => setEditingId(null)}
                 />
-              ))}
+                )
+              })}
 
               {/* Frågeläget — bokningskrockar AI:n inte kunde lösa själv. */}
               {reschedules.map(s => {
@@ -733,6 +787,7 @@ function EmptyQueue({ lastResolvedAt }: { lastResolvedAt: string | null }) {
 
 function ApprovalCard({
   approval,
+  group,
   expanded,
   editing,
   editText,
@@ -745,6 +800,8 @@ function ApprovalCard({
   onToggleDetail,
 }: {
   approval: Approval
+  /** Sammanslagen grupp (samma agent+typ+dygn). Odefinierad = ensamt kort. */
+  group?: Approval[]
   expanded: boolean
   editing: boolean
   editText: string
@@ -790,6 +847,21 @@ function ApprovalCard({
   // ingenting skickades. Se lib/jarvis/card-voice.ts.
   const rost = voiceFor(approval.approval_type)
 
+  // Sammanslagning: samma agent, samma typ, samma dygn. Summan visas bara om
+  // ALLA medlemmar bär ett belopp — annars vore den en gissning som ser exakt
+  // ut (samma ärlighetsregel som momentlagret).
+  const arGrupp = Boolean(group && group.length > 1)
+  const gruppSumma = arGrupp
+    ? groupTotalKr(
+        { primary: approval, members: group!, merged: true },
+        a => {
+          const p = (a.payload || {}) as Record<string, any>
+          const v = p.amount_kr ?? p.total ?? p.estimated_value
+          return typeof v === 'number' ? v : null
+        },
+      )
+    : null
+
   return (
     <AgentDecisionCard
       agentKey={agentKey}
@@ -799,13 +871,21 @@ function ApprovalCard({
       alternatives={rost === 'fragar' ? reviewAlternatives(approval.approval_type) : undefined}
       typeLabel={typeLabel(approval.approval_type)}
       timeLabel={timeAgo(approval.created_at)}
-      title={approval.title}
+      // Sammanslagen grupp får en rubrik som säger ANTALET — det är den nya
+      // informationen. Beloppet tas med bara när varje medlem bär ett.
+      title={arGrupp ? groupTitle({ primary: approval, members: group!, merged: true }, gruppSumma) : approval.title}
       // Vem och vad — alltid. Utan den fick hantverkaren "Kunden har en fråga
       // om offerten" utan att veta vilken kund eller vilken offert.
-      context={cardContext(approval.payload)}
-      description={approval.description}
+      // Gruppens kontextrad vore missvisande (den beskriver bara ett av
+      // korten), så den utelämnas när flera slagits ihop.
+      context={arGrupp ? undefined : cardContext(approval.payload)}
+      description={arGrupp ? null : approval.description}
       attention={needsAttention(approval)}
-      approveLabel={approveLabel(approval.approval_type, approval.payload)}
+      approveLabel={
+        arGrupp
+          ? `Skicka alla ${group!.length}`
+          : approveLabel(approval.approval_type, approval.payload)
+      }
       editable={isEditable(approval)}
       onAction={onAction}
       deepLink={deepLinkFor(approval) || undefined}
@@ -832,6 +912,31 @@ function ApprovalCard({
         ) : undefined
       }
     >
+      {/* ═══ SAMMANSLAGNING FÅR ALDRIG DÖLJA NÅGOT (2026-08-08) ═══
+          Källraderna ligger kvar synliga. Poängen är att sluta UPPREPA
+          samma rubrik och knappar, inte att gömma vilka ärenden det gäller. */}
+      {arGrupp && (
+        <CardFactBox>
+          <div className="divide-y divide-slate-100">
+            {group!.map(m => {
+              const mp = (m.payload || {}) as Record<string, any>
+              const belopp = mp.amount_kr ?? mp.total ?? mp.estimated_value
+              return (
+                <div key={m.id} className="flex items-center gap-3 py-2 text-[13px] text-slate-600">
+                  <span className="flex-1 min-w-0 truncate">{cardContext(m.payload) || m.title}</span>
+                  <span className="text-xs text-slate-400 shrink-0">{timeAgo(m.created_at)}</span>
+                  {typeof belopp === 'number' && belopp > 0 && (
+                    <span className="font-heading font-semibold w-[76px] text-right shrink-0">
+                      {formatKr(belopp)}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </CardFactBox>
+      )}
+
       {detailOpen && summary?.ready && (
         <>
           <QuoteDraftDetail

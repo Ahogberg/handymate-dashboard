@@ -350,8 +350,9 @@ test.describe('spärrhaken — läckaget får bara krympa', () => {
     // Deno edge function — kan inte importera lib/, och det är oklart om den
     // ens är deployad (se docs/audits/ROSTVAGAR_KARTLAGGNING_2026-08-08.md).
     'supabase/functions/scheduled-triggers/index.ts',
-    // Testharness, inte en produktionsväg.
-    'lib/e2e-deal-flow.ts',
+    // (lib/e2e-deal-flow.ts stod först här som "testharness" — fel läsning
+    //  av namnet. "E2E" betyder end-to-end DEAL FLOW, hela affärslivscykeln,
+    //  anropad från app/api/deals/[id]/flow. Den är migrerad.)
     // Utvecklarverktyg — men det skickar RIKTIGA SMS som kostar riktiga
     // pengar. Nåbarhet i produktion behöver kontrolleras separat.
     'app/api/debug/sms/route.ts',
