@@ -157,6 +157,38 @@ export async function executeTool(
   }
 }
 
+// ═══ TENANTVAKTEN (Codex audit P0.1, 2026-08-08) ═══
+//
+// Routern kör med service_role — RLS gäller inte här. Flera mutations-
+// verktyg skrev params.customer_id rakt in i insert:en utan att verifiera
+// att kunden hör till företaget. Ett främmande id (hallucinerat av
+// modellen, eller injicerat via en konversation) skapade då en offert,
+// faktura eller bokning som pekar in i EN ANNAN TENANTS kunddata — exakt
+// den klass v96 stängde för läsningar, fast för skrivningar.
+//
+// Regeln: varje mutationsverktyg som tar ett customer_id validerar det
+// mot business_id FÖRE första skrivningen. Saknat/främmande id → tydligt
+// fel, noll mutation. Kan kontrollen inte göras (DB-fel) nekas anropet —
+// fail-closed, samma princip som handoff-räknaren.
+async function assertCustomerInBusiness(
+  supabase: SupabaseClient,
+  businessId: string,
+  customerId: unknown,
+): Promise<string | null> {
+  if (typeof customerId !== 'string' || customerId.length === 0) {
+    return 'customer_id saknas eller är ogiltigt'
+  }
+  const { data, error } = await supabase
+    .from('customer')
+    .select('customer_id')
+    .eq('business_id', businessId)
+    .eq('customer_id', customerId)
+    .maybeSingle()
+  if (error) return `Kunde inte verifiera kunden: ${error.message}`
+  if (!data) return 'Kunden finns inte i det här företaget'
+  return null
+}
+
 // ── CRM ─────────────────────────────────────────────────
 
 async function getCustomer(
@@ -253,6 +285,10 @@ async function updateCustomer(
 async function createQuote(
   supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
 ): Promise<ToolResult> {
+  // Tenantvakten FÖRE första skrivningen — se assertCustomerInBusiness.
+  const tenantFel = await assertCustomerInBusiness(supabase, businessId, params.customer_id)
+  if (tenantFel) return { success: false, error: tenantFel }
+
   const items = (params.items as any[]).map(i => ({ ...i, total: i.quantity * i.unit_price }))
   const laborTotal = items.filter(i => i.type === 'labor').reduce((s, i) => s + i.total, 0)
   const materialTotal = items.filter(i => i.type === 'material').reduce((s, i) => s + i.total, 0)
@@ -371,6 +407,10 @@ async function getQuotes(
 async function createInvoice(
   supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
 ): Promise<ToolResult> {
+  // Tenantvakten FÖRE första skrivningen — se assertCustomerInBusiness.
+  const tenantFel = await assertCustomerInBusiness(supabase, businessId, params.customer_id)
+  if (tenantFel) return { success: false, error: tenantFel }
+
   let items: any[] = []
   let rotRutType = params.rot_rut_type as string | null
 
@@ -703,6 +743,11 @@ async function createBooking(
   supabase: SupabaseClient, businessId: string, params: Record<string, unknown>,
   context: ToolContext
 ): Promise<ToolResult> {
+  // Tenantvakten FÖRE insert:en — se assertCustomerInBusiness. Gäller även
+  // book_site_visit, som kör hit igenom.
+  const tenantFel = await assertCustomerInBusiness(supabase, businessId, params.customer_id)
+  if (tenantFel) return { success: false, error: tenantFel }
+
   const bookingId = generateId('book')
   const { error } = await supabase.from('booking').insert({
     booking_id: bookingId, business_id: businessId, customer_id: params.customer_id,
@@ -880,6 +925,10 @@ async function updateProject(
 async function logTime(
   supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
 ): Promise<ToolResult> {
+  // Tenantvakten FÖRE insert:en — se assertCustomerInBusiness.
+  const tenantFel = await assertCustomerInBusiness(supabase, businessId, params.customer_id)
+  if (tenantFel) return { success: false, error: tenantFel }
+
   const [sH, sM] = (params.start_time as string).split(':').map(Number)
   const [eH, eM] = (params.end_time as string).split(':').map(Number)
   const duration = (eH * 60 + eM) - (sH * 60 + sM)
@@ -895,13 +944,17 @@ async function logTime(
   // fallback → null. Se lib/time-entries/resolve-attribution.ts.
   let bookingAssignedUserId: string | null = null
   if (params.booking_id) {
-    const { data: booking } = await supabase
+    const { data: booking, error: bookingErr } = await supabase
       .from('booking')
       .select('assigned_user_id')
       .eq('business_id', businessId)
       .eq('booking_id', params.booking_id)
       .maybeSingle()
-    bookingAssignedUserId = booking?.assigned_user_id ?? null
+    // Tenantvakten även för bokningen: utan den skrevs ett främmande
+    // booking_id in i tidraden, bara utan attribution.
+    if (bookingErr) return { success: false, error: `Kunde inte verifiera bokningen: ${bookingErr.message}` }
+    if (!booking) return { success: false, error: 'Bokningen finns inte i det här företaget' }
+    bookingAssignedUserId = booking.assigned_user_id ?? null
   }
 
   let activeBusinessUserIds: string[] = []
@@ -1402,6 +1455,13 @@ async function qualifyLead(
 async function updateLeadStatus(
   supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
 ): Promise<ToolResult> {
+  // Tenantvakten — leaden är business-scopad i where-satsen, men customer_id
+  // är ett fritt fält som skulle knyta leaden till en annan tenants kund.
+  if (params.customer_id) {
+    const tenantFel = await assertCustomerInBusiness(supabase, businessId, params.customer_id)
+    if (tenantFel) return { success: false, error: tenantFel }
+  }
+
   const updates: Record<string, unknown> = { status: params.status, updated_at: new Date().toISOString() }
   if (params.lost_reason) updates.lost_reason = params.lost_reason
   if (params.notes) updates.notes = params.notes

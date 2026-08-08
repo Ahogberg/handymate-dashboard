@@ -67,7 +67,7 @@ test.describe('handoff-persistensen ljuger inte', () => {
   test('kan räkningen inte göras nekas handoffen — aldrig fail-open', () => {
     expect(s).toContain('countErr')
     const i = s.indexOf('countErr')
-    const efter = s.slice(i, i + 500)
+    const efter = s.slice(i, i + 900)
     expect(efter).toContain("refused_reason: 'max_handoffs_reached'")
   })
 })

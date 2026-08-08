@@ -28,6 +28,7 @@ import {
   buildExternalActionSummary,
 } from '@/lib/agent/external-confirm'
 import { getRelevantMemories, buildMemoryPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
+import { getAgentTools } from '@/lib/agents/personalities'
 
 const MAX_IMAGES_PER_MESSAGE = 4
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -187,6 +188,36 @@ const CURATED_TOOL_NAMES = [
   // R5 (tasks/resurs-masterplan.md) — persondagen/beläggning per person.
   'get_person_schedule',
 ]
+
+// ═══ PER-AGENT ALLOWLIST (Codex audit P0.2, 2026-08-08) ═══
+//
+// Trigger-routen har alltid upprätthållit agenternas verktygsgränser
+// (lib/agents/personalities.ts). Chatten gav ALLA agenter samma lista —
+// specialistens namn påverkade prompten men inte vad den faktiskt kunde
+// köra. En handoff till Lisa kunde alltså skapa fakturor.
+//
+// Gränsen sitter nu på två ställen: listan som ges till modellen filtreras
+// per agent, OCH varje exekvering verifieras igen — en hallucinerad
+// tool_use förbi listan nekas server-side. Prompten är aldrig gränsen.
+
+/** Koordinationsverktyg alla agenter behöver oavsett domän. */
+const COORDINATION_TOOLS = new Set([
+  'navigate',
+  'handoff_to_agent',
+  'create_approval_request',
+  'check_pending_approvals',
+])
+
+function isToolAllowedForAgent(agent: AgentId, toolName: string): boolean {
+  if (COORDINATION_TOOLS.has(toolName)) return true
+  const allowed = getAgentTools(agent)
+  if (allowed === 'all') return true
+  return allowed.includes(toolName)
+}
+
+function toolsForAgent(agent: AgentId): any[] {
+  return TOOLS.filter(t => isToolAllowedForAgent(agent, t.name))
+}
 
 const TOOLS: any[] = [
   ...filterTools(CURATED_TOOL_NAMES),
@@ -404,6 +435,8 @@ async function callClaude(opts: {
   apiKey: string
   system: any[]
   messages: any[]
+  /** Agentens filtrerade verktygslista — prompten är aldrig gränsen. */
+  tools?: any[]
 }): Promise<any> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -416,7 +449,7 @@ async function callClaude(opts: {
       model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       system: opts.system,
-      tools: TOOLS,
+      tools: opts.tools ?? TOOLS,
       messages: opts.messages,
     }),
   })
@@ -522,10 +555,14 @@ async function runAgentTurn(opts: {
   requireConfirmExternal: boolean
 }): Promise<AgentTurnResult> {
   const MAX_TOOL_ITERATIONS = 5
+  // Agentens allowlist låses för hela turen — byts agenten sker det via en
+  // NY runAgentTurn efter handoff, med den nya agentens lista.
+  const agentTools = toolsForAgent(opts.agent)
   let response = await callClaude({
     apiKey: opts.apiKey,
     system: opts.systemArray,
     messages: opts.initialMessages,
+    tools: agentTools,
   })
 
   const toolMessages: any[] = []
@@ -589,6 +626,17 @@ async function runAgentTurn(opts: {
           finalAction = { type: 'navigate', target: block.input?.path || '' }
           return { type: 'tool_result', tool_use_id: block.id, content: `Navigerar till ${block.input?.path || ''}` }
         }
+        // Andra halvan av allowlisten: även om modellen hallucinerar ett
+        // verktyg utanför sin filtrerade lista nekas exekveringen här.
+        // Listan till modellen är UX; det här är gränsen.
+        if (!isToolAllowedForAgent(opts.agent, block.name)) {
+          console.warn(`[matte/chat] agent ${opts.agent} nekades verktyget ${block.name}`)
+          return {
+            type: 'tool_result',
+            tool_use_id: block.id,
+            content: `Fel: ${block.name} ligger utanför ${opts.agent}s område. Lämna över till rätt specialist i stället.`,
+          }
+        }
         const r: any = await executeSharedTool(block.name, block.input || {}, opts.supabase, opts.businessId, opts.toolContext as any)
         const content = r?.error ? `Fel: ${r.error}` : JSON.stringify(r?.data ?? r)
         return { type: 'tool_result', tool_use_id: block.id, content }
@@ -605,6 +653,7 @@ async function runAgentTurn(opts: {
       apiKey: opts.apiKey,
       system: opts.systemArray,
       messages: [...opts.initialMessages, ...trimmed],
+      tools: agentTools,
     })
   }
 

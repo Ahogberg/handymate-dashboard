@@ -1,0 +1,53 @@
+name: Contract checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contracts-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: TypeScript and contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: handymate-dashboard
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: handymate-dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Run browserless contract tests
+        run: >-
+          npx playwright test
+          tests/agent-team.spec.ts
+          tests/approval-action-contract.spec.ts
+          tests/column-contract.spec.ts
+          tests/cron-auth.spec.ts
+          tests/dead-code-paths.spec.ts
+          tests/permission-contract.spec.ts
+          tests/schema-contract.spec.ts
+          --no-deps
+          --project=chromium
+          --reporter=line
