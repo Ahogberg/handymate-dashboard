@@ -76,6 +76,55 @@ export function smsCostOre(message: string, p: PriceList = currentPriceList()): 
   return smsPartCount(message) * p.sms_part_ore
 }
 
+/**
+ * ═══ TYPOGRAFIN ÄR DEN VERKLIGA KOSTNADSLÄCKAN (fynd 2026-08-08) ═══
+ *
+ * Mätaren flaggade två historiska SMS som UCS-2. Ingetdera innehöll emoji.
+ * De innehöll `—` (långt tankstreck) och `"…"` (typografiska citattecken) —
+ * tecken som AI:n skriver helt naturligt och som INTE finns i GSM-7. Det ena
+ * var av typen `quote_nudge`, alltså en återkommande offertuppföljning.
+ *
+ * Ett enda tankstreck halverar utrymmet från 160 till 70 tecken per del och
+ * dubblar därmed kostnaden för meddelandet. I en mall som går ut varje vecka
+ * är det inte ett kuriosum, det är en fast kostnadspost ingen beställt.
+ *
+ * Funktionen byter bara ut tecken mot sina GSM-7-motsvarigheter som ser
+ * likadana ut i en SMS-app. Den STRYPER ingenting: en riktig emoji, ett
+ * grekiskt eller kyrilliskt tecken lämnas orört, för då är UCS-2 avsiktligt
+ * och att tvätta bort tecknet vore att ändra meddelandets innehåll.
+ */
+const GSM7_ERSATTNINGAR: Array<[RegExp, string]> = [
+  [/[‐-―]/g, '-'],      // ‐ ‑ ‒ – — ― → bindestreck
+  [/[‘’‚‛]/g, "'"], // ' ' ‚ ‛ → apostrof
+  [/[“”„‟]/g, '"'], // " " „ ‟ → rakt citattecken
+  [/…/g, '...'],              // … → tre punkter
+  [/[   ]/g, ' '],  // hårda mellanslag → vanligt
+  [/[•·]/g, '-'],        // • · → bindestreck
+  [/–/g, '-'],                // – (redundant men explicit)
+  [/[′″]/g, "'"],        // ′ ″ → apostrof
+]
+
+export function normalizeForGsm7(message: string): string {
+  let t = message ?? ''
+  for (const [mönster, ersättning] of GSM7_ERSATTNINGAR) {
+    t = t.replace(mönster, ersättning)
+  }
+  return t
+}
+
+/**
+ * Normaliserar bara om det FAKTISKT sparar delar. Går meddelandet ändå inte
+ * ner i GSM-7 (t.ex. för att det innehåller en riktig emoji) lämnas texten
+ * orörd — en kosmetisk ändring utan besparing är bara en ändring.
+ */
+export function normalizeIfCheaper(message: string): { text: string; sparadeDelar: number } {
+  const före = smsPartCount(message)
+  const tvättad = normalizeForGsm7(message)
+  const efter = smsPartCount(tvättad)
+  if (efter < före) return { text: tvättad, sparadeDelar: före - efter }
+  return { text: message, sparadeDelar: 0 }
+}
+
 // ── Samtal ───────────────────────────────────────────────────────────────
 
 export type CallDestination = 'mobile' | 'landline' | 'unknown'

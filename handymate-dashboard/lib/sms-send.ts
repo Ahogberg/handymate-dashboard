@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { normalizeSwedishPhone } from './phone-normalize'
 import { sanitizeSenderId } from './sms/sender-id'
-import { smsPartCount, smsCostOre } from './costs/meter'
+import { smsPartCount, smsCostOre, normalizeIfCheaper } from './costs/meter'
 import { recordCost } from './costs/record'
 import { PRICE_VERSION } from './costs/price-list'
 
@@ -153,7 +153,27 @@ async function isCustomerOptedOut(
  * system-flow ska räknas mot kvoten, gör det manuellt på callsite.
  */
 export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> {
-  const { supabase, businessId, businessName, to, message, customerId, relatedId, messageType, approvalId } = args
+  const { supabase, businessId, businessName, to, message: råMeddelande, customerId, relatedId, messageType, approvalId } = args
+
+  // ═══ TYPOGRAFITVÄTT (fynd ur mätaren, 2026-08-08) ═══
+  //
+  // Mätaren flaggade historiska SMS som UCS-2 — och det var inte emoji, utan
+  // `—` och typografiska citattecken som AI:n skriver naturligt. Ett enda
+  // tankstreck sänker utrymmet från 160 till 70 tecken per del och dubblar
+  // kostnaden. Ett av fallen var av typen quote_nudge, alltså en mall som går
+  // ut om och om igen.
+  //
+  // Tvätten byter bara tecken mot GSM-7-motsvarigheter som ser likadana ut i
+  // en SMS-app, och bara när det FAKTISKT sparar en del. Riktiga emoji lämnas
+  // orörda — då är UCS-2 avsiktligt, och att stryka tecknet vore att ändra
+  // vad hantverkaren skickar.
+  const { text: message, sparadeDelar } = normalizeIfCheaper(råMeddelande)
+  if (sparadeDelar > 0) {
+    console.log(
+      `[sendSmsViaElks] typografitvätt sparade ${sparadeDelar} SMS-del(ar)` +
+      `${messageType ? ` (${messageType})` : ''}`
+    )
+  }
 
   if (!ELKS_API_USER || !ELKS_API_PASSWORD) {
     return { success: false, error: '46elks credentials not configured' }

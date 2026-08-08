@@ -83,6 +83,61 @@ test.describe('SMS-delar — där pengarna läcker tyst', () => {
   })
 })
 
+test.describe('typografitvätten — den verkliga läckan var inte emoji', () => {
+  const { normalizeForGsm7, normalizeIfCheaper } = require('../lib/costs/meter')
+
+  test('tankstreck och typografiska citattecken tvingar UCS-2', () => {
+    // Fyndet: två historiska SMS flaggades som UCS-2 och INGET av dem hade
+    // emoji. De hade `—` och `"…"` — tecken AI:n skriver naturligt.
+    const medTankstreck = 'a'.repeat(100) + ' — klart'
+    expect(smsPartCount(medTankstreck)).toBe(2)
+    expect(smsPartCount(normalizeForGsm7(medTankstreck))).toBe(1)
+  })
+
+  test('ett enda tankstreck dubblar kostnaden för ett kort meddelande', () => {
+    const rent = 'Hej Andreas! Jag sag att du tittade pa offerten. Hor av dig.'
+    const medTyp = 'Hej Andreas — jag såg att du tittade på offerten. Hör av dig.'
+    expect(smsPartCount(rent)).toBe(1)
+    expect(smsPartCount(medTyp)).toBe(1) // kort nog att rymmas ändå
+    // ...men i ett meddelande nära gränsen är skillnaden hela kostnaden:
+    const nästanFullt = 'å'.repeat(150)
+    expect(smsPartCount(nästanFullt)).toBe(1)
+    expect(smsPartCount(nästanFullt + '—')).toBe(3) // 151 tecken UCS-2
+  })
+
+  test('svenska tecken rörs aldrig — de är redan GSM-7', () => {
+    const svenska = 'Håkan på Ängsvägen fick förslaget. Övrigt är klart.'
+    expect(normalizeForGsm7(svenska)).toBe(svenska)
+  })
+
+  test('riktiga emoji lämnas orörda — då är UCS-2 avsiktligt', () => {
+    // Att stryka en emoji vore att ändra vad hantverkaren faktiskt skickar.
+    const medEmoji = 'Tack för jobbet! 😊'
+    expect(normalizeForGsm7(medEmoji)).toContain('😊')
+    // Och tvätten görs inte alls när den ändå inte sparar något:
+    const r = normalizeIfCheaper('Kort text 😊')
+    expect(r.sparadeDelar).toBe(0)
+    expect(r.text).toBe('Kort text 😊')
+  })
+
+  test('tvätten sker bara när den faktiskt sparar delar', () => {
+    const kort = 'Hej — allt klart!'
+    // Ryms i en del även som UCS-2 → ingen anledning att röra texten.
+    expect(normalizeIfCheaper(kort).sparadeDelar).toBe(0)
+    expect(normalizeIfCheaper(kort).text).toBe(kort)
+  })
+
+  test('strypunkten tvättar innan den räknar och skickar', () => {
+    const s = kod('lib/sms-send.ts')
+    const tvätt = s.indexOf('normalizeIfCheaper(råMeddelande)')
+    expect(tvätt, 'ingen tvätt vid strypunkten').toBeGreaterThan(-1)
+    // Måste ske FÖRE både kostnadsberäkning och 46elks-anropet, annars
+    // betalar vi för den otvättade texten.
+    expect(s.indexOf('smsPartCount(message)')).toBeGreaterThan(tvätt)
+    expect(s.indexOf('api.46elks.com/a1/sms')).toBeGreaterThan(tvätt)
+  })
+})
+
 test.describe('samtal — fyra gånger prisskillnad på klassificeringen', () => {
   test('svenska mobilserier känns igen', () => {
     expect(classifySwedishNumber('+46701234567')).toBe('mobile')
