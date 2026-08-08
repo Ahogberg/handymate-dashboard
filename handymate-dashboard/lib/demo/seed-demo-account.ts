@@ -1,10 +1,12 @@
 import { getServerSupabase } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import { calculateQuoteTotals } from '@/lib/quote-calculations'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { generateOCR } from '@/lib/ocr'
 import { getNextCustomerNumber, getNextCaseNumber } from '@/lib/numbering'
 import { ensureDefaultStages, getStageBySlug } from '@/lib/pipeline'
 import type { QuoteItem } from '@/lib/types/quote'
+import { buildDemoManifest, type DemoManifest } from '@/lib/demo/manifest'
 
 /**
  * lib/demo/seed-demo-account.ts (2026-07)
@@ -52,6 +54,7 @@ export interface DemoResetSummary {
   agentRuns: number
   bookings: number
   scheduleEntries: number
+  manifest: DemoManifest
 }
 
 export interface DemoResetError {
@@ -83,7 +86,9 @@ function svDate(offsetDays: number): string {
 }
 
 export async function resetDemoAccount(
-  businessId: string
+  businessId: string,
+  actorUserId: string,
+  accessToken: string,
 ): Promise<DemoResetSummary | DemoResetError> {
   const supabase = getServerSupabase()
 
@@ -107,27 +112,61 @@ export async function resetDemoAccount(
   const businessName = (biz.business_name as string) || 'Företaget'
   const contactName = (biz.contact_name as string) || ''
 
-  // ── 1. Radera tidigare demo-data (endast denna business_id) ──
-  // Ordning: löv-till-rot så inga FK-beroenden (t.ex. pipeline_activity →
-  // deal, quote_items → quotes) någonsin ger ett orphan-fel, oavsett om
-  // CASCADE redan skulle städat undan dem.
-  await supabase.from('pending_approvals').delete().eq('business_id', businessId)
-  await supabase.from('business_knowledge').delete().eq('business_id', businessId)
-  await supabase.from('agent_runs').delete().eq('business_id', businessId)
-  await supabase.from('pipeline_activity').delete().eq('business_id', businessId)
-  await supabase.from('quote_items').delete().eq('business_id', businessId)
-  await supabase.from('invoice').delete().eq('business_id', businessId)
-  await supabase.from('project_checklist').delete().eq('business_id', businessId)
-  await supabase.from('project').delete().eq('business_id', businessId)
-  await supabase.from('quotes').delete().eq('business_id', businessId)
-  await supabase.from('deal').delete().eq('business_id', businessId)
-  await supabase.from('customer').delete().eq('business_id', businessId)
-  // Fas 0.2: booking.customer_id har INGEN FK-constraint (verifierat mot
-  // sql/v71_add_missing_fks.sql — saknas i den listan), så gårdagens
-  // demo-bokningar skulle annars bli hängande orphans mot nya kund-id:n
-  // varje reset istället för att städas undan som allt annat här.
-  await supabase.from('booking').delete().eq('business_id', businessId)
-  await supabase.from('schedule_entry').delete().eq('business_id', businessId)
+  // ── 1. Atomisk radering via V99 ───────────────────────────
+  // RPC:n anropas med den verkliga användarens JWT så auth.uid() i
+  // SECURITY DEFINER-funktionen blir auditens actor och DB:n kan upprepa
+  // owner/admin-grinden. Service-role används fortsatt enbart för seedningen.
+  const rpcSupabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    },
+  )
+  const resetStartedAt = new Date().toISOString()
+  const { data: resetAuditId, error: resetError } = await rpcSupabase.rpc(
+    'reset_demo_tenant',
+    { p_business_id: businessId },
+  )
+
+  if (resetError || typeof resetAuditId !== 'string') {
+    console.error('[demo-reset] atomisk radering misslyckades:', resetError?.message)
+    // RPC-transaktionen rullade tillbaka även sin påbörjade audit. Skriv en
+    // separat, smal felrad efter rollback så försöket ändå blir synligt.
+    const { error: auditInsertError } = await supabase.from('demo_reset_audit').insert({
+      business_id: businessId,
+      actor_user_id: actorUserId,
+      started_at: resetStartedAt,
+      finished_at: new Date().toISOString(),
+      ok: false,
+      error_text: 'delete_transaction_failed',
+      reset_version: 'v99',
+    })
+    if (auditInsertError) {
+      console.error('[demo-reset] kunde inte auditlogga rollback:', auditInsertError.message)
+    }
+    return { error: 'Kunde inte radera det gamla demoläget. Inga gamla demorader ändrades.' }
+  }
+
+  async function failReset(message: string, errorCode = 'seed_failed'): Promise<DemoResetError> {
+    const { error: auditError } = await supabase
+      .from('demo_reset_audit')
+      .update({
+        actor_user_id: actorUserId,
+        finished_at: new Date().toISOString(),
+        ok: false,
+        error_text: errorCode,
+      })
+      .eq('id', resetAuditId)
+      .eq('business_id', businessId)
+    if (auditError) {
+      console.error('[demo-reset] kunde inte avsluta felauditen:', auditError.message)
+    }
+    return { error: message }
+  }
+
+  try {
 
   // ── 2. Pipeline-steg måste finnas (no-op om redan seedade) ──
   await ensureDefaultStages(businessId)
@@ -231,7 +270,7 @@ export async function resetDemoAccount(
       .insert({ ...c.insert, customer_number: customerNumber, created_at: new Date().toISOString() })
       .select('customer_id, name, email, phone_number')
       .single()
-    if (error || !data) return { error: `Kunde inte skapa kund ${c.key}: ${error?.message}` }
+    if (error || !data) return failReset(`Kunde inte skapa kund ${c.key}: ${error?.message}`, 'customer_insert_failed')
     customers[c.key] = data
   }
 
@@ -245,7 +284,7 @@ export async function resetDemoAccount(
   // — demokontots "accepterad offert"-exempel visas numera i 'won' istället.
   const stageWon = await getStageBySlug(businessId, 'won')
   if (!stageNewInquiry || !stageContacted || !stageQuoteSent || !stageWon) {
-    return { error: 'Pipeline-steg saknas för demokontot — kunde inte skapa affärer.' }
+    return failReset('Pipeline-steg saknas för demokontot — kunde inte skapa affärer.', 'pipeline_stage_missing')
   }
 
   type SeedDeal = {
@@ -326,10 +365,10 @@ export async function resetDemoAccount(
       })
       .select('id, title')
       .single()
-    if (error || !data) return { error: `Kunde inte skapa affär ${d.key}: ${error?.message}` }
+    if (error || !data) return failReset(`Kunde inte skapa affär ${d.key}: ${error?.message}`, 'deal_insert_failed')
     deals[d.key] = data
 
-    await supabase.from('pipeline_activity').insert({
+    const { error: activityError } = await supabase.from('pipeline_activity').insert({
       business_id: businessId,
       deal_id: data.id,
       activity_type: 'deal_created',
@@ -338,6 +377,9 @@ export async function resetDemoAccount(
       triggered_by: 'user',
       created_at: d.created_at,
     })
+    if (activityError) {
+      return failReset(`Kunde inte skapa pipelineaktivitet för ${d.key}: ${activityError.message}`, 'pipeline_activity_insert_failed')
+    }
   }
 
   // ══════════════════════════════════════════════════════════
@@ -475,7 +517,7 @@ export async function resetDemoAccount(
       .select('quote_id, quote_number, total, customer_pays')
       .single()
 
-    if (error || !data) return { error: `Kunde inte skapa offert ${q.key}: ${error?.message}` }
+    if (error || !data) return failReset(`Kunde inte skapa offert ${q.key}: ${error?.message}`, 'quote_insert_failed')
     quotes[q.key] = data
 
     const itemInserts = q.items.map((item, idx) => ({
@@ -499,13 +541,20 @@ export async function resetDemoAccount(
       sort_order: idx,
     }))
     const { error: itemsErr } = await supabase.from('quote_items').insert(itemInserts)
-    if (itemsErr) return { error: `Kunde inte skapa offertrader för ${q.key}: ${itemsErr.message}` }
+    if (itemsErr) return failReset(`Kunde inte skapa offertrader för ${q.key}: ${itemsErr.message}`, 'quote_items_insert_failed')
 
     // Länka dealen tillbaka till offerten (samma mönster som POST /api/quotes,
     // MEN vi synkar medvetet INTE deal.value hit — pipeline-värdena ska hålla
     // sig till de exkl.-moms-siffror som är specade för demon).
     if (q.dealKey) {
-      await supabase.from('deal').update({ quote_id: quoteId }).eq('id', deals[q.dealKey].id).eq('business_id', businessId)
+      const { error: dealLinkError } = await supabase
+        .from('deal')
+        .update({ quote_id: quoteId })
+        .eq('id', deals[q.dealKey].id)
+        .eq('business_id', businessId)
+      if (dealLinkError) {
+        return failReset(`Kunde inte länka offerten till affären ${q.dealKey}: ${dealLinkError.message}`, 'deal_quote_link_failed')
+      }
     }
   }
 
@@ -532,7 +581,7 @@ export async function resetDemoAccount(
     })
     .select('project_id')
     .single()
-  if (annaProjErr || !annaProject) return { error: `Kunde inte skapa projekt (Anna): ${annaProjErr?.message}` }
+  if (annaProjErr || !annaProject) return failReset(`Kunde inte skapa projekt (Anna): ${annaProjErr?.message}`, 'project_insert_failed')
 
   const { data: kristinaProject, error: kristinaProjErr } = await supabase
     .from('project')
@@ -553,7 +602,7 @@ export async function resetDemoAccount(
     })
     .select('project_id')
     .single()
-  if (kristinaProjErr || !kristinaProject) return { error: `Kunde inte skapa projekt (Kristina): ${kristinaProjErr?.message}` }
+  if (kristinaProjErr || !kristinaProject) return failReset(`Kunde inte skapa projekt (Kristina): ${kristinaProjErr?.message}`, 'project_insert_failed')
 
   // ══════════════════════════════════════════════════════════
   // 6b. EGENKONTROLL-CHECKLISTA (1 st, aktiv) — Anna-badrummet, tema
@@ -588,7 +637,7 @@ export async function resetDemoAccount(
     status: 'in_progress',
     created_at: isoAt(-2, 14, 0),
   })
-  if (checklistErr) return { error: `Kunde inte skapa checklista (Anna): ${checklistErr.message}` }
+  if (checklistErr) return failReset(`Kunde inte skapa checklista (Anna): ${checklistErr.message}`, 'project_checklist_insert_failed')
 
   // ══════════════════════════════════════════════════════════
   // 6c. VECKANS SCHEMA (R2-DoD, tasks/resurs-masterplan.md) — bookings
@@ -600,19 +649,22 @@ export async function resetDemoAccount(
   //     teammedlemmar seedas separat (sql/demo_seed_flerpersons.sql), inte
   //     här.
   // ══════════════════════════════════════════════════════════
-  const { data: teamRows } = await supabase
+  const { data: teamRows, error: teamError } = await supabase
     .from('business_users')
     .select('id, name')
     .eq('business_id', businessId)
     .eq('is_active', true)
     .order('created_at', { ascending: true })
+  if (teamError) {
+    return failReset(`Kunde inte läsa demoteamet: ${teamError.message}`, 'team_read_failed')
+  }
   const team = (teamRows || []) as { id: string; name: string }[]
 
   // Måndagen i INNEVARANDE vecka, relativt NU — resurstavlan öppnas alltid
   // på innevarande vecka vid inloggning, så veckans bokningar måste ligga
   // där oavsett vilken dag demot körs (samma "allt relativt NU"-princip
   // som resten av filen).
-  function mondayThisWeek(): Date {
+  const mondayThisWeek = (): Date => {
     const d = new Date()
     const dow = d.getDay() // 0=sön..6=lör
     const diffToMonday = dow === 0 ? -6 : 1 - dow
@@ -620,7 +672,7 @@ export async function resetDemoAccount(
     d.setHours(0, 0, 0, 0)
     return d
   }
-  function weekDateTime(dayOffset: number, hour: number, minute = 0): string {
+  const weekDateTime = (dayOffset: number, hour: number, minute = 0): string => {
     const d = mondayThisWeek()
     d.setDate(d.getDate() + dayOffset)
     d.setHours(hour, minute, 0, 0)
@@ -667,13 +719,8 @@ export async function resetDemoAccount(
       kind: b.kind || 'standard',
       created_at: new Date().toISOString(),
     })
-    if (bookErr) {
-      // Non-fatal: samma grad som agent_runs nedan — en trasig bokningsrad
-      // ska aldrig stoppa hela demo-resetten.
-      console.error('[demo-reset] booking insert failed (non-blocking):', bookErr.message)
-    } else {
-      bookingsCreated++
-    }
+    if (bookErr) return failReset(`Kunde inte skapa demobokning: ${bookErr.message}`, 'booking_insert_failed')
+    bookingsCreated++
   }
 
   let scheduleEntriesCreated = 0
@@ -693,8 +740,8 @@ export async function resetDemoAccount(
       type: 'internal',
       status: 'scheduled',
     })
-    if (internalErr) console.error('[demo-reset] schedule_entry (internal) insert failed (non-blocking):', internalErr.message)
-    else scheduleEntriesCreated++
+    if (internalErr) return failReset(`Kunde inte skapa intern schemarad: ${internalErr.message}`, 'schedule_entry_insert_failed')
+    scheduleEntriesCreated++
   }
   if (team.length > 1) {
     // En frånvaro (heldag, torsdag) — annan person än onsdagens konflikt,
@@ -712,8 +759,8 @@ export async function resetDemoAccount(
       type: 'time_off',
       status: 'scheduled',
     })
-    if (absenceErr) console.error('[demo-reset] schedule_entry (frånvaro) insert failed (non-blocking):', absenceErr.message)
-    else scheduleEntriesCreated++
+    if (absenceErr) return failReset(`Kunde inte skapa frånvarorad: ${absenceErr.message}`, 'schedule_entry_insert_failed')
+    scheduleEntriesCreated++
   }
 
   // ══════════════════════════════════════════════════════════
@@ -721,7 +768,7 @@ export async function resetDemoAccount(
   // ══════════════════════════════════════════════════════════
   type SeedInvoiceItem = { id: string; item_type: string; description: string; quantity: number; unit: string; unit_price: number; total: number; type: string; is_rot_eligible: boolean; is_rut_eligible: boolean; sort_order: number }
 
-  function invoiceItem(description: string, total: number, type: 'labor' | 'material', rot: boolean, idx: number): SeedInvoiceItem {
+  const invoiceItem = (description: string, total: number, type: 'labor' | 'material', rot: boolean, idx: number): SeedInvoiceItem => {
     return {
       id: genId('ii'),
       item_type: 'item',
@@ -766,7 +813,7 @@ export async function resetDemoAccount(
     })
     .select('invoice_id, invoice_number')
     .single()
-  if (fastighetsInvErr || !fastighetsInvoice) return { error: `Kunde inte skapa faktura (Fastighets): ${fastighetsInvErr?.message}` }
+  if (fastighetsInvErr || !fastighetsInvoice) return failReset(`Kunde inte skapa faktura (Fastighets): ${fastighetsInvErr?.message}`, 'invoice_insert_failed')
 
   // 7b. Skickad, ej förfallen — Johan Ek, äldre jobb med ROT
   const johanInvItems = [invoiceItem('Byte av 4 element', 9600, 'labor', true, 0)]
@@ -799,7 +846,7 @@ export async function resetDemoAccount(
     })
     .select('invoice_id, invoice_number')
     .single()
-  if (johanInvErr || !johanInvoice) return { error: `Kunde inte skapa faktura (Johan): ${johanInvErr?.message}` }
+  if (johanInvErr || !johanInvoice) return failReset(`Kunde inte skapa faktura (Johan): ${johanInvErr?.message}`, 'invoice_insert_failed')
 
   // 7c. Förfallen 8 dagar — Kristina Bergström (kopplad till avslutade projektet)
   const kristinaInvItems = [invoiceItem('Byte av kökskran och packningar', 4800, 'labor', false, 0)]
@@ -832,7 +879,7 @@ export async function resetDemoAccount(
     })
     .select('invoice_id, invoice_number')
     .single()
-  if (kristinaInvErr || !kristinaInvoice) return { error: `Kunde inte skapa faktura (Kristina): ${kristinaInvErr?.message}` }
+  if (kristinaInvErr || !kristinaInvoice) return failReset(`Kunde inte skapa faktura (Kristina): ${kristinaInvErr?.message}`, 'invoice_insert_failed')
 
   // ══════════════════════════════════════════════════════════
   // 8. PENDING_APPROVALS (5 st) — payload-strukturen kopierad EXAKT från
@@ -853,6 +900,10 @@ export async function resetDemoAccount(
   const reminderFee = 60
   const penaltyInterest = 8
   const interestAmount = Math.round((kristinaTotal * (penaltyInterest / 100) * daysOverdue) / 365)
+  const invoiceReminderApprovalId = genId('appr')
+  const ataMissedApprovalId = genId('appr')
+  const materialMissedApprovalId = genId('appr')
+  const profitabilityWarningApprovalId = genId('appr')
 
   const approvalSeeds = [
     // Daniel — offert-uppföljning (kopierar lib/autopilot/quote-nudge.ts:84-103)
@@ -901,7 +952,7 @@ export async function resetDemoAccount(
     // app/api/cron/send-reminders/route.ts:342-360, ReminderDeliveryInput i
     // lib/invoice-reminder-send.ts — så Godkänn kör deliverInvoiceReminder på riktigt).
     {
-      id: genId('appr'),
+      id: invoiceReminderApprovalId,
       business_id: businessId,
       approval_type: 'invoice_reminder',
       title: `Skicka påminnelse för faktura ${kristinaInvoice.invoice_number}`,
@@ -1002,7 +1053,7 @@ export async function resetDemoAccount(
     // seedade världen: ÄTA:n hör till annas aktiva badrumsprojekt,
     // materialet till kristinas avslutade kranbyte.
     {
-      id: genId('appr'),
+      id: ataMissedApprovalId,
       business_id: businessId,
       approval_type: 'missad_intakt',
       routing_role: 'owner_admin',
@@ -1023,7 +1074,7 @@ export async function resetDemoAccount(
       expires_at: isoAt(14),
     },
     {
-      id: genId('appr'),
+      id: materialMissedApprovalId,
       business_id: businessId,
       approval_type: 'missad_intakt',
       routing_role: 'owner_admin',
@@ -1044,7 +1095,7 @@ export async function resetDemoAccount(
       expires_at: isoAt(14),
     },
     {
-      id: genId('appr'),
+      id: profitabilityWarningApprovalId,
       business_id: businessId,
       approval_type: 'profitability_warning',
       title: 'Badrumsrenoveringen är på väg att spräcka kalkylen',
@@ -1066,7 +1117,7 @@ export async function resetDemoAccount(
   ]
 
   const { error: approvalsErr } = await supabase.from('pending_approvals').insert(approvalSeeds)
-  if (approvalsErr) return { error: `Kunde inte skapa godkännanden: ${approvalsErr.message}` }
+  if (approvalsErr) return failReset(`Kunde inte skapa godkännanden: ${approvalsErr.message}`, 'approvals_insert_failed')
 
   // ══════════════════════════════════════════════════════════
   // 8b. OBSERVATIONER (business_knowledge) — teamets "berättar"-röst.
@@ -1109,7 +1160,7 @@ export async function resetDemoAccount(
       created_at: isoAt(0, 6, 5),
     },
   ])
-  if (knowledgeErr) return { error: `Kunde inte skapa observationer: ${knowledgeErr.message}` }
+  if (knowledgeErr) return failReset(`Kunde inte skapa observationer: ${knowledgeErr.message}`, 'business_knowledge_insert_failed')
 
   // ══════════════════════════════════════════════════════════
   // 9. AGENT_RUNS — några enkla rader "igår kväll" så bevisbandet har siffror.
@@ -1124,8 +1175,49 @@ export async function resetDemoAccount(
   ]
   const { error: agentRunsErr } = await supabase.from('agent_runs').insert(agentRunSeeds)
   if (agentRunsErr) {
-    // Non-fatal: bevisbandet degraderar bara till "inget nytt sedan igår" om detta failar.
-    console.error('[demo-reset] agent_runs insert failed (non-blocking):', agentRunsErr.message)
+    return failReset(`Kunde inte skapa agentkörningar: ${agentRunsErr.message}`, 'agent_runs_insert_failed')
+  }
+
+  // ── 10. Stabilt entity-manifest för Epic 5 ────────────────
+  // Alla värden kommer från de inserts som precis lyckades. Inga belopp eller
+  // seedantaganden lagras här — bara pekare till riktiga produktionsobjekt.
+  const manifest = buildDemoManifest({
+    businessId,
+    staleQuoteId: quotes.mikael_quote.quote_id,
+    marginProjectId: annaProject.project_id,
+    overdueInvoiceId: kristinaInvoice.invoice_id,
+    ataMissedApprovalId,
+    materialMissedApprovalId,
+    profitabilityWarningApprovalId,
+    invoiceReminderApprovalId,
+  })
+  const { error: manifestError } = await supabase.from('business_preferences').upsert(
+    {
+      business_id: businessId,
+      key: 'demo_manifest',
+      value: JSON.stringify(manifest),
+      source: 'user',
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'business_id,key' },
+  )
+  if (manifestError) {
+    return failReset(`Kunde inte spara demomanifestet: ${manifestError.message}`, 'demo_manifest_upsert_failed')
+  }
+
+  const { error: auditFinishError } = await supabase
+    .from('demo_reset_audit')
+    .update({
+      actor_user_id: actorUserId,
+      finished_at: new Date().toISOString(),
+      ok: true,
+      error_text: null,
+    })
+    .eq('id', resetAuditId)
+    .eq('business_id', businessId)
+  if (auditFinishError) {
+    console.error('[demo-reset] kunde inte avsluta success-auditen:', auditFinishError.message)
+    return { error: 'Demon seedades men återställningen kunde inte auditloggas som klar.' }
   }
 
   return {
@@ -1135,9 +1227,17 @@ export async function resetDemoAccount(
     invoices: 3,
     projects: 2,
     approvals: approvalSeeds.length,
-    agentRuns: agentRunsErr ? 0 : agentRunSeeds.length,
+    agentRuns: agentRunSeeds.length,
     bookings: bookingsCreated,
     scheduleEntries: scheduleEntriesCreated,
+    manifest,
+  }
+  } catch (error: any) {
+    console.error('[demo-reset] oväntat seedfel:', error)
+    return failReset(
+      error?.message ? `Kunde inte slutföra seedningen: ${error.message}` : 'Kunde inte slutföra seedningen.',
+      'unexpected_seed_exception',
+    )
   }
 }
 

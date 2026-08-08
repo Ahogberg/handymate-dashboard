@@ -85,6 +85,11 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       requires: 'owner-admin',
       why: 'Raderar hela kontot (30 dagars grace). Får aldrig kunna utlösas av en anställd.',
     },
+    {
+      route: 'admin/demo-reset',
+      requires: 'owner-admin',
+      why: 'Raderar och seedar om hela demotenantens operativa data. Env-/tenantgrinden ersätter inte aktörens roll.',
+    },
   ],
 
   'Abonnemang och pengar ut': [
@@ -232,8 +237,6 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
  * schema-kontraktet: den dokumenterade skulden, inte en glömska.
  */
 const UNPROTECTED_BY_DESIGN: Record<string, string> = {
-  'admin/demo-reset':
-    'Destruktiv men skyddad av business_id === DEMO_BUSINESS_ID i stället för roll. Medvetet dokumenterat i filhuvudet.',
   'projects':
     'Grindar inte utan DEGRADERAR svaret (canSeeAllProjects/canSeeFinancials filtrerar fälten). Fail-open på !currentUser är medvetet för superadmin-impersonation.',
 }

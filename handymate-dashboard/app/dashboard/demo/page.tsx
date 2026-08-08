@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { RefreshCcw, Loader2, CheckCircle2, AlertTriangle, ShieldAlert } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -14,6 +14,36 @@ import { supabase } from '@/lib/supabase'
 export default function DemoPage() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; text: string; isForbidden?: boolean } | null>(null)
+
+  useEffect(() => {
+    try {
+      const notice = sessionStorage.getItem('hm_demo_reset_notice')
+      if (!notice) return
+      sessionStorage.removeItem('hm_demo_reset_notice')
+      const parsed = JSON.parse(notice) as { text?: string }
+      if (parsed.text) setResult({ ok: true, text: parsed.text })
+    } catch {
+      // Storage kan vara avstängt; resetten är ändå klar på servern.
+    }
+  }, [])
+
+  function clearDemoClientState(successText: string) {
+    try {
+      localStorage.removeItem('hm_moments_seen')
+      for (let index = localStorage.length - 1; index >= 0; index--) {
+        const key = localStorage.key(index)
+        if (key?.startsWith('hm_demo_story')) localStorage.removeItem(key)
+      }
+      for (let index = sessionStorage.length - 1; index >= 0; index--) {
+        const key = sessionStorage.key(index)
+        if (key?.startsWith('hm_demo_story')) sessionStorage.removeItem(key)
+      }
+      sessionStorage.removeItem('matte-chat-auto-opened')
+      sessionStorage.setItem('hm_demo_reset_notice', JSON.stringify({ text: successText }))
+    } catch {
+      // Full reload nedan nollställer ändå Jobbkompisens aktiva thread-state.
+    }
+  }
 
   async function handleReset() {
     setLoading(true)
@@ -39,10 +69,12 @@ export default function DemoPage() {
       }
 
       const totalArenden = (json.approvals || 0)
-      setResult({
-        ok: true,
-        text: `Demon är återställd — ${json.customers} kunder, ${totalArenden} ärenden i kön.`,
-      })
+      const successText = `Demon är återställd — ${json.customers} kunder, ${totalArenden} ärenden i kön.`
+      clearDemoClientState(successText)
+      // Jobbkompisens threadId är avsiktligt komponentstate, inte storage.
+      // En full reload efter att RPC:n raderat agent_threads garanterar därför
+      // att nästa Matte-fråga börjar i en ny tråd.
+      window.location.reload()
     } catch {
       setResult({ ok: false, text: 'Kunde inte återställa demon — försök igen.' })
     } finally {
