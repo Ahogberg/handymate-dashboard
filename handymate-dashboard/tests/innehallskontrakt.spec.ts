@@ -259,6 +259,89 @@ test.describe('regel 3: ett ärende per kort', () => {
   })
 })
 
+test.describe('"Värt att veta" — tre grindar', () => {
+  const { entityFrom, arSammanfattning, passerarGrindar, grindaNyheter } =
+    require('../lib/jarvis/news-gates')
+  const { nyhetsAtgard } = require('../lib/jarvis/news-actions')
+  const obs = (id: string, data_basis: any = null) => ({
+    id, agent_id: 'daniel', observation: 'text', suggestion: null,
+    data_basis, created_at: '2026-08-08T09:00:00Z',
+  })
+
+  test('grind 2: en rad utan namngivet objekt faller', () => {
+    expect(passerarGrindar(obs('a'), new Set())).toBe(false)
+    expect(passerarGrindar(obs('b', { quote_id: 'q1' }), new Set())).toBe(true)
+  })
+
+  test('grind 3: en aggregatrad är en sammanfattning, inte ett fynd', () => {
+    // "Av 11 offerter har 4 accepterats" — samma sak som Verksamheten säger.
+    expect(arSammanfattning(obs('a', { metric: 'acceptance_rate_by_customer_type' }))).toBe(true)
+    // ...men bär raden ett objekt är den ett fynd, även med metric.
+    expect(arSammanfattning(obs('b', { metric: 'x', quote_id: 'q1' }))).toBe(false)
+  })
+
+  test('grind 1: en rad man redan sett är ingen nyhet', () => {
+    const r = obs('a', { quote_id: 'q1' })
+    expect(passerarGrindar(r, new Set())).toBe(true)
+    expect(passerarGrindar(r, new Set(['a']))).toBe(false)
+  })
+
+  test('fem rader om samma tio offerter blir en', () => {
+    // Fyra aggregatvarianter + ett riktigt fynd — precis Claude Designs bild.
+    const rader = [
+      obs('1', { metric: 'acceptance_rate_by_customer_type' }),
+      obs('2', { metric: 'acceptance_by_detail_level' }),
+      obs('3', null),
+      obs('4', { metric: 'lead_source_conversion' }),
+      obs('5', { quote_id: 'q_bengtsson' }),
+    ]
+    const kvar = grindaNyheter(rader, new Set())
+    expect(kvar).toHaveLength(1)
+    expect(kvar[0].id).toBe('5')
+  })
+
+  test('entiteten plockas ut specifikt före generellt', () => {
+    expect(entityFrom({ quote_id: 'q1', customer_id: 'c1' })).toEqual({ typ: 'quote', id: 'q1' })
+    expect(entityFrom({ customer_id: 'c1' })).toEqual({ typ: 'customer', id: 'c1' })
+    expect(entityFrom({ metric: 'x' })).toBeNull()
+    expect(entityFrom(null)).toBeNull()
+    // Tom sträng är inget id.
+    expect(entityFrom({ quote_id: '  ' })).toBeNull()
+  })
+
+  test('den döda länkgrenen är återupplivad', () => {
+    // nyhetsAtgard tog redan emot entiteten — men anropades utan den, så
+    // alla Daniels rader fick samma generiska länk till /dashboard/pipeline.
+    const generisk = nyhetsAtgard('daniel', null)
+    const specifik = nyhetsAtgard('daniel', entityFrom({ quote_id: 'q1' }))
+    expect(generisk.href).toBe('/dashboard/pipeline')
+    expect(specifik.href).toBe('/dashboard/quotes/q1')
+    expect(specifik.label).toBe('Öppna offerten')
+
+    const s = kod('components/jarvis/JarvisHome.tsx')
+    expect(s, 'anropas fortfarande utan entitet')
+      .toContain('nyhetsAtgard(o.agent_id, entityFrom(o.data_basis))')
+  })
+
+  test('ytan grindar, och markerar sett EFTER renderingen', () => {
+    const s = kod('components/jarvis/JarvisHome.tsx')
+    expect(s).toContain('grindaNyheter(')
+    // Markeras de under renderingen filtreras de bort i samma render som de
+    // visas i — och syns aldrig.
+    expect(s).toContain('NYHET_SEDD_EFTER_MS')
+    expect(s).toContain('hm_nyheter_sedda')
+  })
+
+  test('tomma tillstånd säger något sant i stället för en nolla', () => {
+    const s = kod('components/jarvis/JarvisHome.tsx')
+    // Siffran får stå kvar när den är över noll — felet var att en NOLLA
+    // renderades rakt av. Villkoret är det som ska finnas.
+    expect(s, 'antalet renderas fortfarande ovillkorligt')
+      .toContain('pipelineStats.newLeadsToday > 0')
+    expect(s).toContain('inga nya idag')
+  })
+})
+
 test.describe('ytan använder härledningen', () => {
   const s = kod('components/jarvis/JarvisHome.tsx')
 

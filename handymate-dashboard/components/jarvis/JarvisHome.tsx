@@ -32,6 +32,7 @@ import type { CardAction } from '@/lib/jarvis/voice'
 import { voiceFor, reviewAlternatives, doneRowText } from '@/lib/jarvis/card-voice'
 import { mayExecute } from '@/lib/approvals/action-contract'
 import { groupApprovals, groupTitle, groupTotalKr } from '@/lib/jarvis/group-approvals'
+import { grindaNyheter, entityFrom } from '@/lib/jarvis/news-gates'
 
 /**
  * JarvisHome — teamets rapportbord (2026-08-07).
@@ -73,6 +74,11 @@ const NYHETS_IKON: Record<NyhetsIkon, React.ReactNode> = {
 
 const UNDO_WINDOW_MS = 5000
 const MAX_FULL_CARDS = 3
+/** Sedd-nyckel för nyhetsraderna — samma mönster som hm_moments_seen. */
+const NYHETER_SEDDA_KEY = 'hm_nyheter_sedda'
+const NYHETER_SEDDA_MAX = 200
+/** En rad ska hinna läsas innan den räknas som sedd. */
+const NYHET_SEDD_EFTER_MS = 8000
 
 interface Approval {
   id: string
@@ -93,6 +99,12 @@ interface Observation {
   related_approval_id: string | null
   /** Sätts av rutten när kortet funnits men inte längre är pending. */
   had_approval?: boolean
+  /**
+   * Agentens strukturerade underlag (quote_id, invoice_id, metric …).
+   * Selectades redan av /api/observations men togs aldrig emot här — därför
+   * nåddes aldrig grenen i news-actions som ger "Öppna offerten →".
+   */
+  data_basis?: Record<string, unknown> | null
   created_at: string
 }
 
@@ -188,6 +200,21 @@ export default function JarvisHome({
   const [snack, setSnack] = useState<{ approvalId: string; text: string } | null>(null)
   const [feedback, setFeedback] = useState<{ text: string; isError: boolean } | null>(null)
   const [proof, setProof] = useState<string | null>(null)
+
+  // ═══ GRIND 1: HAR NÅGOT HÄNT SEDAN DU TITTADE SIST? ═══
+  //
+  // Samma mekanik som momentlagret (hm_moments_seen): sedd-status hör hemma
+  // hos klienten, och observation.id är redan stabilt så ingen ny kolumn
+  // behövs. Raderna markeras som sedda när sidan renderat dem — de får en
+  // visning, sedan är de inte längre nyheter.
+  const [seddaNyheter, setSeddaNyheter] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(NYHETER_SEDDA_KEY)
+      if (raw) setSeddaNyheter(new Set(JSON.parse(raw) as string[]))
+    } catch { /* trasig localStorage får aldrig fälla sidan */ }
+  }, [])
 
   const pendingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
@@ -469,7 +496,38 @@ export default function JarvisHome({
   // Nyhetsrader = observationer som ALDRIG haft ett beslutskort. had_approval
   // sätts av /api/observations när kortet funnits men är hanterat — utan den
   // dök ett nyss avfärdat kort upp igen som nyhet längre ned på sidan.
-  const nyheter = observations.filter(o => !o.related_approval_id && !o.had_approval)
+  // Nyhetsrader = observationer som ALDRIG haft ett beslutskort, och som
+  // dessutom klarar de tre grindarna (lib/jarvis/news-gates.ts): något har
+  // hänt sedan sist, den handlar om ett namngivet objekt, och den säger något
+  // högerspalten inte redan säger. Fem rader om samma tio offerter blir en.
+  const nyheter = grindaNyheter(
+    observations.filter(o => !o.related_approval_id && !o.had_approval),
+    seddaNyheter,
+  )
+
+  // Markera som sedda EFTER renderingen, inte under den — annars filtreras
+  // raderna bort i samma render de visas i och man ser dem aldrig.
+  useEffect(() => {
+    if (nyheter.length === 0) return
+    const ids = nyheter.map(o => o.id)
+    const timer = setTimeout(() => {
+      setSeddaNyheter(prev => {
+        const n = new Set(prev)
+        ids.forEach(id => n.add(id))
+        try {
+          localStorage.setItem(
+            NYHETER_SEDDA_KEY,
+            JSON.stringify(Array.from(n).slice(-NYHETER_SEDDA_MAX)),
+          )
+        } catch { /* non-blocking */ }
+        return n
+      })
+    }, NYHET_SEDD_EFTER_MS)
+    return () => clearTimeout(timer)
+    // Avsiktligt bara id-listan i beroendet: seddaNyheter ändras av effekten
+    // själv, och att lyssna på den hade gett en oändlig loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nyheter.map(o => o.id).join(',')])
 
   // Närvarobandet: samma två källor som resten av sidan visar, omformade per
   // agent. Observationerna först — de är vad agenten SÄGER — och Klart idag
@@ -611,8 +669,12 @@ export default function JarvisHome({
                 <span className="text-xs text-slate-400">Inget att godkänna — bara läget</span>
               </div>
               <div>
-                {nyheter.slice(0, 5).map(o => {
-                  const atgard = nyhetsAtgard(o.agent_id)
+                {nyheter.map(o => {
+                  // Entiteten kommer ur data_basis och skickas vidare — utan
+                  // andra argumentet nåddes grenen som ger "Öppna offerten →"
+                  // aldrig, och alla Daniels rader fick samma generiska länk
+                  // till pipeline.
+                  const atgard = nyhetsAtgard(o.agent_id, entityFrom(o.data_basis))
                   return (
                     <AgentNewsRow
                       key={o.id}
@@ -699,8 +761,14 @@ export default function JarvisHome({
             {pipelineStats ? (
               <>
                 <span className="block font-heading text-2xl font-bold text-slate-900">{formatKr(pipelineStats.totalValue)}</span>
+                {/* "0 nya idag" är en nolla, inte ett besked. Mönstret finns
+                    redan två kort ned ("Inga obetalda — Karin bevakar"):
+                    tomt ska sägas som lugn, inte som frånvaro. */}
                 <span className="block text-xs text-slate-500 mt-0.5">
-                  {pipelineStats.totalDeals} affärer i flödet · {pipelineStats.newLeadsToday} nya idag
+                  {pipelineStats.totalDeals} affärer i flödet
+                  {pipelineStats.newLeadsToday > 0
+                    ? ` · ${pipelineStats.newLeadsToday} nya idag`
+                    : ' · inga nya idag'}
                 </span>
               </>
             ) : (
