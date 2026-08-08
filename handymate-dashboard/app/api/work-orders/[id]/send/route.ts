@@ -96,32 +96,27 @@ export async function POST(
 
     const message = lines.join('\n')
 
-    // Send SMS via 46elks
-    const elkUser = process.env.ELKS_API_USER
-    const elkPass = process.env.ELKS_API_PASSWORD
-
-    if (!elkUser || !elkPass) {
-      return NextResponse.json({ error: 'SMS-konfiguration saknas' }, { status: 500 })
-    }
-
-    const senderName = sanitizeSenderId(business.business_name)
-
-    const smsRes = await fetch('https://api.46elks.com/a1/sms', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${elkUser}:${elkPass}`).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        from: senderName,
-        to: wo.assigned_phone,
-        message,
-      }),
+    // ═══ GENOM STRYPUNKTEN (etapp 0 batch 4, 2026-08-08) ═══
+    //
+    // Arbetsordern går till en ANSTÄLLD (wo.assigned_phone), inte till en
+    // kund — därför recipient:'internal'. Det var just det här fallet som
+    // fick flaggan att byta namn från 'owner': mottagaren är varken kund
+    // eller ägare, och ett namn som ljuger om vem det gäller är farligt i ett
+    // säkerhetsräcke.
+    const { sendSmsViaElks } = await import('@/lib/sms-send')
+    const smsRes = await sendSmsViaElks({
+      supabase,
+      businessId: business.business_id,
+      businessName: business.business_name,
+      to: wo.assigned_phone,
+      message,
+      relatedId: wo.id || null,
+      messageType: 'work_order',
+      recipient: 'internal',
     })
 
-    if (!smsRes.ok) {
-      const errText = await smsRes.text()
-      console.error('46elks SMS error:', errText)
+    if (!smsRes.success) {
+      console.error('[work-orders] SMS misslyckades:', smsRes.error)
       return NextResponse.json({ error: 'Kunde inte skicka SMS' }, { status: 500 })
     }
 

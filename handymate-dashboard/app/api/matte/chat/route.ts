@@ -303,58 +303,41 @@ async function executeTool(
   switch (toolName) {
     case 'send_sms': {
       const { phone, message, customer_name } = toolInput
-      const ELKS_USER = process.env.ELKS_API_USER
-      const ELKS_PASS = process.env.ELKS_API_PASSWORD
-      if (!ELKS_USER || !ELKS_PASS) {
-        return { result: 'SMS-tjänsten är inte konfigurerad — be admin kolla 46elks-nycklarna.' }
-      }
 
-      // Hämta business-namn för from-fältet
+      // ═══ GENOM STRYPUNKTEN (etapp 0 batch 4, 2026-08-08) ═══
+      //
+      // Det här är den SISTA vägen ut ur huset, och den ligger redan bakom
+      // bekräftelsekortet (require_confirm_external + signerad token) — men
+      // det räcket gatar om hantverkaren sett texten, inte om kunden vill ha
+      // SMS över huvud taget. Opt-out saknades alltså även här.
+      //
+      // Den lokala sms_log-insert:en tas bort; helpern skriver den, och
+      // skriver även vid misslyckande (den gamla loggade alltid 'sent').
+      // formatPhone ersätts av helperns normalizeSwedishPhone.
       const { data: biz } = await supabase
         .from('business_config')
         .select('business_name')
         .eq('business_id', businessId)
         .single()
 
-      const formattedPhone = formatPhone(phone)
-
-      const response = await fetch('https://api.46elks.com/a1/sms', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Basic ' + Buffer.from(`${ELKS_USER}:${ELKS_PASS}`).toString('base64'),
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          from: sanitizeSenderId(biz?.business_name),
-          to: formattedPhone,
-          message: String(message),
-        }),
+      const { sendSmsViaElks } = await import('@/lib/sms-send')
+      const r = await sendSmsViaElks({
+        supabase,
+        businessId,
+        businessName: biz?.business_name,
+        to: String(phone),
+        message: String(message),
+        messageType: 'matte_chat',
       })
 
-      if (!response.ok) {
-        const errText = await response.text()
-        console.error('[matte/chat] SMS error:', errText)
-        return { result: `SMS-sändning misslyckades: ${errText.slice(0, 100)}` }
+      if (!r.success) {
+        console.error('[matte/chat] SMS misslyckades:', r.error)
+        // Matte får ALDRIG säga "skickat" när inget skickades — samma
+        // ärlighetsregel som orkestreringens statusspråk.
+        return { result: `SMS-sändning misslyckades: ${r.error || 'okänt fel'}` }
       }
 
-      const elksData = await response.json().catch(() => ({} as any))
-
-      // Logga (non-blocking)
-      try {
-        await supabase.from('sms_log').insert({
-          sms_id: 'sms_' + Math.random().toString(36).substring(2, 14),
-          business_id: businessId,
-          direction: 'outbound',
-          phone_from: sanitizeSenderId(biz?.business_name),
-          phone_to: formattedPhone,
-          message: String(message),
-          status: 'sent',
-          elks_id: elksData?.id,
-          created_at: new Date().toISOString(),
-        })
-      } catch { /* non-blocking */ }
-
-      return { result: `SMS skickat till ${customer_name} (${formattedPhone}).` }
+      return { result: `SMS skickat till ${customer_name}.` }
     }
 
     case 'create_approval': {

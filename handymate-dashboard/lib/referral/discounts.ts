@@ -156,21 +156,20 @@ export async function handleFirstPaymentReferral(
         .single()
 
       if (referrerConfig?.personal_phone) {
-        const ELKS_API_USER = process.env.ELKS_API_USER!
-        const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
-
-        await fetch('https://api.46elks.com/a1/sms', {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            from: sanitizeSenderId(referrerConfig.business_name),
-            to: referrerConfig.personal_phone,
-            message: 'Din kollega har nu aktiverat Handymate! Du får 50% rabatt på nästa månads faktura. Tack för att du spred ordet!',
-          }),
+        // Genom strypunkten (etapp 0 batch 4). Går till hantverkarens EGET
+        // nummer — rabattbeskedet är vår notis till honom, inte ett
+        // kundutskick, därför recipient:'owner'.
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const r = await sendSmsViaElks({
+          supabase,
+          businessId: referrerBusinessId,
+          businessName: referrerConfig.business_name,
+          to: referrerConfig.personal_phone,
+          message: 'Din kollega har nu aktiverat Handymate! Du får 50% rabatt på nästa månads faktura. Tack för att du spred ordet!',
+          messageType: 'referral_reward',
+          recipient: 'internal',
         })
+        if (!r.success) console.error('[referral] rabattnotis misslyckades:', r.error)
       }
     } catch (err) {
       console.error('[Referral] SMS-sändning misslyckades:', err)

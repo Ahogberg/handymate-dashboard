@@ -340,16 +340,12 @@ test.describe('spärrhaken — läckaget får bara krympa', () => {
     // maintenance (recensionsförfrågan), monthly-review, morning-report.
     // Två av tre går till HANTVERKAREN själv och använder recipient:'owner'
     // — se facit "opt-out gäller kunder, inte hantverkaren" nedan.
-    // batch 4 — svansen
-    'app/api/field-reports/[id]/sign/route.ts',
-    'app/api/work-orders/[id]/send/route.ts',
-    'app/api/projects/[id]/stages/route.ts',
-    'app/api/portal/[token]/route.ts',
-    'app/api/invoices/[id]/reminder/route.ts',
-    'app/api/matte/chat/route.ts',
-    'app/api/actions/route.ts',
-    'lib/referral/discounts.ts',
-    'lib/leads/golden-path.ts',
+    // ── Batch 4 MIGRERAD 2026-08-08 — SVANSEN ÄR SLUT ────────────────────
+    // field-reports ×2, work-orders, projektsteg, kundportalen,
+    // fakturapåminnelsen, Matte-chatten, actions ×2, referral, golden-path.
+    //
+    // Alla 24 migrerbara vägar går nu genom sendSmsViaElks. Kvar är bara de
+    // tre nedan, som medvetet aldrig migreras.
     // Migreras medvetet ALDRIG:
     // Deno edge function — kan inte importera lib/, och det är oklart om den
     // ens är deployad (se docs/audits/ROSTVAGAR_KARTLAGGNING_2026-08-08.md).
@@ -417,9 +413,13 @@ test.describe('spärrhaken — läckaget får bara krympa', () => {
     //
     // Flaggan är farlig om den sprider sig till kundmeddelanden, så listan
     // hålls kort och explicit här.
-    const TILLATNA_OWNER_SITES = [
+    const TILLATNA_INTERNA_SITES = [
       'lib/agent/morning-report.ts',
       'app/api/cron/monthly-review/route.ts',
+      'lib/leads/golden-path.ts',
+      'lib/referral/discounts.ts',
+      'app/api/work-orders/[id]/send/route.ts',
+      'app/api/field-reports/[id]/sign/route.ts',
     ]
     const träffar: string[] = []
     const gå = (dir: string) => {
@@ -431,17 +431,17 @@ test.describe('spärrhaken — läckaget får bara krympa', () => {
           if (f.name === 'node_modules' || f.name === '.next') continue
           gå(rel)
         } else if (/\.tsx?$/.test(f.name)) {
-          if (/recipient:\s*'owner'/.test(kod(rel))) träffar.push(rel)
+          if (/recipient:\s*'internal'/.test(kod(rel))) träffar.push(rel)
         }
       }
     }
     for (const rot of ['lib', 'app']) gå(rot)
-    expect(träffar.sort(), `oväntad owner-flagga: ${träffar.join(', ')}`)
-      .toEqual(TILLATNA_OWNER_SITES.sort())
+    expect(träffar.sort(), `oväntad internal-flagga: ${träffar.join(', ')}`)
+      .toEqual(TILLATNA_INTERNA_SITES.sort())
 
     // Och helpern måste faktiskt hoppa över spärren för dem.
     const s = kod('lib/sms-send.ts')
-    expect(s).toContain("args.recipient === 'owner'")
+    expect(s).toContain("args.recipient === 'internal'")
   })
 
   test('strypunkten mäter kostnad och delar', () => {

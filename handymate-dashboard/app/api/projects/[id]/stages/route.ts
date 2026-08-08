@@ -83,27 +83,26 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           .single()
 
         if (customer?.phone_number) {
-          const ELKS_API_USER = process.env.ELKS_API_USER
-          const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
-
-          if (ELKS_API_USER && ELKS_API_PASSWORD) {
+          {
+            // Genom strypunkten (etapp 0 batch 4). Projektstatus går till
+            // KUNDEN — opt-out gäller.
             const message = STAGE_SMS[stage]
               .replace('{name}', customer.name || '')
               .replace('{project}', project.name || '')
               .replace('{business}', business.business_name || 'Handymate')
 
-            await fetch('https://api.46elks.com/a1/sms', {
-              method: 'POST',
-              headers: {
-                'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-                'Content-Type': 'application/x-www-form-urlencoded',
-              },
-              body: new URLSearchParams({
-                from: sanitizeSenderId(business.business_name),
-                to: customer.phone_number,
-                message,
-              }),
+            const { sendSmsViaElks } = await import('@/lib/sms-send')
+            const r = await sendSmsViaElks({
+              supabase,
+              businessId: business.business_id,
+              businessName: business.business_name,
+              to: customer.phone_number,
+              message,
+              customerId: project.customer_id,
+              relatedId: params.id,
+              messageType: `project_stage_${stage}`,
             })
+            if (!r.success) console.error('[project-stages] SMS misslyckades:', r.error)
           }
         }
       }

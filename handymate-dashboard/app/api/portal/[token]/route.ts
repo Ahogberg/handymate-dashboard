@@ -64,29 +64,21 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
             `Hej${firstName ? ' ' + firstName : ''}! Välkommen till din kundportal hos ${bizName}. ` +
             `Här ser du offerter, fakturor, projektstatus och kan chatta med oss direkt.\n${suffix}`
 
-          await fetch('https://api.46elks.com/a1/sms', {
-            method: 'POST',
-            headers: {
-              Authorization: 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-              from: sanitizeSenderId(bizName),
-              to: customer.phone_number,
-              message,
-            }).toString(),
+          // Genom strypunkten (etapp 0 batch 4). Går till KUNDEN, så opt-out
+          // gäller. Den lokala sms_log-insert:en tas bort — helpern skriver
+          // den nu, med delantal och kostnad, och skriver även när utskicket
+          // misslyckas (den gamla loggade bara 'sent', oavsett utfall).
+          const { sendSmsViaElks } = await import('@/lib/sms-send')
+          const r = await sendSmsViaElks({
+            supabase,
+            businessId: customer.business_id,
+            businessName: bizName,
+            to: customer.phone_number,
+            message,
+            customerId: customer.customer_id,
+            messageType: 'portal_welcome',
           })
-
-          await supabase.from('sms_log').insert({
-            sms_id: 'sms_' + Math.random().toString(36).slice(2, 12),
-            business_id: customer.business_id,
-            customer_id: customer.customer_id,
-            direction: 'outbound',
-            phone_to: customer.phone_number,
-            message_type: 'portal_welcome',
-            status: 'sent',
-            sent_at: new Date().toISOString(),
-          })
+          if (!r.success) console.error('[portal] välkomst-SMS misslyckades:', r.error)
         } catch (err) {
           console.error('[portal] welcome SMS failed:', err)
         }

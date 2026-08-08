@@ -122,24 +122,24 @@ export async function POST(
     // Send SMS reminder
     if (invoice.customer?.phone_number) {
       try {
-        const smsResponse = await fetch('https://api.46elks.com/a1/sms', {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: new URLSearchParams({
-            from: sanitizeSenderId(businessName),
-            to: invoice.customer.phone_number,
-            message: message
-          }).toString()
+        // Genom strypunkten (etapp 0 batch 4). Betalningspåminnelser är
+        // kundmeddelanden — opt-out gäller.
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const smsResponse = await sendSmsViaElks({
+          supabase,
+          businessId: business.business_id,
+          businessName,
+          to: invoice.customer.phone_number,
+          message,
+          customerId: invoice.customer_id || null,
+          relatedId: invoiceId,
+          messageType: 'invoice_reminder',
         })
 
-        if (smsResponse.ok) {
+        if (smsResponse.success) {
           smsSent = true
         } else {
-          const errorData = await smsResponse.text()
-          console.error('SMS error:', errorData)
+          console.error('SMS error:', smsResponse.error)
           errors.push('SMS kunde inte skickas')
         }
       } catch (smsError) {

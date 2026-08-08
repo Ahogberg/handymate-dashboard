@@ -31,20 +31,25 @@ export interface SendSmsArgs {
   /**
    * Vem meddelandet går till. Default 'customer'.
    *
-   * ═══ 'owner' FÅR ALDRIG ANVÄNDAS FÖR KUNDMEDDELANDEN ═══
+   * ═══ 'internal' FÅR ALDRIG ANVÄNDAS FÖR KUNDMEDDELANDEN ═══
    *
    * Opt-out är ett KUNDSKYDD: `customer.sms_opt_out` sätts när en kund svarar
-   * STOPP. Men tre utskick går till hantverkaren själv — morgonrapporten,
-   * månadsrapporten och driftlarm. Om hantverkarens eget nummer råkar finnas
-   * som en kundrad i hans EGET företag (vanligt i test- och demokonton) med
-   * opt-out satt, skulle han tyst sluta få sin egen rapport.
+   * STOPP. Men flera utskick går inte till en kund alls — morgonrapporten och
+   * månadsrapporten till hantverkaren själv, arbetsordern till hans anställde,
+   * lead-notisen till hans telefon. Råkar något av de numren finnas som en
+   * kundrad i hans EGET företag (vanligt i test- och demokonton) med opt-out
+   * satt, skulle han tyst sluta få sina egna meddelanden.
    *
-   * 'owner' hoppar därför över opt-out-uppslaget. Allt annat — E.164,
+   * Flaggan hette först 'owner'. Den döptes om när arbetsordern visade att
+   * mottagaren lika gärna kan vara en anställd — ett namn som ljuger om vem
+   * det gäller är farligt i ett säkerhetsräcke.
+   *
+   * 'internal' hoppar därför över opt-out-uppslaget. Allt annat — E.164,
    * sms_log, kostnadsmätning, typografitvätt — gäller precis som vanligt.
    * Facit i tests/cogs-matare.spec.ts håller listan över tillåtna
-   * 'owner'-callsites kort.
+   * 'internal'-callsites kort.
    */
-  recipient?: 'customer' | 'owner'
+  recipient?: 'customer' | 'internal'
 }
 
 export interface SendSmsResult {
@@ -213,7 +218,7 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
   // Meddelanden till hantverkaren själv omfattas inte av kundens opt-out —
   // se noten vid `recipient` i SendSmsArgs.
   const optedOut =
-    args.recipient === 'owner'
+    args.recipient === 'internal'
       ? false
       : await isCustomerOptedOut(supabase, businessId, customerId, phone)
   if (optedOut) {

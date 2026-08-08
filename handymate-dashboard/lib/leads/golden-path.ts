@@ -25,22 +25,33 @@ import { getStageBySlug } from '@/lib/pipeline'
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
 
-async function sendSMS(to: string, message: string, from: string): Promise<boolean> {
-  if (!ELKS_API_USER || !ELKS_API_PASSWORD) return false
+/**
+ * Genom strypunkten (etapp 0 batch 4, 2026-08-08).
+ *
+ * Båda anroparna skickar till HANTVERKARENS eget nummer ("ny lead kom in"),
+ * inte till en kund — därför recipient:'owner'. Avsändaren 'Handymate' är
+ * medvetet kvar: det är vår notis till honom, inte hans utskick till någon.
+ */
+async function sendSMS(
+  supabase: SupabaseClient,
+  businessId: string,
+  to: string,
+  message: string,
+  from: string,
+): Promise<boolean> {
   try {
-    const res = await fetch('https://api.46elks.com/a1/sms', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        from: sanitizeSenderId(from),
-        to,
-        message,
-      }),
+    const { sendSmsViaElks } = await import('@/lib/sms-send')
+    const r = await sendSmsViaElks({
+      supabase,
+      businessId,
+      businessName: from,
+      to,
+      message,
+      messageType: 'new_lead_notice',
+      recipient: 'internal',
     })
-    return res.ok
+    if (!r.success) console.error('[golden-path] SMS misslyckades:', r.error)
+    return r.success
   } catch {
     return false
   }
@@ -220,7 +231,7 @@ export async function createLeadAndDeal(
   // ── 5. SMS till hantverkaren (non-blocking) ──────────────────
   if (businessPhoneNumber) {
     const smsText = `🌐 Ny lead från ${source}!\nNamn: ${name}\nTel: ${cleanPhone}${message ? `\n"${message.slice(0, 80)}"` : ''}\n→ app.handymate.se/dashboard/pipeline`
-    sendSMS(businessPhoneNumber, smsText, 'Handymate').catch(() => {})
+    sendSMS(supabase, businessId, businessPhoneNumber, smsText, 'Handymate').catch(() => {})
   }
 
   // ── 6. Automation-event ──────────────────────────────────────
@@ -323,7 +334,7 @@ export async function activatePendingLead(
   // SMS-notis (non-blocking)
   if (biz?.phone_number) {
     const smsText = `🌐 Ny lead!\nNamn: ${lead.name}\nTel: ${lead.phone}${lead.notes ? `\n"${lead.notes.slice(0, 80)}"` : ''}\n→ app.handymate.se/dashboard/pipeline`
-    sendSMS(biz.phone_number, smsText, 'Handymate').catch(() => {})
+    sendSMS(supabase, lead.business_id, biz.phone_number, smsText, 'Handymate').catch(() => {})
   }
 
   // Automation-event

@@ -43,22 +43,20 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     try {
       const biz = report.business as any
       if (biz?.phone_number) {
-        const ELKS_USER = process.env.ELKS_API_USER
-        const ELKS_PASS = process.env.ELKS_API_PASSWORD
-        if (ELKS_USER && ELKS_PASS) {
-          await fetch('https://api.46elks.com/a1/sms', {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Basic ' + Buffer.from(`${ELKS_USER}:${ELKS_PASS}`).toString('base64'),
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-              from: sanitizeSenderId(biz.business_name),
-              to: biz.phone_number,
-              message: `${signed_by || 'Kunden'} har signerat fältrapporten "${report.title}"!`,
-            }),
-          })
-        }
+        // Genom strypunkten (etapp 0 batch 4). Går till HANTVERKAREN — hans
+        // kund har just signerat — därför recipient:'internal'.
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const r = await sendSmsViaElks({
+          supabase,
+          businessId: report.business_id,
+          businessName: biz.business_name,
+          to: biz.phone_number,
+          message: `${signed_by || 'Kunden'} har signerat fältrapporten "${report.title}"!`,
+          relatedId: params.id,
+          messageType: 'field_report_signed',
+          recipient: 'internal',
+        })
+        if (!r.success) console.error('[field-reports] signeringsnotis misslyckades:', r.error)
       }
     } catch { /* non-blocking */ }
 
@@ -109,22 +107,19 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     try {
       const biz = report.business as any
       if (biz?.phone_number) {
-        const ELKS_USER = process.env.ELKS_API_USER
-        const ELKS_PASS = process.env.ELKS_API_PASSWORD
-        if (ELKS_USER && ELKS_PASS) {
-          await fetch('https://api.46elks.com/a1/sms', {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Basic ' + Buffer.from(`${ELKS_USER}:${ELKS_PASS}`).toString('base64'),
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-              from: sanitizeSenderId(biz.business_name),
-              to: biz.phone_number,
-              message: `${signed_by || 'Kunden'} har invändningar mot "${report.title}". ${customer_note ? 'Kommentar: ' + customer_note : ''}`,
-            }),
-          })
-        }
+        // Genom strypunkten (etapp 0 batch 4). Går till HANTVERKAREN.
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const r = await sendSmsViaElks({
+          supabase,
+          businessId: report.business_id,
+          businessName: biz.business_name,
+          to: biz.phone_number,
+          message: `${signed_by || 'Kunden'} har invändningar mot "${report.title}". ${customer_note ? 'Kommentar: ' + customer_note : ''}`,
+          relatedId: params.id,
+          messageType: 'field_report_rejected',
+          recipient: 'internal',
+        })
+        if (!r.success) console.error('[field-reports] invändningsnotis misslyckades:', r.error)
       }
     } catch { /* non-blocking */ }
   }

@@ -31,22 +31,20 @@ export async function POST(request: NextRequest) {
 
         const { to, message } = data
 
-        const response = await fetch('https://api.46elks.com/a1/sms', {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            from: 'Handymate',
-            to: to,
-            message: message,
-          }),
+        // Genom strypunkten (etapp 0 batch 4). Avsändaren var hårdkodad till
+        // 'Handymate' — kunden såg vår produkt i stället för sin hantverkare.
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const r = await sendSmsViaElks({
+          supabase,
+          businessId: authBusiness.business_id,
+          businessName: authBusiness.business_name,
+          to,
+          message,
+          messageType: 'action_sms',
         })
 
-        const result = await response.json()
-        if (!response.ok) throw new Error(result.message || 'Failed to send SMS')
-        return NextResponse.json({ success: true, smsId: result.id })
+        if (!r.success) throw new Error(r.error || 'Failed to send SMS')
+        return NextResponse.json({ success: true, smsId: r.elksId })
       }
 
       case 'initiate_call': {
@@ -407,18 +405,20 @@ case 'create_booking': {
     const message = `Hej${customer.name ? ' ' + customer.name.split(' ')[0] : ''}! Din tid hos ${businessConfig.business_name} är bokad: ${dateStr} kl ${timeStr}. Välkommen! Behöver du ändra tiden?\n${suffix}`
 
     try {
-      await fetch('https://api.46elks.com/a1/sms', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          from: sanitizeSenderId(businessConfig.business_name),
-          to: customer.phone_number,
-          message: message,
-        }),
+      // Genom strypunkten (etapp 0 batch 4). Bokningsbekräftelsen går till
+      // KUNDEN — opt-out gäller. Fortsätter ändå vid fel: bokningen är redan
+      // skapad och får inte rullas tillbaka av ett uteblivet SMS.
+      const { sendSmsViaElks } = await import('@/lib/sms-send')
+      const r = await sendSmsViaElks({
+        supabase,
+        businessId: authBusiness.business_id,
+        businessName: businessConfig.business_name,
+        to: customer.phone_number,
+        message,
+        customerId,
+        messageType: 'booking_confirmation',
       })
+      if (!r.success) console.error('[actions] bokningsbekräftelse misslyckades:', r.error)
     } catch (smsError) {
       console.error('Failed to send confirmation SMS:', smsError)
       // Fortsätt ändå - bokningen är skapad

@@ -162,7 +162,7 @@ export async function sendMorningReport(businessId: string): Promise<{
       to: config.personal_phone,
       message,
       messageType: 'morning_report',
-      recipient: 'owner',
+      recipient: 'internal',
     })
 
     if (!smsResult.success) {
