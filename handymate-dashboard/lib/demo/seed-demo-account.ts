@@ -112,6 +112,7 @@ export async function resetDemoAccount(
   // deal, quote_items → quotes) någonsin ger ett orphan-fel, oavsett om
   // CASCADE redan skulle städat undan dem.
   await supabase.from('pending_approvals').delete().eq('business_id', businessId)
+  await supabase.from('business_knowledge').delete().eq('business_id', businessId)
   await supabase.from('agent_runs').delete().eq('business_id', businessId)
   await supabase.from('pipeline_activity').delete().eq('business_id', businessId)
   await supabase.from('quote_items').delete().eq('business_id', businessId)
@@ -989,10 +990,126 @@ export async function resetDemoAccount(
       created_at: isoAt(0, 9, 35),
       expires_at: isoAt(7),
     },
+    // ═══ Storyläget (2026-08-08) — värdefynden som bär säljdemon ═══
+    //
+    // Momentlagret (lib/moments/derive.ts) härleder sina kort ur precis de
+    // här raderna, genom SAMMA väg som produktion. Payloadformerna kopierar
+    // producenterna EXAKT: missad_intakt speglar cron/missed-revenue
+    // (inkl. dedupe_key — annars dubblerar nästa nattsvep korten), och
+    // profitability_warning speglar lib/profitability.ts.
+    //
+    // Beloppen är valda för demons dramaturgi men KONSISTENTA med den
+    // seedade världen: ÄTA:n hör till annas aktiva badrumsprojekt,
+    // materialet till kristinas avslutade kranbyte.
+    {
+      id: genId('appr'),
+      business_id: businessId,
+      approval_type: 'missad_intakt',
+      routing_role: 'owner_admin',
+      title: 'Signerad ÄTA ej fakturerad — 8 900 kr',
+      description: 'Badrumsrenovering – Björkvägen 14 — Extra tätskikt vid dusch, signerad för 12 dagar sedan',
+      status: 'pending',
+      risk_level: 'low',
+      payload: {
+        routed_agent: 'karin',
+        kind: 'ata_ej_fakturerad',
+        project_id: annaProject.project_id,
+        project_name: 'Badrumsrenovering – Björkvägen 14',
+        amount_kr: 8900,
+        evidence: 'Extra tätskikt vid dusch — signerad ÄTA utan faktura',
+        dedupe_key: `ata:${genId('chg')}`,
+      },
+      created_at: isoAt(0, 6, 40),
+      expires_at: isoAt(14),
+    },
+    {
+      id: genId('appr'),
+      business_id: businessId,
+      approval_type: 'missad_intakt',
+      routing_role: 'owner_admin',
+      title: 'Ofakturerat material på avslutat projekt — 2 400 kr',
+      description: 'Byte av kökskran och packningar — projektet är klart men materialet är inte fakturerat',
+      status: 'pending',
+      risk_level: 'low',
+      payload: {
+        routed_agent: 'karin',
+        kind: 'material_ej_fakturerat',
+        project_id: kristinaProject.project_id,
+        project_name: 'Byte av kökskran och packningar',
+        amount_kr: 2400,
+        evidence: 'Blandare och packningar registrerade men aldrig fakturerade',
+        dedupe_key: `material:${kristinaProject.project_id}`,
+      },
+      created_at: isoAt(0, 6, 41),
+      expires_at: isoAt(14),
+    },
+    {
+      id: genId('appr'),
+      business_id: businessId,
+      approval_type: 'profitability_warning',
+      title: 'Badrumsrenoveringen är på väg att spräcka kalkylen',
+      description: 'Materialkostnaden ligger över kalkyl utan registrerad ÄTA — prognosen pekar på 9 250 kr överdrag.',
+      status: 'pending',
+      risk_level: 'medium',
+      payload: {
+        agent_id: 'karin',
+        project_id: annaProject.project_id,
+        project_name: 'Badrumsrenovering – Björkvägen 14',
+        cost_percent: 82,
+        margin_percent: 9,
+        projected_overrun: 9250,
+        status: 'at_risk',
+      },
+      created_at: isoAt(0, 6, 50),
+      expires_at: isoAt(7),
+    },
   ]
 
   const { error: approvalsErr } = await supabase.from('pending_approvals').insert(approvalSeeds)
   if (approvalsErr) return { error: `Kunde inte skapa godkännanden: ${approvalsErr.message}` }
+
+  // ══════════════════════════════════════════════════════════
+  // 8b. OBSERVATIONER (business_knowledge) — teamets "berättar"-röst.
+  //     Härleds till insikter i Matte-panelen och närvarobandet. Inga
+  //     belopp i strukturen (tabellen saknar värdekolumn) — summorna får
+  //     stå i texten, och momentlagret gör dem ALDRIG till kronor.
+  // ══════════════════════════════════════════════════════════
+  const { error: knowledgeErr } = await supabase.from('business_knowledge').insert([
+    {
+      business_id: businessId,
+      agent_id: 'daniel',
+      knowledge_type: 'insight',
+      title: 'Två offerter har inte följts upp',
+      observation: `Offerten till Mikael Svensson har stått obesvarad i över fem dagar. Historiskt vinner ni ungefär var fjärde sådan efter en påminnelse.`,
+      suggestion: null,
+      confidence: 0.8,
+      status: 'active',
+      created_at: isoAt(0, 6, 15),
+    },
+    {
+      business_id: businessId,
+      agent_id: 'lisa',
+      knowledge_type: 'insight',
+      title: 'Tre samtal fångade i natt',
+      observation: 'Jag svarade på tre samtal utanför arbetstid — ett gällde en ny förfrågan om takläckage som ligger som lead.',
+      suggestion: null,
+      confidence: 0.9,
+      status: 'active',
+      created_at: isoAt(0, 5, 55),
+    },
+    {
+      business_id: businessId,
+      agent_id: 'lars',
+      knowledge_type: 'anomaly',
+      title: 'Materialuttag utan ÄTA på Björkvägen',
+      observation: 'Materialkostnaden på badrumsrenoveringen ligger över kalkyl, men ingen ÄTA är registrerad för tillägget.',
+      suggestion: 'Kolla om extraarbetet borde bli en ÄTA innan fakturan går.',
+      confidence: 0.75,
+      status: 'active',
+      created_at: isoAt(0, 6, 5),
+    },
+  ])
+  if (knowledgeErr) return { error: `Kunde inte skapa observationer: ${knowledgeErr.message}` }
 
   // ══════════════════════════════════════════════════════════
   // 9. AGENT_RUNS — några enkla rader "igår kväll" så bevisbandet har siffror.

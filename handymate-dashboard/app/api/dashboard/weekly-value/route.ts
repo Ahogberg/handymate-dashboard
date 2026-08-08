@@ -15,7 +15,13 @@ export async function GET(request: NextRequest) {
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supabase = getServerSupabase()
-  const value = await getWeeklyValue(supabase, business.business_id)
+
+  // ?days=30 för månadsräknaren (2026-08-08). Klampas hårt: fönstret styr
+  // fyra frågor och attributionen — ett fritt värde vore en DoS-ratt.
+  const daysRaw = parseInt(request.nextUrl.searchParams.get('days') || '7', 10)
+  const days = [7, 30].includes(daysRaw) ? daysRaw : 7
+
+  const value = await getWeeklyValue(supabase, business.business_id, days)
 
   return NextResponse.json(value)
 }

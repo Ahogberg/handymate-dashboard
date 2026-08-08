@@ -85,14 +85,33 @@ export function needsAttention(approval: ApprovalLike): boolean {
  * "Godkänn" i största allmänhet säger inte vad som händer. "Skicka
  * påminnelsen" gör det — och den som trycker ska veta vad han sätter igång.
  */
-export function approveLabel(approvalType: string): string {
+/**
+ * Utfallsspråk (2026-08-08): när kortet bär ett VERKLIGT belopp står det på
+ * knappen — "Skicka påminnelsen om 24 300 kr" säger varför man ska trycka,
+ * "Godkänn" säger ingenting. Beloppet läses ur strukturerade payloadfält
+ * (samma regel som momentlagret); finns inget står verbet utan siffra.
+ * Aldrig en påhittad summa på en knapp som utför något.
+ */
+export function approveLabel(approvalType: string, payload?: Record<string, unknown> | null): string {
+  const p = payload ?? {}
+  const kr = (v: unknown): string | null =>
+    typeof v === 'number' && Number.isFinite(v) && v > 0
+      ? `${Math.round(v).toLocaleString('sv-SE')} kr`
+      : null
+
   if (approvalType === 'invoice_reminder') return 'Skicka påminnelsen'
   // create_quote_draft SKAPAR offerten som utkast — den skickas inte.
   // Exekveraren POST:ar till /api/quotes och returnerar ett quote_id; något
   // utskick sker aldrig (approvals/[id]/route.ts, case 'create_quote_draft').
   // "Godkänn & skicka" hade alltså varit en osanning på själva knappen.
-  if (approvalType === 'create_quote_draft') return 'Skapa offerten'
-  if (approvalType === 'create_ata_draft') return 'Skapa ÄTA:n'
+  if (approvalType === 'create_quote_draft') {
+    const varde = kr(p.estimated_value)
+    return varde ? `Skapa offerten — ${varde}` : 'Skapa offerten'
+  }
+  if (approvalType === 'create_ata_draft') {
+    const varde = kr(p.amount_estimate)
+    return varde ? `Skapa ÄTA:n — ${varde}` : 'Skapa ÄTA:n'
+  }
   if (approvalType === 'send_quote') return 'Godkänn & skicka'
   if (approvalType === 'send_sms') return 'Skicka'
   if (approvalType === 'autonomy_offer') return 'Ja, kör automatiskt'

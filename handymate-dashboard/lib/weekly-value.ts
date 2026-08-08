@@ -54,8 +54,18 @@ export interface WeeklyValue {
   autonomous_count: number
 }
 
-export async function getWeeklyValue(supabase: SupabaseClient, businessId: string): Promise<WeeklyValue> {
-  const sinceIso = new Date(Date.now() - ROLLING_DAYS * 24 * 3600_000).toISOString()
+/**
+ * `rangeDays` (2026-08-08): den globala värderäknaren visar "denna månad"
+ * och behövde 30 dagar. Beräkningen är identisk — samma tre ärlighetsnivåer,
+ * samma attributionsfönster — bara fönstret parameteriseras. Default 7 så
+ * dag-7-mailet och veckovyn står orörda.
+ */
+export async function getWeeklyValue(
+  supabase: SupabaseClient,
+  businessId: string,
+  rangeDays: number = ROLLING_DAYS,
+): Promise<WeeklyValue> {
+  const sinceIso = new Date(Date.now() - rangeDays * 24 * 3600_000).toISOString()
 
   const [runsRes, logsRes, leadsRes, autonomousRes] = await Promise.all([
     supabase
@@ -112,13 +122,13 @@ export async function getWeeklyValue(supabase: SupabaseClient, businessId: strin
   // Händelser (accepterad offert / betald faktura) senaste 7 dagarna,
   // attribuerade till godkända outbound-kort. Bokningsattributioner (0 kr)
   // hålls utanför radlistan — de är händelser, inte kronor.
-  const recovered = await getRecoveredRevenue(supabase, businessId, { sinceDays: ROLLING_DAYS })
+  const recovered = await getRecoveredRevenue(supabase, businessId, { sinceDays: rangeDays })
   const confirmedItems: Array<{ label: string; amount: number }> = recovered.attributions
     .filter((a) => a.amount_kr > 0)
     .map((a) => ({ label: a.label, amount: Math.round(a.amount_kr) }))
 
   return {
-    range_days: ROLLING_DAYS,
+    range_days: rangeDays,
     confirmed_kr: recovered.total_recovered_kr,
     confirmed_items: confirmedItems,
     captured_count: capturedCount,

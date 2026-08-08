@@ -15,6 +15,7 @@ import PWAInstallBanner from '@/components/PWAInstallBanner'
 import BillingStatusBanner from '@/components/BillingStatusBanner'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { ToastProvider } from '@/components/Toast'
+import { MomentsProvider } from '@/components/moments/MomentsProvider'
 import { useAuth } from '@/lib/useAuth'
 import { checkSubscriptionStatus } from '@/lib/auth'
 import { useSessionKeepalive } from '@/lib/hooks/useSessionKeepalive'
@@ -83,18 +84,23 @@ export default function DashboardLayout({
         <JobbuddyProvider>
           <ErrorBoundary>
             <ToastProvider>
-              <div className="flex min-h-screen bg-[#F8FAFC]">
-                <Sidebar businessName={business.business_name} businessId={business.business_id} onLogout={logout} />
-                <main className="flex-1 md:ml-64">
-                  <ImpersonationBanner />
-                  <BillingStatusBanner />
-                  {children}
-                </main>
-                <Jobbkompisen />
-                <WelcomeModal />
-                <FeedbackWidget />
-                <PWAInstallBanner />
-              </div>
+              {/* MomentsProvider ovanför Jobbkompisen: bubblan konsumerar
+                  useMoments() för badge och beloppsläge. Providern renderar
+                  själv det enda globala fynd-kortet (z-100, under Toast). */}
+              <MomentsProvider>
+                <div className="flex min-h-screen bg-[#F8FAFC]">
+                  <Sidebar businessName={business.business_name} businessId={business.business_id} onLogout={logout} />
+                  <main className="flex-1 md:ml-64">
+                    <ImpersonationBanner />
+                    <BillingStatusBanner />
+                    {children}
+                  </main>
+                  <Jobbkompisen />
+                  <WelcomeModal />
+                  <FeedbackWidget />
+                  <PWAInstallBanner />
+                </div>
+              </MomentsProvider>
             </ToastProvider>
           </ErrorBoundary>
         </JobbuddyProvider>

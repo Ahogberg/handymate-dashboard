@@ -20,9 +20,15 @@ import {
   Zap,
   Package,
 } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
 import { useJobbuddy } from '@/lib/JobbuddyContext'
 import { useBusiness } from '@/lib/BusinessContext'
 import { getAgentById } from '@/lib/agents/team'
+import { useMoments } from '@/components/moments/MomentsProvider'
+import { pageContextFromPathname } from '@/lib/matte/page-context'
+import { formatKr } from '@/lib/moments/derive'
+import { AgentAvatar } from '@/components/agents/AgentAvatar'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -74,6 +80,16 @@ type Tab = 'chat' | 'voice' | 'photo'
 export default function Jobbkompisen() {
   const { activeTimer, isOpen, setIsOpen, activeTab, setActiveTab, suggestions, clearSuggestion } = useJobbuddy()
   const business = useBusiness()
+
+  // ═══ Matte 2.0 (2026-08-08) ═══
+  //
+  // Bubblan är inte längre bara en dörr till chatten — den bär teamets
+  // fynd. useMoments ger badge-listan och osedd-summan; pathname ger
+  // sidkontexten så chatten vet var hantverkaren står (API:et har läst
+  // context.customerId/projectId hela tiden — ingen skickade in dem).
+  const { badge: momentBadge, panel: momentPanel, unseenKr, markSeen } = useMoments()
+  const pathname = usePathname()
+  const pageContext = pageContextFromPathname(pathname)
 
   // Chat state — riktiga Matte (/api/matte/chat), se Fas 0-spec i tasks/ui-ux-audit.md
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -148,6 +164,14 @@ export default function Jobbkompisen() {
             threadId,
             userName: business.contact_name,
             businessName: business.business_name,
+            // Sidkontexten: API:et läser customerId/projectId sedan länge —
+            // det här är första gången någon faktiskt skickar dem.
+            pathname,
+            page: pageContext.page,
+            customerId: pageContext.customerId,
+            projectId: pageContext.projectId,
+            quoteId: pageContext.quoteId,
+            invoiceId: pageContext.invoiceId,
           },
           require_confirm_external: true,
         }),
@@ -437,38 +461,52 @@ export default function Jobbkompisen() {
   // ── Render: Closed bubble ───────────────────────────────────────────────────
 
   if (!isOpen) {
-    const hasSuggestions = suggestions.length > 0
+    const antalFynd = suggestions.length + momentBadge.length
     const hasActiveJob = !!activeTimer
     const matte = getAgentById('matte')
+    // Beloppsläget: när osedda fynd summerar till riktiga pengar bär bubblan
+    // summan i stället för en anonym siffra. Tröskeln matchar interruption-
+    // motorns globala golv — under den är beloppet inte skäl nog att skrika.
+    const visaBelopp = !hasActiveJob && unseenKr >= 10_000
 
     return (
-      <button
-        onClick={() => setIsOpen(true)}
-        aria-label="Öppna Matte"
-        className={`fixed bottom-6 right-6 w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center hover:scale-105 transition-all z-50 overflow-hidden ${
-          hasActiveJob
-            ? 'bg-gradient-to-br from-emerald-500 to-primary-600 shadow-emerald-500/20 ring-2 ring-emerald-300'
-            : 'bg-white shadow-primary-600/10 ring-1 ring-primary-200'
-        }`}
-      >
-        {hasActiveJob ? (
-          <Mic className="w-6 h-6 text-white animate-pulse" />
-        ) : matte?.avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={matte.avatar}
-            alt="Matte"
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <Sparkles className="w-6 h-6 text-primary-700" />
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-1.5">
+        {visaBelopp && (
+          <button
+            onClick={() => setIsOpen(true)}
+            className="px-3 h-8 rounded-full bg-primary-700 text-white text-xs font-bold shadow-lg shadow-primary-700/20 whitespace-nowrap"
+          >
+            {formatKr(unseenKr)} hittat
+          </button>
         )}
-        {hasSuggestions && (
-          <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 flex items-center justify-center text-[10px] font-bold bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full">
-            {suggestions.length}
-          </span>
-        )}
-      </button>
+        <button
+          onClick={() => setIsOpen(true)}
+          aria-label="Öppna Matte"
+          className={`w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center hover:scale-105 transition-all overflow-hidden relative ${
+            hasActiveJob
+              ? 'bg-gradient-to-br from-emerald-500 to-primary-600 shadow-emerald-500/20 ring-2 ring-emerald-300'
+              : 'bg-white shadow-primary-600/10 ring-1 ring-primary-200'
+          }`}
+        >
+          {hasActiveJob ? (
+            <Mic className="w-6 h-6 text-white animate-pulse" />
+          ) : matte?.avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={matte.avatar}
+              alt="Matte"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <Sparkles className="w-6 h-6 text-primary-700" />
+          )}
+          {antalFynd > 0 && !visaBelopp && (
+            <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 flex items-center justify-center text-[10px] font-bold bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full">
+              {antalFynd}
+            </span>
+          )}
+        </button>
+      </div>
     )
   }
 
@@ -492,6 +530,11 @@ export default function Jobbkompisen() {
           <X className="w-5 h-5 text-gray-900" />
         </button>
       </div>
+
+      {/* Värdebandet — vad Handymate hittat senaste månaden, i de tre
+          ärlighetsnivåerna. Renderas bara när något finns att visa: ett
+          band med nollor hade sagt "vi hittade inget" med stora siffror. */}
+      <MatteValueStrip />
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200 flex-shrink-0">
@@ -622,13 +665,48 @@ function ChatTab({
   onPhotoClick: () => void
   photoAnalyzing: boolean
 }) {
+  // Matte som chef över teamet: innan konversationen börjat visas dagens
+  // fynd — med agentens ansikte, inte som systemnotiser. ChatTab ligger
+  // under MomentsProvider och hämtar dem själv i stället för prop-trädning.
+  const { panel: dagensFynd, markSeen } = useMoments()
+  const chatPathname = usePathname()
+  const quickActions = pageContextFromPathname(chatPathname).quickActions
+
   // Tomt läge: bara hälsningen finns kvar — visa exempel-kommandon som chips
   // (fyller inputen, skickar inte automatiskt) så riktiga Matte blir upptäckbar.
   const showExamples = messages.length <= 1 && suggestions.length === 0
+  const visaFynd = messages.length <= 1 && dagensFynd.length > 0
   return (
     <>
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* Dagens fynd — teamets upptäckter, orkestrerade av Matte */}
+        {visaFynd && !pendingConfirmation && (
+          <div className="space-y-2 mb-3">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              Teamet har hittat
+            </p>
+            {dagensFynd.slice(0, 3).map(m => (
+              <Link
+                key={m.id}
+                href={m.action.href}
+                onClick={() => markSeen(m.id)}
+                className="flex items-start gap-2.5 p-2.5 bg-white border border-slate-200 rounded-xl hover:border-primary-300 transition-colors"
+              >
+                <AgentAvatar agentKey={m.agentId} size="sm" />
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-medium text-gray-900 leading-snug">
+                    {m.headline}
+                  </span>
+                  <span className="block text-xs text-primary-700 font-semibold mt-0.5">
+                    {m.action.label} →
+                  </span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+
         {/* Smart suggestions */}
         {suggestions.length > 0 && (
           <div className="space-y-2 mb-3">
@@ -742,6 +820,26 @@ function ChatTab({
               >
                 Avbryt
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Kontextchips — Matte vet vilken sida hantverkaren står på och
+            föreslår frågor som är relevanta HÄR. Fyller inputen, skickar
+            aldrig automatiskt. */}
+        {quickActions.length > 0 && !pendingConfirmation && messages.length <= 1 && (
+          <div className="pt-1 space-y-2">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Om den här sidan</p>
+            <div className="flex flex-wrap gap-1.5">
+              {quickActions.map(fraga => (
+                <button
+                  key={fraga}
+                  onClick={() => onInputChange(fraga)}
+                  className="px-2.5 py-1.5 bg-primary-50 border border-primary-200 rounded-full text-xs text-primary-800 hover:border-primary-400 transition-colors text-left"
+                >
+                  {fraga}
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -1004,3 +1102,49 @@ function VoiceTab({
   )
 }
 
+
+/**
+ * Värdebandet i Mattes panel — "vad har det här gett mig?"
+ *
+ * Tre nivåer, aldrig ihopblandade (samma epistemik som lib/weekly-value):
+ * bekräftade kronor leder, potential och tid är tydligt märkta som sådana.
+ * Siffrorna kommer från attributionskärnan — här hittas ingenting på, och
+ * därför renderas bandet inte alls innan det finns något att visa.
+ */
+function MatteValueStrip() {
+  const [varde, setVarde] = useState<{ confirmed_kr: number; captured_kr: number; time_hours: number } | null>(null)
+
+  useEffect(() => {
+    let aktiv = true
+    fetch('/api/dashboard/weekly-value?days=30')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (aktiv && d) setVarde(d) })
+      .catch(() => { /* bandet är grädde, aldrig mjölk */ })
+    return () => { aktiv = false }
+  }, [])
+
+  if (!varde) return null
+  const harNagot = varde.confirmed_kr > 0 || varde.captured_kr > 0 || varde.time_hours > 0
+  if (!harNagot) return null
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-2 bg-primary-50/60 border-b border-primary-100 text-[11px] leading-tight flex-shrink-0 overflow-x-auto">
+      <span className="font-semibold text-primary-900 whitespace-nowrap">Senaste 30 dagarna</span>
+      {varde.confirmed_kr > 0 && (
+        <span className="whitespace-nowrap text-primary-800">
+          <b className="font-bold">{formatKr(varde.confirmed_kr)}</b> bekräftat
+        </span>
+      )}
+      {varde.captured_kr > 0 && (
+        <span className="whitespace-nowrap text-primary-700/80">
+          {formatKr(varde.captured_kr)} potential
+        </span>
+      )}
+      {varde.time_hours > 0 && (
+        <span className="whitespace-nowrap text-primary-700/80">
+          ≈ {varde.time_hours} h sparade
+        </span>
+      )}
+    </div>
+  )
+}

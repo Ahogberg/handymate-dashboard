@@ -754,7 +754,7 @@ function ApprovalCard({
       context={cardContext(approval.payload)}
       description={approval.description}
       attention={needsAttention(approval)}
-      approveLabel={approveLabel(approval.approval_type)}
+      approveLabel={approveLabel(approval.approval_type, approval.payload)}
       editable={isEditable(approval)}
       onAction={onAction}
       deepLink={deepLinkFor(approval) || undefined}
