@@ -123,3 +123,34 @@ i dag bara en allmän fråga.
   WON_QUOTE_STATUSES.
 - **E2E-sviten** (127 tester) kräver inloggad session, kan inte köras
   med `--no-deps`.
+
+---
+
+# Pågående — Roadmap + X1 Revenue Recovery (2026-08-08)
+
+- [x] Uppdatera `docs/council/ACTIVE_ROADMAP.md` till faktiskt nuläge.
+- [x] Dokumentera kvarvarande gyllene-vägen- och cross-tenant-grind.
+- [x] Kartlägg projekt-, ÄTA-, material- och fakturafält för X1.
+- [x] Ersätt dagens "entydiga" fynd med explicit konservativ klassning.
+- [x] Begränsa framtida utkastskandidat till avslutad signerad ÄTA efter review.
+- [x] Gör avfärdandededupe och cronfel synliga.
+- [x] Lägg browserlösa facit för fastpris, löpande, blandat, manuell faktura och omkörning.
+- [x] Kör TypeScript, browserlös helsvit och Next-build.
+- [x] Granska slutdiff och skapa separat X1-commit.
+
+## Review
+
+- Roadmapen uppdaterades i separat commit `4e88194d` med faktiskt nuläge,
+  kvarvarande gyllene-vägen-grind och separat produktions-tenanttest.
+- Missad-intäkt-svepet klassar nu fynd som `LIKELY_UNBILLED` eller
+  `NEEDS_REVIEW`; ingen nuvarande regel får påstå `CONFIRMED_UNBILLED`.
+- Pågående/avgående ÄTA, fastprismaterial och källrader med fakturakoppling
+  räknas inte som säker potential. Gamla felaktiga pendingkort avförs som
+  `expired`; giltiga legacykort klassas om på plats.
+- Cronfel och insert/update-fel blir synliga som HTTP 500, och alla
+  omskrivningar är tenant- och statusfiltrerade.
+- Verifierat: `npx tsc --noEmit`, riktat facit 128/128, hela browserlösa
+  kontraktssviten i bokstavsgrupper samt `npx next build` (410 sidor) gröna.
+- Ingen migration skapades eller kördes. Ett live-schema-anrop kunde inte
+  göras lokalt eftersom Supabase-URL/nycklar saknas i tillgänglig `.env.test`;
+  SQL-baserade kolumnkontraktet är grönt och inga databasvärden skrevs.

@@ -4,7 +4,11 @@ import { getServerSupabase } from '@/lib/supabase'
 import {
   sweepMissedRevenue,
   findingTitle,
+  MISSED_REVENUE_CLASSIFICATION_VERSION,
+  legacyPendingCardsToExpire,
+  partitionPriorRevenueCards,
   type MissedRevenueFinding,
+  type PriorRevenueCard,
 } from '@/lib/value/missed-revenue'
 
 /**
@@ -41,6 +45,8 @@ export async function GET(request: NextRequest) {
   const supabase = getServerSupabase()
   const now = new Date()
   let created = 0
+  let updated = 0
+  let expired = 0
   let scanned = 0
   const errors: string[] = []
 
@@ -79,7 +85,7 @@ export async function GET(request: NextRequest) {
             //
             // Aliaset gör att den rena funktionen (som tar `AtaRow.id`) och
             // dess 228 facit står orörda.
-            .select('id:change_id, project_id, description, amount, signed_at, invoiced_at')
+            .select('id:change_id, project_id, change_type, description, amount, signed_at, invoice_id, invoiced_at')
             .eq('business_id', businessId)
             .not('signed_at', 'is', null)
             .is('invoiced_at', null),
@@ -87,47 +93,59 @@ export async function GET(request: NextRequest) {
             // Samma sak här: PK heter `material_id` (sql/supplier_connections.sql:84).
             // Att bara laga ÄTA-frågan ovan hade inte hjälpt — Promise.all
             // läser båda, och EN 42703 fäller hela företagets svep.
-            .select('id:material_id, project_id, total_sell, invoiced')
+            .select('id:material_id, project_id, total_sell, invoiced, invoice_id')
             .eq('business_id', businessId)
             .eq('invoiced', false),
           supabase.from('project')
-            .select('project_id, name, status, completed_at')
+            .select('project_id, name, project_type, status, completed_at')
             .eq('business_id', businessId)
             .eq('status', 'completed'),
           supabase.from('invoice')
             .select('project_id')
             .eq('business_id', businessId)
             .not('project_id', 'is', null),
-          // Redan öppna kort — dedupenycklarna ligger i payloaden.
+          // Alla tidigare kort — ett avfärdat fynd ska inte återuppstå varje
+          // natt. Källraden måste ändras eller få en ny semantisk nyckel.
           supabase.from('pending_approvals')
-            .select('payload')
+            .select('id, payload, status')
             .eq('business_id', businessId)
-            .eq('approval_type', 'missad_intakt')
-            .eq('status', 'pending'),
+            .eq('approval_type', 'missad_intakt'),
         ])
 
         for (const [namn, res] of Object.entries({ atas: atasRes, material: matsRes, projekt: projRes, fakturor: invRes, öppna: openRes })) {
           if (res.error) throw new Error(`${namn}: ${res.error.message}`)
         }
 
-        const alreadyOpen = new Set(
-          (openRes.data || [])
-            .map((r: any) => r?.payload?.dedupe_key)
-            .filter((k: unknown): k is string => typeof k === 'string'),
+        const { alreadyReported, legacyPendingByDedupe } = partitionPriorRevenueCards(
+          (openRes.data || []) as PriorRevenueCard[],
         )
 
-        const findings = sweepMissedRevenue({
+        const allFindings = sweepMissedRevenue({
           atas: (atasRes.data || []) as any,
           materials: (matsRes.data || []) as any,
           projects: (projRes.data || []) as any,
           invoices: (invRes.data || []) as any,
-          alreadyOpen,
+          alreadyReported,
           now,
-        }).slice(0, MAX_CARDS_PER_BUSINESS)
+        })
+
+        // Legacykort som inte längre klarar de konservativa reglerna får inte
+        // ligga kvar och påstå att pengar saknas. Utgå från HELA fyndlistan,
+        // inte nattens femkortstak, så ett giltigt men lägre prioriterat kort
+        // aldrig avförs av misstag.
+        const currentFindingKeys = new Set(allFindings.map(f => f.dedupeKey))
+        for (const id of legacyPendingCardsToExpire(legacyPendingByDedupe, currentFindingKeys)) {
+          await expireLegacyCard(supabase, businessId, id)
+          expired++
+        }
+
+        const findings = allFindings.slice(0, MAX_CARDS_PER_BUSINESS)
 
         for (const f of findings) {
-          const ok = await createCard(supabase, businessId, f)
-          if (ok) created++
+          const existingId = legacyPendingByDedupe.get(f.dedupeKey)
+          await persistCard(supabase, businessId, f, existingId)
+          if (existingId) updated++
+          else created++
         }
       } catch (err: any) {
         // Ett företags fel får inte fälla svepet för alla andra.
@@ -136,22 +154,52 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, scanned, created, errors: errors.slice(0, 10) })
+    if (errors.length > 0) {
+      return NextResponse.json(
+        { success: false, partial: created + updated + expired > 0, scanned, created, updated, expired, errors: errors.slice(0, 10) },
+        { status: 500 },
+      )
+    }
+    return NextResponse.json({ success: true, scanned, created, updated, expired, errors: [] })
   } catch (err: any) {
     console.error('[cron/missed-revenue] svepet failade:', err)
     return NextResponse.json({ error: err?.message || 'Svepet failade' }, { status: 500 })
   }
 }
 
-async function createCard(
+async function expireLegacyCard(
+  supabase: ReturnType<typeof getServerSupabase>,
+  businessId: string,
+  id: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('pending_approvals')
+    .update({
+      status: 'expired',
+      title: 'Tidigare intäktsfynd behöver inte längre granskas',
+      description: 'Underlaget uppfyller inte längre kraven för ett intäktsfynd.',
+    })
+    .eq('id', id)
+    .eq('business_id', businessId)
+    .eq('approval_type', 'missad_intakt')
+    .eq('status', 'pending')
+    .select('id')
+    .maybeSingle()
+
+  if (error || !data) {
+    const message = error?.message || 'kortet hittades inte längre'
+    console.error('[cron/missed-revenue] kunde inte avföra legacykort:', message, { businessId, id })
+    throw new Error(`legacykort ${id}: ${message}`)
+  }
+}
+
+async function persistCard(
   supabase: ReturnType<typeof getServerSupabase>,
   businessId: string,
   f: MissedRevenueFinding,
-): Promise<boolean> {
-  const id = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-  const { error } = await supabase.from('pending_approvals').insert({
-    id,
-    business_id: businessId,
+  existingId?: string,
+): Promise<void> {
+  const fields = {
     approval_type: 'missad_intakt',
     // Ekonomi hör till den som får se den — samma resonemang som
     // behörighetskontraktet (see_financials).
@@ -168,15 +216,43 @@ async function createCard(
       project_id: f.projectId,
       project_name: f.projectName,
       amount_kr: f.amountKr,
+      source_amount_kr: f.sourceAmountKr,
+      confidence: f.confidence,
+      recommended_action: f.action,
+      source_ids: f.sourceIds,
+      classification_version: MISSED_REVENUE_CLASSIFICATION_VERSION,
       evidence: f.evidence,
       // Läses av nästa nattkörning för att inte skapa samma kort igen.
       dedupe_key: f.dedupeKey,
     },
+  }
+
+  if (existingId) {
+    const { data, error } = await supabase
+      .from('pending_approvals')
+      .update(fields)
+      .eq('id', existingId)
+      .eq('business_id', businessId)
+      .eq('status', 'pending')
+      .select('id')
+      .maybeSingle()
+    if (error || !data) {
+      const message = error?.message || 'kortet hittades inte längre'
+      console.error('[cron/missed-revenue] kunde inte klassa om kort:', message, { businessId, dedupeKey: f.dedupeKey })
+      throw new Error(`kort ${f.dedupeKey}: ${message}`)
+    }
+    return
+  }
+
+  const id = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+  const { error } = await supabase.from('pending_approvals').insert({
+    id,
+    business_id: businessId,
+    ...fields,
   })
 
   if (error) {
     console.error('[cron/missed-revenue] kunde inte skapa kort:', error.message, { businessId, dedupeKey: f.dedupeKey })
-    return false
+    throw new Error(`kort ${f.dedupeKey}: ${error.message}`)
   }
-  return true
 }

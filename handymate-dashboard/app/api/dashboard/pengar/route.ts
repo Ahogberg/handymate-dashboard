@@ -48,18 +48,18 @@ export async function GET(request: NextRequest) {
       // (PK heter change_id/material_id; utan alias 42703:ar hela frågan).
       supabase
         .from('project_change')
-        .select('id:change_id, project_id, description, amount, signed_at, invoiced_at')
+        .select('id:change_id, project_id, change_type, description, amount, signed_at, invoice_id, invoiced_at')
         .eq('business_id', businessId)
         .not('signed_at', 'is', null)
         .is('invoiced_at', null),
       supabase
         .from('project_material')
-        .select('id:material_id, project_id, total_sell, invoiced')
+        .select('id:material_id, project_id, total_sell, invoiced, invoice_id')
         .eq('business_id', businessId)
         .eq('invoiced', false),
       supabase
         .from('project')
-        .select('project_id, name, status, completed_at')
+        .select('project_id, name, project_type, status, completed_at')
         .eq('business_id', businessId)
         .eq('status', 'completed'),
       supabase
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
       invoices: (invRes.data ?? []) as any,
       // Tom dedupe med flit: sidan svarar på "vad ligger på bordet TOTALT",
       // inte "vad har ännu inte blivit ett kort".
-      alreadyOpen: new Set(),
+      alreadyReported: new Set(),
       now: nu,
     })
 

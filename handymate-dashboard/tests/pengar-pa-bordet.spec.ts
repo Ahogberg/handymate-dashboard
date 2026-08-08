@@ -16,8 +16,23 @@ import { test, expect } from '@playwright/test'
 import { buildPengarSummary, invoiceAmount } from '../lib/value/pengar-pa-bordet'
 import type { MissedRevenueFinding } from '../lib/value/missed-revenue'
 
-function fynd(kind: MissedRevenueFinding['kind'], amountKr: number): MissedRevenueFinding {
-  return { kind, projectId: 'p1', projectName: 'Projekt', amountKr, evidence: 'e', dedupeKey: `${kind}:x` }
+function fynd(
+  kind: MissedRevenueFinding['kind'],
+  amountKr: number,
+  confidence: MissedRevenueFinding['confidence'] = amountKr > 0 ? 'LIKELY_UNBILLED' : 'NEEDS_REVIEW',
+): MissedRevenueFinding {
+  return {
+    kind,
+    projectId: 'p1',
+    projectName: 'Projekt',
+    amountKr,
+    sourceAmountKr: amountKr,
+    confidence,
+    action: 'REVIEW_ONLY',
+    sourceIds: ['source'],
+    evidence: 'e',
+    dedupeKey: `${kind}:x`,
+  }
 }
 
 const TOMT = { staleQuotes: [], missedRevenue: [], overdueInvoices: [], marginOverruns: [], ataEstimates: [] }
@@ -39,6 +54,16 @@ test.describe('summan hittas aldrig på', () => {
     expect(kat.antal).toBe(1)
     expect(kat.antalUtanBelopp).toBe(1)
     expect(s.totalKr).toBe(8900)
+  })
+
+  test('NEEDS_REVIEW kan bära ett källbelopp men bidrar aldrig till potentialen', () => {
+    const review = { ...fynd('material_ej_fakturerat', 0, 'NEEDS_REVIEW'), sourceAmountKr: 45_000 }
+    const s = buildPengarSummary({ ...TOMT, missedRevenue: [review] })
+    const kat = s.kategorier.find(k => k.key === 'ofakturerat')!
+    expect(kat.summaKr).toBe(0)
+    expect(kat.antalUtanBelopp).toBe(1)
+    expect(s.totalKr).toBe(0)
+    expect(kat.titel).toBe('Fakturaunderlag att granska')
   })
 
   test('ROT-faktura bidrar med det kunden betalar, inte totalen', () => {

@@ -10,8 +10,8 @@
  *
  *   1. Offerter att följa upp   — öppna offerter äldre än uppföljnings-
  *                                 cadencen (samma regel som cron/quote-follow-up)
- *   2. Klart att fakturera      — missed-revenue-svepets fynd (signerade
- *                                 ÄTA + ofakturerat material)
+ *   2. Fakturaunderlag att granska — missed-revenue-svepets konservativt
+ *                                    klassade signaler
  *   3. Förfallna kundfordringar — fakturor förbi förfallodatum
  *   4. Marginalrisk             — profitability_warnings prognostiserade överdrag
  *   5. Möjliga ÄTA              — föreslagna ÄTA-utkast med belopp
@@ -84,15 +84,15 @@ export function buildPengarSummary(input: {
     })
   }
 
-  // 2. Klart att fakturera — svepets fynd. Projekt utan faktura (amountKr 0)
-  //    räknas i antalUtanBelopp; deras okända värde blir aldrig en siffra.
+  // 2. Fakturaunderlag att granska. Bara LIKELY/CONFIRMED får bära amountKr;
+  //    NEEDS_REVIEW är antal utan belopp och påverkar aldrig totalsumman.
   const medBelopp = input.missedRevenue.filter(f => f.amountKr > 0)
   const utanBelopp = input.missedRevenue.filter(f => f.amountKr === 0)
   if (input.missedRevenue.length > 0) {
     kategorier.push({
       key: 'ofakturerat',
-      titel: 'Färdigt arbete som kan faktureras',
-      beskrivning: 'Signerade ÄTA och material på avslutade projekt utan faktura.',
+      titel: 'Fakturaunderlag att granska',
+      beskrivning: 'Källrader som kan sakna fakturakoppling — kontrollera innan ett utkast skapas.',
       summaKr: Math.round(medBelopp.reduce((s, f) => s + f.amountKr, 0)),
       antal: medBelopp.length,
       ...(utanBelopp.length > 0 ? { antalUtanBelopp: utanBelopp.length } : {}),

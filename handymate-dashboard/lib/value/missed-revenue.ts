@@ -10,17 +10,18 @@
  *
  * Därför hittar det här mer ju senare det körs första gången, inte mindre.
  *
- * ═══ TRE REGLER, VALDA FÖR ATT DE ÄR ENTYDIGA ═══
+ * ═══ TRE SIGNALER, MED OLIKA BEVISSTYRKA ═══
  *
- * 1. **Godkänd ÄTA utan faktura** — `signed_at` satt, `invoiced_at` tom.
- *    Kunden har skrivit under på tilläggsarbetet. Pengarna är förtjänade.
- * 2. **Material ej fakturerat** — `invoiced = false` på ett avslutat projekt.
- * 3. **Avslutat projekt utan faktura** — i efterhand, till skillnad från
- *    triggern.
+ * 1. **Godkänd ÄTA utan källkoppling** — kunden har godkänt priset, men
+ *    signaturen bevisar inte ensam att arbetet utförts.
+ * 2. **Material markerat ofakturerat** — relevant på löpande/blandat projekt,
+ *    men kan ingå i fastpris eller i en manuellt skapad faktura.
+ * 3. **Avslutat projekt utan kopplad faktura** — en signal, aldrig bevis för
+ *    ett visst belopp.
  *
- * Alla tre bygger på ett fält som SÄGER att något inte hänt. Ingen av dem
- * gissar. Det är avsiktligt: ett svep som producerar tveksamma kort blir ett
- * svep hantverkaren slutar öppna.
+ * Ingen nuvarande regel når `CONFIRMED_UNBILLED`: historiska och manuella
+ * fakturor saknar tillräcklig källradslänkning. Kontraktet är avsiktligt
+ * konservativt tills X1b har en verifierad source→invoice-kedja.
  *
  * ═══ VÄRDET ÄR DIREKT, INTE ATTRIBUERAT ═══
  *
@@ -45,15 +46,62 @@ export const MIN_AMOUNT_KR = 500
  * hantverkaren med fakturan just nu. Att larma då är att lägga sig i.
  */
 export const GRACE_DAYS = 3
+export const MISSED_REVENUE_CLASSIFICATION_VERSION = 1
 
 export type MissedRevenueKind = 'ata_ej_fakturerad' | 'material_ej_fakturerat' | 'projekt_utan_faktura'
+export type RevenueConfidence = 'CONFIRMED_UNBILLED' | 'LIKELY_UNBILLED' | 'NEEDS_REVIEW'
+export type RevenueAction = 'REVIEW_ONLY' | 'DRAFT_AFTER_REVIEW'
+
+export interface PriorRevenueCard {
+  id: string | null
+  status: string | null
+  payload: Record<string, unknown> | null
+}
+
+export function partitionPriorRevenueCards(rows: PriorRevenueCard[]): {
+  alreadyReported: Set<string>
+  legacyPendingByDedupe: Map<string, string>
+} {
+  const alreadyReported = new Set<string>()
+  const legacyPendingByDedupe = new Map<string, string>()
+
+  for (const row of rows) {
+    const dedupeKey = row.payload?.dedupe_key
+    if (typeof dedupeKey !== 'string') continue
+    const currentVersion = row.payload?.classification_version === MISSED_REVENUE_CLASSIFICATION_VERSION
+    if (row.status === 'pending' && !currentVersion && typeof row.id === 'string') {
+      legacyPendingByDedupe.set(dedupeKey, row.id)
+    } else {
+      // Hanterade legacykort återuppstår inte. Pending på aktuell version
+      // behöver inte heller skapas eller skrivas om igen.
+      alreadyReported.add(dedupeKey)
+    }
+  }
+
+  return { alreadyReported, legacyPendingByDedupe }
+}
+
+export function legacyPendingCardsToExpire(
+  legacyPendingByDedupe: Map<string, string>,
+  currentFindingKeys: Set<string>,
+): string[] {
+  return Array.from(legacyPendingByDedupe.entries())
+    .filter(([dedupeKey]) => !currentFindingKeys.has(dedupeKey))
+    .map(([, id]) => id)
+}
 
 export interface MissedRevenueFinding {
   kind: MissedRevenueKind
   projectId: string
   projectName: string
-  /** Belopp i kronor, avrundat. Känt vid upptäckt — inte uppskattat. */
+  /** Belopp som får ingå i identifierad potential. 0 när källan är tvetydig. */
   amountKr: number
+  /** Källradens nominella belopp, även när det inte får summeras som potential. */
+  sourceAmountKr: number
+  confidence: RevenueConfidence
+  action: RevenueAction
+  /** Exakta källrader som en framtida review-adapter får arbeta med. */
+  sourceIds: string[]
   /** Vad som gör det till ett fynd, i klartext för kortet. */
   evidence: string
   /** Stabil nyckel för dedupe — samma fynd ska inte ge ett nytt kort varje natt. */
@@ -65,9 +113,11 @@ export interface MissedRevenueFinding {
 export interface AtaRow {
   id: string
   project_id: string
+  change_type: string | null
   description: string | null
   amount: number | null
   signed_at: string | null
+  invoice_id: string | null
   invoiced_at: string | null
 }
 
@@ -76,11 +126,13 @@ export interface MaterialRow {
   project_id: string
   total_sell: number | null
   invoiced: boolean | null
+  invoice_id: string | null
 }
 
 export interface ProjectRow {
   project_id: string
   name: string | null
+  project_type: string | null
   status: string | null
   completed_at: string | null
 }
@@ -102,30 +154,43 @@ export function isPastGrace(completedAt: string | null, now: Date, graceDays = G
 const nameOf = (p: ProjectRow | undefined) => p?.name?.trim() || 'Projekt utan namn'
 
 /**
- * REGEL 1 — godkänd ÄTA utan faktura.
+ * REGEL 1 — godkänd ÄTA utan säker fakturakoppling.
  *
- * Kräver INTE att projektet är avslutat: en påskriven ÄTA mitt i ett långt
- * projekt är lika mycket förtjänade pengar, och det är just de som glöms.
+ * Kräver att projektet är avslutat. En påskriven ÄTA mitt i ett pågående
+ * projekt är ett avtal om pris, inte bevis på utfört arbete.
  */
 export function findUninvoicedAta(
   atas: AtaRow[],
   projects: Map<string, ProjectRow>,
+  invoices: InvoiceRow[],
   now: Date,
 ): MissedRevenueFinding[] {
+  const invoicedProjects = new Set(invoices.map(invoice => invoice.project_id).filter(Boolean))
   const out: MissedRevenueFinding[] = []
   for (const a of atas) {
-    if (!a.signed_at || a.invoiced_at) continue
-    const amount = kr(a.amount)
-    if (amount < MIN_AMOUNT_KR) continue
-    // Även ÄTA får nådatid — påskriven i morse ska inte larma i natt.
-    if (!isPastGrace(a.signed_at, now)) continue
+    if (!a.signed_at || a.invoiced_at || a.invoice_id) continue
+    // Avgående ÄTA minskar kontraktet och är aldrig missad intäkt. Okänd typ
+    // failar stängt; dagens riktiga skapare skriver addition/change/removal.
+    if (a.change_type !== 'addition' && a.change_type !== 'change') continue
     const p = projects.get(a.project_id)
+    // En signatur godkänner priset, inte att arbetet är utfört. Före avslut är
+    // detta ett avtal, inte missad intäkt, och ska därför inte larma.
+    if (!p || p.status !== 'completed' || !isPastGrace(p.completed_at, now)) continue
+    const sourceAmount = kr(a.amount)
+    if (sourceAmount < MIN_AMOUNT_KR) continue
+    const hasLinkedInvoice = invoicedProjects.has(a.project_id)
     out.push({
       kind: 'ata_ej_fakturerad',
       projectId: a.project_id,
       projectName: nameOf(p),
-      amountKr: amount,
-      evidence: `Kunden skrev under ${a.signed_at.slice(0, 10)}${a.description ? ` — ${a.description.slice(0, 60)}` : ''}`,
+      amountKr: hasLinkedInvoice ? 0 : sourceAmount,
+      sourceAmountKr: sourceAmount,
+      confidence: hasLinkedInvoice ? 'NEEDS_REVIEW' : 'LIKELY_UNBILLED',
+      action: hasLinkedInvoice ? 'REVIEW_ONLY' : 'DRAFT_AFTER_REVIEW',
+      sourceIds: [a.id],
+      evidence: hasLinkedInvoice
+        ? `Kunden skrev under ${a.signed_at.slice(0, 10)}, men projektet har redan en kopplad faktura — kontrollera om tillägget ingår`
+        : `Kunden skrev under ${a.signed_at.slice(0, 10)}, projektet är avslutat och tillägget saknar fakturakoppling${a.description ? ` — ${a.description.slice(0, 60)}` : ''}`,
       dedupeKey: `ata:${a.id}`,
     })
   }
@@ -133,34 +198,51 @@ export function findUninvoicedAta(
 }
 
 /**
- * REGEL 2 — material ej fakturerat på avslutat projekt.
+ * REGEL 2 — material markerat ofakturerat på avslutat projekt.
  *
- * Summeras PER PROJEKT, inte per rad: femton ofakturerade skruvpaket är ett
- * problem, inte femton. Ett kort per rad hade dränkt kön.
+ * Summeras PER PROJEKT, inte per rad. Fastpris/okänd faktureringsform och
+ * projekt som redan har faktura blir review-only utan belopp i potentialen.
  */
 export function findUninvoicedMaterial(
   materials: MaterialRow[],
   projects: Map<string, ProjectRow>,
+  invoices: InvoiceRow[],
   now: Date,
 ): MissedRevenueFinding[] {
-  const perProject = new Map<string, number>()
+  const invoicedProjects = new Set(invoices.map(invoice => invoice.project_id).filter(Boolean))
+  const perProject = new Map<string, { amount: number; sourceIds: string[] }>()
   for (const m of materials) {
-    if (m.invoiced) continue
+    if (m.invoiced || m.invoice_id) continue
     const p = projects.get(m.project_id)
     if (!p || p.status !== 'completed' || !isPastGrace(p.completed_at, now)) continue
-    perProject.set(m.project_id, (perProject.get(m.project_id) || 0) + kr(m.total_sell))
+    const group = perProject.get(m.project_id) || { amount: 0, sourceIds: [] }
+    group.amount += kr(m.total_sell)
+    group.sourceIds.push(m.id)
+    perProject.set(m.project_id, group)
   }
 
   const out: MissedRevenueFinding[] = []
-  for (const [projectId, amount] of Array.from(perProject.entries())) {
-    if (amount < MIN_AMOUNT_KR) continue
+  for (const [projectId, group] of Array.from(perProject.entries())) {
+    if (group.amount < MIN_AMOUNT_KR) continue
     const p = projects.get(projectId)
+    if (!p) continue
+    const billableContract = p.project_type === 'hourly' || p.project_type === 'mixed'
+    const hasLinkedInvoice = invoicedProjects.has(projectId)
+    const likely = billableContract && !hasLinkedInvoice
     out.push({
       kind: 'material_ej_fakturerat',
       projectId,
       projectName: nameOf(p),
-      amountKr: amount,
-      evidence: `Material inlagt på projektet men aldrig fakturerat`,
+      amountKr: likely ? group.amount : 0,
+      sourceAmountKr: group.amount,
+      confidence: likely ? 'LIKELY_UNBILLED' : 'NEEDS_REVIEW',
+      action: 'REVIEW_ONLY',
+      sourceIds: group.sourceIds,
+      evidence: !billableContract
+        ? `Material är registrerat, men projektets faktureringsform är ${p.project_type === 'fixed_price' ? 'fastpris' : 'okänd'} — kostnaden kan redan ingå i avtalet`
+        : hasLinkedInvoice
+          ? `Material är markerat ofakturerat, men projektet har redan en kopplad faktura — kontrollera källraderna`
+          : `Material är markerat ofakturerat på ett avslutat ${p.project_type === 'mixed' ? 'blandprojekt' : 'projekt på löpande räkning'}`,
       dedupeKey: `material:${projectId}`,
     })
   }
@@ -193,6 +275,10 @@ export function findCompletedWithoutInvoice(
       projectId: p.project_id,
       projectName: nameOf(p),
       amountKr: 0,
+      sourceAmountKr: 0,
+      confidence: 'NEEDS_REVIEW',
+      action: 'REVIEW_ONLY',
+      sourceIds: [],
       evidence: `Avslutat ${p.completed_at?.slice(0, 10) ?? 'tidigare'} men ingen faktura finns`,
       dedupeKey: `projekt:${p.project_id}`,
     })
@@ -211,18 +297,18 @@ export function sweepMissedRevenue(input: {
   materials: MaterialRow[]
   projects: ProjectRow[]
   invoices: InvoiceRow[]
-  /** dedupeKeys som redan har ett öppet kort. */
-  alreadyOpen: Set<string>
+  /** dedupeKeys som redan rapporterats, även om kortet har avfärdats. */
+  alreadyReported: Set<string>
   now: Date
 }): MissedRevenueFinding[] {
   const byId = new Map(input.projects.map(p => [p.project_id, p]))
   const all = [
-    ...findUninvoicedAta(input.atas, byId, input.now),
-    ...findUninvoicedMaterial(input.materials, byId, input.now),
+    ...findUninvoicedAta(input.atas, byId, input.invoices, input.now),
+    ...findUninvoicedMaterial(input.materials, byId, input.invoices, input.now),
     ...findCompletedWithoutInvoice(input.projects, input.invoices, input.now),
   ]
   return all
-    .filter(f => !input.alreadyOpen.has(f.dedupeKey))
+    .filter(f => !input.alreadyReported.has(f.dedupeKey))
     .sort((a, b) => b.amountKr - a.amountKr)
 }
 
@@ -231,9 +317,9 @@ export function findingTitle(f: MissedRevenueFinding): string {
   const belopp = f.amountKr > 0 ? ` — ${f.amountKr.toLocaleString('sv-SE')} kr` : ''
   switch (f.kind) {
     case 'ata_ej_fakturerad':
-      return `Godkänt tilläggsarbete inte fakturerat${belopp}`
+      return `Godkänt tilläggsarbete behöver fakturakontroll${belopp}`
     case 'material_ej_fakturerat':
-      return `Material inte fakturerat${belopp}`
+      return `Material behöver fakturakontroll${belopp}`
     case 'projekt_utan_faktura':
       return `Avslutat projekt saknar faktura`
   }

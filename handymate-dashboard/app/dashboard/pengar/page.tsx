@@ -63,7 +63,7 @@ export default function PengarPaBordetPage() {
               </span>
               <h2 className="m-0 text-[15px] font-semibold text-slate-900">Inget ligger på bordet just nu</h2>
               <p className="m-0 mt-1 text-sm text-slate-500">
-                Alla offerter är färska, allt klart arbete är fakturerat och inga fakturor är förfallna.
+                Inga aktuella källrader behöver fakturakontroll och inga fakturor är förfallna.
               </p>
             </div>
           ) : (
@@ -106,7 +106,7 @@ export default function PengarPaBordetPage() {
               </div>
 
               <p className="mt-5 text-xs text-slate-400 text-center">
-                Summorna räknas direkt ur dina offerter, projekt och fakturor — ingenting är uppskattat.
+                Summorna kommer från källrader i offerter, projekt och fakturor. De är potential tills de har granskats.
               </p>
             </>
           )
