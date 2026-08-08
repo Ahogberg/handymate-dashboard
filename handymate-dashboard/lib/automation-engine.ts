@@ -279,78 +279,35 @@ async function handleSendSms(
     return { success: false, error: 'Inget telefonnummer i kontext' }
   }
 
-  // Skicka direkt via 46elks (ej via auth-skyddad API-route)
-  const ELKS_USER = process.env.ELKS_API_USER
-  const ELKS_PASS = process.env.ELKS_API_PASSWORD
-  if (!ELKS_USER || !ELKS_PASS) {
-    return { success: false, error: '46elks-credentials saknas i miljövariabler' }
+  // ═══ GENOM STRYPUNKTEN (etapp 0 batch 2, 2026-08-08) ═══
+  //
+  // Regelmotorn hade den mest kompletta kopian av strypunkten: egen
+  // E.164-formaterare, egen sms_log-skrivning för både lyckat och misslyckat,
+  // egen felparsning. Allt det finns i sendSmsViaElks — men det som INTE fanns
+  // här var opt-out-spärren, och automationsregler är precis den sortens
+  // utskick den finns för: de går utan att någon människa tittar.
+  //
+  // Den lokala formatPhone() var dessutom en fjärde variant av samma
+  // E.164-logik. Nu en väg.
+  const { sendSmsViaElks } = await import('@/lib/sms-send')
+  const r = await sendSmsViaElks({
+    supabase,
+    businessId,
+    businessName: business?.business_name,
+    to,
+    message,
+    customerId: (context.customer_id as string) || null,
+    messageType: 'automation_rule',
+  })
+
+  if (!r.success) {
+    console.error('[automation-engine] SMS misslyckades:', r.error)
+    return { success: false, error: r.error || 'SMS send failed' }
   }
 
-  // Formatera telefonnummer till E.164
-  const formatPhone = (num: string): string => {
-    const clean = num.replace(/[\s\-()]/g, '')
-    if (clean.startsWith('0')) return '+46' + clean.slice(1)
-    return clean.startsWith('+') ? clean : '+' + clean
-  }
-
-  try {
-    const res = await fetch('https://api.46elks.com/a1/sms', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${ELKS_USER}:${ELKS_PASS}`).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        from: sanitizeSenderId(business?.business_name),
-        to: formatPhone(to),
-        message,
-      }),
-    })
-
-    const responseText = await res.text()
-    let result: any
-    try { result = JSON.parse(responseText) } catch { result = { raw: responseText } }
-
-    if (!res.ok) {
-      console.error('[automation-engine] SMS failed:', res.status, responseText)
-      return { success: false, error: result.message || responseText || `46elks HTTP ${res.status}` }
-    }
-
-    // Logga i sms_log
-    try {
-      await supabase.from('sms_log').insert({
-        sms_id: 'sms_' + Math.random().toString(36).substring(2, 14),
-        business_id: businessId,
-        direction: 'outbound',
-        phone_from: sanitizeSenderId(business?.business_name),
-        phone_to: formatPhone(to),
-        message,
-        status: 'sent',
-        elks_id: result.id,
-        created_at: new Date().toISOString(),
-      })
-    } catch { /* non-blocking */ }
-
-    return { success: true, data: { to: formatPhone(to), elks_id: result.id, message_preview: message.substring(0, 80) } }
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'SMS send failed'
-    console.error('[automation-engine] SMS exception:', msg)
-
-    // Logga misslyckade SMS också
-    try {
-      await supabase.from('sms_log').insert({
-        sms_id: 'sms_' + Math.random().toString(36).substring(2, 14),
-        business_id: businessId,
-        direction: 'outbound',
-        phone_to: to,
-        message,
-        status: 'failed',
-        error_message: msg,
-        created_at: new Date().toISOString(),
-      })
-    } catch { /* non-blocking */ }
-
-    return { success: false, error: msg }
+  return {
+    success: true,
+    data: { to, elks_id: r.elksId, message_preview: message.substring(0, 80) },
   }
 }
 

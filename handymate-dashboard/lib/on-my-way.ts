@@ -113,48 +113,27 @@ export async function sendOnMyWaySms(args: OnMyWaySmsArgs): Promise<OnMyWaySmsRe
   let smsSuccess = false
   let smsError = ''
 
+  // Genom strypunkten (etapp 0 batch 2, 2026-08-08). "Jag är på väg" gick
+  // tidigare direkt mot 46elks — utan opt-out-spärr, utan sms_log och utan
+  // kostnadsmätning. Felhanteringen nedan blir kortare eftersom helpern äger
+  // både 46elks-svaret och loggningen.
   if (!normalizedPhone) {
     smsError = `Ogiltigt telefonnummer: ${customerPhone}`
-  } else if (ELKS_API_USER && ELKS_API_PASSWORD) {
-    try {
-      const smsRes = await fetch('https://api.46elks.com/a1/sms', {
-        method: 'POST',
-        headers: {
-          Authorization:
-            'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          from: sanitizeSenderId(businessName),
-          to: normalizedPhone,
-          message: smsText,
-        }),
-      })
-      const responseBody = await smsRes.text()
-      smsSuccess = smsRes.ok
-      if (!smsRes.ok) {
-        let parsed: any = null
-        try {
-          parsed = JSON.parse(responseBody)
-        } catch {
-          // body kan vara ren text
-        }
-        smsError = parsed?.message || responseBody?.substring(0, 200) || 'SMS misslyckades'
-        console.error('[on-my-way] 46elks error:', {
-          status: smsRes.status,
-          body: responseBody.substring(0, 500),
-          to: normalizedPhone,
-          from_truncated: sanitizeSenderId(businessName),
-        })
-      } else {
-        console.log('[on-my-way] 46elks ok:', { status: smsRes.status, to: normalizedPhone })
-      }
-    } catch (err: any) {
-      smsError = err?.message || 'SMS-fel'
-      console.error('[on-my-way] 46elks fetch exception:', err?.message)
-    }
   } else {
-    smsError = '46elks ej konfigurerad'
+    const { sendSmsViaElks } = await import('@/lib/sms-send')
+    const r = await sendSmsViaElks({
+      supabase,
+      businessId,
+      businessName,
+      to: normalizedPhone,
+      message: smsText,
+      messageType: 'on_my_way',
+    })
+    smsSuccess = r.success
+    if (!r.success) {
+      smsError = r.error || 'SMS misslyckades'
+      console.error('[on-my-way] SMS misslyckades:', { error: smsError, to: normalizedPhone })
+    }
   }
 
   // Logga (non-blocking)

@@ -328,13 +328,14 @@ test.describe('spärrhaken — läckaget får bara krympa', () => {
     // I sms/send (hantverkarens EGNA manuella utskick) returneras 409 med ett
     // tydligt besked i stället för tyst bortfall — hen ska kunna ringa i
     // stället, inte undra varför inget hände.
-    // batch 2 — agent och automation
-    'lib/approve-actions.ts',
-    'lib/automation-engine.ts',
-    'lib/smart-communication.ts',
-    'lib/on-my-way.ts',
-    'app/api/suggestions/approve/route.ts',
-    'app/api/agent/trigger/tool-router.ts',
+    // ── Batch 2 MIGRERAD 2026-08-08 ──────────────────────────────────────
+    // approve-actions ×2, automation-engine, smart-communication, on-my-way,
+    // suggestions/approve ×2, agentens send_sms. Här betyder opt-out mest:
+    // ingen människa läser dessa innan de går. Två sidofynd: avsändaren var
+    // hårdkodad till 'Handymate' i fyra av dem (kunden såg vår produkt i
+    // stället för sin hantverkare), och lib/approve-actions.ts påstår i sitt
+    // filhuvud att den används av både manuell och automatisk godkännande —
+    // men suggestions/approve har en EGEN kopia av alla sex handlers.
     // batch 3 — cron
     'app/api/cron/maintenance/route.ts',
     'app/api/cron/monthly-review/route.ts',

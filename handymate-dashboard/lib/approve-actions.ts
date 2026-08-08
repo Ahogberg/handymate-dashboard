@@ -20,7 +20,7 @@ export async function executeApproveAction(
     case 'callback':
       return createFollowUp(supabase, suggestion, actionData)
     case 'sms':
-      return sendSMS(suggestion, actionData)
+      return sendSMS(supabase, suggestion, actionData)
     case 'reminder':
       return createReminder(supabase, suggestion, actionData)
     case 'reschedule':
@@ -343,7 +343,16 @@ async function createFollowUp(supabase: SupabaseClient, suggestion: any, actionD
   }
 }
 
-async function sendSMS(suggestion: any, actionData: any) {
+/**
+ * Genom strypunkten (etapp 0 batch 2, 2026-08-08).
+ *
+ * Två saker ändrades utöver opt-out, sms_log och kostnadsmätningen:
+ * avsändaren var hårdkodad till 'Handymate' i stället för hantverkarens eget
+ * företagsnamn — kunden såg alltså fel avsändare — och auto-approve-vägen
+ * (lib/auto-approve.ts) skickar hit UTAN att någon människa tittat, vilket är
+ * precis det fall opt-out-spärren finns för.
+ */
+async function sendSMS(supabase: SupabaseClient, suggestion: any, actionData: any) {
   try {
     const phoneNumber = actionData.phone_number ||
       suggestion.call_recording?.phone_number ||
@@ -354,28 +363,25 @@ async function sendSMS(suggestion: any, actionData: any) {
     const message = actionData.message_template || actionData.message || suggestion.description
     if (!message) return { success: false, error: 'Inget meddelande' }
 
-    const ELKS_API_USER = process.env.ELKS_API_USER
-    const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
-    if (!ELKS_API_USER || !ELKS_API_PASSWORD) {
-      return { success: false, error: '46elks inte konfigurerat' }
-    }
+    const { data: biz } = await supabase
+      .from('business_config')
+      .select('business_name')
+      .eq('business_id', suggestion.business_id)
+      .maybeSingle()
 
-    const response = await fetch('https://api.46elks.com/a1/sms', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        from: 'Handymate',
-        to: phoneNumber,
-        message: message,
-      }).toString(),
+    const { sendSmsViaElks } = await import('@/lib/sms-send')
+    const r = await sendSmsViaElks({
+      supabase,
+      businessId: suggestion.business_id,
+      businessName: biz?.business_name,
+      to: phoneNumber,
+      message,
+      customerId: suggestion.call_recording?.customer?.customer_id || null,
+      messageType: 'suggestion_sms',
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`SMS failed: ${errorText}`)
+    if (!r.success) {
+      throw new Error(`SMS failed: ${r.error || 'okänt fel'}`)
     }
     return { success: true }
   } catch (error: any) {
@@ -511,26 +517,32 @@ async function rescheduleBooking(supabase: SupabaseClient, suggestion: any, acti
       suggestion.call_recording?.customer?.phone_number
 
     if (phoneNumber) {
-      const ELKS_API_USER = process.env.ELKS_API_USER
-      const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
+      // Genom strypunkten (etapp 0 batch 2). Avsändaren var hårdkodad till
+      // 'Handymate' — kunden såg alltså vår produkt som avsändare i stället
+      // för sin hantverkare.
+      const formattedDate = newScheduledStart.toLocaleDateString('sv-SE')
+      const formattedTime = newScheduledStart.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
 
-      if (ELKS_API_USER && ELKS_API_PASSWORD) {
-        const formattedDate = newScheduledStart.toLocaleDateString('sv-SE')
-        const formattedTime = newScheduledStart.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+      const { data: biz } = await supabase
+        .from('business_config')
+        .select('business_name')
+        .eq('business_id', suggestion.business_id)
+        .maybeSingle()
 
-        await fetch('https://api.46elks.com/a1/sms', {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            from: 'Handymate',
-            to: phoneNumber,
-            message: `Din bokning har flyttats till ${formattedDate} kl ${formattedTime}. Välkommen!`,
-          }).toString(),
-        })
-      }
+      const { sendSmsViaElks } = await import('@/lib/sms-send')
+      const r = await sendSmsViaElks({
+        supabase,
+        businessId: suggestion.business_id,
+        businessName: biz?.business_name,
+        to: phoneNumber,
+        message: `Din bokning har flyttats till ${formattedDate} kl ${formattedTime}. Välkommen!`,
+        customerId: suggestion.call_recording?.customer?.customer_id || null,
+        relatedId: bookingId,
+        messageType: 'reschedule',
+      })
+      // Icke-blockerande: ombokningen är redan gjord i databasen. Ett uteblivet
+      // bekräftelse-SMS får inte rulla tillbaka den.
+      if (!r.success) console.error('[approve-actions] ombokningsbekräftelse misslyckades:', r.error)
     }
 
     return { success: true, booking_id: bookingId, new_time: newScheduledStart.toISOString() }

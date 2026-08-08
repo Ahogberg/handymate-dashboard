@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         break
 
       case 'sms':
-        result = await sendSMS(suggestion, finalActionData)
+        result = await sendSMS(supabase, suggestion, finalActionData)
         message = result.success ? 'SMS skickat!' : result.error
         break
 
@@ -272,7 +272,7 @@ async function createFollowUp(supabase: SupabaseClient, suggestion: any, actionD
 /**
  * Skicka SMS
  */
-async function sendSMS(suggestion: any, actionData: any) {
+async function sendSMS(supabase: SupabaseClient, suggestion: any, actionData: any) {
   try {
     const phoneNumber = actionData.phone_number ||
       suggestion.call_recording?.phone_number ||
@@ -288,29 +288,35 @@ async function sendSMS(suggestion: any, actionData: any) {
       return { success: false, error: 'Inget meddelande' }
     }
 
-    // Skicka via 46elks
-    const ELKS_API_USER = process.env.ELKS_API_USER
-    const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
+    // ═══ GENOM STRYPUNKTEN (etapp 0 batch 2, 2026-08-08) ═══
+    //
+    // OBS: den här funktionen är en KOPIA av sendSMS i lib/approve-actions.ts,
+    // som i sitt filhuvud påstår sig användas av både manuell och automatisk
+    // godkännande — men rutten anropar den inte. Manuell och automatisk väg
+    // har alltså varsin implementation av samtliga sex handlers och kan glida
+    // isär. Sammanslagningen hör inte hemma i en SMS-batch; den är noterad.
+    //
+    // Avsändaren var hårdkodad till 'Handymate' — kunden såg vår produkt som
+    // avsändare i stället för sin hantverkare.
+    const { data: biz } = await supabase
+      .from('business_config')
+      .select('business_name')
+      .eq('business_id', suggestion.business_id)
+      .maybeSingle()
 
-    if (!ELKS_API_USER || !ELKS_API_PASSWORD) {
-      return { success: false, error: '46elks inte konfigurerat' }
-    }
-
-    const response = await fetch('https://api.46elks.com/a1/sms', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        from: 'Handymate',
-        to: phoneNumber,
-        message: message
-      }).toString()
+    const { sendSmsViaElks } = await import('@/lib/sms-send')
+    const r = await sendSmsViaElks({
+      supabase,
+      businessId: suggestion.business_id,
+      businessName: biz?.business_name,
+      to: phoneNumber,
+      message,
+      customerId: suggestion.call_recording?.customer?.customer_id || null,
+      messageType: 'suggestion_sms',
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
+    if (!r.success) {
+      const errorText = r.error || 'okänt fel'
       throw new Error(`SMS failed: ${errorText}`)
     }
 
@@ -429,26 +435,30 @@ async function rescheduleBooking(supabase: SupabaseClient, suggestion: any, acti
       suggestion.call_recording?.customer?.phone_number
 
     if (phoneNumber) {
-      const ELKS_API_USER = process.env.ELKS_API_USER
-      const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
+      // Genom strypunkten (etapp 0 batch 2) — se noten i sendSMS ovan om att
+      // den här filen är en kopia av lib/approve-actions.ts.
+      const formattedDate = newScheduledStart.toLocaleDateString('sv-SE')
+      const formattedTime = newScheduledStart.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
 
-      if (ELKS_API_USER && ELKS_API_PASSWORD) {
-        const formattedDate = newScheduledStart.toLocaleDateString('sv-SE')
-        const formattedTime = newScheduledStart.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+      const { data: biz } = await supabase
+        .from('business_config')
+        .select('business_name')
+        .eq('business_id', suggestion.business_id)
+        .maybeSingle()
 
-        await fetch('https://api.46elks.com/a1/sms', {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: new URLSearchParams({
-            from: 'Handymate',
-            to: phoneNumber,
-            message: `Din bokning har flyttats till ${formattedDate} kl ${formattedTime}. Välkommen!`
-          }).toString()
-        })
-      }
+      const { sendSmsViaElks } = await import('@/lib/sms-send')
+      const r = await sendSmsViaElks({
+        supabase,
+        businessId: suggestion.business_id,
+        businessName: biz?.business_name,
+        to: phoneNumber,
+        message: `Din bokning har flyttats till ${formattedDate} kl ${formattedTime}. Välkommen!`,
+        customerId: suggestion.call_recording?.customer?.customer_id || null,
+        relatedId: bookingId,
+        messageType: 'reschedule',
+      })
+      // Icke-blockerande: ombokningen är redan skriven i databasen.
+      if (!r.success) console.error('[suggestions/approve] ombokningsbekräftelse misslyckades:', r.error)
     }
 
     return {

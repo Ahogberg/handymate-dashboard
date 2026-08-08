@@ -253,34 +253,23 @@ export async function sendSmartMessage(params: {
   let errorMessage: string | undefined
 
   if (params.channel === 'sms') {
-    if (!ELKS_API_USER || !ELKS_API_PASSWORD) {
-      errorMessage = '46elks credentials not configured'
-    } else {
-      try {
-        const response = await fetch('https://api.46elks.com/a1/sms', {
-          method: 'POST',
-          headers: {
-            Authorization:
-              'Basic ' +
-              Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            from: sanitizeSenderId(business?.business_name),
-            to: params.recipient,
-            message: params.message,
-          }),
-        })
-
-        sendSuccess = response.ok
-        if (!response.ok) {
-          const result = await response.json()
-          errorMessage = result.message || 'SMS failed'
-        }
-      } catch (err: any) {
-        errorMessage = err.message
-      }
-    }
+    // Genom strypunkten (etapp 0 batch 2, 2026-08-08). Regelstyrda utskick är
+    // just den sortens meddelanden opt-out finns för: ingen människa tittar
+    // innan de går. customerId finns redan i params, så spärren kan slå exakt
+    // på rätt kund i stället för att gissa via telefonnumret.
+    const { sendSmsViaElks } = await import('@/lib/sms-send')
+    const r = await sendSmsViaElks({
+      supabase,
+      businessId: params.businessId,
+      businessName: business?.business_name,
+      to: params.recipient,
+      message: params.message,
+      customerId: params.customerId || null,
+      relatedId: params.context?.dealId || params.context?.invoiceId || null,
+      messageType: 'smart_communication',
+    })
+    sendSuccess = r.success
+    if (!r.success) errorMessage = r.error || 'SMS failed'
   }
 
   // Log the communication

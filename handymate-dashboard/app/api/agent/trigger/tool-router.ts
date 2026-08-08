@@ -1162,34 +1162,31 @@ async function sendSms(
     return { success: true, data: { queued: true, queue_id: queueId, send_after: sendAfter, message: `SMS köat — skickas ${swedenHour < 8 ? 'idag' : 'imorgon'} kl 08:00` } }
   }
 
-  const elksUser = process.env.ELKS_API_USER!
-  const elksPassword = process.env.ELKS_API_PASSWORD!
+  // ═══ GENOM STRYPUNKTEN (etapp 0 batch 2, 2026-08-08) ═══
+  //
+  // Agentens send_sms är den väg där opt-out betyder allra mest: här skriver
+  // en modell meddelandet och skickar det utan att någon människa läser det
+  // först. Nattspärren ovan (sms_queue) ligger kvar oförändrad — den gatar
+  // NÄR, strypunkten gatar OM och TILL VEM.
+  //
+  // sms_log skrivs numera av helpern, med delantal och kostnad. Den lokala
+  // insert:en var en av fyra kopior av samma logg.
   const senderName = sanitizeSenderId(context.businessName)
-
-  const response = await fetch('https://api.46elks.com/a1/sms', {
-    method: 'POST',
-    headers: {
-      Authorization: 'Basic ' + Buffer.from(`${elksUser}:${elksPassword}`).toString('base64'),
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({ from: senderName, to, message }),
+  const { sendSmsViaElks } = await import('@/lib/sms-send')
+  const smsResult = await sendSmsViaElks({
+    supabase,
+    businessId,
+    businessName: context.businessName,
+    to,
+    message,
+    customerId: (params.customer_id as string) || null,
+    messageType: 'agent_sms',
   })
 
-  const result = await response.json()
-  if (!response.ok) return { success: false, error: `46elks-fel: ${result.message || response.statusText}` }
-
-  // Log SMS
-  try {
-    await supabase.from('sms_log').insert({
-      sms_id: 'sms_' + Math.random().toString(36).substring(2, 14),
-      business_id: businessId, direction: 'outbound',
-      phone_from: senderName, phone_to: to, message,
-      status: 'sent', elks_id: result.id, created_at: new Date().toISOString(),
-    })
-  } catch (err: any) {
-    // Icke-blockerande — SMS:et är redan skickat, bara loggningen misslyckades.
-    console.error('[sendSms] sms_log insert failed (non-blocking):', businessId, to, err?.message || err)
+  if (!smsResult.success) {
+    return { success: false, error: `SMS kunde inte skickas: ${smsResult.error || 'okänt fel'}` }
   }
+  const result = { id: smsResult.elksId }
 
   // Also log to sms_conversation for conversation history continuity
   try {
