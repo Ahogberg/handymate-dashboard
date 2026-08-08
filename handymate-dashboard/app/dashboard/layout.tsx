@@ -22,6 +22,7 @@ import { useSessionKeepalive } from '@/lib/hooks/useSessionKeepalive'
 import { BusinessContext } from '@/lib/BusinessContext'
 import { CurrentUserProvider } from '@/lib/CurrentUserContext'
 import { JobbuddyProvider } from '@/lib/JobbuddyContext'
+import PresenterBar from '@/components/demo/PresenterBar'
 
 export default function DashboardLayout({
   children,
@@ -92,6 +93,7 @@ export default function DashboardLayout({
                   <Sidebar businessName={business.business_name} businessId={business.business_id} onLogout={logout} />
                   <main className="flex-1 md:ml-64">
                     <ImpersonationBanner />
+                    <PresenterBar />
                     <BillingStatusBanner />
                     {children}
                   </main>

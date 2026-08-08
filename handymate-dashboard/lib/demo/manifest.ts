@@ -52,3 +52,12 @@ export function buildDemoManifest(input: DemoManifestInput): DemoManifest {
     invoice_reminder: input.invoiceReminderApprovalId,
   }
 }
+
+export function isDemoManifest(value: unknown): value is DemoManifest {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  return [...DEMO_STORY_ENTITY_KEYS, ...DEMO_SUPPORTING_ENTITY_KEYS].every(key => {
+    const entry = record[key]
+    return typeof entry === 'string' && entry.length > 0
+  })
+}
