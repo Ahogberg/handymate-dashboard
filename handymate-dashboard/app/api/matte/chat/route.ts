@@ -989,7 +989,13 @@ export async function POST(request: NextRequest) {
     // Upp till MAX_SPECIALIST_STEPS specialiststeg per request (se nedan).
     // Trådens dygnstak MAX_HANDOFFS_PER_THREAD ligger kvar som backstop mot
     // spiraler över tid.
-    const responseMessages: Array<{ agent: AgentId; content: string; is_handoff_announcement?: boolean }> = []
+    const responseMessages: Array<{
+      agent: AgentId
+      content: string
+      is_handoff_announcement?: boolean
+      /** Epic 3: statusen UI:t visar. Sätts bara där orkestreringen härlett en. */
+      status?: AgentResult['status']
+    }> = []
     let finalAction: any = null
     let outerMessages = initialMessages
 
@@ -1209,7 +1215,14 @@ export async function POST(request: NextRequest) {
     const redovisade = steps.filter(s => s.agent !== 'matte' || s.status !== 'completed')
     if (shouldMatteSummarize(redovisade)) {
       const summering = buildOrchestrationSummary(redovisade)
-      responseMessages.push({ agent: 'matte', content: summering })
+      // Sammanfattningens status är den SÄMSTA bland stegen — ett felat steg
+      // får aldrig gömmas bakom ett klart. Samma ordning som i UI-chippet.
+      const värst: AgentResult['status'] =
+        redovisade.some(s => s.status === 'failed') ? 'failed'
+        : redovisade.some(s => s.status === 'partial') ? 'partial'
+        : redovisade.some(s => s.status === 'awaiting_approval') ? 'awaiting_approval'
+        : 'completed'
+      responseMessages.push({ agent: 'matte', content: summering, status: värst })
       if (thread) {
         saveThreadMessage({
           threadId: thread.id,

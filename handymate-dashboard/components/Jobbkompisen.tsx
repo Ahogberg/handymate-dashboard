@@ -29,6 +29,8 @@ import { useMoments } from '@/components/moments/MomentsProvider'
 import { pageContextFromPathname } from '@/lib/matte/page-context'
 import { formatKr } from '@/lib/moments/derive'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
+import { AgentMessage } from '@/components/agents/AgentMessage'
+import type { InteractionStatus } from '@/lib/agents/interaction'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,9 @@ interface ChatMessage {
   actions?: AIAction[]
   /** Vilken agent i teamet som skrev svaret (matte/lars/karin/daniel/hanna/lisa). */
   agent?: string | null
+  is_handoff_announcement?: boolean
+  /** Orkestreringens status på Mattes sammanfattning (Epic 2) — aldrig gissad i UI:t. */
+  status?: InteractionStatus | null
 }
 
 /** Fas 0-säkerhetsräcke: kort som visas när Matte vill skicka något ut ur huset. */
@@ -185,10 +190,17 @@ export default function Jobbkompisen() {
       if (Array.isArray(data.messages) && data.messages.length > 0) {
         setMessages(prev => [
           ...prev,
-          ...data.messages.map((m: { agent?: string; content: string }) => ({
+          ...data.messages.map((m: {
+            agent?: string
+            content: string
+            is_handoff_announcement?: boolean
+            status?: InteractionStatus | null
+          }) => ({
             role: 'assistant' as const,
             content: m.content,
             agent: m.agent,
+            is_handoff_announcement: m.is_handoff_announcement,
+            status: m.status ?? null,
           })),
         ])
       } else if (data.reply) {
@@ -225,10 +237,17 @@ export default function Jobbkompisen() {
       if (Array.isArray(data.messages) && data.messages.length > 0) {
         setMessages(prev => [
           ...prev,
-          ...data.messages.map((m: { agent?: string; content: string }) => ({
+          ...data.messages.map((m: {
+            agent?: string
+            content: string
+            is_handoff_announcement?: boolean
+            status?: InteractionStatus | null
+          }) => ({
             role: 'assistant' as const,
             content: m.content,
             agent: m.agent,
+            is_handoff_announcement: m.is_handoff_announcement,
+            status: m.status ?? null,
           })),
         ])
       } else {
@@ -731,34 +750,12 @@ function ChatTab({
           </div>
         )}
 
-        {/* Chat messages */}
+        {/* Chat messages — Epic 3: samma bubbla som MatteChatModal.
+            Dirigeringen syntes tidigare bara som en fotnot ("💬 via Karin")
+            med Mattes formspråk runt; nu ÄR porträttet avsändaren, och
+            överlämningar och statusar ser likadana ut på båda ytorna. */}
         {messages.map((message, i) => (
-          <div key={i}>
-            <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                  message.role === 'user'
-                    ? 'bg-primary-700 text-white'
-                    : 'bg-gray-100 text-gray-800 border border-gray-200'
-                }`}
-              >
-                {message.content}
-                {/* Dirigering synlig (Andreas 2026-08-03): agent-fältet togs
-                    emot från /api/matte/chat men renderades aldrig här —
-                    Mattes handoff till specialisterna var osynlig i hörn-
-                    bubblan. Samma mönster som MatteChatModal (Agent-sidan). */}
-                {message.role === 'assistant' && message.agent && message.agent !== 'matte' && (() => {
-                  const agent = getAgentById(message.agent)
-                  if (!agent) return null
-                  return (
-                    <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-200 text-[11px] text-gray-500">
-                      <span className={`w-2 h-2 rounded-full ${agent.color}`} />
-                      <span>💬 via {agent.name} <span className="text-gray-400">({agent.role})</span></span>
-                    </div>
-                  )
-                })()}
-              </div>
-            </div>
+          <AgentMessage key={i} message={message} index={i}>
             {/* Actions from AI */}
             {message.actions && message.actions.length > 0 && (
               <div className="mt-2 ml-1 space-y-1.5">
@@ -790,7 +787,7 @@ function ChatTab({
                 ))}
               </div>
             )}
-          </div>
+          </AgentMessage>
         ))}
         {loading && (
           <div className="flex justify-start">

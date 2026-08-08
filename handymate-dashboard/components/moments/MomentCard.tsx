@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { X } from 'lucide-react'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
-import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
+import { agentIdentity } from '@/lib/agents/interaction'
 import { formatKr, type AgentMoment } from '@/lib/moments/derive'
 
 /**
@@ -38,7 +38,7 @@ export function MomentCard({
   moment: AgentMoment
   onDismiss: () => void
 }) {
-  const agent = AGENT_INFO[moment.agentId]
+  const identitet = agentIdentity(moment.agentId)
 
   return (
     <div
@@ -49,9 +49,12 @@ export function MomentCard({
         <AgentAvatar agentKey={moment.agentId} size="md" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
+            {/* Epic 3: bylinen kommer ur det delade identitetskontraktet, så
+                Daniel HITTAR och Lars KONTROLLERAR — här stod tidigare
+                "hittade något" för alla sex, oavsett vad de gjort. */}
             <span className="text-xs text-slate-500 truncate">
-              <b className="font-semibold text-slate-900">{agent?.name ?? 'Teamet'}</b>
-              {agent?.role ? ` · ${agent.role}` : ''} hittade något
+              <b className="font-semibold text-slate-900">{identitet.name}</b>
+              {identitet.role ? ` · ${identitet.role}` : ''} {identitet.shortVerb}
             </span>
             <button
               type="button"

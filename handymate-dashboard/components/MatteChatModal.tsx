@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import ReactMarkdown from 'react-markdown'
 import { X, Send, Plus, MessageCircle, Sparkles, Trash2, Menu } from 'lucide-react'
-import { getAgentById } from '@/lib/agents/team'
+import { AgentMessage } from '@/components/agents/AgentMessage'
+import type { InteractionStatus } from '@/lib/agents/interaction'
 
 interface ChatMessage {
   id?: string
@@ -13,6 +13,8 @@ interface ChatMessage {
   /** Vilken agent som skrev (matte/lars/karin/daniel/hanna/lisa). */
   agent?: string | null
   is_handoff_announcement?: boolean
+  /** Orkestreringens status på Mattes sammanfattning (Epic 2) — aldrig gissad i UI:t. */
+  status?: InteractionStatus | null
 }
 
 interface Conversation {
@@ -69,7 +71,12 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
       })
       const data = await res.json()
       if (data.thread_id) setActiveId(data.thread_id)
-      const chain: Array<{ agent?: string; content: string }> = data.messages?.length
+      const chain: Array<{
+        agent?: string
+        content: string
+        is_handoff_announcement?: boolean
+        status?: InteractionStatus | null
+      }> = data.messages?.length
         ? data.messages
         : [{ agent: data.current_agent || 'matte', content: data.reply || '' }]
       const now = new Date().toISOString()
@@ -77,6 +84,8 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
         role: 'assistant' as const,
         content: m.content,
         agent: m.agent ?? null,
+        is_handoff_announcement: m.is_handoff_announcement,
+        status: m.status ?? null,
         created_at: now,
       }))])
     } catch {
@@ -211,7 +220,12 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
       if (data.thread_id) setActiveId(data.thread_id)
       if (data.pending_confirmation) setPendingConfirmation(data.pending_confirmation)
       // Rendera HELA agent-kedjan (handoff syns) — fallback till reply om tomt.
-      const chain: Array<{ agent?: string; content: string }> = data.messages?.length
+      const chain: Array<{
+        agent?: string
+        content: string
+        is_handoff_announcement?: boolean
+        status?: InteractionStatus | null
+      }> = data.messages?.length
         ? data.messages
         : [{ agent: data.current_agent || 'matte', content: data.reply || '' }]
       const now = new Date().toISOString()
@@ -219,6 +233,8 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
         role: 'assistant' as const,
         content: m.content,
         agent: m.agent ?? null,
+        is_handoff_announcement: m.is_handoff_announcement,
+        status: m.status ?? null,
         created_at: now,
       }))])
       fetchConversations()
@@ -374,50 +390,12 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
               </div>
             )}
 
+            {/* Epic 3: en delad bubbla för båda chattytorna. Förut ritades
+                Mattes porträtt på ALLA svar här, med en fotnot "via Karin"
+                under — efter Epic 2 kan tre kollegor svara i följd, och då
+                är fel ansikte inte en detalj. */}
             {messages.map((msg, idx) => (
-              <div key={msg.id || idx} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                {msg.role === 'assistant' && (
-                  <div className="w-8 h-8 flex-shrink-0">
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt="Matte" className="w-8 h-8 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-primary-700 text-white flex items-center justify-center font-bold text-xs">M</div>
-                    )}
-                  </div>
-                )}
-                <div className={`max-w-[75%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                    msg.role === 'user'
-                      ? 'bg-primary-700 text-white rounded-br-sm'
-                      : 'bg-white border border-gray-200 text-gray-800 rounded-bl-sm'
-                  }`}>
-                    {msg.role === 'assistant' ? (
-                      <>
-                        <div className="prose prose-sm max-w-none [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 [&_strong]:font-semibold [&_a]:text-primary-700">
-                          <ReactMarkdown>{msg.content}</ReactMarkdown>
-                        </div>
-                        {msg.agent && msg.agent !== 'matte' && (() => {
-                          const agent = getAgentById(msg.agent)
-                          if (!agent) return null
-                          return (
-                            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-100 text-[11px] text-gray-500">
-                              <span className={`w-2 h-2 rounded-full ${agent.color}`} />
-                              <span>💬 via {agent.name} <span className="text-gray-400">({agent.role})</span></span>
-                            </div>
-                          )
-                        })()}
-                      </>
-                    ) : (
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
-                    )}
-                  </div>
-                  {msg.created_at && (
-                    <p className={`text-[10px] text-gray-400 mt-1 px-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
-                      {new Date(msg.created_at).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  )}
-                </div>
-              </div>
+              <AgentMessage key={msg.id || idx} message={msg} index={idx} timestamp={msg.created_at} />
             ))}
 
             {/* Typing-indicator */}
