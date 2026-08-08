@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Bot } from 'lucide-react'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 
@@ -29,6 +30,7 @@ export function AgentAvatar({
   /** sm 28px (listrader) · md 36px (kort och rubriker) · lg 44px (rubrikytor) */
   size?: 'sm' | 'md' | 'lg'
 }) {
+  const [brusten, setBrusten] = useState(false)
   const agent = AGENT_INFO[agentKey]
   const cls =
     size === 'sm' ? 'w-7 h-7 text-[10px]' : size === 'lg' ? 'w-11 h-11 text-sm' : 'w-9 h-9 text-xs'
@@ -38,6 +40,24 @@ export function AgentAvatar({
       <div className={`${cls} rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0`}>
         <Bot className="w-4 h-4 text-gray-500" />
       </div>
+    )
+  }
+
+  // Porträttet först, initialerna som fallback. Bilden ligger i Supabase
+  // storage och kan misslyckas — då byter vi tillbaka till bokstäverna i
+  // stället för att lämna en tom cirkel. En avatar som ibland är blank läses
+  // som ett fel i produkten.
+  if (agent.avatar && !brusten) {
+    return (
+      <img
+        src={agent.avatar}
+        alt={agent.name}
+        onError={() => setBrusten(true)}
+        // Färgen sitter som ring runt porträttet i stället för fyllnad —
+        // agenten går fortfarande att känna igen på färg, men ansiktet syns.
+        className={`${cls} rounded-full object-cover flex-shrink-0 ring-2 bg-gray-100`}
+        style={{ ['--tw-ring-color' as string]: agent.dot }}
+      />
     )
   }
 

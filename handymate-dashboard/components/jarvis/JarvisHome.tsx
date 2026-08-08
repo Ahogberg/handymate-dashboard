@@ -2,13 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Check, ChevronDown, ChevronRight, ChevronUp, Loader2, Mic, Phone, Undo2 } from 'lucide-react'
+import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, FileText, Loader2, Mic, Phone, Undo2, User } from 'lucide-react'
+import { nyhetsAtgard, type NyhetsIkon } from '@/lib/jarvis/news-actions'
+import { byggNarvaro } from '@/lib/jarvis/team-presence'
+import { TeamPresenceBand } from '@/components/jarvis/TeamPresenceBand'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useJobbuddy } from '@/lib/JobbuddyContext'
 import { AgentDecisionCard, CardFactBox } from '@/components/agents/AgentDecisionCard'
 import { AgentNewsRow } from '@/components/agents/AgentNewsRow'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
+import { RailCard } from '@/components/jarvis/RailCard'
+import { ScheduleTimeline, parseKonflikter, minuterFranIso } from '@/components/jarvis/ScheduleTimeline'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { QuoteDraftDetail, QuoteToolExit } from '@/components/jarvis/QuoteDraftDetail'
 import { KarinCalendarWidget } from '@/components/karin/KarinCalendarWidget'
@@ -52,6 +57,15 @@ import type { CardAction } from '@/lib/jarvis/voice'
  * skickats. Att bryta ut den mekaniken medan Idag-vyn fortfarande är i prod
  * hade riskerat den vyn för en refaktorering som inte behövs ännu.
  */
+
+/** Ikonen hålls här, inte i logiken — lib/jarvis/news-actions.ts ska gå att
+ *  facit-testa utan att dra in React. */
+const NYHETS_IKON: Record<NyhetsIkon, React.ReactNode> = {
+  telefon: <Phone className="w-3.5 h-3.5" />,
+  person: <User className="w-3.5 h-3.5" />,
+  dokument: <FileText className="w-3.5 h-3.5" />,
+  pengar: <Banknote className="w-3.5 h-3.5" />,
+}
 
 const UNDO_WINDOW_MS = 5000
 const MAX_FULL_CARDS = 3
@@ -372,6 +386,14 @@ export default function JarvisHome({
   // samma sak på två ställen gör att man slutar läsa båda.
   const nyheter = observations.filter(o => !o.related_approval_id)
 
+  // Närvarobandet: samma två källor som resten av sidan visar, omformade per
+  // agent. Observationerna först — de är vad agenten SÄGER — och Klart idag
+  // efter, som är vad hon GJORT. Ingen extra hämtning.
+  const narvaro = byggNarvaro([
+    ...observations.map(o => ({ agentId: o.agent_id, text: o.observation, vid: o.created_at })),
+    ...doneRows.map(r => ({ agentId: r.agent, text: r.text, vid: r.time })),
+  ])
+
   return (
     <div className="max-w-[1180px] mx-auto px-4 sm:px-8 pt-6 sm:pt-7 pb-9">
       <div className="grid lg:grid-cols-[1fr_320px] gap-6 lg:gap-7">
@@ -386,6 +408,10 @@ export default function JarvisHome({
                 Texten säger det den mäter — inte "sedan igår kväll". */}
             {proof && <> · Teamet har senaste dygnet hanterat <b className="font-semibold text-slate-800">{proof}</b>.</>}
           </p>
+
+          {/* Teamets ansikten före besluten. Härlett ur observationerna och
+              Klart idag — ingen egen hämtning, ingen påhittad aktivitet. */}
+          <TeamPresenceBand rader={narvaro} />
 
           {feedback && (
             <div className={`mt-4 px-3.5 py-2.5 border rounded-xl text-sm font-medium ${
@@ -435,30 +461,47 @@ export default function JarvisHome({
               ))}
 
               {/* Frågeläget — bokningskrockar AI:n inte kunde lösa själv. */}
-              {reschedules.map(s => (
-                <AgentDecisionCard
-                  key={s.suggestion_id}
-                  agentKey="lars"
-                  voice="fragar"
-                  typeLabel="Schema"
-                  timeLabel={timeAgo(s.created_at)}
-                  title={s.title}
-                  alternatives={[
-                    { id: 'kalender', label: 'Välj en annan tid' },
-                    { id: 'kund', label: 'Fråga kunden' },
-                  ]}
-                  onAction={() => { window.location.href = '/dashboard/schedule' }}
-                  deepLink={{ label: 'Öppna kalendern →', href: '/dashboard/schedule' }}
-                >
-                  {s.description && (
-                    <CardFactBox>
-                      <p className="m-0 text-[13px] text-slate-600 leading-relaxed whitespace-pre-line">
-                        {s.description}
-                      </p>
-                    </CardFactBox>
-                  )}
-                </AgentDecisionCard>
-              ))}
+              {reschedules.map(s => {
+                // Tiderna finns i suggested_data (lib/approve-actions.ts):
+                // önskad start/slut som ISO, krockarna som formaterade
+                // strängar. Går de att läsa ritar vi överlappet; går de inte
+                // det står beskrivningen kvar. Aldrig både och — två
+                // beskrivningar av samma krock är en för mycket.
+                const bokat = parseKonflikter(s.suggested_data?.conflicts)
+                const oStart = minuterFranIso(s.suggested_data?.requested_start)
+                const oSlut = minuterFranIso(s.suggested_data?.requested_end)
+                const onskad = oStart !== null
+                  ? { titel: s.suggested_data?.service || 'Ny bokning', startMin: oStart, slutMin: oSlut ?? oStart + 60 }
+                  : null
+                const harTidslinje = bokat.length > 0 || onskad !== null
+
+                return (
+                  <AgentDecisionCard
+                    key={s.suggestion_id}
+                    agentKey="lars"
+                    voice="fragar"
+                    typeLabel="Schema"
+                    timeLabel={timeAgo(s.created_at)}
+                    title={s.title}
+                    alternatives={[
+                      { id: 'kalender', label: 'Välj en annan tid' },
+                      { id: 'kund', label: 'Fråga kunden' },
+                    ]}
+                    onAction={() => { window.location.href = '/dashboard/schedule' }}
+                    deepLink={{ label: 'Öppna kalendern →', href: '/dashboard/schedule' }}
+                  >
+                    {harTidslinje ? (
+                      <ScheduleTimeline bokat={bokat} onskad={onskad} />
+                    ) : s.description ? (
+                      <CardFactBox>
+                        <p className="m-0 text-[13px] text-slate-600 leading-relaxed whitespace-pre-line">
+                          {s.description}
+                        </p>
+                      </CardFactBox>
+                    ) : null}
+                  </AgentDecisionCard>
+                )
+              })}
 
               {approvals.length >= 15 && (
                 <Link href="/dashboard/approvals" className="block text-center text-xs font-semibold text-primary-700 hover:text-primary-800 py-2">
@@ -476,16 +519,19 @@ export default function JarvisHome({
                 <span className="text-xs text-slate-400">Inget att godkänna — bara läget</span>
               </div>
               <div>
-                {nyheter.slice(0, 5).map(o => (
-                  <AgentNewsRow
-                    key={o.id}
-                    agentKey={o.agent_id}
-                    link={o.agent_id === 'lisa' ? { label: 'Ring upp', href: '/dashboard/calls', icon: <Phone className="w-3.5 h-3.5" /> } : undefined}
-                  >
-                    {o.observation}
-                    {o.suggestion && <span className="text-slate-500"> {o.suggestion}</span>}
-                  </AgentNewsRow>
-                ))}
+                {nyheter.slice(0, 5).map(o => {
+                  const atgard = nyhetsAtgard(o.agent_id)
+                  return (
+                    <AgentNewsRow
+                      key={o.id}
+                      agentKey={o.agent_id}
+                      link={atgard ? { label: atgard.label, href: atgard.href, icon: NYHETS_IKON[atgard.ikon] } : undefined}
+                    >
+                      {o.observation}
+                      {o.suggestion && <span className="text-slate-500"> {o.suggestion}</span>}
+                    </AgentNewsRow>
+                  )
+                })}
               </div>
             </>
           )}
@@ -624,23 +670,6 @@ export default function JarvisHome({
           </button>
         </div>
       )}
-    </div>
-  )
-}
-
-function RailCard({ title, href, children }: { title: string; href: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-4">
-      {/* Rubriken ÄR ingången till sidan. 44px träffyta, uttagen med negativ
-          marginal så kortet inte växer av det. */}
-      <Link
-        href={href}
-        className="flex items-center justify-between text-sm font-semibold text-slate-900 mb-2 min-h-[44px] -mt-2 -mx-1 px-1"
-      >
-        {title}
-        <ChevronRight className="w-4 h-4 text-slate-300" />
-      </Link>
-      {children}
     </div>
   )
 }

@@ -29,11 +29,18 @@ export interface AgentPersona {
   color: string
   initials: string
   dot: string
+  /**
+   * Porträttet. Fanns i TEAM men utelämnades här — därför visade AgentAvatar
+   * bara initialer, trots att bilderna funnits i Supabase storage hela tiden.
+   * Ett team man ser i ansiktet läses som kollegor; två bokstäver i en cirkel
+   * läses som ett systemkonto.
+   */
+  avatar?: string
 }
 
 export const AGENT_INFO: Record<string, AgentPersona> = Object.fromEntries(
   TEAM.map(a => [
     a.id,
-    { name: a.name, role: a.role, color: a.color, initials: a.initials, dot: a.dot },
+    { name: a.name, role: a.role, color: a.color, initials: a.initials, dot: a.dot, avatar: a.avatar },
   ]),
 )

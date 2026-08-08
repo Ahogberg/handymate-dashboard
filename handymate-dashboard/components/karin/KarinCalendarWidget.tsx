@@ -1,10 +1,20 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { ChevronRight, Loader2 } from 'lucide-react'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
+import { RailCard } from '@/components/jarvis/RailCard'
+import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import type { CalendarEvent } from '@/lib/karin/calendar'
+
+/**
+ * När en deadline börjar se brådskande ut.
+ *
+ * Avsiktligt vidare än `SISTA_ANFLYGNING_DAGAR` (3) i lib/karin/handled-store.
+ * Den siffran är en invariant — de sista dagarna går aldrig att tysta. Den här
+ * är en påminnelse: en vecka räcker för att boka in bokföring eller ringa
+ * revisorn, tre dagar gör det inte.
+ */
+const BRADSKAR_DAGAR = 7
 
 /**
  * "Karin · kommande 30 dagar" — bolagskalendern på hemskärmen (2026-08-07).
@@ -67,12 +77,9 @@ export function KarinCalendarWidget() {
 
   if (laddar) {
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl p-4">
-        <div className="flex items-center justify-between text-sm font-semibold text-slate-900 mb-3 min-h-[24px]">
-          Bolagskalendern
-        </div>
+      <RailCard title="Bolagskalendern" href="/dashboard/karin" leading={<AgentAvatar agentKey="karin" size="sm" />}>
         <div className="h-10 bg-slate-50 rounded-lg animate-pulse" />
-      </div>
+      </RailCard>
     )
   }
 
@@ -83,35 +90,35 @@ export function KarinCalendarWidget() {
   if (kommande.length === 0) return null
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-4">
-      <Link
-        href="/dashboard/karin"
-        className="flex items-center justify-between text-sm font-semibold text-slate-900 mb-2 min-h-[44px] -mt-2 -mx-1 px-1"
-      >
-        Bolagskalendern
-        <ChevronRight className="w-4 h-4 text-slate-300" />
-      </Link>
-
+    <RailCard title="Bolagskalendern" href="/dashboard/karin" leading={<AgentAvatar agentKey="karin" size="sm" />}>
       <div className="flex flex-col gap-2.5">
         {kommande.map(e => {
-          const forsenad = dagarKvar(e.due_date) < 0
+          const kvar = dagarKvar(e.due_date)
+          // Brådskan börjar en vecka innan, inte på förfallodagen. En
+          // momsdeklaration som blir amber först när den är försenad har
+          // varnat för sent — hela poängen är att hinna reagera.
+          const bradskar = kvar <= BRADSKAR_DAGAR
           return (
             <div key={e.id} className="flex items-center gap-2.5">
-              <span className="font-heading text-[13px] text-primary-700 w-11 shrink-0 tabular-nums">
+              <span
+                className={`font-heading text-[13px] w-11 shrink-0 tabular-nums ${bradskar ? 'text-amber-700' : 'text-primary-700'}`}
+              >
                 {new Date(e.due_date + 'T12:00:00').toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}
               </span>
-              <span className="w-[3px] h-8 rounded-sm bg-primary-500 shrink-0" />
+              <span className={`w-[3px] h-8 rounded-sm shrink-0 ${bradskar ? 'bg-amber-500' : 'bg-primary-500'}`} />
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium text-slate-900 truncate">{e.title}</span>
                 <span className="block text-xs text-slate-400 truncate">{e.authority}</span>
               </span>
-              <span className={`text-xs shrink-0 whitespace-nowrap ${forsenad ? 'text-amber-700 font-semibold' : 'text-slate-400'}`}>
+              <span
+                className={`text-xs shrink-0 whitespace-nowrap ${bradskar ? 'text-amber-700 font-semibold' : 'text-slate-400'}`}
+              >
                 {nedrakning(e.due_date)}
               </span>
             </div>
           )
         })}
       </div>
-    </div>
+    </RailCard>
   )
 }
