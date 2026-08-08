@@ -136,18 +136,44 @@ COMMENT ON COLUMN public.sms_log.sms_parts IS
   'Antal SMS-delar. NULL på rader skrivna före COGS-mätaren (2026-08-08) — '
   'de går inte att räkna om i efterhand.';
 
--- ── 4. usage_record märks avvecklad ────────────────────────────────────────
+-- ── 4. usage_record märks avvecklad — OM den ens finns ─────────────────────
 --
 -- Droppas INTE: en DROP TABLE är oåterkallelig och ger noll värde när
--- läsarna ändå tas bort. Kommentaren finns för att nästa person som hittar
--- tabellen ska förstå varför den är tom i stället för att börja fylla den.
+-- läsarna ändå tas bort.
+--
+-- ═══ DEN HÄR TABELLEN FINNS INTE I PRODUKTION (verifierat 2026-08-08) ═══
+--
+-- Första körningen av v100 föll på 42P01: relation "public.usage_record"
+-- does not exist. sql/billing.sql har alltså ALDRIG körts i produktion.
+--
+-- Det gör bilden värre än kartläggningen visade, inte bättre: billing-sidan
+-- visade inte 0 för att tabellen var tom — den visade 0 för att queryn mot
+-- en OBEFINTLIG tabell felade, och felet slängdes bort
+-- (`const { data: usage } = await supabase...` utan error-läsning). Kunden
+-- fick en siffra som aldrig hade någon källa alls.
+--
+-- Läsarna är borttagna i samma ändring, så inget hänger på den. Kommentaren
+-- sätts bara om tabellen mot förmodan finns i någon miljö — annars ska
+-- migrationen INTE falla på det.
 
-COMMENT ON TABLE public.usage_record IS
-  'AVVECKLAD 2026-08-08. Var död i praktiken: incrementUsage() hade noll '
-  'callsites, så call_minutes skrevs aldrig — men billing-sidan läste '
-  'tabellen och visade 0 för kunden. Räknarformad utan valuta, och '
-  'dubblerade sms_usage. Fyll den inte: kostnad hör i cost_event, kvot i '
-  'sms_usage. Läsarna borttagna i samma ändring.';
+DO $usage_record_kommentar$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'usage_record'
+  ) THEN
+    COMMENT ON TABLE public.usage_record IS
+      'AVVECKLAD 2026-08-08. Var död i praktiken: incrementUsage() hade noll '
+      'callsites, så call_minutes skrevs aldrig — men billing-sidan läste '
+      'tabellen och visade 0 för kunden. Räknarformad utan valuta, och '
+      'dubblerade sms_usage. Fyll den inte: kostnad hör i cost_event, kvot i '
+      'sms_usage. Läsarna borttagna i samma ändring.';
+  ELSE
+    RAISE NOTICE 'usage_record finns inte — hoppar över kommentaren. Det är '
+                 'förväntat: sql/billing.sql har aldrig körts i produktion.';
+  END IF;
+END
+$usage_record_kommentar$;
 
 -- ============================================================================
 -- VERIFIERING efter körning
@@ -176,4 +202,19 @@ COMMENT ON TABLE public.usage_record IS
 -- service_role) — förväntat: noll rader eller permission denied:
 --
 --   SELECT count(*) FROM public.cost_event;
+--
+-- ── FÖLJDFRÅGA SOM v100 AVSLÖJADE ─────────────────────────────────────────
+--
+-- usage_record saknades, alltså kördes sql/billing.sql aldrig. Kontrollera
+-- vad mer ur den filen som saknas — särskilt billing_plan, som /api/billing
+-- och /api/billing/usage läser med .single() och `throw planError`. Saknas
+-- den svarar båda rutterna 500, och billing-sidan visar ingenting alls:
+--
+--   SELECT t.table_name,
+--          (SELECT count(*) FROM information_schema.tables i
+--            WHERE i.table_schema='public' AND i.table_name=t.table_name) AS finns
+--   FROM (VALUES ('billing_plan'),('usage_record'),('billing_event'),
+--                ('sms_usage'),('sms_log'),('cost_event')) AS t(table_name);
+--   -- förväntat efter v100: cost_event=1, sms_log=1, sms_usage=1.
+--   -- billing_plan=0 betyder att billing-sidan är trasig för ALLA kunder.
 -- ============================================================================
