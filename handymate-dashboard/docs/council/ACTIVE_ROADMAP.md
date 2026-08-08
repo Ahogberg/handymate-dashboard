@@ -17,14 +17,15 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
-# Läge 2026-08-07 kväll
+# Läge 2026-08-08 kväll
 
-NOW-vågen är **byggd och i produktion**. Sjutton commits gick ut under dagen.
+NOW-vågen är **byggd och i produktion**. Därefter har orkestrerings-, demo-,
+röst- och kostnadsspåren levererats utan att ändra den kommersiella NEXT-ordningen.
 
 | Epic | Läge |
 |---|---|
 | N1 Schemasanning | **Klar.** 27 döda kolumnreferenser i 13 filer lagade. Vakten utökad till filterkolumner. |
-| N2 Säkerhetsgrind | **Kod klar, migration körd, beteende obevisat.** Se nedan. |
+| N2 Säkerhetsgrind | **Produktionsläget verifierat.** RLS, grants och `SECURITY DEFINER` är kontrollerade mot prod. Det disponibla tvåtenantstestet är fortfarande okört. |
 | N3 Leveranssanning | **Klar.** Auto-sändningen hade aldrig fungerat — rutten kräver session, serveranropet 401:ade varje gång, felet kastades bort. |
 | N4 Karins kvittens | **Klar.** Två lägen, invariant att de sista tre dagarna aldrig går att tysta, synlig ångra. |
 | N5 Godkännande-kontrakt | **Klar.** 43 producenttyper klassade; okänd typ failar stängt. Elva föll tidigare till en gren som gissade fram SMS till kund. |
@@ -32,6 +33,11 @@ NOW-vågen är **byggd och i produktion**. Sjutton commits gick ut under dagen.
 | Offert-P0 (Codex) | **Klar, alla tio.** Publika läckan, referensfoton, beacon-dubbletten, dolda rader, ROT-taket, atomisk signering, lead/deal, versionsfält, unika nummer, momsen. |
 | Innehållslås på accepterade offerter | **Klar.** Kommersiellt innehåll fryst vid accept; ändring kräver ny version. |
 | Inställningarna | **Etapp 1 + 2 klara.** 27 val → sex områden, elva olänkade sidor fick hemvist, mobilen når allt. |
+| Matte Epic 1–2 | **Klara.** Serverägda toolgränser, tenantvaliderade service-role-skrivningar och sekventiell plan med högst tre specialister. |
+| AgentInteraction Epic 3 | **Klar.** Ett presentationskontrakt och samma agentmeddelande på chattytor och moments. |
+| Demo Epic 4–5 | **Klara.** V99 är manuellt körd; reset är demo-only, atomisk och auditerad. Sexstegsstoryn använder riktiga routes och riktigt Matte-flöde. |
+| Röstsäkerhet | **Hårdnad.** Sex tenant-/signaturhål är stängda. En produktionsadapter Voice → Matte är fortfarande ett senare, separat beslut. |
+| Kostnadsmätning | **Grund byggd.** Leverantörsanvändning och COGS kan mätas; detta ändrar inte kundvärdesordningen nedan. |
 
 ## Verifierat mot produktionsdatabasen 2026-08-07
 
@@ -45,20 +51,28 @@ NOW-vågen är **byggd och i produktion**. Sjutton commits gick ut under dagen.
 - v98 failade först på fem `#E2E`-testofferter med samma nummer. Omnumrerade, inte
   raderade — tre av dem hade projekt eller faktura hängande.
 
-## Grinden till NEXT — halvvägs
+## Grinden till NEXT — fortfarande öppen
 
-Båda halvorna finns skrivna, ingen är körd.
+Produktionssnapshoten är gjord, men de två beteendeproven är inte dokumenterat körda.
 
 **Cross-tenant-provet** (`tests/tenant-isolation.integration.spec.ts`, Codex) kräver en
 egen disponibel Supabase-instans. Blockerat av att **`business_config` saknar
 `CREATE TABLE` i `sql/`** — en tom databas går inte att bootstrappa ur repot. DDL ska
 genereras ur prod-schemat och läggas in som baslinje.
 
-**Gyllene vägen** (`tasks/gyllene-vagen.md`) går Christoffer 8 augusti.
+**Gyllene vägen** (`tasks/gyllene-vagen.md`) är färdig som manus men något verifierat
+utfall är ännu inte infört här. Den ska köras i ett separat företag utan produktions-Fortnox.
 
-Allt ovan är databasens och kodens egen beskrivning av sig själv. **Ingenting av dagens
-arbete är ännu bevisat mot verkligheten** — och vi har flera gånger i dag sett saker som
-såg rätt ut i koden och var döda i drift. NEXT startar inte förrän båda halvorna är körda.
+**Tillåten korrigering medan grinden är öppen:** det befintliga
+`missed-revenue`-svepet är redan aktiv produktionskod och beskriver signerad ÄTA och
+ofakturerat material som entydigt fakturerbart. Det är starkare än källorna bevisar.
+Att nedgradera dessa fynd till ett explicit, konservativt klassningskontrakt är en
+NOW-sanningsfix — inte start av den nya X1-fakturavägen.
+
+Allt ovan är databasens och kodens egen beskrivning av sig själv. Produktionssnapshoten
+bevisar det aktuella policytillståndet, men **hela kundkedjans beteende är ännu inte
+bevisat**. Vi har flera gånger sett saker som såg rätt ut i koden och var döda i drift.
+X1b startar inte förrän båda beteendeproven är körda.
 
 ---
 
@@ -515,8 +529,9 @@ domänbetydelse, kundflöde och tvärdomän-implementation.**
 | N4 Karins kvittens | Claude | Codex | `claude/karin-reminder-safety` | `lib/karin/**`, `app/api/karin/**`, Karin-cron och -vy | `business_config`-migrationslanen, Revenue, central exekvering | N1 |
 | N5 Godkännande-kontrakt | Claude | Codex | `claude/approval-action-truth` | Klassning, hanterare, godkännande-UI | Revenue-detektorn, Karin, migrationslanen | N1, N2 |
 | N6 CI-grind | Codex | Claude | `codex/contract-ci` | Ny workflow i repo-roten, testdokumentation | Produktionshanterare, Karin, migrationer, Revenue | N1 |
-| X1 Revenue Recovery V1 | Claude | Codex | `claude/revenue-review-v1` | `lib/value/missed-revenue*`, Revenue-API/UI, adapter mot befintlig fakturabyggare | Generisk fakturaomskrivning, projektekonomi, Karin, migrationer utan reservation | N1, N2, N3, N5 |
-| X1-verifiering | Codex | Claude | `codex/revenue-v1-verification` | Tester, fixtures, funktionslokal observabilitet | Samma produktionsfiler medan Claudes branch är öppen | X1:s payload-kontrakt fryst |
+| X1a Befintlig detektors sanning | Codex | Claude | Nuvarande arbetsträd | `lib/value/missed-revenue.ts`, dess cron, Pengar-på-bordet-semantik och browserlösa facit | Ny fakturaväg, projektekonomikärnan, Karin | NOW klar; får göras före beteendegrinden eftersom vägen redan kör |
+| X1b Revenue Review V1 | Claude | Codex | `claude/revenue-review-v1` | Review-API/UI och en källspecifik adapter mot befintlig fakturabyggare | Generisk fakturaomskrivning, projektekonomi, Karin, migrationer utan reservation | Gyllene vägen + X1a:s kontrakt |
+| X1-verifiering | Codex | Claude | `codex/revenue-v1-verification` | Tester, fixtures, funktionslokal observabilitet | Samma produktionsfiler medan Claudes branch är öppen | X1b:s payload-kontrakt fryst |
 | X2 Outcome Quality | Codex backend → Claude UI | Ömsesidig | Sekventiella worktrees, **aldrig samtidiga** | Codex: ekonomi/frysning/avstämning. Claude: befintlig utfalls-UI efter backend-merge | Samtidiga ändringar i `compute-economics.ts`, `freeze-outcome.ts`, offerthärledning eller samma migration | X1:s pilotbevis |
 
 **Kollisionsregler**
@@ -548,10 +563,13 @@ N2  Säkerhetsgrind                               │
               N5  Godkännande-kontrakt ◄─────────┘
                     │
                     ▼
+        X1a Befintlig detektors sanningsfix
+                    │
+                    ▼
         ══ GRIND: pilotens gyllene väg ══
                     │
                     ▼
-              X1  Revenue Recovery V1
+              X1b Revenue Review V1
                     │
                     ▼
         ══ GRIND: pilotbevis ══
@@ -561,8 +579,9 @@ N2  Säkerhetsgrind                               │
 ```
 
 **Kan gå parallellt:** N3, N4 och N6 efter N2 (olika domäner, inga delade filer).
-**Kan inte:** N5 före N2 (behörighetsprov saknas), X1 före N5 (`missad_intakt` oklassad),
-X2 före X1 (källkvalitetsfynden kommer ur piloten).
+**Kan inte:** X1b före den gyllene vägen, X1b före X1a:s klassningskontrakt eller
+X2 före X1b (källkvalitetsfynden kommer ur piloten). X1a är uttryckligen tillåten
+före grinden eftersom den minskar påståenden i en redan aktiv väg.
 
 ---
 
@@ -606,13 +625,14 @@ Tre tal som aldrig slås ihop: **identifierad ≠ fakturerad ≠ betald.**
 
 ```text
 NEXT ACTION:
-N1 — Schemasanningen. Verifiera och merga de 13 filerna i arbetsträdet plus
-tests/column-contract.spec.ts. Codex äger committen och har redan börjat lösa ut
-filgränsen; ingen annan branch får röra dessa filer förrän den är mergad.
-Klar när: tsc rent, kolumnvakten grön, och intäktssvepet skapar kort mot riktig data.
+1. Kör och dokumentera pilotens gyllene väg i ett separat testföretag.
+2. Skapa den disponibla tvåtenantmiljön och kör
+   tests/tenant-isolation.integration.spec.ts mot den riktiga databasen.
+3. Codex gör X1a: det befintliga intäktssvepet får ett konservativt
+   CONFIRMED_UNBILLED / LIKELY_UNBILLED / NEEDS_REVIEW-kontrakt, falska
+   fastprisbelopp tas bort och cronfel blir synliga.
 
-SAFE PARALLEL ACTION:
-Ingen. N1 rör 13 filer i fem domäner och blockerar avsiktligt allt annat.
-Direkt efter N1-merge startar N2 (Codex, codex/wave0-tenant-cron-gate) —
-och först när N2 är mergad kan N3, N4 och N6 löpa parallellt.
+EFTER GRINDEN:
+Claude bygger X1b:s smala review-yta och exakt en källspecifik väg till ett
+fakturautkast. Ingen autosändning och ingen generell tid+material+ÄTA-byggare.
 ```
