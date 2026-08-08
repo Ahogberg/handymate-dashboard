@@ -191,7 +191,16 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        await resend.emails.send({
+        // ═══ RETURVÄRDET MÅSTE LÄSAS (N3-felklassen, fynd av Codex 2026-08-08) ═══
+        //
+        // Resend-SDK:n kastar INTE vid HTTP-fel — den returnerar
+        // { data: null, error } (node_modules/resend/dist/index.mjs).
+        // Tidigare kastades svaret bort och results.email sattes till true
+        // villkorslöst: en avvisad sändning blev alltså "skickad", och
+        // fakturan fick status sent utan att någonting nått kunden. Exakt
+        // samma mönster som auto-fakturans 401 — påstådd leverans utan
+        // verifierad.
+        const emailRes = await resend.emails.send({
           from: `${business?.business_name || 'Handymate'} <faktura@${process.env.RESEND_DOMAIN || 'handymate.se'}>`,
           to: invoice.customer.email,
           subject: `Faktura ${invoice.invoice_number} från ${business?.business_name || 'oss'}`,
@@ -223,7 +232,12 @@ export async function POST(request: NextRequest) {
           ]
         })
 
-        results.email = true
+        if (emailRes.error) {
+          console.error('Email send rejected by Resend:', emailRes.error)
+          results.errors.push(`Email: ${emailRes.error.message || 'avvisad av e-posttjänsten'}`)
+        } else {
+          results.email = true
+        }
       } catch (emailError: any) {
         console.error('Email send error:', emailError)
         results.errors.push(`Email: ${emailError.message}`)

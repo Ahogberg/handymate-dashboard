@@ -119,3 +119,29 @@ test.describe('pengarna hamnar inte i limbo', () => {
     expect(KOD).toContain('men kunde inte skickas')
   })
 })
+
+test.describe('sändrutten läser Resends svar (fynd av Codex 2026-08-08)', () => {
+  // Resend-SDK:n kastar INTE vid HTTP-fel — den returnerar { data, error }.
+  // Rutten kastade bort svaret och satte results.email = true villkorslöst:
+  // en avvisad sändning blev "skickad" och fakturan fick status sent utan
+  // att något nått kunden. Samma felklass som auto-fakturans 401, fast i
+  // den manuella sändvägen.
+  const RUTT = fs.readFileSync(path.join(ROOT, 'app/api/invoices/send/route.ts'), 'utf8')
+
+  test('returvärdet fångas och felet grenas', () => {
+    expect(RUTT).toContain('const emailRes = await resend.emails.send')
+    expect(RUTT).toContain('if (emailRes.error)')
+  })
+
+  test('email markeras bara skickad när Resend inte avvisat', () => {
+    // results.email = true får bara finnas i else-grenen efter felkontrollen.
+    const i = RUTT.indexOf('if (emailRes.error)')
+    const j = RUTT.indexOf('results.email = true')
+    expect(i).toBeGreaterThan(-1)
+    expect(j, 'results.email sätts före felkontrollen').toBeGreaterThan(i)
+  })
+
+  test('status sent grindas på faktiskt utfall', () => {
+    expect(RUTT).toContain('if (results.email || results.sms)')
+  })
+})

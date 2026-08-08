@@ -50,31 +50,39 @@ SELECT 'v98 constraint quotes_parent_version_unique',
 
 
 -- ───────────────────────────────────────────────────────────────────────────
--- 2. ÄR TENANT-ISOLERINGEN PÅ RIKTIGT?
+-- 2. HUR SER POLICYERNA UT? (en ögonblicksbild — INTE beviset)
 --
--- Grants säger ingenting om radfiltrering — den ligger i policyn.
+-- Codex granskning 2026-08-08 hade rätt: den här läser vad databasen SÄGER om
+-- sig själv. Beviset att isoleringen HÅLLER är cross-tenant-provet
+-- (tests/tenant-isolation.integration.spec.ts) som faktiskt försöker läsa fel
+-- tenants rader med en riktig session. Kör båda; lita bara på provet.
 --
--- DET DU VILL SE: varje tabell har en policy för `authenticated` vars `qual`
--- innehåller is_business_member(business_id).
+-- DET DU VILL SE: rls_pa = true på varje tabell, och för `authenticated` att
+-- BÅDE qual OCH with_check innehåller is_business_member(business_id). En
+-- policy med rätt qual men with_check = NULL/true släpper igenom SKRIVNINGAR
+-- till andras rader trots att läsningen filtreras.
 --
--- DET SOM ÄR ILLA: en kvarvarande rad där `qual` är `true` för authenticated.
--- Då är tabellen fortfarande öppen oavsett hur grants ser ut. (`true` för
--- service_role är däremot väntat och rätt.)
+-- DET SOM ÄR ILLA: qual eller with_check = `true` för authenticated, eller
+-- rls_pa = false. (`true` för service_role är väntat och rätt.)
 -- ───────────────────────────────────────────────────────────────────────────
 SELECT
-  tablename,
-  policyname,
-  roles::text AS roller,
-  cmd,
-  qual
-FROM pg_policies
-WHERE schemaname = 'public'
-  AND tablename IN (
+  p.tablename,
+  c.relrowsecurity AS rls_pa,
+  p.policyname,
+  p.roles::text AS roller,
+  p.cmd,
+  p.qual,
+  p.with_check
+FROM pg_policies p
+JOIN pg_class c ON c.relname = p.tablename
+JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = p.schemaname
+WHERE p.schemaname = 'public'
+  AND p.tablename IN (
     'project', 'project_change', 'project_material',
     'time_entry', 'supplier_invoices', 'business_config',
     'business_integration_credentials'
   )
-ORDER BY tablename, policyname;
+ORDER BY p.tablename, p.policyname;
 
 
 -- ───────────────────────────────────────────────────────────────────────────
@@ -114,8 +122,12 @@ HAVING COUNT(*) > 1;
 -- nattsvep som fungerar lämnar kort efter sig.
 --
 -- DET VIKTIGASTE: finns `missad_intakt`? Intäktssvepet var dött i veckor på
--- grund av en kolumn som inte fanns. Saknas typen här har det fortfarande
--- inte kört skarpt — och då kan Revenue Recovery V1 inte starta.
+-- grund av en kolumn som inte fanns.
+--
+-- OBS (Codex, 2026-08-08): frånvaro bevisar INTE att cronen är död — det kan
+-- också betyda att inga kvalificerade fynd fanns. Saknas typen: skapa ett
+-- känt fynd i testföretaget (signerad ÄTA utan faktura) och se om nästa
+-- nattkörning plockar upp det. Först det skiljer "död" från "inget att hitta".
 --
 -- Se också efter `karin_deadline` (bolagskalenderns påminnelser) och
 -- `review_auto_invoice` (fakturautkast efter avslutat projekt).

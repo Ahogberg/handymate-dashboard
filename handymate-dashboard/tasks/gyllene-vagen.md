@@ -11,7 +11,20 @@ visade tomma sektioner, och auto-fakturan sa "skickad" om fakturor som aldrig
 lämnat huset. Facit är gröna, men facit läser källkod. **Den här vandringen är
 det enda som visar att det verkar i verkligheten.**
 
-**Skicka allt till dig själv, aldrig till en riktig kund.** Skapa en testkund med
+## Innan du börjar — tre regler (efter Codex granskning 2026-08-08)
+
+**1. Kör i ett eget testföretag, inte i ditt riktiga.** En testkund räcker inte:
+vandringen förbrukar offert-, projekt- och fakturanummer, förorenar automationer
+och intäktsmätning — och steg 9 kan registrera en **riktig Fortnox-betalning**
+om fakturan har ett `fortnox_invoice_number` (`lib/invoices/apply-payment.ts`).
+Skapa ett nytt företag för ändamålet, **utan Fortnox-koppling** (eller med ett
+uttryckligt sandboxkonto). Aldrig produktions-Fortnox.
+
+**2. Märk körningen.** Välj ett kör-ID — dagens datum räcker, t.ex. `GV-0808` —
+och skriv det i offertens titel, projektnamnet och fakturans referens. Då går
+körningen att hitta och städa i efterhand, och två körningar blandas aldrig ihop.
+
+**3. Skicka allt till dig själv, aldrig till en riktig kund.** Testkunden har
 din egen mejl och ditt eget nummer.
 
 Kör `sql/verify-state-gyllene-vagen.sql` först och klistra tillbaka svaret — då
@@ -75,7 +88,17 @@ Gå till Projekt.
 Auditen hittade tre olika projektskapare som kör i olika ordning beroende på hur
 offerten accepterades. Två projekt här betyder att de trampar på varandra.
 
-> Ett eller flera? Rätt kund? Syns offerten på projektet?
+**Men "exakt ett" räcker inte** (Codex fynd): den publika signeringen kör först
+en äldre projektmotor och därefter den rikare skaparen — som ser att ett projekt
+redan finns och avstår. Ett enda *tunt* projekt kan alltså betyda att **fel
+skapare vann**. Öppna projektet och kontrollera att det är fylligt:
+
+- adressen från offerten står där
+- budget (timmar och belopp) är satt, inte tom
+- milstolpar finns
+- statusen är rimlig (inte något halvfärdigt internläge)
+
+> Ett eller flera? Rätt kund? Syns offerten? **Är projektet fylligt eller tunt?**
 
 ## 6. Arbeta på det
 
@@ -119,7 +142,12 @@ den som skickad.
 
 **Ska ha hänt:** projektets ekonomi följer med — intäkten syns på projektet.
 
-> Stämmer siffrorna mot vad du fakturerade?
+Kontrollera också projektets **stegkedja**: betalsteget uppdateras i en
+sidokanal som kan fallera utan att betalmarkeringen faller
+(`lib/invoices/apply-payment.ts`). Siffran kan alltså stämma medan steget
+`Betald` aldrig tänds — och då ljuger projektvyn om var jobbet står.
+
+> Stämmer siffrorna? Tändes betalsteget på projektet?
 
 ## 10. Kolla godkännande-kön
 
@@ -180,6 +208,22 @@ slagit till i stället för riktig data.
 **Något som blev sämre.** Vi failar nu stängt på okända korttyper och låser
 accepterade offerter. Om något du brukade kunna göra plötsligt vägrar — säg till.
 Det är i så fall vi som dragit gränsen på fel ställe.
+
+---
+
+## Tre korta extraprov — offertens skarpaste kanter
+
+Vandringen ovan provar huvudflödet. Tre av gårdagens offertfixar ligger utanför
+det och behöver varsin minut:
+
+**Dold rad.** Lägg en rad i en offert, dölj den, spara och öppna igen. Den ska
+finnas kvar dold — inte försvinna, inte bli synlig.
+
+**Referensfoto.** Skapa en offert åt testkunden utan samtycke för referensfoton.
+Inga foton från andra jobb ska följa med i dokumentet.
+
+**ROT-taket.** Sätt testkundens ROT-utnyttjande nära årstaket och signera en
+offert som skulle spränga det. Avdraget ska kapas vid taket, inte räknas fullt.
 
 ---
 
