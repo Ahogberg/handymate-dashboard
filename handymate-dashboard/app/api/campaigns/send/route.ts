@@ -2,42 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
-import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { sendSmsViaElks } from '@/lib/sms-send'
 import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
 
-const ELKS_API_USER = process.env.ELKS_API_USER!
-const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
 
-async function sendSMS(to: string, message: string, from: string): Promise<{ success: boolean; elksId?: string; error?: string }> {
-  try {
-    const response = await fetch('https://api.46elks.com/a1/sms', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        from: sanitizeSenderId(from),
-        to: to,
-        message: message,
-      }),
-    })
-
-    // 46elks svarar ofta plaintext vid fel — läs text först och parsa
-    // defensivt (tidigare kastade .json() före .ok-koll → vilseledande fel).
-    const raw = await response.text()
-    if (!response.ok) {
-      return { success: false, error: raw || 'Unknown error' }
-    }
-    let result: any = {}
-    try { result = JSON.parse(raw) } catch { /* plaintext-svar */ }
-
-    return { success: true, elksId: result.id }
-  } catch (error: any) {
-    return { success: false, error: error.message }
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {

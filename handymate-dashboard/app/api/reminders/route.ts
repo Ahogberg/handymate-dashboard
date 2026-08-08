@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
-import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
-const ELKS_API_USER = process.env.ELKS_API_USER!
-const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
 
 interface Booking {
   booking_id: string
@@ -19,24 +17,35 @@ interface Booking {
   }
 }
 
-async function sendSMS(to: string, message: string, from: string): Promise<boolean> {
-  try {
-    const response = await fetch('https://api.46elks.com/a1/sms', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        from: sanitizeSenderId(from),
-        to: to,
-        message: message,
-      }),
-    })
-    return response.ok
-  } catch {
-    return false
-  }
+/**
+ * Genom strypunkten (etapp 0 batch 1, 2026-08-08).
+ *
+ * Bokningspåminnelser gick tidigare direkt mot 46elks utan opt-out-spärr,
+ * utan sms_log och utan kostnadsmätning. Signaturen har utökats med tenant
+ * och kund — utan dem går varken opt-out eller bokföring att göra.
+ */
+async function sendSMS(
+  supabase: SupabaseClient,
+  businessId: string,
+  to: string,
+  message: string,
+  from: string,
+  customerId?: string | null,
+  bookingId?: string | null,
+): Promise<boolean> {
+  const { sendSmsViaElks } = await import('@/lib/sms-send')
+  const r = await sendSmsViaElks({
+    supabase,
+    businessId,
+    businessName: from,
+    to,
+    message,
+    customerId: customerId || null,
+    relatedId: bookingId || null,
+    messageType: 'booking_reminder',
+  })
+  if (!r.success) console.error('[reminders] SMS misslyckades:', r.error)
+  return r.success
 }
 
 export async function POST(request: NextRequest) {
@@ -96,7 +105,7 @@ export async function POST(request: NextRequest) {
       const suffix = buildSmsSuffix(business.business_name, (business as any).assigned_phone_number)
       const message = `Påminnelse: Du har en tid hos ${business.business_name} imorgon kl ${timeStr}. Välkommen! Behöver du ändra tiden?\n${suffix}`
 
-      const success = await sendSMS(customer.phone_number, message, business.business_name)
+      const success = await sendSMS(supabase, booking.business_id, customer.phone_number, message, business.business_name, (customer as any).customer_id ?? null, booking.booking_id)
 
       if (success) {
         // Markera som skickad

@@ -3,10 +3,7 @@ import { getAuthenticatedBusiness, getBusinessPlanFromConfig, isBillingActive } 
 import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
 import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
 import { getServerSupabase } from '@/lib/supabase'
-import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
-const ELKS_API_USER = process.env.ELKS_API_USER!
-const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,42 +53,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing to or message' }, { status: 400 })
     }
 
-    // Formatera till E.164 (+46...)
-    const formatPhone = (num: string): string => {
-      const clean = num.replace(/[\s\-()]/g, '')
-      if (clean.startsWith('0')) return '+46' + clean.slice(1)
-      return clean.startsWith('+') ? clean : '+' + clean
-    }
-    const formattedTo = formatPhone(to)
-
-    const response = await fetch('https://api.46elks.com/a1/sms', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        from: sanitizeSenderId(business.business_name),
-        to: formattedTo,
-        message: message,
-      }),
+    // ═══ GÅR NU GENOM STRYPUNKTEN (etapp 0 batch 1, 2026-08-08) ═══
+    //
+    // Routen anropade tidigare 46elks direkt med en egen E.164-formaterare.
+    // Den hade kvot, rate limit och billing-check — men INGEN opt-out-spärr,
+    // ingen sms_log-rad och ingen kostnadsmätning. sendSmsViaElks har alla
+    // tre, plus typografitvätten som halverar kostnaden för meddelanden med
+    // tankstreck.
+    //
+    // BETEENDEÄNDRING: en kund som svarat STOPP blockeras nu även här. Det är
+    // avsiktligt — men eftersom det här är hantverkarens EGET manuella utskick
+    // får hen ett tydligt besked i stället för en tyst uteblivelse, så hen kan
+    // ringa i stället. Ett tyst bortfall vore värre än ett nej.
+    const { sendSmsViaElks } = await import('@/lib/sms-send')
+    const smsResult = await sendSmsViaElks({
+      supabase,
+      businessId: business.business_id,
+      businessName: business.business_name,
+      to,
+      message,
+      messageType: 'manual',
     })
 
-    // 46elks returnerar ibland plaintext, inte JSON
-    const responseText = await response.text()
-    let result: any
-    try {
-      result = JSON.parse(responseText)
-    } catch {
-      if (!response.ok) {
-        return NextResponse.json({ error: responseText || 'SMS failed' }, { status: 500 })
-      }
-      result = { id: 'unknown' }
+    if (!smsResult.success) {
+      const optOut = smsResult.error === 'Kunden har avböjt SMS'
+      return NextResponse.json(
+        {
+          error: optOut
+            ? 'Kunden har tackat nej till SMS. Ring eller mejla i stället.'
+            : smsResult.error || 'SMS kunde inte skickas',
+          ...(optOut ? { opt_out: true } : {}),
+        },
+        { status: optOut ? 409 : 500 }
+      )
     }
 
-    if (!response.ok) {
-      return NextResponse.json({ error: result.message || responseText || 'SMS failed' }, { status: 500 })
-    }
+    const result = { id: smsResult.elksId || 'unknown' }
 
     // Räkna upp SMS-usage
     try {

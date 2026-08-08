@@ -9,7 +9,6 @@ import { generateInvoicePDF } from '@/lib/pdf-generator'
 import { generateSwishQR } from '@/lib/swish-qr'
 import { buildInvoicePdfBuffer } from '@/lib/invoices/build-invoice-pdf'
 import { randomUUID } from 'crypto'
-import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 // Chromium-rendering (buildInvoicePdfBuffer → renderHtmlToPdf) kräver
 // Node-runtime och en generösare timeout än default — samma mönster som
@@ -250,24 +249,25 @@ export async function POST(request: NextRequest) {
         const amountToPay = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
         const smsLink = portalUrl || `${APP_URL}/api/invoices/pdf?invoiceId=${invoice_id}`
 
-        const smsResponse = await fetch('https://api.46elks.com/a1/sms', {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Basic ' + Buffer.from(`${process.env.ELKS_API_USER}:${process.env.ELKS_API_PASSWORD}`).toString('base64'),
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            from: sanitizeSenderId(business?.business_name),
-            to: invoice.customer.phone_number,
-            message: `Faktura ${invoice.invoice_number} från ${business?.business_name || 'oss'}.\n\nAtt betala: ${amountToPay?.toLocaleString('sv-SE')} kr\nFörfaller: ${new Date(invoice.due_date).toLocaleDateString('sv-SE')}\n\nSe faktura: ${smsLink}`
-          }).toString()
+        // Genom strypunkten (etapp 0 batch 1) — ger opt-out-spärr, sms_log,
+        // kostnadsmätning och typografitvätt. Utan den kunde en kund som
+        // svarat STOPP få fakturan via SMS ändå.
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const smsResult = await sendSmsViaElks({
+          supabase,
+          businessId: business.business_id,
+          businessName: business?.business_name,
+          to: invoice.customer.phone_number,
+          message: `Faktura ${invoice.invoice_number} från ${business?.business_name || 'oss'}.\n\nAtt betala: ${amountToPay?.toLocaleString('sv-SE')} kr\nFörfaller: ${new Date(invoice.due_date).toLocaleDateString('sv-SE')}\n\nSe faktura: ${smsLink}`,
+          customerId: invoice.customer_id || null,
+          relatedId: invoice_id,
+          messageType: 'invoice',
         })
 
-        if (smsResponse.ok) {
+        if (smsResult.success) {
           results.sms = true
         } else {
-          const smsError = await smsResponse.text()
-          results.errors.push(`SMS: ${smsError}`)
+          results.errors.push(`SMS: ${smsResult.error || 'kunde inte skickas'}`)
         }
       } catch (smsError: any) {
         console.error('SMS send error:', smsError)

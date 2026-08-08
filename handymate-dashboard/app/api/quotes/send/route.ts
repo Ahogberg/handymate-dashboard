@@ -1,47 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { checkSmsRateLimitDb, checkEmailRateLimitDb } from '@/lib/rate-limit-db'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { getOrCreatePortalLink } from '@/lib/portal-link'
-import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { escapeHtml } from '@/lib/document-html'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 
-const ELKS_API_USER = process.env.ELKS_API_USER
-const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
 /**
  * Skicka SMS via 46elks
  */
-async function sendSMS(to: string, message: string, from: string): Promise<boolean> {
-  if (!ELKS_API_USER || !ELKS_API_PASSWORD) {
-    console.error('46elks credentials not configured')
-    return false
-  }
-
-  try {
-    const response = await fetch('https://api.46elks.com/a1/sms', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        from: sanitizeSenderId(from),
-        to: to,
-        message: message,
-      }),
-    })
-    return response.ok
-  } catch (error) {
-    console.error('SMS send error:', error)
-    return false
-  }
+/**
+ * Genom strypunkten (etapp 0 batch 1, 2026-08-08).
+ *
+ * Anropade tidigare 46elks direkt och saknade därmed opt-out-spärren,
+ * sms_log-raden och kostnadsmätningen. Signaturen har utökats med tenant och
+ * kund — utan dem kan varken opt-out kollas eller kostnaden bokföras på rätt
+ * företag.
+ */
+async function sendSMS(
+  supabase: SupabaseClient,
+  businessId: string,
+  to: string,
+  message: string,
+  from: string,
+  customerId?: string | null,
+  quoteId?: string | null,
+): Promise<boolean> {
+  const { sendSmsViaElks } = await import('@/lib/sms-send')
+  const r = await sendSmsViaElks({
+    supabase,
+    businessId,
+    businessName: from,
+    to,
+    message,
+    customerId: customerId || null,
+    relatedId: quoteId || null,
+    messageType: 'quote',
+  })
+  if (!r.success) console.error('[quotes/send] SMS misslyckades:', r.error)
+  return r.success
 }
 
 /**
@@ -475,7 +479,7 @@ ${portalUrl}
 Frågor? Ring ${business.phone_number}
 ${suffix}`
 
-      smsSent = await sendSMS(quote.customer.phone_number, smsMessage, business.business_name)
+      smsSent = await sendSMS(supabase, business.business_id, quote.customer.phone_number, smsMessage, business.business_name, quote.customer_id, quoteId)
 
       if (smsSent) {
         // Logga SMS-aktivitet

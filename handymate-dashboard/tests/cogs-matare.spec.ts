@@ -322,12 +322,12 @@ test.describe('spärrhaken — läckaget får bara krympa', () => {
    * voice/execute.
    */
   const KVAR_ATT_MIGRERA = [
-    // Etapp 9 batch 1 — volym och användarvänt
-    'app/api/sms/send/route.ts',
-    'app/api/campaigns/send/route.ts',
-    'app/api/reminders/route.ts',
-    'app/api/quotes/send/route.ts',
-    'app/api/invoices/send/route.ts',
+    // ── Batch 1 MIGRERAD 2026-08-08 ──────────────────────────────────────
+    // sms/send, campaigns/send, reminders, quotes/send, invoices/send går nu
+    // genom sendSmsViaElks. Beteendeändring: opt-out-spärren gäller dem alla.
+    // I sms/send (hantverkarens EGNA manuella utskick) returneras 409 med ett
+    // tydligt besked i stället för tyst bortfall — hen ska kunna ringa i
+    // stället, inte undra varför inget hände.
     // batch 2 — agent och automation
     'lib/approve-actions.ts',
     'lib/automation-engine.ts',
