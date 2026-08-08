@@ -1112,7 +1112,13 @@ function VoiceTab({
  * därför renderas bandet inte alls innan det finns något att visa.
  */
 function MatteValueStrip() {
-  const [varde, setVarde] = useState<{ confirmed_kr: number; captured_kr: number; time_hours: number } | null>(null)
+  const [varde, setVarde] = useState<{
+    confirmed_kr: number
+    captured_kr: number
+    time_hours: number
+    confirmed_items: Array<{ label: string; amount: number; agent: string; dagar: number }>
+  } | null>(null)
+  const [oppen, setOppen] = useState(false)
 
   useEffect(() => {
     let aktiv = true
@@ -1127,23 +1133,55 @@ function MatteValueStrip() {
   const harNagot = varde.confirmed_kr > 0 || varde.captured_kr > 0 || varde.time_hours > 0
   if (!harNagot) return null
 
+  const bevis = varde.confirmed_items ?? []
+
   return (
-    <div className="flex items-center gap-3 px-4 py-2 bg-primary-50/60 border-b border-primary-100 text-[11px] leading-tight flex-shrink-0 overflow-x-auto">
-      <span className="font-semibold text-primary-900 whitespace-nowrap">Senaste 30 dagarna</span>
-      {varde.confirmed_kr > 0 && (
-        <span className="whitespace-nowrap text-primary-800">
-          <b className="font-bold">{formatKr(varde.confirmed_kr)}</b> bekräftat
-        </span>
-      )}
-      {varde.captured_kr > 0 && (
-        <span className="whitespace-nowrap text-primary-700/80">
-          {formatKr(varde.captured_kr)} potential
-        </span>
-      )}
-      {varde.time_hours > 0 && (
-        <span className="whitespace-nowrap text-primary-700/80">
-          ≈ {varde.time_hours} h sparade
-        </span>
+    <div className="flex-shrink-0 border-b border-primary-100">
+      <button
+        type="button"
+        onClick={() => setOppen(o => !o)}
+        className="w-full flex items-center gap-3 px-4 py-2 bg-primary-50/60 text-[11px] leading-tight overflow-x-auto"
+      >
+        <span className="font-semibold text-primary-900 whitespace-nowrap">Senaste 30 dagarna</span>
+        {varde.confirmed_kr > 0 && (
+          <span className="whitespace-nowrap text-primary-800">
+            <b className="font-bold">{formatKr(varde.confirmed_kr)}</b> bekräftat
+          </span>
+        )}
+        {varde.captured_kr > 0 && (
+          <span className="whitespace-nowrap text-primary-700/80">
+            {formatKr(varde.captured_kr)} potential
+          </span>
+        )}
+        {varde.time_hours > 0 && (
+          <span className="whitespace-nowrap text-primary-700/80">
+            ≈ {varde.time_hours} h sparade
+          </span>
+        )}
+        {bevis.length > 0 && (
+          <ChevronRight className={`w-3.5 h-3.5 text-primary-400 ml-auto shrink-0 transition-transform ${oppen ? 'rotate-90' : ''}`} />
+        )}
+      </button>
+
+      {/* Värdebevisen: varje bekräftad krona bär sin berättelse — vilken
+          agent, vilket utskick, hur många dagar till utfallet. Det är
+          kvittot på varför man betalar, och det går aldrig att expandera
+          fram en rad som attributionskärnan inte verifierat. */}
+      {oppen && bevis.length > 0 && (
+        <div className="px-4 py-2 bg-white border-t border-primary-50 max-h-40 overflow-y-auto">
+          {bevis.slice(0, 6).map((b, i) => (
+            <div key={`${b.label}-${i}`} className="flex items-center gap-2 py-1.5">
+              <AgentAvatar agentKey={b.agent} size="sm" />
+              <span className="flex-1 min-w-0 text-xs text-gray-600 truncate">{b.label}</span>
+              <span className="shrink-0 text-right">
+                <span className="block text-xs font-bold text-gray-900">+{formatKr(b.amount)}</span>
+                <span className="block text-[10px] text-gray-400">
+                  {b.dagar === 0 ? 'samma dag' : `inom ${b.dagar} ${b.dagar === 1 ? 'dag' : 'dagar'}`}
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )

@@ -931,6 +931,28 @@ export default function AgentDashboardPage() {
   const [agentSettings, setAgentSettings] = useState<AgentSettings>(DEFAULT_SETTINGS)
   const [trustData, setTrustData] = useState<TrustLadderData | null>(null)
   const [memoryCounts, setMemoryCounts] = useState<Record<string, number>>({})
+
+  // Bekräftat värde per agent, senaste 30 dagarna (2026-08-08). Kommer ur
+  // attributionskärnan via weekly-value — bara verifierade händelser, aldrig
+  // uppskattningar. En agent utan bekräftade kronor får ingen siffra alls.
+  const [agentVarde, setAgentVarde] = useState<Record<string, number>>({})
+  useEffect(() => {
+    let aktiv = true
+    fetch('/api/dashboard/weekly-value?days=30')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!aktiv || !Array.isArray(d?.confirmed_items)) return
+        const perAgent: Record<string, number> = {}
+        for (const item of d.confirmed_items) {
+          if (typeof item?.amount !== 'number' || item.amount <= 0) continue
+          const agent = typeof item.agent === 'string' ? item.agent : 'matte'
+          perAgent[agent] = (perAgent[agent] || 0) + item.amount
+        }
+        setAgentVarde(perAgent)
+      })
+      .catch(() => { /* siffran är grädde — teamvyn står ändå */ })
+    return () => { aktiv = false }
+  }, [])
   const [teamMessages, setTeamMessages] = useState<Array<{ from_agent: string; to_agent: string; content: string; created_at: string; message_type?: string; metadata?: any }>>([])
   const [showAllMessages, setShowAllMessages] = useState(false)
 
@@ -1180,6 +1202,11 @@ export default function AgentDashboardPage() {
               <span className="text-sm font-semibold text-gray-900 block">{agent.name}</span>
               <span className="text-[11px] text-gray-500 block">{agent.role}</span>
               {allowed && agent.description && <span className="text-[10px] text-gray-400 hidden sm:block mt-0.5">{agent.description}</span>}
+              {allowed && (agentVarde[agent.id] || 0) > 0 && (
+                <span className="inline-flex items-center text-[10px] font-semibold text-emerald-700 mt-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100">
+                  +{Math.round(agentVarde[agent.id]).toLocaleString('sv-SE')} kr · 30 dgr
+                </span>
+              )}
               {allowed && (memoryCounts[agent.id] || 0) > 0 && (
                 <span
                   role="button"

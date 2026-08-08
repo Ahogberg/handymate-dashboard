@@ -45,7 +45,8 @@ const ACTION_DEFAULT = 6
 export interface WeeklyValue {
   range_days: number
   confirmed_kr: number
-  confirmed_items: Array<{ label: string; amount: number }>
+  /** Värdebevisen: agent + dagar-till-utfall gör varje rad till en berättelse. */
+  confirmed_items: Array<{ label: string; amount: number; agent: string; dagar: number }>
   captured_count: number
   captured_kr: number
   calls_captured: number
@@ -123,9 +124,15 @@ export async function getWeeklyValue(
   // attribuerade till godkända outbound-kort. Bokningsattributioner (0 kr)
   // hålls utanför radlistan — de är händelser, inte kronor.
   const recovered = await getRecoveredRevenue(supabase, businessId, { sinceDays: rangeDays })
-  const confirmedItems: Array<{ label: string; amount: number }> = recovered.attributions
+  const confirmedItems: WeeklyValue['confirmed_items'] = recovered.attributions
     .filter((a) => a.amount_kr > 0)
-    .map((a) => ({ label: a.label, amount: Math.round(a.amount_kr) }))
+    .map((a) => ({
+      label: a.label,
+      amount: Math.round(a.amount_kr),
+      agent: a.agent ?? 'matte',
+      // Dagar från godkänt kort till verifierad händelse — bevisets tidsspann.
+      dagar: Math.max(0, Math.round((a.occurred_at_ms - a.card_resolved_at_ms) / 86_400_000)),
+    }))
 
   return {
     range_days: rangeDays,

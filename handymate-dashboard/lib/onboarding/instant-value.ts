@@ -29,6 +29,14 @@ export interface InstantValue {
   customer_count: number
   open_deals_count: number
   open_deals_value_kr: number
+  /**
+   * 90-dagarsgenomgången (2026-08-08): rena ANTAL för checklistan efter
+   * import — "87 offerter analyserade ✓". Bara counts, ingen AI-väntan i
+   * onboardingflödet; noll är ett giltigt svar och animeras inte bort.
+   */
+  quotes_analyzed: number
+  projects_analyzed: number
+  invoices_analyzed: number
   headline: InstantHeadline
 }
 
@@ -70,6 +78,10 @@ export function computeInstantValue(input: {
   customerCount: number
   deals: InstantDealRow[]
   stages: InstantStageRow[]
+  /** 90-dagarsgenomgångens counts — valfria så befintliga anropare står orörda. */
+  quotesAnalyzed?: number
+  projectsAnalyzed?: number
+  invoicesAnalyzed?: number
 }): InstantValue {
   let overdue_count = 0
   let overdue_sum_kr = 0
@@ -117,7 +129,13 @@ export function computeInstantValue(input: {
     open_deals_value_kr,
   }
 
-  return { ...base, headline: pickHeadline(base) }
+  return {
+    ...base,
+    quotes_analyzed: Math.max(0, Math.round(input.quotesAnalyzed ?? 0)),
+    projects_analyzed: Math.max(0, Math.round(input.projectsAnalyzed ?? 0)),
+    invoices_analyzed: Math.max(0, Math.round(input.invoicesAnalyzed ?? input.invoices.length)),
+    headline: pickHeadline(base),
+  }
 }
 
 /**
@@ -129,7 +147,7 @@ export function computeInstantValue(input: {
  *   4. Kunder importerade   → Hanna (redo att jobba)
  *   5. Tomt (skippad import) → Lisa, mjuk default, aldrig fabricerat
  */
-export function pickHeadline(v: Omit<InstantValue, 'headline'>): InstantHeadline {
+export function pickHeadline(v: Omit<InstantValue, 'headline' | 'quotes_analyzed' | 'projects_analyzed' | 'invoices_analyzed'>): InstantHeadline {
   if (v.overdue_count > 0) {
     return {
       agent: 'Karin',

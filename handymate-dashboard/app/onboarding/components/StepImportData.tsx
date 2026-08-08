@@ -52,6 +52,27 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
   const [csvCount, setCsvCount] = useState(0)
   const [csvBusy, setCsvBusy] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+
+  // 90-dagarsgenomgången: när importen är klar hämtas RIKTIGA counts —
+  // checklistan tickar aldrig fram siffror vi inte har.
+  const [genomgang, setGenomgang] = useState<Array<{ antal: number; label: string }> | null>(null)
+  useEffect(() => {
+    if (view !== 'fortnox-done' && view !== 'csv-done') return
+    let aktiv = true
+    fetch('/api/onboarding/instant-value')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!aktiv || !d) return
+        setGenomgang([
+          { antal: d.customer_count ?? 0, label: 'kunder' },
+          { antal: d.quotes_analyzed ?? 0, label: 'offerter' },
+          { antal: d.projects_analyzed ?? 0, label: 'projekt' },
+          { antal: d.invoices_analyzed ?? 0, label: 'fakturor' },
+        ])
+      })
+      .catch(() => { /* genomgången är grädde — importresultatet står ändå */ })
+    return () => { aktiv = false }
+  }, [view])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const importStartedRef = useRef(false)
 
@@ -224,6 +245,7 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
               { num: String(fortnoxResult.invoices), label: 'obetalda fakturor' },
               { num: fortnoxResult.outstandingKr.toLocaleString('sv-SE'), label: 'kr utestående', hero: true },
             ]}
+            genomgang={genomgang ?? undefined}
             agent={fortnoxResult.invoices > 0 ? {
               id: 'karin',
               text: <><b>Karin</b> har förberett påminnelser på dina obetalda fakturor — du godkänner dem på dashboarden.</>,
@@ -307,6 +329,7 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
           <SuccessView
             title={<><span className="hl">{csvCount} kunder</span> inlästa</>}
             sub="Teamet kan nu jobba på hela din kundbas."
+            genomgang={genomgang ?? undefined}
             agent={{
               id: 'hanna',
               text: <><b>Hanna</b> kan nu väcka dina vilande kunder med en reaktiverings-kampanj — starta den på dashboarden.</>,
@@ -353,16 +376,51 @@ function FallbackNote({ text }: { text: string }) {
   )
 }
 
+/**
+ * 90-dagarsgenomgången (2026-08-08): raderna tickas i efter varandra —
+ * känslan av att teamet GÅR IGENOM verksamheten, inte bara räknar rader.
+ * Bara rader med innehåll visas: "0 offerter analyserade ✓" är ingen
+ * genomgång, det är en tom databas med konfetti.
+ */
+function GenomgangChecklist({ rader }: { rader: Array<{ antal: number; label: string }> }) {
+  const synliga = rader.filter(r => r.antal > 0)
+  const [visade, setVisade] = useState(0)
+
+  useEffect(() => {
+    if (visade >= synliga.length) return
+    const t = setTimeout(() => setVisade(v => v + 1), 450)
+    return () => clearTimeout(t)
+  }, [visade, synliga.length])
+
+  if (synliga.length === 0) return null
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '18px auto 0', maxWidth: 320, textAlign: 'left' }}>
+      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#94A3B8' }}>
+        Genomgång av senaste 90 dagarna
+      </p>
+      {synliga.slice(0, visade).map(r => (
+        <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#334155' }}>
+          <Check size={15} strokeWidth={2.6} style={{ color: '#0F766E', flexShrink: 0 }} />
+          <span><b>{r.antal.toLocaleString('sv-SE')}</b> {r.label} analyserade</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function SuccessView({
   title,
   sub,
   stats,
   agent,
+  genomgang,
 }: {
   title: React.ReactNode
   sub: string
   stats?: Array<{ num: string; label: string; hero?: boolean }>
   agent?: { id: string; text: React.ReactNode }
+  genomgang?: Array<{ antal: number; label: string }>
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '100%' }}>
@@ -370,6 +428,8 @@ function SuccessView({
         <div className="obi-burst"><Check size={40} strokeWidth={2.6} /></div>
         <h1 className="obi-success-title">{title}</h1>
         <p className="obi-success-sub">{sub}</p>
+
+        {genomgang && <GenomgangChecklist rader={genomgang} />}
 
         {stats && stats.length > 0 && (
           <div className="obi-stats">

@@ -27,7 +27,12 @@ export async function GET(request: NextRequest) {
 
   // Obetalda fakturor (samma konvention som cash-radar-data: status IN
   // ('sent','overdue'), belopp = total). Öppna deals filtreras via stage-flaggor.
-  const [invoicesRes, customerRes, dealRows, stagesRes] = await Promise.all([
+  // 90-dagarsfönstret för genomgångens counts — samma period som
+  // agentobservationerna analyserar. Bara head-counts: onboardingen får
+  // aldrig vänta på tung analys.
+  const nittioDagar = new Date(Date.now() - 90 * 86_400_000).toISOString()
+
+  const [invoicesRes, customerRes, dealRows, stagesRes, quotesCountRes, projectsCountRes, invoicesCountRes] = await Promise.all([
     supabase
       .from('invoice')
       .select('total, status')
@@ -47,6 +52,21 @@ export async function GET(request: NextRequest) {
       .from('pipeline_stage')
       .select('id, is_won, is_lost')
       .eq('business_id', businessId),
+    supabase
+      .from('quotes')
+      .select('quote_id', { count: 'exact', head: true })
+      .eq('business_id', businessId)
+      .gte('created_at', nittioDagar),
+    supabase
+      .from('project')
+      .select('project_id', { count: 'exact', head: true })
+      .eq('business_id', businessId)
+      .gte('created_at', nittioDagar),
+    supabase
+      .from('invoice')
+      .select('invoice_id', { count: 'exact', head: true })
+      .eq('business_id', businessId)
+      .gte('created_at', nittioDagar),
   ])
 
   const result = computeInstantValue({
@@ -54,6 +74,9 @@ export async function GET(request: NextRequest) {
     customerCount: customerRes.count ?? 0,
     deals: dealRows.data ?? [],
     stages: stagesRes.data ?? [],
+    quotesAnalyzed: quotesCountRes.count ?? 0,
+    projectsAnalyzed: projectsCountRes.count ?? 0,
+    invoicesAnalyzed: invoicesCountRes.count ?? 0,
   })
 
   return NextResponse.json(result)

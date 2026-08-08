@@ -17,6 +17,7 @@ import { ScheduleTimeline, parseKonflikter, minuterFranIso } from '@/components/
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { QuoteDraftDetail, QuoteToolExit } from '@/components/jarvis/QuoteDraftDetail'
 import { KarinCalendarWidget } from '@/components/karin/KarinCalendarWidget'
+import { PengarRailCard } from '@/components/jarvis/PengarRailCard'
 import { approvalPreview, isEditable, buildApprovalEdit } from '@/lib/jarvis/approval-preview'
 import {
   agentForApproval,
@@ -632,6 +633,7 @@ export default function JarvisHome({
           {/* Karins bolagskalender. Renderar ingenting för anställda, och
               inget när profilen saknar uppgifter — en widget som säger
               "inget på gång" när vi inte vet vore osann. */}
+          <PengarRailCard />
           <KarinCalendarWidget />
         </aside>
 

@@ -29,6 +29,7 @@ import {
   Globe,
   HelpCircle,
   Package,
+  Banknote,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -91,6 +92,9 @@ const NAV: NavItem[] = [
     ],
   },
   { type: 'link', key: 'approvals', label: 'Godkännanden', icon: ClipboardCheck, href: '/dashboard/approvals', hasApprovalBadge: true },
+  // Pengar på bordet (2026-08-08): "var ligger pengarna ni riskerar att missa"
+  // — fem kategorier ur befintliga källor, se lib/value/pengar-pa-bordet.ts.
+  { type: 'link', key: 'pengar', label: 'Pengar på bordet', icon: Banknote, href: '/dashboard/pengar' },
   { type: 'link', key: 'customers', label: 'Kunder', icon: Users, href: '/dashboard/customers', paths: ['/dashboard/customers', '/dashboard/warranties', '/dashboard/customer-portal'] },
   { type: 'link', key: 'pipeline', label: 'Verksamhetsöversikt', icon: TrendingUp, href: '/dashboard/pipeline' },
   { type: 'link', key: 'agent', label: 'Mitt team', icon: Bot, href: '/dashboard/agent' },
