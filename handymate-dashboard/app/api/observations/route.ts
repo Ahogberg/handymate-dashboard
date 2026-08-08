@@ -93,9 +93,18 @@ export async function GET(request: NextRequest) {
           .eq('status', 'pending')
           .in('id', linkedIds)
         const pendingSet = new Set((pendingRows || []).map((r: any) => r.id))
+        // ═══ ETT AVFÄRDAT KORT SKA INTE ÅTERUPPSTÅ SOM NYHET (2026-08-08) ═══
+        //
+        // Nollningen ovan är rätt för Agera-knappen, men den hade en
+        // bieffekt ingen såg: hemskärmens nyhetsfilter testar bara
+        // `!related_approval_id`. Ett beslutskort man precis avfärdat dök
+        // därför upp igen längre ned på sidan, som en nyhetsrad.
+        //
+        // `had_approval` skiljer "hade aldrig ett kort" från "hade ett kort
+        // som är hanterat". Klienten filtrerar på båda.
         observations = observations.map((o: any) =>
           o.related_approval_id && !pendingSet.has(o.related_approval_id)
-            ? { ...o, related_approval_id: null }
+            ? { ...o, related_approval_id: null, had_approval: true }
             : o,
         )
       }

@@ -630,21 +630,27 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
    - Vilken kund-typ (privat / brf / företag) accepterar oftast?
    - Vilken typ har lägst acceptance-rate — är det offerten eller pris?
    - Finns det en kund-typ vi underskattar i vår jakt?
+   - dedup_key: "daniel_conversion_by_customer_type" — EN nyckel för hela
+     fenomenet, oavsett hur du formulerar dig.
 
 2. **Stale-offerter (öppnade men inte signerade):**
    - Vilka offerter har 3+ visningar utan signering? Det är heta kunder som tvekar.
    - Hur länge har de legat? Värt en personlig follow-up?
    - Vilka beloppsklasser fastnar mest?
+   - dedup_key: "daniel_stale_quotes_pattern" (mönstret som helhet). Gäller
+     en ENSKILD offert är punkt 5 rätt plats, med offertens id i nyckeln.
 
 3. **Lead-källor med högst konvertering:**
    - Vilken källa (sms/voice/webform/partners/manual) ger flest vinster?
    - Var lägger vi tid på leads som aldrig stänger?
    - Finns en kanal vi underinvesterar i?
+   - dedup_key: "daniel_lead_source_conversion".
 
 4. **Pris-elasticitet per kund-typ:**
    - Vilken kund-typ accepterar de högsta beloppen?
    - Skiljer accepterad vs avvisad snittsumma per typ?
    - Vilket prisspann ger högst acceptans?
+   - dedup_key: "daniel_price_elasticity".
 
 4b. **Visningsnivå vs acceptans (2026-07-12):**
    - I aggregate.acceptance_by_detail_level (kan vara null om för lite data)
@@ -695,6 +701,13 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
    - ÄRLIGHETSREGEL: nämn ALDRIG en procentsats du inte har i aggregate.ata_frequency_by_job_type. Tom array, eller ingen jobbtyp över 40% → hoppa HELT över denna punkt.
 
 Generera 1-3 KORTA observationer (max 2-3 meningar var) med konkret suggestion när det är vettigt.
+
+DEDUP-NYCKELN BESKRIVER FENOMENET, INTE FORMULERINGEN (2026-08-08).
+Punkt 1-4 saknade instruerad dedup_key och föll därför tillbaka på en nyckel
+härledd ur rubriken. Skrev du om dig — "BRF accepterar 92% av offerterna" ena
+dagen, "BRF-kunder vinner oftast" nästa — blev det en NY nyckel och en ny rad.
+Hemskärmen fick fem varianter av samma tio offerter. Två observationer om
+samma sak ska ha samma nyckel även när orden skiljer sig.
 
 Var inte trivial. "Du har X offerter ute" = data, inte observation.
 "BRF Lindgården har öppnat offert ÄTA-22 fem gånger men inte signerat — värt en personlig påringning?" = observation.

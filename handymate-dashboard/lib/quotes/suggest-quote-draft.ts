@@ -328,6 +328,14 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
       title: `Offertutkast redo för ${leadName} — ${generated.jobTitle}`,
       description: generated.jobDescription || textDescription.slice(0, 200),
       status: 'pending',
+      // ═══ UTKASTET ÅLDRAS (2026-08-08) ═══
+      //
+      // expires_at saknades, och underhållscronens `.lt('expires_at', now)`
+      // matchar aldrig NULL — kortet låg alltså kvar för evigt. Ett tre veckor
+      // gammalt AI-utkast är prissatt på gammal data och sämre än inget
+      // utkast. Leaden finns kvar i pipeline oavsett; det är bara förslaget
+      // som försvinner.
+      expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
       risk_level: 'low',
       payload: {
         routed_agent: 'daniel',

@@ -144,6 +144,27 @@ export async function saveAndPush(
       continue
     }
 
+    // ═══ TAKET FLYTTADE BRUS I STÄLLET FÖR ATT TA BORT DET (2026-08-08) ═══
+    //
+    // Kontrollen låg tidigare EFTER inserten. Följden: observationen sparades,
+    // fick inget related_approval_id, och hemskärmens nyhetsfilter
+    // (`observations.filter(o => !o.related_approval_id)`) släppte då igenom
+    // den som en "Värt att veta"-rad. Ett tak tänkt att skona hantverkaren
+    // från spam förvandlade alltså beslutskort till nyhetsrader.
+    //
+    // Nu hoppas hela observationen över när kvoten är slut. Den är inte
+    // förlorad: underlaget finns kvar i morgondagens körning, då kvoten är
+    // ny — och dedup-nyckeln hindrar att den dubbleras när den kommer
+    // tillbaka. En observation UTAN suggestion är en ren nyhetsrad och rörs
+    // inte av taket, som bara gäller approvals.
+    if (obs.suggestion && obs.suggestion.trim().length > 0 && approvalsRemainingToday <= 0) {
+      skippedRateLimit++
+      console.log(
+        `[rate-limit] agent=${agentId} business=${businessId} dagskvot slut — observationen sparas inte, den återkommer imorgon`,
+      )
+      continue
+    }
+
     // ── INSERT business_knowledge ─────────────────────────────
     const { data: savedRow, error: saveErr } = await supabase
       .from('business_knowledge')
@@ -179,7 +200,7 @@ export async function saveAndPush(
       if (approvalsRemainingToday <= 0) {
         skippedRateLimit++
         console.log(
-          `[rate-limit] agent=${agentId} business=${businessId} dagskvot slut — observation sparad utan approval`,
+          `[rate-limit] agent=${agentId} business=${businessId} dagskvot slut — hoppas över, återkommer imorgon`,
         )
         continue
       }

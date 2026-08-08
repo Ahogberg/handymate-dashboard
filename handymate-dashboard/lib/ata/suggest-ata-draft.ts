@@ -190,6 +190,10 @@ export async function suggestAtaDraft(
       title: `ÄTA-förslag: ${description.slice(0, 80)}`,
       description,
       status: 'pending',
+      // Åldras efter 14 dagar, som create_quote_draft. Utan expires_at
+      // matchar underhållscronens `.lt()` aldrig NULL och kortet låg kvar
+      // för evigt. Projektet finns kvar; det är förslaget som försvinner.
+      expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
       // Inga pengar bundna, inget skickas till kund förrän hantverkaren
       // själv agerar — samma resonemang som create_quote_draft (etapp 2a).
       risk_level: 'low',

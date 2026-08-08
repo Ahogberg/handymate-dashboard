@@ -111,6 +111,58 @@ test.describe('Klart idag ljuger inte om vad som hände', () => {
   })
 })
 
+test.describe('bruset uppströms — fem rader om samma tio offerter', () => {
+  test('Daniels schema och dedup-fönstret säger samma sak', () => {
+    // 168 h dimensionerades för "söndag + onsdag" — det står i dedup-modulens
+    // eget filhuvud. Daniel kördes ändå DAGLIGEN, så det räckte att modellen
+    // formulerade om sig för att samma insikt skulle passera som ny.
+    const v = JSON.parse(read('vercel.json'))
+    const daniel = v.crons.find((c: any) => c.path.endsWith('/daniel'))
+    expect(daniel, 'daniels cron saknas').toBeTruthy()
+    expect(daniel.schedule, 'daniel kör oftare än dedup-fönstret klarar')
+      .toMatch(/\* \* 0,3$/)
+  })
+
+  test('varje hypotes har en dedup-nyckel som beskriver fenomenet', () => {
+    // Punkt 1-4 saknade instruerad nyckel och föll tillbaka på rubriken.
+    const p = read('lib/agents/daniel/observation-prompt.ts')
+    for (const nyckel of [
+      'daniel_conversion_by_customer_type',
+      'daniel_stale_quotes_pattern',
+      'daniel_lead_source_conversion',
+      'daniel_price_elasticity',
+    ]) {
+      expect(p, `hypotesen saknar ${nyckel}`).toContain(nyckel)
+    }
+  })
+
+  test('rate-limiten tar bort brus i stället för att flytta det', () => {
+    // Kontrollen låg EFTER inserten: observationen sparades, fick inget
+    // related_approval_id, och dök upp som nyhetsrad i stället. Ett tak som
+    // skulle skona hantverkaren gjorde beslutskort till nyheter.
+    const s = kod('lib/agents/shared/save-and-push.ts')
+    const grind = s.indexOf('approvalsRemainingToday <= 0')
+    const insert = s.indexOf(".from('business_knowledge')")
+    expect(grind, 'ingen kvotgrind').toBeGreaterThan(-1)
+    expect(grind, 'kvoten kollas efter att raden sparats').toBeLessThan(insert)
+  })
+
+  test('ett avfärdat kort återuppstår inte som nyhet', () => {
+    // Rutten nollar related_approval_id när kortet inte längre är pending
+    // (rätt för Agera-knappen). Nyhetsfiltret testade bara det fältet, så
+    // kortet man nyss avfärdat kom tillbaka längre ned på sidan.
+    expect(kod('app/api/observations/route.ts')).toContain('had_approval: true')
+    expect(kod('components/jarvis/JarvisHome.tsx'))
+      .toContain('!o.related_approval_id && !o.had_approval')
+  })
+
+  test('utkastkorten åldras — NULL matchas aldrig av .lt()', () => {
+    for (const fil of ['lib/quotes/suggest-quote-draft.ts', 'lib/ata/suggest-ata-draft.ts']) {
+      expect(kod(fil), `${fil} sätter inget expires_at`).toContain('expires_at:')
+    }
+  })
+})
+
 test.describe('ytan använder härledningen', () => {
   const s = kod('components/jarvis/JarvisHome.tsx')
 

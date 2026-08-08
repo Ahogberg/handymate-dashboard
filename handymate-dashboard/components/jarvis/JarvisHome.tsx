@@ -90,6 +90,8 @@ interface Observation {
   observation: string
   suggestion: string | null
   related_approval_id: string | null
+  /** Sätts av rutten när kortet funnits men inte längre är pending. */
+  had_approval?: boolean
   created_at: string
 }
 
@@ -417,7 +419,10 @@ export default function JarvisHome({
 
   // Observationer vars ärende redan står som kort ovanför filtreras bort —
   // samma sak på två ställen gör att man slutar läsa båda.
-  const nyheter = observations.filter(o => !o.related_approval_id)
+  // Nyhetsrader = observationer som ALDRIG haft ett beslutskort. had_approval
+  // sätts av /api/observations när kortet funnits men är hanterat — utan den
+  // dök ett nyss avfärdat kort upp igen som nyhet längre ned på sidan.
+  const nyheter = observations.filter(o => !o.related_approval_id && !o.had_approval)
 
   // Närvarobandet: samma två källor som resten av sidan visar, omformade per
   // agent. Observationerna först — de är vad agenten SÄGER — och Klart idag

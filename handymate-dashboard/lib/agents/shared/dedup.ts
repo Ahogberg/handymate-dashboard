@@ -29,6 +29,21 @@ const DEDUP_WINDOWS_HOURS: Record<string, number> = {
   anomaly: 48,
 }
 
+/**
+ * ═══ FÖNSTRET OCH SCHEMAT MÅSTE SÄGA SAMMA SAK (2026-08-08) ═══
+ *
+ * 168 h dimensionerades för "söndag + onsdag", vilket den här filens huvud
+ * också påstår. Men vercel.json körde daniel, karin och lars DAGLIGEN. Med
+ * sju körningar i ett sjudagarsfönster räcker det att modellen formulerar om
+ * sig för att samma insikt ska passera som ny — och det var precis så
+ * hemskärmen fick fem Daniel-rader om samma tio offerter.
+ *
+ * Daniel är flyttad till 0,3 (bevisat problem). karin, lars och lisa kör
+ * fortfarande dagligen — deras observationer är mer händelsedrivna
+ * (en faktura förfaller ett visst datum), så där saknas belägg för att
+ * schemat är fel. Uppstår samma mönster hos dem är det schemat som ska
+ * ändras, inte fönstret: prompterna är skrivna för två körningar i veckan.
+ */
 const DEFAULT_DEDUP_WINDOW_HOURS = 168 // 7 dagar
 
 export function getDedupWindowHours(knowledgeType: string): number {
