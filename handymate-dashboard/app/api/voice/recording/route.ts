@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { verifyElksSignature } from '@/lib/elks-signature'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
@@ -11,12 +12,25 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = getServerSupabase()
 
-    let formData: FormData
-    try {
-      formData = await request.formData()
-    } catch {
-      return NextResponse.json({ error: 'Invalid form data' }, { status: 400 })
+    // ═══ SIGNATUREN SAKNADES HELT (2026-08-08) ═══
+    //
+    // Routen litade på en overifierad payload för både tenantuppslag och
+    // inspelnings-URL. En förfalskad POST kunde alltså lägga in en
+    // inspelningsrad i valfritt företag och därmed starta kedjan
+    // recording → transcribe → Lisa-agentkörning utifrån. Samma HMAC som
+    // voice/incoming och sms/incoming redan använde.
+    const rawBody = await request.text()
+    if (process.env.ELKS_SKIP_SIGNATURE !== 'true') {
+      const req = new NextRequest(request.url, { method: 'POST', headers: request.headers, body: rawBody })
+      if (!verifyElksSignature(req, rawBody)) {
+        console.error('[voice/recording] Ogiltig 46elks-signatur, avvisar webhook')
+        return new NextResponse('Unauthorized', { status: 401 })
+      }
     }
+
+    // Body:n är redan läst för signaturen — parsa samma sträng i stället för
+    // att anropa formData() (som skulle läsa en tömd ström).
+    const formData = new URLSearchParams(rawBody)
 
     const callId = formData.get('callid') as string
     const recordingId = formData.get('recordingid') as string
@@ -114,7 +128,13 @@ export async function POST(request: NextRequest) {
     if (recording?.recording_id) {
       fetch(`${APP_URL}/api/voice/transcribe`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          // Den interna kedjan legitimerar sig — transcribe kräver numera
+          // antingen den här hemligheten eller en inloggad ägare till
+          // inspelningen (routen var tidigare helt öppen).
+          ...(process.env.CRON_SECRET ? { 'x-internal-secret': process.env.CRON_SECRET } : {}),
+        },
         body: JSON.stringify({ recording_id: recording.recording_id })
       }).catch(err => console.error('Failed to trigger transcription:', err))
     }

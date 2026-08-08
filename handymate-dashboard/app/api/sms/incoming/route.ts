@@ -64,23 +64,39 @@ export async function POST(request: NextRequest) {
     if (directBusiness) {
       business = directBusiness
     } else {
-      // Fallback: find via sender's phone number → customer → business
-      const { data: customerData } = await supabase
+      // ═══ FALLBACKEN FICK INTE GISSA TENANT (2026-08-08) ═══
+      //
+      // Uppslaget var `.eq('phone_number', from).limit(1)` utan business-
+      // filter. Ett nummer som finns som kund hos TVÅ företag routade alltså
+      // SMS:et — och agentkörningen som följer — till vilken rad som råkade
+      // returneras först. Hantverkare i samma bransch delar underleverantörer;
+      // det är inget kantfall.
+      //
+      // Fallbacken behövs (numret kan vara lagrat i annat format än `to`), så
+      // den finns kvar — men bara när svaret är ENTYDIGT. Är det tvetydigt
+      // finns ingen tenant-evidens, och då gör vi ingenting.
+      const { data: kandidater } = await supabase
         .from('customer')
         .select('business_id')
         .eq('phone_number', from)
-        .limit(1)
-        .maybeSingle()
+        .limit(10)
 
-      if (!customerData) {
+      const företag = Array.from(new Set((kandidater || []).map(k => k.business_id)))
+      if (företag.length === 0) {
         console.log('[SMS Incoming] No business found for', to)
+        return NextResponse.json({ success: true, handled: false })
+      }
+      if (företag.length > 1) {
+        console.warn(
+          `[SMS Incoming] avsändaren ${from} finns hos ${företag.length} företag och "${to}" matchar inget tilldelat nummer — avstår i stället för att gissa tenant`
+        )
         return NextResponse.json({ success: true, handled: false })
       }
 
       const { data: biz } = await supabase
         .from('business_config')
         .select('business_id, business_name')
-        .eq('business_id', customerData.business_id)
+        .eq('business_id', företag[0])
         .maybeSingle()
 
       if (!biz) {

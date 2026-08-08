@@ -233,31 +233,28 @@ export async function POST(request: NextRequest) {
           }, { status: 404 })
         }
 
-        const ELKS_API_USER = process.env.ELKS_API_USER
-        const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
-
-        if (!ELKS_API_USER || !ELKS_API_PASSWORD) {
-          return NextResponse.json({
-            success: false,
-            error: 'SMS-tjänst ej konfigurerad',
-          }, { status: 500 })
-        }
-
-        const smsRes = await fetch('https://api.46elks.com/a1/sms', {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            from: sanitizeSenderId(business.business_name),
-            to: customer.phone_number,
-            message: action.data.message || '',
-          }),
+        // ═══ OPT-OUT-SPÄRREN FÖRBIGICKS (2026-08-08) ═══
+        //
+        // Grenen anropade api.46elks.com direkt och hoppade därmed över allt
+        // sendSmsViaElks gör: opt-out-kontrollen (en kund som avböjt SMS fick
+        // ändå ett), E.164-normaliseringen och sms_log-raden. Ett utskick som
+        // inte finns i loggen går inte att svara för i efterhand.
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const smsResult = await sendSmsViaElks({
+          supabase,
+          businessId,
+          businessName: business.business_name,
+          to: customer.phone_number,
+          message: action.data.message || '',
+          customerId: customer.customer_id,
+          messageType: 'voice_action',
         })
 
-        if (!smsRes.ok) {
-          return NextResponse.json({ success: false, error: 'SMS kunde inte skickas' }, { status: 500 })
+        if (!smsResult.success) {
+          return NextResponse.json(
+            { success: false, error: smsResult.error || 'SMS kunde inte skickas' },
+            { status: 500 }
+          )
         }
 
         return NextResponse.json({

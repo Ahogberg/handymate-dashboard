@@ -73,6 +73,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
     }
 
+    // Auth fanns — men ingen jämförelse mellan inloggat företag och
+    // inspelningens (2026-08-08). En inloggad kund kunde alltså skicka ett
+    // annat företags recording_id och orsaka Claude-analys, ai_suggestion
+    // och tryAutoApprove i DEN tenanten. Att vara inloggad någonstans är
+    // inte samma sak som att ha rätt till just den här raden.
+    if (!internalOk && recording.business_id !== authed!.business_id) {
+      return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
+    }
+
     if (!recording.transcript) {
       return NextResponse.json({
         error: 'No transcript available for analysis'

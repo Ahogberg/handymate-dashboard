@@ -60,6 +60,26 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     const answered = state === 'success' || duration > 0
     console.log('[voice/missed] hangup', { businessId, from, callId, handled, state, duration, answered })
 
+    // ═══ BARA POST FÅR UTLÖSA NÅGOT (2026-08-08) ═══
+    //
+    // Signaturkontrollen ovan ligger inuti `if (request.method === 'POST')`,
+    // men GET exporterades också — och business_id + from läses ur query-
+    // strängen. En förfalskad GET kunde alltså fyra call_missed för VALFRITT
+    // företag med VALFRITT telefonnummer, vilket skickar catch-SMS:et till
+    // angriparens nummer på kundens räkning. Ett osignerat GET-anrop är
+    // ingen webhook, det är en främling.
+    //
+    // GET svarar fortfarande 200 (46elks ska inte retry-storma) men muterar
+    // ingenting. Loggraden finns för att vi ska SE om 46elks någonsin
+    // faktiskt använder GET — då är rätt åtgärd att signera den, inte att
+    // öppna den igen.
+    if (request.method !== 'POST') {
+      if (handled !== '1' && !answered && businessId && from) {
+        console.warn('[voice/missed] GET som skulle ha fyrat call_missed avvisades — osignerad väg')
+      }
+      return NextResponse.json({})
+    }
+
     if (handled !== '1' && !answered && businessId && from) {
       const { getServerSupabase } = await import('@/lib/supabase')
       const { fireEvent } = await import('@/lib/automation-engine')

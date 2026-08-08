@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 import { triggerAgentFireAndForget, makeIdempotencyKey } from '@/lib/agent-trigger'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
@@ -13,6 +14,25 @@ const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
 export async function POST(request: NextRequest) {
   try {
     const supabase = getServerSupabase()
+
+    // ═══ ROUTEN VAR HELT OAUTENTISERAD (2026-08-08) ═══
+    //
+    // Enda inputen var recording_id. Vem som helst kunde alltså bränna
+    // Whisper-krediter och — allvarligare — STARTA EN LISA-AGENTKÖRNING i
+    // ett främmande företag (se triggerAgentFireAndForget längre ner) genom
+    // att gissa ett id. Samma mönster som voice/analyze redan hade lagat.
+    //
+    // Två tillåtna anropare: den interna kedjan recording→transcribe (delad
+    // hemlighet, server-till-server) och en inloggad användare som tittar på
+    // SIN EGEN inspelning. Tenantmatchningen görs efter uppslaget nedan.
+    const authed = await getAuthenticatedBusiness(request)
+    const internalOk =
+      !!process.env.CRON_SECRET &&
+      request.headers.get('x-internal-secret') === process.env.CRON_SECRET
+    if (!authed && !internalOk) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { recording_id } = await request.json()
 
     if (!recording_id) {
@@ -27,6 +47,14 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (fetchError || !recording) {
+      return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
+    }
+
+    // Inloggad väg: inspelningen måste tillhöra det egna företaget. Utan den
+    // här raden räcker auth inte — vilken kund som helst kunde peka på en
+    // annan kunds inspelning. Samma svar som "hittades inte", så id:n inte
+    // går att räkna ut genom att jämföra felkoder.
+    if (!internalOk && recording.business_id !== authed!.business_id) {
       return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
     }
 
