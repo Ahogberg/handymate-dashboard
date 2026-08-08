@@ -162,6 +162,64 @@ ett riktigt SMS till kunden för korttyper ingen byggt en hanterare för.
 
 > Fanns det kort du inte förstod? Något som såg ut att göra ingenting?
 
+## 10b. Hemskärmen — korten ska bära ett resultat, inte en varning
+
+Öppna **/dashboard/hem** (inte startsidan — hem är en egen yta än så länge).
+
+Det här steget är nytt efter en designgranskning. Titta på fyra saker:
+
+**Knappen säger sanningen.** Ett kort som faktiskt kan skicka något har en
+**Godkänn**-knapp med belopp: *"Påminn om 3 813 kr"*, *"Skapa offerten —
+48 500 kr"*. Ett kort som bara kan öppnas för granskning har **"Öppna och
+granska"** — och ingen Godkänn-knapp alls.
+
+*Ska INTE ha hänt:* att du trycker Godkänn och raden i **Klart idag** säger
+"skickade …" utan att något faktiskt gick iväg. Det var buggen. Står det
+"Läst och borttagen — ingenting skickades" är det rätt.
+
+**Dubbletter är sammanslagna.** Har du två förfallna fakturor samma dag ska de
+vara **ett kort** som säger *"2 fakturor har förfallit — 7 626 kr totalt"*, med
+båda raderna listade inuti. Räknaren högst upp ska räkna **beslut**, inte kort.
+
+*Ska INTE ha hänt:* två identiska kort intill varandra med samma rubrik.
+
+**Korten visar vad de gäller.** Ett ÄTA-förslag ska visa raden och beloppet, ett
+fakturagranskningskort ska visa fakturaraderna, ett intäktsfynd ska visa vad som
+skulle faktureras — allt utan att du öppnar något.
+
+*Ska INTE ha hänt:* ett kort som bara säger att något är fel och ber dig gå
+någon annanstans för att ta reda på vad.
+
+**"Värt att veta" ska vara kort.** Raderna längst ned ska handla om namngivna
+kunder eller affärer, och gå att öppna. Allmänna sammanfattningar ("av 11
+offerter har 4 accepterats") hör hemma under Analys och ska inte stå här.
+
+*Ska INTE ha hänt:* fem rader som säger ungefär samma sak med olika ord, eller
+en rad du precis avfärdat som beslutskort som dyker upp igen längre ned.
+
+> Trodde du att något skulle skickas som inte skickades? Fanns det kort du inte
+> kunde bedöma utan att klicka dig vidare?
+
+## 10c. STOPP — kunden som tackat nej till SMS
+
+**Kräver saldo hos 46elks.** Är kontot tomt failar alla utskick och provet säger
+ingenting. Kolla det först.
+
+Skicka **STOPP** som SMS från en testtelefon till företagets nummer. Försök
+sedan skicka något till samma kund från appen — en offert, en faktura, ett
+manuellt SMS.
+
+**Ska ha hänt:** inget SMS går iväg, och appen säger varför. I det manuella
+utskicket ska du få beskedet *"Kunden har tackat nej till SMS. Ring eller mejla
+i stället."*
+
+**Ska INTE ha hänt:** att SMS:et går iväg ändå, eller att det tyst försvinner
+utan att du får veta det.
+
+Skicka sedan **START** och prova igen — då ska det fungera som vanligt.
+
+> Fick du veta varför det inte gick? Eller hände bara ingenting?
+
 ## 11. Karins bolagskalender
 
 Öppna kalendern. Kvittera en deadline. Ladda om sidan.
@@ -199,7 +257,15 @@ borde vara tom.
 
 **Allt som påstår att något skickats.** Varje gång appen säger *skickad*,
 *levererad* eller *klart* — kontrollera att det stämmer. Det var mönstret bakom
-tre av dagens fixar.
+tre av dagens fixar, och sedan dess har vi hittat det på fyra ställen till:
+fakturautskicket som rapporterade e-post som skickad när Resend avvisat den,
+hemskärmens "skickade …" på kort som inte kan skicka något, ångra-rutans
+"Skickar …" några sekunder tidigare, och Matte-chatten som sa "SMS skickat"
+oavsett utfall.
+
+Alla fyra är lagade och facit-låsta. Men mönstret är envist nog att det är värt
+att leta efter en femte gång — det är den enskilt vanligaste felklassen i den
+här kodbasen.
 
 **Siffror som är för runda.** Ett belopp som är exakt 0 kr, en procent på jämnt
 100, en lista med exakt fem poster. Ofta betyder det att ett fallback-värde
