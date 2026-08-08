@@ -33,10 +33,21 @@ import { PRICE_VERSION } from './price-list'
 
 export type CostResource = 'sms' | 'call_out' | 'whisper' | 'llm'
 
+/**
+ * Hälsosondens resursslag (app/api/admin/cost-probe). Medvetet UTANFÖR
+ * CostResource: rapporten i report.ts itererar över de fyra riktiga slagen
+ * och hoppar över allt annat, så en sondrad kan aldrig förorena en
+ * kostnadsrapport — oavsett hur många gånger sonden körs.
+ *
+ * Den ligger här och inte i unionen just för att en diagnostikrad inte är en
+ * affärshändelse och inte ska kunna förväxlas med en.
+ */
+export type ProbeResource = 'probe'
+
 export interface RecordCostArgs {
   supabase: SupabaseClient
   businessId: string
-  resource: CostResource
+  resource: CostResource | ProbeResource
   units: number
   /** Heltal öre, SEK. Se valutanoten ovan. */
   costOre: number

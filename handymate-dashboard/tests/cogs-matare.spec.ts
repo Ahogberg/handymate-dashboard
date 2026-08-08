@@ -415,6 +415,30 @@ test.describe('Whisper och samtalsminuter', () => {
   })
 })
 
+test.describe('hälsosonden — en tyst mätare måste gå att fråga', () => {
+  const s = kod('app/api/admin/cost-probe/route.ts')
+
+  test('sonden är adminspärrad som övriga adminrutter', () => {
+    expect(s).toContain('isAdmin(request)')
+    expect(s).toContain('status: 403')
+  })
+
+  test('den LÄSER TILLBAKA — recordCost:s tystnad går inte att lita på', () => {
+    // recordCost sväljer sina fel. Ett svar byggt på att den "inte kastade"
+    // hade rapporterat grönt på en trasig mätare.
+    const skriv = s.indexOf('recordCost({')
+    const läs = s.indexOf(".from('cost_event')")
+    expect(skriv).toBeGreaterThan(-1)
+    expect(läs, 'sonden läser inte tillbaka raden').toBeGreaterThan(skriv)
+    expect(s).toContain('matare_fungerar: !!data')
+  })
+
+  test('sonden kostar noll — den får inte förorena rapporten', () => {
+    expect(s).toContain('costOre: 0')
+    expect(s).toContain("refType: 'probe'")
+  })
+})
+
 test.describe('ägarskapsgränsen — planens viktigaste test', () => {
   test('kvot-modulen känner inte till kostnad', () => {
     // sms_usage äger KVOT (vad vi tar av kunden). Kostnad i samma modul gör
