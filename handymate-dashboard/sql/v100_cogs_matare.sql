@@ -144,17 +144,22 @@ COMMENT ON COLUMN public.sms_log.sms_parts IS
 -- ═══ DEN HÄR TABELLEN FINNS INTE I PRODUKTION (verifierat 2026-08-08) ═══
 --
 -- Första körningen av v100 föll på 42P01: relation "public.usage_record"
--- does not exist. sql/billing.sql har alltså ALDRIG körts i produktion.
+-- does not exist.
 --
--- Det gör bilden värre än kartläggningen visade, inte bättre: billing-sidan
--- visade inte 0 för att tabellen var tom — den visade 0 för att queryn mot
--- en OBEFINTLIG tabell felade, och felet slängdes bort
--- (`const { data: usage } = await supabase...` utan error-läsning). Kunden
--- fick en siffra som aldrig hade någon källa alls.
+-- Kontrollen mot produktion visade att billing_plan och billing_event DÄREMOT
+-- finns. sql/billing.sql har alltså körts — men usage_record saknas ändå,
+-- ensam av filens tre tabeller. Varför går inte att avgöra ur repot: den kan
+-- ha droppats i efterhand, eller aldrig ha skapats. Det spelar ingen roll
+-- operativt, för läsarna är borttagna i samma ändring.
 --
--- Läsarna är borttagna i samma ändring, så inget hänger på den. Kommentaren
--- sätts bara om tabellen mot förmodan finns i någon miljö — annars ska
--- migrationen INTE falla på det.
+-- Det som DOCK ändrar bilden: billing-sidan visade inte 0 för att tabellen
+-- var tom. Den visade 0 för att queryn gick mot en tabell som inte finns, och
+-- felet slängdes bort (`const { data: usage } = await supabase…` utan
+-- error-läsning). Kunden fick en siffra som aldrig hade någon källa alls —
+-- och ingen larmade, eftersom ett bortkastat fel ser ut som noll.
+--
+-- Kommentaren nedan sätts bara om tabellen mot förmodan finns i någon miljö.
+-- Migrationen ska inte falla på dess frånvaro.
 
 DO $usage_record_kommentar$
 BEGIN
@@ -203,18 +208,18 @@ $usage_record_kommentar$;
 --
 --   SELECT count(*) FROM public.cost_event;
 --
--- ── FÖLJDFRÅGA SOM v100 AVSLÖJADE ─────────────────────────────────────────
---
--- usage_record saknades, alltså kördes sql/billing.sql aldrig. Kontrollera
--- vad mer ur den filen som saknas — särskilt billing_plan, som /api/billing
--- och /api/billing/usage läser med .single() och `throw planError`. Saknas
--- den svarar båda rutterna 500, och billing-sidan visar ingenting alls:
+-- ── SCHEMALÄGET, KONTROLLERAT 2026-08-08 ──────────────────────────────────
 --
 --   SELECT t.table_name,
 --          (SELECT count(*) FROM information_schema.tables i
 --            WHERE i.table_schema='public' AND i.table_name=t.table_name) AS finns
 --   FROM (VALUES ('billing_plan'),('usage_record'),('billing_event'),
 --                ('sms_usage'),('sms_log'),('cost_event')) AS t(table_name);
---   -- förväntat efter v100: cost_event=1, sms_log=1, sms_usage=1.
---   -- billing_plan=0 betyder att billing-sidan är trasig för ALLA kunder.
+--
+-- Utfall efter v100: billing_plan=1, usage_record=0, billing_event=1,
+-- sms_usage=1, sms_log=1, cost_event=1.
+--
+-- billing_plan finns, alltså svarar /api/billing och /api/billing/usage som
+-- de ska — prenumerationssidan är hel. usage_record är den enda saknade, och
+-- den är avvecklad ändå.
 -- ============================================================================
