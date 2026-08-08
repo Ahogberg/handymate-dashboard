@@ -29,6 +29,8 @@ import {
 import { quoteDraftSummary } from '@/lib/jarvis/quote-preview-summary'
 import { cardContext } from '@/lib/jarvis/card-context'
 import type { CardAction } from '@/lib/jarvis/voice'
+import { voiceFor, reviewAlternatives, doneRowText } from '@/lib/jarvis/card-voice'
+import { mayExecute } from '@/lib/approvals/action-contract'
 
 /**
  * JarvisHome — teamets rapportbord (2026-08-07).
@@ -330,14 +332,29 @@ export default function JarvisHome({
         if (res.status === 409) void fetchQueue()
         return
       }
+      // ═══ SVARET LÄSES (innehållskontraktet, 2026-08-08) ═══
+      //
+      // Servern har hela tiden svarat ärligt: ett kort som inte kan utföras
+      // returnerar { executed: false, note: 'Öppna ärendet och granska det
+      // innan något skickas.' } (lib/approvals/action-contract.ts). Klienten
+      // kastade svaret och skrev "skickade: …" oavsett — hantverkaren fick
+      // veta att något gått iväg när ingenting hade hänt.
+      // Fälten ligger nästlade under `execution` (route.ts returnerar
+      // { success, action, execution, execution_outcome }), inte på toppnivå.
+      const svar = await res.json().catch(() => ({} as any))
+      const utforande = svar?.execution ?? {}
+
       setApprovals(prev => prev.filter(a => a.id !== approval.id))
       setDoneRows(prev => [{
         key: `fresh-${approval.id}`,
         time: formatClock(new Date().toISOString()),
         agent: agentForApproval(approval),
-        text: action === 'reject'
-          ? `avvisade: ${approval.title}`
-          : `skickade: ${approval.title}${action === 'edit' ? ' (med din ändring)' : ''}`,
+        text: doneRowText({
+          action,
+          title: approval.title,
+          executed: utforande?.executed,
+          note: utforande?.note,
+        }),
         auto: false,
         fresh: true,
       }, ...prev])
@@ -352,7 +369,13 @@ export default function JarvisHome({
     setHiddenIds(prev => new Set(prev).add(approval.id))
     setSnack({
       approvalId: approval.id,
-      text: action === 'reject' ? 'Förslaget avvisas' : `Skickar: ${approval.title.slice(0, 60)}`,
+      // Ångra-rutan sa "Skickar: …" även för kort som inte kan skicka något.
+      // Samma lögn som Klart idag-raden, bara några sekunder tidigare.
+      text: action === 'reject'
+        ? 'Förslaget avvisas'
+        : mayExecute(approval.approval_type)
+          ? `Skickar: ${approval.title.slice(0, 60)}`
+          : `Behandlar: ${approval.title.slice(0, 60)}`,
     })
     const timer = setTimeout(() => {
       setSnack(null)
@@ -372,6 +395,15 @@ export default function JarvisHome({
   function onCardAction(approval: Approval, action: CardAction) {
     if (action.id === 'approve') return queueAction(approval, 'approve')
     if (action.id === 'reject') return queueAction(approval, 'reject')
+    // 'open' finns bara på kort som INTE får utföras med ett klick
+    // (REVIEW_REQUIRED m.fl., se lib/jarvis/card-voice.ts). Det öppnar
+    // detaljvyn i stället för att skicka något — vilket är exakt vad serverns
+    // note säger att man ska göra.
+    if (action.id === 'open') {
+      setDetailIds(prev => new Set(prev).add(approval.id))
+      setExpandedIds(prev => new Set(prev).add(approval.id))
+      return
+    }
     if (action.id === 'edit') {
       setEditingId(approval.id)
       setEditText(approvalPreview(approval).text)
@@ -744,10 +776,22 @@ function ApprovalCard({
     )
   }
 
+  // ═══ RÖSTEN HÄRLEDS UR KONTRAKTET (2026-08-08) ═══
+  //
+  // Stod tidigare hårdkodat som "foreslar" här, för VARJE korttyp. Men
+  // missad_intakt, review_auto_invoice och four_eyes_* är REVIEW_REQUIRED —
+  // de kan inte utföras. Kortet sa alltså "föreslår" och visade Godkänn, och
+  // ett klick gav "skickade: …" i Klart idag fast servern svarat att
+  // ingenting skickades. Se lib/jarvis/card-voice.ts.
+  const rost = voiceFor(approval.approval_type)
+
   return (
     <AgentDecisionCard
       agentKey={agentKey}
-      voice="foreslar"
+      voice={rost}
+      // 'fragar' bygger sina knappar ur alternativen — och sätter approves:false
+      // på allihop, så ett granskningskort inte KAN utlösa ett godkännande.
+      alternatives={rost === 'fragar' ? reviewAlternatives(approval.approval_type) : undefined}
       typeLabel={typeLabel(approval.approval_type)}
       timeLabel={timeAgo(approval.created_at)}
       title={approval.title}
