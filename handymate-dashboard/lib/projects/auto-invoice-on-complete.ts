@@ -409,6 +409,24 @@ export async function autoInvoiceOnComplete(
             items_count: allItems.length,
             has_ata: ataItems.length > 0,
             rot_rut_type: rotRutType,
+            // ═══ KORTET SKA BÄRA DET MAN GODKÄNNER (regel 1, 2026-08-08) ═══
+            //
+            // Fakturautkastet är redan SKAPAT här ovanför — artefakten finns.
+            // Men payloaden bar bara `total` och `items_count`, så kortet
+            // visade en summa utan att man kunde se vad den bestod av.
+            // "Granska faktura" utan raderna är en uppmaning att gå någon
+            // annanstans, inte ett färdigt resultat.
+            //
+            // Samma form som create_quote_draft: raderna och delsummorna i
+            // payloaden, så kortet kan visa dem utan att öppna fakturan.
+            preview: {
+              items: allItems,
+              subtotal,
+              vat_amount: vatAmount,
+              total,
+              rot_rut_deduction: rotRutDeduction || 0,
+              customer_pays: customerPays ?? total,
+            },
           },
         })
         if (approvalErr) {

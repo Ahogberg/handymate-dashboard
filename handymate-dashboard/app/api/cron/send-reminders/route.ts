@@ -417,6 +417,19 @@ async function sendAutoReminders() {
         payload: {
           invoice_id: inv.invoice_id,
           autonomy_key: 'invoice_reminder',
+          // ═══ TOPPNIVÅ FÖR YTAN (innehållskontraktet regel 1+2, 2026-08-08) ═══
+          //
+          // Beloppet och kunden låg BARA nästlade under `delivery`. cardContext
+          // och approveLabel läser toppnivån, så kortets kontextrad blev TOM
+          // ("Karin föreslår" utan att säga vem eller vilken faktura) och
+          // knappen sa bara "Skicka påminnelsen" utan siffra.
+          //
+          // Samma värden, en nivå upp. `delivery` är orört — deliverInvoiceReminder
+          // läser fortfarande därifrån.
+          amount_kr: amountToPay ?? null,
+          customer_name: customer?.name ?? null,
+          invoice_number: inv.invoice_number,
+          days_overdue: daysOverdue,
           delivery: deliveryInput,
         },
         status: 'pending',

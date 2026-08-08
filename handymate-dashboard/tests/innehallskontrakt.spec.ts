@@ -342,6 +342,66 @@ test.describe('"Värt att veta" — tre grindar', () => {
   })
 })
 
+test.describe('regel 1: kortet bär ett färdigt resultat', () => {
+  const { approveLabel } = require('../lib/jarvis/approval-view')
+  const { cardContext } = require('../lib/jarvis/card-context')
+
+  test('invoice_reminder: beloppet och kunden ligger på toppnivå', () => {
+    // Låg tidigare BARA nästlat under `delivery`. cardContext och
+    // approveLabel läser toppnivån, så kontextraden blev tom och knappen
+    // sa "Skicka påminnelsen" utan siffra.
+    const s = kod('app/api/cron/send-reminders/route.ts')
+    for (const falt of ['amount_kr:', 'customer_name:', 'invoice_number:']) {
+      expect(s, `${falt} saknas på payloadens toppnivå`).toContain(falt)
+    }
+    // Och delivery är ORÖRT — deliverInvoiceReminder läser fortfarande därifrån.
+    expect(s).toContain('delivery: deliveryInput')
+
+    const payload = { amount_kr: 3813, customer_name: 'Andreas', invoice_number: '2026-001' }
+    // sv-SE formaterar med HÅRT mellanslag (U+00A0) — jämför mot samma
+    // formaterare i stället för mot en literal med vanligt mellanslag.
+    expect(approveLabel('invoice_reminder', payload))
+      .toContain((3813).toLocaleString('sv-SE'))
+    expect(cardContext(payload)).toContain('Andreas')
+  })
+
+  test('review_auto_invoice: raderna följer med, inte bara summan', () => {
+    // Fakturautkastet är redan SKAPAT — artefakten fanns, men payloaden bar
+    // bara total och items_count. "Granska faktura" utan raderna är en
+    // uppmaning att gå någon annanstans, inte ett färdigt resultat.
+    const s = kod('lib/projects/auto-invoice-on-complete.ts')
+    expect(s).toContain('preview: {')
+    expect(s).toContain('items: allItems')
+    expect(s).toContain('customer_pays:')
+  })
+
+  test('create_ata_draft producerar utkastet FÖRE frågan', () => {
+    const s = kod('lib/ata/suggest-ata-draft.ts')
+    // Genereringen ska ske i producenten, inte vid godkännandet.
+    expect(s).toContain('generateQuoteFromInput')
+    expect(s).toContain('preview')
+    // Fail-soft: ett ÄTA-behov får inte försvinna för att modellen failar.
+    expect(s).toContain('kortet skapas ändå')
+  })
+
+  test('create_ata_draft: rubriken är inte längre en kopia av brödtexten', () => {
+    // Stod som `ÄTA-förslag: ${description.slice(0,80)}` direkt ovanför samma
+    // sträng i sin helhet.
+    const s = kod('lib/ata/suggest-ata-draft.ts')
+    expect(s, 'rubriken är fortfarande en avhuggen kopia')
+      .not.toContain('ÄTA-förslag: ${description.slice(0, 80)}')
+    expect(s).toContain('preview?.job_title')
+  })
+
+  test('ett räknat belopp slår alltid en gissad parameter', () => {
+    const s = kod('lib/ata/suggest-ata-draft.ts')
+    const raknat = s.indexOf('preview?.total_before_vat')
+    const gissat = s.indexOf('params.amountEstimate')
+    expect(raknat, 'det räknade beloppet saknas').toBeGreaterThan(-1)
+    expect(raknat, 'gissningen prioriteras före beräkningen').toBeLessThan(gissat)
+  })
+})
+
 test.describe('ytan använder härledningen', () => {
   const s = kod('components/jarvis/JarvisHome.tsx')
 

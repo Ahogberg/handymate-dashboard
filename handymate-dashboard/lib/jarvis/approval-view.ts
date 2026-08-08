@@ -99,7 +99,13 @@ export function approveLabel(approvalType: string, payload?: Record<string, unkn
       ? `${Math.round(v).toLocaleString('sv-SE')} kr`
       : null
 
-  if (approvalType === 'invoice_reminder') return 'Skicka påminnelsen'
+  // Utfallsspråk: knappen säger vad som händer OCH hur mycket det gäller.
+  // Beloppet lyftes till payloadens toppnivå 2026-08-08 (det låg bara nästlat
+  // under `delivery`, så varken den här funktionen eller cardContext såg det).
+  if (approvalType === 'invoice_reminder') {
+    const varde = kr(p.amount_kr)
+    return varde ? `Påminn om ${varde}` : 'Skicka påminnelsen'
+  }
   // create_quote_draft SKAPAR offerten som utkast — den skickas inte.
   // Exekveraren POST:ar till /api/quotes och returnerar ett quote_id; något
   // utskick sker aldrig (approvals/[id]/route.ts, case 'create_quote_draft').

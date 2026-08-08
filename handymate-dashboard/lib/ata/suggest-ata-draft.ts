@@ -54,11 +54,17 @@
  * create_quote_draft: inga pengar bundna, inget skickas till kund förrän
  * hantverkaren själv agerar (skapar/skickar den riktiga ÄTA:n).
  *
- * INGET AI-ANROP i denna fil — till skillnad från suggest-quote-draft.ts
- * (som eagerly genererar en preview via generateQuoteFromInput) gör denna
- * funktion BARA en dedup-koll + insert. Ingen cost-guard behövs — ingen ny
- * AI-kostnad introduceras här, exekverarens ai-generate-anrop finns redan
- * sedan tidigare och triggas oavsett anropskälla.
+ * AI-ANROP TILLKOM 2026-08-08 (innehållskontraktet, regel 1). Filhuvudet sa
+ * tidigare "INGET AI-ANROP i denna fil" — och det var precis problemet:
+ * funktionen hette suggest-ata-DRAFT men producerade inget utkast. Kortet bar
+ * rå beskrivningstext, och genereringen skedde först VID godkännandet.
+ * Hantverkaren tryckte alltså Godkänn på något han inte hade sett.
+ *
+ * Nu samma ordning som suggest-quote-draft: generera först med samma motor
+ * som UI-knappen, lägg raderna i payload.preview, fråga sedan. Genereringen
+ * är fail-soft — misslyckas den skapas kortet ändå, utan preview och utan
+ * påstått belopp, precis som förut. Ett ÄTA-behov ska inte försvinna för att
+ * modellen hade en dålig dag.
  *
  * FAIL-SAFE: kastar aldrig. Returnerar { created, reason } så
  * agentverktyget kan ge ett meningsfullt svar till LLM:en, och
@@ -181,13 +187,108 @@ export async function suggestAtaDraft(
     const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
     const description = params.description.trim()
 
+    // ═══ UTKASTET PRODUCERAS FÖRST, FRÅGAN KOMMER SEDAN (2026-08-08) ═══
+    //
+    // Trots namnet producerade den här funktionen INGET utkast: den gjorde en
+    // dedup-koll och skrev ett kort med rå beskrivningstext. Genereringen
+    // skedde först VID godkännandet — hantverkaren tryckte alltså Godkänn på
+    // något han inte hade sett.
+    //
+    // Nu samma ordning som create_quote_draft: generera med samma motor som
+    // UI-knappen, avbryt om det inte blir något (hellre inget förslag än ett
+    // tomt kort), och lägg raderna i payloaden så kortet kan visa dem.
+    //
+    // Fail-soft hela vägen: ett fel i genereringen får aldrig hindra att
+    // ÄTA-behovet ändå syns — då skrivs kortet utan preview, precis som förut.
+    let preview: any = null
+    let projektNamn: string | null = null
+    try {
+      // Projektet ger både sammanhang till modellen och rätt kund för
+      // prislistan. Business-scopat — samma tenantregel som resten.
+      const { data: project } = await supabase
+        .from('project')
+        .select('name, customer_id')
+        .eq('business_id', params.businessId)
+        .eq('project_id', params.projectId)
+        .maybeSingle()
+      projektNamn = project?.name ?? null
+
+      const [priceListResult, templatesResult, bizResult] = await Promise.all([
+        supabase
+          .from('products')
+          .select('id, name, unit, sales_price, category')
+          .eq('business_id', params.businessId)
+          .eq('is_active', true)
+          .order('is_favorite', { ascending: false })
+          .order('name')
+          .limit(100),
+        supabase
+          .from('quote_templates')
+          .select('name, default_items, category')
+          .eq('business_id', params.businessId)
+          .limit(5),
+        supabase
+          .from('business_config')
+          .select('industry, pricing_settings, default_hourly_rate')
+          .eq('business_id', params.businessId)
+          .maybeSingle(),
+      ])
+
+      const biz = (bizResult.data || {}) as {
+        industry?: string | null
+        pricing_settings?: { hourly_rate?: number } | null
+        default_hourly_rate?: number | null
+      }
+
+      const { generateQuoteFromInput } = await import('@/lib/ai-quote-generator')
+      const generated = await generateQuoteFromInput({
+        businessId: params.businessId,
+        branch: biz.industry || 'Bygg',
+        hourlyRate: biz.pricing_settings?.hourly_rate || biz.default_hourly_rate || 650,
+        // ÄTA:n gäller ett PÅGÅENDE projekt — projektnamnet ger modellen
+        // sammanhanget som annars saknas i en lös mening om extraarbete.
+        textDescription: [
+          project?.name ? `Tilläggsarbete på projektet "${project.name}".` : null,
+          description,
+          params.customerContext ? `Kundens egna ord: "${params.customerContext}"` : null,
+        ].filter(Boolean).join(' '),
+        priceList: (priceListResult.data || []).map((p: any) => ({
+          id: p.id, name: p.name, unit: p.unit, unit_price: p.sales_price, category: p.category,
+        })),
+        templates: templatesResult.data || [],
+        customerId: project?.customer_id || undefined,
+      })
+
+      if (generated?.items?.length) {
+        preview = {
+          job_title: generated.jobTitle,
+          job_description: generated.jobDescription,
+          items: generated.items,
+          total_before_vat: generated.items.reduce(
+            (s: number, i: any) => s + (Number(i.quantity) || 0) * (Number(i.unit_price) || 0),
+            0,
+          ),
+          confidence: generated.confidence,
+        }
+      }
+    } catch (genErr) {
+      console.error('[ata/suggest-ata-draft] generering misslyckades (kortet skapas ändå):', genErr)
+    }
+
     const { error: insertErr } = await supabase.from('pending_approvals').insert({
       id: approvalId,
       business_id: params.businessId,
       approval_type: 'create_ata_draft',
       // ÄTA hör till projektteamet — se lib/approvals/routing.ts.
       routing_role: 'project_team',
-      title: `ÄTA-förslag: ${description.slice(0, 80)}`,
+      // ═══ RUBRIKEN VAR EN AVHUGGEN KOPIA AV BRÖDTEXTEN (regel 2) ═══
+      //
+      // `ÄTA-förslag: ${description.slice(0,80)}` stod direkt ovanför samma
+      // sträng i sin helhet. Nu namnger rubriken ARBETET (modellens jobbtitel)
+      // och projektet, så man vet vad och var utan att läsa brödtexten.
+      title: preview?.job_title
+        ? `ÄTA-förslag: ${preview.job_title}${projektNamn ? ` — ${projektNamn}` : ''}`
+        : `ÄTA-förslag${projektNamn ? ` — ${projektNamn}` : ''}`,
       description,
       status: 'pending',
       // Åldras efter 14 dagar, som create_quote_draft. Utan expires_at
@@ -203,9 +304,20 @@ export async function suggestAtaDraft(
         // Läses EXAKT så här av exekveraren (approvals/[id]/route.ts,
         // case 'create_ata_draft') — se filhuvudet.
         description,
-        ...(typeof params.amountEstimate === 'number' ? { amount_estimate: params.amountEstimate } : {}),
+        // Beloppet: modellens summa om den finns, annars anroparens
+        // uppskattning. Ett RÄKNAT belopp slår alltid en gissad parameter.
+        ...(typeof preview?.total_before_vat === 'number' && preview.total_before_vat > 0
+          ? { amount_estimate: Math.round(preview.total_before_vat) }
+          : typeof params.amountEstimate === 'number'
+            ? { amount_estimate: params.amountEstimate }
+            : {}),
         ...(params.customerContext ? { customer_context: params.customerContext } : {}),
         ...(params.customerId ? { entity: { customerId: params.customerId } } : {}),
+        // Utkastet — raderna kortet visar och som godkännandet ska
+        // materialisera. Saknas det (generering failade) faller kortet
+        // tillbaka på gamla beteendet: rå beskrivning, inget påstått belopp.
+        ...(preview ? { preview } : {}),
+        ...(projektNamn ? { project_name: projektNamn } : {}),
       },
     })
 
