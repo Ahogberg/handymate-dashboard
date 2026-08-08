@@ -106,6 +106,27 @@ export interface MissedRevenueFinding {
   evidence: string
   /** Stabil nyckel för dedupe — samma fynd ska inte ge ett nytt kort varje natt. */
   dedupeKey: string
+  /**
+   * Fakturaraderna fyndet skulle bli, när underlaget räcker.
+   *
+   * ═══ SÄTTS BARA VID action === 'DRAFT_AFTER_REVIEW' (2026-08-08) ═══
+   *
+   * Innehållskontraktet (regel 1) säger att ett kort ska bära ett FÄRDIGT
+   * resultat, inte en rubrik om ett problem. "Avslutat projekt saknar
+   * faktura" är en varning; en rad med text och belopp är något man kan
+   * bedöma.
+   *
+   * Men bara där klassificeringen tillåter det. Ett fynd som klassats
+   * NEEDS_REVIEW har per definition tvetydigt underlag — att visa ett
+   * "utkast" där vore att återinföra precis den falska säkerhet den
+   * konservativa klassningen byggde bort. Därför följer utkastet action,
+   * inte kind.
+   *
+   * Ingen faktura skapas av att kortet skrivs. Raderna är en förhandsvisning
+   * i payloaden, samma form som create_quote_draft — kortet visar vad som
+   * skulle faktureras, hantverkaren avgör.
+   */
+  draftLines?: Array<{ description: string; amount_kr: number }>
 }
 
 // ── Indata: exakt de kolumner reglerna behöver, inget mer ──────────────
@@ -192,6 +213,17 @@ export function findUninvoicedAta(
         ? `Kunden skrev under ${a.signed_at.slice(0, 10)}, men projektet har redan en kopplad faktura — kontrollera om tillägget ingår`
         : `Kunden skrev under ${a.signed_at.slice(0, 10)}, projektet är avslutat och tillägget saknar fakturakoppling${a.description ? ` — ${a.description.slice(0, 60)}` : ''}`,
       dedupeKey: `ata:${a.id}`,
+      // Utkastet följer ACTION, inte kind: bara när klassificeringen säger
+      // DRAFT_AFTER_REVIEW finns underlag nog att visa en rad. ÄTA:n bär
+      // redan sin text och sitt belopp — inget genereras, inget gissas.
+      ...(hasLinkedInvoice
+        ? {}
+        : {
+            draftLines: [{
+              description: a.description?.trim() || 'Tilläggsarbete enligt signerad ÄTA',
+              amount_kr: sourceAmount,
+            }],
+          }),
     })
   }
   return out

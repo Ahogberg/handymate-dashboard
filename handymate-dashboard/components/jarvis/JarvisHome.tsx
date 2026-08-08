@@ -1005,6 +1005,39 @@ function ApprovalCard({
         </CardFactBox>
       )}
 
+      {/* ═══ ENKLA UTKASTRADER (innehållskontraktet regel 1, 2026-08-08) ═══
+          missad_intakt, create_ata_draft och review_auto_invoice bär numera
+          payload.preview.items. Formen är enklare än offertutkastets (ingen
+          moms- eller ROT-beräkning), så de renderas här i stället för genom
+          QuoteDraftDetail. Poängen är densamma: man ska se VAD man tar
+          ställning till utan att öppna något. */}
+      {!arGrupp && Array.isArray(pl.preview?.items) && pl.preview.items.length > 0
+        && approval.approval_type !== 'create_quote_draft' && (
+        <CardFactBox>
+          <div className="divide-y divide-slate-100">
+            {pl.preview.items.slice(0, 6).map((rad: any, i: number) => {
+              const belopp = rad.amount_kr ?? (Number(rad.quantity) || 0) * (Number(rad.unit_price) || 0)
+              return (
+                <div key={i} className="flex items-center gap-3 py-2 text-[13px] text-slate-600">
+                  <span className="flex-1 min-w-0 truncate">{rad.description || rad.name || 'Rad'}</span>
+                  {typeof belopp === 'number' && belopp > 0 && (
+                    <span className="font-heading font-semibold shrink-0">{formatKr(belopp)}</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {typeof pl.preview.total_before_vat === 'number' && pl.preview.total_before_vat > 0 && (
+            <div className="flex items-baseline justify-between border-t border-slate-200 mt-1.5 pt-2">
+              <span className="text-[13px] font-semibold text-slate-700">Att fakturera</span>
+              <span className="font-heading text-[17px] font-bold text-slate-900">
+                {formatKr(pl.preview.total_before_vat)}
+              </span>
+            </div>
+          )}
+        </CardFactBox>
+      )}
+
       {detailOpen && summary?.ready && (
         <>
           <QuoteDraftDetail

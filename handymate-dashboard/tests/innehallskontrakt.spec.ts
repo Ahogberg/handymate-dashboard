@@ -402,6 +402,63 @@ test.describe('regel 1: kortet bär ett färdigt resultat', () => {
   })
 })
 
+test.describe('missad_intakt: utkastet följer klassificeringen', () => {
+  const { findUninvoicedAta } = require('../lib/value/missed-revenue')
+  const nu = new Date('2026-08-08T12:00:00Z')
+  const projekt = new Map([['p1', {
+    project_id: 'p1', name: 'Badrum Andersson', status: 'completed',
+    completed_at: '2026-07-01T00:00:00Z',
+  }]])
+  const ata = (id: string, extra: any = {}) => ({
+    id, project_id: 'p1', change_type: 'addition', description: 'Extra eluttag i garaget',
+    amount: 8900, signed_at: '2026-07-02T00:00:00Z', invoice_id: null, invoiced_at: null, ...extra,
+  })
+
+  test('DRAFT_AFTER_REVIEW ger rader man kan bedöma', () => {
+    const [f] = findUninvoicedAta([ata('a1')], projekt, [], nu)
+    expect(f.action).toBe('DRAFT_AFTER_REVIEW')
+    expect(f.draftLines).toHaveLength(1)
+    expect(f.draftLines[0].description).toBe('Extra eluttag i garaget')
+    expect(f.draftLines[0].amount_kr).toBe(8900)
+  })
+
+  test('NEEDS_REVIEW ger INGA rader — tvetydigt underlag får inte se färdigt ut', () => {
+    // Projektet har redan en kopplad faktura: kanske ingår tillägget, kanske
+    // inte. Ett "utkast" där vore precis den falska säkerhet den konservativa
+    // klassningen byggde bort.
+    const [f] = findUninvoicedAta([ata('a1')], projekt, [{ project_id: 'p1' } as any], nu)
+    expect(f.action).toBe('REVIEW_ONLY')
+    expect(f.confidence).toBe('NEEDS_REVIEW')
+    expect(f.draftLines).toBeUndefined()
+  })
+
+  test('utkastet följer action, inte kind', () => {
+    // Regeln skriven som kod: ingen finding får ha rader utan att
+    // klassificeringen tillåtit det.
+    const fynd = [
+      ...findUninvoicedAta([ata('a1')], projekt, [], nu),
+      ...findUninvoicedAta([ata('a2')], projekt, [{ project_id: 'p1' } as any], nu),
+    ]
+    for (const f of fynd) {
+      if (f.draftLines) expect(f.action, `${f.kind} bär rader utan tillstånd`).toBe('DRAFT_AFTER_REVIEW')
+    }
+  })
+
+  test('svepet lägger raderna i payloaden, men skapar ingen faktura', () => {
+    const s = kod('app/api/cron/missed-revenue/route.ts')
+    expect(s).toContain('f.draftLines?.length')
+    expect(s).toContain('preview: {')
+    // Kortet ska fortfarande inte röra pengar när det skrivs.
+    expect(s, 'svepet skapar en faktura').not.toMatch(/\.from\('invoice'\)\s*\.insert/)
+  })
+
+  test('kortet renderar raderna utan att öppna något', () => {
+    const s = kod('components/jarvis/JarvisHome.tsx')
+    expect(s).toContain('pl.preview?.items')
+    expect(s).toContain('Att fakturera')
+  })
+})
+
 test.describe('ytan använder härledningen', () => {
   const s = kod('components/jarvis/JarvisHome.tsx')
 

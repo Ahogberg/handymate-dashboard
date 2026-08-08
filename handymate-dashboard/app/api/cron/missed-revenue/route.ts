@@ -222,6 +222,18 @@ async function persistCard(
       source_ids: f.sourceIds,
       classification_version: MISSED_REVENUE_CLASSIFICATION_VERSION,
       evidence: f.evidence,
+      // Fakturaraderna fyndet skulle bli — bara när klassificeringen säger
+      // DRAFT_AFTER_REVIEW (se draftLines i lib/value/missed-revenue.ts).
+      // Ingen faktura skapas här; raderna är en förhandsvisning så kortet
+      // bär ett resultat i stället för en varning.
+      ...(f.draftLines?.length
+        ? {
+            preview: {
+              items: f.draftLines,
+              total_before_vat: f.draftLines.reduce((s, l) => s + l.amount_kr, 0),
+            },
+          }
+        : {}),
       // Läses av nästa nattkörning för att inte skapa samma kort igen.
       dedupe_key: f.dedupeKey,
     },
