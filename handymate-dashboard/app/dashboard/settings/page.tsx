@@ -533,11 +533,25 @@ export default function SettingsPage() {
   }
 
   async function fetchConfig() {
-    const { data } = await supabase
+    // Felet lästes inte förut. När v96 lade RLS på business_config gav den här
+    // läsningen tyst noll rader, och sidan svarade "Kunde inte ladda
+    // inställningar" utan att någonstans säga varför. Ett tyst fel på en
+    // klient-sida-läsning är samma felklass som gjorde intäktssvepet dött.
+    const { data, error } = await supabase
       .from('business_config')
       .select('*')
       .eq('business_id', business.business_id)
       .single()
+
+    if (error) {
+      console.error('[settings] kunde inte läsa business_config:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        business_id: business.business_id,
+      })
+    }
 
     if (data) {
       // Auto-generera website_api_key om det saknas
