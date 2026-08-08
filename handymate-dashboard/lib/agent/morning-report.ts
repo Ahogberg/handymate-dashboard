@@ -6,10 +6,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
-import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
-const ELKS_API_USER = process.env.ELKS_API_USER!
-const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
 
 export async function sendMorningReport(businessId: string): Promise<{
   success: boolean
@@ -147,23 +144,29 @@ export async function sendMorningReport(businessId: string): Promise<{
 
     message += `\nAgenten hanterar resten. Ha en bra dag!\n\u2014 Handymate`
 
-    // Skicka via 46elks
-    const smsResponse = await fetch('https://api.46elks.com/a1/sms', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        from: sanitizeSenderId(config.business_name),
-        to: config.personal_phone,
-        message,
-      }),
+    // ═══ GENOM STRYPUNKTEN (etapp 0 batch 3, 2026-08-08) ═══
+    //
+    // recipient: 'owner' — det här går till hantverkarens EGEN telefon, inte
+    // till en kund. Utan flaggan hade hans morgonrapport kunnat tystas av en
+    // kundrad med opt-out som råkar bära samma nummer.
+    //
+    // Sidovinst: meddelandet slutar med "— Handymate", alltså ett långt
+    // tankstreck. Det tvingade hela SMS:et till UCS-2 (70 tecken per del i
+    // stället för 160) och dubblade kostnaden — varje morgon, för varje kund.
+    // Typografitvätten i helpern rättar det automatiskt.
+    const { sendSmsViaElks } = await import('@/lib/sms-send')
+    const smsResult = await sendSmsViaElks({
+      supabase,
+      businessId,
+      businessName: config.business_name,
+      to: config.personal_phone,
+      message,
+      messageType: 'morning_report',
+      recipient: 'owner',
     })
 
-    if (!smsResponse.ok) {
-      const errData = await smsResponse.json().catch(() => ({}))
-      return { success: false, error: `46elks error: ${(errData as any).message || smsResponse.status}` }
+    if (!smsResult.success) {
+      return { success: false, error: `SMS misslyckades: ${smsResult.error || 'okänt fel'}` }
     }
 
     // Push notification

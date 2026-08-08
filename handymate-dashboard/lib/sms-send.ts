@@ -28,6 +28,23 @@ export interface SendSmsArgs {
    * oanvända) — ingen migration behövs. Ger attributionskedjan kort→SMS.
    */
   approvalId?: string | null
+  /**
+   * Vem meddelandet går till. Default 'customer'.
+   *
+   * ═══ 'owner' FÅR ALDRIG ANVÄNDAS FÖR KUNDMEDDELANDEN ═══
+   *
+   * Opt-out är ett KUNDSKYDD: `customer.sms_opt_out` sätts när en kund svarar
+   * STOPP. Men tre utskick går till hantverkaren själv — morgonrapporten,
+   * månadsrapporten och driftlarm. Om hantverkarens eget nummer råkar finnas
+   * som en kundrad i hans EGET företag (vanligt i test- och demokonton) med
+   * opt-out satt, skulle han tyst sluta få sin egen rapport.
+   *
+   * 'owner' hoppar därför över opt-out-uppslaget. Allt annat — E.164,
+   * sms_log, kostnadsmätning, typografitvätt — gäller precis som vanligt.
+   * Facit i tests/cogs-matare.spec.ts håller listan över tillåtna
+   * 'owner'-callsites kort.
+   */
+  recipient?: 'customer' | 'owner'
 }
 
 export interface SendSmsResult {
@@ -193,7 +210,12 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
   let errorMsg: string | undefined
   let success = false
 
-  const optedOut = await isCustomerOptedOut(supabase, businessId, customerId, phone)
+  // Meddelanden till hantverkaren själv omfattas inte av kundens opt-out —
+  // se noten vid `recipient` i SendSmsArgs.
+  const optedOut =
+    args.recipient === 'owner'
+      ? false
+      : await isCustomerOptedOut(supabase, businessId, customerId, phone)
   if (optedOut) {
     errorMsg = 'Kunden har avböjt SMS'
   } else {

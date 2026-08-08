@@ -47,20 +47,27 @@ export async function GET(request: NextRequest) {
       }, { onConflict: 'business_id,month' })
 
       // Skicka SMS-notis till hantverkaren
+      // Genom strypunkten (etapp 0 batch 3). recipient: 'owner' — går till
+      // hantverkarens eget nummer, inte till en kund.
+      //
+      // Avsändaren hade en EGEN sanerare här — femte varianten — och den
+      // strök dessutom å/ä/ö rakt av i stället för att gå genom
+      // sanitizeSenderId, som först tar bort bolagsformen ("Bee Service AB"
+      // → "BeeService" i stället för "BeeServiceA").
       const smsTo = biz.phone_number
-      if (smsTo && process.env.ELKS_API_USER && process.env.ELKS_API_PASSWORD) {
+      if (smsTo) {
         const smsText = buildMonthlyReviewSms(report.data, report.recommendations.length)
-        const from = (biz.business_name || 'Handymate').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 11)
-        try {
-          await fetch('https://api.46elks.com/a1/sms', {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Basic ' + Buffer.from(`${process.env.ELKS_API_USER}:${process.env.ELKS_API_PASSWORD}`).toString('base64'),
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({ from, to: smsTo, message: smsText }).toString(),
-          })
-        } catch { /* non-blocking */ }
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const r = await sendSmsViaElks({
+          supabase,
+          businessId: biz.business_id,
+          businessName: biz.business_name,
+          to: smsTo,
+          message: smsText,
+          messageType: 'monthly_review',
+          recipient: 'owner',
+        })
+        if (!r.success) console.error('[cron/monthly-review] SMS misslyckades:', r.error)
       }
 
       // Skapa pending_approval så rapporten dyker upp som notis

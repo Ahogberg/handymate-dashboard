@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
-import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -129,33 +128,34 @@ export async function GET(request: NextRequest) {
           : null
         const reviewLink = portalUrl || p.google_review_url
 
-        const smsRes = await fetch('https://api.46elks.com/a1/sms', {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            from: sanitizeSenderId(bizName),
-            to: p.customer_phone,
-            message: `Hej${firstName ? ' ' + firstName : ''}! Tack igen för att du valde oss. Om du är nöjd skulle vi uppskatta en recension — det hjälper oss enormt! ${reviewLink}\n${suffix}`,
-          }).toString(),
+        // ═══ GENOM STRYPUNKTEN (etapp 0 batch 3, 2026-08-08) ═══
+        //
+        // Den ENDA av de tre cron-vägarna som går till en KUND — alltså den
+        // enda där opt-out ska gälla, och den gällde inte. En kund som svarat
+        // STOPP fick ändå en förfrågan om att lämna recension.
+        //
+        // Meddelandet innehåller dessutom ett långt tankstreck ("recension —
+        // det hjälper"), vilket tvingade hela SMS:et till UCS-2 och dubblade
+        // kostnaden. Typografitvätten rättar det.
+        //
+        // Den lokala sms_log-insert:en tas bort: helpern skriver den nu, med
+        // delantal och kostnad. message_type och related_id går med som
+        // parametrar i stället.
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const smsRes = await sendSmsViaElks({
+          supabase,
+          businessId: review.business_id,
+          businessName: bizName,
+          to: p.customer_phone,
+          message: `Hej${firstName ? ' ' + firstName : ''}! Tack igen för att du valde oss. Om du är nöjd skulle vi uppskatta en recension — det hjälper oss enormt! ${reviewLink}\n${suffix}`,
+          customerId: p.customer_id || null,
+          relatedId: p.invoice_id || null,
+          messageType: 'review_request',
         })
 
-        if (smsRes.ok) {
+        if (smsRes.success) {
           reviewsSent++
           await supabase.from('pending_approvals').update({ status: 'approved' }).eq('id', review.id)
-          await supabase.from('sms_log').insert({
-            sms_id: 'sms_' + Math.random().toString(36).slice(2, 12),
-            business_id: review.business_id,
-            customer_id: p.customer_id,
-            direction: 'outbound',
-            phone_to: p.customer_phone,
-            message_type: 'review_request',
-            related_id: p.invoice_id,
-            status: 'sent',
-            sent_at: new Date().toISOString(),
-          })
           // Komplettera SMS:et med ett portal-mail (kunden får båda kanalerna)
           if (p.customer_id) {
             try {

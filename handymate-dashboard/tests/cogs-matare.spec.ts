@@ -336,10 +336,10 @@ test.describe('spärrhaken — läckaget får bara krympa', () => {
     // stället för sin hantverkare), och lib/approve-actions.ts påstår i sitt
     // filhuvud att den används av både manuell och automatisk godkännande —
     // men suggestions/approve har en EGEN kopia av alla sex handlers.
-    // batch 3 — cron
-    'app/api/cron/maintenance/route.ts',
-    'app/api/cron/monthly-review/route.ts',
-    'lib/agent/morning-report.ts',
+    // ── Batch 3 MIGRERAD 2026-08-08 ──────────────────────────────────────
+    // maintenance (recensionsförfrågan), monthly-review, morning-report.
+    // Två av tre går till HANTVERKAREN själv och använder recipient:'owner'
+    // — se facit "opt-out gäller kunder, inte hantverkaren" nedan.
     // batch 4 — svansen
     'app/api/field-reports/[id]/sign/route.ts',
     'app/api/work-orders/[id]/send/route.ts',
@@ -406,6 +406,42 @@ test.describe('spärrhaken — läckaget får bara krympa', () => {
       döda,
       `Migrerade — ta bort ur KVAR_ATT_MIGRERA: ${döda.join(', ')}`
     ).toEqual([])
+  })
+
+  test("opt-out gäller kunder, inte hantverkaren — och listan är kort", () => {
+    // customer.sms_opt_out är ett KUNDSKYDD. Tre utskick går till
+    // hantverkarens egen telefon (morgonrapport, månadsrapport). Råkar hans
+    // nummer finnas som en kundrad i hans EGET företag med opt-out satt —
+    // vanligt i test- och demokonton — skulle han tyst sluta få sin egen
+    // rapport. recipient:'owner' hoppar därför över opt-out-uppslaget.
+    //
+    // Flaggan är farlig om den sprider sig till kundmeddelanden, så listan
+    // hålls kort och explicit här.
+    const TILLATNA_OWNER_SITES = [
+      'lib/agent/morning-report.ts',
+      'app/api/cron/monthly-review/route.ts',
+    ]
+    const träffar: string[] = []
+    const gå = (dir: string) => {
+      let poster
+      try { poster = fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }) } catch { return }
+      for (const f of poster) {
+        const rel = `${dir}/${f.name}`
+        if (f.isDirectory()) {
+          if (f.name === 'node_modules' || f.name === '.next') continue
+          gå(rel)
+        } else if (/\.tsx?$/.test(f.name)) {
+          if (/recipient:\s*'owner'/.test(kod(rel))) träffar.push(rel)
+        }
+      }
+    }
+    for (const rot of ['lib', 'app']) gå(rot)
+    expect(träffar.sort(), `oväntad owner-flagga: ${träffar.join(', ')}`)
+      .toEqual(TILLATNA_OWNER_SITES.sort())
+
+    // Och helpern måste faktiskt hoppa över spärren för dem.
+    const s = kod('lib/sms-send.ts')
+    expect(s).toContain("args.recipient === 'owner'")
   })
 
   test('strypunkten mäter kostnad och delar', () => {
