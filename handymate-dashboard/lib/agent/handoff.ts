@@ -41,7 +41,7 @@ export interface HandoffAttemptResult {
   /** Aktuell agent EFTER försöket — antingen target_agent (på success) eller from_agent (om refused). */
   current_agent: AgentId
   /** Varför handoff:en avvisades, om ok=false. */
-  refused_reason?: 'invalid_target' | 'not_allowed' | 'max_handoffs_reached' | 'self_handoff'
+  refused_reason?: 'invalid_target' | 'not_allowed' | 'max_handoffs_reached' | 'self_handoff' | 'persist_failed'
 }
 
 /**
@@ -153,24 +153,54 @@ export async function executeHandoff(opts: {
     return { ok: false, current_agent: fromAgent, refused_reason: 'not_allowed' }
   }
 
-  if ((thread.handoff_count || 0) >= MAX_HANDOFFS_PER_THREAD) {
-    console.warn(`[handoff] max-loop reached on thread ${thread.id}, refusing handoff ${fromAgent}→${target}`)
+  const supabase = getSupabase()
+
+  // ═══ TAKET ÄR FÖNSTRAT, INTE LIVSTID (Codex fynd, 2026-08-08) ═══
+  //
+  // Taket räknades på thread.handoff_count — ett ackumulerat livstidsfält.
+  // Efter tre historiska byten blev tråden PERMANENT oförmögen till handoff:
+  // en kundtråd som levt några veckor kunde aldrig mer nå en specialist,
+  // och ingen såg varför. Loop-skyddet ska stoppa en spiral i stunden,
+  // inte åldras in i tråden. Nu räknas de senaste 24 timmarna ur
+  // auditloggen; handoff_count står kvar som ackumulerad statistik.
+  const { count: senasteDygnet, error: countErr } = await supabase
+    .from('agent_handoffs')
+    .select('id', { count: 'exact', head: true })
+    .eq('thread_id', thread.id)
+    .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+
+  if (countErr) {
+    // Kan vi inte räkna failar vi STÄNGT — hellre en nekad handoff än en
+    // obegränsad loop när räkneverket ligger nere.
+    console.error(`[handoff] kunde inte räkna handoffs för tråd ${thread.id}:`, countErr.message)
     return { ok: false, current_agent: fromAgent, refused_reason: 'max_handoffs_reached' }
   }
 
-  const supabase = getSupabase()
+  if ((senasteDygnet ?? 0) >= MAX_HANDOFFS_PER_THREAD) {
+    console.warn(`[handoff] max-loop (24h-fönster) på tråd ${thread.id}, nekar ${fromAgent}→${target}`)
+    return { ok: false, current_agent: fromAgent, refused_reason: 'max_handoffs_reached' }
+  }
 
-  // Logga handoff (audit)
-  await supabase.from('agent_handoffs').insert({
+  // ═══ FELEN LÄSES (Codex fynd, 2026-08-08) ═══
+  //
+  // Båda skrivningarna kastade bort sina fel: funktionen kunde returnera
+  // ok:true utan att current_agent_id ändrats. Chatten körde då specialistens
+  // varv medan tråden fortfarande stod på förra agenten — nästa meddelande
+  // hamnade hos fel agent utan att någon kunde se varför. Ok:true betyder
+  // nu att state FAKTISKT skrivits; auditloggen är sekundär och stoppar
+  // inte handoffen men syns i loggen.
+  const { error: auditErr } = await supabase.from('agent_handoffs').insert({
     thread_id: thread.id,
     from_agent: fromAgent,
     to_agent: target,
     reason,
     context_summary: contextSummary || null,
   })
+  if (auditErr) {
+    console.error(`[handoff] audit-insert misslyckades (${fromAgent}→${target}):`, auditErr.message)
+  }
 
-  // Uppdatera tråd
-  await supabase
+  const { error: updateErr } = await supabase
     .from('agent_threads')
     .update({
       current_agent_id: target,
@@ -179,6 +209,11 @@ export async function executeHandoff(opts: {
       last_message_at: new Date().toISOString(),
     })
     .eq('id', thread.id)
+
+  if (updateErr) {
+    console.error(`[handoff] tråduppdatering misslyckades (${fromAgent}→${target}):`, updateErr.message)
+    return { ok: false, current_agent: fromAgent, refused_reason: 'persist_failed' }
+  }
 
   return { ok: true, current_agent: target }
 }

@@ -47,6 +47,44 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+
+  // Bekräftelsekortet för externa utskick — samma kontrakt som Jobbkompisen:
+  // servern signerar en token för EXAKT det verktygsanrop som visas, och
+  // [Skicka] återanropar med enbart token. Inget skickas förrän man tryckt.
+  const [pendingConfirmation, setPendingConfirmation] = useState<{
+    summary: string
+    token: string
+  } | null>(null)
+
+  const confirmPending = useCallback(async () => {
+    if (!pendingConfirmation || sending) return
+    const token = pendingConfirmation.token
+    setPendingConfirmation(null)
+    setSending(true)
+    try {
+      const res = await fetch('/api/matte/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: { token } }),
+      })
+      const data = await res.json()
+      if (data.thread_id) setActiveId(data.thread_id)
+      const chain: Array<{ agent?: string; content: string }> = data.messages?.length
+        ? data.messages
+        : [{ agent: data.current_agent || 'matte', content: data.reply || '' }]
+      const now = new Date().toISOString()
+      setMessages(prev => [...prev, ...chain.map(m => ({
+        role: 'assistant' as const,
+        content: m.content,
+        agent: m.agent ?? null,
+        created_at: now,
+      }))])
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Kunde inte nå servern — inget skickades.', created_at: new Date().toISOString() }])
+    } finally {
+      setSending(false)
+    }
+  }, [pendingConfirmation, sending])
   const [loadingConversations, setLoadingConversations] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [initialized, setInitialized] = useState(false)
@@ -154,6 +192,14 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
         body: JSON.stringify({
           messages: [{ role: 'user', content: text }],
           context: { threadId: activeId },
+          // ═══ SÄKERHETSGRÄNSEN (Codex fynd, 2026-08-08) ═══
+          //
+          // Jobbkompisen har alltid begärt bekräftelsekort för externa
+          // utskick — den här modalen utelämnade flaggan, så samma Matte
+          // kunde SMS:a kunder direkt beroende på vilken yta man råkade
+          // skriva i. Gränsen får aldrig bero på vilken dörr man kom in
+          // genom. Bekräftelsekortet renderas nedan.
+          require_confirm_external: true,
         }),
       })
       if (!res.ok) {
@@ -163,6 +209,7 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
       }
       const data = await res.json()
       if (data.thread_id) setActiveId(data.thread_id)
+      if (data.pending_confirmation) setPendingConfirmation(data.pending_confirmation)
       // Rendera HELA agent-kedjan (handoff syns) — fallback till reply om tomt.
       const chain: Array<{ agent?: string; content: string }> = data.messages?.length
         ? data.messages
@@ -391,6 +438,30 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
               </div>
             )}
           </div>
+
+          {/* Bekräftelsekort — externt utskick väntar på ett mänskligt ja */}
+          {pendingConfirmation && (
+            <div className="border-t border-amber-200 bg-amber-50 p-3">
+              <p className="m-0 text-sm text-amber-900 font-medium">{pendingConfirmation.summary}</p>
+              <div className="flex gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={confirmPending}
+                  disabled={sending}
+                  className="inline-flex items-center min-h-[40px] px-4 rounded-xl bg-primary-700 text-white text-sm font-semibold disabled:opacity-50"
+                >
+                  Skicka
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingConfirmation(null)}
+                  className="inline-flex items-center min-h-[40px] px-4 rounded-xl bg-white border border-slate-300 text-sm font-medium text-slate-700"
+                >
+                  Avbryt
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Input */}
           <div className="border-t border-gray-100 bg-white p-3">
