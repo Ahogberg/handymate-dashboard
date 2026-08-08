@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { AGENT_CAPABILITIES, isValidAgentId, type AgentId } from '@/lib/agent/capabilities'
+import { AGENT_CAPABILITIES, type AgentId } from '@/lib/agent/capabilities'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 import {
   getOrCreateThread,
   executeHandoff,
   buildHandoffAnnouncement,
   touchThread,
+  restoreThreadOwner,
   MAX_HANDOFFS_PER_THREAD,
 } from '@/lib/agent/handoff'
 import {
@@ -29,6 +30,17 @@ import {
 } from '@/lib/agent/external-confirm'
 import { getRelevantMemories, buildMemoryPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
 import { getAgentTools } from '@/lib/agents/personalities'
+import {
+  validateNextStep,
+  toAgentResult,
+  buildHandoffBriefing,
+  buildOrchestrationSummary,
+  shouldMatteSummarize,
+  MAX_SPECIALIST_STEPS,
+  type AgentResult,
+  type OrchestrationIntent,
+  type ToolOutcome,
+} from '@/lib/agent/orchestration'
 
 const MAX_IMAGES_PER_MESSAGE = 4
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -511,6 +523,8 @@ ${outOfScope}
 
 VID HANDOFF: Var transparent men kort. Använd handoff_to_agent-verktyget — säg inte "Hej, jag är X" till användaren, det säger nästa agent. Skriv en kort context_for_next_agent så nästa agent kan svara direkt utan att fråga om.
 
+ÄRENDEN SOM RÖR FLERA OMRÅDEN: gör klart DIN del först, lämna sedan över till nästa specialist för deras del. Ärendet får passera högst tre specialister, och du får bara komma in en gång — planera därför din del färdigt innan du lämnar. Matte sammanfattar för hantverkaren till sist, så du behöver inte upprepa vad andra gjort. Påstå ALDRIG att något är gjort som du inte själv utfört med ett verktyg; blev det fel, säg det rakt.
+
 Du har tillgång till verktyg för kunder, offerter (skapa riktiga offerter med ROT/RUT), fakturor, bokningar, kalender, tidrapporter, leads, SMS, e-post och navigering. Använd dem för att faktiskt UTFÖRA det hantverkaren ber om — men bara inom ditt expertområde.${imageBlock}
 
 Var vänlig, professionell och effektiv. Använd du-tilltal.`
@@ -531,6 +545,12 @@ interface AgentTurnResult {
    * har INTE exekverats — outer loop stannar och ber om explicit bekräftelse.
    */
   pendingExternal: { toolName: string; toolInput: Record<string, unknown> } | null
+  /**
+   * Epic 2: vad verktygen FAKTISKT gjorde under turen. Grunden för stegets
+   * status — utan den härleds "klart" ur modellens egen text, vilket är
+   * precis den part som kan ha fel om saken.
+   */
+  toolOutcomes: ToolOutcome[]
 }
 
 /**
@@ -566,6 +586,7 @@ async function runAgentTurn(opts: {
   })
 
   const toolMessages: any[] = []
+  const toolOutcomes: ToolOutcome[] = []
   let finalAction: any = null
   let iterations = 0
 
@@ -590,6 +611,7 @@ async function runAgentTurn(opts: {
           context_for_next_agent: String(handoffBlock.input?.context_for_next_agent || ''),
         },
         pendingExternal: null,
+        toolOutcomes,
       }
     }
 
@@ -612,6 +634,7 @@ async function runAgentTurn(opts: {
           action: finalAction,
           handoff: null,
           pendingExternal: { toolName: gatedBlock.name, toolInput: gatedBlock.input || {} },
+          toolOutcomes,
         }
       }
     }
@@ -631,6 +654,7 @@ async function runAgentTurn(opts: {
         // Listan till modellen är UX; det här är gränsen.
         if (!isToolAllowedForAgent(opts.agent, block.name)) {
           console.warn(`[matte/chat] agent ${opts.agent} nekades verktyget ${block.name}`)
+          toolOutcomes.push({ tool: block.name, ok: false, error: `${block.name} ligger utanför agentens område` })
           return {
             type: 'tool_result',
             tool_use_id: block.id,
@@ -638,6 +662,16 @@ async function runAgentTurn(opts: {
           }
         }
         const r: any = await executeSharedTool(block.name, block.input || {}, opts.supabase, opts.businessId, opts.toolContext as any)
+        // Epic 2: bokför utfallet som routern rapporterade det. Ett verktyg
+        // som la något i godkännandekön är INTE verkställt — den skillnaden
+        // är hela poängen med statusen längre upp.
+        const lyckades = !r?.error && r?.success !== false
+        toolOutcomes.push({
+          tool: block.name,
+          ok: lyckades,
+          ...(r?.error ? { error: String(r.error) } : {}),
+          ...(lyckades && block.name === 'create_approval_request' ? { awaitingApproval: true } : {}),
+        })
         const content = r?.error ? `Fel: ${r.error}` : JSON.stringify(r?.data ?? r)
         return { type: 'tool_result', tool_use_id: block.id, content }
       })
@@ -663,7 +697,7 @@ async function runAgentTurn(opts: {
     .join('\n')
     .trim()
 
-  return { text: finalText, action: finalAction, handoff: null, pendingExternal: null }
+  return { text: finalText, action: finalAction, handoff: null, pendingExternal: null, toolOutcomes }
 }
 
 /**
@@ -951,15 +985,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── Outer handoff-loop ──────────────────────────────────────────────
-    // Maximalt 1 handoff per chat-turn (det räcker i 95% av fallen). Tråden
-    // kan ackumulera fler handoffs över flera turns — capped vid
-    // MAX_HANDOFFS_PER_THREAD (audit + skydd mot loops).
+    // ── Orkestreringsloopen ─────────────────────────────────────────────
+    // Upp till MAX_SPECIALIST_STEPS specialiststeg per request (se nedan).
+    // Trådens dygnstak MAX_HANDOFFS_PER_THREAD ligger kvar som backstop mot
+    // spiraler över tid.
     const responseMessages: Array<{ agent: AgentId; content: string; is_handoff_announcement?: boolean }> = []
     let finalAction: any = null
-    const MAX_PER_TURN_HANDOFFS = 1
-    let handoffsThisTurn = 0
     let outerMessages = initialMessages
+
+    // ═══ SEKVENTIELL MULTI-AGENT V1 (Epic 2) ═══
+    //
+    // Förut: exakt EN överlämning per tur, och efter den kom Matte aldrig
+    // tillbaka. Storgatan-ärendet ("klara på Storgatan, fyra timmar extra,
+    // kunden vill ha fakturan idag") rör tre domäner och gick alltså inte
+    // att besvara sant.
+    //
+    // Nu: upp till tre specialiststeg i följd, ursprungsärendet skickas
+    // OFÖRÄNDRAT vidare i varje steg, och varje steg bokförs som ett
+    // AgentResult härlett ur verktygens faktiska utfall. Ingen svärm, ingen
+    // workflow engine — samma loop, med ett räkneverk och ett minne.
+    const intent: OrchestrationIntent = {
+      text: newUserText || '',
+      customerId: customerId || null,
+      projectId: projectId || null,
+    }
+    const steps: AgentResult[] = []
+    const visitedSpecialists: AgentId[] = []
 
     while (true) {
       // Minne: samma funktioner (getRelevantMemories/buildMemoryPrompt) som
@@ -1046,7 +1097,16 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      if (!turn.handoff || handoffsThisTurn >= MAX_PER_TURN_HANDOFFS) {
+      // Bokför steget innan vi bestämmer nästa. Statusen härleds ur
+      // verktygsutfallen, inte ur texten — modellen får inte betygsätta sig
+      // själv (se lib/agent/orchestration.ts).
+      steps.push(toAgentResult(currentAgent, turn.text, turn.toolOutcomes))
+
+      const plan = turn.handoff
+        ? validateNextStep({ from: currentAgent, target: turn.handoff.target_agent, visited: visitedSpecialists })
+        : null
+
+      if (!turn.handoff || !plan?.ok) {
         // Klart: lägg sista textsvaret om det finns
         if (turn.text) {
           responseMessages.push({ agent: currentAgent, content: turn.text })
@@ -1061,13 +1121,11 @@ export async function POST(request: NextRequest) {
             }).catch(() => {})
           }
         }
-        break
-      }
-
-      // Handoff begärd — verifiera och utför
-      if (!isValidAgentId(turn.handoff.target_agent)) {
-        // Ogiltig target — fall tillbaka till nuvarande agents textsvar
-        if (turn.text) responseMessages.push({ agent: currentAgent, content: turn.text })
+        // Nekad plan syns i loggen; användaren möter den genom Mattes
+        // sammanfattning, inte genom ett tekniskt felmeddelande.
+        if (plan && !plan.ok) {
+          console.warn(`[matte/chat] planen nekade ${currentAgent}→${turn.handoff?.target_agent}: ${plan.reason}`)
+        }
         break
       }
 
@@ -1086,7 +1144,7 @@ export async function POST(request: NextRequest) {
       const result = await executeHandoff({
         thread,
         fromAgent: currentAgent,
-        toAgent: turn.handoff.target_agent,
+        toAgent: plan.target,
         reason: turn.handoff.reason,
         contextSummary: turn.handoff.context_for_next_agent,
       })
@@ -1127,16 +1185,52 @@ export async function POST(request: NextRequest) {
         }).catch(() => {})
       }
 
-      // Byt till ny agent + injicera context som user-meddelande för nästa runda
+      // Byt till ny agent. Briefingen bär ursprungsärendet ORDAGRANT plus vad
+      // kollegorna faktiskt gjort — förut fick nästa agent bara avgående
+      // agents fria sammanfattning, alltså en tolkning av en tolkning.
       currentAgent = result.current_agent
+      if (currentAgent !== 'matte' && !visitedSpecialists.includes(currentAgent)) {
+        visitedSpecialists.push(currentAgent)
+      }
       outerMessages = [
         ...initialMessages,
         {
           role: 'user',
-          content: `[Handoff-kontext: ${turn.handoff.context_for_next_agent}]\n\nSvara kort på frågan ovan.`,
+          content: buildHandoffBriefing(intent, steps, turn.handoff.context_for_next_agent),
         },
       ]
-      handoffsThisTurn++
+    }
+
+    // ── Matte återtar samtalet ──────────────────────────────────────────
+    // Specialisterna äger sitt domänresonemang; Matte äger slutstatusen.
+    // Sammanfattningen listar bara det som verktygsutfallen faktiskt visar,
+    // så ingen "klart!" kan överleva ett verktyg som felade. En ensam lyckad
+    // specialist får behålla ordet — där vore en sammanfattning bara brus.
+    const redovisade = steps.filter(s => s.agent !== 'matte' || s.status !== 'completed')
+    if (shouldMatteSummarize(redovisade)) {
+      const summering = buildOrchestrationSummary(redovisade)
+      responseMessages.push({ agent: 'matte', content: summering })
+      if (thread) {
+        saveThreadMessage({
+          threadId: thread.id,
+          businessId,
+          role: 'assistant',
+          agent: 'matte',
+          content: summering,
+          metadata: {
+            orchestration: {
+              steps: redovisade.map(s => ({ agent: s.agent, status: s.status, actions: s.actions })),
+            },
+          },
+        }).catch(() => {})
+        if (currentAgent !== 'matte') {
+          // Tråden lämnas tillbaka till Matte — inte som en handoff (det är
+          // ingen agents beslut och ska inte äta av loopskyddets kvot), utan
+          // som ett ägarbyte tillbaka till koordinatorn.
+          restoreThreadOwner(thread.id, 'matte').catch(() => {})
+        }
+      }
+      currentAgent = 'matte'
     }
 
     // Touch-thread så last_message_at uppdateras

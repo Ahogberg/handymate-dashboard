@@ -14,7 +14,15 @@
 import { createClient } from '@supabase/supabase-js'
 import { AGENT_CAPABILITIES, canHandoff, isValidAgentId, type AgentId } from './capabilities'
 
-export const MAX_HANDOFFS_PER_THREAD = 3
+/**
+ * Trådtaket är en BACKSTOP mot spiraler över tid, inte planens loopskydd.
+ * Det senare sitter i lib/agent/orchestration.ts och är request-scopat (max
+ * tre specialiststeg, ingen agent två gånger). Med Epic 2 kan EN request
+ * använda tre handoffs; ett dygnstak på 3 hade då låst tråden i ett dygn
+ * efter ett enda tvärdomänärende. Tolv räcker för flera ärenden per dag och
+ * stoppar fortfarande en skenande kedja.
+ */
+export const MAX_HANDOFFS_PER_THREAD = 12
 
 function getSupabase() {
   return createClient(
@@ -242,6 +250,27 @@ export async function getThread(threadId: string): Promise<AgentThread | null> {
     .eq('id', threadId)
     .maybeSingle()
   return (data as AgentThread) || null
+}
+
+/**
+ * Matte återtar tråden efter en avslutad orkestrering (Epic 2).
+ *
+ * Detta är INTE en handoff: ingen agent bad om det, och det ska därför
+ * varken loggas i agent_handoffs eller räknas mot loopskyddet — annars
+ * skulle varje sammanfattning äta av kvoten för nästa riktiga överlämning.
+ * Bara ägarbytet skrivs.
+ */
+export async function restoreThreadOwner(threadId: string, agent: AgentId = 'matte'): Promise<boolean> {
+  const supabase = getSupabase()
+  const { error } = await supabase
+    .from('agent_threads')
+    .update({ current_agent_id: agent, last_message_at: new Date().toISOString() })
+    .eq('id', threadId)
+  if (error) {
+    console.error(`[handoff] kunde inte återlämna tråd ${threadId} till ${agent}:`, error.message)
+    return false
+  }
+  return true
 }
 
 /** Uppdatera last_message_at — bör anropas vid varje meddelande på tråden. */
