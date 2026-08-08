@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { triggerAgentFireAndForget, makeIdempotencyKey } from '@/lib/agent-trigger'
+import { recordCost } from '@/lib/costs/record'
+import { whisperCostOre } from '@/lib/costs/meter'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 const ELKS_API_USER = process.env.ELKS_API_USER
@@ -126,6 +128,29 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error('Error saving transcript:', updateError)
+    }
+
+    // ═══ WHISPER-KOSTNADEN BOKFÖRS (COGS-mätaren, 2026-08-08) ═══
+    //
+    // Detta är enda Whisper-anropet i kedjan med KÄND ljudlängd
+    // (recording.duration_seconds) och enda som skalar med kundvolym — de tre
+    // användarinitierade (matte/transcribe, jobbuddy/voice,
+    // quotes/transcribe-voice) lämnas medvetet omätta: att estimera längd ur
+    // filstorlek ger ett tal som ser exakt ut utan att vara det.
+    //
+    // Idempotens-checken högre upp (returnerar tidigt om transcript redan
+    // finns) gör att en retry inte dubbelbokför.
+    const ljudSekunder = Number(recording.duration_seconds) || 0
+    if (ljudSekunder > 0) {
+      await recordCost({
+        supabase,
+        businessId: recording.business_id,
+        resource: 'whisper',
+        units: ljudSekunder,
+        costOre: whisperCostOre(ljudSekunder),
+        refType: 'call_recording',
+        refId: recording_id,
+      })
     }
 
     // Trigger AI agent for call analysis (primary path)

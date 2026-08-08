@@ -60,6 +60,25 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     const answered = state === 'success' || duration > 0
     console.log('[voice/missed] hangup', { businessId, from, callId, handled, state, duration, answered })
 
+    // ═══ SAMTALSKOSTNADEN: PAYLOAD FÖRST, PRISLOGIK SEDAN (2026-08-08) ═══
+    //
+    // Vidarekopplingen till hantverkarens mobil är ett UTGÅENDE ben som
+    // debiteras 0,57 kr/minut — största rörliga kostnaden per kund, och den
+    // har aldrig haft en rad någonstans i schemat.
+    //
+    // Men vi vet inte säkert vad 46elks skickar här: bär `duration`
+    // sekunder eller minuter, gäller den hela samtalet eller bara det
+    // vidarekopplade benet, och debiteras påbörjad minut? Ett fel antagande
+    // är fel med en faktor 60. Därför loggas hela payloaden RÅ först — när
+    // den är avstämd mot en faktisk 46elks-faktura kopplas recordCost in
+    // här med callCostOre().
+    //
+    // Loggen är avsiktligt en enda rad med hela bodyn, så den går att söka
+    // fram i Vercel-loggen utan att gissa fältnamn.
+    if (request.method === 'POST' && rawBody) {
+      console.log('[voice/missed] RÅ PAYLOAD för kostnadsmätning (v100):', rawBody)
+    }
+
     // ═══ BARA POST FÅR UTLÖSA NÅGOT (2026-08-08) ═══
     //
     // Signaturkontrollen ovan ligger inuti `if (request.method === 'POST')`,

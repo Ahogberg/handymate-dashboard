@@ -45,6 +45,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getClaudeModel } from '@/lib/ai/get-model'
 import { normalizeSwedishPhone } from '@/lib/phone-normalize'
+import { llmCostUsd } from '@/lib/costs/meter'
 import { extractFirstName } from '@/lib/agents/daniel/unopened-quotes'
 import { priceInclVatPerVisit, type PriceItemLike } from '@/lib/agreements/pricing'
 import { canContactCustomer } from '@/lib/outbound/frequency-guard'
@@ -62,9 +63,10 @@ export const AVTAL_FORSLAG_TRIGGER = 'avtal_forslag'
 export const AVTAL_FORSLAG_SMS_MAX_LENGTH = 300
 export const APPROVAL_EXPIRES_DAYS = 14
 
-// Haiku-priser (per skill-katalogen 2026-07): $1/1M input, $5/1M output.
-const HAIKU_INPUT_PRICE_PER_M = 1.0
-const HAIKU_OUTPUT_PRICE_PER_M = 5.0
+// Haiku-priserna låg tidigare här som konstanter. De bor nu i
+// lib/costs/price-list.ts tillsammans med Sonnet och Opus — ett pris ska
+// finnas på ett ställe, inte i varje fil som råkar anropa en modell.
+const HAIKU_MODEL = 'claude-haiku-4-5-20251001'
 
 // ─────────────────────────────────────────────────────────────────
 // Rena typer + hjälpfunktioner — testbara utan DB (tests/serviceavtal.spec.ts)
@@ -280,10 +282,7 @@ export async function matchViaHaiku(opts: {
     const usage = usageRaw
       ? { input_tokens: usageRaw.input_tokens || 0, output_tokens: usageRaw.output_tokens || 0 }
       : null
-    const costUsd = usage
-      ? (usage.input_tokens / 1_000_000) * HAIKU_INPUT_PRICE_PER_M +
-        (usage.output_tokens / 1_000_000) * HAIKU_OUTPUT_PRICE_PER_M
-      : 0
+    const costUsd = usage ? llmCostUsd(usage, HAIKU_MODEL) : 0
 
     const validTypeIds = opts.catalog.map((c) => c.type_id)
     const result = parseAndValidateHaikuResponse(text, validTypeIds)

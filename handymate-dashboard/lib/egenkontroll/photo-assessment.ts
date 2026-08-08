@@ -27,6 +27,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { getClaudeModel } from '@/lib/ai/get-model'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 // ─────────────────────────────────────────────────────────────────
 // Typer
@@ -291,12 +292,14 @@ function buildImageBlock(source: ImageSource): AnthropicContentBlock {
   return { type: 'image', source: { type: 'base64', media_type: source.mediaType, data: source.data } }
 }
 
-// Sonnet 4.6-priser (samma källa som lib/agents/shared/thinking-call.ts):
-// $3/1M input tokens, $15/1M output tokens. Håll i synk om priserna ändras.
+// Priserna låg tidigare som literaler här med en kommentar om att "hålla i
+// synk" med thinking-call.ts — vilket är precis det en delad källa gör
+// onödigt. De bor nu i lib/costs/price-list.ts.
 function estimateCostUsd(usage: AssessmentUsage): number {
-  const inputCost = (usage.input_tokens / 1_000_000) * 3.0
-  const outputCost = (usage.output_tokens / 1_000_000) * 15.0
-  return inputCost + outputCost
+  return llmCostUsd(
+    { input_tokens: usage.input_tokens, output_tokens: usage.output_tokens },
+    'claude-sonnet-4-6'
+  )
 }
 
 /**

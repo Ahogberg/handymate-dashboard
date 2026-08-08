@@ -8,9 +8,6 @@ import {
   Zap,
   BarChart3,
   MessageSquare,
-  Phone,
-  Bot,
-  HardDrive,
   ArrowLeft,
   Check,
   AlertTriangle,
@@ -55,13 +52,6 @@ interface BillingData {
     amount: number
     description: string
   }>
-}
-
-interface UsageData {
-  sms: { used: number; limit: number }
-  calls: { used: number; limit: number }
-  ai: { used: number; limit: number }
-  storage: { used: number; limit: number }
 }
 
 const PLANS = [
@@ -163,7 +153,6 @@ function SkeletonBlock({ className }: { className?: string }) {
 export default function BillingPage() {
   const business = useBusiness()
   const [billing, setBilling] = useState<BillingData | null>(null)
-  const [usage, setUsage] = useState<UsageData | null>(null)
   const [smsUsage, setSmsUsage] = useState<{ sent: number; quota: number; extraSent: number; extraCostSek: number; hardCap: number; percentUsed: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [portalLoading, setPortalLoading] = useState(false)
@@ -175,19 +164,17 @@ export default function BillingPage() {
     async function fetchData() {
       setLoading(true)
       try {
-        const [billingRes, usageRes, smsRes] = await Promise.all([
+        // /api/billing/usage anropas inte längre: den läste den avvecklade
+        // usage_record och gav siffror som alltid var 0. Rutten finns kvar
+        // (permission-contract-facit refererar den), men ingen yta läser den.
+        const [billingRes, smsRes] = await Promise.all([
           fetch('/api/billing'),
-          fetch('/api/billing/usage'),
           fetch('/api/sms/usage'),
         ])
 
         if (billingRes.ok) {
           const data = await billingRes.json()
           setBilling(data)
-        }
-        if (usageRes.ok) {
-          const data = await usageRes.json()
-          setUsage(data)
         }
         if (smsRes.ok) {
           const data = await smsRes.json()
@@ -371,34 +358,28 @@ export default function BillingPage() {
                 <UsageBar
                   icon={<MessageSquare className="w-4 h-4" />}
                   label="SMS"
-                  used={smsUsage?.sent ?? usage?.sms?.used ?? 0}
+                  used={smsUsage?.sent ?? 0}
                   limit={smsUsage?.quota ?? currentPlan?.limits.sms ?? 50}
                   unit="skickade"
                   extraInfo={smsUsage && smsUsage.extraSent > 0
                     ? `Extra SMS: ${smsUsage.extraSent.toLocaleString('sv-SE')} st = ${Math.round(smsUsage.extraCostSek).toLocaleString('sv-SE')} kr`
                     : undefined}
                 />
-                <UsageBar
-                  icon={<Phone className="w-4 h-4" />}
-                  label="Samtal"
-                  used={usage?.calls?.used ?? 0}
-                  limit={currentPlan?.limits.calls ?? 100}
-                  unit="minuter"
-                />
-                <UsageBar
-                  icon={<Bot className="w-4 h-4" />}
-                  label="Automationer"
-                  used={usage?.ai?.used ?? 0}
-                  limit={currentPlan?.limits.automations ?? 3}
-                  unit="aktiva"
-                />
-                <UsageBar
-                  icon={<HardDrive className="w-4 h-4" />}
-                  label="Offertmallar"
-                  used={usage?.storage?.used ?? 0}
-                  limit={currentPlan?.limits.templates ?? 3}
-                  unit="skapade"
-                />
+                {/* ═══ SAMTAL, AUTOMATIONER OCH OFFERTMALLAR ÄR BORTTAGNA ═══
+                    (2026-08-08)
+
+                    De visade alltid 0. Två oberoende fel samtidigt: tabellen
+                    de läste (usage_record) fylldes aldrig — incrementUsage
+                    hade noll callsites — OCH formen matchade inte, eftersom
+                    setUsage får {'{ period, usage: {...} }'} medan renderingen
+                    läste usage?.calls?.used. De hade alltså visat 0 även med
+                    full tabell.
+
+                    En tom yta är bättre än en falsk siffra: en kund som ser
+                    "0 minuter" när hen ringt i en timme slutar tro på hela
+                    sidan. Mätarna kommer tillbaka när de matas av en riktig
+                    kvotkälla — se planen, avsnittet om kundvända gränser.
+                    SMS-mätaren ovan är kvar: den läser sms_usage och är sann. */}
               </div>
             </div>
 

@@ -52,25 +52,20 @@ export async function GET(request: NextRequest) {
 
     if (allPlansError) throw allPlansError
 
-    // Hämta aktuell periodens användning
+    // ═══ FÖRBRUKNINGSBLOCKET ÄR BORTTAGET (2026-08-08) ═══
+    //
+    // Läste usage_record, som aldrig fylldes: incrementUsage() hade noll
+    // callsites, så sms_count/call_minutes/ai_requests var alltid 0. Rutten
+    // rapporterade alltså 0 % förbrukning för varje kund, varje månad, medan
+    // billing-sidan visade det som en sanning.
+    //
+    // Kvot som kunden SKA se bor i sms_usage (/api/sms/usage) och är sann.
+    // Vår kostnad bor i cost_event (lib/costs/report.ts) och visas bara
+    // internt. Se sql/v100_cogs_matare.sql för ägarskapsgränsen.
+    //
+    // Kundvända gränser för samtal och AI kommer tillbaka när de har en sann
+    // källa — inte innan.
     const now = new Date()
-    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
-
-    const { data: usage } = await supabase
-      .from('usage_record')
-      .select('sms_count, call_minutes, ai_requests, storage_mb, updated_at')
-      .eq('business_id', businessId)
-      .gte('period_start', periodStart.toISOString())
-      .single()
-
-    const currentUsage = {
-      sms_count: usage?.sms_count || 0,
-      call_minutes: usage?.call_minutes || 0,
-      ai_requests: usage?.ai_requests || 0,
-      storage_mb: usage?.storage_mb || 0
-    }
-
-    const limits = plan?.limits || {}
 
     // Beräkna trial-dagar kvar
     let trialDaysLeft = 0
@@ -99,21 +94,6 @@ export async function GET(request: NextRequest) {
         is_trialing: billingData?.subscription_status === 'trialing',
         ends_at: billingData?.trial_ends_at || null,
         days_left: trialDaysLeft
-      },
-      usage: {
-        current: currentUsage,
-        limits: {
-          sms_per_month: limits.sms_per_month || 0,
-          call_minutes_per_month: limits.call_minutes_per_month || 0,
-          ai_requests_per_month: limits.ai_requests_per_month || 0,
-          storage_gb: limits.storage_gb || 0
-        },
-        percentages: {
-          sms: limits.sms_per_month ? Math.round((currentUsage.sms_count / limits.sms_per_month) * 100) : 0,
-          call_minutes: limits.call_minutes_per_month ? Math.round((currentUsage.call_minutes / limits.call_minutes_per_month) * 100) : 0,
-          ai_requests: limits.ai_requests_per_month ? Math.round((currentUsage.ai_requests / limits.ai_requests_per_month) * 100) : 0,
-          storage: limits.storage_gb ? Math.round((currentUsage.storage_mb / (limits.storage_gb * 1024)) * 100) : 0
-        }
       },
       all_plans: allPlans
     })

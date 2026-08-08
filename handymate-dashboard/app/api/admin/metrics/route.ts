@@ -129,6 +129,21 @@ export async function GET(request: NextRequest) {
     }
 
     // Recent signups (last 10)
+    // COGS per kund för innevarande månad. Fail-soft: går kostnadsboken inte
+    // att läsa (t.ex. innan v100-migrationen körts) ska adminpanelens övriga
+    // siffror ändå visas — men det ska SYNAS att kostnaden saknas, inte
+    // rapporteras som noll.
+    let cogsPerTenant: unknown[] = []
+    let cogsNote: string | null = null
+    try {
+      const { getAllTenantCogs, MEASUREMENT_STARTED_AT } = await import('@/lib/costs/report')
+      cogsPerTenant = await getAllTenantCogs()
+      cogsNote = `Mätningen startade ${MEASUREMENT_STARTED_AT}. Ingen backfill finns.`
+    } catch (cogsErr: any) {
+      cogsNote = `Kostnadsdata kunde inte läsas: ${cogsErr?.message || 'okänt fel'}`
+      console.warn('[admin/metrics] COGS-läsning misslyckades:', cogsErr?.message || cogsErr)
+    }
+
     const sortedBusinesses = [...businesses].sort(
       (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
@@ -150,6 +165,17 @@ export async function GET(request: NextRequest) {
       sms_this_month: smsThisMonthRes.count || 0,
       plan_distribution,
       recent_signups,
+      // ═══ COGS PER KUND (2026-08-08) ═══
+      //
+      // Vår inköpskostnad, i öre. Ligger HÄR och inte på kundens billing-sida:
+      // COGS är vårt tal för vår publik. En hantverkare som betalar 5 995 kr
+      // ska inte se vår marginal, och den kvot hen SKA se bor i sms_usage.
+      //
+      // Mätaren startade 2026-08-08 och har ingen backfill — tomma perioder
+      // före dess betyder avsaknad av MÄTNING, inte avsaknad av kostnad.
+      // Fail-soft: ett läsfel får inte fälla hela adminpanelen.
+      cogs_per_tenant: cogsPerTenant,
+      cogs_note: cogsNote,
     })
   } catch (error: any) {
     console.error('Admin metrics error:', error)

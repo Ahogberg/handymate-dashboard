@@ -17,6 +17,7 @@
  */
 
 import { normalizeObservation, type AgentObservation } from './normalize'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 // ─────────────────────────────────────────────────────────────────
 // Debug-info exporterad så per-agent debug-types kan extenda
@@ -174,11 +175,19 @@ export async function callAgentWithThinking(
       cache_creation_input_tokens: cacheWrite,
       cache_read_input_tokens: cacheRead,
     }
-    const inputCost = (inputTokens / 1_000_000) * 3.0
-    const outputCost = (outputTokens / 1_000_000) * 15.0
-    const cacheWriteCost = (cacheWrite / 1_000_000) * 3.75
-    const cacheReadCost = (cacheRead / 1_000_000) * 0.30
-    debug.estimated_cost_usd = inputCost + outputCost + cacheWriteCost + cacheReadCost
+    // Priserna bodde tidigare som literaler här (3.0/15.0/3.75/0.30) och i
+    // två andra filer — samma tal på tre ställen, alltså tre ställen att
+    // glömma vid en prisändring. De bor nu i lib/costs/price-list.ts, och
+    // facit i tests/cogs-matare.spec.ts fångar om de återinförs.
+    debug.estimated_cost_usd = llmCostUsd(
+      {
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        cache_creation_input_tokens: cacheWrite,
+        cache_read_input_tokens: cacheRead,
+      },
+      'claude-sonnet-4-6'
+    )
   }
 
   const thinkingBlock = blocks.find(b => b.type === 'thinking')

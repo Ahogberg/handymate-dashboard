@@ -1,6 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { normalizeSwedishPhone } from './phone-normalize'
 import { sanitizeSenderId } from './sms/sender-id'
+import { smsPartCount, smsCostOre } from './costs/meter'
+import { recordCost } from './costs/record'
+import { PRICE_VERSION } from './costs/price-list'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -215,9 +218,40 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
     }
   }
 
+  // ═══ STRYPUNKTEN MÄTER (COGS-mätaren, 2026-08-08) ═══
+  //
+  // Delräkningen fanns inte i kodbasen alls: ett 300-teckens SMS kostade oss
+  // 2 × 52 öre men bokfördes som ett, och en emoji tvingar hela meddelandet
+  // till UCS-2 (70 tecken per del i stället för 160) — så en agent som lägger
+  // en emoji i ett 100-teckens SMS fördubblade kostnaden tyst.
+  //
+  // Bara LYCKADE utskick kostar. Ett avvisat SMS (opt-out) eller ett 46elks-
+  // fel debiteras inte, och att bokföra dem hade gjort marginalsiffran fel i
+  // den optimistiska riktningen. Delantalet skrivs dock i sms_log även för
+  // misslyckade rader — det är audit, inte kostnad.
+  const smsParts = smsPartCount(message)
+  const smsCost = success ? smsCostOre(message) : 0
+  if (success) {
+    // Fail-soft: recordCost kastar aldrig. Ett SMS får inte gå förlorat för
+    // att en kostnadsrad inte kunde skrivas.
+    await recordCost({
+      supabase,
+      businessId,
+      resource: 'sms',
+      units: smsParts,
+      costOre: smsCost,
+      refType: 'sms_log',
+      refId: smsId,
+      meta: { message_type: messageType || null, parts: smsParts },
+    })
+  }
+
   // Logga i sms_log (även misslyckanden för audit-spår). Non-blocking.
   try {
     const { error: insertErr } = await supabase.from('sms_log').insert({
+      sms_parts: smsParts,
+      cost_ore: smsCost,
+      price_version: PRICE_VERSION,
       sms_id: smsId,
       business_id: businessId,
       customer_id: customerId || null,

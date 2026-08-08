@@ -47,6 +47,8 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { recordCost } from '@/lib/costs/record'
+import { usdToOre } from '@/lib/costs/meter'
 
 /** Beslut att skippa businessen — caller returnerar denna info direkt
     utan att anropa runner. */
@@ -204,8 +206,9 @@ export async function logAgentRun(
     return 0
   }
 
+  const runId = 'agentrun_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10)
+
   try {
-    const runId = 'agentrun_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10)
     await supabase.from('agent_runs').insert({
       run_id: runId,
       business_id: businessId,
@@ -217,6 +220,27 @@ export async function logAgentRun(
   } catch (logErr) {
     console.warn(`[cost-guard/${agentId}] agent_runs insert failed:`, logErr)
   }
+
+  // ═══ SAMMA VÄRDE, TVÅ MOTTAGARE (COGS-mätaren, 2026-08-08) ═══
+  //
+  // agent_runs.estimated_cost är GOVERNORN — dygnstaket som checkCostGuards
+  // läser, i USD. cost_event är BOKEN — vår totala COGS per kund, i öre.
+  // Båda skrivs här, från samma `debug.estimated_cost_usd`, i samma funktion.
+  // Det är härledning, inte en kopia: det finns ingen väg där de kan glida
+  // isär, och facit i tests/cogs-matare.spec.ts kontrollerar att ingen annan
+  // fil skriver resource:'llm'.
+  //
+  // usdToOre är enda valutabryggan — dollar får aldrig hamna i cost_ore.
+  await recordCost({
+    supabase,
+    businessId,
+    resource: 'llm',
+    units: (debug.usage.input_tokens || 0) + (debug.usage.output_tokens || 0),
+    costOre: usdToOre(debug.estimated_cost_usd),
+    refType: 'agent_run',
+    refId: runId,
+    meta: { agent: agentId },
+  })
 
   return debug.estimated_cost_usd
 }
