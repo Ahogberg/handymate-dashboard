@@ -17,6 +17,31 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-09 kväll (uppdatering)
+
+Sedan gårdagens lägesbild har följande levererats till prod — inget ändrar
+NEXT-ordningen, men tre av gårdagens öppna punkter är stängda:
+
+| Leverans | Läge |
+|---|---|
+| X1a Detektorns sanning | **Klar** (`e12d9570` + `6ecc3be9`): konservativ CONFIRMED/LIKELY/NEEDS_REVIEW-klassning, falska fastprisbelopp borta, cronfel syns i svaret. Punkt 3 i NEXT ACTION är alltså gjord. |
+| Tvåtenantmiljön | **Upplåst** (`b5e9f7d2`): `sql/testbed_tenant_isolation.sql` reser den disponibla miljön — business_config-blockeraren är borta. Kvar: resa ett gratisprojekt och köra provet. |
+| Klientsessionen | **Kritisk fix** (`3e88d202`): webbläsaren läste som `anon` — sessionen bodde i cookies men klienten letade i localStorage. Efter v96 nekades alla klientläsningar; settings sa det högt, 27 ytor läste tyst tomt. |
+| RLS-utbyggnad | v101 KÖRD och verifierad: tretton tabeller till (booking, call_recording, ai_suggestion, business_users m.fl.) har v96:s mönster. |
+| Samtalsvägen (etapp 2a–c) | Överlämningens fyra fel lagade; Lisa/analysmotorn har kodgräns; godkännandefällorna stängda (fail-closed). |
+| Kanoniska offertbyggaren | Sju direktskrivare → en (`44da4055`); sign_token/nummer-buggen (SMS utan länk) stängd. Spärrhake-facit. |
+| Inkorgen + Mötesassistenten | Etapp 1 + 3 i prod; v102 körd. |
+| Fakturaunderlaget (P1-3) | **Klar** (`e75d1976`): autofakturan läser quote_items, inte legacy-JSONB:n; tillval hanteras. |
+| Ett projekt per offert (P0-2) | Kod klar (`759a2856`); **v103 väntar på manuell körning** (dubblettlista först). |
+| Beslutsposten (Spår 1.1) | Komplett: fem AI-producenter stämplar; price_adjustment medvetet utanför (ren matematik). |
+
+**Öppen blind fläck som INTE står i NEXT-vågen:** Handymates egen betalväg.
+Stripe B7-testköpet är fortfarande okört (tasks/launch-sprint.md del B) — utan
+det kan ingen riktig kund betala oss, oavsett produktkvalitet. Behandlas som
+lanseringsgrind bredvid gyllene vägen.
+
+---
+
 # Läge 2026-08-08 kväll
 
 NOW-vågen är **byggd och i produktion**. Därefter har orkestrerings-, demo-,
@@ -624,15 +649,17 @@ Tre tal som aldrig slås ihop: **identifierad ≠ fakturerad ≠ betald.**
 ---
 
 ```text
-NEXT ACTION:
+NEXT ACTION (uppdaterad 2026-08-09):
 1. Kör och dokumentera pilotens gyllene väg i ett separat testföretag.
-2. Skapa den disponibla tvåtenantmiljön och kör
-   tests/tenant-isolation.integration.spec.ts mot den riktiga databasen.
-3. Codex gör X1a: det befintliga intäktssvepet får ett konservativt
-   CONFIRMED_UNBILLED / LIKELY_UNBILLED / NEEDS_REVIEW-kontrakt, falska
-   fastprisbelopp tas bort och cronfel blir synliga.
+2. Res den disponibla tvåtenantmiljön (sql/testbed_tenant_isolation.sql i ett
+   nytt gratis Supabase-projekt) och kör npm run test:tenant-isolation.
+3. [KLAR 2026-08-09] X1a: konservativt klassningskontrakt, falska
+   fastprisbelopp borta, cronfel synliga.
+4. Stripe B7-testköpet — lanseringsgrind bredvid gyllene vägen; saknades
+   tidigare helt i det här dokumentet.
+5. Kör sql/v103 (ett projekt per offert) — dubblettlistan först.
 
-EFTER GRINDEN:
+EFTER GRINDEN (gyllene vägen + tvåtenantprovet):
 Claude bygger X1b:s smala review-yta och exakt en källspecifik väg till ett
 fakturautkast. Ingen autosändning och ingen generell tid+material+ÄTA-byggare.
 ```
