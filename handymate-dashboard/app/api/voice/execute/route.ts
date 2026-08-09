@@ -3,6 +3,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { createQuote } from '@/lib/quotes/create-quote'
 
 /**
  * POST /api/voice/execute
@@ -139,57 +140,50 @@ export async function POST(request: NextRequest) {
       }
 
       case 'invoice': {
-        // Create a draft quote that can be converted to invoice
+        // Create a draft quote that can be converted to invoice.
+        // Kanoniska byggaren — röstutkasten saknade tidigare både nummer och
+        // sign_token och var därmed olänkbara och osynliga i listor.
         const customer = await findOrCreateCustomer(supabase, businessId, action.data.customer_name)
-        const quoteId = 'q_' + Math.random().toString(36).substr(2, 9)
-
-        const { error: invError } = await supabase.from('quotes').insert({
-          quote_id: quoteId,
-          business_id: businessId,
-          customer_id: customer.customer_id,
+        const skapad = await createQuote(supabase, businessId, {
+          customerId: customer.customer_id,
           title: action.data.description || 'Faktura (röstkommando)',
-          status: 'draft',
-          created_at: new Date().toISOString(),
+          source: 'voice',
         })
-        if (invError) {
-          console.error('[voice/execute] invoice draft insert error:', invError)
+        if (!skapad.success) {
+          console.error('[voice/execute] invoice draft insert error:', skapad.error)
           return NextResponse.json({ success: false, error: 'Kunde inte skapa faktura-utkast' }, { status: 500 })
         }
 
         return NextResponse.json({
           success: true,
           message: 'Offert/faktura-utkast skapat',
-          data: { quote_id: quoteId, customer_id: customer.customer_id },
+          data: { quote_id: skapad.quoteId, customer_id: customer.customer_id },
         })
       }
 
       case 'quote': {
         const customer = await findOrCreateCustomer(supabase, businessId, action.data.customer_name)
-        const quoteId = 'q_' + Math.random().toString(36).substr(2, 9)
         const amount = Number(action.data.estimated_amount) || 0
 
-        const { error: qError } = await supabase.from('quotes').insert({
-          quote_id: quoteId,
-          business_id: businessId,
-          customer_id: customer.customer_id,
+        // Beloppet blir en riktig rad i quote_items — inte bara ett total-fält
+        // på huvudet som PDF:en ändå inte kan visa.
+        const skapad = await createQuote(supabase, businessId, {
+          customerId: customer.customer_id,
           title: action.data.description || 'Offert (röstkommando)',
-          status: 'draft',
-          total: amount,
-          subtotal: amount,
-          vat_rate: 25,
-          vat_amount: Math.round(amount * 0.25),
-          valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          created_at: new Date().toISOString(),
+          source: 'voice',
+          items: amount > 0
+            ? [{ description: action.data.description || 'Arbete enligt röstkommando', quantity: 1, unit: 'st', unit_price: amount }]
+            : [],
         })
-        if (qError) {
-          console.error('[voice/execute] quote insert error:', qError)
+        if (!skapad.success) {
+          console.error('[voice/execute] quote insert error:', skapad.error)
           return NextResponse.json({ success: false, error: 'Kunde inte skapa offert' }, { status: 500 })
         }
 
         return NextResponse.json({
           success: true,
-          message: `Offert skapad: ${amount > 0 ? amount + ' kr' : 'utkast'}`,
-          data: { quote_id: quoteId, customer_id: customer.customer_id },
+          message: `Offert ${skapad.quoteNumber} skapad: ${amount > 0 ? amount + ' kr' : 'utkast'}`,
+          data: { quote_id: skapad.quoteId, customer_id: customer.customer_id },
         })
       }
 

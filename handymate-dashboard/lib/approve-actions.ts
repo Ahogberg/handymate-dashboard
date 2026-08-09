@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
+import { createQuote as createCanonicalQuote } from '@/lib/quotes/create-quote'
 
 /**
  * Shared action execution for AI suggestion approval.
@@ -245,14 +246,15 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
       console.error('AI quote generation failed, using fallback:', aiErr.message)
     }
 
-    // Build quote data from AI result or fallback
+    // Build quote data from AI result or fallback. Id, nummer, sign_token och
+    // radskrivningen ägs av den kanoniska byggaren — den här vägen skapade
+    // tidigare offerter utan nummer och token, som inte gick att SMS-länka.
     const quoteData: any = {
-      business_id: businessId,
-      customer_id: customerId,
-      status: 'draft',
-      valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       source: 'ai_suggestion',
     }
+    let kanoniskaRader: Array<Record<string, unknown>> = []
+    let rotRutTyp: string | null = null
+    let rotRutAvdrag = 0
 
     if (aiQuote && aiQuote.items && aiQuote.items.length > 0) {
       // Use AI-generated line items
@@ -294,10 +296,19 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
       quoteData.vat_rate = vatRate
       quoteData.vat = vat
       quoteData.total_with_vat = total
-      quoteData.rot_rut_type = rotRutType !== 'none' ? rotRutType : null
-      quoteData.rot_rut_deduction = rotRutDeduction
       quoteData.customer_pays = total - rotRutDeduction
       quoteData.notes = `AI-genererad offert (konfidens: ${aiQuote.confidence}%). ${aiQuote.reasoning || ''}`
+      rotRutTyp = rotRutType !== 'none' ? rotRutType : null
+      rotRutAvdrag = rotRutDeduction
+      kanoniskaRader = items.map((i: any) => ({
+        description: i.description || '',
+        quantity: i.quantity ?? 0,
+        unit: i.unit || 'st',
+        unit_price: i.unit_price ?? 0,
+        is_rot_eligible: i.type === 'labor' && rotRutTyp === 'rot',
+        is_rut_eligible: i.type === 'labor' && rotRutTyp === 'rut',
+        rot_rut_type: i.type === 'labor' ? rotRutTyp : null,
+      }))
     } else {
       // Fallback: basic quote without line items
       quoteData.title = actionData.service || 'Offert'
@@ -305,16 +316,21 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
       quoteData.total = actionData.estimated_price ? parseFloat(actionData.estimated_price) : null
     }
 
-    const { data: quote, error } = await supabase
-      .from('quotes')
-      .insert(quoteData)
-      .select()
-      .single()
+    const skapad = await createCanonicalQuote(supabase, businessId, {
+      customerId,
+      title: quoteData.title,
+      description: quoteData.description ?? null,
+      rotRutType: rotRutTyp,
+      rotRutDeduction: rotRutAvdrag,
+      source: 'system',
+      items: kanoniskaRader as any,
+      extra: quoteData,
+    })
 
-    if (error) throw error
+    if (!skapad.success) throw new Error(skapad.error)
     return {
       success: true,
-      quote_id: quote?.quote_id,
+      quote_id: skapad.quoteId,
       ai_generated: !!aiQuote,
       items_count: aiQuote?.items?.length || 0,
     }

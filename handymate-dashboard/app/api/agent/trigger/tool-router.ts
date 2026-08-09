@@ -17,6 +17,7 @@ import {
   type PlanRefusal,
 } from '@/lib/agent/orchestration'
 import type { AgentId } from '@/lib/agent/capabilities'
+import { createQuote as createCanonicalQuote } from '@/lib/quotes/create-quote'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
@@ -345,55 +346,43 @@ async function createQuote(
 
   const rotRutType = (params.rot_rut_type as string) ?? null
 
-  const quoteId = generateId('quote')
-  const { error } = await supabase.from('quotes').insert({
-    quote_id: quoteId, business_id: businessId, customer_id: params.customer_id,
-    title: params.title, description: (params.description as string) ?? null, status: 'draft', items,
-    labor_total: laborTotal, material_total: materialTotal,
-    subtotal, vat_rate: vatRate, vat_amount: vatAmount, total,
-    rot_rut_type: rotRutType,
-    rot_rut_deduction: rotRutDeduction, customer_pays: total - rotRutDeduction,
-    valid_until: validUntil.toISOString(), created_at: new Date().toISOString(),
+  // Kanoniska byggaren (lib/quotes/create-quote.ts). Agentens offerter fick
+  // tidigare varken quote_number eller sign_token — smart-communication satte
+  // då quote_link: undefined och SMS:et till kunden gick ut UTAN länk.
+  const skapad = await createCanonicalQuote(supabase, businessId, {
+    customerId: params.customer_id as string,
+    title: String(params.title),
+    description: (params.description as string) ?? null,
+    vatRate,
+    rotRutType,
+    rotRutDeduction,
+    validDays: (params.valid_days as number) || 30,
+    source: 'agent',
+    items: items.map(i => {
+      const isLabor = i.type === 'labor'
+      return {
+        // create_quote-schemat (tool-definitions.ts) definierar radfältet som
+        // "name", inte "description" — name är primärt, description
+        // accepteras också ifall agenten (mot schema) skickar det.
+        description: i.name ?? i.description ?? '',
+        quantity: i.quantity ?? 0,
+        unit: i.unit ?? 'st',
+        unit_price: i.unit_price ?? 0,
+        is_rot_eligible: isLabor && rotRutType === 'rot',
+        is_rut_eligible: isLabor && rotRutType === 'rut',
+        rot_rut_type: isLabor && (rotRutType === 'rot' || rotRutType === 'rut') ? rotRutType : null,
+      }
+    }),
+    // items-JSONB:n är bara en spegling (quote_items är sanningen), men
+    // speglingen behålls tills läsarna av den är migrerade.
+    extra: { items, labor_total: laborTotal, material_total: materialTotal, vat_amount: vatAmount },
   })
 
-  if (error) return { success: false, error: error.message }
-
-  // Skriv strukturerade rader till quote_items — det är dessa PDF/utskick läser
-  // (quotes.items JSONB är bara en spegling). Utan detta blir offerten TOM i PDF:en.
-  const itemInserts = items.map((i, idx) => {
-    const isLabor = i.type === 'labor'
-    const rowRotEligible = isLabor && rotRutType === 'rot'
-    const rowRutEligible = isLabor && rotRutType === 'rut'
-    return {
-      id: 'qi_' + Math.random().toString(36).substring(2, 14),
-      quote_id: quoteId,
-      business_id: businessId,
-      item_type: 'item',
-      // create_quote-schemat (tool-definitions.ts) definierar radfältet som
-      // "name", inte "description" — den gamla `i.description ?? ''` gav
-      // därför alltid en tom rad-beskrivning i PDF:en. name är primärt,
-      // description accepteras också ifall agenten (mot schema) skickar det.
-      description: i.name ?? i.description ?? '',
-      quantity: i.quantity ?? 0,
-      unit: i.unit ?? 'st',
-      unit_price: i.unit_price ?? 0,
-      total: i.total,
-      is_rot_eligible: rowRotEligible,
-      is_rut_eligible: rowRutEligible,
-      rot_rut_type: (rowRotEligible || rowRutEligible) ? rotRutType : null,
-      sort_order: idx,
-    }
-  })
-
-  const { error: itemsError } = await supabase.from('quote_items').insert(itemInserts)
-  if (itemsError) {
-    // En offert utan rader är korrupt — ta bort huvudet så inget halvsparat blir kvar.
-    await supabase.from('quotes').delete().eq('quote_id', quoteId).eq('business_id', businessId)
-    return { success: false, error: `Kunde inte spara offertens rader: ${itemsError.message}` }
-  }
+  if (!skapad.success) return { success: false, error: skapad.error }
 
   return { success: true, data: {
-    quote_id: quoteId, message: `Offert "${params.title}" skapad`,
+    quote_id: skapad.quoteId, quote_number: skapad.quoteNumber,
+    message: `Offert ${skapad.quoteNumber} "${params.title}" skapad`,
     summary: {
       labor_total: laborTotal, material_total: materialTotal,
       subtotal_ex_vat: subtotal, vat_rate: vatRate, vat_amount: vatAmount, total_incl_vat: total,

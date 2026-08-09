@@ -19,7 +19,15 @@ test('duplicate/version bevarar kundens kontraktsfält och CRM-länkar', () => {
 })
 
 test('duplicate/version lämnar aldrig ett offerthuvud utan kopierade rader', () => {
+  // Uppdaterad 2026-08-09: kopian skapas via den kanoniska byggaren
+  // (lib/quotes/create-quote.ts), som skriver huvud och rader ihop och rullar
+  // tillbaka huvudet om raderna inte går att spara. Källraderna läses FÖRE
+  // skapandet; ett läsfel stoppar innan något huvud alls skapats.
   expect(duplicateBranch).toContain('error: sourceItemsErr')
-  expect(duplicateBranch).toContain('error: dupItemsErr')
-  expect(duplicateBranch).toMatch(/if \(dupItemsErr\)[\s\S]*\.from\('quotes'\)[\s\S]*\.delete\(\)[\s\S]*\.eq\('quote_id', newId\)/)
+  const läsning = duplicateBranch.indexOf('sourceItemsErr')
+  const skapande = duplicateBranch.indexOf('createQuote(')
+  expect(skapande, 'kopian går inte via byggaren').toBeGreaterThan(-1)
+  expect(läsning, 'raderna läses efter skapandet — läsfel lämnar ett tomt huvud').toBeLessThan(skapande)
+  // Byggarens rollback-regel är facit-låst i tests/offertbyggaren.spec.ts.
+  expect(duplicateBranch).toMatch(/items: \(sourceItems \|\| \[\]\)\.map/)
 })

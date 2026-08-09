@@ -30,6 +30,7 @@ import {
 } from '@/lib/agent/external-confirm'
 import { getRelevantMemories, buildMemoryPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
 import { getAgentTools } from '@/lib/agents/personalities'
+import { createQuote } from '@/lib/quotes/create-quote'
 import {
   validateNextStep,
   toAgentResult,
@@ -396,24 +397,22 @@ async function executeTool(
 
     case 'create_quote_draft': {
       const { customer_id, title } = toolInput
-      const quoteId = 'q_' + Math.random().toString(36).substring(2, 14)
-      const { error } = await supabase.from('quotes').insert({
-        quote_id: quoteId,
-        business_id: businessId,
-        customer_id: customer_id || null,
+      // Kanoniska byggaren — Mattes utkast fick tidigare varken nummer eller
+      // sign_token, så det var osynligt i listor och gick inte att länka.
+      const skapad = await createQuote(supabase, businessId, {
+        customerId: (customer_id as string) || null,
         title: String(title),
-        status: 'draft',
-        created_at: new Date().toISOString(),
+        source: 'matte',
       })
 
-      if (error) {
-        console.error('[matte/chat] quote draft error:', error)
-        return { result: `Kunde inte skapa offert-utkastet: ${error.message}` }
+      if (!skapad.success) {
+        console.error('[matte/chat] quote draft error:', skapad.error)
+        return { result: `Kunde inte skapa offert-utkastet: ${skapad.error}` }
       }
 
       return {
-        result: `Offert-utkast skapat. Öppnar redigeringsvyn.`,
-        action: { type: 'navigate', target: `/dashboard/quotes/${quoteId}/edit` },
+        result: `Offert-utkast ${skapad.quoteNumber} skapat. Öppnar redigeringsvyn.`,
+        action: { type: 'navigate', target: `/dashboard/quotes/${skapad.quoteId}/edit` },
       }
     }
 

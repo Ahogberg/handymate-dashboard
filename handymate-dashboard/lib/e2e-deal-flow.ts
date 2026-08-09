@@ -7,6 +7,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { createQuote as createCanonicalQuote } from '@/lib/quotes/create-quote'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
@@ -465,39 +466,44 @@ async function executeQuoteGeneration(
       const vatAmount = Math.round(subtotal * 0.25 * 100) / 100
       const total = Math.round((subtotal + vatAmount) * 100) / 100
 
-      const { data: quote, error: quoteErr } = await supabase
-        .from('quotes')
-        .insert({
-          business_id: businessId,
-          customer_id: deal.customer_id,
-          title: aiQuote.jobTitle || deal.title || 'Offert',
-          description: aiQuote.jobDescription || description,
+      // Kanoniska byggaren — deal-flödets offerter fick tidigare varken
+      // nummer eller sign_token, och inga rader i quote_items (tom PDF).
+      const rotRutTyp = aiQuote.suggestedDeductionType !== 'none' ? aiQuote.suggestedDeductionType : null
+      const skapad = await createCanonicalQuote(supabase, businessId, {
+        customerId: deal.customer_id,
+        title: aiQuote.jobTitle || deal.title || 'Offert',
+        description: aiQuote.jobDescription || description,
+        rotRutType: rotRutTyp,
+        source: 'system',
+        items: items.map((i: any) => ({
+          description: i.description || '',
+          quantity: i.quantity ?? 0,
+          unit: i.unit || 'st',
+          unit_price: i.unit_price ?? 0,
+          is_rot_eligible: i.type === 'labor' && rotRutTyp === 'rot',
+          is_rut_eligible: i.type === 'labor' && rotRutTyp === 'rut',
+          rot_rut_type: i.type === 'labor' ? rotRutTyp : null,
+        })),
+        extra: {
           items,
           labor_total: laborTotal,
           material_total: materialTotal,
-          subtotal,
-          vat_rate: 25,
           vat_amount: vatAmount,
-          total,
-          rot_rut_type: aiQuote.suggestedDeductionType !== 'none' ? aiQuote.suggestedDeductionType : null,
-          status: 'draft',
-          valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           source: 'deal_flow_auto',
           notes: `Automatiskt genererad av deal-flödet (konfidens: ${aiQuote.confidence}%)`,
-        })
-        .select('quote_id')
-        .single()
+        },
+      })
 
-      if (quoteErr) {
-        return { executed: false, reason: `Offertgenerering misslyckades: ${quoteErr.message}` }
+      if (!skapad.success) {
+        return { executed: false, reason: `Offertgenerering misslyckades: ${skapad.error}` }
       }
 
       // Länka offert till deal
-      await supabase.from('deal').update({ quote_id: quote!.quote_id }).eq('id', dealId)
+      await supabase.from('deal').update({ quote_id: skapad.quoteId }).eq('id', dealId)
 
       await logDealFlowActivity(businessId, dealId, `AI-offert genererad: ${aiQuote.jobTitle} (${Math.round(total)} kr inkl moms)`)
 
-      return { executed: true, data: { quote_id: quote!.quote_id, total } }
+      return { executed: true, data: { quote_id: skapad.quoteId, total } }
     } catch (aiErr: any) {
       console.error('[DealFlow] AI-offertgenerering misslyckades:', aiErr.message)
       return { executed: false, reason: `AI-offertgenerering misslyckades: ${aiErr.message}` }

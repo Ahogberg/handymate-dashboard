@@ -4,6 +4,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
+import { createQuote as createCanonicalQuote } from '@/lib/quotes/create-quote'
 
 /**
  * POST - Godkänn ett AI-förslag och utför åtgärden
@@ -216,25 +217,22 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
       customerId = newCustomer?.customer_id
     }
 
-    // Skapa offert
-    const { data: quote, error } = await supabase
-      .from('quotes')
-      .insert({
-        business_id: businessId,
-        customer_id: customerId,
-        status: 'draft',
-        title: actionData.service || 'Offert',
-        description: actionData.description || `Offert skapad från samtalsanalys`,
+    // Skapa offert via den kanoniska byggaren — utan den saknade utkastet
+    // både nummer och sign_token och gick inte att länka i något utskick.
+    const skapad = await createCanonicalQuote(supabase, businessId, {
+      customerId: customerId ?? null,
+      title: actionData.service || 'Offert',
+      description: actionData.description || `Offert skapad från samtalsanalys`,
+      source: 'system',
+      extra: {
         total: actionData.estimated_price ? parseFloat(actionData.estimated_price) : null,
-        valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 dagar
-        source: 'ai_suggestion'
-      })
-      .select()
-      .single()
+        source: 'ai_suggestion',
+      },
+    })
 
-    if (error) throw error
+    if (!skapad.success) throw new Error(skapad.error)
 
-    return { success: true, quote_id: quote?.quote_id }
+    return { success: true, quote_id: skapad.quoteId }
 
   } catch (error: any) {
     console.error('Create quote error:', error)

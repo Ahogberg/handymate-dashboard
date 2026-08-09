@@ -6,6 +6,7 @@ import { calculateQuoteTotals } from '@/lib/quote-calculations'
 import { applyAnnualCap } from '@/lib/quotes/apply-annual-cap'
 import { resolveReferencePerson } from '@/lib/quotes/resolve-reference-person'
 import { lockedChanges, lockedChangeMessage } from '@/lib/quotes/lifecycle'
+import { createQuote, resolveItemSplit } from '@/lib/quotes/create-quote'
 import type { QuoteItem } from '@/lib/types/quote'
 
 /**
@@ -15,27 +16,8 @@ import type { QuoteItem } from '@/lib/types/quote'
  * = total − labor_amount, logga varning, blockera aldrig sparandet.
  * `??` genomgående — labor_amount 0 är GILTIGT (ren material), inte falsy.
  */
-function resolveItemSplit(
-  item: QuoteItem,
-  rowTotal: number
-): { labor_amount: number | null; material_amount: number | null } {
-  const labor = item.labor_amount ?? null
-  if (labor === null) {
-    return { labor_amount: null, material_amount: item.material_amount ?? null }
-  }
-  const material = item.material_amount ?? null
-  if (material === null || Math.abs(labor + material - rowTotal) > 0.01) {
-    const derived = Math.round((rowTotal - labor) * 100) / 100
-    if (material !== null) {
-      console.warn(
-        `[quotes] Split-invariant korrigerad för rad "${item.description}": ` +
-        `labor ${labor} + material ${material} != total ${rowTotal} → material_amount ${derived}`
-      )
-    }
-    return { labor_amount: labor, material_amount: derived }
-  }
-  return { labor_amount: labor, material_amount: material }
-}
+// Split-invarianten bor numera i den kanoniska byggaren — en kopia här hade
+// varit två sanningar om samma regel.
 
 /**
  * GET - Lista offerter för ett företag
@@ -212,11 +194,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Source quote not found' }, { status: 404 })
       }
 
-      const newId = 'quote_' + Math.random().toString(36).substr(2, 9)
-      const quoteNumber = await generateQuoteNumber(supabase, businessId)
-      const validUntil = new Date()
-      validUntil.setDate(validUntil.getDate() + 30)
-
       // Version support: if create_version is true, link to parent and increment version
       const isVersion = body.create_version === true
       const parentQuoteId = isVersion ? (source.parent_quote_id || source.quote_id) : null
@@ -236,21 +213,14 @@ export async function POST(request: NextRequest) {
         if (!versionLabel) versionLabel = `Version ${versionNumber}`
       }
 
+      // De källkopierade fälten. Invarianterna (id, NYTT nummer, NY sign_token,
+      // datum) sätts av byggaren — kopian ärvde tidigare ingen token alls och
+      // gick därför inte att dela förrän den skickades.
       const dupData: Record<string, any> = {
-        quote_id: newId,
-        business_id: businessId,
-        customer_id: source.customer_id,
-        quote_number: quoteNumber,
-        status: 'draft',
-        // Kopian/versionen tillhör den som skapar den (v68-identitet), inte
-        // originalets skapare — annars visar avsändarblocket fel person.
-        created_by: currentUser?.id ?? null,
-        title: isVersion ? (source.title || 'Offert') : (source.title ? source.title + ' (kopia)' : 'Kopia'),
         // Version fields
         parent_quote_id: parentQuoteId,
         version_number: isVersion ? versionNumber : 1,
         version_label: isVersion ? versionLabel : null,
-        description: source.description,
         items: source.items,
         labor_total: source.labor_total,
         material_total: source.material_total,
@@ -266,7 +236,6 @@ export async function POST(request: NextRequest) {
         customer_pays: source.customer_pays,
         terms: source.terms,
         images: source.images,
-        valid_until: validUntil.toISOString().split('T')[0],
         duplicated_from: body.duplicate_from,
         ai_generated: source.ai_generated,
         // New fields
@@ -299,15 +268,8 @@ export async function POST(request: NextRequest) {
       if (source.personnummer) dupData.personnummer = source.personnummer
       if (source.fastighetsbeteckning) dupData.fastighetsbeteckning = source.fastighetsbeteckning
 
-      const { data: newQuote, error: dupErr } = await supabase
-        .from('quotes')
-        .insert(dupData)
-        .select()
-        .single()
-
-      if (dupErr) throw dupErr
-
-      // Duplicate quote_items
+      // Raderna läses FÖRE skapandet — byggaren skriver huvud och rader ihop
+      // och rullar tillbaka huvudet om raderna inte går att spara.
       const { data: sourceItems, error: sourceItemsErr } = await supabase
         .from('quote_items')
         .select('*')
@@ -316,47 +278,43 @@ export async function POST(request: NextRequest) {
 
       if (sourceItemsErr) {
         console.error('Read source quote_items error:', sourceItemsErr)
-        await supabase
-          .from('quotes')
-          .delete()
-          .eq('quote_id', newId)
-          .eq('business_id', businessId)
         return NextResponse.json(
           { error: 'Kunde inte läsa originaloffertens rader — försök igen' },
           { status: 500 }
         )
       }
 
-      if (sourceItems && sourceItems.length > 0) {
-        const dupItems = sourceItems.map((item: any) => ({
-          ...item,
-          id: 'qi_' + Math.random().toString(36).substr(2, 12),
-          quote_id: newId,
-        }))
-        const { error: dupItemsErr } = await supabase.from('quote_items').insert(dupItems)
-        if (dupItemsErr) {
-          console.error('Duplicate quote_items error:', dupItemsErr)
-          await supabase
-            .from('quotes')
-            .delete()
-            .eq('quote_id', newId)
-            .eq('business_id', businessId)
-          return NextResponse.json(
-            { error: 'Kunde inte kopiera offertens rader — försök igen' },
-            { status: 500 }
-          )
-        }
+      const skapadKopia = await createQuote(supabase, businessId, {
+        customerId: source.customer_id,
+        title: isVersion ? (source.title || 'Offert') : (source.title ? source.title + ' (kopia)' : 'Kopia'),
+        description: source.description,
+        vatRate: source.vat_rate ?? 25,
+        rotRutType: source.rot_rut_type,
+        rotRutDeduction: source.rot_rut_deduction ?? 0,
+        // Kopian/versionen tillhör den som skapar den (v68-identitet), inte
+        // originalets skapare — annars visar avsändarblocket fel person.
+        createdBy: currentUser?.id ?? null,
+        source: 'duplicate',
+        items: (sourceItems || []).map(({ id: _id, quote_id: _q, business_id: _b, sort_order: _s, created_at: _c, ...rad }: any) => rad),
+        extra: dupData,
+      })
+
+      if (!skapadKopia.success || !skapadKopia.quote) {
+        console.error('Duplicate quote error:', skapadKopia.error)
+        return NextResponse.json(
+          { error: skapadKopia.error || 'Kunde inte kopiera offerten — försök igen' },
+          { status: 500 }
+        )
       }
 
-      return NextResponse.json({ quote: newQuote })
+      return NextResponse.json({ quote: skapadKopia.quote })
     }
 
-    // New quote creation - support both legacy items and structured quote_items
-    const quoteId = 'quote_' + Math.random().toString(36).substr(2, 9)
-    const quoteNumber = await generateQuoteNumber(supabase, businessId)
+    // New quote creation - support both legacy items and structured quote_items.
+    // Id, nummer, sign_token, valid_until och radskrivningen ägs numera av den
+    // kanoniska byggaren (lib/quotes/create-quote.ts) — samma golv som agenten,
+    // Matte och rösten går genom. Den här vägen behåller sin rikedom via extra.
     const validDays = body.valid_days ?? 30
-    const validUntil = new Date()
-    validUntil.setDate(validUntil.getDate() + validDays)
 
     const structuredItems: QuoteItem[] = body.quote_items || []
     const legacyItems = body.items || []
@@ -433,14 +391,9 @@ export async function POST(request: NextRequest) {
       total: (i.quantity || 0) * (i.unit_price || 0)
     }))
 
+    // De rika fälten. Invarianterna (id, nummer, token, datum) sätts av
+    // byggaren; det här är allt den INTE behöver förstå.
     const insertData: Record<string, any> = {
-      quote_id: quoteId,
-      business_id: businessId,
-      customer_id: body.customer_id || null,
-      quote_number: quoteNumber,
-      status: body.status || 'draft',
-      title: body.title || '',
-      description: body.description || null,
       items: structuredItems.length > 0 ? [] : processedLegacyItems,
       labor_total: laborTotal,
       material_total: materialTotal,
@@ -462,7 +415,6 @@ export async function POST(request: NextRequest) {
       // sql/quote_overhaul.sql) fanns, men POST skrev aldrig till den, så
       // ALLA bilagor tappades tyst redan vid skapande, oavsett foto-fixen.
       attachments: body.attachments || [],
-      valid_until: validUntil.toISOString().split('T')[0],
       sent_at: body.status === 'sent' ? new Date().toISOString() : null,
       ai_generated: body.ai_generated || false,
       ai_confidence: body.ai_confidence || null,
@@ -471,9 +423,6 @@ export async function POST(request: NextRequest) {
       template_style: ['modern', 'premium', 'friendly'].includes(body.template_style)
         ? body.template_style
         : null,
-      // Generera sign_token redan vid create så portal-länken alltid fungerar,
-      // oavsett om offerten skickas via /quotes/send eller delas direkt.
-      sign_token: crypto.randomUUID(),
       // New fields
       introduction_text: body.introduction_text || null,
       conclusion_text: body.conclusion_text || null,
@@ -509,72 +458,30 @@ export async function POST(request: NextRequest) {
     if (body.lead_id) insertData.lead_id = body.lead_id
     if (body.deal_id) insertData.deal_id = body.deal_id
 
-    const { data: quote, error: insertError } = await supabase
-      .from('quotes')
-      .insert(insertData)
-      .select()
-      .single()
+    const skapad = await createQuote(supabase, businessId, {
+      customerId: body.customer_id || null,
+      title: body.title || '',
+      description: body.description || null,
+      status: body.status === 'sent' ? 'sent' : 'draft',
+      vatRate,
+      rotRutType: body.rot_rut_type || null,
+      rotRutDeduction,
+      validDays,
+      createdBy: currentUser?.id ?? null,
+      source: 'ui',
+      items: structuredItems,
+      extra: insertData,
+    })
 
-    if (insertError) {
-      console.error('Quote insert error:', insertError)
-      return NextResponse.json({ error: insertError.message }, { status: 500 })
+    if (!skapad.success || !skapad.quote) {
+      console.error('Quote insert error:', skapad.error)
+      return NextResponse.json({ error: skapad.error || 'Offerten kunde inte skapas' }, { status: 500 })
     }
+    const quote = skapad.quote as Record<string, any>
+    const quoteId = skapad.quoteId!
 
-    // Save structured items to quote_items table
-    if (structuredItems.length > 0) {
-      const itemInserts = structuredItems.map((item, idx) => {
-        const rowTotal = item.item_type === 'item' ? (item.quantity || 0) * (item.unit_price || 0) : (item.total || 0)
-        const split = resolveItemSplit(item, rowTotal)
-        return {
-          id: item.id || ('qi_' + Math.random().toString(36).substr(2, 12)),
-          quote_id: quoteId,
-          business_id: businessId,
-          item_type: item.item_type,
-          group_name: item.group_name || null,
-          description: item.description || '',
-          quantity: item.quantity || 0,
-          unit: item.unit || 'st',
-          unit_price: item.unit_price || 0,
-          total: rowTotal,
-          cost_price: item.cost_price || null,
-          article_number: item.article_number || null,
-          category_slug: item.category_slug || null,
-          is_rot_eligible: item.is_rot_eligible || false,
-          is_rut_eligible: item.is_rut_eligible || false,
-          rot_rut_type: item.rot_rut_type || null,
-          option_selected: item.option_selected ?? false,
-          option_default: item.option_default ?? false,
-          linked_product_id: item.linked_product_id || null,
-          // Produktbank (v67): snapshot-fälten — ?? så att 0 bevaras
-          labor_amount: split.labor_amount,
-          material_amount: split.material_amount,
-          estimated_hours: item.estimated_hours ?? null,
-          component_snapshot: item.component_snapshot ?? null,
-          show_components_to_customer: item.show_components_to_customer ?? false,
-          // Dold för kunden — priset ingår ändå i summan (v90).
-          is_hidden: item.is_hidden ?? false,
-          sort_order: idx,
-        }
-      })
-
-      const { error: itemsError } = await supabase.from('quote_items').insert(itemInserts)
-      if (itemsError) {
-        console.error('Insert quote_items error:', itemsError)
-        // En offert utan rader är korrupt — ta bort det nyskapade huvudet
-        // så användaren kan försöka igen utan halvsparad data. (Insert av
-        // raderna är ett enda statement och därmed atomiskt: vid fel har
-        // inga rader skapats, så det räcker att radera huvudet.)
-        await supabase
-          .from('quotes')
-          .delete()
-          .eq('quote_id', quoteId)
-          .eq('business_id', businessId)
-        return NextResponse.json(
-          { error: 'Kunde inte spara offertens rader — försök igen' },
-          { status: 500 }
-        )
-      }
-    }
+    // Raderna (quote_items) skrevs av byggaren, med samma rollback-regel som
+    // förut: en offert utan sina rader är korrupt och huvudet tas bort.
 
     // Sync deal value + quote_id if deal_id provided
     if (body.deal_id && quote.quote_id) {
@@ -1022,13 +929,5 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-async function generateQuoteNumber(supabase: any, businessId: string): Promise<string> {
-  const year = new Date().getFullYear()
-  const { count } = await supabase
-    .from('quotes')
-    .select('*', { count: 'exact', head: true })
-    .eq('business_id', businessId)
-    .gte('created_at', `${year}-01-01`)
-
-  return `#${String((count || 0) + 1).padStart(3, '0')}`
-}
+// Nummergivningen bor i den kanoniska byggaren (lib/quotes/create-quote.ts),
+// inklusive omtag vid v98-kollision. En lokal kopia utan omtaget vore sämre.
