@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
@@ -323,20 +324,15 @@ export async function POST(request: NextRequest) {
       selectClause: `*, customer:customer_id ( customer_id, name, phone_number, email, address_line )`,
     })
 
-    // Markera tidrapporter som fakturerade
-    if (time_entry_ids && time_entry_ids.length > 0) {
-      await supabase
-        .from('time_entry')
-        .update({ invoice_id: invoice.invoice_id, invoiced: true })
-        .in('time_entry_id', time_entry_ids)
-    }
-
-    // Markera material som fakturerat
-    if (project_material_ids && project_material_ids.length > 0) {
-      await supabase
-        .from('project_material')
-        .update({ invoice_id: invoice.invoice_id, invoiced: true })
-        .in('material_id', project_material_ids)
+    // Källorna markeras atomiskt via den delade vägen (P0-4).
+    const markering = await markInvoiceSources(supabase, {
+      businessId: business_id,
+      invoiceId: invoice.invoice_id,
+      timeEntryIds: time_entry_ids || [],
+      materialIds: project_material_ids || [],
+    })
+    if (!markering.ok) {
+      console.error('[invoices POST] källmarkeringen misslyckades:', markering.errors)
     }
 
     // V3 Automation Engine: fire invoice_created event

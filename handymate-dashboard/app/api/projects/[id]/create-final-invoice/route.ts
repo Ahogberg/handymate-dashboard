@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
@@ -433,22 +434,20 @@ export async function POST(
     let ataUpdateWarning: string | undefined
     if (signedAtas.length > 0) {
       const changeIds = signedAtas.map(a => a.change_id)
-      const { error: updateError } = await supabase
-        .from('project_change')
-        .update({
-          status: 'invoiced',
-          invoice_id: invoice.invoice_id,
-          invoiced_at: new Date().toISOString(),
-        })
-        .in('change_id', changeIds)
-        .eq('business_id', business.business_id)
+      // Delade vägen (P0-4): atomisk via RPC:n när v104 är körd; annars
+      // samma per-tabell-fallback som förut, men aldrig tyst.
+      const markering = await markInvoiceSources(supabase, {
+        businessId: business.business_id,
+        invoiceId: invoice.invoice_id,
+        changeIds,
+      })
 
-      if (updateError) {
-        console.error('[create-final-invoice] CRITICAL: project_change update failed after invoice insert:', {
+      if (!markering.ok) {
+        console.error('[create-final-invoice] CRITICAL: källmarkeringen misslyckades efter fakturaskapandet:', {
           invoice_id: invoice.invoice_id,
           invoice_number: invoice.invoice_number,
           change_ids: changeIds,
-          error: updateError,
+          errors: markering.errors,
         })
         ataUpdateWarning = `Fakturan skapades (${invoice.invoice_number}) men ÄTA-status kunde inte uppdateras. Kontakta support — change_ids: ${changeIds.join(', ')}`
       }

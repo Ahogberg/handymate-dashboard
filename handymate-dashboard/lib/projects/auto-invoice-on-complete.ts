@@ -9,6 +9,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { createInvoice } from '@/lib/invoices/create-invoice'
 
@@ -315,21 +316,17 @@ export async function autoInvoiceOnComplete(
     // gör nu likadant. Även `business_id` läggs till: en `.in()` på id:n utan
     // företagsfilter förlitade sig på att id:n är globalt unika.
     if (atas && atas.length > 0) {
-      const { error: ataErr } = await supabase
-        .from('project_change')
-        .update({
-          status: 'invoiced',
-          invoice_id: invoice?.invoice_id ?? null,
-          invoiced_at: new Date().toISOString(),
-        })
-        .eq('business_id', businessId)
-        .in('change_id', atas.map(a => a.change_id))
-
-      // Fakturan finns redan. Misslyckas markeringen är det ÄTA:n som blir
-      // fel, inte fakturan — och då ska det synas i loggen i stället för att
-      // dyka upp som ett falskt intäktsfynd tre dygn senare.
-      if (ataErr) {
-        console.error('[auto-invoice] kunde inte markera ÄTA som fakturerade:', ataErr.message, {
+      // Delade vägen (P0-4): atomisk via RPC:n när v104 är körd.
+      // Misslyckas markeringen är det ÄTA:n som blir fel, inte fakturan —
+      // och det ska synas i loggen i stället för att dyka upp som ett
+      // falskt intäktsfynd tre dygn senare.
+      const markering = await markInvoiceSources(supabase, {
+        businessId,
+        invoiceId: invoice.invoice_id,
+        changeIds: atas.map(a => a.change_id),
+      })
+      if (!markering.ok) {
+        console.error('[auto-invoice] kunde inte markera ÄTA som fakturerade:', markering.errors, {
           project_id: projectId,
           invoice_id: invoice?.invoice_id,
           ata_count: atas.length,

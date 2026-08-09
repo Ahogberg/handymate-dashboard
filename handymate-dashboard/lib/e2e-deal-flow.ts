@@ -8,6 +8,7 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { createQuote as createCanonicalQuote } from '@/lib/quotes/create-quote'
+import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
@@ -755,18 +756,16 @@ async function executeInvoiceGeneration(
       return { executed: false, reason: `Fakturagenerering misslyckades: ${invoiceErr.message}` }
     }
 
-    // Markera tidposter och material som fakturerade
-    if (sourceTimeEntryIds.length > 0) {
-      await supabase
-        .from('time_entry')
-        .update({ invoiced: true, invoice_id: invoiceId })
-        .in('time_entry_id', sourceTimeEntryIds)
-    }
-    if (sourceMaterialIds.length > 0) {
-      await supabase
-        .from('project_material')
-        .update({ invoiced: true, invoice_id: invoiceId })
-        .in('material_id', sourceMaterialIds)
+    // Källorna markeras atomiskt via den delade vägen (P0-4) — tidigare två
+    // separata anrop utan felkontroll och utan tenantfilter.
+    const markering = await markInvoiceSources(supabase, {
+      businessId,
+      invoiceId,
+      timeEntryIds: sourceTimeEntryIds,
+      materialIds: sourceMaterialIds,
+    })
+    if (!markering.ok) {
+      console.error('[e2e-deal-flow] källmarkeringen misslyckades:', markering.errors)
     }
 
     // Inkrementera fakturanummer

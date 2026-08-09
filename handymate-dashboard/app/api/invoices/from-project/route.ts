@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
@@ -299,21 +300,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 
-  // Markera tidposter som fakturerade
-  if (source_time_entry_ids.length > 0) {
-    await supabase
-      .from('time_entry')
-      .update({ invoiced: true, invoice_id: invoiceId })
-      .in('time_entry_id', source_time_entry_ids)
-  }
+  // Källorna markeras atomiskt via den delade vägen (P0-4) — tidigare två
+  // separata anrop utan felkontroll OCH utan tenantfilter.
+  const markering = await markInvoiceSources(supabase, {
+    businessId: business.business_id,
+    invoiceId,
+    timeEntryIds: source_time_entry_ids,
+    materialIds: source_material_ids,
+  })
 
-  // Markera material som fakturerat
-  if (source_material_ids.length > 0) {
-    await supabase
-      .from('project_material')
-      .update({ invoiced: true, invoice_id: invoiceId })
-      .in('material_id', source_material_ids)
-  }
-
-  return NextResponse.json({ invoice_id: invoiceId, invoice_number: invoiceNumber })
+  return NextResponse.json({
+    invoice_id: invoiceId,
+    invoice_number: invoiceNumber,
+    ...(markering.ok ? {} : { warning: `Fakturan skapades men källmarkeringen misslyckades: ${markering.errors.join('; ')}` }),
+  })
 }

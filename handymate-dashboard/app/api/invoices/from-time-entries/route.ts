@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
@@ -177,20 +178,28 @@ export async function POST(request: NextRequest) {
       selectClause: `*, customer:customer_id ( customer_id, name, phone_number, email, address_line )`,
     })
 
-    // Markera tidrapporter som fakturerade
-    await supabase
-      .from('time_entry')
-      .update({ invoice_id: invoice.invoice_id, invoiced: true })
-      .in('time_entry_id', time_entry_ids)
-
-    // Markera material som fakturerat
+    // Källorna markeras atomiskt via den delade vägen (P0-4). Materialet
+    // slås upp till id:n först — RPC:n arbetar med explicita rader, aldrig
+    // "allt ofakturerat" som kan hinna ändras mellan läsning och skrivning.
+    let materialIds: string[] = []
     if (project_id) {
-      await supabase
+      const { data: mtrl } = await supabase
         .from('project_material')
-        .update({ invoice_id: invoice.invoice_id, invoiced: true })
+        .select('material_id')
         .eq('project_id', project_id)
         .eq('business_id', business_id)
         .eq('invoiced', false)
+      materialIds = (mtrl || []).map((m: any) => m.material_id)
+    }
+
+    const markering = await markInvoiceSources(supabase, {
+      businessId: business_id,
+      invoiceId: invoice.invoice_id,
+      timeEntryIds: time_entry_ids,
+      materialIds,
+    })
+    if (!markering.ok) {
+      console.error('[from-time-entries] källmarkeringen misslyckades:', markering.errors)
     }
 
     return NextResponse.json({ invoice })

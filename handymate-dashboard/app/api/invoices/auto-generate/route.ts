@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { createInvoice } from '@/lib/invoices/create-invoice'
@@ -216,12 +217,16 @@ async function generateInvoicesForBusiness(params: {
       const dueDate = new Date()
       dueDate.setDate(dueDate.getDate() + dueDays)
 
-      // Mark time entries as invoiced
+      // Källorna markeras atomiskt via den delade vägen (P0-4).
       const entryIds = entries.map((e: any) => e.time_entry_id)
-      await supabase
-        .from('time_entry')
-        .update({ invoice_id: invoice.invoice_id, invoiced: true })
-        .in('time_entry_id', entryIds)
+      const markering = await markInvoiceSources(supabase, {
+        businessId: params.businessId,
+        invoiceId: invoice.invoice_id,
+        timeEntryIds: entryIds,
+      })
+      if (!markering.ok) {
+        console.error('[auto-generate] källmarkeringen misslyckades:', markering.errors)
+      }
 
       // Log customer activity
       await supabase.from('customer_activity').insert({
