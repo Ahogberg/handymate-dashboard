@@ -495,7 +495,14 @@ export async function PUT(request: NextRequest) {
     if (body.description !== undefined) updates.description = body.description
     if (body.project_type !== undefined) updates.project_type = body.project_type
     if (body.status !== undefined) {
-      // 4-eyes check för projektstängning
+      // ═══ FOUR-EYES-GRINDEN — DATABASENS VÄRDE, ALDRIG KLIENTENS ═══
+      // (Projektauditen P1-5, lagad 2026-08-09.)
+      //
+      // Grinden löd `body.budget_amount || 0` och kontrollen kördes bara när
+      // det var falsy. Ett anrop med `{status:'completed', budget_amount: 1}`
+      // hoppade alltså över HELA kontrollen — klienten kunde stänga vilket
+      // projekt som helst förbi fyra ögon genom att skicka en krona.
+      // En policygrind som frågar den grindade parten om värdet är ingen grind.
       if (body.status === 'completed') {
         const { data: fourEyesConfig } = await supabase
           .from('business_config')
@@ -503,21 +510,36 @@ export async function PUT(request: NextRequest) {
           .eq('business_id', business.business_id)
           .single()
 
-        const projectValue = body.budget_amount || 0
-        // Hämta befintligt projektvärde om inte i body
-        if (!projectValue) {
+        if (fourEyesConfig?.four_eyes_enabled) {
+          // Tenantfiltret saknades också — uppslaget körs med service_role,
+          // så utan raden lästes budget från vilket företags projekt som helst.
           const { data: existingProject } = await supabase
             .from('project')
             .select('budget_amount')
             .eq('project_id', project_id)
+            .eq('business_id', business.business_id)
             .single()
-          if (existingProject) {
-            const pVal = existingProject.budget_amount || 0
-            if (
-              fourEyesConfig?.four_eyes_enabled &&
-              pVal >= (fourEyesConfig.four_eyes_threshold_sek || 50000)
-            ) {
-              const approvalId = `appr_4e_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+
+          const pVal = existingProject?.budget_amount || 0
+          const troskel = fourEyesConfig.four_eyes_threshold_sek || 50000
+
+          if (pVal >= troskel) {
+            // Upprepad PUT ska inte ge ett kort per försök — ligger ett
+            // pending-kort redan i kön är svaret detsamma (auditens P2-4).
+            const { data: befintligtKort } = await supabase
+              .from('pending_approvals')
+              .select('id')
+              .eq('business_id', business.business_id)
+              .eq('approval_type', 'four_eyes_project_close')
+              .eq('status', 'pending')
+              .contains('payload', { project_id })
+              .limit(1)
+              .maybeSingle()
+
+            const approvalId = befintligtKort?.id
+              || `appr_4e_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+
+            if (!befintligtKort) {
               await supabase.from('pending_approvals').insert({
                 id: approvalId,
                 business_id: business.business_id,
@@ -525,19 +547,19 @@ export async function PUT(request: NextRequest) {
                 // Etapp 3b (multi-employee-parity-plan.md): kö-routing.
                 routing_role: 'owner_admin',
                 title: `Projektstängning kräver godkännande — ${pVal.toLocaleString('sv-SE')} kr`,
-                description: `Projektets värde överstiger gränsen på ${(fourEyesConfig.four_eyes_threshold_sek || 50000).toLocaleString('sv-SE')} kr.`,
-                payload: { project_id, budget_amount: pVal, threshold: fourEyesConfig.four_eyes_threshold_sek },
+                description: `Projektets värde överstiger gränsen på ${troskel.toLocaleString('sv-SE')} kr.`,
+                payload: { project_id, budget_amount: pVal, threshold: troskel },
                 status: 'pending',
                 risk_level: 'high',
                 expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
               })
-
-              return NextResponse.json({
-                requires_approval: true,
-                approval_id: approvalId,
-                message: `Projektstängning kräver admin-godkännande (${pVal.toLocaleString('sv-SE')} kr)`,
-              })
             }
+
+            return NextResponse.json({
+              requires_approval: true,
+              approval_id: approvalId,
+              message: `Projektstängning kräver admin-godkännande (${pVal.toLocaleString('sv-SE')} kr)`,
+            })
           }
         }
 

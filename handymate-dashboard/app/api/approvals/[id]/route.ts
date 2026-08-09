@@ -1585,10 +1585,14 @@ async function executeApprovalPayload(
 
         const supabase4p = (await import('@/lib/supabase')).getServerSupabase()
 
+        // Tenantfiltret saknades — uppdateringen körs med service_role och
+        // kunde stänga ett projekt i vilket företag som helst om payloadens
+        // project_id pekade fel. Kortets businessId är sanningen.
         await supabase4p
           .from('project')
           .update({ status: 'completed', completed_at: new Date().toISOString() })
           .eq('project_id', pl.project_id)
+          .eq('business_id', businessId)
 
         // Fire job_completed
         try {
