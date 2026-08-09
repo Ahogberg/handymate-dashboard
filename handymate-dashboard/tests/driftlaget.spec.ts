@@ -104,3 +104,33 @@ test.describe('listan svarar "vad behöver jag göra?" (P2-1)', () => {
     expect(fn.slice(vakt, vakt + 120)).toContain('amber')
   })
 })
+
+test.describe('portalen läser samma sanning (P2-5)', () => {
+  const PORTAL = 'app/api/portal/[token]/projects/route.ts'
+
+  test('sex frågor totalt — inte sex per projekt', () => {
+    const s = kod(PORTAL)
+    expect(s, 'per-projekt-loopen med egna frågor är kvar').not.toMatch(/map\(async \(p: any\) => \{[\s\S]{0,400}?from\('project_milestone'\)/)
+    expect(s).toContain(".in('project_id', ids)")
+  })
+
+  test('driftläget kommer från samma härledning som hantverkarens lista', () => {
+    const s = kod(PORTAL)
+    expect(s).toContain('deriveProjectLifecycle({')
+  })
+
+  test('barnfel loggas — tyst tomhet var portalens historiska felklass', () => {
+    const s = kod(PORTAL)
+    expect(s).toContain('hämtning misslyckades')
+  })
+
+  test('sign_token exponeras fortfarande bara för osignerade ÄTA', () => {
+    const s = kod(PORTAL)
+    expect(s).toContain("a.status === 'sent' ? a.sign_token : null")
+  })
+
+  test('fotolimiten per projekt överlevde batchningen', () => {
+    const s = kod(PORTAL)
+    expect(s).toContain('.slice(0, 12)')
+  })
+})

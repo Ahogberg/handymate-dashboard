@@ -69,82 +69,109 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
       return 0
     })
 
-    // For each project, get milestones, latest log, stages, and photos
-    const enriched = await Promise.all((projects || []).map(async (p: any) => {
-      const [milestonesRes, logsRes, scheduleRes, ataRes, stagesRes, photosRes] = await Promise.all([
-        supabase
-          .from('project_milestone')
-          .select('name, status, sort_order')
-          .eq('project_id', p.project_id)
-          .order('sort_order', { ascending: true }),
-        supabase
-          .from('project_log')
-          // `description:work_description` — ALIAS. Byggdagboken har
-          // `work_description`/`notes`, aldrig `description`
-          // (sql/rot_rut_documents.sql:64). Frågan gav 42703, så kundens
-          // portal har aldrig visat senaste dagboksanteckningen.
-          .select('description:work_description, created_at')
-          .eq('project_id', p.project_id)
-          .order('created_at', { ascending: false })
-          .limit(1),
-        supabase
-          .from('schedule_entry')
-          // Kolumnerna heter `start_datetime`/`end_datetime`
-          // (sql/schedule_tables.sql:8). Frågan bad om `start_time`/`end_time`
-          // — 42703 — så kundportalen har aldrig visat nästa besök.
-          // Aliasen behåller formen `nextVisit` skickas ut i; filter och
-          // sortering måste däremot använda de riktiga namnen.
-          .select('title, start_time:start_datetime, end_time:end_datetime')
-          .eq('project_id', p.project_id)
-          .gte('start_datetime', new Date().toISOString())
-          .order('start_datetime', { ascending: true })
-          .limit(1),
-        supabase
-          .from('project_change')
-          .select('change_id, ata_number, change_type, description, items, total, status, sign_token, signed_at, signed_by_name, created_at')
-          .eq('project_id', p.project_id)
-          .in('status', ['sent', 'signed', 'approved'])
-          .order('ata_number', { ascending: true }),
-        supabase
-          .from('project_stages')
-          .select('stage, label, completed_at, completed_by, note')
-          .eq('project_id', p.project_id)
-          .order('created_at', { ascending: true }),
-        supabase
-          .from('project_photos')
-          .select('id, url, caption, type, uploaded_at')
-          .eq('project_id', p.project_id)
-          .order('uploaded_at', { ascending: false })
-          .limit(12),
-      ])
+    /**
+     * ═══ SEX FRÅGOR TOTALT — INTE SEX PER PROJEKT (P2-5, 2026-08-09) ═══
+     *
+     * Barndatan hämtades i en Promise.all PER projekt: en kund med åtta
+     * projekt kostade ~49 queries per portalbesök. Nu batchas varje tabell
+     * med .in('project_id', ids) en gång och grupperas i minnet. Svarets
+     * form är oförändrad — frontend märker bara att det går fortare.
+     *
+     * Aliasen är bevarade från tidigare lagningar: project_log har
+     * work_description (aldrig description), schedule_entry har
+     * start_datetime/end_datetime (aldrig start_time) — båda gav 42703 och
+     * tomma sektioner en gång i tiden.
+     */
+    const ids = (projects || []).map((p: any) => p.project_id)
+    const [milestonesRes, logsRes, scheduleRes, ataRes, stagesRes, photosRes, invoiceRes] = ids.length === 0
+      ? [null, null, null, null, null, null, null] as any[]
+      : await Promise.all([
+          supabase
+            .from('project_milestone')
+            .select('project_id, name, status, sort_order')
+            .in('project_id', ids)
+            .eq('business_id', customer.business_id)
+            .order('sort_order', { ascending: true }),
+          supabase
+            .from('project_log')
+            .select('project_id, description:work_description, created_at')
+            .in('project_id', ids)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('schedule_entry')
+            .select('project_id, title, start_time:start_datetime, end_time:end_datetime')
+            .in('project_id', ids)
+            .gte('start_datetime', new Date().toISOString())
+            .order('start_datetime', { ascending: true }),
+          supabase
+            .from('project_change')
+            .select('project_id, change_id, ata_number, change_type, description, items, total, status, sign_token, signed_at, signed_by_name, created_at')
+            .in('project_id', ids)
+            .eq('business_id', customer.business_id)
+            .in('status', ['sent', 'signed', 'approved'])
+            .order('ata_number', { ascending: true }),
+          supabase
+            .from('project_stages')
+            .select('project_id, stage, label, completed_at, completed_by, note')
+            .in('project_id', ids)
+            .order('created_at', { ascending: true }),
+          supabase
+            .from('project_photos')
+            .select('project_id, id, url, caption, type, uploaded_at')
+            .in('project_id', ids)
+            .order('uploaded_at', { ascending: false }),
+          // Fakturafakta för det härledda driftläget (P1-2) — portalen kan
+          // därmed lämna sin egen, tredje stegrepresentation i egen takt.
+          supabase
+            .from('invoice')
+            .select('project_id, status')
+            .in('project_id', ids)
+            .eq('business_id', customer.business_id),
+        ])
 
-      // Felsökningen från TD-22:s ÄTA-jakt är borttagen (2026-08-07). Den
-      // loggade hela ÄTA-listan per projekt vid VARJE kundvisning och körde
-      // dessutom en extra count-fråga per projekt bara för att jämföra
-      // radantal — en N+1 på en kundvänd route, kvar långt efter att jakten
-      // var över.
-      //
-      // Ett verkligt fel ska däremot inte förbli tyst: en misslyckad
-      // ÄTA-hämtning gav förut en tom lista utan spår.
-      if (ataRes.error) {
-        console.error('[portal/projects] ÄTA-hämtning misslyckades:', ataRes.error.message, {
-          project_id: p.project_id,
-        })
-      }
+    // Ett verkligt fel ska inte förbli tyst: en misslyckad hämtning gav
+    // förut en tom lista utan spår.
+    for (const [namn, res] of Object.entries({ milestones: milestonesRes, log: logsRes, schedule: scheduleRes, ata: ataRes, stages: stagesRes, photos: photosRes })) {
+      if (res?.error) console.error(`[portal/projects] ${namn}-hämtning misslyckades:`, res.error.message)
+    }
 
-      return {
-        ...p,
-        milestones: milestonesRes.data || [],
-        latestLog: logsRes.data?.[0] || null,
-        nextVisit: scheduleRes.data?.[0] || null,
-        atas: (ataRes.data || []).map((a: any) => ({
-          ...a,
-          // Only expose sign_token for ÄTAs that need signing
-          sign_token: a.status === 'sent' ? a.sign_token : null,
-        })),
-        tracker_stages: stagesRes.data || [],
-        photos: photosRes.data || [],
+    const per = <T extends { project_id: string }>(rows: T[] | null | undefined) => {
+      const map = new Map<string, T[]>()
+      for (const r of rows || []) {
+        const lista = map.get(r.project_id) || []
+        lista.push(r)
+        map.set(r.project_id, lista)
       }
+      return map
+    }
+    const milestonesPer = per(milestonesRes?.data)
+    const logsPer = per(logsRes?.data)
+    const schedulePer = per(scheduleRes?.data)
+    const ataPer = per(ataRes?.data)
+    const stagesPer = per(stagesRes?.data)
+    const photosPer = per(photosRes?.data)
+    const invoicesPer = per(invoiceRes?.data)
+
+    const { deriveProjectLifecycle } = await import('@/lib/projects/derive-lifecycle')
+
+    const enriched = (projects || []).map((p: any) => ({
+      ...p,
+      milestones: (milestonesPer.get(p.project_id) || []).map(({ project_id: _p, ...m }: any) => m),
+      latestLog: (logsPer.get(p.project_id) || [])[0] || null,
+      nextVisit: (schedulePer.get(p.project_id) || [])[0] || null,
+      atas: (ataPer.get(p.project_id) || []).map((a: any) => ({
+        ...a,
+        // Only expose sign_token for ÄTAs that need signing
+        sign_token: a.status === 'sent' ? a.sign_token : null,
+      })),
+      tracker_stages: (stagesPer.get(p.project_id) || []).map(({ project_id: _p, ...s }: any) => s),
+      photos: (photosPer.get(p.project_id) || []).slice(0, 12),
+      // Samma driftläge som hantverkarens lista — en sanning, två läsare.
+      lifecycle: deriveProjectLifecycle({
+        status: p.status,
+        completed_at: p.completed_at,
+        invoices: (invoicesPer.get(p.project_id) || []).map((i: any) => ({ status: i.status ?? null })),
+      }),
     }))
 
     return NextResponse.json({ projects: enriched })
