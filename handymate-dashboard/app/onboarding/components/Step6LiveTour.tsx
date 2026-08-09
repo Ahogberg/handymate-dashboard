@@ -92,10 +92,16 @@ export default function Step6LiveTour({ onFinish, data }: Step6Props) {
 
   useEffect(() => {
     const t1 = setTimeout(() => setShowToast(false), 2800)
-    const t2 = setTimeout(() => setTourStep(0), 1400)
+    const t2 = setTimeout(() => setTourStep(s => (s === -1 ? 0 : s)), 1400)
+    // Säkerhetsnät (B7-fyndet): hänger tour-statet av någon anledning kvar
+    // på -1 fanns INGENTING klickbart — och inloggningen studsar tillbaka
+    // hit tills onboardingen är slutförd. Evighetsloop. Efter 5 s tvingas
+    // touren till avslutat läge så Kör igång alltid går att nå.
+    const t3 = setTimeout(() => setTourStep(s => (s === -1 ? -2 : s)), 5000)
     return () => {
       clearTimeout(t1)
       clearTimeout(t2)
+      clearTimeout(t3)
     }
   }, [])
 
@@ -181,6 +187,32 @@ export default function Step6LiveTour({ onFinish, data }: Step6Props) {
           onNext={next}
           onSkip={skip}
         />
+      )}
+
+      {/* Ständig utväg — touren ska aldrig kunna hålla någon fången. Diskret
+          uppe till höger under hela turen; försvinner när stora CTA:n tar över. */}
+      {!finished && (
+        <button
+          type="button"
+          onClick={skip}
+          style={{
+            position: 'absolute',
+            top: 14,
+            right: 16,
+            zIndex: 60,
+            background: 'var(--ob-surface)',
+            border: '1px solid var(--ob-border)',
+            borderRadius: 'var(--ob-r-pill)',
+            padding: '6px 12px',
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--ob-muted)',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          Hoppa till start →
+        </button>
       )}
 
       {/* Final CTA */}

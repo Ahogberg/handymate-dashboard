@@ -112,3 +112,19 @@ test.describe('rundturen — tipset täcker inte sitt eget motiv', () => {
     expect(matte).toContain("placement: 'top'")
   })
 })
+
+test.describe('touren kan aldrig hålla någon fången (B7-fyndet: evighetsloopen)', () => {
+  test('säkerhetsnätet tvingar fram avslutat läge om statet hänger', () => {
+    const s = read('app/onboarding/components/Step6LiveTour.tsx')
+    expect(s).toContain("setTourStep(s => (s === -1 ? -2 : s)), 5000")
+  })
+
+  test('en ständig utväg finns under hela turen', () => {
+    const s = read('app/onboarding/components/Step6LiveTour.tsx')
+    expect(s).toContain('Hoppa till start')
+    // Utvägen renderas när touren INTE är klar — motsatt villkor mot CTA:n.
+    const utvag = s.indexOf('Hoppa till start')
+    const villkor = s.lastIndexOf('{!finished && (', utvag)
+    expect(villkor, 'utvägen är gated bakom fel villkor').toBeGreaterThan(-1)
+  })
+})
