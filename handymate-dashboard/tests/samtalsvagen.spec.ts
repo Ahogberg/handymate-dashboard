@@ -323,3 +323,54 @@ test.describe('rollfördelningen är kod, inte prompttillit', () => {
     expect(s).toContain('"type": "quote|callback|follow_up|reminder|reschedule"')
   })
 })
+
+/**
+ * ═══ Etapp 2c: de två fällorna i create_approval_request ═══
+ *
+ *   1. 'other' dokumenterades i verktygsbeskrivningen men saknas i
+ *      ACTION_CONTRACT — kortet gick inte att godkänna, bara avvisa.
+ *   2. risk_level low/medium auto-exekverade via en switch som bara kan fyra
+ *      typer och tyst returnerade skipped:'no handler' för resten — kortet
+ *      markerades auto_approved medan ingenting hänt.
+ */
+test.describe('de två fällorna är stängda', () => {
+  const DEFS = 'app/api/agent/trigger/tool-definitions.ts'
+
+  test("'other' är borta ur verktygsbeskrivningen", () => {
+    const s = kod(DEFS)
+    const block = s.slice(s.indexOf('create_approval_request'), s.indexOf('check_pending_approvals'))
+    expect(block, "'other' erbjuds fortfarande som approval_type").not.toMatch(/create_booking, other/)
+  })
+
+  test('okänd typ avvisas vid skapandet, före varje skrivning', () => {
+    const s = kod(ROUTER)
+    const fn = s.slice(s.indexOf('async function createApprovalRequest'))
+    const grind = fn.indexOf('classify(typ)')
+    const skrivning = fn.indexOf("from('pending_approvals')")
+    expect(grind, 'ingen kontraktskontroll vid skapandet').toBeGreaterThan(-1)
+    expect(grind, 'kontrollen ligger efter skrivningen').toBeLessThan(skrivning)
+  })
+
+  test('låg risk utan handler blir pending — aldrig godkänd utan utförande', () => {
+    const s = kod(ROUTER)
+    const fn = s.slice(s.indexOf('async function createApprovalRequest'))
+    expect(fn).toContain('INTERNAL_EXEC_TYPES.has(typ)')
+    // Nedgraderingen: low/medium utan handler tvingas till high-grenen.
+    expect(fn).toMatch(/!harHandler \? 'high'/)
+  })
+
+  test('handler-mängden speglar switchens faktiska cases', () => {
+    // Facitet läser switchens case-rader och jämför med mängden — läggs en
+    // handler till utan att mängden uppdateras (eller tvärtom) faller provet.
+    const s = read(ROUTER)
+    const exec = s.slice(
+      s.indexOf('async function executeApprovalPayloadInternal'),
+      s.indexOf('async function checkPendingApprovals')
+    )
+    const cases = (exec.match(/case '([a-z_]+)':/g) || []).map(c => c.replace(/case '|':/g, ''))
+    const mangd = (s.match(/INTERNAL_EXEC_TYPES = new Set\(\[([^\]]+)\]\)/)?.[1].match(/'([a-z_]+)'/g) || [])
+      .map(t => t.replace(/'/g, ''))
+    expect(cases.sort()).toEqual(mangd.sort())
+    expect(mangd.length).toBeGreaterThan(0)
+  })
+})

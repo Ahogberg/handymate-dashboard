@@ -18,6 +18,7 @@ import {
 } from '@/lib/agent/orchestration'
 import type { AgentId } from '@/lib/agent/capabilities'
 import { createQuote as createCanonicalQuote } from '@/lib/quotes/create-quote'
+import { classify } from '@/lib/approvals/action-contract'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
@@ -1668,11 +1669,41 @@ async function createApprovalRequest(
   params: Record<string, unknown>
 ): Promise<ToolResult> {
   const { approval_type, title, description, payload } = params
-  const risk_level = (params.risk_level as string) || 'high'
 
   if (!approval_type || !title || !payload) {
     return { success: false, error: 'approval_type, title och payload krävs' }
   }
+
+  /**
+   * ═══ FÄLLA 1: okänd typ avvisas VID SKAPANDET (etapp 2c) ═══
+   *
+   * Verktygsbeskrivningen dokumenterade 'other', som saknas i ACTION_CONTRACT.
+   * Ett sådant kort gick inte att godkänna — bara avvisa. Ett kort som inte
+   * kan godkännas ska aldrig skapas; modellen får ett begripligt fel och kan
+   * välja rätt typ i stället.
+   */
+  const typ = String(approval_type)
+  if (!classify(typ)) {
+    return {
+      success: false,
+      error:
+        `Okänd approval_type "${typ}" — kortet skulle inte gå att godkänna. ` +
+        `Välj en typ som faktiskt finns, t.ex. send_sms, send_quote, send_invoice, create_booking.`,
+    }
+  }
+
+  /**
+   * ═══ FÄLLA 2: fail-closed när handlern saknas ═══
+   *
+   * risk_level low/medium auto-exekverar via executeApprovalPayloadInternal,
+   * som bara kan fyra typer och tidigare tyst returnerade skipped:'no handler'
+   * för resten — kortet markerades auto_approved medan ingenting hänt.
+   * En låg risk utan handler är nu i praktiken hög: kortet blir pending och
+   * en människa utför det. Aldrig "godkänt" utan utförande.
+   */
+  const begartRisk = (params.risk_level as string) || 'high'
+  const harHandler = INTERNAL_EXEC_TYPES.has(typ)
+  const risk_level = (begartRisk === 'low' || begartRisk === 'medium') && !harHandler ? 'high' : begartRisk
 
   const id = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
@@ -1804,6 +1835,14 @@ async function createApprovalRequest(
  * Execute an approval payload inline (used for low/medium risk auto-approvals).
  * Mirrors the switch in app/api/approvals/[id]/route.ts.
  */
+/**
+ * Typerna executeApprovalPayloadInternal faktiskt kan utföra. Härledd ur
+ * switchens cases; facit håller dem i synk. Allt utanför mängden är
+ * fail-closed vid low/medium — kortet blir pending i stället för att
+ * markeras utfört utan utförande.
+ */
+const INTERNAL_EXEC_TYPES = new Set(['send_sms', 'send_quote', 'send_invoice', 'create_booking'])
+
 async function executeApprovalPayloadInternal(
   appUrl: string,
   businessId: string,

@@ -325,7 +325,9 @@ export const toolDefinitions = [
       properties: {
         approval_type: {
           type: "string",
-          description: "Typ av åtgärd: send_sms, send_quote, send_invoice, create_booking, other",
+          // 'other' fanns här förut men saknas i ACTION_CONTRACT — ett sådant
+          // kort gick inte att godkänna. Okänd typ avvisas numera vid skapandet.
+          description: "Typ av åtgärd: send_sms, send_quote, send_invoice, create_booking. Endast dessa auto-utförs vid low/medium — övriga kontraktstyper blir alltid väntande kort.",
         },
         title: {
           type: "string",
