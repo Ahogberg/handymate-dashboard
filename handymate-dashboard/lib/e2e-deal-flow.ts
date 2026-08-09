@@ -606,6 +606,13 @@ async function executeProjectCreation(
       console.error('[e2e-deal-flow] suggestChecklistForProject error (non-blocking):', err)
     })
 
+    // Stegkedjan startar vid födseln (P1-1) — samma init som
+    // create-from-quote; motorn är idempotent.
+    import('@/lib/project-stages/automation-engine')
+      .then(({ advanceProjectStage, SYSTEM_STAGES }) =>
+        advanceProjectStage(projectId, SYSTEM_STAGES.CONTRACT_SIGNED, businessId))
+      .catch(err => console.error('[e2e-deal-flow] stage init error (non-blocking):', err))
+
     await logDealFlowActivity(
       businessId,
       dealId,

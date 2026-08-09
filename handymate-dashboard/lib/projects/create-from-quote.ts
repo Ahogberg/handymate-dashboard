@@ -133,6 +133,15 @@ export async function createProjectFromQuote(
       console.error('[createProjectFromQuote] suggestChecklistForProject error (non-blocking):', err)
     })
 
+    // Stegkedjan startar VID födseln (auditens P1-1): projektet föds ur en
+    // signerad offert, så första steget är Avtal signerat. Utan initieringen
+    // stod stage null tills första fakturahändelsen och projektlistan kunde
+    // inte svara på var jobbet står. Idempotent och fire-and-forget.
+    import('@/lib/project-stages/automation-engine')
+      .then(({ advanceProjectStage, SYSTEM_STAGES }) =>
+        advanceProjectStage(projectId, SYSTEM_STAGES.CONTRACT_SIGNED, businessId))
+      .catch(err => console.error('[createProjectFromQuote] stage init error (non-blocking):', err))
+
     // 5. Skapa milestones från offertens arbetsrader
     // Använder labor_items från budgetDerivation (samma helper) så
     // milestones byggs från quote_items-tabellen, inte tom JSONB.

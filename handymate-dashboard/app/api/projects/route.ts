@@ -428,6 +428,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: insertError.message || 'Kunde inte skapa projekt' }, { status: 500 })
     }
 
+    // Stegkedjan startar vid födseln (auditens P1-1). Kommer projektet ur en
+    // offert är avtalet tecknat; skapas det manuellt som aktivt är jobbet
+    // igång. Ett manuellt planerings-projekt får däremot INGET steg — det har
+    // inget sant att påstå ännu. Idempotent, fire-and-forget.
+    const initStage = body.from_quote_id
+      ? 'CONTRACT_SIGNED' as const
+      : projectData.status === 'active'
+        ? 'JOB_STARTED' as const
+        : null
+    if (initStage && project) {
+      import('@/lib/project-stages/automation-engine')
+        .then(({ advanceProjectStage, SYSTEM_STAGES }) =>
+          advanceProjectStage(project.project_id, SYSTEM_STAGES[initStage], businessId))
+        .catch(err => console.error('[projects POST] stage init error (non-blocking):', err))
+    }
+
     // If from quote, create milestones from quote items
     // Pilot-blocker fix 2026-05-22: använder samma budget-derivation-helper
     // som ovan så milestones bygger på quote_items-tabellen, inte tom JSONB.

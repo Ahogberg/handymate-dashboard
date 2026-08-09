@@ -98,6 +98,12 @@ export async function triggerAutopilot(
         suggestChecklistForProject({ businessId, projectId: newProjectId }).catch(err => {
           console.error('[autopilot/trigger] suggestChecklistForProject error (non-blocking):', err)
         })
+        // Stegkedjan startar vid födseln (P1-1) — samma init som
+        // create-from-quote; motorn är idempotent.
+        import('@/lib/project-stages/automation-engine')
+          .then(({ advanceProjectStage, SYSTEM_STAGES }) =>
+            advanceProjectStage(newProjectId, SYSTEM_STAGES.CONTRACT_SIGNED, businessId))
+          .catch(err => console.error('[autopilot/trigger] stage init error (non-blocking):', err))
       } else if (projErr.code === '23505') {
         // v103: en annan skapare hann före mellan kontrollen och inserten.
         // Dedup-regeln gör sitt jobb — använd vinnaren.
