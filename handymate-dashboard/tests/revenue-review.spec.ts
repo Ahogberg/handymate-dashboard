@@ -121,3 +121,34 @@ test.describe('kontraktet mot godkännandekön hålls', () => {
     expect(classify('missad_intakt')).toBe('REVIEW_REQUIRED')
   })
 })
+
+test.describe('den smala ytan', () => {
+  const YTA = 'components/pengar/Intaktsfynden.tsx'
+
+  test('bor på Pengar på bordet — ingen femte parallell sida', () => {
+    expect(kod('app/dashboard/pengar/page.tsx')).toContain('<Intaktsfynden />')
+    expect(fs.existsSync(path.join(ROOT, 'app/dashboard/revenue-review'))).toBe(false)
+    expect(fs.existsSync(path.join(ROOT, 'app/dashboard/intaktsfynd'))).toBe(false)
+  })
+
+  test('utkastsknappen finns bara där servern skulle säga ja', () => {
+    const s = kod(YTA)
+    expect(s).toContain("fynd.kind === 'ata_ej_fakturerad' && fynd.recommended_action === 'DRAFT_AFTER_REVIEW'")
+  })
+
+  test('avfärdandet kräver text innan knappen fungerar', () => {
+    const s = kod(YTA)
+    expect(s).toContain('disabled={!orsak.trim()')
+  })
+
+  test('tyst när inget väntar — ett tomt avsnitt är brus', () => {
+    const s = kod(YTA)
+    expect(s).toContain('data.identifierade.length === 0) return null')
+  })
+
+  test('beskedet lovar aldrig sändning — utkastet skickas från Fakturor', () => {
+    const s = kod(YTA)
+    expect(s).toContain('granska och skicka från Fakturor')
+    expect(s).not.toContain('skickad till kund')
+  })
+})

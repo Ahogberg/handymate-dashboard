@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Banknote, Loader2 } from 'lucide-react'
 import { formatKr } from '@/lib/moments/derive'
+import { Intaktsfynden } from '@/components/pengar/Intaktsfynden'
 import type { PengarSummary } from '@/lib/value/pengar-pa-bordet'
 
 /**
@@ -111,6 +112,10 @@ export default function PengarPaBordetPage() {
             </>
           )
         )}
+
+        {/* Revenue Review (X1b): granska fynden HÄR — frågan och handlingen
+            hör ihop. Renderar ingenting när inget väntar. */}
+        {!laddar && <Intaktsfynden />}
       </div>
     </div>
   )
