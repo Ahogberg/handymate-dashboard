@@ -53,8 +53,9 @@ test.describe('skapandet påstår ingen leverans', () => {
     // Ankras på KOD, inte på kommentartext — kommentarerna är bortstrippade.
     const start = KOD.indexOf('createInvoice(supabase')
     // `from('project_change')` duger inte som slutankare — ÄTA HÄMTAS redan
-    // före skapandet. Markeringen som följer efteråt är unik.
-    const slut = KOD.indexOf("status: 'invoiced'")
+    // före skapandet. Källmarkeringen som följer efteråt är unik (P0-4:
+    // själva invoiced-skrivningen bor numera i lib/invoices/mark-sources).
+    const slut = KOD.indexOf('markInvoiceSources(')
     expect(start, 'createInvoice-anropet hittades inte').toBeGreaterThan(-1)
     expect(slut, 'ÄTA-blocket hittades inte').toBeGreaterThan(start)
     expect(KOD.slice(start, slut)).not.toContain("'sent'")

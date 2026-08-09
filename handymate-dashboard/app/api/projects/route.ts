@@ -7,6 +7,7 @@ import { getQuoteBudgetDerivation } from '@/lib/quotes/get-quote-budget-derivati
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 import { verifyOwnership } from '@/lib/auth/verify-ownership'
 import { checkFourEyesGate } from '@/lib/projects/four-eyes-gate'
+import { deriveProjectLifecycle } from '@/lib/projects/derive-lifecycle'
 
 /**
  * GET - Lista projekt för ett företag
@@ -101,6 +102,18 @@ export async function GET(request: NextRequest) {
       timeData = data || []
     }
 
+    // Fakturafakta för den härledda livscykeln (P1-2): en bulk-query,
+    // bara status per projekt. Verkligheten, inte progress_percent.
+    let invoiceData: any[] = []
+    if (projectIds.length > 0) {
+      const { data } = await supabase
+        .from('invoice')
+        .select('project_id, status')
+        .eq('business_id', businessId)
+        .in('project_id', projectIds)
+      invoiceData = data || []
+    }
+
     // Fetch next milestone deadline per project
     let milestoneData: any[] = []
     if (projectIds.length > 0) {
@@ -188,6 +201,13 @@ export async function GET(request: NextRequest) {
         actual_amount: Math.round(actual_amount),
         uninvoiced_hours: Math.round(uninvoiced_minutes / 60 * 100) / 100,
         next_deadline: nextDeadline?.due_date || null,
+        // Driftläget — härlett ur status + fakturafakta (P1-2). Lagras
+        // aldrig; det som inte lagras kan inte drifta.
+        lifecycle: deriveProjectLifecycle({
+          status: project.status,
+          completed_at: project.completed_at,
+          invoices: invoiceData.filter((i: any) => i.project_id === project.project_id),
+        }),
       }
 
       if (!includeWorkflow) return base
