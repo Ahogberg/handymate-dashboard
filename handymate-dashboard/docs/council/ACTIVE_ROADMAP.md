@@ -666,8 +666,13 @@ NEXT ACTION (uppdaterad 2026-08-09):
    nytt gratis Supabase-projekt) och kör npm run test:tenant-isolation.
 3. [KLAR 2026-08-09] X1a: konservativt klassningskontrakt, falska
    fastprisbelopp borta, cronfel synliga.
-4. Stripe B7-testköpet — lanseringsgrind bredvid gyllene vägen; saknades
-   tidigare helt i det här dokumentet.
+4. [KLAR 2026-08-09 kväll] Stripe B7-testköpet BEVISAT: subscription_status
+   'active', stripe_subscription_id satt, payment_succeeded +
+   checkout_completed i billing_event. Kvar: B8 LIVE-växlingen (test-price-id:n
+   i billing_plan byts tillbaka till live + live-nycklar + live-webhook) —
+   görs som eget steg när gyllene vägen och STOPP-provet är gröna.
+   Genomgången gav dessutom tio UX-fynd som fixades i farten (teamintro,
+   org.nr-vakten, steg 3/4-besked, tourplacering, support@).
 5. Kör sql/v103 (ett projekt per offert) — dubblettlistan först.
 
 EFTER GRINDEN (gyllene vägen + tvåtenantprovet):
