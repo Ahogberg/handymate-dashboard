@@ -389,3 +389,38 @@ test.describe('produktionsvägarnas klassningskontrakt', () => {
     expect(cronSource).toContain('success: false')
   })
 })
+
+test.describe('saknad arbetskostnad — null-belopp i källraderna (X1-fixturkravet)', () => {
+  // Roadmapens testlista kräver fallet uttryckligen: rader där beloppet
+  // aldrig registrerades. Regeln: ett okänt belopp är NOLL i potentialen —
+  // aldrig NaN, aldrig en krasch, aldrig ett kort som påstår en summa.
+  const ataUtanBelopp = {
+    id: 'a_null', project_id: 'p1', change_type: 'addition' as const,
+    description: 'Tillägg utan registrerat belopp',
+    amount: null, signed_at: LÄNGE_SEDAN, invoice_id: null, invoiced_at: null,
+  }
+
+  test('ÄTA utan belopp blir inget kort — under minimigränsen, inte NaN', () => {
+    const fynd = findUninvoicedAta([ataUtanBelopp], karta(projekt()), INGA_FAKTUROR, NOW)
+    expect(fynd).toHaveLength(0)
+  })
+
+  test('material utan belopp kraschar inte och blåser inte upp summan', () => {
+    const rader = [
+      { id: 'm1', project_id: 'p1', total_sell: null, invoiced: false, invoice_id: null },
+      { id: 'm2', project_id: 'p1', total_sell: 900, invoiced: false, invoice_id: null },
+    ]
+    const fynd = findUninvoicedMaterial(rader, karta(projekt()), INGA_FAKTUROR, NOW)
+    expect(fynd).toHaveLength(1)
+    expect(Number.isFinite(fynd[0].amountKr)).toBe(true)
+    expect(fynd[0].sourceAmountKr).toBe(900)
+  })
+
+  test('enbart null-rader når aldrig minimibeloppet', () => {
+    const rader = [
+      { id: 'm1', project_id: 'p1', total_sell: null, invoiced: false, invoice_id: null },
+      { id: 'm2', project_id: 'p1', total_sell: null, invoiced: false, invoice_id: null },
+    ]
+    expect(findUninvoicedMaterial(rader, karta(projekt()), INGA_FAKTUROR, NOW)).toHaveLength(0)
+  })
+})

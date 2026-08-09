@@ -256,3 +256,37 @@ alltid skapar en token nådde ingen kund funktionerna.
 **Regel:** innan en kundvänd funktion byggs, spåra vilken URL kunden FAKTISKT
 får i sitt SMS/mejl och följ alla redirects. "Sidan finns" är inte samma sak
 som "kunden hamnar där".
+
+## 2026-08-09: Auditer åldras — verifiera fyndet innan du bygger fixen
+
+**Vad hände:** Tre auditfynd visade sig redan vara åtgärdade vid källkontroll
+(X1a:s klassningskontrakt, complete-jobs felkoll, stage-uppslaget via
+invoice.project_id), och ett minne påstod att SMS-migreringen återstod fast
+den var klar sedan en dag. Att bygga på påståendena rakt av hade dubblerat
+arbete och riskerat regressioner i redan lagad kod.
+
+**Regel:** ett audit-/minnespåstående är en HYPOTES med datumstämpel. Grep
+källkoden och kör facit FÖRST; är fyndet redan stängt — lås det med ett prov
+i stället för att "fixa" det igen. Uppdatera dokumentet/minnet i samma veva,
+annars ärver nästa session samma fälla.
+
+## 2026-08-09: Spärrhakar hittar det grepen missar — skriv facitet före svepet
+
+**Vad hände:** Offertbyggarens spärrhake hittade tre direktskrivare och
+fakturakällornas spärrhake två, som mina inledande greps missat (fleradiga
+kedjor, andra filnamn). Facitet var bättre på inventering än inventeringen.
+
+**Regel:** vid "en väg in"-konsolideringar: skriv den rekursiva
+spärrhaken FÖRST och låt den producera trafiklistan. Grep är för att hitta
+startpunkten, inte för att bevisa fullständighet.
+
+## 2026-08-09: En policy med två dörrar och ett lås är ingen policy
+
+**Vad hände:** Four-eyes-grinden lagades i PUT /api/projects — och visade sig
+sedan kunna kringgås helt via mobilens complete-job, som stängde projektet
+utan att fråga. Fixen i första dörren hade invaggat i falsk trygghet.
+
+**Regel:** när en grind/policy läggs på en åtgärd: grep efter ALLA vägar som
+utför samma åtgärd (samma tabell + samma statusövergång) innan fixen anses
+klar, och extrahera grinden till en delad funktion så nästa dörr inte kan
+glömma den.
