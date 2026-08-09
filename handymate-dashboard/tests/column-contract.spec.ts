@@ -62,7 +62,12 @@ function buildColumnFacit(): Map<string, Set<string>> {
   const sqlDir = path.join(ROOT, 'sql')
   if (!fs.existsSync(sqlDir)) return facit
 
-  const filer = fs.readdirSync(sqlDir).filter(f => f.endsWith('.sql')).sort()
+  // Testbäddar är avsiktliga MINIATYRER för disponibla miljöer — deras
+  // CREATE TABLE beskriver inte prod-schemat och får inte krympa facit.
+  // (testbed_tenant_isolation.sql har t.ex. en femkolumnig business_config.)
+  const filer = fs.readdirSync(sqlDir)
+    .filter(f => f.endsWith('.sql') && !f.startsWith('testbed'))
+    .sort()
 
   for (const f of filer) {
     const sql = fs.readFileSync(path.join(sqlDir, f), 'utf8')

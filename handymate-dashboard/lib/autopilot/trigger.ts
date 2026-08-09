@@ -98,6 +98,19 @@ export async function triggerAutopilot(
         suggestChecklistForProject({ businessId, projectId: newProjectId }).catch(err => {
           console.error('[autopilot/trigger] suggestChecklistForProject error (non-blocking):', err)
         })
+      } else if (projErr.code === '23505') {
+        // v103: en annan skapare hann före mellan kontrollen och inserten.
+        // Dedup-regeln gör sitt jobb — använd vinnaren.
+        const { data: vinnare } = await supabase
+          .from('project')
+          .select('project_id, name')
+          .eq('business_id', businessId)
+          .eq('quote_id', quoteId)
+          .maybeSingle()
+        if (vinnare) {
+          projectId = vinnare.project_id
+          projectName = vinnare.name
+        }
       }
     }
 

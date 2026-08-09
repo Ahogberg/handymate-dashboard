@@ -106,6 +106,22 @@ export async function createProjectFromQuote(
       })
 
     if (insertErr) {
+      // v103: (business_id, quote_id) är unikt. En kollision betyder att en
+      // annan skapare (autopiloten, deal-flödet, en samtidig signering) hann
+      // före mellan vår kontroll och vår insert — det är INTE ett fel, det
+      // är dedup-regeln som gör sitt jobb. Hämta vinnaren och peka dit.
+      if (insertErr.code === '23505') {
+        const { data: vinnare } = await supabase
+          .from('project')
+          .select('project_id')
+          .eq('quote_id', quoteId)
+          .eq('business_id', businessId)
+          .limit(1)
+          .maybeSingle()
+        if (vinnare) {
+          return { success: true, project_id: vinnare.project_id, already_existed: true }
+        }
+      }
       return { success: false, error: insertErr.message }
     }
 

@@ -523,11 +523,17 @@ async function executeProjectCreation(
     const deal = await getDealData(businessId, dealId)
     if (!deal) return { executed: false, reason: 'Deal hittades inte' }
 
-    // Kontrollera om projekt redan finns
+    // Kontrollera om projekt redan finns — på dealen ELLER offerten.
+    // Kontrollen gällde tidigare bara deal_id: ett projekt skapat av
+    // signeringsvägen (create-from-quote, som inte sätter deal_id) syntes
+    // inte här, och samma offert fick ett andra projekt. Två projekt ur
+    // samma offert är förstadiet till två fakturor (auditens P0-2).
     const { data: existingProject } = await supabase
       .from('project')
       .select('project_id')
-      .eq('deal_id', dealId)
+      .eq('business_id', businessId)
+      .or(deal.quote_id ? `deal_id.eq.${dealId},quote_id.eq.${deal.quote_id}` : `deal_id.eq.${dealId}`)
+      .limit(1)
       .maybeSingle()
 
     if (existingProject) {
@@ -587,6 +593,20 @@ async function executeProjectCreation(
     })
 
     if (insertErr) {
+      // v103: en annan skapare hann före mellan kontrollen och inserten —
+      // dedup-regeln gör sitt jobb. Peka dealen på vinnaren.
+      if (insertErr.code === '23505' && deal.quote_id) {
+        const { data: vinnare } = await supabase
+          .from('project')
+          .select('project_id')
+          .eq('business_id', businessId)
+          .eq('quote_id', deal.quote_id)
+          .maybeSingle()
+        if (vinnare) {
+          await supabase.from('deal').update({ project_id: vinnare.project_id }).eq('id', dealId)
+          return { executed: true, data: { project_id: vinnare.project_id, already_exists: true } }
+        }
+      }
       return { executed: false, reason: `Projektgenerering misslyckades: ${insertErr.message}` }
     }
 
