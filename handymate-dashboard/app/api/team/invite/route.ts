@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
+import { getUserLimit, type PlanType } from '@/lib/feature-gates'
 import { Resend } from 'resend'
 
 function getResend() {
@@ -33,6 +34,39 @@ export async function POST(request: NextRequest) {
 
     if (!body.email || !body.name) {
       return NextResponse.json({ error: 'Namn och email krävs' }, { status: 400 })
+    }
+
+    /**
+     * ═══ ANVÄNDARTAKET UPPRÄTTHÅLLS DÄR COPYN LOVAR DET (2026-08-09) ═══
+     *
+     * "Upp till X användare" i planvalet var ren copy — den här rutten
+     * räknade aldrig. Nu: aktiva medlemmar räknas mot planens tak
+     * (lib/feature-gates.ts USER_LIMITS; Firman höjdes samtidigt 3 → 5).
+     * Beskedet säger vägen framåt i stället för bara nej.
+     */
+    // Planen finns inte på auth-objektet — slå upp den. Saknad/okänd plan
+    // faller till professional (5), aldrig till obegränsat.
+    const { data: planRad } = await supabase
+      .from('business_config')
+      .select('subscription_plan')
+      .eq('business_id', business.business_id)
+      .single()
+    const anvandartak = getUserLimit((planRad?.subscription_plan as PlanType) || 'professional')
+    if (anvandartak !== null) {
+      const { count: aktiva } = await supabase
+        .from('business_users')
+        .select('id', { count: 'exact', head: true })
+        .eq('business_id', business.business_id)
+        .eq('is_active', true)
+
+      if ((aktiva ?? 0) >= anvandartak) {
+        return NextResponse.json(
+          {
+            error: `Din plan rymmer ${anvandartak} användare och alla platser är upptagna. Uppgradera till Storfirman för obegränsat antal — eller inaktivera någon som slutat under Team.`,
+          },
+          { status: 403 }
+        )
+      }
     }
 
     // Kolla om email redan finns

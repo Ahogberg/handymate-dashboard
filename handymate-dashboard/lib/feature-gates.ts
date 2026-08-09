@@ -49,6 +49,28 @@ export function getAutomationLimit(plan: PlanType): number | null {
 }
 
 // ---------------------------------------------------------------------------
+// Användare per plan (Andreas-beslut 2026-08-09: Firman 3 → 5)
+//
+// Typfirman är 2–5 personer; taket på 3 tvingade en firma med fyra montörer
+// till dubbla priset för EN extra inloggning — en köpstoppare precis vid
+// kortinmatningen. Storfirman behåller sin egg: obegränsat + hemsida +
+// dedikerad support.
+//
+// OBS: gränsen var tidigare REN COPY — inbjudningsrutten räknade aldrig.
+// Nu upprätthålls den där copyn lovar den (app/api/team/invite).
+// ---------------------------------------------------------------------------
+
+export const USER_LIMITS: Record<PlanType, number | null> = {
+  starter: 3,
+  professional: 5,
+  business: null, // obegränsat
+}
+
+export function getUserLimit(plan: PlanType): number | null {
+  return USER_LIMITS[plan] ?? 3
+}
+
+// ---------------------------------------------------------------------------
 // Team-agenter per plan (Bas = bara Matte)
 // ---------------------------------------------------------------------------
 

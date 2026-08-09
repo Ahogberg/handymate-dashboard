@@ -81,7 +81,7 @@ const PLANS = [
     features: [
       '300 SMS/mån (0,79 kr/extra)',
       '400 samtal/mån',
-      'Upp till 3 användare',
+      'Upp till 5 användare',
       '10 offertmallar',
       'Alla automationer + custom',
       'Hela AI-teamet — sex medarbetare',

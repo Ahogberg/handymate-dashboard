@@ -31,14 +31,24 @@ const PLANS = [
     price: 5995,
     popular: true,
     agents: ['lisa', 'karin', 'daniel', 'hanna', 'lars', 'matte'],
-    features: ['Hela AI-teamet — sex medarbetare', 'Missade samtal fångas 24/7', 'Offerter, ROT/RUT & fakturor', 'SMS-utskick & kampanjer', 'Upp till 3 användare'],
+    // Utfall, inte funktioner (Andreas-beslut 2026-08-09): varje rad svarar
+    // på en smärta hantverkaren känner. Rad 2–3 är det ingen nordisk
+    // konkurrent kan säga — moaten är svensk back-office, inte "AI-team".
+    // Avatarraden visar redan de sex medarbetarna; texten upprepar det inte.
+    features: [
+      'Missat samtal? Kunden får svar inom 30 sekunder — dygnet runt',
+      'Färdig offert på minuter — ROT-avdraget rätt räknat',
+      'Jobbet klart → fakturan skapad. Inget glöms',
+      'Tyst vecka? Teamet föreslår utskicket som fyller den',
+      'Upp till 5 användare',
+    ],
     valueBullets: [
       'Daniel följer upp offerter som blivit liggande',
       'Hanna väcker gamla kunder med kampanjer och serviceavtal',
       'Karin förbereder fakturor och påminnelser åt dig',
-      'För firmor med 1–3 personer',
+      'För firmor med 1–5 personer',
     ],
-    upgradeHint: 'Fler än tre som behöver logga in? Då är Storfirman rätt.',
+    upgradeHint: 'Fler än fem som behöver logga in? Då är Storfirman rätt.',
   },
   {
     id: 'business',
@@ -51,7 +61,7 @@ const PLANS = [
       'Hela teamet loggar in — tidrapporter och projekt på ett ställe',
       'Lars håller koll på marginalerna när projekten blir fler',
       'Större utrymme för utskick när kundbasen växer',
-      'Från 4 anställda och uppåt',
+      'Från 6 anställda och uppåt',
     ],
     upgradeHint: 'Fler än 10 anställda eller flera bolag? Hör av dig så skräddarsyr vi.',
   },
