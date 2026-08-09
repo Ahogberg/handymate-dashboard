@@ -73,7 +73,49 @@ export async function autoInvoiceOnComplete(
         .eq('quote_id', project.quote_id)
         .single()
 
-      if (quote?.items && Array.isArray(quote.items)) {
+      /**
+       * ═══ RADERNA LÄSES FRÅN quote_items — SANNINGEN, INTE SPEGLINGEN ═══
+       * (Projektauditen P1-3, lagad 2026-08-09.)
+       *
+       * quotes.items (JSONB) är en legacy-spegling. Moderna offerter sparar
+       * `items: []` där — raderna bor i quote_items-tabellen, som PDF och
+       * utskick redan läser. Den här vägen läste BARA speglingen: fakturan
+       * för ett modernt fastprisprojekt byggdes alltså utan offertens rader —
+       * enbart ÄTA, eller "Inga fakturarader" — medan siffran på kortet såg
+       * rimlig ut.
+       *
+       * Tabellen först; JSONB:n enbart som fallback för offerter skapade
+       * innan quote_items fanns. Sektioner/textblock och dolda rader (v90:
+       * priset ingår i summan) följer med — samma innehåll som kunden såg
+       * och skrev på.
+       */
+      const { data: strukturerade } = await supabase
+        .from('quote_items')
+        .select('item_type, description, quantity, unit, unit_price, total, is_rot_eligible, sort_order, is_hidden, option_selected')
+        .eq('quote_id', project.quote_id)
+        .eq('business_id', businessId)
+        .order('sort_order')
+
+      if (strukturerade && strukturerade.length > 0) {
+        quoteItems = strukturerade
+          // Tillval kunden INTE valde ska aldrig faktureras. Valda tillval blir
+          // vanliga rader — annars hade subtotalens item-filter tyst tappat
+          // arbete kunden faktiskt beställt (quote-calculations räknar
+          // selected options som items; fakturan måste göra detsamma).
+          .filter((item: any) => item.item_type !== 'option' || item.option_selected === true)
+          .map((item: any, i: number) => ({
+            id: 'ii_q_' + Math.random().toString(36).substr(2, 8),
+            item_type: item.item_type === 'option' ? 'item' : (item.item_type || 'item'),
+            description: item.description || '',
+            quantity: item.quantity || 1,
+            unit: item.unit || 'st',
+            unit_price: item.unit_price || 0,
+            total: item.total ?? (item.quantity || 1) * (item.unit_price || 0),
+            is_rot_eligible: item.is_rot_eligible || false,
+            sort_order: item.sort_order ?? i,
+          }))
+      } else if (quote?.items && Array.isArray(quote.items)) {
+        // Legacy-offert: JSONB:n är den enda källan som finns.
         quoteItems = quote.items.map((item: any, i: number) => ({
           id: 'ii_q_' + Math.random().toString(36).substr(2, 8),
           item_type: item.item_type || 'item',
@@ -86,6 +128,9 @@ export async function autoInvoiceOnComplete(
           is_rot_eligible: item.is_rot_eligible || false,
           sort_order: item.sort_order ?? i,
         }))
+      }
+
+      if (quote && quoteItems.length > 0) {
         rotRutType = quote.rot_rut_type || null
         rotRutDeduction = quote.rot_rut_deduction || 0
         customerPays = quote.customer_pays || null
