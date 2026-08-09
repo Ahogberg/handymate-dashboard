@@ -265,7 +265,11 @@ export default function OnboardingPage() {
 
   return (
     <div className="ob-page">
-      <div className="ob-card-wrap">
+      {/* Teamintrot (steg 0) får ett brett kort på desktop: sex agenter i
+          telefonformatets 460px tvingade fram en inre scroll där halva
+          teamet var osynligt. Övriga steg är formulär och mår bra i det
+          smala kortet — bredden gäller BARA där den behövs. */}
+      <div className="ob-card-wrap" data-wide={step === 0 ? 'true' : undefined}>
         {step === 0 && <Step1MeetTheTeam onNext={next} />}
         {step === 1 && (
           <Step2Business onNext={next} onBack={back} data={data} setData={setDataUpdater} />

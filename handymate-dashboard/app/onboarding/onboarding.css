@@ -86,6 +86,15 @@
     border: 1px solid var(--ob-border);
     box-shadow: 0 12px 32px rgba(15,23,42,0.08);
   }
+  /* Teamintrot: sex agenter ryms inte i telefonformatet — bred variant med
+     naturlig höjd så hela teamet syns utan inre scroll. Sätts per steg via
+     data-wide i page.tsx. */
+  .ob-card-wrap[data-wide='true'] {
+    max-width: 980px;
+    height: auto;
+    min-height: 640px;
+    max-height: calc(100vh - 64px);
+  }
 }
 
 .ob-screen {

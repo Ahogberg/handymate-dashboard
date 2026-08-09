@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowRight, Phone, FileText, FileSignature, Calendar, Megaphone } from 'lucide-react'
+import { ArrowRight, Phone, FileText, FileSignature, Calendar, Megaphone, MessageSquare } from 'lucide-react'
 import { TEAM } from '@/lib/agents/team'
 import OnboardingHeader from './OnboardingHeader'
 
@@ -23,6 +23,20 @@ interface AgentDisplay {
 // OBS Lisa: "Svarar i telefonen" är FÖRBJUDEN copy (låter som talande röst-AI,
 // vilket produkten inte har) — hon fångar samtal + skickar SMS.
 const AGENT_DISPLAY: Record<string, AgentDisplay> = {
+  // Matte SAKNADES i introt (upptäckt vid B7-genomgången 2026-08-09) — trots
+  // att han är den man faktiskt pratar med (Jarvis-first). Han leder reveal-
+  // ordningen: chefen presenterar sig först, sen teamet han koordinerar.
+  matte: {
+    id: 'matte',
+    activity: 'Din högra hand — koordinerar teamet',
+    icon: MessageSquare,
+    bg: '#E1F5EE',
+    ring: '#0F766E',
+    examples: [
+      'Skriv eller prata: "boka in Svensson på tisdag" → rätt kollega gör det',
+      'Varje morgon: läget i firman, utan att du frågar',
+    ],
+  },
   lisa: {
     id: 'lisa',
     activity: 'Fångar samtalen du missar',
@@ -80,7 +94,7 @@ const AGENT_DISPLAY: Record<string, AgentDisplay> = {
   },
 }
 
-const REVEAL_ORDER = ['lisa', 'karin', 'daniel', 'lars', 'hanna'] as const
+const REVEAL_ORDER = ['matte', 'lisa', 'karin', 'daniel', 'lars', 'hanna'] as const
 
 /**
  * Desktop-detektering för inline-styles (≥768px). Lyssnar på matchMedia-
@@ -152,11 +166,19 @@ export default function Step1MeetTheTeam({ onNext }: Step1Props) {
             Ditt AI-team väntar
           </h1>
           <p style={{ color: 'var(--ob-muted)', fontSize: 15, lineHeight: 1.5 }}>
-            Fem medarbetare. Redo att börja jobba åt dig.
+            Matte och fem specialister. Redo att börja jobba åt dig.
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Desktop: två kolumner så alla sex syns utan scroll (breda kortet
+            sätts av data-wide i page.tsx). Mobil: samma stapel som förut. */}
+        <div
+          style={
+            isDesktop
+              ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }
+              : { display: 'flex', flexDirection: 'column', gap: 10 }
+          }
+        >
           {REVEAL_ORDER.map((id, i) => {
             const agent = TEAM.find(a => a.id === id)
             const display = AGENT_DISPLAY[id]

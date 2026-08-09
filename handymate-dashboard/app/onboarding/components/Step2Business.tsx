@@ -342,7 +342,17 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
     const missing: string[] = []
     if (!data.companyName?.trim()) missing.push('företagsnamn')
     if (!data.trade) missing.push('bransch')
-    if (data.orgNumber?.length !== 11) missing.push('org.nr (10 siffror)')
+    // SAMMA validator som spärren (checkOrgNumber, kontrollsiffra) — inte en
+    // egen längdkoll. De två gled isär (B7-fyndet 2026-08-09): ett org.nr med
+    // rätt längd men fel kontrollsiffra gav "0 fält saknas" på en död knapp,
+    // och användaren satt fast utan besked.
+    if (!checkOrgNumber(data.orgNumber).valid) {
+      missing.push(
+        data.orgNumber?.length === 11
+          ? 'org.nr — kontrollsiffran stämmer inte, kontrollera siffrorna'
+          : 'org.nr (10 siffror)'
+      )
+    }
     if (!data.area?.trim()) missing.push('tjänsteområde')
     if (!data.paymentMethod) missing.push('betalmottagare-typ')
     if (!data.paymentNumber?.trim()) missing.push('betalmottagare-nummer')
