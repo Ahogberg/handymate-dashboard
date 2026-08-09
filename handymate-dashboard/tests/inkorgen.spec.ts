@@ -48,15 +48,16 @@ test.describe('en inkorg i menyn, inte fyra utanför den', () => {
     }
   })
 
-  test('alla fyra flikarna finns och laddas lazy', () => {
+  test('alla fem flikarna finns och laddas lazy', () => {
     const s = read('app/dashboard/inkorg/page.tsx')
-    for (const flik of ['SMS', 'Samtal', 'E-post', 'Historik']) {
+    // Möte tillkom i etapp 3 (mötesassistenten) — planerad plats från start.
+    for (const flik of ['SMS', 'Samtal', 'Möte', 'E-post', 'Historik']) {
       expect(s, `fliken ${flik} saknas`).toContain(`label: '${flik}'`)
     }
     // Samtalsfliken är 934 rader med egna Supabase-anrop. Att ladda den när
-    // man bara ville läsa ett SMS vore att betala för fyra sidor.
+    // man bara ville läsa ett SMS vore att betala för fem sidor.
     const dynamiska = (s.match(/dynamic\(\(\) => import\(/g) || []).length
-    expect(dynamiska, 'någon flik laddas inte lazy').toBe(4)
+    expect(dynamiska, 'någon flik laddas inte lazy').toBe(5)
   })
 })
 

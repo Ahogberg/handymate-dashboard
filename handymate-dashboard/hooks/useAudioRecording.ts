@@ -27,6 +27,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type RecordingState = 'idle' | 'recording' | 'stopped' | 'denied' | 'unsupported'
 
+export interface UseAudioRecordingOptions {
+  /**
+   * Hård maxlängd i sekunder. Vid taket stoppas inspelningen AV HOOKEN —
+   * inte av komponenten, som kan ha avmonterats eller tappat fokus.
+   * Mötesassistenten kräver detta (10 min); utan tak växer en bortglömd
+   * inspelning tills webbläsaren tar slut på minne eller filen blir för
+   * stor för Whisper (25 MB).
+   */
+  maxDurationSeconds?: number
+}
+
 export interface UseAudioRecording {
   state: RecordingState
   /** Sekunder sedan inspelningen startade. */
@@ -38,6 +49,10 @@ export interface UseAudioRecording {
   reset: () => void
   /** Formaterad speltid, t.ex. "0:12". */
   durationLabel: string
+  /** Sekunder kvar till taket, null utan maxDurationSeconds. */
+  secondsLeft: number | null
+  /** Sant när inspelningen stoppades av taket, inte av användaren. */
+  stoppedByLimit: boolean
 }
 
 function formatDuration(seconds: number): string {
@@ -46,11 +61,13 @@ function formatDuration(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export function useAudioRecording(): UseAudioRecording {
+export function useAudioRecording(options?: UseAudioRecordingOptions): UseAudioRecording {
   const [state, setState] = useState<RecordingState>('idle')
   const [duration, setDuration] = useState(0)
   const [blob, setBlob] = useState<Blob | null>(null)
+  const [stoppedByLimit, setStoppedByLimit] = useState(false)
 
+  const maxSeconds = options?.maxDurationSeconds
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
@@ -109,9 +126,26 @@ export function useAudioRecording(): UseAudioRecording {
       recorder.start()
       setBlob(null)
       setDuration(0)
+      setStoppedByLimit(false)
       setState('recording')
       clearTimer()
-      timerRef.current = setInterval(() => setDuration(d => d + 1), 1000)
+      timerRef.current = setInterval(() => {
+        setDuration(d => {
+          const ny = d + 1
+          // Taket verkställs HÄR, i hookens egen timer — komponenten kan ha
+          // tappat fokus eller avmonterats, men inspelningen ska ändå stanna.
+          if (maxSeconds && ny >= maxSeconds) {
+            setStoppedByLimit(true)
+            clearTimer()
+            if (recorderRef.current?.state === 'recording') {
+              try { recorderRef.current.stop() } catch { /* redan stoppad */ }
+            }
+            setState('stopped')
+            return maxSeconds
+          }
+          return ny
+        })
+      }, 1000)
     } catch (err: any) {
       releaseStream()
       // NotAllowedError = användaren nekade. Allt annat (ingen mikrofon,
@@ -140,8 +174,14 @@ export function useAudioRecording(): UseAudioRecording {
     chunksRef.current = []
     setBlob(null)
     setDuration(0)
+    setStoppedByLimit(false)
     setState('idle')
   }, [clearTimer, releaseStream])
 
-  return { state, duration, blob, start, stop, reset, durationLabel: formatDuration(duration) }
+  return {
+    state, duration, blob, start, stop, reset,
+    durationLabel: formatDuration(duration),
+    secondsLeft: maxSeconds ? Math.max(0, maxSeconds - duration) : null,
+    stoppedByLimit,
+  }
 }

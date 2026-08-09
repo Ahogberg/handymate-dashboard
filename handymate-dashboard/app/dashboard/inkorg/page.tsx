@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { MessageSquare, Volume2, Mail, History, Loader2 } from 'lucide-react'
+import { MessageSquare, Volume2, Mic, Mail, History, Loader2 } from 'lucide-react'
 
 /**
  * Inkorgen — en plats för allt som kommer in (2026-08-09).
@@ -55,11 +55,18 @@ const RecordingsPage = dynamic(() => import('@/app/dashboard/recordings/page'), 
   loading: LoadingSpinner,
 })
 
-type TabKey = 'sms' | 'samtal' | 'epost' | 'historik'
+// Mötesassistenten (etapp 3): inspelningsknappen för platsbesök. Lazy som de
+// andra — mikrofonlogiken ska inte laddas när man bara läser ett SMS.
+const Motesassistenten = dynamic(() => import('@/components/moten/Motesassistenten'), {
+  loading: LoadingSpinner,
+})
+
+type TabKey = 'sms' | 'samtal' | 'mote' | 'epost' | 'historik'
 
 const tabs: { key: TabKey; label: string; icon: any }[] = [
   { key: 'sms', label: 'SMS', icon: MessageSquare },
   { key: 'samtal', label: 'Samtal', icon: Volume2 },
+  { key: 'mote', label: 'Möte', icon: Mic },
   { key: 'epost', label: 'E-post', icon: Mail },
   { key: 'historik', label: 'Historik', icon: History },
 ]
@@ -107,6 +114,7 @@ export default function InkorgPage() {
 
       {activeTab === 'sms' && <SmsInboxPage />}
       {activeTab === 'samtal' && <CallInboxPage />}
+      {activeTab === 'mote' && <Motesassistenten />}
       {activeTab === 'epost' && <EmailInboxPage />}
       {activeTab === 'historik' && <RecordingsPage />}
     </div>

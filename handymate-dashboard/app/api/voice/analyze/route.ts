@@ -140,9 +140,17 @@ export async function POST(request: NextRequest) {
       ? business.services_offered.join(', ')
       : business?.services_offered || 'Hantverkstjänster'
 
+    // Mötesassistenten (etapp 3): ett platsbesök är hantverkarens eget rum,
+    // inte ett inkommande samtal. Vinkeln byts — ÄTA/offert och uppföljning
+    // föreslås, återuppringning är meningslös (de stod bredvid varandra).
+    // Kolumnen kommer med sql/v102; saknas den är allt telefoni som förut.
+    const arMote = recording.source === 'site_visit'
+
     // Förbättrad AI-prompt
     const prompt = `Du är en AI-assistent för en ${industry} i Sverige.
-Lyssna på detta transkript från ett kundsamtal och analysera noggrant.
+${arMote
+  ? 'Läs detta transkript från ett PLATSBESÖK — hantverkaren spelade själv in mötet med kunden på plats. Analysera noggrant.'
+  : 'Lyssna på detta transkript från ett kundsamtal och analysera noggrant.'}
 
 === FÖRETAGSINFORMATION ===
 Företag: ${business?.business_name || 'Okänt'}
@@ -152,7 +160,7 @@ Serviceområde: ${business?.service_area || 'Okänt'}
 ${productContext}
 
 === SAMTALSINFORMATION ===
-Samtalsriktning: ${recording.direction === 'inbound' ? 'INKOMMANDE (kund ringde)' : 'UTGÅENDE (vi ringde)'}
+${arMote ? 'Typ: PLATSBESÖK — hantverkaren och kunden träffades fysiskt' : `Samtalsriktning: ${recording.direction === 'inbound' ? 'INKOMMANDE (kund ringde)' : 'UTGÅENDE (vi ringde)'}`}
 Telefonnummer: ${recording.phone_number || 'Okänt'}
 Samtalslängd: ${recording.duration_seconds || 0} sekunder
 ${recording.customer ? `
@@ -198,8 +206,19 @@ Analysera samtalet och extrahera följande information:
 === FÖRSLAG ===
 
 Baserat på analysen, skapa KONKRETA och ACTIONABLE förslag.
+${arMote
+  ? `Detta är ett PLATSBESÖK — hantverkaren var själv där. Föreslå det som för
+affären framåt efter besöket:
 
-VIKTIGT: En kollega (AI-agenten Lisa) hanterar samma samtal parallellt och
+- Om jobb/pris/omfattning diskuterades → "quote" (skapa offert). Nämndes
+  TILLÄGG till ett pågående jobb (ÄTA) → "quote" med "ÄTA" i titeln.
+- Om material listades → nämn materialen i beskrivningen på quote-förslaget.
+- Om något ska följas upp efter besöket → "follow_up"
+- Om något ska påminnas om (beställning, återbesök) → "reminder"
+- Om en inbokad tid diskuterades om → "reschedule"
+- Föreslå ALDRIG "callback" — hantverkaren pratade nyss med kunden ansikte
+  mot ansikte.`
+  : `VIKTIGT: En kollega (AI-agenten Lisa) hanterar samma samtal parallellt och
 sköter själv bokningar, SMS-bekräftelser och kundregistrering. Föreslå ALDRIG
 dessa — då görs samma sak två gånger. Du föreslår ENBART:
 
@@ -209,7 +228,7 @@ dessa — då görs samma sak två gånger. Du föreslår ENBART:
 - Om uppföljning behövs → "follow_up"
 - Om något ska påminnas om → "reminder"
 - Om kund vill flytta/ändra tid → "reschedule" (flytta bokning)
-  Triggerfraser: "kan vi flytta", "passar inte", "annan tid", "ändra tiden", "boka om", "flytta bokningen"
+  Triggerfraser: "kan vi flytta", "passar inte", "annan tid", "ändra tiden", "boka om", "flytta bokningen"`}
 
 === SVARSFORMAT ===
 
