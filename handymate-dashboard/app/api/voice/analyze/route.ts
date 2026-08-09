@@ -4,6 +4,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { getClaudeModel } from '@/lib/ai/get-model'
 import { filtreraAnalysforslag, type AnalysForslagsTyp } from '@/lib/voice/analysis-scope'
+import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
 
 function getAnthropic() {
   return new Anthropic({
@@ -284,10 +285,14 @@ Svara ENDAST med JSON i följande format:
 7. Föreslå ALDRIG booking, sms eller create_customer — de sköts av Lisa
 8. Svara ENDAST med JSON, ingen annan text före eller efter`
 
+    // Fångad i variabel så beslutsposten stämplar modellen som FAKTISKT
+    // användes — inte den vi tror används vid läsning senare.
+    const analysModell = getClaudeModel('background')
+
     const response = await anthropic.messages.create({
       // Post-call analys av transkript — background extraction (kunden har redan
       // lagt på). JSON-output gör Haiku lämplig. Sonnet behövdes inte här.
-      model: getClaudeModel('background'),
+      model: analysModell,
       max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }]
     })
@@ -370,13 +375,24 @@ Svara ENDAST med JSON i följande format:
       if (suggestion.confidence < 0.4) continue
 
       // Lägg till extraherad kundinfo i action_data
-      const actionData = {
-        ...suggestion.action_data,
-        customer_name: suggestion.action_data?.customer_name || extractedInfo.customer_name,
-        phone_number: suggestion.action_data?.phone_number || extractedInfo.phone_number || recording.phone_number,
-        address: suggestion.action_data?.address || extractedInfo.address,
-        email: suggestion.action_data?.email || extractedInfo.email
-      }
+      const actionData = withDecisionRecord(
+        {
+          ...suggestion.action_data,
+          customer_name: suggestion.action_data?.customer_name || extractedInfo.customer_name,
+          phone_number: suggestion.action_data?.phone_number || extractedInfo.phone_number || recording.phone_number,
+          address: suggestion.action_data?.address || extractedInfo.address,
+          email: suggestion.action_data?.email || extractedInfo.email,
+        },
+        // SPÅR 1.1: beslutsposten — vilken modell och promptversion som
+        // producerade förslaget, plus hash av transkriptet. Utan den går det
+        // inte att svara på om samtalsanalysen blir bättre.
+        buildDecisionRecord({
+          model: analysModell,
+          prompt: 'callAnalysis',
+          input: recording.transcript,
+          now: new Date(),
+        })
+      )
 
       const { data: createdSuggestion, error: insertError } = await supabase
         .from('ai_suggestion')

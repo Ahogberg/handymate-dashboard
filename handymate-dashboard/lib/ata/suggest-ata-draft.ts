@@ -72,6 +72,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
 
 // ─────────────────────────────────────────────────────────────────
 // shouldSuggestAtaDraft — ren, facit-testbar gate
@@ -201,6 +202,10 @@ export async function suggestAtaDraft(
     // Fail-soft hela vägen: ett fel i genereringen får aldrig hindra att
     // ÄTA-behovet ändå syns — då skrivs kortet utan preview, precis som förut.
     let preview: any = null
+    // Beslutsposten (Spår 1.1): sätts bara när genereringen lyckades — en
+    // stämpel utan modell vore ett påstående om ett beslut som aldrig togs.
+    let genereradModell: string | null = null
+    let ataUnderlag: string | null = null
     let projektNamn: string | null = null
     try {
       // Projektet ger både sammanhang till modellen och rätt kund för
@@ -241,17 +246,20 @@ export async function suggestAtaDraft(
       }
 
       const { generateQuoteFromInput } = await import('@/lib/ai-quote-generator')
+      // ÄTA:n gäller ett PÅGÅENDE projekt — projektnamnet ger modellen
+      // sammanhanget som annars saknas i en lös mening om extraarbete.
+      // Hoistad så beslutsposten kan hasha exakt det underlag modellen fick.
+      ataUnderlag = [
+        project?.name ? `Tilläggsarbete på projektet "${project.name}".` : null,
+        description,
+        params.customerContext ? `Kundens egna ord: "${params.customerContext}"` : null,
+      ].filter(Boolean).join(' ')
+
       const generated = await generateQuoteFromInput({
         businessId: params.businessId,
         branch: biz.industry || 'Bygg',
         hourlyRate: biz.pricing_settings?.hourly_rate || biz.default_hourly_rate || 650,
-        // ÄTA:n gäller ett PÅGÅENDE projekt — projektnamnet ger modellen
-        // sammanhanget som annars saknas i en lös mening om extraarbete.
-        textDescription: [
-          project?.name ? `Tilläggsarbete på projektet "${project.name}".` : null,
-          description,
-          params.customerContext ? `Kundens egna ord: "${params.customerContext}"` : null,
-        ].filter(Boolean).join(' '),
+        textDescription: ataUnderlag,
         priceList: (priceListResult.data || []).map((p: any) => ({
           id: p.id, name: p.name, unit: p.unit, unit_price: p.sales_price, category: p.category,
         })),
@@ -270,6 +278,7 @@ export async function suggestAtaDraft(
           ),
           confidence: generated.confidence,
         }
+        genereradModell = generated.model
       }
     } catch (genErr) {
       console.error('[ata/suggest-ata-draft] generering misslyckades (kortet skapas ändå):', genErr)
@@ -318,6 +327,18 @@ export async function suggestAtaDraft(
         // tillbaka på gamla beteendet: rå beskrivning, inget påstått belopp.
         ...(preview ? { preview } : {}),
         ...(projektNamn ? { project_name: projektNamn } : {}),
+        // SPÅR 1.1: beslutsposten — modell, promptversion och hash av
+        // underlaget. Bara när genereringen lyckades; ett kort utan preview
+        // bar inget AI-beslut att stämpla. Ligger under _decision och läses
+        // aldrig av gränssnittet.
+        ...(genereradModell
+          ? withDecisionRecord({}, buildDecisionRecord({
+              model: genereradModell,
+              prompt: 'ataDraftSuggestion',
+              input: ataUnderlag,
+              now: new Date(),
+            }))
+          : {}),
       },
     })
 

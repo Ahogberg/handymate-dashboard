@@ -10,6 +10,8 @@
  *   npx playwright test tests/decision-record.spec.ts --no-deps
  */
 import { test, expect } from '@playwright/test'
+import fs from 'fs'
+import path from 'path'
 import {
   buildDecisionRecord,
   hashInput,
@@ -19,6 +21,8 @@ import {
   DECISION_KEY,
   type PromptKey,
 } from '../lib/ai/decision-record'
+
+const ROOT = path.resolve(__dirname, '..')
 
 // Fast tidpunkt — aldrig new Date() i ett test, då blir facit rörligt.
 const NOW = new Date('2026-08-06T10:30:00.000Z')
@@ -132,5 +136,31 @@ test.describe('promptregistret', () => {
       const r = buildDecisionRecord({ model: 'm', prompt: key, input: 'x', now: NOW })
       expect(r.promptVersion).toBe(PROMPT_VERSIONS[key])
     }
+  })
+})
+
+test.describe('producenterna stämplar — kopplingen kan inte tyst försvinna', () => {
+  // Vägar som BÄR ett AI-beslut ska stämpla det. price_adjustment-korten är
+  // medvetet utanför: ren matematik, inget AI-beslut att stämpla.
+  const PRODUCENTER: Array<[string, string]> = [
+    ['lib/quotes/suggest-quote-draft.ts', 'quoteDraftSuggestion'],
+    ['lib/ata/suggest-ata-draft.ts', 'ataDraftSuggestion'],
+    ['app/api/voice/analyze/route.ts', 'callAnalysis'],
+  ]
+
+  for (const [fil, nyckel] of PRODUCENTER) {
+    test(`${nyckel} stämplas i ${fil}`, () => {
+      const s = fs.readFileSync(path.join(ROOT, fil), 'utf8')
+      expect(s, `${fil} importerar inte beslutsposten`).toContain('withDecisionRecord')
+      expect(s, `${fil} stämplar inte med nyckeln ${nyckel}`).toContain(`prompt: '${nyckel}'`)
+    })
+  }
+
+  test('analysen stämplar modellvariabeln som faktiskt användes', () => {
+    const s = fs.readFileSync(path.join(ROOT, 'app/api/voice/analyze/route.ts'), 'utf8')
+    // Samma variabel i anropet och i stämpeln — inte två getClaudeModel-anrop
+    // som kan glida isär om routing-logiken blir tidsberoende.
+    expect(s).toContain('model: analysModell,')
+    expect((s.match(/model: analysModell/g) || []).length).toBeGreaterThanOrEqual(2)
   })
 })

@@ -46,8 +46,21 @@ export const PROMPT_VERSIONS = {
   ataDraftSuggestion: 1,
   /** lib/egenkontroll/photo-assessment.ts — foto mot checklista. */
   photoAssessment: 1,
-  /** lib/agent/pricing-engine.ts — prissättningsförslag. */
+  /**
+   * lib/agent/pricing-engine.ts — Haiku-klassificeringen av offerter till
+   * jobbtyper. OBS: price_adjustment-KORTEN (lib/agent/price-analysis.ts) är
+   * ren matematik över tidrapporter och stämplas medvetet INTE — en
+   * beslutspost där vore ett påstående om ett AI-beslut som aldrig togs.
+   * Klassificeringen skriver till pricing_intelligence som saknar payload;
+   * stämpling kräver en kolumn och väntar tills tabellen ändå rörs.
+   */
   pricingSuggestion: 1,
+  /**
+   * app/api/voice/analyze/route.ts — samtals-/mötesanalysen till
+   * ai_suggestion. v1 = rollfördelningen (2026-08-09): enbart de fem typer
+   * Lisa saknar verktyg för, mötesvinkel för source='site_visit'.
+   */
+  callAnalysis: 1,
 } as const
 
 export type PromptKey = keyof typeof PROMPT_VERSIONS
