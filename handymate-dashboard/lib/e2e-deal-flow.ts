@@ -540,35 +540,21 @@ async function executeProjectCreation(
       return { executed: true, data: { project_id: existingProject.project_id, already_exists: true } }
     }
 
-    // Hämta offert-data för budget
+    // Budget och projekttyp ur offerten — via den delade helpern som läser
+    // quote_items-tabellen primärt. Den lokala varianten här läste bara
+    // quotes.items (legacy-JSONB), och moderna offerter sparar [] där:
+    // budgeten blev tom och typen gissades till 'hourly' för varje modernt
+    // fastprisjobb. Samma felklass som fakturaunderlaget (P1-3), samma fix.
     let budgetAmount: number | null = null
     let budgetHours: number | null = null
     let projectType = 'hourly'
 
     if (deal.quote_id) {
-      const { data: quote } = await supabase
-        .from('quotes')
-        .select('items, total, labor_total, material_total')
-        .eq('quote_id', deal.quote_id)
-        .single()
-
-      if (quote) {
-        budgetAmount = quote.total || null
-        if (quote.items && Array.isArray(quote.items)) {
-          const laborHours = (quote.items as any[])
-            .filter((i: any) => i.type === 'labor')
-            .reduce((sum: number, i: any) => sum + (i.quantity || 0), 0)
-          budgetHours = laborHours || null
-
-          if (laborHours > 0 && (quote.items as any[]).some((i: any) => i.type === 'material')) {
-            projectType = 'mixed'
-          } else if (laborHours > 0) {
-            projectType = 'hourly'
-          } else {
-            projectType = 'fixed_price'
-          }
-        }
-      }
+      const { getQuoteBudgetDerivation } = await import('@/lib/quotes/get-quote-budget-derivation')
+      const härledning = await getQuoteBudgetDerivation(supabase, deal.quote_id, businessId)
+      budgetAmount = härledning.budget_amount
+      budgetHours = härledning.budget_hours
+      projectType = härledning.project_type
     }
 
     const projectId = 'proj_' + Math.random().toString(36).substring(2, 14)
