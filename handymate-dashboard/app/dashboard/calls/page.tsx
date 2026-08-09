@@ -1,69 +1,32 @@
 'use client'
 
-import { useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import dynamic from 'next/dynamic'
-import { Inbox, Volume2, Mail, Loader2 } from 'lucide-react'
+import { useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
 
-const LoadingSpinner = () => (
-  <div className="flex items-center justify-center py-20">
-    <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
-  </div>
-)
-
-const InboxPage = dynamic(() => import('@/app/dashboard/inbox/page'), {
-  loading: LoadingSpinner,
-})
-
-const RecordingsPage = dynamic(() => import('@/app/dashboard/recordings/page'), {
-  loading: LoadingSpinner,
-})
-
-const EmailInboxPage = dynamic(() => import('@/app/dashboard/email/page'), {
-  loading: LoadingSpinner,
-})
-
-type TabKey = 'inbox' | 'email' | 'history'
-
-const tabs: { key: TabKey; label: string; icon: any }[] = [
-  { key: 'inbox', label: 'Inbox', icon: Inbox },
-  { key: 'email', label: 'E-post', icon: Mail },
-  { key: 'history', label: 'Samtalshistorik', icon: Volume2 },
-]
-
-export default function CallsPage() {
+/**
+ * /dashboard/calls → /dashboard/inkorg (2026-08-09).
+ *
+ * Den här sidan var en flikbehållare (Inbox · E-post · Samtalshistorik) som
+ * aldrig fanns i sidomenyn. Inkorgen ersätter den och lägger till SMS, så att
+ * allt som kommer in bor på ett ställe.
+ *
+ * Sidan finns kvar som omdirigering i stället för att tas bort — bokmärken och
+ * gamla djuplänkar ska inte dö. `?tab=`-värdet följer med; Inkorgen översätter
+ * de gamla nycklarna (inbox/email/history) till sina egna.
+ */
+export default function CallsRedirect() {
+  const router = useRouter()
   const searchParams = useSearchParams()
-  const initialTab = (searchParams?.get('tab') as TabKey) || 'inbox'
-  const [activeTab, setActiveTab] = useState<TabKey>(
-    tabs.some(t => t.key === initialTab) ? initialTab : 'inbox'
-  )
+
+  useEffect(() => {
+    const tab = searchParams?.get('tab')
+    router.replace(tab ? `/dashboard/inkorg?tab=${encodeURIComponent(tab)}` : '/dashboard/inkorg')
+  }, [router, searchParams])
 
   return (
-    <div className="bg-[#F8FAFC] min-h-screen">
-      {/* Sticky tab bar */}
-      <div className="sticky top-0 z-30 bg-[#F8FAFC]/95 backdrop-blur-xl border-b border-gray-200 px-4 sm:px-8 pt-4 sm:pt-6 pb-0">
-        <div className="flex gap-1 p-1 bg-white rounded-xl border border-[#E2E8F0] mb-4 overflow-x-auto">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                activeTab === tab.key
-                  ? 'bg-[#F0FDFA] text-white border border-[#E2E8F0]'
-                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              <tab.icon className={`w-4 h-4 ${activeTab === tab.key ? 'text-primary-700' : ''}`} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === 'inbox' && <InboxPage />}
-      {activeTab === 'email' && <EmailInboxPage />}
-      {activeTab === 'history' && <RecordingsPage />}
+    <div className="flex items-center justify-center py-20">
+      <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
     </div>
   )
 }

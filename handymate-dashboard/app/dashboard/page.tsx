@@ -434,8 +434,11 @@ export default function DashboardPage() {
         )}
 
         {/* AI Inbox Banner — fixed: no floating "0" when pending_suggestions is 0 */}
+        {/* Länken pekade på /dashboard/ai-inbox, som var en radvis kopia av
+            samtalsfliken och nu är borttagen. Inkorgens samtalsflik visar
+            samma förslag. */}
         {(stats?.ai?.pending_suggestions ?? 0) > 0 && (
-          <Link href="/dashboard/ai-inbox">
+          <Link href="/dashboard/inkorg?tab=samtal">
             <div className="mb-6 p-4 bg-primary-50 border border-[#E2E8F0] rounded-xl hover:border-primary-300 transition-all cursor-pointer">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">

@@ -98,7 +98,10 @@ const NAV: NavItem[] = [
   { type: 'link', key: 'customers', label: 'Kunder', icon: Users, href: '/dashboard/customers', paths: ['/dashboard/customers', '/dashboard/warranties', '/dashboard/customer-portal'] },
   { type: 'link', key: 'pipeline', label: 'Verksamhetsöversikt', icon: TrendingUp, href: '/dashboard/pipeline' },
   { type: 'link', key: 'agent', label: 'Mitt team', icon: Bot, href: '/dashboard/agent' },
-  { type: 'link', key: 'sms_inbox', label: 'SMS', icon: MessageSquare, href: '/dashboard/sms-inbox' },
+  // Inkorgen — en plats för allt som kommer in (2026-08-09). Posten hette
+  // tidigare "SMS" och pekade bara på SMS-sidan; samtalens transkript och
+  // åtgärdsförslag fanns bara på ytor som inte gick att nå från menyn.
+  { type: 'link', key: 'sms_inbox', label: 'Inkorg', icon: MessageSquare, href: '/dashboard/inkorg', paths: ['/dashboard/inkorg', '/dashboard/sms-inbox', '/dashboard/calls', '/dashboard/inbox', '/dashboard/recordings', '/dashboard/email'] },
   {
     type: 'group', key: 'jobs', label: 'Jobb', icon: Briefcase,
     children: [
