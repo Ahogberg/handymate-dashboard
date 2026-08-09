@@ -360,6 +360,10 @@ export default function SettingsPage() {
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
 
   const [config, setConfig] = useState<BusinessConfig | null>(null)
+  // Varför läsningen misslyckades. Sidan sa förut bara "Kunde inte ladda
+  // inställningar" — samma återvändsgränd oavsett om det var behörighet,
+  // nätverk eller en saknad rad. Skälet står nu på skärmen.
+  const [configFel, setConfigFel] = useState<string | null>(null)
   const [workingHours, setWorkingHours] = useState(DEFAULT_HOURS)
   const [newService, setNewService] = useState('')
 
@@ -544,6 +548,13 @@ export default function SettingsPage() {
       .single()
 
     if (error) {
+      setConfigFel(
+        error.code === '42501' || /permission denied/i.test(error.message || '')
+          ? 'Din inloggning saknar behörighet att läsa företagets inställningar. Logga ut och in igen — hjälper det inte, hör av dig till oss.'
+          : error.code === 'PGRST116'
+            ? 'Vi hittar ingen företagsprofil för din inloggning.'
+            : `Databasen svarade: ${error.message}`
+      )
       console.error('[settings] kunde inte läsa business_config:', {
         message: error.message,
         code: error.code,
@@ -1348,7 +1359,16 @@ export default function SettingsPage() {
   if (!config) {
     return (
       <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">Kunde inte ladda inställningar</div>
+        <div className="max-w-md text-center">
+          <p className="text-gray-900 font-medium">Vi kunde inte hämta dina inställningar</p>
+          {configFel && <p className="mt-2 text-sm text-gray-500">{configFel}</p>}
+          <button
+            onClick={() => { setConfigFel(null); setLoading(true); fetchConfig() }}
+            className="mt-5 min-h-[44px] px-5 rounded-lg bg-primary-700 text-white text-sm font-medium hover:bg-primary-800"
+          >
+            Försök igen
+          </button>
+        </div>
       </div>
     )
   }

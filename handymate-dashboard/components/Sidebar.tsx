@@ -83,6 +83,12 @@ const NAV: NavItem[] = [
       // sagt att den nya är bättre. Posten tas bort när routen byts.
       { label: 'Hem (ny)', href: '/dashboard/hem', exact: true },
       { label: 'Analys', href: '/dashboard/analytics', featureGate: 'lead_intelligence' },
+      // Pengar på bordet (2026-08-08) låg först på egen rad i toppnivån. Sidan
+      // säger själv att den ÄR en sammanställning och att allt arbete sker på
+      // länkmålen — den hör alltså hemma bland de andra överblickarna, inte
+      // bland ytorna man arbetar på. Hemskärmen har den redan som kort
+      // (PengarRailCard); menyposten är vägen dit för den som står på Översikt.
+      { label: 'Pengar på bordet', href: '/dashboard/pengar' },
       { label: 'Månadsrapport', href: '/dashboard/monthly-review' },
       // Karins bolagskalender (2026-08-07). Ligger bredvid Månadsrapport —
       // samma sorts ägaröverblick. Döljs för alla utom ägare och admin via
@@ -92,9 +98,6 @@ const NAV: NavItem[] = [
     ],
   },
   { type: 'link', key: 'approvals', label: 'Godkännanden', icon: ClipboardCheck, href: '/dashboard/approvals', hasApprovalBadge: true },
-  // Pengar på bordet (2026-08-08): "var ligger pengarna ni riskerar att missa"
-  // — fem kategorier ur befintliga källor, se lib/value/pengar-pa-bordet.ts.
-  { type: 'link', key: 'pengar', label: 'Pengar på bordet', icon: Banknote, href: '/dashboard/pengar' },
   { type: 'link', key: 'customers', label: 'Kunder', icon: Users, href: '/dashboard/customers', paths: ['/dashboard/customers', '/dashboard/warranties', '/dashboard/customer-portal'] },
   { type: 'link', key: 'pipeline', label: 'Verksamhetsöversikt', icon: TrendingUp, href: '/dashboard/pipeline' },
   { type: 'link', key: 'agent', label: 'Mitt team', icon: Bot, href: '/dashboard/agent' },
@@ -582,7 +585,9 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
    * blivit redirectad. En länk som leder till en stängd dörr är sämre än ingen
    * länk.
    */
-  const OWNER_ADMIN_ONLY_CHILDREN = new Set(['/dashboard/karin'])
+  // Pengar på bordet är ekonomi: /api/dashboard/pengar svarar 403 för anställda.
+  // Utan grinden hade en montör sett en menypost som bara leder till ett fel.
+  const OWNER_ADMIN_ONLY_CHILDREN = new Set(['/dashboard/karin', '/dashboard/pengar'])
 
   /**
    * Lanseringsfilter — gäller ALLA roller, även ägaren.

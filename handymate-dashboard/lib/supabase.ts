@@ -1,24 +1,45 @@
 import { createClient } from '@supabase/supabase-js'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-// Client-side Supabase client (for use in React components)
-//
-// Explicit auth-config för att garantera att JWT-tokens auto-refreshas i
-// bakgrunden. Default är true i v2 men explicit konfig förebygger framtida
-// regressioner + dokumenterar avsikten. Cookies persistas så server-side
-// getAuthenticatedBusiness ser uppdaterade tokens. detectSessionInUrl
-// hanterar magic-link/OAuth-callbacks som kommer tillbaka med ?code=...
-export const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-      },
-    })
-  : null as any
+/**
+ * Webbläsarens Supabase-klient.
+ *
+ * ═══ VARFÖR createClientComponentClient OCH INTE createClient ═══
+ *
+ * Inloggningen sker helt på servern: /dashboard-sidorna postar till
+ * /api/auth, som kör signInWithPassword på en createRouteHandlerClient.
+ * Sessionen hamnar därmed i cookies — inte i webbläsarens localStorage.
+ *
+ * Den här filen byggde tidigare klienten med rå createClient från
+ * supabase-js. Den lagrar sessionen i localStorage, som aldrig fylldes.
+ * Följden: varje läsning som en React-komponent gjorde gick som rollen
+ * `anon`, aldrig som den inloggade användaren. Det märktes inte så länge
+ * tabellerna hade en villkorslöst öppen policy.
+ *
+ * v96 stängde den dörren — `REVOKE ALL ... FROM anon` på business_config,
+ * project, project_change, project_material, time_entry och
+ * supplier_invoices, med policyer bara för `authenticated` och
+ * `service_role`. Från den stunden svarade alla klientläsningar av de sex
+ * tabellerna med nekad behörighet. Inställningssidan visade "Kunde inte
+ * ladda inställningar"; 27 andra ytor läste tyst tomt.
+ *
+ * createClientComponentClient läser samma cookie som routehanteraren
+ * skriver. Klienten blir alltså den faktiskt inloggade användaren, RLS
+ * bedömer honom som medlem i sitt eget företag, och läsningarna går
+ * igenom — som sig själv, inte som anon.
+ *
+ * Under SSR av klientkomponenter finns ingen cookie att läsa i den här
+ * modulen. Där byggs en sessionslös klient; komponenterna läser ändå i
+ * useEffect, alltså i webbläsaren.
+ */
+export const supabase = !supabaseUrl || !supabaseAnonKey
+  ? (null as any)
+  : typeof window === 'undefined'
+    ? createClient(supabaseUrl, supabaseAnonKey)
+    : createClientComponentClient()
 
 // Server-side Supabase client with service role (for use in API routes)
 export function getServerSupabase() {
