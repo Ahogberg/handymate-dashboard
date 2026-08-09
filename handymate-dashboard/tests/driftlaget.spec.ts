@@ -83,3 +83,24 @@ test.describe('härledningen läser fakta, inte påståenden', () => {
     expect(s, 'fakturafakta hämtas inte').toContain("select('project_id, status')")
   })
 })
+
+test.describe('listan svarar "vad behöver jag göra?" (P2-1)', () => {
+  test('raden bär driftläges-badgen, med statusfältet bara som fallback', () => {
+    const s = kod('app/dashboard/projects/page.tsx')
+    expect(s).toContain('project.lifecycle ? (')
+    expect(s).toContain('getLifecycleStyle(project.lifecycle.phase, project.lifecycle.needsAction)')
+  })
+
+  test('needsAction sorteras överst — pengar som väntar syns först', () => {
+    const s = kod('app/dashboard/projects/page.tsx')
+    expect(s).toContain('needsAction ?? false')
+  })
+
+  test('fasen som gör ont är visuellt varm, inte grå', () => {
+    const s = kod('app/dashboard/projects/page.tsx')
+    const fn = s.slice(s.indexOf('getLifecycleStyle'))
+    const vakt = fn.indexOf('needsAction) return')
+    expect(vakt, 'needsAction har ingen egen stil').toBeGreaterThan(-1)
+    expect(fn.slice(vakt, vakt + 120)).toContain('amber')
+  })
+})

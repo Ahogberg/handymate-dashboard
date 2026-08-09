@@ -45,6 +45,8 @@ interface Project {
   actual_amount: number
   uninvoiced_hours: number
   next_deadline: string | null
+  /** Härlett driftläge (P1-2): fakta ur fakturatabellen, inte statusfältet. */
+  lifecycle?: { phase: string; label: string; needsAction: boolean }
   ai_health_score: number | null
   ai_health_summary: string | null
   ai_auto_created: boolean
@@ -262,6 +264,24 @@ export default function ProjectsPage() {
     }
   }
 
+  /**
+   * Driftläges-badgen (P2-1): svarar "var står jobbet?" ur fakturafakta.
+   * klart_ofakturerat är fasen som ska göra ont — där ligger pengar och
+   * väntar. Saknas lifecycle (cachat svar från före deployen) faller raden
+   * tillbaka på gamla statusbadgen.
+   */
+  const getLifecycleStyle = (phase: string, needsAction: boolean) => {
+    if (needsAction) return 'bg-amber-100 text-amber-700 border-amber-300 font-medium'
+    switch (phase) {
+      case 'planering': return 'bg-gray-100 text-gray-500 border-gray-300'
+      case 'pagar': return 'bg-primary-100 text-primary-600 border-primary-600/30'
+      case 'fakturerat': return 'bg-sky-100 text-sky-600 border-sky-200'
+      case 'betalt': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
+      case 'avbrutet': return 'bg-red-100 text-red-600 border-red-200'
+      default: return 'bg-gray-100 text-gray-500 border-gray-300'
+    }
+  }
+
   const getBudgetColor = (actual: number, budget: number) => {
     if (!budget || budget === 0) return 'text-gray-500'
     const usage = (actual / budget) * 100
@@ -287,13 +307,17 @@ export default function ProjectsPage() {
     return true
   })
 
-  const filteredProjects = visibleProjects.filter(p => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesJobType = !jobTypeFilter || p.job_type === jobTypeFilter
-    return matchesSearch && matchesJobType
-  })
+  const filteredProjects = visibleProjects
+    .filter(p => {
+      const matchesSearch =
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesJobType = !jobTypeFilter || p.job_type === jobTypeFilter
+      return matchesSearch && matchesJobType
+    })
+    // Det som kräver handling (klart men ofakturerat — pengar som väntar)
+    // ligger överst. Stabil sortering: inbördes ordning behålls.
+    .sort((a, b) => Number(b.lifecycle?.needsAction ?? false) - Number(a.lifecycle?.needsAction ?? false))
 
   // Stats
   const activeCount = projects.filter(p => p.status === 'active' || p.status === 'planning').length
@@ -462,9 +486,15 @@ export default function ProjectsPage() {
                         <span className="text-xs font-mono text-gray-400 flex-shrink-0">{project.project_number || `P-${project.project_id.slice(0, 6)}`}</span>
                         <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
                         <JobTypeBadge slug={project.job_type} jobTypes={jobTypes} />
-                        <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${getStatusStyle(project.status)}`}>
-                          {getStatusText(project.status)}
-                        </span>
+                        {project.lifecycle ? (
+                          <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${getLifecycleStyle(project.lifecycle.phase, project.lifecycle.needsAction)}`}>
+                            {project.lifecycle.label}
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${getStatusStyle(project.status)}`}>
+                            {getStatusText(project.status)}
+                          </span>
+                        )}
                         {project.ai_health_score != null && project.status !== 'completed' && project.status !== 'cancelled' && (
                           <span
                             className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border ${
