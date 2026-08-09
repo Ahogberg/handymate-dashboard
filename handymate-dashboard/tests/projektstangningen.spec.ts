@@ -89,3 +89,21 @@ test.describe('detaljen skiljer tomt från trasigt (P2-3)', () => {
     expect(s).toContain('partialErrors.push(namn)')
   })
 })
+
+test.describe('fas-flytten syns direkt (P2-2)', () => {
+  test('modalen bär onChanged och anropar den efter LYCKAD flytt', () => {
+    const s = kod('components/pipeline/unified/ProjectStageModal.tsx')
+    const flytt = s.indexOf('await fetchWorkflow(projectId)')
+    const krok = s.indexOf('onChanged?.()')
+    expect(krok, 'onChanged anropas aldrig').toBeGreaterThan(-1)
+    // Efter refetchen, i success-grenen — inte i catch/finally.
+    expect(krok).toBeGreaterThan(flytt)
+    const felgren = s.indexOf('Kunde inte flytta stage', flytt)
+    expect(krok).toBeLessThan(felgren)
+  })
+
+  test('projektsidan pekar kroken på sin egen refetch', () => {
+    const s = kod('app/dashboard/projects/[id]/page.tsx')
+    expect(s).toContain('onChanged={fetchProjectData}')
+  })
+})

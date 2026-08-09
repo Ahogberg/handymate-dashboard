@@ -57,6 +57,12 @@ interface ProjectTask {
 }
 
 interface ProjectStageModalProps {
+  /**
+   * Anropas efter en LYCKAD stage-flytt (P2-2). Modalen refetchar bara sin
+   * egen vy — utan den här kroken visade förälderns fas-strip det gamla
+   * steget tills sidan laddades om, och flytten såg ut att inte ha hänt.
+   */
+  onChanged?: () => void
   projectId: string | null
   onClose: () => void
 }
@@ -76,7 +82,7 @@ function fmtDateRange(start: string | null, end: string | null): string {
 
 // ─── Component ──────────────────────────────────────────────────────
 
-export function ProjectStageModal({ projectId, onClose }: ProjectStageModalProps) {
+export function ProjectStageModal({ projectId, onClose, onChanged }: ProjectStageModalProps) {
   const [data, setData] = useState<WorkflowResponse | null>(null)
   const [tasks, setTasks] = useState<ProjectTask[]>([])
   const [loading, setLoading] = useState(false)
@@ -177,13 +183,15 @@ export function ProjectStageModal({ projectId, onClose }: ProjectStageModalProps
         })
         // Refetch för fresh data inkl. ny AI-automation
         await fetchWorkflow(projectId)
+        // Föräldern (fas-stripen på projektsidan) ska se flytten direkt.
+        onChanged?.()
       } catch (err: any) {
         setToast({ msg: err.message || 'Kunde inte flytta stage', type: 'error' })
       } finally {
         setAdvancing(false)
       }
     },
-    [projectId, data, fetchWorkflow]
+    [projectId, data, fetchWorkflow, onChanged]
   )
 
   if (!projectId) return null

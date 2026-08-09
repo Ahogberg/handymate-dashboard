@@ -4619,6 +4619,9 @@ export default function ProjectDetailPage() {
       <ProjectStageModal
         projectId={stageModalOpen ? projectId : null}
         onClose={() => setStageModalOpen(false)}
+        // P2-2: utan kroken visade fas-stripen det gamla steget tills sidan
+        // laddades om — flytten såg ut att inte ha hänt.
+        onChanged={fetchProjectData}
       />
     </div>
   )
