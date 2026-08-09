@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { getClaudeModel } from '@/lib/ai/get-model'
+import { filtreraAnalysforslag, type AnalysForslagsTyp } from '@/lib/voice/analysis-scope'
 
 function getAnthropic() {
   return new Anthropic({
@@ -10,8 +11,15 @@ function getAnthropic() {
   })
 }
 
+/**
+ * Rollfördelningen (etapp 2b): analysmotorn FÖRESLÅR enbart de typer Lisa
+ * saknar verktyg för — quote, follow_up, callback, reminder, reschedule.
+ * booking, sms och create_customer GÖR Lisa själv i agentkörningen som löper
+ * parallellt; producerades de även här blev det två åtgärder på samma mening.
+ * Gränsen upprätthålls i kod (filtreraAnalysforslag), inte i prompten.
+ */
 interface AISuggestion {
-  type: 'booking' | 'follow_up' | 'quote' | 'reminder' | 'sms' | 'callback' | 'create_customer' | 'reschedule' | 'other'
+  type: AnalysForslagsTyp
   title: string
   description: string
   priority: 'low' | 'medium' | 'high' | 'urgent'
@@ -86,6 +94,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         error: 'No transcript available for analysis'
       }, { status: 400 })
+    }
+
+    // Dubbelkörningsspärr. Analysen körs numera ALLTID automatiskt efter
+    // transkriberingen — men UI:t har också en Analysera-knapp. Utan spärren
+    // hade knappen skapat en andra uppsättning identiska kort (och betalat
+    // en Haiku-körning till). Samma samtal analyseras en gång.
+    const { data: befintliga } = await supabase
+      .from('ai_suggestion')
+      .select('suggestion_id, suggestion_type, title, status')
+      .eq('recording_id', recording_id)
+      .limit(20)
+
+    if (befintliga && befintliga.length > 0) {
+      return NextResponse.json({
+        success: true,
+        recording_id,
+        already_analyzed: true,
+        summary: recording.transcript_summary || null,
+        suggestions_created: 0,
+        suggestions: befintliga,
+      })
     }
 
     // Hämta business-info för kontext
@@ -168,15 +197,17 @@ Analysera samtalet och extrahera följande information:
 
 === FÖRSLAG ===
 
-Baserat på analysen, skapa KONKRETA och ACTIONABLE förslag:
+Baserat på analysen, skapa KONKRETA och ACTIONABLE förslag.
+
+VIKTIGT: En kollega (AI-agenten Lisa) hanterar samma samtal parallellt och
+sköter själv bokningar, SMS-bekräftelser och kundregistrering. Föreslå ALDRIG
+dessa — då görs samma sak två gånger. Du föreslår ENBART:
 
 - Om pris/jobb diskuterades → "quote" (skapa offert)
-- Om tid nämndes → "booking" (boka in)
-- Om ny kund → "create_customer" (registrera kund)
-- Om kund vill bli återkopplad → "callback" (ring tillbaka)
 - Om "skicka offert" nämndes → "quote" med hög prioritet
-- Om bekräftelse önskas → "sms" (skicka SMS)
+- Om kund vill bli återkopplad → "callback" (ring tillbaka)
 - Om uppföljning behövs → "follow_up"
+- Om något ska påminnas om → "reminder"
 - Om kund vill flytta/ändra tid → "reschedule" (flytta bokning)
   Triggerfraser: "kan vi flytta", "passar inte", "annan tid", "ändra tiden", "boka om", "flytta bokningen"
 
@@ -202,7 +233,7 @@ Svara ENDAST med JSON i följande format:
   },
   "suggestions": [
     {
-      "type": "booking|quote|callback|sms|follow_up|create_customer|reminder|reschedule|other",
+      "type": "quote|callback|follow_up|reminder|reschedule",
       "title": "Kort titel på svenska",
       "description": "Beskrivning av vad som ska göras",
       "priority": "low|medium|high|urgent",
@@ -229,9 +260,9 @@ Svara ENDAST med JSON i följande format:
 2. Om kunden nämner något specifikt, citera det i source_text
 3. Confidence ska reflektera hur tydligt det framgår i samtalet
 4. Om inget konkret diskuterades, returnera tom suggestions-array
-5. Prioritera "quote" och "booking" om kunden har ett aktivt behov
+5. Prioritera "quote" om kunden har ett aktivt behov
 6. "urgent" prioritet ENDAST vid akuta problem (läcka, strömavbrott, etc)
-7. Skapa "create_customer" om det är en ny kund med namn/kontaktinfo
+7. Föreslå ALDRIG booking, sms eller create_customer — de sköts av Lisa
 8. Svara ENDAST med JSON, ingen annan text före eller efter`
 
     const response = await anthropic.messages.create({
@@ -298,8 +329,21 @@ Svara ENDAST med JSON i följande format:
       }
     }
 
-    // Skapa AI-förslag i databasen
-    const suggestions = analysisResult.suggestions || []
+    // ═══ GRÄNSEN ÄR KOD, INTE PROMPTTILLIT ═══
+    //
+    // Prompten ber modellen hålla sig till de fem typer Lisa saknar verktyg
+    // för — men det som skyddar hantverkaren från dubbelåtgärder (Lisa bokar
+    // mötet OCH ett "boka in mötet"-kort skapas) är filtret här. Det som
+    // kastas loggas, så en modell som börjar svamla syns i loggen.
+    const { tillatna: suggestions, kastade } = filtreraAnalysforslag<AISuggestion>(
+      analysisResult.suggestions || []
+    )
+    if (kastade.length > 0) {
+      console.warn(
+        `[voice/analyze] ${kastade.length} förslag utanför analysmotorns område kastades:`,
+        kastade.map(k => k.type).join(', ')
+      )
+    }
     const createdSuggestions = []
 
     for (const suggestion of suggestions) {

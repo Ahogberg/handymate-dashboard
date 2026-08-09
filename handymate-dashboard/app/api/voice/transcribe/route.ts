@@ -153,8 +153,19 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Trigger AI agent for call analysis (primary path)
-    // Agent will: qualify lead, create/find customer, suggest next steps
+    // ═══ TVÅ MOTTAGARE, TVÅ ROLLER (etapp 2b) ═══
+    //
+    // Analysmotorn var tidigare en fallback i catch-grenen nedan — den kördes
+    // i praktiken aldrig, och de fem förslagstyper den var ensam om (offert,
+    // uppföljning, återuppringning, påminnelse, ombokning) hade tyst slutat
+    // produceras. Nu är den ett AVSIKTLIGT andra steg:
+    //
+    //   Lisa (agentmotorn)  AGERAR — bokar, SMS:ar, registrerar kund.
+    //   Analysmotorn        FÖRESLÅR — enbart de typer Lisa saknar verktyg
+    //                       för; gränsen är kod i lib/voice/analysis-scope.ts.
+    //
+    // Båda är fire-and-forget: samtalet är redan avslutat, ingen väntar, och
+    // typgränsen — inte ordningen — är det som hindrar dubbelåtgärder.
     try {
       triggerAgentFireAndForget(
         recording.business_id,
@@ -169,18 +180,20 @@ export async function POST(request: NextRequest) {
         makeIdempotencyKey('call', recording_id)
       )
     } catch (agentErr) {
-      console.error('[Transcribe] Agent trigger failed, falling back to analyze:', agentErr)
-      // Fallback: use legacy standalone analysis
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-      fetch(`${appUrl}/api/voice/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-internal-secret': process.env.CRON_SECRET || '',
-        },
-        body: JSON.stringify({ recording_id })
-      }).catch(err => console.error('Failed to trigger analysis:', err))
+      // Lisa uteblir — men analysmotorn nedan kör ändå, så samtalet blir
+      // åtminstone föreslaget om inte utfört.
+      console.error('[Transcribe] Agent trigger failed:', agentErr)
     }
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+    fetch(`${appUrl}/api/voice/analyze`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': process.env.CRON_SECRET || '',
+      },
+      body: JSON.stringify({ recording_id })
+    }).catch(err => console.error('Failed to trigger analysis:', err))
 
     return NextResponse.json({
       success: true,

@@ -245,3 +245,81 @@ test.describe('taket är detsamma i båda vägarna', () => {
     expect(kod(ROUTE)).toContain('MAX_SPECIALIST_STEPS')
   })
 })
+
+/**
+ * ═══ Etapp 2b: rollfördelningen Lisa/analysmotorn ═══
+ *
+ * Lisa AGERAR (bokar, SMS:ar, registrerar kund). Analysmotorn FÖRESLÅR —
+ * enbart de typer Lisa saknar verktyg för. Överlappet är omöjligt per
+ * konstruktion, och konstruktionen bevisas här genom att korsläsa
+ * analysmotorns lista mot Lisas allowedTools: glider de isär faller provet.
+ */
+test.describe('rollfördelningen är kod, inte prompttillit', () => {
+  const ANALYZE = 'app/api/voice/analyze/route.ts'
+  const TRANSCRIBE = 'app/api/voice/transcribe/route.ts'
+
+  /** Lisas allowedTools, lästa ur personalities.ts — inte kopierade hit. */
+  function lisasVerktyg(): string[] {
+    const s = read('lib/agents/personalities.ts')
+    const lisa = s.slice(s.indexOf("lisa: {"), s.indexOf("triggers: ['incoming_call'"))
+    const block = lisa.slice(lisa.indexOf('allowedTools'))
+    return (block.match(/'([a-z_]+)'/g) || []).map(t => t.replace(/'/g, ''))
+  }
+
+  test('analysmotorn föreslår ENBART det Lisa inte kan utföra', () => {
+    const { ANALYS_TILLATNA_TYPER, LISA_AGER_TYPERNA } = require('../lib/voice/analysis-scope')
+    const verktyg = lisasVerktyg()
+    expect(verktyg.length, 'Lisas verktygslista tolkades tomt').toBeGreaterThan(5)
+
+    // De typer Lisa äger ska motsvara verktyg hon faktiskt har …
+    for (const [typ, verktygsNamn] of Object.entries(LISA_AGER_TYPERNA)) {
+      expect(verktyg, `Lisa saknar ${verktygsNamn} — då kan hon inte äga ${typ}`).toContain(verktygsNamn)
+      expect(ANALYS_TILLATNA_TYPER, `${typ} ägs av Lisa och får inte föreslås`).not.toContain(typ)
+    }
+    // … och offerten, som analysmotorn föreslår, ska Lisa INTE kunna skapa.
+    expect(ANALYS_TILLATNA_TYPER).toContain('quote')
+    expect(verktyg, 'Lisa har fått create_quote — då ska quote bort ur analyslistan').not.toContain('create_quote')
+  })
+
+  test('filtret körs FÖRE databasskrivningen', () => {
+    const s = kod(ANALYZE)
+    const filter = s.indexOf('filtreraAnalysforslag')
+    const insert = s.indexOf("from('ai_suggestion')\n")
+    const insertAlt = s.indexOf(".from('ai_suggestion')")
+    const skrivning = insert > -1 ? insert : insertAlt
+    expect(filter, 'filtret saknas i analyze').toBeGreaterThan(-1)
+    // Dubbelkörningsspärrens SELECT ligger först; jämför mot insert-stället.
+    const insertIdx = s.indexOf('.insert({', s.indexOf('Skapa AI-förslag') > -1 ? s.indexOf('Skapa AI-förslag') : filter)
+    expect(filter, 'filtret körs efter skrivningen — då är det ingen grind').toBeLessThan(insertIdx)
+    expect(skrivning).toBeGreaterThan(-1)
+  })
+
+  test('det som kastas loggas — en svamlande modell ska synas', () => {
+    expect(read(ANALYZE)).toContain('kastade')
+  })
+
+  test('analysen är ett avsiktligt steg, inte en catch-gren', () => {
+    const s = kod(TRANSCRIBE)
+    const catchIdx = s.indexOf('catch (agentErr)')
+    const analyzeIdx = s.indexOf('/api/voice/analyze')
+    expect(analyzeIdx, 'analyze anropas inte alls').toBeGreaterThan(-1)
+    expect(catchIdx).toBeGreaterThan(-1)
+    // Anropet ska ligga EFTER catch-blockets slut — i huvudflödet.
+    const catchSlut = s.indexOf('}', s.indexOf('console.error', catchIdx))
+    expect(analyzeIdx, 'analyze bor fortfarande i catch-grenen').toBeGreaterThan(catchSlut)
+  })
+
+  test('samma samtal analyseras en gång — knappen ger inga dubbletter', () => {
+    const s = kod(ANALYZE)
+    expect(s).toContain('already_analyzed')
+    const sparr = s.indexOf('already_analyzed')
+    const modellanrop = s.indexOf('anthropic.messages.create')
+    expect(sparr, 'spärren ligger efter modellanropet — kostnaden är redan tagen').toBeLessThan(modellanrop)
+  })
+
+  test('prompten erbjuder inte längre Lisas typer', () => {
+    const s = read(ANALYZE)
+    expect(s, 'typunionen i prompten har kvar Lisas typer').not.toContain('"type": "booking|quote')
+    expect(s).toContain('"type": "quote|callback|follow_up|reminder|reschedule"')
+  })
+})
