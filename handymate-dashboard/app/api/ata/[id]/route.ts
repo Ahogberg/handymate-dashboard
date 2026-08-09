@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { maybeStripAtaList } from '@/lib/ata/strip-prices'
+import { canTransitionAta, isAtaEditable, ataTransitionError } from '@/lib/ata/lifecycle'
 
 /**
  * GET /api/ata/[id] — Hämta en ÄTA
@@ -69,8 +70,8 @@ export async function PATCH(
 
     const updates: Record<string, any> = {}
 
-    // Editable fields (only if draft or pending)
-    if (existing.status === 'draft' || existing.status === 'pending') {
+    // Editable fields — bara i redigerbara lägen (lib/ata/lifecycle.ts)
+    if (isAtaEditable(existing.status)) {
       if (body.description !== undefined) updates.description = body.description
       if (body.change_type !== undefined) updates.change_type = body.change_type
       if (body.items !== undefined) {
@@ -85,20 +86,13 @@ export async function PATCH(
       if (body.notes !== undefined) updates.notes = body.notes
     }
 
-    // Status transitions
+    // Status transitions — matrisen bor i lib/ata/lifecycle.ts (P1-6):
+    // en sanning, delad med projects/[id]/changes som tidigare var en
+    // konkurrerande maskin utan regler alls.
     if (body.status !== undefined) {
-      const validTransitions: Record<string, string[]> = {
-        draft: ['pending', 'sent'],
-        pending: ['approved', 'rejected', 'sent'],
-        sent: ['approved', 'rejected', 'signed', 'declined'],
-        approved: ['invoiced'],
-        signed: ['approved', 'invoiced'],
-      }
-
-      const allowed = validTransitions[existing.status] || []
-      if (!allowed.includes(body.status)) {
+      if (!canTransitionAta(existing.status, body.status)) {
         return NextResponse.json(
-          { error: `Kan inte gå från '${existing.status}' till '${body.status}'` },
+          { error: ataTransitionError(existing.status, body.status) },
           { status: 400 }
         )
       }

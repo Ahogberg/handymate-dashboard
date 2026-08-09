@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { maybeStripAtaList } from '@/lib/ata/strip-prices'
+import { canTransitionAta, isAtaEditable, ataTransitionError } from '@/lib/ata/lifecycle'
 
 /**
  * GET - Lista ÄTA för ett projekt
@@ -109,20 +110,61 @@ export async function PUT(
       return NextResponse.json({ error: 'Missing change_id' }, { status: 400 })
     }
 
+    /**
+     * ═══ SAMMA LIVSCYKEL SOM /api/ata (P1-6, 2026-08-09) ═══
+     *
+     * Den här rutten var den konkurrerande maskinen: vilken status som helst
+     * accepterades, och belopp/typ gick att redigera i vilket läge som helst
+     * — även efter att kunden signerat. En signerad ÄTA vars belopp kan
+     * skrivas om är samma felklass som den olåsta accepterade offerten.
+     * Nu frågar båda rutterna samma matris i lib/ata/lifecycle.ts.
+     */
+    const { data: existing, error: fetchError } = await supabase
+      .from('project_change')
+      .select('status')
+      .eq('change_id', body.change_id)
+      .eq('project_id', params.id)
+      .eq('business_id', business.business_id)
+      .single()
+
+    if (fetchError || !existing) {
+      return NextResponse.json({ error: 'ÄTA hittades inte' }, { status: 404 })
+    }
+
     const updates: Record<string, any> = {}
 
-    if (body.description !== undefined) updates.description = body.description
-    if (body.amount !== undefined) updates.amount = body.amount
-    if (body.hours !== undefined) updates.hours = body.hours
-    if (body.change_type !== undefined) updates.change_type = body.change_type
+    if (isAtaEditable(existing.status)) {
+      if (body.description !== undefined) updates.description = body.description
+      if (body.amount !== undefined) updates.amount = body.amount
+      if (body.hours !== undefined) updates.hours = body.hours
+      if (body.change_type !== undefined) updates.change_type = body.change_type
+    } else if (
+      body.description !== undefined || body.amount !== undefined ||
+      body.hours !== undefined || body.change_type !== undefined
+    ) {
+      return NextResponse.json(
+        { error: 'ÄTA:ns innehåll är låst efter att den skickats. Skapa en ny ÄTA för ändringar.' },
+        { status: 400 }
+      )
+    }
 
     if (body.status !== undefined) {
+      if (!canTransitionAta(existing.status, body.status)) {
+        return NextResponse.json(
+          { error: ataTransitionError(existing.status, body.status) },
+          { status: 400 }
+        )
+      }
       updates.status = body.status
       if (body.status === 'approved') {
         updates.approved_at = new Date().toISOString()
       } else {
         updates.approved_at = null
       }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'Inget att uppdatera' }, { status: 400 })
     }
 
     const { data: change, error } = await supabase
