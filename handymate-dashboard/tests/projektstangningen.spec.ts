@@ -79,3 +79,13 @@ test.describe('återöppning är synlig, inte tyst', () => {
     expect(h).toContain('rullas INTE tillbaka')
   })
 })
+
+test.describe('detaljen skiljer tomt från trasigt (P2-3)', () => {
+  test('barnfrågorna körs parallellt och delfel redovisas', () => {
+    const s = kod('app/api/projects/[id]/route.ts')
+    expect(s).toContain('Promise.all')
+    expect(s).toContain('partial_errors: partialErrors')
+    // Varje failad sektion loggas med namn — inte sväljs.
+    expect(s).toContain('partialErrors.push(namn)')
+  })
+})

@@ -49,37 +49,41 @@ export async function GET(
     }
     project.customer = customer
 
-    // Fetch milestones
-    const { data: milestones } = await supabase
-      .from('project_milestone')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('business_id', business.business_id)
-      .order('sort_order')
+    /**
+     * ═══ BARNFRÅGORNA: PARALLELLT, OCH FEL SYNS (P2-3, 2026-08-09) ═══
+     *
+     * Fyra sekventiella frågor vars fel kastades bort: en trasig
+     * milstolpsfråga blev en tom milstolpslista — "inget att visa" — och
+     * hantverkaren trodde projektet saknade innehåll. Tomma listor som
+     * borde ha innehåll är kodbasens vanligaste felklass.
+     *
+     * Nu: parallella frågor, och varje delfel loggas OCH redovisas i svaret
+     * som partial_errors, så gränssnittet kan skilja "tomt" från "gick inte
+     * att hämta".
+     */
+    const [milestonesRes, changesRes, timeRes, materialsRes] = await Promise.all([
+      supabase.from('project_milestone').select('*')
+        .eq('project_id', projectId).eq('business_id', business.business_id).order('sort_order'),
+      supabase.from('project_change').select('*')
+        .eq('project_id', projectId).eq('business_id', business.business_id).order('created_at', { ascending: false }),
+      supabase.from('time_entry').select('*')
+        .eq('project_id', projectId).eq('business_id', business.business_id).order('work_date', { ascending: false }),
+      supabase.from('project_material').select('*')
+        .eq('project_id', projectId).eq('business_id', business.business_id).order('created_at', { ascending: false }),
+    ])
 
-    // Fetch changes (ÄTA)
-    const { data: changes } = await supabase
-      .from('project_change')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('business_id', business.business_id)
-      .order('created_at', { ascending: false })
-
-    // Fetch time entries
-    const { data: timeEntries } = await supabase
-      .from('time_entry')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('business_id', business.business_id)
-      .order('work_date', { ascending: false })
-
-    // Fetch project materials
-    const { data: materials } = await supabase
-      .from('project_material')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('business_id', business.business_id)
-      .order('created_at', { ascending: false })
+    const partialErrors: string[] = []
+    const barn = (namn: string, res: { data: any[] | null; error: { message: string } | null }) => {
+      if (res.error) {
+        console.error(`[projects/${projectId}] ${namn}-frågan failade:`, res.error.message)
+        partialErrors.push(namn)
+      }
+      return res.data
+    }
+    const milestones = barn('milestones', milestonesRes)
+    const changes = barn('changes', changesRes)
+    const timeEntries = barn('time_entries', timeRes)
+    const materials = barn('materials', materialsRes)
 
     // Fetch linked quote if exists
     let quote = null
@@ -164,6 +168,9 @@ export async function GET(
       ...ataResult.flag,
       time_entries: entries,
       materials: mats,
+      // P2-3: sektioner vars fråga failade — så UI:t kan skilja "tomt"
+      // från "gick inte att hämta". Tom lista = allt hämtades.
+      partial_errors: partialErrors,
       summary: {
         // Tim-fält — behålls för alla (arbetsinstruktion, inte pris)
         total_hours: Math.round(totalMinutes / 60 * 100) / 100,
