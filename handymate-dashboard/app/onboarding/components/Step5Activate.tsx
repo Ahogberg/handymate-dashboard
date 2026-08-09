@@ -188,11 +188,11 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
         </div>
 
         <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--ob-muted)', marginBottom: 24 }}>
-          {/* Publika ytor använder hej@ (alias mot andreas@) — ett personnamn
+          {/* Supportärenden går till support@ (alias mot andreas@) — ett personnamn
               i betalsteget ser litet ut och överlever inte en organisation. */}
           Större företag med särskilda behov?{' '}
-          <a href="mailto:hej@handymate.se" style={{ color: 'var(--ob-primary-700)', fontWeight: 600 }}>
-            Mejla oss på hej@handymate.se
+          <a href="mailto:support@handymate.se" style={{ color: 'var(--ob-primary-700)', fontWeight: 600 }}>
+            Mejla oss på support@handymate.se
           </a>
         </p>
 
