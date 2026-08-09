@@ -68,6 +68,7 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
   }
 
   const valid = selected.length > 0 && days.some(Boolean)
+  const [visaSaknas, setVisaSaknas] = useState(false)
 
   const lisa = TEAM.find(a => a.id === 'lisa')
 
@@ -76,7 +77,10 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
       <OnboardingHeader step={1} total={5} onBack={onBack} />
       <div className="ob-body">
         <h1 className="ob-headline">Hur jobbar du?</h1>
-        <p className="ob-sub">Lisa behöver veta för att svara rätt i telefonen</p>
+        {/* "svara rätt i telefonen" är FÖRBJUDEN copy (låter som talande
+            röst-AI, vilket produkten inte har) — samma regel som i teamintrot.
+            Lisa fångar missade samtal och svarar kunder via SMS. */}
+        <p className="ob-sub">Lisa behöver veta det här för att svara kunderna rätt</p>
 
         {/* Specialties */}
         <section style={{ marginBottom: 28 }}>
@@ -372,11 +376,35 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
       </div>
 
       <div className="ob-footer">
+        {/* En död knapp utan besked lämnar användaren att gissa (B7-fyndet:
+            org.nr-knappen). Samma mönster som Step2: knappen är klickbar,
+            och ett klick i ogiltigt läge SÄGER vad som saknas. */}
+        {visaSaknas && !valid && (
+          <div
+            role="alert"
+            style={{
+              marginBottom: 10,
+              padding: '10px 12px',
+              borderRadius: 'var(--ob-r-md)',
+              background: 'var(--ob-rose-50)',
+              border: '1px solid #FECACA',
+              fontSize: 13,
+              color: '#B91C1C',
+            }}
+          >
+            <strong>Innan du fortsätter:</strong>{' '}
+            {[
+              selected.length === 0 ? 'välj minst en specialitet' : null,
+              !days.some(Boolean) ? 'markera minst en arbetsdag' : null,
+            ].filter(Boolean).join(' och ')}
+          </div>
+        )}
         <button
           type="button"
           className="ob-cta"
-          disabled={!valid}
-          onClick={onNext}
+          aria-disabled={!valid}
+          style={!valid ? { opacity: 0.6, cursor: 'pointer' } : undefined}
+          onClick={() => (valid ? onNext() : setVisaSaknas(true))}
         >
           Fortsätt <ArrowRight size={18} />
         </button>

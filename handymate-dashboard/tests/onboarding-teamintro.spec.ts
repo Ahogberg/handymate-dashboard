@@ -60,3 +60,21 @@ test.describe('fältvakten och spärren är samma sanning (B7-fyndet)', () => {
     expect(fn).toContain('kontrollsiffran stämmer inte')
   })
 })
+
+test.describe('steg 3 — inga döda knappar, ingen röst-copy', () => {
+  const STEG3 = 'app/onboarding/components/Step3HowYouWork.tsx'
+
+  test('"svara rätt i telefonen" är borta — Lisa har ingen röst', () => {
+    const s = read(STEG3)
+    expect(s.replace(/^\s*\{\/\*[\s\S]*?\*\/\}/gm, '')).not.toContain('svara rätt i telefonen')
+    expect(s).toContain('svara kunderna rätt')
+  })
+
+  test('knappen är klickbar i ogiltigt läge och SÄGER vad som saknas', () => {
+    const s = read(STEG3)
+    expect(s, 'disabled-knapp utan besked är tillbaka').not.toContain('disabled={!valid}')
+    expect(s).toContain('aria-disabled={!valid}')
+    expect(s).toContain('välj minst en specialitet')
+    expect(s).toContain('markera minst en arbetsdag')
+  })
+})
