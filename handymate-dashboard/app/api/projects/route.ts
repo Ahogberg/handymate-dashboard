@@ -526,6 +526,24 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Missing project_id' }, { status: 400 })
     }
 
+    // Föregående tillstånd (P2-4): sidoeffekterna vid stängning ska bara
+    // eldas på ÖVERGÅNGEN inte-klart → klart. Upprepad PUT med samma status
+    // dubblerade tidigare job_completed-eventet — recensionsbegäran och
+    // nurture gick ut en gång per klick.
+    const { data: foregaende } = await supabase
+      .from('project')
+      .select('status, completed_at')
+      .eq('project_id', project_id)
+      .eq('business_id', business.business_id)
+      .maybeSingle()
+
+    if (!foregaende) {
+      return NextResponse.json({ error: 'Projektet hittades inte' }, { status: 404 })
+    }
+    const varRedanKlart = foregaende.status === 'completed'
+    const blirKlart = body.status === 'completed' && !varRedanKlart
+    const aterOppnas = varRedanKlart && (body.status === 'active' || body.status === 'planning')
+
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
 
     if (body.name !== undefined) updates.name = body.name
@@ -541,21 +559,37 @@ export async function PUT(request: NextRequest) {
       // projekt som helst förbi fyra ögon genom att skicka en krona.
       // En policygrind som frågar den grindade parten om värdet är ingen grind.
       if (body.status === 'completed') {
-        // Delade grinden (lib/projects/four-eyes-gate.ts) — samma lås som
-        // mobilens complete-job. Beslutet fattas på databasens värde.
-        const grind = await checkFourEyesGate(supabase, business.business_id, project_id)
-        if (grind.gated) {
-          return NextResponse.json({
-            requires_approval: true,
-            approval_id: grind.approvalId,
-            message: `Projektstängning kräver admin-godkännande (${(grind.budgetAmount || 0).toLocaleString('sv-SE')} kr)`,
-          })
+        // Grinden prövas bara på övergången — ett redan stängt projekt som
+        // PUT:as igen ska inte generera nya godkännandekort.
+        if (blirKlart) {
+          // Delade grinden (lib/projects/four-eyes-gate.ts) — samma lås som
+          // mobilens complete-job. Beslutet fattas på databasens värde.
+          const grind = await checkFourEyesGate(supabase, business.business_id, project_id)
+          if (grind.gated) {
+            return NextResponse.json({
+              requires_approval: true,
+              approval_id: grind.approvalId,
+              message: `Projektstängning kräver admin-godkännande (${(grind.budgetAmount || 0).toLocaleString('sv-SE')} kr)`,
+            })
+          }
+          updates.completed_at = new Date().toISOString()
         }
-
-        updates.completed_at = new Date().toISOString()
+        // Upprepad stängning: behåll ursprungligt completed_at — datumet
+        // projektet faktiskt stängdes, inte senaste klicket.
       }
       if (body.status === 'active' || body.status === 'planning') {
         updates.completed_at = null
+        if (aterOppnas) {
+          // Återöppning rullar INTE tillbaka det stängningen skapade:
+          // fakturan, fruset utfall och recensionsbegäran finns kvar. Det är
+          // ett medvetet val (auditens P2-4) — men det ska SYNAS, inte ske
+          // tyst, så att ett projekt som studsar klart↔aktivt går att utreda.
+          console.warn('[projects] projekt återöppnas — faktura/utfall/recension rullas INTE tillbaka:', {
+            project_id,
+            business_id: business.business_id,
+            stangdes: foregaende.completed_at,
+          })
+        }
       }
     }
     if (body.budget_hours !== undefined) updates.budget_hours = body.budget_hours
@@ -585,8 +619,10 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Project workflow stage: 'Slutbesiktning' när status blir 'completed'
-    if (body.status === 'completed' && project) {
+    // Project workflow stage: 'Slutbesiktning' när status blir 'completed'.
+    // Bara på ÖVERGÅNGEN (P2-4) — steget är idempotent, men vakten här gör
+    // avsikten läsbar och håller mönstret enhetligt med blocket nedan.
+    if (blirKlart && project) {
       try {
         const { advanceProjectStage, SYSTEM_STAGES } = await import('@/lib/project-stages/automation-engine')
         await advanceProjectStage(project.project_id, SYSTEM_STAGES.FINAL_INSPECTION, business.business_id)
@@ -595,8 +631,12 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Fire job_completed event → triggar review request + nurture
-    if (body.status === 'completed' && project) {
+    // Fire job_completed event → triggar review request + nurture.
+    // ═══ BARA PÅ ÖVERGÅNGEN inte-klart → klart (P2-4) ═══
+    // Villkoret var body.status === 'completed': varje upprepad PUT eldade
+    // om hela kedjan — recensionsbegäran, nurture och Lars-triggern gick ut
+    // en gång per klick på ett redan stängt projekt.
+    if (blirKlart && project) {
       try {
         const { fireEvent } = await import('@/lib/automation-engine')
         await fireEvent(supabase, 'job_completed', business.business_id, {
