@@ -40,6 +40,17 @@ Stripe B7-testköpet är fortfarande okört (tasks/launch-sprint.md del B) — u
 det kan ingen riktig kund betala oss, oavsett produktkvalitet. Behandlas som
 lanseringsgrind bredvid gyllene vägen.
 
+**Tillägg 2026-08-09 sent:** Hela projektauditen stängd P0→P2 (P1-6
+ÄTA-livscykeln, P0-4 atomisk källmarkering via sql/v104, P1-2 härlett
+driftläge + P2-1 i listan, P2-2/2-3/2-4). **X1b Revenue Review V1 är BYGGD**
+(`8516a076` + `81d9fb36`) på Andreas beslut att köra före verifierings-
+grindarna — Codex utan usage eliminerade kollisionsrisken, och kontraktet
+var fryst sedan X1a. Scope hölls exakt: en källspecifik väg (ÄTA→utkast),
+ingen autosändning, avfärdande med orsak, separata observabilitetstal.
+Grindarna GÄLLER FORTFARANDE som pilotbevis: X1b:s definition-of-done
+(minst ett verkligt pilotfynd → korrekt utkast utan dubbla rader) kräver
+gyllene vägen + tvåtenantprovet innan X2 får starta.
+
 ---
 
 # Läge 2026-08-08 kväll
