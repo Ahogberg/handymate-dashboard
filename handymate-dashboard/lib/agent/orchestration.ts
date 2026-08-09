@@ -56,6 +56,25 @@ export interface AgentResult {
   actions: Array<{ tool: string; status: 'completed' | 'awaiting_approval' | 'failed'; error?: string }>
 }
 
+/**
+ * Orkestreringens spår genom EN kedja, som den reser mellan agentkörningar.
+ *
+ * Chatten håller det här i minnet inom en request. Triggervägen kan inte —
+ * varje överlämning är en ny HTTP-körning i en ny process. Kedjan måste därför
+ * skickas med, annars vet mottagaren bara vem som ringde och aldrig vilka som
+ * redan varit inne.
+ */
+export interface HandoffChain {
+  /** Specialister som redan kört i den här kedjan, i ordning. */
+  visited: AgentId[]
+  /** Ursprungsärendet, oförändrat sedan första steget. */
+  intent: OrchestrationIntent
+  /** Stabil nyckel för händelsen som startade kedjan — grund för idempotens. */
+  originKey: string
+  /** Vad tidigare specialister faktiskt gjorde, härlett ur verktygsutfall. */
+  results: AgentResult[]
+}
+
 export type PlanRefusal = 'invalid_agent' | 'max_steps' | 'agent_repeat' | 'not_allowed'
 
 /**
@@ -171,6 +190,54 @@ function statusOrd(status: StepStatus): string {
 export function shouldMatteSummarize(results: AgentResult[]): boolean {
   if (results.length === 0) return false
   return results.length >= 2 || results.some(r => r.status !== 'completed')
+}
+
+/**
+ * Läser ett verktygssvar som ett utfall — samma härledning i triggervägen som
+ * i chatten, så att ett steg inte kan få olika status beroende på vilken dörr
+ * agenten kom in genom.
+ *
+ * Två sätt att hamna i väntan på en människa, båda observerade i routern:
+ *   - send_sms/send_email som köats: data.queued_for_approval === true
+ *   - create_approval_request med high risk: ett approval_id utan execution
+ *
+ * `data.queued` (nattkön för SMS) räknas INTE som väntan på godkännande — det
+ * meddelandet går iväg av sig självt klockan åtta. Att blanda ihop de två
+ * skulle få kort att se ut som att de behövde ett klick de inte behöver.
+ */
+export function outcomeFromToolResult(
+  tool: string,
+  result: { success: boolean; data?: unknown; error?: string },
+): ToolOutcome {
+  const data = (result.data ?? {}) as Record<string, unknown>
+  const awaitingApproval =
+    data.queued_for_approval === true ||
+    (typeof data.approval_id === 'string' && data.execution === undefined)
+
+  return {
+    tool,
+    ok: result.success,
+    ...(result.error ? { error: result.error } : {}),
+    ...(result.success && awaitingApproval ? { awaitingApproval: true } : {}),
+  }
+}
+
+/**
+ * Idempotensnyckel för ett överlämningssteg.
+ *
+ * Utan den blev varje överlämning en ny körning: samma samtal som råkade
+ * behandlas två gånger gav två uppsättningar åtgärder mot samma kund. Nyckeln
+ * binds till URSPRUNGSHÄNDELSEN, inte till klockan — två dispatchar av samma
+ * samtal till samma agent i samma steg är samma arbete och ska mötas av
+ * agent_runs befintliga idempotensträff.
+ */
+export function handoffIdempotencyKey(opts: {
+  originKey: string
+  target: AgentId
+  step: number
+}): string {
+  const rensad = opts.originKey.replace(/\s+/g, '').slice(0, 80)
+  return `handoff:${rensad}:${opts.target}:${opts.step}`
 }
 
 /**

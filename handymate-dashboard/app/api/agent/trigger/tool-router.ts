@@ -7,6 +7,16 @@ import { getCustomerEmails, sendGmailEmail } from '@/lib/gmail'
 import { getNextCustomerNumber, getNextProjectNumber, getNextLeadNumber } from '@/lib/numbering'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { shouldQueueForApproval } from '@/lib/autonomy/agent-gating'
+import {
+  buildHandoffBriefing,
+  handoffIdempotencyKey,
+  validateNextStep,
+  type AgentResult,
+  type HandoffChain,
+  type OrchestrationIntent,
+  type PlanRefusal,
+} from '@/lib/agent/orchestration'
+import type { AgentId } from '@/lib/agent/capabilities'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
@@ -41,6 +51,12 @@ interface ToolContext {
   contactEmail: string
   googleConnection: GoogleConnection | null
   agentId?: string
+  /**
+   * Orkestreringskedjan när körningen SJÄLV är en överlämning. Odefinierad för
+   * en förstakörning. Bär vilka specialister som redan varit inne, så att
+   * loopskyddet kan säga nej till A→B→A, och ursprungsärendet ordagrant.
+   */
+  handoffChain?: HandoffChain
   /**
    * TD-52: vem/vad initierade den här agent-körningen. 'user' = en
    * levande människa just nu (dashboard/mobil-chatt, eller ett svar i en
@@ -2278,56 +2294,147 @@ async function sendAgentMessageTool(
     matte: 'Matte', karin: 'Karin', hanna: 'Hanna', daniel: 'Daniel', lars: 'Lars', lisa: 'Lisa',
   }
 
-  // Handoff auto-trigger: anropa agent/trigger så mottagaren kör direkt. Best-effort
-  // dispatch — vi väntar in svaret med en kort timeout för att kunna rapportera om
-  // leveransen lyckades, men ett fel blockerar aldrig (meddelandet är redan sparat).
-  let autoTriggered = false
-  let handoffDelivered = false
-  if (type === 'handoff') {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-    autoTriggered = true
-    try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 8000)
-      const handoffRes = await fetch(`${appUrl}/api/agent/trigger`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-internal-secret': process.env.CRON_SECRET || '',
-        },
-        body: JSON.stringify({
-          business_id: businessId,
-          trigger_type: 'agent_handoff',
-          agent_id: toAgent,
-          trigger_data: {
-            from_agent: fromAgent,
-            handoff_message: content,
-            handoff_reason: reason || null,
-            handoff_context: ctxData || null,
-            message_id: inserted?.id,
-          },
-        }),
-        signal: controller.signal,
-      }).finally(() => clearTimeout(timeout))
-      handoffDelivered = handoffRes.ok
-      if (!handoffRes.ok) console.error('[sendAgentMessage] handoff dispatch svarade', handoffRes.status)
-    } catch (err: any) {
-      // Timeout eller nätverksfel — meddelandet ligger kvar och plockas av mottagaren
-      // vid nästa körning. Icke-fatalt.
-      console.error('[sendAgentMessage] handoff dispatch misslyckades:', err?.message || err)
+  if (type !== 'handoff') {
+    return {
+      success: true,
+      data: { message: `Meddelande skickat till ${agentNames[toAgent]}`, to: toAgent, type },
     }
+  }
+
+  /**
+   * ═══ ÖVERLÄMNINGEN ═══
+   *
+   * Formen är oförändrad: en nästlad HTTP-POST till samma rutt. Det bevarar
+   * fire-and-forget-kontraktet mot voice/transcribe, som inte väntar på svar.
+   * Fyra saker inuti är däremot nya.
+   *
+   * 1. LOOPSKYDDET. validateNextStep frågade förut bara chatten. Här fanns
+   *    ingenting: Lisa→Daniel→Lisa var möjligt, och varje varv kostade en hel
+   *    modellkörning. Kedjan reser nu med i trigger_data.
+   *
+   * 2. BRIEFINGEN. Mottagaren fick fritext och, i praktiken, hela trigger_data
+   *    som JSON (default-caset i getTriggerInstructions). Nu byggs den i kod:
+   *    ursprungsärendet ordagrant plus vad kollegorna faktiskt gjort.
+   *
+   * 3. TIDSGRÄNSEN. Timeouten var 8 sekunder — kortare än en typisk körning med
+   *    verktygssteg. handoff_delivered blev därför systematiskt false för
+   *    överlämningar som faktiskt kördes klart, medan modellen ändå fick texten
+   *    "tar över nu". Budgeten följer nu routens egen (maxDuration 60) med
+   *    marginal, och när vi ändå inte hinner invänta svaret säger vi OKÄNT —
+   *    inte "misslyckades". En flagga som ljuger är värre än ingen flagga.
+   *
+   * 4. RESULTATET. Anroparen fick en boolean. Nu returneras mottagarens
+   *    agent_result, så Lisa vet vad Daniel gjorde i stället för att gissa.
+   */
+  const kedja = context.handoffChain
+  const visited = kedja?.visited ?? []
+  const steg = validateNextStep({ from: fromAgent as AgentId, target: toAgent, visited })
+
+  if (!steg.ok) {
+    return { success: false, error: HANDOFF_AVSLAG[steg.reason](agentNames[toAgent] || toAgent) }
+  }
+
+  const intent: OrchestrationIntent = kedja?.intent ?? {
+    text: content,
+    customerId: (ctxData?.customer_id as string) || null,
+    projectId: (ctxData?.project_id as string) || null,
+  }
+  const originKey = kedja?.originKey || String(inserted?.id || `${businessId}:${fromAgent}`)
+  const briefing = buildHandoffBriefing(intent, kedja?.results ?? [], reason || content)
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+  let levererat: 'levererad' | 'nekad' | 'okand' = 'okand'
+  let mottagarensResultat: AgentResult | undefined
+  let redanUtford = false
+
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), HANDOFF_BUDGET_MS)
+    const handoffRes = await fetch(`${appUrl}/api/agent/trigger`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': process.env.CRON_SECRET || '',
+      },
+      body: JSON.stringify({
+        business_id: businessId,
+        trigger_type: 'agent_handoff',
+        agent_id: steg.target,
+        idempotency_key: handoffIdempotencyKey({
+          originKey,
+          target: steg.target,
+          step: visited.length + 1,
+        }),
+        trigger_data: {
+          from_agent: fromAgent,
+          handoff_briefing: briefing,
+          handoff_message: content,
+          handoff_reason: reason || null,
+          handoff_context: ctxData || null,
+          message_id: inserted?.id,
+          handoff_chain: {
+            visited: [...visited, fromAgent].filter(a => a !== 'matte'),
+            intent,
+            originKey,
+            results: kedja?.results ?? [],
+          },
+        },
+      }),
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout))
+
+    if (handoffRes.ok) {
+      levererat = 'levererad'
+      const svar = await handoffRes.json().catch(() => null)
+      mottagarensResultat = svar?.agent_result
+      redanUtford = svar?.duplicate === true
+    } else {
+      levererat = 'nekad'
+      console.error('[sendAgentMessage] handoff dispatch svarade', handoffRes.status)
+    }
+  } catch (err: any) {
+    // Timeout eller nätverksfel. Meddelandet ligger kvar i agent_messages och
+    // plockas av mottagaren vid nästa körning — men VI vet inte om körningen
+    // hann bli klar. Det är precis det ordet vi ska använda.
+    console.error('[sendAgentMessage] handoff dispatch okänt utfall:', err?.message || err)
   }
 
   return {
     success: true,
     data: {
-      message: `Meddelande skickat till ${agentNames[toAgent]}${autoTriggered ? ' — tar över nu' : ''}`,
-      to: toAgent,
+      message: HANDOFF_BESKED[levererat](agentNames[steg.target], redanUtford),
+      to: steg.target,
       type,
-      auto_triggered: autoTriggered,
-      handoff_delivered: type === 'handoff' ? handoffDelivered : undefined,
+      auto_triggered: true,
+      handoff_status: levererat,
+      ...(mottagarensResultat ? { handoff_result: mottagarensResultat } : {}),
     },
   }
+}
+
+/**
+ * Budgeten för att invänta mottagaren. Routen tillåter 60 s; 45 lämnar
+ * anroparen tid att avsluta sin egen körning i stället för att själv dö i
+ * väntan. Löper den ut vet vi inte utfallet — vi påstår därför ingenting.
+ */
+const HANDOFF_BUDGET_MS = 45_000
+
+/** Vad modellen får veta när loopskyddet stoppar bytet. */
+const HANDOFF_AVSLAG: Record<PlanRefusal, (namn: string) => string> = {
+  invalid_agent: namn => `${namn} finns inte i teamet.`,
+  not_allowed: namn => `Du får inte lämna över till ${namn} — ärendet ligger utanför den vägen.`,
+  agent_repeat: namn => `${namn} har redan varit inne i det här ärendet. Avsluta i stället för att skicka tillbaka det.`,
+  max_steps: () => 'Ärendet har redan passerat tre specialister. Sammanfatta läget för hantverkaren i stället.',
+}
+
+/** Beskedet till modellen. Säger aldrig mer än vi vet. */
+const HANDOFF_BESKED: Record<'levererad' | 'nekad' | 'okand', (namn: string, redan: boolean) => string> = {
+  levererad: (namn, redan) =>
+    redan
+      ? `${namn} hade redan tagit det här ärendet — ingen dubbelkörning gjordes.`
+      : `${namn} har tagit över och kört klart.`,
+  nekad: namn => `Meddelandet till ${namn} är sparat, men överlämningen gick inte fram.`,
+  okand: namn => `Meddelandet till ${namn} är sparat. ${namn} hann inte svara innan jag släppte — påstå inget om vad som gjorts.`,
 }
 
 async function getAgentMessagesTool(

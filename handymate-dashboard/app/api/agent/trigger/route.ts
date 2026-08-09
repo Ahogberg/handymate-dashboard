@@ -11,6 +11,15 @@ import { getBusinessPreferences } from '@/lib/business-preferences'
 import { routeToAgent, getAgentPromptSuffix, getAgentTools } from '@/lib/agents/personalities'
 import { getRelevantMemories, buildMemoryPrompt, getAgentMessages as fetchAgentMessages, buildMessagesPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
 import { checkCostGuards } from '@/lib/agents/shared/cost-guard'
+import {
+  MAX_SPECIALIST_STEPS,
+  outcomeFromToolResult,
+  toAgentResult,
+  type AgentResult,
+  type HandoffChain,
+  type ToolOutcome,
+} from '@/lib/agent/orchestration'
+import { isValidAgentId, type AgentId } from '@/lib/agent/capabilities'
 
 // Central AI agent endpoint — handles ALL inbound triggers:
 // - Manual (dashboard), phone_call (46elks/Vapi), incoming_sms, cron
@@ -368,12 +377,42 @@ export async function POST(request: NextRequest) {
 
     const systemPrompt = baseSystemPrompt + '\n\n' + getAgentPromptSuffix(agentId) + memorySuffix + messagesSuffix
 
+    /**
+     * Orkestreringskedjan, om den här körningen ÄR en överlämning.
+     *
+     * Kedjan reser i trigger_data och tas emot här, så att sendAgentMessage
+     * kan fråga validateNextStep om nästa byte är tillåtet. Utan den vet varje
+     * körning bara vem som ringde, aldrig vilka som redan varit inne — och
+     * Lisa→Daniel→Lisa ser då ut som ett förstasteg varje gång.
+     *
+     * Trigger_data kommer från vår egen dispatch, men den passerar HTTP. Fälten
+     * valideras därför i stället för att litas på: bara giltiga agent-id räknas
+     * som besökta, och kedjan kapas vid MAX_SPECIALIST_STEPS oavsett vad
+     * avsändaren påstod.
+     */
+    const inkommandeKedja = (trigger_data?.handoff_chain as Record<string, unknown> | undefined) || undefined
+    const handoffChain: HandoffChain | undefined = inkommandeKedja
+      ? {
+          visited: (Array.isArray(inkommandeKedja.visited) ? inkommandeKedja.visited : [])
+            .filter((a): a is AgentId => typeof a === 'string' && isValidAgentId(a))
+            .slice(0, MAX_SPECIALIST_STEPS),
+          intent: {
+            text: String((inkommandeKedja.intent as any)?.text || ''),
+            customerId: ((inkommandeKedja.intent as any)?.customerId as string) || null,
+            projectId: ((inkommandeKedja.intent as any)?.projectId as string) || null,
+          },
+          originKey: String(inkommandeKedja.originKey || ''),
+          results: Array.isArray(inkommandeKedja.results) ? (inkommandeKedja.results as AgentResult[]) : [],
+        }
+      : undefined
+
     const context = {
       businessName: bizConfig.business_name || 'Handymate',
       contactEmail: bizConfig.contact_email || '',
       googleConnection,
       agentId,
       triggerSource,
+      handoffChain,
     }
 
     // Build initial user message
@@ -396,6 +435,9 @@ export async function POST(request: NextRequest) {
       tool_calls?: Array<{ tool: string; input: unknown; result: unknown }>
     }> = []
     const agentAllowedTools = getAgentTools(agentId)
+    // Vad verktygen FAKTISKT svarade. Grunden för körningens status — aldrig
+    // modellens egen beskrivning av vad den gjort.
+    const outcomes: ToolOutcome[] = []
     let totalTokens = 0
     let toolCallCount = 0
     let finalResponse = ''
@@ -476,6 +518,8 @@ export async function POST(request: NextRequest) {
           result,
         })
 
+        outcomes.push(outcomeFromToolResult(toolUse.name, result as any))
+
         toolResults.push({
           type: 'tool_result',
           tool_use_id: toolUse.id,
@@ -536,6 +580,10 @@ export async function POST(request: NextRequest) {
       duration_ms: durationMs,
       final_response: finalResponse,
       step_details: steps,
+      // Vad den här körningen faktiskt uträttade, härlett ur verktygsutfallen.
+      // Den som lämnade över får tillbaka detta i stället för en boolean, och
+      // kan därmed säga vad kollegan gjorde utan att gissa.
+      agent_result: toAgentResult(agentId as AgentId, finalResponse, outcomes),
     })
   } catch (error: any) {
     console.error('[AgentTrigger] Error:', error)

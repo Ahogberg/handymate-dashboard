@@ -2,6 +2,7 @@
 // Mirrors supabase/functions/agent/system-prompt.ts
 
 import { formatKnowledgeForPrompt } from '@/lib/widget-activation'
+import { AGENT_CAPABILITIES, isValidAgentId } from '@/lib/agent/capabilities'
 
 /** +46761234567 → 076-123 45 67 */
 function formatAgentPhoneHint(phone: string): string {
@@ -297,6 +298,11 @@ function buildGoogleSection(business: BusinessContext): string {
   return section + '\n'
 }
 
+/** Kollegans namn ur AGENT_CAPABILITIES — en källa, inte en kopierad lista. */
+function agentNamn(id: unknown): string {
+  return isValidAgentId(id) ? AGENT_CAPABILITIES[id].name : 'en kollega'
+}
+
 function getTriggerInstructions(
   triggerType: string,
   triggerData?: Record<string, unknown>
@@ -345,6 +351,22 @@ Använd get_project_outcome(project_id) om du behöver fler detaljer om utfallet
     case 'manual':
       return `### Manuell begäran
 ${triggerData?.instruction || '(Ingen instruktion)'}`
+
+    /**
+     * En kollega har lämnat över ärendet.
+     *
+     * Föll tidigare igenom till default-caset, som skrev ut hela trigger_data
+     * som JSON. Mottagaren fick alltså läsa `{"from_agent":"lisa",...}` och
+     * gissa vad som förväntades. Briefingen byggs nu i kod
+     * (buildHandoffBriefing) och innehåller ursprungsärendet ordagrant plus
+     * vad tidigare kollegor faktiskt gjorde — inte deras tolkning av det.
+     */
+    case 'agent_handoff':
+      return `### Överlämning från ${agentNamn(triggerData?.from_agent)}
+${triggerData?.handoff_briefing || triggerData?.handoff_message || '(Ingen briefing)'}
+
+Gör bara det som ligger inom ditt område. Behöver ärendet någon annan efter
+dig — lämna över, men påstå aldrig att kollegan gjort något ännu.`
 
     default:
       return `### ${triggerType}\n${JSON.stringify(triggerData || {})}`
