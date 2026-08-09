@@ -48,6 +48,13 @@ interface TourStep {
   id: 'team' | 'matte' | 'approve' | 'setup'
   title: string
   body: string
+  /**
+   * Var tipskortet ligger. Kortet satt alltid i botten (B7-fyndet) och
+   * täckte då exakt det spotlighten pekade på för elementen i nedre halvan
+   * — Matte-knappen och setuplistan gömdes bakom sina egna tips. Kortet
+   * ska stå på MOTSATT sida om det det visar.
+   */
+  placement: 'top' | 'bottom'
 }
 
 const TOUR_STEPS: TourStep[] = [
@@ -55,21 +62,25 @@ const TOUR_STEPS: TourStep[] = [
     id: 'team',
     title: 'Här bor ditt AI-team',
     body: 'Se i realtid vad Lisa, Karin, Daniel, Lars och Hanna jobbar med.',
+    placement: 'bottom',
   },
   {
     id: 'matte',
     title: 'Här pratar du med Matte',
     body: 'Din chefsassistent. Fråga vad som helst — han har koll på allt.',
+    placement: 'top',
   },
   {
     id: 'approve',
     title: 'Här godkänner du beslut',
     body: 'AI-teamet jobbar autonomt — du ser bara det som behöver din input. Under Automationer styr du själv vad som körs direkt och vad som kräver ditt godkännande.',
+    placement: 'top',
   },
   {
     id: 'setup',
     title: 'Här kompletterar du setup',
     body: 'Några sista steg för att låsa upp full automation.',
+    placement: 'top',
   },
 ]
 
@@ -727,7 +738,10 @@ function SpotlightOverlay({ step, index, total, onNext, onSkip }: SpotlightOverl
         position: 'absolute',
         left: 16,
         right: 16,
-        bottom: 24,
+        // Kortet står på motsatt sida om det spotlighten visar — annars
+        // täcker tipset sitt eget motiv (B7-fyndet: Matte-knappen och
+        // setuplistan låg gömda bakom kortet).
+        ...(step.placement === 'top' ? { top: 60 } : { bottom: 24 }),
         padding: 16,
         background: 'var(--ob-surface)',
         borderRadius: 'var(--ob-r-lg)',

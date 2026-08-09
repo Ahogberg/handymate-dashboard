@@ -100,3 +100,15 @@ test.describe('steg 4 — numret: synligt, ärligt, begripligt', () => {
     expect(s).toContain('ditt privata nummer förblir privat')
   })
 })
+
+test.describe('rundturen — tipset täcker inte sitt eget motiv', () => {
+  test('varje toursteg bär en placering och kortet läser den', () => {
+    const s = read('app/onboarding/components/Step6LiveTour.tsx')
+    // Fyra steg, fyra placeringar — och elementen i nedre halvan får top.
+    expect((s.match(/placement: '(top|bottom)'/g) || []).length).toBe(4)
+    expect(s).toContain("step.placement === 'top' ? { top: 60 } : { bottom: 24 }")
+    // Matte-knappen bor nere till höger — dess tips får ALDRIG ligga i botten.
+    const matte = s.slice(s.indexOf("id: 'matte'"), s.indexOf("id: 'approve'"))
+    expect(matte).toContain("placement: 'top'")
+  })
+})
