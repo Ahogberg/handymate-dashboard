@@ -78,3 +78,25 @@ test.describe('steg 3 — inga döda knappar, ingen röst-copy', () => {
     expect(s).toContain('markera minst en arbetsdag')
   })
 })
+
+test.describe('steg 4 — numret: synligt, ärligt, begripligt', () => {
+  const STEG4 = 'app/onboarding/components/Step4PhoneNumber.tsx'
+
+  test('overflow-klippet är borta — Kolla igen-knappen syns', () => {
+    const s = read(STEG4)
+    const kort = s.slice(s.indexOf('Reveal card'), s.indexOf("phase === 'reserving'"))
+    expect(kort).not.toContain("overflow: 'hidden'")
+  })
+
+  test('väntetexten säger reserverat — inte tilldelas-snurr', () => {
+    const s = read(STEG4)
+    expect(s).toContain('Ditt nummer är reserverat')
+    expect(s).not.toContain('tilldelas just nu')
+  })
+
+  test('valen förklarar vad som händer med kundens nummer', () => {
+    const s = read(STEG4)
+    expect(s).toContain('Kunder ringer ditt vanliga nummer som idag')
+    expect(s).toContain('ditt privata nummer förblir privat')
+  })
+})

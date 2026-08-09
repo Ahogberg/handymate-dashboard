@@ -372,7 +372,9 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
             borderRadius: 'var(--ob-r-2xl)',
             textAlign: 'center',
             position: 'relative',
-            overflow: 'hidden',
+            // overflow:hidden klippte "Kolla igen"-knappen i pending-läget
+            // (B7-fyndet): en halv knapp stack upp ur kortets nederkant utan
+            // att gå att läsa. Bakgrunden rundas av border-radius ändå.
           }}
         >
           {phase === 'reserving' ? (
@@ -395,11 +397,11 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
           ) : phase === 'pending' ? (
             <div style={{ padding: '14px 0' }}>
               <p style={{ color: 'var(--ob-ink)', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
-                Ditt nummer tilldelas just nu
+                Ditt nummer är reserverat
               </p>
               <p style={{ color: 'var(--ob-muted)', fontSize: 13, lineHeight: 1.5, maxWidth: 300, margin: '0 auto' }}>
-                Det tar ibland en liten stund. Du kan fortsätta — numret dyker upp
-                i appen under Inställningar → Telefoni så snart det är klart.
+                Du kan fortsätta direkt — numret aktiveras i bakgrunden och dyker
+                upp i appen under Inställningar → Telefoni.
               </p>
               <button
                 type="button"
@@ -498,8 +500,19 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
           <label className="ob-label">Hur vill du använda numret?</label>
           <div style={{ display: 'flex', gap: 8 }}>
             {[
-              { id: 'forward' as const, title: 'Behåll mitt nummer', sub: 'Vidarekoppla till Lisa' },
-              { id: 'primary' as const, title: 'Använd Handymate-nr', sub: 'Som primärnummer' },
+              // Tydligare val (B7-fyndet): vad som faktiskt händer, inte
+              // teknikorden. Kärnfrågan för hantverkaren är "vilket nummer
+              // ger jag ut till kunder?" — svaret ska stå i valet.
+              {
+                id: 'forward' as const,
+                title: 'Behåll mitt nummer',
+                sub: 'Kunder ringer ditt vanliga nummer som idag. Samtal du inte hinner ta skickas vidare — Lisa fångar dem och SMS:ar kunden.',
+              },
+              {
+                id: 'primary' as const,
+                title: 'Använd Handymate-numret',
+                sub: 'Du ger ut det nya numret till kunder. Lisa fångar allt du missar — och ditt privata nummer förblir privat.',
+              },
             ].map(opt => (
               <button
                 type="button"
@@ -527,7 +540,7 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
                 >
                   {opt.title}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--ob-muted)' }}>{opt.sub}</div>
+                <div style={{ fontSize: 11, color: 'var(--ob-muted)', lineHeight: 1.45 }}>{opt.sub}</div>
               </button>
             ))}
           </div>
