@@ -22,11 +22,22 @@ export const dynamic = 'force-dynamic'
  *
  * Säkerhet och försiktighet:
  *   - Kräver admin (isAdmin — @handymate.se eller ADMIN_EMAILS).
- *   - Rör ALDRIG ett konto som redan har minst en produkt.
+ *   - Rör ALDRIG ett konto som redan har minst en produkt — utom i
+ *     komplement-läget, som ENBART lägger till SKU:er kontot saknar.
  *   - `dryRun` (default) visar vad som skulle hända utan att skriva något.
  *
- * Body: { dryRun?: boolean, businessId?: string }
+ * ═══ KOMPLEMENT-LÄGET (v93-efterspelet, 2026-08-09) ═══
+ *
+ * När ett konto får en andrabransch (business_config.secondary_branches)
+ * finns artiklarna redan för huvudbranschen — och de kan bära intjänade
+ * priser som ALDRIG får skrivas över eller tömmas. `complement: true`
+ * jämför sortimentet per SKU och lägger bara till det som saknas.
+ * Befintliga rader rörs inte: inga prisändringar, inga dubbletter.
+ *
+ * Body: { dryRun?: boolean, businessId?: string, complement?: boolean }
  *   businessId → kör bara det kontot. Utelämnat → alla konton utan produkter.
+ *   complement → kräver businessId; lägger till saknade SKU:er på ett konto
+ *                som redan har artiklar.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -38,6 +49,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const dryRun = body.dryRun !== false
     const onlyBusinessId: string | undefined = body.businessId
+    const complement = body.complement === true
+
+    // Komplement utan målkonto vore "lägg till saknade SKU:er ÖVERALLT" —
+    // en åtgärd ingen menat. Kräv explicit konto.
+    if (complement && !onlyBusinessId) {
+      return NextResponse.json(
+        { error: 'complement kräver businessId — komplettering görs ett konto i taget' },
+        { status: 400 }
+      )
+    }
 
     const supabase = getServerSupabase()
 
@@ -57,17 +78,17 @@ export async function POST(request: NextRequest) {
     const results: Array<{ business_id: string; branch: string; seeded: number; skipped?: string }> = []
 
     for (const biz of businesses || []) {
-      const { data: existing, error: existErr } = await supabase
-        .from('products')
-        .select('id')
-        .eq('business_id', biz.business_id)
-        .limit(1)
+      // I komplement-läget behövs ALLA befintliga SKU:er för jämförelsen;
+      // annars räcker det att veta om det finns någon rad alls.
+      const { data: existing, error: existErr } = complement
+        ? await supabase.from('products').select('sku').eq('business_id', biz.business_id)
+        : await supabase.from('products').select('id').eq('business_id', biz.business_id).limit(1)
 
       if (existErr) {
         results.push({ business_id: biz.business_id, branch: '', seeded: 0, skipped: `uppslag misslyckades: ${existErr.message}` })
         continue
       }
-      if (existing && existing.length > 0) {
+      if (!complement && existing && existing.length > 0) {
         results.push({ business_id: biz.business_id, branch: '', seeded: 0, skipped: 'har redan artiklar' })
         continue
       }
@@ -76,7 +97,18 @@ export async function POST(request: NextRequest) {
       // både elektriker och bygg och ska ha båda sortimenten.
       const branches = resolveBranches(biz as Parameters<typeof resolveBranches>[0])
       const branch = branches.join(' + ')
-      const products = getDefaultProducts(branches)
+      let products = getDefaultProducts(branches)
+
+      if (complement) {
+        // Enbart det som SAKNAS. Befintliga rader — och deras eventuellt
+        // intjänade priser — rörs aldrig.
+        const harRedan = new Set((existing || []).map((r: any) => r.sku).filter(Boolean))
+        products = products.filter(p => !harRedan.has(p.sku))
+        if (products.length === 0) {
+          results.push({ business_id: biz.business_id, branch, seeded: 0, skipped: 'inget saknas — sortimentet är komplett' })
+          continue
+        }
+      }
 
       if (dryRun) {
         results.push({ business_id: biz.business_id, branch, seeded: products.length, skipped: 'torrkörning' })
@@ -85,7 +117,9 @@ export async function POST(request: NextRequest) {
 
       const { error: insertErr } = await supabase.from('products').insert(
         products.map((p, i) => ({
-          id: `prod_${biz.business_id}_${i}`,
+          // Komplementets id-serie får inte kollidera med grundseedens
+          // prod_<biz>_<i> — de räknar båda från 0.
+          id: complement ? `prod_${biz.business_id}_c_${Date.now()}_${i}` : `prod_${biz.business_id}_${i}`,
           business_id: biz.business_id,
           name: p.name,
           description: p.description || null,
