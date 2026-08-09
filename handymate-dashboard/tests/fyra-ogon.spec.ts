@@ -35,33 +35,65 @@ function grinden(): string {
 }
 
 test.describe('grinden frågar databasen, aldrig klienten', () => {
+  const GATE = 'lib/projects/four-eyes-gate.ts'
+
   test('body.budget_amount deltar inte i beslutet', () => {
-    const g = grinden()
-    expect(g, 'klientens belopp styr fortfarande grinden').not.toContain('body.budget_amount')
+    expect(grinden(), 'klientens belopp styr fortfarande grinden').not.toContain('body.budget_amount')
+    expect(kod(GATE), 'helpern läser klientdata').not.toContain('body.')
   })
 
   test('projektvärdet hämtas ur databasen, tenantfiltrerat', () => {
-    const g = grinden()
-    expect(g).toContain("select('budget_amount')")
-    expect(g, 'projektuppslaget saknar tenantfilter').toContain("eq('business_id', business.business_id)")
+    const g = kod(GATE)
+    expect(g).toContain("select('budget_amount")
+    expect(g, 'projektuppslaget saknar tenantfilter').toContain("eq('business_id', businessId)")
   })
 
   test('tröskeln prövas ovillkorligt när fyra ögon är på', () => {
     // Den gamla formen prövade bara i en gren som gick att undvika. Nu:
     // enabled → slå upp → jämför. Ingen väg runt.
-    const g = grinden()
+    const g = kod(GATE)
     const enabled = g.indexOf('four_eyes_enabled')
     const uppslag = g.indexOf("from('project')")
-    const jamforelse = g.indexOf('pVal >= troskel')
+    const jamforelse = g.indexOf('budgetAmount < threshold')
     expect(enabled).toBeGreaterThan(-1)
     expect(uppslag).toBeGreaterThan(enabled)
     expect(jamforelse).toBeGreaterThan(uppslag)
   })
 
   test('upprepad stängning ger samma kort, inte ett nytt per försök', () => {
-    const g = grinden()
+    const g = kod(GATE)
     expect(g, 'ingen dedup mot befintligt pending-kort').toContain("eq('approval_type', 'four_eyes_project_close')")
-    expect(g).toContain('befintligtKort?.id')
+    expect(g).toContain('return { gated: true, approvalId: existing.id')
+  })
+})
+
+test.describe('en policy, ett lås — alla dörrar', () => {
+  test('grinden har EN definition som båda dörrarna använder', () => {
+    // PUT /api/projects och mobilens complete-job stänger projekt. Två
+    // kopior av grinden hade glidit isär — precis som de redan gjort en gång.
+    expect(kod('lib/projects/four-eyes-gate.ts')).toContain('export async function checkFourEyesGate')
+    expect(kod(PUT)).toContain('checkFourEyesGate(')
+    expect(kod('app/api/booking/complete-job/route.ts')).toContain('checkFourEyesGate(')
+  })
+
+  test('sidodörren grindar FÖRE projektskrivningen, men bokningen bockas ändå', () => {
+    const s = kod('app/api/booking/complete-job/route.ts')
+    const bokning = s.indexOf("job_status: 'completed'")
+    const grind = s.indexOf('checkFourEyesGate(')
+    const stangning = s.indexOf("status: 'completed'", grind)
+    expect(bokning, 'bokningen bockas inte av före grinden').toBeLessThan(grind)
+    expect(grind, 'grinden ligger efter projektstängningen').toBeLessThan(stangning)
+    expect(s).toContain('project_completed: false')
+  })
+
+  test('ett trasigt kort öppnar inte låset', () => {
+    // Kan kortet inte skapas GÄLLER grinden ändå — felet får inte bli en
+    // gräddfil förbi policyn.
+    const s = kod('lib/projects/four-eyes-gate.ts')
+    const insertFel = s.indexOf('if (insertError)')
+    const svar = s.indexOf('return { gated: true', insertFel)
+    expect(insertFel).toBeGreaterThan(-1)
+    expect(svar, 'insert-fel släpper igenom stängningen').toBeGreaterThan(insertFel)
   })
 })
 

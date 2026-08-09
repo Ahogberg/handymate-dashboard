@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { computeBookingDayProgress, fetchProjectBookings } from '@/lib/bookings/day-progress'
+import { checkFourEyesGate } from '@/lib/projects/four-eyes-gate'
 
 /**
  * POST /api/booking/complete-job
@@ -94,6 +95,31 @@ export async function POST(request: NextRequest) {
           project_id: existing.project_id,
           day: `${dayProgress.current_day}/${dayProgress.total_days}`,
         })
+
+        // ═══ FOUR-EYES-GRINDEN GÄLLER ÄVEN SIDODÖRREN (P1-5) ═══
+        //
+        // PUT /api/projects grindade stora projektstängningar — men den här
+        // vägen stängde projektet direkt när sista bokningen bockades av.
+        // Samma policy, samma lås: är projektet över tröskeln skapas kortet
+        // och stängningen (plus autofakturan) väntar på godkännandet.
+        // Bokningen bockas ändå av — det är PROJEKTET som kräver fyra ögon,
+        // inte hantverkarens arbetsdag.
+        const grind = await checkFourEyesGate(supabase, business.business_id, existing.project_id)
+        if (grind.gated) {
+          console.log('[booking/complete-job] four-eyes gate — completion queued for approval:', {
+            project_id: existing.project_id,
+            approval_id: grind.approvalId,
+          })
+          return NextResponse.json({
+            success: true,
+            booking: updated,
+            booking_completed: true,
+            project_completed: false,
+            requires_approval: true,
+            approval_id: grind.approvalId ?? null,
+            message: `Sista bokningen är klar. Projektstängningen (${(grind.budgetAmount || 0).toLocaleString('sv-SE')} kr) väntar på admin-godkännande.`,
+          })
+        }
 
         // 1. Markera projektet som slutfört
         try {

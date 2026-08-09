@@ -6,6 +6,7 @@ import { getNextProjectNumber, bumpCounter } from '@/lib/numbering'
 import { getQuoteBudgetDerivation } from '@/lib/quotes/get-quote-budget-derivation'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 import { verifyOwnership } from '@/lib/auth/verify-ownership'
+import { checkFourEyesGate } from '@/lib/projects/four-eyes-gate'
 
 /**
  * GET - Lista projekt för ett företag
@@ -520,63 +521,15 @@ export async function PUT(request: NextRequest) {
       // projekt som helst förbi fyra ögon genom att skicka en krona.
       // En policygrind som frågar den grindade parten om värdet är ingen grind.
       if (body.status === 'completed') {
-        const { data: fourEyesConfig } = await supabase
-          .from('business_config')
-          .select('four_eyes_enabled, four_eyes_threshold_sek')
-          .eq('business_id', business.business_id)
-          .single()
-
-        if (fourEyesConfig?.four_eyes_enabled) {
-          // Tenantfiltret saknades också — uppslaget körs med service_role,
-          // så utan raden lästes budget från vilket företags projekt som helst.
-          const { data: existingProject } = await supabase
-            .from('project')
-            .select('budget_amount')
-            .eq('project_id', project_id)
-            .eq('business_id', business.business_id)
-            .single()
-
-          const pVal = existingProject?.budget_amount || 0
-          const troskel = fourEyesConfig.four_eyes_threshold_sek || 50000
-
-          if (pVal >= troskel) {
-            // Upprepad PUT ska inte ge ett kort per försök — ligger ett
-            // pending-kort redan i kön är svaret detsamma (auditens P2-4).
-            const { data: befintligtKort } = await supabase
-              .from('pending_approvals')
-              .select('id')
-              .eq('business_id', business.business_id)
-              .eq('approval_type', 'four_eyes_project_close')
-              .eq('status', 'pending')
-              .contains('payload', { project_id })
-              .limit(1)
-              .maybeSingle()
-
-            const approvalId = befintligtKort?.id
-              || `appr_4e_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
-
-            if (!befintligtKort) {
-              await supabase.from('pending_approvals').insert({
-                id: approvalId,
-                business_id: business.business_id,
-                approval_type: 'four_eyes_project_close',
-                // Etapp 3b (multi-employee-parity-plan.md): kö-routing.
-                routing_role: 'owner_admin',
-                title: `Projektstängning kräver godkännande — ${pVal.toLocaleString('sv-SE')} kr`,
-                description: `Projektets värde överstiger gränsen på ${troskel.toLocaleString('sv-SE')} kr.`,
-                payload: { project_id, budget_amount: pVal, threshold: troskel },
-                status: 'pending',
-                risk_level: 'high',
-                expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-              })
-            }
-
-            return NextResponse.json({
-              requires_approval: true,
-              approval_id: approvalId,
-              message: `Projektstängning kräver admin-godkännande (${pVal.toLocaleString('sv-SE')} kr)`,
-            })
-          }
+        // Delade grinden (lib/projects/four-eyes-gate.ts) — samma lås som
+        // mobilens complete-job. Beslutet fattas på databasens värde.
+        const grind = await checkFourEyesGate(supabase, business.business_id, project_id)
+        if (grind.gated) {
+          return NextResponse.json({
+            requires_approval: true,
+            approval_id: grind.approvalId,
+            message: `Projektstängning kräver admin-godkännande (${(grind.budgetAmount || 0).toLocaleString('sv-SE')} kr)`,
+          })
         }
 
         updates.completed_at = new Date().toISOString()
