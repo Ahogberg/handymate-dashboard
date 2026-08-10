@@ -137,6 +137,33 @@ test.describe('närvarobandet hittar aldrig på aktivitet', () => {
   })
 })
 
+test.describe('skrivradens chips pekar på sidor som finns', () => {
+  // Etapp 4: chipsen är Link-pills till hårdkodade rutter. En flyttad sida
+  // ska bli röd HÄR, inte en död länk i prod. Källskanningen läser chipsens
+  // href ur komponenten och kräver motsvarande page.tsx på disk.
+  const { SKRIVRAD_CHIPS } = require('../components/jarvis/SkrivRad')
+
+  test('varje chip-href motsvarar en existerande page.tsx', () => {
+    for (const chip of SKRIVRAD_CHIPS) {
+      const sida = path.join(ROOT, 'app', chip.href.replace(/^\//, ''), 'page.tsx')
+      expect(fs.existsSync(sida), `${chip.label} pekar på ${chip.href} — men ${sida} finns inte`).toBe(true)
+    }
+  })
+
+  test('chipsen är de fyra vanligaste ärendena — inte en meny', () => {
+    expect(SKRIVRAD_CHIPS).toHaveLength(4)
+    const labels = SKRIVRAD_CHIPS.map((c: any) => c.label)
+    expect(labels).toEqual(['Ny offert', 'Boka in ett jobb', 'Skicka en faktura', 'SMS till en kund'])
+  })
+
+  test('ytan växlar läge på beslutströskeln — samma tröskel som bevakningen', () => {
+    const s = fs.readFileSync(path.join(ROOT, 'components/jarvis/JarvisHome.tsx'), 'utf8')
+    expect(s).toContain('<SkrivRad stor={beslut <= 1}')
+    // Pill-markupen bor i komponenten nu — inte kvar duplicerad i ytan.
+    expect(s).not.toContain('Skriv till teamet — eller tryck.')
+  })
+})
+
 test.describe('profilbilderna når fram', () => {
   test('AgentPersona bär avatar', () => {
     const kalla = fs.readFileSync(path.join(ROOT, 'components/dashboard/agentPersonas.ts'), 'utf8')

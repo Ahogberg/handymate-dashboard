@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, FileText, Loader2, Mic, Phone, Undo2, User } from 'lucide-react'
+import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, FileText, Loader2, Phone, Undo2, User } from 'lucide-react'
 import { nyhetsAtgard, type NyhetsIkon } from '@/lib/jarvis/news-actions'
 import { byggBevakning, type BevakningsRad } from '@/lib/jarvis/bevakning'
 import { TeamBevakning } from '@/components/jarvis/TeamBevakning'
@@ -12,6 +12,7 @@ import { useJobbuddy } from '@/lib/JobbuddyContext'
 import { AgentDecisionCard, CardFactBox } from '@/components/agents/AgentDecisionCard'
 import { AgentNewsRow } from '@/components/agents/AgentNewsRow'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
+import { SkrivRad } from '@/components/jarvis/SkrivRad'
 import { RailCard } from '@/components/jarvis/RailCard'
 import { ScheduleTimeline, parseKonflikter, minuterFranIso } from '@/components/jarvis/ScheduleTimeline'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
@@ -797,20 +798,14 @@ export default function JarvisHome({
              skrivarbete. Öppnar befintliga Jobbkompisen (riktiga Matte, med
              röst), så ingen ny chattbackend behövs.
 
+             Två lägen (etapp 4): stor med chips när kön är lugn, pill när
+             besluten väntar — samma tröskel som bevakningen.
+
              Eget rutnätsbarn i stället för sist i huvudspalten: på mobil
              hamnar den då efter gräv-korten, som en hantverkare på bygget har
              mer nytta av än en skrivrad. På desktop ligger den kvar under
              huvudspalten precis som i mockupen. */}
-        <button
-          type="button"
-          onClick={() => openJobbkompisen(true)}
-          className="lg:row-start-2 lg:col-start-1 w-full flex items-center gap-2.5 h-12 pl-[18px] pr-2 bg-white border border-slate-200 rounded-full text-sm text-slate-400 hover:border-slate-300 transition-colors"
-        >
-          <span className="flex-1 text-left truncate">Skriv till teamet — eller tryck. Allt ovanför klaras utan tangentbord.</span>
-          <span className="w-9 h-9 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center shrink-0">
-            <Mic className="w-4 h-4" />
-          </span>
-        </button>
+        <SkrivRad stor={beslut <= 1} onOppna={() => openJobbkompisen(true)} />
       </div>
 
       {/* Ångra-snackbaren. POST:en har INTE gått iväg än. */}
