@@ -46,7 +46,13 @@ export const MIN_AMOUNT_KR = 500
  * hantverkaren med fakturan just nu. Att larma då är att lägga sig i.
  */
 export const GRACE_DAYS = 3
-export const MISSED_REVENUE_CLASSIFICATION_VERSION = 1
+/**
+ * v2 (Tur 4 etapp 2, 2026-08-10): projekt_utan_faktura med komplett underlag
+ * blir `fakturera_projekt` — kortet bär hela fakturautkastet och Godkänn
+ * skickar. Bumpen gör att pending `projekt:*`-kort på v1 klassas om nästa
+ * nattkörning (partitionPriorRevenueCards lägger dem i legacy-uppgradering).
+ */
+export const MISSED_REVENUE_CLASSIFICATION_VERSION = 2
 
 export type MissedRevenueKind = 'ata_ej_fakturerad' | 'material_ej_fakturerat' | 'projekt_utan_faktura'
 export type RevenueConfidence = 'CONFIRMED_UNBILLED' | 'LIKELY_UNBILLED' | 'NEEDS_REVIEW'
@@ -342,6 +348,28 @@ export function sweepMissedRevenue(input: {
   return all
     .filter(f => !input.alreadyReported.has(f.dedupeKey))
     .sort((a, b) => b.amountKr - a.amountKr)
+}
+
+/**
+ * Rubriken för ett fakturera_projekt-kort — kortet som bär ett FÄRDIGT utkast.
+ *
+ * Deterministisk och utan AI: namnet, månaden projektet blev klart och det
+ * belopp kunden betalar. "Fakturan är ifylld och redo" är sant i exakt det
+ * ögonblick kortet skapas — cronen persisterar hela previewn i samma veva.
+ */
+export function fakturaKortTitel(
+  projectName: string,
+  completedAt: string | null,
+  kundenBetalarKr: number,
+): string {
+  const namn = projectName?.trim() || 'Projektet'
+  const belopp = `${Math.round(kundenBetalarKr).toLocaleString('sv-SE')} kr`
+  const t = completedAt ? Date.parse(completedAt) : NaN
+  if (!Number.isFinite(t)) {
+    return `${namn} är klart — fakturan är ifylld och redo · ${belopp}`
+  }
+  const manad = new Date(t).toLocaleDateString('sv-SE', { month: 'long' })
+  return `${namn} blev klart i ${manad} — fakturan är ifylld och redo · ${belopp}`
 }
 
 /** Svensk rubrik till kortet. */

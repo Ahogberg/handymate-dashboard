@@ -4,6 +4,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import {
   sweepMissedRevenue,
   findingTitle,
+  fakturaKortTitel,
   MISSED_REVENUE_CLASSIFICATION_VERSION,
   legacyPendingCardsToExpire,
   partitionPriorRevenueCards,
@@ -11,6 +12,7 @@ import {
   type PriorRevenueCard,
 } from '@/lib/value/missed-revenue'
 import { arTestId, arTestNamn } from '@/lib/testdata'
+import { byggProjektFakturaUnderlag, type ProjektFakturaUnderlag } from '@/lib/invoices/project-invoice-draft'
 
 /**
  * Nattligt svep efter pengar som är intjänade men inte fakturerade (spår 1.3).
@@ -107,10 +109,12 @@ export async function GET(request: NextRequest) {
             .not('project_id', 'is', null),
           // Alla tidigare kort — ett avfärdat fynd ska inte återuppstå varje
           // natt. Källraden måste ändras eller få en ny semantisk nyckel.
+          // Båda korttyperna: fakturera_projekt delar dedupe-nycklarna
+          // (projekt:*) med missad_intakt sedan Tur 4 etapp 2.
           supabase.from('pending_approvals')
             .select('id, payload, status')
             .eq('business_id', businessId)
-            .eq('approval_type', 'missad_intakt'),
+            .in('approval_type', ['missad_intakt', 'fakturera_projekt']),
         ])
 
         for (const [namn, res] of Object.entries({ atas: atasRes, material: matsRes, projekt: projRes, fakturor: invRes, öppna: openRes })) {
@@ -147,9 +151,25 @@ export async function GET(request: NextRequest) {
           .filter(f => !arTestId(f.projectId) && !arTestNamn(f.projectName))
           .slice(0, MAX_CARDS_PER_BUSINESS)
 
+        const completedAtByProject = new Map(
+          (projRes.data || []).map((p: any) => [p.project_id as string, p.completed_at as string | null]),
+        )
+
         for (const f of findings) {
           const existingId = legacyPendingByDedupe.get(f.dedupeKey)
-          await persistCard(supabase, businessId, f, existingId)
+
+          // Tur 4 etapp 2: ett avslutat projekt utan faktura får bära hela
+          // fakturautkastet NÄR underlaget håller (kund finns, rader finns,
+          // ingen faktura). Håller det inte förblir kortet dagens
+          // granska-variant (missad_intakt) — fallbacken ägaren beslutade.
+          // Beslutet fattas HÄR, i produktionsögonblicket — aldrig vid klick.
+          let underlag: ProjektFakturaUnderlag | null = null
+          if (f.kind === 'projekt_utan_faktura') {
+            const u = await byggProjektFakturaUnderlag(supabase, businessId, f.projectId)
+            if (u.ok) underlag = u
+          }
+
+          await persistCard(supabase, businessId, f, existingId, underlag, completedAtByProject.get(f.projectId) ?? null)
           if (existingId) updated++
           else created++
         }
@@ -204,8 +224,49 @@ async function persistCard(
   businessId: string,
   f: MissedRevenueFinding,
   existingId?: string,
+  underlag?: ProjektFakturaUnderlag | null,
+  completedAt?: string | null,
 ): Promise<void> {
-  const fields = {
+  // ═══ fakturera_projekt — kortet bär HELA utkastet (Tur 4 etapp 2) ═══
+  //
+  // Bara när byggProjektFakturaUnderlag svarat ok. Previewn persisteras i
+  // sin helhet: exekveraren jämför kortets customer_pays mot ett nybyggt
+  // underlag vid Godkänn (drift-vakt) — utan komplett preview vore vakten
+  // blind. Ingen faktura skapas här; det sker först vid godkännandet.
+  const fields = underlag
+    ? {
+        approval_type: 'fakturera_projekt',
+        routing_role: 'owner_admin',
+        title: fakturaKortTitel(f.projectName, completedAt ?? null, underlag.customerPays),
+        description: `${f.projectName} — ${f.evidence}`,
+        status: 'pending',
+        // Ett klick skickar en riktig faktura till kund — medium, aldrig low.
+        risk_level: 'medium',
+        payload: {
+          routed_agent: 'karin',
+          kind: f.kind,
+          project_id: f.projectId,
+          project_name: f.projectName,
+          amount_kr: underlag.customerPays,
+          source_amount_kr: f.sourceAmountKr,
+          confidence: f.confidence,
+          recommended_action: f.action,
+          source_ids: f.sourceIds,
+          classification_version: MISSED_REVENUE_CLASSIFICATION_VERSION,
+          evidence: f.evidence,
+          preview: {
+            items: underlag.items,
+            subtotal: underlag.subtotal,
+            vat_amount: underlag.vatAmount,
+            total: underlag.total,
+            rot_rut_deduction: underlag.rotRutDeduction,
+            customer_pays: underlag.customerPays,
+            total_before_vat: underlag.subtotal,
+          },
+          dedupe_key: f.dedupeKey,
+        },
+      }
+    : {
     approval_type: 'missad_intakt',
     // Ekonomi hör till den som får se den — samma resonemang som
     // behörighetskontraktet (see_financials).

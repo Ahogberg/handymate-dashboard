@@ -28,7 +28,7 @@ export function agentForApproval(approval: ApprovalLike): string {
   if (routed && AGENT_INFO[routed]) return routed
 
   const t = approval.approval_type
-  if (t.includes('invoice') || t.includes('payment') || t === 'profitability_warning') return 'karin'
+  if (t.includes('invoice') || t.includes('faktur') || t.includes('payment') || t === 'profitability_warning') return 'karin'
   if (t.includes('campaign') || t.includes('neighbour') || t.includes('reactivat') || t.includes('review')) return 'hanna'
   if (t.includes('quote') || t.includes('lead') || t.includes('pipeline')) return 'daniel'
   if (t.includes('booking') || t.includes('project') || t.includes('dispatch') || t.includes('job_report') || t.includes('warranty')) return 'lars'
@@ -56,6 +56,7 @@ export const TYPE_LABEL: Record<string, string> = {
   tidrapport_forslag: 'Tidrapport',
   create_quote_draft: 'Offertutkast',
   create_ata_draft: 'ÄTA-förslag',
+  fakturera_projekt: 'Faktura',
 }
 
 export function typeLabel(approvalType: string): string {
@@ -118,6 +119,12 @@ export function approveLabel(approvalType: string, payload?: Record<string, unkn
     const varde = kr(p.amount_estimate)
     return varde ? `Skapa ÄTA:n — ${varde}` : 'Skapa ÄTA:n'
   }
+  // fakturera_projekt SKICKAR fakturan — beloppet på knappen är det kunden
+  // betalar (amount_kr sätts till customer_pays när kortet skapas).
+  if (approvalType === 'fakturera_projekt') {
+    const varde = kr(p.amount_kr)
+    return varde ? `Godkänn & skicka — ${varde}` : 'Godkänn & skicka'
+  }
   if (approvalType === 'send_quote') return 'Godkänn & skicka'
   if (approvalType === 'send_sms') return 'Skicka'
   if (approvalType === 'autonomy_offer') return 'Ja, kör automatiskt'
@@ -134,6 +141,9 @@ export function deepLinkFor(approval: ApprovalLike): { label: string; href: stri
   }
   if (t === 'create_quote_draft' && pl.lead_id) {
     return { label: 'Öppna leaden →', href: `/dashboard/pipeline?lead=${pl.lead_id}` }
+  }
+  if (t === 'fakturera_projekt' && pl.project_id) {
+    return { label: 'Läs & ändra →', href: `/dashboard/projects/${pl.project_id}` }
   }
   if (t === 'publish_microsite') return { label: 'Visa först →', href: '/dashboard/website' }
   if (t.includes('booking')) return { label: 'Öppna kalendern →', href: '/dashboard/schedule' }

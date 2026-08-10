@@ -1027,14 +1027,45 @@ function ApprovalCard({
               )
             })}
           </div>
-          {typeof pl.preview.total_before_vat === 'number' && pl.preview.total_before_vat > 0 && (
+          {/* Full summering (Tur 4 etapp 2): fakturera_projekt persisterar
+              hela previewn — Delsumma/Moms/ROT/Kunden betalar, samma rader
+              som fakturan får. Äldre kort utan customer_pays behåller den
+              enkla "Att fakturera"-raden (bakåtkompatibelt). */}
+          {typeof pl.preview.customer_pays === 'number' && pl.preview.customer_pays > 0 ? (
+            <div className="border-t border-slate-200 mt-1.5 pt-2">
+              {typeof pl.preview.subtotal === 'number' && (
+                <div className="flex justify-between text-[13px] text-slate-600 py-0.5">
+                  <span>Delsumma</span>
+                  <span className="font-heading font-semibold">{formatKr(pl.preview.subtotal)}</span>
+                </div>
+              )}
+              {typeof pl.preview.vat_amount === 'number' && (
+                <div className="flex justify-between text-[13px] text-slate-600 py-0.5">
+                  <span>Moms</span>
+                  <span className="font-heading font-semibold">{formatKr(pl.preview.vat_amount)}</span>
+                </div>
+              )}
+              {typeof pl.preview.rot_rut_deduction === 'number' && pl.preview.rot_rut_deduction > 0 && (
+                <div className="flex justify-between text-[13px] text-slate-600 py-0.5">
+                  <span>ROT-avdrag</span>
+                  <span className="font-heading font-semibold text-primary-700">−{formatKr(pl.preview.rot_rut_deduction)}</span>
+                </div>
+              )}
+              <div className="flex items-baseline justify-between border-t border-slate-200 mt-1 pt-2">
+                <span className="text-[13px] font-semibold text-slate-900">Kunden betalar</span>
+                <span className="font-heading text-[17px] font-bold text-slate-900">
+                  {formatKr(pl.preview.customer_pays)}
+                </span>
+              </div>
+            </div>
+          ) : typeof pl.preview.total_before_vat === 'number' && pl.preview.total_before_vat > 0 ? (
             <div className="flex items-baseline justify-between border-t border-slate-200 mt-1.5 pt-2">
               <span className="text-[13px] font-semibold text-slate-700">Att fakturera</span>
               <span className="font-heading text-[17px] font-bold text-slate-900">
                 {formatKr(pl.preview.total_before_vat)}
               </span>
             </div>
-          )}
+          ) : null}
         </CardFactBox>
       )}
 

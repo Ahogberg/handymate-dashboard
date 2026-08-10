@@ -67,6 +67,15 @@ test.describe('KNAPPEN SÄGER VAD SOM HÄNDER', () => {
     expect(approveLabel('send_sms').toLowerCase()).toContain('skicka')
   })
 
+  test('fakturera_projekt säger skicka OCH beloppet kunden betalar', () => {
+    // Kortet bär hela utkastet och Godkänn skickar fakturan (Tur 4 etapp 2).
+    // amount_kr sätts till customer_pays när kortet skapas i cronen.
+    const label = approveLabel('fakturera_projekt', { amount_kr: 48750 })
+    expect(label).toBe(`Godkänn & skicka — ${(48750).toLocaleString('sv-SE')} kr`)
+    // Utan belopp lovas ingen påhittad siffra — men verbet står kvar.
+    expect(approveLabel('fakturera_projekt', {})).toBe('Godkänn & skicka')
+  })
+
   test('okänd typ faller tillbaka på ett neutralt ord', () => {
     // Bättre att säga för lite än att lova fel.
     expect(approveLabel('nagot_helt_nytt')).toBe('Godkänn')
@@ -92,6 +101,8 @@ test.describe('agentroutingen', () => {
 
   test('fakturor till Karin, offerter till Daniel, samtal till Lisa', () => {
     expect(agentForApproval({ approval_type: 'invoice_reminder' })).toBe('karin')
+    // Även utan routed_agent i payloaden — svenskt "faktur" räcker.
+    expect(agentForApproval({ approval_type: 'fakturera_projekt' })).toBe('karin')
     expect(agentForApproval({ approval_type: 'create_quote_draft' })).toBe('daniel')
     expect(agentForApproval({ approval_type: 'send_sms' })).toBe('lisa')
     expect(agentForApproval({ approval_type: 'create_booking' })).toBe('lars')
@@ -122,5 +133,12 @@ test.describe('djuplänken', () => {
   test('utan id blir det ingen länk — aldrig en trasig', () => {
     expect(deepLinkFor({ approval_type: 'invoice_reminder', payload: {} })).toBeNull()
     expect(deepLinkFor({ approval_type: 'create_quote_draft', payload: {} })).toBeNull()
+    expect(deepLinkFor({ approval_type: 'fakturera_projekt', payload: {} })).toBeNull()
+  })
+
+  test('fakturera_projekt länkar till projektet — där underlaget kan ändras', () => {
+    const länk = deepLinkFor({ approval_type: 'fakturera_projekt', payload: { project_id: 'p1' } })
+    expect(länk?.href).toBe('/dashboard/projects/p1')
+    expect(länk?.label).toBe('Läs & ändra →')
   })
 })

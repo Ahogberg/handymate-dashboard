@@ -86,6 +86,13 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   invoice_reminder: 'EXECUTABLE_ACTION',
   automation: 'EXECUTABLE_ACTION',
   price_adjustment: 'EXECUTABLE_ACTION',
+  // `fakturera_projekt` är den ENDA intäktsfynd-varianten som får utföras —
+  // och bara för att den skapas uteslutande när byggProjektFakturaUnderlag
+  // gett komplett underlag (kund, rader, ingen befintlig faktura), previewn
+  // persisterats på kortet, och exekveraren kör drift-vakt (bygger om
+  // underlaget och failar stängt vid avvikelse). `missad_intakt` nedan
+  // förblir REVIEW_REQUIRED — ett tvetydigt fynd får aldrig en skicka-knapp.
+  fakturera_projekt: 'EXECUTABLE_ACTION',
 
   // ── Kräver mänsklig granskning, aldrig ett klick ────────────────────
   //

@@ -149,6 +149,36 @@ test.describe('de tidigare hemlösa typerna', () => {
   })
 })
 
+test.describe('fakturera_projekt — enda intäktsfyndet som får utföras', () => {
+  test('typen är klassad som utförande och har en egen hanterare', () => {
+    expect(classify('fakturera_projekt')).toBe('EXECUTABLE_ACTION')
+    expect(hanteradeTyper().has('fakturera_projekt')).toBe(true)
+  })
+
+  test('missad_intakt förblir granskning — tvetydiga fynd får aldrig en skicka-knapp', () => {
+    // Beslutet fattas i produktionsögonblicket (cronen), aldrig vid klick:
+    // komplett underlag ⇒ fakturera_projekt, annars missad_intakt.
+    expect(classify('missad_intakt')).toBe('REVIEW_REQUIRED')
+    expect(mayExecute('missad_intakt')).toBe(false)
+  })
+
+  test('caset kör drift-vakten och failar stängt med den ärliga texten', () => {
+    const i = RUTT.indexOf("case 'fakturera_projekt':")
+    expect(i, 'hanteraren saknas').toBeGreaterThan(-1)
+    const gren = RUTT.slice(i, RUTT.indexOf("case 'lead_review':", i))
+    // Underlaget byggs OM vid godkännandet — kortet visade A, B skickas aldrig.
+    expect(gren).toContain('byggProjektFakturaUnderlag')
+    expect(gren).toContain('Underlaget har ändrats sedan kortet skapades — öppna projektet och granska innan något skickas.')
+    // Idempotens: en befintlig faktura stoppar allt, ärligt.
+    expect(gren).toContain('Projektet har redan en faktura — ingenting skickades.')
+    // Sändningen går via sändrutten med klickarens session (create_invoices-grinden).
+    expect(gren).toContain('/api/invoices/send')
+    expect(gren).toContain('forwardHeaders()')
+    // Fakturan skapas som utkast — sändrutten äger statusflippen.
+    expect(gren).toContain("status: 'draft'")
+  })
+})
+
 test.describe('uppslaget', () => {
   test('okänd typ ger null, aldrig en gissning', () => {
     expect(classify('finns-inte')).toBeNull()

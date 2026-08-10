@@ -1685,6 +1685,138 @@ async function executeApprovalPayload(
         }
       }
 
+      case 'fakturera_projekt': {
+        // ═══ GODKÄNN & SKICKA — kortet bar hela utkastet (Tur 4 etapp 2) ═══
+        //
+        // Enda intäktsfynd-varianten som får utföras (se ACTION_CONTRACT).
+        // Kortet skapades bara när underlaget var komplett; här verifieras
+        // det PÅ NYTT innan pengar rör sig:
+        //   1. Idempotens — finns redan en faktura görs ingenting.
+        //   2. Drift-vakt — underlaget byggs om; skiljer sig beloppet från
+        //      kortets preview failar vi stängt. Kortet visade A; B skickas
+        //      aldrig.
+        //   3. Fakturan skapas som UTKAST, ÄTA källmarkeras.
+        //   4. Sändningen går via /api/invoices/send med klickarens session
+        //      (rutten grindar create_invoices). Misslyckas den ligger
+        //      fakturan kvar som utkast och svaret säger det ärligt.
+        const pl = payload as any
+        const projectId = pl.project_id as string | undefined
+        if (!projectId) return { action: 'fakturera_projekt', error: 'project_id saknas' }
+
+        const supabaseFP = getServerSupabase()
+
+        const { data: befintlig } = await supabaseFP
+          .from('invoice')
+          .select('invoice_id')
+          .eq('business_id', businessId)
+          .eq('project_id', projectId)
+          .limit(1)
+          .maybeSingle()
+        if (befintlig) {
+          return {
+            action: 'fakturera_projekt',
+            error: 'Projektet har redan en faktura — ingenting skickades.',
+            navigate_to: `/dashboard/invoices/${befintlig.invoice_id}`,
+          }
+        }
+
+        const { byggProjektFakturaUnderlag } = await import('@/lib/invoices/project-invoice-draft')
+        const underlag = await byggProjektFakturaUnderlag(supabaseFP, businessId, projectId)
+        if (!underlag.ok) {
+          return {
+            action: 'fakturera_projekt',
+            error: 'Underlaget har ändrats sedan kortet skapades — öppna projektet och granska innan något skickas.',
+            navigate_to: `/dashboard/projects/${projectId}`,
+          }
+        }
+
+        const kortetsBelopp = Number(pl.preview?.customer_pays)
+        if (!Number.isFinite(kortetsBelopp) || Math.round(underlag.customerPays) !== Math.round(kortetsBelopp)) {
+          return {
+            action: 'fakturera_projekt',
+            error: 'Underlaget har ändrats sedan kortet skapades — öppna projektet och granska innan något skickas.',
+            navigate_to: `/dashboard/projects/${projectId}`,
+          }
+        }
+
+        const { data: cfgFP } = await supabaseFP
+          .from('business_config')
+          .select('default_payment_days')
+          .eq('business_id', businessId)
+          .maybeSingle()
+
+        const { createInvoice } = await import('@/lib/invoices/create-invoice')
+        let fakturaFP: { invoice_id: string; invoice_number: string }
+        try {
+          const created = await createInvoice(supabaseFP, {
+            businessId,
+            customerId: underlag.project.customer_id,
+            items: underlag.items,
+            subtotal: underlag.subtotal,
+            vatRate: underlag.vatRate,
+            vatAmount: underlag.vatAmount,
+            total: underlag.total,
+            rotRutType: underlag.rotRutType,
+            rotRutDeduction: underlag.rotRutDeduction,
+            customerPays: underlag.customerPays,
+            projectId,
+            quoteId: underlag.project.quote_id,
+            invoiceType: 'standard',
+            status: 'draft',
+            dueDays: cfgFP?.default_payment_days || 30,
+            personnummer: underlag.personnummer,
+            fastighetsbeteckning: underlag.fastighetsbeteckning,
+            selectClause: 'invoice_id, invoice_number, total, status',
+          })
+          fakturaFP = created.invoice
+        } catch (createErr: any) {
+          return { action: 'fakturera_projekt', error: `Fakturan kunde inte skapas: ${createErr.message}` }
+        }
+
+        if (underlag.ataChangeIds.length > 0) {
+          const { markInvoiceSources } = await import('@/lib/invoices/mark-sources')
+          const markering = await markInvoiceSources(supabaseFP, {
+            businessId,
+            invoiceId: fakturaFP.invoice_id,
+            changeIds: underlag.ataChangeIds,
+          })
+          if (!markering.ok) {
+            console.error('[approvals/fakturera_projekt] kunde inte källmarkera ÄTA:', markering.errors, {
+              project_id: projectId,
+              invoice_id: fakturaFP.invoice_id,
+            })
+          }
+        }
+
+        const sendResFP = await fetch(`${appUrl}/api/invoices/send`, {
+          method: 'POST',
+          headers: forwardHeaders(),
+          body: JSON.stringify({
+            invoice_id: fakturaFP.invoice_id,
+            send_email: true,
+            send_sms: true,
+          }),
+        })
+        const rFP = await classifyResponse(sendResFP)
+        if (!rFP.ok) {
+          return {
+            action: 'fakturera_projekt',
+            invoice_id: fakturaFP.invoice_id,
+            navigate_to: `/dashboard/invoices/${fakturaFP.invoice_id}`,
+            ...rFP,
+            error: rFP.error
+              ? `Fakturan är skapad som utkast men kunde inte skickas: ${rFP.error}`
+              : 'Fakturan är skapad som utkast men kunde inte skickas — öppna och skicka själv.',
+          }
+        }
+        return {
+          action: 'fakturera_projekt',
+          invoice_id: fakturaFP.invoice_id,
+          navigate_to: `/dashboard/invoices/${fakturaFP.invoice_id}`,
+          ...rFP,
+        }
+      }
+
       case 'lead_review': {
         // Email-forwarding-flöde (2026-05-28): leaden skapades av
         // /api/email/inbound i status='pending_review' utan deal.

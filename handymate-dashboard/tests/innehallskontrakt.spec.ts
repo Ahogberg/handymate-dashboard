@@ -452,6 +452,22 @@ test.describe('missad_intakt: utkastet följer klassificeringen', () => {
     expect(s, 'svepet skapar en faktura').not.toMatch(/\.from\('invoice'\)\s*\.insert/)
   })
 
+  test('fakturera_projekt persisterar HELA previewn — drift-vakten kräver den', () => {
+    // Tur 4 etapp 2: kortet bär fakturautkastet (rader + delsummor + kunden
+    // betalar). Exekveraren jämför kortets customer_pays mot ett nybyggt
+    // underlag vid Godkänn — utan komplett preview vore vakten blind.
+    const s = kod('app/api/cron/missed-revenue/route.ts')
+    expect(s).toContain("approval_type: 'fakturera_projekt'")
+    const i = s.indexOf("approval_type: 'fakturera_projekt'")
+    const block = s.slice(i, i + 1600)
+    for (const falt of ['items: underlag.items', 'subtotal:', 'vat_amount:', 'rot_rut_deduction:', 'customer_pays:', 'total_before_vat:']) {
+      expect(block, `previewn saknar ${falt}`).toContain(falt)
+    }
+    // Ett klick skickar en riktig faktura — aldrig low.
+    expect(block).toContain("risk_level: 'medium'")
+    expect(block).toContain("routing_role: 'owner_admin'")
+  })
+
   test('kortet renderar raderna utan att öppna något', () => {
     const s = kod('components/jarvis/JarvisHome.tsx')
     expect(s).toContain('pl.preview?.items')

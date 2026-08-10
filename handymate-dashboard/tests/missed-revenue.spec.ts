@@ -21,10 +21,12 @@ import {
   sweepMissedRevenue,
   isPastGrace,
   findingTitle,
+  fakturaKortTitel,
   legacyPendingCardsToExpire,
   partitionPriorRevenueCards,
   MIN_AMOUNT_KR,
   GRACE_DAYS,
+  MISSED_REVENUE_CLASSIFICATION_VERSION,
   type ProjectRow,
 } from '../lib/value/missed-revenue'
 
@@ -288,10 +290,24 @@ test.describe('versionsdedupe för befintliga kort', () => {
     const result = partitionPriorRevenueCards([{
       id: 'appr_current',
       status: 'pending',
-      payload: { dedupe_key: 'ata:a1', classification_version: 1 },
+      payload: { dedupe_key: 'ata:a1', classification_version: MISSED_REVENUE_CLASSIFICATION_VERSION },
     }])
     expect(result.alreadyReported.has('ata:a1')).toBe(true)
     expect(result.legacyPendingByDedupe.size).toBe(0)
+  })
+
+  test('versionsbumpen till v2 gör v1-pendingkort till legacy — uppgraderas nästa natt', () => {
+    // Tur 4 etapp 2: pending projekt:*-kort på v1 ska klassas om (till
+    // fakturera_projekt när underlaget håller). Mekaniken är versionsbumpen —
+    // står konstanten kvar på 1 händer ingenting i prod.
+    expect(MISSED_REVENUE_CLASSIFICATION_VERSION).toBeGreaterThanOrEqual(2)
+    const result = partitionPriorRevenueCards([{
+      id: 'appr_v1',
+      status: 'pending',
+      payload: { dedupe_key: 'projekt:p1', classification_version: 1 },
+    }])
+    expect(result.legacyPendingByDedupe.get('projekt:p1')).toBe('appr_v1')
+    expect(result.alreadyReported.has('projekt:p1')).toBe(false)
   })
 
   test('legacykort som inte längre kvalificerar avförs, giltiga behålls', () => {
@@ -342,6 +358,41 @@ test.describe('rubrikerna är på svenska och säger beloppet', () => {
   })
 })
 
+test.describe('fakturaKortTitel — rubriken på kortet som bär utkastet', () => {
+  test('namn, svensk månad och beloppet kunden betalar', () => {
+    const titel = fakturaKortTitel('Badrum Ekbacken', '2026-07-01T09:00:00.000Z', 48750)
+    expect(titel).toContain('Badrum Ekbacken')
+    expect(titel).toContain('juli')
+    expect(titel).toContain('fakturan är ifylld och redo')
+    // sv-SE formaterar med hårt mellanslag — jämför mot samma formaterare.
+    expect(titel).toContain(`${(48750).toLocaleString('sv-SE')} kr`)
+  })
+
+  test('deterministisk — samma indata ger exakt samma rubrik', () => {
+    const a = fakturaKortTitel('P', '2026-06-15T00:00:00.000Z', 1000)
+    const b = fakturaKortTitel('P', '2026-06-15T00:00:00.000Z', 1000)
+    expect(a).toBe(b)
+  })
+
+  test('saknat eller trasigt datum ger rubrik utan månadspåstående', () => {
+    for (const datum of [null, 'inte-ett-datum']) {
+      const titel = fakturaKortTitel('Altan Berg', datum, 12000)
+      expect(titel).toContain('Altan Berg')
+      expect(titel).toContain('är klart')
+      expect(titel).not.toContain('blev klart i')
+    }
+  })
+
+  test('tomt projektnamn faller tillbaka på ett neutralt ord, aldrig tomrum', () => {
+    expect(fakturaKortTitel('', LÄNGE_SEDAN, 900)).toMatch(/^Projektet /)
+  })
+
+  test('inga tekniska termer i rubriken', () => {
+    const titel = fakturaKortTitel('Badrum Ekbacken', LÄNGE_SEDAN, 48750)
+    expect(titel).not.toMatch(/payload|invoice|project_|null|undefined|_/)
+  })
+})
+
 test.describe('produktionsvägarnas klassningskontrakt', () => {
   test('båda vägarna läser faktureringsformen som klassningen kräver', () => {
     const select = ".select('project_id, name, project_type, status, completed_at')"
@@ -361,11 +412,13 @@ test.describe('produktionsvägarnas klassningskontrakt', () => {
     }
   })
 
-  test('dedupen läser även hanterade kort, inte bara pending', () => {
+  test('dedupen läser även hanterade kort, inte bara pending — och båda korttyperna', () => {
     const start = cronSource.indexOf("supabase.from('pending_approvals')")
     const end = cronSource.indexOf('])', start)
     const query = cronSource.slice(start, end)
-    expect(query).toContain(".eq('approval_type', 'missad_intakt')")
+    // fakturera_projekt delar dedupe-nycklarna (projekt:*) med missad_intakt —
+    // läser frågan bara den ena typen återuppstår hanterade kort som nya.
+    expect(query).toContain(".in('approval_type', ['missad_intakt', 'fakturera_projekt'")
     expect(query).not.toContain(".eq('status', 'pending')")
     expect(cronSource).toContain('legacyPendingByDedupe.get(f.dedupeKey)')
     expect(cronSource).toContain('legacyPendingCardsToExpire(legacyPendingByDedupe, currentFindingKeys)')
