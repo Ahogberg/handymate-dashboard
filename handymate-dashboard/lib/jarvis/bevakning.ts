@@ -50,6 +50,33 @@ export interface BevakningsIndata {
   hannaFragor?: string[] | null
 }
 
+/**
+ * Fynd-pekaren: "1 nytt fynd ↓" på agentens bevakningskort (2026-08-10).
+ *
+ * Fynden BOR i "Värt att veta" (tre grindar, en sanning) — kortet får en
+ * PEKARE dit, aldrig en kopia. Att duplicera fyndtexten in i korten vore
+ * gamla närvarobandets felklass: samma sak på två ställen gör att man
+ * slutar läsa båda. anchorId pekar på agentens första synliga nyhetsrad;
+ * ytan scrollar dit (samma mönster som "väntar ovan" i Att hämta).
+ */
+export interface FyndPekare {
+  antal: number
+  anchorId: string
+}
+
+export function fyndPerAgent(
+  nyheter: Array<{ id: string; agent_id: string | null | undefined }>,
+): Record<string, FyndPekare> {
+  const ut: Record<string, FyndPekare> = {}
+  for (const n of nyheter) {
+    if (!n.agent_id || !n.id) continue
+    const p = ut[n.agent_id]
+    if (p) p.antal += 1
+    else ut[n.agent_id] = { antal: 1, anchorId: `nyhet-${n.id}` }
+  }
+  return ut
+}
+
 /** "sön 14 juni 09:00" — deterministisk sv-SE, utan år. */
 function bokningsEtikett(iso: string): string | null {
   const t = Date.parse(iso)

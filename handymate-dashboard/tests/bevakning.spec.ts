@@ -11,7 +11,7 @@
 import { test, expect } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
-import { byggBevakning } from '../lib/jarvis/bevakning'
+import { byggBevakning, fyndPerAgent } from '../lib/jarvis/bevakning'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
@@ -140,7 +140,7 @@ test.describe('Hannas mjuka fråga', () => {
 test.describe('ytan och datakällan', () => {
   test('JarvisHome renderar bevakningen EFTER besluten, med den explicita tröskeln', () => {
     const s = read('components/jarvis/JarvisHome.tsx')
-    expect(s).toContain('<TeamBevakning rader={bevakning} kompakt={beslut >= 2} />')
+    expect(s).toContain('<TeamBevakning rader={bevakning} kompakt={beslut >= 2} fynd={fynd} />')
     // Efter beslutssektionen, före Värt att veta. Sektionsmarkören, inte
     // frasen — "Värt att veta" står även i filhuvudets doc-kommentar.
     const beslutSlut = s.indexOf('Se alla i Godkännanden')
@@ -170,5 +170,52 @@ test.describe('ytan och datakällan', () => {
     const s = read('app/api/dashboard/team-activity/route.ts')
     const watchDel = s.slice(s.indexOf('WATCH-BLOCKET'))
     expect(watchDel).not.toContain('customer:customer_id(')
+  })
+})
+
+test.describe('fynd-pekaren — pekare till Värt att veta, aldrig kopia', () => {
+  test('räknar per agent och pekar på FÖRSTA synliga raden', () => {
+    const fynd = fyndPerAgent([
+      { id: 'obs_1', agent_id: 'daniel' },
+      { id: 'obs_2', agent_id: 'karin' },
+      { id: 'obs_3', agent_id: 'daniel' },
+    ])
+    expect(fynd.daniel).toEqual({ antal: 2, anchorId: 'nyhet-obs_1' })
+    expect(fynd.karin).toEqual({ antal: 1, anchorId: 'nyhet-obs_2' })
+  })
+
+  test('rader utan agent eller id räknas aldrig', () => {
+    expect(fyndPerAgent([{ id: '', agent_id: 'karin' }, { id: 'x', agent_id: null }])).toEqual({})
+    expect(fyndPerAgent([])).toEqual({})
+  })
+
+  test('kortet bär en KNAPP som scrollar — aldrig fyndtexten', () => {
+    const s = read('components/jarvis/TeamBevakning.tsx')
+    expect(s).toContain('scrollTillFynd')
+    expect(s).toContain('scrollIntoView')
+    // Nyhetsraderna bär ankaret pekaren träffar.
+    expect(read('components/jarvis/JarvisHome.tsx')).toContain('id={`nyhet-${o.id}`}')
+  })
+})
+
+test.describe('orkestratorn — hierarki genom layout, aldrig pilar', () => {
+  const s = read('components/jarvis/TeamBevakning.tsx')
+
+  test('Matte får fullbreddsraden överst, specialisterna gridden', () => {
+    expect(s).toContain("rader.find(r => r.agentId === 'matte')")
+    expect(s).toContain("rader.filter(r => r.agentId !== 'matte')")
+    expect(s).toContain('håller ihop teamet')
+    // Kompaktavatarerna leds av Matte — ordningen bär hierarkin.
+    expect(s).toContain('matte ? [matte, ...specialister] : specialister')
+  })
+
+  test('yrkesrollerna står i korten — ur personakartan, aldrig hårdkodade', () => {
+    expect(s).toContain('AGENT_INFO[r.agentId]?.role')
+  })
+
+  test('skrivraden säger vem man delegerar till', () => {
+    const skrivrad = read('components/jarvis/SkrivRad.tsx')
+    expect(skrivrad).toContain('Säg till Matte — teamet tar det därifrån')
+    expect(skrivrad).toContain('Säg till Matte — eller tryck.')
   })
 })

@@ -4,30 +4,73 @@ import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
-import type { BevakningsRad } from '@/lib/jarvis/bevakning'
+import type { BevakningsRad, FyndPekare } from '@/lib/jarvis/bevakning'
 
 /**
- * "Teamet just nu" — bevakningskorten (Tur 4 etapp 3).
+ * "Teamet just nu" — bevakningskorten (Tur 4 etapp 3, orkestratorpolering
+ * 2026-08-10).
  *
  * Ersätter TeamPresenceBand: bandet härledde dåtid ("vad har agenterna
  * gjort"), det här säger vad teamet HÅLLER ÖGONEN PÅ och när de säger till.
  * Raderna kommer färdiga ur lib/jarvis/bevakning.ts — komponenten ritar bara.
  *
+ * ═══ MATTE ÖVERST — HIERARKI GENOM LAYOUT, ALDRIG PILAR (Andreas beslut) ═══
+ *
+ * Matte är orkestratorn och får en egen fullbreddsrad över specialisternas
+ * grid. Ordningen och copyn bär hierarkin; ett org-diagram med pilar hade
+ * varit dekoration som säger samma sak varje dag — och visar hur systemet
+ * är byggt i stället för vad hantverkaren får. I kompaktläget leder Matte
+ * avatarstapeln av samma skäl.
+ *
+ * ═══ FYND-PEKAREN — PEKARE, ALDRIG KOPIA ═══
+ *
+ * "N nya fynd ↓" scrollar till agentens rad i Värt att veta. Fyndtexten bor
+ * BARA där — en kopia i kortet vore närvarobandets felklass (samma sak på
+ * två ställen → man slutar läsa båda).
+ *
  * ═══ TRÖSKELN, EXPLICIT ═══
  *
- * `kompakt` sätts av ytan till `beslut >= 2` (förenar Tur 4 med 3b: besluten
- * äger skärmen). Kompakt = EN rad med staplade avatarer och antal; chevronen
- * expanderar lokalt. Vid `beslut <= 1` får bevakningen andas i en grid.
- *
- * Grön puls bara vid `aktiv` — schemalagda rader och Hannas fråga pulserar
- * aldrig (regeln bor i lib:en, inte här).
+ * `kompakt` sätts av ytan till `beslut >= 2` (besluten äger skärmen).
+ * Grön puls bara vid `aktiv` — regeln bor i lib:en, inte här.
  */
-export function TeamBevakning({ rader, kompakt }: { rader: BevakningsRad[]; kompakt: boolean }) {
+export function TeamBevakning({
+  rader,
+  kompakt,
+  fynd,
+}: {
+  rader: BevakningsRad[]
+  kompakt: boolean
+  fynd?: Record<string, FyndPekare>
+}) {
   const [oppen, setOppen] = useState(false)
 
   // Ingen bevakning → ingenting. En tom rad ansikten hade sagt "teamet finns"
   // när frågan är "vad bevakar teamet".
   if (rader.length === 0) return null
+
+  const matte = rader.find(r => r.agentId === 'matte') ?? null
+  const specialister = rader.filter(r => r.agentId !== 'matte')
+  const avatarOrdning = matte ? [matte, ...specialister] : specialister
+
+  const scrollTillFynd = (agentId: string) => {
+    const p = fynd?.[agentId]
+    if (!p) return
+    document.getElementById(p.anchorId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
+  const FyndKnapp = ({ agentId }: { agentId: string }) => {
+    const p = fynd?.[agentId]
+    if (!p) return null
+    return (
+      <button
+        type="button"
+        onClick={() => scrollTillFynd(agentId)}
+        className="inline-flex items-center text-xs font-semibold text-primary-700 hover:underline"
+      >
+        {p.antal} ny{p.antal === 1 ? 'tt fynd' : 'a fynd'} ↓
+      </button>
+    )
+  }
 
   if (kompakt && !oppen) {
     return (
@@ -37,7 +80,7 @@ export function TeamBevakning({ rader, kompakt }: { rader: BevakningsRad[]; komp
         className="mt-6 w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 min-h-[44px] flex items-center gap-3 text-left hover:border-slate-300 transition-colors"
       >
         <span className="flex -space-x-2 shrink-0">
-          {rader.slice(0, 4).map(r => (
+          {avatarOrdning.slice(0, 4).map(r => (
             <span key={r.agentId} className="inline-flex rounded-lg ring-2 ring-white">
               <AgentAvatar agentKey={r.agentId} size="sm" />
             </span>
@@ -68,13 +111,34 @@ export function TeamBevakning({ rader, kompakt }: { rader: BevakningsRad[]; komp
         )}
       </div>
 
+      {/* Orkestratorn — fullbredd, före specialisterna. */}
+      {matte && (
+        <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 mb-2.5 flex items-center gap-3">
+          <AgentAvatar agentKey="matte" size="md" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-slate-900 truncate">
+              Matte <span className="font-normal text-slate-400">· {AGENT_INFO['matte']?.role || 'Chefsassistent'}</span>
+            </span>
+            <span className="block text-xs text-slate-500 truncate">håller ihop teamet</span>
+          </span>
+          <span className="hidden sm:block text-right min-w-0 shrink">
+            <span className="block text-[13px] font-medium text-slate-700 truncate">{matte.rubrik}</span>
+            <span className="block text-xs text-slate-400 truncate">{matte.detalj}</span>
+          </span>
+          <FyndKnapp agentId="matte" />
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-        {rader.map(r => (
+        {specialister.map(r => (
           <div key={`${r.agentId}-${r.rubrik}`} className="bg-white border border-slate-200 rounded-2xl px-4 py-3">
             <div className="flex items-center gap-2.5">
               <AgentAvatar agentKey={r.agentId} size="sm" />
               <span className="min-w-0 text-[13px] font-semibold text-slate-900 truncate">
                 {AGENT_INFO[r.agentId]?.name ?? r.agentId}
+                {AGENT_INFO[r.agentId]?.role && (
+                  <span className="font-normal text-slate-400"> · {AGENT_INFO[r.agentId].role}</span>
+                )}
               </span>
               {r.fraga && (
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 bg-slate-100 rounded px-1.5 py-0.5 shrink-0">
@@ -90,6 +154,11 @@ export function TeamBevakning({ rader, kompakt }: { rader: BevakningsRad[]; komp
             </div>
             <p className="m-0 mt-2 text-sm font-medium text-slate-800 leading-snug">{r.rubrik}</p>
             <p className="m-0 mt-0.5 text-xs text-slate-500 leading-snug">{r.detalj}</p>
+            {fynd?.[r.agentId] && (
+              <p className="m-0 mt-1.5">
+                <FyndKnapp agentId={r.agentId} />
+              </p>
+            )}
           </div>
         ))}
       </div>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, FileText, Loader2, Phone, Undo2, User } from 'lucide-react'
 import { nyhetsAtgard, type NyhetsIkon } from '@/lib/jarvis/news-actions'
-import { byggBevakning, type BevakningsRad } from '@/lib/jarvis/bevakning'
+import { byggBevakning, fyndPerAgent, type BevakningsRad } from '@/lib/jarvis/bevakning'
 import { byggDygnsdigest, halsningsBevis, type DigestAktivitet } from '@/lib/jarvis/dygnsdigest'
 import { TeamBevakning } from '@/components/jarvis/TeamBevakning'
 import { supabase } from '@/lib/supabase'
@@ -616,6 +616,10 @@ export default function JarvisHome({
     seddaNyheter,
   )
 
+  // Fynd-pekaren på bevakningskorten: "N nya fynd ↓" scrollar till agentens
+  // rad i Värt att veta. Pekare, aldrig kopia — fyndtexten bor bara där.
+  const fynd = fyndPerAgent(nyheter.map(o => ({ id: o.id, agent_id: o.agent_id })))
+
   // Markera som sedda EFTER renderingen, inte under den — annars filtreras
   // raderna bort i samma render de visas i och man ser dem aldrig.
   useEffect(() => {
@@ -822,7 +826,7 @@ export default function JarvisHome({
 
           {/* ── Teamet just nu — EFTER besluten, aldrig före (3b: besluten
               äger skärmen). Kompakt enkelrad så fort två beslut väntar. ── */}
-          <TeamBevakning rader={bevakning} kompakt={beslut >= 2} />
+          <TeamBevakning rader={bevakning} kompakt={beslut >= 2} fynd={fynd} />
 
           {/* ── Värt att veta ── */}
           {nyheter.length > 0 && (
@@ -839,14 +843,17 @@ export default function JarvisHome({
                   // till pipeline.
                   const atgard = nyhetsAtgard(o.agent_id, entityFrom(o.data_basis))
                   return (
-                    <AgentNewsRow
-                      key={o.id}
-                      agentKey={o.agent_id}
-                      link={atgard ? { label: atgard.label, href: atgard.href, icon: NYHETS_IKON[atgard.ikon] } : undefined}
-                    >
-                      {o.observation}
-                      {o.suggestion && <span className="text-slate-500"> {o.suggestion}</span>}
-                    </AgentNewsRow>
+                    // Ankaret är fynd-pekarens mål — bevakningskortets
+                    // "N nya fynd ↓" scrollar hit.
+                    <div key={o.id} id={`nyhet-${o.id}`}>
+                      <AgentNewsRow
+                        agentKey={o.agent_id}
+                        link={atgard ? { label: atgard.label, href: atgard.href, icon: NYHETS_IKON[atgard.ikon] } : undefined}
+                      >
+                        {o.observation}
+                        {o.suggestion && <span className="text-slate-500"> {o.suggestion}</span>}
+                      </AgentNewsRow>
+                    </div>
                   )
                 })}
               </div>

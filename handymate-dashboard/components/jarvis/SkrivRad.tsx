@@ -39,7 +39,7 @@ export function SkrivRad({ stor, onOppna }: { stor: boolean; onOppna: () => void
         onClick={onOppna}
         className="lg:row-start-3 lg:col-start-1 w-full flex items-center gap-2.5 h-12 pl-[18px] pr-2 bg-white border border-slate-200 rounded-full text-sm text-slate-400 hover:border-slate-300 transition-colors"
       >
-        <span className="flex-1 text-left truncate">Skriv till teamet — eller tryck. Allt ovanför klaras utan tangentbord.</span>
+        <span className="flex-1 text-left truncate">Säg till Matte — eller tryck. Allt ovanför klaras utan tangentbord.</span>
         <span className="w-9 h-9 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center shrink-0">
           <Mic className="w-4 h-4" />
         </span>
@@ -54,8 +54,11 @@ export function SkrivRad({ stor, onOppna }: { stor: boolean; onOppna: () => void
         onClick={onOppna}
         className="w-full flex items-center gap-3 min-h-[52px] text-left"
       >
+        {/* Orkestreringen demonstreras där den ANVÄNDS: här delegerar man
+            till Matte, som dirigerar specialisterna. Copyn säger det —
+            hellre än ett org-diagram som säger samma sak varje dag. */}
         <span className="flex-1 text-[15px] text-slate-400 truncate">
-          Skriv eller säg till teamet — de tar det därifrån …
+          Säg till Matte — teamet tar det därifrån …
         </span>
         <span className="w-11 h-11 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center shrink-0 shadow-sm">
           <Mic className="w-5 h-5" />
