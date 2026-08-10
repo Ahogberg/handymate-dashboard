@@ -110,6 +110,40 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
+    // 5b. Owner-rad i business_users — OBLIGATORISK (2026-08-10).
+    // getCurrentUser (lib/permissions.ts) läser ENBART business_users; utan
+    // raden får piloten 403 på allt behörighetsgrindat — skicka offert,
+    // skicka faktura, godkänna kort. Denna rutt skapade tidigare bara
+    // business_config, så en admin-skapad pilot såg ut att fungera (login,
+    // dashboard) men stoppades exakt när det räknades. Speglar owner-raden
+    // från registreringsvägen (app/api/auth/route.ts) inkl. rollback.
+    const { error: businessUserError } = await supabase
+      .from('business_users')
+      .insert({
+        business_id: businessId,
+        user_id: authData.user.id,
+        role: 'owner',
+        name: contactName,
+        email: email,
+        phone: phone || null,
+        accepted_at: new Date().toISOString(),
+        can_see_all_projects: true,
+        can_see_financials: true,
+        can_manage_users: true,
+        can_approve_time: true,
+        can_create_invoices: true,
+      })
+
+    if (businessUserError) {
+      console.error('[create-pilot] business_users insert failed, rolling back:', businessUserError)
+      await supabase.from('business_config').delete().eq('business_id', businessId)
+      await supabase.auth.admin.deleteUser(authData.user.id)
+      return NextResponse.json({
+        error: 'Failed to create owner relation',
+        details: businessUserError.message
+      }, { status: 500 })
+    }
+
     // 6. Provision phone number
     let assignedPhoneNumber: string | null = null
     let phoneError: string | null = null

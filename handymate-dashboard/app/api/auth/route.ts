@@ -6,16 +6,21 @@ import { getKnowledgeForBranch } from '@/lib/knowledge-defaults'
 import { isSuperAdmin, IMPERSONATION_COOKIE } from '@/lib/auth/superadmin'
 
 /**
- * sql/v75_website_url.sql lägger till website_url-kolumnen (hemsida-
- * förgreningen) men körs MANUELLT av Andreas i Supabase SQL Editor efter
- * merge — samma fönster/mönster som isMissingWebsiteUrlColumn i
- * app/api/onboarding/route.ts. Sedan förgreningen flyttades till BÖRJAN av
- * företagssteget skickas website_url med redan i register-anropet (ingen
- * session finns förrän kontot skapats), så samma skydd behövs här.
+ * Kolumner vars migration körs MANUELLT av Andreas i Supabase SQL Editor
+ * efter merge (v75 website_url, v93 secondary_branches) — under fönstret
+ * mellan deploy och körd migration saknas kolumnen, och EN okänd kolumn
+ * failar HELA registreringsinserten. Skyddet: hittas en av dessa i
+ * felmeddelandet stryks just den kolumnen och inserten görs om, i stället
+ * för att kontoskapandet dör. Samma mönster som i app/api/onboarding/route.ts.
+ * OBS: f_skatt_registered står medvetet INTE här — kolumnen är gammal
+ * (invoice_overhaul.sql) och finns i prod; saknas den ska det synas.
  */
-function isMissingWebsiteUrlColumn(error: unknown): boolean {
+const VANTANDE_MIGRATIONSKOLUMNER = ['website_url', 'secondary_branches'] as const
+
+function saknadKolumn(error: unknown): string | null {
   const message = String((error as { message?: string })?.message || '')
-  return /website_url/i.test(message) && /schema cache|does not exist|column/i.test(message)
+  if (!/schema cache|does not exist|column/i.test(message)) return null
+  return VANTANDE_MIGRATIONSKOLUMNER.find(c => message.toLowerCase().includes(c)) ?? null
 }
 
 /**
@@ -53,7 +58,7 @@ if (action === 'register') {
   if (!data?.email || !data?.password || !data?.businessName || !data?.contactName) {
     return NextResponse.json({ error: 'Fyll i alla obligatoriska fält' }, { status: 400 })
   }
-  const { email, password, businessName, displayName, contactName, phone, branch, serviceArea, referralCode, orgNumber, bankgiro, plusgiro, bankAccount, websiteUrl } = data
+  const { email, password, businessName, displayName, contactName, phone, branch, serviceArea, referralCode, orgNumber, bankgiro, plusgiro, bankAccount, websiteUrl, fSkatt, secondaryBranches } = data
 
   // 1. Skapa auth user via admin API (skippar e-postverifiering)
   const supabaseAdmin = getServerSupabase()
@@ -126,19 +131,41 @@ if (action === 'register') {
     // kontot skapas, så website_url skickas med här direkt istället för via
     // en efterföljande PUT. null om kunden svarade "Nej"/hoppade över.
     website_url: websiteUrl || null,
+    // Serverhalvan av fSkatt-fixen (2026-08-10). Klienten skickar fSkatt
+    // sedan 2026-08-07 — men den här rutten läste aldrig fältet, så
+    // f_skatt_registered blev false för VARJE kund oavsett svar, medan
+    // faktura-/ROT-koden och Karins bolagskalender läser den. Persisteras
+    // bara när svaret faktiskt är en boolean: en F-skattestatus får aldrig
+    // hittas på för anropare som inte besvarat frågan (DB-default false
+    // är det ärliga läget — "inte intygat").
+    ...(typeof fSkatt === 'boolean' ? { f_skatt_registered: fSkatt } : {}),
+  }
+
+  // secondary_branches (v93): bara med när listan är icke-tom — då slipper
+  // de flesta registreringar kolumnrisken helt. Filtret mot primärbranschen
+  // speglar DB-constrainten (branch får inte ingå i secondary_branches).
+  const cleanSecondary = Array.isArray(secondaryBranches)
+    ? secondaryBranches.filter((s: unknown): s is string => typeof s === 'string' && !!s && s !== branch)
+    : []
+  if (cleanSecondary.length > 0) {
+    businessInsert.secondary_branches = cleanSecondary
   }
 
   let { error: businessError } = await supabaseAdmin
     .from('business_config')
     .insert(businessInsert)
 
-  if (businessError && isMissingWebsiteUrlColumn(businessError)) {
-    // v75-migrationen har inte körts än — försök om utan website_url
-    // istället för att hela registreringen failar.
-    const { website_url: _websiteUrl, ...fallbackInsert } = businessInsert
+  // Migrationsfönstret: stryk saknade valfria kolumner en i taget och försök
+  // om, i stället för att hela registreringen failar. Bounded av listan.
+  for (
+    let kolumn = businessError && saknadKolumn(businessError);
+    kolumn;
+    kolumn = businessError && saknadKolumn(businessError)
+  ) {
+    delete businessInsert[kolumn]
     ;({ error: businessError } = await supabaseAdmin
       .from('business_config')
-      .insert(fallbackInsert))
+      .insert(businessInsert))
   }
 
   if (businessError) {
