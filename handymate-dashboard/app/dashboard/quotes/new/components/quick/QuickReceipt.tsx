@@ -60,10 +60,15 @@ export function QuickReceipt({
     // DOM-träd), så entrén säger "nytt element" medan dokumentets dimning
     // släpper via sin egen transition.
     <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm anim-rise">
-      <div className="flex items-baseline justify-between mb-4">
+      <div className="flex items-baseline justify-between mb-1">
         <p className="font-heading text-lg font-bold text-slate-900 tracking-tight">Offerten är klar</p>
         <p className="font-heading text-lg font-bold text-primary-700 tabular-nums">{amountToPay}</p>
       </div>
+      {/* Samma räknare som granskningsbaren (designpasset 2026-08-10) —
+          svaret på Christoffers fråga i en siffra, före listan. */}
+      <p className="text-xs text-slate-400 mb-4 tabular-nums">
+        {SECTION_ORDER.filter(s => sectionReviewState(summaries[s], approved.includes(s)) === 'granskad').length} av {SECTION_ORDER.length} delar genomgångna
+      </p>
 
       <div className="space-y-2 mb-4">
         {SECTION_ORDER.map((section, i) => {

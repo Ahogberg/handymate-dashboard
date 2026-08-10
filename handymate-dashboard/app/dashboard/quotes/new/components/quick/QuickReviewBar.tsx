@@ -83,7 +83,9 @@ export function QuickReviewBar({
   return (
     <div ref={barRef} className="fixed inset-x-0 bottom-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_16px_rgba(15,23,42,0.06)]">
       <div className="max-w-3xl mx-auto px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        {/* Progressprickar — tappbara, aldrig en grind */}
+        {/* Progressprickar — tappbara, aldrig en grind. Positionsräknaren
+            (designpasset 2026-08-10) ger orientering utan att läsa prickar:
+            "2 av 4" säger var man är och hur mycket som återstår. */}
         <div className="flex items-center justify-center gap-2 mb-3">
           {SECTION_ORDER.map(s => {
             const isCurrent = s === section
@@ -106,6 +108,9 @@ export function QuickReviewBar({
               />
             )
           })}
+          <span className="text-[10px] font-semibold text-slate-400 tabular-nums ml-1">
+            {SECTION_ORDER.indexOf(section) + 1} av {SECTION_ORDER.length}
+          </span>
         </div>
 
         <div className="flex items-center gap-3">

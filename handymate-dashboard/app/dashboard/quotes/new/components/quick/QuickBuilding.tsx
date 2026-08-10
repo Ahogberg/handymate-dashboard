@@ -50,9 +50,12 @@ export function QuickBuilding({ businessName, customerName, issuedDate }: QuickB
 
   const slow = elapsed > SLOW_AFTER_MS
   const stage = STAGES.filter(s => elapsed >= s.after).pop() ?? STAGES[0]
+  const stageIndex = STAGES.indexOf(stage)
 
   return (
-    <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
+    // bg-slate-50 — samma fond som intaget (designpasset 2026-08-10), så
+    // beskriv → bygg läses som EN resa, inte två appar.
+    <div className="fixed inset-0 bg-slate-50 z-50 overflow-y-auto">
       <style>{`
         @keyframes qb-shimmer { 0% { opacity: .45 } 50% { opacity: .9 } 100% { opacity: .45 } }
         .qb-skel { background: #E2E8F0; border-radius: 6px; animation: qb-shimmer 1.4s ease-in-out infinite; }
@@ -66,6 +69,25 @@ export function QuickBuilding({ businessName, customerName, issuedDate }: QuickB
             mjuk övergång gör att bytet läses som ett STEG i ett förlopp i
             stället för som ett ryck. */}
         <div className="mb-6">
+          {/* Stegprickarna gör förloppet SYNLIGT — tre ärliga steg, inget
+              påhittat. Vid "tar längre än vanligt" dämpas de: vi låtsas inte
+              att förloppet fortfarande tickar. */}
+          <div className="flex items-center gap-1.5 mb-3" aria-hidden>
+            {STAGES.map((s, i) => (
+              <span
+                key={s.text}
+                className={`h-1.5 rounded-full transition-all duration-slow ease-standard ${
+                  slow
+                    ? 'w-4 bg-slate-200'
+                    : i < stageIndex
+                      ? 'w-4 bg-primary-300'
+                      : i === stageIndex
+                        ? 'w-8 bg-primary-700'
+                        : 'w-4 bg-slate-200'
+                }`}
+              />
+            ))}
+          </div>
           <p
             key={slow ? 'slow' : stage.text}
             className="font-heading text-xl font-bold text-slate-900 tracking-tight anim-fade"

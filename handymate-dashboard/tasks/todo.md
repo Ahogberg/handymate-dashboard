@@ -174,10 +174,12 @@ FAKTISKT skickas, aldrig när utkastet byggdes.
 
 ## KVAR ATT BYGGA
 
-**Claude Design.** ~~Intagsskärmen (C1)~~ — designpasset gjort 2026-08-10 på
-Andreas fynd (kort-yta, exempelchips, editorlänk i headern, mall som riktig
-sekundärknapp, förklaring på inaktiv knapp). Kvar: reveal-koreografin (C2),
-granskningsbaren (C3) och kvittokortet (C4). Ramarna: ren CSS (framer-motion finns inte i projektet),
+**Claude Design.** ~~ALLA FYRA KLARA 2026-08-10.~~ C1 (kort-yta, exempelchips,
+editorlänk i headern, mall som riktig sekundärknapp), C2 (slate-fond som
+intaget + ärliga stegprickar som dämpas vid långsam körning), C3
+(positionsräknare "2 av 4" vid prickarna), C4 (genomgånget-räknare före
+listan). C3/C4 visade sig redan bära genomtänkt design — passet blev
+sammanhållning och orientering, inte dekoration. Ramarna: ren CSS (framer-motion finns inte i projektet),
 teal `#0F766E`, bottom sheet-mönstret från RowEditSheet, 44px träffytor.
 Mekaniken är byggd först med flit — DOM-strukturen är nu bestämd, så designen
 läggs ovanpå en fungerande yta i stället för att gissa mot en mockup.
