@@ -4,7 +4,9 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getCalendarEvents, createGoogleEvent } from '@/lib/google-calendar'
 import { getCustomerEmails, sendGmailEmail } from '@/lib/gmail'
-import { getNextCustomerNumber, getNextProjectNumber, getNextLeadNumber } from '@/lib/numbering'
+import { getNextCustomerNumber, getNextProjectNumber, getNextCaseNumber } from '@/lib/numbering'
+import { getStageBySlug } from '@/lib/pipeline'
+import { createLeadAndDeal } from '@/lib/leads/golden-path'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { shouldQueueForApproval } from '@/lib/autonomy/agent-gating'
 import {
@@ -1341,7 +1343,7 @@ async function qualifyLead(
 
   const { data: existingLead } = await supabase
     .from('leads')
-    .select('lead_id, score')
+    .select('lead_id, score, customer_id, name, source')
     .eq('business_id', businessId)
     .eq('conversation_id', conversationId)
     .single()
@@ -1419,19 +1421,91 @@ async function qualifyLead(
     suggestQuoteDraftForLead(businessId, existingLead.lead_id).catch(err =>
       console.error('[qualifyLead] suggestQuoteDraftForLead error (non-blocking):', err))
 
+    // A5 (lead-intake-granskningen 2026-08-10): denna gren opererar på en
+    // REDAN existerande lead (samma conversation_id sågs tidigare) och satte
+    // bara om score/urgency — aldrig en deal. Om leaden av någon anledning
+    // saknar deal (t.ex. skapad innan denna fix, eller ett tidigare
+    // golden-path-försök som fick dealError) kompletterar vi HÄR — men
+    // ENDAST om ingen deal finns, och utan SMS/event (det är ingen ny lead,
+    // bara en tyst självläkning). Skriver inte om lead.status, till skillnad
+    // från activatePendingLead — den funktionen tvingar status→'new', vilket
+    // vore fel för en lead som redan hunnit längre i pipelinen.
+    const { data: existingDeal } = await supabase
+      .from('deal')
+      .select('id')
+      .eq('business_id', businessId)
+      .eq('lead_id', existingLead.lead_id)
+      .limit(1)
+      .maybeSingle()
+
+    if (!existingDeal) {
+      try {
+        const stage = await getStageBySlug(businessId, 'new_inquiry')
+        if (stage) {
+          const dealNumber = await getNextCaseNumber(supabase, businessId)
+          const { error: dealBackfillError } = await supabase.from('deal').insert({
+            business_id: businessId,
+            title: jobType !== 'Okänt' ? jobType : `Förfrågan från ${existingLead.name || contactName || phone || 'kund'}`,
+            customer_id: existingLead.customer_id ?? null,
+            lead_id: existingLead.lead_id,
+            stage_id: stage.id,
+            source: existingLead.source || source,
+            deal_number: dealNumber,
+            priority: 'medium',
+          })
+          if (dealBackfillError) console.error('[qualifyLead] deal-komplettering misslyckades:', dealBackfillError.message)
+        } else {
+          console.warn(`[qualifyLead] pipeline_stage "new_inquiry" saknas — deal ej kompletterad (business ${businessId})`)
+        }
+      } catch (err) {
+        console.error('[qualifyLead] deal-komplettering fel (non-blocking):', err)
+      }
+    }
+
     return { success: true, data: { lead_id: existingLead.lead_id, action: 'updated', score, urgency, job_type: jobType, estimated_value: estimatedValue } }
   }
 
-  const leadId = generateId('lead')
-  const leadNumber = await getNextLeadNumber(supabase, businessId)
-  const { error } = await supabase.from('leads').insert({
-    lead_id: leadId, business_id: businessId, phone, name: contactName || null,
-    source, status: 'new', score, score_reasons: scoreReasons.filter(r => r.matched),
-    estimated_value: estimatedValue, job_type: jobType, urgency,
-    conversation_id: conversationId, lead_number: leadNumber, created_at: now, updated_at: now,
-  })
+  // A5 (lead-intake-granskningen 2026-08-10): denna gren SKAPAR leads
+  // bespoke — och är den PRIMÄRA vägen in för telefon/SMS-agenten (se
+  // system-prompt.ts: "Kvalificera ALLTID inkommande kontakt som lead med
+  // qualify_lead" körs FÖRE kundsökning). Den gamla inserten skapade varken
+  // kund eller deal, så agent-kvalificerade leads nådde aldrig pipelinen —
+  // exakt granskningsfyndet. Konvergerar nu till golden path-helpern
+  // (samma väg som röstwebhooken app/api/voice/incoming/route.ts redan
+  // använder) för kund-dedup, deal i new_inquiry-steget och ägar-SMS.
+  // Kvalificeringsfälten (score, urgency, job_type, ...) känner golden path
+  // inte till — sätts i en uppföljande UPDATE. fireEvent('lead_created')
+  // nedan behålls oförändrat: nurture-välkomstflödet (lib/seed-defaults.ts)
+  // lyssnar EXKLUSIVT på det eventet, golden path fyr bara 'lead_received'.
+  const { data: biz } = await supabase
+    .from('business_config')
+    .select('phone_number')
+    .eq('business_id', businessId)
+    .single()
 
-  if (error) return { success: false, error: error.message }
+  const gp = await createLeadAndDeal(
+    {
+      businessId,
+      businessPhoneNumber: biz?.phone_number ?? null,
+      name: contactName || phone || 'Okänd kontakt',
+      phone,
+      email: null,
+      message: transcript || null,
+      source,
+    },
+    supabase
+  )
+  const leadId = gp.leadId
+
+  const { error: qualifyFieldsError } = await supabase.from('leads').update({
+    score, score_reasons: scoreReasons.filter(r => r.matched),
+    estimated_value: estimatedValue, job_type: jobType, urgency,
+    conversation_id: conversationId, updated_at: now,
+  }).eq('lead_id', leadId)
+  if (qualifyFieldsError) console.error('[qualifyLead] kvalificeringsfält-update misslyckades:', qualifyFieldsError.message)
+
+  const { data: leadRow } = await supabase.from('leads').select('lead_number').eq('lead_id', leadId).single()
+  const leadNumber = leadRow?.lead_number
 
   const { error: createdActivityError } = await supabase.from('lead_activities').insert({
     activity_id: generateId('la'), lead_id: leadId, business_id: businessId,

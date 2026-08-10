@@ -83,6 +83,13 @@ export interface CreateLeadAndDealInput {
       webhook som vill skapa lead i pending_review-state och vänta på
       manuell godkännande innan deal aktiveras. Default true. */
   createDealAndNotify?: boolean
+  /** Om false skapas deal som vanligt men ägar-SMS:et och
+      lead_received-eventet hoppas över. För källor som redan sköter sin
+      egen kommunikation: bokningsflödet skickar bokningsbekräftelse till
+      kunden och bokningsnotis till ägaren — ett extra "tack för din
+      förfrågan"-SMS ovanpå (seedade snabbsvars-regeln triggar på eventet)
+      vore förvirrande dubbelkommunikation. Default true. */
+  notify?: boolean
 }
 
 export interface CreateLeadAndDealResult {
@@ -117,6 +124,7 @@ export async function createLeadAndDeal(
     sourceRef,
     initialStatus = 'new',
     createDealAndNotify = true,
+    notify = true,
   } = input
 
   // Dubbelkunds-vakten (Epic A, 2026-08-10): 46elks levererar E.164
@@ -143,6 +151,15 @@ export async function createLeadAndDeal(
 
   if (match) {
     customerId = match.customer_id
+    // Icke-destruktiv komplettering: en e-postmatch kan bära ett telefon-
+    // nummer kunden saknar, och tvärtom. Fyll BARA fält som är tomma på den
+    // matchade kunden — befintlig data vinner alltid, ingen överskrivning.
+    const fyll: Record<string, string> = {}
+    if (!match.phone_number && leadPhone) fyll.phone_number = leadPhone
+    if (!match.email && email) fyll.email = email
+    if (Object.keys(fyll).length > 0) {
+      await supabase.from('customer').update(fyll).eq('customer_id', match.customer_id)
+    }
   } else {
     const newId = 'cust_' + Math.random().toString(36).substr(2, 9)
     const { data: newCustomer } = await supabase
@@ -172,7 +189,7 @@ export async function createLeadAndDeal(
   let leadNumber: string | undefined
   try { leadNumber = await getNextLeadNumber(supabase, businessId) } catch { /* non-blocking */ }
 
-  await supabase.from('leads').insert({
+  const { error: leadInsertError } = await supabase.from('leads').insert({
     lead_id: leadId,
     business_id: businessId,
     customer_id: customerId,
@@ -188,6 +205,14 @@ export async function createLeadAndDeal(
     ...(leadSourceId ? { lead_source_id: leadSourceId } : {}),
     ...(sourceRef ? { source_ref: sourceRef } : {}),
   })
+
+  // En lead som aldrig landade får ALDRIG se ut som success — samma princip
+  // som dealError, men hårdare: utan lead-rad är allt nedströms (deal-FK,
+  // uppföljning, attribution) meningslöst. Kasta så callerns catch svarar
+  // ärligt i stället för att returnera ett lead_id som inte finns.
+  if (leadInsertError) {
+    throw new Error(`Lead-insert misslyckades: ${leadInsertError.message}`)
+  }
 
   // ── 3. Pending → skippa deal + notifications ─────────────────
   // Webhook använder pending_review: lead skapas, deal skapas FÖRST när
@@ -242,21 +267,23 @@ export async function createLeadAndDeal(
   }
 
   // ── 5. SMS till hantverkaren (non-blocking) ──────────────────
-  if (businessPhoneNumber) {
+  if (notify && businessPhoneNumber) {
     const smsText = `🌐 Ny lead från ${source}!\nNamn: ${name}\nTel: ${cleanPhone}${message ? `\n"${message.slice(0, 80)}"` : ''}\n→ app.handymate.se/dashboard/pipeline`
     sendSMS(supabase, businessId, businessPhoneNumber, smsText, 'Handymate').catch(() => {})
   }
 
   // ── 6. Automation-event ──────────────────────────────────────
-  try {
-    const { fireEvent } = await import('@/lib/automation-engine')
-    await fireEvent(supabase, 'lead_received', businessId, {
-      source,
-      lead_id: leadId,
-      customer_id: customerId,
-      customer_name: name,
-    })
-  } catch { /* non-blocking */ }
+  if (notify) {
+    try {
+      const { fireEvent } = await import('@/lib/automation-engine')
+      await fireEvent(supabase, 'lead_received', businessId, {
+        source,
+        lead_id: leadId,
+        customer_id: customerId,
+        customer_name: name,
+      })
+    } catch { /* non-blocking */ }
+  }
 
   return { leadId, dealId, customerId, dealError }
 }

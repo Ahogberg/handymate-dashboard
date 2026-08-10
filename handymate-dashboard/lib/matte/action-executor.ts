@@ -7,6 +7,7 @@ import type { MatteDecision, MatteAction, IncomingSignal } from './intent-agent'
 import type { ResolvedEntity } from './resolver'
 import type { TimeSlot } from './calendar-slots'
 import { suggestAtaDraft } from '@/lib/ata/suggest-ata-draft'
+import { createLeadAndDeal } from '@/lib/leads/golden-path'
 
 export async function executeMatteActions(
   decision: MatteDecision,
@@ -115,31 +116,38 @@ async function executeDirectAction(
         .maybeSingle()
 
       if (!existing) {
-        // Kolumnen heter pipeline_stage_key (INTE pipeline_stage — den finns
-        // inte). Leads-funneln (pipeline_stages, PLURAL) använder nyckeln
-        // 'new_lead' som default — INTE deals-Kanbanens 'new_inquiry'. Fel
-        // kolumnnamn tidigare → PostgREST avvisade hela inserten → AI-detekterade
-        // leads föll tyst bort (felet lästes aldrig). Kontrollera felet nu.
-        const { error: leadError } = await supabase.from('leads').insert({
-          lead_id: `lead_${Math.random().toString(36).substr(2, 12)}`,
-          business_id: businessId,
-          phone,
-          email: entity.email ?? null,
-          name: entity.customerName ?? null,
-          source: `${signal.channel}_inbound`,
-          status: 'new',
-          pipeline_stage_key: 'new_lead',
-          created_at: new Date().toISOString(),
-        })
-        if (leadError) {
-          console.error('[Matte] create_lead insert misslyckades:', leadError.message)
-          throw new Error(`create_lead misslyckades: ${leadError.message}`)
+        // A4 (lead-intake-sprinten, 2026-08-10): körde tidigare en egen
+        // bespoke insert som aldrig skapade en deal — AI-detekterade leads
+        // nådde aldrig deals-pipelinen (se den gamla TODO:n som stod här).
+        // Konvergerar nu till golden path-helpern (lib/leads/golden-path.ts,
+        // samma väg som portal-formulär och email-godkännande använder) för
+        // kund-dedup, deal i new_inquiry-steget, ägar-SMS och
+        // lead_received-eventet. source: 'inbound_sms' för SMS-tråden,
+        // annars 'manual' (Mattes enda andra kanal är e-post — se
+        // IncomingSignal['channel'] i intent-agent.ts).
+        const { data: biz } = await supabase
+          .from('business_config')
+          .select('phone_number')
+          .eq('business_id', businessId)
+          .single()
+
+        try {
+          await createLeadAndDeal(
+            {
+              businessId,
+              businessPhoneNumber: biz?.phone_number ?? null,
+              name: entity.customerName || 'Okänd kund',
+              phone,
+              email: entity.email ?? null,
+              message: signal.body || null,
+              source: signal.channel === 'sms' ? 'inbound_sms' : 'manual',
+            },
+            supabase
+          )
+        } catch (err) {
+          console.error('[Matte] create_lead (golden path) misslyckades:', err)
+          throw err
         }
-        // TODO (uppföljning): denna väg skapar endast en lead, ingen deal, så
-        // AI-detekterade leads når aldrig deals-pipelinen. Kör golden-path-
-        // helpern (createLeadAndDeal) här för att få in dem i funneln. Deferrat:
-        // kräver source-mappning mot valid_source-CHECK + businessPhoneNumber-
-        // hämtning — större ändring än denna kolumn-/felkontrollsfix.
       }
       break
     }
