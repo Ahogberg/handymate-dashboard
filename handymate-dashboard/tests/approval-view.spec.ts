@@ -18,6 +18,7 @@ import {
   approveLabel,
   deepLinkFor,
   needsAttention,
+  ringUppmaning,
   typeLabel,
   TYPE_LABEL,
 } from '../lib/jarvis/approval-view'
@@ -121,6 +122,42 @@ test.describe('etiketten', () => {
   test('okänd typ visar aldrig sitt tekniska namn', () => {
     // "egenkontroll_nytt_falt" i gränssnittet är obegripligt för en hantverkare.
     expect(typeLabel('nagot_tekniskt_namn')).toBe('Förslag')
+  })
+})
+
+test.describe('ring-uppmaningen — samtalet rakt ur kortet', () => {
+  // Andreas fynd 2026-08-10: "Ring kund om offert" gav Godkänn → Bekräfta →
+  // ingenting. Servern kan inte ringa; den enda ärliga primärhandlingen är
+  // kundens nummer som tel:-knapp.
+  const ringkort = {
+    approval_type: 'automation',
+    title: 'Ring kund om offert',
+    description: 'Offerten har varit obesvarad i 10+ dagar. Vill du ringa kunden?',
+    payload: { customer_phone: '070-123 45 67', customer_name: 'Eva Lindqvist' },
+  }
+
+  test('med nummer och ring-ord blir det en tel-knapp med förnamnet', () => {
+    const ring = ringUppmaning(ringkort)
+    expect(ring?.label).toBe('Ring Eva')
+    // tel-länken saneras — mellanslag och bindestreck ur numret, + behålls.
+    expect(ring?.href).toBe('tel:0701234567')
+    expect(ringUppmaning({ ...ringkort, payload: { ...ringkort.payload, customer_phone: '+46701234567' } })?.href)
+      .toBe('tel:+46701234567')
+  })
+
+  test('utan nummer finns ingen knapp — aldrig en trasig tel-länk', () => {
+    expect(ringUppmaning({ ...ringkort, payload: { customer_name: 'Eva' } })).toBeNull()
+    expect(ringUppmaning({ ...ringkort, payload: { customer_phone: '   ' } })).toBeNull()
+  })
+
+  test('ordgränsen friar fakturering och beställning', () => {
+    for (const titel of ['Fakturering klar', 'Ny beställning inkommen', 'Påminnelse skickad']) {
+      expect(ringUppmaning({ ...ringkort, title: titel, description: null }), `"${titel}" fick en ringknapp`).toBeNull()
+    }
+  })
+
+  test('utan namn heter knappen Ring kunden', () => {
+    expect(ringUppmaning({ ...ringkort, payload: { customer_phone: '0701234567' } })?.label).toBe('Ring kunden')
   })
 })
 

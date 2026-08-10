@@ -179,6 +179,35 @@ test.describe('fakturera_projekt — enda intäktsfyndet som får utföras', () 
   })
 })
 
+test.describe('godkännandet ljuger aldrig om leveransen (2026-08-10)', () => {
+  test('en skippad påminnelse är ett fel med orsak — aldrig en tystnad', () => {
+    // Andreas godkände en påminnelse mot sin egen testkund; ingenting kom
+    // fram och raden sa ändå "skickade". Nu bär svaret executed:false och
+    // orsaken (från deliverInvoiceReminder) hela vägen till ytan.
+    const i = RUTT.indexOf("case 'invoice_reminder':")
+    const gren = RUTT.slice(i, i + 3000)
+    expect(gren).toContain('if (r.skipped)')
+    expect(gren).toContain('executed: false')
+    expect(gren).toContain('Påminnelsen skickades inte')
+    // Leveranshelpern producerar orsaken — inte en gissning i rutten.
+    const helper = fs.readFileSync(path.join(ROOT, 'lib/invoice-reminder-send.ts'), 'utf8')
+    expect(helper).toContain('orsak')
+    expect(helper).toContain('kunden saknar telefonnummer')
+  })
+
+  test('create_approval-kort spawnar aldrig ett nytt kort vid godkännande', () => {
+    // Självreferensen: kortet skapades AV create_approval — att köra samma
+    // action igen födde ett tomt "Godkännande krävs"-kort vid varje klick.
+    const i = RUTT.indexOf("case 'automation':")
+    const gren = RUTT.slice(i, i + 2500)
+    expect(gren).toContain("actionType === 'create_approval'")
+    const guard = gren.indexOf("actionType === 'create_approval'")
+    const kor = gren.indexOf('runApprovedAutomationAction')
+    expect(guard, 'vakten ligger efter körningen — spökkorten är tillbaka').toBeLessThan(kor)
+    expect(gren).toContain('executed: false')
+  })
+})
+
 test.describe('uppslaget', () => {
   test('okänd typ ger null, aldrig en gissning', () => {
     expect(classify('finns-inte')).toBeNull()

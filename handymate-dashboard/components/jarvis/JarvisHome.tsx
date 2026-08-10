@@ -29,6 +29,7 @@ import {
   approveLabel,
   deepLinkFor,
   needsAttention,
+  ringUppmaning,
   typeLabel,
 } from '@/lib/jarvis/approval-view'
 import { quoteDraftSummary } from '@/lib/jarvis/quote-preview-summary'
@@ -492,6 +493,14 @@ export default function JarvisHome({
     const mal = group && group.length > 1 ? group : approval
     if (action.id === 'approve') return queueAction(mal, 'approve')
     if (action.id === 'reject') return queueAction(mal, 'reject')
+    // 'ring' finns bara på ring-uppmaningskorten (ringUppmaning) — öppnar
+    // telefonens uppringare direkt ur kortet. Kortet ligger kvar tills
+    // hantverkaren avfärdar det själv efter samtalet.
+    if (action.id === 'ring') {
+      const ring = ringUppmaning(approval)
+      if (ring) window.location.href = ring.href
+      return
+    }
     // 'open' finns bara på kort som INTE får utföras med ett klick
     // (REVIEW_REQUIRED m.fl., se lib/jarvis/card-voice.ts). Det öppnar
     // detaljvyn i stället för att skicka något — vilket är exakt vad serverns
@@ -975,7 +984,12 @@ function ApprovalCard({
   // de kan inte utföras. Kortet sa alltså "föreslår" och visade Godkänn, och
   // ett klick gav "skickade: …" i Klart idag fast servern svarat att
   // ingenting skickades. Se lib/jarvis/card-voice.ts.
-  const rost = voiceFor(approval.approval_type)
+  //
+  // RING-UPPMANINGEN (2026-08-10): "Ring kund om offert" kan inte utföras av
+  // servern — den enda ärliga primärhandlingen är kundens nummer. Kortet
+  // frågar, och första alternativet ÄR ring-knappen (tel:).
+  const ring = ringUppmaning(approval)
+  const rost = ring ? 'fragar' : voiceFor(approval.approval_type)
 
   // Sammanslagning: samma agent, samma typ, samma dygn. Summan visas bara om
   // ALLA medlemmar bär ett belopp — annars vore den en gissning som ser exakt
@@ -998,7 +1012,12 @@ function ApprovalCard({
       voice={rost}
       // 'fragar' bygger sina knappar ur alternativen — och sätter approves:false
       // på allihop, så ett granskningskort inte KAN utlösa ett godkännande.
-      alternatives={rost === 'fragar' ? reviewAlternatives(approval.approval_type) : undefined}
+      // Ring-kortet får ring-knappen som fyllt förstaval + Avvisa.
+      alternatives={
+        ring
+          ? [{ id: 'ring', label: ring.label }, { id: 'reject', label: 'Avvisa' }]
+          : rost === 'fragar' ? reviewAlternatives(approval.approval_type) : undefined
+      }
       typeLabel={typeLabel(approval.approval_type)}
       timeLabel={timeAgo(approval.created_at)}
       // Sammanslagen grupp får en rubrik som säger ANTALET — det är den nya

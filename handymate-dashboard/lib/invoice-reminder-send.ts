@@ -54,6 +54,14 @@ export interface ReminderDeliveryResult {
   interestAdded: number
   /** true om varken SMS eller e-post gick ut → ingen mutation gjord. */
   skipped: boolean
+  /**
+   * VARFÖR inget gick ut — på svenska, redo för hantverkarens yta.
+   *
+   * Fanns inte tidigare: anroparen fick bara `skipped: true`, godkännande-
+   * vägen returnerade inget fel, och Klart idag-raden sa "skickade: …" om
+   * en påminnelse som aldrig lämnade huset (Andreas fynd 2026-08-10).
+   */
+  orsak?: string
 }
 
 /**
@@ -73,6 +81,7 @@ export async function deliverInvoiceReminder(
 
   let smsSent = false
   let emailSent = false
+  let smsFel: string | null = null
 
   // ── Skicka SMS ──
   if (customerPhone && process.env.ELKS_API_USER) {
@@ -87,6 +96,9 @@ export async function deliverInvoiceReminder(
       messageType: 'invoice_reminder',
     })
     smsSent = r.success
+    // Felet kastades tidigare bort — spärrhakens/46elks besked är exakt den
+    // information hantverkaren behöver när "skickades inte" ska förklaras.
+    if (!r.success) smsFel = (r as { error?: string }).error || null
   }
 
   // ── Skicka e-post (från andra påminnelsen) ──
@@ -107,7 +119,14 @@ export async function deliverInvoiceReminder(
   }
 
   if (!smsSent && !emailSent) {
-    return { smsSent: false, emailSent: false, feeAdded: 0, interestAdded: 0, skipped: true }
+    const orsak = smsFel
+      ? `SMS:et stoppades (${smsFel})`
+      : !customerPhone
+        ? 'kunden saknar telefonnummer'
+        : !process.env.ELKS_API_USER
+          ? 'SMS-tjänsten är inte konfigurerad'
+          : 'ingen kanal nådde kunden'
+    return { smsSent: false, emailSent: false, feeAdded: 0, interestAdded: 0, skipped: true, orsak }
   }
 
   // ── Avgift + ränta (BARA när något faktiskt gick ut) ──

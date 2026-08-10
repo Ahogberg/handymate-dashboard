@@ -78,11 +78,19 @@ test.describe('threshold-entiteterna bär det seed-mallarna kräver', () => {
     expect(bookingGren, 'bokningsgrenen tappade customer_name').toContain('customer_name:')
   })
 
-  test('namnen hämtas via separat batch — aldrig embed på quotes/booking', () => {
+  test('numret följer med — Ring kund-korten behöver en tel-knapp', () => {
+    // Utan customer_phone i kontexten kan create_approval-korten aldrig visa
+    // en riktig ring-knapp (Andreas fynd 2026-08-10: Godkänn → Bekräfta →
+    // ingenting).
+    expect(quoteGren, 'offertgrenen tappade customer_phone').toContain('customer_phone:')
+    expect(bookingGren, 'bokningsgrenen tappade customer_phone').toContain('customer_phone:')
+  })
+
+  test('kontakterna hämtas via separat batch — aldrig embed på quotes/booking', () => {
     // FK:erna är obekräftade i prod; en PGRST200 fäller hela threshold-frågan
     // tyst (lesson 2026-08-05 regel 3). Fakturagrenens embed är bevisat säker
     // och undantagen.
-    expect(motor).toContain('fetchCustomerNames')
+    expect(motor).toContain('fetchCustomerContacts')
     expect(quoteGren, 'embed smög in i offertgrenen').not.toContain('customer:customer_id')
   })
 })

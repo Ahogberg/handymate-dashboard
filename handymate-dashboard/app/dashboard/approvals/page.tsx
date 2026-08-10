@@ -32,6 +32,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
+import { ringUppmaning } from '@/lib/jarvis/approval-view'
 
 // SPÅR D1 (2026-08-06): kartan låg inlinead här och var en av fyra kopior av
 // teamet som hunnit gå isär. Härleds nu ur den enda källan (lib/agents/team.ts).
@@ -1114,8 +1115,14 @@ export default function ApprovalsPage() {
         const isCampaign = a.approval_type.includes('campaign') || recipientCount > 1
         const type = a.approval_type
 
+        // Ring-uppmaningen: kortet vars hela poäng är att MÄNNISKAN ringer.
+        // Modalen sa tidigare bara "Bekräfta åtgärd" och godkännandet utförde
+        // ingenting — nu är primärhandlingen kundens nummer (tel:).
+        const ring = ringUppmaning({ ...a, payload })
+
         // Dynamisk rubrik och knapptext per typ
         const getModalInfo = () => {
+          if (ring) return { title: 'Ring kunden?', btn: 'Noterat', icon: '📞' }
           if (isCampaign) return { title: `Skicka kampanj till ${recipientCount} mottagare?`, btn: `Skicka till ${recipientCount} mottagare`, icon: '📢' }
           if (type === 'job_report') return { title: 'Skicka jobbrapport till kund?', btn: 'Skicka rapport', icon: '📋' }
           if (type === 'price_adjustment') return { title: 'Ändra pris i prislistan?', btn: 'Ändra pris', icon: '💰' }
@@ -1186,10 +1193,25 @@ export default function ApprovalsPage() {
                   >
                     Avbryt
                   </button>
+                  {/* Ring-kortet: den fyllda knappen ÄR samtalet — direkt ur
+                      påminnelsen, ingen omväg via Bekräfta. "Noterat" kvitterar
+                      kortet efteråt (servern utför ingenting). */}
+                  {ring && (
+                    <a
+                      href={ring.href}
+                      className="flex-1 px-4 py-3 bg-primary-700 text-white rounded-xl text-sm font-semibold hover:bg-primary-800 text-center"
+                    >
+                      📞 {ring.label}
+                    </a>
+                  )}
                   <button
                     onClick={confirmAndExecute}
                     disabled={actionLoading !== null}
-                    className="flex-1 px-4 py-3 bg-primary-700 text-white rounded-xl text-sm font-semibold hover:bg-primary-800 disabled:opacity-50"
+                    className={`flex-1 px-4 py-3 rounded-xl text-sm font-semibold disabled:opacity-50 ${
+                      ring
+                        ? 'border border-[#E2E8F0] text-gray-600 hover:bg-gray-50'
+                        : 'bg-primary-700 text-white hover:bg-primary-800'
+                    }`}
                   >
                     {actionLoading ? 'Utför...' : info.btn}
                   </button>

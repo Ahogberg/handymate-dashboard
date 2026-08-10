@@ -1863,9 +1863,28 @@ async function executeApprovalPayload(
         const { deliverInvoiceReminder } = await import('@/lib/invoice-reminder-send')
         const supabaseIR = getServerSupabase()
         const r = await deliverInvoiceReminder(supabaseIR, delivery)
+        // ═══ EN SKIPPAD LEVERANS ÄR ETT FEL, INTE EN TYSTNAD (2026-08-10) ═══
+        //
+        // Returnerade tidigare bara sent:false — inget `error`, inget
+        // `executed`. classifyExecutionResult råkade fånga sms_sent:false,
+        // men Klart idag-raden läser `executed`/`note` och sa "skickade: …"
+        // om en påminnelse som aldrig lämnade huset. Andreas godkände mot
+        // sin egen testkund och ingenting kom fram — utan att ytan sa det.
+        if (r.skipped) {
+          return {
+            action: 'invoice_reminder',
+            sent: false,
+            sms_sent: false,
+            email_sent: false,
+            executed: false,
+            error: `Påminnelsen skickades inte — ${r.orsak || 'ingen kanal nådde kunden'}.`,
+            note: `Påminnelsen skickades inte — ${r.orsak || 'ingen kanal nådde kunden'}.`,
+          }
+        }
         return {
           action: 'invoice_reminder',
-          sent: !r.skipped,
+          sent: true,
+          executed: true,
           sms_sent: r.smsSent,
           email_sent: r.emailSent,
           fee_added: r.feeAdded,
@@ -2087,6 +2106,22 @@ async function executeApprovalPayload(
         const actionType = pl.rule_action_type
         if (!actionType) {
           return { action: 'automation', acknowledged: true, note: 'Ingen åtgärd i payload' }
+        }
+        // ═══ SJÄLVREFERENSEN STOPPAS (2026-08-10, Andreas fynd) ═══
+        //
+        // Ett kort som SKAPADES av en create_approval-regel ("Ring kund om
+        // offert") bär rule_action_type 'create_approval'. Att "utföra" den
+        // åtgärden igen vid godkännande skapade ett NYTT tomt kort
+        // ("Godkännande krävs", utan config) — varje godkännande födde ett
+        // spökkort. Kortet är en uppmaning till MÄNNISKAN (ring-knappen bor
+        // på ytan); godkännandet kvitterar, ingenting utförs.
+        if (actionType === 'create_approval') {
+          return {
+            action: 'automation',
+            acknowledged: true,
+            executed: false,
+            note: 'Noterat. Ingenting skickades — kortet var en uppmaning till dig.',
+          }
         }
         const { runApprovedAutomationAction } = await import('@/lib/automation-engine')
         const supabaseAuto = getServerSupabase()

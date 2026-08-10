@@ -14,6 +14,8 @@ interface ApprovalLike {
   approval_type: string
   risk_level?: string | null
   payload?: Record<string, unknown> | null
+  title?: string | null
+  description?: string | null
 }
 
 /**
@@ -129,6 +131,32 @@ export function approveLabel(approvalType: string, payload?: Record<string, unkn
   if (approvalType === 'send_sms') return 'Skicka'
   if (approvalType === 'autonomy_offer') return 'Ja, kör automatiskt'
   return 'Godkänn'
+}
+
+/**
+ * Ring-uppmaningen — kortet vars hela poäng är att MÄNNISKAN ringer.
+ *
+ * "Ring kund om offert / Vill du ringa kunden?" (create_approval-regeln) gav
+ * tidigare Godkänn → Bekräfta-modal → ingenting. Servern kan inte ringa;
+ * det enda ärliga kortet är en tel:-knapp med kundens nummer (Andreas fynd
+ * 2026-08-10). Numret läggs i payloaden av threshold-motorn
+ * (fetchCustomerContacts).
+ *
+ * Deterministisk detektion: ordet "ring" i rubrik/beskrivning + ett nummer i
+ * payloaden. Ordgränsen friar "fakturering" och "beställning"; utan nummer
+ * finns ingen knapp — aldrig en trasig tel:-länk.
+ */
+export function ringUppmaning(approval: ApprovalLike): { label: string; href: string } | null {
+  const pl = (approval.payload || {}) as Record<string, any>
+  const telefon = typeof pl.customer_phone === 'string' ? pl.customer_phone.trim() : ''
+  if (!telefon) return null
+  const text = `${approval.title || ''} ${approval.description || ''}`
+  if (!/\bring/i.test(text)) return null
+  const fornamn =
+    typeof pl.customer_name === 'string' && pl.customer_name.trim()
+      ? pl.customer_name.trim().split(' ')[0]
+      : 'kunden'
+  return { label: `Ring ${fornamn}`, href: `tel:${telefon.replace(/[^\d+]/g, '')}` }
 }
 
 /** Djuplänken in i den sida ärendet hör hemma på, eller null. */
