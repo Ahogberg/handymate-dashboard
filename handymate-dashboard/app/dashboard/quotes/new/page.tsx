@@ -714,6 +714,11 @@ export default function NewQuotePage() {
               dueDescription: p.due_description || null,
             }))
           : null,
+        // Bilagorna syns i förhandsvisningen precis som i kunddokumentet —
+        // det man ser är det kunden får (2026-08-10).
+        attachments: attachments.length > 0
+          ? attachments.map(a => ({ name: a.name, url: a.url }))
+          : null,
       },
     }
 

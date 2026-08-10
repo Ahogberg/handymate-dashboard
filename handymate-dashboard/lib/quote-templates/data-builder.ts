@@ -328,6 +328,15 @@ export function buildQuoteTemplateData(
               dueDescription: p.due_description || null,
             }))
         : null,
+      // Bifogade dokument (2026-08-10, Andreas fynd): uppladdningen sparades
+      // i quotes.attachments men nådde aldrig kunddokumentet — samma felklass
+      // som A4 (fanns i databasen och i redigeraren, renderades aldrig).
+      // Samma defensiva filtrering som reservationerna.
+      attachments: Array.isArray(quote.attachments)
+        ? quote.attachments
+            .filter((a: any) => a && typeof a.name === 'string' && typeof a.url === 'string')
+            .map((a: any) => ({ name: a.name, url: a.url }))
+        : null,
     },
   }
 }

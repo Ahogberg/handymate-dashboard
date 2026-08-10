@@ -16,6 +16,7 @@ import { useReservationSuggestions } from '../../_shared/useReservationSuggestio
 import { ReservationSuggestionBanner, ReservationMutedNotice } from '../../_shared/ReservationSuggestionBanner'
 import { ReservationReviewSheet } from '../../_shared/ReservationReviewSheet'
 import { QuoteMarginCard } from '../../_shared/QuoteMarginCard'
+import { QuoteNewAttachmentsCard } from '../../new/components/QuoteNewAttachmentsCard'
 import { supabase } from '@/lib/supabase'
 import {
   calculatePaymentPlan,
@@ -325,6 +326,13 @@ export default function EditQuotePage() {
   const [loadedReservations, setLoadedReservations] = useState<Array<{ reservation_id?: string | null; title: string; content: string }>>([])
   const reservations = useReservationSuggestions(items, loadedReservations)
 
+  // Bilagor (2026-08-10, Andreas fynd): fanns på new-sidan men saknades HELT
+  // här — dokument uppladdade vid skapandet syntes inte i redigeraren och
+  // kunde varken tas bort eller kompletteras. Samma kort och samma
+  // uppladdningsväg som new-sidan.
+  const [attachments, setAttachments] = useState<{ name: string; url: string; size?: number }[]>([])
+  const [uploadingFile, setUploadingFile] = useState(false)
+
   // Produktbank: NY rad (add-row-combo/snabbval) resp. förfyllnad av
   // BEFINTLIG rad (inline-combon) — komponenterna hämtas lazily vid behov,
   // sedan samma applyProductToItem-väg som new-vyn.
@@ -509,6 +517,10 @@ export default function EditQuotePage() {
               amount: p.amount,
               dueDescription: p.due_description || null,
             }))
+          : null,
+        // Bilagorna i live-dokumentet — det man ser är det kunden får.
+        attachments: attachments.length > 0
+          ? attachments.map(a => ({ name: a.name, url: a.url }))
           : null,
       },
     }
@@ -787,6 +799,10 @@ export default function EditQuotePage() {
       const savedReservations = (quote as any).reservations_snapshot
       if (Array.isArray(savedReservations)) setLoadedReservations(savedReservations)
 
+      // Bilagorna läses in så de syns, kan tas bort och följer med vid spar —
+      // annars är dokument uppladdade vid skapandet osynliga här.
+      if (Array.isArray((quote as any).attachments)) setAttachments((quote as any).attachments)
+
       const hasAnyStandardText =
         quote.not_included ||
         quote.ata_terms ||
@@ -900,6 +916,9 @@ export default function EditQuotePage() {
         fastighetsbeteckning: hasRotItems ? fastighetsbeteckning || null : null,
         valid_days: validDays,
         template_style: templateStyle,
+        // Skickas alltid (API:t uppdaterar bara när fältet finns i bodyn) —
+        // en tömd lista ska också sparas, annars går bilagor inte att ta bort.
+        attachments,
       }
     },
     [
@@ -908,6 +927,7 @@ export default function EditQuotePage() {
       paymentTermsText, paymentPlan, totals.total, referencePerson, customerReference,
       projectAddress, detailLevel, showUnitPrices, showQuantities, personnummer,
       fastighetsbeteckning, hasRotItems, hasRutItems, validDays, templateStyle,
+      attachments,
       // termsText ingår i payloaden (terms_text) — utan den här memoiserar
       // buildPayload en gammal villkorstext och sparar den tyst.
       termsText,
@@ -939,8 +959,37 @@ export default function EditQuotePage() {
     personnummer, fastighetsbeteckning, referencePerson, customerReference,
     projectAddress, notIncluded, ataTerms,
     paymentTermsText, termsText, paymentPlan, detailLevel, showUnitPrices, showQuantities,
-    templateStyle,
+    templateStyle, attachments,
   ])
+
+  // Samma uppladdningsväg som new-sidan (customer-documents-bucketen).
+  // Autosparen plockar upp liständringen och skriver quotes.attachments.
+  async function handleAttachmentUpload(file: File) {
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Filen är för stor (max 10 MB)')
+      return
+    }
+    setUploadingFile(true)
+    try {
+      const timestamp = Date.now()
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const filePath = `${business.business_id}/quotes/${quoteId}/${timestamp}_${safeName}`
+      const arrayBuffer = await file.arrayBuffer()
+      const { error: uploadError } = await supabase.storage
+        .from('customer-documents')
+        .upload(filePath, arrayBuffer, { contentType: file.type, upsert: false })
+      if (uploadError) throw uploadError
+      const { data: urlData } = supabase.storage.from('customer-documents').getPublicUrl(filePath)
+      setAttachments(prev => [
+        ...prev,
+        { name: file.name, url: urlData.publicUrl, size: file.size },
+      ])
+    } catch (err) {
+      console.error('Upload failed:', err)
+      toast.error('Kunde inte ladda upp filen')
+    }
+    setUploadingFile(false)
+  }
 
   async function performAutoSave() {
     if (!initialLoadDone.current) return
@@ -1278,6 +1327,15 @@ export default function EditQuotePage() {
               onUpdateEntry={updatePaymentPlanEntry}
               onRemoveEntry={removePaymentPlanEntry}
               formatCurrency={formatCurrency}
+            />
+
+            {/* Bilagor — samma kort som new-sidan. Saknades helt här:
+                dokument uppladdade vid skapandet var osynliga i redigeraren. */}
+            <QuoteNewAttachmentsCard
+              attachments={attachments}
+              setAttachments={setAttachments}
+              uploadingFile={uploadingFile}
+              onFileUpload={handleAttachmentUpload}
             />
 
             <QuoteEditDisplaySettingsSection

@@ -58,6 +58,7 @@ export default function PortalQuoteSigningModal({
     discountPercent: 0,
     vatRate: 25,
   })
+  const [bilagor, setBilagor] = useState<{ name: string; url: string }[]>([])
   // Bas-totaler (icke-tillvalsrader) från publika GET:en — i summary/rows-läge
   // är à-priserna strippade och klienten kan inte summera basen själv.
   const [baseTotals, setBaseTotals] = useState<QuoteTotals | null>(null)
@@ -133,6 +134,10 @@ export default function PortalQuoteSigningModal({
         })
         setBaseTotals(data.quote.base_totals ?? null)
         setReferencePhotos(data.reference_photos ?? null)
+        // Bilagor (2026-08-10): publika DTO:n har burit dem hela tiden —
+        // men bara /quote/[token] renderade dem, sidan portalkunder
+        // redirectas förbi. Nu visas de här, där kunden faktiskt är.
+        setBilagor(Array.isArray(data.quote.attachments) ? data.quote.attachments : [])
       })
       .catch(() => { /* tillval visas ej — signering fungerar ändå */ })
     return () => { cancelled = true }
@@ -542,6 +547,52 @@ export default function PortalQuoteSigningModal({
                           </figcaption>
                         )}
                       </figure>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Bilagor — dokument hantverkaren bifogat offerten. Del av
+                  det kunden tar ställning till, därför i Granska-steget. */}
+              {bilagor.length > 0 && (
+                <div style={{ marginBottom: 18 }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: 'var(--muted)',
+                      letterSpacing: '0.08em',
+                      marginBottom: 8,
+                    }}
+                  >
+                    BILAGOR
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {bilagor.map((b, i) => (
+                      <a
+                        key={i}
+                        href={b.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '10px 14px',
+                          background: 'var(--bg)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--r-md)',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: 'var(--ink)',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        <FileText size={16} style={{ flexShrink: 0 }} />
+                        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {b.name}
+                        </span>
+                      </a>
                     ))}
                   </div>
                 </div>

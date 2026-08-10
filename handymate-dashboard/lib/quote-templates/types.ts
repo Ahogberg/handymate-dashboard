@@ -154,6 +154,9 @@ export interface QuoteTemplateQuote {
       punktlista i villkorssektionen, efter "Ej inkluderat". Tom/utelämnad →
       inget block alls. */
   reservations?: QuoteTemplateReservation[] | null
+  /** Bifogade dokument (quotes.attachments) — namn + länk, aldrig innehåll.
+      Renderas som klickbar lista i dokumentet; PDF:en listar namnen. */
+  attachments?: Array<{ name: string; url: string }> | null
   /** ÄTA-villkor (etapp A4, 2026-08-06) — vad som gäller vid ändringar och
       tilläggsarbeten. Fältet har funnits i databasen och i redigeraren sedan
       länge men renderades ALDRIG i kunddokumentet: hantverkaren fyllde i det

@@ -627,6 +627,25 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
           </div>
         )}
 
+        {/* Bilagor (2026-08-10, Andreas fynd): uppladdade dokument sparades
+            på offerten men renderades aldrig i kunddokumentet. Länklista —
+            namnen följer med i PDF:en, klicken fungerar i webb och portal.
+            Återanvänder reservationsblockets typografi. */}
+        {!isInvoice && data.quote.attachments && data.quote.attachments.length > 0 && (
+          <div className="reservations">
+            <p className="reservations-title">Bilagor</p>
+            <ul>
+              {data.quote.attachments.map((bilaga, idx) => (
+                <li key={idx}>
+                  <a href={bilaga.url} target="_blank" rel="noopener noreferrer">
+                    {bilaga.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {!isInvoice && (
           <SignatureCta mode={mode} cta={resolvedCta} isSigned={!!data.isSigned} signedDate={data.signedDate} />
         )}
