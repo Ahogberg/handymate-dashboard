@@ -75,7 +75,7 @@ Detta dokument läses automatiskt av Claude Code vid sessionsstart. Följ alltid
 
 - `businesses` i spec/dokumentation = `business_config` i faktiska databasen — alltid
 - `business_users` tabellen finns och används för användarrelationer
-- SQL-migrationer körs manuellt i Supabase SQL Editor — skapa alltid en `.sql`-fil i `sql/`-mappen, kör aldrig migrationer programmatiskt
+- SQL-migrationer: skapa alltid en `.sql`-fil i `sql/`-mappen (granskningsbar i git). Sedan 2026-08-10 finns Supabase MCP kopplad (projekt pktaqedooyzgvzwipslu) — Claude FÅR köra migrationen via MCP, men bara efter att Andreas sagt "kör" i chatten, och verifierar alltid resultatet med en SELECT direkt efteråt. Destruktiva satser (DELETE/DROP/TRUNCATE) kräver att Andreas sett filen först. Schemakontroller (finns tabellen/kolumnen?) får göras fritt läsande via MCP — gissa aldrig när det går att slå upp
 - Namnge migrationsfiler: `sql/v2_<feature>.sql`, ex. `sql/v2_pending_approvals.sql`
 - Kontrollera alltid att tabeller och kolumner faktiskt finns innan du skriver queries mot dem
 
