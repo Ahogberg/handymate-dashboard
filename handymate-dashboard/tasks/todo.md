@@ -17,13 +17,36 @@ Fullständig plan: `C:\Users\Gaming\.claude\plans\f-rb-ttring-av-den-nya-dynamic
 - [x] **Etapp 4 — Skrivraden.** Ny `components/jarvis/SkrivRad.tsx` — stor med chips (beslut <= 1), liten pill (beslut >= 2). Källskanning: chip-hrefs finns som sidor.
 - [x] **Etapp 5 — Att hämta.** Ny `lib/jarvis/att-hamta.ts` + `components/jarvis/AttHamtaRailCard.tsx` med "väntar ovan"-scroll. PengarRailCard + Fakturor-kortet bort. Ny `tests/att-hamta.spec.ts`.
 - [x] **Etapp 6 — Senaste dygnet.** Ny `lib/jarvis/dygnsdigest.ts` (24h rullande + grindar, halsningsBevis). Digest under besluten, agentfärgade prickar, kollapsbar. Ny `tests/dygnsdigest.spec.ts`.
-- [ ] **Etapp 7 (VALFRI).** Värdekvittot natt 1 — bara om alla sex är gröna och pushade.
+- [x] **Etapp 7 (VALFRI).** Värdekvittot natt 1 — bara om alla sex är gröna och pushade.
 
 ## Verifiering per etapp
 `npx tsc --noEmit` → `npm run build` → `npx playwright test <berörda specs> --no-deps` → push → kontrollera grön deploy innan nästa etapp (lesson 2026-08-04).
 
-## Review
-(fylls i löpande)
+## Review (nattkörningen 2026-08-10, slutförd på morgonen)
+
+Alla sju etapper byggda, gröna (tsc + next build + specs) och pushade:
+1. `4b7662fd` testdata-filtret (lib/testdata.ts, 4 läsvägar + 3 producenter, 140 tester gröna)
+2. `3fc631af` fakturera_projekt (project-invoice-draft.ts delad kärna, drift-vakt, v2-bump)
+3. `5b414acd` Teamet just nu (bevakning.ts + watch-block utan belopp, TeamPresenceBand raderad)
+4. `bbe42aab` skrivraden två lägen (SkrivRad.tsx, chips källskannade mot page.tsx)
+5. `e2d818e8` Att hämta (att-hamta.ts, PengarRailCard + Fakturor-kortet borta, väntar ovan-scroll)
+6. `975c1c22` Senaste dygnet (dygnsdigest.ts 24h-fönster, halsningsBevis, team-presence städad)
+7. Värdekvittot natt 1 (vardekvitto.ts fyra ärlighetsregler, GET /api/value/kvitto ägargrindad, ramlös rad)
+
+Utöver planen: `cc2fc1ec` — Andreas skärmdump på morgonen visade att V3-motorns
+offertuppföljnings-SMS gick ut med `{{customer_name}}` ordagrant. Rotorsak:
+threshold-motorns kvot- och bokningsgrenar la aldrig customer_name i kontexten.
+Fixad med separat batch-hämtning (aldrig embed), vaktpost i specen.
+
+**Kvar till Andreas (kan inte göras av nattkörningen):**
+- Skarptest av Godkänn & skicka i egen tenant mot egen e-post (produktbeslutet).
+- Manuell koll av /dashboard/hem som ägare, anställd och mobil 390px (planens punkt 4).
+- Kontrollera att Vercel-deployerna är gröna (7 deployer sedan i natt).
+- Efter nästa nattliga missed-revenue-cron: kontrollera räknarna i prod-logg
+  (versionsbumpen skriver om pending projekt:*-kort).
+- OBS: skärmdumpens offertuppföljning gick ut för en offert som var 140 dagar
+  gammal — V3-regelns days_since_sent har ingen övre gräns/dedupe värd namnet.
+  Inte åtgärdat i natt (utanför scope) — värt ett eget beslut.
 
 ---
 

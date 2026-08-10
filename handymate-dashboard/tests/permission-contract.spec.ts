@@ -172,6 +172,11 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       why: 'Fakturerat, obetalt, overhead, margin_target_percent, arbetskostnad — hela företagets resultat.',
     },
     {
+      route: 'value/kvitto',
+      requires: 'owner-admin',
+      why: 'Värdekvittot: månadens bekräftade kronor attribuerade per agent — företagets intäktsutfall, inget en montör ska se i förbifarten.',
+    },
+    {
       route: 'dashboard/economy-summary',
       requires: 'see_financials',
       why: 'Fakturerat i månaden och obetalda belopp.',

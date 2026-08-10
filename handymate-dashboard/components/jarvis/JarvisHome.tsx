@@ -22,6 +22,7 @@ import { KarinCalendarWidget } from '@/components/karin/KarinCalendarWidget'
 import { AttHamtaRailCard } from '@/components/jarvis/AttHamtaRailCard'
 import { byggAttHamta } from '@/lib/jarvis/att-hamta'
 import type { PengarSummary } from '@/lib/value/pengar-pa-bordet'
+import type { Vardekvitto } from '@/lib/value/vardekvitto'
 import { approvalPreview, isEditable, buildApprovalEdit } from '@/lib/jarvis/approval-preview'
 import {
   agentForApproval,
@@ -208,6 +209,7 @@ export default function JarvisHome({
   const [pengarData, setPengarData] = useState<PengarSummary | null>(null)
   const [aktiviteter, setAktiviteter] = useState<DigestAktivitet[]>([])
   const [samtal, setSamtal] = useState<{ antal: number; bokade: number } | null>(null)
+  const [kvitto, setKvitto] = useState<Vardekvitto | null>(null)
 
   // ═══ GRIND 1: HAR NÅGOT HÄNT SEDAN DU TITTADE SIST? ═══
   //
@@ -341,6 +343,16 @@ export default function JarvisHome({
       .then(r => (r.ok ? r.json() : null))
       .then(d => { if (aktiv && d) setPengarData(d) })
       .catch(() => { /* kortet är grädde, aldrig mjölk */ })
+    return () => { aktiv = false }
+  }, [])
+
+  // Värdekvittot (etapp 7): månadens bekräftade kronor — samma tystnad.
+  useEffect(() => {
+    let aktiv = true
+    fetch('/api/value/kvitto')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (aktiv && d?.kvitto) setKvitto(d.kvitto) })
+      .catch(() => { /* raden är information, aldrig blockerande */ })
     return () => { aktiv = false }
   }, [])
 
@@ -778,6 +790,21 @@ export default function JarvisHome({
                 })}
               </div>
             </>
+          )}
+
+          {/* ── Värdekvittot — en RAMLÖS rad, aldrig ett beslutskort (etapp 7).
+              Bekräftat ur attributionskärnan (månadens kvitto), vilande ur
+              samma pengar-data som Att hämta bär — ingen andra sanning om
+              samma kronor. Renderas bara för den som får se ekonomi (kvittot
+              är ägargrindat) och bara när det finns något att säga. */}
+          {kvitto && (kvitto.confirmed_kr > 0 || (pengarData?.totalKr ?? 0) > 0) && (
+            <p className="mt-5 px-1 text-[13px] text-slate-500 m-0">
+              Värdekvitto {new Date().toLocaleDateString('sv-SE', { month: 'long' })}:{' '}
+              <b className="font-semibold text-slate-700">{formatKr(kvitto.confirmed_kr)} bekräftat</b>
+              {pengarData && pengarData.totalKr > 0 && (
+                <> · {formatKr(pengarData.totalKr)} vilande på <Link href="/dashboard/pengar" className="text-primary-700 hover:underline">Pengar på bordet</Link></>
+              )}
+            </p>
           )}
 
         </div>
