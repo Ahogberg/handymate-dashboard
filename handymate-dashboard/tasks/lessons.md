@@ -1,5 +1,22 @@
 # Lessons Learned
 
+## 2026-08-10: PowerShell 5.1 + git commit -m: inga raka citattecken i meddelandet
+
+**Vad hände:** Ett commit-meddelande med `"Företagsmail → förfrågningar"` i
+en single-quoted here-string splittrades vid citattecknen när PowerShell
+byggde kommandoraden till git.exe — allt efter första `"` blev pathspecs
+("error: pathspec ... did not match"). Committen uteblev tyst medan
+föregående kommando i kedjan (git add + första committen) redan körts.
+
+**Root cause:** PS 5.1 escapar inte inbäddade `"` när argument skickas till
+nativa program. Here-stringen är literal för PowerShell, men barnprocessens
+kommandorad tolkar `"` som quote-gränser.
+
+**Regel:** commit-meddelanden via PowerShell får aldrig innehålla raka
+citattecken — skriv om utan, eller använd typografiska »«. Och kedja aldrig
+två commits i ett kommando: när del två felar har del ett redan kört, och
+felläget blir halvfärdigt-stagat.
+
 ## PowerShell Get-Content → Set-Content förstör svenska tecken i UTF-8-filer
 - **Symtom (2026-08-06):** Ett `(Get-Content $f -Raw) -replace ... | Set-Content -Encoding utf8`-anrop på en testfil förvandlade alla å/ä/ö till `Ã¥`/`Ã¤`/`Ã¶` genom hela filen. Filen såg oförändrad ut i git-diffen tills man tittade på tecknen.
 - **Root cause:** `Get-Content` i Windows PowerShell 5.1 läser en UTF-8-fil UTAN BOM som ANSI (systemets kodsida). Varje flerbytetecken blir då två felaktiga tecken. `Set-Content -Encoding utf8` skriver sedan tillbaka de felaktiga tecknen som giltig UTF-8 — dubbelkodningen är permanent och inget verktyg klagar.

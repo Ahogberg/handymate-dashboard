@@ -170,12 +170,16 @@ export async function GET(request: NextRequest) {
             title: `Följ upp offert innan den går ut`,
             description: `Offerten "${q.title || ''}" på ${amount} kr går ut om 3 dagar. Godkänn för att skicka en påminnelse till kunden.`,
             // to/message/related_id → send_sms-casen; autonomy_key → streak-räkning.
+            // agent_id (Hanna v2 spel 4, bärande princip #6): offertjakten är
+            // Daniels domän — utan detta föll kortet igenom till Lisa i
+            // agentForApproval (send_sms matchar "sms" innan "quote").
             payload: {
               to: customer.phone_number,
               message,
               customer_id: q.customer_id,
               related_id: q.quote_id,
               autonomy_key: 'quote_followup_sms',
+              agent_id: 'daniel',
             },
             status: 'pending',
             risk_level: 'medium',
@@ -232,6 +236,8 @@ export async function GET(request: NextRequest) {
             const { error: nudgeLogErr } = await supabase.from('v3_automation_logs').insert({
               business_id: q.business_id,
               rule_id: null,
+              // Hanna v2 spel 4 (bärande princip #6): Daniel äger offertjakten.
+              agent_id: 'daniel',
               rule_name: 'Offert-förfallonudge (cron)',
               trigger_type: 'cron',
               action_type: 'send_sms',
@@ -382,6 +388,11 @@ export async function GET(request: NextRequest) {
         const { error: logErr } = await supabase.from('v3_automation_logs').insert({
           business_id: businessId,
           rule_id: null,
+          // Hanna v2 spel 4 (bärande princip #6): denna runda routas redan till
+          // Daniel-personan via routeToAgent('cron', 'quote_followup') (prefix
+          // 'quote_' → daniel) — stämplar loggraden explicit så scoreboard och
+          // veckodigest kan räkna den utan att räkna om routingen.
+          agent_id: 'daniel',
           rule_name: 'Offertuppföljning (cron)',
           trigger_type: 'cron',
           action_type: `send_${item.channel}`,

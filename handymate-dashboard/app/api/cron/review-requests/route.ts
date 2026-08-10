@@ -319,6 +319,14 @@ export async function GET(request: NextRequest) {
       // heter `context`) och saknade trigger_type (NOT NULL) → den har tyst
       // failat sedan den skrevs. Supabase kastar inte på insert-fel, så
       // catch-blocket fångade aldrig något — felet syntes aldrig.
+      // agent_id sätts MEDVETET INTE här (Hanna v2 spel 2, bärande princip #6):
+      // saved-scoreboard/veckodigest räknar varje v3_automation_logs-rad med
+      // agent_id som en åtgärd. Denna rad loggar bara att FÖRSLAGET skapades
+      // (action_type='create_approval') — sätts agent_id här räknas samma
+      // recension dubbelt så fort hantverkaren godkänner (då loggar execute-
+      // vägen i approvals/[id]/route.ts EN GÅNG TILL). Ingen annan producent
+      // i kodbasen loggar vid skapande, bara vid utfört utskick — attributionen
+      // ligger i stället på execute-vägens rad (rule_name='review_request').
       const { error: apprLogErr } = await supabase.from('v3_automation_logs').insert({
         business_id: biz.business_id,
         rule_name: 'review_request_cron',

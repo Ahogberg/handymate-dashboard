@@ -75,6 +75,11 @@ export interface CreateLeadAndDealInput {
   leadSourceId?: string | null
   /** Extern referens (URL, ID från extern CRM). */
   sourceRef?: string | null
+  /** Befintlig kund vars rekommendation genererade leaden (Epic C).
+      Skickas BARA när referral-flödet är avsändare — kolumnen finns först
+      efter v107, och spread-mönstret nedan gör att fältet aldrig når
+      PostgREST när det inte anges (annars 400 på hela inserten). */
+  referralCustomerId?: string | null
   /** Initial status. Default 'new' (Golden Path). Webhook använder
       'pending_review' så helpern kan reusa lead-skapande utan att
       skapa deal — då skickas leadCreatesDeal=false. */
@@ -125,6 +130,7 @@ export async function createLeadAndDeal(
     initialStatus = 'new',
     createDealAndNotify = true,
     notify = true,
+    referralCustomerId = null,
   } = input
 
   // Dubbelkunds-vakten (Epic A, 2026-08-10): 46elks levererar E.164
@@ -204,6 +210,7 @@ export async function createLeadAndDeal(
     ...(leadNumber ? { lead_number: leadNumber } : {}),
     ...(leadSourceId ? { lead_source_id: leadSourceId } : {}),
     ...(sourceRef ? { source_ref: sourceRef } : {}),
+    ...(referralCustomerId ? { referral_customer_id: referralCustomerId } : {}),
   })
 
   // En lead som aldrig landade får ALDRIG se ut som success — samma princip
@@ -251,6 +258,7 @@ export async function createLeadAndDeal(
           source: source.toLowerCase(),
           deal_number: nextNumber,
           priority: 'medium',
+          ...(referralCustomerId ? { referral_customer_id: referralCustomerId } : {}),
         })
         .select('id')
         .maybeSingle()

@@ -12,6 +12,7 @@ import { getBusinessPlanFromConfig } from '@/lib/auth'
 import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { classify, nonExecutableResult } from '@/lib/approvals/action-contract'
+import { extractAgentId } from '@/lib/patterns/utils/extract-agent-id'
 
 export const dynamic = 'force-dynamic'
 
@@ -648,6 +649,38 @@ async function executeApprovalPayload(
           relatedId: (payload.related_id as string | undefined) || null,
           messageType: approval_type,
         })
+
+        // Hanna v2 spel 4 (bärande princip #6): denna case delas av MÅNGA
+        // producenter (Karin/Daniel/Lisa/generiska send_sms) — attribuera
+        // bara när payloaden faktiskt bär en agent (extractAgentId, samma
+        // policy som rate-limit/approve-rate använder), annars null i
+        // stället för en gissning. quote_nudge-kort från Daniels offertjakt
+        // bär agent_id='daniel' sedan tidigare (lib/autopilot/quote-nudge.ts).
+        try {
+          const agentIdForLog = extractAgentId({ payload })
+          const supabaseQN = await getSupabase()
+          const { error: qnLogErr } = await supabaseQN.from('v3_automation_logs').insert({
+            business_id: businessId,
+            agent_id: agentIdForLog,
+            rule_name: approval_type,
+            trigger_type: 'approval_executed',
+            action_type: 'send_sms',
+            approval_id: approvalId,
+            status: r.sms_sent ? 'success' : 'failed',
+            error_message: r.sms_sent ? null : (r.error || null),
+            context: {
+              customer_id: (payload.customer_id as string | undefined) || null,
+              related_id: (payload.related_id as string | undefined) || null,
+              quote_id: (payload.quote_id as string | undefined) || null,
+            },
+          })
+          if (qnLogErr) {
+            console.warn('[approvals/send_sms] v3-logg insert misslyckades (icke-blockerande):', qnLogErr.message)
+          }
+        } catch (logErr: any) {
+          console.warn('[approvals/send_sms] v3-logg insert kastade (icke-blockerande):', logErr?.message || logErr)
+        }
+
         return { action: 'send_sms', ...r }
       }
 
@@ -800,6 +833,32 @@ async function executeApprovalPayload(
           relatedId: projectId,
           messageType: 'review_request',
         })
+
+        // Hanna v2 spel 2 (bärande princip #6): logga utfallet till
+        // v3_automation_logs med agent_id='hanna' — dessa tre typer är
+        // alltid Hannas domän (recension/1-årsuppföljning) — så det syns
+        // i scoreboard + veckodigest, samma mönster som proactive_care/
+        // warranty_followup-casen ovan. Tidigare loggades exekveringen
+        // inte alls här (bara cronens EGEN skapande-logg fanns).
+        try {
+          const supabaseRR = await getSupabase()
+          const { error: rrLogErr } = await supabaseRR.from('v3_automation_logs').insert({
+            business_id: businessId,
+            agent_id: 'hanna',
+            rule_name: approval_type,
+            trigger_type: 'approval_executed',
+            action_type: 'send_sms',
+            approval_id: approvalId,
+            status: r.sms_sent ? 'success' : 'failed',
+            error_message: r.sms_sent ? null : (r.error || null),
+            context: { customer_id: customerId, project_id: projectId },
+          })
+          if (rrLogErr) {
+            console.warn('[approvals/review_request] v3-logg insert misslyckades (icke-blockerande):', rrLogErr.message)
+          }
+        } catch (logErr: any) {
+          console.warn('[approvals/review_request] v3-logg insert kastade (icke-blockerande):', logErr?.message || logErr)
+        }
 
         if (!r.sms_sent) {
           return {
