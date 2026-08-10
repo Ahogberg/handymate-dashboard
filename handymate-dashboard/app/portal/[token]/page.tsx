@@ -85,6 +85,8 @@ export default function CustomerPortalPage() {
   })
   const [messages, setMessages] = useState<Message[]>([])
   const [loadingTab, setLoadingTab] = useState(false)
+  // Dokumentflikens startsektion — sätts av Hem-knapparnas deep-links.
+  const [docsSection, setDocsSection] = useState<'all' | 'quotes' | 'invoices'>('all')
 
   // Initial load
   useEffect(() => {
@@ -156,10 +158,35 @@ export default function CustomerPortalPage() {
     return () => clearInterval(interval)
   }, [subRoute, selectedProject, portal, token])
 
+  // Tråden pollar medan den är öppen (2026-08-10): hantverkarens svar ska
+  // synas utan att kunden navigerar bort och tillbaka — samma 30 s som
+  // projektdetaljen och Hem.
+  useEffect(() => {
+    if (subRoute !== 'messages' || !portal) return
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/portal/${token}/messages`)
+        if (res.ok) {
+          const data = await res.json()
+          setMessages(data.messages || [])
+        }
+      } catch { /* nästa tick försöker igen */ }
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [subRoute, portal, token])
+
   // Navigation helper for cross-screen jumps
-  function navigate(route: 'project' | 'docs' | 'contact' | 'messages' | 'project-detail', payload?: { projectId?: string }) {
+  function navigate(
+    route: 'project' | 'docs' | 'contact' | 'messages' | 'project-detail',
+    payload?: { projectId?: string; docsSection?: 'quotes' | 'invoices' },
+  ) {
     if (route === 'project') { setTab('project'); setSubRoute(null); setSelectedProject(null) }
-    else if (route === 'docs') { setTab('docs'); setSubRoute(null); setSelectedInvoice(null) }
+    else if (route === 'docs') {
+      setTab('docs'); setSubRoute(null); setSelectedInvoice(null)
+      // Deep-link (2026-08-10): "Offerter" och "Fakturor" på Hem gick båda
+      // till samma ofiltrerade lista — klicket ska landa på rätt sektion.
+      setDocsSection(payload?.docsSection ?? 'all')
+    }
     else if (route === 'contact') { setTab('contact'); setSubRoute(null) }
     else if (route === 'messages') setSubRoute('messages')
     else if (route === 'project-detail') {
@@ -297,9 +324,11 @@ export default function CustomerPortalPage() {
 
       {tab === 'docs' && (
         <PortalDocumentsList
+          key={docsSection}
           portal={portal}
           quotes={quotes}
           invoices={invoices}
+          initialFilter={docsSection}
           onOpenQuote={() => setSubRoute('quote')}
           onOpenInvoice={(id) => { setSelectedInvoice(id); setSubRoute('invoice') }}
         />

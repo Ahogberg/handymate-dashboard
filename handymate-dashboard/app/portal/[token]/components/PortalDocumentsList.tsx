@@ -11,6 +11,9 @@ interface PortalDocumentsListProps {
   portal: PortalData
   quotes: Quote[]
   invoices: Invoice[]
+  /** Deep-link från Hem (2026-08-10): "Fakturor"-knappen ska landa på
+      fakturorna, inte i en ofiltrerad lista där kunden får leta. */
+  initialFilter?: FilterId
   onOpenQuote: (id: string) => void
   onOpenInvoice: (id: string) => void
 }
@@ -36,10 +39,11 @@ export default function PortalDocumentsList({
   portal,
   quotes,
   invoices,
+  initialFilter,
   onOpenQuote,
   onOpenInvoice,
 }: PortalDocumentsListProps) {
-  const [filter, setFilter] = useState<FilterId>('all')
+  const [filter, setFilter] = useState<FilterId>(initialFilter ?? 'all')
 
   const docItems: DocItem[] = [
     ...quotes.map((q): DocItem => ({

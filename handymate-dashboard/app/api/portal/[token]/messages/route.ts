@@ -75,7 +75,10 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
       return NextResponse.json({ error: 'Kunde inte skicka meddelande' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true })
+    // Raden följer med så tråden kan visa meddelandet DIREKT — tidigare
+    // returnerades bara success och kundens meddelande försvann ur vyn
+    // tills nästa sidladdning.
+    return NextResponse.json({ success: true, message: result.message ?? null })
   } catch (error: any) {
     console.error('Portal message send error:', error)
     return NextResponse.json({ error: 'Kunde inte skicka meddelande' }, { status: 500 })

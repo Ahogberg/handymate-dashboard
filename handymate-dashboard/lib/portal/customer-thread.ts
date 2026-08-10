@@ -56,6 +56,10 @@ export interface InboundMessageInput {
 export interface InboundMessageResult {
   threadWritten: boolean
   approvalCreated: boolean
+  /** Den skrivna trådraden — portalen visar den direkt utan omhämtning.
+      Utan den försvann kundens meddelande ur vyn tills nästa sidladdning
+      (POST:en returnerade bara success, klienten appendade undefined). */
+  message?: { id: string; direction: string; message: string; read_at: string | null; created_at: string } | null
 }
 
 /**
@@ -77,16 +81,21 @@ export async function receiveCustomerMessage(
   const prefix = input.quote ? buildQuoteContextPrefix(input.quote) : ''
   const threadMessage = `${prefix}${trimmed}`
 
-  const { error: threadErr } = await supabase.from('customer_message').insert({
-    business_id: input.businessId,
-    customer_id: input.customerId,
-    direction: 'inbound',
-    message: threadMessage,
-  })
+  const { data: threadRow, error: threadErr } = await supabase
+    .from('customer_message')
+    .insert({
+      business_id: input.businessId,
+      customer_id: input.customerId,
+      direction: 'inbound',
+      message: threadMessage,
+    })
+    .select('id, direction, message, read_at, created_at')
+    .single()
   if (threadErr) {
     console.error('[customer-thread] kunde inte skriva i tråden:', threadErr.message)
   } else {
     result.threadWritten = true
+    result.message = threadRow
   }
 
   const customerName = input.customerName || 'Kunden'
@@ -177,6 +186,25 @@ export async function sendCustomerReply(
     console.error('[customer-thread] kunde inte skriva svaret i tråden:', error.message)
     return false
   }
+
+  // ═══ SVARAT = LÄST (2026-08-10) ═══
+  //
+  // Portalens "Läst"-kvitto kunde aldrig bli sant: ingenting på
+  // hantverkarens sida satte read_at på kundens meddelanden. Det enda
+  // otvetydiga läs-ögonblicket är SVARET — den som svarar har läst.
+  // Fail-soft: ett misslyckat kvitto får aldrig fälla ett svar som
+  // redan skrivits i tråden.
+  const { error: kvittoErr } = await supabase
+    .from('customer_message')
+    .update({ read_at: new Date().toISOString() })
+    .eq('business_id', input.businessId)
+    .eq('customer_id', input.customerId)
+    .eq('direction', 'inbound')
+    .is('read_at', null)
+  if (kvittoErr) {
+    console.error('[customer-thread] läskvittot kunde inte sättas (non-blocking):', kvittoErr.message)
+  }
+
   return true
 }
 

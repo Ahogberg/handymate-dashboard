@@ -22,7 +22,10 @@ import type { PortalActivity, PortalData, Project } from '../types'
 interface PortalHomeProps {
   portal: PortalData
   token: string
-  onNavigate: (route: 'project' | 'docs' | 'contact' | 'messages' | 'project-detail', payload?: { projectId?: string }) => void
+  onNavigate: (
+    route: 'project' | 'docs' | 'contact' | 'messages' | 'project-detail',
+    payload?: { projectId?: string; docsSection?: 'quotes' | 'invoices' },
+  ) => void
 }
 
 const ICON_MAP: Record<string, typeof ImageIcon> = {
@@ -82,12 +85,27 @@ export default function PortalHome({ portal, token, onNavigate }: PortalHomeProp
   const totalMilestones = activeProject?.milestones?.length || 0
   const progressPct = activeProject?.progress ?? (totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0)
 
+  // Deep-links (2026-08-10): Offerter och Fakturor gick båda till samma
+  // ofiltrerade dokumentlista — nu landar klicket på rätt sektion.
   const quickActions = [
-    { id: 'project' as const, Icon: FolderKanban,    label: 'Projekt',  color: 'var(--bee-700)',   bg: 'var(--bee-50)' },
-    { id: 'docs' as const,    Icon: FileSignature,   label: 'Offerter', color: 'var(--blue-600)',  bg: 'var(--blue-50)' },
-    { id: 'docs' as const,    Icon: Receipt,         label: 'Fakturor', color: 'var(--ink)',       bg: 'var(--bg)' },
-    { id: 'contact' as const, Icon: Phone,           label: 'Kontakt',  color: 'var(--green-600)', bg: 'var(--green-50)' },
+    { id: 'project' as const, Icon: FolderKanban,    label: 'Projekt',  color: 'var(--bee-700)',   bg: 'var(--bee-50)',   payload: undefined },
+    { id: 'docs' as const,    Icon: FileSignature,   label: 'Offerter', color: 'var(--blue-600)',  bg: 'var(--blue-50)',  payload: { docsSection: 'quotes' as const } },
+    { id: 'docs' as const,    Icon: Receipt,         label: 'Fakturor', color: 'var(--ink)',       bg: 'var(--bg)',       payload: { docsSection: 'invoices' as const } },
+    { id: 'contact' as const, Icon: Phone,           label: 'Kontakt',  color: 'var(--green-600)', bg: 'var(--green-50)', payload: undefined },
   ]
+
+  // Statuschippen följer projektets FAKTISKA läge (2026-08-10): kortet
+  // faller tillbaka på första projektet när inget är aktivt, och den gamla
+  // hårdkodade "Pågår"-chippen med puls gjorde ett avslutat projekt till
+  // ett pågående. Pulsen är reserverad för det som faktiskt pågår.
+  const arPagaende = activeProject?.status === 'active' || activeProject?.status === 'in_progress'
+  const statusChip = arPagaende
+    ? { text: 'Pågår', bg: 'var(--green-50)', color: 'var(--green-600)', puls: true }
+    : activeProject?.status === 'completed'
+      ? { text: 'Klart', bg: 'var(--green-50)', color: 'var(--green-600)', puls: false }
+      : activeProject?.status === 'paused'
+        ? { text: 'Pausat', bg: '#FEF3C7', color: '#92400E', puls: false }
+        : { text: 'Planeras', bg: 'var(--bg)', color: 'var(--muted)', puls: false }
 
   return (
     <>
@@ -109,7 +127,11 @@ export default function PortalHome({ portal, token, onNavigate }: PortalHomeProp
           <h1>{greeting} {firstName},</h1>
           <p>
             {activeProject
-              ? `${activeProject.name} pågår — vi håller dig uppdaterad.`
+              ? arPagaende
+                ? `${activeProject.name} pågår — vi håller dig uppdaterad.`
+                : activeProject.status === 'completed'
+                  ? `${activeProject.name} är klart — hör av dig om du undrar något.`
+                  : `${activeProject.name} är planerat — vi hör av oss inför start.`
               : 'Välkommen till din portal.'}
           </p>
         </div>
@@ -132,7 +154,7 @@ export default function PortalHome({ portal, token, onNavigate }: PortalHomeProp
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--bee-700)', letterSpacing: '0.08em', marginBottom: 4 }}>
-                      AKTIVT PROJEKT
+                      {arPagaende ? 'AKTIVT PROJEKT' : 'DITT PROJEKT'}
                     </div>
                     <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
                       {activeProject.name}
@@ -147,13 +169,13 @@ export default function PortalHome({ portal, token, onNavigate }: PortalHomeProp
                     style={{
                       display: 'flex', alignItems: 'center', gap: 6,
                       padding: '4px 10px',
-                      background: 'var(--green-50)',
+                      background: statusChip.bg,
                       borderRadius: 'var(--r-pill)',
                       flexShrink: 0,
                     }}
                   >
-                    <span className="bp-live-dot" />
-                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--green-600)' }}>Pågår</span>
+                    {statusChip.puls && <span className="bp-live-dot" />}
+                    <span style={{ fontSize: 11, fontWeight: 600, color: statusChip.color }}>{statusChip.text}</span>
                   </div>
                 </div>
 
@@ -224,7 +246,7 @@ export default function PortalHome({ portal, token, onNavigate }: PortalHomeProp
                 type="button"
                 key={i}
                 className="bp-card-tap"
-                onClick={() => onNavigate(a.id)}
+                onClick={() => onNavigate(a.id, a.payload)}
                 style={{
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',

@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell } from 'lucide-react'
+import { MessageCircle } from 'lucide-react'
 import type { PortalData } from '../types'
 
 interface PortalShellHeaderProps {
@@ -38,14 +38,39 @@ export default function PortalShellHeader({
         <div className="bp-brand-name">{business.name || 'Handymate'}</div>
         {subtitle && <div className="bp-brand-sub">{subtitle}</div>}
       </div>
+      {/* Ikonen ÄR meddelandeingången — en klocka som öppnar chatten läses
+          som notiser (2026-08-10). Antalet olästa sägs, inte bara en prick. */}
       <button
         type="button"
         className="bp-icon-btn"
         onClick={onNotificationClick}
-        aria-label="Notiser"
+        aria-label={unreadMessages > 0 ? `Meddelanden — ${unreadMessages} olästa` : 'Meddelanden'}
+        style={{ position: 'relative' }}
       >
-        <Bell size={18} />
-        {unreadMessages > 0 && <span className="bp-badge-dot" />}
+        <MessageCircle size={18} />
+        {unreadMessages > 0 && (
+          <span
+            style={{
+              position: 'absolute',
+              top: 2,
+              right: 2,
+              minWidth: 16,
+              height: 16,
+              padding: '0 4px',
+              borderRadius: 8,
+              background: '#EF4444',
+              color: '#fff',
+              fontSize: 10,
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              lineHeight: 1,
+            }}
+          >
+            {unreadMessages > 9 ? '9+' : unreadMessages}
+          </span>
+        )}
       </button>
     </div>
   )

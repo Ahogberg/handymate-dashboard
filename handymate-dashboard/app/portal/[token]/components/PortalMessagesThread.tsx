@@ -16,7 +16,9 @@ interface PortalMessagesThreadProps {
 /**
  * iMessage-stil meddelandetråd (port av bp-messages.jsx).
  * Inkommande från företaget = vit bubbla med kontakt-initial.
- * Egna meddelanden = bee-färgad bubbla höger med Skickad/Levererad/Läst-status.
+ * Egna meddelanden = bee-färgad bubbla höger med Skickat/Läst-status —
+ * "Läst" blir sant först när hantverkaren svarat (läskvittot sätts av
+ * svaret, lib/portal/customer-thread).
  */
 export default function PortalMessagesThread({
   business,
@@ -27,6 +29,9 @@ export default function PortalMessagesThread({
 }: PortalMessagesThreadProps) {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  // Sändfel var tidigare TYST (console.error) — kunden trodde meddelandet
+  // gått iväg. Nu sägs det, och utkastet står kvar så inget skrivet tappas.
+  const [sendError, setSendError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -36,6 +41,7 @@ export default function PortalMessagesThread({
   async function send() {
     if (!draft.trim() || sending) return
     setSending(true)
+    setSendError(null)
     try {
       const res = await fetch(`/api/portal/${token}/messages`, {
         method: 'POST',
@@ -44,11 +50,15 @@ export default function PortalMessagesThread({
       })
       if (res.ok) {
         const data = await res.json()
-        onMessageSent(data.message)
+        // Raden kommer från servern sedan 2026-08-10 — utan vakten appendade
+        // vi undefined och meddelandet försvann ur vyn tills omladdning.
+        if (data.message) onMessageSent(data.message)
         setDraft('')
+      } else {
+        setSendError('Meddelandet kunde inte skickas — försök igen.')
       }
     } catch {
-      console.error('Failed to send message')
+      setSendError('Meddelandet kunde inte skickas — kontrollera uppkopplingen och försök igen.')
     }
     setSending(false)
   }
@@ -70,7 +80,10 @@ export default function PortalMessagesThread({
         >
           <ArrowLeft size={20} />
         </button>
-        <div style={{ position: 'relative', flexShrink: 0 }}>
+        {/* Ingen närvaroprick och ingen påstådd närvarostatus — det fanns
+            aldrig någon mekanik bakom dem (2026-08-10). Undertexten lovar
+            bara det som är sant. */}
+        <div style={{ flexShrink: 0 }}>
           <div
             style={{
               width: 36,
@@ -87,23 +100,11 @@ export default function PortalMessagesThread({
           >
             {contactInitial}
           </div>
-          <span
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              right: 0,
-              width: 10,
-              height: 10,
-              background: 'var(--green-600)',
-              border: '2px solid #fff',
-              borderRadius: '50%',
-            }}
-          />
         </div>
         <div className="bp-brand">
           <div className="bp-brand-name">{business.contactName || business.name}</div>
-          <div className="bp-brand-sub" style={{ color: 'var(--green-600)' }}>
-            ● Online · {business.name}
+          <div className="bp-brand-sub">
+            {business.name} · svarar så snart de kan
           </div>
         </div>
         {business.phone && (
@@ -130,27 +131,31 @@ export default function PortalMessagesThread({
           </div>
         ) : (
           <>
-            <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)', padding: '8px 0 14px' }}>
-              {messages.length > 0 && new Date(messages[0].created_at).toLocaleDateString('sv-SE', {
-                day: 'numeric',
-                month: 'short',
-              })}
-            </div>
-
             {messages.map((m, i) => {
               const prev = messages[i - 1]
               const fromBusiness = m.direction === 'outbound'
               const showAvatar = fromBusiness && (!prev || prev.direction !== 'outbound')
               const groupedTop = prev && prev.direction === m.direction
+              // Datumseparator per DAG — en enda stämpel överst fick en tråd
+              // över tre veckor att se ut som ett datum (2026-08-10).
+              const nyDag = !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString()
               return (
+                <div key={m.id}>
+                {nyDag && (
+                  <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)', padding: i === 0 ? '8px 0 14px' : '16px 0 8px' }}>
+                    {new Date(m.created_at).toLocaleDateString('sv-SE', {
+                      day: 'numeric',
+                      month: 'short',
+                    })}
+                  </div>
+                )}
                 <div
-                  key={m.id}
                   style={{
                     display: 'flex',
                     justifyContent: fromBusiness ? 'flex-start' : 'flex-end',
                     alignItems: 'flex-end',
                     gap: 6,
-                    marginTop: groupedTop ? 0 : 8,
+                    marginTop: groupedTop && !nyDag ? 0 : 8,
                     animation: 'bp-pop-in 240ms',
                   }}
                 >
@@ -193,6 +198,7 @@ export default function PortalMessagesThread({
                     {m.message}
                   </div>
                 </div>
+                </div>
               )
             })}
 
@@ -210,13 +216,35 @@ export default function PortalMessagesThread({
                   gap: 4,
                 }}
               >
-                {lastMine.read_at ? 'Läst' : 'Levererad'}
+                {/* Den gamla leveransetiketten lovade mer än en databasrad
+                    kan. "Skickat" är sant direkt; "Läst" blir sant när
+                    hantverkaren svarat (läskvittot sätts av svaret —
+                    lib/portal/customer-thread). */}
+                {lastMine.read_at ? 'Läst' : 'Skickat'}
                 <span style={{ marginLeft: 4 }}>{formatDateTime(lastMine.created_at)}</span>
               </div>
             )}
           </>
         )}
       </div>
+
+      {/* Sändfelet sägs — aldrig en tyst papperskorg. Utkastet står kvar. */}
+      {sendError && (
+        <div
+          role="alert"
+          style={{
+            margin: '0 14px 8px',
+            padding: '10px 14px',
+            background: '#FEF3C7',
+            border: '1px solid #FCD34D',
+            borderRadius: 'var(--r-md)',
+            fontSize: 13,
+            color: '#92400E',
+          }}
+        >
+          {sendError}
+        </div>
+      )}
 
       {/* Composer */}
       <div
