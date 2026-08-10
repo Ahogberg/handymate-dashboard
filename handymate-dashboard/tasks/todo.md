@@ -1,4 +1,15 @@
-# NÄSTA NATTKÖRNING — A1 Ägarrapporten (planerad 2026-08-10, godkänd av Andreas)
+# A1 Ägarrapporten — BYGGD 2026-08-10 (natt 1: yta, inga utskick)
+
+Alla natt 1-punkter klara samma dag (se sektionen nedan för ursprungsplanen):
+lib/value/agarrapport.ts (fryst, tre sanningsnivåer), GET /api/value/agarrapport
+(ägargrindad, i permission-kartan, kostnad grindad på B7-fälten + billing_plan.price_sek),
+AgarrapportBlock på Månadsrapporten (vilande ur /api/dashboard/pengar — ingen andra
+sanning), 12 facit i tests/agarrapport.spec.ts. KVAR (natt 2): månadsutskicket
+(cron månadsvis — Hobby-gränsen OK), historiska månader kräver lagrade poster.
+
+---
+
+# URSPRUNGSPLAN — A1 Ägarrapporten (planerad 2026-08-10, godkänd av Andreas)
 
 Bakgrund: extern ChatGPT-rapport mappad mot rådsroadmapen — addendum i
 `docs/council/ACTIVE_ROADMAP.md` ("Extern rapport 2026-08-10"). A1 är den enda

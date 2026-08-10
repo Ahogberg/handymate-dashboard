@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { BarChart3, TrendingUp, TrendingDown, ChevronDown, ChevronRight, Loader2, RefreshCw, Users, FileText, DollarSign, AlertCircle, Sparkles } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
+import { AgarrapportBlock } from '@/components/value/AgarrapportBlock'
 import type { MonthlyReviewData } from '@/lib/matte/monthly-review'
 
 interface MonthlyReviewRow {
@@ -117,6 +118,11 @@ export default function MonthlyReviewPage() {
             {generating ? 'Genererar...' : 'Generera nu'}
           </button>
         </div>
+
+        {/* Värdet den här månaden — live ur attributionskärnan (Spår A1).
+            Renderar ingenting för anställda (API:t svarar 403) och inget
+            när det inte finns något att säga. */}
+        <AgarrapportBlock />
 
         {/* Content */}
         {loading ? (

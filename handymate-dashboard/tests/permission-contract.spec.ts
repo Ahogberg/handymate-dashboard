@@ -177,6 +177,11 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       why: 'Värdekvittot: månadens bekräftade kronor attribuerade per agent — företagets intäktsutfall, inget en montör ska se i förbifarten.',
     },
     {
+      route: 'value/agarrapport',
+      requires: 'owner-admin',
+      why: 'Ägarrapporten: bekräftat värde, abonnemangskostnad och retention-argumentet — företagets ekonomi och avtal med oss, aldrig personaldata.',
+    },
+    {
       route: 'dashboard/economy-summary',
       requires: 'see_financials',
       why: 'Fakturerat i månaden och obetalda belopp.',
