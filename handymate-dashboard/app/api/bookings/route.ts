@@ -319,7 +319,8 @@ export async function POST(request: NextRequest) {
 
         const project = pendingProjects?.[0]
         if (project) {
-          await advanceProjectStage(project.project_id, SYSTEM_STAGES.MEETING_BOOKED, business.business_id)
+          const flytt = await advanceProjectStage(project.project_id, SYSTEM_STAGES.MEETING_BOOKED, business.business_id)
+          if (!flytt.moved) console.error('[bookings] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: project.project_id })
         }
       } catch (err) {
         console.error('[bookings] advanceProjectStage MEETING_BOOKED failed:', err)

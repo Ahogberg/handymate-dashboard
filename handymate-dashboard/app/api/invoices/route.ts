@@ -443,7 +443,8 @@ export async function PUT(request: NextRequest) {
         })
         if (project) {
           const stage = fields.status === 'paid' ? SYSTEM_STAGES.INVOICE_PAID : SYSTEM_STAGES.INVOICE_SENT
-          await advanceProjectStage(project.project_id, stage, business.business_id)
+          const flytt = await advanceProjectStage(project.project_id, stage, business.business_id)
+          if (!flytt.moved) console.error('[invoices] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: project.project_id })
         }
       } catch (err) {
         console.error('[invoice status] advanceProjectStage failed:', err)

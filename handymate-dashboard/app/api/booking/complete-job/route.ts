@@ -214,11 +214,16 @@ export async function POST(request: NextRequest) {
           const { advanceProjectStage, SYSTEM_STAGES } = await import(
             '@/lib/project-stages/automation-engine'
           )
-          await advanceProjectStage(
+          // Motorn kastar inte — den svarar { moved, error }. Utan läsningen
+          // var ett misslyckande osynligt här (2026-08-10).
+          const stegflytt = await advanceProjectStage(
             existing.project_id,
             SYSTEM_STAGES.FINAL_INSPECTION,
             business.business_id,
           )
+          if (!stegflytt.moved) {
+            console.error('[booking/complete-job] stegflytten misslyckades (non-blocking):', stegflytt.error, { projectId: existing.project_id })
+          }
         } catch (stageErr) {
           console.error('[booking/complete-job] stage advance failed:', stageErr)
         }

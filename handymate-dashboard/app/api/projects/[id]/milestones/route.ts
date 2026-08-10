@@ -223,11 +223,12 @@ export async function PUT(
         const total = allMilestones?.length || 0
         if (total > 0) {
           const { advanceProjectStage, SYSTEM_STAGES } = await import('@/lib/project-stages/automation-engine')
-          if (completed === total) {
-            await advanceProjectStage(params.id, SYSTEM_STAGES.FINAL_INSPECTION, business.business_id)
-          } else if (completed === 1 && total > 1) {
-            await advanceProjectStage(params.id, SYSTEM_STAGES.MILESTONE_REACHED, business.business_id)
-          }
+          const flytt = completed === total
+            ? await advanceProjectStage(params.id, SYSTEM_STAGES.FINAL_INSPECTION, business.business_id)
+            : completed === 1 && total > 1
+              ? await advanceProjectStage(params.id, SYSTEM_STAGES.MILESTONE_REACHED, business.business_id)
+              : null
+          if (flytt && !flytt.moved) console.error('[milestones] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: params.id })
         }
       } catch (err) {
         console.error('[milestones] advanceProjectStage failed:', err)

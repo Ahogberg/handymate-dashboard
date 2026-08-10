@@ -182,5 +182,65 @@ export async function GET(request: NextRequest) {
     results.reviews_error = err.message
   }
 
+  // ── 4. Jobb igång-svepet (2026-08-10) ──────────────────────────────
+  //
+  // JOB_STARTED hade ingen händelseproducent: ett offertfött projekt
+  // hoppade från Avtal/Möte direkt till Slutbesiktning, och steppern stod
+  // stilla mitt i jobbet. Två deterministiska signaler säger att arbetet
+  // börjat: en registrerad tidrapport, eller en bekräftad bokning vars
+  // starttid passerat. Svepet fångar ALLA tidrapportsvägar (sex insert-
+  // ställen) på ett ställe, plus gamla projekt från motorns döda period.
+  // Framåt-vakten (advanceProjectStageForward) backar aldrig ett projekt.
+  try {
+    const { advanceProjectStageForward, SYSTEM_STAGES } = await import('@/lib/project-stages/automation-engine')
+    const tidigaSteg = [SYSTEM_STAGES.CONTRACT_SIGNED, SYSTEM_STAGES.MEETING_BOOKED]
+
+    const { data: kandidater, error: kandErr } = await supabase
+      .from('project')
+      .select('project_id, business_id, current_workflow_stage_id')
+      .in('status', ['planning', 'active'])
+      .limit(500)
+    if (kandErr) throw kandErr
+
+    const tidiga = (kandidater || []).filter(p =>
+      p.current_workflow_stage_id === null || tidigaSteg.includes(p.current_workflow_stage_id),
+    )
+
+    let jobbIgang = 0
+    if (tidiga.length > 0) {
+      const ids = tidiga.map(p => p.project_id)
+      const nuIso = new Date().toISOString()
+      const [teRes, bokRes] = await Promise.all([
+        supabase.from('time_entry').select('project_id').in('project_id', ids).limit(2000),
+        supabase.from('booking').select('project_id')
+          .in('project_id', ids)
+          .in('status', ['confirmed', 'completed'])
+          .lte('scheduled_start', nuIso)
+          .limit(2000),
+      ])
+      // Fel läses — ett tyst misslyckat uppslag får inte se ut som "inget
+      // arbete finns" (lärdomen 2026-08-05).
+      if (teRes.error) throw teRes.error
+      if (bokRes.error) throw bokRes.error
+
+      const harArbete = new Set([
+        ...(teRes.data || []).map(r => r.project_id),
+        ...(bokRes.data || []).map(r => r.project_id),
+      ])
+
+      for (const p of tidiga) {
+        if (!harArbete.has(p.project_id)) continue
+        const flytt = await advanceProjectStageForward(p.project_id, SYSTEM_STAGES.JOB_STARTED, p.business_id)
+        if (flytt.moved && p.current_workflow_stage_id !== SYSTEM_STAGES.JOB_STARTED) jobbIgang++
+        else if (!flytt.moved) console.error('[maintenance] Jobb igång-flytt misslyckades:', flytt.error, { projectId: p.project_id })
+      }
+    }
+    results.job_started_moved = jobbIgang
+    if (jobbIgang > 0) console.log(`[maintenance] Jobb igång: ${jobbIgang} projekt flyttade`)
+  } catch (err: any) {
+    console.error('[maintenance] jobb-igång-svepet failade:', err.message)
+    results.job_started_error = err.message
+  }
+
   return NextResponse.json({ ok: true, ...results })
 }

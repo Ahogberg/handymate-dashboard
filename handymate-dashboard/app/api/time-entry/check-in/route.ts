@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
 
     const now = new Date()
     const workDate = now.toISOString().split('T')[0]
+    const checkInProjectId = project_id || null
 
     const { data: entry, error } = await supabase
       .from('time_entry')
@@ -78,6 +79,24 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) throw error
+
+    // Jobb igång (2026-08-10): incheckningen är den tydligaste "arbetet
+    // börjar NU"-signalen — flytta projektet framåt till JOB_STARTED.
+    // Framåt-vakten backar aldrig ett fakturerat projekt, och ett fel här
+    // får aldrig fälla incheckningen (fire-and-forget med synlig logg).
+    if (checkInProjectId) {
+      void (async () => {
+        try {
+          const { advanceProjectStageForward, SYSTEM_STAGES } = await import('@/lib/project-stages/automation-engine')
+          const flytt = await advanceProjectStageForward(checkInProjectId, SYSTEM_STAGES.JOB_STARTED, businessId)
+          if (!flytt.moved) {
+            console.error('[check-in] Jobb igång-flytten misslyckades (non-blocking):', flytt.error, { projectId: checkInProjectId })
+          }
+        } catch (stageErr) {
+          console.error('[check-in] Jobb igång-flytten kastade (non-blocking):', stageErr, { projectId: checkInProjectId })
+        }
+      })()
+    }
 
     return NextResponse.json({ entry })
   } catch (error: any) {

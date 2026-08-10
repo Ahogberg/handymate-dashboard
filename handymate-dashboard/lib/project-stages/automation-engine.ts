@@ -25,6 +25,40 @@ export const SYSTEM_STAGES = {
 
 export type SystemStageId = typeof SYSTEM_STAGES[keyof typeof SYSTEM_STAGES]
 
+/**
+ * Flytta ENDAST framåt (2026-08-10, Jobb igång-producenten).
+ *
+ * Händelseproducenter (första tidrapporten, bokningsstart passerad) vet att
+ * arbetet BÖRJAT — men inte var projektet står. Ett projekt som redan är
+ * fakturerat får aldrig backas till "Jobb igång" av en sen tidrapport.
+ *
+ * Systemstegens id är ordnade (ps-01 … ps-08) så strängjämförelsen räcker.
+ * Står projektet på ett EGET (icke-ps-) steg vet vi inte var i flödet det
+ * är — då rör vi det inte alls. Hellre ett stillastående steg än ett fel.
+ */
+export async function advanceProjectStageForward(
+  projectId: string,
+  stageId: SystemStageId,
+  businessId: string,
+): Promise<AdvanceStageResult> {
+  const supabase = getServerSupabase()
+  const { data: p, error } = await supabase
+    .from('project')
+    .select('current_workflow_stage_id')
+    .eq('project_id', projectId)
+    .eq('business_id', businessId)
+    .maybeSingle()
+  if (error) return { moved: false, error: error.message }
+  if (!p) return { moved: false, error: 'Projektet hittades inte' }
+
+  const current = p.current_workflow_stage_id as string | null
+  if (current) {
+    if (!/^ps-\d\d$/.test(current)) return { moved: true } // eget steg — rör inte
+    if (current >= stageId) return { moved: true }          // redan där eller längre
+  }
+  return advanceProjectStage(projectId, stageId, businessId)
+}
+
 interface StageHistoryEntry {
   stage_id: string
   entered_at: string

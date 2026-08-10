@@ -123,7 +123,8 @@ export async function PATCH(
           invoiceId,
         })
         if (project) {
-          await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_PAID, business.business_id)
+          const flytt = await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_PAID, business.business_id)
+          if (!flytt.moved) console.error('[invoice status] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: project.project_id })
         }
       } catch (err) {
         console.error('[invoice status] advanceProjectStage INVOICE_PAID failed:', err)

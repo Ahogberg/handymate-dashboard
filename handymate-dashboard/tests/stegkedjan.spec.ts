@@ -72,3 +72,43 @@ test.describe('stegkedjan startar vid födseln', () => {
     expect(fn).toContain("select('project_id')")
   })
 })
+
+test.describe('Jobb igång har verkliga producenter (2026-08-10)', () => {
+  test('framåt-vakten backar aldrig och rör aldrig egna steg', () => {
+    const s = kod('lib/project-stages/automation-engine.ts')
+    const fn = s.slice(s.indexOf('export async function advanceProjectStageForward'))
+    // Eget (icke-ps-) steg → rör inte; redan där eller längre → ingen flytt.
+    expect(fn).toContain('/^ps-\\d\\d$/')
+    expect(fn).toContain('current >= stageId')
+  })
+
+  test('incheckningen flyttar projektet till Jobb igång — fire-and-forget', () => {
+    const s = kod('app/api/time-entry/check-in/route.ts')
+    expect(s).toContain('advanceProjectStageForward')
+    expect(s).toContain('SYSTEM_STAGES.JOB_STARTED')
+    expect(s, 'ett stegfel får aldrig fälla incheckningen').toContain('non-blocking')
+  })
+
+  test('det dagliga svepet fångar tidrapporter OCH passerade bokningsstarter', () => {
+    const s = kod('app/api/cron/maintenance/route.ts')
+    expect(s).toContain('SYSTEM_STAGES.JOB_STARTED')
+    expect(s).toContain("from('time_entry')")
+    expect(s).toContain(".lte('scheduled_start'")
+    // Fel läses — ett tyst misslyckat uppslag får inte se ut som "inget arbete".
+    expect(s).toContain('if (teRes.error) throw teRes.error')
+  })
+
+  test('sidoflödena läser flytt-resultatet — motorn kastar inte', () => {
+    // Motorn svarar { moved, error }; try/catch räcker inte. Utan läsningen
+    // är ett misslyckande osynligt i just pengavägarna.
+    for (const fil of [
+      'app/api/invoices/send/route.ts',
+      'lib/invoices/apply-payment.ts',
+      'app/api/booking/complete-job/route.ts',
+      'app/api/bookings/route.ts',
+      'lib/fortnox/sync-payments.ts',
+    ]) {
+      expect(kod(fil), `${fil} läser inte flytt-resultatet`).toContain('.moved')
+    }
+  })
+})

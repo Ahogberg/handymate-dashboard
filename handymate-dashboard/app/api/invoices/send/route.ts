@@ -331,7 +331,8 @@ export async function POST(request: NextRequest) {
           invoiceId: invoice_id,
         })
         if (project) {
-          await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_SENT, business.business_id)
+          const flytt = await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_SENT, business.business_id)
+          if (!flytt.moved) console.error('[invoices/send] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: project.project_id })
         }
       } catch (err) {
         console.error('[invoices/send] advanceProjectStage failed:', err)

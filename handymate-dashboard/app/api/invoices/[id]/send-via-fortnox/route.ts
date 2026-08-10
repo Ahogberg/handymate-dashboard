@@ -374,7 +374,8 @@ async function runPostSendAutomations(
     const { advanceProjectStage, SYSTEM_STAGES, findProjectForEntity } = await import('@/lib/project-stages/automation-engine')
     const project = await findProjectForEntity({ businessId, invoiceId })
     if (project) {
-      await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_SENT, businessId)
+      const flytt = await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_SENT, businessId)
+      if (!flytt.moved) console.error('[send-via-fortnox] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: project.project_id })
     }
   } catch (err) {
     console.error('[send-via-fortnox] project-stage error:', err)

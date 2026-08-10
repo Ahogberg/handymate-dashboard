@@ -144,7 +144,8 @@ async function runPostPaymentAutomations(
     const { advanceProjectStage, SYSTEM_STAGES, findProjectForEntity } = await import('@/lib/project-stages/automation-engine')
     const project = await findProjectForEntity({ businessId, invoiceId })
     if (project) {
-      await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_PAID, businessId)
+      const flytt = await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_PAID, businessId)
+      if (!flytt.moved) console.error('[apply-payment] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: project.project_id })
     }
   } catch (err) {
     console.error('[apply-payment] project-stage error:', err)
