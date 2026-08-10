@@ -1,3 +1,69 @@
+# Fortnox-konsolidering — Codex-briefens uppgift 6 (2026-08-10, pågår)
+
+Godkänt av Andreas ("då kör vi vidare") efter Codex-facit i
+tasks/rapport-human-followup-queue.md. Inget committas — arbetsträdet
+lämnas för granskning.
+
+**Mål:** ETT Fortnox-rutträd: `/api/integrations/fortnox/*` (nya, med
+förstärkt audit-loggning). Gamla `/api/fortnox/*` bort. Alla anropare
+ompekade. Ingen funktion försvinner — gamla trädets rutter som saknas i nya
+(customers, invoices, sync/*, import/*) flyttas in med audit-mönstret.
+Fortnox är licensblockerat och aldrig verifierat mot riktigt kundkonto —
+detta är städning, inte funktionsändring.
+
+- [x] Kartlägg: varje rutts uppgift i båda träden, alla anropare, var
+      audit-loggningen bor, vilken redirect-URI som är registrerad hos
+      Fortnox (callbacken!)
+- [x] Flytta saknad funktionalitet till nya trädet med audit-loggning
+      (+ manage_settings-grinden till nya disconnect, + paritet i
+      sync-payments: payment_method 'fortnox' och Cancelled-hantering)
+- [x] Peka om alla anropare (settings-sidan, invoices, onboarding,
+      .env.local.example, skill-dokumentationen)
+- [x] Ta bort `app/api/fortnox/*` + uppdatera TD-kommentaren i lib/fortnox.ts
+- [x] Lås disconnect-grinden i permission-kontraktet (ny domängrupp
+      'Integrationer' i SENSITIVE_ROUTES)
+- [x] Verifiera: tsc ✅ noll fel · next build ✅ ren · riktade specar ✅ 98/98 ·
+      fulla browserlösa sviten ✅ 4337 passed, noll failed (ENOENT
+      playwright/.auth ignoreras per briefen)
+- [x] Review-sektion
+
+Spärr: rör inte components/Sidebar.tsx (briefens spärrlista) — orörd.
+
+## Review (2026-08-10)
+
+Ett rutträd: `/api/integrations/fortnox/*`. Gamla `/api/fortnox/*` (12 rutter)
+raderat. Fem rutter flyttade in (import/customers, import/invoices,
+sync/customers, sync/invoices, sync/invoice) — de två sista bytte samtidigt
+från det avvikande session-mönstret till `getAuthenticatedBusiness`. Alla fem
+fick aggregat-audit via nya `logFortnoxOperation` (lib/fortnox/api-log.ts);
+rå-anropen loggades redan per anrop av `fortnoxRequest`.
+
+Två funktionsfynd utöver flytten:
+1. **Nya disconnect saknade `manage_settings`-grinden** som gamla hade — en
+   anställd kunde koppla bort företagets bokföring. Grinden portad och LÅST i
+   tests/permission-contract.spec.ts (ny domängrupp 'Integrationer').
+2. **Cancelled-ordningsbuggen i sync-payments**: en makulerad Fortnox-faktura
+   har saldo 0 och hade markerats BETALD (med hela post-payment-kedjan).
+   Cancelled prövas nu före betald-kollen; `payment_method:'fortnox'` sätts
+   som gamla rutten gjorde; nytt additivt fält `marked_cancelled`.
+
+Två rutter raderades utan ersättare (customers, invoices) — noll anropare.
+Död OAuth-kod ur lib/fortnox.ts (getFortnoxAuthUrl, exchangeCodeForTokens,
+FORTNOX_REDIRECT_URI, APP_URL); scope-dokumentationen bor redan bättre i nya
+connect. `.env.local.example` + skill-referensen rättade (redirect-URI:n ägs
+av koden — env-varianten pekade på FEL träd och hade brutit OAuth om den
+sattes i Vercel).
+
+OBS till Andreas: OAuth-flödet efter koppling landar nu alltid på
+/dashboard/settings/integrations (nya callbacken) — inte på gamla
+settings-flikens `?fortnox=`-toast, vars hanterare är borttagen. Två
+Fortnox-UI:n finns fortfarande (settings-fliken + integrations-sidan) — de
+anropar nu samma träd men visar olika delmängder; sammanslagning är ett
+UI-beslut, inte rutt-städning. INGET committat — allt ligger i arbetsträdet
+för granskning.
+
+---
+
 # A1 Ägarrapporten — BYGGD 2026-08-10 (natt 1: yta, inga utskick)
 
 Alla natt 1-punkter klara samma dag (se sektionen nedan för ursprungsplanen):

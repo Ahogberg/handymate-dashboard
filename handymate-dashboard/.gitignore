@@ -1,5 +1,8 @@
 next-env.d.ts
 
+# MCP-konfig med access-token — får aldrig committas
+.mcp.json
+
 .vercel
 
 # Playwright
