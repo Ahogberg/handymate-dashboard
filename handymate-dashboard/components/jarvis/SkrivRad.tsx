@@ -37,7 +37,7 @@ export function SkrivRad({ stor, onOppna }: { stor: boolean; onOppna: () => void
       <button
         type="button"
         onClick={onOppna}
-        className="lg:row-start-2 lg:col-start-1 w-full flex items-center gap-2.5 h-12 pl-[18px] pr-2 bg-white border border-slate-200 rounded-full text-sm text-slate-400 hover:border-slate-300 transition-colors"
+        className="lg:row-start-3 lg:col-start-1 w-full flex items-center gap-2.5 h-12 pl-[18px] pr-2 bg-white border border-slate-200 rounded-full text-sm text-slate-400 hover:border-slate-300 transition-colors"
       >
         <span className="flex-1 text-left truncate">Skriv till teamet — eller tryck. Allt ovanför klaras utan tangentbord.</span>
         <span className="w-9 h-9 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center shrink-0">
@@ -48,7 +48,7 @@ export function SkrivRad({ stor, onOppna }: { stor: boolean; onOppna: () => void
   }
 
   return (
-    <div className="lg:row-start-2 lg:col-start-1 bg-white border border-slate-200 rounded-2xl p-4">
+    <div className="lg:row-start-3 lg:col-start-1 bg-white border border-slate-200 rounded-2xl p-4">
       <button
         type="button"
         onClick={onOppna}

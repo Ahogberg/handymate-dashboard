@@ -16,14 +16,40 @@ import { byggBevakning } from '../lib/jarvis/bevakning'
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
 
-test.describe('raderna finns bara när något bevakas', () => {
-  test('tom indata ger tom lista — aldrig utfyllnadsrader', () => {
+test.describe('hela teamet syns — men bara när datat finns', () => {
+  test('tom indata ger tom lista — vi påstår aldrig bevakning vi inte sett', () => {
     expect(byggBevakning({})).toEqual([])
-    expect(byggBevakning({ fakturor: { bevakade: 0 }, offerter: { oppna: 0, followupDagar: 5 } })).toEqual([])
   })
 
-  test('inaktiv telefon ger ingen Lisa-rad — även med samtal i historiken', () => {
-    expect(byggBevakning({ telefon: { aktiv: false, samtal: 7 } })).toEqual([])
+  test('noll händelser är ÄRLIG standby, inte tystnad (produktbeslut 2026-08-10)', () => {
+    // Andreas fynd: "hela teamets kollegor syns inte" kändes som ett fel.
+    // Karin bevakar fakturorna även när noll är obetalda — raden säger det.
+    const rader = byggBevakning({ fakturor: { bevakade: 0 }, offerter: { oppna: 0, followupDagar: 5 } })
+    expect(rader.map(r => r.agentId)).toEqual(['karin', 'daniel'])
+    expect(rader[0].rubrik).toBe('Bevakar fakturorna')
+    expect(rader[0].detalj).toBe('inga obetalda just nu')
+    expect(rader[1].rubrik).toBe('Bevakar offerterna')
+    // Standby är fortfarande aktiv bevakning — pulsen står på.
+    expect(rader.every(r => r.aktiv)).toBe(true)
+  })
+
+  test('full indata ger hela teamet — sex rader', () => {
+    const rader = byggBevakning({
+      fakturor: { bevakade: 2 },
+      offerter: { oppna: 1, followupDagar: 5 },
+      telefon: { aktiv: true, samtal: 0 },
+      nastaBokning: null,
+      veckosammanfattning: true,
+      hannaFragor: [],
+    })
+    expect(rader.map(r => r.agentId)).toEqual(['karin', 'daniel', 'lisa', 'lars', 'matte', 'hanna'])
+  })
+
+  test('okopplad telefon är ärlig standby utan puls — aldrig påstådd bevakning', () => {
+    const [rad] = byggBevakning({ telefon: { aktiv: false, samtal: 7 } })
+    expect(rad.agentId).toBe('lisa')
+    expect(rad.rubrik).toBe('Telefonen är inte kopplad ännu')
+    expect(rad.aktiv).toBe(false)
   })
 
   test('Karin bevakar fakturor — antal, aldrig belopp', () => {
@@ -69,8 +95,15 @@ test.describe('Lisa, Lars och Matte', () => {
     expect(rad.aktiv).toBe(true)
   })
 
-  test('Lars: trasigt datum ger ingen rad — aldrig en gissad tid', () => {
-    expect(byggBevakning({ nastaBokning: { start: 'inte-ett-datum' } })).toEqual([])
+  test('Lars: trasigt datum eller ingen bokning ger standby — aldrig en gissad tid', () => {
+    for (const nastaBokning of [{ start: 'inte-ett-datum' }, null]) {
+      const [rad] = byggBevakning({ nastaBokning })
+      expect(rad.agentId).toBe('lars')
+      expect(rad.rubrik).toBe('Bevakar schemat')
+      expect(rad.detalj).toBe('inget bokat framåt just nu')
+    }
+    // undefined = datat saknas helt → ingen rad, inget påstående.
+    expect(byggBevakning({})).toEqual([])
   })
 
   test('Matte: schemalagd sammanfattning renderas men pulserar INTE', () => {
@@ -95,8 +128,12 @@ test.describe('Hannas mjuka fråga', () => {
     expect(rad.aktiv).toBe(false)
   })
 
-  test('tomma strängar räknas inte som frågor', () => {
-    expect(byggBevakning({ hannaFragor: ['', '  '] })).toEqual([])
+  test('tomma strängar räknas inte som frågor — men Hanna syns som standby', () => {
+    const [rad] = byggBevakning({ hannaFragor: ['', '  '] })
+    expect(rad.agentId).toBe('hanna')
+    expect(rad.rubrik).toBe('Inget att fråga om just nu')
+    expect(rad.fraga).toBeUndefined()
+    expect(rad.aktiv).toBe(false)
   })
 })
 

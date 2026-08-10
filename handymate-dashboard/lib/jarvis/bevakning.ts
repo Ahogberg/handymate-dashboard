@@ -10,11 +10,14 @@
  *
  * ═══ REGLERNA (facit i tests/bevakning.spec.ts) ═══
  *
- * - En rad renderas ENDAST vid aktiv bevakning — det finns inga "vilar"-rader.
- *   Tom indata ger tom lista, och ytan renderar då ingenting.
+ * - HELA teamet syns när dess områdesdata FINNS (produktbeslut Andreas
+ *   2026-08-10 — "hela teamets kollegor syns inte" var fel känsla). Utan
+ *   händelser blir raden en ÄRLIG standby ("inga obetalda just nu"), aldrig
+ *   påhittad aktivitet. Saknas områdesdatat helt (fältet inte satt) finns
+ *   ingen rad — vi påstår aldrig bevakning vi inte kan se.
  * - Grön puls (`aktiv: true`) bara på AKTIVT bevakande — något som kan hända
- *   när som helst. Mattes schemalagda veckosammanfattning pulserar inte, och
- *   Hannas mjuka fråga pulserar aldrig.
+ *   när som helst. Mattes schemalagda veckosammanfattning pulserar inte,
+ *   Hannas rader pulserar aldrig, och en okopplad telefon pulserar inte.
  * - Hanna får max EN fråga (`fraga: true`) — två frågor är ett formulär.
  * - Daniels uppföljningsdag kommer ur automation-inställningarna
  *   (quote_followup_days, default 5) — aldrig ett hårdkodat mockup-värde.
@@ -60,48 +63,79 @@ function bokningsEtikett(iso: string): string | null {
 export function byggBevakning(indata: BevakningsIndata): BevakningsRad[] {
   const rader: BevakningsRad[] = []
 
-  // Karin — fakturabevakningen. Antal och löfte, aldrig belopp.
-  if (indata.fakturor && indata.fakturor.bevakade > 0) {
+  // Karin — fakturabevakningen. Antal och löfte, aldrig belopp. Noll
+  // obetalda är fortfarande bevakning — Karin tittar på varje ny faktura.
+  if (indata.fakturor) {
     const n = indata.fakturor.bevakade
-    rader.push({
-      agentId: 'karin',
-      rubrik: `Bevakar ${n} faktur${n === 1 ? 'a' : 'or'}`,
-      detalj: 'säger till dagen efter förfallodatum',
-      aktiv: true,
-    })
+    rader.push(n > 0
+      ? {
+          agentId: 'karin',
+          rubrik: `Bevakar ${n} faktur${n === 1 ? 'a' : 'or'}`,
+          detalj: 'säger till dagen efter förfallodatum',
+          aktiv: true,
+        }
+      : {
+          agentId: 'karin',
+          rubrik: 'Bevakar fakturorna',
+          detalj: 'inga obetalda just nu',
+          aktiv: true,
+        })
   }
 
   // Daniel — öppna offerter + cadencen ur inställningarna (INTE mockupens 7).
-  if (indata.offerter && indata.offerter.oppna > 0) {
+  if (indata.offerter) {
     const n = indata.offerter.oppna
-    rader.push({
-      agentId: 'daniel',
-      rubrik: `${n} öppn${n === 1 ? 'a offert' : 'a offerter'}`,
-      detalj: `föreslår påminnelse på dag ${indata.offerter.followupDagar}`,
-      aktiv: true,
-    })
+    rader.push(n > 0
+      ? {
+          agentId: 'daniel',
+          rubrik: `${n} öppn${n === 1 ? 'a offert' : 'a offerter'}`,
+          detalj: `föreslår påminnelse på dag ${indata.offerter.followupDagar}`,
+          aktiv: true,
+        }
+      : {
+          agentId: 'daniel',
+          rubrik: 'Bevakar offerterna',
+          detalj: 'inga öppna just nu',
+          aktiv: true,
+        })
   }
 
-  // Lisa — telefonbevakningen. Bara när numret faktiskt är kopplat.
-  if (indata.telefon?.aktiv) {
-    const n = indata.telefon.samtal
-    rader.push({
-      agentId: 'lisa',
-      rubrik: 'Bevakar telefonen',
-      detalj: n > 0 ? `${n} samtal senaste dygnet` : 'svarar när du inte kan',
-      aktiv: true,
-    })
+  // Lisa — telefonbevakningen. En okopplad telefon är ingen bevakning:
+  // raden säger det ärligt och pulserar aldrig.
+  if (indata.telefon) {
+    rader.push(indata.telefon.aktiv
+      ? {
+          agentId: 'lisa',
+          rubrik: 'Bevakar telefonen',
+          detalj: indata.telefon.samtal > 0 ? `${indata.telefon.samtal} samtal senaste dygnet` : 'svarar när du inte kan',
+          aktiv: true,
+        }
+      : {
+          agentId: 'lisa',
+          rubrik: 'Telefonen är inte kopplad ännu',
+          detalj: 'Lisa svarar så fort ett nummer finns',
+          aktiv: false,
+        })
   }
 
-  // Lars — nästa bokning. Utan bokning finns ingen bevakning att påstå.
-  if (indata.nastaBokning) {
-    const nar = bokningsEtikett(indata.nastaBokning.start)
+  // Lars — nästa bokning. null = kollat och inget bokat (ärlig standby);
+  // undefined = datat saknas, då påstås ingenting. Trasigt datum ger standby
+  // i stället för en gissad tid.
+  if (indata.nastaBokning !== undefined) {
+    const nar = indata.nastaBokning ? bokningsEtikett(indata.nastaBokning.start) : null
     if (nar) {
-      const kund = indata.nastaBokning.kund?.trim()
+      const kund = indata.nastaBokning!.kund?.trim()
       rader.push({
         agentId: 'lars',
         rubrik: `Nästa bokning ${nar}`,
         detalj: kund ? `hos ${kund} — påminner kunden dagen innan` : 'påminner kunden dagen innan',
+        aktiv: true,
+      })
+    } else {
+      rader.push({
+        agentId: 'lars',
+        rubrik: 'Bevakar schemat',
+        detalj: 'inget bokat framåt just nu',
         aktiv: true,
       })
     }
@@ -119,15 +153,23 @@ export function byggBevakning(indata: BevakningsIndata): BevakningsRad[] {
   }
 
   // Hanna — max EN mjuk fråga, aldrig puls. Två frågor är ett formulär.
-  const fraga = (indata.hannaFragor || []).find(f => typeof f === 'string' && f.trim().length > 0)
-  if (fraga) {
-    rader.push({
-      agentId: 'hanna',
-      rubrik: fraga.trim(),
-      detalj: 'svara när det passar — inget brådskar',
-      aktiv: false,
-      fraga: true,
-    })
+  // Tom lista (kollat, inget att fråga) ger ärlig standby; undefined ger inget.
+  if (indata.hannaFragor !== undefined && indata.hannaFragor !== null) {
+    const fraga = indata.hannaFragor.find(f => typeof f === 'string' && f.trim().length > 0)
+    rader.push(fraga
+      ? {
+          agentId: 'hanna',
+          rubrik: fraga.trim(),
+          detalj: 'svara när det passar — inget brådskar',
+          aktiv: false,
+          fraga: true,
+        }
+      : {
+          agentId: 'hanna',
+          rubrik: 'Inget att fråga om just nu',
+          detalj: 'hör av sig när något är värt att lyfta',
+          aktiv: false,
+        })
   }
 
   return rader

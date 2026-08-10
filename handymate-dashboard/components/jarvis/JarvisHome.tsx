@@ -228,6 +228,10 @@ export default function JarvisHome({
   }, [])
 
   const pendingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  // Det köade beslutet i sin helhet — så att en sidlämning kan SKICKA det i
+  // stället för att tyst kasta det (Andreas fynd 2026-08-10: godkända kort
+  // återuppstod, för unmount-städningen clearTimeout:ade bort själva beslutet).
+  const pendingActions = useRef<Map<string, { approval: Approval; action: 'approve' | 'reject' | 'edit'; editedText?: string }>>(new Map())
 
   const authHeaders = useCallback(async (): Promise<Record<string, string>> => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -358,8 +362,15 @@ export default function JarvisHome({
   }, [])
 
   useEffect(() => {
-    const timers = pendingTimers.current
-    return () => { timers.forEach(t => clearTimeout(t)) }
+    // pagehide täcker stängd flik/mobilens app-byte; unmount-returen täcker
+    // SPA-navigering. Båda SKICKAR det köade — clearTimeout utan flush var
+    // buggen som lät godkända kort återuppstå.
+    const onPagehide = () => flushRef.current()
+    window.addEventListener('pagehide', onPagehide)
+    return () => {
+      window.removeEventListener('pagehide', onPagehide)
+      flushRef.current()
+    }
   }, [])
 
   function flash(text: string, isError = false) {
@@ -369,6 +380,7 @@ export default function JarvisHome({
 
   async function executeSend(approval: Approval, action: 'approve' | 'reject' | 'edit', editedText?: string) {
     pendingTimers.current.delete(approval.id)
+    pendingActions.current.delete(approval.id)
     try {
       const body: Record<string, unknown> = { action }
       if (action === 'edit') {
@@ -379,6 +391,9 @@ export default function JarvisHome({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify(body),
+        // Överlever sidlämning: flushen vid pagehide/unmount hinner annars
+        // inte få iväg anropet innan sidan rivs.
+        keepalive: true,
       })
       if (!res.ok) {
         setHiddenIds(prev => { const n = new Set(prev); n.delete(approval.id); return n })
@@ -467,8 +482,36 @@ export default function JarvisHome({
 
     // Ångra-knappen adresserar gruppen via första kortets id; alla timers
     // pekar på samma timeout så en ångring stoppar hela gruppen.
-    medlemmar.forEach(m => pendingTimers.current.set(m.id, timer))
+    medlemmar.forEach(m => {
+      pendingTimers.current.set(m.id, timer)
+      pendingActions.current.set(m.id, { approval: m, action, editedText })
+    })
   }
+
+  /**
+   * ═══ ETT KÖAT BESLUT ÖVERLEVER SIDLÄMNING (2026-08-10) ═══
+   *
+   * 5-sekundersfönstret fanns för ångra — men unmount-städningen gjorde
+   * clearTimeout och KASTADE beslutet. Navigerade man vidare (eller stängde
+   * fliken) inom fem sekunder skickades ingenting, korten låg kvar som
+   * pending i databasen och återuppstod vid nästa besök, fast ytan sagt
+   * "Skickar…". Att lämna sidan betyder nu "skicka direkt": ångra-fönstret
+   * är ett erbjudande medan man tittar, aldrig en tyst papperskorg.
+   */
+  function flushQueued() {
+    if (pendingActions.current.size === 0) return
+    const koade = Array.from(pendingActions.current.values())
+    pendingActions.current.clear()
+    const timers = new Set(pendingTimers.current.values())
+    timers.forEach(t => clearTimeout(t))
+    pendingTimers.current.clear()
+    setSnack(null)
+    void (async () => {
+      for (const k of koade) await executeSend(k.approval, k.action, k.editedText)
+    })()
+  }
+  const flushRef = useRef<() => void>(() => {})
+  flushRef.current = flushQueued
 
   function undo(approvalId: string) {
     const t = pendingTimers.current.get(approvalId)
@@ -480,6 +523,8 @@ export default function JarvisHome({
     pendingTimers.current.forEach((timer, id) => { if (timer === t) gruppens.push(id) })
     gruppens.forEach(id => pendingTimers.current.delete(id))
     if (gruppens.length === 0) pendingTimers.current.delete(approvalId)
+    // Även ur flush-kön — annars skickar en senare sidlämning det ångrade.
+    ;(gruppens.length ? gruppens : [approvalId]).forEach(id => pendingActions.current.delete(id))
 
     setHiddenIds(prev => {
       const n = new Set(prev)
@@ -598,21 +643,28 @@ export default function JarvisHome({
   return (
     <div className="max-w-[1180px] mx-auto px-4 sm:px-8 pt-6 sm:pt-7 pb-9">
       <div className="grid lg:grid-cols-[1fr_320px] gap-6 lg:gap-7">
-        {/* ── Huvudspalten ─────────────────────────────────────────────── */}
-        <div className="min-w-0 lg:row-start-1 lg:col-start-1">
+        {/* ── Hälsningen — egen fullbreddsrad (2026-08-10) ─────────────────
+             Högerspalten började tidigare i höjd med rubriken, så "Dagens
+             plan" hamnade ovanför beslutssektionens kant. Nu spänner
+             hälsningen över båda kolumnerna och railen börjar i linje med
+             "Kräver ditt beslut" — symmetrin Andreas efterfrågade. */}
+        <div className="min-w-0 lg:col-span-2">
           <h1 className="font-heading text-[22px] sm:text-[26px] font-bold tracking-[-0.02em] text-slate-900 m-0">
             {greetingName ? `God morgon, ${greetingName}` : 'God morgon'}
           </h1>
-          <p className="mt-1.5 text-sm text-slate-500 leading-normal">
+          <p className="mt-1.5 text-sm text-slate-500 leading-normal m-0">
             {new Date().toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
             {/* Tidsfönstret är ett RULLANDE dygn (team-activity, HOURS_BACK=24).
                 halsningsBevis säger det den mäter — "Sedan igår" vore osant —
                 och är ärlig om huruvida något behövde ägaren. */}
             {bevis && <> · <span className="text-slate-600">{bevis}</span></>}
           </p>
+        </div>
 
+        {/* ── Huvudspalten ─────────────────────────────────────────────── */}
+        <div className="min-w-0 lg:row-start-2 lg:col-start-1">
           {feedback && (
-            <div className={`mt-4 px-3.5 py-2.5 border rounded-xl text-sm font-medium ${
+            <div className={`mb-4 px-3.5 py-2.5 border rounded-xl text-sm font-medium ${
               feedback.isError
                 ? 'bg-amber-50 border-amber-300 text-amber-800'
                 : 'bg-emerald-50 border-emerald-200 text-emerald-700'
@@ -622,7 +674,7 @@ export default function JarvisHome({
           )}
 
           {/* ── Kräver ditt beslut ── */}
-          <div className="flex items-baseline gap-2 mt-6 mb-2.5">
+          <div className="flex items-baseline gap-2 mb-2.5">
             <h2 className="m-0 text-[15px] font-semibold text-slate-900">Kräver ditt beslut</h2>
             {beslut > 0 && (
               <span className="font-heading text-xs font-bold bg-primary-700 text-white rounded-full min-w-[21px] h-[21px] px-1.5 inline-flex items-center justify-center">
@@ -819,7 +871,7 @@ export default function JarvisHome({
         </div>
 
         {/* ── Högerspalten — gräv-ingångarna ───────────────────────────── */}
-        <aside className="flex flex-col gap-3 min-w-0 lg:row-start-1 lg:col-start-2">
+        <aside className="flex flex-col gap-3 min-w-0 lg:row-start-2 lg:col-start-2">
           <RailCard title="Dagens plan" href="/dashboard/schedule">
             {!bookingsLoaded ? (
               <div className="h-16 bg-slate-50 rounded-lg animate-pulse" />
