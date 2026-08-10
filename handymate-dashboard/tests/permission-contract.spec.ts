@@ -247,6 +247,11 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       requires: 'manage_settings',
       why: 'Kopplar bort företagets bokföring. Gamla /api/fortnox/disconnect hade grinden men nya trädet saknade den tills konsolideringen 2026-08-10 — exakt den tysta regression den här kartan finns för att stoppa.',
     },
+    {
+      route: 'integrations/email-lead',
+      requires: 'manage_settings',
+      why: 'POST skapar företagets inkommande leadadress — en inställning som styr vart kundernas mail routas. Får inte kunna aktiveras av vilken anställd som helst.',
+    },
   ],
 }
 

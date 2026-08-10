@@ -28,17 +28,37 @@ Andreas beslut: "bygg allt enligt rekommendationerna utom DO NOT BUILD-listan"
       namn+adress auto-mergas aldrig.
 - [x] A8 rate-limit på /api/leads/intake (Sonnet): 10/IP/timme, hashad IP,
       svensk 429 + Retry-After.
-- [ ] A4 Mattes `create_lead` (lib/matte/action-executor.ts:137) → golden path
-- [ ] A5 `qualify_lead` (tool-router) → golden path
-- [ ] A6 `/api/public/book/[slug]` → golden path
+- [x] A4 Mattes `create_lead` → golden path (Sonnet). Skapade tidigare lead-rad
+      utan kund/deal. Källa: inbound_sms/manual efter kanal. Dedup-vakten kvar.
+- [x] A5 `qualify_lead` → golden path (Sonnet). Primära telefon/SMS-vägen skapade
+      lead utan kund/deal; nu konvergerad + deal-backfill för befintliga leads
+      (bara när deal saknas, tyst self-heal). lead_created-eventet BEVARAT —
+      enda drivaren av nurture-välkomstflödet.
+- [x] A6 `/api/public/book/[slug]` → golden path (Sonnet) med notify:false
+      (bokningsflödet sköter egen kommunikation). Krockvakten ligger före
+      lead-skapandet → ingen dubblett vid dubbel-submit.
+- [x] Kärnhärdningar i golden path (Fable): notify-flaggan, icke-destruktiv
+      kontaktkomplettering vid dedup-match, lead-insert-fel kastas (en lead
+      som aldrig landade får inte se ut som success).
 - [ ] Designbeslut per källa: seedade auto-SMS:et på `lead_received` (requires_approval:false) — vilka källor ska trigga det?
 - [ ] SHOULD: kvalificeringsdjup — fyll job_type/urgency/score från Mattes SMS-tolkning vid intag
 
 ## Epic B — Företagsmailen (multi-tenant e-post→lead)
-- [ ] Routningstabell adress→business_id (fail-closed — aldrig payload-styrd tenant)
-- [ ] Ersätt POSTMARK_INBOUND_DEFAULT_BUSINESS_ID-låsningen
-- [ ] Settings-UI för per-business inbound-adress
-- [ ] Bilagor länkas till leadet
+- [x] sql/v106_email_inbound_route.sql skriven (Fable) — KÖRS VIA MCP efter "kör".
+      DNS-engångsjobb (Andreas): MX för leads.handymate.se → Postmark inbound.
+- [x] B1 Routning i webhooken (Sonnet): OriginalRecipient→ToFull→To, lowercase-
+      uppslag, fail-closed med env-fallback (koden tål okörd migration),
+      okänd adress → 200 skipped + logg, aldrig payload-styrd tenant.
+- [x] B2 Settings-API /api/integrations/email-lead (Sonnet): GET fritt, POST
+      manage_settings-grindad (nu även låst i permission-kontraktet), idempotent,
+      slug-generering med å/ä/ö + kollisions- och race-hantering, 503 endast
+      på "tabell saknas" (42P01) — riktiga fel maskeras inte.
+- [x] B3 Integrations-kortet "Företagsmail → förfrågningar" (Sonnet): ersatte
+      gamla "kommer snart"-platshållaren, kopiera-knapp, svensk text utan
+      teknikord, 503-läge.
+- [ ] B4 Bilagor länkas till leadet (nästa increment)
+- [ ] B5 MX-detektering + auto-bekräftelse av Gmails vidarebefordringskod +
+      live-kvitto i guiden (Epic B polish, efter B4)
 - [ ] (Historikskanning = DO NOT BUILD; omprövas ev. som opt-in med ANTAL, aldrig kronor)
 
 ## Epic C — Ägd tillväxt (Hanna v2 + referral)

@@ -32,6 +32,12 @@ export default function IntegrationsPage() {
   const [fortnox, setFortnox] = useState<FortnoxStatus | null>(null)
   const [fortnoxAction, setFortnoxAction] = useState<'syncing' | 'disconnecting' | null>(null)
   const [fortnoxToast, setFortnoxToast] = useState<string | null>(null)
+  const [emailLead, setEmailLead] = useState<{ address: string | null } | null>(null)
+  const [emailLeadLoading, setEmailLeadLoading] = useState(true)
+  const [emailLeadUnavailable, setEmailLeadUnavailable] = useState(false)
+  const [emailLeadActivating, setEmailLeadActivating] = useState(false)
+  const [emailLeadCopied, setEmailLeadCopied] = useState(false)
+  const [emailLeadError, setEmailLeadError] = useState<string | null>(null)
 
   const embedCode = `<script src="https://app.handymate.se/embed.js" data-key="HM-${business.business_id?.slice(0, 8) || 'abc123'}"></script>`
 
@@ -51,6 +57,22 @@ export default function IntegrationsPage() {
     } catch { /* non-blocking */ }
   }, [])
 
+  const refreshEmailLead = useCallback(async () => {
+    try {
+      const res = await fetch('/api/integrations/email-lead')
+      if (res.status === 503) {
+        setEmailLeadUnavailable(true)
+        setEmailLead(null)
+        return
+      }
+      if (res.ok) {
+        const data = await res.json()
+        setEmailLead({ address: data.address || null })
+        setEmailLeadUnavailable(false)
+      }
+    } catch { /* non-blocking */ }
+  }, [])
+
   useEffect(() => {
     if (!business.business_id) return
     let cancelled = false
@@ -59,6 +81,7 @@ export default function IntegrationsPage() {
         const [googleRes] = await Promise.all([
           fetch('/api/google/status').then(r => r.ok ? r.json() : null).catch(() => null),
           refreshFortnox(),
+          refreshEmailLead(),
         ])
         if (cancelled) return
         setCalendarConnected(!!(googleRes?.connected && googleRes?.syncEnabled))
@@ -66,11 +89,14 @@ export default function IntegrationsPage() {
       } catch {
         /* non-blocking */
       } finally {
-        if (!cancelled) setStatusLoading(false)
+        if (!cancelled) {
+          setStatusLoading(false)
+          setEmailLeadLoading(false)
+        }
       }
     })()
     return () => { cancelled = true }
-  }, [business.business_id, refreshFortnox])
+  }, [business.business_id, refreshFortnox, refreshEmailLead])
 
   // Visa toast vid OAuth-callback
   useEffect(() => {
@@ -119,6 +145,35 @@ export default function IntegrationsPage() {
       setFortnoxAction(null)
       setTimeout(() => setFortnoxToast(null), 4000)
     }
+  }
+
+  async function handleActivateEmailLead() {
+    setEmailLeadActivating(true)
+    setEmailLeadError(null)
+    try {
+      const res = await fetch('/api/integrations/email-lead', { method: 'POST' })
+      if (res.status === 503) {
+        setEmailLeadUnavailable(true)
+        return
+      }
+      const data = await res.json()
+      if (res.ok) {
+        setEmailLead({ address: data.address || null })
+      } else {
+        setEmailLeadError(data.error || 'Något gick fel')
+      }
+    } catch (err: any) {
+      setEmailLeadError(err.message || 'Något gick fel')
+    } finally {
+      setEmailLeadActivating(false)
+    }
+  }
+
+  function handleCopyEmailLead() {
+    if (!emailLead?.address) return
+    navigator.clipboard.writeText(emailLead.address)
+    setEmailLeadCopied(true)
+    setTimeout(() => setEmailLeadCopied(false), 2000)
   }
 
   if (!business.business_id) {
@@ -260,29 +315,63 @@ export default function IntegrationsPage() {
             )}
           </div>
 
-          {/* E-post — kommer snart (icke-klickbar) */}
-          <div
-            aria-disabled="true"
-            className="flex items-center gap-4 p-4 bg-white rounded-xl border border-[#E2E8F0] opacity-70 cursor-not-allowed select-none"
-          >
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-400 bg-gray-100">
-              <Mail className="w-5 h-5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-700">E-post</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium border border-amber-200">
-                  Kommer snart
-                </span>
+          {/* Företagsmail → förfrågningar */}
+          <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
+            <div className="flex items-center gap-4 p-4">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center text-primary-700 bg-primary-50">
+                <Mail className="w-5 h-5" />
               </div>
-              <p className="text-sm text-gray-500 truncate">Automatisk hantering av inkommande kundmail — aktiveras snart</p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-gray-900">Företagsmail → förfrågningar</span>
+                  {!emailLeadLoading && emailLead?.address && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">Aktiv</span>
+                  )}
+                  {!emailLeadLoading && !emailLead?.address && !emailLeadUnavailable && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">Ej aktiverad</span>
+                  )}
+                </div>
+                {emailLeadUnavailable ? (
+                  <p className="text-sm text-gray-500 truncate">Funktionen aktiveras inom kort</p>
+                ) : emailLead?.address ? (
+                  <p className="text-sm text-gray-500 truncate">Kundförfrågningar som kommer via mail hamnar direkt i din kö</p>
+                ) : (
+                  <p className="text-sm text-gray-500 truncate">Få förfrågningar som skickas till din mail direkt i din kö</p>
+                )}
+              </div>
+              {!emailLeadUnavailable && !emailLeadLoading && !emailLead?.address && (
+                <button
+                  onClick={handleActivateEmailLead}
+                  disabled={emailLeadActivating}
+                  className="text-xs font-medium text-white bg-[#0F766E] hover:bg-[#0D9488] px-4 py-2 rounded-lg flex-shrink-0 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {emailLeadActivating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Aktivera
+                </button>
+              )}
             </div>
-            <span
-              aria-hidden="true"
-              className="text-xs font-medium text-gray-400 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 flex-shrink-0"
-            >
-              Inaktiv
-            </span>
+            {emailLead?.address && (
+              <div className="px-4 pb-4">
+                <div className="flex items-center gap-2 bg-gray-50 border border-[#E2E8F0] rounded-lg px-3 py-2">
+                  <span className="text-sm font-mono text-gray-800 truncate flex-1">{emailLead.address}</span>
+                  <button
+                    onClick={handleCopyEmailLead}
+                    className="p-1.5 rounded-md text-gray-500 hover:text-[#0F766E] hover:bg-white transition-colors flex-shrink-0"
+                    title="Kopiera"
+                  >
+                    {emailLeadCopied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Vidarebefordra din företagsmail (t.ex. info@dittbolag.se) till adressen ovan så fångar Handymate förfrågningar automatiskt. Mail som inte är förfrågningar ignoreras.
+                </p>
+              </div>
+            )}
+            {emailLeadError && (
+              <div className="px-4 py-2 bg-red-50 border-t border-red-100 text-xs text-red-600">
+                {emailLeadError}
+              </div>
+            )}
           </div>
         </div>
 

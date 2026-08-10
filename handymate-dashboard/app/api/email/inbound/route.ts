@@ -1,25 +1,26 @@
 /**
  * POST /api/email/inbound — Postmark Inbound-webhook.
  *
- * Flöde (2026-05-28):
+ * Flöde (2026-05-28, multi-tenant-routning tillagd 2026-08-10 — Epic B):
  *   1. Verifiera Basic Auth (postmark-signature.ts)
  *   2. Parsa Postmark JSON-payload
- *   3. Stage 1 Haiku: isLikelyLead — spam-filter
- *   4. Stage 2 Haiku: parseLeadFromEmail — extrahera fält + källa
- *   5. Slå upp lead_source mot business via parsed.source (best-effort)
- *   6. Skapa lead i status='pending_review' (createLeadAndDeal med
+ *   3. Slå upp mottagaradressen mot email_inbound_route → business_id
+ *      (sql/v106_email_inbound_route.sql är kontraktet — se resolveInboundBusinessId)
+ *   4. Stage 1 Haiku: isLikelyLead — spam-filter
+ *   5. Stage 2 Haiku: parseLeadFromEmail — extrahera fält + källa
+ *   6. Slå upp lead_source mot business via parsed.source (best-effort)
+ *   7. Skapa lead i status='pending_review' (createLeadAndDeal med
  *      createDealAndNotify=false — ingen deal/SMS/event ännu)
- *   7. Skapa pending_approvals row med approval_type='lead_review'
+ *   8. Skapa pending_approvals row med approval_type='lead_review'
  *      som granska-vyn visar
  *
  * Approve sker via /api/approvals/[id] (POST { action: 'approve' }).
  * Den kallar createLeadAndDeal igen med vanliga defaults så deal
  * skapas i pipeline + Golden Path-events triggar.
  *
- * MVP-begränsning: business_id hämtas från
- * env POSTMARK_INBOUND_DEFAULT_BUSINESS_ID. Pilot är enbiz (Bee Service).
- * Senare uppgradering: per-business inbox-routing via Postmark "tag"
- * eller olika inbound-mailaddresser (TD).
+ * Multi-tenant-routning: env POSTMARK_INBOUND_DEFAULT_BUSINESS_ID lever kvar
+ * som fail-closed legacy-fallback (enbiz-piloten, Bee Service) för adresser
+ * som inte finns i email_inbound_route — se resolveInboundBusinessId nedan.
  */
 
 import { NextRequest } from 'next/server'
@@ -38,7 +39,71 @@ interface PostmarkInboundPayload {
   Date?: string
   MessageID?: string
   To?: string
+  /** Postmark expanderar To till en strukturerad lista — mer tillförlitlig
+      att parsa än råsträngen To när flera mottagare finns. */
+  ToFull?: { Email?: string; Name?: string; MailboxHash?: string }[]
+  /** Den exakta adress mailet skickades till, innan alias/vidarebefordran —
+      det Postmark rekommenderar för routning. Se Postmarks inbound-docs. */
+  OriginalRecipient?: string
   Tag?: string
+}
+
+/**
+ * Extraherar mottagaradressen ur payloaden, lower-cased.
+ * Prioritet: OriginalRecipient (mest tillförlitlig) → ToFull[0].Email → To
+ * (fritextparsad). Ingen av dem är "innehåll" i den mening fail-closed-
+ * principen avser — det är kuvertadressen, inte mailets brödtext/ämne.
+ */
+function extractRecipientAddress(payload: PostmarkInboundPayload): string | null {
+  if (payload.OriginalRecipient) {
+    return payload.OriginalRecipient.trim().toLowerCase()
+  }
+  const firstToFull = payload.ToFull?.find(entry => entry.Email)?.Email
+  if (firstToFull) {
+    return firstToFull.trim().toLowerCase()
+  }
+  if (payload.To) {
+    const match = payload.To.match(/[^\s<>,]+@[^\s<>,]+/)
+    if (match) return match[0].trim().toLowerCase()
+  }
+  return null
+}
+
+/**
+ * Löser business_id ur mottagaradressen. FAIL-CLOSED (sql/v106 är kontraktet):
+ *   1. Adressen finns som aktiv rad i email_inbound_route → dess business_id.
+ *   2. Ingen träff (eller tabellen saknas — migrationen inte körd än, eller
+ *      annat DB-fel) → env POSTMARK_INBOUND_DEFAULT_BUSINESS_ID (legacy-
+ *      entenant, dagens beteende) om den är satt.
+ *   3. Varken träff eller env → null. Tenant-valet får ALDRIG härledas ur
+ *      payloadens innehåll i övrigt (From/Subject/body).
+ */
+async function resolveInboundBusinessId(
+  recipientAddress: string | null,
+  supabase: ReturnType<typeof getServerSupabase>,
+): Promise<string | null> {
+  const envDefault = process.env.POSTMARK_INBOUND_DEFAULT_BUSINESS_ID || null
+
+  if (recipientAddress) {
+    try {
+      const { data, error } = await supabase
+        .from('email_inbound_route')
+        .select('business_id')
+        .eq('address', recipientAddress)
+        .eq('active', true)
+        .maybeSingle()
+
+      if (error) throw error
+      if (data?.business_id) return data.business_id
+    } catch (err) {
+      // Tabellen finns troligen inte ännu (v106 ej körd) — kan också vara
+      // ett tillfälligt DB-fel. Båda fallen: samma env-fallback, aldrig
+      // payload-styrd gissning.
+      console.warn('[email-inbound] uppslag mot email_inbound_route misslyckades, faller tillbaka på env:', err)
+    }
+  }
+
+  return envDefault
 }
 
 export async function POST(request: NextRequest) {
@@ -55,13 +120,18 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const businessId = process.env.POSTMARK_INBOUND_DEFAULT_BUSINESS_ID
-  if (!businessId) {
-    console.error('[email/inbound] POSTMARK_INBOUND_DEFAULT_BUSINESS_ID ej satt')
-    return Response.json({ error: 'Server config missing' }, { status: 500 })
-  }
-
   const supabase = getServerSupabase()
+
+  // ── 2.5 Multi-tenant-routning: mottagaradress → business_id ───────
+  const recipientAddress = extractRecipientAddress(payload)
+  const businessId = await resolveInboundBusinessId(recipientAddress, supabase)
+  if (!businessId) {
+    // Okänd adress och ingen env-fallback satt — avvisa tyst. 200 så
+    // Postmark inte retry:ar (mailet är inte "tillfälligt fel", det hör
+    // inte hemma här).
+    console.log(`[email-inbound] okänd mottagaradress, mail avvisat: ${recipientAddress || '(ingen mottagaradress i payload)'}`)
+    return Response.json({ skipped: true, reason: 'unknown_recipient' })
+  }
 
   const emailInput: EmailInput = {
     subject: payload.Subject || '(utan ämne)',
