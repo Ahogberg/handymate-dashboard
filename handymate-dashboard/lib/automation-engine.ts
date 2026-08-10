@@ -1027,6 +1027,43 @@ export async function evaluateThresholds(
 }
 
 /**
+ * Kundnamn för threshold-entiteter — separat batch-hämtning, ALDRIG embed.
+ *
+ * FK:erna på quotes/booking mot customer är inte bekräfat körda i prod, och en
+ * PGRST200 hade tyst fällt hela threshold-frågan (samma felklass som
+ * proactive-care). Fakturagrenen har en bevisat säker embed och behåller den.
+ *
+ * Utan namnet i kontexten går '{{customer_name}}' ut ORDAGRANT i kund-SMS —
+ * interpolateTemplate lämnar medvetet okända nycklar orörda (Andreas
+ * skärmdump 2026-08-10: offertuppföljningen sa "Hej {{customer_name}}!"
+ * medan fakturapåminnelsen sa "Hej Andreas!").
+ */
+async function fetchCustomerNames(
+  supabase: SupabaseClient,
+  businessId: string,
+  customerIds: Array<unknown>,
+): Promise<Map<string, string>> {
+  const ids = Array.from(new Set(
+    customerIds.filter((id): id is string => typeof id === 'string' && id.length > 0),
+  ))
+  if (ids.length === 0) return new Map()
+  const { data, error } = await supabase
+    .from('customer')
+    .select('customer_id, name')
+    .eq('business_id', businessId)
+    .in('customer_id', ids)
+  if (error) {
+    console.error('[automation-engine] kunde inte hämta kundnamn för threshold-entiteter:', error.message)
+    return new Map()
+  }
+  return new Map(
+    (data || [])
+      .filter((c: Record<string, unknown>) => typeof c.name === 'string' && c.name)
+      .map((c: Record<string, unknown>) => [c.customer_id as string, c.name as string]),
+  )
+}
+
+/**
  * Query entities matching a threshold condition.
  */
 async function queryThresholdEntities(
@@ -1053,9 +1090,16 @@ async function queryThresholdEntities(
           .in('status', [...OPEN_QUOTE_STATUSES])
           .lte('sent_at', cutoffDate.toISOString())
 
+        // customer_name via separat batch — se fetchCustomerNames. Saknades
+        // helt här, så seed-regelns SMS ("Hej {{customer_name}}! Vi skickade
+        // en offert för {{days}} dagar sedan…") gick ut med platshållaren
+        // kvar medan days och business_name ersattes.
+        const kundnamn = await fetchCustomerNames(supabase, businessId, (data || []).map((q: Record<string, unknown>) => q.customer_id))
+
         return (data || []).map((q: Record<string, unknown>) => ({
           id: q.quote_id,
           customer_id: q.customer_id,
+          customer_name: kundnamn.get(q.customer_id as string) ?? null,
           total: q.total,
           days: Math.floor((now.getTime() - new Date(q.sent_at as string).getTime()) / (24 * 60 * 60 * 1000)),
         }))
@@ -1106,9 +1150,14 @@ async function queryThresholdEntities(
           .gte('scheduled_start', now.toISOString())
           .lte('scheduled_start', maxTime.toISOString())
 
+        // Samma lucka som offertgrenen: bokningspåminnelsens seed-mall säger
+        // "Hej {{customer_name}}!" — utan namnet går platshållaren ut i SMS.
+        const kundnamn = await fetchCustomerNames(supabase, businessId, (data || []).map((b: Record<string, unknown>) => b.customer_id))
+
         return (data || []).map((b: Record<string, unknown>) => ({
           id: b.booking_id,
           customer_id: b.customer_id,
+          customer_name: kundnamn.get(b.customer_id as string) ?? null,
           time: b.scheduled_start,
           title: b.notes,
         }))

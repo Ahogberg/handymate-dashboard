@@ -6,6 +6,8 @@
  * (samma mönster som tests/earned-autonomy.spec.ts)
  */
 import { test, expect } from '@playwright/test'
+import fs from 'fs'
+import path from 'path'
 import { interpolateTemplate, deriveApprovalDedupeKey } from '../lib/automation-engine'
 
 test.describe('interpolateTemplate', () => {
@@ -49,6 +51,39 @@ test.describe('interpolateTemplate', () => {
   test('ersätter numeriska värden korrekt', () => {
     const result = interpolateTemplate('{{days}} dagar sedan', { days: 7 })
     expect(result).toBe('7 dagar sedan')
+  })
+})
+
+test.describe('threshold-entiteterna bär det seed-mallarna kräver', () => {
+  // Andreas skärmdump 2026-08-10: offertuppföljningens SMS gick ut med
+  // "Hej {{customer_name}}!" ORDAGRANT — {{days}} och {{business_name}}
+  // ersattes, men kvot-grenen la aldrig customer_name i kontexten, och
+  // interpolationen lämnar (med rätta) okända nycklar orörda. Fakturagrenen
+  // hade namnet — därför sa påminnelsen "Hej Andreas!". Samma lucka fanns i
+  // bokningsgrenen. Vakten läser källan: varje entitetsgren vars seed-mall
+  // säger {{customer_name}} måste mappa fältet.
+  const motor = fs.readFileSync(
+    path.resolve(__dirname, '..', 'lib/automation-engine.ts'), 'utf8',
+  )
+
+  // `: {`-formen finns bara i threshold-switchen — den tidigare
+  // action-switchen (rad ~664) har case-etiketter utan block och skulle
+  // annars ge tomma slices.
+  const quoteGren = motor.slice(motor.indexOf("case 'quote': {"), motor.indexOf("case 'invoice': {"))
+  const bookingGren = motor.slice(motor.indexOf("case 'booking': {"), motor.indexOf("case 'customer': {"))
+
+  test('offert- och bokningsgrenen mappar customer_name', () => {
+    expect(quoteGren.length, 'slice-ankarna hittade inte threshold-grenarna').toBeGreaterThan(0)
+    expect(quoteGren, 'offertgrenen tappade customer_name — SMS säger {{customer_name}} igen').toContain('customer_name:')
+    expect(bookingGren, 'bokningsgrenen tappade customer_name').toContain('customer_name:')
+  })
+
+  test('namnen hämtas via separat batch — aldrig embed på quotes/booking', () => {
+    // FK:erna är obekräftade i prod; en PGRST200 fäller hela threshold-frågan
+    // tyst (lesson 2026-08-05 regel 3). Fakturagrenens embed är bevisat säker
+    // och undantagen.
+    expect(motor).toContain('fetchCustomerNames')
+    expect(quoteGren, 'embed smög in i offertgrenen').not.toContain('customer:customer_id')
   })
 })
 
