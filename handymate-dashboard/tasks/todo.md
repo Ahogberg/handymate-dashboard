@@ -163,9 +163,10 @@ FAKTISKT skickas, aldrig när utkastet byggdes.
 
 ## KVAR ATT BYGGA
 
-**Claude Design.** Fyra nya ytor väntar på visuell design och animering:
-intagsskärmen (C1), reveal-koreografin (C2), granskningsbaren (C3) och
-kvittokortet (C4). Ramarna: ren CSS (framer-motion finns inte i projektet),
+**Claude Design.** ~~Intagsskärmen (C1)~~ — designpasset gjort 2026-08-10 på
+Andreas fynd (kort-yta, exempelchips, editorlänk i headern, mall som riktig
+sekundärknapp, förklaring på inaktiv knapp). Kvar: reveal-koreografin (C2),
+granskningsbaren (C3) och kvittokortet (C4). Ramarna: ren CSS (framer-motion finns inte i projektet),
 teal `#0F766E`, bottom sheet-mönstret från RowEditSheet, 44px träffytor.
 Mekaniken är byggd först med flit — DOM-strukturen är nu bestämd, så designen
 läggs ovanpå en fungerande yta i stället för att gissa mot en mockup.
@@ -181,8 +182,11 @@ scopet innan det byggs.
 **Idé 5b — fråga per RAD.** Backend tar redan emot `item_id`. Kundvyn skickar
 i dag bara en allmän fråga.
 
-**Etapp D2 — "vill du alltid börja så här?"** Trösklarna och lagringen finns
-(`shouldAskPreferred`, `setPreferredStart`), dialogen är inte byggd.
+**Etapp D2 — "vill du alltid börja så här?"** ~~dialogen är inte byggd~~ —
+FELAKTIG SKULD, verifierad 2026-08-10: banderollen, ja/nej-hanteringen,
+kallstartsrespekten OCH vägen tillbaka finns alla i new/page.tsx
+(QuickStartPreferenceBanner, rad ~2157–2191). Skulden var ett inaktuellt
+minne, inte ett hål.
 
 ---
 

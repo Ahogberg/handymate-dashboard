@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Camera, Loader2, Mic, Square, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Camera, FileText, Loader2, Mic, Square, X } from 'lucide-react'
 import { useAudioRecording } from '@/hooks/useAudioRecording'
 /** Bara det intaget faktiskt behöver. Strukturell typ i stället för en import
     av sidans Customer: det finns tre olika Customer-typer i kodbasen, och den
@@ -31,7 +31,25 @@ interface IntakeCustomer {
  * Whisper hör fel på fackord ibland, och hantverkaren måste kunna rätta det
  * innan AI:n bygger vidare på det. Att skicka ett orättat transkript direkt
  * till genereringen hade gjort felet dyrare att upptäcka.
+ *
+ * ═══ VÄGVALET ÄR FÖRSTKLASSIGT (designpasset 2026-08-10, Andreas fynd) ═══
+ *
+ * "Öppna editorn direkt" låg som en grå fotnot under en jättelik inaktiverad
+ * knapp — en vägtull med gömd nödutgång för den som kan editorn. Nu ligger
+ * den i headerhöjd och mallvalet är en riktig sekundärknapp bredvid Bygg
+ * utkast. Standarden förblir beskriv-vägen (den byggdes åt piloten som blev
+ * galen på editorns ~33 kontroller); rymningarna är synliga, och D2-vanan
+ * ("vill du alltid börja så här?") minns valet efter tredje gången.
  */
+
+/** Exempelchips mot tomma-sidan-paralysen. Klick FYLLER rutan — texten är
+    redigerbar som allt annat, aldrig en svart låda. Döljs så fort något
+    står i rutan. */
+const EXEMPEL = [
+  'Byta 12 fönster i villa, två plan',
+  'Helrenovera badrum, ca 6 m²',
+  'Nya eluttag och jordfelsbrytare i garage',
+]
 
 interface QuickIntakeProps {
   customers: IntakeCustomer[]
@@ -135,18 +153,31 @@ export function QuickIntake({
   const voiceUnavailable = recording.state === 'denied' || recording.state === 'unsupported'
 
   return (
-    <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
-      <div className="max-w-xl mx-auto min-h-screen flex flex-col px-4 py-6 sm:py-10">
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 mb-6 -ml-1 px-2 py-2 self-start"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Tillbaka
-        </button>
+    <div className="fixed inset-0 bg-slate-50 z-50 overflow-y-auto">
+      <div className="max-w-xl mx-auto min-h-screen flex flex-col px-4 py-5 sm:py-8">
+        {/* Headerraden: vägen ut åt BÅDA hållen är synlig från början —
+            "Tillbaka" lämnar offerten, editorlänken byter verktyg. Ingen av
+            dem ska behöva letas fram under en inaktiverad knapp. */}
+        <div className="flex items-center justify-between mb-5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 -ml-1 px-2 py-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Tillbaka
+          </button>
+          <button
+            type="button"
+            onClick={onOpenFullEditor}
+            className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-primary-700 px-2 py-2 transition-colors"
+          >
+            Öppna editorn direkt
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
 
-        <div className="mb-6">
+        <div className="mb-5">
           <h1 className="font-heading text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Berätta om jobbet
           </h1>
@@ -155,14 +186,15 @@ export function QuickIntake({
           </p>
         </div>
 
-        {/* Beskrivningen */}
+        {/* Arbetsytan — ett kort, tre kontroller. */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm">
         <div className="relative">
           <textarea
             ref={textareaRef}
             value={value}
             onChange={e => onChange(e.target.value)}
             rows={6}
-            placeholder={'T.ex. "Byta 12 fönster i villa, två plan. Kunden vill ha treglas och att vi tar hand om de gamla."'}
+            placeholder="Vad ska göras, var, och vad kunden önskat sig …"
             className="w-full px-4 py-3.5 pr-16 border-2 border-slate-200 rounded-2xl text-slate-900 placeholder:text-slate-400 bg-white focus:outline-none focus:border-primary-700 focus:ring-4 focus:ring-primary-100 transition-colors resize-none leading-relaxed"
           />
           <button
@@ -187,6 +219,27 @@ export function QuickIntake({
                 : <Mic className="w-5 h-5 anim-fade" />}
           </button>
         </div>
+
+        {/* Exempelchips — mot tomma-sidan-paralysen. Bara när rutan är tom:
+            så fort något står där är de brus och försvinner. */}
+        {!value.trim() && !isRecording && !transcribing && (
+          <div className="flex flex-wrap gap-1.5 mt-2.5 anim-fade">
+            <span className="text-xs text-slate-400 self-center mr-0.5">T.ex.</span>
+            {EXEMPEL.map(exempel => (
+              <button
+                key={exempel}
+                type="button"
+                onClick={() => {
+                  onChange(exempel)
+                  requestAnimationFrame(() => textareaRef.current?.focus())
+                }}
+                className="inline-flex items-center min-h-[32px] px-3 rounded-full border border-slate-200 bg-slate-50 text-xs font-medium text-slate-600 hover:border-primary-200 hover:text-primary-700 hover:bg-primary-50 transition-colors"
+              >
+                {exempel}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Rösttillståndet — alltid uttalat, aldrig tyst.
             Höjden är reserverad (min-h), så tillstånden kan tona in och ut
@@ -251,7 +304,7 @@ export function QuickIntake({
         </div>
 
         {/* Kund — frivillig med flit */}
-        <div className="mt-6">
+        <div className="mt-5">
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
             Kund
           </label>
@@ -267,40 +320,41 @@ export function QuickIntake({
           </select>
           <p className="text-xs text-slate-400 mt-1.5">Du kan välja kund senare — börja med jobbet.</p>
         </div>
+        </div>
 
-        <div className="mt-auto pt-8">
-          <button
-            type="button"
-            onClick={onBuild}
-            disabled={!canBuild}
-            // Släppet av opacity-40 ska glida när knappen blir tillgänglig,
-            // inte slå om — det är ögonblicket beskrivningen räcker till.
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-4 bg-primary-700 hover:bg-primary-600 text-white text-base font-semibold rounded-2xl transition-[background-color,opacity] duration-base ease-standard disabled:opacity-40 shadow-sm"
-          >
-            {building && <Loader2 className="w-5 h-5 animate-spin" />}
-            {building ? 'Bygger…' : 'Bygg utkast'}
-          </button>
-          {/* De två utgångarna. De ersätter startväljarens fyra kort och
-              kostar ingenting förrän de behövs. Mallänken försvinner så fort
-              offerten har innehåll — se hasContent. */}
-          <div className="mt-4 flex flex-col items-center gap-1">
+        <div className="mt-auto pt-6">
+          {/* Två riktiga knappar, inte en hjälte och två fotnoter. Bygg
+              utkast är primär; mallen är en synlig sekundär (döljs när
+              offerten har innehåll — se hasContent). Editorlänken bor i
+              headern. */}
+          <div className="flex flex-col sm:flex-row gap-2.5">
+            <button
+              type="button"
+              onClick={onBuild}
+              disabled={!canBuild}
+              // Släppet av opacity-40 ska glida när knappen blir tillgänglig,
+              // inte slå om — det är ögonblicket beskrivningen räcker till.
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-4 bg-primary-700 hover:bg-primary-600 text-white text-base font-semibold rounded-2xl transition-[background-color,opacity] duration-base ease-standard disabled:opacity-40 shadow-sm"
+            >
+              {building && <Loader2 className="w-5 h-5 animate-spin" />}
+              {building ? 'Bygger…' : 'Bygg utkast'}
+            </button>
             {!hasContent && (
               <button
                 type="button"
                 onClick={onUseTemplate}
-                className="w-full py-3 text-sm font-medium text-primary-700 hover:text-primary-600 transition-colors"
+                className="sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-4 bg-white border-2 border-slate-200 hover:border-primary-700 rounded-2xl text-base font-semibold text-slate-700 hover:text-primary-700 transition-colors"
               >
-                Använd en mall i stället
+                <FileText className="w-4 h-4" />
+                Använd en mall
               </button>
             )}
-            <button
-              type="button"
-              onClick={onOpenFullEditor}
-              className="w-full py-3 text-sm text-slate-500 hover:text-slate-900 transition-colors"
-            >
-              Öppna fullständiga editorn
-            </button>
           </div>
+          {/* Den inaktiverade knappen förklarar sig — höjden är reserverad
+              så förklaringen inte knuffar knapparna när den försvinner. */}
+          <p className="text-center text-xs text-slate-400 mt-2.5 min-h-[16px] m-0">
+            {!canBuild && !building && !transcribing ? 'Beskriv jobbet först — sedan bygger vi utkastet åt dig.' : ''}
+          </p>
         </div>
       </div>
     </div>
