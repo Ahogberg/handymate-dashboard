@@ -39,7 +39,6 @@ const MANUAL_TABLES = [
   'sms_campaign',
   'sms_campaign_recipient',
   'material_order',
-  'human_followup_queue',
 ]
 
 function walk(dir: string, out: string[] = []): string[] {

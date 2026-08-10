@@ -1,3 +1,51 @@
+# LEAD-INTAKE-SPRINTEN — beslut 2026-08-10 (pågår)
+
+Andreas beslut: "bygg allt enligt rekommendationerna utom DO NOT BUILD-listan"
+(tasks/lead-intake-granskning-2026-08-10.md är facit). Google-synk-felsökningen
+(Christoffers pilotproblem) ingår. Ordning enligt granskningen:
+
+## Steg 0 — Followup-läckan (FÖRUTSÄTTNING, vägval A)
+- [ ] `createFollowUp` i lib/approve-actions.ts + kopian i
+      app/api/suggestions/approve/route.ts skriver till TASKSYSTEMET
+      (där hantverkaren faktiskt tittar) i stället för human_followup_queue
+- [ ] Svarstexten "Uppföljning schemalagd!" får bara sägas när posten når en yta
+- [ ] Facit-test som låser att godkänd uppföljning blir synlig
+- [ ] Därefter: human_followup_queue ur MANUAL_TABLES + tabellen kan tömmas/droppas (manuellt beslut)
+
+## Epic A — Konvergens & intagshygien
+- [ ] `normalizeSwedishPhone` + e-postfallback i createLeadAndDeal (dubbelkunds-buggen: +4670 vs 070)
+- [ ] lead-portal (`app/api/lead-portal/[code]`) → golden path (skapar idag ingen deal)
+- [ ] widget-chat → golden path (TD-72: deal utan lead-rad)
+- [ ] Mattes `create_lead` (lib/matte/action-executor.ts:137) → golden path (TODO finns redan i koden)
+- [ ] `qualify_lead` (tool-router) → golden path
+- [ ] `/api/public/book/[slug]` → golden path (bokningskanalen osynlig i pipeline idag)
+- [ ] `approve-actions.createBooking` → findCustomerDuplicates (insertar idag kund helt utan dedup)
+- [ ] `checkRateLimitDb` på /api/leads/intake (CORS * utan rate-limit)
+- [ ] Designbeslut per källa: seedade auto-SMS:et på `lead_received` (requires_approval:false) — vilka källor ska trigga det?
+- [ ] SHOULD: kvalificeringsdjup — fyll job_type/urgency/score från Mattes SMS-tolkning vid intag
+
+## Epic B — Företagsmailen (multi-tenant e-post→lead)
+- [ ] Routningstabell adress→business_id (fail-closed — aldrig payload-styrd tenant)
+- [ ] Ersätt POSTMARK_INBOUND_DEFAULT_BUSINESS_ID-låsningen
+- [ ] Settings-UI för per-business inbound-adress
+- [ ] Bilagor länkas till leadet
+- [ ] (Historikskanning = DO NOT BUILD; omprövas ev. som opt-in med ANTAL, aldrig kronor)
+
+## Epic C — Ägd tillväxt (Hanna v2 + referral)
+- [ ] Spel 2 (recension) + spel 4 (Daniels offertjakt) enligt tasks/hanna-sales-engine-v2-spec.md
+- [ ] Spel 1 + `referral_customer_id` på leads/deals → attribution via attributionskärnan
+
+## Parallellt — Google-synk-felsökningen (Christoffer)
+- [ ] Recon-rapport (Explore pågår) → rankad felsökningslista i tasks/
+- [ ] DB-kontroll av Christoffers kopplingstillstånd (kräver Supabase MCP — nya sessionen)
+- [ ] Rotorsak + fix
+
+Regler: allt bygger på golden path (aldrig parallell pipeline), utskick genom
+approvals/sendSmsViaElks, projekt grindas bakom accept (v103). Verifiering per
+increment: tsc → build → riktade specar → commit+push med grön deploy-koll.
+
+---
+
 # Fortnox-konsolidering — Codex-briefens uppgift 6 (2026-08-10, pågår)
 
 Godkänt av Andreas ("då kör vi vidare") efter Codex-facit i

@@ -85,21 +85,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, callId: result.id })
       }
 
-      case 'mark_resolved': {
-        const { queueId, notes } = data
-        
-        const { error } = await supabase
-          .from('human_followup_queue')
-          .update({
-            resolved_at: new Date().toISOString(),
-            resolution_notes: notes || 'Markerad som klar',
-          })
-          .eq('queue_id', queueId)
-
-        if (error) throw error
-        return NextResponse.json({ success: true })
-      }
-
       case 'create_customer': {
         const { name, phone_number, email, address_line, personal_number, property_designation,
                 customer_type, org_number, contact_person, invoice_address, visit_address, reference, apartment_count,

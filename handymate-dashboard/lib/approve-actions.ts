@@ -341,16 +341,27 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
 
 async function createFollowUp(supabase: SupabaseClient, suggestion: any, actionData: any) {
   try {
+    // Uppföljningen ska landa där någon faktiskt tittar. Tidigare skrevs den
+    // till en kö utan läsare (bekräftad tyst läcka, se
+    // tasks/rapport-human-followup-queue.md): godkännandet svarade
+    // "schemalagd!" medan posten försvann. visibility 'team' är obligatoriskt
+    // här — en rad utan skapare/tilldelad med 'private' syns inte för någon
+    // (v42-regeln). Kontraktet låses av tests/followup-landar.spec.ts.
+    const prioritet =
+      suggestion.priority === 'high' || suggestion.priority === 'urgent' ? 'high'
+      : suggestion.priority === 'low' ? 'low'
+      : 'medium'
+
     const { error } = await supabase
-      .from('human_followup_queue')
+      .from('task')
       .insert({
         business_id: suggestion.business_id,
-        case_id: null,
-        customer_id: suggestion.customer_id,
-        reason: actionData.reason || suggestion.title || 'Uppföljning från AI-förslag',
-        priority: suggestion.priority || 'normal',
-        notes: suggestion.description,
-        queued_at: new Date().toISOString(),
+        title: actionData.reason || suggestion.title || 'Uppföljning från AI-förslag',
+        description: suggestion.description || null,
+        status: 'pending',
+        priority: prioritet,
+        customer_id: suggestion.customer_id || null,
+        visibility: 'team',
       })
     if (error) throw error
     return { success: true }
