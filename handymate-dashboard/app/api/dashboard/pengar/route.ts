@@ -5,6 +5,7 @@ import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { sweepMissedRevenue } from '@/lib/value/missed-revenue'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 import { buildPengarSummary, type OverdueInvoice, type StaleQuote } from '@/lib/value/pengar-pa-bordet'
+import { arTestId, arTestNamn } from '@/lib/testdata'
 
 /**
  * GET /api/dashboard/pengar — "var ligger pengarna ni riskerar att missa?"
@@ -40,7 +41,9 @@ export async function GET(request: NextRequest) {
     const [quotesRes, atasRes, matsRes, projRes, invRes, overdueRes, marginRes, ataDraftRes] = await Promise.all([
       supabase
         .from('quotes')
-        .select('total, sent_at')
+        // `title` läses ENBART för testdata-filtret nedan — e2e-offerten
+        // heter "E2E Test — …" och skulle annars räknas som riktiga pengar.
+        .select('total, sent_at, title')
         .eq('business_id', businessId)
         .in('status', [...OPEN_QUOTE_STATUSES])
         .lt('sent_at', staleGrans),
@@ -69,7 +72,9 @@ export async function GET(request: NextRequest) {
         .not('project_id', 'is', null),
       supabase
         .from('invoice')
-        .select('total, customer_pays, rot_rut_type')
+        // `invoice_id` läses ENBART för testdata-filtret — e2e-fakturor
+        // prefixas 'e2e_inv_' och ska inte synas som förfallna fordringar.
+        .select('invoice_id, total, customer_pays, rot_rut_type')
         .eq('business_id', businessId)
         .in('status', ['sent', 'overdue'])
         .lt('due_date', idag),
@@ -99,10 +104,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Testdata-filter (2026-08-10): e2e-rader räknas aldrig som pengar på
+    // bordet. Testprojekt filtreras FÖRE svepet — ÄTA/material på dem faller
+    // då automatiskt (svepets regler kräver att projektet finns i kartan).
+    const riktigaProjekt = (projRes.data ?? []).filter(
+      (p: any) => !arTestId(p.project_id) && !arTestNamn(p.name),
+    )
+    const riktigaOfferter = (quotesRes.data ?? []).filter((q: any) => !arTestNamn(q.title))
+    const riktigaForfallna = (overdueRes.data ?? []).filter((i: any) => !arTestId(i.invoice_id))
+
     const missedRevenue = sweepMissedRevenue({
       atas: (atasRes.data ?? []) as any,
       materials: (matsRes.data ?? []) as any,
-      projects: (projRes.data ?? []) as any,
+      projects: riktigaProjekt as any,
       invoices: (invRes.data ?? []) as any,
       // Tom dedupe med flit: sidan svarar på "vad ligger på bordet TOTALT",
       // inte "vad har ännu inte blivit ett kort".
@@ -121,9 +135,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       buildPengarSummary({
-        staleQuotes: (quotesRes.data ?? []) as StaleQuote[],
+        staleQuotes: riktigaOfferter as StaleQuote[],
         missedRevenue,
-        overdueInvoices: (overdueRes.data ?? []) as OverdueInvoice[],
+        overdueInvoices: riktigaForfallna as OverdueInvoice[],
         marginOverruns: (marginRes.data ?? []).map(r => overrun(r.payload)),
         ataEstimates: (ataDraftRes.data ?? []).map(r => estimate(r.payload)),
       }),

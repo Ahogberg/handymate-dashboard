@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/permissions'
 import { canActOnApproval, type ApprovalRoutingRow } from '@/lib/approvals/routing'
+import { arTestdataApproval } from '@/lib/testdata'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,7 +81,11 @@ export async function GET(request: NextRequest) {
     // canActOnApproval kortsluter till `true` direkt för 'any'-bucketen
     // (idag alla rader, se lib/approvals/routing.ts) så detta är i
     // praktiken en no-op tills Etapp 3b börjar sätta specifika buckets.
-    const rows = (data || []) as ApprovalRoutingRow[]
+    // Testdata-filter (2026-08-10): e2e-flödena skriver riktiga rader i
+    // pending_approvals, och de har bevisligen nått hemskärmen. Gömda vid
+    // läsning — aldrig raderade härifrån (lib/testdata.ts).
+    const rows = ((data || []) as ApprovalRoutingRow[])
+      .filter((row) => !arTestdataApproval(row as any))
     const permits = await Promise.all(rows.map((row) => canActOnApproval(supabase, currentUser, row)))
     const visible = rows.filter((_, i) => permits[i])
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { arTestNamn } from '@/lib/testdata'
 
 export async function GET(request: NextRequest) {
   try {
@@ -128,7 +129,12 @@ export async function GET(request: NextRequest) {
 
     merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
-    return NextResponse.json({ data: merged.slice(0, limit) })
+    // Testdata-filter (2026-08-10): e2e-flödenas aktivitetsrader bär
+    // testnamnen i beskrivningen ("E2E-test installation", "E2E Testkund") —
+    // de göms vid läsning så digest och Klart idag aldrig visar dem.
+    const utanTestdata = merged.filter((r) => !arTestNamn(r.description))
+
+    return NextResponse.json({ data: utanTestdata.slice(0, limit) })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

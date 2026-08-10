@@ -8,6 +8,7 @@ import { sendSmsViaElks } from '@/lib/sms-send'
 import { getBusinessPlanFromConfig } from '@/lib/auth'
 import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
+import { arTestId, arTestNamn } from '@/lib/testdata'
 
 /**
  * GET /api/cron/quote-follow-up - Automatisk uppföljning av offerter via AI agent.
@@ -123,6 +124,9 @@ export async function GET(request: NextRequest) {
       for (const q of expiringQuotes || []) {
         const customer = q.customer as any
         if (!customer?.phone_number) continue
+
+        // Testdata-vakt (2026-08-10): e2e-offerter nudgas aldrig (lib/testdata.ts).
+        if (arTestId(q.quote_id) || arTestNamn(customer?.name) || arTestNamn(q.title)) continue
 
         // Respektera toggle
         if (!nudgeEnabledMap.get(q.business_id)) continue
@@ -305,6 +309,9 @@ export async function GET(request: NextRequest) {
     for (const quote of sentQuotes || []) {
       const customer = quote.customer as any
       if (!customer) continue
+
+      // Testdata-vakt (2026-08-10): e2e-offerter följs aldrig upp (lib/testdata.ts).
+      if (arTestId(quote.quote_id) || arTestNamn(customer?.name) || arTestNamn(quote.title)) continue
 
       // Dedup: om V3 threshold-regler hanterar detta företag, skippa cron-uppföljning
       if (v3HandlesQuoteFollowup.has(quote.business_id)) continue

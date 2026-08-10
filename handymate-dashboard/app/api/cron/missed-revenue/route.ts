@@ -10,6 +10,7 @@ import {
   type MissedRevenueFinding,
   type PriorRevenueCard,
 } from '@/lib/value/missed-revenue'
+import { arTestId, arTestNamn } from '@/lib/testdata'
 
 /**
  * Nattligt svep efter pengar som är intjänade men inte fakturerade (spår 1.3).
@@ -139,7 +140,12 @@ export async function GET(request: NextRequest) {
           expired++
         }
 
-        const findings = allFindings.slice(0, MAX_CARDS_PER_BUSINESS)
+        // Testdata-filter (2026-08-10): e2e-projekt får aldrig bli nya kort.
+        // Filtret ligger EFTER currentFindingKeys med flit — befintliga
+        // e2e-kort göms av läsfiltret i stället för att avföras här.
+        const findings = allFindings
+          .filter(f => !arTestId(f.projectId) && !arTestNamn(f.projectName))
+          .slice(0, MAX_CARDS_PER_BUSINESS)
 
         for (const f of findings) {
           const existingId = legacyPendingByDedupe.get(f.dedupeKey)

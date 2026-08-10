@@ -7,6 +7,7 @@ import { buildSwishQRData } from '@/lib/swish-qr'
 import { isAutonomous } from '@/lib/autonomy/earned-autonomy'
 import { deliverInvoiceReminder } from '@/lib/invoice-reminder-send'
 import { svDateStr } from '@/lib/dates'
+import { arTestId, arTestNamn } from '@/lib/testdata'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -330,6 +331,10 @@ async function sendAutoReminders() {
       })
 
       const customer = inv.customer as any
+
+      // Testdata-vakt (2026-08-10): e2e-fakturor och testkunder får varken
+      // påminnelser eller kort (lib/testdata.ts).
+      if (arTestId(inv.invoice_id) || arTestNamn(customer?.name)) continue
 
       // Beräkna nästa påminnelsetid (samma oavsett väg)
       const nextCount = currentCount + 1

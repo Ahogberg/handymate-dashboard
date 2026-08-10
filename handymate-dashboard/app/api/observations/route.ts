@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
+import { arTestdataObservation } from '@/lib/testdata'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,7 +81,9 @@ export async function GET(request: NextRequest) {
     // tom kö utan kort att agera på. Nolla länken när approvalen inte längre
     // är pending; ett fel i kollen får aldrig fälla svaret (degradera till
     // ofiltrerat, dvs. dagens beteende).
-    let observations = data || []
+    // Testdata-filter (2026-08-10): observationer härledda ur e2e-rader
+    // ("E2E Testkund", test_-id:n i data_basis) göms vid läsning.
+    let observations = (data || []).filter((o: any) => !arTestdataObservation(o))
     try {
       const linkedIds = observations
         .map((o: any) => o.related_approval_id)
