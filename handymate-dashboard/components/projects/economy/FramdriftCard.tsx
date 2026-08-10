@@ -69,6 +69,27 @@ export function FramdriftCard({
     ? Math.round(((actualRevenue as number) / (budgetAmount as number)) * 100)
     : 0
 
+  // Inget arbete än: "0 % + 0.00/24.00 tim + 0 % använt" är tre nollor om
+  // samma faktum. Ett ärligt besked räcker tills det finns något att rita
+  // (2026-08-10, samma regel som Ekonomi-pulsens planeringsläge).
+  if (progressPercent === 0 && actualHours === 0) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6">
+        <div className="flex items-center gap-2 mb-3">
+          <BarChart3 className="w-4 h-4 text-primary-700" />
+          <span className="text-[11px] font-bold uppercase tracking-wider text-primary-700">
+            Framdrift
+          </span>
+        </div>
+        <p className="m-0 text-sm text-slate-500 leading-relaxed">
+          Inget arbete registrerat än
+          {hasHoursBudget ? <> — {formatHours(budgetHours as number)} budgeterade</> : null}
+          . Staplarna ritas när tid rapporteras.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6">
       <div className="flex items-center gap-2 mb-5">

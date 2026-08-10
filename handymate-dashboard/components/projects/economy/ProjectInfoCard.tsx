@@ -61,29 +61,32 @@ export function ProjectInfoCard({
         </span>
       </div>
 
+      {/* Fält utan värde renderas INTE (2026-08-10): ett kort vars
+          huvudinnehåll är tankstreck säger bara "vi vet inget" med fyra
+          rutor. Datumen dyker upp när de är satta. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <div>
           <Eyebrow icon={<Briefcase className="w-3 h-3" />}>Typ</Eyebrow>
           <p className="mt-1.5 text-sm text-slate-900">{projectTypeLabel || '—'}</p>
         </div>
 
-        <div>
-          <Eyebrow icon={<Calendar className="w-3 h-3" />}>Startdatum</Eyebrow>
-          <p className="mt-1.5 text-sm text-slate-900 tabular-nums">
-            {startDate ? formatDate(startDate) : '—'}
-          </p>
-        </div>
+        {startDate && (
+          <div>
+            <Eyebrow icon={<Calendar className="w-3 h-3" />}>Startdatum</Eyebrow>
+            <p className="mt-1.5 text-sm text-slate-900 tabular-nums">{formatDate(startDate)}</p>
+          </div>
+        )}
 
-        <div>
-          <Eyebrow icon={<Calendar className="w-3 h-3" />}>Slutdatum</Eyebrow>
-          <p className="mt-1.5 text-sm text-slate-900 tabular-nums">
-            {endDate ? formatDate(endDate) : '—'}
-          </p>
-        </div>
+        {endDate && (
+          <div>
+            <Eyebrow icon={<Calendar className="w-3 h-3" />}>Slutdatum</Eyebrow>
+            <p className="mt-1.5 text-sm text-slate-900 tabular-nums">{formatDate(endDate)}</p>
+          </div>
+        )}
 
-        <div>
-          <Eyebrow icon={<User className="w-3 h-3" />}>Kund</Eyebrow>
-          {customer ? (
+        {customer && (
+          <div>
+            <Eyebrow icon={<User className="w-3 h-3" />}>Kund</Eyebrow>
             <Link
               href={`/dashboard/customers/${customer.customer_id}`}
               className="mt-1.5 inline-flex items-center gap-1 text-sm text-primary-700 hover:text-primary-800 hover:underline"
@@ -91,10 +94,8 @@ export function ProjectInfoCard({
               {customer.name}
               <ExternalLink className="w-3 h-3" />
             </Link>
-          ) : (
-            <p className="mt-1.5 text-sm text-slate-400">—</p>
-          )}
-        </div>
+          </div>
+        )}
 
         {quote && (
           <div className="sm:col-span-2">

@@ -8,7 +8,6 @@ import {
   Clock,
   DollarSign,
   AlertTriangle,
-  CheckCircle,
   Calendar,
   User,
   Loader2,
@@ -361,36 +360,33 @@ export default function ProjectsPage() {
           </button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <FolderKanban className="w-4 h-4 text-primary-600" />
-              <span className="text-xs text-gray-400">Aktiva</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{activeCount}</p>
-          </div>
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-red-600" />
-              <span className="text-xs text-gray-400">Över budget</span>
-            </div>
-            <p className={`text-2xl font-bold ${overBudget > 0 ? 'text-red-600' : 'text-gray-900'}`}>{overBudget}</p>
-          </div>
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="w-4 h-4 text-amber-600" />
-              <span className="text-xs text-gray-400">Ofakturerat</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{Math.round(totalUninvoiced).toLocaleString('sv-SE')} kr</p>
-          </div>
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="w-4 h-4 text-emerald-600" />
-              <span className="text-xs text-gray-400">Totalt</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{projects.length}</p>
-          </div>
+        {/* Läget — besked i stället för fyra statiska kort (2026-08-10).
+            "Aktiva 8" + "Totalt 8" var samma siffra två gånger, och nollorna
+            stod på paradplats. Nu: kontexten som text, varningarna som chips
+            BARA när de bär något, och tomt sägs som lugn — inte som en nolla. */}
+        <div className="flex flex-wrap items-center gap-2.5 mb-8">
+          <span className="inline-flex items-center gap-2 px-3.5 min-h-[36px] bg-white border border-[#E2E8F0] rounded-full text-sm font-medium text-gray-700">
+            <FolderKanban className="w-4 h-4 text-primary-600" />
+            {activeCount} aktiva projekt
+          </span>
+          {overBudget > 0 && (
+            <span className="inline-flex items-center gap-2 px-3.5 min-h-[36px] bg-red-50 border border-red-200 rounded-full text-sm font-semibold text-red-700">
+              <AlertTriangle className="w-4 h-4" />
+              {overBudget} över budget
+            </span>
+          )}
+          {totalUninvoiced > 0 && (
+            <Link
+              href="/dashboard/pengar"
+              className="inline-flex items-center gap-2 px-3.5 min-h-[36px] bg-amber-50 border border-amber-200 rounded-full text-sm font-semibold text-amber-700 hover:border-amber-300 transition-colors"
+            >
+              <DollarSign className="w-4 h-4" />
+              {Math.round(totalUninvoiced).toLocaleString('sv-SE')} kr ofakturerat
+            </Link>
+          )}
+          {overBudget === 0 && totalUninvoiced <= 0 && (
+            <span className="text-sm text-gray-400">Inget över budget · inget ofakturerat</span>
+          )}
         </div>
 
         {/* Filters */}
@@ -407,7 +403,7 @@ export default function ProjectsPage() {
                 className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
                   filter === f.key
                     ? 'bg-primary-700 text-white'
-                    : 'bg-white text-gray-500 hover:text-white border border-[#E2E8F0]'
+                    : 'bg-white text-gray-500 hover:text-gray-900 hover:bg-gray-50 border border-[#E2E8F0]'
                 }`}
               >
                 {f.label}
@@ -478,12 +474,16 @@ export default function ProjectsPage() {
                 <Link
                   key={project.project_id}
                   href={`/dashboard/projects/${project.project_id}`}
-                  className="block p-5 hover:bg-gray-100/30 transition-all"
+                  className="group block p-5 hover:bg-gray-100/30 transition-all"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-xs font-mono text-gray-400 flex-shrink-0">{project.project_number || `P-${project.project_id.slice(0, 6)}`}</span>
+                        {/* Bara riktiga projektnummer — ett rått id-fragment
+                            (P-877e3f) är tekniskt läckage, inte information. */}
+                        {project.project_number && (
+                          <span className="text-xs font-mono text-gray-400 flex-shrink-0">{project.project_number}</span>
+                        )}
                         <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
                         <JobTypeBadge slug={project.job_type} jobTypes={jobTypes} />
                         {project.lifecycle ? (
@@ -495,19 +495,21 @@ export default function ProjectsPage() {
                             {getStatusText(project.status)}
                           </span>
                         )}
-                        {project.ai_health_score != null && project.status !== 'completed' && project.status !== 'cancelled' && (
+                        {/* Hälsan syns BARA när den avviker, och med ORD. Ett
+                            "80" på varje frisk rad är ett hittepå-score som
+                            blir tapet efter dag två (rådets Business Health-
+                            regel). Sammanfattningen bor i tooltipen. */}
+                        {project.ai_health_score != null && project.ai_health_score < 80 && project.status !== 'completed' && project.status !== 'cancelled' && (
                           <span
                             className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border ${
-                              project.ai_health_score >= 80
-                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                : project.ai_health_score >= 50
+                              project.ai_health_score >= 50
                                 ? 'bg-amber-50 text-amber-600 border-amber-200'
                                 : 'bg-red-50 text-red-600 border-red-200'
                             }`}
                             title={project.ai_health_summary || ''}
                           >
                             <Activity className="w-3 h-3" />
-                            {project.ai_health_score}
+                            {project.ai_health_score >= 50 ? 'Behöver koll' : 'Risk'}
                           </span>
                         )}
                       </div>
@@ -548,63 +550,88 @@ export default function ProjectsPage() {
                         {project.project_type === 'fixed_price' && <span>Fast pris</span>}
                         {project.project_type === 'mixed' && <span>Blandat</span>}
                         {project.ai_auto_created && (
-                          <span className="text-primary-600">Auto</span>
+                          <span className="text-xs" title="Projektet skapades automatiskt när offerten accepterades">
+                            Skapad automatiskt
+                          </span>
                         )}
                       </div>
                     </div>
 
                     <div className="flex items-center gap-6">
-                      {/* Budget */}
-                      {project.budget_hours ? (
-                        <div className="text-right min-w-[120px]">
-                          <div className="flex items-center gap-1 justify-end mb-1">
-                            <Clock className="w-3 h-3 text-gray-400" />
-                            <span className={`text-sm font-medium ${getBudgetColor(project.actual_hours, project.budget_hours)}`}>
-                              {project.actual_hours}/{project.budget_hours} tim
+                      {project.actual_hours === 0 && project.actual_amount === 0 && project.progress_percent === 0 ? (
+                        /* Inte påbörjat: "0/24 tim", "0/34 480 kr" och "0 %"
+                           med tre staplar sa samma sak tre gånger. Ett besked
+                           plus det offererade räcker — staplarna kommer när
+                           det finns något att rita. */
+                        <div className="text-right">
+                          <span className="block text-sm font-medium text-gray-500">Inte påbörjat</span>
+                          {project.budget_amount ? (
+                            <span className="block text-xs text-gray-400">
+                              offererat {Math.round(project.budget_amount).toLocaleString('sv-SE')} kr <span className="text-[10px]">exkl. moms</span>
                             </span>
-                          </div>
-                          <div className="h-1.5 bg-gray-100 rounded-full w-24 ml-auto">
-                            <div
-                              className={`h-full rounded-full transition-all ${getBudgetBarColor(project.actual_hours, project.budget_hours)}`}
-                              style={{ width: `${Math.min(100, (project.actual_hours / project.budget_hours) * 100)}%` }}
-                            />
-                          </div>
+                          ) : project.budget_hours ? (
+                            <span className="block text-xs text-gray-400">{project.budget_hours} tim budgeterat</span>
+                          ) : null}
                         </div>
-                      ) : null}
+                      ) : (
+                        <>
+                          {/* Budget */}
+                          {project.budget_hours ? (
+                            <div className="text-right min-w-[120px]">
+                              <div className="flex items-center gap-1 justify-end mb-1">
+                                <Clock className="w-3 h-3 text-gray-400" />
+                                <span className={`text-sm font-medium ${getBudgetColor(project.actual_hours, project.budget_hours)}`}>
+                                  {project.actual_hours}/{project.budget_hours} tim
+                                </span>
+                              </div>
+                              <div className="h-1.5 bg-gray-100 rounded-full w-24 ml-auto">
+                                <div
+                                  className={`h-full rounded-full transition-all ${getBudgetBarColor(project.actual_hours, project.budget_hours)}`}
+                                  style={{ width: `${Math.min(100, (project.actual_hours / project.budget_hours) * 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          ) : null}
 
-                      {project.budget_amount ? (
-                        <div className="text-right min-w-[130px] hidden md:block">
-                          <div className="flex items-center gap-1 justify-end mb-1">
-                            <DollarSign className="w-3 h-3 text-gray-400" />
-                            <span className={`text-sm font-medium ${getBudgetColor(project.actual_amount, project.budget_amount)}`}>
-                              {Math.round(project.actual_amount).toLocaleString('sv-SE')} / {Math.round(project.budget_amount).toLocaleString('sv-SE')} kr <span className="text-[10px] text-gray-400 font-normal">exkl. moms</span>
-                            </span>
+                          {project.budget_amount ? (
+                            <div className="text-right min-w-[130px] hidden md:block">
+                              <div className="flex items-center gap-1 justify-end mb-1">
+                                <DollarSign className="w-3 h-3 text-gray-400" />
+                                <span className={`text-sm font-medium ${getBudgetColor(project.actual_amount, project.budget_amount)}`}>
+                                  {Math.round(project.actual_amount).toLocaleString('sv-SE')} / {Math.round(project.budget_amount).toLocaleString('sv-SE')} kr <span className="text-[10px] text-gray-400 font-normal">exkl. moms</span>
+                                </span>
+                              </div>
+                              <div className="h-1.5 bg-gray-100 rounded-full w-28 ml-auto">
+                                <div
+                                  className={`h-full rounded-full transition-all ${getBudgetBarColor(project.actual_amount, project.budget_amount)}`}
+                                  style={{ width: `${Math.min(100, (project.actual_amount / project.budget_amount) * 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {/* Progress */}
+                          <div className="text-right min-w-[60px]">
+                            <span className="text-sm font-medium text-gray-900">{project.progress_percent}%</span>
+                            <div className="h-1.5 bg-gray-100 rounded-full w-14 ml-auto mt-1">
+                              <div
+                                className="h-full rounded-full bg-primary-700 transition-all"
+                                style={{ width: `${project.progress_percent}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="h-1.5 bg-gray-100 rounded-full w-28 ml-auto">
-                            <div
-                              className={`h-full rounded-full transition-all ${getBudgetBarColor(project.actual_amount, project.budget_amount)}`}
-                              style={{ width: `${Math.min(100, (project.actual_amount / project.budget_amount) * 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      ) : null}
+                        </>
+                      )}
 
-                      {/* Progress */}
-                      <div className="text-right min-w-[60px]">
-                        <span className="text-sm font-medium text-gray-900">{project.progress_percent}%</span>
-                        <div className="h-1.5 bg-gray-100 rounded-full w-14 ml-auto mt-1">
-                          <div
-                            className="h-full rounded-full bg-primary-700 transition-all"
-                            style={{ width: `${project.progress_percent}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Delete button (only planning with no entries) */}
+                      {/* Radering — destruktiv åtgärd, inte blickfång. Syns
+                          vid hover/fokus (alltid på mobil, där hover saknas)
+                          och bara på oskrivna planeringsprojekt. */}
                       {project.status === 'planning' && project.actual_hours === 0 && (
                         <button
                           onClick={(e) => { e.preventDefault(); handleDeleteProject(project.project_id) }}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          aria-label="Ta bort projektet"
+                          title="Ta bort projektet"
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

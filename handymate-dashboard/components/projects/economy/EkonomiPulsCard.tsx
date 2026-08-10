@@ -124,6 +124,16 @@ function PulsCardLayout({
     ? Math.round((fakturerat / totalIntakt) * 100)
     : null
 
+  // ═══ PLANERINGSLÄGET — ETT BESKED, INTE FYRA NOLLOR (2026-08-10) ═══
+  //
+  // Innan något är nedlagt eller fakturerat sa gridden "0 kr · 0 kr ·
+  // 0 kr · +hela intäkten (Preliminär)" — en vägg av nollor plus en
+  // marginalsiffra som såg ut som vinst. Sanningen är en mening.
+  const ingetRegistrerat =
+    fakturerat === 0 &&
+    kostnader.material_inkop_kr === 0 &&
+    (kostnader.total_kr == null || kostnader.total_kr === 0)
+
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6">
       <div className="flex items-center justify-between mb-4">
@@ -143,6 +153,15 @@ function PulsCardLayout({
         </button>
       </div>
 
+      {ingetRegistrerat ? (
+        <p className="m-0 text-sm text-slate-500 leading-relaxed">
+          {totalIntakt > 0 ? (
+            <>Offererat <b className="font-semibold text-slate-900">{formatKr(totalIntakt)}</b> — inget nedlagt eller fakturerat än. Siffrorna fylls i när arbetet börjar.</>
+          ) : (
+            <>Ingen ekonomi registrerad än — siffrorna fylls i när offert kopplas eller arbete rapporteras.</>
+          )}
+        </p>
+      ) : (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5">
         <PulsStat
           label="Intäkt"
@@ -175,6 +194,7 @@ function PulsCardLayout({
         />
         <MarginalPuls state={state} economics={economics} />
       </div>
+      )}
     </div>
   )
 }
@@ -299,7 +319,23 @@ function MarginalPuls({
     )
   }
 
-  const isPotentialOrPreliminary = state === 'potential' || state === 'preliminary'
+  // 'potential' = noll kostnader ⇒ "marginalen" är hela intäkten. Ekonomi-
+  // flikens MarginalCard visar siffran MED den fulla förklaringen ("siffran
+  // är vad du tar in, inte vad du tjänar") — pulsens miniformat rymmer inte
+  // den meningen, och en bar "+34 480 kr" med bara en pill läses som vinst.
+  // Utan förklaringsutrymme visas därför ingen siffra alls (2026-08-10).
+  if (state === 'potential') {
+    return (
+      <PulsStat
+        label="Marginal"
+        value="—"
+        sub="inga kostnader registrerade än"
+        tone="slate"
+        valueClass="text-slate-400"
+      />
+    )
+  }
+
   const value = marginal.marginal_kr
   const pct = marginal.marginal_pct
   const valueLabel =
@@ -307,17 +343,13 @@ function MarginalPuls({
       ? '—'
       : `${value > 0 ? '+' : ''}${formatKr(value)}`
 
-  if (isPotentialOrPreliminary) {
+  if (state === 'preliminary') {
     const completeness = marginal.kostnad_completeness_pct ?? 0
     return (
       <PulsStat
         label="Marginal"
         value={valueLabel}
-        sub={
-          state === 'potential'
-            ? 'inga kostnader registrerade'
-            : `${completeness}% kostnad registrerad`
-        }
+        sub={`${completeness}% kostnad registrerad`}
         tone="slate"
         valueClass="text-slate-700"
         pill={{ text: 'Preliminär', variant: 'amber' }}

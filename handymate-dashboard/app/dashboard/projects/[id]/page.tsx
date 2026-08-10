@@ -94,7 +94,7 @@ import { FramdriftCard } from '@/components/projects/economy/FramdriftCard'
 import { ProjectQuoteSpec } from '@/components/projects/ProjectQuoteSpec'
 import { ProjectQuoteDocumentCard } from '@/components/projects/ProjectQuoteDocumentCard'
 import { ProjectStatusCard, getStageBucket } from '@/components/projects/ProjectStatusCard'
-import ProjectTodoBlock, { TODO_PRIMARY_LABEL, type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
+import ProjectTodoBlock, { type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
 import { formatSEK } from '@/lib/format-price'
 import type { ProjectEconomics } from '@/lib/projects/compute-economics'
 import { svDateStr, svDateStrPlusDays, svStartOfDay } from '@/lib/dates'
@@ -1997,16 +1997,6 @@ export default function ProjectDetailPage() {
           ? () => setChangeModal({ open: true, editing: null })
           : () => openTimeModal()
 
-  function renderPrimaryTodoButton() {
-    const label = TODO_PRIMARY_LABEL[todoMode]
-    const cls = 'inline-flex items-center justify-center gap-2 px-5 h-11 bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold rounded-lg transition-colors'
-    return todoPrimaryHref ? (
-      <Link href={todoPrimaryHref} className={cls}>{label}</Link>
-    ) : (
-      <button type="button" onClick={todoPrimaryOnClick} className={cls}>{label}</button>
-    )
-  }
-
   // "Fler åtgärder" — konsoliderar de tidigare fristående header-knapparna
   // (Nytt tilläggsarbete, Förhandsgranska faktura, Visa offert, status-
   // ändring) i en meny, eftersom canvasens sidhuvud inte har plats för dem
@@ -2147,9 +2137,11 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
-          {/* Desktop-actions: "Fler åtgärder" (befintliga sekundär-åtgärder,
-              se nedan) + dubblerad primärknapp (samma läge/åtgärd som
-              vänsterkolumnens ProjectTodoBlock). */}
+          {/* Desktop-actions: BARA "Fler åtgärder". Primärknappen bodde här
+              OCH i vänsterkolumnens Att göra — samma åtgärd som två knappar
+              på samma skärm (samma felklass som offert-sprintens "en sanning
+              per kontroll"). Att göra äger den: det är listan man läser när
+              man undrar vad som ska hända härnäst. */}
           <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
             <div className="relative">
               <button
@@ -2162,7 +2154,6 @@ export default function ProjectDetailPage() {
               </button>
               {moreMenuOpen && renderMoreActionsMenu()}
             </div>
-            {renderPrimaryTodoButton()}
           </div>
         </div>
 
