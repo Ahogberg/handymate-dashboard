@@ -20,7 +20,6 @@ import fs from 'fs'
 import path from 'path'
 import { parseKonflikter, minuterFranIso } from '../components/jarvis/ScheduleTimeline'
 import { nyhetsAtgard } from '../lib/jarvis/news-actions'
-import { byggNarvaro } from '../lib/jarvis/team-presence'
 import { TEAM } from '../lib/agents/team'
 
 const ROOT = path.resolve(__dirname, '..')
@@ -96,46 +95,9 @@ test.describe('nyhetsraderna har en väg vidare', () => {
   })
 })
 
-test.describe('närvarobandet hittar aldrig på aktivitet', () => {
-  test('en agent utan spår står inte i bandet', () => {
-    const rader = byggNarvaro([{ agentId: 'lisa', text: 'Svarade tre samtal', vid: '2026-08-08T06:12:00Z' }])
-    expect(rader).toHaveLength(1)
-    expect(rader[0].agentId).toBe('lisa')
-  })
-
-  test('tomma spår ger tomt band', () => {
-    expect(byggNarvaro([])).toEqual([])
-    expect(byggNarvaro([{ agentId: '', text: 'x' }])).toEqual([])
-    expect(byggNarvaro([{ agentId: 'lisa', text: '' }])).toEqual([])
-  })
-
-  test('senaste raden visas, alla räknas', () => {
-    const rader = byggNarvaro([
-      { agentId: 'karin', text: 'Äldre', vid: '2026-08-08T06:00:00Z' },
-      { agentId: 'karin', text: 'Nyare', vid: '2026-08-08T09:00:00Z' },
-    ])
-    expect(rader[0].senaste).toBe('Nyare')
-    expect(rader[0].antal).toBe(2)
-  })
-
-  test('ordningen följer teamet, inte aktiviteten', () => {
-    // Ett band som hoppar om sig varje morgon går inte att skumma.
-    const rader = byggNarvaro([
-      { agentId: 'lisa', text: 'a', vid: '2026-08-08T09:00:00Z' },
-      { agentId: 'karin', text: 'b', vid: '2026-08-08T06:00:00Z' },
-    ])
-    const teamOrdning = TEAM.map(a => a.id)
-    const iBandet = rader.map(r => r.agentId)
-    const forvantad = teamOrdning.filter(id => iBandet.includes(id))
-    expect(iBandet).toEqual(forvantad)
-  })
-
-  test('okänd agent kommer aldrig med', () => {
-    // Bandet itererar TEAM, så ett spår från något som inte är en agent kan
-    // aldrig rita ett ansikte utan namn.
-    expect(byggNarvaro([{ agentId: 'spöke', text: 'x' }])).toEqual([])
-  })
-})
+// Närvarobandet (byggNarvaro) städades bort i Tur 4 etapp 6 — bevakningen
+// (tests/bevakning.spec.ts) och dygnsdigesten (tests/dygnsdigest.spec.ts)
+// äger numera de ytorna.
 
 test.describe('skrivradens chips pekar på sidor som finns', () => {
   // Etapp 4: chipsen är Link-pills till hårdkodade rutter. En flyttad sida

@@ -16,7 +16,7 @@ Fullständig plan: `C:\Users\Gaming\.claude\plans\f-rb-ttring-av-den-nya-dynamic
 - [x] **Etapp 3 — Teamet just nu.** Ny `lib/jarvis/bevakning.ts`, watch-block i team-activity (bara antal/datum), `components/jarvis/TeamBevakning.tsx` (kompakt = beslut >= 2), TeamPresenceBand bort. Ny `tests/bevakning.spec.ts`.
 - [x] **Etapp 4 — Skrivraden.** Ny `components/jarvis/SkrivRad.tsx` — stor med chips (beslut <= 1), liten pill (beslut >= 2). Källskanning: chip-hrefs finns som sidor.
 - [x] **Etapp 5 — Att hämta.** Ny `lib/jarvis/att-hamta.ts` + `components/jarvis/AttHamtaRailCard.tsx` med "väntar ovan"-scroll. PengarRailCard + Fakturor-kortet bort. Ny `tests/att-hamta.spec.ts`.
-- [ ] **Etapp 6 — Senaste dygnet.** Ny `lib/jarvis/dygnsdigest.ts` (24h rullande + grindar, halsningsBevis). Digest under besluten, agentfärgade prickar, kollapsbar. Ny `tests/dygnsdigest.spec.ts`.
+- [x] **Etapp 6 — Senaste dygnet.** Ny `lib/jarvis/dygnsdigest.ts` (24h rullande + grindar, halsningsBevis). Digest under besluten, agentfärgade prickar, kollapsbar. Ny `tests/dygnsdigest.spec.ts`.
 - [ ] **Etapp 7 (VALFRI).** Värdekvittot natt 1 — bara om alla sex är gröna och pushade.
 
 ## Verifiering per etapp

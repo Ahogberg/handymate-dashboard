@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, FileText, Loader2, Phone, Undo2, User } from 'lucide-react'
 import { nyhetsAtgard, type NyhetsIkon } from '@/lib/jarvis/news-actions'
 import { byggBevakning, type BevakningsRad } from '@/lib/jarvis/bevakning'
+import { byggDygnsdigest, halsningsBevis, type DigestAktivitet } from '@/lib/jarvis/dygnsdigest'
 import { TeamBevakning } from '@/components/jarvis/TeamBevakning'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -205,6 +206,8 @@ export default function JarvisHome({
   const [proof, setProof] = useState<string | null>(null)
   const [bevakning, setBevakning] = useState<BevakningsRad[]>([])
   const [pengarData, setPengarData] = useState<PengarSummary | null>(null)
+  const [aktiviteter, setAktiviteter] = useState<DigestAktivitet[]>([])
+  const [samtal, setSamtal] = useState<{ antal: number; bokade: number } | null>(null)
 
   // ═══ GRIND 1: HAR NÅGOT HÄNT SEDAN DU TITTADE SIST? ═══
   //
@@ -279,21 +282,9 @@ export default function JarvisHome({
       .then(r => (r.ok ? r.json() : null))
       .then(res => {
         if (!active || !res?.data) return
-        const midnatt = new Date(); midnatt.setHours(0, 0, 0, 0)
-        setDoneRows(
-          (res.data as Array<any>)
-            .filter(a => new Date(a.created_at) >= midnatt && a.status !== 'failed' && a.description)
-            .slice(0, 12)
-            .map(a => ({
-              key: `${a.source}-${a.id}`,
-              time: formatClock(a.created_at),
-              agent: a.agent_id || 'matte',
-              text: String(a.description),
-              // AUTO kommer nu från servern (approval_id IS NULL), inte från
-              // en klientgissning. Ett märke som gissar är värre än inget.
-              auto: a.auto !== false,
-            })),
-        )
+        // Rådata till digesten — fönstret (24 h rullande) och grindarna
+        // bor i lib/jarvis/dygnsdigest.ts, inte här.
+        setAktiviteter(res.data as DigestAktivitet[])
       })
       .catch(() => { /* loggen är en bekvämlighet, aldrig blockerande */ })
     return () => { active = false }
@@ -331,6 +322,10 @@ export default function JarvisHome({
         if (s.total_bookings_updated > 0) delar.push(`${s.total_bookings_updated} bokning${s.total_bookings_updated > 1 ? 'ar' : ''}`)
         if (delar.length === 0 && s.total_automations > 0) delar.push(`${s.total_automations} åtgärd${s.total_automations > 1 ? 'er' : ''}`)
         setProof(delar.length ? delar.join(', ').replace(/,([^,]*)$/, ' och$1') : null)
+        // Digestens dåtidsaggregat: samtalen bor i agent_runs, inte i
+        // aktivitetsloggen. Bokade besök kan inte attribueras ärligt ännu —
+        // 0 gör att raden aldrig påstår det (regeln bor i dygnsdigest.ts).
+        if (typeof s.total_calls === 'number') setSamtal({ antal: s.total_calls, bokade: 0 })
         // Bevakningen ur samma svar — watch-blocket bär bara antal och datum.
         if (d.watch) setBevakning(byggBevakning(d.watch))
       })
@@ -517,12 +512,29 @@ export default function JarvisHome({
     if (!faktureringskort) return
     document.getElementById(`beslut-${faktureringskort.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
+
+  // Dygnsdigesten: 24 h rullande fönster + grindar (lib/jarvis/dygnsdigest.ts).
+  // Färska rader från executeSend (doneRows) står alltid först — de är det
+  // man nyss beslutade och ska synas direkt.
+  const dygnsRader: DoneRow[] = [
+    ...doneRows,
+    ...byggDygnsdigest({ aktiviteter, samtal, nu: new Date() }).map(r => ({
+      key: r.key,
+      time: formatClock(r.tid),
+      agent: r.agentId,
+      text: r.text,
+      auto: r.auto,
+    })),
+  ]
   // Räknaren visar BESLUT, inte databasrader. Två förfallna fakturor från
   // samma agent samma dygn är ett beslut — "4" när tre av korten är samma
   // ärende läser som att man ligger efter mer än man gör.
   const grupper = groupApprovals(synliga)
   const beslut = grupper.length + reschedules.length
   const koTom = queueLoaded && beslut === 0
+
+  // Hälsningens bevisrad — rullande dygn, ärligt om något behövde ägaren.
+  const bevis = halsningsBevis(proof, beslut)
 
   // Observationer vars ärende redan står som kort ovanför filtreras bort —
   // samma sak på två ställen gör att man slutar läsa båda.
@@ -573,8 +585,9 @@ export default function JarvisHome({
           <p className="mt-1.5 text-sm text-slate-500 leading-normal">
             {new Date().toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
             {/* Tidsfönstret är ett RULLANDE dygn (team-activity, HOURS_BACK=24).
-                Texten säger det den mäter — inte "sedan igår kväll". */}
-            {proof && <> · Teamet har senaste dygnet hanterat <b className="font-semibold text-slate-800">{proof}</b>.</>}
+                halsningsBevis säger det den mäter — "Sedan igår" vore osant —
+                och är ärlig om huruvida något behövde ägaren. */}
+            {bevis && <> · <span className="text-slate-600">{bevis}</span></>}
           </p>
 
           {feedback && (
@@ -683,6 +696,57 @@ export default function JarvisHome({
             </div>
           )}
 
+          {/* ── Senaste dygnet — digesten DIREKT under besluten (etapp 6).
+              24 h rullande fönster, grindarna i lib/jarvis/dygnsdigest.ts.
+              Kollapsbar, default hopfälld — den är kvitto, inte kö. ── */}
+          {dygnsRader.length > 0 && (
+            <div className="mt-4 bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setDoneOpen(o => !o)}
+                className="w-full flex items-center gap-2 px-4 py-3 min-h-[44px] text-left"
+              >
+                <Check className="w-4 h-4 text-primary-700 shrink-0" />
+                <span className="text-sm font-semibold text-slate-700">
+                  Senaste dygnet · {dygnsRader.length} händelse{dygnsRader.length > 1 ? 'r' : ''}
+                </span>
+                <span className="text-xs text-slate-400">
+                  {dygnsRader.filter(r => r.auto).length} automatiskt · {dygnsRader.filter(r => !r.auto).length} godkända av dig
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 ml-auto shrink-0 transition-transform ${doneOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {doneOpen && (
+                <ul className="border-t border-slate-100 divide-y divide-slate-50">
+                  {dygnsRader.map(r => (
+                    <li key={r.key} className={`flex items-center gap-2.5 px-4 py-2.5 ${r.fresh ? 'bg-primary-50/50' : ''}`}>
+                      <span className="font-mono text-[11px] text-slate-400 w-10 shrink-0">{r.time}</span>
+                      {/* Agentfärgad prick — persona-färgen är den enda
+                          tillåtna icke-teal-accenten, och pricken pekar ut
+                          VEM utan att en avatarkolumn tar plats i listan. */}
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: AGENT_INFO[r.agent]?.dot || '#94a3b8' }}
+                        aria-hidden
+                      />
+                      <span className="flex-1 min-w-0 text-[13px] text-slate-600 truncate">{r.text}</span>
+                      {/* Bocken är reserverad för mänskliga beslut. Maskinens
+                          eget arbete får ett eget, neutralt märke. */}
+                      {r.auto ? (
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 bg-slate-100 rounded px-1.5 py-0.5 shrink-0">
+                          Automatiskt
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary-700 bg-primary-50 rounded-full px-2 py-0.5 shrink-0">
+                          <Check className="w-3 h-3" /> Godkänt av dig
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           {/* ── Teamet just nu — EFTER besluten, aldrig före (3b: besluten
               äger skärmen). Kompakt enkelrad så fort två beslut väntar. ── */}
           <TeamBevakning rader={bevakning} kompakt={beslut >= 2} />
@@ -714,48 +778,6 @@ export default function JarvisHome({
                 })}
               </div>
             </>
-          )}
-
-          {/* ── Klart idag ── */}
-          {doneRows.length > 0 && (
-            <div className="mt-4 bg-white border border-slate-200 rounded-xl overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setDoneOpen(o => !o)}
-                className="w-full flex items-center gap-2 px-4 py-3 min-h-[44px] text-left"
-              >
-                <Check className="w-4 h-4 text-primary-700 shrink-0" />
-                <span className="text-sm font-semibold text-slate-700">
-                  Klart idag · {doneRows.length} åtgärd{doneRows.length > 1 ? 'er' : ''}
-                </span>
-                <span className="text-xs text-slate-400">
-                  {doneRows.filter(r => r.auto).length} automatiskt · {doneRows.filter(r => !r.auto).length} godkända av dig
-                </span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 ml-auto shrink-0 transition-transform ${doneOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {doneOpen && (
-                <ul className="border-t border-slate-100 divide-y divide-slate-50">
-                  {doneRows.map(r => (
-                    <li key={r.key} className={`flex items-center gap-2.5 px-4 py-2.5 ${r.fresh ? 'bg-primary-50/50' : ''}`}>
-                      <span className="font-mono text-[11px] text-slate-400 w-10 shrink-0">{r.time}</span>
-                      <AgentAvatar agentKey={r.agent} size="sm" />
-                      <span className="flex-1 min-w-0 text-[13px] text-slate-600 truncate">{r.text}</span>
-                      {/* Bocken är reserverad för mänskliga beslut. Maskinens
-                          eget arbete får ett eget, neutralt märke. */}
-                      {r.auto ? (
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 bg-slate-100 rounded px-1.5 py-0.5 shrink-0">
-                          Automatiskt
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary-700 bg-primary-50 rounded-full px-2 py-0.5 shrink-0">
-                          <Check className="w-3 h-3" /> Godkänt av dig
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
           )}
 
         </div>
