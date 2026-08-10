@@ -144,3 +144,67 @@ export function buildPengarSummary(input: {
     kategorier,
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Trikotomin (Spår A2, 2026-08-10): Hämta nu / Möjligheter / Risk.
+//
+// Fem kategorier i en platt lista svarar på "var ligger pengarna?" men inte
+// på "vad gör jag först?". Grupperingen är samma sanning i tre handlings-
+// nivåer — intjänat, potentiellt, hotat — utan att en enda krona flyttas
+// mellan kategorierna. Hemskärmens Att hämta gör redan samma separation.
+// ─────────────────────────────────────────────────────────────────────────
+
+export type PengarGruppKey = 'hamta_nu' | 'mojligheter' | 'risk'
+
+export interface PengarGrupp {
+  key: PengarGruppKey
+  titel: string
+  beskrivning: string
+  summaKr: number
+  kategorier: PengarKategori[]
+}
+
+/**
+ * UTTÖMMANDE mappning — Record över kategorinycklarna gör att en ny
+ * kategori inte kompilerar förrän någon bestämt vilken handlingsnivå den
+ * tillhör. En ogrupperad kategori hade tyst försvunnit från sidan.
+ */
+export const GRUPP_AV_KATEGORI: Record<PengarKategori['key'], PengarGruppKey> = {
+  forfallet: 'hamta_nu',      // redan intjänat — förbi förfallodatum
+  ofakturerat: 'hamta_nu',    // utfört arbete som saknar faktura
+  offerter: 'mojligheter',    // skickat men obesvarat
+  ata: 'mojligheter',         // föreslagna tillägg, ännu inte avtal
+  marginalrisk: 'risk',       // prognos om överdrag — kan försvinna
+}
+
+const GRUPP_META: Record<PengarGruppKey, { titel: string; beskrivning: string }> = {
+  hamta_nu: {
+    titel: 'Att hämta nu',
+    beskrivning: 'Intjänat arbete och förfallna fakturor — konkreta handlingar.',
+  },
+  mojligheter: {
+    titel: 'Möjligheter',
+    beskrivning: 'Potentiellt värde — offerter och tillägg som ännu inte är avtal.',
+  },
+  risk: {
+    titel: 'Risk',
+    beskrivning: 'Pengar som kan försvinna om prognosen slår in.',
+  },
+}
+
+/** Ren omgruppering: summan per grupp är exakt kategorisumman, tomma
+    grupper utelämnas, ordningen är alltid hämta → möjligheter → risk. */
+export function grupperaPengar(summary: PengarSummary): PengarGrupp[] {
+  const ordning: PengarGruppKey[] = ['hamta_nu', 'mojligheter', 'risk']
+  return ordning
+    .map(key => {
+      const kategorier = summary.kategorier.filter(k => GRUPP_AV_KATEGORI[k.key] === key)
+      return {
+        key,
+        ...GRUPP_META[key],
+        summaKr: kategorier.reduce((s, k) => s + k.summaKr, 0),
+        kategorier,
+      }
+    })
+    .filter(g => g.kategorier.length > 0)
+}

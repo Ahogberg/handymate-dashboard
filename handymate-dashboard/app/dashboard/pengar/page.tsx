@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ArrowRight, Banknote, Loader2 } from 'lucide-react'
 import { formatKr } from '@/lib/moments/derive'
 import { Intaktsfynden } from '@/components/pengar/Intaktsfynden'
-import type { PengarSummary } from '@/lib/value/pengar-pa-bordet'
+import { grupperaPengar, type PengarSummary } from '@/lib/value/pengar-pa-bordet'
 
 /**
  * /dashboard/pengar — "Pengar på bordet".
@@ -78,33 +78,51 @@ export default function PengarPaBordetPage() {
                 </span>
               </div>
 
-              <div className="mt-4 flex flex-col gap-3">
-                {data.kategorier.map(k => (
-                  <Link
-                    key={k.key}
-                    href={k.href}
-                    className="flex items-center gap-4 bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 hover:border-primary-300 transition-colors"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline gap-2 flex-wrap">
-                        <span className="font-heading text-xl font-bold text-slate-900">
-                          {k.summaKr > 0 ? formatKr(k.summaKr) : `${k.antal} st`}
-                        </span>
-                        <span className="text-sm font-semibold text-slate-700">{k.titel}</span>
-                      </div>
-                      <p className="m-0 mt-0.5 text-[13px] text-slate-500 leading-relaxed">
-                        {k.beskrivning}
-                        {k.antalUtanBelopp ? (
-                          <span className="text-slate-400">
-                            {' '}+ {k.antalUtanBelopp} utan känt belopp
-                          </span>
-                        ) : null}
-                      </p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-slate-300 shrink-0" />
-                  </Link>
-                ))}
-              </div>
+              {/* Trikotomin (A2): samma fem kategorier, grupperade i tre
+                  handlingsnivåer — intjänat, potentiellt, hotat. Svarar på
+                  "vad gör jag först?", inte bara "var ligger pengarna?". */}
+              {grupperaPengar(data).map(grupp => (
+                <div key={grupp.key} className="mt-5">
+                  <div className="flex items-baseline gap-2 mb-2 px-1">
+                    <h2 className="m-0 text-[15px] font-semibold text-slate-900">{grupp.titel}</h2>
+                    {grupp.summaKr > 0 && (
+                      <span className={`font-heading text-sm font-bold ${
+                        grupp.key === 'risk' ? 'text-red-700' : grupp.key === 'mojligheter' ? 'text-slate-500' : 'text-primary-700'
+                      }`}>
+                        {formatKr(grupp.summaKr)}
+                      </span>
+                    )}
+                    <span className="text-xs text-slate-400 hidden sm:inline">{grupp.beskrivning}</span>
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    {grupp.kategorier.map(k => (
+                      <Link
+                        key={k.key}
+                        href={k.href}
+                        className="flex items-center gap-4 bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 hover:border-primary-300 transition-colors"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className="font-heading text-xl font-bold text-slate-900">
+                              {k.summaKr > 0 ? formatKr(k.summaKr) : `${k.antal} st`}
+                            </span>
+                            <span className="text-sm font-semibold text-slate-700">{k.titel}</span>
+                          </div>
+                          <p className="m-0 mt-0.5 text-[13px] text-slate-500 leading-relaxed">
+                            {k.beskrivning}
+                            {k.antalUtanBelopp ? (
+                              <span className="text-slate-400">
+                                {' '}+ {k.antalUtanBelopp} utan känt belopp
+                              </span>
+                            ) : null}
+                          </p>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-slate-300 shrink-0" />
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ))}
 
               <p className="mt-5 text-xs text-slate-400 text-center">
                 Summorna kommer från källrader i offerter, projekt och fakturor. De är potential tills de har granskats.

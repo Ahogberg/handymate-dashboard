@@ -107,3 +107,54 @@ test.describe('summan hittas aldrig på', () => {
     }
   })
 })
+
+test.describe('trikotomin — Hämta nu / Möjligheter / Risk (A2, 2026-08-10)', () => {
+  const { grupperaPengar, GRUPP_AV_KATEGORI } = require('../lib/value/pengar-pa-bordet')
+
+  const summering = buildPengarSummary({
+    staleQuotes: [{ total: 45000, sent_at: '2026-08-01' }],
+    missedRevenue: [fynd('ata_ej_fakturerad', 8900)],
+    overdueInvoices: [{ total: 7626, customer_pays: null, rot_rut_type: null }],
+    marginOverruns: [11400],
+    ataEstimates: [4250],
+  })
+
+  test('varje kategorinyckel har en handlingsnivå — uttömmande mappning', () => {
+    // En ny kategori utan grupp hade tyst försvunnit från sidan.
+    for (const key of ['offerter', 'ofakturerat', 'forfallet', 'marginalrisk', 'ata']) {
+      expect(GRUPP_AV_KATEGORI[key], `${key} saknar grupp`).toBeTruthy()
+    }
+  })
+
+  test('ordningen är alltid hämta → möjligheter → risk', () => {
+    const grupper = grupperaPengar(summering)
+    expect(grupper.map((g: any) => g.key)).toEqual(['hamta_nu', 'mojligheter', 'risk'])
+  })
+
+  test('ingen krona flyttas — gruppsummorna är exakt totalsumman', () => {
+    const grupper = grupperaPengar(summering)
+    const gruppTotal = grupper.reduce((s: number, g: any) => s + g.summaKr, 0)
+    expect(gruppTotal).toBe(summering.totalKr)
+    // Och varje gruppsumma är exakt sina kategoriers summa.
+    for (const g of grupper) {
+      expect(g.summaKr).toBe(g.kategorier.reduce((s: number, k: any) => s + k.summaKr, 0))
+    }
+  })
+
+  test('tomma grupper utelämnas — aldrig en tom rubrik', () => {
+    const baraOfferter = buildPengarSummary({
+      ...TOMT,
+      staleQuotes: [{ total: 45000, sent_at: '2026-08-01' }],
+    })
+    const grupper = grupperaPengar(baraOfferter)
+    expect(grupper.map((g: any) => g.key)).toEqual(['mojligheter'])
+  })
+
+  test('intjänat hamnar i hämta nu, prognoser i risk', () => {
+    const grupper = grupperaPengar(summering)
+    const hamta = grupper.find((g: any) => g.key === 'hamta_nu')
+    const risk = grupper.find((g: any) => g.key === 'risk')
+    expect(hamta.kategorier.map((k: any) => k.key).sort()).toEqual(['forfallet', 'ofakturerat'])
+    expect(risk.kategorier.map((k: any) => k.key)).toEqual(['marginalrisk'])
+  })
+})
