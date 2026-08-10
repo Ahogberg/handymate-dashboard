@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { getNextLeadNumber } from '@/lib/numbering'
+import { createLeadAndDeal } from '@/lib/leads/golden-path'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -80,6 +80,17 @@ export async function GET(
 
 /**
  * POST /api/lead-portal/[code] — Skicka nytt lead via portalen
+ *
+ * Increment A2 (2026-08-10): rutten hade tidigare egen kund/lead-skaplogik
+ * och nådde ALDRIG pipelinen — ingen deal, ingen ägar-SMS, svagare kund-
+ * dedup (exakt telefon-match, ingen normalisering). Konvergerad till
+ * Golden Path-helpern (lib/leads/golden-path.ts) så kund-dedup (normaliserad
+ * telefon → e-post), lead, deal i new_inquiry, ägar-SMS och automation-
+ * eventet sker via samma väg som /api/leads/intake och email-webhooken.
+ *
+ * category/estimated_value/lead_number saknar motsvarighet i Golden Path-
+ * kontraktet (helpern hålls medvetet tunn, se dess header-kommentar) och
+ * hanteras därför separat nedan.
  */
 export async function POST(
   request: NextRequest,
@@ -108,49 +119,12 @@ export async function POST(
       return NextResponse.json({ error: 'Namn och telefon krävs' }, { status: 400, headers: corsHeaders })
     }
 
-    const cleanPhone = phone.replace(/\s/g, '')
-
-    // Skapa eller hitta kund
-    let customerId: string | null = null
-    const { data: existing } = await supabase
-      .from('customer')
-      .select('customer_id')
+    // Hantverkarens telefon för ägar-SMS — Golden Path skickar notis om satt.
+    const { data: biz } = await supabase
+      .from('business_config')
+      .select('phone_number')
       .eq('business_id', source.business_id)
-      .eq('phone_number', cleanPhone)
-      .maybeSingle()
-
-    if (existing) {
-      customerId = existing.customer_id
-    } else {
-      const newId = 'cust_' + Math.random().toString(36).substr(2, 9)
-      const { data: newCustomer } = await supabase
-        .from('customer')
-        .insert({
-          customer_id: newId,
-          business_id: source.business_id,
-          name,
-          phone_number: cleanPhone,
-          email: email || null,
-          address_line: address || null,
-        })
-        .select('customer_id')
-        .single()
-      customerId = newCustomer?.customer_id || newId
-    }
-
-    // Hämta första pipeline-steget
-    const { data: firstStage } = await supabase
-      .from('pipeline_stages')
-      .select('key')
-      .eq('business_id', source.business_id)
-      .order('sort_order', { ascending: true })
-      .limit(1)
       .single()
-
-    // Skapa lead
-    const leadId = 'lead_' + Math.random().toString(36).substr(2, 9)
-    let leadNumber: string | undefined
-    try { leadNumber = await getNextLeadNumber(supabase, source.business_id) } catch { /* non-blocking */ }
 
     const noteParts: string[] = []
     if (service) noteParts.push(`Tjänst: ${service}`)
@@ -158,45 +132,74 @@ export async function POST(
     if (desired_date) noteParts.push(`Önskat datum: ${desired_date}`)
     if (address) noteParts.push(`Adress: ${address}`)
 
-    const { error: insertErr } = await supabase.from('leads').insert({
-      lead_id: leadId,
-      business_id: source.business_id,
-      customer_id: customerId,
-      name,
-      phone: cleanPhone,
-      email: email || null,
-      notes: noteParts.join('\n') || null,
-      source: source.name.toLowerCase(),
-      status: 'new',
-      pipeline_stage_key: firstStage?.key || 'new_lead',
-      score: 0,
-      estimated_value: estimated_value ? parseInt(estimated_value) : null,
-      lead_source_id: source.id,
-      source_ref: source_ref || null,
-      category: category || (source as any).default_category || null,
-      ...(leadNumber ? { lead_number: leadNumber } : {}),
-    })
+    // leads.source har en valid_source-CHECK (sql/v56_lead_pending_review.sql)
+    // med ett fast, litet värde-set — källans fria namn (source.name, t.ex.
+    // "Bygghemma") är INTE giltigt där. Samma mönster som email/inbound-
+    // webhooken: CHECK-värdet 'website_form' i kolumnen, källans riktiga namn
+    // bevaras via lead_source_id-FK:n (source.id) istället.
+    const gp = await createLeadAndDeal(
+      {
+        businessId: source.business_id,
+        businessPhoneNumber: biz?.phone_number || null,
+        name,
+        phone,
+        email: email || null,
+        message: noteParts.join('\n') || null,
+        source: 'website_form',
+        leadSourceId: source.id,
+        sourceRef: source_ref || null,
+      },
+      supabase,
+    )
 
-    if (insertErr) {
-      console.error('Portal lead insert error:', insertErr)
-      return NextResponse.json({ error: 'Kunde inte skapa lead' }, { status: 500, headers: corsHeaders })
+    // Ett tyst deal-fel får aldrig se ut som success — logga (svälj inte).
+    if (gp.dealError) {
+      console.error('[lead-portal] Lead skapad men deal misslyckades:', gp.dealError)
     }
 
-    // Fire automation event (non-blocking)
-    try {
-      const { fireEvent } = await import('@/lib/automation-engine')
-      await fireEvent(supabase, 'lead_received', source.business_id, {
-        source: source.name,
-        lead_id: leadId,
-        customer_id: customerId,
-        customer_name: name,
-      })
-    } catch { /* non-blocking */ }
+    // category/estimated_value ingår inte i Golden Path-kontraktet — sätts
+    // här i samma svep som vi läser lead_number till klientsvaret.
+    const leadExtra: Record<string, unknown> = {}
+    const resolvedCategory = category || (source as any).default_category || null
+    if (resolvedCategory) leadExtra.category = resolvedCategory
+    if (estimated_value) leadExtra.estimated_value = parseInt(estimated_value)
+
+    let leadNumber: string | null = null
+    if (Object.keys(leadExtra).length > 0) {
+      const { data: updated, error: extraErr } = await supabase
+        .from('leads')
+        .update(leadExtra)
+        .eq('lead_id', gp.leadId)
+        .select('lead_number')
+        .maybeSingle()
+      if (extraErr) console.error('[lead-portal] Kunde inte sätta category/estimated_value:', extraErr.message)
+      leadNumber = updated?.lead_number ?? null
+    } else {
+      const { data: leadRow } = await supabase
+        .from('leads')
+        .select('lead_number')
+        .eq('lead_id', gp.leadId)
+        .maybeSingle()
+      leadNumber = leadRow?.lead_number ?? null
+    }
+
+    // Adress på kunden — sätts bara om den saknas, så en dedupad kunds
+    // befintliga adress aldrig skrivs över.
+    if (address) {
+      const { data: custRow } = await supabase
+        .from('customer')
+        .select('address_line')
+        .eq('customer_id', gp.customerId)
+        .maybeSingle()
+      if (custRow && !custRow.address_line) {
+        await supabase.from('customer').update({ address_line: address }).eq('customer_id', gp.customerId)
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      lead_id: leadId,
-      lead_number: leadNumber || null,
+      lead_id: gp.leadId,
+      lead_number: leadNumber,
     }, { headers: corsHeaders })
   } catch (error: any) {
     console.error('Portal POST error:', error)

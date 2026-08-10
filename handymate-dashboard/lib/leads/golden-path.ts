@@ -21,6 +21,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getNextLeadNumber, getNextCaseNumber } from '@/lib/numbering'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { getStageBySlug } from '@/lib/pipeline'
+import { normalizeSwedishPhone } from '@/lib/phone-normalize'
+import { findCustomerDuplicates } from '@/lib/customer-dedupe'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -117,19 +119,30 @@ export async function createLeadAndDeal(
     createDealAndNotify = true,
   } = input
 
+  // Dubbelkunds-vakten (Epic A, 2026-08-10): 46elks levererar E.164
+  // (+4670…) medan formulär levererar 070… — den gamla exakta eq-matchen
+  // gjorde samma person till två kunder beroende på väg in, och en tom
+  // telefonsträng kunde matcha en godtycklig kund utan nummer. Nu samma
+  // normaliserade hierarki som kund-API:t: telefon starkast, sedan e-post.
+  // Namn+adress är för svagt för automatisk sammanslagning och lämnas
+  // medvetet utanför (granskningens princip: tvetydig identitet failar
+  // säkert som NY kund, aldrig tyst merge).
   const cleanPhone = phone.replace(/\s/g, '')
+  const leadPhone = normalizeSwedishPhone(phone) || cleanPhone
 
-  // ── 1. Customer (dedup på business_id + phone) ────────────────
+  // ── 1. Customer (dedup: normaliserad telefon → e-post) ────────
   let customerId: string
-  const { data: existing } = await supabase
-    .from('customer')
-    .select('customer_id')
-    .eq('business_id', businessId)
-    .eq('phone_number', cleanPhone)
-    .maybeSingle()
+  const dubbletter = await findCustomerDuplicates(supabase, {
+    business_id: businessId,
+    phone: phone || null,
+    email: email || null,
+  })
+  const match =
+    dubbletter.find(d => d.match_type === 'phone') ??
+    dubbletter.find(d => d.match_type === 'email')
 
-  if (existing) {
-    customerId = existing.customer_id
+  if (match) {
+    customerId = match.customer_id
   } else {
     const newId = 'cust_' + Math.random().toString(36).substr(2, 9)
     const { data: newCustomer } = await supabase
@@ -138,7 +151,7 @@ export async function createLeadAndDeal(
         customer_id: newId,
         business_id: businessId,
         name,
-        phone_number: cleanPhone,
+        phone_number: leadPhone || null,
         email: email || null,
       })
       .select('customer_id')

@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { createQuote as createCanonicalQuote } from '@/lib/quotes/create-quote'
+import { findCustomerDuplicates } from '@/lib/customer-dedupe'
 
 /**
  * Shared action execution for AI suggestion approval.
@@ -39,18 +40,36 @@ async function createBooking(supabase: SupabaseClient, suggestion: any, actionDa
     let customerId = suggestion.customer_id
 
     if (!customerId && actionData.customer_name) {
-      const { data: newCustomer } = await supabase
-        .from('customer')
-        .insert({
-          business_id: businessId,
-          name: actionData.customer_name,
-          phone_number: actionData.phone_number || suggestion.call_recording?.phone_number,
-          email: actionData.email || null,
-          address: actionData.address || null,
-        })
-        .select('customer_id')
-        .single()
-      customerId = newCustomer?.customer_id
+      const phoneNumberForCustomer = actionData.phone_number || suggestion.call_recording?.phone_number
+      const emailForCustomer = actionData.email || null
+
+      // Dubblettkontroll innan ny kund skapas — telefon slår e-post, namn+adress
+      // är för svagt för att auto-mergas (se lib/customer-dedupe.ts).
+      const duplicates = await findCustomerDuplicates(supabase, {
+        business_id: businessId,
+        phone: phoneNumberForCustomer || null,
+        email: emailForCustomer,
+      })
+      const starkasteTraff =
+        duplicates.find((d) => d.match_type === 'phone') ||
+        duplicates.find((d) => d.match_type === 'email')
+
+      if (starkasteTraff) {
+        customerId = starkasteTraff.customer_id
+      } else {
+        const { data: newCustomer } = await supabase
+          .from('customer')
+          .insert({
+            business_id: businessId,
+            name: actionData.customer_name,
+            phone_number: phoneNumberForCustomer,
+            email: emailForCustomer,
+            address: actionData.address || null,
+          })
+          .select('customer_id')
+          .single()
+        customerId = newCustomer?.customer_id
+      }
     }
 
     const durationMinutes = actionData.duration_minutes || 60

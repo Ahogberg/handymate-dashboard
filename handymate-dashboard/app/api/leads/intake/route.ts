@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
+import { checkRateLimitDb } from '@/lib/rate-limit-db'
+import { createHash } from 'crypto'
 
 /**
  * /api/leads/intake — Golden Path-route för lead-skapande.
@@ -17,12 +19,46 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
 }
 
+// Privacy: hash IP istället för att lagra raw — samma mönster som
+// app/api/widget/chat/route.ts. Salt + 16-char slice räcker för
+// rate-limit-buckets utan att kunna reverse:as tillbaka till IP.
+function hashIp(ip: string): string {
+  return createHash('sha256').update(ip + 'hm-leads-intake-salt').digest('hex').slice(0, 16)
+}
+
+function getClientIp(request: NextRequest): string {
+  const fwd = request.headers.get('x-forwarded-for')
+  if (fwd) return fwd.split(',')[0].trim()
+  return request.headers.get('x-real-ip') || 'unknown'
+}
+
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: corsHeaders })
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // IP-rate-limit (anti-abuse) — publikt API utan CAPTCHA. 10 anrop/timme
+    // per IP räcker för legitima formulär- och portalintegrationer men
+    // stoppar skript som spammar lead_sources-nycklar.
+    const ipHash = hashIp(getClientIp(request))
+    const rateCheck = await checkRateLimitDb(`leads-intake:ip:${ipHash}`, {
+      maxRequests: 10,
+      windowMs: 60 * 60 * 1000,
+    })
+    if (!rateCheck.allowed) {
+      return Response.json(
+        { error: 'För många förfrågningar. Försök igen om en stund.' },
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            'Retry-After': String(Math.max(1, Math.ceil((rateCheck.resetAt - Date.now()) / 1000))),
+          },
+        },
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const apiKey = searchParams.get('api_key') || request.headers.get('x-api-key')
     const portalCode = searchParams.get('portal_code')

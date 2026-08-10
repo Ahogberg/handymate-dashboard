@@ -4,6 +4,7 @@ import { checkRateLimitDb } from '@/lib/rate-limit-db'
 import { createHash } from 'crypto'
 import Anthropic from '@anthropic-ai/sdk'
 import { formatKnowledgeForPrompt, formatGuardrailsForPrompt } from '@/lib/widget-activation'
+import { createLeadAndDeal } from '@/lib/leads/golden-path'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     // är ifylld så blir den andra sektionen tom i prompten.
     const { data: config } = await supabase
       .from('business_config')
-      .select('business_id, business_name, display_name, service_area, widget_enabled, widget_max_estimate, widget_collect_contact, widget_give_estimates, widget_ask_budget, widget_bot_name, knowledge_base, widget_guardrails')
+      .select('business_id, business_name, display_name, phone_number, service_area, widget_enabled, widget_max_estimate, widget_collect_contact, widget_give_estimates, widget_ask_budget, widget_bot_name, knowledge_base, widget_guardrails')
       .eq('business_id', business_id)
       .single()
 
@@ -237,96 +238,61 @@ ${config.widget_collect_contact ? 'När du har fått kontaktuppgifter (minst nam
 
     if (hasName && hasContact && !conversation.lead_created) {
       try {
-        // Create customer if not exists
-        const phone = conversation.visitor_phone || visitor_info?.phone
-        const email = conversation.visitor_email || visitor_info?.email
+        const phone = conversation.visitor_phone || visitor_info?.phone || ''
+        const email = conversation.visitor_email || visitor_info?.email || null
         const name = conversation.visitor_name || visitor_info?.name
 
-        let customerId: string | null = null
+        // Kundens beskrivna behov = alla dennes egna meddelanden i chatten
+        // hittills, sammanslagna. Landar i lead.notes (fulltext) och
+        // deal.title (slice 80) via golden-path.
+        const customerNeed = updatedMessages
+          .filter(m => m.role === 'user')
+          .map(m => m.content)
+          .join(' ')
+          .trim() || null
 
-        // Check for existing customer
-        if (phone) {
-          const { data: existing } = await supabase
-            .from('customer')
-            .select('customer_id')
-            .eq('business_id', business_id)
-            .eq('phone_number', phone)
-            .single()
-          if (existing) customerId = existing.customer_id
+        // Golden Path (TD-72): konvergerad väg — samma helper som portal-
+        // formulär (/api/leads/intake) och email-forward-godkännande. Ger
+        // widget-leads kund-dedup (normaliserad telefon → e-post), lead-rad,
+        // deal i new_inquiry, ägar-SMS och automation-event via EN källa.
+        // source måste vara giltigt enligt valid_source-CHECK (sql/v56) —
+        // widgetens tidigare 'website_widget' fanns aldrig i den listan.
+        const gp = await createLeadAndDeal(
+          {
+            businessId: business_id,
+            businessPhoneNumber: config.phone_number || null,
+            name,
+            phone,
+            email,
+            message: customerNeed,
+            source: 'website_form',
+          },
+          supabase,
+        )
+
+        // Ett tyst deal-fel får aldrig se ut som success — logga det.
+        if (gp.dealError) {
+          console.error('[widget/chat] Lead skapad men deal misslyckades:', gp.dealError)
         }
 
-        if (!customerId && email) {
-          const { data: existing } = await supabase
-            .from('customer')
-            .select('customer_id')
-            .eq('business_id', business_id)
-            .eq('email', email)
-            .single()
-          if (existing) customerId = existing.customer_id
-        }
+        // Mark conversation as lead-created (blockerar omskapande vid
+        // efterföljande meddelanden i samma session)
+        await supabase.from('widget_conversation').update({
+          lead_created: true,
+          deal_id: gp.dealId,
+        }).eq('id', conversation.id)
 
-        if (!customerId) {
-          const { data: newCustomer } = await supabase
-            .from('customer')
-            .insert({
-              business_id,
-              name,
-              phone_number: phone || null,
-              email: email || null,
-            })
-            .select('customer_id')
-            .single()
-          customerId = newCustomer?.customer_id || null
-        }
-
-        // Create deal
-        if (customerId) {
-          const dealTitle = `Webbförfrågan: ${name}`
-          const { data: stages } = await supabase
-            .from('pipeline_stage')
-            .select('id')
-            .eq('business_id', business_id)
-            .order('sort_order', { ascending: true })
-            .limit(1)
-
-          const firstStageId = stages?.[0]?.id
-
-          if (firstStageId) {
-            const { data: deal } = await supabase
-              .from('deal')
-              .insert({
-                business_id,
-                title: dealTitle,
-                customer_id: customerId,
-                stage_id: firstStageId,
-                source: 'website_widget',
-                lead_source_platform: 'website_widget',
-                lead_temperature: 'warm',
-                first_response_at: new Date().toISOString(),
-                response_time_seconds: 0,
-              })
-              .select('id')
-              .single()
-
-            // Mark conversation as lead-created
-            await supabase.from('widget_conversation').update({
-              lead_created: true,
-              deal_id: deal?.id || null,
-            }).eq('id', conversation.id)
-
-            // Create notification
-            try {
-              await supabase.from('notification').insert({
-                business_id,
-                type: 'new_lead',
-                title: `Ny lead från hemsidan: ${name}`,
-                message: phone ? `Telefon: ${phone}` : `Email: ${email}`,
-                icon: '🌐',
-                link: deal?.id ? `/dashboard/pipeline` : null,
-              })
-            } catch { /* notification table may not exist */ }
-          }
-        }
+        // Create notification
+        try {
+          await supabase.from('notification').insert({
+            business_id,
+            type: 'new_lead',
+            title: `Ny lead från hemsidan: ${name}`,
+            message: phone ? `Telefon: ${phone}` : `Email: ${email}`,
+            icon: '🌐',
+            link: gp.dealId ? `/dashboard/pipeline` : null,
+          })
+        } catch { /* notification table may not exist */ }
       } catch { /* lead creation failed, non-critical */ }
     }
 

@@ -13,14 +13,24 @@ Andreas beslut: "bygg allt enligt rekommendationerna utom DO NOT BUILD-listan"
 - [ ] Därefter: human_followup_queue ur MANUAL_TABLES + tabellen kan tömmas/droppas (manuellt beslut)
 
 ## Epic A — Konvergens & intagshygien
-- [ ] `normalizeSwedishPhone` + e-postfallback i createLeadAndDeal (dubbelkunds-buggen: +4670 vs 070)
-- [ ] lead-portal (`app/api/lead-portal/[code]`) → golden path (skapar idag ingen deal)
-- [ ] widget-chat → golden path (TD-72: deal utan lead-rad)
-- [ ] Mattes `create_lead` (lib/matte/action-executor.ts:137) → golden path (TODO finns redan i koden)
-- [ ] `qualify_lead` (tool-router) → golden path
-- [ ] `/api/public/book/[slug]` → golden path (bokningskanalen osynlig i pipeline idag)
-- [ ] `approve-actions.createBooking` → findCustomerDuplicates (insertar idag kund helt utan dedup)
-- [ ] `checkRateLimitDb` på /api/leads/intake (CORS * utan rate-limit)
+- [x] A1 `normalizeSwedishPhone` + e-postfallback i createLeadAndDeal (Fable). Tom
+      telefonsträng kunde dessutom matcha godtycklig nummerlös kund — också täppt.
+- [x] A2 lead-portal → golden path (Sonnet). LATENT BUGG HITTAD: portalen skrev
+      källans VISNINGSNAMN i den CHECK-låsta source-kolumnen → trolig 500 på
+      portalinlämningar; nu 'website_form' + lead_source_id-FK (etablerat mönster).
+      Ägar-SMS skickades ALDRIG för portal-leads tidigare — fixat via delade vägen.
+      category/estimated_value/adress bevaras via icke-destruktiva tilläggsqueries.
+- [x] A3 widget-chat → golden path (Sonnet). TD-72 värre än beskrivet: ingen
+      lead-rad, inget event, ingen ägar-SMS, och 'website_widget' var aldrig
+      giltigt mot CHECK:en. lead_temperature/first_response_at sätts inte längre
+      vid AI-svar — medvetet öppet beslut om widget-AI ska räknas i speed-to-lead.
+- [x] A7 createBooking-dedup (Sonnet): findCustomerDuplicates telefon→e-post,
+      namn+adress auto-mergas aldrig.
+- [x] A8 rate-limit på /api/leads/intake (Sonnet): 10/IP/timme, hashad IP,
+      svensk 429 + Retry-After.
+- [ ] A4 Mattes `create_lead` (lib/matte/action-executor.ts:137) → golden path
+- [ ] A5 `qualify_lead` (tool-router) → golden path
+- [ ] A6 `/api/public/book/[slug]` → golden path
 - [ ] Designbeslut per källa: seedade auto-SMS:et på `lead_received` (requires_approval:false) — vilka källor ska trigga det?
 - [ ] SHOULD: kvalificeringsdjup — fyll job_type/urgency/score från Mattes SMS-tolkning vid intag
 
@@ -34,6 +44,13 @@ Andreas beslut: "bygg allt enligt rekommendationerna utom DO NOT BUILD-listan"
 ## Epic C — Ägd tillväxt (Hanna v2 + referral)
 - [ ] Spel 2 (recension) + spel 4 (Daniels offertjakt) enligt tasks/hanna-sales-engine-v2-spec.md
 - [ ] Spel 1 + `referral_customer_id` på leads/deals → attribution via attributionskärnan
+
+## Att verifiera i MCP-sessionen (upptäckt under bygget)
+- [ ] Finns kolumnen `customer.address` i prod? `lib/approve-actions.ts` createBooking
+      insertar `address` medan resten av kodbasen använder `address_line` — saknas
+      kolumnen failar kundskapandet vid bokningsgodkännande (befintligt beteende,
+      ej rört i A7). `SELECT column_name FROM information_schema.columns WHERE
+      table_name='customer' AND column_name IN ('address','address_line');`
 
 ## Parallellt — Google-synk-felsökningen (Christoffer)
 - [ ] Recon-rapport (Explore pågår) → rankad felsökningslista i tasks/
