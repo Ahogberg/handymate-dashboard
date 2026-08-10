@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 
 /**
  * GET /api/dashboard/team-activity
@@ -205,9 +206,87 @@ export async function GET(request: NextRequest) {
     active_agents: allActiveAgents,
   }
 
+  // ═══ WATCH-BLOCKET — "Teamet just nu" (Tur 4 etapp 3) ═══
+  //
+  // Enbart ANTAL och DATUM, aldrig belopp — blocket bor på en yta hela
+  // personalen ser, så ingen ny rollgrind behövs (permission-kontraktet
+  // orört). Kronorna bor i ägargrindade Att hämta.
+  //
+  // Inga embeds: FK:erna på booking/quotes är obekräftade i prod (lärdomen
+  // 2026-08-05) — kundnamnet till nästa bokning hämtas separat.
+  const nu = new Date().toISOString()
+  const [obetaldaRes, oppnaOffRes, settingsRes, cfgRes, nastaBokningRes] = await Promise.all([
+    supabase
+      .from('invoice')
+      .select('due_date', { count: 'exact' })
+      .eq('business_id', businessId)
+      .in('status', ['sent', 'overdue'])
+      .order('due_date', { ascending: true })
+      .limit(1),
+    supabase
+      .from('quotes')
+      .select('quote_id', { count: 'exact', head: true })
+      .eq('business_id', businessId)
+      .in('status', [...OPEN_QUOTE_STATUSES]),
+    supabase
+      .from('v3_automation_settings')
+      .select('quote_followup_days')
+      .eq('business_id', businessId)
+      .maybeSingle(),
+    supabase
+      .from('business_config')
+      .select('assigned_phone_number')
+      .eq('business_id', businessId)
+      .maybeSingle(),
+    supabase
+      .from('booking')
+      .select('scheduled_start, customer_id')
+      .eq('business_id', businessId)
+      .eq('status', 'confirmed')
+      .gte('scheduled_start', nu)
+      .order('scheduled_start', { ascending: true })
+      .limit(1),
+  ])
+
+  const nastaBokningRad = (nastaBokningRes.data || [])[0] || null
+  let nastaBokningKund: string | null = null
+  if (nastaBokningRad?.customer_id) {
+    const { data: kund } = await supabase
+      .from('customer')
+      .select('name')
+      .eq('business_id', businessId)
+      .eq('customer_id', nastaBokningRad.customer_id)
+      .maybeSingle()
+    nastaBokningKund = kund?.name || null
+  }
+
+  const watch = {
+    fakturor: {
+      bevakade: obetaldaRes.count ?? 0,
+      nastaForfall: (obetaldaRes.data || [])[0]?.due_date ?? null,
+    },
+    offerter: {
+      oppna: oppnaOffRes.count ?? 0,
+      followupDagar: settingsRes.data?.quote_followup_days ?? 5,
+    },
+    telefon: {
+      aktiv: Boolean(cfgRes.data?.assigned_phone_number),
+      samtal: lisaCalls.length,
+    },
+    nastaBokning: nastaBokningRad
+      ? { start: nastaBokningRad.scheduled_start, kund: nastaBokningKund }
+      : null,
+    // Statisk: generate-insights-cronen kör söndag 06:00 (vercel.json).
+    veckosammanfattning: true,
+    // Hanna får en källa när det finns en ärlig sådan — hellre ingen fråga
+    // än en påhittad.
+    hannaFragor: [] as string[],
+  }
+
   return NextResponse.json({
     agents: [matte, lisa, daniel, karin, lars, hanna],
     summary,
+    watch,
     since: sinceIso,
   })
 }

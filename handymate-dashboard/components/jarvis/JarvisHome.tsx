@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, FileText, Loader2, Mic, Phone, Undo2, User } from 'lucide-react'
 import { nyhetsAtgard, type NyhetsIkon } from '@/lib/jarvis/news-actions'
-import { byggNarvaro } from '@/lib/jarvis/team-presence'
-import { TeamPresenceBand } from '@/components/jarvis/TeamPresenceBand'
+import { byggBevakning, type BevakningsRad } from '@/lib/jarvis/bevakning'
+import { TeamBevakning } from '@/components/jarvis/TeamBevakning'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useJobbuddy } from '@/lib/JobbuddyContext'
@@ -200,6 +200,7 @@ export default function JarvisHome({
   const [snack, setSnack] = useState<{ approvalId: string; text: string } | null>(null)
   const [feedback, setFeedback] = useState<{ text: string; isError: boolean } | null>(null)
   const [proof, setProof] = useState<string | null>(null)
+  const [bevakning, setBevakning] = useState<BevakningsRad[]>([])
 
   // ═══ GRIND 1: HAR NÅGOT HÄNT SEDAN DU TITTADE SIST? ═══
   //
@@ -326,6 +327,8 @@ export default function JarvisHome({
         if (s.total_bookings_updated > 0) delar.push(`${s.total_bookings_updated} bokning${s.total_bookings_updated > 1 ? 'ar' : ''}`)
         if (delar.length === 0 && s.total_automations > 0) delar.push(`${s.total_automations} åtgärd${s.total_automations > 1 ? 'er' : ''}`)
         setProof(delar.length ? delar.join(', ').replace(/,([^,]*)$/, ' och$1') : null)
+        // Bevakningen ur samma svar — watch-blocket bär bara antal och datum.
+        if (d.watch) setBevakning(byggBevakning(d.watch))
       })
       .catch(() => { /* bandet är inte kritiskt */ })
     return () => { active = false }
@@ -529,14 +532,6 @@ export default function JarvisHome({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nyheter.map(o => o.id).join(',')])
 
-  // Närvarobandet: samma två källor som resten av sidan visar, omformade per
-  // agent. Observationerna först — de är vad agenten SÄGER — och Klart idag
-  // efter, som är vad hon GJORT. Ingen extra hämtning.
-  const narvaro = byggNarvaro([
-    ...observations.map(o => ({ agentId: o.agent_id, text: o.observation, vid: o.created_at })),
-    ...doneRows.map(r => ({ agentId: r.agent, text: r.text, vid: r.time })),
-  ])
-
   return (
     <div className="max-w-[1180px] mx-auto px-4 sm:px-8 pt-6 sm:pt-7 pb-9">
       <div className="grid lg:grid-cols-[1fr_320px] gap-6 lg:gap-7">
@@ -551,10 +546,6 @@ export default function JarvisHome({
                 Texten säger det den mäter — inte "sedan igår kväll". */}
             {proof && <> · Teamet har senaste dygnet hanterat <b className="font-semibold text-slate-800">{proof}</b>.</>}
           </p>
-
-          {/* Teamets ansikten före besluten. Härlett ur observationerna och
-              Klart idag — ingen egen hämtning, ingen påhittad aktivitet. */}
-          <TeamPresenceBand rader={narvaro} />
 
           {feedback && (
             <div className={`mt-4 px-3.5 py-2.5 border rounded-xl text-sm font-medium ${
@@ -660,6 +651,10 @@ export default function JarvisHome({
               )}
             </div>
           )}
+
+          {/* ── Teamet just nu — EFTER besluten, aldrig före (3b: besluten
+              äger skärmen). Kompakt enkelrad så fort två beslut väntar. ── */}
+          <TeamBevakning rader={bevakning} kompakt={beslut >= 2} />
 
           {/* ── Värt att veta ── */}
           {nyheter.length > 0 && (
