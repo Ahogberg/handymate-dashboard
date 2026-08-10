@@ -170,31 +170,62 @@ export async function PATCH(
             }),
           })
 
-          // Recensionsförfrågan med Google Reviews-länk (om aktiverad)
-          if (config?.review_request_enabled !== false && config?.google_review_url) {
-            const delayDays = config.review_request_delay_days || 3
-            const delayMs = delayDays * 24 * 60 * 60 * 1000
+          // Recensionsförfrågan med Google Reviews-länk (om aktiverad).
+          //
+          // Buggfix 2026-08-10: payloaden byggdes tidigare UTAN `to`/`message`
+          // — exekveringscaset (app/api/approvals/[id]/route.ts, case
+          // 'scheduled_review_request') läser just de fälten, så
+          // godkännandet failade tyst med "payload saknar to eller message"
+          // så fort hantverkaren klickade Godkänn. Kanonisk form nu, samma
+          // som cronens (app/api/cron/review-requests/route.ts).
+          if (config?.review_request_enabled !== false && config?.google_review_url && invoice.customer_id) {
+            // 180-dagarsspärr (review_request_sent_at) — samma spärr som
+            // cronen respekterar. Utan den kan denna faktura-triggade väg
+            // och cronen be samma kund om recension två gånger.
+            const { data: customerReview } = await supabase
+              .from('customer')
+              .select('review_request_sent_at')
+              .eq('customer_id', invoice.customer_id)
+              .eq('business_id', business.business_id)
+              .maybeSingle()
+            const reviewSentAt = customerReview?.review_request_sent_at as string | null | undefined
+            const askedRecently = !!reviewSentAt
+              && new Date(reviewSentAt) > new Date(Date.now() - 180 * 24 * 3600000)
 
-            // Schemalägg review-SMS — lagra i pending_approvals som scheduled task
-            const scheduledAt = new Date(Date.now() + delayMs).toISOString()
-            await supabase.from('pending_approvals').insert({
-              id: `review_${invoiceId}_${Date.now()}`,
-              business_id: business.business_id,
-              approval_type: 'scheduled_review_request',
-              title: `Skicka recensionsförfrågan till ${customerName || 'kund'}`,
-              description: `Schemalagd ${delayDays} dagar efter betalning`,
-              payload: {
-                customer_id: invoice.customer_id,
-                customer_phone: customerPhone,
-                customer_name: customerName,
-                google_review_url: config.google_review_url,
-                business_name: bizName,
-                invoice_id: invoiceId,
-              },
-              status: 'pending',
-              risk_level: 'low',
-              expires_at: scheduledAt,
-            })
+            if (!askedRecently) {
+              const delayDays = config.review_request_delay_days || 3
+              const delayMs = delayDays * 24 * 60 * 60 * 1000
+
+              // Schemalägg review-SMS — lagra i pending_approvals som scheduled task
+              const scheduledAt = new Date(Date.now() + delayMs).toISOString()
+              const { buildReviewRequestMessage } = await import('@/lib/notifications/review-request-message')
+              const message = buildReviewRequestMessage({
+                customerName,
+                businessName: bizName,
+                reviewUrl: config.google_review_url,
+              })
+              await supabase.from('pending_approvals').insert({
+                id: `review_${invoiceId}_${Date.now()}`,
+                business_id: business.business_id,
+                approval_type: 'scheduled_review_request',
+                title: `Skicka recensionsförfrågan till ${customerName || 'kund'}`,
+                description: `Schemalagd ${delayDays} dagar efter betalning`,
+                payload: {
+                  customer_id: invoice.customer_id,
+                  customer_phone: customerPhone,
+                  customer_name: customerName,
+                  google_review_url: config.google_review_url,
+                  business_name: bizName,
+                  invoice_id: invoiceId,
+                  to: customerPhone,
+                  message,
+                  agent_id: 'hanna',
+                },
+                status: 'pending',
+                risk_level: 'low',
+                expires_at: scheduledAt,
+              })
+            }
           }
         }
       } catch (err) {

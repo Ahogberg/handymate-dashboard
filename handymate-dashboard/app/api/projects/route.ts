@@ -701,11 +701,18 @@ export async function PUT(request: NextRequest) {
         console.error('[projects] job_completed agent trigger failed (non-blocking):', triggerErr)
       }
 
-      // Schemalägg Google-recension 24h efter projektslut
+      // Schemalägg Google-recension 24h efter projektslut.
+      //
+      // Buggfix 2026-08-10: payloaden byggdes tidigare UTAN `to`/`message`
+      // — exekveringscaset (app/api/approvals/[id]/route.ts, case
+      // 'scheduled_review_request') läser just de fälten, så godkännandet
+      // failade tyst med "payload saknar to eller message" så fort
+      // hantverkaren klickade Godkänn. Kanonisk form nu, samma som cronens
+      // (app/api/cron/review-requests/route.ts).
       try {
         const { data: customer } = await supabase
           .from('customer')
-          .select('name, phone_number')
+          .select('name, phone_number, review_request_sent_at')
           .eq('customer_id', project.customer_id)
           .single()
 
@@ -715,8 +722,22 @@ export async function PUT(request: NextRequest) {
           .eq('business_id', business.business_id)
           .single()
 
-        if (customer?.phone_number && config?.google_review_url) {
+        // 180-dagarsspärr (review_request_sent_at) — samma spärr som cronen
+        // respekterar. Utan den kan denna projekt-avslutade väg och cronen
+        // be samma kund om recension två gånger.
+        const reviewSentAt = customer?.review_request_sent_at as string | null | undefined
+        const askedRecently = !!reviewSentAt
+          && new Date(reviewSentAt) > new Date(Date.now() - 180 * 24 * 3600000)
+
+        if (customer?.phone_number && config?.google_review_url && !askedRecently) {
           const scheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h from now
+          const { buildReviewRequestMessage } = await import('@/lib/notifications/review-request-message')
+          const message = buildReviewRequestMessage({
+            customerName: customer.name,
+            projectName: project.name,
+            businessName: config.business_name,
+            reviewUrl: config.google_review_url,
+          })
           await supabase.from('pending_approvals').insert({
             business_id: business.business_id,
             approval_type: 'scheduled_review_request',
@@ -734,6 +755,9 @@ export async function PUT(request: NextRequest) {
               project_name: project.name,
               business_name: config.business_name,
               google_review_url: config.google_review_url,
+              to: customer.phone_number,
+              message,
+              agent_id: 'hanna',
             },
           })
         }

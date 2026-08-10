@@ -299,10 +299,11 @@ async function runDefaultAutomations(
 ) {
   const supabase = getServerSupabase()
 
-  // Hämta business-namn för SMS
+  // Hämta business-namn för SMS + recensionslänk (google_review_url/
+  // google_place_id) för review_request-caset nedan.
   const { data: config } = await supabase
     .from('business_config')
-    .select('business_name')
+    .select('business_name, google_review_url, google_place_id')
     .eq('business_id', businessId)
     .single()
 
@@ -349,47 +350,99 @@ async function runDefaultAutomations(
           project,
         })
       }
-      // Schemalägg recensionsförfrågan +3 dagar
-      await supabase.from('pending_approvals').insert({
-        id: 'appr_' + Math.random().toString(36).substring(2, 14),
-        business_id: businessId,
-        approval_type: 'review_request',
-        title: `Recensionsförfrågan — ${projectName}`,
-        description: 'Be kunden om recension nu när jobbet är betalt',
-        payload: {
-          project_id: project.project_id,
-          customer_id: project.customer_id,
-          customer_phone: customerPhone,
-          customer_name: project.customer?.name,
-          project_name: projectName,
-          scheduled_at: new Date(Date.now() + 3 * 24 * 3600000).toISOString(),
-        },
-        status: 'pending',
-        risk_level: 'low',
-        expires_at: new Date(Date.now() + 14 * 24 * 3600000).toISOString(),
-      })
+      // Schemalägg recensionsförfrågan +3 dagar.
+      //
+      // Buggfix 2026-08-10: payloaden byggdes tidigare UTAN `to`/`message` —
+      // exekveringscaset (app/api/approvals/[id]/route.ts, case
+      // 'review_request') läser just de fälten, så godkännandet failade
+      // tyst med "payload saknar to eller message" så fort hantverkaren
+      // klickade Godkänn. Kanonisk form nu, samma som cronens
+      // (app/api/cron/review-requests/route.ts).
+      //
+      // 180-dagarsspärr: project.customer hämtades med select('*') i
+      // advanceProjectStage ovan, så review_request_sent_at finns redan på
+      // objektet utan extra query. Utan spärren kan denna stage-triggade
+      // väg och cronen be samma kund om recension två gånger.
+      {
+        const reviewSentAt = project.customer?.review_request_sent_at as string | null | undefined
+        const askedRecently = !!reviewSentAt
+          && new Date(reviewSentAt) > new Date(Date.now() - 180 * 24 * 3600000)
+
+        const placeId = (config?.google_place_id || '').trim()
+        const reviewUrl = config?.google_review_url
+          || (placeId.startsWith('ChIJ')
+            ? `https://search.google.com/local/writereview?placeid=${placeId}`
+            : null)
+
+        if (customerPhone && reviewUrl && !askedRecently) {
+          const { buildReviewRequestMessage } = await import('@/lib/notifications/review-request-message')
+          const message = buildReviewRequestMessage({
+            customerName: project.customer?.name,
+            projectName,
+            businessName: companyName,
+            reviewUrl,
+          })
+          await supabase.from('pending_approvals').insert({
+            id: 'appr_' + Math.random().toString(36).substring(2, 14),
+            business_id: businessId,
+            approval_type: 'review_request',
+            title: `Recensionsförfrågan — ${projectName}`,
+            description: 'Be kunden om recension nu när jobbet är betalt',
+            payload: {
+              project_id: project.project_id,
+              customer_id: project.customer_id,
+              customer_phone: customerPhone,
+              customer_name: project.customer?.name,
+              project_name: projectName,
+              scheduled_at: new Date(Date.now() + 3 * 24 * 3600000).toISOString(),
+              to: customerPhone,
+              message,
+              agent_id: 'hanna',
+            },
+            status: 'pending',
+            risk_level: 'low',
+            expires_at: new Date(Date.now() + 14 * 24 * 3600000).toISOString(),
+          })
+        }
+      }
       break
 
     case SYSTEM_STAGES.REVIEW_RECEIVED:
-      // Schemalägg 1-årsuppföljning
-      await supabase.from('pending_approvals').insert({
-        id: 'appr_' + Math.random().toString(36).substring(2, 14),
-        business_id: businessId,
-        approval_type: 'yearly_followup',
-        title: `1-årsuppföljning — ${projectName}`,
-        description: 'Hör av dig till kunden ett år efter avslutat jobb',
-        payload: {
-          project_id: project.project_id,
-          customer_id: project.customer_id,
-          customer_phone: customerPhone,
-          customer_name: project.customer?.name,
-          project_name: projectName,
-          scheduled_at: new Date(Date.now() + 365 * 24 * 3600000).toISOString(),
-        },
-        status: 'pending',
-        risk_level: 'low',
-        expires_at: new Date(Date.now() + 400 * 24 * 3600000).toISOString(),
-      })
+      // Schemalägg 1-årsuppföljning.
+      // Buggfix 2026-08-10: samma to/message-saknad som review_request ovan
+      // — se kommentaren där för exekveringscaset som kräver dessa fält.
+      // Ingen 180-dagarsspärr här — det är en uppföljningsfråga, inte en
+      // recensionsförfrågan (review_request_sent_at), och den skjuts redan
+      // upp ett helt år.
+      if (customerPhone) {
+        const { buildYearlyFollowupMessage } = await import('@/lib/notifications/review-request-message')
+        const message = buildYearlyFollowupMessage({
+          customerName: project.customer?.name,
+          projectName,
+          businessName: companyName,
+        })
+        await supabase.from('pending_approvals').insert({
+          id: 'appr_' + Math.random().toString(36).substring(2, 14),
+          business_id: businessId,
+          approval_type: 'yearly_followup',
+          title: `1-årsuppföljning — ${projectName}`,
+          description: 'Hör av dig till kunden ett år efter avslutat jobb',
+          payload: {
+            project_id: project.project_id,
+            customer_id: project.customer_id,
+            customer_phone: customerPhone,
+            customer_name: project.customer?.name,
+            project_name: projectName,
+            scheduled_at: new Date(Date.now() + 365 * 24 * 3600000).toISOString(),
+            to: customerPhone,
+            message,
+            agent_id: 'hanna',
+          },
+          status: 'pending',
+          risk_level: 'low',
+          expires_at: new Date(Date.now() + 400 * 24 * 3600000).toISOString(),
+        })
+      }
       break
 
     // De övriga stages (MEETING_BOOKED, MILESTONE_REACHED, FINAL_INSPECTION,
