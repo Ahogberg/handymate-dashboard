@@ -17,6 +17,42 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Extern rapport 2026-08-10 — absorberat / avvisat / fanns redan
+
+En extern roadmap-rapport (ChatGPT med repo-tillgång) granskades 2026-08-10 mot detta
+dokument och nattens Tur 4-leverans. **Domen: riktningen bekräftar rådets analys, men
+~hälften av förslagen finns redan byggda och inget i den ändrar grindarna.** Mappningen
+dokumenteras här så nästa session ärver den i stället för att göra om analysen.
+
+| Rapportens förslag | Dom |
+|---|---|
+| 1 Value Layer | **Fanns till ~60 %**: attributionskärnan, weekly-value:s tre ärlighetsnivåer, Värdekvittot natt 1 (2026-08-10: `lib/value/vardekvitto.ts`, `GET /api/value/kvitto`). **Absorberat som Spår A1: Ägarrapporten** — se nedan. |
+| 2 Matte som interface | = Jarvis-first-BESLUTET (mockup levererad 2026-08-07, väntar). Ingen ny spec behövs. "Får nästan vad som helst gjort" avvisas — utvidgning sker per verktyg med bevis, spärrarna (max tre specialister, fail-closed toolgränser, kön för pengar) står. |
+| 3 Voice → Matte | Grunden finns (useAudioRecording, /api/matte/transcribe, hårdnad röstsäkerhet). Produktionsadaptern förblir ett medvetet senare beslut — voice→pengar är produktens högst riskade väg. |
+| 4 Offer-to-Reality · 5 Job Genome | = X2a–f + prisinlärningens gate. Redan spec:at, gated på X1-pilotbevis. Rapporten bekräftar sekvensen, ändrar inget. |
+| 6 Pengar på bordet 2.0 | Trikotomins hämta nu/möjligheter/risk byggdes 2026-08-10 på hemskärmen (Att hämta). **Absorberat som Spår A2**: samma gruppering på helsidan — liten insats, ogated. |
+| 7 Next Best Action | Kärnexemplen finns (fakturera_projekt-kortet, offertnudgar, cash-radar). Per-objekt-bredd = inkrementellt, efter pilot. |
+| 8 Automation receipts / veckorapport | Dygnsdigesten + hälsningsbeviset byggdes 2026-08-10. Ägarrapporten (A1) täcker rapportframingen. |
+| 9 Customer professionalism | Portal + automatiska meddelanden finns. Detta är landningssidecopy (handymate-landing), inte kod. |
+| 10 Promise Ledger | Står redan i AFTER EVIDENCE med gate. Rapportens "fånga löften ur samtal" = den breda AI-extraktion gaten uttryckligen förbjuder som start. Avvisat i den formen. |
+| 11 Supplier Intelligence | NOT NOW med gate (licensierat AP-flöde). Oförändrat. |
+| 13 Business Health | = AFTER EVIDENCE (rapportens egen brasklapp säger samma sak). |
+
+**Spår A-deltat (absorberat, ogated — byggbart efter/parallellt med kvällsgrindarna):**
+- **A1 Ägarrapporten**: värde-block på befintliga Månadsrapporten (INTE ny yta —
+  "Andra Economic Copilot-UI: aldrig" gäller). Fyra block, tre sanningsnivåer som aldrig
+  slås ihop: bekräftat (Värdekvittot) · uppskattat märkt (weekly-value-tid) · vilande
+  (Pengar på bordet) · kostnadsraden (verifieras mot billing-data, annars utelämnas).
+  Natt 1 = yta, inga utskick. Plan: `tasks/todo.md`.
+- **A2 Pengar på bordet 2.0**: gruppera helsidan i Hämta nu / Möjligheter / Risk —
+  samma kategorier ur `lib/value/pengar-pa-bordet.ts`, ny gruppering.
+- **A3**: värdebevis- och professionalismcopy till handymate-landing.
+
+**Ingen grind ändras.** Kvällsgrindarna (gyllene vägen, tvåtenantprovet, STOPP-provet,
+B8, migrationerna) förblir #1 — moat-klockan startar vid kund 1.
+
+---
+
 # Läge 2026-08-09 kväll (uppdatering)
 
 Sedan gårdagens lägesbild har följande levererats till prod — inget ändrar

@@ -1,3 +1,35 @@
+# NÄSTA NATTKÖRNING — A1 Ägarrapporten (planerad 2026-08-10, godkänd av Andreas)
+
+Bakgrund: extern ChatGPT-rapport mappad mot rådsroadmapen — addendum i
+`docs/council/ACTIVE_ROADMAP.md` ("Extern rapport 2026-08-10"). A1 är den enda
+punkten som är ny, byggbar nu och ogated. Plan-fil:
+`C:\Users\Gaming\.claude\plans\grymt-chatgpt-skrev-denna-peppy-bonbon.md`
+
+**Vad:** värde-block på befintliga `/dashboard/monthly-review` (Månadsrapporten) —
+INTE en ny sida (rådets NOT NOW: "Andra Economic Copilot-UI: aldrig").
+
+**Fyra block, tre sanningsnivåer som ALDRIG slås ihop:**
+- [ ] **Bekräftat** — Värdekvittot för månaden via `getVardekvitto()`
+      (`lib/value/vardekvitto.ts`): confirmed_kr + bevisrader (label, kr, agent, dagar).
+- [ ] **Uppskattat (märkt)** — admin-tid + samtal via `getWeeklyValue(supabase, bizId,
+      månadens dagar)`: time_hours, calls_captured, autonomous_count. Ordet
+      "uppskattad" står alltid utskrivet.
+- [ ] **Vilande** — Pengar på bordet-totalen (`/api/dashboard/pengar`, ägargrindad).
+- [ ] **Retention-raden** — "Handymate har kostat X kr — och bidragit till Y kr
+      bekräftat värde." Kostnadskällan VERIFIERAS mot billing_plan/B7-datan FÖRST
+      (lesson 2026-05-30: Stripe-speglande fält är cache). Saknas säker källa →
+      ingen rad, aldrig en gissning.
+- [ ] Ny ren `lib/value/agarrapport.ts` (sammanställaren) + `tests/agarrapport.spec.ts`
+      med ärlighetsregler i värdekvittots stil (uppskattat når aldrig bekräftat;
+      kostnad/värde separata; tom månad = ärlig nolla; saknad kostnadskälla ⇒ ingen rad).
+- [ ] Ev. `GET /api/value/agarrapport` — ägargrindad, in i permission-kontraktets karta.
+
+**Ingår INTE natt 1:** mailutskick (natt 2 — Vercel Hobby max daglig cron, månadsvis OK),
+veckovariant, PDF. Verifiering per nattkörningsprotokollet: tsc → build → specs →
+commit + push; manuell koll som ägare OCH anställd (ingen pengaläcka).
+
+---
+
 # Tur 4 — Innehållskontraktet fullt ut på /dashboard/hem (nattkörning 2026-08-10)
 
 Plan godkänd av Andreas. Byggreferens: mockupen "Innehållskontrakt" (Tur 2–4).
