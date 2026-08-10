@@ -1037,7 +1037,14 @@ async function executeApprovalPayload(
           timeAttestationBusinessUserId = attestedBusinessUser?.id ?? null
         }
 
-        // Create time_entry
+        // Create time_entry. approval_status sätts explicit till 'approved'
+        // — hantverkaren klickade just Godkänn på DET HÄR kortet, så raden
+        // ska inte falla på DB-defaulten 'pending' och landa i "Att
+        // attestera" igen (samma bugg och samma fix som app/api/checkin/
+        // approve/route.ts redan gör, och som blockerade BillableView.tsx
+        // från att räkna dessa timmar som fakturerbara). Funktionen har
+        // ingen currentUser i scope — businessId som approved_by speglar
+        // checkin/approve-mönstret.
         const entryId = 'te_' + Math.random().toString(36).substr(2, 9)
         await supabaseTime.from('time_entry').insert({
           time_entry_id: entryId,
@@ -1048,6 +1055,9 @@ async function executeApprovalPayload(
           duration_minutes: minutes,
           work_date: plTime.checked_in_at?.split('T')[0] || new Date().toISOString().split('T')[0],
           is_billable: true,
+          approval_status: 'approved',
+          approved_by: businessId,
+          approved_at: new Date().toISOString(),
         })
 
         return { action: 'time_attestation', time_entry_id: entryId, minutes }
@@ -2117,6 +2127,12 @@ async function executeApprovalPayload(
         // fältet: null, exakt tidigare beteende (ingen gissning).
         const assignedUserIdTe = resolveTimeEntryBusinessUserId(plTe)
 
+        // approval_status sätts explicit till 'approved' — samma bugg och
+        // samma fix som 'time_attestation'-caset ovan (och som
+        // checkin/approve/route.ts redan dokumenterar): utan detta faller
+        // raden på DB-defaulten 'pending', hamnar i "Att attestera" igen
+        // och räknas inte som fakturerbar i BillableView.tsx trots att
+        // hantverkaren just godkänt kortet.
         const supabaseTe = getServerSupabase()
         const entryIdTe = 'te_' + Math.random().toString(36).substr(2, 9)
         const { error: insertTeErr } = await supabaseTe.from('time_entry').insert({
@@ -2130,6 +2146,9 @@ async function executeApprovalPayload(
             ? `Tidrapport-förslag · ${plTe.project_name}`
             : 'Tidrapport-förslag',
           is_billable: true,
+          approval_status: 'approved',
+          approved_by: businessId,
+          approved_at: new Date().toISOString(),
         })
 
         if (insertTeErr) {

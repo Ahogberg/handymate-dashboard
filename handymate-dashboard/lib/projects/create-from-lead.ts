@@ -4,6 +4,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 
 interface CreateResult {
   success: boolean
@@ -108,6 +109,15 @@ export async function createProjectFromLead(
     if (insertError || !project) {
       return { success: false, error: insertError?.message || 'Kunde inte skapa projekt' }
     }
+
+    // Egenkontroll-agenten (etapp 1d, tasks/easoft-gap-plan.md). Fire-and-
+    // forget — föreslår en branschchecklista i godkännande-kön om
+    // projektet saknar checklista sedan tidigare. suggestChecklistForProject
+    // är själv fail-safe (kastar aldrig), .catch() är bara ett extra
+    // skyddsnät (samma mönster som app/api/projects/route.ts).
+    suggestChecklistForProject({ businessId, projectId: project.project_id }).catch(err => {
+      console.error('[create-from-lead] suggestChecklistForProject error (non-blocking):', err)
+    })
 
     // 6. Skapa milestones från offertens arbetsrader (om > 1 rad)
     if (quote?.items && Array.isArray(quote.items)) {

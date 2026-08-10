@@ -14,6 +14,7 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { createNotification } from '@/lib/notifications'
+import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 
 // ── Event Types ───────────────────────────────────────────────
 
@@ -215,6 +216,12 @@ async function onQuoteAccepted(businessId: string, quoteId: string): Promise<voi
     console.error('[AI ProjectManager] Failed to create project:', projectError)
     return
   }
+
+  // Egenkontroll-agenten (etapp 1d, tasks/easoft-gap-plan.md). Fire-and-
+  // forget, fail-safe — samma mönster som app/api/projects/route.ts.
+  suggestChecklistForProject({ businessId, projectId: project.project_id }).catch(err => {
+    console.error('[project-ai-engine] suggestChecklistForProject error (non-blocking):', err)
+  })
 
   // Create milestones from labor items
   const laborItems = items.filter((i) => i.type === 'labor')

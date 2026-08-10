@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 
 /**
  * Default project templates for Swedish construction trades
@@ -143,6 +144,12 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (projError) throw projError
+
+    // Egenkontroll-agenten (etapp 1d, tasks/easoft-gap-plan.md). Fire-and-
+    // forget, fail-safe — samma mönster som app/api/projects/route.ts.
+    suggestChecklistForProject({ businessId: business.business_id, projectId: project.project_id }).catch(err => {
+      console.error('[project-templates] suggestChecklistForProject error (non-blocking):', err)
+    })
 
     // Create milestones
     const milestones = template.milestones.map((m, i) => {

@@ -19,6 +19,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 
 interface MaybeCreateResult {
   created: boolean
@@ -123,6 +124,13 @@ export async function maybeCreateProjectFromBooking(
     } catch {
       /* non-blocking */
     }
+
+    // Egenkontroll-agenten (etapp 1d, tasks/easoft-gap-plan.md). Bara
+    // denna gren — lead-grenen ovan går via createProjectFromLead som
+    // redan hänger på hooken själv. Fire-and-forget, fail-safe.
+    suggestChecklistForProject({ businessId, projectId: project.project_id }).catch(err => {
+      console.error('[maybe-create-from-booking] suggestChecklistForProject error (non-blocking):', err)
+    })
   }
 
   // Länka bokningen till projektet (booking.project_id finns sedan v51).
