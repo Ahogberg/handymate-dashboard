@@ -25,7 +25,15 @@
 export const MODERN_DOCUMENT_CSS = `
 .quote-document { font-family: 'DM Sans', system-ui, sans-serif; color: #0F172A; line-height: 1.5; }
 .quote-document * { margin: 0; padding: 0; box-sizing: border-box; }
-.quote-document .page { width: 210mm; min-height: 297mm; padding: 22mm 20mm; margin: 0 auto; background: #fff; box-shadow: 0 16px 40px rgba(15,23,42,0.10); display: flex; flex-direction: column; }
+.quote-document .page { width: 210mm; min-height: 297mm; padding: 22mm 20mm; margin: 0 auto; background: #fff; box-shadow: 0 16px 40px rgba(15,23,42,0.10); display: flex; flex-direction: column; overflow-wrap: anywhere; }
+/* ÖVERLEVNADSREGELN (2026-08-10, Andreas fynd): sidan är fast 210 mm och
+   ingenting fick bryta ord — en enda obruten sträng (långt produktnamn,
+   filnamn, URL) tryckte tabellen förbi högerkanten, och både förhands-
+   visningen och PDF:en (samma markup) klipptes på höger sida.
+   overflow-wrap ÄRVS, så regeln på .page täcker allt innehåll, även
+   framtida sektioner. Bilder får aldrig vara bredare än sin yta.
+   Mäts på riktigt i tests/quote-document-width.spec.ts. */
+.quote-document img { max-width: 100%; }
 .quote-document .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
 .quote-document .brand { display: flex; align-items: center; gap: 12px; }
 .quote-document .brand-mark { width: 44px; height: 44px; border-radius: 10px; background: var(--qd-accent); color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; overflow: hidden; }
