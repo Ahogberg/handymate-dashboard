@@ -59,7 +59,7 @@ export async function registerCalendarWatch(
       .eq('is_active', true)
 
     // Skapa ny watch
-    await supabase.from('calendar_watches').insert({
+    const { error: insertError } = await supabase.from('calendar_watches').insert({
       business_id: businessId,
       calendar_connection_id: connectionId,
       channel_id: channelId,
@@ -67,6 +67,11 @@ export async function registerCalendarWatch(
       expires_at: expirationTime.toISOString(),
       is_active: true,
     })
+
+    if (insertError) {
+      console.error(`[Calendar Watch] Insert failed for ${businessId}:`, insertError.message)
+      return { success: false, error: insertError.message }
+    }
 
     console.log(`[Calendar Watch] Registered: ${channelId} for ${businessId}, expires ${expirationTime.toISOString()}`)
 

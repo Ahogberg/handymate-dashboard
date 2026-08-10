@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       if (currentUser) {
         const { data: connection } = await supabase
           .from('calendar_connection')
-          .select('access_token, refresh_token, token_expires_at, calendar_id, sync_enabled')
+          .select('id, access_token, refresh_token, token_expires_at, calendar_id, sync_enabled')
           .eq('business_user_id', currentUser.id)
           .eq('provider', 'google')
           .single()

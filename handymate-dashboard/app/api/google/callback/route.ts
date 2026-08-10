@@ -83,19 +83,37 @@ export async function GET(request: NextRequest) {
       account_email: tokens.email,
       calendar_id: primaryCalendarId,
       access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
       token_expires_at: new Date(tokens.expiry_date).toISOString(),
     }
 
+    // Google skickar inte alltid ett nytt refresh_token vid re-consent (bara
+    // vid FÖRSTA godkännandet, eller om användaren återkallat åtkomsten i sitt
+    // Google-konto). Skriver vi över ett befintligt refresh_token med undefined
+    // blir kopplingen obrukbar — nästa ensureValidToken-refresh failar tyst.
+    const hasNewRefreshToken = !!tokens.refresh_token
+    const refreshTokenField = hasNewRefreshToken ? { refresh_token: tokens.refresh_token } : {}
+
     if (existing) {
+      if (!hasNewRefreshToken) {
+        console.warn('[google/callback] Inget nytt refresh_token från Google vid re-consent — behåller befintligt värde', {
+          connectionId: existing.id,
+        })
+      }
+
       // Endast kalenderscope begärs — Gmail kräver dyr säkerhetsaudit
       const { error: updateErr } = await supabase
         .from('calendar_connection')
-        .update({ ...coreFields, gmail_scope_granted: false, gmail_send_scope_granted: false })
+        .update({ ...coreFields, ...refreshTokenField, gmail_scope_granted: false, gmail_send_scope_granted: false })
         .eq('id', existing.id)
 
       if (updateErr) return errorRedirect('Kunde inte uppdatera anslutningen: ' + updateErr.message)
     } else {
+      if (!hasNewRefreshToken) {
+        console.warn('[google/callback] Ny koppling saknar refresh_token — kan inte förnyas automatiskt vid utgång', {
+          businessId: state.business_id,
+        })
+      }
+
       const id = `gcal_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
       const { error: insertErr } = await supabase
         .from('calendar_connection')
@@ -105,6 +123,7 @@ export async function GET(request: NextRequest) {
           business_user_id: state.user_id,
           provider: 'google',
           ...coreFields,
+          ...refreshTokenField,
           gmail_scope_granted: false,
           gmail_send_scope_granted: false,
         })

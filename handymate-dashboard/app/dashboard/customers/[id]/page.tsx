@@ -48,6 +48,7 @@ import CustomerTimeline from '@/components/CustomerTimeline'
 import { CopyId } from '@/components/CopyId'
 import { normalizeSwedishPhone, formatSwedishPhone } from '@/lib/phone-normalize'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
+import { formatSEK } from '@/lib/format-price'
 
 interface Customer {
   customer_id: string
@@ -224,6 +225,7 @@ export default function CustomerDetailPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [deals, setDeals] = useState<Deal[]>([])
   const [serviceAgreements, setServiceAgreements] = useState<ServiceAgreement[]>([])
+  const [referrals, setReferrals] = useState<{ leadsCount: number; wonDealsCount: number; wonValueSum: number } | null>(null)
 
   // Edit mode
   const [isEditing, setIsEditing] = useState(false)
@@ -400,6 +402,19 @@ export default function CustomerDetailPage() {
       }
     } catch {
       // Tasks table may not exist yet
+    }
+
+    // Fetch referral attribution (nice-to-have — fail-soft till null döljer kortet)
+    try {
+      const refRes = await fetch(`/api/customers/${customerId}/referrals`)
+      if (refRes.ok) {
+        const refData = await refRes.json()
+        setReferrals(refData)
+      } else {
+        setReferrals(null)
+      }
+    } catch {
+      setReferrals(null)
     }
 
     await fetchServiceAgreements()
@@ -775,6 +790,23 @@ export default function CustomerDetailPage() {
                   {customer.last_job_date && (
                     <p className="text-xs text-gray-500">
                       Senaste jobb: {new Date(customer.last_job_date).toLocaleDateString('sv-SE')}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Rekommendationer */}
+            {referrals !== null && referrals.leadsCount >= 1 && (
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Rekommendationer</h2>
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-900">
+                    {referrals.leadsCount} {referrals.leadsCount === 1 ? 'förfrågan' : 'förfrågningar'} via rekommendation
+                  </p>
+                  {referrals.wonDealsCount >= 1 && (
+                    <p className="text-xs text-gray-500">
+                      {referrals.wonDealsCount} vunna jobb · {formatSEK(referrals.wonValueSum)}
                     </p>
                   )}
                 </div>

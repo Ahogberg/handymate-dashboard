@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
     try {
       // Ensure valid token
       const tokenResult = await ensureValidToken({
+        id: conn.id,
         access_token: conn.access_token,
         refresh_token: conn.refresh_token,
         token_expires_at: conn.token_expires_at,

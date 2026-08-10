@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     let userId: string | null = null
 
     // Try to get business_users entry
-    const currentUser = await getCurrentUser(request)
+    const currentUser = await getCurrentUser(request, business.business_id)
     if (currentUser) {
       userId = currentUser.id
     } else {

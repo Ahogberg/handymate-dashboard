@@ -1,4 +1,5 @@
 import { google, calendar_v3 } from 'googleapis'
+import { getServerSupabase } from './supabase'
 
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar.readonly',
@@ -264,6 +265,7 @@ export async function deleteGoogleEvent(
  * Returns the current or refreshed access token.
  */
 export async function ensureValidToken(connection: {
+  id: string
   access_token: string
   refresh_token: string
   token_expires_at: string | null
@@ -276,7 +278,26 @@ export async function ensureValidToken(connection: {
   if (Date.now() > expiresAt - 5 * 60 * 1000) {
     try {
       return await refreshGoogleToken(connection.refresh_token)
-    } catch {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown token refresh error'
+      console.error('[ensureValidToken] Token refresh failed', {
+        connectionId: connection.id,
+        error: message,
+      })
+
+      try {
+        const supabase = getServerSupabase()
+        await supabase
+          .from('calendar_connection')
+          .update({ sync_error: message })
+          .eq('id', connection.id)
+      } catch (persistError: unknown) {
+        console.error('[ensureValidToken] Failed to persist sync_error', {
+          connectionId: connection.id,
+          error: persistError instanceof Error ? persistError.message : persistError,
+        })
+      }
+
       return null
     }
   }

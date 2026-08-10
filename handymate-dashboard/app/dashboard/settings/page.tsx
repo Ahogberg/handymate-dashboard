@@ -407,6 +407,7 @@ export default function SettingsPage() {
   const [googleReviewUrl, setGoogleReviewUrl] = useState('')
   const [reviewRequestEnabled, setReviewRequestEnabled] = useState(true)
   const [reviewRequestDelayDays, setReviewRequestDelayDays] = useState(3)
+  const [referralAskEnabled, setReferralAskEnabled] = useState(false)
   const [reviewStats, setReviewStats] = useState({ sent: 0, clicked: 0 })
   const [quoteSignedEmailEnabled, setQuoteSignedEmailEnabled] = useState(true)
   const [savingReview, setSavingReview] = useState(false)
@@ -563,6 +564,7 @@ export default function SettingsPage() {
       setGoogleReviewUrl(data.google_review_url || '')
       setReviewRequestEnabled(data.review_request_enabled ?? true)
       setReviewRequestDelayDays(data.review_request_delay_days ?? 3)
+      setReferralAskEnabled(data.referral_ask_enabled ?? false)
 
       // Fetch quote signed email toggle from v3_automation_settings
       try {
@@ -1113,6 +1115,7 @@ export default function SettingsPage() {
           google_review_url: googleReviewUrl || null,
           review_request_enabled: reviewRequestEnabled,
           review_request_delay_days: reviewRequestDelayDays,
+          referral_ask_enabled: referralAskEnabled,
         })
         .eq('business_id', business.business_id)
       if (error) throw error
@@ -3245,6 +3248,19 @@ export default function SettingsPage() {
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${reviewRequestEnabled ? 'bg-primary-800' : 'bg-gray-300'}`}
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${reviewRequestEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Fråga om rekommendation</p>
+                    <p className="text-xs text-gray-400">Skicka med kundens personliga rekommendationslänk i samma sms, så hen enkelt kan tipsa vänner och grannar.</p>
+                  </div>
+                  <button
+                    onClick={() => setReferralAskEnabled(!referralAskEnabled)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${referralAskEnabled ? 'bg-primary-800' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${referralAskEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
 

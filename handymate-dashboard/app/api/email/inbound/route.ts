@@ -28,6 +28,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { verifyPostmarkBasicAuth } from '@/lib/email/postmark-signature'
 import { isLikelyLead, parseLeadFromEmail, type EmailInput } from '@/lib/gmail-lead-detection'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
+import { saveInboundAttachments, type PostmarkAttachment } from '@/lib/email/postmark-attachments'
 
 interface PostmarkInboundPayload {
   From?: string
@@ -46,6 +47,9 @@ interface PostmarkInboundPayload {
       det Postmark rekommenderar för routning. Se Postmarks inbound-docs. */
   OriginalRecipient?: string
   Tag?: string
+  /** Bilagor, base64 direkt i payloaden. Kräver att "Include raw email
+      content" / attachments är påslaget i Postmarks inbound-serverkonfig. */
+  Attachments?: PostmarkAttachment[]
 }
 
 /**
@@ -133,6 +137,39 @@ export async function POST(request: NextRequest) {
     return Response.json({ skipped: true, reason: 'unknown_recipient' })
   }
 
+  // ── 2.6 Live-kvitto (B5): markera senaste routningsträffen ────────
+  // Best-effort — tabellen kan sakna kolumnen om v109 inte körts än.
+  // Gäller både lead-grenen och bekräftelsemail-grenen nedan.
+  if (recipientAddress) {
+    try {
+      const { error } = await supabase
+        .from('email_inbound_route')
+        .update({ last_received_at: new Date().toISOString() })
+        .eq('address', recipientAddress)
+      if (error) console.warn('[email-inbound] kunde inte skriva last_received_at:', error)
+    } catch (err) {
+      console.warn('[email-inbound] kunde inte skriva last_received_at:', err)
+    }
+  }
+
+  // ── 2.7 Gmail-vidarebefordran-bekräftelse — auto-fångst (B5) ──────
+  // Kunden vidarebefordrar sin info@ hit; Gmail skickar ETT bekräftelse-
+  // mail TILL den nya adressen som måste besökas för att aktivera
+  // vidarebefordran. Fångas HÄR, före Stage 1, så det aldrig riskerar att
+  // klassas som spam eller bli en lead. Bara länkar till mail.google.com
+  // hämtas — ett förfalskat From-fält är ofarligt eftersom GET:en ändå
+  // bara går mot Googles egen domän, aldrig mot payloadens innehåll i
+  // övrigt.
+  if (/forwarding-noreply@google\.com/i.test(payload.From || '')) {
+    const confirmed = await tryConfirmGmailForwarding(payload)
+    console.log('[email-inbound] Gmail-vidarebefordran-bekräftelse', {
+      businessId,
+      recipientAddress,
+      confirmed,
+    })
+    return Response.json({ handled: 'gmail_forwarding_confirmation', success: confirmed })
+  }
+
   const emailInput: EmailInput = {
     subject: payload.Subject || '(utan ämne)',
     from: payload.FromName ? `${payload.FromName} <${payload.From || ''}>` : (payload.From || 'unknown'),
@@ -202,6 +239,20 @@ export async function POST(request: NextRequest) {
     supabase,
   )
 
+  // ── 6.5 Bilagor → customer_document (B4) ──────────────────────
+  // Leaden är redan skapad — en trasig bilaga får aldrig påverka svaret.
+  try {
+    await saveInboundAttachments(
+      payload.Attachments,
+      businessId,
+      result.leadId,
+      result.customerId,
+      payload.MessageID || null,
+    )
+  } catch (err) {
+    console.error('[email-inbound] Bilagehantering misslyckades (ej fatalt):', err)
+  }
+
   // ── 7. pending_approvals för granska-UI ──────────────────────
   const previewLine = parsed.description
     ? parsed.description.slice(0, 140)
@@ -246,6 +297,41 @@ export async function POST(request: NextRequest) {
     lead_id: result.leadId,
     status: 'pending_review',
   })
+}
+
+/**
+ * Försöker auto-bekräfta Gmails vidarebefordringsmail: hittar en länk till
+ * mail.google.com i mailkroppen och gör ett server-side GET mot den. Ingen
+ * retry, kort timeout — misslyckas den, loggas det bara, mailet studsar
+ * inte och skapar ingen lead.
+ */
+async function tryConfirmGmailForwarding(payload: PostmarkInboundPayload): Promise<boolean> {
+  const body = payload.HtmlBody || payload.TextBody || ''
+  const urlMatches = body.match(/https?:\/\/[^\s"'<>]+/g)
+  if (!urlMatches) return false
+
+  for (const raw of urlMatches) {
+    let url: URL
+    try {
+      url = new URL(raw.replace(/[)\].,]+$/, ''))
+    } catch {
+      continue
+    }
+    if (url.hostname !== 'mail.google.com') continue
+
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 8000)
+      const res = await fetch(url.toString(), { method: 'GET', signal: controller.signal })
+      clearTimeout(timeout)
+      return res.ok
+    } catch (err) {
+      console.warn('[email-inbound] Kunde inte hämta Gmail-bekräftelselänken:', err)
+      return false
+    }
+  }
+
+  return false
 }
 
 function stripHtml(html: string): string {

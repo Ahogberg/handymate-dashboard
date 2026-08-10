@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
       .from('calendar_connection')
       .select('*')
       .eq('sync_enabled', true)
+      .order('last_sync_at', { ascending: true, nullsFirst: true })
       .limit(MAX_CONNECTIONS_PER_RUN)
 
     if (fetchError) {
@@ -48,14 +49,11 @@ export async function GET(request: NextRequest) {
 
     for (const connection of connections) {
       try {
-        // Ensure valid token
+        // Ensure valid token. ensureValidToken persisterar redan ett specifikt
+        // sync_error till calendar_connection vid refresh-fel (lib/google-calendar.ts) —
+        // skriv aldrig en generisk sträng här, det skulle bara skriva över det.
         const tokenResult = await ensureValidToken(connection)
         if (!tokenResult) {
-          // Token refresh failed, set sync_error and skip
-          await supabase
-            .from('calendar_connection')
-            .update({ sync_error: 'Failed to refresh access token' })
-            .eq('id', connection.id)
           failed++
           continue
         }

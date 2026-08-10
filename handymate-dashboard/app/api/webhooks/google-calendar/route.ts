@@ -103,10 +103,10 @@ export async function POST(request: NextRequest) {
       // (det vore förvirrande — bara synka existerande)
     }
 
-    // Uppdatera last_synced
+    // Uppdatera last_sync_at
     await supabase
       .from('calendar_connection')
-      .update({ last_synced_at: new Date().toISOString() })
+      .update({ last_sync_at: new Date().toISOString() })
       .eq('id', connection.id)
 
     console.log(`[Calendar Webhook] ${watch.business_id}: ${synced} bookings updated from ${events.length} events`)

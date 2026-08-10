@@ -64,7 +64,7 @@ async function createBooking(supabase: SupabaseClient, suggestion: any, actionDa
             name: actionData.customer_name,
             phone_number: phoneNumberForCustomer,
             email: emailForCustomer,
-            address: actionData.address || null,
+            address_line: actionData.address || null,
           })
           .select('customer_id')
           .single()
@@ -196,7 +196,7 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
           business_id: businessId,
           name: actionData.customer_name || 'Ny kund',
           phone_number: actionData.phone_number || suggestion.call_recording?.phone_number,
-          address: actionData.address || null,
+          address_line: actionData.address || null,
         })
         .select('customer_id')
         .single()

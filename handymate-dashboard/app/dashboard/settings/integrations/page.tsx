@@ -32,7 +32,7 @@ export default function IntegrationsPage() {
   const [fortnox, setFortnox] = useState<FortnoxStatus | null>(null)
   const [fortnoxAction, setFortnoxAction] = useState<'syncing' | 'disconnecting' | null>(null)
   const [fortnoxToast, setFortnoxToast] = useState<string | null>(null)
-  const [emailLead, setEmailLead] = useState<{ address: string | null } | null>(null)
+  const [emailLead, setEmailLead] = useState<{ address: string | null; last_received_at: string | null } | null>(null)
   const [emailLeadLoading, setEmailLeadLoading] = useState(true)
   const [emailLeadUnavailable, setEmailLeadUnavailable] = useState(false)
   const [emailLeadActivating, setEmailLeadActivating] = useState(false)
@@ -67,7 +67,7 @@ export default function IntegrationsPage() {
       }
       if (res.ok) {
         const data = await res.json()
-        setEmailLead({ address: data.address || null })
+        setEmailLead({ address: data.address || null, last_received_at: data.last_received_at || null })
         setEmailLeadUnavailable(false)
       }
     } catch { /* non-blocking */ }
@@ -158,7 +158,7 @@ export default function IntegrationsPage() {
       }
       const data = await res.json()
       if (res.ok) {
-        setEmailLead({ address: data.address || null })
+        setEmailLead({ address: data.address || null, last_received_at: data.last_received_at || null })
       } else {
         setEmailLeadError(data.error || 'Något gick fel')
       }
@@ -365,6 +365,17 @@ export default function IntegrationsPage() {
                 <p className="text-xs text-gray-500 mt-2">
                   Vidarebefordra din företagsmail (t.ex. info@dittbolag.se) till adressen ovan så fångar Handymate förfrågningar automatiskt. Mail som inte är förfrågningar ignoreras.
                 </p>
+                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                  {emailLead.last_received_at ? (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">
+                      Senast mottaget: {relativeTime(emailLead.last_received_at)}
+                    </span>
+                  ) : (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                      Väntar på första mailet
+                    </span>
+                  )}
+                </div>
               </div>
             )}
             {emailLeadError && (

@@ -24,6 +24,12 @@ function isMissingTableError(err: any): boolean {
   return err?.code === '42P01' || /relation .* does not exist/i.test(String(err?.message || ''))
 }
 
+/** Postgres undefined_column (42703) — v109 (last_received_at) inte körd
+    ännu. Samma fail-soft-princip som isMissingTableError. */
+function isMissingColumnError(err: any): boolean {
+  return err?.code === '42703' || /column .* does not exist/i.test(String(err?.message || ''))
+}
+
 function missingTableResponse() {
   return NextResponse.json({ error: 'not_available', message: MISSING_TABLE_MESSAGE }, { status: 503 })
 }
@@ -44,17 +50,33 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabase()
 
     try {
-      const { data, error } = await supabase
-        .from('email_inbound_route')
-        .select('address, active, created_at')
-        .eq('business_id', business.business_id)
-        .maybeSingle()
-
-      if (error) throw error
+      let data: { address: string; active: boolean; created_at: string; last_received_at?: string | null } | null = null
+      try {
+        const result = await supabase
+          .from('email_inbound_route')
+          .select('address, active, created_at, last_received_at')
+          .eq('business_id', business.business_id)
+          .maybeSingle()
+        if (result.error) throw result.error
+        data = result.data
+      } catch (err: any) {
+        // v109 (last_received_at) kanske inte är körd än — fall tillbaka på
+        // en select utan den kolumnen i stället för att svara 503 helt i
+        // onödan för en funktion (adressvisning) som annars fungerar fint.
+        if (!isMissingColumnError(err)) throw err
+        const fallback = await supabase
+          .from('email_inbound_route')
+          .select('address, active, created_at')
+          .eq('business_id', business.business_id)
+          .maybeSingle()
+        if (fallback.error) throw fallback.error
+        data = fallback.data
+      }
 
       return NextResponse.json({
         address: data?.address || null,
         active: data?.active ?? null,
+        last_received_at: data?.last_received_at ?? null,
       })
     } catch (err: any) {
       if (isMissingTableError(err)) return missingTableResponse()

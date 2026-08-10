@@ -1,6 +1,6 @@
 import { getServerSupabase } from '@/lib/supabase'
 
-const ALLOWED_MIME_TYPES: Record<string, string> = {
+export const ALLOWED_MIME_TYPES: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
   'image/jpg': 'jpg',
@@ -16,12 +16,12 @@ const ALLOWED_MIME_TYPES: Record<string, string> = {
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
 }
 
-const ALLOWED_EXTENSIONS = new Set([
+export const ALLOWED_EXTENSIONS = new Set([
   'png', 'jpg', 'jpeg', 'gif', 'webp',
   'pdf', 'zip', 'doc', 'docx', 'xls', 'xlsx',
 ])
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20 MB
+export const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20 MB
 
 interface AttachmentMeta {
   filename: string
