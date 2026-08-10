@@ -37,13 +37,21 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = getServerSupabase()
 
-    // Hämta quote för business_id
-    const { data: quote } = await supabase
+    // Hämta quote för business_id. MEDVETET bara kolumner som bevisligen
+    // finns: den gamla listan tog med v16-räknarna (view_count,
+    // first_viewed_at) — saknas en enda kolumn i prod 400:ar PostgREST hela
+    // frågan, quote blir null och pixeln returneras utan att NÅGOT loggas.
+    // Felet läses nu också (2026-08-10).
+    const { data: quote, error: quoteErr } = await supabase
       .from('quotes')
-      .select('business_id, customer_id, title, view_count, first_viewed_at, status')
+      .select('business_id, status')
       .eq('quote_id', quoteId)
       .single()
 
+    if (quoteErr) {
+      console.error('[quotes/track] kunde inte läsa offerten — inget spårades:', quoteErr.message, { quoteId })
+      return new Response(PIXEL, { headers: pixelHeaders })
+    }
     if (!quote) {
       return new Response(PIXEL, { headers: pixelHeaders })
     }
@@ -60,7 +68,7 @@ export async function GET(req: NextRequest) {
         source: 'pixel',
       })
     } else {
-      await supabase.from('quote_tracking_events').insert({
+      const { error: eventErr } = await supabase.from('quote_tracking_events').insert({
         quote_id: quoteId,
         business_id: quote.business_id,
         event_type: event,
@@ -69,6 +77,7 @@ export async function GET(req: NextRequest) {
         ip_hash: hashIP(req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || ''),
         user_agent: (req.headers.get('user-agent') || '').slice(0, 200),
       })
+      if (eventErr) console.error('[quotes/track] händelseloggen misslyckades:', eventErr.message, { quoteId, event })
     }
 
     // Om closed event med duration — uppdatera total view time

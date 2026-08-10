@@ -9,13 +9,24 @@ import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
  * offerten via en route som inte loggade något. Statusen berodde därför helt på
  * spårningspixeln i mejlet — skickades offerten via SMS, eller blockerade
  * kundens mejlklient bilder, blev en offert som lästs och signerats aldrig
- * markerad som öppnad. `view_count` stod kvar på 0, nudgen vid tre visningar
- * kunde aldrig lösa ut, och "aldrig öppnade"-statistiken var systematiskt fel.
+ * markerad som öppnad.
  *
- * Nu anropar både pixeln och den publika offert-routen den här funktionen.
+ * ═══ HÄRDNING 2026-08-10 (Andreas: "står inte som Öppnad än") ═══
  *
- * Allt är non-blocking: en misslyckad loggning får aldrig hindra kunden från
- * att se sin offert.
+ * Kedjan var kopplad på alla tre ytor (pixel, kundvy, portalmodal) men
+ * kunde ändå dö tyst: selecten och uppdateringen listade v16-kolumnerna
+ * (view_count, first_viewed_at, …) i SAMMA operation som statusflippen.
+ * Saknas en enda kolumn i prod 400:ar PostgREST hela frågan — och inget
+ * `.error` lästes någonstans, så en offert som lästs förblev "Skickad"
+ * utan ett enda loggspår (billing_plan-lärdomen 2026-05-30 + kolumnlista-
+ * lärdomen 2026-08-06).
+ *
+ * Nu: statusflippen är en EGEN, minimal uppdatering som bara rör `status`.
+ * Räknarna är best-effort för sig. VARJE fel läses och loggas synligt —
+ * en död spårning ska aldrig mer vara tyst.
+ *
+ * Allt är non-blocking: en misslyckad loggning får aldrig hindra kunden
+ * från att se sin offert.
  */
 
 export interface RegisterQuoteOpenResult {
@@ -38,19 +49,39 @@ export async function registerQuoteOpen(
   const empty: RegisterQuoteOpenResult = { registered: false, viewCount: 0, isFirstOpen: false }
 
   try {
+    // select('*') med flit: en enradsläsning där en enda saknad kolumn i en
+    // kolumnlista hade tystat HELA spårningen (kolumnlista-lärdomen).
     const { data: quote, error } = await supabase
       .from('quotes')
-      .select('business_id, customer_id, title, total, view_count, first_viewed_at, status')
+      .select('*')
       .eq('quote_id', quoteId)
       .single()
 
-    if (error || !quote) return empty
+    if (error) {
+      console.error('[track-open] kunde inte läsa offerten — öppningen registreras inte:', error.message, { quoteId })
+      return empty
+    }
+    if (!quote) return empty
 
     // En besvarad offert ska inte kunna "öppnas" igen och skriva över sin
     // status — men visningen är fortfarande intressant, så eventet loggas.
     const isOpenable = (OPEN_QUOTE_STATUSES as readonly string[]).includes(quote.status)
 
-    await supabase.from('quote_tracking_events').insert({
+    // 1. STATUSFLIPPEN — det kritiska. Egen minimal uppdatering som bara rör
+    //    status, så saknade räknarkolumner aldrig kan stoppa "Öppnad".
+    if (quote.status === 'sent') {
+      const { error: statusErr } = await supabase
+        .from('quotes')
+        .update({ status: 'opened' })
+        .eq('quote_id', quoteId)
+        .eq('status', 'sent')
+      if (statusErr) {
+        console.error('[track-open] statusflippen misslyckades:', statusErr.message, { quoteId })
+      }
+    }
+
+    // 2. Händelseloggen — best-effort, felet läses (kastar aldrig).
+    const { error: eventErr } = await supabase.from('quote_tracking_events').insert({
       quote_id: quoteId,
       business_id: quote.business_id,
       event_type: 'opened',
@@ -58,19 +89,25 @@ export async function registerQuoteOpen(
       ip_hash: opts.ipHash || null,
       user_agent: (opts.userAgent || '').slice(0, 200) || null,
     })
+    if (eventErr) {
+      console.error('[track-open] händelseloggen misslyckades (är v16 körd?):', eventErr.message, { quoteId })
+    }
 
-    const newViewCount = (quote.view_count || 0) + 1
+    // 3. Räknarna — best-effort för sig. Saknas v16-kolumnerna loggas det
+    //    högt, men statusen ovan är redan satt.
+    const newViewCount = (Number(quote.view_count) || 0) + 1
     const isFirstOpen = !quote.first_viewed_at
-
-    await supabase
+    const { error: raknareErr } = await supabase
       .from('quotes')
       .update({
         view_count: newViewCount,
         first_viewed_at: quote.first_viewed_at || new Date().toISOString(),
         last_viewed_at: new Date().toISOString(),
-        status: quote.status === 'sent' ? 'opened' : quote.status,
       })
       .eq('quote_id', quoteId)
+    if (raknareErr) {
+      console.error('[track-open] räknarna kunde inte uppdateras (är v16 körd?):', raknareErr.message, { quoteId })
+    }
 
     if (isFirstOpen) {
       // Live-notis: "Kunden läser din offert nu". Bara första gången —
@@ -109,7 +146,7 @@ export async function registerQuoteOpen(
 
     return { registered: true, viewCount: newViewCount, isFirstOpen }
   } catch (err) {
-    console.warn('[track-open] kunde inte registrera öppning (icke-blockerande):', err)
+    console.error('[track-open] kunde inte registrera öppning (icke-blockerande):', err)
     return empty
   }
 }
