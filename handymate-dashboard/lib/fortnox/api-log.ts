@@ -42,6 +42,28 @@ export async function logFortnoxApi(entry: LogEntry): Promise<void> {
   }
 }
 
+/**
+ * Aggregatlogg för en rutt-operation (import/synk). Rå-anropen mot Fortnox
+ * loggas redan ett och ett av fortnoxRequest — den här raden är summan av
+ * hela operationen, med rutt-namnet som pseudo-endpoint (samma mönster som
+ * 'oauth_callback' i callback-rutten). Non-blocking som allt annat här.
+ */
+export async function logFortnoxOperation(
+  businessId: string,
+  operation: string,
+  summary: unknown,
+  errorMessage?: string | null
+): Promise<void> {
+  await logFortnoxApi({
+    business_id: businessId,
+    endpoint: operation,
+    method: 'POST',
+    status_code: errorMessage ? 500 : 200,
+    response_payload: summary,
+    error_message: errorMessage ?? null,
+  })
+}
+
 function truncatePayload(payload: unknown): unknown {
   if (!payload) return null
   try {

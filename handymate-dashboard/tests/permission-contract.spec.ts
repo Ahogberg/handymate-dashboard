@@ -240,6 +240,14 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       why: 'Markerar en faktura som betald — påverkar bokföring och kassaflödesprognos.',
     },
   ],
+
+  'Integrationer': [
+    {
+      route: 'integrations/fortnox/disconnect',
+      requires: 'manage_settings',
+      why: 'Kopplar bort företagets bokföring. Gamla /api/fortnox/disconnect hade grinden men nya trädet saknade den tills konsolideringen 2026-08-10 — exakt den tysta regression den här kartan finns för att stoppa.',
+    },
+  ],
 }
 
 /**

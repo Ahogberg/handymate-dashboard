@@ -2,18 +2,10 @@ import { createClient } from '@supabase/supabase-js'
 
 const FORTNOX_CLIENT_ID = process.env.FORTNOX_CLIENT_ID!
 const FORTNOX_CLIENT_SECRET = process.env.FORTNOX_CLIENT_SECRET!
-// FORTNOX_REDIRECT_URI saknas typiskt i env — fallback bygger från
-// NEXT_PUBLIC_APP_URL (vilket sätts av Vercel/lokal config). MÅSTE matcha
-// exakt det som är registrerat i Fortnox developer console:
-// https://app.handymate.se/api/integrations/fortnox/callback
-//
-// OBS: callback ligger under /api/integrations/fortnox/* (nya route-stacket
-// med förstärkt audit-loggning), inte /api/fortnox/* (gamla). Settings-
-// sidan anropar fortfarande /api/fortnox/connect — det är OK eftersom
-// state-cookien sätts med path=/ och kan läsas av callback på vilken path
-// som helst på samma domän. TD att konsolidera båda route-trees.
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-const FORTNOX_REDIRECT_URI = process.env.FORTNOX_REDIRECT_URI || `${APP_URL}/api/integrations/fortnox/callback`
+// OAuth-flödet (auth-URL, code-exchange, redirect-URI) ägs helt av
+// app/api/integrations/fortnox/connect + callback — det enda rutt-trädet
+// sedan konsolideringen 2026-08-10. Redirect-URI:n som ska vara registrerad
+// hos Fortnox: {APP_URL}/api/integrations/fortnox/callback.
 const FORTNOX_API_BASE = 'https://api.fortnox.se/3'
 const FORTNOX_AUTH_BASE = 'https://apps.fortnox.se/oauth-v1'
 
@@ -38,63 +30,6 @@ interface FortnoxConfig {
   fortnox_token_expires_at: string | null
   fortnox_connected_at: string | null
   fortnox_company_name: string | null
-}
-
-/**
- * Generate the Fortnox OAuth authorization URL.
- *
- * Scope-strategi v1: begär bara MINIMAL set som finns i alla Fortnox-plans
- * (även gratis/basic). Andreas pilot-test 2026-05-18 fick
- * 'error_missing_license' eftersom test-Fortnox-kontot saknade
- * prenumeration för `article`-scope. Bee Services riktiga Fortnox-konto
- * har sannolikt full licens — men för att tryggt fungera mot ALLA
- * pilot-kunder begränsar vi till bas-scopes som funkar överallt.
- *
- * Utöka scope-listan i en separat sprint när vi vet vilka moduler
- * pilot-kunder faktiskt har, eller bygg en plan-aware scope-selection.
- *
- * TD-49: Article + Payment + Bookkeeping + Project + Time scopes
- * kräver Fortnox-moduler som inte alla kunder har. Vid 'error_missing_license'
- * måste vi kunna återanvända koppling med reducerade scopes.
- */
-export function getFortnoxAuthUrl(state: string): string {
-  const params = new URLSearchParams({
-    client_id: FORTNOX_CLIENT_ID,
-    redirect_uri: FORTNOX_REDIRECT_URI,
-    // Minimal scope-set som finns i alla Fortnox-plans:
-    scope: 'invoice customer companyinformation',
-    state: state,
-    response_type: 'code',
-    access_type: 'offline'
-  })
-
-  return `${FORTNOX_AUTH_BASE}/auth?${params.toString()}`
-}
-
-/**
- * Exchange authorization code for tokens
- */
-export async function exchangeCodeForTokens(code: string): Promise<FortnoxTokens> {
-  const response = await fetch(`${FORTNOX_AUTH_BASE}/token`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': 'Basic ' + Buffer.from(`${FORTNOX_CLIENT_ID}:${FORTNOX_CLIENT_SECRET}`).toString('base64')
-    },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code: code,
-      redirect_uri: FORTNOX_REDIRECT_URI
-    }).toString()
-  })
-
-  if (!response.ok) {
-    const error = await response.text()
-    console.error('Fortnox token exchange error:', error)
-    throw new Error('Failed to exchange code for tokens')
-  }
-
-  return response.json()
 }
 
 /**

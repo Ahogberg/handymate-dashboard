@@ -5,6 +5,7 @@ import {
   isFortnoxConnected,
   createFortnoxCustomer,
 } from '@/lib/fortnox'
+import { logFortnoxOperation } from '@/lib/fortnox/api-log'
 
 interface Customer {
   customer_id: string
@@ -16,10 +17,12 @@ interface Customer {
 }
 
 /**
- * POST /api/fortnox/sync/customers
- * Sync all unsynced customers to Fortnox
+ * POST /api/integrations/fortnox/sync/customers
+ *
+ * Pushar alla kunder utan fortnox_customer_number till Fortnox.
  */
 export async function POST(request: NextRequest) {
+  let businessId: string | null = null
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -27,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
-    const businessId = business.business_id
+    businessId = business.business_id
 
     const connected = await isFortnoxConnected(businessId)
     if (!connected) {
@@ -105,6 +108,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await logFortnoxOperation(businessId, 'sync_customers', {
+      synced: results.synced,
+      failed: results.failed,
+      error_count: results.errors.length,
+    })
+
     return NextResponse.json({
       success: true,
       synced: results.synced,
@@ -115,6 +124,9 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error('Sync customers error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Sync failed'
+    if (businessId) {
+      await logFortnoxOperation(businessId, 'sync_customers', null, errorMessage)
+    }
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }

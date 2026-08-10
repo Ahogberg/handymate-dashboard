@@ -8,8 +8,9 @@
  * kan aldrig trigga ett automatiskt utskick. Karin FÖRESLÅR att jaga via den
  * godkännande-gatade vägen; inget skickas av importen själv.
  *
- * Rutten (app/api/fortnox/import/invoices/route.ts) lägger till business_id,
- * customer_id och fortnox_synced_at (icke-deterministisk tid) innan insert.
+ * Rutten (app/api/integrations/fortnox/import/invoices/route.ts) lägger till
+ * business_id, customer_id och fortnox_synced_at (icke-deterministisk tid)
+ * innan insert.
  */
 
 import type { FortnoxInvoiceListItem } from '../fortnox'

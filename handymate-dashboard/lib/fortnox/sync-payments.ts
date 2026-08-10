@@ -13,6 +13,7 @@ export interface SyncResult {
   checked: number
   marked_paid: number
   marked_overdue: number
+  marked_cancelled: number
   errors: string[]
 }
 
@@ -32,6 +33,9 @@ interface FortnoxInvoiceListItem {
  * Logik:
  *   - Hämta Handymate-fakturor med fortnox_invoice_number satt och status != 'paid'/'cancelled'
  *   - För varje: läs Fortnox-fakturan, jämför Balance + förfallodatum
+ *   - Om Fortnox visar Cancelled → makulera lokalt. Prövas FÖRE betald-kollen:
+ *     en makulerad faktura har Balance 0 och hade annars blivit "betald" och
+ *     dragit igång hela post-payment-kedjan
  *   - Om Fortnox visar Balance=0 → markera som betald i Handymate
  *   - Om DueDate har passerats och Balance>0 → markera som overdue
  *
@@ -45,6 +49,7 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string): Promis
     checked: 0,
     marked_paid: 0,
     marked_overdue: 0,
+    marked_cancelled: 0,
     errors: [],
   }
 
@@ -83,6 +88,14 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string): Promis
       )
       const fnInv = fnRes?.Invoice
       if (!fnInv) continue
+
+      if (fnInv.Cancelled === true) {
+        if (inv.status !== 'cancelled') {
+          await markInvoiceCancelled(inv.invoice_id, businessId)
+          result.marked_cancelled++
+        }
+        continue
+      }
 
       const isPaid = fnInv.FullyPaid === true || (typeof fnInv.Balance === 'number' && fnInv.Balance <= 0)
       const isOverdue = !isPaid && fnInv.DueDate && fnInv.DueDate < todayStr
@@ -132,6 +145,7 @@ async function markInvoicePaid(invoiceId: string, businessId: string, customerId
     .update({
       status: 'paid',
       paid_at: now,
+      payment_method: 'fortnox',
     })
     .eq('invoice_id', invoiceId)
     .eq('business_id', businessId)
@@ -140,6 +154,15 @@ async function markInvoicePaid(invoiceId: string, businessId: string, customerId
   await runPostPaymentAutomations(invoiceId, businessId, customerId).catch(err =>
     console.error('[fortnox-sync] post-payment automations failed:', err)
   )
+}
+
+async function markInvoiceCancelled(invoiceId: string, businessId: string) {
+  const supabase = getSupabase()
+  await supabase
+    .from('invoice')
+    .update({ status: 'cancelled' })
+    .eq('invoice_id', invoiceId)
+    .eq('business_id', businessId)
 }
 
 async function markInvoiceOverdue(invoiceId: string, businessId: string) {

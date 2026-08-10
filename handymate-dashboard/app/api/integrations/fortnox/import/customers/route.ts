@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { isFortnoxConnected, getFortnoxCustomers } from '@/lib/fortnox'
+import { logFortnoxOperation } from '@/lib/fortnox/api-log'
 
 interface ExistingCustomer {
   email: string | null
@@ -10,10 +11,13 @@ interface ExistingCustomer {
 }
 
 /**
- * POST /api/fortnox/import/customers
- * Import customers from Fortnox to Handymate
+ * POST /api/integrations/fortnox/import/customers
+ *
+ * Importerar Fortnox-kunder till lokala `customer`-rader. Dedup på
+ * fortnox-kundnummer, e-post och telefon.
  */
 export async function POST(request: NextRequest) {
+  let businessId: string | null = null
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -21,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
-    const businessId = business.business_id
+    businessId = business.business_id
 
     const connected = await isFortnoxConnected(businessId)
     if (!connected) {
@@ -107,6 +111,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await logFortnoxOperation(businessId, 'import_customers', {
+      imported: results.imported,
+      skipped: results.skipped,
+      total: fortnoxCustomers.length,
+      error_count: results.errors.length,
+    })
+
     return NextResponse.json({
       success: true,
       imported: results.imported,
@@ -118,6 +129,9 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error('Import customers error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Import failed'
+    if (businessId) {
+      await logFortnoxOperation(businessId, 'import_customers', null, errorMessage)
+    }
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }

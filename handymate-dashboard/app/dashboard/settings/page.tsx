@@ -130,9 +130,9 @@ interface BusinessConfig {
 
 interface FortnoxStatus {
   connected: boolean
-  companyName: string | null
-  connectedAt: string | null
-  expiresAt: string | null
+  company_name: string | null
+  connected_at: string | null
+  token_expires_at: string | null
 }
 
 interface WorkType {
@@ -454,22 +454,7 @@ export default function SettingsPage() {
     fetchLeadSources()
   }, [business.business_id])
 
-  // Handle Fortnox OAuth callback
   useEffect(() => {
-    const fortnoxParam = searchParams?.get('fortnox')
-    if (fortnoxParam === 'connected') {
-      setActiveTab('integrations')
-      showToast('Fortnox kopplat!', 'success')
-      fetchFortnoxStatus()
-      // Clean up URL
-      window.history.replaceState({}, '', '/dashboard/settings')
-    } else if (fortnoxParam === 'error') {
-      setActiveTab('integrations')
-      const message = searchParams?.get('message') || 'Kunde inte koppla Fortnox'
-      showToast(message, 'error')
-      window.history.replaceState({}, '', '/dashboard/settings')
-    }
-
     // Handle tab param
     const tabParam = searchParams?.get('tab')
 
@@ -513,7 +498,7 @@ export default function SettingsPage() {
 
   async function fetchFortnoxStatus() {
     try {
-      const response = await fetch('/api/fortnox/status')
+      const response = await fetch('/api/integrations/fortnox/status')
       if (response.ok) {
         const data = await response.json()
         setFortnoxStatus(data)
@@ -892,7 +877,7 @@ export default function SettingsPage() {
 
   const handleConnectFortnox = () => {
     setFortnoxLoading(true)
-    window.location.href = '/api/fortnox/connect'
+    window.location.href = '/api/integrations/fortnox/connect'
   }
 
   const handleDisconnectFortnox = async () => {
@@ -902,12 +887,13 @@ export default function SettingsPage() {
 
     setDisconnectingFortnox(true)
     try {
-      const response = await fetch('/api/fortnox/disconnect', { method: 'POST' })
+      const response = await fetch('/api/integrations/fortnox/disconnect', { method: 'POST' })
       if (response.ok) {
-        setFortnoxStatus({ connected: false, companyName: null, connectedAt: null, expiresAt: null })
+        setFortnoxStatus({ connected: false, company_name: null, connected_at: null, token_expires_at: null })
         showToast('Fortnox bortkopplat', 'success')
       } else {
-        throw new Error('Kunde inte koppla bort Fortnox')
+        const data = await response.json().catch(() => null)
+        throw new Error(data?.error || 'Kunde inte koppla bort Fortnox')
       }
     } catch (error: any) {
       showToast(error.message || 'Något gick fel', 'error')
@@ -920,7 +906,7 @@ export default function SettingsPage() {
     setSyncingCustomers(true)
     setSyncResult(null)
     try {
-      const response = await fetch('/api/fortnox/sync/customers', { method: 'POST' })
+      const response = await fetch('/api/integrations/fortnox/sync/customers', { method: 'POST' })
       const data = await response.json()
       if (response.ok) {
         setSyncResult({ synced: data.synced, failed: data.failed })
@@ -943,7 +929,7 @@ export default function SettingsPage() {
     setImportingCustomers(true)
     setSyncResult(null)
     try {
-      const response = await fetch('/api/fortnox/import/customers', { method: 'POST' })
+      const response = await fetch('/api/integrations/fortnox/import/customers', { method: 'POST' })
       const data = await response.json()
       if (response.ok) {
         setSyncResult({ imported: data.imported })
@@ -966,7 +952,7 @@ export default function SettingsPage() {
     setSyncingInvoices(true)
     setInvoiceSyncResult(null)
     try {
-      const response = await fetch('/api/fortnox/sync/invoices', { method: 'POST' })
+      const response = await fetch('/api/integrations/fortnox/sync/invoices', { method: 'POST' })
       const data = await response.json()
       if (response.ok) {
         setInvoiceSyncResult({ synced: data.synced, failed: data.failed })
@@ -989,12 +975,14 @@ export default function SettingsPage() {
     setSyncingPayments(true)
     setInvoiceSyncResult(null)
     try {
-      const response = await fetch('/api/fortnox/sync/payments', { method: 'POST' })
+      const response = await fetch('/api/integrations/fortnox/sync-now', { method: 'POST' })
       const data = await response.json()
       if (response.ok) {
-        setInvoiceSyncResult({ updated: data.updated, unchanged: data.unchanged })
-        if (data.updated > 0) {
-          showToast(`${data.updated} betalningar uppdaterade`, 'success')
+        const updated = (data.marked_paid ?? 0) + (data.marked_overdue ?? 0) + (data.marked_cancelled ?? 0)
+        const unchanged = Math.max(0, (data.checked ?? 0) - updated)
+        setInvoiceSyncResult({ updated, unchanged })
+        if (updated > 0) {
+          showToast(`${updated} betalningar uppdaterade`, 'success')
         } else {
           showToast('Inga nya betalningar att hämta', 'success')
         }
@@ -3347,7 +3335,7 @@ export default function SettingsPage() {
                         <CheckCircle className="w-5 h-5 text-emerald-600" />
                         <div>
                           <p className="font-medium text-gray-900">Kopplad till Fortnox</p>
-                          <p className="text-sm text-gray-500">{fortnoxStatus.companyName || 'Företag'}</p>
+                          <p className="text-sm text-gray-500">{fortnoxStatus.company_name || 'Företag'}</p>
                         </div>
                       </div>
                       <span className="px-2 py-1 bg-emerald-100 text-emerald-600 text-xs rounded-lg">
@@ -3360,8 +3348,8 @@ export default function SettingsPage() {
                     <div className="p-3 bg-gray-50 rounded-xl">
                       <p className="text-xs text-gray-400">Kopplad sedan</p>
                       <p className="text-sm text-gray-900">
-                        {fortnoxStatus.connectedAt
-                          ? new Date(fortnoxStatus.connectedAt).toLocaleDateString('sv-SE')
+                        {fortnoxStatus.connected_at
+                          ? new Date(fortnoxStatus.connected_at).toLocaleDateString('sv-SE')
                           : '-'
                         }
                       </p>
@@ -3369,8 +3357,8 @@ export default function SettingsPage() {
                     <div className="p-3 bg-gray-50 rounded-xl">
                       <p className="text-xs text-gray-400">Token giltig till</p>
                       <p className="text-sm text-gray-900">
-                        {fortnoxStatus.expiresAt
-                          ? new Date(fortnoxStatus.expiresAt).toLocaleDateString('sv-SE')
+                        {fortnoxStatus.token_expires_at
+                          ? new Date(fortnoxStatus.token_expires_at).toLocaleDateString('sv-SE')
                           : '-'
                         }
                       </p>

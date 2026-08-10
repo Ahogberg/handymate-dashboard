@@ -155,7 +155,7 @@ export default function InvoicesPage() {
   const handleSyncToFortnox = async (invoiceId: string) => {
     setSyncingId(invoiceId)
     try {
-      const response = await fetch('/api/fortnox/sync/invoice', {
+      const response = await fetch('/api/integrations/fortnox/sync/invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ invoiceId })

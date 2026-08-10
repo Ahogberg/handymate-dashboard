@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { isFortnoxConnected, getFortnoxInvoices } from '@/lib/fortnox'
 import { mapFortnoxInvoice } from '@/lib/fortnox/map-invoice'
+import { logFortnoxOperation } from '@/lib/fortnox/api-log'
 
 interface ExistingInvoice {
   fortnox_document_number: string | null
@@ -14,7 +15,7 @@ interface CustomerRow {
 }
 
 /**
- * POST /api/fortnox/import/invoices
+ * POST /api/integrations/fortnox/import/invoices
  *
  * Importerar ÖPPNA/OBETALDA Fortnox-fakturor till lokala `invoice`-rader så att
  * Karin/pengar-in-radarn ser dem direkt (och kan FÖRESLÅ påminnelser via den
@@ -24,13 +25,14 @@ interface CustomerRow {
  * utskick. reminder_count sätts till 0, next_reminder_at lämnas orört (null),
  * och ingen reminder-/send-funktion anropas. Bara data-rader skapas.
  *
- * Körs typiskt EFTER /api/fortnox/import/customers så att kundkopplingen finns.
- * Omatchade fakturor importeras ändå med customer_id = null (räknas som
- * `unlinked` i svaret) så totalsumman ändå syns.
+ * Körs typiskt EFTER /api/integrations/fortnox/import/customers så att
+ * kundkopplingen finns. Omatchade fakturor importeras ändå med
+ * customer_id = null (räknas som `unlinked` i svaret) så totalsumman ändå syns.
  *
  * DEDUP: hoppar över fakturor vars fortnox_document_number redan finns lokalt.
  */
 export async function POST(request: NextRequest) {
+  let businessId: string | null = null
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
-    const businessId = business.business_id
+    businessId = business.business_id
 
     const connected = await isFortnoxConnected(businessId)
     if (!connected) {
@@ -130,6 +132,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await logFortnoxOperation(businessId, 'import_invoices', {
+      imported: results.imported,
+      skipped: results.skipped,
+      unlinked: results.unlinked,
+      total: fortnoxInvoices.length,
+      total_outstanding_kr: Math.round(results.total_outstanding_kr),
+      error_count: results.errors.length,
+    })
+
     return NextResponse.json({
       success: true,
       imported: results.imported,
@@ -142,6 +153,9 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error('Import invoices error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Import failed'
+    if (businessId) {
+      await logFortnoxOperation(businessId, 'import_invoices', null, errorMessage)
+    }
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }

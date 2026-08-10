@@ -82,11 +82,11 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
     setView('fortnox-loading')
     setError(null)
     try {
-      const custRes = await fetch('/api/fortnox/import/customers', { method: 'POST' })
+      const custRes = await fetch('/api/integrations/fortnox/import/customers', { method: 'POST' })
       const cust = await custRes.json().catch(() => ({}))
       if (!custRes.ok) throw new Error(cust?.error ?? 'Kunde inte hämta kunder från Fortnox')
 
-      const invRes = await fetch('/api/fortnox/import/invoices', { method: 'POST' })
+      const invRes = await fetch('/api/integrations/fortnox/import/invoices', { method: 'POST' })
       const inv = await invRes.json().catch(() => ({}))
       if (!invRes.ok) throw new Error(inv?.error ?? 'Kunde inte hämta fakturor från Fortnox')
 
