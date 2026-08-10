@@ -18,7 +18,9 @@ import { ScheduleTimeline, parseKonflikter, minuterFranIso } from '@/components/
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { QuoteDraftDetail, QuoteToolExit } from '@/components/jarvis/QuoteDraftDetail'
 import { KarinCalendarWidget } from '@/components/karin/KarinCalendarWidget'
-import { PengarRailCard } from '@/components/jarvis/PengarRailCard'
+import { AttHamtaRailCard } from '@/components/jarvis/AttHamtaRailCard'
+import { byggAttHamta } from '@/lib/jarvis/att-hamta'
+import type { PengarSummary } from '@/lib/value/pengar-pa-bordet'
 import { approvalPreview, isEditable, buildApprovalEdit } from '@/lib/jarvis/approval-preview'
 import {
   agentForApproval,
@@ -202,6 +204,7 @@ export default function JarvisHome({
   const [feedback, setFeedback] = useState<{ text: string; isError: boolean } | null>(null)
   const [proof, setProof] = useState<string | null>(null)
   const [bevakning, setBevakning] = useState<BevakningsRad[]>([])
+  const [pengarData, setPengarData] = useState<PengarSummary | null>(null)
 
   // ═══ GRIND 1: HAR NÅGOT HÄNT SEDAN DU TITTADE SIST? ═══
   //
@@ -333,6 +336,17 @@ export default function JarvisHome({
       })
       .catch(() => { /* bandet är inte kritiskt */ })
     return () => { active = false }
+  }, [])
+
+  // Att hämta: tyst hämtning — 403 (anställd) eller fel betyder inget kort,
+  // aldrig ett halvt. Samma tystnadsregel som kalenderwidgeten.
+  useEffect(() => {
+    let aktiv = true
+    fetch('/api/dashboard/pengar')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (aktiv && d) setPengarData(d) })
+      .catch(() => { /* kortet är grädde, aldrig mjölk */ })
+    return () => { aktiv = false }
   }, [])
 
   useEffect(() => {
@@ -488,6 +502,21 @@ export default function JarvisHome({
   }
 
   const synliga = approvals.filter(a => !hiddenIds.has(a.id))
+
+  // Att hämta-raden "väntar ovan": finns ett faktureringskort i kön pekar
+  // raden upp till det i stället för ut till en sida.
+  const faktureringskort = synliga.find(
+    a => a.approval_type === 'fakturera_projekt' || a.approval_type === 'missad_intakt',
+  )
+  const attHamta = byggAttHamta({
+    obetalda: economics ? { antal: economics.unpaidCount, summaKr: economics.unpaidAmount } : null,
+    pengar: pengarData,
+    harFaktureringskort: Boolean(faktureringskort),
+  })
+  const scrollTillFaktureringskort = () => {
+    if (!faktureringskort) return
+    document.getElementById(`beslut-${faktureringskort.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
   // Räknaren visar BESLUT, inte databasrader. Två förfallna fakturor från
   // samma agent samma dygn är ett beslut — "4" när tre av korten är samma
   // ärende läser som att man ligger efter mer än man gör.
@@ -581,8 +610,8 @@ export default function JarvisHome({
               {grupper.map((grupp, i) => {
                 const approval = grupp.primary
                 return (
+                <div key={approval.id} id={`beslut-${approval.id}`}>
                 <ApprovalCard
-                  key={approval.id}
                   approval={approval}
                   // Sammanslagen grupp: samma agent, samma typ, samma dygn.
                   // Två förfallna fakturor är ETT beslut, inte två identiska
@@ -599,6 +628,7 @@ export default function JarvisHome({
                   onSaveEdit={() => queueAction(approval, 'edit', editText)}
                   onCancelEdit={() => setEditingId(null)}
                 />
+                </div>
                 )
               })}
 
@@ -772,23 +802,16 @@ export default function JarvisHome({
             )}
           </RailCard>
 
-          <RailCard title="Fakturor" href="/dashboard/invoices?status=sent">
-            {economics ? (
-              <>
-                <span className="block font-heading text-2xl font-bold text-slate-900">{formatKr(economics.unpaidAmount)}</span>
-                <span className="block text-xs text-slate-500 mt-0.5">
-                  {economics.unpaidCount > 0 ? `${economics.unpaidCount} obetalda · Karin bevakar` : 'Inga obetalda — Karin bevakar'}
-                </span>
-              </>
-            ) : (
-              <div className="h-10 bg-slate-50 rounded-lg animate-pulse" />
-            )}
-          </RailCard>
+          {/* Att hämta ersätter Fakturor-kortet OCH Pengar på bordet — samma
+              pengar ska aldrig synas som två saker (etapp 5). null för
+              anställda: beloppen är see_financials-data. */}
+          {attHamta && (
+            <AttHamtaRailCard vy={attHamta} onVantarOvan={scrollTillFaktureringskort} />
+          )}
 
           {/* Karins bolagskalender. Renderar ingenting för anställda, och
               inget när profilen saknar uppgifter — en widget som säger
               "inget på gång" när vi inte vet vore osann. */}
-          <PengarRailCard />
           <KarinCalendarWidget />
         </aside>
 

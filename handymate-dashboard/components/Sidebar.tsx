@@ -87,7 +87,7 @@ const NAV: NavItem[] = [
       // säger själv att den ÄR en sammanställning och att allt arbete sker på
       // länkmålen — den hör alltså hemma bland de andra överblickarna, inte
       // bland ytorna man arbetar på. Hemskärmen har den redan som kort
-      // (PengarRailCard); menyposten är vägen dit för den som står på Översikt.
+      // (AttHamtaRailCard); menyposten är vägen dit för den som står på Översikt.
       { label: 'Pengar på bordet', href: '/dashboard/pengar' },
       { label: 'Månadsrapport', href: '/dashboard/monthly-review' },
       // Karins bolagskalender (2026-08-07). Ligger bredvid Månadsrapport —
