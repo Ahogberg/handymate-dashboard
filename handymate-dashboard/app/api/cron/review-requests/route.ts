@@ -3,8 +3,35 @@ import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { normalizeSwedishPhone } from '@/lib/phone-normalize'
+import { buildReferralUrl } from '@/lib/referral/link'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * Epic C spel 1 (tasks/hanna-sales-engine-v2-spec.md): har företaget
+ * aktiverat att kundens rekommendationslänk bifogas i recensions-SMS:et?
+ * EGEN, ISOLERAD fråga — INTE en del av business_config-huvudselecten
+ * längre ner. En okörd sql/v108_referral_ask_enabled.sql-migration får
+ * ALDRIG fälla HELA cronen (PostgREST avvisar hela selectet vid okänd
+ * kolumn om den stod i huvudfrågan). Fail-closed: fel eller saknad kolumn
+ * ⇒ false (ingen länk bifogas, spel 2 fortsätter som innan).
+ */
+async function isReferralAskEnabled(
+  supabase: ReturnType<typeof getServerSupabase>,
+  businessId: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('business_config')
+      .select('referral_ask_enabled')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (error) return false
+    return (data as { referral_ask_enabled?: boolean } | null)?.referral_ask_enabled === true
+  } catch {
+    return false
+  }
+}
 
 /**
  * GET /api/cron/review-requests
@@ -111,6 +138,10 @@ export async function GET(request: NextRequest) {
     const { isAutonomous } = await import('@/lib/autonomy/earned-autonomy')
     const reviewAutonomous = await isAutonomous(supabase, biz.business_id, 'review_request')
 
+    // Epic C spel 1: en gång per business (som ovan), återanvänds för alla
+    // dess projekt i loopen nedan.
+    const referralAskEnabled = await isReferralAskEnabled(supabase, biz.business_id)
+
     for (const project of projects || []) {
       projectsScanned++
 
@@ -195,6 +226,35 @@ export async function GET(request: NextRequest) {
         smsText = `${greeting} Skulle du vilja recensera oss? ${reviewUrl}`
       }
 
+      // ── Epic C spel 1 (Hanna v2 spec): bifoga rekommendationslänken ────
+      // Specen (tasks/hanna-sales-engine-v2-spec.md) beskriver spel 1 som en
+      // EGEN utskicksanledning med ett eget meddelande ("Tack {namn}! Känner
+      // du någon som behöver {tjänst}?") — den tar INTE ställning till att
+      // kombinera spel 1 och spel 2 i samma SMS. Det är byggbeslutet för
+      // denna increment: en beröringspunkt (samma recensions-SMS) i stället
+      // för att bygga spel 1:s separata proactive_care-flöde nu. Gatat
+      // bakom business_config.referral_ask_enabled (sql/v108, default
+      // false) — specens bärande princip #2 ("Gatad som standard") kräver
+      // uttrycklig aktivering; det gäller här att BIFOGA länken, inte
+      // grunden för att skicka SMS:et (den godkänns/autonom-sänds precis
+      // som innan, oförändrat).
+      //
+      // MÅSTE ske HÄR — innan reviewPayload byggs, inte efter. Den
+      // autonoma sändningsgrenen nedan skickar `message: smsText` (den
+      // lokala variabeln), INTE reviewPayload.message — en mutation av
+      // reviewPayload efter konstruktion hade missat den grenen helt.
+      let referralUrl: string | null = null
+      if (referralAskEnabled) {
+        const url = buildReferralUrl(biz.business_id, customer.customer_id)
+        const referralLine = `\nTipsa en vän: ${url}`
+        // Tak: ~2 SMS-segment (306 tecken sammanlänkat). Recensionsdelen
+        // vinner alltid — hellre ingen länk än ett väl långt/dyrt utskick.
+        if ((smsText + referralLine).length <= 306) {
+          smsText += referralLine
+          referralUrl = url
+        }
+      }
+
       const expiresAt = new Date(now.getTime() + 14 * 86400000)
 
       const reviewPayload = {
@@ -207,6 +267,7 @@ export async function GET(request: NextRequest) {
         google_place_id: placeId,
         review_url: reviewUrl,
         suggested_sms_text: smsText,
+        referral_url: referralUrl,
         // Agent-routing för approval-UI: Hanna äger detta
         routed_agent: 'hanna',
         // Behövs av approve-endpoint för att skicka via sendSmsViaElks:
@@ -242,6 +303,7 @@ export async function GET(request: NextRequest) {
             earned_autonomy: true,
             customer_id: customer.customer_id,
             project_id: project.project_id,
+            referral_link_attached: !!referralUrl,
           },
           result: smsResult.success ? {} : { error: smsResult.error || 'okänt fel' },
         })
@@ -336,6 +398,7 @@ export async function GET(request: NextRequest) {
         context: {
           project_id: project.project_id,
           customer_id: customer.customer_id,
+          referral_link_attached: !!referralUrl,
         },
       })
       if (apprLogErr) {

@@ -62,10 +62,42 @@ Andreas beslut: "bygg allt enligt rekommendationerna utom DO NOT BUILD-listan"
 - [ ] (Historikskanning = DO NOT BUILD; omprövas ev. som opt-in med ANTAL, aldrig kronor)
 
 ## Epic C — Ägd tillväxt (Hanna v2 + referral)
-- [ ] Spel 2 (recension) + spel 4 (Daniels offertjakt) enligt tasks/hanna-sales-engine-v2-spec.md
-- [ ] Spel 1 + `referral_customer_id` på leads/deals → attribution via attributionskärnan
+- [x] Spel 2 + 4: fanns i allt väsentligt redan — gapet var ATTRIBUTIONEN
+      (gated review-requests loggades aldrig vid exekvering; expiry-nudgen
+      misattribuerades till Lisa). Stängt utan dubbelräkning; delad
+      extractAgentId på generiska vägar.
+- [x] Payload-buggen (fynd under bygget): tre producenter skapade recensions-
+      godkännanden som tyst failade vid godkännande (customer_phone utan
+      message). Kanonisk payload + 180-dagarsspärrar som saknades + delad
+      buildReviewRequestMessage — facit-cronen orörd.
+- [x] Spel 1: signerad referral-token (CRON_SECRET-HMAC, husets konvention),
+      publik /rekommendera/[token]-sida, /api/referral-lead (rate-limitad,
+      fail-closed, 503 tills v107 körts), länk-kroken i recensions-SMS:et
+      gated bakom referral_ask_enabled (v108, default false). OBS: två
+      OLIKA referral-system finns nu — lib/referral/codes.ts är Handymates
+      egen partnervärvning; lib/referral/link.ts är hantverkarens kunder.
+- [ ] Settings-UI-toggle för referral_ask_enabled (idag manuell SQL) — nästa increment
+- [ ] Attributionsytan (Johansson genererade X kr) — efter v107 + första referral-leads
+
+## Sprintreview (2026-08-10)
+
+Steg 0 + Epic A (komplett) + Epic B V1 + Epic C (spel 1/2/4) byggda, verifierade
+och pushade samma dag. Arbetsmodell: Fable planerar/granskar/kärnändrar, Sonnet
+5-agenter bygger på exakta briefer. Åtta commits. Sex latenta buggar hittade och
+fixade under vägen (followup-läckan, portalens CHECK-brott, widgetens ogiltiga
+källa + saknade lead-rad, tomma-telefonens falskmatch, review-payload-buggen,
+expiry-nudgens misattribution). Slutverifiering: tsc 0 fel, ren build, 4353
+gröna browserlösa tester.
+
+KVAR till MCP-sessionen: kör v106+v107+v108, DNS (MX leads.handymate.se),
+verifieringspunkterna ovan, Google-diagnosen för Christoffer, B4/B5, settings-
+toggle för referral, attributionsytan.
 
 ## Att verifiera i MCP-sessionen (upptäckt under bygget)
+- [ ] Granska: app/api/invoices/[id]/status skickar ett OMEDELBART ovillkorligt
+      tack-SMS via /api/sms/send vid betald faktura — utanför approvals, utöver
+      det schemalagda recensionskortet. Går genom strypunkten (opt-out gäller)
+      men är en andra oberoende SMS-väg — medvetet? (Fynd 2026-08-10, ej rört.)
 - [ ] Finns kolumnen `customer.address` i prod? `lib/approve-actions.ts` createBooking
       insertar `address` medan resten av kodbasen använder `address_line` — saknas
       kolumnen failar kundskapandet vid bokningsgodkännande (befintligt beteende,
