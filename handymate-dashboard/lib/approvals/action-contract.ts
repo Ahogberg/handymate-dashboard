@@ -139,6 +139,11 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // extraktion, alltid ett kort en människa godkänner.
   meeting_summary: 'INFORMATIONAL',
   meeting_followup: 'EXECUTABLE_ACTION',
+
+  // Förtjänad autonomi — nedgradering (lib/autonomy/earned-autonomy.ts
+  // recordAutonomyFailure): "nyckeln togs bort" är ett konstaterande, inte
+  // ett förslag. Godkänn = jag har läst den, ingenting att utföra.
+  autonomy_revoked: 'INFORMATIONAL',
 }
 
 /** Vad är det här kortet? `null` = okänt, och okänt godkänns inte. */

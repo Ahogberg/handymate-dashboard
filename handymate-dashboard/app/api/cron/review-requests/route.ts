@@ -134,8 +134,9 @@ export async function GET(request: NextRequest) {
 
     // Förtjänad autonomi (beror bara på business_id — kolla en gång per
     // business, inte per projekt): har hantverkaren beviljat Hanna autonomi
-    // för recensionsförfrågningar?
-    const { isAutonomous } = await import('@/lib/autonomy/earned-autonomy')
+    // för recensionsförfrågningar? Inget belopp på detta kort → ingen
+    // beloppsgräns (recensionsförfrågningar kostar bara en SMS-kredit).
+    const { isAutonomous, recordAutonomyFailure } = await import('@/lib/autonomy/earned-autonomy')
     const reviewAutonomous = await isAutonomous(supabase, biz.business_id, 'review_request')
 
     // Epic C spel 1: en gång per business (som ovan), återanvänds för alla
@@ -326,9 +327,13 @@ export async function GET(request: NextRequest) {
           continue
         }
 
-        // Misslyckat autonomt utskick: notifiera ägaren (samma push-mönster
-        // som automation-motorns autonomi-fail) och fall igenom till
-        // approval-inserten nedan — INGEN continue, ingen stämpling.
+        // Misslyckat autonomt utskick — räknas mot nedgraderings-tröskeln
+        // (2 fel/14 dagar). Fail-safe internt, kastar aldrig.
+        await recordAutonomyFailure(supabase, biz.business_id, 'review_request')
+
+        // Notifiera ägaren (samma push-mönster som automation-motorns
+        // autonomi-fail) och fall igenom till approval-inserten nedan —
+        // INGEN continue, ingen stämpling.
         try {
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
           await fetch(`${appUrl}/api/push/send`, {

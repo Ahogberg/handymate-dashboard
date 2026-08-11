@@ -3,7 +3,7 @@ import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { triggerAgentInternal, makeIdempotencyKey } from '@/lib/agent-trigger'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
-import { isAutonomous } from '@/lib/autonomy/earned-autonomy'
+import { isAutonomous, getAutonomyCap, underAutonomyCap, recordAutonomyFailure } from '@/lib/autonomy/earned-autonomy'
 import { sendSmsViaElks } from '@/lib/sms-send'
 import { getBusinessPlanFromConfig } from '@/lib/auth'
 import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
@@ -63,6 +63,9 @@ export async function GET(request: NextRequest) {
       const nudgeV3Handles = new Set<string>()
       // Förtjänad autonomi per företag (för icke-V3-vägen).
       const nudgeAutonomousMap = new Map<string, boolean>()
+      // Beloppsgräns per företag (bara relevant om autonomt) — kollas per
+      // offert nedan, cap:et självt är samma oavsett belopp.
+      const nudgeCapMap = new Map<string, number | null>()
 
       if (nudgeBizIds.length > 0) {
         const { data: v3NudgeRules } = await supabase
@@ -118,6 +121,13 @@ export async function GET(request: NextRequest) {
             autonomous = false
           }
           nudgeAutonomousMap.set(bizId, autonomous)
+          if (autonomous) {
+            try {
+              nudgeCapMap.set(bizId, await getAutonomyCap(supabase, bizId, 'quote_followup_sms'))
+            } catch {
+              nudgeCapMap.set(bizId, null)
+            }
+          }
         }
       }
 
@@ -143,13 +153,20 @@ export async function GET(request: NextRequest) {
           .single()
 
         const businessName = biz?.display_name || biz?.business_name || ''
-        const amount = (q.customer_pays || q.total || 0).toLocaleString('sv-SE')
+        const amountRaw = q.customer_pays || q.total || 0
+        const amount = amountRaw.toLocaleString('sv-SE')
         const firstName = (customer.name || '').split(' ')[0]
         const suffix = buildSmsSuffix(businessName, biz?.assigned_phone_number)
         const message = `Hej${firstName ? ' ' + firstName : ''}! Din offert "${q.title || ''}" på ${amount} kr går ut om 3 dagar. Hör av dig om du har frågor eller vill gå vidare!\n${suffix}`
 
+        // Beloppsgräns: ett belopp över gränsen tar godkännande-vägen även om
+        // företaget annars fått autonomi — hög risk trumpar streak.
+        const bizAutonomous = nudgeAutonomousMap.get(q.business_id) === true
+        const capExceeded = bizAutonomous && !underAutonomyCap(nudgeCapMap.get(q.business_id) ?? null, amountRaw)
+        const treatAsAutonomous = bizAutonomous && !capExceeded
+
         // ── Grind: icke-V3-företag gatas genom förtjänad autonomi ──
-        if (!nudgeAutonomousMap.get(q.business_id)) {
+        if (!treatAsAutonomous) {
           // Ej autonom → skapa godkännande (dedup mot öppet pending för offerten).
           // send_sms-casen i executeApprovalPayload skickar via sendSmsViaElks.
           const { count: existing } = await supabase
@@ -168,8 +185,9 @@ export async function GET(request: NextRequest) {
             business_id: q.business_id,
             approval_type: 'send_sms',
             title: `Följ upp offert innan den går ut`,
-            description: `Offerten "${q.title || ''}" på ${amount} kr går ut om 3 dagar. Godkänn för att skicka en påminnelse till kunden.`,
+            description: `Offerten "${q.title || ''}" på ${amount} kr går ut om 3 dagar. Godkänn för att skicka en påminnelse till kunden.${capExceeded ? ` Daniel sköter vanligtvis dessa själv, men beloppet avviker (${amount} kr).` : ''}`,
             // to/message/related_id → send_sms-casen; autonomy_key → streak-räkning.
+            // amount_kr → cardContext/approveLabel + beloppsgränskontrollen ovan.
             // agent_id (Hanna v2 spel 4, bärande princip #6): offertjakten är
             // Daniels domän — utan detta föll kortet igenom till Lisa i
             // agentForApproval (send_sms matchar "sms" innan "quote").
@@ -180,6 +198,7 @@ export async function GET(request: NextRequest) {
               related_id: q.quote_id,
               autonomy_key: 'quote_followup_sms',
               agent_id: 'daniel',
+              amount_kr: amountRaw,
             },
             status: 'pending',
             risk_level: 'medium',
@@ -229,6 +248,9 @@ export async function GET(request: NextRequest) {
               }
             } else {
               console.error('[quote-follow-up] expiry-nudge SMS send failed (non-blocking):', q.business_id, q.quote_id, smsResult.error)
+              // Autonomt utskick nådde ingen kund — räknas mot nedgraderings-
+              // tröskeln (2 fel/14 dagar). Fail-safe internt, kastar aldrig.
+              await recordAutonomyFailure(supabase, q.business_id, 'quote_followup_sms')
             }
 
             // VP2 (gap 4): nudge-vägen loggade tidigare INGENTING till

@@ -77,9 +77,9 @@ test.describe('computeStreakFromRows (rader sorterade NYAST först)', () => {
     const rows = [row({}), row({ status: 'pending' }), row({ status: 'expired' }), row({})]
     expect(computeStreakFromRows(rows, 'invoice_reminder')).toBe(2)
   })
-  test('redigerade godkännanden hoppas över (räknas ej, nollar ej)', () => {
+  test('redigerade godkännanden bryter streaken (som en avvisning)', () => {
     const rows = [row({}), row({ payload: { autonomy_key: 'invoice_reminder', edited: true } }), row({})]
-    expect(computeStreakFromRows(rows, 'invoice_reminder')).toBe(2)
+    expect(computeStreakFromRows(rows, 'invoice_reminder')).toBe(1)
   })
   test('tom lista → 0', () => {
     expect(computeStreakFromRows([], 'review_request')).toBe(0)

@@ -9,7 +9,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
-import { deriveAutonomyKey, isAutonomous as isAutonomyGranted } from '@/lib/autonomy/earned-autonomy'
+import { deriveAutonomyKey, isAutonomous as isAutonomyGranted, recordAutonomyFailure } from '@/lib/autonomy/earned-autonomy'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 import { arTestId, arTestNamn } from '@/lib/testdata'
 
@@ -923,6 +923,11 @@ export async function executeRule(
   // Förtjänad autonomi: ett autonomt utskick som failar får inte svälta tyst —
   // hantverkaren har delegerat och måste få veta när delegationen fallerar.
   if (status === 'failed' && autonomousBypass) {
+    // Räknas mot nedgraderings-tröskeln (2 fel/14 dagar). autonomyKey är satt
+    // (annars hade autonomousBypass aldrig blivit true). Fail-safe internt.
+    if (autonomyKey) {
+      await recordAutonomyFailure(supabase, typedRule.business_id, autonomyKey)
+    }
     try {
       await fetch(`${APP_URL}/api/push/send`, {
         method: 'POST',

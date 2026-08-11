@@ -4,7 +4,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { generateOCR } from '@/lib/ocr'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { buildSwishQRData } from '@/lib/swish-qr'
-import { isAutonomous } from '@/lib/autonomy/earned-autonomy'
+import { isAutonomous, getAutonomyCap, underAutonomyCap, recordAutonomyFailure } from '@/lib/autonomy/earned-autonomy'
 import { deliverInvoiceReminder } from '@/lib/invoice-reminder-send'
 import { svDateStr } from '@/lib/dates'
 import { arTestId, arTestNamn } from '@/lib/testdata'
@@ -372,6 +372,18 @@ async function sendAutoReminders() {
         autonomous = await isAutonomous(supabase, inv.business_id, 'invoice_reminder')
       } catch { autonomous = false }
 
+      // Beloppsgräns: ett belopp över gränsen tar godkännande-vägen även för
+      // ett företag som annars fått autonomi — hög risk trumpar streak.
+      let capExceeded = false
+      if (autonomous) {
+        let cap: number | null = null
+        try { cap = await getAutonomyCap(supabase, inv.business_id, 'invoice_reminder') } catch { cap = null }
+        if (!underAutonomyCap(cap, amountToPay)) {
+          capExceeded = true
+          autonomous = false
+        }
+      }
+
       if (autonomous) {
         const delivery = await deliverInvoiceReminder(supabase, deliveryInput)
         if (!delivery.skipped) {
@@ -390,6 +402,9 @@ async function sendAutoReminders() {
           })
         } else {
           results.push({ invoice_id: inv.invoice_id, invoice_number: inv.invoice_number, level, success: false })
+          // Autonomt utskick nådde ingen kund — räknas mot nedgraderings-
+          // tröskeln (2 fel/14 dagar). Fail-safe internt, kastar aldrig.
+          await recordAutonomyFailure(supabase, inv.business_id, 'invoice_reminder')
         }
         continue
       }
@@ -415,7 +430,7 @@ async function sendAutoReminders() {
         business_id: inv.business_id,
         approval_type: 'invoice_reminder',
         title: `Skicka påminnelse för faktura ${inv.invoice_number}`,
-        description: `Faktura ${inv.invoice_number} på ${amountLabel} kr är ${daysOverdue} dagar försenad. Godkänn för att skicka påminnelse ${nextCount} till kunden.`,
+        description: `Faktura ${inv.invoice_number} på ${amountLabel} kr är ${daysOverdue} dagar försenad. Godkänn för att skicka påminnelse ${nextCount} till kunden.${capExceeded ? ` Karin sköter vanligtvis dessa själv, men beloppet avviker (${amountLabel} kr).` : ''}`,
         // invoice_id på topp-nivå → dedup-guarden ovan kan matcha via .contains.
         // autonomy_key → streak-räkning (förtjänad autonomi) kan mappa raden.
         // delivery → allt deliverInvoiceReminder behöver vid godkännande.
