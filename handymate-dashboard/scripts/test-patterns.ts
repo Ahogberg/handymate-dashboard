@@ -433,6 +433,21 @@ function makeApproval(
   }
 }
 
+/**
+ * Redigerat godkännande: DB skriver aldrig status='edited' — en redigering
+ * sparas som status='approved' med payload.edited===true (se
+ * app/api/approvals/[id]/route.ts). Fixture-helpern speglar det.
+ */
+function makeEditedApproval(agentId: string | null, created_at: string, approval_type: string = 'send_sms'): ApprovalSample {
+  return {
+    id: `appr_${Math.random().toString(36).slice(2, 8)}`,
+    status: 'approved',
+    approval_type,
+    payload: { ...(agentId ? { agent_id: agentId } : {}), edited: true },
+    created_at,
+  }
+}
+
 // Tom samples-array
 {
   const result = computeApproveRate([], WINDOW_START, WINDOW_END)
@@ -478,7 +493,7 @@ function makeApproval(
   const samples: ApprovalSample[] = [
     makeApproval('approved', 'karin', '2026-05-29T10:00:00Z'),
     makeApproval('approved', 'karin', '2026-05-29T11:00:00Z'),
-    makeApproval('edited', 'karin', '2026-05-29T12:00:00Z'),
+    makeEditedApproval('karin', '2026-05-29T12:00:00Z'),
     makeApproval('approved', 'daniel', '2026-05-29T13:00:00Z'),
     makeApproval('rejected', 'daniel', '2026-05-29T14:00:00Z'),
     makeApproval('rejected', 'daniel', '2026-05-29T15:00:00Z'),

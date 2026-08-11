@@ -28,7 +28,7 @@ export interface AgentBrief {
  * (Upptäckt 2026-08-05: overdue-fixen syntes inte förrän dagen efter
  * eftersom GET:en serverade 05:30-cronens cache byggd med gammal kod.)
  */
-export const MORNING_BRIEF_VERSION = 4 // 4: "Inför mötet"-raderna (Epic 1)
+export const MORNING_BRIEF_VERSION = 5 // 5: profWarnings läser pending_approvals istället för project_events (var alltid tom)
 
 export interface MorningBrief {
   date: string
@@ -95,9 +95,14 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
       .lte('scheduled_start', `${today}T23:59:59`)
       .not('status', 'eq', 'cancelled')
       .order('scheduled_start'),
-    supabase.from('project_events')
-      .select('project_id, description')
-      .eq('business_id', businessId).eq('type', 'profitability_warning')
+    // Bugg (2026-08-12): läste tidigare project_events/'profitability_warning'
+    // — ingen kod skriver dit. Producenten checkProfitabilityWarnings
+    // (lib/profitability.ts) skriver till pending_approvals, samma mönster
+    // som app/api/dashboard/pengar/route.ts:81-86.
+    supabase.from('pending_approvals')
+      .select('description, payload')
+      .eq('business_id', businessId).eq('approval_type', 'profitability_warning')
+      .eq('status', 'pending')
       .gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString())
       .limit(3),
     supabase.from('customer')
@@ -189,7 +194,12 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
     console.warn('[morning-brief] möteskontext hoppades över (icke-blockerande):', err)
   }
 
-  const larsBrief = buildLarsBrief(todayBookings.data || [], profWarnings.data || [], moteskontext)
+  // pending_approvals har project_id i payload, inte som egen kolumn.
+  const profWarningRows = (profWarnings.data || []).map((w: any) => ({
+    description: w.description,
+    project_id: w.payload?.project_id,
+  }))
+  const larsBrief = buildLarsBrief(todayBookings.data || [], profWarningRows, moteskontext)
   const hannaBrief = buildHannaBrief(inactiveCustomers.data || [])
   const lisaBrief = buildLisaBrief(recentCalls.data || [])
   const matteBrief = buildMatteBrief(pendingApprovals.data || [], [karinBrief, danielBrief, larsBrief, hannaBrief, lisaBrief])
@@ -305,7 +315,7 @@ function buildLarsBrief(
     agentId: 'lars', quote: `${warnings.length} projekt med lönsamhetsrisk`,
     badge: 'Risk', badgeType: 'danger',
     details: [
-      ...warnings.map((w: any) => ({ text: w.description, urgency: 'high' as const, link: `/dashboard/projects/${w.project_id}` })),
+      ...warnings.map((w: any) => ({ text: w.description, urgency: 'high' as const, link: w.project_id ? `/dashboard/projects/${w.project_id}` : '/dashboard/projects' })),
       ...bookings.map(bokningsRad),
     ],
   }

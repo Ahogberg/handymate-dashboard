@@ -70,6 +70,10 @@ export async function analyzePriceAdjustments(businessId: string): Promise<{
 
     // 5. Aggregate estimated hours per category per quote
     const estimatedByCategory = new Map<string, { totalHours: number; count: number }>()
+    // Håller koll på vilka kategorier varje offert har tim-rader i. time_entry saknar
+    // jobbkategori helt, så faktiska timmar kan bara jämföras ärligt mot en offerts
+    // kategori-estimat om offerten bara har EN kategori — annars blandas ihop äpplen och päron.
+    const categoriesByQuote = new Map<string, Set<string>>()
     for (const item of quoteItems) {
       const cat = item.category_slug || 'ovrigt'
       const existing = estimatedByCategory.get(`${item.quote_id}:${cat}`)
@@ -81,6 +85,11 @@ export async function analyzePriceAdjustments(businessId: string): Promise<{
           count: 1,
         })
       }
+
+      if (!categoriesByQuote.has(item.quote_id)) {
+        categoriesByQuote.set(item.quote_id, new Set())
+      }
+      categoriesByQuote.get(item.quote_id)!.add(cat)
     }
 
     // 6. Aggregate actual hours per category per project → quote
@@ -99,6 +108,11 @@ export async function analyzePriceAdjustments(businessId: string): Promise<{
 
     for (const [key, est] of Array.from(estimatedByCategory.entries())) {
       const [quoteId, cat] = key.split(':')
+
+      // Hoppa över offerter med fler än en kategori — då är offertens totala
+      // faktiska timmar inte jämförbara mot just denna kategoris estimat.
+      if ((categoriesByQuote.get(quoteId)?.size || 0) > 1) continue
+
       const actualKey = `${quoteId}:all`
       const actualHours = actualByCategory.get(actualKey)
       if (actualHours === undefined) continue

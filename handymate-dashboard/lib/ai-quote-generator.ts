@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getServerSupabase } from '@/lib/supabase'
 import { matchGeneratedItem, type MatchableProduct } from '@/lib/products/match-generated-items'
+import { WON_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 
 export interface PriceListItem {
   name: string
@@ -364,15 +365,17 @@ export async function findSimilarQuotes(
   businessId: string,
   jobDescription: string,
   limit: number = 5
-): Promise<Array<{ quote_id: string; title: string; total: number; items: any[] }>> {
+): Promise<Array<{ quote_id: string; title: string; total: number }>> {
   const supabase = getServerSupabase()
 
-  // Get accepted/sent quotes for this business to find pricing patterns
+  // Vunna offerter (accepterade/signerade) ger prishistoriken — utkast är
+  // aldrig prissatta i skarpt läge och ska inte forma ankaret (se
+  // WON_QUOTE_STATUSES i lib/quotes/statuses.ts).
   const { data: quotes } = await supabase
     .from('quotes')
-    .select('quote_id, title, description, total, items, labor_total, material_total')
+    .select('quote_id, title, description, total, labor_total, material_total')
     .eq('business_id', businessId)
-    .in('status', ['accepted', 'sent', 'draft'])
+    .in('status', WON_QUOTE_STATUSES)
     .order('created_at', { ascending: false })
     .limit(50)
 
@@ -393,8 +396,7 @@ export async function findSimilarQuotes(
     .map((q: any) => ({
       quote_id: q.quote_id,
       title: q.title,
-      total: q.total,
-      items: q.items
+      total: q.total
     }))
 }
 
@@ -402,6 +404,7 @@ export async function getAveragePrice(
   businessId: string,
   jobDescription: string
 ): Promise<{ average: number; min: number; max: number; count: number }> {
+  // Samma vunna-filter som findSimilarQuotes — se kommentar där.
   const similar = await findSimilarQuotes(businessId, jobDescription, 20)
 
   if (similar.length === 0) {

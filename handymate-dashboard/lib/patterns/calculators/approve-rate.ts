@@ -5,8 +5,11 @@
  *
  * Pattern: hur ofta godkänner användaren agentens KONKRETA förslag?
  *
- * Sample = en resolved approval (status approved | rejected | edited)
+ * Sample = en resolved approval (DB-status approved | rejected)
  *          MED actionable approval_type (typed action, inte ack-only).
+ *          'edited' är ingen DB-status — en redigering sparas som
+ *          status='approved' med payload.edited===true och klassificeras
+ *          om till "edited" internt (se isEditedSample nedan).
  * Window: senaste 30 dagar.
  * Min N preliminary: 5 totala resolved approvals (efter exclusions).
  *
@@ -60,7 +63,12 @@ import type {
  */
 export interface ApprovalSample {
   id: string
-  status: string  // 'approved' | 'rejected' | 'edited' | annat (filtreras)
+  /**
+   * DB skriver aldrig status='edited' — en redigering sparas som
+   * status='approved' med payload.edited===true (se app/api/approvals/[id]/route.ts).
+   * 'edited' klassificeras därför internt i computeApproveRate, inte i DB-queryn.
+   */
+  status: string  // 'approved' | 'rejected' | annat (filtreras)
   /**
    * Den approval-typ som skapades. Används för att skilja typed actions
    * (rate-mätbara) från generic ack-only observations.
@@ -74,8 +82,21 @@ export interface ApprovalSample {
  * Resolved-status som räknas. Andra status (pending, expired,
  * auto_approved) exkluderas — de representerar inte aktiv mänsklig
  * feedback.
+ *
+ * 'edited' är INTE en DB-status (se ApprovalSample.status-kommentar) —
+ * den klassificeras ur payload.edited på 'approved'-rader längre ner.
  */
-const RESOLVED_STATUSES = new Set(['approved', 'rejected', 'edited'])
+const RESOLVED_STATUSES = new Set(['approved', 'rejected'])
+
+/**
+ * En 'approved'-rad är i själva verket en redigering om payload.edited===true
+ * (satt av app/api/approvals/[id]/route.ts vid action==='edit'). Samma
+ * payload-kontroll som lib/autonomy/earned-autonomy.ts:107 använder för
+ * streak-räkning — måste hållas i synk med den.
+ */
+function isEditedSample(sample: ApprovalSample): boolean {
+  return sample.status === 'approved' && (sample.payload as Record<string, unknown> | null)?.edited === true
+}
 
 /**
  * Approval-typer som är INFORMATIVA snarare än actionable. Användarens
@@ -142,7 +163,10 @@ export function computeApproveRate(
 
   for (const sample of kept) {
     const agentId = extractAgentId(sample)
-    const status = sample.status
+    // 'edited' är inte en DB-status — den härleds ur payload.edited på
+    // approved-rader (isEditedSample). Ren 'approved' annars, 'rejected' som DB skriver.
+    const edited = isEditedSample(sample)
+    const status = edited ? 'edited' : sample.status
 
     if (status === 'approved') totalApproved++
     else if (status === 'rejected') totalRejected++
@@ -231,7 +255,7 @@ export async function calculateApproveRate(
     .from('pending_approvals')
     .select('id, status, approval_type, payload, created_at')
     .eq('business_id', businessId)
-    .in('status', ['approved', 'rejected', 'edited'])
+    .in('status', ['approved', 'rejected'])  // 'edited' finns inte som DB-status, se ApprovalSample
     .gte('created_at', window.start.toISOString())
     .lte('created_at', window.end.toISOString())
 
