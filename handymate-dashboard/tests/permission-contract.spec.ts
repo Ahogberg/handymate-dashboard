@@ -197,6 +197,11 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       why: 'Sammanfattad pipeline-summa (totalValue) — mindre payload, samma exponering. Det här var den rutt Verksamhetsöversikt-plattan i mobilappen faktiskt hämtade utan behörighetskontroll.',
     },
     {
+      route: 'pipeline/deals',
+      requires: 'see_financials',
+      why: 'GET gör select(*) på deal-tabellen (inkl. affärsvärde). Systerrutten som Flödet-sidan anropar i samma Promise.all som /api/pipeline — kvarstod oskyddad efter den första pipeline-fixen och var den faktiska läckan.',
+    },
+    {
       route: 'dashboard/cash-radar',
       requires: 'see_financials',
       why: 'Fem veckors kassaflödesprognos — fakturerat plus viktad potential, alltså företagets likviditet.',
