@@ -149,6 +149,11 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   meeting_summary: 'INFORMATIONAL',
   meeting_followup: 'EXECUTABLE_ACTION',
 
+  // Customer Facts V1 (2026-08-12): säg-det-en-gång-minnet. Godkännande
+  // skriver EN rad i customer_fact — fältlokal skrivning, samma klass som
+  // meeting_followup ovan. Se sql/v122_customer_fact.sql.
+  customer_fact: 'EXECUTABLE_ACTION',
+
   // Förtjänad autonomi — nedgradering (lib/autonomy/earned-autonomy.ts
   // recordAutonomyFailure): "nyckeln togs bort" är ett konstaterande, inte
   // ett förslag. Godkänn = jag har läst den, ingenting att utföra.

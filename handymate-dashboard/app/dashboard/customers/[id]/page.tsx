@@ -77,6 +77,16 @@ interface Customer {
   sms_opt_out_source?: string | null
 }
 
+interface CustomerFact {
+  id: string
+  fact_type: 'preference' | 'constraint' | 'commitment' | 'contact'
+  content: string
+  evidence_quote: string | null
+  confidence: number | null
+  created_at: string
+  confirmed_at: string | null
+}
+
 interface CustomerDocument {
   id: string
   file_name: string
@@ -202,6 +212,14 @@ interface AgreementType {
   is_active: boolean
 }
 
+// Customer Facts V1 — svenska badge-etiketter per fact_type, teal-tema.
+const FACT_TYPE_BADGE: Record<string, { label: string; className: string }> = {
+  preference: { label: 'Preferens', className: 'bg-teal-50 text-teal-700' },
+  constraint: { label: 'Förutsättning', className: 'bg-amber-50 text-amber-700' },
+  commitment: { label: 'Löfte', className: 'bg-primary-50 text-primary-700' },
+  contact: { label: 'Kontakt', className: 'bg-gray-100 text-gray-700' },
+}
+
 export default function CustomerDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -226,6 +244,7 @@ export default function CustomerDetailPage() {
   const [deals, setDeals] = useState<Deal[]>([])
   const [serviceAgreements, setServiceAgreements] = useState<ServiceAgreement[]>([])
   const [referrals, setReferrals] = useState<{ leadsCount: number; wonDealsCount: number; wonValueSum: number } | null>(null)
+  const [customerFacts, setCustomerFacts] = useState<CustomerFact[]>([])
 
   // Edit mode
   const [isEditing, setIsEditing] = useState(false)
@@ -415,6 +434,20 @@ export default function CustomerDetailPage() {
       }
     } catch {
       setReferrals(null)
+    }
+
+    // Customer Facts V1 (2026-08-12): fail-soft precis som referrals — en
+    // tom lista döljer bara sektionen, kraschar aldrig kundkortet.
+    try {
+      const factsRes = await fetch(`/api/customers/${customerId}/facts`)
+      if (factsRes.ok) {
+        const factsData = await factsRes.json()
+        setCustomerFacts(factsData.facts || [])
+      } else {
+        setCustomerFacts([])
+      }
+    } catch {
+      setCustomerFacts([])
     }
 
     await fetchServiceAgreements()
@@ -809,6 +842,39 @@ export default function CustomerDetailPage() {
                       {referrals.wonDealsCount} vunna jobb · {formatSEK(referrals.wonValueSum)}
                     </p>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Det här vet Handymate — Customer Facts V1 (2026-08-12).
+                Explicit sagda kundfakta godkända via kort i Inkorgen.
+                Sektionen renderas inte alls när listan är tom. */}
+            {customerFacts.length > 0 && (
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Det här vet Handymate</h2>
+                <div className="space-y-3">
+                  {customerFacts.map(fact => {
+                    const badge = FACT_TYPE_BADGE[fact.fact_type] || FACT_TYPE_BADGE.preference
+                    const datum = fact.confirmed_at || fact.created_at
+                    return (
+                      <div key={fact.id} className="p-3 bg-gray-50 rounded-xl">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badge.className}`}>
+                            {badge.label}
+                          </span>
+                          {datum && (
+                            <span className="text-xs text-gray-400">
+                              {new Date(datum).toLocaleDateString('sv-SE')}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-900">{fact.content}</p>
+                        {fact.evidence_quote && (
+                          <p className="text-xs text-gray-500 italic mt-1">"{fact.evidence_quote}"</p>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}

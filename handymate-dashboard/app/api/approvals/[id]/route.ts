@@ -1155,6 +1155,40 @@ async function executeApprovalPayload(
         return { action: 'meeting_followup', task_id: task.id, title: task.title }
       }
 
+      case 'customer_fact': {
+        // Customer Facts V1 (2026-08-12): säg-det-en-gång-minnet. Godkännande
+        // skriver EN rad i customer_fact — samma mönster som meeting_followup
+        // ovan, fältlokal skrivning. Tabellen skapas av sql/v122 (körs
+        // senare av Andreas) — misslyckas inserten (t.ex. tabellen saknas
+        // ännu) failar caset stängt med ett svenskt fel, aldrig en krasch.
+        const pl = payload as any
+        if (!pl.customer_id || !pl.content) {
+          return { action: 'customer_fact', ok: false, error: 'Kortet saknar kund eller innehåll.' }
+        }
+        const supabaseCF = await getSupabase()
+        const { data: fact, error: factErr } = await supabaseCF
+          .from('customer_fact')
+          .insert({
+            business_id: businessId,
+            customer_id: pl.customer_id,
+            fact_type: pl.fact_type || 'preference',
+            content: pl.content,
+            source_type: 'meeting',
+            source_id: pl.recording_id ?? null,
+            evidence_quote: pl.evidence_quote ?? null,
+            confidence: pl.confidence ?? null,
+            confirmed_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single()
+
+        if (factErr || !fact) {
+          console.error('[approvals/customer_fact] kunde inte spara faktumet:', factErr?.message)
+          return { action: 'customer_fact', ok: false, error: 'Kunde inte spara — försök igen om en stund' }
+        }
+        return { action: 'customer_fact', ok: true, fact_id: fact.id }
+      }
+
       case 'proactive_care': {
         const pl = payload as any
         if (!pl.customer_phone || !pl.suggested_sms) {

@@ -29,6 +29,8 @@ interface AISuggestion {
   action_data?: Record<string, any>
   confidence: number
   source_text?: string
+  // Customer Facts V1 (2026-08-12): bara satt när type === 'customer_fact'.
+  fact_type?: 'preference' | 'constraint' | 'commitment' | 'contact'
 }
 
 /**
@@ -49,12 +51,14 @@ interface AISuggestion {
  *           och märker ingen skillnad mellan de två vägarna.
  */
 interface MapReduceFynd {
-  type: 'quote' | 'follow_up' | 'reminder' | 'reschedule'
+  type: 'quote' | 'follow_up' | 'reminder' | 'reschedule' | 'customer_fact'
   title: string
   description: string
   source_text: string
   tidsstampel: string | null
   confidence: number
+  // Customer Facts V1 (2026-08-12): bara satt när type === 'customer_fact'.
+  fact_type?: 'preference' | 'constraint' | 'commitment' | 'contact'
 }
 
 /** Plockar ut ett JSON-objekt ur ett AI-svar — svaret är nästan alltid ren
@@ -87,22 +91,34 @@ ${chunk}
 === UPPGIFT ===
 Extrahera KANDIDATFYND — konkreta saker som diskuterades och kan bli åtgärder. Det här är en delanalys inför en senare sammanslagning, så var generös men konkret: hellre ett extra fynd än att missa något.
 
-Tillåtna typer (ENDAST dessa fyra — föreslå ALDRIG "callback", "booking" eller "sms", de hanteras av ett annat system):
+Tillåtna typer (ENDAST dessa fem — föreslå ALDRIG "callback", "booking" eller "sms", de hanteras av ett annat system):
 - "quote": jobb, pris eller omfattning diskuterades (inkl. ÄTA — tillägg till pågående jobb)
 - "follow_up": något ska följas upp efter mötet
 - "reminder": något ska påminnas om (beställning, återbesök)
 - "reschedule": en inbokad tid diskuterades om
+- "customer_fact": kunden eller hantverkaren sa EXPLICIT något om en preferens,
+  en begränsning, ett löfte eller en kontaktuppgift (se regler nedan)
+
+Regler för "customer_fact" (striktare än övriga typer):
+- BARA saker som uttryckligen sades — gissa eller tolka ALDRIG in något.
+- Max 5 per transkriptdel.
+- Sätt alltid "fact_type" till ett av: "preference" (önskemål/preferens),
+  "constraint" (begränsning, t.ex. tillträdestider, allergier), "commitment"
+  (löfte, t.ex. "vi hör av oss senast fredag") eller "contact" (kontaktuppgift,
+  t.ex. portkod, bästa telefonnummer).
+- "source_text" MÅSTE vara ett ordagrant citat — aldrig en omskrivning.
 
 Svara ENDAST med JSON i detta format:
 {
   "fynd": [
     {
-      "type": "quote|follow_up|reminder|reschedule",
+      "type": "quote|follow_up|reminder|reschedule|customer_fact",
       "title": "Kort titel på svenska",
       "description": "Vad som diskuterades",
       "source_text": "Relevant citat från transkriptdelen",
       "tidsstampel": "Närmaste [mm:ss]-markör i den här delen, eller null",
-      "confidence": 0.0-1.0
+      "confidence": 0.0-1.0,
+      "fact_type": "preference|constraint|commitment|contact (endast för customer_fact)"
     }
   ]
 }
@@ -146,18 +162,22 @@ ${JSON.stringify(alltFynd, null, 2)}
 2. Deduplicera fynd som beskriver SAMMA sak (samma typ + liknande titel/innehåll) — behåll bara det bäst underbyggda (tydligast source_text, högst confidence).
 3. Sätt en prioritet (low/medium/high/urgent) för varje kvarvarande förslag — "urgent" ENDAST vid akuta problem (läcka, strömavbrott etc).
 4. Har ett fynd en tidsstämpel (fältet "tidsstampel") — inled dess source_text med den, t.ex. "[05:30] ...", så den syns i det slutgiltiga förslaget.
+5. "customer_fact"-fynd: behåll fältet "fact_type" oförändrat. Finns fler än 5
+   kvar efter dedupe för hela mötet, behåll bara de 5 med högst confidence —
+   resten faller bort.
 
 Svara ENDAST med JSON i exakt detta format:
 {
   "summary": "Kort sammanfattning av mötet på svenska (2-3 meningar)",
   "suggestions": [
     {
-      "type": "quote|follow_up|reminder|reschedule",
+      "type": "quote|follow_up|reminder|reschedule|customer_fact",
       "title": "Kort titel på svenska",
       "description": "Beskrivning av vad som ska göras",
       "priority": "low|medium|high|urgent",
       "confidence": 0.0-1.0,
-      "source_text": "Relevant citat, med [mm:ss]-prefix om tidsstämpel finns"
+      "source_text": "Relevant citat, med [mm:ss]-prefix om tidsstämpel finns",
+      "fact_type": "preference|constraint|commitment|contact (endast för customer_fact)"
     }
   ]
 }
@@ -406,6 +426,13 @@ affären framåt efter besöket:
 - Om något ska följas upp efter besöket → "follow_up"
 - Om något ska påminnas om (beställning, återbesök) → "reminder"
 - Om en inbokad tid diskuterades om → "reschedule"
+- Sa kunden eller hantverkaren EXPLICIT något om en preferens (t.ex.
+  tidpreferens, önskemål om utförande), en begränsning (t.ex. tillträdestider,
+  allergier), ett löfte (t.ex. "vi hör av oss senast fredag") eller en
+  kontaktuppgift (t.ex. portkod, bästa telefonnummer) → "customer_fact".
+  Max 5 per möte. BARA saker som uttryckligen sades — gissa aldrig. Ange
+  alltid "fact_type": "preference", "constraint", "commitment" eller
+  "contact", och citera ordagrant i source_text.
 - Föreslå ALDRIG "callback" — hantverkaren pratade nyss med kunden ansikte
   mot ansikte.
 - Innehåller transkriptet ovan tidsstämpel-markörer ([mm:ss] eller
@@ -445,12 +472,13 @@ Svara ENDAST med JSON i följande format:
   },
   "suggestions": [
     {
-      "type": "quote|callback|follow_up|reminder|reschedule",
+      "type": "quote|callback|follow_up|reminder|reschedule|customer_fact",
       "title": "Kort titel på svenska",
       "description": "Beskrivning av vad som ska göras",
       "priority": "low|medium|high|urgent",
       "confidence": 0.0-1.0,
       "source_text": "Relevant citat från samtalet",
+      "fact_type": "preference|constraint|commitment|contact (endast för customer_fact, endast vid platsbesök)",
       "action_data": {
         "customer_name": "Namn om känt",
         "phone_number": "Telefon",
@@ -618,6 +646,24 @@ Svara ENDAST med JSON i följande format:
         kundNamn = kund?.name || null
       }
 
+      // Customer Facts V1 (2026-08-12): ett fakta-kort får ALDRIG skapas utan
+      // en säkert härledd kund. recording.customer_id (customerId ovan) kan
+      // vara null för ett fysiskt platsbesök som spelades in utan
+      // telefonkoppling — men bokningen känner ofta kunden ändå
+      // (call_recording.booking_id → booking.customer_id, v118). Hittas
+      // ingen kund här hoppas fakta-extraktionen tyst över nedan — ingen
+      // gissning, inget kort på fel kund.
+      let factCustomerId: string | null = customerId || null
+      if (!factCustomerId && recording.booking_id) {
+        const { data: koppladBokning } = await supabase
+          .from('booking')
+          .select('customer_id')
+          .eq('booking_id', recording.booking_id)
+          .eq('business_id', recording.business_id)
+          .maybeSingle()
+        factCustomerId = koppladBokning?.customer_id || null
+      }
+
       const beslutsstampel = buildDecisionRecord({
         model: analysModell,
         prompt: 'callAnalysis',
@@ -641,6 +687,27 @@ Svara ENDAST med JSON i följande format:
               source_text: s.source_text || null,
               confidence: s.confidence,
               recording_id,
+              decision_record: beslutsstampel,
+            },
+          })
+        } else if (s.type === 'customer_fact') {
+          // Ingen kund härledd → hoppa helt, tyst. Inte ens ett loggat fel —
+          // det är ett förväntat läge (möte utan bokningskoppling), inte en bugg.
+          if (!factCustomerId) continue
+          const kortInnehall = s.description || s.title
+          kort.push({
+            approval_type: 'customer_fact',
+            title: `Matte hörde: ${kortInnehall.length > 60 ? kortInnehall.slice(0, 60) + '…' : kortInnehall}`,
+            description: `${s.description || ''}${evidens}`,
+            risk_level: 'low',
+            payload: {
+              customer_id: factCustomerId,
+              fact_type: s.fact_type || 'preference',
+              content: s.description,
+              evidence_quote: s.source_text || null,
+              confidence: s.confidence,
+              recording_id,
+              agent_id: 'matte',
               decision_record: beslutsstampel,
             },
           })

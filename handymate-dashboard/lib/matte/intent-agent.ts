@@ -187,7 +187,9 @@ KONVERSATIONSHISTORIK (senaste ${entity.conversationHistory.length}):
 ${entity.conversationHistory.map(m =>
     `  ${m.direction === 'in' ? '←' : '→'} [${m.timestamp.split('T')[0]}]: "${m.body.slice(0, 80)}${m.body.length > 80 ? '...' : ''}"`
   ).join('\n') || '  Ingen historik'}
-${slotsSection}
+${entity.confirmedFacts.length > 0
+  ? `\nBEKRÄFTADE KUNDFAKTA (godkända av hantverkaren):\n${entity.confirmedFacts.map(f => `  • [${f.fact_type}] ${f.content}`).join('\n')}\n`
+  : ''}${slotsSection}
 
 FÖRETAG: ${config.businessName}
 Timpris: ${config.hourlyRate} kr/h | ROT: ${config.rotEnabled ? 'Ja' : 'Nej'} | Arbetstid: ${config.workStart}–${config.workEnd}`

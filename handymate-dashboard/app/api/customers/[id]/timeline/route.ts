@@ -536,6 +536,40 @@ export async function GET(
     }
   }
 
+  // ── 13. customer_fact — Bekräftade kundfakta ────────────────────
+  // Customer Facts V1 (2026-08-12). Egen try/catch: tabellen skapas av
+  // sql/v122 (körs senare) — en saknad tabell ska bara tömma den här
+  // sektionen av tidslinjen, aldrig hela svaret.
+  if (filter === 'all' || filter === 'facts') {
+    try {
+      const { data: facts, error: factsErr } = await supabase
+        .from('customer_fact')
+        .select('id, fact_type, content, evidence_quote, created_at, confirmed_at')
+        .eq('business_id', businessId)
+        .eq('customer_id', customerId)
+        .is('superseded_by', null)
+        .order('created_at', { ascending: false })
+        .limit(20)
+
+      if (factsErr) {
+        console.error('[timeline] kundfakta:', factsErr.message)
+      } else {
+        for (const f of facts || []) {
+          events.push({
+            id: `fact_${f.id}`,
+            type: 'customer_fact_confirmed',
+            title: 'Kundfakta bekräftad',
+            description: f.content,
+            timestamp: f.confirmed_at || f.created_at,
+            metadata: { fact_type: f.fact_type, evidence_quote: f.evidence_quote },
+          })
+        }
+      }
+    } catch (err) {
+      console.error('[timeline] kundfakta oväntat fel:', err)
+    }
+  }
+
   // ── Deduplicate, sort, paginate ───────────────────────────────
   // Deduplicate by id
   const seen = new Set<string>()

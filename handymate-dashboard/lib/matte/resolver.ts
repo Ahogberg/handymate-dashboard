@@ -37,6 +37,10 @@ export interface ResolvedEntity {
     timestamp: string
     channel: 'sms' | 'email'
   }[]
+  // Customer Facts V1 (2026-08-12): godkända kundfakta ur möten
+  // (customer_fact, superseded_by IS NULL). Tom array för leads/okänd —
+  // fakta är alltid kundknutna.
+  confirmedFacts: { fact_type: string; content: string }[]
 }
 
 /**
@@ -126,12 +130,13 @@ export async function resolveEntity(
       activeDeals: [],
       recentInvoices: [],
       conversationHistory: [],
+      confirmedFacts: [],
     }
   }
 
   // ── Steg 2: Hämta kontext parallellt ──
 
-  const [projects, deals, invoices, smsHistory] = await Promise.all([
+  const [projects, deals, invoices, smsHistory, customerFacts] = await Promise.all([
     customerId
       ? supabase
           .from('booking')
@@ -180,6 +185,21 @@ export async function resolveEntity(
           .order('created_at', { ascending: false })
           .limit(10)
       : Promise.resolve({ data: [] as any[] }),
+
+    // Customer Facts V1: senaste 10 icke-ersatta godkända fakta för kunden.
+    // Fail-safe genom formen — Supabase returnerar {data:null, error} om
+    // tabellen inte finns än (sql/v122 körs senare), och (customerFacts.data
+    // || []) längre ner ger tom lista i stället för att kasta.
+    customerId
+      ? supabase
+          .from('customer_fact')
+          .select('fact_type, content')
+          .eq('business_id', businessId)
+          .eq('customer_id', customerId)
+          .is('superseded_by', null)
+          .order('created_at', { ascending: false })
+          .limit(10)
+      : Promise.resolve({ data: [] as any[] }),
   ])
 
   return {
@@ -216,5 +236,9 @@ export async function resolveEntity(
         timestamp: m.created_at,
         channel: 'sms' as const,
       })),
+    confirmedFacts: (customerFacts.data || []).map((f: any) => ({
+      fact_type: f.fact_type,
+      content: f.content,
+    })),
   }
 }

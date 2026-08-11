@@ -320,7 +320,9 @@ test.describe('rollfördelningen är kod, inte prompttillit', () => {
   test('prompten erbjuder inte längre Lisas typer', () => {
     const s = read(ANALYZE)
     expect(s, 'typunionen i prompten har kvar Lisas typer').not.toContain('"type": "booking|quote')
-    expect(s).toContain('"type": "quote|callback|follow_up|reminder|reschedule"')
+    // Customer Facts V1 (2026-08-12): customer_fact lades till i unionen —
+    // se lib/voice/analysis-scope.ts ANALYS_TILLATNA_TYPER.
+    expect(s).toContain('"type": "quote|callback|follow_up|reminder|reschedule|customer_fact"')
   })
 })
 

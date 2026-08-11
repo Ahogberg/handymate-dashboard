@@ -29,6 +29,10 @@ export const ANALYS_TILLATNA_TYPER = [
   'callback',   // inget verktyg finns
   'reminder',   // inget verktyg finns
   'reschedule', // ombokningen bor i approve-actions, inte i Lisas verktyg
+  // Customer Facts V1 (2026-08-12): explicit sagda kundfakta ur möten.
+  // Lisa har inget verktyg för det här heller — hör hemma i samma lista,
+  // trots att den bara faktiskt produceras i mötesgrenen (arMote).
+  'customer_fact',
 ] as const
 
 export type AnalysForslagsTyp = (typeof ANALYS_TILLATNA_TYPER)[number]
