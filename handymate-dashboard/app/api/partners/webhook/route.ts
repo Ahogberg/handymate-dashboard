@@ -4,6 +4,37 @@ import { getServerSupabase } from '@/lib/supabase'
 import { createHmac } from 'crypto'
 
 /**
+ * GET /api/partners/webhook — hämta hemligheter PÅ BEGÄRAN (2026-08-11).
+ *
+ * Dashboard-payloaden skickade tidigare webhook_secret + rå api_key vid
+ * varje sidladdning. Nu hämtas de bara när partnern öppnar
+ * inställningsmodalen/klickar visa — samma cookie-auth, men hemligheterna
+ * ligger inte i standardsvaret (eller i loggar/devtools av misstag).
+ */
+export async function GET(request: NextRequest) {
+  const token = getPartnerTokenFromRequest(request)
+  if (!token) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const partner = await getPartnerFromToken(token)
+  if (!partner) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const supabase = getServerSupabase()
+  const { data } = await supabase
+    .from('partners')
+    .select('api_key, webhook_secret')
+    .eq('id', partner.id)
+    .single()
+
+  return NextResponse.json({
+    api_key: data?.api_key || null,
+    webhook_secret: data?.webhook_secret || null,
+  })
+}
+
+/**
  * PUT /api/partners/webhook — Save webhook configuration
  */
 export async function PUT(request: NextRequest) {

@@ -5,11 +5,11 @@
 import { createHmac } from 'crypto'
 import { getServerSupabase } from '@/lib/supabase'
 
-const provisionPerPlan: Record<string, number> = {
-  starter: 499,       // 20% av 2 495
-  professional: 1199, // 20% av 5 995
-  enterprise: 2399,   // 20% av 11 995
-}
+// Prismappen som låg här (499/1199/2399 kr) är borttagen (2026-08-11):
+// den hade fel plannyckel ('enterprise' — riktiga id:t är 'business') och
+// blev fel i grunden när provisionen blev trappbaserad och betalningsdriven.
+// Faktiska belopp bor i partner_commission_ledger; events/webhooks bär
+// inte längre något påhittat belopp.
 
 /**
  * Notify the partner's webhook when a referred business triggers an event.
@@ -41,14 +41,13 @@ export async function notifyPartnerWebhook(
   if (!partner) return
 
   const plan = business.subscription_plan || 'starter'
-  const amountSek = provisionPerPlan[plan] || 0
 
-  // Log the event
+  // Log the event (business_id är TEXT sedan v117 — inserts fungerar nu)
   await supabase.from('partner_events').insert({
     partner_id: partner.id,
     business_id: businessId,
     event_type: eventType,
-    amount_sek: amountSek,
+    amount_sek: null,
     meta: {
       business_name: business.business_name || business.company_name,
       plan,
@@ -65,7 +64,7 @@ export async function notifyPartnerWebhook(
     event: eventType,
     business_name: business.business_name || business.company_name,
     plan,
-    amount_sek: amountSek,
+    amount_sek: null,
     timestamp: new Date().toISOString(),
   }
 

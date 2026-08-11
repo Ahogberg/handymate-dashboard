@@ -1,132 +1,33 @@
 'use client'
 
+// Partnerportalen (omskriven 2026-08-11, partnerprogram v2).
+// Orkestrerare — kortlogiken bor i ./components/. Nytt mot v1:
+//  - Kundkort med aktivitetsnivå + Uppföljning 1/2/3 + provisionsläge
+//  - Provisionsunderlag per månad (kund × månad × sats × belopp) ur liggaren
+//  - Partnerns FAKTISKA trappa visas — ingen hårdkodad "20 % i 12 månader"
+//  - Hemligheter (api-nyckel/webhook-secret) hämtas på begäran, ligger
+//    inte i sidans standardpayload
+
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-  Zap,
-  Copy,
-  Check,
-  Users,
-  TrendingUp,
-  Clock,
-  Banknote,
-  LogOut,
-  Loader2,
-  Eye,
-  EyeOff,
-  Share2,
-  Settings,
-  X,
-  ChevronDown,
-  ChevronRight,
-  Circle,
+  Zap, Copy, Check, Users, TrendingUp, Banknote, Wallet, LogOut,
+  Loader2, Eye, EyeOff, Share2, Settings, X,
 } from 'lucide-react'
-
-// ─── Types ───────────────────────────────────────────────────
-
-interface PartnerData {
-  id: string
-  name: string
-  company: string | null
-  email: string
-  referral_code: string
-  referral_url: string | null
-  commission_rate: number
-  total_earned_sek: number
-  total_pending_sek: number
-  api_key: string | null
-  webhook_url: string | null
-  webhook_secret: string | null
-  webhook_events: string[]
-}
-
-interface Stats {
-  total_referred: number
-  active_customers: number
-  total_converted: number
-  pending_commission_sek: number
-  total_earned_sek: number
-  next_payout_sek: number
-}
-
-interface Referral {
-  id: string
-  email: string | null
-  business_name: string | null
-  plan: string | null
-  subscription_status: string | null
-  status: string
-  created_at: string
-  converted_at: string | null
-  commission_month: number
-  monthly_commission: number
-  total_earned: number
-}
-
-interface PartnerEvent {
-  id: string
-  partner_id: string
-  business_id: string | null
-  event_type: string
-  amount_sek: number | null
-  meta: Record<string, unknown> | null
-  created_at: string
-}
-
-// ─── Helpers ─────────────────────────────────────────────────
-
-function formatSek(amount: number): string {
-  return amount.toLocaleString('sv-SE') + ' kr'
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('sv-SE')
-}
-
-function statusBadge(status: string): { text: string; color: string; icon: string } {
-  switch (status) {
-    case 'pending': return { text: 'Trial', color: 'bg-amber-50 text-amber-700 border-amber-200', icon: '🔄' }
-    case 'active': return { text: 'Aktiv', color: 'bg-green-50 text-green-700 border-green-200', icon: '✅' }
-    case 'rewarded': return { text: 'Klar (12 mån)', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: '🏆' }
-    case 'churned': return { text: 'Avslutad', color: 'bg-red-50 text-red-700 border-red-200', icon: '❌' }
-    default: return { text: status, color: 'bg-gray-50 text-gray-700 border-gray-200', icon: '—' }
-  }
-}
-
-function planLabel(plan: string | null): string {
-  if (!plan) return '—'
-  const map: Record<string, string> = {
-    starter: 'Starter',
-    professional: 'Professional',
-    enterprise: 'Enterprise',
-    trial: 'Trial',
-  }
-  return map[plan] || plan
-}
-
-function eventTypeLabel(type: string): string {
-  const map: Record<string, string> = {
-    referral_clicked: 'Klickade på din länk',
-    trial_started: 'Startade trial',
-    converted: 'Konverterade till betalande',
-    plan_upgraded: 'Uppgraderade plan',
-    provision_earned: 'Provision intjänad',
-    provision_paid: 'Provision utbetald',
-    churned: 'Avslutade prenumeration',
-    test: 'Test-webhook',
-  }
-  return map[type] || type
-}
+import ReferralCard from './components/ReferralCard'
+import StatementSection from './components/StatementSection'
+import {
+  formatSek,
+  type PartnerData, type Stats, type Referral, type Statement, type PartnerEvent,
+} from './components/types'
 
 const WEBHOOK_EVENT_OPTIONS = [
-  { key: 'trial_started', label: 'Trial startad' },
+  { key: 'trial_started', label: 'Registrering via din länk' },
   { key: 'converted', label: 'Konverterad till betalande' },
   { key: 'plan_upgraded', label: 'Plan uppgraderad' },
   { key: 'churned', label: 'Kund avslutad' },
 ]
-
-// ─── Component ───────────────────────────────────────────────
 
 export default function PartnerDashboardPage() {
   const router = useRouter()
@@ -134,18 +35,18 @@ export default function PartnerDashboardPage() {
   const [partner, setPartner] = useState<PartnerData | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   const [referrals, setReferrals] = useState<Referral[]>([])
-  const [events, setEvents] = useState<PartnerEvent[]>([])
+  const [statements, setStatements] = useState<Statement[]>([])
   const [eventsByBusiness, setEventsByBusiness] = useState<Record<string, PartnerEvent[]>>({})
 
-  // Clipboard states
   const [copiedLink, setCopiedLink] = useState(false)
   const [copiedKey, setCopiedKey] = useState(false)
   const [copiedSecret, setCopiedSecret] = useState(false)
 
-  // API key visibility
+  // Hemligheter hämtas på begäran (GET /api/partners/webhook), aldrig i standardpayloaden.
+  const [revealedKey, setRevealedKey] = useState<string | null>(null)
+  const [revealedSecret, setRevealedSecret] = useState<string | null>(null)
   const [showKey, setShowKey] = useState(false)
 
-  // Webhook modal
   const [webhookOpen, setWebhookOpen] = useState(false)
   const [webhookUrl, setWebhookUrl] = useState('')
   const [webhookEvents, setWebhookEvents] = useState<string[]>([])
@@ -153,14 +54,12 @@ export default function PartnerDashboardPage() {
   const [webhookTesting, setWebhookTesting] = useState(false)
   const [webhookTestResult, setWebhookTestResult] = useState<string | null>(null)
 
-  // Expanded referral timelines
   const [expandedRef, setExpandedRef] = useState<string | null>(null)
-
-  // Share modal
   const [shareOpen, setShareOpen] = useState(false)
 
   useEffect(() => {
     fetchDashboard()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function fetchDashboard() {
@@ -174,10 +73,9 @@ export default function PartnerDashboardPage() {
       setPartner(data.partner)
       setStats(data.stats)
       setReferrals(data.referrals || [])
-      setEvents(data.events || [])
+      setStatements(data.statements || [])
       setEventsByBusiness(data.events_by_business || {})
 
-      // Initialize webhook form
       if (data.partner) {
         setWebhookUrl(data.partner.webhook_url || '')
         setWebhookEvents(data.partner.webhook_events || ['trial_started', 'converted', 'plan_upgraded', 'churned'])
@@ -187,6 +85,29 @@ export default function PartnerDashboardPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function fetchSecrets(): Promise<{ api_key: string | null; webhook_secret: string | null } | null> {
+    try {
+      const res = await fetch('/api/partners/webhook')
+      if (!res.ok) return null
+      const data = await res.json()
+      setRevealedKey(data.api_key || null)
+      setRevealedSecret(data.webhook_secret || null)
+      return data
+    } catch {
+      return null
+    }
+  }
+
+  async function toggleShowKey() {
+    if (!showKey && revealedKey === null) await fetchSecrets()
+    setShowKey(v => !v)
+  }
+
+  async function openWebhookModal() {
+    if (revealedSecret === null) await fetchSecrets()
+    setWebhookOpen(true)
   }
 
   async function handleLogout() {
@@ -243,11 +164,6 @@ export default function PartnerDashboardPage() {
     )
   }
 
-  function getEventsForBusiness(businessId: string | undefined): PartnerEvent[] {
-    if (!businessId) return []
-    return eventsByBusiness[businessId] || []
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -263,8 +179,8 @@ export default function PartnerDashboardPage() {
   const statCards = [
     { label: 'Hänvisade företag', value: String(stats.total_referred), icon: Users, color: 'text-blue-600 bg-blue-50' },
     { label: 'Aktiva kunder', value: String(stats.active_customers), icon: TrendingUp, color: 'text-green-600 bg-green-50' },
-    { label: 'Intjänat totalt', value: formatSek(stats.total_earned_sek), icon: Banknote, color: 'text-primary-700 bg-primary-50' },
-    { label: 'Nästa utbetalning', value: formatSek(stats.next_payout_sek), icon: Clock, color: 'text-amber-600 bg-amber-50' },
+    { label: 'Upplupen provision', value: formatSek(stats.pending_commission_sek), icon: Wallet, color: 'text-amber-600 bg-amber-50' },
+    { label: 'Utbetalt totalt', value: formatSek(stats.total_earned_sek), icon: Banknote, color: 'text-primary-700 bg-primary-50' },
   ]
 
   return (
@@ -315,7 +231,6 @@ export default function PartnerDashboardPage() {
 
         {/* ─── Referral link + API key ─── */}
         <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
-          {/* Referral link */}
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Din unika länk</p>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -325,7 +240,7 @@ export default function PartnerDashboardPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => copyToClipboard(referralUrl, setCopiedLink)}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-primary-800 text-white text-sm font-medium rounded-lg hover:bg-primary-800 transition-colors whitespace-nowrap"
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-primary-800 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap"
                 >
                   {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   {copiedLink ? 'Kopierad!' : 'Kopiera'}
@@ -341,24 +256,26 @@ export default function PartnerDashboardPage() {
             </div>
           </div>
 
-          {/* API key */}
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Din API-nyckel</p>
             <div className="flex items-center gap-2">
               <div className="flex-1 min-w-0 bg-slate-50 border border-gray-200 rounded-lg px-3 py-2">
                 <p className="text-sm font-mono text-gray-900">
-                  {showKey ? (partner.api_key || '—') : '••••••••••••••••••••'}
+                  {showKey && revealedKey ? revealedKey : (partner.api_key_masked || '••••••••••••••••••••')}
                 </p>
               </div>
               <button
-                onClick={() => setShowKey(!showKey)}
+                onClick={toggleShowKey}
                 className="p-2 text-gray-500 hover:text-gray-900 transition-colors"
                 title={showKey ? 'Dölj' : 'Visa'}
               >
                 {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
               <button
-                onClick={() => partner.api_key && copyToClipboard(partner.api_key, setCopiedKey)}
+                onClick={async () => {
+                  const key = revealedKey ?? (await fetchSecrets())?.api_key ?? null
+                  if (key) copyToClipboard(key, setCopiedKey)
+                }}
                 className="p-2 text-gray-500 hover:text-gray-900 transition-colors"
                 title="Kopiera"
               >
@@ -368,10 +285,11 @@ export default function PartnerDashboardPage() {
           </div>
         </div>
 
-        {/* ─── Referrals list ─── */}
+        {/* ─── Kundlista ─── */}
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="font-semibold text-gray-900">Hänvisade företag</h2>
+            <h2 className="font-semibold text-gray-900">Dina kunder</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Klicka på Uppföljning 1/2/3 när du haft kontakt — så håller vi koll tillsammans</p>
           </div>
 
           {referrals.length === 0 ? (
@@ -382,127 +300,30 @@ export default function PartnerDashboardPage() {
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {referrals.map(ref => {
-                const badge = statusBadge(ref.status)
-                const isExpanded = expandedRef === ref.id
-                const bizEvents = getEventsForBusiness(ref.id)
-                // Find events by matching business_id from the enriched referral
-                const refEvents = events.filter(e =>
-                  e.meta && (e.meta as Record<string, unknown>).business_name === ref.business_name
-                )
-
-                return (
-                  <div key={ref.id}>
-                    {/* Main row */}
-                    <button
-                      onClick={() => setExpandedRef(isExpanded ? null : ref.id)}
-                      className="w-full px-5 py-4 flex items-center gap-4 hover:bg-slate-50/50 transition-colors text-left"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-gray-900 truncate">
-                            {ref.business_name || ref.email || '—'}
-                          </p>
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${badge.color}`}>
-                            {badge.icon} {badge.text}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                          {ref.plan && <span>{planLabel(ref.plan)}</span>}
-                          <span>Registrerad: {formatDate(ref.created_at)}</span>
-                        </div>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        {ref.status === 'active' || ref.status === 'rewarded' ? (
-                          <>
-                            <p className="text-sm font-semibold text-primary-700">
-                              {formatSek(ref.monthly_commission)}/mån
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              × {ref.commission_month} mån = {formatSek(ref.total_earned)}
-                            </p>
-                          </>
-                        ) : ref.status === 'pending' ? (
-                          <p className="text-xs text-gray-400">Startar vid konvertering</p>
-                        ) : (
-                          <p className="text-xs text-gray-400">Avslutad</p>
-                        )}
-                      </div>
-
-                      <div className="shrink-0 text-gray-400">
-                        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                      </div>
-                    </button>
-
-                    {/* Expanded timeline */}
-                    {isExpanded && (
-                      <div className="px-5 pb-4 pl-8">
-                        <div className="border-l-2 border-gray-200 pl-4 space-y-3">
-                          {/* Registration event */}
-                          <TimelineItem
-                            date={ref.created_at}
-                            text="Registrerade sig via din länk"
-                          />
-                          {/* Trial start */}
-                          <TimelineItem
-                            date={ref.created_at}
-                            text="Startade 14-dagars trial"
-                          />
-                          {/* Conversion */}
-                          {ref.converted_at && (
-                            <TimelineItem
-                              date={ref.converted_at}
-                              text={`Konverterade → ${planLabel(ref.plan)}`}
-                            />
-                          )}
-                          {/* Commission start */}
-                          {ref.converted_at && ref.monthly_commission > 0 && (
-                            <TimelineItem
-                              date={ref.converted_at}
-                              text={`Provision: ${formatSek(ref.monthly_commission)}/mån startade`}
-                            />
-                          )}
-                          {/* Monthly commission progress */}
-                          {ref.commission_month > 0 && (
-                            <TimelineItem
-                              date={new Date().toISOString()}
-                              text={`${ref.commission_month} månader aktiva — ${formatSek(ref.total_earned)} intjänat`}
-                              active
-                            />
-                          )}
-                          {/* Dynamic events from partner_events */}
-                          {refEvents.map(evt => (
-                            <TimelineItem
-                              key={evt.id}
-                              date={evt.created_at}
-                              text={`${eventTypeLabel(evt.event_type)}${evt.amount_sek ? ` (${formatSek(evt.amount_sek)})` : ''}`}
-                            />
-                          ))}
-                          {/* Status if churned */}
-                          {ref.status === 'churned' && (
-                            <TimelineItem
-                              date={new Date().toISOString()}
-                              text="Prenumeration avslutad — provision stoppad"
-                            />
-                          )}
-                          {/* Status if rewarded */}
-                          {ref.status === 'rewarded' && (
-                            <TimelineItem
-                              date={new Date().toISOString()}
-                              text="12 månader uppnådda — provision klar!"
-                              active
-                            />
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+              {referrals.map(ref => (
+                <ReferralCard
+                  key={ref.id}
+                  referral={ref}
+                  events={eventsByBusiness[ref.business_id] || []}
+                  expanded={expandedRef === ref.id}
+                  onToggle={() => setExpandedRef(expandedRef === ref.id ? null : ref.id)}
+                  onFollowupChanged={fetchDashboard}
+                />
+              ))}
             </div>
           )}
         </div>
+
+        {/* ─── Provisionsunderlag ─── */}
+        <StatementSection
+          statements={statements}
+          tiers={partner.commission_tiers}
+          legacyRate={partner.legacy_commission_rate}
+          baseRateAfter={partner.base_rate_after}
+          currentTierRate={stats.current_tier_rate}
+          activeCustomers={stats.active_customers}
+          ladderMonths={partner.ladder_months}
+        />
 
         {/* ─── Webhook settings ─── */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
@@ -512,7 +333,7 @@ export default function PartnerDashboardPage() {
               <p className="text-sm text-gray-500 mt-1">Få notifikationer när dina leads konverterar</p>
             </div>
             <button
-              onClick={() => setWebhookOpen(true)}
+              onClick={openWebhookModal}
               className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <Settings className="w-4 h-4" />
@@ -526,12 +347,14 @@ export default function PartnerDashboardPage() {
           )}
         </div>
 
-        {/* ─── Commission info ─── */}
+        {/* ─── Utbetalningsinfo ─── */}
         <div className="bg-primary-50 border border-primary-200 rounded-xl p-5">
           <h3 className="font-semibold text-primary-800 mb-2">Om provisionsutbetalning</h3>
           <p className="text-sm text-primary-700">
-            Du tjänar 20% löpande provision i 12 månader per hantverkare som registrerar sig via din länk.
-            Provisionen beräknas automatiskt varje månad. Utbetalning sker månadsvis i efterskott.
+            Provisionen räknas på vad dina kunder faktiskt betalat och ackrueras automatiskt
+            månaden efter betalningen. Utbetalning sker via självfakturering: du fakturerar oss
+            beloppet i underlaget ovan, månadsvis i efterskott. Dina exakta villkor ser du i
+            provisionssektionen.
           </p>
         </div>
       </div>
@@ -596,7 +419,6 @@ export default function PartnerDashboardPage() {
             </div>
 
             <div className="space-y-4">
-              {/* URL */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
                 <input
@@ -608,7 +430,6 @@ export default function PartnerDashboardPage() {
                 />
               </div>
 
-              {/* Events */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Händelser att notifiera</label>
                 <div className="space-y-2">
@@ -626,7 +447,6 @@ export default function PartnerDashboardPage() {
                 </div>
               </div>
 
-              {/* Webhook secret */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Webhook secret (för signaturverifiering)
@@ -634,11 +454,11 @@ export default function PartnerDashboardPage() {
                 <div className="flex items-center gap-2">
                   <div className="flex-1 bg-slate-50 border border-gray-200 rounded-lg px-3 py-2">
                     <p className="text-xs font-mono text-gray-600 truncate">
-                      {partner.webhook_secret || '—'}
+                      {revealedSecret || (partner.has_webhook_secret ? '••••••••' : '—')}
                     </p>
                   </div>
                   <button
-                    onClick={() => partner.webhook_secret && copyToClipboard(partner.webhook_secret, setCopiedSecret)}
+                    onClick={() => revealedSecret && copyToClipboard(revealedSecret, setCopiedSecret)}
                     className="p-2 text-gray-500 hover:text-gray-900 transition-colors"
                     title="Kopiera"
                   >
@@ -647,14 +467,12 @@ export default function PartnerDashboardPage() {
                 </div>
               </div>
 
-              {/* Result message */}
               {webhookTestResult && (
                 <p className="text-sm text-gray-700 bg-slate-50 rounded-lg px-3 py-2">
                   {webhookTestResult}
                 </p>
               )}
 
-              {/* Actions */}
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={testWebhook}
@@ -666,7 +484,7 @@ export default function PartnerDashboardPage() {
                 <button
                   onClick={saveWebhook}
                   disabled={webhookSaving}
-                  className="flex-1 px-4 py-2 bg-primary-800 text-white text-sm font-medium rounded-lg hover:bg-primary-800 transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-primary-800 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
                   {webhookSaving ? 'Sparar...' : 'Spara'}
                 </button>
@@ -688,20 +506,6 @@ function ModalOverlay({ children, onClose }: { children: React.ReactNode; onClos
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       {children}
-    </div>
-  )
-}
-
-function TimelineItem({ date, text, active }: { date: string; text: string; active?: boolean }) {
-  return (
-    <div className="relative flex items-start gap-3">
-      <div className={`absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full border-2 ${
-        active ? 'bg-primary-500 border-primary-600' : 'bg-white border-gray-300'
-      }`} />
-      <div className="min-w-0">
-        <p className={`text-sm ${active ? 'font-medium text-primary-700' : 'text-gray-700'}`}>{text}</p>
-        <p className="text-xs text-gray-400">{formatDate(date)}</p>
-      </div>
     </div>
   )
 }

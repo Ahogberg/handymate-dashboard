@@ -24,6 +24,7 @@ import {
   Zap,
   ChevronDown,
 } from 'lucide-react'
+import PartnerCommissionModal from './components/PartnerCommissionModal'
 
 interface Customer {
   business_id: string
@@ -130,6 +131,7 @@ export default function AdminDashboardPage() {
   const [toast, setToast] = useState<string | null>(null)
   const [partners, setPartners] = useState<Partner[]>([])
   const [partnerFilter, setPartnerFilter] = useState<string>('all')
+  const [commissionPartnerId, setCommissionPartnerId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchMetrics()
@@ -816,6 +818,10 @@ export default function AdminDashboardPage() {
                             </td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex gap-1.5 justify-end">
+                                <button onClick={() => setCommissionPartnerId(partner.id)}
+                                  className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200">
+                                  Provision
+                                </button>
                                 {partner.status === 'pending_approval' && (
                                   <button onClick={() => handlePartnerAction(partner.id, 'approve')}
                                     className="px-3 py-1 bg-primary-700 text-white rounded-lg text-xs font-medium hover:bg-primary-800">
@@ -844,6 +850,14 @@ export default function AdminDashboardPage() {
               )}
             </div>
           </div>
+        )}
+
+        {/* Partner-provisionsmodal */}
+        {commissionPartnerId && (
+          <PartnerCommissionModal
+            partnerId={commissionPartnerId}
+            onClose={() => setCommissionPartnerId(null)}
+          />
         )}
 
         {/* Toast */}

@@ -157,12 +157,15 @@ async function runAgentContext() {
   const succeeded = results.filter(r => r.context.success).length
   const totalTokens = results.reduce((sum, r) => sum + (r.context.tokens_used || 0), 0)
 
-  // Process partner commissions
-  let commissionResult = { processed: 0, commissioned: 0, completed: 0, errors: [] as string[] }
+  // Partnerprovision: ackruera FÖREGÅENDE månad ur liggaren (2026-08-11).
+  // Idempotent (UNIQUE partner+business+period) — nattlig körning är säker
+  // och plockar upp sena Stripe-betalningar för förra månaden efterhand.
+  let commissionResult: { period: string; partnersProcessed: number; rowsInserted: number; totalSek: number; errors: string[] } =
+    { period: '', partnersProcessed: 0, rowsInserted: 0, totalSek: 0, errors: [] }
   try {
-    const { processMonthlyCommissions } = await import('@/lib/partners/commission')
-    commissionResult = await processMonthlyCommissions()
-    console.log(`[AgentContext Cron] Commissions: ${commissionResult.commissioned} processed, ${commissionResult.completed} completed`)
+    const { processCommissionPeriod, previousMonth } = await import('@/lib/partners/commission')
+    commissionResult = await processCommissionPeriod(previousMonth())
+    console.log(`[AgentContext Cron] Commissions ${commissionResult.period}: ${commissionResult.rowsInserted} rader, ${commissionResult.totalSek} kr, ${commissionResult.errors.length} fel`)
   } catch (err: any) {
     console.error('[AgentContext Cron] Commission processing failed:', err.message)
   }

@@ -440,6 +440,21 @@ async function handleSubscriptionDeleted(supabase: any, event: Stripe.Event) {
       }
     })
 
+  // Partnerspårning vid churn (2026-08-11): sätt referral-raden till
+  // 'churned' så portalens badge och provisionsmotorn berättar samma sak.
+  // Motorn behöver det inte (ingen betalning → ingen liggarrad), men
+  // partnern ska se varför provisionen upphörde.
+  try {
+    await supabase
+      .from('referrals')
+      .update({ status: 'churned' })
+      .eq('referred_business_id', targetBusinessId)
+      .eq('referrer_type', 'partner')
+      .in('status', ['active', 'rewarded'])
+  } catch (err) {
+    console.error('[Billing] Kunde inte sätta partner-referral till churned:', err)
+  }
+
   // Notify partner webhook about churn
   try {
     const { notifyPartnerWebhook } = await import('@/lib/partners/webhook')
@@ -475,7 +490,11 @@ async function handlePaymentSucceeded(supabase: any, event: Stripe.Event) {
     .update({ subscription_status: 'active' })
     .eq('business_id', business.business_id)
 
-  // Logga händelse
+  // Logga händelse. total_excluding_tax/tax (2026-08-11): provisionsmotorn
+  // (lib/partners/commission-engine.ts) räknar partnerprovision på faktiskt
+  // betalt belopp EX MOMS. Idag kör Stripe utan automatic_tax så
+  // amount_paid == ex moms, men om moms aktiveras senare måste basen komma
+  // härifrån — därför sparas fälten från och med nu.
   await supabase
     .from('billing_event')
     .insert({
@@ -485,6 +504,8 @@ async function handlePaymentSucceeded(supabase: any, event: Stripe.Event) {
       data: {
         invoice_id: invoice.id,
         amount_paid: invoice.amount_paid,
+        total_excluding_tax: invoice.total_excluding_tax ?? null,
+        tax: (invoice as any).tax ?? null,
         currency: invoice.currency,
         hosted_invoice_url: invoice.hosted_invoice_url
       }

@@ -110,14 +110,14 @@ export async function handleFirstPaymentReferral(
     return { rewarded: false }
   }
 
-  // Resolve referralkod → referrer business_id
-  const { resolveReferralCode } = await import('./codes')
-  const referrerBusinessId = await resolveReferralCode(config.referred_by)
-  if (!referrerBusinessId) {
-    return { rewarded: false, error: 'Referralkod kunde inte lösas' }
-  }
-
-  // Kolla om redan konverterad
+  // Ladda referral-raden FÖRST och branch:a på referrer_type (fixat
+  // 2026-08-11). Tidigare låg resolveReferralCode före den här punkten —
+  // men den slår bara upp kunders egna koder i business_config.referral_code,
+  // så partnerkoder (P-…) returnerade i förtid med "Referralkod kunde inte
+  // lösas" och partner-referrals fastnade i 'pending' för evigt.
+  // Provisionsmotorn (lib/partners/commission.ts) kräver converted_at —
+  // hela partnerkedjan var därmed död. Koden löses nu bara i kundgrenen,
+  // som är den enda som behöver referrerBusinessId.
   const { data: existingReferral } = await supabase
     .from('referrals')
     .select('id, status, referrer_type')
@@ -134,6 +134,31 @@ export async function handleFirstPaymentReferral(
 
   const referrerType = existingReferral.referrer_type || 'customer'
 
+  if (referrerType === 'partner') {
+    // Partnergrenen: aktivera bara. Ingen rabatt, ingen engångsprovision —
+    // löpande provision ackrueras per FAKTISKT BETALD månad av
+    // processCommissionPeriod (trappa 1-12 mån, sedan basnivå), med
+    // liggarrader som utbetalningsunderlag. Den gamla 50 %-engångsmodellen
+    // som låg här stred mot både partneravtalet och trappmodellen och är
+    // borttagen (2026-08-11).
+    await supabase
+      .from('referrals')
+      .update({
+        status: 'active',
+        converted_at: new Date().toISOString(),
+      })
+      .eq('id', existingReferral.id)
+
+    return { rewarded: true }
+  }
+
+  // Kundgrenen: resolve referralkod → referrer business_id
+  const { resolveReferralCode } = await import('./codes')
+  const referrerBusinessId = await resolveReferralCode(config.referred_by)
+  if (!referrerBusinessId) {
+    return { rewarded: false, error: 'Referralkod kunde inte lösas' }
+  }
+
   // Uppdatera referral till active
   await supabase
     .from('referrals')
@@ -143,72 +168,55 @@ export async function handleFirstPaymentReferral(
     })
     .eq('id', existingReferral.id)
 
-  if (referrerType === 'customer') {
-    // Ge referrer 50% rabatt på nästa faktura
-    await applyNextInvoiceDiscount(referrerBusinessId, 50)
+  // Ge referrer 50% rabatt på nästa faktura
+  await applyNextInvoiceDiscount(referrerBusinessId, 50)
 
-    // Skicka SMS till referrer
-    try {
-      const { data: referrerConfig } = await supabase
-        .from('business_config')
-        .select('personal_phone, business_name')
-        .eq('business_id', referrerBusinessId)
-        .single()
+  // Skicka SMS till referrer
+  try {
+    const { data: referrerConfig } = await supabase
+      .from('business_config')
+      .select('personal_phone, business_name')
+      .eq('business_id', referrerBusinessId)
+      .single()
 
-      if (referrerConfig?.personal_phone) {
-        // Genom strypunkten (etapp 0 batch 4). Går till hantverkarens EGET
-        // nummer — rabattbeskedet är vår notis till honom, inte ett
-        // kundutskick, därför recipient:'owner'.
-        const { sendSmsViaElks } = await import('@/lib/sms-send')
-        const r = await sendSmsViaElks({
-          supabase,
-          businessId: referrerBusinessId,
-          businessName: referrerConfig.business_name,
-          to: referrerConfig.personal_phone,
-          message: 'Din kollega har nu aktiverat Handymate! Du får 50% rabatt på nästa månads faktura. Tack för att du spred ordet!',
-          messageType: 'referral_reward',
-          recipient: 'internal',
-        })
-        if (!r.success) console.error('[referral] rabattnotis misslyckades:', r.error)
-      }
-    } catch (err) {
-      console.error('[Referral] SMS-sändning misslyckades:', err)
+    if (referrerConfig?.personal_phone) {
+      // Genom strypunkten (etapp 0 batch 4). Går till hantverkarens EGET
+      // nummer — rabattbeskedet är vår notis till honom, inte ett
+      // kundutskick, därför recipient:'owner'.
+      const { sendSmsViaElks } = await import('@/lib/sms-send')
+      const r = await sendSmsViaElks({
+        supabase,
+        businessId: referrerBusinessId,
+        businessName: referrerConfig.business_name,
+        to: referrerConfig.personal_phone,
+        message: 'Din kollega har nu aktiverat Handymate! Du får 50% rabatt på nästa månads faktura. Tack för att du spred ordet!',
+        messageType: 'referral_reward',
+        recipient: 'internal',
+      })
+      if (!r.success) console.error('[referral] rabattnotis misslyckades:', r.error)
     }
-
-    // Uppdatera till rewarded
-    await supabase
-      .from('referrals')
-      .update({
-        status: 'rewarded',
-        rewarded_at: new Date().toISOString(),
-        referrer_discount_applied_at: new Date().toISOString(),
-      })
-      .eq('id', existingReferral.id)
-
-    // Fire automation event
-    try {
-      const { fireEvent } = await import('@/lib/automation-engine')
-      await fireEvent(supabase, 'referral_converted', referrerBusinessId, {
-        referred_business_id: businessId,
-        amount_sek: amountSek,
-      })
-    } catch { /* non-blocking */ }
+  } catch (err) {
+    console.error('[Referral] SMS-sändning misslyckades:', err)
   }
 
-  if (referrerType === 'partner') {
-    const commission = Math.round(amountSek * 0.5)
+  // Uppdatera till rewarded
+  await supabase
+    .from('referrals')
+    .update({
+      status: 'rewarded',
+      rewarded_at: new Date().toISOString(),
+      referrer_discount_applied_at: new Date().toISOString(),
+    })
+    .eq('id', existingReferral.id)
 
-    await supabase
-      .from('referrals')
-      .update({
-        status: 'rewarded',
-        rewarded_at: new Date().toISOString(),
-        partner_commission_sek: commission,
-      })
-      .eq('id', existingReferral.id)
-
-    console.log(`[Referral] Partner-provision: ${commission} kr för business ${businessId}`)
-  }
+  // Fire automation event
+  try {
+    const { fireEvent } = await import('@/lib/automation-engine')
+    await fireEvent(supabase, 'referral_converted', referrerBusinessId, {
+      referred_business_id: businessId,
+      amount_sek: amountSek,
+    })
+  } catch { /* non-blocking */ }
 
   return { rewarded: true, referrerBusinessId }
 }
