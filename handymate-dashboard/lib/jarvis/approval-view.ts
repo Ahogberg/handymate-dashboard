@@ -59,6 +59,8 @@ export const TYPE_LABEL: Record<string, string> = {
   create_quote_draft: 'Offertutkast',
   create_ata_draft: 'ÄTA-förslag',
   fakturera_projekt: 'Faktura',
+  meeting_summary: 'Möte',
+  meeting_followup: 'Uppföljning från möte',
 }
 
 export function typeLabel(approvalType: string): string {

@@ -122,6 +122,14 @@ export async function getCalendarEvents(
   start: Date
   end: Date
   allDay: boolean
+  // Epic 1 (2026-08-11): fälten nedan kastades tidigare vid API-gränsen —
+  // trots att attendee-emailen är exakt det entitetsupplösningen
+  // (lib/matte/resolver.ts) behöver för att koppla externa kalenderhändelser
+  // till kunder. Scope calendar.readonly täcker redan allt detta.
+  attendees: string[]          // deltagar-emails, exkl. resource-rum
+  location: string | null
+  meetUrl: string | null       // hangoutLink eller första video-entrypoint
+  organizerEmail: string | null
 }>> {
   const client = getGoogleAuthClient()
   client.setCredentials({ access_token: accessToken })
@@ -153,6 +161,15 @@ export async function getCalendarEvents(
       ? new Date(event.end?.date + 'T23:59:59')
       : new Date(event.end?.dateTime!)
 
+    const attendees = (event.attendees || [])
+      .filter(a => a.email && !a.resource)
+      .map(a => a.email as string)
+
+    const meetUrl =
+      event.hangoutLink ||
+      event.conferenceData?.entryPoints?.find(e => e.entryPointType === 'video')?.uri ||
+      null
+
     return {
       id: event.id || '',
       summary: event.summary || '(Ingen titel)',
@@ -160,6 +177,10 @@ export async function getCalendarEvents(
       start,
       end,
       allDay,
+      attendees,
+      location: event.location || null,
+      meetUrl,
+      organizerEmail: event.organizer?.email || null,
     }
   })
 }

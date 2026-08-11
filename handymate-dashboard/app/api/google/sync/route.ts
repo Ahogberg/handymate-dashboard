@@ -7,6 +7,7 @@ import {
   getCalendarEvents,
   createGoogleEvent,
 } from '@/lib/google-calendar'
+import { resolveCustomerFromAttendees } from '@/lib/calendar/resolve-attendees'
 
 /**
  * POST /api/google/sync
@@ -89,6 +90,22 @@ export async function POST(request: NextRequest) {
             if (!existing) {
               // Create new schedule_entry
               const id = `sch_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+
+              // Epic 1 (2026-08-11): attendee-email → kund (se cron-vägen).
+              let customerId: string | null = null
+              if (gEvent.attendees.length > 0) {
+                try {
+                  customerId = await resolveCustomerFromAttendees(
+                    supabase,
+                    business.business_id,
+                    gEvent.attendees,
+                    [connection.account_email, gEvent.organizerEmail],
+                  )
+                } catch (resolveErr) {
+                  console.error('[google/sync] attendee-upplösning misslyckades:', gEvent.id, resolveErr)
+                }
+              }
+
               const { error: insertError } = await supabase
                 .from('schedule_entry')
                 .insert({
@@ -104,6 +121,7 @@ export async function POST(request: NextRequest) {
                   external_source: 'google',
                   status: 'scheduled',
                   google_event_id: gEvent.id,
+                  customer_id: customerId, // v118
                 })
 
               if (insertError) {

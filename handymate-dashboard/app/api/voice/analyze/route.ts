@@ -388,6 +388,116 @@ Svara ENDAST med JSON i följande format:
         kastade.map(k => k.type).join(', ')
       )
     }
+    // ═══ MÖTESGRENEN → APPROVAL-RÄLSEN (Epic 2, 2026-08-11) ═══
+    //
+    // Mötesutfall landar som pending_approvals-kort — INTE i legacy-
+    // ai_suggestion (voice-auditens "Epic 6-kärnproblem": två köer på samma
+    // transkript). Telefongrenen lämnas orörd nedan. Korten bär evidens
+    // (source_text + confidence) och går genom action-kontraktet:
+    // create_quote_draft är EXECUTABLE (exekveraren finns), meeting_followup
+    // EXECUTABLE → task-rad, meeting_summary INFORMATIONAL.
+    if (arMote) {
+      let kundNamn: string | null = null
+      if (customerId) {
+        const { data: kund } = await supabase
+          .from('customer')
+          .select('name')
+          .eq('customer_id', customerId)
+          .maybeSingle()
+        kundNamn = kund?.name || null
+      }
+
+      const beslutsstampel = buildDecisionRecord({
+        model: analysModell,
+        prompt: 'callAnalysis',
+        input: recording.transcript,
+        now: new Date(),
+      })
+
+      const kort: Array<Record<string, unknown>> = []
+      for (const s of suggestions) {
+        if (s.confidence < 0.4) continue
+        const evidens = s.source_text ? ` Ur mötet: "${s.source_text}"` : ''
+        if (s.type === 'quote') {
+          kort.push({
+            approval_type: 'create_quote_draft',
+            title: s.title,
+            description: `${s.description || ''}${evidens}`,
+            risk_level: 'high',
+            payload: {
+              description: [s.description, s.source_text].filter(Boolean).join('\n\n'),
+              entity: { customerId },
+              source_text: s.source_text || null,
+              confidence: s.confidence,
+              recording_id,
+              decision_record: beslutsstampel,
+            },
+          })
+        } else {
+          // follow_up / reminder / reschedule → uppföljningskort → task.
+          kort.push({
+            approval_type: 'meeting_followup',
+            title: s.type === 'reschedule' ? `Omboka: ${s.title}` : s.title,
+            description: `${s.description || ''}${evidens}`,
+            risk_level: 'low',
+            payload: {
+              title: s.type === 'reschedule' ? `Omboka: ${s.title}` : s.title,
+              description: s.description || null,
+              source_text: s.source_text || null,
+              confidence: s.confidence,
+              priority: s.priority || 'medium',
+              customer_id: customerId,
+              recording_id,
+              decision_record: beslutsstampel,
+            },
+          })
+        }
+      }
+
+      // Sammanfattningskortet — alltid, även när inga förslag hittades.
+      // Ärlighet: kortet säger vad som FANNS, aldrig "allt är hanterat".
+      kort.unshift({
+        approval_type: 'meeting_summary',
+        title: kundNamn
+          ? `Mötet med ${kundNamn} är sammanfattat — ${kort.length} ${kort.length === 1 ? 'sak' : 'saker'} att ta vidare`
+          : `Mötet är sammanfattat — ${kort.length} ${kort.length === 1 ? 'sak' : 'saker'} att ta vidare`,
+        description: analysisResult.summary || 'Ingen sammanfattning kunde skapas.',
+        risk_level: 'low',
+        payload: {
+          recording_id,
+          customer_id: customerId,
+          summary: analysisResult.summary || null,
+          forslag: kort.length,
+          decision_record: beslutsstampel,
+        },
+      })
+
+      let skapadeKort = 0
+      for (const k of kort) {
+        const { error: kortFel } = await supabase.from('pending_approvals').insert({
+          id: `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+          business_id: recording.business_id,
+          status: 'pending',
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          ...k,
+        })
+        if (kortFel) console.error('[voice/analyze] möteskort kunde inte skapas:', kortFel.message)
+        else skapadeKort++
+      }
+
+      // OBS: tryAutoApprove/processCallForPipeline/triggerEventCommunication
+      // körs INTE för möten. Särskilt kommunikationstriggern: nu när möten
+      // bär customer_id (P0-fixen) hade den börjat skicka kundkommunikation
+      // utifrån ett möte hantverkaren själv satt i — exakt det rummet-
+      // principen förbjuder (Lisa-exkluderingen).
+      return NextResponse.json({
+        success: true,
+        recording_id,
+        summary: analysisResult.summary,
+        cards_created: skapadeKort,
+      })
+    }
+
     const createdSuggestions = []
 
     for (const suggestion of suggestions) {

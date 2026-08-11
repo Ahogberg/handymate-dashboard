@@ -37,6 +37,14 @@ interface KundTraff {
   name: string
 }
 
+interface DagensBokning {
+  booking_id: string
+  scheduled_start: string
+  customer_id: string | null
+  customer: { name: string } | null
+  notes: string | null
+}
+
 export function Motesassistenten() {
   const business = useBusiness()
   const insp = useAudioRecording({ maxDurationSeconds: MAX_SEKUNDER })
@@ -52,6 +60,40 @@ export function Motesassistenten() {
   const [kundSok, setKundSok] = useState('')
   const [kundTraffar, setKundTraffar] = useState<KundTraff[]>([])
   const [valdKund, setValdKund] = useState<KundTraff | null>(null)
+
+  // Epic 1 (2026-08-11): dagens kundkopplade bokningar som snabbval —
+  // hantverkaren står oftast hos en bokad kund, ett tryck räcker.
+  // Bokningsvalet ger transkriptet både customer_id OCH booking_id (v118).
+  const [dagensBokningar, setDagensBokningar] = useState<DagensBokning[]>([])
+  const [valdBokning, setValdBokning] = useState<DagensBokning | null>(null)
+
+  useEffect(() => {
+    let aktiv = true
+    async function hamtaBokningar() {
+      const idag = new Date().toISOString().slice(0, 10)
+      const { data } = await supabase
+        .from('booking')
+        .select('booking_id, scheduled_start, customer_id, notes, customer (name)')
+        .eq('business_id', business.business_id)
+        .gte('scheduled_start', `${idag}T00:00:00`)
+        .lte('scheduled_start', `${idag}T23:59:59`)
+        .not('status', 'eq', 'cancelled')
+        .not('customer_id', 'is', null)
+        .order('scheduled_start')
+        .limit(8)
+      if (aktiv) setDagensBokningar((data as unknown as DagensBokning[]) || [])
+    }
+    hamtaBokningar()
+    return () => { aktiv = false }
+  }, [business.business_id])
+
+  function valjBokning(b: DagensBokning) {
+    setValdBokning(b)
+    if (b.customer_id) {
+      setValdKund({ customer_id: b.customer_id, name: b.customer?.name || 'Kund' })
+    }
+    setKundTraffar([])
+  }
 
   useEffect(() => {
     const term = kundSok.trim()
@@ -105,6 +147,7 @@ export function Motesassistenten() {
       form.append('audio', insp.blob, `platsbesok.${andelse}`)
       form.append('duration_seconds', String(insp.duration))
       if (valdKund) form.append('customer_id', valdKund.customer_id)
+      if (valdBokning) form.append('booking_id', valdBokning.booking_id)
 
       const res = await fetch('/api/voice/site-visit', { method: 'POST', body: form })
       const data = await res.json().catch(() => null)
@@ -140,13 +183,38 @@ export function Motesassistenten() {
         <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">
           Vilken kund gäller mötet? (valfritt)
         </label>
+
+        {/* Dagens bokningar som ett-trycks-val */}
+        {!valdKund && dagensBokningar.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {dagensBokningar.map(b => (
+              <button
+                key={b.booking_id}
+                onClick={() => valjBokning(b)}
+                disabled={spelarIn || skickar}
+                className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[40px] rounded-full border border-primary-200 bg-primary-50 text-primary-800 text-sm hover:bg-primary-100 disabled:opacity-50"
+              >
+                <span className="font-medium">
+                  {new Date(b.scheduled_start).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                {b.customer?.name || 'Kund'}
+              </button>
+            ))}
+          </div>
+        )}
+
         {valdKund ? (
           <div className="mt-2 flex items-center justify-between gap-3">
             <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-50 text-primary-800 text-sm font-medium">
               {valdKund.name}
+              {valdBokning && (
+                <span className="text-primary-600 font-normal">
+                  · bokning {new Date(valdBokning.scheduled_start).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
             </span>
             <button
-              onClick={() => { setValdKund(null); setKundSok('') }}
+              onClick={() => { setValdKund(null); setValdBokning(null); setKundSok('') }}
               className="text-sm text-gray-500 hover:text-gray-700"
               disabled={spelarIn || skickar}
             >
@@ -264,7 +332,7 @@ export function Motesassistenten() {
           <p className="text-sm font-medium text-primary-800">Mötet är sparat</p>
           <p className="mt-2 text-sm text-gray-700 whitespace-pre-wrap">{senasteTranskript}</p>
           <p className="mt-3 text-xs text-gray-500">
-            Förslag utifrån mötet dyker upp under Samtal inom någon minut.
+            Matte går igenom mötet nu — kort med förslag dyker upp på Idag inom någon minut.
           </p>
         </div>
       )}

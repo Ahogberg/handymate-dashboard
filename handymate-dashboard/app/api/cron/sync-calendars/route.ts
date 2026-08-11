@@ -7,6 +7,7 @@ import {
   createGoogleEvent,
 } from '@/lib/google-calendar'
 import { renewExpiringWatches, ensureAllWatches } from '@/lib/google-calendar-watch'
+import { resolveCustomerFromAttendees } from '@/lib/calendar/resolve-attendees'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -96,6 +97,24 @@ export async function GET(request: NextRequest) {
 
             if (!existing) {
               const id = `sch_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+
+              // Epic 1 (2026-08-11): attendee-email → kund. Externa event
+              // med en känd kunds email i deltagarlistan kundattribueras
+              // direkt vid import — grunden för mötesbriefen.
+              let customerId: string | null = null
+              if (gEvent.attendees.length > 0) {
+                try {
+                  customerId = await resolveCustomerFromAttendees(
+                    supabase,
+                    businessId,
+                    gEvent.attendees,
+                    [connection.account_email, gEvent.organizerEmail],
+                  )
+                } catch (resolveErr) {
+                  console.error('[sync-calendars] attendee-upplösning misslyckades:', gEvent.id, resolveErr)
+                }
+              }
+
               // P0-fix 2026-08-11: type 'external' bröt schedule_entrys
               // CHECK-constraint ('project','internal','time_off','travel')
               // och felet kontrollerades aldrig — varje Google-import har
@@ -114,6 +133,7 @@ export async function GET(request: NextRequest) {
                 external_source: 'google',
                 status: 'scheduled',
                 google_event_id: gEvent.id,
+                customer_id: customerId, // v118
               })
               if (importError) {
                 console.error('[sync-calendars] import-insert misslyckades:', gEvent.id, importError.message)

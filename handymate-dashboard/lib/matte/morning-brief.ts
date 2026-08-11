@@ -28,7 +28,7 @@ export interface AgentBrief {
  * (Upptäckt 2026-08-05: overdue-fixen syntes inte förrän dagen efter
  * eftersom GET:en serverade 05:30-cronens cache byggd med gammal kod.)
  */
-export const MORNING_BRIEF_VERSION = 3
+export const MORNING_BRIEF_VERSION = 4 // 4: "Inför mötet"-raderna (Epic 1)
 
 export interface MorningBrief {
   date: string
@@ -88,7 +88,8 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
       .lt('created_at', new Date(Date.now() - 5 * 86400000).toISOString())
       .limit(5),
     supabase.from('booking')
-      .select('booking_id, notes, scheduled_start, status')
+      // Epic 1 (2026-08-11): kundjoin för "Inför mötet"-raderna nedan.
+      .select('booking_id, notes, scheduled_start, status, customer_id, customer (name)')
       .eq('business_id', businessId)
       .gte('scheduled_start', `${today}T00:00:00`)
       .lte('scheduled_start', `${today}T23:59:59`)
@@ -141,7 +142,54 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
   }
 
   const danielBrief = buildDanielBrief(openLeads.data || [], staleQuotes.data || [])
-  const larsBrief = buildLarsBrief(todayBookings.data || [], profWarnings.data || [])
+
+  // ═══ "Inför mötet" (Meeting Intelligence Epic 1, 2026-08-11) ═══
+  //
+  // För dagens KUNDKOPPLADE bokningar hämtas det hantverkaren behöver veta
+  // innan han kliver in: öppna offerter och förfallna fakturor för just de
+  // kunderna. Batchat (en .in()-fråga per tabell), aldrig blockerande —
+  // briefen är viktigare än mötesraderna.
+  const moteskontext = new Map<string, { offert?: string; faktura?: string }>()
+  try {
+    const kundIds = Array.from(new Set(
+      (todayBookings.data || [])
+        .map((b: any) => b.customer_id)
+        .filter(Boolean),
+    )) as string[]
+    if (kundIds.length > 0) {
+      const [oppnaOfferter, forfallnaFakturor] = await Promise.all([
+        supabase.from('quotes')
+          .select('customer_id, total, created_at')
+          .eq('business_id', businessId)
+          .in('customer_id', kundIds)
+          .in('status', [...OPEN_QUOTE_STATUSES]),
+        supabase.from('invoice')
+          .select('customer_id, total, due_date')
+          .eq('business_id', businessId)
+          .in('customer_id', kundIds)
+          .in('status', ['sent', 'overdue'])
+          .lt('due_date', today),
+      ])
+      for (const kundId of kundIds) {
+        const offert = (oppnaOfferter.data || []).find((q: any) => q.customer_id === kundId)
+        const faktura = (forfallnaFakturor.data || []).find((f: any) => f.customer_id === kundId)
+        if (!offert && !faktura) continue
+        const post: { offert?: string; faktura?: string } = {}
+        if (offert) {
+          const dagar = Math.floor((Date.now() - new Date(offert.created_at).getTime()) / 86400000)
+          post.offert = `öppen offert ${Math.round(Number(offert.total) || 0).toLocaleString('sv-SE')} kr (${dagar} dgr utan svar)`
+        }
+        if (faktura) {
+          post.faktura = `förfallen faktura ${Math.round(Number(faktura.total) || 0).toLocaleString('sv-SE')} kr`
+        }
+        moteskontext.set(kundId, post)
+      }
+    }
+  } catch (err) {
+    console.warn('[morning-brief] möteskontext hoppades över (icke-blockerande):', err)
+  }
+
+  const larsBrief = buildLarsBrief(todayBookings.data || [], profWarnings.data || [], moteskontext)
   const hannaBrief = buildHannaBrief(inactiveCustomers.data || [])
   const lisaBrief = buildLisaBrief(recentCalls.data || [])
   const matteBrief = buildMatteBrief(pendingApprovals.data || [], [karinBrief, danielBrief, larsBrief, hannaBrief, lisaBrief])
@@ -226,27 +274,45 @@ function buildDanielBrief(leads: any[], staleQuotes: any[]): AgentBrief {
   return { agentId: 'daniel', quote: 'Inga leads just nu.', badge: 'Tomt', badgeType: 'neutral', details: [] }
 }
 
-function buildLarsBrief(bookings: any[], warnings: any[]): AgentBrief {
+function buildLarsBrief(
+  bookings: any[],
+  warnings: any[],
+  moteskontext: Map<string, { offert?: string; faktura?: string }> = new Map(),
+): AgentBrief {
+  // "Inför mötet"-raden: bokningens tid + kund + det man behöver veta innan
+  // man kliver in (öppen offert / förfallen faktura). Utan kontext blir det
+  // den vanliga bokningsraden.
+  const bokningsRad = (b: any): BriefDetail => {
+    const tid = new Date(b.scheduled_start).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+    const kundNamn = b.customer?.name || null
+    const ctx = b.customer_id ? moteskontext.get(b.customer_id) : undefined
+    if (kundNamn && ctx) {
+      const delar = [ctx.offert, ctx.faktura].filter(Boolean).join(' · ')
+      return {
+        text: `Inför mötet med ${kundNamn} kl ${tid}: ${delar}`,
+        urgency: 'medium' as const,
+        link: `/dashboard/schedule`,
+      }
+    }
+    return {
+      text: `Kl ${tid}: ${kundNamn || b.notes || 'Bokning'}`,
+      urgency: 'low' as const,
+      link: `/dashboard/schedule`,
+    }
+  }
+
   if (warnings.length > 0) return {
     agentId: 'lars', quote: `${warnings.length} projekt med lönsamhetsrisk`,
     badge: 'Risk', badgeType: 'danger',
     details: [
       ...warnings.map((w: any) => ({ text: w.description, urgency: 'high' as const, link: `/dashboard/projects/${w.project_id}` })),
-      ...bookings.map((b: any) => ({
-        text: `Kl ${new Date(b.scheduled_start).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}: ${b.notes || 'Bokning'}`,
-        urgency: 'low' as const,
-        link: `/dashboard/schedule`,
-      })),
+      ...bookings.map(bokningsRad),
     ],
   }
   if (bookings.length > 0) return {
     agentId: 'lars', quote: `${bookings.length} bokning${bookings.length > 1 ? 'ar' : ''} idag`,
     badge: `${bookings.length} idag`, badgeType: 'neutral',
-    details: bookings.map((b: any) => ({
-      text: `Kl ${new Date(b.scheduled_start).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}: ${b.notes || 'Bokning'}`,
-      urgency: 'low' as const,
-      link: `/dashboard/schedule`,
-    })),
+    details: bookings.map(bokningsRad),
   }
   return { agentId: 'lars', quote: 'Inga bokningar idag.', badge: 'Ledig', badgeType: 'neutral', details: [] }
 }

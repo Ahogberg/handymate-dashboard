@@ -119,3 +119,85 @@ test.describe('fliken finns i Inkorgen', () => {
     expect(s).toContain("import('@/components/moten/Motesassistenten')")
   })
 })
+
+/**
+ * ═══ MEETING INTELLIGENCE EPIC 1–2 (2026-08-11) ═══
+ * docs/audits/MEETING_INTELLIGENCE_ARCHITECTURE.md är beslutet.
+ */
+
+test.describe('möteskontext (Epic 1)', () => {
+  test('komponenten skickar customer_id och booking_id till routen', () => {
+    const s = kod(KOMPONENT)
+    expect(s, 'kundvalet skickas inte — transkripten blir föräldralösa igen').toContain("form.append('customer_id'")
+    expect(s).toContain("form.append('booking_id'")
+  })
+
+  test('routen ägarskapskontrollerar klientens kopplingar', () => {
+    // customer_id/booking_id kommer från klienten och inserten sker med
+    // service role — utan verifiering vore det en cross-tenant-skrivväg.
+    const s = kod(ROUTE)
+    expect(s).toContain('verifyOwnership')
+    expect(s).toContain("idValue: bookingId")
+  })
+
+  test('kalendermappningen kastar inte längre attendees/location', () => {
+    const s = kod('lib/google-calendar.ts')
+    expect(s, 'attendees kastas vid API-gränsen igen').toContain('attendees')
+    expect(s).toContain('meetUrl')
+    expect(s).toContain('organizerEmail')
+  })
+
+  test('attendee-upplösningen avstår hellre än gissar vid flera träffar', () => {
+    const s = kod('lib/calendar/resolve-attendees.ts')
+    expect(s).toContain('data.length === 1')
+  })
+})
+
+test.describe('mötesutfall på approval-rälsen (Epic 2)', () => {
+  test('mötesgrenen skapar pending_approvals-kort, inte ai_suggestion', () => {
+    const s = kod(ANALYZE)
+    // Mötesgrenen (if (arMote)) ska returnera FÖRE legacy-loopens
+    // ai_suggestion-INSERT (lastIndexOf — en tidigare läsning finns i
+    // tenant-guarden högst upp i filen).
+    const moteGren = s.indexOf('if (arMote) {')
+    const aiSuggestionInsert = s.lastIndexOf(".from('ai_suggestion')")
+    expect(moteGren, 'mötesgrenen saknas').toBeGreaterThan(-1)
+    expect(moteGren, 'mötesgrenen ligger efter legacy-kön').toBeLessThan(aiSuggestionInsert)
+    const gren = s.slice(moteGren, aiSuggestionInsert)
+    expect(gren).toContain("from('pending_approvals')")
+    expect(gren, 'mötesgrenen faller igenom till legacy-kön').toContain('return NextResponse.json')
+  })
+
+  test('kommunikationstriggern körs INTE för möten', () => {
+    // Med customer_id satt (P0-fixen) hade triggerEventCommunication annars
+    // börjat skicka kundkommunikation utifrån hantverkarens eget möte —
+    // exakt det Lisa-exkluderingen förbjuder.
+    const s = kod(ANALYZE)
+    const moteGren = s.slice(s.indexOf('if (arMote) {'), s.lastIndexOf(".from('ai_suggestion')"))
+    expect(moteGren).not.toContain('triggerEventCommunication')
+    expect(moteGren).not.toContain('tryAutoApprove')
+  })
+
+  test('nya korttyperna är klassade i action-kontraktet', () => {
+    const s = kod('lib/approvals/action-contract.ts')
+    expect(s).toContain("meeting_summary: 'INFORMATIONAL'")
+    expect(s).toContain("meeting_followup: 'EXECUTABLE_ACTION'")
+  })
+
+  test('meeting_followup-exekveraren skapar en task-rad med evidens', () => {
+    const s = kod('app/api/approvals/[id]/route.ts')
+    const caseStart = s.indexOf("case 'meeting_followup'")
+    expect(caseStart, 'exekverar-caset saknas').toBeGreaterThan(-1)
+    const block = s.slice(caseStart, caseStart + 2000)
+    expect(block).toContain("from('task')")
+    expect(block).toContain('source_text')
+  })
+
+  test('ÄTA-kortet skapar en riktig project_change när projekt finns', () => {
+    const s = kod('app/api/approvals/[id]/route.ts')
+    const caseStart = s.indexOf("case 'create_ata_draft'")
+    const block = s.slice(caseStart, caseStart + 4000)
+    expect(block, 'sista milen öppen igen — ÄTA blir föräldralös offert').toContain('/api/ata')
+    expect(block).toContain("changeType: 'addition'")
+  })
+})

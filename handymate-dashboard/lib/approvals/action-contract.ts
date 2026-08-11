@@ -129,6 +129,16 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   ata_signed_notification: 'INFORMATIONAL',
   ata_declined_notification: 'INFORMATIONAL',
   profitability_warning: 'INFORMATIONAL',
+
+  // ═══ Meeting Intelligence Epic 2 (2026-08-11) ═══
+  // Mötesanalysens utfall landar HÄR (inte i legacy-ai_suggestion).
+  // meeting_summary: "Mötet med X är sammanfattat" — läses, utför inget.
+  // meeting_followup: godkännande skapar en task-rad med evidenscitat ur
+  // mötet. Detta är den explicita, granskningsbara formen som trär rådets
+  // Promise Ledger-gate (ACTIVE_ROADMAP.md:37,554) — aldrig ambient
+  // extraktion, alltid ett kort en människa godkänner.
+  meeting_summary: 'INFORMATIONAL',
+  meeting_followup: 'EXECUTABLE_ACTION',
 }
 
 /** Vad är det här kortet? `null` = okänt, och okänt godkänns inte. */

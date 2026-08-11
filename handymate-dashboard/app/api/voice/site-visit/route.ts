@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { verifyOwnership } from '@/lib/auth/verify-ownership'
 import { recordCost } from '@/lib/costs/record'
 import { whisperCostOre } from '@/lib/costs/meter'
 
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get('audio') as File | null
     const durationSeconds = Number(formData.get('duration_seconds')) || 0
     const customerId = (formData.get('customer_id') as string) || null
+    const bookingId = (formData.get('booking_id') as string) || null
 
     if (!file || file.size === 0) {
       return NextResponse.json({ error: 'Ingen ljudfil mottagen' }, { status: 400 })
@@ -65,6 +67,16 @@ export async function POST(request: NextRequest) {
     if (durationSeconds > MAX_SECONDS + 5) {
       // +5: klockslack mellan klientens timer och blobbens verkliga längd.
       return NextResponse.json({ error: 'Inspelningen överskrider tio minuter' }, { status: 413 })
+    }
+
+    // Cross-tenant-skydd: customer_id/booking_id kommer från klienten och
+    // inserten sker med service role — verifiera ägarskap före användning.
+    const ownership = await verifyOwnership(getServerSupabase(), business.business_id, [
+      { table: 'customer', idColumn: 'customer_id', idValue: customerId, label: 'kund' },
+      { table: 'booking', idColumn: 'booking_id', idValue: bookingId, label: 'bokning' },
+    ])
+    if (!ownership.ok) {
+      return NextResponse.json({ error: `Ogiltig koppling: ${ownership.missing.join(', ')}` }, { status: 403 })
     }
 
     // ── Transkribera. Ljudet finns bara i minnet under det här anropet. ──
@@ -98,6 +110,7 @@ export async function POST(request: NextRequest) {
       .insert({
         business_id: business.business_id,
         customer_id: customerId,
+        booking_id: bookingId, // v118 — vilken bokning platsbesöket gällde
         source: 'site_visit',
         transcript,
         transcript_summary: null,

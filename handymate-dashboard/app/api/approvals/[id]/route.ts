@@ -1108,6 +1108,46 @@ async function executeApprovalPayload(
         return { action: 'seasonal_campaign', campaign_id: campaignId, recipients: customers.length }
       }
 
+      case 'meeting_followup': {
+        // Meeting Intelligence Epic 2 (2026-08-11): mötesanalysens
+        // uppföljningsfynd blir en task-rad NÄR hantverkaren godkänner
+        // kortet — den explicita, granskningsbara formen som trär rådets
+        // Promise Ledger-gate. Evidenscitatet följer med i beskrivningen
+        // så tasken bär sitt eget "varför".
+        const pl = payload as any
+        if (!pl.title) {
+          return { action: 'meeting_followup', ok: false, error: 'Kortet saknar titel.' }
+        }
+        const supabaseMF = await getSupabase()
+        const beskrivning = [
+          pl.description || null,
+          pl.source_text ? `Ur mötet: "${pl.source_text}"` : null,
+        ].filter(Boolean).join('\n\n')
+
+        const { data: task, error: taskErr } = await supabaseMF
+          .from('task')
+          .insert({
+            business_id: businessId,
+            title: pl.title,
+            description: beskrivning || null,
+            status: 'pending',
+            priority: pl.priority === 'urgent' || pl.priority === 'high' ? 'high' : 'medium',
+            due_date: pl.due_date || null,
+            customer_id: pl.customer_id || null,
+            // null, inte en fejkad användare — visibility 'team' gör den
+            // synlig för alla; private-filtret jämför created_by mot userId.
+            created_by: null,
+            visibility: 'team',
+          })
+          .select('id, title')
+          .single()
+
+        if (taskErr || !task) {
+          return { action: 'meeting_followup', ok: false, error: taskErr?.message || 'Kunde inte skapa uppgiften.' }
+        }
+        return { action: 'meeting_followup', task_id: task.id, title: task.title }
+      }
+
       case 'proactive_care': {
         const pl = payload as any
         if (!pl.customer_phone || !pl.suggested_sms) {
@@ -1377,35 +1417,50 @@ async function executeApprovalPayload(
           return { action: 'create_ata_draft', ok: false, error: 'AI-genereringen gav inga rader att spara.' }
         }
 
-        // KÄND BEGRÄNSNING (verifierad 2026-08-04, sql/projects.sql): quotes-
-        // tabellen har ingen project_id-kolumn — POST /api/quotes-kontraktet
-        // stödjer alltså ingen riktig koppling offert↔projekt. Bästa
-        // tillgängliga: slå upp projektets namn och skriv det i offertens
-        // beskrivning så sambandet syns för hantverkaren, och fall tillbaka
-        // på projektets kund om kortet saknar entity.customerId. Ingen rad i
-        // project_change skapas — hantverkaren måste fortfarande skapa den
-        // riktiga ÄTA:n (POST /api/ata) manuellt utifrån AI-förslaget.
-        let projectLabel = pl.project_id ? `projekt ${pl.project_id}` : null
-        let fallbackCustomerId: string | null = null
+        // ═══ SISTA MILEN STÄNGD (Epic 2, 2026-08-11) ═══
+        //
+        // Tidigare skapade det här caset ALLTID en offert rubricerad "ÄTA"
+        // — aldrig en project_change-rad — eftersom quotes saknar project_id
+        // och kopplingen bara blev textuell. Nu: har kortet ett project_id
+        // skapas en RIKTIG ÄTA (POST /api/ata → project_change i draft-läge,
+        // full livscykel med kundsignering). Offertvägen finns kvar ENBART
+        // som reserv när projekt saknas (t.ex. mötesfynd före projektstart).
         if (pl.project_id) {
-          try {
-            const supabasePr = await getSupabase()
-            const { data: project } = await supabasePr
-              .from('project')
-              .select('name, project_number, customer_id')
-              .eq('project_id', pl.project_id)
-              .eq('business_id', businessId)
-              .maybeSingle()
-            if (project) {
-              projectLabel = project.project_number
-                ? `${project.project_number} — ${project.name}`
-                : project.name || projectLabel
-              fallbackCustomerId = project.customer_id || null
-            }
-          } catch (projErr) {
-            console.error('[approvals] create_ata_draft: kunde inte slå upp projekt:', projErr)
+          const ataItems = quoteItems.map((qi: any) => ({
+            description: qi.description || qi.name || 'Arbete',
+            quantity: qi.quantity ?? 1,
+            unit: qi.unit || 'st',
+            unit_price: qi.unit_price ?? qi.price ?? 0,
+          }))
+          const ataRes = await fetch(`${appUrl}/api/ata`, {
+            method: 'POST',
+            headers: forwardHeaders(),
+            body: JSON.stringify({
+              projectId: pl.project_id,
+              changeType: 'addition',
+              description: generated.jobDescription || pl.description || 'ÄTA-tillägg',
+              items: ataItems,
+              customerId: pl.entity?.customerId || null,
+              notes: pl.source_text ? `Ur mötet/samtalet: "${pl.source_text}"` : null,
+            }),
+          })
+          const ataR = await classifyResponse(ataRes)
+          if (!ataR.ok) {
+            return { action: 'create_ata_draft', ...ataR }
+          }
+          const ata = (ataR.metadata as any)?.ata
+          return {
+            action: 'create_ata_draft',
+            ok: true,
+            ata_id: ata?.id,
+            project_id: pl.project_id,
+            total: ata?.total,
           }
         }
+
+        // Reservvägen (inget projekt): offert rubricerad ÄTA, som tidigare.
+        let projectLabel: string | null = null
+        let fallbackCustomerId: string | null = null
 
         const description = [
           generated.jobDescription || '',
