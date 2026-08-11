@@ -14,3 +14,7 @@ test-results/
 
 # Scraping output
 scripts/scraping/output/*.csv
+.superpowers/
+
+# git worktrees (isolated workspaces for agentic development)
+.worktrees/
