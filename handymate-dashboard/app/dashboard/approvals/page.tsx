@@ -29,6 +29,7 @@ import {
   FileDiff,
   Award,
   KeyRound,
+  Lightbulb,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -130,6 +131,8 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   meeting_followup: { label: 'Uppföljning från möte', icon: Clock, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   // Förtjänad autonomi — nedgradering vid upprepade fel (lib/autonomy/earned-autonomy.ts recordAutonomyFailure).
   autonomy_revoked: { label: 'Förtroende', icon: KeyRound, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
+  // Project Debrief Capture (2026-08-12) — de korta frågorna vid projektstängning.
+  project_debrief: { label: 'Efter jobbet', icon: Lightbulb, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 
@@ -205,6 +208,10 @@ export default function ApprovalsPage() {
   const [failedFeedback, setFailedFeedback] = useState<{ id: string; text: string } | null>(null)
   const [failedExecutions, setFailedExecutions] = useState<Approval[]>([])
   const [retryLoading, setRetryLoading] = useState<string | null>(null)
+  // Project Debrief Capture (2026-08-12): kortet ska ALDRIG godkännas rakt
+  // av — knappen öppnar den här modalen med de 2-3 frågorna som textareor.
+  const [debriefModal, setDebriefModal] = useState<Approval | null>(null)
+  const [debriefAnswers, setDebriefAnswers] = useState<string[]>([])
 
   useEffect(() => {
     if (!business?.business_id) return
@@ -332,7 +339,10 @@ export default function ApprovalsPage() {
   async function handleAction(id: string, action: 'approve' | 'reject', editedPayload?: Record<string, unknown>) {
     setActionLoading(id + action)
     try {
-      const body: Record<string, unknown> = { action }
+      // Servern slår bara ihop edited_payload (och stämplar payload.edited,
+      // som streak/approve_rate läser) vid action:'edit' — ett 'approve' med
+      // ändringar skickade tidigare originaltexten och kastade redigeringen.
+      const body: Record<string, unknown> = { action: action === 'approve' && editedPayload ? 'edit' : action }
       if (editedPayload) body.edited_payload = editedPayload
 
       const { data: { session } } = await supabase.auth.getSession()
@@ -407,6 +417,73 @@ export default function ApprovalsPage() {
     } finally {
       setActionLoading(null)
     }
+  }
+
+  // Project Debrief Capture (2026-08-12): öppnar modalen istället för att
+  // godkänna direkt. Frågorna ligger i payload.questions
+  // (lib/debrief/build-debrief-questions.ts) — en tom textarea per fråga.
+  function openDebriefModal(approval: Approval) {
+    const questions = (approval.payload?.questions as string[] | undefined) || []
+    setDebriefAnswers(questions.map(() => ''))
+    setDebriefModal(approval)
+  }
+
+  // Skickar action:'edit' (inte 'approve') — det är den enda action som
+  // faktiskt slår ihop edited_payload in i payloaden innan exekveringen
+  // (app/api/approvals/[id]/route.ts, finalPayload). Status blir ändå
+  // 'approved', som en vanlig godkänn-med-ändringar.
+  async function submitDebrief() {
+    if (!debriefModal) return
+    const id = debriefModal.id
+    const questions = (debriefModal.payload?.questions as string[] | undefined) || []
+    const answers: Record<string, string> = {}
+    questions.forEach((q, i) => {
+      const svar = (debriefAnswers[i] || '').trim()
+      if (svar) answers[q] = svar
+    })
+
+    setActionLoading(id + 'approve')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/approvals/${id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ action: 'edit', edited_payload: { answers } }),
+      })
+      const result = await res.json().catch(() => null)
+      if (res.ok) {
+        setApprovals(prev => prev.filter(a => a.id !== id))
+        setDebriefModal(null)
+        if (result?.execution_outcome?.outcome === 'failed') {
+          setFailedFeedback({
+            id,
+            text: `Godkänt — men utförandet misslyckades: ${result.execution_outcome.error_text || 'okänt fel'}`,
+          })
+          fetchApprovals()
+          return
+        }
+        setFeedbackMsg(Object.keys(answers).length > 0 ? 'Tack — sparat till nästa offert' : 'Noterat')
+        setTimeout(() => setFeedbackMsg(null), 4000)
+      } else {
+        setFailedFeedback({
+          id,
+          text: result?.error || `Något gick fel (HTTP ${res.status}) — kortet ligger kvar.`,
+        })
+      }
+    } catch {
+      setFailedFeedback({ id, text: 'Nätverksfel — kortet ligger kvar, prova igen.' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  function skipDebrief() {
+    if (!debriefModal) return
+    handleAction(debriefModal.id, 'reject')
+    setDebriefModal(null)
   }
 
   function startEdit(approval: Approval) {
@@ -1075,6 +1152,33 @@ export default function ApprovalsPage() {
                             Avbryt
                           </button>
                         </>
+                      ) : approval.approval_type === 'project_debrief' ? (
+                        // Får INTE godkännas rakt av — knappen öppnar modalen
+                        // med de korta frågorna. "Hoppa över" i modalen och
+                        // "Avvisa" här gör samma sak (avvisar, tomt kostar
+                        // ingenting).
+                        <>
+                          <button
+                            onClick={() => openDebriefModal(approval)}
+                            disabled={actionLoading !== null}
+                            className="flex items-center gap-2 px-4 py-2 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
+                          >
+                            <Lightbulb className="w-4 h-4" />
+                            Svara
+                          </button>
+                          <button
+                            onClick={() => handleAction(approval.id, 'reject')}
+                            disabled={actionLoading !== null}
+                            className="flex items-center gap-2 px-3 py-2 border border-[#E2E8F0] hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-gray-700 text-sm font-medium rounded-lg transition-all"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            {actionLoading === approval.id + 'reject' ? 'Avvisar...' : 'Hoppa över'}
+                          </button>
+                          <span className="ml-auto flex items-center gap-1 text-xs text-gray-400">
+                            <Clock className="w-3 h-3" />
+                            {timeUntilExpiry(approval.expires_at)}
+                          </span>
+                        </>
                       ) : (
                         <>
                           <button
@@ -1235,6 +1339,69 @@ export default function ApprovalsPage() {
                     }`}
                   >
                     {actionLoading ? 'Utför...' : info.btn}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )
+      })()}
+
+      {/* Project Debrief Capture — modal med de korta frågorna. Öppnas i
+          stället för direkt-godkännande (approval_type === 'project_debrief'
+          hoppar aldrig via requestApprove). */}
+      {debriefModal && (() => {
+        const questions = (debriefModal.payload?.questions as string[] | undefined) || []
+        return (
+          <>
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" onClick={() => setDebriefModal(null)} />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
+                <div className="p-6 border-b border-gray-100">
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <Lightbulb className="w-5 h-5 text-amber-500" /> {debriefModal.title}
+                  </h3>
+                  {debriefModal.description && (
+                    <p className="text-sm text-gray-500 mt-1">{debriefModal.description}</p>
+                  )}
+                </div>
+
+                <div className="p-6 space-y-4">
+                  {questions.map((q, i) => (
+                    <div key={i}>
+                      <label className="text-sm font-medium text-gray-700 mb-1.5 block">{q}</label>
+                      <textarea
+                        value={debriefAnswers[i] || ''}
+                        onChange={e => {
+                          const value = e.target.value
+                          setDebriefAnswers(prev => {
+                            const next = [...prev]
+                            next[i] = value
+                            return next
+                          })
+                        }}
+                        rows={2}
+                        placeholder="Frivilligt — hoppa över om inget att säga"
+                        className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-6 border-t border-gray-100 flex gap-3">
+                  <button
+                    onClick={skipDebrief}
+                    disabled={actionLoading !== null}
+                    className="flex-1 px-4 py-3 border border-[#E2E8F0] rounded-xl text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Hoppa över
+                  </button>
+                  <button
+                    onClick={submitDebrief}
+                    disabled={actionLoading !== null}
+                    className="flex-1 px-4 py-3 bg-primary-700 text-white rounded-xl text-sm font-semibold hover:bg-primary-800 disabled:opacity-50"
+                  >
+                    {actionLoading ? 'Sparar...' : 'Spara'}
                   </button>
                 </div>
               </div>
