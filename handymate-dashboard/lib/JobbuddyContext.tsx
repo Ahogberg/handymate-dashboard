@@ -37,6 +37,14 @@ interface JobbuddyContextValue {
   setIsOpen: (open: boolean) => void
   activeTab: 'chat' | 'voice' | 'photo'
   setActiveTab: (tab: 'chat' | 'voice' | 'photo') => void
+
+  // Förifylld promptstart (2026-08-11, Andreas UX-fynd): snabbknapparna på
+  // Hem ("Ny offert", "SMS till en kund"…) ska ÖPPNA Matte med en påbörjad
+  // mening — inte navigera bort till en formulärsida. Jarvis-first: knappen
+  // delegerar till Matte, den flyr inte till gamla UI:t. Jobbkompisen läser
+  // och nollar värdet när den öppnas.
+  pendingPrompt: string | null
+  setPendingPrompt: (prompt: string | null) => void
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -58,6 +66,7 @@ export function JobbuddyProvider({ children }: { children: ReactNode }) {
   const [suggestions, setSuggestions] = useState<JobbuddySuggestion[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'chat' | 'voice' | 'photo'>('chat')
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null)
 
   const clearSuggestion = useCallback((id: string) => {
     setSuggestions(prev => prev.filter(s => s.id !== id))
@@ -74,6 +83,8 @@ export function JobbuddyProvider({ children }: { children: ReactNode }) {
       setIsOpen,
       activeTab,
       setActiveTab,
+      pendingPrompt,
+      setPendingPrompt,
     }}>
       {children}
     </JobbuddyContext.Provider>

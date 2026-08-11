@@ -83,7 +83,7 @@ type Tab = 'chat' | 'voice' | 'photo'
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function Jobbkompisen() {
-  const { activeTimer, isOpen, setIsOpen, activeTab, setActiveTab, suggestions, clearSuggestion } = useJobbuddy()
+  const { activeTimer, isOpen, setIsOpen, activeTab, setActiveTab, suggestions, clearSuggestion, pendingPrompt, setPendingPrompt } = useJobbuddy()
   const business = useBusiness()
 
   // ═══ Matte 2.0 (2026-08-08) ═══
@@ -101,6 +101,18 @@ export default function Jobbkompisen() {
     { role: 'assistant', content: 'Hej! Matte här. Chatta, prata eller fota — jag och teamet hjälper dig med allt.' }
   ])
   const [chatInput, setChatInput] = useState('')
+
+  // Snabbknapparna på Hem lämnar en påbörjad mening här (2026-08-11):
+  // "Skicka ett SMS till " — chatten öppnas med den ifylld så hantverkaren
+  // bara fyller i vem och vad. Nollas direkt så den inte spökar nästa gång.
+  useEffect(() => {
+    if (isOpen && pendingPrompt) {
+      setActiveTab('chat')
+      setChatInput(pendingPrompt)
+      setPendingPrompt(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, pendingPrompt])
   const [chatLoading, setChatLoading] = useState(false)
   const [threadId, setThreadId] = useState<string | null>(null)
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null)
@@ -688,6 +700,8 @@ function ChatTab({
   // fynd — med agentens ansikte, inte som systemnotiser. ChatTab ligger
   // under MomentsProvider och hämtar dem själv i stället för prop-trädning.
   const { panel: dagensFynd, markSeen } = useMoments()
+  // Hopfällt som default (2026-08-11) — chatten är primär, fynden sekundära.
+  const [fyndUtfallda, setFyndUtfallda] = useState(false)
   const chatPathname = usePathname()
   const quickActions = pageContextFromPathname(chatPathname).quickActions
 
@@ -699,30 +713,46 @@ function ChatTab({
     <>
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {/* Dagens fynd — teamets upptäckter, orkestrerade av Matte */}
+        {/* Dagens fynd — HOPFÄLLDA (2026-08-11, Andreas UX-fynd): tre stora
+            fyndkort ovanpå tomma chatten fick ytan att kännas som en logg,
+            inte ett samtal med Matte. Chatten är primär; fynden är en rad
+            man kan fälla ut om man vill. */}
         {visaFynd && !pendingConfirmation && (
-          <div className="space-y-2 mb-3">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              Teamet har hittat
-            </p>
-            {dagensFynd.slice(0, 3).map(m => (
-              <Link
-                key={m.id}
-                href={m.action.href}
-                onClick={() => markSeen(m.id)}
-                className="flex items-start gap-2.5 p-2.5 bg-white border border-slate-200 rounded-xl hover:border-primary-300 transition-colors"
-              >
-                <AgentAvatar agentKey={m.agentId} size="sm" />
-                <span className="flex-1 min-w-0">
-                  <span className="block text-sm font-medium text-gray-900 leading-snug">
-                    {m.headline}
-                  </span>
-                  <span className="block text-xs text-primary-700 font-semibold mt-0.5">
-                    {m.action.label} →
-                  </span>
-                </span>
-              </Link>
-            ))}
+          <div className="mb-3">
+            <button
+              type="button"
+              onClick={() => setFyndUtfallda(v => !v)}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-left hover:border-primary-200 transition-colors"
+            >
+              <span className="text-xs font-medium text-gray-600">
+                Teamet har hittat {dagensFynd.length} {dagensFynd.length === 1 ? 'sak' : 'saker'}
+              </span>
+              <span className="text-xs text-primary-700 font-semibold shrink-0">
+                {fyndUtfallda ? 'Dölj' : 'Visa'}
+              </span>
+            </button>
+            {fyndUtfallda && (
+              <div className="space-y-2 mt-2">
+                {dagensFynd.slice(0, 3).map(m => (
+                  <Link
+                    key={m.id}
+                    href={m.action.href}
+                    onClick={() => markSeen(m.id)}
+                    className="flex items-start gap-2.5 p-2.5 bg-white border border-slate-200 rounded-xl hover:border-primary-300 transition-colors"
+                  >
+                    <AgentAvatar agentKey={m.agentId} size="sm" />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-medium text-gray-900 leading-snug">
+                        {m.headline}
+                      </span>
+                      <span className="block text-xs text-primary-700 font-semibold mt-0.5">
+                        {m.action.label} →
+                      </span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

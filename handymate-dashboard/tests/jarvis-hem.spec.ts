@@ -99,10 +99,11 @@ test.describe('nyhetsraderna har en väg vidare', () => {
 // (tests/bevakning.spec.ts) och dygnsdigesten (tests/dygnsdigest.spec.ts)
 // äger numera de ytorna.
 
-test.describe('skrivradens chips pekar på sidor som finns', () => {
-  // Etapp 4: chipsen är Link-pills till hårdkodade rutter. En flyttad sida
-  // ska bli röd HÄR, inte en död länk i prod. Källskanningen läser chipsens
-  // href ur komponenten och kräver motsvarande page.tsx på disk.
+test.describe('skrivradens chips delegerar till Matte', () => {
+  // Omgjorda 2026-08-11 (Andreas UX-fynd): chipsen navigerade till formulär-
+  // sidor trots att de sitter under Matte-inputen. Nu öppnar de Jobbkompisen
+  // med en påbörjad mening. href behålls som dokumenterad kanonisk sida per
+  // ärende — en flyttad sida ska fortfarande bli röd HÄR.
   const { SKRIVRAD_CHIPS } = require('../components/jarvis/SkrivRad')
 
   test('varje chip-href motsvarar en existerande page.tsx', () => {
@@ -112,15 +113,30 @@ test.describe('skrivradens chips pekar på sidor som finns', () => {
     }
   })
 
+  test('varje chip bär en påbörjad mening som slutar öppet', () => {
+    for (const chip of SKRIVRAD_CHIPS) {
+      expect(typeof chip.prompt, `${chip.label} saknar prompt`).toBe('string')
+      expect(chip.prompt.length, `${chip.label} har tom prompt`).toBeGreaterThan(5)
+      expect(chip.prompt.endsWith(' '), `${chip.label}s prompt ska sluta med mellanslag — hantverkaren fyller i resten`).toBe(true)
+    }
+  })
+
   test('chipsen är de fyra vanligaste ärendena — inte en meny', () => {
     expect(SKRIVRAD_CHIPS).toHaveLength(4)
     const labels = SKRIVRAD_CHIPS.map((c: any) => c.label)
     expect(labels).toEqual(['Ny offert', 'Boka in ett jobb', 'Skicka en faktura', 'SMS till en kund'])
   })
 
+  test('klick fyller Matte-chatten — ingen navigering', () => {
+    const skrivrad = fs.readFileSync(path.join(ROOT, 'components/jarvis/SkrivRad.tsx'), 'utf8')
+    expect(skrivrad, 'chipsen renderas som Link igen — de ska delegera till Matte').toContain('onChip?.(chip.prompt)')
+    const hem = fs.readFileSync(path.join(ROOT, 'components/jarvis/JarvisHome.tsx'), 'utf8')
+    expect(hem).toContain('setPendingPrompt(prompt)')
+  })
+
   test('ytan växlar läge på beslutströskeln — samma tröskel som bevakningen', () => {
     const s = fs.readFileSync(path.join(ROOT, 'components/jarvis/JarvisHome.tsx'), 'utf8')
-    expect(s).toContain('<SkrivRad stor={beslut <= 1}')
+    expect(s).toContain('stor={beslut <= 1}')
     // Pill-markupen bor i komponenten nu — inte kvar duplicerad i ytan.
     expect(s).not.toContain('Skriv till teamet — eller tryck.')
   })

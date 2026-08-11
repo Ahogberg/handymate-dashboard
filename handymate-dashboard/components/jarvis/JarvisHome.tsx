@@ -188,7 +188,7 @@ export default function JarvisHome({
   economics,
 }: JarvisHomeProps) {
   const business = useBusiness()
-  const { setIsOpen: openJobbkompisen } = useJobbuddy()
+  const { setIsOpen: openJobbkompisen, setPendingPrompt } = useJobbuddy()
 
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [queueLoaded, setQueueLoaded] = useState(false)
@@ -945,7 +945,11 @@ export default function JarvisHome({
              hamnar den då efter gräv-korten, som en hantverkare på bygget har
              mer nytta av än en skrivrad. På desktop ligger den kvar under
              huvudspalten precis som i mockupen. */}
-        <SkrivRad stor={beslut <= 1} onOppna={() => openJobbkompisen(true)} />
+        <SkrivRad
+          stor={beslut <= 1}
+          onOppna={() => openJobbkompisen(true)}
+          onChip={prompt => { setPendingPrompt(prompt); openJobbkompisen(true) }}
+        />
       </div>
 
       {/* Ångra-snackbaren. POST:en har INTE gått iväg än. */}

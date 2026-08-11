@@ -23,14 +23,20 @@ import { Mic } from 'lucide-react'
  * röst) — ingen ny chattbackend.
  */
 
-export const SKRIVRAD_CHIPS: Array<{ label: string; href: string }> = [
-  { label: 'Ny offert', href: '/dashboard/quotes/new' },
-  { label: 'Boka in ett jobb', href: '/dashboard/schedule' },
-  { label: 'Skicka en faktura', href: '/dashboard/invoices/new' },
-  { label: 'SMS till en kund', href: '/dashboard/sms-inbox' },
+// Omgjorda 2026-08-11 (Andreas UX-fynd): chipsen navigerade till formulär-
+// sidor — men de sitter UNDER Matte-inputen, så förväntan är att de startar
+// en delegering till Matte, inte flyr till gamla UI:t. Klick öppnar nu
+// Jobbkompisen med en påbörjad mening som hantverkaren fyller i. `href`
+// behålls som dokumenterad kanonisk fallback-sida per ärende (CI kräver att
+// den finns) men används inte längre som primärklick.
+export const SKRIVRAD_CHIPS: Array<{ label: string; href: string; prompt: string }> = [
+  { label: 'Ny offert', href: '/dashboard/quotes/new', prompt: 'Skapa en offert till ' },
+  { label: 'Boka in ett jobb', href: '/dashboard/schedule', prompt: 'Boka in ett jobb åt ' },
+  { label: 'Skicka en faktura', href: '/dashboard/invoices/new', prompt: 'Skicka en faktura till ' },
+  { label: 'SMS till en kund', href: '/dashboard/sms-inbox', prompt: 'Skicka ett SMS till ' },
 ]
 
-export function SkrivRad({ stor, onOppna }: { stor: boolean; onOppna: () => void }) {
+export function SkrivRad({ stor, onOppna, onChip }: { stor: boolean; onOppna: () => void; onChip?: (prompt: string) => void }) {
   if (!stor) {
     // Pillen — flyttad ordagrant från JarvisHome (besluten äger skärmen).
     return (
@@ -66,13 +72,14 @@ export function SkrivRad({ stor, onOppna }: { stor: boolean; onOppna: () => void
       </button>
       <div className="flex flex-wrap gap-2 mt-3">
         {SKRIVRAD_CHIPS.map(chip => (
-          <Link
+          <button
             key={chip.href}
-            href={chip.href}
+            type="button"
+            onClick={() => onChip?.(chip.prompt)}
             className="inline-flex items-center min-h-[36px] px-3.5 rounded-full border border-slate-200 bg-slate-50 text-[13px] font-medium text-slate-600 hover:border-primary-200 hover:text-primary-700 hover:bg-primary-50 transition-colors"
           >
             {chip.label}
-          </Link>
+          </button>
         ))}
       </div>
     </div>
