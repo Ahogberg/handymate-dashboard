@@ -202,6 +202,28 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       why: 'GET gör select(*) på deal-tabellen (inkl. affärsvärde). Systerrutten som Flödet-sidan anropar i samma Promise.all som /api/pipeline — kvarstod oskyddad efter den första pipeline-fixen och var den faktiska läckan.',
     },
     {
+      // Dynamisk sub-route, egen regel skild från 'pipeline/deals' —
+      // samma konvention som team/[id] har en egen rad utöver team.
+      route: 'pipeline/deals/[id]',
+      requires: 'see_financials',
+      why: 'GET gör select(*) på en enskild deal (inkl. affärsvärde), nådd bl.a. från offertformulärets deal-prefill. Tredje systerrutten i samma läcka som pipeline och pipeline/deals.',
+    },
+    {
+      route: 'analytics/win-loss',
+      requires: 'see_financials',
+      why: 'Vunnet/förlorat värde, snittstorlek per affär, källfördelning — hela företagets pipeline-utfall. Analytics-sidan är redan dold för anställda i Sidebar, men API:et kollade aldrig.',
+    },
+    {
+      route: 'analytics/job-types',
+      requires: 'see_financials',
+      why: 'Intäkt per jobbtyp (deal_value, accepted_value, total_value) för hela företaget de senaste 12 månaderna. Samma Analytics-sida som win-loss, samma saknade API-grind.',
+    },
+    {
+      route: 'onboarding/instant-value',
+      requires: 'see_financials',
+      why: 'Summerar deal-värde och obetalda fakturor för hela företaget till onboardingens "payoff"-skärm. Görs alltid av ägaren (har alltid see_financials) så grinden stör aldrig onboardingen.',
+    },
+    {
       route: 'dashboard/cash-radar',
       requires: 'see_financials',
       why: 'Fem veckors kassaflödesprognos — fakturerat plus viktad potential, alltså företagets likviditet.',

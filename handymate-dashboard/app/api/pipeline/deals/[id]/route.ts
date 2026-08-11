@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 
 /**
  * GET - Hämta en deal
@@ -13,6 +14,13 @@ export async function GET(
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rollgrind (2026-08-11, behörighetskontraktet): getAuthenticatedBusiness
+    // avgör vilket FÖRETAG anropet gäller — inte vad användaren får se i det.
+    const currentUser = await getCurrentUser(request, business.business_id)
+    if (!currentUser || !hasPermission(currentUser, 'see_financials')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
     }
 
     const supabase = getServerSupabase()
@@ -48,6 +56,17 @@ export async function PATCH(
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Ingen rollgrind på själva skrivningen — länka kund, sätta prioritet,
+    // tilldela, flytta steg m.m. är vardaglig pipelinehantering för VARJE
+    // anställd (samma resonemang som gör att /api/pipeline/deals POST är
+    // självbetjäning). Men .select().single() nedan returnerar HELA raden,
+    // inklusive value/won_value/lost_value, oavsett vilket fält som
+    // patchades — det är en implicit läsning och degraderas därför
+    // (2026-08-11), samma mönster som app/api/projects/route.ts redan
+    // använder för budget_amount/budget_hours/actual_amount.
+    const currentUser = await getCurrentUser(request, business.business_id)
+    const canSeeFinancials = !currentUser || hasPermission(currentUser, 'see_financials')
 
     const supabase = getServerSupabase()
     const body = await request.json()
@@ -87,7 +106,14 @@ export async function PATCH(
 
     if (error) throw error
 
-    return NextResponse.json({ deal })
+    const responseDeal = canSeeFinancials
+      ? deal
+      : (() => {
+          const { value: _value, won_value: _wonValue, lost_value: _lostValue, ...rest } = deal as any
+          return rest
+        })()
+
+    return NextResponse.json({ deal: responseDeal })
   } catch (error: any) {
     console.error('Update deal error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

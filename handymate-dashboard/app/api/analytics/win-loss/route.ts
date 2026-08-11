@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness, checkFeatureAccess } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 
 interface DealRow {
   id: string
@@ -27,6 +28,13 @@ export async function GET(request: NextRequest) {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rollgrind (2026-08-11, behörighetskontraktet): getAuthenticatedBusiness
+    // avgör vilket FÖRETAG anropet gäller — inte vad användaren får se i det.
+    const currentUser = await getCurrentUser(request, business.business_id)
+    if (!currentUser || !hasPermission(currentUser, 'see_financials')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
     }
 
     const featureCheck = checkFeatureAccess(business, 'lead_intelligence')
