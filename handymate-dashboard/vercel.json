@@ -144,6 +144,14 @@
     {
       "path": "/api/cron/missed-revenue",
       "schedule": "40 6 * * *"
+    },
+    {
+      "path": "/api/cron/meeting-reminders",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/meeting-worker",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

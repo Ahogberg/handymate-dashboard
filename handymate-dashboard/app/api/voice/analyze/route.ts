@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { getClaudeModel } from '@/lib/ai/get-model'
 import { filtreraAnalysforslag, type AnalysForslagsTyp } from '@/lib/voice/analysis-scope'
 import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
+import { splitTranscript, MAP_REDUCE_TROSKEL_TECKEN } from '@/lib/meetings/split-transcript'
 
 function getAnthropic() {
   return new Anthropic({
@@ -27,6 +29,193 @@ interface AISuggestion {
   action_data?: Record<string, any>
   confidence: number
   source_text?: string
+}
+
+/**
+ * ═══ MAP-REDUCE FÖR LÅNGA MÖTESTRANSKRIPT (Mötesassistenten V2) ═══
+ *
+ * Ett 90-minutersmöte kan bli ett transkript på tiotusentals tecken — för
+ * långt för ett enda Claude-anrop utan att antingen trunkera texten (tyst
+ * dataförlust av precis det som spelades in) eller riskera att sprängja
+ * context-fönstret. Över MAP_REDUCE_TROSKEL_TECKEN körs i stället:
+ *
+ *   MAP:    varje transkriptdel (lib/meetings/split-transcript.ts delar på
+ *           tidsstämpel-markörerna, aldrig mitt i en mening) analyseras
+ *           separat och ger kandidatfynd.
+ *   REDUCE: en sista sammanslagningsomgång deduplicerar fynden och
+ *           producerar EXAKT samma svarsformat som engångsanropet
+ *           (`prompt` nedan) skulle ha gjort — resten av routen (metering,
+ *           JSON-parsning, kortbygget) läser bara `response` och `analysisResult`
+ *           och märker ingen skillnad mellan de två vägarna.
+ */
+interface MapReduceFynd {
+  type: 'quote' | 'follow_up' | 'reminder' | 'reschedule'
+  title: string
+  description: string
+  source_text: string
+  tidsstampel: string | null
+  confidence: number
+}
+
+/** Plockar ut ett JSON-objekt ur ett AI-svar — svaret är nästan alltid ren
+    JSON, men modellen lägger ibland text runt den ändå. */
+function parseraJsonSvar(text: string): any {
+  try {
+    return JSON.parse(text)
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/)
+    if (match) return JSON.parse(match[0])
+    throw new Error('Could not parse AI response as JSON')
+  }
+}
+
+/** MAP-steget: extraherar kandidatfynd ur en enskild transkriptdel. */
+async function extraheraFyndFranChunk(
+  anthropic: Anthropic,
+  model: string,
+  chunk: string,
+  chunkIndex: number,
+  totalChunks: number,
+): Promise<{ fynd: MapReduceFynd[]; usage: Anthropic.Usage | null }> {
+  const prompt = `Du analyserar DEL ${chunkIndex + 1} av ${totalChunks} av ett transkript från ett hantverkarmöte (platsbesök hos kund). Transkriptdelen innehåller tidsstämpel-markörer som "[mm:ss]" eller "[h:mm:ss]" på egna rader.
+
+=== TRANSKRIPTDEL ===
+"""
+${chunk}
+"""
+
+=== UPPGIFT ===
+Extrahera KANDIDATFYND — konkreta saker som diskuterades och kan bli åtgärder. Det här är en delanalys inför en senare sammanslagning, så var generös men konkret: hellre ett extra fynd än att missa något.
+
+Tillåtna typer (ENDAST dessa fyra — föreslå ALDRIG "callback", "booking" eller "sms", de hanteras av ett annat system):
+- "quote": jobb, pris eller omfattning diskuterades (inkl. ÄTA — tillägg till pågående jobb)
+- "follow_up": något ska följas upp efter mötet
+- "reminder": något ska påminnas om (beställning, återbesök)
+- "reschedule": en inbokad tid diskuterades om
+
+Svara ENDAST med JSON i detta format:
+{
+  "fynd": [
+    {
+      "type": "quote|follow_up|reminder|reschedule",
+      "title": "Kort titel på svenska",
+      "description": "Vad som diskuterades",
+      "source_text": "Relevant citat från transkriptdelen",
+      "tidsstampel": "Närmaste [mm:ss]-markör i den här delen, eller null",
+      "confidence": 0.0-1.0
+    }
+  ]
+}
+
+Om inget konkret diskuterades i den här delen: returnera {"fynd": []}. Svara ENDAST med JSON, ingen annan text.`
+
+  const response = await anthropic.messages.create({
+    model,
+    max_tokens: 2000,
+    messages: [{ role: 'user', content: prompt }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  let fynd: MapReduceFynd[] = []
+  try {
+    const parsed = parseraJsonSvar(text)
+    fynd = Array.isArray(parsed?.fynd) ? parsed.fynd : []
+  } catch (parseErr) {
+    console.warn('[voice/analyze] map-reduce chunk-parsning misslyckades:', parseErr)
+  }
+
+  return { fynd, usage: response.usage }
+}
+
+/**
+ * REDUCE-steget: slår ihop kandidatfynd från alla delar till exakt samma
+ * svarsformat som engångsanropet (summary + suggestions[]).
+ */
+async function slaIhopFynd(
+  anthropic: Anthropic,
+  model: string,
+  alltFynd: MapReduceFynd[],
+): Promise<Anthropic.Message> {
+  const prompt = `Du får en lista KANDIDATFYND som extraherats separat ur olika delar av ett långt mötestranskript (hantverkarens platsbesök hos en kund). Flera delar kan ha hittat samma sak, med olika ordval eller detaljnivå.
+
+=== KANDIDATFYND ===
+${JSON.stringify(alltFynd, null, 2)}
+
+=== UPPGIFT ===
+1. Skriv en kort sammanfattning av mötet baserat på fynden (2-3 meningar, svenska).
+2. Deduplicera fynd som beskriver SAMMA sak (samma typ + liknande titel/innehåll) — behåll bara det bäst underbyggda (tydligast source_text, högst confidence).
+3. Sätt en prioritet (low/medium/high/urgent) för varje kvarvarande förslag — "urgent" ENDAST vid akuta problem (läcka, strömavbrott etc).
+4. Har ett fynd en tidsstämpel (fältet "tidsstampel") — inled dess source_text med den, t.ex. "[05:30] ...", så den syns i det slutgiltiga förslaget.
+
+Svara ENDAST med JSON i exakt detta format:
+{
+  "summary": "Kort sammanfattning av mötet på svenska (2-3 meningar)",
+  "suggestions": [
+    {
+      "type": "quote|follow_up|reminder|reschedule",
+      "title": "Kort titel på svenska",
+      "description": "Beskrivning av vad som ska göras",
+      "priority": "low|medium|high|urgent",
+      "confidence": 0.0-1.0,
+      "source_text": "Relevant citat, med [mm:ss]-prefix om tidsstämpel finns"
+    }
+  ]
+}
+
+Fanns inga fynd: returnera tom suggestions-array. Svara ENDAST med JSON, ingen annan text.`
+
+  return anthropic.messages.create({
+    model,
+    max_tokens: 4000,
+    messages: [{ role: 'user', content: prompt }],
+  })
+}
+
+/**
+ * Kör hela map-reduce-kedjan för ett långt mötestranskript och returnerar
+ * ett svar på SAMMA form som `anthropic.messages.create` skulle gett för
+ * engångsanropet — anroparen (POST-handlern) behöver inte veta vilken väg
+ * som kördes.
+ */
+async function runMeetingMapReduce(params: {
+  anthropic: Anthropic
+  supabase: SupabaseClient
+  model: string
+  transcript: string
+  businessId: string
+  recordingId: string
+}): Promise<Anthropic.Message> {
+  const { anthropic, supabase, model, transcript, businessId, recordingId } = params
+  const chunks = splitTranscript(transcript)
+
+  const alltFynd: MapReduceFynd[] = []
+  for (let i = 0; i < chunks.length; i++) {
+    const { fynd, usage } = await extraheraFyndFranChunk(anthropic, model, chunks[i], i, chunks.length)
+    alltFynd.push(...fynd)
+
+    // COGS: varje MAP-anrop mäts för sig — annars syns bara sista/enda
+    // anropets kostnad och resten av korten på ett långt möte blir gratis
+    // i boken trots att de facto kostade pengar.
+    if (usage) {
+      try {
+        const { meterDirectLlmCall } = await import('@/lib/agents/shared/cost-guard')
+        const { llmCostUsd } = await import('@/lib/costs/meter')
+        await meterDirectLlmCall({
+          supabase,
+          businessId,
+          usage,
+          costUsd: llmCostUsd(usage, model),
+          refType: 'call_recording',
+          refId: recordingId,
+          meta: { prompt: 'meetingMapReduce', chunk: i, chunks: chunks.length },
+        })
+      } catch (costErr) {
+        console.warn('[voice/analyze] map-reduce kostnadsmätning misslyckades:', costErr)
+      }
+    }
+  }
+
+  return slaIhopFynd(anthropic, model, alltFynd)
 }
 
 /**
@@ -218,7 +407,10 @@ affären framåt efter besöket:
 - Om något ska påminnas om (beställning, återbesök) → "reminder"
 - Om en inbokad tid diskuterades om → "reschedule"
 - Föreslå ALDRIG "callback" — hantverkaren pratade nyss med kunden ansikte
-  mot ansikte.`
+  mot ansikte.
+- Innehåller transkriptet ovan tidsstämpel-markörer ([mm:ss] eller
+  [h:mm:ss]) — inled source_text med den närmaste markören, t.ex.
+  "[05:30] ...", så evidensen blir tidsatt.`
   : `VIKTIGT: En kollega (AI-agenten Lisa) hanterar samma samtal parallellt och
 sköter själv bokningar, SMS-bekräftelser och kundregistrering. Föreslå ALDRIG
 dessa — då görs samma sak två gånger. Du föreslår ENBART:
@@ -289,13 +481,32 @@ Svara ENDAST med JSON i följande format:
     // användes — inte den vi tror används vid läsning senare.
     const analysModell = getClaudeModel('background')
 
-    const response = await anthropic.messages.create({
-      // Post-call analys av transkript — background extraction (kunden har redan
-      // lagt på). JSON-output gör Haiku lämplig. Sonnet behövdes inte här.
-      model: analysModell,
-      max_tokens: 2000,
-      messages: [{ role: 'user', content: prompt }]
-    })
+    // Långa mötestranskript (platsbesök, ofta 60-90 min) kan bli så stora
+    // att ett enda anrop antingen trunkerar eller spränger context-
+    // fönstret. Över tröskeln körs map-reduce (funktionerna ovan) i
+    // stället — resultatet landar i samma `response`-form som engångs-
+    // anropet, så allt nedanför (metering, JSON-parsning, kortbygge) är
+    // omedvetet om vilken väg som kördes.
+    const anvandMapReduce = arMote && recording.transcript.length > MAP_REDUCE_TROSKEL_TECKEN
+
+    const response = anvandMapReduce
+      ? await runMeetingMapReduce({
+          anthropic,
+          supabase,
+          model: analysModell,
+          transcript: recording.transcript,
+          businessId: recording.business_id,
+          recordingId: recording_id,
+        })
+      : await anthropic.messages.create({
+          // Post-call analys av transkript — background extraction (kunden har redan
+          // lagt på). JSON-output gör Haiku lämplig. Sonnet behövdes inte här.
+          // Möten får dubbla tokentaket: transkriptet är längre och
+          // suggestions-listan kan bli större än ett telefonsamtal.
+          model: analysModell,
+          max_tokens: arMote ? 4000 : 2000,
+          messages: [{ role: 'user', content: prompt }]
+        })
 
     // COGS (P0-fix 2026-08-11): analysanropet gick förbi cost-guard och var
     // helt omätt — Whisper bokfördes men inte Haiku. Mätningen bor i
