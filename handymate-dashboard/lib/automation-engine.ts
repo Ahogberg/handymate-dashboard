@@ -413,11 +413,17 @@ async function handleCreateApproval(
   }
   const { entityId, ruleActionType } = dedupeKey
 
+  // Dedup UTAN statusfilter (buggfix 2026-08-11, samma klass som cert-expiry
+  // och proactive-care): kollen på status='pending' skyddade bara medan
+  // kortet låg obehandlat. Korten går ut efter 48h — nästa körning såg då
+  // ingen pending-rad och skapade om samma kort, varje dag, för alltid
+  // (Andreas skärmdump: tre påminnelsekort som återuppstod dagligen). Ett
+  // avvisat/utgånget kort för samma entitet+regel ska INTE återuppstå;
+  // trösklarna förblir sanna för evigt när de passerats.
   const { count } = await supabase
     .from('pending_approvals')
     .select('*', { count: 'exact', head: true })
     .eq('business_id', businessId)
-    .eq('status', 'pending')
     .contains('payload', { entity_id: entityId, rule_action_type: ruleActionType })
 
   if ((count || 0) > 0) {

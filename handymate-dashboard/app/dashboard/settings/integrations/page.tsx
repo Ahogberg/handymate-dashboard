@@ -223,9 +223,11 @@ export default function IntegrationsPage() {
             <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
           </Link>
 
-          {/* Google Calendar */}
+          {/* Google Calendar. ?tab= krävs (buggfix 2026-08-11): utan den
+              landade klicket på inställnings-hubben utan vald flik och
+              kopplingsknappen gick inte att hitta. */}
           <Link
-            href="/dashboard/settings"
+            href="/dashboard/settings?tab=integrations"
             className="flex items-center gap-4 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 hover:shadow-sm transition-all"
           >
             <div className="w-10 h-10 rounded-lg flex items-center justify-center text-blue-600 bg-blue-50">

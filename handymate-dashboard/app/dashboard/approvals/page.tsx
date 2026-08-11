@@ -121,6 +121,12 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   create_ata_draft: { label: 'ÄTA-förslag', icon: FileDiff, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   // Certifikatpåminnelsen (R3, tasks/resurs-masterplan.md).
   cert_expiry_reminder: { label: 'Certifikat', icon: Award, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
+  // v3-automationsreglernas kort ("Faktura obetald 7+ dagar", "Ring kund om
+  // offert") — visades som "Övrigt" (buggfix 2026-08-11).
+  automation: { label: 'Påminnelse', icon: Clock, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
+  // Meeting Intelligence Epic 2.
+  meeting_summary: { label: 'Möte', icon: MessageSquare, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
+  meeting_followup: { label: 'Uppföljning från möte', icon: Clock, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 
@@ -382,7 +388,19 @@ export default function ApprovalsPage() {
             setFeedbackLink(null)
           }, result?.execution?.quote_id ? 10000 : 4000)
         }
+      } else {
+        // Buggfix 2026-08-11 (Andreas skärmdump): serverfel svaldes tyst —
+        // kortet låg kvar, modalen stängdes, och "ingenting hände". Routen
+        // returnerar svenska felmeddelanden skrivna för att VISAS (t.ex.
+        // "Kortet ... går därför inte att godkänna härifrån") — visa dem.
+        const errData = await res.json().catch(() => null)
+        setFailedFeedback({
+          id,
+          text: errData?.error || `Något gick fel (HTTP ${res.status}) — kortet ligger kvar.`,
+        })
       }
+    } catch {
+      setFailedFeedback({ id, text: 'Nätverksfel — kortet ligger kvar, prova igen.' })
     } finally {
       setActionLoading(null)
     }
