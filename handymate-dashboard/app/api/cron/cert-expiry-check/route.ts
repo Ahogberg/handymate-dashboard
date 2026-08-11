@@ -99,14 +99,25 @@ async function runCertExpiryCheck() {
   const results: Array<{ cert_id: string; created: boolean }> = []
 
   for (const cert of rows) {
-    // Dedupe — samma mönster som app/api/cron/send-reminders (.contains på payload).
+    // Dedupe (fixad 2026-08-11): tidigare kollade den bara status='pending',
+    // vilket bara skyddar medan kortet ligger obehandlat. Så fort kortet
+    // löstes — godkänt, avvisat, eller auto-utgånget 14 dagar efter
+    // certets eget valid_until (se expires_at nedan) — matchade nästa
+    // cron-körning samma ofönyade cert på nytt och skapade ett identiskt
+    // kort igen. cert_expiry_reminder är ren ACKNOWLEDGEMENT (rör aldrig
+    // certet självt, se app/api/approvals/[id]/route.ts) så ett godkänt
+    // kort "gjorde" tekniskt sett ingenting — utan denna fix hade det gett
+    // ett nytt "Certifikat går ut"-kort VARJE DAG tills certet faktiskt
+    // förnyas. Dedupar nu på {cert_id, valid_until} utan statusfilter —
+    // samma cert med samma utgångsdatum får aldrig fler än ett kort,
+    // oavsett vad som hände med det förra, men en förnyelse (nytt
+    // valid_until) startar en ny, korrekt påminnelsecykel.
     const { count: existing, error: dedupeError } = await supabase
       .from('pending_approvals')
       .select('*', { count: 'exact', head: true })
       .eq('business_id', cert.business_id)
       .eq('approval_type', 'cert_expiry_reminder')
-      .eq('status', 'pending')
-      .contains('payload', { cert_id: cert.id })
+      .contains('payload', { cert_id: cert.id, valid_until: cert.valid_until })
 
     if (dedupeError) {
       console.error('[cert-expiry-check] dedupe-koll misslyckades, hoppar över för säkerhets skull:', cert.id, dedupeError)

@@ -240,7 +240,6 @@ export async function checkProactiveCare(businessId: string): Promise<{
     }
 
     const now = new Date()
-    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString()
 
     for (const project of projects) {
       // Max 3 proactive contacts per business per day
@@ -265,13 +264,21 @@ export async function checkProactiveCare(businessId: string): Promise<{
       // Also skip if too far past (more than 6 months over cycle — avoid ancient contacts)
       if (monthsSince > lifecycle.months + 6) continue
 
-      // Dedup: check pending_approvals for this customer+project in last 60 days
+      // Dedup (fixad 2026-08-11): kollade tidigare bara de senaste 60 dagarna,
+      // men eligibility-fönstret ovan (lifecycle.months till +6 månader) är
+      // ~183 dagar brett — ungefär tre gånger så brett som dedup-fönstret.
+      // Samma projekt+kund kunde alltså få ett nytt proactive_care-kort (och,
+      // om godkänt, ett dubblett-SMS till kunden) ungefär var 60:e dag så
+      // länge fönstret var öppet. Samma buggklass som upptäcktes i
+      // evaluateThresholds() (lib/automation-engine.ts) samma dag — ett
+      // datumavgränsat dedup mot ett villkor som förblir sant länge. Ingen
+      // datumgräns alls nu, matchar den redan korrekta systertabellen
+      // lib/warranty-followup.ts.
       const { count: existingApprovalCount } = await supabase
         .from('pending_approvals')
         .select('*', { count: 'exact', head: true })
         .eq('business_id', businessId)
         .eq('approval_type', 'proactive_care')
-        .gte('created_at', sixtyDaysAgo)
         .contains('payload', { project_id: project.project_id, customer_id: customer.customer_id })
 
       if (existingApprovalCount && existingApprovalCount > 0) continue
@@ -282,7 +289,6 @@ export async function checkProactiveCare(businessId: string): Promise<{
         .select('id')
         .eq('business_id', businessId)
         .eq('rule_name', 'proactive_customer_care')
-        .gte('created_at', sixtyDaysAgo)
         .contains('context', { project_id: project.project_id })
         .limit(1)
 
