@@ -57,7 +57,34 @@ export async function GET(
       return NextResponse.json({ project_status: project.status, outcome: null })
     }
 
-    return NextResponse.json({ project_status: project.status, outcome: outcome || null })
+    // Förväntad marginal vid accept (v120) — egen defensiv query, en 42703
+    // (kolumnen inte skapad än) får aldrig fälla hela sidan. Bara relevant
+    // när efterkalkylen faktiskt har en offert att jämföra med.
+    let expectedMarginSnapshot: unknown = null
+    const quoteId = (outcome as { quote_id?: string | null } | null)?.quote_id
+    if (quoteId) {
+      try {
+        const { data: quoteRow, error: quoteErr } = await supabase
+          .from('quotes')
+          .select('expected_margin_snapshot')
+          .eq('quote_id', quoteId)
+          .eq('business_id', business.business_id)
+          .maybeSingle()
+        if (quoteErr) {
+          console.warn('[efterkalkyl] expected_margin_snapshot-läsning misslyckades (icke-blockerande):', quoteErr.message)
+        } else {
+          expectedMarginSnapshot = quoteRow?.expected_margin_snapshot || null
+        }
+      } catch (err) {
+        console.warn('[efterkalkyl] oväntat fel vid expected_margin_snapshot-läsning (icke-blockerande):', err)
+      }
+    }
+
+    return NextResponse.json({
+      project_status: project.status,
+      outcome: outcome || null,
+      expected_margin_snapshot: expectedMarginSnapshot,
+    })
   } catch (error: any) {
     console.error('Get efterkalkyl error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

@@ -151,6 +151,14 @@ export async function POST(request: NextRequest) {
 
       const acceptedQuote = updatedRows[0]
 
+      // Förväntad marginal vid accept — icke-blockerande (se lib/quotes/margin-snapshot.ts).
+      try {
+        const { captureExpectedMarginSnapshot } = await import('@/lib/quotes/margin-snapshot')
+        await captureExpectedMarginSnapshot(supabase, customer.business_id, quote_id, 'portal_accept')
+      } catch (err) {
+        console.error('[portal] captureExpectedMarginSnapshot failed (non-blocking):', quote_id, err)
+      }
+
       // Log activity
       await supabase.from('customer_activity').insert({
         customer_id: customer.customer_id,

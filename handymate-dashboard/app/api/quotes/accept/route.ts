@@ -83,6 +83,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Databasfel: ${updateErr.message}` }, { status: 500 })
     }
 
+    // Förväntad marginal vid accept — icke-blockerande (se lib/quotes/margin-snapshot.ts).
+    try {
+      const { captureExpectedMarginSnapshot } = await import('@/lib/quotes/margin-snapshot')
+      await captureExpectedMarginSnapshot(supabase, business.business_id, quoteId, 'manual_accept')
+    } catch (err) {
+      console.error('[quotes/accept] captureExpectedMarginSnapshot failed (non-blocking):', quoteId, err)
+    }
+
     // V80: den gamla "flytta till accepted"-flytten här togs bort — den var
     // vestigial (flyttade dealen till det numera borttagna 'quote_accepted'-
     // steget, för att sedan alltid bli omedelbart överkörd av "Golden Path:

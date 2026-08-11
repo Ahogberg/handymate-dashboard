@@ -596,6 +596,14 @@ export async function POST(
       throw updateError
     }
 
+    // Förväntad marginal vid accept — icke-blockerande (se lib/quotes/margin-snapshot.ts).
+    try {
+      const { captureExpectedMarginSnapshot } = await import('@/lib/quotes/margin-snapshot')
+      await captureExpectedMarginSnapshot(supabase, quote.business_id, quote.quote_id, 'signed')
+    } catch (err) {
+      console.error('[quotes/public] captureExpectedMarginSnapshot failed (non-blocking):', quote.quote_id, err)
+    }
+
     // Notiser/events nedan skall visa det signerade beloppet — inte det
     // gamla quote.total från före tillvalsomräkningen.
     const finalTotal = recomputed ? recomputed.total : (quote.total || 0)

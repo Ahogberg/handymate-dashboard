@@ -35,6 +35,12 @@ interface ProjectOutcome {
   closed_at: string
 }
 
+/** Fryst vid accept (v120, lib/quotes/margin-snapshot.ts) — kan saknas
+    (kolumnen inte skapad än, eller offerten accepterad innan featuren fanns). */
+interface ExpectedMarginSnapshot {
+  margin_pct: number | null
+}
+
 interface EfterkalkylCardProps {
   projectId: string
 }
@@ -78,6 +84,7 @@ const VARIANT_CARD: Record<string, string> = {
 
 export function EfterkalkylCard({ projectId }: EfterkalkylCardProps) {
   const [outcome, setOutcome] = useState<ProjectOutcome | null>(null)
+  const [expectedMargin, setExpectedMargin] = useState<ExpectedMarginSnapshot | null>(null)
   const [projectStatus, setProjectStatus] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -90,6 +97,7 @@ export function EfterkalkylCard({ projectId }: EfterkalkylCardProps) {
         const data = await res.json()
         if (cancelled) return
         setOutcome(data.outcome || null)
+        setExpectedMargin(data.expected_margin_snapshot || null)
         setProjectStatus(data.project_status || null)
       } catch {
         // Tyst degradering — sektionen visas bara inte.
@@ -163,6 +171,11 @@ export function EfterkalkylCard({ projectId }: EfterkalkylCardProps) {
                 Marginal {formatKr(outcome.margin_kr)}
                 {outcome.margin_pct != null ? ` (${outcome.margin_pct}%)` : ''}
               </p>
+              {expectedMargin?.margin_pct != null && (
+                <p className="text-xs text-slate-400 mt-0.5 tabular-nums">
+                  Förväntad vid accept: {expectedMargin.margin_pct}%
+                </p>
+              )}
             </div>
           ) : (
             <p className="text-xs text-amber-700">
