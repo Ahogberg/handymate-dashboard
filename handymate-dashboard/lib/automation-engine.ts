@@ -11,6 +11,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { deriveAutonomyKey, isAutonomous as isAutonomyGranted } from '@/lib/autonomy/earned-autonomy'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
+import { arTestId, arTestNamn } from '@/lib/testdata'
 
 // ── Types ───────────────────────────────────────────────
 
@@ -972,8 +973,6 @@ export async function evaluateThresholds(
 
   if (!rules || rules.length === 0) return { evaluated, triggered, errors }
 
-  const today = new Date().toISOString().slice(0, 10)
-
   for (const rule of rules as AutomationRule[]) {
     evaluated++
     const config = rule.trigger_config
@@ -991,13 +990,30 @@ export async function evaluateThresholds(
         const entityId = entityItem.id as string
         const dedupKey = `${rule.id}:${entityId}`
 
-        // Dedup: check if already run today
+        // Testdata-vakt (2026-08-11, samma mönster som send-reminders-cronen
+        // och lib/testdata.ts): e2e-/test-genererade quotes, fakturor,
+        // bokningar och kunder ska aldrig trigga riktiga kund-SMS eller
+        // godkännanden. Den här grinden saknades helt här — en gammal
+        // e2e-testoffert (mars 2026, status "opened", aldrig städad) var
+        // den faktiska källan till spammet i ägarens skärmdump 2026-08-11.
+        if (
+          arTestId(entityId) ||
+          arTestId(entityItem.customer_id) ||
+          arTestNamn(entityItem.customer_name)
+        ) continue
+
+        // Dedup: samma regel ska bara fyra EN GÅNG per entitet, någonsin —
+        // inte en gång per DAG. Trösklarna (days_since_sent >= 5,
+        // days_overdue >= 1 osv.) förblir sanna för alltid när de väl
+        // passerats, så en dag-avgränsad koll lät samma påminnelse gå ut
+        // igen varje morgon för alltid. Bekräftat: den testoffert som
+        // triggade testdata-vakten ovan hade fyrat "Offertuppföljning dag
+        // 5" 140+ dagar i rad innan den här fixen.
         const { data: existingLog } = await supabase
           .from('v3_automation_logs')
           .select('id')
           .eq('rule_id', rule.id)
           .eq('business_id', businessId)
-          .gte('created_at', `${today}T00:00:00Z`)
           .contains('context', { entity_id: entityId })
           .maybeSingle()
 
