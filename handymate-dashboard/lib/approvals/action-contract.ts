@@ -94,6 +94,15 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // förblir REVIEW_REQUIRED — ett tvetydigt fynd får aldrig en skicka-knapp.
   fakturera_projekt: 'EXECUTABLE_ACTION',
 
+  // Projektdebriefen (Project Debrief Capture, 2026-08-12): 2-3 frivilliga
+  // frågor vid projektstängning, ur efterkalkyl-deltat. Godkännande MED
+  // svar (edited_payload.answers) skriver bekräftade lärdomar till
+  // project_lesson — se lib/debrief/create-debrief-card.ts. Ett tomt
+  // debrief (allt hoppat över) är ett helt giltigt godkännande, och att
+  // avvisa kortet kostar ingenting — ägarens ord är sanningen, aldrig ett
+  // krav.
+  project_debrief: 'EXECUTABLE_ACTION',
+
   // ── Kräver mänsklig granskning, aldrig ett klick ────────────────────
   //
   // `missad_intakt` är hela grinden för intäktsåtervinningen: ett fynd är ett

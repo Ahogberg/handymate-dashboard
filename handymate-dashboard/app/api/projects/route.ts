@@ -679,6 +679,24 @@ export async function PUT(request: NextRequest) {
         console.error('[projects] freezeProjectOutcome error (non-blocking):', outcomeErr)
       }
 
+      // Project Debrief Capture (2026-08-12): 2-3 frivilliga frågor ur
+      // deltat ovan. Fail-safe, får aldrig fälla projektstängningen — se
+      // lib/debrief/create-debrief-card.ts för dedupe/detaljer.
+      try {
+        const { skapaDebriefKort } = await import('@/lib/debrief/create-debrief-card')
+        await skapaDebriefKort(supabase, business.business_id, {
+          project_id: project.project_id,
+          project_name: project.name,
+          quote_id: project.quote_id ?? null,
+          job_type: outcomeForTrigger?.job_type ?? null,
+          hours_diff_pct: outcomeForTrigger?.hours_diff_pct ?? null,
+          amount_diff_pct: outcomeForTrigger?.amount_diff_pct ?? null,
+          margin_pct: outcomeForTrigger?.margin_pct ?? null,
+        })
+      } catch (debriefErr) {
+        console.error('[projects] skapaDebriefKort error (non-blocking):', debriefErr)
+      }
+
       // Våg 2d (tasks/value-chain-plan.md) — väck Lars (job_completed-
       // trigger, matchAgentByPrefix routar 'job_*' till honom). Fire-and-
       // forget, fail-safe, får aldrig fälla projektstängningen.

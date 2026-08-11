@@ -186,6 +186,33 @@ export async function POST(request: NextRequest) {
           console.error('[booking/complete-job] freezeProjectOutcome failed:', outcomeErr)
         }
 
+        // 2.55. Project Debrief Capture (2026-08-12): samma kort som den
+        // andra dörren (PUT /api/projects) skapar — se
+        // lib/debrief/create-debrief-card.ts. Fail-safe, får aldrig fälla
+        // booking-completion. project.name/quote_id hämtas separat här
+        // eftersom `existing` ovan bara valde ut booking-fälten.
+        try {
+          const { data: projectForDebrief } = await supabase
+            .from('project')
+            .select('name, quote_id')
+            .eq('project_id', existing.project_id)
+            .eq('business_id', business.business_id)
+            .maybeSingle()
+
+          const { skapaDebriefKort } = await import('@/lib/debrief/create-debrief-card')
+          await skapaDebriefKort(supabase, business.business_id, {
+            project_id: existing.project_id,
+            project_name: projectForDebrief?.name ?? null,
+            quote_id: projectForDebrief?.quote_id ?? null,
+            job_type: outcomeForTrigger?.job_type ?? null,
+            hours_diff_pct: outcomeForTrigger?.hours_diff_pct ?? null,
+            amount_diff_pct: outcomeForTrigger?.amount_diff_pct ?? null,
+            margin_pct: outcomeForTrigger?.margin_pct ?? null,
+          })
+        } catch (debriefErr) {
+          console.error('[booking/complete-job] skapaDebriefKort failed:', debriefErr)
+        }
+
         // 2.6. Våg 2d (tasks/value-chain-plan.md) — väck Lars (job_completed-
         // trigger, matchAgentByPrefix routar 'job_*' till honom). Fire-and-
         // forget, fail-safe, får aldrig fälla booking-completion.

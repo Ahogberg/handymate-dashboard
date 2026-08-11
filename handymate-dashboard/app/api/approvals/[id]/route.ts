@@ -136,6 +136,7 @@ export async function POST(
           undefined,
           retryCookieHeader,
           retryAuthHeader,
+          currentUser.id,
         )
       } catch (execErr: any) {
         console.error(`[approvals/${params.id}] retry: executeApprovalPayload kastade okontrollerat:`, execErr)
@@ -355,7 +356,8 @@ export async function POST(
           business.business_id,
           action_overrides as Record<string, string> | undefined,
           cookieHeader,
-          authHeader
+          authHeader,
+          currentUser.id,
         )
       } catch (execErr: any) {
         console.error(`[approvals/${params.id}] executeApprovalPayload kastade okontrollerat:`, execErr)
@@ -449,6 +451,11 @@ async function executeApprovalPayload(
   actionOverrides?: Record<string, string>,
   cookieHeader?: string | null,
   authHeader?: string | null,
+  // Project Debrief Capture (2026-08-12): confirmed_by på project_lesson-
+  // raderna behöver identifiera VEM som svarade, inte bara vilket företag.
+  // currentUser.id (business_users.id) — null när okänt (t.ex. retry-vägen
+  // om den någon gång tappar sessionen).
+  resolvedByUserId?: string | null,
 ): Promise<Record<string, unknown>> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   const { approval_type, payload } = approval
@@ -2262,6 +2269,51 @@ async function executeApprovalPayload(
           supabaseAuto, businessId, actionType, (pl.rule_action_config || {}) as Record<string, unknown>, pl,
         )
         return { action: 'automation', action_type: actionType, ...res }
+      }
+
+      case 'project_debrief': {
+        // Project Debrief Capture (2026-08-12): svaren kommer via
+        // edited_payload.answers (klienten skickar action:'edit' — det är
+        // den enda action som faktiskt slår ihop edited_payload in i
+        // `payload` innan den når hit, se finalPayload ovan). Nyckeln i
+        // `answers` är frågetexten, värdet svaret — samma frågor som ligger
+        // i payload.questions (lib/debrief/build-debrief-questions.ts).
+        const pl = payload as any
+        const raSvar = (pl.answers && typeof pl.answers === 'object') ? pl.answers as Record<string, unknown> : {}
+        const ifyllda = Object.entries(raSvar)
+          .map(([fraga, svar]) => ({ fraga, text: typeof svar === 'string' ? svar.trim() : '' }))
+          .filter(s => s.text.length > 0)
+
+        // Tomt debrief (allt hoppat över) är ett helt giltigt godkännande —
+        // inget att spara, men det ska inte se ut som ett fel.
+        if (ifyllda.length === 0) {
+          return { action: 'project_debrief', ok: true, saved: 0 }
+        }
+
+        if (!pl.project_id) {
+          return { action: 'project_debrief', ok: false, error: 'Kortet saknar projekt-koppling.' }
+        }
+
+        const supabasePD = await getSupabase()
+        const { error: lessonErr } = await supabasePD.from('project_lesson').insert(
+          ifyllda.map(s => ({
+            business_id: businessId,
+            project_id: pl.project_id,
+            quote_id: pl.quote_id ?? null,
+            job_type: pl.job_type ?? null,
+            lesson_text: s.text,
+            impact_hint: s.fraga,
+            source: 'debrief',
+            confirmed_by: resolvedByUserId ?? null,
+          })),
+        )
+
+        if (lessonErr) {
+          console.error('[approvals/project_debrief] kunde inte spara lärdomar:', lessonErr.message)
+          return { action: 'project_debrief', ok: false, error: 'Kunde inte spara — försök igen om en stund' }
+        }
+
+        return { action: 'project_debrief', ok: true, saved: ifyllda.length }
       }
 
       default: {

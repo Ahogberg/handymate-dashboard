@@ -32,6 +32,11 @@ export interface QuoteGenerationInput {
   templates?: QuoteTemplate[]
   defaultHourlyRate?: number
   customerPriceList?: CustomerPriceList
+  /** Jobbtyp (t.ex. project.job_type) — om satt filtreras
+      project_lesson-läsningen (Project Debrief Capture, 2026-08-12) på
+      samma jobbtyp. Ingen anropare skickar detta ännu; utan fältet läses
+      de senaste lärdomarna oavsett jobbtyp. */
+  jobType?: string
 }
 
 export interface GeneratedQuoteItem {
@@ -76,6 +81,10 @@ export interface GeneratedQuote {
   confidence: number
   reasoning: string
   similarHistoricalQuotes: Array<{ id: string; title: string; total: number }>
+  /** Bekräftade lärdomar från tidigare liknande jobb (Project Debrief
+      Capture, 2026-08-12) — hantverkarens egna svar, inte AI-inferens.
+      Tom lista är det normala när inga debrief-svar finns än. */
+  lessons: Array<{ lesson_text: string; impact_hint: string | null }>
   priceListEmpty: boolean
   missingPriceCount: number
   /**
@@ -108,6 +117,45 @@ export interface ImageAnalysis {
 
 function getAnthropic() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+}
+
+/**
+ * Project Debrief Capture (2026-08-12): de senaste 3 bekräftade lärdomarna
+ * (project_lesson, sql/v121_project_lesson.sql) för businessen — samma
+ * jobbtyp om input bär en, annars de senaste oavsett jobbtyp.
+ *
+ * Fail-safe: kastar aldrig. Om tabellen ännu inte finns (v121 inte körd
+ * än) eller läsningen av någon annan anledning misslyckas degraderas till
+ * en tom lista — offertgenereringen fungerar precis som innan denna
+ * feature fanns.
+ */
+async function fetchRecentLessons(
+  businessId: string,
+  jobType?: string,
+): Promise<Array<{ lesson_text: string; impact_hint: string | null }>> {
+  try {
+    let query = getServerSupabase()
+      .from('project_lesson')
+      .select('lesson_text, impact_hint, created_at')
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false })
+      .limit(3)
+
+    if (jobType) query = query.eq('job_type', jobType)
+
+    const { data, error } = await query
+    if (error) {
+      console.error('[ai-quote-generator] project_lesson-läsning misslyckades (fail-safe, tom lista):', error.message)
+      return []
+    }
+    return (data || []).map(row => ({
+      lesson_text: (row as any).lesson_text as string,
+      impact_hint: ((row as any).impact_hint as string | null) ?? null,
+    }))
+  } catch (err) {
+    console.error('[ai-quote-generator] project_lesson-läsning kastade (fail-safe, tom lista):', err)
+    return []
+  }
 }
 
 /**
@@ -444,9 +492,10 @@ export async function generateQuoteFromInput(
   // genererar offerten. analyzeJobImage() lever kvar oförändrad — används
   // fortfarande av ai-generate/route.ts för att beskriva EXTRA bilder
   // (bild 2-5) som text innan de vävs in i textDescription här.
-  const [similarQuotes, priceStats] = await Promise.all([
+  const [similarQuotes, priceStats, lessons] = await Promise.all([
     description ? findSimilarQuotes(input.businessId, description) : Promise.resolve([]),
     description ? getAveragePrice(input.businessId, description) : Promise.resolve({ average: 0, min: 0, max: 0, count: 0 }),
+    fetchRecentLessons(input.businessId, input.jobType),
   ])
 
   const fullDescription = [
@@ -474,13 +523,22 @@ Om bilden är ett FOTO:
     ? `\nHistoriska priser för liknande jobb: Snitt ${priceStats.average} kr, Min ${priceStats.min} kr, Max ${priceStats.max} kr (${priceStats.count} offerter)`
     : ''
 
+  // Project Debrief Capture (2026-08-12): hantverkarens egna bekräftade
+  // lärdomar från tidigare liknande jobb — ingen AI-inferens, bara
+  // vidarebefordrade svar. Tom lista när inga debrief-svar finns än.
+  const lessonsContext = lessons.length > 0
+    ? `\n\nLÄRDOMAR FRÅN TIDIGARE LIKNANDE JOBB (bekräftade av hantverkaren — ta höjd för dessa):\n${lessons
+        .map(l => `- ${l.lesson_text}`)
+        .join('\n')}`
+    : ''
+
   const priceContext = buildPriceContext(input.priceList, input.hourlyRate, input.templates, input.customerPriceList)
   const hasPriceList = (input.priceList?.length || 0) > 0
 
   const systemPrompt = `Du är en erfaren svensk kalkylator för bygg- och hantverksprojekt.
 
 Bransch: ${input.branch || 'Bygg/Hantverkare'}
-${priceContext}${historicalContext}
+${priceContext}${historicalContext}${lessonsContext}
 
 Analysera beskrivningen (och en eventuellt bifogad bild — se instruktioner nedan) och ge ett detaljerat offertförslag.
 ${imageInstructions}
@@ -678,6 +736,7 @@ Svara ENDAST med JSON (ingen markdown):
       title: q.title,
       total: q.total
     })),
+    lessons,
     priceListEmpty: !hasPriceList,
     missingPriceCount,
     // B3: defensiv — modellen instrueras till 0-4 korta punkter, men det är
