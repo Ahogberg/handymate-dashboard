@@ -28,6 +28,12 @@ import { whisperCostOre } from '@/lib/costs/meter'
  * det vore att agera i ett rum där hantverkaren själv står.
  */
 
+// Whisper på 10 minuters ljud tar regelmässigt längre än Vercels
+// default-timeout — utan explicit maxDuration dog långa inspelningar i
+// plattformstaket trots att allt annat var rätt (P0-fynd i
+// docs/audits/MEETING_INTELLIGENCE_ARCHITECTURE.md, 2026-08-11).
+export const maxDuration = 300
+
 const MAX_SECONDS = 10 * 60
 const MAX_BYTES = 25 * 1024 * 1024 // Whispers gräns; 10 min ryms med marginal
 

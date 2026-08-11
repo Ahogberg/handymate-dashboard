@@ -99,6 +99,12 @@ export default function RecordingsPage() {
   }, [audioElement])
 
   async function fetchRecordings() {
+    // source-filter (P0-fix 2026-08-11): sidan är telefonhistoriken.
+    // Mötesassistentens rader (source='site_visit', recording_url ALLTID
+    // null) visades här med spelknapp som bara kunde faila och en
+    // "Transkribera"-knapp som hade försökt ladda ner null från 46elks —
+    // exakt förväxlingen v102-kolumnen fanns för att förhindra. Möten har
+    // sin egen yta i Inkorgen → Möte.
     const { data } = await supabase
       .from('call_recording')
       .select(`
@@ -109,6 +115,7 @@ export default function RecordingsPage() {
         )
       `)
       .eq('business_id', business.business_id)
+      .eq('source', 'phone')
       .order('created_at', { ascending: false })
       .limit(50)
 

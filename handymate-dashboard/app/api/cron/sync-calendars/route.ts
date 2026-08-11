@@ -96,7 +96,12 @@ export async function GET(request: NextRequest) {
 
             if (!existing) {
               const id = `sch_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-              await supabase.from('schedule_entry').insert({
+              // P0-fix 2026-08-11: type 'external' bröt schedule_entrys
+              // CHECK-constraint ('project','internal','time_off','travel')
+              // och felet kontrollerades aldrig — varje Google-import har
+              // sannolikt tyst misslyckats sedan start. v118 tillåter
+              // 'external'; felet loggas nu i stället för att sväljas.
+              const { error: importError } = await supabase.from('schedule_entry').insert({
                 id,
                 business_id: businessId,
                 business_user_id: businessUserId,
@@ -110,6 +115,9 @@ export async function GET(request: NextRequest) {
                 status: 'scheduled',
                 google_event_id: gEvent.id,
               })
+              if (importError) {
+                console.error('[sync-calendars] import-insert misslyckades:', gEvent.id, importError.message)
+              }
             } else {
               const startChanged = new Date(existing.start_datetime).getTime() !== gEvent.start.getTime()
               const endChanged = new Date(existing.end_datetime).getTime() !== gEvent.end.getTime()

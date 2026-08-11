@@ -224,6 +224,9 @@ export default function InboxPage() {
   async function fetchRecordings() {
     setRecordingsLoading(true)
 
+    // source-filter (P0-fix 2026-08-11): listan är samtalshistorik med
+    // uppspelning — mötesrader (source='site_visit') saknar alltid ljud
+    // (recording_url=null) och har sin egen yta i Inkorgen → Möte.
     const { data } = await supabase
       .from('call_recording')
       .select(`
@@ -237,6 +240,7 @@ export default function InboxPage() {
         )
       `)
       .eq('business_id', business.business_id)
+      .eq('source', 'phone')
       .order('created_at', { ascending: false })
       .limit(50)
 

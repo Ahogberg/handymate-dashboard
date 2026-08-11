@@ -55,14 +55,19 @@ export async function generateAgentContext(businessId: string): Promise<{
         .in('status', ['sent', 'overdue'])
         .lt('due_date', today),
 
-      // Dagens bokningar
+      // Dagens bokningar. Fixat 2026-08-11: frågade tidigare kolumner som
+      // inte finns (customer_name, address, start_time, end_time) → 42703 →
+      // agentens "dagens bokningar"-kontext har alltid varit tom. Riktiga
+      // kolumner: scheduled_start/scheduled_end, kundnamn via join, adressen
+      // finns inte per bokning (bara i notes) — samma buggklass som
+      // approval_id-kommentaren nedan.
       supabase
         .from('booking')
-        .select('booking_id, customer_name, address, start_time, end_time, status')
+        .select('booking_id, scheduled_start, scheduled_end, status, notes, customer (name)')
         .eq('business_id', businessId)
-        .gte('start_time', `${today}T00:00:00`)
-        .lte('start_time', `${today}T23:59:59`)
-        .order('start_time'),
+        .gte('scheduled_start', `${today}T00:00:00`)
+        .lte('scheduled_start', `${today}T23:59:59`)
+        .order('scheduled_start'),
 
       // Väntande approvals
       supabase
@@ -123,9 +128,9 @@ export async function generateAgentContext(businessId: string): Promise<{
         days_overdue: Math.floor((Date.now() - new Date(i.due_date).getTime()) / (1000 * 60 * 60 * 24)),
       })),
       todays_bookings: todaysBookings.map((b: any) => ({
-        customer: b.customer_name,
-        address: b.address,
-        time: b.start_time,
+        customer: b.customer?.name || null,
+        notes: b.notes || null,
+        time: b.scheduled_start,
       })),
       pending_approvals: pendingApprovalsCount,
       recent_automation_actions: recentLogs.length,

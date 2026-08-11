@@ -244,3 +244,37 @@ export async function logAgentRun(
 
   return debug.estimated_cost_usd
 }
+
+/**
+ * Bokför en LLM-kostnad som INTE går via agent-observationsflödet
+ * (t.ex. röst-/mötesanalysen i /api/voice/analyze, som anropar Anthropic-
+ * SDK:n direkt). Funktionen bor HÄR — inte hos anroparen — för att facit i
+ * tests/cogs-matare.spec.ts kräver att den här filen är kodbasens enda
+ * skrivare av resource:'llm' ("en skrivare per faktum"). Non-blocking,
+ * precis som recordCost själv: mätfel får aldrig fälla analysen.
+ *
+ * P0-fynd 2026-08-11 (docs/audits/MEETING_INTELLIGENCE_ARCHITECTURE.md):
+ * analys-LLM:en var helt omätt — Whisper bokfördes men Haiku-anropet inte.
+ */
+export async function meterDirectLlmCall(params: {
+  supabase: SupabaseClient
+  businessId: string
+  usage: { input_tokens?: number; output_tokens?: number } | null | undefined
+  costUsd: number
+  refType: string
+  refId: string
+  meta?: Record<string, unknown>
+}): Promise<void> {
+  const { supabase, businessId, usage, costUsd, refType, refId, meta } = params
+  if (!usage || !(costUsd > 0)) return
+  await recordCost({
+    supabase,
+    businessId,
+    resource: 'llm',
+    units: (usage.input_tokens || 0) + (usage.output_tokens || 0),
+    costOre: usdToOre(costUsd),
+    refType,
+    refId,
+    meta,
+  })
+}

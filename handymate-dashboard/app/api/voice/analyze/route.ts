@@ -297,6 +297,26 @@ Svara ENDAST med JSON i följande format:
       messages: [{ role: 'user', content: prompt }]
     })
 
+    // COGS (P0-fix 2026-08-11): analysanropet gick förbi cost-guard och var
+    // helt omätt — Whisper bokfördes men inte Haiku. Mätningen bor i
+    // cost-guard (enda tillåtna llm-skrivaren per cogs-facit) och får
+    // aldrig fälla analysen.
+    try {
+      const { meterDirectLlmCall } = await import('@/lib/agents/shared/cost-guard')
+      const { llmCostUsd } = await import('@/lib/costs/meter')
+      await meterDirectLlmCall({
+        supabase,
+        businessId: recording.business_id,
+        usage: response.usage,
+        costUsd: llmCostUsd(response.usage, analysModell),
+        refType: 'call_recording',
+        refId: recording_id,
+        meta: { prompt: 'callAnalysis', source: recording.source || 'phone' },
+      })
+    } catch (costErr) {
+      console.warn('[voice/analyze] kostnadsmätning misslyckades:', costErr)
+    }
+
     const responseText = response.content[0].type === 'text' ? response.content[0].text : ''
 
     // Extrahera JSON från svaret

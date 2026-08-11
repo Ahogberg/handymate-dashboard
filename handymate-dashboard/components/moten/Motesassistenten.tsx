@@ -32,6 +32,11 @@ interface Mote {
   created_at: string
 }
 
+interface KundTraff {
+  customer_id: string
+  name: string
+}
+
 export function Motesassistenten() {
   const business = useBusiness()
   const insp = useAudioRecording({ maxDurationSeconds: MAX_SEKUNDER })
@@ -40,6 +45,33 @@ export function Motesassistenten() {
   const [senasteTranskript, setSenasteTranskript] = useState<string | null>(null)
   const [moten, setMoten] = useState<Mote[]>([])
   const [laddar, setLaddar] = useState(true)
+
+  // Kundkoppling (P0-fix 2026-08-11): routen har alltid tagit emot
+  // customer_id men UI:t skickade det aldrig — varje mötestranskript blev
+  // föräldralöst. Valfri sökväljare; transkriptet sparas även utan val.
+  const [kundSok, setKundSok] = useState('')
+  const [kundTraffar, setKundTraffar] = useState<KundTraff[]>([])
+  const [valdKund, setValdKund] = useState<KundTraff | null>(null)
+
+  useEffect(() => {
+    const term = kundSok.trim()
+    if (term.length < 2 || valdKund) {
+      setKundTraffar([])
+      return
+    }
+    let aktiv = true
+    const t = setTimeout(async () => {
+      const { data } = await supabase
+        .from('customer')
+        .select('customer_id, name')
+        .eq('business_id', business.business_id)
+        .ilike('name', `%${term}%`)
+        .order('name')
+        .limit(8)
+      if (aktiv) setKundTraffar(data || [])
+    }, 250)
+    return () => { aktiv = false; clearTimeout(t) }
+  }, [kundSok, valdKund, business.business_id])
 
   useEffect(() => {
     let aktiv = true
@@ -72,6 +104,7 @@ export function Motesassistenten() {
       const andelse = insp.blob.type.includes('mp4') ? 'mp4' : 'webm'
       form.append('audio', insp.blob, `platsbesok.${andelse}`)
       form.append('duration_seconds', String(insp.duration))
+      if (valdKund) form.append('customer_id', valdKund.customer_id)
 
       const res = await fetch('/api/voice/site-visit', { method: 'POST', body: form })
       const data = await res.json().catch(() => null)
@@ -100,6 +133,52 @@ export function Motesassistenten() {
           Säg till kunden att mötet spelas in för anteckningar, och vänta på
           ett ja. Ljudet sparas inte — bara texten.
         </p>
+      </div>
+
+      {/* Kundval — valfritt men gör transkriptet kopplat till affären. */}
+      <div className="mt-4 bg-white rounded-2xl border border-[#E2E8F0] p-4">
+        <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+          Vilken kund gäller mötet? (valfritt)
+        </label>
+        {valdKund ? (
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-50 text-primary-800 text-sm font-medium">
+              {valdKund.name}
+            </span>
+            <button
+              onClick={() => { setValdKund(null); setKundSok('') }}
+              className="text-sm text-gray-500 hover:text-gray-700"
+              disabled={spelarIn || skickar}
+            >
+              Byt
+            </button>
+          </div>
+        ) : (
+          <div className="relative mt-2">
+            <input
+              type="text"
+              value={kundSok}
+              onChange={e => setKundSok(e.target.value)}
+              placeholder="Sök kund på namn…"
+              disabled={spelarIn || skickar}
+              className="w-full min-h-[44px] px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none disabled:bg-gray-50"
+            />
+            {kundTraffar.length > 0 && (
+              <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                {kundTraffar.map(k => (
+                  <li key={k.customer_id}>
+                    <button
+                      onClick={() => { setValdKund(k); setKundTraffar([]) }}
+                      className="w-full text-left px-3 py-2.5 text-sm text-gray-800 hover:bg-primary-50"
+                    >
+                      {k.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="mt-6 bg-white rounded-2xl border border-[#E2E8F0] p-6 text-center">
