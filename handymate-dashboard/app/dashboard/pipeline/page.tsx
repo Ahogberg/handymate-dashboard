@@ -128,6 +128,10 @@ export default function PipelinePage() {
   const [stats, setStats] = useState<PipelineStats | null>(null)
   const [aiActivities, setAiActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
+  // Rollgrind (2026-08-11): /api/pipeline svarar 403 om användaren saknar
+  // see_financials. Skilj det från ett vanligt nätverksfel så sidan visar
+  // "du saknar behörighet" i stället för en generisk feltoast.
+  const [accessDenied, setAccessDenied] = useState(false)
 
   const [draggingDealId, setDraggingDealId] = useState<string | null>(null)
   const [dragOverStageId, setDragOverStageId] = useState<string | null>(null)
@@ -304,6 +308,10 @@ export default function PipelinePage() {
         fetch(`/api/pipeline?business_id=${business.business_id}`),
         fetch(`/api/pipeline/deals?business_id=${business.business_id}`),
       ])
+      if (pipelineRes.status === 403) {
+        setAccessDenied(true)
+        return
+      }
       if (!pipelineRes.ok) throw new Error('Failed to fetch pipeline')
       const data = await pipelineRes.json()
       setStages((data.stages || []).sort((a: Stage, b: Stage) => a.sort_order - b.sort_order))
@@ -1551,6 +1559,20 @@ export default function PipelinePage() {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
+      </div>
+    )
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center px-4">
+        <div className="text-center max-w-sm">
+          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <Lock className="w-6 h-6 text-slate-400" />
+          </div>
+          <h1 className="text-lg font-semibold text-slate-900 mb-1">Du saknar behörighet</h1>
+          <p className="text-sm text-slate-500">Du saknar behörighet att se den här sidan.</p>
+        </div>
       </div>
     )
   }
