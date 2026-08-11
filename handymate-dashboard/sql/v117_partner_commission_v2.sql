@@ -40,19 +40,26 @@ COMMENT ON COLUMN public.partners.tier_mode IS
 -- ── 2. Typfix: partner_events.business_id UUID → TEXT ───────────────────
 -- Tabellen har 0 rader (alla inserts har tyst misslyckats sedan start —
 -- business_id-värdena är text 'biz_…'). Säkert att byta typ.
+--
+-- ORDNING SPELAR ROLL (lärdom från första körförsöket 2026-08-11):
+-- Postgres vägrar ALTER COLUMN TYPE på en kolumn som en policy refererar
+-- ("0A000: cannot alter type of a column used in a policy definition").
+-- v112-policyn partner_events_tenant_member använder business_id::text i
+-- sin USING-sats — den MÅSTE droppas FÖRE typbytet och återskapas efter.
+
+DROP POLICY IF EXISTS partner_events_tenant_member ON public.partner_events;
 
 ALTER TABLE public.partner_events
   ALTER COLUMN business_id TYPE TEXT USING business_id::text;
 
--- Policyn från v112 använde business_id::text-cast — återskapa utan cast.
-DROP POLICY IF EXISTS partner_events_tenant_member ON public.partner_events;
+-- Återskapa utan ::text-casten (kolumnen är nu TEXT).
 CREATE POLICY partner_events_tenant_member
   ON public.partner_events
   FOR ALL
   TO authenticated
   USING (public.is_business_member(business_id))
   WITH CHECK (public.is_business_member(business_id));
--- partner_events_service_role från v112 berörs inte av typbytet och behålls.
+-- partner_events_service_role från v112 refererar inte kolumnen och behålls.
 
 -- ── 3. Utbetalningsbatchar (före liggaren så FK:n löser) ────────────────
 
