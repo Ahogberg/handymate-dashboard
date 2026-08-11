@@ -187,6 +187,16 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       why: 'Fakturerat i månaden och obetalda belopp.',
     },
     {
+      route: 'pipeline',
+      requires: 'see_financials',
+      why: 'Full pipeline med affärsvärde, deals grupperade per steg — samma finansiella känslighet som economy-summary, men via /api/pipeline exponerat oskyddat till 2026-08-11.',
+    },
+    {
+      route: 'pipeline/stats',
+      requires: 'see_financials',
+      why: 'Sammanfattad pipeline-summa (totalValue) — mindre payload, samma exponering. Det här var den rutt Verksamhetsöversikt-plattan i mobilappen faktiskt hämtade utan behörighetskontroll.',
+    },
+    {
       route: 'dashboard/cash-radar',
       requires: 'see_financials',
       why: 'Fem veckors kassaflödesprognos — fakturerat plus viktad potential, alltså företagets likviditet.',
