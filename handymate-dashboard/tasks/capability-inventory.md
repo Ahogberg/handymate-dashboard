@@ -1,320 +1,251 @@
 # Handymate — Ärlig kapabilitets-inventering
 
-_För pitch-/strategiändamål. Ingen hype — vad som FAKTISKT finns._
-_Genererad 2026-07-01 · **Uppdaterad 2026-08-04** (offert-sprinten, git-verifierad)._
-
-## ⚡ 2026-08-04: OFFERT-SPRINTEN E1-E5 — "dokumentet ÄR gränssnittet", BYGGT (ej LIVE)
-
-Hela offertupplevelsen ombyggd på en dag (tasks/offert-masterplan.md har
-commit-hashar + uppföljningslista): EN dokumentmotor (QuoteDocument)
-ersätter tre parallella renderare — live-canvas, preview, PDF och
-KUNDENS SIGNERINGSSIDA renderar nu samma dokument. Kunden ser äntligen
-mallen hantverkaren valde (Premium når ytan där affären stängs).
-Skaparen är canvas-first (dokumentet huvudyta, 13 kort → smal assistent-
-kolumn + Mer-rad), mobilen fullvärdig (skalat dokument + bottom-sheet-
-radeditor, 44px+), detaljsidan är ett Offertrum (dokumentet i centrum,
-EN primär åtgärd per status, VERKLIG händelselogg från tracking-datat,
-versionsdiff). ~1700 rader dubblett-/dialektkod bort netto. Fyra äkta
-buggar fixade på vägen (tillvalsrader försvann i hantverkarvyn, ROT-
-toggle-desync, PDF:ns tomma sida 2, publikt prisläckage i rows-läget).
-
-HOTFIX-lärdom: react-dom/server-importen fällde alla Vercel-deployer i
-fem etapper innan den upptäcktes — tsc fångar inte webpack-felklassen;
-next build är nu deploy-gate för lib-ändringar (tasks/lessons.md).
-
-Status BYGGT tills Andreas kört manuella verifieringen (lista i
-masterplanen: livecanvas, mobil på riktig telefon, PDF per stil,
-kundvyns signering end-to-end). Nästa: E6 FAKTURA-SPRINTEN (beslutad —
-motorn generaliseras till pengadokument; fakturan renderas idag av
-gamla jsPDF:en = varumärkes-whiplash i betalögonblicket).
-
-## ⚡ 2026-08-03: VÄRDEKEDJORNA STÄNGDA — "motorerna fanns, triggrarna saknades", BYGGT (ej LIVE)
-
-Tre parallella kodrevisioner inför lansering konvergerade: motorerna, kön
-och godkännandemekaniken fanns — men triggrarna saknades. Allt byggt på
-en dag (tasks/value-chain-plan.md har commit-hashar + detaljer):
-
-**Agenterna GÖR nu mer av det som redan var byggt:**
-- Auto-offertutkast: kvalificerad lead (score >= 50 + beskrivning) →
-  färdigt utkast med produktbanksrader i kön, utan att någon ber om det.
-- ÄTA-kedjan: Daniel/Matte föreslår ÄTA-utkast när kundkommunikation
-  klassas som tilläggsbeställning på ett identifierat projekt.
-- Karin väcks på JUST förfallna fakturor (bedömer kund/belopp/relation —
-  mallpåminnelsen kvar som mekanisk fallback).
-- Lars väcks på avslutat jobb med avvikelsedata inline; nytt
-  get_project_outcome-verktyg (enskilt projekt).
-- Daniel får nattlig push på efterkalkyl per jobbtyp + ÄTA-frekvens
-  ("badrummen drar X % över — höj tidsraderna i mallen").
-- Verktygsallokeringen rättad: specialisterna hade inte sina egna
-  domänverktyg (Daniel saknade pris/efterkalkyl, Karin saknade Fortnox).
-
-**Fyra korrekthetsbuggar fixade** (varav en SÄKERHET: auto-approve räknade
-redigerade förslag som rena godkännanden → förtjänad autonomi eskalerade
-för snabbt) + **foto→offert-revisionen** (RUT→ROT-buggen, ROT-default,
-årstak i offertflödet, klientkomprimering av foton som annars kraschade
-mobilflödet, AI-tillval, kundprislistor) + **prisdata-UX** (allvarligast:
-"Din timkostnad"-fältet skrev till AI:ns försäljningsprisnyckel — kunder
-fick offerter till självkostnad; CSV-import; AgentReadinessCard;
-självläkande 0-kr-rader) + **landningssidans BankID-påstående ersatt med
-sant** (ingen BankID-integration finns — SPEC, backlog).
-
-**Status BYGGT, inte LIVE:** v78-migrationen väntar på Andreas; ingen
-kund har använt flödena skarpt. Våg 3 (byggdagbok, grannskapskampanj,
-materialorder, recensionsfångst, avvikelselogg) väntar på pilotsignal.
-
-## ⚡ 2026-08-02: STORFIRMAN-PARITET — 9 etapper byggda på en dag, BYGGT (ej LIVE)
-
-Andreas-direktiv: alla funktioner ska fungera lika bra för ett flermans-
-företag som för en enskild firma. Full kodrevision hittade att detta var
-ETT strukturellt hål (`getAuthenticatedBusiness()` identifierar aldrig
-VILKEN anställd som agerar, bara vilket företag) som visade sig på 11
-ställen — två av dem redan LIVE säkerhets-/dataläckagebuggar, inte bara
-framtida begränsningar. Se `tasks/multi-employee-parity-plan.md` för
-fullständig teknisk detalj och commit-hashar.
-
-**BYGGT idag (main, tsc+build rent, 82 nya/ändrade facit-tester gröna):**
-projektläckage stängd (GET /api/projects filtrerar nu på behörighet),
-löneattribuering (time_entry.business_user_id sätts nu på alla 4
-insert-ställen — löneexporten var tyst fel/tom per anställd för varje
-flermansfirma), kö-routing-infrastruktur + RLS-fix (pending_approvals var
-`USING(true)` — inte ens business-scopad i databasen, en tidigare
-migration hade av misstag återöppnat en redan fixad policy), per-typ
-routing utrullad (finansiella/löne-/projekttyper riktas nu mot rätt
-roll/person), riktade push-notiser, bokningstilldelning (UI + API, plus
-en dispatch-lucka och ett cross-tenant-hål som upptäcktes och fixades i
-samma svep), fakturarader ärver utförare, checklista-spoofing fixad.
-
-**Status = BYGGT, inte LIVE:** två SQL-migrationer (v76, v77) väntar på
-att Andreas kör dem manuellt i Supabase — RLS-fixen (v77) är särskilt
-känslig och har egna verifieringssteg inbyggda i migrationsfilen. Ingen
-riktig flermansfirma har använt något av detta skarpt än.
-
-**Medvetet INTE byggt (Etapp 8, egen framtida plan):** kapacitetsplanering
-per anställd, och att Matte (chatt-assistenten) vet vilken anställd som
-frågar — båda kräver bredare designarbete utöver denna dags scope.
-
-## ⚡ 2026-07-15: A-TESTET GODKÄNT + ALLT SKÖRDAT — stora statusflyttar
-
-**A-testet (A1–A5) + wow-kedjan är körda och godkända av Andreas** (bockade i
-efterhand i launch-docsen). Därmed BYGGT→**LIVE**: tillval-flödet (A2),
-aha-samtalet/onboarding-kedjan (A3), Förtroendetrappan-panelen (A4), Pengar
-in-radarn (A5), Bee-rollverifieringen (A1), onboarding wow-kedjan inkl.
-Fortnox/CSV-import + LiveTour-payoff (Del 1). **Stripe/betalvägen är
-FORTFARANDE BYGGT** — B7-testköpet är INTE kört (Andreas enda kvarvarande grind).
-
-**Skördat till prod 2026-07-15** (mergat + deployat, tsc 0 fel + 204 facit-
-tester gröna): Idag-vy-omdesignen (deployad redan 07-11), offert-vinnaranalysen
-(hopfällbar Offert-prestanda + Daniel-coach), grön teknik-avdraget Fas 1
-(15/50/50%, arbete+material-bas, 14 facit), pengaloopen Del 1 ("Jag har
-betalat"-bekräftelse + delad apply-payment-kärna). Status: **BYGGT/deployade**
-— LIVE först när piloten använt dem skarpt.
-
-**Mobil:** fix/b2 + nya Idag-hemskärmen mergade till mobile-main (tsc 0 fel),
-pushade. **EAS-bygge återstår** — inget på telefoner ännu.
+_För pitch-/GTM-ändamål. Ingen hype — vad som FAKTISKT finns._
+_Genererad 2026-07-01 · **Helt omskriven 2026-08-12** (kod-, git- OCH
+prod-DB-verifierad via Supabase samma dag — radantal nedan är verkliga)._
 
 ## Statusdefinitioner (läs först)
-- **LIVE** = deployat *och* driftsatt/körande i prod sedan tidigare (rimligt bekräftat operativt).
-- **BYGGT** = i `main`, kod-vägen wirad, `tsc`+build rent — men **inte** verifierat med
-  riktig prod-körning. Juni/juli-audits bevisade upprepat att "deployat" ≠ "fungerar"
-  (senast 2026-07-10: dokument-API:t och projektflyttar hade ALDRIG fungerat i prod).
-- **BRANCH** = byggt men inte ens mergat till `main`. Får inte omnämnas alls i pitch.
+- **LIVE** = deployat OCH driftsatt/körande i prod, rimligt bekräftat
+  (helst med prod-data som bevis).
+- **BYGGT** = i `main`, tsc+build rent, EJ verifierat med riktig prod-körning.
 - **SPEC** = inte byggt.
 
-**Epistemisk brasklapp:** författaren kan bekräfta vad som ligger i `main` och om kod är
-kopplad — men inte observera prod-runtime. Statusen lutar därför KONSERVATIVT. Där det står
-LIVE är det en slutsats, inte en garanti. Sann "LIVE" kräver pilot-bekräftelse (Bee).
-**En pitch byggd på fejk-kapabilitet dödar trovärdighet vid första demon.**
+**Epistemisk not:** den här versionen är starkare än tidigare — statusen är
+inte bara kodläsning utan avstämd mot prod-databasen (radantal per tabell,
+2026-08-12). Där det står "0 rader i prod" är det uppmätt, inte gissat.
+**En pitch byggd på fejk-kapabilitet dör vid första demon.**
 
 ---
 
-## 0. NYTT sedan förra inventeringen (2026-07-01 → 2026-07-11)
-
-Allt nedan är i `main` och pushat (= auto-deployat kodmässigt) om inget annat sägs:
+## 0. NYTT sedan 2026-08-04 (åtta extrema dagar — allt i main + deployat)
 
 | Vad | Datum | Status |
 |---|---|---|
-| **Förtjänad autonomi** — komplett motor: streak → förtroende-erbjudande → autonom sändning med bypass, Förtroendetrappan-panel, revoke, 30d-cooldown | 07-02 | **BYGGT** — ingen riktig kund har beviljat autonomi ännu |
-| **Produktbank + sammansatta produkter + visningsfilter** — kategorier/artikelnr, intern kalkyl → kunden ser en rad, ROT på arbetsandel, tre visningsnivåer i ALLA renderare | 07-07/08 | **BYGGT★** — v67 KÖRD i prod, Bees 5 prisrader migrerade, slutverifierad mot riktig Bee-data. Starkaste nya. Ej använd i skarpt kundflöde ännu |
-| **Offert-identitet** — created_by + "Vår referens" = skaparen i mejl/dokument (v68) | 07-05/06 | **BYGGT** |
-| **Offert-mejl + riktig PDF** — ett on-brand mejl, jsPDF-nedladdning i portal/public/dashboard | 07-06 | **BYGGT** |
-| **Ingen trial** — checkout debiterar direkt (garanti-modell), trial-hål stängda, v69-idempotens | 07-08/09 | **BYGGT** — se Stripe nedan |
-| **Onboarding wow-kedja** — import-steg (Fortnox OAuth/CSV) efter betalning → LiveTour-payoff med Karins krona-fynd ur importerad data | 07-09 | **BYGGT** — runbook finns (`tasks/launch-verification.md`), ALDRIG körd end-to-end |
-| **Audit-fixrunda 4-8** — GP1/GP2 (Golden Path var trasig IGEN), agenten skapade TOMMA offerter/fakturor (AB1/AB2) → riktiga rader, kill-switch hedras (AB3), o-gatade cron gatade, roll-gating ägar-routes, ROT-årstak + personnummer på slutfaktura | 07-08/09 | **BYGGT** — audit-fynden prod-verifierade (read-only mot DB), fixarna EJ flödesverifierade |
-| **FK-embed-svepet** — projektflyttar + dokument-API hade ALDRIG fungerat i prod (tysta PostgREST-fel); fixade + sql/v71 | 07-10 | **BYGGT** — lektionen: hela query-klassen felar tyst, mer kan finnas |
-| **Facit-tester** — playwright-facit för instant-value, Fortnox-fakturamappning, produktbank (Christoffers scenario a-h) | 07-08/09 | Testerna gröna lokalt |
-| **Idag-vy-omdesign** (desktop + mobil, från Claude Design) | 07-11 | **BRANCH** — `feat/idag-vy-redesign` (desktop klar, tsc+build rent) + mobil under byggnad. EJ mergad, EJ i prod |
+| Resurs-sprinten: fakturamotorn E6 (QuoteDocument → pengadokument) + Schema/Tid/Team R0-R5 | 08-05 | BYGGT |
+| Snabbofferten (läge i offert-nya) etapp A-D | 08-06 | BYGGT |
+| Karins bolagskalender (svenska myndighetsdatum, v94) | 08-07 | BYGGT |
+| Jarvis-first-hemskärmen (då på /dashboard/hem) + Inställningarnas sex områden | 08-07 | → blev startsidan 08-12, se §2 |
+| SMS-strypunkten (alla 24 vägar via sendSmsViaElks, opt-out-spärr) | 08-08 | **LIVE** (SMS rullar i prod) |
+| Pengar på bordet (5 kategorier, 3 grupper) | 08-08 | BYGGT → yta på startsidan 08-12 |
+| **B7 BEVISAD** — Stripe-testköpet kört (billing_event i prod 2026-08-09) | 08-09 | **LIVE** (betalvägen bevisad end-to-end) |
+| Lead-intake-sprinten (e-postintag, attribution; v106-v108 körda) | 08-10 | BYGGT |
+| Fortnox-rutträdet konsoliderat (ett träd, api-logg) + dead-code-sanering | 08-10 | BYGGT (licensläget oförändrat, se §3) |
+| Gyllene vägen-körboken station 1-10 | 08-10 | Dokument — förlängd till 1-14 den 08-12 |
+| Meeting Intelligence V1 (möteskontext Epic 0-2, v118) | 08-10/11 | BYGGT |
+| RLS-svepet (100+ tabeller/vyer låsta mot anon; v112-v115) | 08-11 | **LIVE** (säkerhet, verifierad) |
+| Företagskollen live på handymate.se + Partnerprogram v2 (trappa/liggare/portal, v117) | 08-11 | LIVE på sajten / BYGGT (0 leads, 2 partnerrader — ingen skarp användning) |
+| **Mötesassistenten V2** (90-min segmentrotation, förmötespush, v119) | 08-11 | BYGGT — **0 möten i prod** (se §1) |
+| Google OAuth-migrerad till eget handymate.se-projekt + settings-kraschen fixad | 08-12 | LIVE (synk verifierad av Andreas) |
+| **Moat-vågen** — autonomi-härdning (beloppsgräns, nåbar nedgradering), margin-snapshot (v120), Project Debrief→lärdomar (v121), Customer Facts (v122), Margin Guardian MVP (kanonisk motor + orsaksrader), intern timkostnad i onboarding | 08-11 natt–08-12 | BYGGT — **alla har 0 rader i prod** (inget hunnit hända) |
+| Kanoniska ekonomimotorn ENDA källan överallt (mobil-API, agentverktyg, Karin, Daniel migrerade) | 08-12 | BYGGT |
+| **Command Center-startsidan** + 4 nya Matte-översiktsverktyg + kundfakta i offertprompt/projektsida | 08-12 | BYGGT (deployad som /dashboard samma dag) |
+| **Value Ledger** (fyrstegsvyn) + moments på hemytan + full demo-livscykel + portal-desktop | 08-12 | BYGGT |
+| Observability: tysta fail-safe-fel → driftlarmet; e2e-lifecycle-rökprov; Reality Week-protokoll | 08-12 | BYGGT |
+| Buggrundan: 4 ruttnade facit-tester fixade (alla var TESTBUGGAR — inga produktregressioner); rena sviten 4 875 gröna, NOLL röda | 08-12 | — |
 
-**Migrations-grindar (manuella Supabase-körningar):** v67 ✅ · v68 ✅ · v70 ✅ ·
-v71 ✅ (verifierade i prod 2026-07-19). **v69 KÖRD 2026-07-20** (billing_period-
-kolumner + billing_plan.limits) — därmed är HELA migrations-grinden grön och
-B7-testköpets DB-facit (billing_period_start) kan uppfyllas.
-
----
-
-## 1. Agenter (6)
-
-Agenterna är INTE sex självständiga AI:n som agerar fritt. De är (a) personas ovanpå en
-delad verktygs-motor, (b) nattliga observations-generatorer, (c) ägare av vissa
-cron-automationer. Den konversationella agenten (Matte) är ansiktet; automations-motorn
-gör de faktiska handlingarna.
-
-| Agent | Roll | Gör KONKRET | Triggers | Status |
-|---|---|---|---|---|
-| **Matte** | Chefsassistent | Chatt (webb+mobil, 24 verktyg): skapa offert/faktura, slå upp kund, boka, svara. Handoff till specialister. | Användarinitierat + nattlig `agent-context` | **BYGGT** — AB1/AB2-fixen (07-09) betyder att agent-skapade offerter/fakturor hade TOMMA rader fram tills nyss; nu riktiga items + kill-switch hedras. Webbchatt kräver fortsatt smoke-test |
-| **Karin** | Ekonom | Fakturapåminnelser, ROT/RUT-beräkning (nu m. årstak-kapp + personnummer), ROT→Skatteverket-fil | `check-overdue` 07:00, `send-reminders` 10:00, obs 06:00 | Påminnelser **LIVE**; ROT-fil **BYGGT** (aldrig skarpt inlämnad) |
-| **Hanna** | Marknadschef | Väcker gamla kunder (gatade förslag), recensionsförfrågningar | `hanna-outbound` 08:30, `review-requests` 09:00 | Reaktivering **BYGGT** (gatad); review **BYGGT/LIVE**; direkt-sändning vid beviljad autonomi **BYGGT** |
-| **Daniel** | Säljare | Följer upp obesvarade/oöppnade offerter, lead-kvalificering | `quote-follow-up` 08:00 | **BYGGT** — nu gatad genom approval/autonomi (07-09), end-to-end i prod EJ bekräftat |
-| **Lars** | Projektledare | Projekt-/boknings-koordinering, projekt-hälsa | `project-health` (veckovis) | **BYGGT** — OBS: projektflyttar via UI fungerade ALDRIG före 07-10-fixen |
-| **Lisa** | Kundservice/telefonist | KOPPLAR inkommande samtal till din telefon ELLER röstmeddelande + transkribering. Missat samtal → catch-SMS (Tier 0). | `voice/incoming`-webhook | Routing **LIVE**; Tier 0 **BYGGT**; INGEN pratande röstagent |
-
-**Kritiskt (oförändrat):** Lisa pratar INTE. Ingen realtids-röstagent finns. Pratande AI i
-telefon = **SPEC** (Vapi ej inkopplat; Röst-Lisa-designen medvetet parkerad tills efter
-lanseringssprinten).
+**Migrationsläget:** v116–v122 KÖRDA och verifierade. Prod-skulden är noll.
+Väntar på engångskörning: `sql/demo_seed_internal_cost.sql` (demokontot).
 
 ---
 
-## 2. Kärnflöden — Golden Path
+## 1. MÖTESASSISTENTEN — exakt sanning (GTM-kritisk)
 
-`lead → deal → offert → projekt → faktura → betalning`
+**Vad den ÄR:** Hantverkaren startar inspelningen AKTIVT med en knapp
+("Starta mötesinspelning") under fliken **Möte i Inkorgen** — det finns ingen
+passiv/kontinuerlig avlyssning och ingen realtidslyssning. Ljudet spelas in i
+5-minuterssegment (max 90 min), laddas upp löpande, och transkriberas i
+EFTERHAND (Whisper, svenska; worker-cron var 5:e min). AI-analysen körs
+EFTER mötet, på hela transkriptet. Ljudet RADERAS efter transkribering —
+bara texten består. Samtyckestext visas alltid före start.
 
-**Brutal sanning, uppdaterad:** Golden Path fixades i juni — och auditen 2026-07-08/09
-hittade den trasig IGEN på nya ställen (GP1: deal-insert läste fel stage-tabell → deals
-skapades inte; GP2: lead-skrivning mot icke-existerande kolumn). Fixat 07-09 (`14fdf805`).
-Dessutom 07-10: projektflyttar och dokument-API hade ALDRIG fungerat (tysta FK-embed-fel).
-Kedjan är kodmässigt hel per 2026-07-10 och fynden är verifierade mot prod-DB — men
-**ingen riktig deal har någonsin dokumenterat flödat hela vägen till "Vunnen" i prod.**
-→ **BYGGT, inte LIVE.** (A-testet i `tasks/launch-verification.md` är beviset som saknas.)
+**Vad analysen producerar (automatiskt, som godkännandekort):** mötes-
+sammanfattning, offertutkast, uppföljningar/påminnelser/ombokningar, och
+bekräftbara kundfakta (preferens/förutsättning/löfte/kontakt — åtkomstkoder
+är förbjudna att extrahera). **ÄTA:** detekteras automatiskt ur transkriptet
+MEN blir ett offertutkast-kort med "ÄTA" i titeln — inte ett separat
+ÄTA-objekt. Inget skickas till kund utan godkännande.
 
----
+**Prod-verkligheten (uppmätt 2026-08-12): 0 möten någonsin.**
+`meeting_job` = 0 rader, `call_recording source='site_visit'` = 0. Inte ens
+Andreas eget skarptest är kört. Bee har aldrig använt den. Kortvägen
+mötesfynd→kort är enhetstestad (facit) och demo-körbar via demokontots
+"Skapa testmöte"-knapp — men ingen riktig kund, inget riktigt möte.
+**Status: BYGGT.** Förmötespushen ("Möte om 15 min") är BYGGT med samma noll.
+
+**Får sägas i demo/annons:** "Spela in kundmötet — Handymate sammanfattar,
+skriver offertutkastet och fångar det kunden sa, du godkänner innan något
+händer" (demonstrerbart på demokontot). **Får INTE sägas:** "lyssnar på dina
+möten" (passivt), "i realtid", "hanterar ÄTA automatiskt" (det blir ett
+offertutkast att granska), eller något som antyder att funktionen är beprövad
+hos kunder.
+
+## 2. COMMAND CENTER — exakt sanning (GTM-kritisk)
+
+"Command Center" är ett INTERNT namn — ordet finns inte i något UI. Det
+användaren ser är **startsidan** (`/dashboard`, menypost "Översikt"), sedan
+2026-08-12 omgjord till fyra sektioner i exakt denna ordning:
+
+1. **"Det här behöver dig idag"** — beslutskort med agentens avatar, röst
+   och EN verb-knapp ("{n} saker behöver ditt beslut")
+2. **"Pengar just nu"** — "{X kr} som Handymate tycker kräver uppmärksamhet"
+   + tre grupper (Att hämta nu / Möjligheter / Risk)
+3. **"Det här sköter teamet"** — bevakningslista per agent + hopfälld
+   dygnsdigest ("{n} automatiskt · {n} godkända av dig")
+4. **"Värt att veta"** + Värdekvitto-raden
+
+Detta MATCHAR GTM-beskrivningen ("vad som behöver ägaren, vad teamet sköter,
+vad som riskerar pengar") — men **deployades IDAG** och har inte setts av en
+enda kund ännu. Gamla vyn ligger kvar på /dashboard/oversikt som fallback.
+**Status: BYGGT** (deployad, ej kundbekräftad). I GTM-material: kalla den
+"startsidan"/"hemskärmen" eller beskriv sektionerna — aldrig "Command
+Center" som produktnamn (det finns inte i produkten).
 
 ## 3. Integrationer
 
-| Integration | Status | Ärlig kommentar |
+| Integration | Status | Ärlig kommentar (prod-data 2026-08-12) |
 |---|---|---|
-| **46elks** (SMS + röst) | **LIVE** | SMS + samtals-routing körande i prod sedan tidigare. |
-| **Stripe** | **BYGGT** | Nytt sedan 07-01: ingen trial — debiteras direkt (garanti = manuell refund), trial-hål stängda, webhook-idempotens (v69), runbook klar. **B7-testköpet (4242 → `active`) är fortfarande INTE genomfört** — betalvägen är aldrig bevisad end-to-end. |
-| **Fortnox** | **BYGGT men LICENS-BLOCKERAD** | Nytt: onboarding-import av kunder + öppna fakturor via OAuth (+ sql/v70). Facit-test för mappningen grönt. MEN: kräver fortfarande kundens Integrationslicens 149 kr/mån (Christoffer har ej köpt — Easoft betalar också, publicering kringgår inte). Funktionellt = SPEC för piloten tills licens finns. |
-| **Google** (kalender/Gmail) | **BYGGT** | Oförändrat — koppling + token-refresh finns, ej bekräftat använt. |
-| **Vapi** (röst-AI) | **SPEC** | Oförändrat. INTE inkopplat, bara en etikett i koden. Röst-Lisa parkerad tills efter sprinten. |
-| **OpenAI Whisper** | **BYGGT** | Oförändrat — röstmeddelanden + mobil röst-input (svenska). |
+| **46elks** (SMS + röst) | **LIVE** | Rullar i prod (SMS-rader senaste veckan). Strypunkten: allt går via sendSmsViaElks med opt-out-spärr. Telefonins inspelning/analys: 0 nya inspelningar på 30 dagar — vägen finns men används inte just nu. |
+| **Stripe** | **LIVE** (betalväg bevisad) | **B7-testköpet KÖRT** — billing_event-rader finns i prod (senast 2026-08-09). 4 aktiva prenumerationer varav 1 verifierat riktig pilot (Bee). Webhook hanterar checkout/subscription/invoice-events. Kvar: B8 (skarp betalning från riktig ny kund). |
+| **Google Calendar** | **LIVE** | 3 kopplingar (inkl. Bee), **91 synkade externa händelser i prod**. OAuth-klienten flyttad till eget handymate.se-projekt 08-12, synk om-verifierad. **Google-VERIFIERINGEN är EJ inskickad** — nya kunder möter varningsskärm tills dess. Gmail-delen pausad ("kommer snart"). |
+| **Fortnox** | **BYGGT men LICENS-BLOCKERAD** | Rutträdet konsoliderat + api-logg (08-10) — men `fortnox_sync` har **0 rader i prod**: ingen synk har någonsin körts skarpt. Kundens integrationslicens 149 kr/mån är fortfarande grinden (Christoffer har inte köpt). Funktionellt = går ej att demoa med riktig data. |
+| **Vapi** (röst-AI) | **SPEC** | Oförändrat. `vapi_call` är bara en käll-ETIKETT på 46elks-webhooken. En vilande edge-function från februari finns; inget i appen anropar den. INGEN pratande röstagent existerar. |
+| **OpenAI Whisper** | **BYGGT/LIVE** | Transkribering (svenska) används av röst-input; mötesvägen byggd men oanvänd (se §1). |
+
+## 4. Golden Path — statusflytt
+
+`lead → deal → offert → projekt → faktura → betalning`
+
+**Uppmätt i prod 2026-08-12: Bee Service AB (riktiga piloten) har 4 vunna
+deals och 2 betalda fakturor.** Tillsammans med A-testet (godkänt),
+B7-betalningsbeviset (billing_event) och körboken ger det:
+**Golden Path = LIVE med brasklapp** — kedjan har bevisligen producerat vunna
+affärer och betalda fakturor hos en riktig kund, men vi har inte spårat EN
+enskild deal dokumenterat genom VARJE station i följd (det är Reality Week
+pass 1:s jobb, protokoll: docs/REALITY-WEEK.md). Säg "kedjan är i drift hos
+pilot", lova inte "felfri hela vägen varje gång".
+
+## 5. "Guardian" / Margin Guardian — namnsanning
+
+"Guardian"/"Margin Guardian" är INTERNA namn — orden finns inte i UI.
+Användaren ser: **Karins varningskort** "🔴 Budget överskriden — {projekt}"
+/ "⚠️ Riskerar överskridning — {projekt}" med orsaksrader (timmar, material,
+osignerad ÄTA, obesvarat ÄTA-förslag, prognos — märkta känt/uppskattat) och
+knappen "Jag har sett det" + "Öppna projektet". På Pengar på bordet heter
+kategorin **"Marginal i riskzonen"** (gruppen "Risk"). Byggd på kanoniska
+ekonomimotorn (ärlighetsprincip: ingen marginal utan konfigurerad intern
+timkostnad — hellre "ej konfigurerad" än påhitt). Push endast vid
+över-budget. **Prod: 0 varningskort hittills** (inga projekt över tröskeln,
+eller ingen data ännu). **Status: BYGGT.** I GTM: beskriv funktionen
+("Karin varnar innan projektet äter marginalen — med orsaker"), använd inte
+"Guardian" som produktnamn. KÄND SKÖNHETSFLÄCK: kortets typ-etikett i kön
+visar "Övrigt" (etikett saknas i TYPE_CONFIG) — fixas i polish.
+
+## 6. "Value Ledger" — namnsanning
+
+"Value Ledger" är ett INTERNT namn. Användaren ser: sidan **"Pengar på
+bordet"** med blocket **"Handymate den här månaden"** — fyra strikt
+åtskilda steg: **Identifierat / Agerat / Fakturerat / Bekräftat betalt** —
+plus **"Värdekvitto {månad}"**-raden på startsidan och **"Värdet i
+{månad}"**-blocket i Månadsrapporten (Bekräftat / Vilande / Uppskattat,
+"blandas aldrig"). Kronor i Fakturerat/Betalt är FAKTURANS belopp via
+direktreferens (aldrig korrelation, aldrig kortets uppskattning);
+tidsbesparing är konservativa schabloner och märks som uppskattning.
+**Viktig ärlighet:** attributions-ID:na började persisteras 2026-08-12 —
+siffrorna ackumulerar från NU. En demo idag visar demokontots seedade data;
+en riktig kunds ledger är nästan tom första veckorna. **Status: BYGGT.**
+Får sägas: "Handymate visar vad den hittat, vad som agerats och vad som
+bevisligen betalats — åtskilt". Får INTE sägas: "har drivit in X åt kunder"
+(ingen historik finns).
+
+## 7. Mobil (Expo-appen) — sämre än förra inventeringen trodde
+
+**Uppmätt:** senaste LYCKADE EAS-production-bygget är okänt/gammalt;
+2026-05-12/15-försöken FAILADE (cert-problem). 2026-08-11 gjordes nya
+preview-byggen — de **KRASCHAR vid start på iOS 26** (känd PAC/Hermes-bugg;
+newArch-avstängd variant hjälpte inte). Apparbetet är PARKERAT ("måste fixa
+appen ordentligt", Andreas). Dessutom: main i mobilrepot ligger **28 commits
+före origin** (hela Jarvis-first-mobilombyggnaden, opushad) och INGET av
+det som byggts sedan maj finns på någon telefon.
+**Status: appen kan INTE demoas och är INTE lanseringsyta. PWA:n
+(webbappen installerad på hemskärmen, med push) ÄR mobilupplevelsen för
+lanseringen** — och den är LIVE. Säg aldrig "ladda ner appen".
+
+## 8. Lärande / moat
+
+| Förmåga | Prod-data 2026-08-12 | Status |
+|---|---|---|
+| Förtjänad autonomi (streak → nyckel; nu med beloppsgräns + nåbar nedgradering + förtroendebevis-UI) | **0 kunder har beviljat autonomi** | BYGGT — säg "förtjänar", aldrig "brukar" |
+| Expected-margin-snapshot vid offertaccept | 0 snapshots | BYGGT — ackumulerar från nu |
+| Project Debrief → lärdomar → Daniels offertrad | 0 lärdomar | BYGGT — jobbtyps-scopad (fix 08-12) |
+| Customer Facts ("Det här vet Handymate", offertprompt, projektsidans "Att tänka på") | 0 fakta | BYGGT — supersede + åtkomstkodförbud på plats |
+| Margin Guardian (kanonisk motor, orsaksrader) | 0 varningar | BYGGT |
+| Värdeattribution (kort → artefakt → faktura → betalning, direktreferens) | börjar 08-12 | BYGGT |
+| Egenkontroll-agenten (foto→bedömning) | 0 skarp användning | BYGGT (08-02) |
+
+**Moaten är oförändrad i tes, kraftigt starkare i kod, och HELT obevisad i
+data:** varje lärande-primitiv finns nu och ackumulerar från idag — men
+ingen firma har ännu en enda bekräftad lärdom, ett kundfaktum eller en
+autonominyckel. Tid-i-drift är moatens råvara; den börjar räknas nu.
+
+## 9. Vad som INTE finns (ärligt)
+
+- **Pratande röstagent** — SPEC. Oförändrat.
+- **Fortnox i skarp drift** — nej (0 sync-rader; licens-blockerad).
+- **BankID** — SPEC.
+- **ROT-fil inlämnad till Skatteverket** — nej (byggd, aldrig inlämnad).
+- **Google-verifieringen inskickad** — nej (nya kunder får varningsskärm).
+- **Mobilapp som går att visa** — nej (kraschar på iOS 26; PWA är svaret).
+- **Ett enda riktigt möte genom mötesassistenten** — nej (0 i prod).
+- **En enda riktig lärdom/kundfaktum/autonominyckel/Guardian-varning** — nej.
+- **Företagskollen-leads** — 0 inskickade hittills (sidan är live).
 
 ---
 
-## 4. Mobil (Expo-app)
+## Bottom line för pitchen (2026-08-12)
 
-| Funktion | Status |
-|---|---|
-| Godkännanden (godkänn/avvisa, läser exekverings-resultat) | **BRANCH** — B2-fixen + autonomy_offer-etiketten ligger på `fix/b2-mobile-execution-read`, EJ mergad till mobile-main |
-| Matte chatt + röst-in, Stage 2 (agent-kedja, transkript-fix) | **BRANCH** — samma omergade branch |
-| Tid, projekt, bokningar, offert | **BYGGT** (i mobile-main sedan maj) |
-| Ny Idag-hemskärm (bevisband, nästa bokning, kö, Klart idag, Matte-dock) | **BRANCH** — byggs 2026-07-11 på `feat/idag-hemskarm` |
+**Kan visas/lovas UTAN att ljuga:**
+- Missat samtal → SMS → bokning (kärnkilen; 46elks LIVE).
+- **Startsidan**: "öppna appen — se vad som behöver dig, vad teamet sköter,
+  var pengarna riskeras" (demoa; deployad idag, säg inte "beprövad").
+- **Hela livscykeln på DEMOKONTOT**: möte → kort → offert → projekt →
+  Guardian-varning → efterkalkyl → debrief → lärdom → nästa offert. Seedad
+  och demo-körbar. Formulering: "så här fungerar det" — inte "så här har
+  det fungerat för våra kunder".
+- Golden Path i pilotdrift (Bee: vunna affärer + betalda fakturor finns).
+- Betalvägen (Stripe B7 bevisad). Kalendersynk (LIVE hos pilot).
+- Värdesynlighet: "identifierat/agerat/fakturerat/betalt hålls åtskilt".
+- PWA på mobilen (installera + push).
 
-**Brutal sanning, uppdaterad:** senaste EAS-production-bygget kördes **2026-05-12**
-(+ Sentry-fix 05-20). TestFlight-distributionens checkboxar i runbooken är otickade —
-**vad som faktiskt kör på en riktig telefon är obekräftat, och är i bästa fall kod från
-2026-05-20.** ALLT mobilarbete efter det (Matte Stage 2, transcribe-fix, B2, Förtroende-
-etiketten, nya Idag-skärmen) ligger på omergade branches = finns inte i något bygge,
-finns inte på någon telefon. Mobilen kan INTE demoas med senaste funktionerna.
+**Får INTE sägas i demo/annons (dödar trovärdighet):**
+- ❌ "AI:n lyssnar på dina möten" / "i realtid" — den SPELAR IN på
+  knapptryck och analyserar EFTERÅT. Säg "spela in mötet, få allt sorterat".
+- ❌ "Hanterar ÄTA automatiskt från mötet" — den föreslår ett OFFERTUTKAST
+  märkt ÄTA som du granskar.
+- ❌ "Handymate har lärt sig våra kunders företag" — 0 lärdomar/fakta i
+  prod; säg "lär sig ERT företag" (framåtblickande).
+- ❌ "Har drivit in X kr åt kunder" — attributionshistoriken börjar idag.
+- ❌ "Kopplar till Fortnox" utan licens-brasklappen (kundens licens 149
+  kr/mån krävs; aldrig skarpkörd).
+- ❌ "En AI som pratar i telefon" — SPEC, finns inte.
+- ❌ "Ladda ner appen" — appen kraschar; PWA:n är mobilupplevelsen.
+- ❌ "Command Center" / "Margin Guardian" / "Value Ledger" som produktnamn
+  kunden möter — de heter Startsidan, Karins varningar och Pengar på
+  bordet/Värdekvittot i produkten. (GTM får gärna DÖPA koncepten i
+  marknadsföring — men demon måste då säga "det här kallar vi X".)
 
----
+**Verifieringar som flyttar BYGGT → LIVE (= Reality Week, protokoll i
+docs/REALITY-WEEK.md):**
+1. Pass 1: gyllene vägen station 1-14 på demokontot (inkl. första mötet
+   genom mötesassistenten — någonsin).
+2. Pass 2: adversarial A1-A15.
+3. Pass 3: integrationsfelvägar + PWA på riktig iPhone + Google-verifiering
+   inskickad.
+4. Första RIKTIGA kundmötet/lärdomen/autonominyckeln hos pilot (post-launch
+   räcker — men först då får "beprövat" användas).
 
-## 5. Lärande / moat
+## §10 Planstruktur (oförändrad sedan 2026-07-31)
 
-| Förmåga | Beräknas? | Används? | Status |
-|---|---|---|---|
-| Agent-attribution (agent_id på loggar) | Ja | Ja — per-agent scoreboard | **BYGGT** |
-| approve_rate + trust-ladder | Ja | Ja — trust-ladder-vy | **BYGGT** |
-| **Förtjänad autonomi** (streak → erbjudande → autonom sändning, revoke, cooldown, Förtroendetrappan-panel) | Ja | Ja — motorn wirad i approvals + cron | **BYGGT** (07-02) — ingen riktig kund har beviljat ännu; redigerade godkännanden räknas korrekt inte in i streaken |
-| Pattern-extraction (nattlig) | Ja | Delvis | **BYGGT** |
-| AI-lärda preferenser (ton/pris/stil) | Ja | Ja — i agent-prompten | **BYGGT** |
-| agent_context (nattlig företagsanalys) | Ja | Ja — i prompten | **BYGGT** |
-| Veckovärde (kr + tid) | Ja | Ja — dashboard | **BYGGT** |
-| **Egenkontroll-agenten** (foto mot checklistpunkt → vision-bedömning → förslag/avvikelse i kön; checklist-förslag vid projektskapande) | Ja | Nej — 0 kund har använt den skarpt | **BYGGT★** (08-02) — tasks/easoft-gap-plan.md etapp 1 (1a-1d) komplett, tsc 0 fel, 86 facit-tester, ej demokörd på riktigt konto ännu |
-
-**Moat-bedömning (oförändrad i sak, starkare i bevis):** moaten = DJUPET i svensk
-back-office (ROT-split på arbetsandel i produktbanken, årstak + personnummer mot
-Skatteverket, Fortnox-loop) — inte agent-tekniken (commodity, jfr GHL). Förtjänad
-autonomi är nu den tydligaste produkt-manifestationen av lärandet.
-
-**Easoft-gap-planen (08-02, tasks/easoft-gap-plan.md):** Easofts egen
-"tio tidstjuvar"-artikel som mätsticka — 5 av 10 nu AI-först (kommunikation,
-planering, budget/Motor 1, realtidsdata, kvalitetskontroll/egenkontroll-
-agenten). 3 halva (tid, arbetsorder), 2 luckor (dokument, inventarier).
-FÅR INTE SÄGAS: "alla tio" eller "10 av 10" förrän samtliga är BYGGT★ MED
-kunddrift — se planens ärlighetsregel.
-
----
-
-## 6. Vad som INTE finns (ärligt)
-
-- **Pratande röstagent** — **SPEC**. Oförändrat.
-- **Skarpa Stripe-betalningar verifierade** — nej. Runbook klar, B7 ej körd.
-- **Fortnox användbart för piloten** — nej (licens-blockerat).
-- **BankID** — **SPEC**.
-- **ROT faktiskt inlämnat till Skatteverket** — nej (nu med årstak/personnummer-hantering, fortfarande aldrig skarpt inlämnad).
-- **Onboarding self-serve end-to-end** — **BYGGT** hela vägen (inkl. import + payoff) men aldrig körd i ett svep; runbook väntar.
-- **Golden Path prod-verifierat** — nej (och den gick sönder igen mellan inventeringarna — ödmjukhet här).
-- **Mobil med senaste funktionerna på riktig telefon** — nej (se §4).
-- **Nya Idag-vyn** — BRANCH, ej mergad (desktop klar, mobil byggs).
-
----
-
-## Bottom line för pitchen
-
-**Kan visas/lovas UTAN att ljuga idag:**
-- Missat samtal → SMS → AI bokar (Tier 0) — kärnkilen. (46elks LIVE.)
-- CRM + offert + faktura + ROT-beräkning med årstak + veckovärde i kronor.
-- **Produktbank + sammansatta produkter + visningsfilter** — verifierad mot pilotens
-  riktiga data; tryggaste nya demon (demoa i eget konto, inte lova "beprövat i drift").
-- Gatad proaktiv reaktivering (Hanna) + Förtroendetrappan som KONCEPT ("teamet förtjänar
-  självständighet") — visa panelen, lova inte att den "brukar" bevilja.
-- Matte-chatt på webben (text). Mobil-chatt bara om EAS-bygget gjorts först.
-
-**Får INTE sägas i demo (dödar trovärdighet) — uppdaterad 2026-07-15:**
-- ❌ "En AI svarar i telefon och pratar" (finns inte — SPEC).
-- ❌ "Kopplar till din Fortnox" (licens-blockerat för kunden; importen kräver att KUNDEN köper licens 149 kr/mån).
-- ❌ "Betala smidigt i appen" (Stripe B7-testköpet fortfarande INTE kört — betalvägen obevisad). OBS: "registrera dig och kom igång själv" är nu OK t.o.m. betalsteget — wow-kedjan är verifierad, men själva köpet är inte.
-- ❌ "Senaste appen i mobilen" (koden mergad 07-15 men INGET EAS-bygge — telefoner kör fortfarande maj-versionen).
-- ❌ "Agenterna sköter sig själva när de förtjänat det" som bevisat (motorn LIVE-verifierad via A4, men ingen riktig kund har nått 15-streaken än — säg "förtjänar", inte "brukar").
-- ❌ Grön teknik/vinnaranalys/betalbekräftelsen som beprövade (deployade 07-15, facit-testade, men ingen har använt dem skarpt — demoa gärna, lova inte drift-historik).
-
-**BORTTAGET från förbudslistan 2026-07-15** (nu OK att visa): nya Idag-vyn
-(LIVE i prod), wow-kedjan/onboarding (A-test-verifierad), tillval, radarn,
-Förtroendetrappan, Golden Path t.o.m. offert→projekt (A-testets flöden körda;
-faktura→Vunnen-steget dock fortfarande obevisat tills B7/riktig betalning).
-
-**Verifieringar som flyttar BYGGT → LIVE (= sprintens definition of done):**
-1. A-testet: wow-kedjan signup → import → payoff → dashboard i ett svep (runbook: `tasks/launch-verification.md`).
-2. B7: Stripe-testköp (4242) → `subscription_status='active'` + `billing_event`-rad.
-3. EAS-mobilbygge (efter merge av `fix/b2-mobile-execution-read`) + bekräftad TestFlight-installation.
-4. Migrations-svep: bekräfta v68–v71 körda i Supabase (v67 ✅).
-5. En riktig deal genom hela Golden Path till "Vunnen".
-
-## 7. Partner-systemet (upptäckt odokumenterat 2026-07-28)
-
-| Del | Status |
-|---|---|
-| Partner-registrering/login/dashboard (app/partners/*) + API (app/api/partners/*) | **BYGGT** — aldrig verifierat i drift |
-| P-kod-attribution i registreringen (referred_by + referrals-rad + partner-webhook) | **BYGGT** |
-| Provisionsmotor 20%/12 mån (lib/partners/commission.ts, nattlig via agent-context, hoppar churnade) | **BYGGT** — matchar publika erbjudandet på /partners |
-| Utbetalningsmarkering (markCommissionPaid, manuell admin) | **BYGGT** |
-| Partneravtal + partner-paket | **UTKAST** (content/partner/, avtal kräver jurist) |
-
-**Verifiering som flyttar BYGGT→LIVE:** end-to-end-test (testpartner → kod →
-registrering → dashboard → provisionsrad) + bekräfta v14_partners körd i prod.
-Får INTE säljas som beprövat till partner innan dess.
-
-## §8 Planstruktur (ändrad 2026-07-31, Andreas-beslut)
-
-Publikt utbud: **Firman 5 995 kr/mån** (intern nyckel: professional) (ingång — hela AI-teamet, sex
-medarbetare) + **Storfirman 11 995 kr/mån** (intern nyckel: business) (skillnad = volym & människor:
-obegränsade användare, 1 000 SMS, större användningsutrymme, hemsida+SEO,
-dedikerad support) + **"Anpassad — kontakta oss"** (inget löfte om
-enterprise-funktioner; bara kontaktväg). **Starter/Bas (2 495) är BORTTAGEN
-ur allt publikt utbud och säljmaterial** — den bröt kategorilöftet (bara
-Matte ≠ AI-team). Plantypen finns kvar i koden för befintliga konton och
-tyst nedgradering. FÖRBJUDET framåt: nämna 2 495/Bas/Starter i pitch, demo
-eller publika sidor. Interna marginaltak per plan ($1,5/$3/$8 per dag,
-degradera-inte-stoppa) är INTERNA — får aldrig beskrivas som "tokens" eller
-tak mot kund; kundspråket är "normal användning" (se
-content/juridik/fair-use-utkast.md, jurist krävs).
+Firman 5 995 kr/mån (professional) + Storfirman 11 995 kr/mån (business) +
+"Anpassad — kontakta oss". Starter/Bas (2 495) FÖRBJUDEN i allt publikt.
+Interna marginaltak beskrivs aldrig som tokens/tak — kundspråket är "normal
+användning". Ingen trial — betala direkt + pengarna-tillbaka-garanti.
