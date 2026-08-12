@@ -639,6 +639,25 @@ export default function CustomerDetailPage() {
     fetchData()
   }
 
+  // Customer Facts V1 — "ta bort"-vägen (2026-08-12). Optimistisk borttagning
+  // ur listan direkt vid klick; misslyckas anropet rullas listan tillbaka och
+  // ett toast-fel visas. Servern sätter superseded_by till radens eget id
+  // (app/api/customers/[id]/facts/route.ts) — ingen hård DELETE.
+  async function deleteFact(factId: string) {
+    const tidigare = customerFacts
+    setCustomerFacts(tidigare.filter(f => f.id !== factId))
+    try {
+      const res = await fetch(`/api/customers/${customerId}/facts?factId=${factId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        setCustomerFacts(tidigare)
+        mainToast.error('Kunde inte ta bort faktumet')
+      }
+    } catch {
+      setCustomerFacts(tidigare)
+      mainToast.error('Kunde inte ta bort faktumet')
+    }
+  }
+
   async function deleteDocument(docId: string) {
     if (!confirm('Ta bort detta dokument?')) return
     const doc = documents.find(d => d.id === docId)
@@ -857,16 +876,26 @@ export default function CustomerDetailPage() {
                     const badge = FACT_TYPE_BADGE[fact.fact_type] || FACT_TYPE_BADGE.preference
                     const datum = fact.confirmed_at || fact.created_at
                     return (
-                      <div key={fact.id} className="p-3 bg-gray-50 rounded-xl">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badge.className}`}>
-                            {badge.label}
-                          </span>
-                          {datum && (
-                            <span className="text-xs text-gray-400">
-                              {new Date(datum).toLocaleDateString('sv-SE')}
+                      <div key={fact.id} className="p-3 bg-gray-50 rounded-xl group">
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badge.className}`}>
+                              {badge.label}
                             </span>
-                          )}
+                            {datum && (
+                              <span className="text-xs text-gray-400">
+                                {new Date(datum).toLocaleDateString('sv-SE')}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => deleteFact(fact.id)}
+                            className="p-1 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all min-w-[28px] min-h-[28px] flex items-center justify-center"
+                            title="Ta bort"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                         <p className="text-sm text-gray-900">{fact.content}</p>
                         {fact.evidence_quote && (

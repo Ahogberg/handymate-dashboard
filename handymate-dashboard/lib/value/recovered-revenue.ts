@@ -28,7 +28,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /** Korttyper som räknas som "outbound-jakt" och därmed får attribuera
-    intäkter. Medvetet snäv — hellre missad attribution än falsk. */
+    intäkter. Medvetet snäv — hellre missad attribution än falsk.
+
+    De fyra sista (2026-08-12) är INTE outbound-jakt — de är direkta
+    penninghändelser (en påminnelse, en ÄTA, ett granskat fynd, en
+    projektfaktura). De får därför ENDAST attribuera via en verifierad
+    direktreferens, aldrig via kundkorrelationsfallbacken nedan. Se
+    DIRECT_ONLY_APPROVAL_TYPES + mapApprovalRowToCard. */
 export const RECOVERY_APPROVAL_TYPES = [
   'send_sms',
   'quote_nudge',
@@ -37,7 +43,25 @@ export const RECOVERY_APPROVAL_TYPES = [
   'customer_reactivation',
   'seasonal_campaign',
   'autopilot_package',
+  'invoice_reminder',
+  'create_ata_draft',
+  'missad_intakt',
+  'fakturera_projekt',
 ] as const
+
+/**
+ * Typer som ENDAST får attribuera via en bevisad direktreferens (se
+ * mapApprovalRowToCard för var referensen kommer ifrån per typ) — aldrig
+ * "kunden råkar matcha inom fönstret". Ett kort av en av dessa typer utan
+ * en direktreferens (t.ex. ett äldre kort skapat innan artifacts-
+ * persisteringen fanns) attribuerar INGENTING, hellre missad än falsk.
+ */
+const DIRECT_ONLY_APPROVAL_TYPES = new Set<string>([
+  'invoice_reminder',
+  'create_ata_draft',
+  'missad_intakt',
+  'fakturera_projekt',
+])
 
 /** Attributionsfönster per händelsetyp (dagar efter kortets godkännande). */
 export const ATTRIBUTION_WINDOW_DAYS = {
@@ -60,6 +84,23 @@ export interface ApprovedCard {
       (quote_nudge/send_sms med related_id) — starkare bevis än kundmatch. */
   quote_id: string | null
   agent: string | null
+  /**
+   * Direkt FAKTURAreferens (2026-08-12) — bara satt för
+   * DIRECT_ONLY_APPROVAL_TYPES. Skild från quote_id ovan: detta pekar på
+   * fakturan själv (en påmind faktura, en projektfaktura, ett granskat
+   * fynds utkast), inte offerten bakom den. Optional så äldre kort-byggare
+   * (tester som bygger ApprovedCard direkt) inte behöver känna till fältet.
+   */
+  invoice_id?: string | null
+  /**
+   * create_ata_draft ENDAST: ÄTA-id ur
+   * payload.execution_result.artifacts.ata_id. Ett halvsteg — ÄTA:n är
+   * inte fakturans värde själv, I/O-lagret (getRecoveredRevenue) slår upp
+   * project_change.invoice_id och fyller i invoice_id ovan om/när ÄTA:n
+   * blivit fakturerad. Rena funktioner (attributeRevenue) läser bara
+   * invoice_id, aldrig ata_id direkt.
+   */
+  ata_id?: string | null
 }
 
 export interface RevenueEvent {
@@ -126,6 +167,44 @@ export function mapApprovalRowToCard(row: {
       ? String(payload.related_id)
       : null
 
+  // ═══ DIREKTATTRIBUTION (2026-08-12) ═══
+  // De fyra DIRECT_ONLY_APPROVAL_TYPES har var sin sanna källa för
+  // fakturareferensen — ALDRIG en gissning ur generiska fält:
+  //
+  //   invoice_reminder  → payload.invoice_id (toppnivå, satt av
+  //                        app/api/cron/send-reminders vid kortets skapande
+  //                        — "händelsen" är att den PÅMINDA fakturan betalas)
+  //   fakturera_projekt → payload.execution_result.artifacts.invoice_id
+  //                        (satt av persist-blocket i approvals/[id]/
+  //                        route.ts vid godkännande, se extractExecutionArtifacts)
+  //   missad_intakt     → payload.draft_invoice_id — INTE execution_result.
+  //                        Det här kortet exekveras ALDRIG via den generiska
+  //                        godkännande-rutten (ACTION_CONTRACT: REVIEW_REQUIRED,
+  //                        se lib/approvals/action-contract.ts). Fakturautkastet
+  //                        skapas via den dedikerade
+  //                        app/api/revenue-review/[id]/route.ts, som skriver
+  //                        draft_invoice_id direkt på SAMMA kort vid "skapa_utkast".
+  //   create_ata_draft  → payload.execution_result.artifacts.ata_id — bara
+  //                        ett halvsteg (se ata_id-fältet på ApprovedCard).
+  //                        I/O-lagret (getRecoveredRevenue) slår upp
+  //                        project_change.invoice_id för att komma hela vägen.
+  let directInvoiceId: string | null = null
+  let ataRef: string | null = null
+  if (row.approval_type === 'invoice_reminder') {
+    directInvoiceId = payload.invoice_id ? String(payload.invoice_id) : null
+  } else if (row.approval_type === 'missad_intakt') {
+    directInvoiceId = payload.draft_invoice_id ? String(payload.draft_invoice_id) : null
+  } else if (row.approval_type === 'fakturera_projekt' || row.approval_type === 'create_ata_draft') {
+    const artifacts = (payload.execution_result as Record<string, unknown> | null | undefined)?.artifacts as
+      | Record<string, unknown>
+      | undefined
+    if (row.approval_type === 'fakturera_projekt') {
+      directInvoiceId = artifacts?.invoice_id ? String(artifacts.invoice_id) : null
+    } else {
+      ataRef = artifacts?.ata_id ? String(artifacts.ata_id) : null
+    }
+  }
+
   return {
     id: row.id,
     approval_type: row.approval_type,
@@ -133,6 +212,8 @@ export function mapApprovalRowToCard(row: {
     customer_id: customerId,
     quote_id: quoteRef,
     agent: row.routed_agent || (payload.agent ? String(payload.agent) : null),
+    invoice_id: directInvoiceId,
+    ata_id: ataRef,
   }
 }
 
@@ -191,8 +272,24 @@ export function attributeRevenue(cards: ApprovedCard[], events: RevenueEvent[]):
         event.kind === 'quote_accepted' ? event.event_id
         : event.kind === 'invoice_paid' ? (event.quote_id ? String(event.quote_id) : null)
         : null
-      const isDirect = card.quote_id !== null && eventQuoteId !== null && card.quote_id === eventQuoteId
+      const isDirectQuote = card.quote_id !== null && eventQuoteId !== null && card.quote_id === eventQuoteId
+      // Direkt FAKTURAreferens (2026-08-12) — kortets egen faktura (påmind/
+      // skapad/granskad) betalades. Bara relevant för invoice_paid; en
+      // quote_accepted- eller booking_created-händelse har ingen invoice_id
+      // att jämföra mot.
+      const isDirectInvoice =
+        event.kind === 'invoice_paid' &&
+        card.invoice_id != null &&
+        card.invoice_id === event.event_id
+      const isDirect = isDirectQuote || isDirectInvoice
+
+      // Sanningsregeln för DIRECT_ONLY_APPROVAL_TYPES: ingen
+      // korrelationsfallback. Saknar kortet en direktreferens attribuerar
+      // det ingenting alls — offertjaktens (send_sms/quote_nudge/…)
+      // befintliga kundmatchning ändras inte.
+      const requireDirect = DIRECT_ONLY_APPROVAL_TYPES.has(card.approval_type)
       const isCustomerMatch =
+        !requireDirect &&
         card.customer_id !== null && event.customer_id !== null && card.customer_id === String(event.customer_id)
       if (!isDirect && !isCustomerMatch) continue
 
@@ -275,6 +372,40 @@ export async function getRecoveredRevenue(
 
   if (cards.length === 0) {
     return { total_recovered_kr: 0, attributions: [], window_days: ATTRIBUTION_WINDOW_DAYS }
+  }
+
+  // create_ata_draft-kort bär bara ett ÄTA-id (card.ata_id, ur
+  // payload.execution_result.artifacts.ata_id) — direktreferensen till
+  // FAKTURAN kräver ett uppslag i project_change (samma tabell
+  // markInvoiceSources skriver invoice_id till när en faktura
+  // källmarkerar en ÄTA, se lib/invoices/mark-sources.ts). Fail-soft: en
+  // trasig eller tom träff lämnar kortets invoice_id null → kortet
+  // utesluts från attribution (hellre missad än falsk), aldrig en gissning.
+  const pendingAtaIds = cards
+    .filter((c) => c.approval_type === 'create_ata_draft' && c.ata_id)
+    .map((c) => c.ata_id as string)
+  if (pendingAtaIds.length > 0) {
+    try {
+      const { data, error } = await supabase
+        .from('project_change')
+        .select('change_id, invoice_id')
+        .eq('business_id', businessId)
+        .in('change_id', pendingAtaIds)
+      if (error) {
+        console.warn('[recovered-revenue] project_change-uppslag misslyckades (ÄTA-kort utesluts):', error.message)
+      } else {
+        const invoiceByAta = new Map<string, string | null>(
+          (data || []).map((r: any) => [String(r.change_id), r.invoice_id ? String(r.invoice_id) : null]),
+        )
+        for (const c of cards) {
+          if (c.approval_type === 'create_ata_draft' && c.ata_id) {
+            c.invoice_id = invoiceByAta.get(c.ata_id) ?? null
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn('[recovered-revenue] project_change-uppslag kastade (ÄTA-kort utesluts):', err?.message || err)
+    }
   }
 
   const events: RevenueEvent[] = []

@@ -7,7 +7,7 @@
  * det som PERSISTERAS på pending_approvals-raden matchar det UI:t visar.
  */
 import { test, expect } from '@playwright/test'
-import { classifyExecutionResult } from '../lib/approvals/execution-outcome'
+import { classifyExecutionResult, extractExecutionArtifacts } from '../lib/approvals/execution-outcome'
 
 test.describe('classifyExecutionResult', () => {
   test('error-sträng → failed, error_text = strängen', () => {
@@ -96,5 +96,46 @@ test.describe('classifyExecutionResult', () => {
   test('ok:true tillsammans med metadata → success', () => {
     const r = classifyExecutionResult({ action: 'confirm_payment', ok: true, metadata: { already_paid: false } })
     expect(r.outcome).toBe('success')
+  })
+})
+
+test.describe('extractExecutionArtifacts — Value Ledger-grunden (kort → skapad artefakt)', () => {
+  test('null-resultat → undefined (reject-actions kör aldrig exekvering)', () => {
+    expect(extractExecutionArtifacts(null)).toBeUndefined()
+  })
+
+  test('resultat utan vitlistade fält → undefined, ingen tom {}-nyckel', () => {
+    const r = extractExecutionArtifacts({ action: 'send_sms', sms_sent: true, error: undefined })
+    expect(r).toBeUndefined()
+  })
+
+  test('fakturera_projekt-resultat: invoice_id plockas ut', () => {
+    const r = extractExecutionArtifacts({ action: 'fakturera_projekt', invoice_id: 'inv_1', ok: true })
+    expect(r).toEqual({ invoice_id: 'inv_1' })
+  })
+
+  test('create_ata_draft-resultat: ata_id + project_id + total plockas ut, ok/action hoppas över', () => {
+    const r = extractExecutionArtifacts({
+      action: 'create_ata_draft', ok: true, ata_id: 'ch_5', project_id: 'proj_1', total: 4000,
+    })
+    expect(r).toEqual({ ata_id: 'ch_5', project_id: 'proj_1', total: 4000 })
+  })
+
+  test('null- och undefined-värden skrivs aldrig, även om nyckeln är vitlistad', () => {
+    const r = extractExecutionArtifacts({ action: 'create_quote_draft', quote_id: undefined, ok: false, error: 'fel' })
+    expect(r).toBeUndefined()
+  })
+
+  test('rena metadatafält (results/error/ok/reason/navigate_to) tas ALDRIG med', () => {
+    const r = extractExecutionArtifacts({
+      action: 'send_invoice', ok: false, error: 'Fortnox-fel', reason: 'fail', navigate_to: '/dashboard/invoices',
+      invoice_id: 'inv_9',
+    })
+    expect(r).toEqual({ invoice_id: 'inv_9' })
+  })
+
+  test('send_email: message_id plockas ut (INTE ett fabricerat email_id-fält)', () => {
+    const r = extractExecutionArtifacts({ action: 'send_email', ok: true, message_id: 'msg_1' })
+    expect(r).toEqual({ message_id: 'msg_1' })
   })
 })

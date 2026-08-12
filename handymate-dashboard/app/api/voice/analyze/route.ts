@@ -105,8 +105,11 @@ Regler för "customer_fact" (striktare än övriga typer):
 - Sätt alltid "fact_type" till ett av: "preference" (önskemål/preferens),
   "constraint" (begränsning, t.ex. tillträdestider, allergier), "commitment"
   (löfte, t.ex. "vi hör av oss senast fredag") eller "contact" (kontaktuppgift,
-  t.ex. portkod, bästa telefonnummer).
+  t.ex. bästa telefonnummer, föredragen kontaktväg).
 - "source_text" MÅSTE vara ett ordagrant citat — aldrig en omskrivning.
+- SÄKERHET: extrahera ALDRIG åtkomstkoder — portkoder, larmkoder,
+  nyckelgömmor, lösenord eller liknande. Sådant får inte lagras, även om det
+  sägs uttryckligen. Hoppa över det helt.
 
 Svara ENDAST med JSON i detta format:
 {
@@ -165,6 +168,9 @@ ${JSON.stringify(alltFynd, null, 2)}
 5. "customer_fact"-fynd: behåll fältet "fact_type" oförändrat. Finns fler än 5
    kvar efter dedupe för hela mötet, behåll bara de 5 med högst confidence —
    resten faller bort.
+6. SÄKERHET: extrahera eller behåll ALDRIG åtkomstkoder — portkoder,
+   larmkoder, nyckelgömmor, lösenord eller liknande — i description eller
+   source_text. Kasta sådana fynd helt, även om de kom med i kandidatlistan.
 
 Svara ENDAST med JSON i exakt detta format:
 {
@@ -429,10 +435,13 @@ affären framåt efter besöket:
 - Sa kunden eller hantverkaren EXPLICIT något om en preferens (t.ex.
   tidpreferens, önskemål om utförande), en begränsning (t.ex. tillträdestider,
   allergier), ett löfte (t.ex. "vi hör av oss senast fredag") eller en
-  kontaktuppgift (t.ex. portkod, bästa telefonnummer) → "customer_fact".
-  Max 5 per möte. BARA saker som uttryckligen sades — gissa aldrig. Ange
-  alltid "fact_type": "preference", "constraint", "commitment" eller
-  "contact", och citera ordagrant i source_text.
+  kontaktuppgift (t.ex. bästa telefonnummer, föredragen kontaktväg) →
+  "customer_fact". Max 5 per möte. BARA saker som uttryckligen sades — gissa
+  aldrig. Ange alltid "fact_type": "preference", "constraint", "commitment"
+  eller "contact", och citera ordagrant i source_text.
+  SÄKERHET: extrahera ALDRIG åtkomstkoder — portkoder, larmkoder,
+  nyckelgömmor, lösenord eller liknande. Sådant får inte lagras, även om det
+  sägs uttryckligen. Hoppa över det helt.
 - Föreslå ALDRIG "callback" — hantverkaren pratade nyss med kunden ansikte
   mot ansikte.
 - Innehåller transkriptet ovan tidsstämpel-markörer ([mm:ss] eller

@@ -37,7 +37,7 @@ Hantverkare: Jag lovar att vi är klara innan midsommar, vi bokar in start redan
 
 [16:45]
 Hantverkare: En sista sak — vilket är bästa numret att nå dig på under projektet, om något dyker upp på plats?
-Kund: Ring mig gärna på 070-555 12 34, det är mitt mobilnummer och jag har det alltid med mig. Portkoden till trapphuset är förresten 1893, ifall ni kommer innan jag är hemma.
+Kund: Ring mig gärna på 070-555 12 34, det är mitt mobilnummer och jag har det alltid med mig. Ring helst efter lunch förresten, förmiddagarna är jag på jobbet.
 Hantverkare: Perfekt, då har jag allt jag behöver. Vi hörs igen när offerten är klar.`
 
 /**

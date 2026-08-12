@@ -301,6 +301,10 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
         priceList,
         templates,
         customerId: lead.customer_id || undefined,
+        // lead.job_type sätts av qualifyLead() (agentverktyget) — redan i
+        // scope ovan (används i textDescription). Låter fetchRecentLessons
+        // filtrera på rätt jobbtyp i stället för att hoppa över lärdomar.
+        jobType: lead.job_type || undefined,
       })
     } catch (genErr) {
       // Ärlighetsregeln: kan AI:n inte generera ett utkast (t.ex. saknad

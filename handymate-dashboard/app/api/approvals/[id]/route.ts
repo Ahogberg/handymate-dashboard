@@ -4,7 +4,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/permissions'
 import { recordLearningEvent } from '@/lib/agent/learning-engine'
 import { sendSmsViaElks } from '@/lib/sms-send'
-import { classifyExecutionResult } from '@/lib/approvals/execution-outcome'
+import { classifyExecutionResult, extractExecutionArtifacts } from '@/lib/approvals/execution-outcome'
 import { canActOnApproval } from '@/lib/approvals/routing'
 import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
 import { resolveTimeEntryBusinessUserId } from '@/lib/egenkontroll/suggest-time-entry'
@@ -144,6 +144,11 @@ export async function POST(
       }
 
       const retryClassified = classifyExecutionResult(retryResult)
+      // Värdeattribution (2026-08-12): en lyckad omkörning skapar precis
+      // samma sortens artefakter som förstaförsöket (fakturan, ÄTA:n, osv)
+      // — utan detta försvann artefakt-ID:na för alla kort som gick igenom
+      // via retry-vägen, se extractExecutionArtifacts.
+      const retryArtifacts = extractExecutionArtifacts(retryResult)
       const { error: retryPersistError } = await supabase
         .from('pending_approvals')
         .update({
@@ -154,6 +159,7 @@ export async function POST(
               error_text: retryClassified.error_text,
               executed_at: new Date().toISOString(),
               retried: true,
+              ...(retryArtifacts ? { artifacts: retryArtifacts } : {}),
             },
           },
         })
@@ -372,6 +378,15 @@ export async function POST(
       const classified = classifyExecutionResult(executionResult)
       const { outcome, error_text } = classified
       executionOutcome = classified
+      // Värdeattributionens första brott (verifierat 2026-08-12): executor-
+      // cases returnerar artefakt-ID:n (ata_id, invoice_id, quote_id, ...) i
+      // HTTP-svaret, men bara outcome/error_text/executed_at persisterades
+      // — kedjan kort→skapad artefakt var därför obevisbar i databasen.
+      // extractExecutionArtifacts vitlistar vilka fält som får följa med
+      // (aldrig en rå spread av executionResult, se lib/approvals/
+      // execution-outcome.ts) så Value Ledger kan slå upp exakt vad ett
+      // godkänt kort ledde till.
+      const artifacts = extractExecutionArtifacts(executionResult)
       const { error: persistError } = await supabase
         .from('pending_approvals')
         .update({
@@ -381,6 +396,7 @@ export async function POST(
               outcome,
               error_text,
               executed_at: new Date().toISOString(),
+              ...(artifacts ? { artifacts } : {}),
             },
           },
         })
@@ -1165,13 +1181,14 @@ async function executeApprovalPayload(
         if (!pl.customer_id || !pl.content) {
           return { action: 'customer_fact', ok: false, error: 'Kortet saknar kund eller innehåll.' }
         }
+        const factType = pl.fact_type || 'preference'
         const supabaseCF = await getSupabase()
         const { data: fact, error: factErr } = await supabaseCF
           .from('customer_fact')
           .insert({
             business_id: businessId,
             customer_id: pl.customer_id,
-            fact_type: pl.fact_type || 'preference',
+            fact_type: factType,
             content: pl.content,
             source_type: 'meeting',
             source_id: pl.recording_id ?? null,
@@ -1186,6 +1203,37 @@ async function executeApprovalPayload(
           console.error('[approvals/customer_fact] kunde inte spara faktumet:', factErr?.message)
           return { action: 'customer_fact', ok: false, error: 'Kunde inte spara — försök igen om en stund' }
         }
+
+        // Supersede-regeln (PRELAUNCH_WAVE kandidat 5, 2026-08-12): "contact"
+        // och "commitment" är typer där det senaste naturligt vinner (nytt
+        // telefonnummer ersätter gammalt, nytt löfte ersätter gammalt) — där
+        // markeras tidigare aktiva fakta av SAMMA kund+typ som ersatta av
+        // den nya raden. "preference"/"constraint" behåller alla aktiva —
+        // en kund kan vilja ha både ek OCH halkfritt golv samtidigt, och vi
+        // kan inte avgöra motsägelse automatiskt utan en AI-gissning.
+        // Egen try/catch: en trasig supersede får aldrig fälla ett redan
+        // sparat och godkänt faktum.
+        if (factType === 'contact' || factType === 'commitment') {
+          try {
+            const { error: supersedeErr } = await supabaseCF
+              .from('customer_fact')
+              .update({ superseded_by: fact.id })
+              .eq('business_id', businessId)
+              .eq('customer_id', pl.customer_id)
+              .eq('fact_type', factType)
+              .is('superseded_by', null)
+              .neq('id', fact.id)
+            if (supersedeErr) {
+              console.error('[approvals/customer_fact] supersede misslyckades (icke-blockerande):', supersedeErr.message)
+            }
+          } catch (supersedeCatchErr: any) {
+            console.error(
+              '[approvals/customer_fact] supersede kastade (icke-blockerande):',
+              supersedeCatchErr?.message || supersedeCatchErr,
+            )
+          }
+        }
+
         return { action: 'customer_fact', ok: true, fact_id: fact.id }
       }
 
@@ -1490,10 +1538,15 @@ async function executeApprovalPayload(
             return { action: 'create_ata_draft', ...ataR }
           }
           const ata = (ataR.metadata as any)?.ata
+          // Rotorsaksfix (2026-08-12): project_change har ingen `id`-kolumn
+          // — dess PK är `change_id` (sql/projects.sql rad 71). `ata?.id`
+          // var därför ALLTID undefined och ata_id försvann tyst redan i
+          // HTTP-svaret, långt innan persist-frågan ens uppstod. Utan denna
+          // fix kan ÄTA→faktura-kedjan aldrig direktattribueras.
           return {
             action: 'create_ata_draft',
             ok: true,
-            ata_id: ata?.id,
+            ata_id: ata?.change_id,
             project_id: pl.project_id,
             total: ata?.total,
           }

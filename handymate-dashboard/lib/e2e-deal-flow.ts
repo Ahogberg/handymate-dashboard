@@ -449,6 +449,9 @@ async function executeQuoteGeneration(
         hourlyRate,
         textDescription: description,
         customerId: deal.customer_id || undefined,
+        // deal.job_type kommer redan med i getDealData's select('*') ovan —
+        // ingen ny query. Låter fetchRecentLessons filtrera på rätt jobbtyp.
+        jobType: deal.job_type || undefined,
       })
 
       // Spara offert

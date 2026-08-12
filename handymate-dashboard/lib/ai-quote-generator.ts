@@ -32,10 +32,12 @@ export interface QuoteGenerationInput {
   templates?: QuoteTemplate[]
   defaultHourlyRate?: number
   customerPriceList?: CustomerPriceList
-  /** Jobbtyp (t.ex. project.job_type) — om satt filtreras
-      project_lesson-läsningen (Project Debrief Capture, 2026-08-12) på
-      samma jobbtyp. Ingen anropare skickar detta ännu; utan fältet läses
-      de senaste lärdomarna oavsett jobbtyp. */
+  /** Jobbtyp (slug, t.ex. project.job_type/quotes.job_type/lead.job_type) —
+      styr project_lesson-läsningen (Project Debrief Capture, 2026-08-12).
+      Sanningsprincipen (fix 2026-08-12): UTAN jobType hämtas INGA lärdomar
+      alls. Prompten påstår "LÄRDOMAR FRÅN TIDIGARE LIKNANDE JOBB" — att
+      visa badrumslärdomar i en altanoffert vore fel, inte bara oprecist.
+      Hellre inga lärdomar än fel lärdomar. */
   jobType?: string
 }
 
@@ -121,8 +123,15 @@ function getAnthropic() {
 
 /**
  * Project Debrief Capture (2026-08-12): de senaste 3 bekräftade lärdomarna
- * (project_lesson, sql/v121_project_lesson.sql) för businessen — samma
- * jobbtyp om input bär en, annars de senaste oavsett jobbtyp.
+ * (project_lesson, sql/v121_project_lesson.sql) för businessen, filtrerat
+ * på SAMMA jobbtyp.
+ *
+ * Sanningsprincipen (fix 2026-08-12): utan jobType hämtas INGA lärdomar —
+ * tidigare lästes de tre senaste OAVSETT jobbtyp, vilket i praktiken
+ * innebar att badrumslärdomar dök upp i altanoffertens prompt under
+ * rubriken "LÄRDOMAR FRÅN TIDIGARE LIKNANDE JOBB". Ett felaktigt "liknande"
+ * är värre än att inte visa några lärdomar alls, så utan en jobbtyp att
+ * matcha mot är svaret en tom lista, inte en gissning.
  *
  * Fail-safe: kastar aldrig. Om tabellen ännu inte finns (v121 inte körd
  * än) eller läsningen av någon annan anledning misslyckas degraderas till
@@ -133,17 +142,19 @@ async function fetchRecentLessons(
   businessId: string,
   jobType?: string,
 ): Promise<Array<{ lesson_text: string; impact_hint: string | null }>> {
+  // Ingen jobbtyp att matcha mot → inga lärdomar. Görs INNAN någon query
+  // byggs, så beteendet är verifierbart utan DB (se tests/project-debrief.spec.ts).
+  if (!jobType) return []
+
   try {
-    let query = getServerSupabase()
+    const { data, error } = await getServerSupabase()
       .from('project_lesson')
       .select('lesson_text, impact_hint, created_at')
       .eq('business_id', businessId)
+      .eq('job_type', jobType)
       .order('created_at', { ascending: false })
       .limit(3)
 
-    if (jobType) query = query.eq('job_type', jobType)
-
-    const { data, error } = await query
     if (error) {
       console.error('[ai-quote-generator] project_lesson-läsning misslyckades (fail-safe, tom lista):', error.message)
       return []

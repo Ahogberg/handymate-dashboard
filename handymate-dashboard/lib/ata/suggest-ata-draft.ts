@@ -210,9 +210,12 @@ export async function suggestAtaDraft(
     try {
       // Projektet ger både sammanhang till modellen och rätt kund för
       // prislistan. Business-scopat — samma tenantregel som resten.
+      // job_type hämtas med — låter lärdome-läsningen (fetchRecentLessons,
+      // ai-quote-generator.ts) filtrera på samma jobbtyp i stället för att
+      // hoppa över lärdomar helt för alla ÄTA-förslag.
       const { data: project } = await supabase
         .from('project')
-        .select('name, customer_id')
+        .select('name, customer_id, job_type')
         .eq('business_id', params.businessId)
         .eq('project_id', params.projectId)
         .maybeSingle()
@@ -265,6 +268,7 @@ export async function suggestAtaDraft(
         })),
         templates: templatesResult.data || [],
         customerId: project?.customer_id || undefined,
+        jobType: project?.job_type || undefined,
       })
 
       if (generated?.items?.length) {

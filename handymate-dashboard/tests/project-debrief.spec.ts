@@ -79,6 +79,48 @@ test.describe('action-contract — project_debrief är registrerad', () => {
   })
 })
 
+test.describe('fetchRecentLessons — sanningsprincipen (fix 2026-08-12)', () => {
+  // Ren källkodsskanning, precis som create-debrief-card.ts nedan: funktionen
+  // gör I/O (Supabase) och är inte exporterad, så den testas inte genom att
+  // anropas — vi verifierar att KÄLLKODENS FORM garanterar beteendet:
+  // utan jobType görs ingen query alls, bara en tom lista.
+  const kalla = fs.readFileSync(path.join(ROOT, 'lib/ai-quote-generator.ts'), 'utf8')
+
+  test('funktionen returnerar tom lista OMEDELBART utan jobType, före queryn', () => {
+    const funkStart = kalla.indexOf('async function fetchRecentLessons')
+    expect(funkStart).toBeGreaterThan(-1)
+    const tidigtGuard = kalla.indexOf('if (!jobType) return []', funkStart)
+    const queryStart = kalla.indexOf(".from('project_lesson')", funkStart)
+    expect(tidigtGuard).toBeGreaterThan(-1)
+    expect(queryStart).toBeGreaterThan(-1)
+    // Guarden måste stå FÖRE queryn bygg — annars hinner en query köras
+    // innan den tomma listan returneras.
+    expect(tidigtGuard).toBeLessThan(queryStart)
+  })
+
+  test('queryn filtrerar ALLTID på job_type — inget villkorat if (jobType) längre', () => {
+    const funkStart = kalla.indexOf('async function fetchRecentLessons')
+    const funkSlice = kalla.slice(funkStart, funkStart + 1200)
+    expect(funkSlice).toContain(".eq('job_type', jobType)")
+    // Den gamla bugvarianten filtrerade bara VILLKORAT — den formen ska
+    // vara borta ur funktionen (jobType är garanterat satt efter guarden).
+    expect(funkSlice).not.toContain('if (jobType) query')
+  })
+})
+
+test.describe('create-from-quote.ts — job_type sätts vid källan (fix 2026-08-12)', () => {
+  const kalla = fs.readFileSync(path.join(ROOT, 'lib/projects/create-from-quote.ts'), 'utf8')
+
+  test('projektet får job_type från offertens job_type', () => {
+    expect(kalla).toContain('job_type: quote.job_type || null')
+  })
+
+  test('offerten läses fortfarande brett (select(\'*\')) så job_type garanterat följer med', () => {
+    expect(kalla).toContain(".from('quotes')")
+    expect(kalla).toContain(".select('*')")
+  })
+})
+
 test.describe('create-debrief-card.ts — livstids-dedupen', () => {
   const kalla = fs.readFileSync(path.join(ROOT, 'lib/debrief/create-debrief-card.ts'), 'utf8')
 

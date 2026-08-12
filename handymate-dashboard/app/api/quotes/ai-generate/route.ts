@@ -15,7 +15,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: rateLimit.error }, { status: 429 })
     }
 
-    const { imageBase64, images, voiceTranscript, textDescription, customerId } = await request.json()
+    // jobType/job_type: valfritt fält — ingen befintlig UI-anropare skickar
+    // det ännu, men tas emot i båda stavningarna så en kommande avsändare
+    // (t.ex. offert-nya-sidan) kan börja skicka det utan API-ändring.
+    // Utan det hämtas inga project_lesson-lärdomar (sanningsprincipen,
+    // lib/ai-quote-generator.ts) — hellre inga lärdomar än fel jobbtyps lärdomar.
+    const { imageBase64, images, voiceTranscript, textDescription, customerId, jobType, job_type } = await request.json()
 
     // Stöd både images[] (nytt) och imageBase64 (bakåtkompatibilitet)
     const allImages: string[] = images?.length ? images : imageBase64 ? [imageBase64] : []
@@ -101,6 +106,7 @@ export async function POST(request: NextRequest) {
       priceList: priceListData,
       templates: templatesData,
       customerPriceList,
+      jobType: jobType || job_type || undefined,
     })
 
     // Get price comparison

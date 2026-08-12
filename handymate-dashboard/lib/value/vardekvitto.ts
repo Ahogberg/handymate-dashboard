@@ -32,7 +32,14 @@ import {
   type Attribution,
 } from '@/lib/value/recovered-revenue'
 
-export const VARDEKVITTO_METHOD_VERSION = 1
+// v2 (2026-08-12): RECOVERY_APPROVAL_TYPES utökades med fyra direkt-
+// attribuerande korttyper (invoice_reminder, create_ata_draft, missad_intakt,
+// fakturera_projekt — se lib/value/recovered-revenue.ts) och kort→artefakt-
+// kedjan blev bevisbar i databasen (execution_result.artifacts). Samma
+// månad kan alltså ge fler bekräftade kronor än innan denna version, inte
+// för att pengarna ändrades utan för att fler av dem nu kan bevisas. Ett
+// kvitto skrivet med v1 jämförs aldrig direkt mot ett skrivet med v2.
+export const VARDEKVITTO_METHOD_VERSION = 2
 
 const DAY_MS = 24 * 60 * 60 * 1000
 

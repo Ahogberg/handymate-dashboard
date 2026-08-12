@@ -41,7 +41,7 @@ COMMENT ON TABLE public.customer_fact IS
 COMMENT ON COLUMN public.customer_fact.evidence_quote IS
   'Ordagrant citat ur mötestranskriptet som fyndet bygger på.';
 COMMENT ON COLUMN public.customer_fact.superseded_by IS
-  'Sätts när ett nyare fakta-kort ersätter detta — läsvägarna filtrerar alltid på superseded_by IS NULL.';
+  'Sätts till ETT AV TVÅ: (1) ett nyare faktums id — automatisk supersede vid godkännande, bara för fact_type contact/commitment (app/api/approvals/[id]/route.ts, case customer_fact — preference/constraint superseder aldrig automatiskt, en kund kan ha flera samtidigt); (2) radens EGET id — manuellt borttagen via kundkortets papperskorg-knapp (DELETE app/api/customers/[id]/facts/route.ts). Läsvägarna filtrerar alltid på superseded_by IS NULL. Dokumentation uppdaterad 2026-08-12 — kräver ingen ny körning, kolumnen finns redan.';
 
 CREATE INDEX IF NOT EXISTS idx_customer_fact_business_customer
   ON public.customer_fact (business_id, customer_id);

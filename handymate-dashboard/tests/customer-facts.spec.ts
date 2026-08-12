@@ -27,7 +27,7 @@ test.describe('godkännande-kontraktet', () => {
     const s = read('app/api/approvals/[id]/route.ts')
     const i = s.indexOf("case 'customer_fact':")
     expect(i, 'hanteraren saknas i executeApprovalPayload').toBeGreaterThan(-1)
-    const gren = s.slice(i, i + 1500)
+    const gren = s.slice(i, i + 1700)
     expect(gren).toContain("from('customer_fact')")
     expect(gren).toContain('.insert(')
     // Misslyckad insert ska ge det svenska felet, aldrig en tyst krasch.
@@ -67,6 +67,114 @@ test.describe('mötesgrenen bygger korrekt kort', () => {
     const s = read(ANALYZE)
     expect(s, 'fallback till booking.customer_id saknas').toContain("from('booking')")
     expect(s).toContain('recording.booking_id')
+  })
+})
+
+test.describe('säkerhet: åtkomstkoder får aldrig extraheras', () => {
+  test('mötesanalysens tre prompter förbjuder åtkomstkoder explicit', () => {
+    const s = read('app/api/voice/analyze/route.ts')
+    // Engångsprompten, MAP-prompten och REDUCE-prompten ska alla bära den
+    // explicita förbudsraden — inte bara nämna "kontaktuppgift" i förbigående.
+    const forbudsrader = s.match(/SÄKERHET: extrahera[^\n]*ALDRIG åtkomstkoder/g) || []
+    expect(forbudsrader.length, 'förbudsraden saknas i minst en av de tre prompterna').toBeGreaterThanOrEqual(3)
+  })
+
+  test('"portkod" nämns inte längre som exempel på en kontaktuppgift', () => {
+    // "portkod(er)" får förekomma i förbudsraderna ("extrahera ALDRIG
+    // åtkomstkoder — portkoder, ...") men aldrig längre i den gamla,
+    // uppmuntrande formen "kontaktuppgift (t.ex. portkod, ...)".
+    const s = read('app/api/voice/analyze/route.ts')
+    expect(s).not.toMatch(/kontaktuppgift[^\n]*portkod/i)
+    expect(s).not.toMatch(/t\.ex\.\s*portkod/i)
+  })
+
+  test('demo-transkriptet innehåller ingen åtkomstkod', () => {
+    const s = read('app/api/admin/demo-seed-meeting/route.ts')
+    expect(s.toLowerCase()).not.toContain('portkod')
+    expect(s.toLowerCase()).not.toContain('larmkod')
+  })
+})
+
+test.describe('supersede — senaste vinner bara för contact/commitment', () => {
+  const ROUTE = 'app/api/approvals/[id]/route.ts'
+
+  test('supersede-uppdateringen finns i customer_fact-caset, efter inserten', () => {
+    const s = read(ROUTE)
+    const caseStart = s.indexOf("case 'customer_fact':")
+    const insertIdx = s.indexOf(".insert(", caseStart)
+    const supersedeIdx = s.indexOf('superseded_by: fact.id', caseStart)
+    expect(caseStart, 'caset saknas').toBeGreaterThan(-1)
+    expect(insertIdx).toBeGreaterThan(caseStart)
+    expect(supersedeIdx, 'supersede-uppdateringen saknas').toBeGreaterThan(insertIdx)
+  })
+
+  test('bara contact och commitment superseder — preference/constraint behåller alla aktiva', () => {
+    const s = read(ROUTE)
+    const i = s.indexOf("case 'customer_fact':")
+    const gren = s.slice(i, i + 3000)
+    expect(gren).toContain("factType === 'contact' || factType === 'commitment'")
+    expect(gren).not.toContain("factType === 'preference'")
+    expect(gren).not.toContain("factType === 'constraint'")
+  })
+
+  test('supersede-uppdateringen filtrerar på business+customer+fact_type och utesluter det nya faktumet självt', () => {
+    const s = read(ROUTE)
+    const i = s.indexOf('superseded_by: fact.id')
+    const gren = s.slice(Math.max(0, i - 400), i + 400)
+    expect(gren).toContain("eq('business_id', businessId)")
+    expect(gren).toContain("eq('customer_id', pl.customer_id)")
+    expect(gren).toContain("eq('fact_type', factType)")
+    expect(gren).toContain(".is('superseded_by', null)")
+    expect(gren).toContain(".neq('id', fact.id)")
+  })
+
+  test('supersede-uppdateringen har egen try/catch — får aldrig fälla ett redan sparat faktum', () => {
+    const s = read(ROUTE)
+    const i = s.indexOf('superseded_by: fact.id')
+    const tryStart = s.lastIndexOf('try {', i)
+    const catchAfter = s.indexOf('} catch', i)
+    expect(tryStart, 'supersede-uppdateringen ligger inte i ett eget try-block').toBeGreaterThan(-1)
+    expect(catchAfter).toBeGreaterThan(i)
+    // Insert-felet ovanför returnerar redan (stänger caset) om det gick fel,
+    // så try/catchet här skyddar bara supersede-steget, inte hela caset.
+    const returnBeforeTry = s.lastIndexOf('return { action:', tryStart)
+    expect(returnBeforeTry).toBeGreaterThan(-1)
+  })
+})
+
+test.describe('"ta bort"-vägen — självrefererande superseded_by', () => {
+  const FACTS_ROUTE = 'app/api/customers/[id]/facts/route.ts'
+
+  test('DELETE-handler finns, kräver inloggning och tenant-matchning', () => {
+    const s = read(FACTS_ROUTE)
+    const i = s.indexOf('export async function DELETE')
+    expect(i, 'DELETE-handlern saknas').toBeGreaterThan(-1)
+    const gren = s.slice(i, i + 2000)
+    expect(gren).toContain('getAuthenticatedBusiness')
+    expect(gren).toContain("eq('business_id', business.business_id)")
+    expect(gren).toContain("eq('customer_id', customerId)")
+  })
+
+  test('DELETE sätter superseded_by till radens EGET id — ingen hård DELETE', () => {
+    const s = read(FACTS_ROUTE)
+    const i = s.indexOf('export async function DELETE')
+    const gren = s.slice(i, i + 2000)
+    expect(gren).toContain('update({ superseded_by: factId })')
+    expect(gren).toContain("eq('id', factId)")
+    expect(gren).not.toContain('.delete(')
+  })
+
+  test('DELETE filtrerar på superseded_by IS NULL — kan inte "ta bort" ett redan ersatt faktum', () => {
+    const s = read(FACTS_ROUTE)
+    const i = s.indexOf('export async function DELETE')
+    const gren = s.slice(i, i + 2000)
+    expect(gren).toContain(".is('superseded_by', null)")
+  })
+
+  test('sql/v122-kommentaren dokumenterar båda superseded_by-konventionerna', () => {
+    const s = read('sql/v122_customer_fact.sql')
+    expect(s).toContain('radens EGET id')
+    expect(s).toContain('contact/commitment')
   })
 })
 

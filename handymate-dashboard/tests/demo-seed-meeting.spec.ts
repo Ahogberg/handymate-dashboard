@@ -98,9 +98,13 @@ test.describe('default-transkriptet täcker alla fyra customer_fact-typer', () =
     expect(routeSource).toContain('Jag lovar att vi är klara innan midsommar')
   })
 
-  test('innehåller en kontaktuppgift', () => {
+  test('innehåller en kontaktuppgift — men aldrig en åtkomstkod', () => {
     expect(routeSource).toMatch(/070-555 12 34/)
-    expect(routeSource).toContain('Portkoden')
+    // Säkerhetsregression (PRELAUNCH_WAVE kandidat 5): demo-transkriptet
+    // innehöll tidigare "Portkoden till trapphuset är förresten 1893" —
+    // åtkomstkoder ska aldrig finnas i exempeldata som analyseras.
+    expect(routeSource.toLowerCase()).not.toContain('portkod')
+    expect(routeSource.toLowerCase()).not.toContain('larmkod')
   })
 
   test('innehåller ett tydligt offertrelaterat uttalande (för create_quote_draft)', () => {

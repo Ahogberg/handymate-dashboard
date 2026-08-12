@@ -93,6 +93,13 @@ export async function createProjectFromQuote(
         quote_id: quoteId,
         lead_id: quote.lead_id || null,
         project_type: projectType,
+        // job_type (slug, samma format som deal.job_type/lead.job_type) sätts
+        // bara när offerten faktiskt har en — klassificeraren (lib/agent/
+        // pricing-engine.ts) fyller den retroaktivt i bakgrunden, så fältet
+        // kan vara null här. Sätts ALDRIG genom gissning: utan värde läser
+        // fetchRecentLessons (lib/ai-quote-generator.ts) inga lärdomar alls
+        // för projektet, vilket är rätt fail-safe hellre än fel jobbtyp.
+        job_type: quote.job_type || null,
         budget_hours: budgetHours,
         budget_amount: budgetAmount || quote.customer_pays || quote.total || null,
         address: quote.project_address || null,
