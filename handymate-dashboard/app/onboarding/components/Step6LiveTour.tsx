@@ -20,6 +20,7 @@
 import { useEffect, useState } from 'react'
 import { ListChecks, Rocket, Target, Crown } from 'lucide-react'
 import { TEAM, getAgentById } from '@/lib/agents/team'
+import { TourTarget, SpotlightOverlay, type TourStepBase } from '@/components/tour/TourPrimitives'
 import type { OnboardingFormData } from '../types-redesign'
 
 interface Step6Props {
@@ -44,24 +45,24 @@ interface InstantValue {
   }
 }
 
-interface TourStep {
+/**
+ * Stopptexterna refererade tidigare ytnamn som inte längre finns på riktiga
+ * startsidan (2026-08-13, docs/design/FORSTA-30-MINUTERNA.md) — "Här
+ * godkänner du beslut" pekade på en "Godkännanden"-etikett som blivit "Det
+ * här behöver dig idag", och setup-checklistan finns inte kvar där. Texterna
+ * är nu skrivna mot de RIKTIGA rubrikerna Hemturen (components/tour/HemTur.tsx)
+ * visar strax efter — samma språk, så förhandsvisningen känns som en
+ * fortsättning, inte en repris.
+ */
+interface TourStep extends TourStepBase {
   id: 'team' | 'matte' | 'approve' | 'setup'
-  title: string
-  body: string
-  /**
-   * Var tipskortet ligger. Kortet satt alltid i botten (B7-fyndet) och
-   * täckte då exakt det spotlighten pekade på för elementen i nedre halvan
-   * — Matte-knappen och setuplistan gömdes bakom sina egna tips. Kortet
-   * ska stå på MOTSATT sida om det det visar.
-   */
-  placement: 'top' | 'bottom'
 }
 
 const TOUR_STEPS: TourStep[] = [
   {
     id: 'team',
-    title: 'Här bor ditt AI-team',
-    body: 'Se i realtid vad Lisa, Karin, Daniel, Lars och Hanna jobbar med.',
+    title: 'Det här sköter teamet',
+    body: 'Se i realtid vad Lisa, Karin, Daniel, Lars och Hanna jobbar med — du behöver inte fråga.',
     placement: 'bottom',
   },
   {
@@ -72,14 +73,14 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: 'approve',
-    title: 'Här godkänner du beslut',
-    body: 'AI-teamet jobbar autonomt — du ser bara det som behöver din input. Under Automationer styr du själv vad som körs direkt och vad som kräver ditt godkännande.',
+    title: 'Det här behöver dig idag',
+    body: 'Allt teamet vill göra hamnar här. Inget går ut utan ditt ja.',
     placement: 'top',
   },
   {
     id: 'setup',
-    title: 'Här kompletterar du setup',
-    body: 'Några sista steg för att låsa upp full automation.',
+    title: 'Kom igång-uppdragen',
+    body: 'På startsidan väntar tre korta uppdrag i stället för en lång checklista.',
     placement: 'top',
   },
 ]
@@ -228,6 +229,17 @@ export default function Step6LiveTour({ onFinish, data }: Step6Props) {
             animation: 'ob-fade-in 400ms',
           }}
         >
+          <p
+            style={{
+              textAlign: 'center',
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--ob-muted)',
+              marginBottom: 10,
+            }}
+          >
+            Nu visar vi dig runt på riktigt.
+          </p>
           <button type="button" className="ob-cta" onClick={onFinish}>
             Kör igång <Rocket size={18} />
           </button>
@@ -722,127 +734,6 @@ function PayoffHero({
           <Target size={13} /> {nf(h.amount_kr)} kr att driva in
         </div>
       )}
-    </div>
-  )
-}
-
-interface TourTargetProps {
-  id: string
-  highlight: boolean
-  dim: number
-  round?: boolean
-  children: React.ReactNode
-}
-
-function TourTarget({ id, highlight, dim, round, children }: TourTargetProps) {
-  return (
-    <div
-      data-tour-target={id}
-      style={{
-        position: 'relative',
-        opacity: highlight ? 1 : dim,
-        transition: 'opacity 320ms',
-        zIndex: highlight ? 40 : 1,
-        borderRadius: round ? '50%' : 'var(--ob-r-lg)',
-        boxShadow: highlight
-          ? '0 0 0 4px rgba(13,148,136,0.55), 0 0 0 9999px rgba(15,23,42,0.55)'
-          : 'none',
-      }}
-    >
-      {children}
-    </div>
-  )
-}
-
-interface SpotlightOverlayProps {
-  step: TourStep
-  index: number
-  total: number
-  onNext: () => void
-  onSkip: () => void
-}
-
-function SpotlightOverlay({ step, index, total, onNext, onSkip }: SpotlightOverlayProps) {
-  const isLast = index === total - 1
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        left: 16,
-        right: 16,
-        // Kortet står på motsatt sida om det spotlighten visar — annars
-        // täcker tipset sitt eget motiv (B7-fyndet: Matte-knappen och
-        // setuplistan låg gömda bakom kortet).
-        ...(step.placement === 'top' ? { top: 60 } : { bottom: 24 }),
-        padding: 16,
-        background: 'var(--ob-surface)',
-        borderRadius: 'var(--ob-r-lg)',
-        boxShadow: 'var(--ob-sh-lg)',
-        border: '1px solid var(--ob-border)',
-        zIndex: 50,
-        animation: 'ob-pop-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 6,
-        }}
-      >
-        <span className="ob-eyebrow">
-          {index + 1} av {total}
-        </span>
-        <button
-          type="button"
-          onClick={onSkip}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--ob-muted)',
-            fontSize: 12,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}
-        >
-          Hoppa över
-        </button>
-      </div>
-      <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--ob-ink)', marginBottom: 4 }}>{step.title}</h3>
-      <p style={{ fontSize: 13, color: 'var(--ob-muted)', lineHeight: 1.5, marginBottom: 14 }}>{step.body}</p>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: 4, flex: 1 }}>
-          {Array.from({ length: total }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                height: 4,
-                flex: 1,
-                borderRadius: 2,
-                background: i <= index ? 'var(--ob-primary-700)' : 'var(--ob-border)',
-              }}
-            />
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={onNext}
-          style={{
-            padding: '9px 18px',
-            background: 'var(--ob-primary-700)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 'var(--ob-r-pill)',
-            fontWeight: 600,
-            fontSize: 13,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}
-        >
-          {isLast ? 'Klart' : 'Nästa'}
-        </button>
-      </div>
     </div>
   )
 }

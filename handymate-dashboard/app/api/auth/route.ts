@@ -418,6 +418,8 @@ if (action === 'login') {
           onboarding_step: business.onboarding_step ?? 1,
           onboarding_completed_at: business.onboarding_completed_at ?? null,
           created_at: business.created_at ?? null,
+          // Hemturens gate — se components/tour/HemTur.tsx.
+          welcome_tour_seen: business.welcome_tour_seen ?? null,
         }
       })
     }

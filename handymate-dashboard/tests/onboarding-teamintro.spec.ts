@@ -126,7 +126,14 @@ test.describe('rundturen — tipset täcker inte sitt eget motiv', () => {
     const stegCount = (arr.match(/id: '/g) || []).length
     const placeringCount = (arr.match(/placement: '(top|bottom)'/g) || []).length
     expect(placeringCount, 'varje toursteg-objekt måste bära en placering').toBe(stegCount)
-    expect(s).toContain("step.placement === 'top' ? { top: 60 } : { bottom: 24 }")
+    // Placeringslogiken (kortet på motsatt sida om spotlighten) lyftes ur
+    // Step6 till components/tour/TourPrimitives.tsx (2026-08-13) — Step6
+    // importerar SpotlightOverlay därifrån i stället för att äga logiken
+    // själv, se docs/design/FORSTA-30-MINUTERNA.md DEL 1.
+    expect(s, 'Step6 ska importera den delade rundtursmekaniken, inte äga en egen kopia')
+      .toContain("import { TourTarget, SpotlightOverlay, type TourStepBase } from '@/components/tour/TourPrimitives'")
+    const primitives = read('components/tour/TourPrimitives.tsx')
+    expect(primitives).toContain("step.placement === 'top' ? { top: 60 } : { bottom: 24 }")
     // Matte-knappen bor nere till höger — dess tips får ALDRIG ligga i botten.
     const matte = arr.slice(arr.indexOf("id: 'matte'"), arr.indexOf("id: 'approve'"))
     expect(matte).toContain("placement: 'top'")

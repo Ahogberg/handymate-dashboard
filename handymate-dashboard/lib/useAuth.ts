@@ -15,6 +15,7 @@ interface Business {
   onboarding_step: number
   onboarding_completed_at: string | null
   created_at?: string
+  welcome_tour_seen?: string | null
 }
 
 export function useAuth(requireAuth = true) {

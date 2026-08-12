@@ -221,15 +221,12 @@ export default function OnboardingPage() {
       })
       if (!res.ok) throw new Error('finalize failed')
 
-      // welcome_tour_seen är kosmetiskt — best-effort, blockerar inte klar-flödet.
-      await fetch('/api/onboarding', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          config: { welcome_tour_seen: new Date().toISOString() },
-        }),
-      }).catch(() => {})
-
+      // welcome_tour_seen skrivs INTE här längre (2026-08-13). Den gated
+      // tidigare bort Hemturen (components/tour/HemTur.tsx) innan den ens
+      // hunnit visas — kolumnen sattes redan när Step6-förhandsvisningen
+      // stängdes, så den riktiga touren på /dashboard hade alltid ett
+      // redan-satt flagg att läsa. Nu är Hemturen ensam ägare av skrivningen
+      // (vid dess avslut/hopp) — se docs/design/FORSTA-30-MINUTERNA.md.
       router.push('/dashboard')
     } catch {
       setFinishing(false)

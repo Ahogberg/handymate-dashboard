@@ -196,6 +196,47 @@ test.describe('designkontraktet — fyra frågor, i ordning (Matte Command Cente
   })
 })
 
+test.describe('Kom igång-railen + Hemturen monterade (2026-08-13, docs/design/FORSTA-30-MINUTERNA.md)', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'components/jarvis/JarvisHome.tsx'), 'utf8')
+
+  test('KomIgangRail står överst i högerspalten, före Dagens plan', () => {
+    expect(home).toContain("import { KomIgangRail } from '@/components/jarvis/KomIgangRail'")
+    const railIdx = home.indexOf('<KomIgangRail />')
+    const dagensPlanIdx = home.indexOf('title="Dagens plan"')
+    expect(railIdx, 'KomIgangRail saknas ur aside').toBeGreaterThan(-1)
+    expect(dagensPlanIdx, 'Dagens plan saknas').toBeGreaterThan(-1)
+    expect(railIdx).toBeLessThan(dagensPlanIdx)
+  })
+
+  test('HemTur är monterad', () => {
+    expect(home).toContain("import HemTur from '@/components/tour/HemTur'")
+    expect(home).toContain('<HemTur />')
+  })
+
+  test('KomIgangRail läser sin egen completion-rutt, inte statiska false', () => {
+    const rail = fs.readFileSync(path.join(ROOT, 'components/jarvis/KomIgangRail.tsx'), 'utf8')
+    expect(rail).toContain("fetch('/api/onboarding/kom-igang')")
+    expect(rail).toContain('ring_test')
+    expect(rail).toContain('forsta_artefakten')
+    expect(rail).toContain('pwa')
+  })
+
+  test('railen har en completion-källa per uppdrag i backend-rutten (RIKTIG data, inte gissad)', () => {
+    const route = fs.readFileSync(path.join(ROOT, 'app/api/onboarding/kom-igang/route.ts'), 'utf8')
+    expect(route).toContain("from('call_recording')")
+    expect(route).toContain("from('meeting_job')")
+    expect(route).toContain("from('quotes')")
+    expect(route).toContain("from('push_subscriptions')")
+    expect(route).toContain('getAuthenticatedBusiness')
+  })
+
+  test('railen döljs permanent i localStorage när alla tre uppdrag är klara', () => {
+    const rail = fs.readFileSync(path.join(ROOT, 'components/jarvis/KomIgangRail.tsx'), 'utf8')
+    expect(rail).toContain("DONE_KEY = 'hm_kom_igang_klar'")
+    expect(rail).toContain('localStorage.setItem(DONE_KEY')
+  })
+})
+
 test.describe('momenten i Värt att veta (2026-08-12)', () => {
   const home = fs.readFileSync(path.join(ROOT, 'components/jarvis/JarvisHome.tsx'), 'utf8')
 

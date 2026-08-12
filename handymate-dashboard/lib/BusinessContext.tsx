@@ -11,6 +11,8 @@ interface Business {
   onboarding_step: number
   onboarding_completed_at: string | null
   created_at?: string
+  /** Hemturens gate (docs/design/FORSTA-30-MINUTERNA.md) — null = turen är osedd. */
+  welcome_tour_seen?: string | null
 }
 
 export const BusinessContext = createContext<Business | null>(null)
