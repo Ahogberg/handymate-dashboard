@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { Briefcase, Calendar, ExternalLink, User } from 'lucide-react'
+import { PortalLankKnapp } from '@/components/customers/PortalLankKnapp'
 
 /**
  * ProjectInfoCard (Etapp 4b steg 3, 2026-05-23).
@@ -87,13 +88,16 @@ export function ProjectInfoCard({
         {customer && (
           <div>
             <Eyebrow icon={<User className="w-3 h-3" />}>Kund</Eyebrow>
-            <Link
-              href={`/dashboard/customers/${customer.customer_id}`}
-              className="mt-1.5 inline-flex items-center gap-1 text-sm text-primary-700 hover:text-primary-800 hover:underline"
-            >
-              {customer.name}
-              <ExternalLink className="w-3 h-3" />
-            </Link>
+            <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+              <Link
+                href={`/dashboard/customers/${customer.customer_id}`}
+                className="inline-flex items-center gap-1 text-sm text-primary-700 hover:text-primary-800 hover:underline"
+              >
+                {customer.name}
+                <ExternalLink className="w-3 h-3" />
+              </Link>
+              <PortalLankKnapp customerId={customer.customer_id} variant="compact" />
+            </div>
           </div>
         )}
 

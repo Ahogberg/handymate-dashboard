@@ -40,6 +40,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { CopyId } from '@/components/CopyId'
+import { PortalLankKnapp } from '@/components/customers/PortalLankKnapp'
 import { DealTimeline } from '@/components/pipeline/DealTimeline'
 import SmartTaskTitleInput from '@/components/SmartTaskTitleInput'
 import { SCORE_FACTOR_LABELS, getTemperatureColor, getTemperatureLabel } from '@/lib/lead-scoring'
@@ -581,6 +582,7 @@ export function DealModal() {
                           className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-violet-200 bg-violet-50 text-sm text-violet-700 hover:bg-violet-100 transition-colors">
                           <Calendar className="w-4 h-4" /> Platsbesök
                         </button>
+                        {selectedDeal.customer_id && <PortalLankKnapp customerId={selectedDeal.customer_id} variant="chip" />}
                       </div>
                       {!getStageForDeal(selectedDeal)?.is_lost && (
                         <button onClick={() => markDealLost(selectedDeal.id)} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">

@@ -13,6 +13,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { CopyId } from '@/components/CopyId'
+import { PortalLankKnapp } from '@/components/customers/PortalLankKnapp'
 import { getLeadCategory } from '@/lib/lead-categories'
 import { formatValueCompact, getPriorityDot, timeAgo } from '../helpers'
 import { usePipelineContext } from '../context'
@@ -146,6 +147,7 @@ export function DealCard({ deal, isDragging }: DealCardProps) {
           <CheckSquare className="w-3.5 h-3.5" />
           <span className="text-[10px]">Uppgifter</span>
         </button>
+        {deal.customer_id && <PortalLankKnapp customerId={deal.customer_id} variant="icon" />}
       </div>
     </div>
   )
