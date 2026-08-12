@@ -22,6 +22,8 @@ import { KarinCalendarWidget } from '@/components/karin/KarinCalendarWidget'
 import { PengarBand } from '@/components/jarvis/PengarBand'
 import type { PengarSummary } from '@/lib/value/pengar-pa-bordet'
 import type { Vardekvitto } from '@/lib/value/vardekvitto'
+import type { ManadsLedger } from '@/lib/value/ledger'
+import { retentionRad, type Agarrapport } from '@/lib/value/agarrapport'
 import { approvalPreview, isEditable, buildApprovalEdit } from '@/lib/jarvis/approval-preview'
 import {
   agentForApproval,
@@ -38,6 +40,8 @@ import { voiceFor, reviewAlternatives, doneRowText } from '@/lib/jarvis/card-voi
 import { mayExecute } from '@/lib/approvals/action-contract'
 import { groupApprovals, groupTitle, groupTotalKr } from '@/lib/jarvis/group-approvals'
 import { grindaNyheter, entityFrom } from '@/lib/jarvis/news-gates'
+import { pengaFynd } from '@/lib/jarvis/moment-rows'
+import type { AgentMoment } from '@/lib/moments/derive'
 
 /**
  * JarvisHome — teamets rapportbord (2026-08-07).
@@ -95,6 +99,8 @@ const NYHETER_SEDDA_KEY = 'hm_nyheter_sedda'
 const NYHETER_SEDDA_MAX = 200
 /** En rad ska hinna läsas innan den räknas som sedd. */
 const NYHET_SEDD_EFTER_MS = 8000
+/** Momentraderna i Värt att veta — en permanent yta, inte en kö. */
+const MAX_MOMENT_RADER = 3
 
 interface Approval {
   id: string
@@ -216,9 +222,12 @@ export default function JarvisHome({
   const [proof, setProof] = useState<string | null>(null)
   const [bevakning, setBevakning] = useState<BevakningsRad[]>([])
   const [pengarData, setPengarData] = useState<PengarSummary | null>(null)
+  const [moments, setMoments] = useState<AgentMoment[]>([])
   const [aktiviteter, setAktiviteter] = useState<DigestAktivitet[]>([])
   const [samtal, setSamtal] = useState<{ antal: number; bokade: number } | null>(null)
   const [kvitto, setKvitto] = useState<Vardekvitto | null>(null)
+  const [ledger, setLedger] = useState<ManadsLedger | null>(null)
+  const [retentionText, setRetentionText] = useState<string | null>(null)
 
   // ═══ GRIND 1: HAR NÅGOT HÄNT SEDAN DU TITTADE SIST? ═══
   //
@@ -279,6 +288,18 @@ export default function JarvisHome({
       .then(d => { if (active) setObservations(d.observations || []) })
       .catch(() => { if (active) setObservations([]) })
     return () => { active = false }
+  }, [])
+
+  // Momenten (teamets penga-fynd) i Värt att veta: samma härledning som
+  // MomentsProvider läser (/api/moments, ägargrindad) — providerns flyktiga
+  // globala kort rörs inte, det här är en separat, permanent rad-yta.
+  useEffect(() => {
+    let aktiv = true
+    fetch('/api/moments')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (aktiv && d?.moments) setMoments(d.moments as AgentMoment[]) })
+      .catch(() => { /* momentraderna är grädde, aldrig mjölk */ })
+    return () => { aktiv = false }
   }, [])
 
   // Frågeläget: bokningskrockar som AI:n stötte på och inte kunde lösa.
@@ -366,6 +387,31 @@ export default function JarvisHome({
       .then(r => (r.ok ? r.json() : null))
       .then(d => { if (aktiv && d?.kvitto) setKvitto(d.kvitto) })
       .catch(() => { /* raden är information, aldrig blockerande */ })
+    return () => { aktiv = false }
+  }, [])
+
+  // Value Ledger-fyrstegsvyn (2026-08-12): värdekvittoraden får ett
+  // miniformat av de fyra stadierna när datat finns. Fail-safe med flit —
+  // ett uteblivet svar (fel/403) lämnar `ledger` null och raden faller
+  // tillbaka på exakt dagens beteende (pengarData-klausulen nedan).
+  useEffect(() => {
+    let aktiv = true
+    fetch('/api/value/ledger')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (aktiv && d?.ledger) setLedger(d.ledger) })
+      .catch(() => { /* raden faller tillbaka på dagens beteende */ })
+    return () => { aktiv = false }
+  }, [])
+
+  // Retentionraden (Spår A1): en gång per månad, bara de FÖRSTA 3 dagarna —
+  // datumvillkoret räcker, ingen ny lagring behövs. Samma tysta 403-regel.
+  useEffect(() => {
+    if (new Date().getDate() > 3) return
+    let aktiv = true
+    fetch('/api/value/agarrapport')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (aktiv && d?.rapport) setRetentionText(retentionRad(d.rapport as Agarrapport)) })
+      .catch(() => { /* raden är extra, aldrig blockerande */ })
     return () => { aktiv = false }
   }, [])
 
@@ -609,9 +655,30 @@ export default function JarvisHome({
     seddaNyheter,
   )
 
+  // Momentraderna: penga-fynden (potential/risk) som INTE redan står som ett
+  // beslutskort ovanför. Beslutskortens id-mängd är exakt det som visas i
+  // "Det här behöver dig idag" just nu — synliga, inte den råa approvals-
+  // listan, för avfärdade/godkända kort (hiddenIds) ska räknas som lediga.
+  const beslutskortIds = new Set(synliga.map(a => a.id))
+  const momentRader = pengaFynd(moments, beslutskortIds, MAX_MOMENT_RADER)
+
   // Fynd-pekaren på bevakningskorten: "N nya fynd ↓" scrollar till agentens
   // rad i Värt att veta. Pekare, aldrig kopia — fyndtexten bor bara där.
   const fynd = fyndPerAgent(nyheter.map(o => ({ id: o.id, agent_id: o.agent_id })))
+
+  // Värt att veta blandar nyhetsraderna och momentraderna, nyast först —
+  // "blandat" enligt uppdraget, inte två separata block under samma rubrik.
+  type VardAttVetaRad =
+    | { kind: 'nyhet'; obs: (typeof nyheter)[number] }
+    | { kind: 'moment'; moment: AgentMoment }
+  const vardAttVetaRader: VardAttVetaRad[] = [
+    ...nyheter.map(obs => ({ kind: 'nyhet' as const, obs })),
+    ...momentRader.map(moment => ({ kind: 'moment' as const, moment })),
+  ].sort((a, b) => {
+    const ta = a.kind === 'nyhet' ? a.obs.created_at : a.moment.createdAt
+    const tb = b.kind === 'nyhet' ? b.obs.created_at : b.moment.createdAt
+    return tb.localeCompare(ta)
+  })
 
   // Markera som sedda EFTER renderingen, inte under den — annars filtreras
   // raderna bort i samma render de visas i och man ser dem aldrig.
@@ -848,14 +915,36 @@ export default function JarvisHome({
           <TeamBevakning rader={bevakning} kompakt={beslut >= 2} fynd={fynd} />
 
           {/* ── Värt att veta ── */}
-          {nyheter.length > 0 && (
+          {vardAttVetaRader.length > 0 && (
             <>
               <div className="flex items-baseline gap-2 mt-6 mb-2">
                 <h2 className="m-0 text-[15px] font-semibold text-slate-900">Värt att veta</h2>
                 <span className="text-xs text-slate-400">Inget att godkänna — bara läget</span>
               </div>
               <div>
-                {nyheter.map(o => {
+                {vardAttVetaRader.map(rad => {
+                  if (rad.kind === 'moment') {
+                    const m = rad.moment
+                    return (
+                      <div key={m.id} id={`moment-${m.id}`}>
+                        <AgentNewsRow
+                          agentKey={m.agentId}
+                          link={{ label: m.action.label, href: m.action.href, icon: NYHETS_IKON.pengar }}
+                        >
+                          {/* Beloppsbadgen visas bara när källraden bär ett
+                              verkligt belopp — samma ärlighetsregel som
+                              momentlagret (lib/moments/derive.ts). */}
+                          {typeof m.amountKr === 'number' && (
+                            <span className="mr-1.5 inline-block text-[11px] font-semibold text-primary-700 bg-primary-50 rounded-full px-1.5 py-0.5 align-middle">
+                              ~{formatKr(m.amountKr)}
+                            </span>
+                          )}
+                          {m.headline}
+                        </AgentNewsRow>
+                      </div>
+                    )
+                  }
+                  const o = rad.obs
                   // Entiteten kommer ur data_basis och skickas vidare — utan
                   // andra argumentet nåddes grenen som ger "Öppna offerten →"
                   // aldrig, och alla Daniels rader fick samma generiska länk
@@ -888,10 +977,22 @@ export default function JarvisHome({
             <p className="mt-5 px-1 text-[13px] text-slate-500 m-0">
               Värdekvitto {new Date().toLocaleDateString('sv-SE', { month: 'long' })}:{' '}
               <b className="font-semibold text-slate-700">{formatKr(kvitto.confirmed_kr)} bekräftat</b>
-              {pengarData && pengarData.totalKr > 0 && (
+              {ledger ? (
+                <>
+                  {' '}·{' '}
+                  <Link href="/dashboard/pengar" className="text-primary-700 hover:underline">
+                    {formatKr(ledger.identifierat.kr)} identifierat → {formatKr(ledger.betalt.kr)} bekräftat betalt
+                  </Link>
+                </>
+              ) : pengarData && pengarData.totalKr > 0 ? (
                 <> · {formatKr(pengarData.totalKr)} vilande på <Link href="/dashboard/pengar" className="text-primary-700 hover:underline">Pengar på bordet</Link></>
-              )}
+              ) : null}
             </p>
+          )}
+
+          {/* Retentionraden — en gång per månad, de första 3 dagarna. */}
+          {retentionText && (
+            <p className="mt-1.5 px-1 text-[12px] text-slate-400 m-0">{retentionText}</p>
           )}
 
         </div>

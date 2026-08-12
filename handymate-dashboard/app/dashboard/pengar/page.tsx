@@ -6,6 +6,7 @@ import { ArrowRight, Banknote, Loader2 } from 'lucide-react'
 import { formatKr } from '@/lib/moments/derive'
 import { Intaktsfynden } from '@/components/pengar/Intaktsfynden'
 import { grupperaPengar, type PengarSummary } from '@/lib/value/pengar-pa-bordet'
+import type { ManadsLedger, ManadsLedgerSteg } from '@/lib/value/ledger'
 
 /**
  * /dashboard/pengar — "Pengar på bordet".
@@ -17,11 +18,19 @@ import { grupperaPengar, type PengarSummary } from '@/lib/value/pengar-pa-bordet
  * Totalsiffran är POTENTIAL och sidan säger det rakt ut. Att blanda ihop
  * den med bekräftat värde (Mattes värdeband) hade gjort båda siffrorna
  * omöjliga att lita på.
+ *
+ * ═══ VALUE LEDGER-FYRSTEGSVYN (2026-08-12) ═══
+ *
+ * Fristående block överst: fyra STRIKT åtskilda stadier (identifierat →
+ * agerat → fakturerat → betalt, se lib/value/ledger.ts). Egen fetch, eget
+ * fel-läge — ett trasigt /api/value/ledger-svar utelämnar bara det blocket,
+ * aldrig hela sidan (samma tystnadsregel som hemytans grädde-kort).
  */
 export default function PengarPaBordetPage() {
   const [data, setData] = useState<PengarSummary | null>(null)
   const [fel, setFel] = useState(false)
   const [laddar, setLaddar] = useState(true)
+  const [ledger, setLedger] = useState<ManadsLedger | null>(null)
 
   useEffect(() => {
     let aktiv = true
@@ -30,6 +39,15 @@ export default function PengarPaBordetPage() {
       .then(d => { if (aktiv) setData(d) })
       .catch(() => { if (aktiv) setFel(true) })
       .finally(() => { if (aktiv) setLaddar(false) })
+    return () => { aktiv = false }
+  }, [])
+
+  useEffect(() => {
+    let aktiv = true
+    fetch('/api/value/ledger')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (aktiv && d?.ledger) setLedger(d.ledger) })
+      .catch(() => { /* blocket är extra, aldrig blockerande */ })
     return () => { aktiv = false }
   }, [])
 
@@ -43,6 +61,23 @@ export default function PengarPaBordetPage() {
           Var ligger pengarna ni annars riskerar att missa? Allt nedan är
           identifierad potential — inte bokförd intäkt.
         </p>
+
+        {ledger && (
+          <div className="mt-6">
+            <h2 className="m-0 text-[15px] font-semibold text-slate-900">
+              Handymate den här månaden
+            </h2>
+            <p className="mt-1 mb-3 text-xs text-slate-400">
+              Identifierat = möjligheter teamet hittat · Betalt = pengar bekräftat på kontot
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <LedgerStegKort titel="Identifierat" steg={ledger.identifierat} ton="slate" />
+              <LedgerStegKort titel="Agerat" steg={ledger.agerat} ton="primary" />
+              <LedgerStegKort titel="Fakturerat" steg={ledger.fakturerat} ton="primary" />
+              <LedgerStegKort titel="Bekräftat betalt" steg={ledger.betalt} ton="emerald" />
+            </div>
+          </div>
+        )}
 
         {laddar && (
           <div className="mt-10 flex justify-center">
@@ -135,6 +170,29 @@ export default function PengarPaBordetPage() {
             hör ihop. Renderar ingenting när inget väntar. */}
         {!laddar && <Intaktsfynden />}
       </div>
+    </div>
+  )
+}
+
+/** Ett stadium i fyrstegsvyn — mobil 2x2, desktop en rad om fyra. */
+function LedgerStegKort({
+  titel,
+  steg,
+  ton,
+}: {
+  titel: string
+  steg: ManadsLedgerSteg
+  ton: 'slate' | 'primary' | 'emerald'
+}) {
+  const farg =
+    ton === 'emerald' ? 'text-emerald-700' : ton === 'primary' ? 'text-primary-700' : 'text-slate-900'
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-4">
+      <span className="block text-xs font-semibold text-slate-500">{titel}</span>
+      <span className={`block font-heading text-xl sm:text-2xl font-bold mt-1 ${farg}`}>
+        {formatKr(steg.kr)}
+      </span>
+      <span className="block text-[11px] text-slate-400 mt-0.5">{steg.antal} st</span>
     </div>
   )
 }

@@ -28,6 +28,7 @@ import {
   type ObservationRow,
 } from '../lib/moments/derive'
 import { tierFor, splitByTier, unseenValueKr } from '../lib/moments/interruption'
+import { pengaFynd, approvalIdFromMoment } from '../lib/jarvis/moment-rows'
 
 const NU = new Date('2026-08-08T12:00:00Z')
 
@@ -166,6 +167,56 @@ test.describe('avbrottsmotorn', () => {
     ])[0]
     expect(unseenValueKr([stort, insikt], new Set())).toBe(34_900)
     expect(unseenValueKr([stort, insikt], new Set(['appr:stor']))).toBe(0)
+  })
+})
+
+test.describe('penga-fynd i Värt att veta (JarvisHome, 2026-08-12)', () => {
+  const stor = deriveFromApprovals([
+    appr({ id: 'stor', approval_type: 'missad_intakt', payload: { amount_kr: 34_900, project_id: 'p1', project_name: 'X', kind: 'material_ej_fakturerat' } }),
+  ])[0]
+  const utanBelopp = deriveFromApprovals([
+    appr({ id: 'utan', approval_type: 'missad_intakt', payload: { amount_kr: 0, project_id: 'p2', project_name: 'Y', kind: 'projekt_utan_faktura' } }),
+  ])[0]
+  const insikt = deriveFromObservations([
+    { id: 'o1', agent_id: 'lars', title: 'T', observation: 'Obs', suggestion: null, related_approval_id: null, created_at: '2026-08-08T06:00:00Z' },
+  ])[0]
+
+  test('approvalIdFromMoment läser bara appr:-formatet', () => {
+    expect(approvalIdFromMoment(stor)).toBe('stor')
+    expect(approvalIdFromMoment(insikt)).toBeNull()
+  })
+
+  test('ett moment vars approval redan är ett synligt beslutskort dedupliceras bort', () => {
+    const utan = pengaFynd([stor], new Set(['stor']))
+    expect(utan.map(m => m.id)).not.toContain('appr:stor')
+  })
+
+  test('ett moment vars approval INTE syns som beslutskort tas med', () => {
+    const med = pengaFynd([stor], new Set(['annan-approval']))
+    expect(med.map(m => m.id)).toContain('appr:stor')
+  })
+
+  test('insikter (observationsmoment) hör inte hemma här — Värt att veta visar dem redan som nyhetsrader', () => {
+    const rader = pengaFynd([stor, insikt], new Set())
+    expect(rader.map(m => m.id)).toEqual(['appr:stor'])
+  })
+
+  test('ett moment utan belopp (t.ex. projekt_utan_faktura) tas ändå med — bara badgen uteblir', () => {
+    const rader = pengaFynd([utanBelopp], new Set())
+    expect(rader).toHaveLength(1)
+    expect(rader[0].amountKr).toBeUndefined()
+  })
+
+  test('högst `max` rader — resten göms, inkommande ordning bevaras (deriveMoments sorterar redan störst-först innan pengaFynd anropas)', () => {
+    const flera = deriveFromApprovals([
+      appr({ id: 'a', approval_type: 'missad_intakt', payload: { amount_kr: 40_000, project_id: 'p1', project_name: 'A', kind: 'material_ej_fakturerat' } }),
+      appr({ id: 'b', approval_type: 'missad_intakt', payload: { amount_kr: 30_000, project_id: 'p2', project_name: 'B', kind: 'material_ej_fakturerat' } }),
+      appr({ id: 'c', approval_type: 'missad_intakt', payload: { amount_kr: 20_000, project_id: 'p3', project_name: 'C', kind: 'material_ej_fakturerat' } }),
+      appr({ id: 'd', approval_type: 'missad_intakt', payload: { amount_kr: 10_000, project_id: 'p4', project_name: 'D', kind: 'material_ej_fakturerat' } }),
+    ])
+    const rader = pengaFynd(flera, new Set(), 3)
+    expect(rader).toHaveLength(3)
+    expect(rader.map(m => m.id)).toEqual(['appr:a', 'appr:b', 'appr:c'])
   })
 })
 

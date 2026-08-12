@@ -190,3 +190,32 @@ test.describe('designkontraktet — fyra frågor, i ordning (Matte Command Cente
     expect(home).toContain("import { PengarBand } from '@/components/jarvis/PengarBand'")
   })
 })
+
+test.describe('momenten i Värt att veta (2026-08-12)', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'components/jarvis/JarvisHome.tsx'), 'utf8')
+
+  test('läser samma härledning som MomentsProvider, via en egen hämtning', () => {
+    // MomentsProvider (det flyktiga globala kortet) rörs inte — den här
+    // ytan hämtar /api/moments själv och delar bara typen/härledningen.
+    expect(home).toContain("import { pengaFynd } from '@/lib/jarvis/moment-rows'")
+    expect(home).toContain("import type { AgentMoment } from '@/lib/moments/derive'")
+    expect(home).toContain("fetch('/api/moments')")
+  })
+
+  test('dedupliceras mot beslutskortens id-mängd (synliga, inte hela approvals-listan)', () => {
+    expect(home).toContain('const beslutskortIds = new Set(synliga.map(a => a.id))')
+    expect(home).toContain('const momentRader = pengaFynd(moments, beslutskortIds, MAX_MOMENT_RADER)')
+  })
+
+  test('högst 3 momentrader', () => {
+    expect(home).toContain('const MAX_MOMENT_RADER = 3')
+  })
+
+  test('beloppsbadgen är villkorad på amountKr — aldrig en gissning', () => {
+    expect(home).toContain('typeof m.amountKr === \'number\'')
+  })
+
+  test('momentraderna delar radmönster och åtgärdslänk med nyhetsraderna (AgentNewsRow)', () => {
+    expect(home).toContain('link={{ label: m.action.label, href: m.action.href, icon: NYHETS_IKON.pengar }}')
+  })
+})
