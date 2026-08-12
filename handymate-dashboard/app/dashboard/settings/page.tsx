@@ -445,6 +445,26 @@ export default function SettingsPage() {
     return {}
   }
 
+  // ── Etapp 2: de sex områdena ────────────────────────────────────────
+  // Flyttad hit 2026-08-12 (kraschfynd: "Cannot access before initialization"
+  // på /dashboard/settings?tab=integrations). `omradeForTab` anropades från
+  // useEffect:en direkt nedanför — som hoisted `function` var den själv alltid
+  // säker, men produktionsminifieraren flyttade uppenbarligen om ordningen
+  // mot `omraden` (ursprungligen deklarerad först på rad ~1445, långt efter
+  // denna effekt) på ett sätt källkoden inte förutsåg. Deklarationerna står
+  // nu FÖRE varje ställe som kan använda dem, källordning och körordning
+  // stämmer överens och tvetydigheten är borta.
+  const omraden = visibleAreas({ isOwnerOrAdmin })
+  const omrade = omraden.find(a => a.key === aktivtOmrade) || null
+
+  /** Området en inbyggd flik hör hemma i — så `?tab=` landar rätt. */
+  function omradeForTab(tabId: string): string | null {
+    for (const a of omraden) {
+      if (a.groups.some(g => g.entries.some(e => e.id === tabId))) return a.key
+    }
+    return null
+  }
+
   useEffect(() => {
     fetchConfig()
     fetchFortnoxStatus()
@@ -1440,18 +1460,6 @@ export default function SettingsPage() {
     .filter(g => g.tabs.length > 0)
 
   const tabs = tabGroups.flatMap(g => g.tabs)
-
-  // ── Etapp 2: de sex områdena ────────────────────────────────────────
-  const omraden = visibleAreas({ isOwnerOrAdmin })
-  const omrade = omraden.find(a => a.key === aktivtOmrade) || null
-
-  /** Området en inbyggd flik hör hemma i — så `?tab=` landar rätt. */
-  function omradeForTab(tabId: string): string | null {
-    for (const a of omraden) {
-      if (a.groups.some(g => g.entries.some(e => e.id === tabId))) return a.key
-    }
-    return null
-  }
 
   function oppnaOmrade(key: string) {
     setAktivtOmrade(key)
