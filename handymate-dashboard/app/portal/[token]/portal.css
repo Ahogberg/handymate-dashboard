@@ -68,6 +68,26 @@
   overflow-x: hidden;
 }
 
+/* Desktop/tablet: sluta klippa till en telefonsmal remsa — ge korten luft
+   och en tydlig kortkänsla mot bp-page-bg i stället för avhuggen mobilvy.
+   Innehållet staplar precis som på mobil, ingen layoutomritning. */
+@media (min-width: 768px) {
+  .bp-mobile-shell {
+    max-width: 680px;
+    min-height: calc(100vh - 48px);
+    margin: 24px 0;
+    border-radius: var(--r-xl);
+    border: 1px solid var(--border);
+    box-shadow: var(--sh-lg);
+    overflow: hidden;
+  }
+}
+@media (min-width: 1024px) {
+  .bp-mobile-shell {
+    max-width: 760px;
+  }
+}
+
 /* Screen shell */
 .bp-screen {
   width: 100%; height: 100%;

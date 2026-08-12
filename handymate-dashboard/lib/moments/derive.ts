@@ -217,7 +217,7 @@ export function deriveFromObservations(observations: ObservationRow[]): AgentMom
       explanation: o.observation + (o.suggestion ? ` ${o.suggestion}` : ''),
       valueKind: 'insikt' as const,
       urgency: 'low' as const,
-      action: { label: 'Läs mer', href: '/dashboard/hem' },
+      action: { label: 'Läs mer', href: '/dashboard' },
       createdAt: o.created_at,
     }))
 }
