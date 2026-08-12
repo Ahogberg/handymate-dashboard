@@ -45,6 +45,15 @@ export interface ProjectProfitability {
   status: 'on_track' | 'at_risk' | 'over_budget'
 }
 
+/**
+ * @deprecated (2026-08-12) Sista anroparen migrerad till computeProjectEconomics
+ * (lib/projects/compute-economics.ts) samma dag — mobile-profitability-routen,
+ * agentverktyget get_project_profitability, Karins observationsunderlag och
+ * Daniels offert-intelligens. Läser stale project.actual_*-snapshotkolumner
+ * som en DB-trigger fyller med KUNDENS pris (time_entry.hourly_rate) i
+ * stället för intern kostnad — falsk marginal. Lämnad orörd men anropslös;
+ * radera i en egen städomgång när ingen ny konsument tillkommit på ett tag.
+ */
 export async function calculateProfitability(
   projectId: string,
   businessId: string
