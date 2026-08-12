@@ -103,21 +103,35 @@ Kolla att event loggas i Supabase `billing_event`-tabellen.
 
 **KRITISKT** innan lansering mot icke-testusers.
 
-1. Google Cloud Console → APIs & Services → OAuth consent screen
-2. Fyll i:
-   - App name: **Handymate**
-   - User support email: support@handymate.se
-   - App logo (uppladda)
-   - Application home page: https://handymate.se
-   - Privacy policy: https://handymate.se/privacy
-   - Terms of service: https://handymate.se/terms
-3. **Scopes** (sparse-mode):
-   - `openid`, `email`, `profile`
+Google Cloud-projektet skapades 2026-08-12 under **andreas@handymate.se** (inte
+under Byglo-kontot — håll ägarskapet knutet till Handymate, inte till en
+annan verksamhet). Använd IAM för att lägga till fler ägare i stället för att
+skapa ett nytt projekt, om det någonsin behövs igen — annars tappar alla
+redan kopplade Google Calendar-konton sin koppling (nytt Client ID/Secret =
+gamla refresh-tokens slutar fungera).
+
+Google har döpt om gränssnittet (syns som separata sidor i vänstermenyn, inte
+längre en enda "OAuth consent screen"-sida):
+
+1. **Branding**: appnamn **Handymate**, logga, User support email
+   **support@handymate.se**, Developer contact **support@handymate.se**,
+   Application home page https://handymate.se, Privacy policy
+   https://handymate.se/privacy, Terms of service https://handymate.se/terms
+2. **Data Access → Add or remove scopes** — bara det appen faktiskt begär
+   (se `lib/google-calendar.ts` SCOPES). Gmail-scopes ska INTE läggas till —
+   Gmail-integrationen är pausad (flyttad till "kommer snart") och kräver
+   dessutom Googles tyngre säkerhetsgranskning (CASA) om den någonsin
+   återupplivas — lägg då till scopes och sök verifiering på nytt då, inte
+   i förväg:
+   - `https://www.googleapis.com/auth/calendar.readonly`
    - `https://www.googleapis.com/auth/calendar.events`
-   - `https://www.googleapis.com/auth/gmail.readonly`
-   - `https://www.googleapis.com/auth/gmail.send`
-4. Submit for verification — kan ta 2-4 veckor
-5. Under verifiering: max 100 test-users får använda OAuth
+   - `https://www.googleapis.com/auth/userinfo.email`
+3. **Audience** → Test users: lägg till egna/pilotkunders Google-konton här
+   så länge appen står på "Testing" — de slipper varningsskärmen helt.
+4. **Verification Center → Submit for verification** — kalender-scopes
+   räknas som "känsliga" (sensitive), inte "begränsade" (restricted), så
+   det är standardgranskningen, inte CASA-revisionen. Betydligt snabbare
+   än 2-4 veckor i normalfallet.
 
 ## 5. 46elks konto
 
