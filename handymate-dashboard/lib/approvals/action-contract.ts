@@ -134,6 +134,11 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // ── Berättar bara ───────────────────────────────────────────────────
   agent_insight: 'INFORMATIONAL',
   monthly_review: 'INFORMATIONAL',
+  // Måndagskortet (Måndagsmötet etapp 1, 2026-08-13): veckovis lägesbild ur
+  // fyra redan befintliga källor (ledger/lärdomar/Guardian/förtjänad
+  // autonomi). Rent read/summary — godkänn = jag har läst det, ingenting
+  // utförs. Se lib/jarvis/monday-brief.ts.
+  monday_brief: 'INFORMATIONAL',
   quote_signed: 'INFORMATIONAL',
   ata_signed_notification: 'INFORMATIONAL',
   ata_declined_notification: 'INFORMATIONAL',

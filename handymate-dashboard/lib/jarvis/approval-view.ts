@@ -63,6 +63,8 @@ export const TYPE_LABEL: Record<string, string> = {
   meeting_followup: 'Uppföljning från möte',
   // Startkorten (docs/design/FORSTA-30-MINUTERNA.md).
   team_intro: 'Ditt team',
+  // Måndagskortet (2026-08-13) — veckovis lägesbild, se lib/jarvis/monday-brief.ts.
+  monday_brief: 'Måndagskortet',
 }
 
 export function typeLabel(approvalType: string): string {
@@ -142,6 +144,8 @@ export function approveLabel(approvalType: string, payload?: Record<string, unkn
   // Startkorten är INFORMATIONAL (action-contract.ts) — godkänn = "jag har
   // läst det", ingenting utförs. Samma ord som profitability_warning ovan.
   if (approvalType === 'team_intro') return 'Jag har läst det'
+  // Måndagskortet är också INFORMATIONAL — samma ord, samma regel.
+  if (approvalType === 'monday_brief') return 'Jag har läst det'
   return 'Godkänn'
 }
 

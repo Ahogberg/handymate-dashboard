@@ -31,11 +31,13 @@ import {
   KeyRound,
   Lightbulb,
   Users,
+  ListChecks,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { ringUppmaning } from '@/lib/jarvis/approval-view'
+import { MandagskortCard } from '@/components/jarvis/MandagskortCard'
 
 // SPÅR D1 (2026-08-06): kartan låg inlinead här och var en av fyra kopior av
 // teamet som hunnit gå isär. Härleds nu ur den enda källan (lib/agents/team.ts).
@@ -137,6 +139,8 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   // Startkorten (docs/design/FORSTA-30-MINUTERNA.md) — teamet presenterar
   // sig genom kortmekaniken vid onboarding-slut.
   team_intro: { label: 'Ditt team', icon: Users, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
+  // Måndagskortet (Måndagsmötet etapp 1, 2026-08-13) — se lib/jarvis/monday-brief.ts.
+  monday_brief: { label: 'Måndagskortet', icon: ListChecks, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 
@@ -1075,6 +1079,22 @@ export default function ApprovalsPage() {
                                 </Link>
                               )}
                             </div>
+                          )
+                        })()}
+                        {/* Måndagskortet (Måndagsmötet etapp 1, 2026-08-13) — de fyra
+                            sektionerna ur lib/jarvis/monday-brief.ts, egen
+                            komponent eftersom raderna är grupperade (till
+                            skillnad från profitability_warnings platta
+                            orsakslista ovan). Rent INFORMATIONAL. */}
+                        {approval.approval_type === 'monday_brief' && approval.payload && (() => {
+                          const pl = approval.payload as any
+                          return (
+                            <MandagskortCard
+                              resultat={pl.resultat ?? null}
+                              lardomar={pl.lardomar ?? null}
+                              risker={pl.risker ?? null}
+                              fortroende={pl.fortroende ?? null}
+                            />
                           )
                         })()}
                         {/* Lead review details (email-forwarding-flöde) */}
