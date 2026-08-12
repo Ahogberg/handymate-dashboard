@@ -312,8 +312,20 @@ test.describe('rollfördelningen är kod, inte prompttillit', () => {
   test('samma samtal analyseras en gång — knappen ger inga dubbletter', () => {
     const s = kod(ANALYZE)
     expect(s).toContain('already_analyzed')
-    const sparr = s.indexOf('already_analyzed')
-    const modellanrop = s.indexOf('anthropic.messages.create')
+    // Mötesassistenten V2 (map-reduce för långa transkript) lade till egna
+    // anthropic.messages.create-anrop i hjälpfunktioner OVANFÖR POST-handlern
+    // (extraheraFyndFranChunk, slaIhopFynd) — de körs bara om POST själv
+    // anropar dem, EFTER dubbelkörningsspärren. Ett indexOf över hela filen
+    // hittar då fel anrop (det första textmässigt, inte det som faktiskt
+    // körs). Avgränsa till POST-handlerns egen kropp där spärren verkligen
+    // sitter, så jämförelsen inte förskjuts av kod ovanför den.
+    const postStart = s.indexOf('export async function POST')
+    expect(postStart, 'POST-handlern hittades inte').toBeGreaterThan(-1)
+    const post = s.slice(postStart)
+    const sparr = post.indexOf('already_analyzed')
+    const modellanrop = post.indexOf('anthropic.messages.create')
+    expect(sparr, 'spärren saknas i POST-handlern').toBeGreaterThan(-1)
+    expect(modellanrop, 'modellanropet saknas i POST-handlern').toBeGreaterThan(-1)
     expect(sparr, 'spärren ligger efter modellanropet — kostnaden är redan tagen').toBeLessThan(modellanrop)
   })
 

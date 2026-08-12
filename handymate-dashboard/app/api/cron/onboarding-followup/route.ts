@@ -149,7 +149,7 @@ function buildDay7EmailHtml(firstName: string, value: WeeklyValue): string {
   }
   if (value.confirmed_kr > 0) {
     bullets.push(
-      `<li style="margin-bottom: 8px;"><b>${kr(value.confirmed_kr)} kr</b> i offerter ute som teamet följt upp</li>`
+      `<li style="margin-bottom: 8px;"><b>${kr(value.confirmed_kr)} kr</b> i accepterade offerter och betalda fakturor som teamet bidragit till</li>`
     )
   }
 

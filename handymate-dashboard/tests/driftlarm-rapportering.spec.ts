@@ -148,4 +148,31 @@ test.describe('källskanning — de fem fail-safe-vägarna ropar in rapporteraTy
     expect(factsSlice).toContain('rapporteraTystFel')
     expect(factsSlice).toContain('arSchemaSaknas')
   })
+
+  test('freeze-outcome.ts: freezeProjectOutcome rapporterar i alla tysta felgrenar utom den kända schema-saknas-grenen', () => {
+    const s = read('lib/efterkalkyl/freeze-outcome.ts')
+    expect(s).toContain("from '@/lib/observability/driftlarm'")
+    expect(s).toContain('rapporteraTystFel')
+
+    const fnStart = s.indexOf('export async function freezeProjectOutcome')
+    expect(fnStart).toBeGreaterThan(-1)
+    const fnBody = s.slice(fnStart)
+
+    // Fyra distinkta anropsställen: projekt-hittades-inte, economics-null,
+    // upsert (icke-schema-fel) och top-level catch.
+    const count = (fnBody.match(/rapporteraTystFel\(/g) || []).length
+    expect(count, 'förväntar minst ett anrop per icke-schema fail-safe-gren').toBeGreaterThanOrEqual(4)
+
+    // Den kända "tabellen saknas ännu" (v73 ej körd) grenen ska INTE larma —
+    // samma konvention som arSchemaSaknas skippar 42P01/42703 på andra håll.
+    const missingTableIdx = fnBody.indexOf('isMissingTableError(upsertErr)')
+    expect(missingTableIdx).toBeGreaterThan(-1)
+    const missingTableGren = fnBody.slice(missingTableIdx, fnBody.indexOf('return', missingTableIdx))
+    expect(missingTableGren).not.toContain('rapporteraTystFel')
+
+    // Top-level catch ska rapportera (absolut sista skyddsnätet).
+    const catchIdx = fnBody.indexOf('} catch (err) {')
+    expect(catchIdx).toBeGreaterThan(-1)
+    expect(fnBody.slice(catchIdx)).toContain('rapporteraTystFel')
+  })
 })

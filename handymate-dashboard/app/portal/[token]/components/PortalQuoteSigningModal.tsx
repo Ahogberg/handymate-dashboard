@@ -246,10 +246,10 @@ export default function PortalQuoteSigningModal({
     >
       <div
         onClick={e => e.stopPropagation()}
+        className="bp-sign-modal"
         style={{
           background: '#fff',
           width: '100%',
-          maxWidth: 460,
           margin: '0 auto',
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,

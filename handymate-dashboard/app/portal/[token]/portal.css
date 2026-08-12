@@ -317,6 +317,25 @@
   100% { transform: translateY(420px) rotate(720deg); opacity: 0; }
 }
 
+/* Signeringsmodal — bottensheet på mobil (width:100%, oförändrat), men
+   följer portalskalets bredd på desktop/tablet i stället för att klippas
+   av mitt i skalets 680/760px-kort (samma brytpunkter som .bp-mobile-shell
+   ovan). Måste sättas här, inte inline — inline style="maxWidth" kan inte
+   media-querya och skulle alltid vinna över klassen. */
+.bp-sign-modal {
+  max-width: 460px;
+}
+@media (min-width: 768px) {
+  .bp-sign-modal {
+    max-width: 680px;
+  }
+}
+@media (min-width: 1024px) {
+  .bp-sign-modal {
+    max-width: 760px;
+  }
+}
+
 /* Handymate footer attribution (always teal) */
 .bp-hm-attr {
   display: flex; align-items: center; justify-content: center;

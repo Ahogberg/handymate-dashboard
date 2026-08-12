@@ -25,6 +25,7 @@ import {
   getQuoteBudgetDerivation,
   type QuoteBudgetDerivation,
 } from '@/lib/quotes/get-quote-budget-derivation'
+import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 
 // ─────────────────────────────────────────────────────────────────
 // Ren kärna — testbar utan Supabase (facit-tester i tests/efterkalkyl.spec.ts)
@@ -231,6 +232,13 @@ export async function freezeProjectOutcome(
         businessId,
         error: projectErr,
       })
+      await rapporteraTystFel(
+        supabase,
+        businessId,
+        'freeze-outcome:project-not-found',
+        projectErr?.message || 'projekt hittades inte',
+        { projectId },
+      )
       return
     }
 
@@ -239,6 +247,13 @@ export async function freezeProjectOutcome(
     const economics = await computeProjectEconomics(supabase, projectId, businessId)
     if (!economics) {
       console.error('[freeze-outcome] computeProjectEconomics gav null, skippar frysning', { projectId })
+      await rapporteraTystFel(
+        supabase,
+        businessId,
+        'freeze-outcome:no-economics',
+        'computeProjectEconomics gav null',
+        { projectId },
+      )
       return
     }
 
@@ -282,6 +297,9 @@ export async function freezeProjectOutcome(
 
     if (upsertErr) {
       if (isMissingTableError(upsertErr)) {
+        // Väntat innan v73 körts (se filhuvudet) — larma inte driftlarmet
+        // för ett känt, väntat tillstånd. Samma konvention som arSchemaSaknas
+        // i lib/observability/driftlarm.ts.
         if (!missingTableWarned) {
           missingTableWarned = true
           console.error(
@@ -292,11 +310,19 @@ export async function freezeProjectOutcome(
         return
       }
       console.error('[freeze-outcome] upsert misslyckades, skippar frysning', { projectId, error: upsertErr })
+      await rapporteraTystFel(supabase, businessId, 'freeze-outcome:upsert', upsertErr.message, { projectId })
       return
     }
   } catch (err) {
     // Absolut sista skyddsnät — freezeProjectOutcome får ALDRIG fälla
     // anroparen (projektstängning/autofakturering har redan körts).
     console.error('[freeze-outcome] oväntat fel (fail-safe, ignoreras)', { projectId, businessId, error: err })
+    await rapporteraTystFel(
+      supabase,
+      businessId,
+      'freeze-outcome:unexpected',
+      err instanceof Error ? err.message : String(err),
+      { projectId },
+    )
   }
 }
