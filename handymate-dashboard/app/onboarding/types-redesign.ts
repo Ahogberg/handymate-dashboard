@@ -52,6 +52,13 @@ export interface OnboardingFormData {
   endHour?: number
   priceMin?: number
   priceMax?: number
+  /**
+   * Intern timkostnad (2026-08-12) — vad en arbetstimme faktiskt KOSTAR
+   * företaget (lön + sociala avgifter), inte vad kunden debiteras. Frivilligt:
+   * lämnas den tom räknar lönsamhetsmotorn hellre ingen marginal alls än en
+   * falsk (se lib/projects/compute-economics.ts arbetskostnad_konfigurerad).
+   */
+  internalHourlyCost?: number
 
   // ── Step 4: Telefonnummer ────────────────────────────────
   lisaNumber?: string

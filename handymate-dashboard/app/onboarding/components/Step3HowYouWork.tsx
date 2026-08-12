@@ -29,6 +29,7 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
   const endHour = data.endHour ?? 17
   const priceMin = data.priceMin ?? 600
   const priceMax = data.priceMax ?? 1200
+  const internalHourlyCost = data.internalHourlyCost
 
   const [extraSheetOpen, setExtraSheetOpen] = useState(false)
   const [expandedTrade, setExpandedTrade] = useState<string | null>(null)
@@ -278,6 +279,64 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
               </strong>
             </p>
           </div>
+        </section>
+
+        {/* ── Intern timkostnad ────────────────────────────────────────────
+             Frivillig (2026-08-12). Skiljer sig från Timdebitering ovan:
+             det här är vad en timme faktiskt KOSTAR er (lön + sociala
+             avgifter), inte vad kunden betalar. Utan den kan Karin räkna
+             fram vad ett jobb DRAR IN men aldrig vad det TJÄNAR — hon
+             visar då hellre ingen marginal än en påhittad. */}
+        <section style={{ marginBottom: 28 }}>
+          <label className="ob-label">Intern timkostnad (frivilligt)</label>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ob-muted)', lineHeight: 1.5 }}>
+            Vad kostar en arbetstimme er — lön plus sociala avgifter? Med den kan Karin
+            varna innan ett jobb går med förlust, inte bara efteråt.
+          </p>
+          <div style={{ position: 'relative', maxWidth: 200 }}>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={10}
+              placeholder="t.ex. 300"
+              value={internalHourlyCost ?? ''}
+              onChange={e => {
+                const raw = e.target.value
+                update({ internalHourlyCost: raw === '' ? undefined : Math.max(0, Number(raw)) })
+              }}
+              style={{
+                width: '100%',
+                height: 56,
+                paddingLeft: 14,
+                paddingRight: 44,
+                border: '1px solid var(--ob-border)',
+                borderRadius: 'var(--ob-r-md)',
+                background: 'var(--ob-surface)',
+                fontSize: 16,
+                fontWeight: 600,
+                color: 'var(--ob-ink)',
+                fontFamily: 'inherit',
+              }}
+            />
+            <span
+              style={{
+                position: 'absolute',
+                right: 14,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                fontSize: 13,
+                color: 'var(--ob-muted)',
+                pointerEvents: 'none',
+              }}
+            >
+              kr/h
+            </span>
+          </div>
+          <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--ob-muted)', lineHeight: 1.5 }}>
+            Vet du inte exakt — hoppa över. Ofta 250–350 kr/h inkl sociala avgifter. Du kan
+            fylla i den senare under Inställningar → Interna kostnader.
+          </p>
         </section>
 
         {/* ── Skatterytmen ─────────────────────────────────────────────────

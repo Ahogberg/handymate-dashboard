@@ -172,6 +172,13 @@ export default function OnboardingPage() {
         // 0 = "brutet år" i knappvalet — månaden fylls i under Bolagsprofil.
         if (data.fiscalYearEndMonth) config.fiscal_year_end_month = data.fiscalYearEndMonth
         config.company_profile_source = 'user'
+
+        // Intern timkostnad (2026-08-12) — frivillig, precis som skatterytmen
+        // ovan: `undefined` betyder att frågan hoppades över, och lönsamhets-
+        // motorn ska då säga "ej konfigurerad" i stället för att anta ett tal.
+        if (typeof data.internalHourlyCost === 'number') {
+          config.default_internal_hourly_cost = data.internalHourlyCost
+        }
       }
 
       if (step === 3 && data.lisaNumber) {

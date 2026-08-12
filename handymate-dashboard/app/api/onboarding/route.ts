@@ -130,6 +130,9 @@ export async function PUT(request: NextRequest) {
         'company_form',
         'f_skatt_registered',
         'company_profile_source',
+        // Intern timkostnad (2026-08-12) — Guardians lönsamhetsmotor läser
+        // den via compute-economics.ts; frivillig, se Step3HowYouWork.tsx.
+        'default_internal_hourly_cost',
       ] as const
       for (const col of ALLOWED_COLUMNS) {
         if (col in config) updates[col] = (config as Record<string, unknown>)[col]
