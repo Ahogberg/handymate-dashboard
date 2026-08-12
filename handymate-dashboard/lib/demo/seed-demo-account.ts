@@ -7,6 +7,10 @@ import { getNextCustomerNumber, getNextCaseNumber } from '@/lib/numbering'
 import { ensureDefaultStages, getStageBySlug } from '@/lib/pipeline'
 import type { QuoteItem } from '@/lib/types/quote'
 import { buildDemoManifest, type DemoManifest } from '@/lib/demo/manifest'
+import { captureExpectedMarginSnapshot } from '@/lib/quotes/margin-snapshot'
+import { freezeProjectOutcome } from '@/lib/efterkalkyl/freeze-outcome'
+import { getProjectOutcome } from '@/lib/efterkalkyl/get-project-outcome'
+import { skapaDebriefKort } from '@/lib/debrief/create-debrief-card'
 
 /**
  * lib/demo/seed-demo-account.ts (2026-07)
@@ -27,7 +31,14 @@ import { buildDemoManifest, type DemoManifest } from '@/lib/demo/manifest'
  * Tabeller som seedas (samma set som raderas, i beroendeordning vid radering):
  *   pending_approvals, agent_runs, pipeline_activity, quote_items, invoice,
  *   project_checklist, project, quotes, deal, customer, booking,
- *   schedule_entry
+ *   schedule_entry, time_entry, project_change, project_material
+ *
+ * Sedan 2026-08-12 seedas även: project_outcome (via freezeProjectOutcome),
+ * project_lesson, customer_fact och (städas, seedas dock av det separata
+ * Meeting Intelligence-demot) call_recording. V99-RPC:n (sql/v99_demo_
+ * reset_transaction.sql) känner ÄNNU INTE till dessa fyra — se steg 0b
+ * nedan för TS-nivå-städningen som kompletterar tills Andreas uppdaterar
+ * RPC:ns DELETE-manifest manuellt.
  *
  * Fas 0.2 (planen vad-kan-vi-kopiera-snug-phoenix.md, R2-DoD
  * tasks/resurs-masterplan.md): booking + schedule_entry seedas nu också —
@@ -111,6 +122,31 @@ export async function resetDemoAccount(
   }
   const businessName = (biz.business_name as string) || 'Företaget'
   const contactName = (biz.contact_name as string) || ''
+
+  // ── 0b. Städa nyare tabeller SOM V99 ÄNNU INTE KÄNNER TILL ──
+  // (kompletterar sql/v99_demo_reset_transaction.sql tills RPC:ns
+  // explicita DELETE-manifest uppdateras manuellt av Andreas — se
+  // filhuvudets kommentar om varför V99 medvetet är en statisk lista).
+  //
+  // call_recording MÅSTE städas HÄR, FÖRE V99-anropet: tabellen har en
+  // NO ACTION-foreignkey mot customer.customer_id (call_recording_
+  // customer_id_fkey) och seedas separat av app/api/admin/demo-seed-
+  // meeting/route.ts (Meeting Intelligence-demot). Om en sådan rad
+  // någonsin pekar på en av demokontots kunder skulle V99:s
+  // "DELETE FROM public.customer" annars misslyckas med en FK-
+  // violation och hela resetten rulla tillbaka.
+  //
+  // project_outcome/project_lesson/customer_fact har ingen sådan FK-
+  // risk (fristående TEXT-kolumner, ingen REFERENCES mot project/
+  // customer) men städas här ändå — de skrivs av stegen längre ned
+  // (freezeProjectOutcome, lärdomsraderna, kundfakta) och måste rensas
+  // mellan varje reset precis som resten av demovärlden.
+  for (const staleTable of ['call_recording', 'project_outcome', 'project_lesson', 'customer_fact']) {
+    const { error: cleanupErr } = await supabase.from(staleTable).delete().eq('business_id', businessId)
+    if (cleanupErr) {
+      return { error: `Kunde inte städa gamla ${staleTable}-rader innan återställning: ${cleanupErr.message}` }
+    }
+  }
 
   // ── 1. Atomisk radering via V99 ───────────────────────────
   // RPC:n anropas med den verkliga användarens JWT så auth.uid() i
@@ -400,11 +436,15 @@ export async function resetDemoAccount(
     projectAddress: string
   }
 
+  // cost_price satt på tre av fyra rader — INTE rivningen. Margin-
+  // snapshoten (steg 9b nedan) ska demoa den ÄRLIGA partiella marginalen
+  // (lib/quotes/margin.ts): en rad utan känt inköpspris redovisas
+  // separat, aldrig som en gissad nolla.
   const annaItems: SeedQuoteItem[] = [
     { id: genId('qi'), item_type: 'item', description: 'Rivning befintligt badrum och bortforsling', quantity: 1, unit: 'st', unit_price: 18000, total: 18000, is_rot_eligible: true, is_rut_eligible: false, rot_rut_type: 'rot', labor_amount: 18000, material_amount: 0, sort_order: 0 },
-    { id: genId('qi'), item_type: 'item', description: 'VVS-arbete – rör, avlopp och installation', quantity: 1, unit: 'st', unit_price: 45000, total: 45000, is_rot_eligible: true, is_rut_eligible: false, rot_rut_type: 'rot', labor_amount: 45000, material_amount: 0, sort_order: 1 },
-    { id: genId('qi'), item_type: 'item', description: 'Kakel- och klinkerarbete', quantity: 1, unit: 'st', unit_price: 42000, total: 42000, is_rot_eligible: true, is_rut_eligible: false, rot_rut_type: 'rot', labor_amount: 42000, material_amount: 0, sort_order: 2 },
-    { id: genId('qi'), item_type: 'item', description: 'Material – kakel, klinker, sanitetsporslin och blandare', quantity: 1, unit: 'st', unit_price: 80000, total: 80000, is_rot_eligible: false, is_rut_eligible: false, rot_rut_type: null, labor_amount: 0, material_amount: 80000, sort_order: 3 },
+    { id: genId('qi'), item_type: 'item', description: 'VVS-arbete – rör, avlopp och installation', quantity: 1, unit: 'st', unit_price: 45000, total: 45000, cost_price: 27000, is_rot_eligible: true, is_rut_eligible: false, rot_rut_type: 'rot', labor_amount: 45000, material_amount: 0, sort_order: 1 },
+    { id: genId('qi'), item_type: 'item', description: 'Kakel- och klinkerarbete', quantity: 1, unit: 'st', unit_price: 42000, total: 42000, cost_price: 25000, is_rot_eligible: true, is_rut_eligible: false, rot_rut_type: 'rot', labor_amount: 42000, material_amount: 0, sort_order: 2 },
+    { id: genId('qi'), item_type: 'item', description: 'Material – kakel, klinker, sanitetsporslin och blandare', quantity: 1, unit: 'st', unit_price: 80000, total: 80000, cost_price: 58000, is_rot_eligible: false, is_rut_eligible: false, rot_rut_type: null, labor_amount: 0, material_amount: 80000, sort_order: 3 },
   ]
 
   const mikaelItems: SeedQuoteItem[] = [
@@ -416,6 +456,17 @@ export async function resetDemoAccount(
   const johanItems: SeedQuoteItem[] = [
     { id: genId('qi'), item_type: 'item', description: 'Byte av 6 fönster – 2-glas till 3-glas, arbete och montering', quantity: 1, unit: 'st', unit_price: 62000, total: 62000, is_rot_eligible: true, is_rut_eligible: false, rot_rut_type: 'rot', labor_amount: 25000, material_amount: 37000, sort_order: 0 },
     { id: genId('qi'), item_type: 'option', description: 'Tillval: uppgradering till aluminiumbeklädnad utvändigt', quantity: 1, unit: 'st', unit_price: 18000, total: 18000, is_rot_eligible: false, is_rut_eligible: false, rot_rut_type: null, option_selected: false, option_default: false, sort_order: 1 },
+  ]
+
+  // Johans ANDRA, äldre jobb (en gästtoalett) — offert i timmar så
+  // getQuoteBudgetDerivation (lib/quotes/get-quote-budget-derivation.ts)
+  // kan härleda budget_hours till det tredje, avslutade projektet (9e
+  // nedan). Separat från fönsterbytes-offerten ovan (samma kund, två
+  // olika jobb — helt normalt).
+  const johanBadrumItems: SeedQuoteItem[] = [
+    { id: genId('qi'), item_type: 'item', description: 'Rivning och förberedelse gästtoalett', quantity: 8, unit: 'tim', unit_price: 650, total: 5200, is_rot_eligible: true, is_rut_eligible: false, rot_rut_type: 'rot', labor_amount: 5200, material_amount: 0, sort_order: 0 },
+    { id: genId('qi'), item_type: 'item', description: 'Kakelsättning och tätskikt', quantity: 16, unit: 'tim', unit_price: 650, total: 10400, is_rot_eligible: true, is_rut_eligible: false, rot_rut_type: 'rot', labor_amount: 10400, material_amount: 0, sort_order: 1 },
+    { id: genId('qi'), item_type: 'item', description: 'Material – kakel, klinker, blandare och sanitetsporslin', quantity: 1, unit: 'st', unit_price: 24000, total: 24000, is_rot_eligible: false, is_rut_eligible: false, rot_rut_type: null, labor_amount: 0, material_amount: 24000, sort_order: 2 },
   ]
 
   const quoteSeeds: SeedQuote[] = [
@@ -456,6 +507,19 @@ export async function resetDemoAccount(
       acceptedAt: null,
       createdAt: isoAt(0, 11, 0),
       validUntilOffset: 30,
+      projectAddress: 'Sjövägen 19, 131 40 Nacka',
+    },
+    {
+      key: 'johan_badrum_quote',
+      customerKey: 'johan',
+      dealKey: null,
+      title: 'Gästtoalett – renovering, Sjövägen 19',
+      status: 'accepted',
+      items: johanBadrumItems,
+      sentAt: isoAt(-18, 10, 0),
+      acceptedAt: isoAt(-17, 15, 0),
+      createdAt: isoAt(-18, 9, 30),
+      validUntilOffset: 12,
       projectAddress: 'Sjövägen 19, 131 40 Nacka',
     },
   ]
@@ -538,6 +602,9 @@ export async function resetDemoAccount(
       option_default: item.option_default ?? false,
       labor_amount: item.labor_amount ?? null,
       material_amount: item.material_amount ?? null,
+      // cost_price (v120-familjen): krävs för att captureExpectedMarginSnapshot
+      // (steg 9b nedan) ska ha något att räkna marginal på — se annaItems ovan.
+      cost_price: item.cost_price ?? null,
       sort_order: idx,
     }))
     const { error: itemsErr } = await supabase.from('quote_items').insert(itemInserts)
@@ -557,6 +624,17 @@ export async function resetDemoAccount(
       }
     }
   }
+
+  // ══════════════════════════════════════════════════════════
+  // 5b. FÖRVÄNTAD MARGINAL VID ACCEPT — Annas offert är redan seedad
+  //     'accepted' ovan (status/accepted_at satta i quoteSeeds). Kör den
+  //     RIKTIGA helpern (samma som app/api/quotes/accept/route.ts
+  //     använder) istället för att bygga snapshoten för hand, så demot
+  //     verifierar den faktiska koden. Fail-safe i sig själv — kastar
+  //     aldrig (lib/quotes/margin-snapshot.ts) — ingen extra try/catch
+  //     behövs här.
+  // ══════════════════════════════════════════════════════════
+  await captureExpectedMarginSnapshot(supabase, businessId, quotes.anna_quote.quote_id, 'manual_accept')
 
   // ══════════════════════════════════════════════════════════
   // 6. PROJEKT (2 st)
@@ -1114,6 +1192,30 @@ export async function resetDemoAccount(
       created_at: isoAt(0, 6, 50),
       expires_at: isoAt(7),
     },
+    // Daniel — ett NYTT, ännu ej skickat ÄTA-förslag (skiljer sig från den
+    // redan SIGNERADE ÄTA:n som seedas i steg 9d nedan — den här är bara
+    // ett utkast i kön). Payload-formen kopierar lib/ata/suggest-ata-draft.ts
+    // EXAKT (routed_agent/project_id/description/amount_estimate), så
+    // Guardian-orsaksraden och pengabandets ÄTA-kategori har ett riktigt
+    // kort att peka på utöver den redan bokförda posten.
+    {
+      id: genId('appr'),
+      business_id: businessId,
+      approval_type: 'create_ata_draft',
+      routing_role: 'project_team',
+      title: 'ÄTA-förslag: Golvvärme i duschutrymme — Badrumsrenovering – Björkvägen 14',
+      description: 'Kunden bad om golvvärme i duschutrymmet utöver offerten — inget skickat till kund än.',
+      status: 'pending',
+      risk_level: 'low',
+      payload: {
+        routed_agent: 'daniel',
+        project_id: annaProject.project_id,
+        description: 'Golvvärme i duschutrymme, utöver ursprunglig offert',
+        amount_estimate: 4500,
+      },
+      created_at: isoAt(0, 7, 10),
+      expires_at: isoAt(14),
+    },
   ]
 
   const { error: approvalsErr } = await supabase.from('pending_approvals').insert(approvalSeeds)
@@ -1178,6 +1280,303 @@ export async function resetDemoAccount(
     return failReset(`Kunde inte skapa agentkörningar: ${agentRunsErr.message}`, 'agent_runs_insert_failed')
   }
 
+  // ══════════════════════════════════════════════════════════
+  // 9c. TIDRAPPORTER (time_entry) — Annas badrum (pågående) och Kristinas
+  //     kranbyte (avslutat) får riktiga timrader så computeProjectEconomics
+  //     (lib/projects/compute-economics.ts) har arbetskostnad att räkna
+  //     på. business_user_id pekar på samma `team`-lista som veckans
+  //     schema (6c ovan) — degraderar till null om inget team seedats än
+  //     (samma failsafe-mönster, se teamAt() nedan).
+  //     OBS: arbetskostnaden blir ändå null ("ej konfigurerad") tills
+  //     sql/demo_seed_internal_cost.sql körts EN GÅNG i Supabase SQL
+  //     Editor — den filen sätter business_config.default_internal_
+  //     hourly_cost, som resetDemoAccount MEDVETET aldrig rör (se
+  //     filhuvudet: business_config/business_users/auth är read-only här).
+  // ══════════════════════════════════════════════════════════
+  const teamAt = (idx: number): string | null => (team.length > 0 ? team[idx % team.length].id : null)
+
+  const insertTimeEntry = async (input: {
+    projectId: string
+    customerId: string
+    date: string
+    minutes: number
+    member: string | null
+    desc: string
+  }): Promise<DemoResetError | null> => {
+    const { error } = await supabase.from('time_entry').insert({
+      time_entry_id: genId('time'),
+      business_id: businessId,
+      project_id: input.projectId,
+      customer_id: input.customerId,
+      business_user_id: input.member,
+      description: input.desc,
+      work_date: input.date,
+      duration_minutes: input.minutes,
+      work_category: 'work',
+      is_billable: true,
+      approval_status: 'approved',
+      approved_by: businessId,
+      approved_at: new Date().toISOString(),
+    })
+    if (error) return { error: `Kunde inte skapa tidrapport (${input.desc}): ${error.message}` }
+    return null
+  }
+
+  const timeEntrySeeds = [
+    // Anna — badrum (pågående)
+    { projectId: annaProject.project_id, customerId: customers.anna.customer_id, date: dateOnly(-8), minutes: 480, member: teamAt(0), desc: 'Rivning och bortforsling' },
+    { projectId: annaProject.project_id, customerId: customers.anna.customer_id, date: dateOnly(-6), minutes: 480, member: teamAt(0), desc: 'VVS-installation' },
+    { projectId: annaProject.project_id, customerId: customers.anna.customer_id, date: dateOnly(-4), minutes: 420, member: teamAt(2), desc: 'Tätskikt och kakelsättning' },
+    { projectId: annaProject.project_id, customerId: customers.anna.customer_id, date: dateOnly(-2), minutes: 360, member: teamAt(1), desc: 'Kakelsättning, dag 2' },
+    { projectId: annaProject.project_id, customerId: customers.anna.customer_id, date: dateOnly(-1), minutes: 240, member: teamAt(0), desc: 'Fogning och detaljarbete' },
+    // Kristina — kranbyte (avslutat)
+    { projectId: kristinaProject.project_id, customerId: customers.kristina.customer_id, date: dateOnly(-5), minutes: 240, member: teamAt(1), desc: 'Byte av kökskran och packningar' },
+    { projectId: kristinaProject.project_id, customerId: customers.kristina.customer_id, date: dateOnly(-4), minutes: 120, member: teamAt(1), desc: 'Färdigställande och läcktest' },
+  ]
+  for (const t of timeEntrySeeds) {
+    const err = await insertTimeEntry(t)
+    if (err) return failReset(err.error, 'time_entry_insert_failed')
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // 9d. ÄTA (project_change) — en SIGNERAD men ofakturerad ÄTA på Annas
+  //     badrumsprojekt. Samma underlag som "missad_intakt"-kortet ovan
+  //     (8, 8 900 kr, "signerad för 12 dagar sedan") beskriver — nu
+  //     materialiserad som en riktig rad så computeProjectEconomics
+  //     (ata_signerat_kr) och projektvyns ÄTA-flik har något att visa,
+  //     inte bara ett fristående kort. change_id/ata_number sätts av
+  //     DB-defaulten/triggern (v10_ata.sql: set_ata_number) — sätts
+  //     medvetet inte här.
+  // ══════════════════════════════════════════════════════════
+  const { error: ataErr } = await supabase.from('project_change').insert({
+    business_id: businessId,
+    project_id: annaProject.project_id,
+    customer_id: customers.anna.customer_id,
+    change_type: 'addition',
+    description: 'Extra tätskikt vid dusch och breddat kakelparti',
+    amount: 8900,
+    hours: 6,
+    total: 8900,
+    items: [
+      {
+        id: genId('atai'),
+        name: 'Extra tätskikt vid dusch',
+        description: 'Extra tätskikt vid dusch och breddat kakelparti',
+        quantity: 1,
+        unit: 'st',
+        unit_price: 8900,
+        rot_rut_type: 'rot',
+      },
+    ],
+    status: 'signed',
+    sent_at: isoAt(-13, 9, 0),
+    signed_at: isoAt(-12, 14, 0),
+    signed_by_name: customers.anna.name,
+    created_at: isoAt(-13, 9, 0),
+  })
+  if (ataErr) return failReset(`Kunde inte skapa ÄTA: ${ataErr.message}`, 'project_change_insert_failed')
+
+  // ══════════════════════════════════════════════════════════
+  // 9e. TREDJE PROJEKTET — AVSLUTAT, MED HELA EFTERKALKYL-KEDJAN. Johans
+  //     gästtoalett knyts till en egen accepterad offert (johan_badrum_
+  //     quote, steg 5) så freezeProjectOutcome (lib/efterkalkyl/freeze-
+  //     outcome.ts) får riktiga offererade timmar/belopp att jämföra
+  //     mot — inte bara projektets budget_amount/budget_hours i tomma
+  //     luften.
+  // ══════════════════════════════════════════════════════════
+  const { data: johanProject, error: johanProjErr } = await supabase
+    .from('project')
+    .insert({
+      business_id: businessId,
+      customer_id: customers.johan.customer_id,
+      quote_id: quotes.johan_badrum_quote.quote_id,
+      name: 'Gästtoalett – renovering, Sjövägen 19',
+      project_type: 'fixed',
+      status: 'completed',
+      budget_amount: quotes.johan_badrum_quote.customer_pays,
+      budget_hours: 24,
+      progress_percent: 100,
+      start_date: dateOnly(-16),
+      end_date: dateOnly(-10),
+      completed_at: isoAt(-10, 14, 0),
+      address: 'Sjövägen 19, 131 40 Nacka',
+      job_type: 'badrum',
+      created_at: isoAt(-16, 8, 0),
+    })
+    .select('project_id')
+    .single()
+  if (johanProjErr || !johanProject) return failReset(`Kunde inte skapa projekt (Johan gästtoalett): ${johanProjErr?.message}`, 'project_insert_failed')
+
+  // Material — via project_material (städas redan av V99, till skillnad
+  // från supplier_invoices som INTE finns i RPC:ns DELETE-manifest och
+  // därför medvetet undviks här).
+  const { error: materialErr } = await supabase.from('project_material').insert({
+    project_id: johanProject.project_id,
+    business_id: businessId,
+    name: 'Kakel, klinker, blandare och sanitetsporslin',
+    quantity: 1,
+    unit: 'st',
+    purchase_price: 22000,
+    sell_price: 24000,
+    total_purchase: 22000,
+    total_sell: 24000,
+    invoiced: true,
+  })
+  if (materialErr) return failReset(`Kunde inte registrera material (gästtoalett): ${materialErr.message}`, 'project_material_insert_failed')
+
+  // Tidrapporter — 28 timmar mot offererade 24 (+16,7 %), samma avvikelse
+  // som lärdomsraden nedan beskriver ("en halv dag längre").
+  const johanTimeEntrySeeds = [
+    { projectId: johanProject.project_id, customerId: customers.johan.customer_id, date: dateOnly(-16), minutes: 480, member: teamAt(2), desc: 'Rivning och förberedelse' },
+    { projectId: johanProject.project_id, customerId: customers.johan.customer_id, date: dateOnly(-15), minutes: 480, member: teamAt(2), desc: 'Rivning, dag 2 — dubbla lager gammalt kakel' },
+    { projectId: johanProject.project_id, customerId: customers.johan.customer_id, date: dateOnly(-13), minutes: 480, member: teamAt(2), desc: 'Tätskikt och kakelsättning' },
+    { projectId: johanProject.project_id, customerId: customers.johan.customer_id, date: dateOnly(-11), minutes: 240, member: teamAt(2), desc: 'Fogning och installation' },
+  ]
+  for (const t of johanTimeEntrySeeds) {
+    const err = await insertTimeEntry(t)
+    if (err) return failReset(err.error, 'time_entry_insert_failed')
+  }
+
+  // Betald faktura kopplad till projektet.
+  const johanBadrumInvItems = [
+    invoiceItem('Renovering gästtoalett – arbete', 15600, 'labor', true, 0),
+    invoiceItem('Material – kakel, klinker och sanitetsporslin', 24000, 'material', false, 1),
+  ]
+  const johanBadrumSubtotal = 15600 + 24000
+  const johanBadrumVat = johanBadrumSubtotal * 0.25
+  const johanBadrumTotal = johanBadrumSubtotal + johanBadrumVat
+  const johanBadrumRotDeduction = rotRutDeductionInclVat('rot', 15600, { vatRate: 25 })
+  const johanBadrumInvoiceNumber = `FV-${new Date().getFullYear()}-D04`
+  const { data: johanBadrumInvoice, error: johanBadrumInvErr } = await supabase
+    .from('invoice')
+    .insert({
+      business_id: businessId,
+      customer_id: customers.johan.customer_id,
+      project_id: johanProject.project_id,
+      invoice_number: johanBadrumInvoiceNumber,
+      invoice_type: 'standard',
+      status: 'paid',
+      items: johanBadrumInvItems,
+      subtotal: johanBadrumSubtotal,
+      vat_rate: 25,
+      vat_amount: johanBadrumVat,
+      total: johanBadrumTotal,
+      rot_rut_type: 'rot',
+      rot_rut_deduction: johanBadrumRotDeduction,
+      customer_pays: johanBadrumTotal - johanBadrumRotDeduction,
+      invoice_date: dateOnly(-10),
+      due_date: dateOnly(20),
+      paid_at: isoAt(-9, 11, 0),
+      ocr_number: generateOCR(johanBadrumInvoiceNumber),
+      our_reference: contactName || null,
+      created_at: isoAt(-10, 14, 30),
+    })
+    .select('invoice_id, invoice_number')
+    .single()
+  if (johanBadrumInvErr || !johanBadrumInvoice) return failReset(`Kunde inte skapa faktura (gästtoalett): ${johanBadrumInvErr?.message}`, 'invoice_insert_failed')
+
+  // Riktiga freezeProjectOutcome + skapaDebriefKort — SAMMA två anrop som
+  // BÅDA produktionsvägarna gör (app/api/projects/route.ts PUT,
+  // app/api/booking/complete-job/route.ts) direkt efter att ett projekt
+  // stängs. Båda fail-safe i sig själva — ingen extra try/catch krävs.
+  await freezeProjectOutcome(supabase, businessId, johanProject.project_id)
+  const johanOutcome = await getProjectOutcome(supabase, businessId, johanProject.project_id)
+  await skapaDebriefKort(supabase, businessId, {
+    project_id: johanProject.project_id,
+    project_name: 'Gästtoalett – renovering, Sjövägen 19',
+    quote_id: quotes.johan_badrum_quote.quote_id,
+    job_type: 'badrum',
+    hours_diff_pct: johanOutcome.hours_diff_pct,
+    amount_diff_pct: johanOutcome.amount_diff_pct,
+    margin_pct: johanOutcome.margin_pct,
+  })
+
+  // Bekräftade lärdomar (project_lesson) — svaren på debrief-kortet, satta
+  // direkt istället för att simulera en godkänd approval-runda (samma
+  // "föds bekräftad"-mönster som kundfaktan i 9f nedan). Läses av
+  // lib/ai-quote-generator.ts vid nästa offert av samma jobbtyp.
+  const { error: lessonErr } = await supabase.from('project_lesson').insert([
+    {
+      business_id: businessId,
+      project_id: johanProject.project_id,
+      quote_id: quotes.johan_badrum_quote.quote_id,
+      job_type: 'badrum',
+      lesson_text: 'Rivningen tog en halv dag längre än kalkylerat — gammalt kakel i dubbla lager.',
+      impact_hint: 'Vad tog längre tid än planerat?',
+      source: 'debrief',
+      confirmed_by: contactName || null,
+      created_at: isoAt(-9, 16, 0),
+    },
+    {
+      business_id: businessId,
+      project_id: johanProject.project_id,
+      quote_id: quotes.johan_badrum_quote.quote_id,
+      job_type: 'badrum',
+      lesson_text: 'Räkna med extra rivningstid på badrum byggda före 1990 — dubbla lager kakel är vanligt.',
+      impact_hint: 'Något att göra annorlunda nästa gång?',
+      source: 'debrief',
+      confirmed_by: contactName || null,
+      created_at: isoAt(-9, 16, 0),
+    },
+  ])
+  if (lessonErr) return failReset(`Kunde inte skapa lärdomar (gästtoalett): ${lessonErr.message}`, 'project_lesson_insert_failed')
+
+  // ══════════════════════════════════════════════════════════
+  // 9f. KUNDFAKTA (customer_fact) — bekräftade fynd på Anna (huvudkunden
+  //     för badrumsprojektet). "Föds bekräftade" i demot precis som
+  //     lärdomsraderna ovan — i produktion skapas de via ett godkänt
+  //     customer_fact-kort (app/api/voice/analyze/route.ts, arMote-
+  //     grenen), men demot behöver inte simulera hela mötesanalysen för
+  //     att kundkortet/"Att tänka på" ska ha innehåll.
+  // ══════════════════════════════════════════════════════════
+  const { error: factsErr } = await supabase.from('customer_fact').insert([
+    {
+      business_id: businessId,
+      customer_id: customers.anna.customer_id,
+      fact_type: 'preference',
+      content: 'Vill ha ekparkett, inte laminat',
+      source_type: 'meeting',
+      evidence_quote: 'Vi vill ha ekparkett, inte laminat — det är viktigt för oss.',
+      confidence: 0.9,
+      created_at: isoAt(-6, 10, 0),
+      confirmed_at: isoAt(-6, 10, 5),
+    },
+    {
+      business_id: businessId,
+      customer_id: customers.anna.customer_id,
+      fact_type: 'constraint',
+      content: 'Har hund — golvet får inte vara halkigt',
+      source_type: 'meeting',
+      evidence_quote: 'Vi har en hund, så golvet får absolut inte bli halt när det är blött.',
+      confidence: 0.85,
+      created_at: isoAt(-6, 10, 2),
+      confirmed_at: isoAt(-6, 10, 5),
+    },
+    {
+      business_id: businessId,
+      customer_id: customers.anna.customer_id,
+      fact_type: 'commitment',
+      content: 'Lovat återkomma med materialpris innan fredag',
+      source_type: 'meeting',
+      evidence_quote: 'Jag återkommer med priset på materialet innan fredag.',
+      confidence: 0.95,
+      created_at: isoAt(-2, 13, 0),
+      confirmed_at: isoAt(-2, 13, 5),
+    },
+    {
+      business_id: businessId,
+      customer_id: customers.anna.customer_id,
+      fact_type: 'contact',
+      content: 'Nås säkrast efter lunch',
+      source_type: 'meeting',
+      evidence_quote: 'Ring gärna efter lunch, då är jag ledig.',
+      confidence: 0.8,
+      created_at: isoAt(-6, 10, 4),
+      confirmed_at: isoAt(-6, 10, 5),
+    },
+  ])
+  if (factsErr) return failReset(`Kunde inte skapa kundfakta: ${factsErr.message}`, 'customer_fact_insert_failed')
+
   // ── 10. Stabilt entity-manifest för Epic 5 ────────────────
   // Alla värden kommer från de inserts som precis lyckades. Inga belopp eller
   // seedantaganden lagras här — bara pekare till riktiga produktionsobjekt.
@@ -1224,8 +1623,8 @@ export async function resetDemoAccount(
     customers: customerSeeds.length,
     deals: dealSeeds.length,
     quotes: quoteSeeds.length,
-    invoices: 3,
-    projects: 2,
+    invoices: 4,
+    projects: 3,
     approvals: approvalSeeds.length,
     agentRuns: agentRunSeeds.length,
     bookings: bookingsCreated,
