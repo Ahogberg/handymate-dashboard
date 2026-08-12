@@ -98,6 +98,13 @@ export default function OnboardingChecklist({
           link: '/dashboard/automations',
         },
         {
+          id: 'meeting',
+          label: 'Spela in ditt nästa platsbesök — Matte sammanfattar mötet åt dig',
+          completed: false,
+          optional: true,
+          link: '/dashboard/inkorg?tab=mote',
+        },
+        {
           id: 'calendar',
           label: 'Koppla Google Kalender',
           completed: !!(businessConfig.google_connected || businessConfig.google_calendar_connected),

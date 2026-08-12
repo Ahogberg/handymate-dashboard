@@ -189,6 +189,11 @@ test.describe('designkontraktet — fyra frågor, i ordning (Matte Command Cente
     expect(home).not.toContain('AttHamtaRailCard')
     expect(home).toContain("import { PengarBand } from '@/components/jarvis/PengarBand'")
   })
+
+  test('Mötesassistenten har en genväg i högerspalten (byggd 08-11/12, obesökt utan denna länk)', () => {
+    expect(home).toContain('/dashboard/inkorg?tab=mote')
+    expect(home).toContain('Möte idag?')
+  })
 })
 
 test.describe('momenten i Värt att veta (2026-08-12)', () => {

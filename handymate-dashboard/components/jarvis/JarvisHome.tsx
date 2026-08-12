@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, FileText, Loader2, Phone, Undo2, User } from 'lucide-react'
+import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, FileText, Loader2, Mic, Phone, Undo2, User } from 'lucide-react'
 import { nyhetsAtgard, type NyhetsIkon } from '@/lib/jarvis/news-actions'
 import { byggBevakning, fyndPerAgent, type BevakningsRad } from '@/lib/jarvis/bevakning'
 import { byggDygnsdigest, halsningsBevis, type DigestAktivitet } from '@/lib/jarvis/dygnsdigest'
@@ -1043,6 +1043,15 @@ export default function JarvisHome({
               inget när profilen saknar uppgifter — en widget som säger
               "inget på gång" när vi inte vet vore osann. */}
           <KarinCalendarWidget />
+
+          {/* Mötesassistenten (2026-08-13): byggd 08-11/12 men obesökt —
+              ingen genväg fanns någonstans i navigationen. Sist i spalten,
+              inte i huvudflödets fyra sektioner (designkontraktet rörs ej). */}
+          <RailCard title="Möte idag?" href="/dashboard/inkorg?tab=mote" leading={<Mic className="w-4 h-4 text-primary-600 shrink-0" />}>
+            <p className="text-[13px] text-slate-500 m-0">
+              Spela in platsbesöket — Matte sammanfattar och skriver offertutkastet.
+            </p>
+          </RailCard>
         </aside>
 
         {/* ── Skrivraden ───────────────────────────────────────────────────
