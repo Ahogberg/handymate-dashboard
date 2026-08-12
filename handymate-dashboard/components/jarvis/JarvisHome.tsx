@@ -17,6 +17,7 @@ import { SkrivRad } from '@/components/jarvis/SkrivRad'
 import { RailCard } from '@/components/jarvis/RailCard'
 import { KomIgangRail } from '@/components/jarvis/KomIgangRail'
 import HemTur from '@/components/tour/HemTur'
+import CompanyScan from '@/components/tour/CompanyScan'
 import { ScheduleTimeline, parseKonflikter, minuterFranIso } from '@/components/jarvis/ScheduleTimeline'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { QuoteDraftDetail, QuoteToolExit } from '@/components/jarvis/QuoteDraftDetail'
@@ -230,6 +231,11 @@ export default function JarvisHome({
   const [kvitto, setKvitto] = useState<Vardekvitto | null>(null)
   const [ledger, setLedger] = useState<ManadsLedger | null>(null)
   const [retentionText, setRetentionText] = useState<string | null>(null)
+  // Kedjningen (tasks/jaunty-pondering-hummingbird.md): CompanyScan renderas
+  // FÖRST — Hemturen släpps inte fram förrän skannen anropat onClose (klar,
+  // hoppad, eller aldrig aktuell för kontot). HemTur behåller sina egna
+  // gates orörda — den öppnar bara inte förrän den här flaggan är sann.
+  const [scanKlar, setScanKlar] = useState(false)
 
   // ═══ GRIND 1: HAR NÅGOT HÄNT SEDAN DU TITTADE SIST? ═══
   //
@@ -1092,10 +1098,17 @@ export default function JarvisHome({
         />
       </div>
 
+      {/* Company Scan (tasks/jaunty-pondering-hummingbird.md) — dashboardens
+          allra första ögonblick, INNAN Hemturen. Äger sin egen gate
+          (welcome_tour_seen + hm_scan_klar) och anropar onClose när den
+          stängs oavsett anledning; Hemturen renderas inte förrän dess. */}
+      <CompanyScan onClose={() => setScanKlar(true)} />
+
       {/* Hemturen (docs/design/FORSTA-30-MINUTERNA.md) — spotlightar de fem
           data-tour-target-noderna ovan. Gatead på welcome_tour_seen +
-          localStorage; renderar ingenting förrän gaten öppnar. */}
-      <HemTur />
+          localStorage; renderar ingenting förrän gaten öppnar OCH skannen
+          har stängts (scanKlar). */}
+      {scanKlar && <HemTur />}
 
       {/* Ångra-snackbaren. POST:en har INTE gått iväg än. */}
       {snack && (

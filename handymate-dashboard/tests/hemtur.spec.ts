@@ -164,3 +164,33 @@ test.describe('monterad i JarvisHome', () => {
     expect(hem).toContain('<HemTur />')
   })
 })
+
+test.describe('kedjningen (Company Scan, tasks/jaunty-pondering-hummingbird.md) bryter inte turens egna gates', () => {
+  test('HemTur.tsx är helt orört — egen grind (welcome_tour_seen + hm_hemtur_klar), egen flaggskrivning', () => {
+    // Regression: kedjningen ska vara ADDITIV (JarvisHome väntar med att
+    // rendera <HemTur /> tills skannen stängts) — den ska INTE ha flyttat
+    // in i eller ersatt HemTur:s egen gate-logik. Samma påståenden som
+    // testerna ovan bevisar redan detta, men skrivs ut explicit här så en
+    // framtida ändring som smyger bort HemTur:s gate fångas direkt.
+    const s = read(HEMTUR)
+    expect(s).toContain('business.welcome_tour_seen')
+    expect(s).toContain("SEEN_KEY = 'hm_hemtur_klar'")
+    expect(s).toContain("config: { welcome_tour_seen: new Date().toISOString() }")
+  })
+
+  test('JarvisHome väntar med HemTur tills CompanyScan stängts — HemTur renderas villkorat, inte ovillkorat', () => {
+    const hem = read(HEM)
+    expect(hem).toContain('const [scanKlar, setScanKlar] = useState(false)')
+    expect(hem).toContain('{scanKlar && <HemTur />}')
+    // CompanyScan står FÖRE i JSX-trädet — det är hela kedjningen.
+    const scanIdx = hem.indexOf('<CompanyScan onClose=')
+    const hemturIdx = hem.indexOf('{scanKlar && <HemTur />}')
+    expect(scanIdx).toBeGreaterThan(-1)
+    expect(scanIdx).toBeLessThan(hemturIdx)
+  })
+
+  test('CompanyScan.tsx skriver ALDRIG welcome_tour_seen — Hemturen är ensam ägare av den flaggan', () => {
+    const scan = read('components/tour/CompanyScan.tsx')
+    expect(scan).not.toContain("config: { welcome_tour_seen")
+  })
+})
