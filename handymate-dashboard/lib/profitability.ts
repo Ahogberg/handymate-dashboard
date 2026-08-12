@@ -6,6 +6,8 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { computeProjectEconomics } from '@/lib/projects/compute-economics'
+import { byggLonsamhetsVarning } from '@/lib/projects/margin-guardian'
 
 export interface ProjectProfitability {
   project_id: string
@@ -155,13 +157,27 @@ export async function calculateProfitability(
 
 /**
  * Karin-varning: kolla alla aktiva projekt och skapa varningar vid behov.
+ *
+ * Flyttad (2026-08-12) från de legacy `project.actual_*`-snapshotkolumnerna
+ * till den kanoniska ekonomimotorn (compute-economics.ts) via
+ * lib/projects/margin-guardian.ts. De gamla kolumnerna underhölls av en
+ * DB-trigger som räknade arbetskostnad på KUNDPRISET (time_entry.hourly_rate),
+ * missade supplier_invoices helt och räknade bara ÄTA med status 'approved'
+ * (aldrig kundsignerade 'signed'). calculateProfitability() ovan rör vi INTE
+ * — den har andra konsumenter kvar.
+ *
+ * Dedup: pending-livstid, inte per dag. Ett projekt i riskzonen ska hålla
+ * SAMMA kort (uppdaterat) tills det löses — inte stapla ett nytt varje dygn.
+ * Ett projekt som friskförklaras (kortet avvisas/godkänns) och senare
+ * försämras igen ska däremot få ett nytt kort — därför dedupas bara mot
+ * status='pending', inte mot hela projektets historik.
  */
 export async function checkProfitabilityWarnings(businessId: string): Promise<number> {
   const supabase = getServerSupabase()
 
   const { data: projects } = await supabase
     .from('project')
-    .select('project_id, name, budget_amount, actual_hours, actual_labor_cost, actual_material_cost, budget_hours')
+    .select('project_id, name, budget_hours, budget_amount')
     .eq('business_id', businessId)
     .eq('status', 'active')
     .gt('budget_amount', 0)
@@ -171,31 +187,88 @@ export async function checkProfitabilityWarnings(businessId: string): Promise<nu
   let warningsCreated = 0
 
   for (const project of projects) {
-    const prof = await calculateProfitability(project.project_id, businessId)
-    if (!prof || prof.status === 'on_track') continue
+    const economics = await computeProjectEconomics(supabase, project.project_id, businessId)
+    if (!economics) continue
 
-    // Kolla om vi redan skapat en varning för detta projekt idag
-    const today = new Date().toISOString().split('T')[0]
+    // Äldsta obesvarade ÄTA-förslags-kort för projektet — dess ålder är en
+    // av orsaksraderna (ett förslag som väntat länge kostar tid och pengar).
+    const { data: ataCards } = await supabase
+      .from('pending_approvals')
+      .select('created_at')
+      .eq('business_id', businessId)
+      .eq('approval_type', 'create_ata_draft')
+      .eq('status', 'pending')
+      .contains('payload', { project_id: project.project_id })
+      .order('created_at', { ascending: true })
+      .limit(1)
+
+    const oldestAta = ataCards?.[0]?.created_at
+    const aldstaDagar = oldestAta
+      ? Math.floor((Date.now() - new Date(oldestAta).getTime()) / (24 * 60 * 60 * 1000))
+      : null
+
+    const result = byggLonsamhetsVarning(
+      economics,
+      { project_id: project.project_id, name: project.name || '', budget_hours: project.budget_hours || 0 },
+      { aldsta_dagar: aldstaDagar },
+    )
+    if (!result) continue
+
+    const isOverBudget = result.status === 'over_budget'
+    const title = isOverBudget
+      ? `Budget överskriden — ${project.name}`
+      : `Riskerar överskridning — ${project.name}`
+
+    const enMening = isOverBudget
+      ? `${result.cost_percent}% av kalkylerad kostnad använt — budgeten är överskriden.`
+      : `${result.cost_percent}% av kalkylerad kostnad använt.`
+    const description = result.orsaker.length > 0
+      ? `${enMening} Orsaker: ${result.orsaker.map(o => o.text).join(' · ')}`
+      : enMening
+
+    const payload = {
+      agent_id: 'karin',
+      project_id: project.project_id,
+      project_name: project.name,
+      cost_percent: result.cost_percent,
+      margin_percent: result.margin_percent,
+      projected_overrun: result.projected_overrun,
+      status: result.status,
+      orsaker: result.orsaker,
+      // Gratis radrendering på Jarvis-hemmet (JarvisHome.tsx:1158-1173) —
+      // samma preview.items-form som create_ata_draft och review_auto_invoice.
+      preview: {
+        items: result.orsaker.map(o => ({
+          description: o.kind === 'UPPSKATTAT' ? `${o.text} (uppskattat)` : o.text,
+          amount_kr: o.amount_kr,
+        })),
+      },
+    }
+    const riskLevel = isOverBudget ? 'high' : 'medium'
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
     const { data: existing } = await supabase
       .from('pending_approvals')
       .select('id')
       .eq('business_id', businessId)
       .eq('approval_type', 'profitability_warning')
-      .gte('created_at', today)
+      .eq('status', 'pending')
       .contains('payload', { project_id: project.project_id })
       .limit(1)
 
-    if (existing && existing.length > 0) continue
-
-    // Skapa varning
-    const isOverBudget = prof.status === 'over_budget'
-    const title = isOverBudget
-      ? `Budget överskriden — ${prof.project_name}`
-      : `Riskerar överskridning — ${prof.project_name}`
-
-    const description = isOverBudget
-      ? `${prof.cost_percent}% av budget använt. Prognos: ${formatSEK(prof.projected_final_cost)} (budget: ${formatSEK(prof.total_budget)}). Skapa ÄTA-tillägg?`
-      : `${prof.cost_percent}% av budget använt (${formatSEK(prof.actual_total_cost)} av ${formatSEK(prof.total_budget)}). Tid: ${prof.actual_hours}h / ${prof.budget_hours}h.`
+    if (existing && existing.length > 0) {
+      await supabase
+        .from('pending_approvals')
+        .update({
+          title: `${isOverBudget ? '🔴' : '⚠️'} ${title}`,
+          description,
+          payload,
+          risk_level: riskLevel,
+          expires_at: expiresAt,
+        })
+        .eq('id', existing[0].id)
+      continue
+    }
 
     await supabase.from('pending_approvals').insert({
       business_id: businessId,
@@ -203,37 +276,33 @@ export async function checkProfitabilityWarnings(businessId: string): Promise<nu
       title: `${isOverBudget ? '🔴' : '⚠️'} ${title}`,
       description,
       status: 'pending',
-      priority: isOverBudget ? 'high' : 'medium',
-      payload: {
-        agent_id: 'karin',
-        project_id: prof.project_id,
-        project_name: prof.project_name,
-        cost_percent: prof.cost_percent,
-        margin_percent: prof.margin_percent,
-        projected_overrun: prof.projected_overrun,
-        status: prof.status,
-      },
+      risk_level: riskLevel,
+      expires_at: expiresAt,
+      payload,
     })
 
-    // Push-notis till hantverkaren — realtidslarm
+    // Push-notis till hantverkaren — realtidslarm. Bara vid FÖRSTA kortet för
+    // ett projekt, inte varje gång cronen uppdaterar ett redan pending kort
+    // (samma buggklass som 8394ac9d/ee73c915 — trösklar som fyrar om varje
+    // körning så länge villkoret förblir sant).
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-    fetch(`${APP_URL}/api/push/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        business_id: businessId,
-        title: isOverBudget ? '🔴 Budget överskriden' : '⚠️ Lönsamhetslarm',
-        body: `${prof.project_name}: ${prof.cost_percent}% av budget använt${isOverBudget ? ' — skapa ÄTA?' : ''}`,
-        url: `/dashboard/projects/${prof.project_id}`,
-      }),
-    }).catch(() => {})
+    try {
+      await fetch(`${APP_URL}/api/push/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          business_id: businessId,
+          title: isOverBudget ? '🔴 Budget överskriden' : '⚠️ Lönsamhetslarm',
+          body: `${project.name}: ${result.cost_percent}% av kalkylen använt${isOverBudget ? ' — skapa ÄTA?' : ''}`,
+          url: `/dashboard/projects/${project.project_id}`,
+        }),
+      })
+    } catch {
+      // Push är best-effort — kortet finns i kön oavsett.
+    }
 
     warningsCreated++
   }
 
   return warningsCreated
-}
-
-function formatSEK(amount: number): string {
-  return new Intl.NumberFormat('sv-SE', { style: 'decimal', maximumFractionDigits: 0 }).format(amount) + ' kr'
 }

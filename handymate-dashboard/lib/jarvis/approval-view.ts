@@ -132,6 +132,11 @@ export function approveLabel(approvalType: string, payload?: Record<string, unkn
   if (approvalType === 'send_quote') return 'Godkänn & skicka'
   if (approvalType === 'send_sms') return 'Skicka'
   if (approvalType === 'autonomy_offer') return 'Ja, kör automatiskt'
+  // profitability_warning är INFORMATIONAL i action-contract — inget att
+  // utföra. Denna etikett syns bara om kortet någonsin renderas med en
+  // approve-knapp (voice='fragar' bygger annars sina egna alternativ, se
+  // lib/jarvis/card-voice.ts reviewAlternatives).
+  if (approvalType === 'profitability_warning') return 'Jag har sett det'
   return 'Godkänn'
 }
 
@@ -174,6 +179,9 @@ export function deepLinkFor(approval: ApprovalLike): { label: string; href: stri
   }
   if (t === 'fakturera_projekt' && pl.project_id) {
     return { label: 'Läs & ändra →', href: `/dashboard/projects/${pl.project_id}` }
+  }
+  if (t === 'profitability_warning' && pl.project_id) {
+    return { label: 'Öppna projektet →', href: `/dashboard/projects/${pl.project_id}` }
   }
   if (t === 'publish_microsite') return { label: 'Visa först →', href: '/dashboard/website' }
   if (t.includes('booking')) return { label: 'Öppna kalendern →', href: '/dashboard/schedule' }
