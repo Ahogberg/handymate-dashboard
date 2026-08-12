@@ -203,7 +203,7 @@ export async function checkProfitabilityWarnings(businessId: string): Promise<nu
     // av orsaksraderna (ett förslag som väntat länge kostar tid och pengar).
     const { data: ataCards } = await supabase
       .from('pending_approvals')
-      .select('created_at')
+      .select('id, created_at')
       .eq('business_id', businessId)
       .eq('approval_type', 'create_ata_draft')
       .eq('status', 'pending')
@@ -211,15 +211,15 @@ export async function checkProfitabilityWarnings(businessId: string): Promise<nu
       .order('created_at', { ascending: true })
       .limit(1)
 
-    const oldestAta = ataCards?.[0]?.created_at
+    const oldestAta = ataCards?.[0]
     const aldstaDagar = oldestAta
-      ? Math.floor((Date.now() - new Date(oldestAta).getTime()) / (24 * 60 * 60 * 1000))
+      ? Math.floor((Date.now() - new Date(oldestAta.created_at).getTime()) / (24 * 60 * 60 * 1000))
       : null
 
     const result = byggLonsamhetsVarning(
       economics,
       { project_id: project.project_id, name: project.name || '', budget_hours: project.budget_hours || 0 },
-      { aldsta_dagar: aldstaDagar },
+      { aldsta_dagar: aldstaDagar, approval_id: oldestAta?.id ?? null },
     )
     if (!result) continue
 
@@ -294,20 +294,27 @@ export async function checkProfitabilityWarnings(businessId: string): Promise<nu
     // ett projekt, inte varje gång cronen uppdaterar ett redan pending kort
     // (samma buggklass som 8394ac9d/ee73c915 — trösklar som fyrar om varje
     // körning så länge villkoret förblir sant).
-    const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-    try {
-      await fetch(`${APP_URL}/api/push/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          business_id: businessId,
-          title: isOverBudget ? '🔴 Budget överskriden' : '⚠️ Lönsamhetslarm',
-          body: `${project.name}: ${result.cost_percent}% av kalkylen använt${isOverBudget ? ' — skapa ÄTA?' : ''}`,
-          url: `/dashboard/projects/${project.project_id}`,
-        }),
-      })
-    } catch {
-      // Push är best-effort — kortet finns i kön oavsett.
+    //
+    // Bara over_budget pushar. at_risk (75%) är information — hantverkaren ser
+    // kortet i kön ändå — medan over_budget (95%) är ett larm. Att pusha på
+    // båda ger notiströtthet: 75%-varningen är väntad i de flesta projekt
+    // mot slutet och skulle bli brus.
+    if (isOverBudget) {
+      const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+      try {
+        await fetch(`${APP_URL}/api/push/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            business_id: businessId,
+            title: '🔴 Budget överskriden',
+            body: `${project.name}: ${result.cost_percent}% av kalkylen använt — skapa ÄTA?`,
+            url: `/dashboard/projects/${project.project_id}`,
+          }),
+        })
+      } catch {
+        // Push är best-effort — kortet finns i kön oavsett.
+      }
     }
 
     warningsCreated++

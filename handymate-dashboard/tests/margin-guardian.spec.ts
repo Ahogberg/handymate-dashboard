@@ -8,9 +8,13 @@
  * Körs utan browser/session:
  *   npx playwright test tests/margin-guardian.spec.ts --no-deps
  */
+import fs from 'fs'
+import path from 'path'
 import { test, expect } from '@playwright/test'
 import { byggLonsamhetsVarning, type GuardianProjekt, type GuardianAtaSignal } from '../lib/projects/margin-guardian'
 import type { ProjectEconomics } from '../lib/projects/compute-economics'
+
+const ROOT = path.join(__dirname, '..')
 
 function eko(overrides: {
   budget_amount?: number
@@ -182,6 +186,21 @@ test.describe('ÄTA-raderna', () => {
     expect(rad?.text).toContain('5 dagar')
     expect(rad?.kind).toBe('KÄNT')
   })
+
+  test('väntat-raden bär approval_id när signalen har ett', () => {
+    const r = byggLonsamhetsVarning(eko({ material_inkop_kr: 80000 }), projekt(), {
+      aldsta_dagar: 5,
+      approval_id: 'ata-kort-123',
+    })
+    const rad = r?.orsaker.find(o => o.text.includes('väntat'))
+    expect(rad?.approval_id).toBe('ata-kort-123')
+  })
+
+  test('väntat-raden saknar approval_id när signalen inte har ett', () => {
+    const r = byggLonsamhetsVarning(eko({ material_inkop_kr: 80000 }), projekt(), { aldsta_dagar: 5 })
+    const rad = r?.orsaker.find(o => o.text.includes('väntat'))
+    expect(rad?.approval_id).toBeUndefined()
+  })
 })
 
 test.describe('payload-kontraktet', () => {
@@ -227,5 +246,28 @@ test.describe('beloppen formateras svenskt', () => {
     const r = byggLonsamhetsVarning(eko({ material_inkop_kr: 80000 }), projekt(), ingenAta)
     const rad = r?.orsaker.find(o => o.text.includes('Materialinköp'))
     expect(rad?.text).toBe(`Materialinköp: ${(80000).toLocaleString('sv-SE')} kr`)
+  })
+})
+
+test.describe('push-gränsen (källskanning av lib/profitability.ts)', () => {
+  const kalla = fs.readFileSync(path.join(ROOT, 'lib/profitability.ts'), 'utf8')
+
+  test('push-blocket är villkorat på isOverBudget, inte at_risk', () => {
+    const pushIndex = kalla.indexOf('/api/push/send')
+    expect(pushIndex).toBeGreaterThan(-1)
+    const fore = kalla.slice(0, pushIndex)
+    const sistaIf = fore.lastIndexOf('if (isOverBudget)')
+    expect(sistaIf).toBeGreaterThan(-1)
+    // Ingen annan kod (utom kommentarer) mellan if:et och push-anropet som
+    // skulle kunna öppna för at_risk också.
+    const mellan = kalla.slice(sistaIf, pushIndex)
+    expect(mellan).not.toContain('isOverBudget ?')
+  })
+
+  test('push-anropets title/body pratar bara om budget överskriden, inte lönsamhetslarm', () => {
+    const pushIndex = kalla.indexOf('/api/push/send')
+    const block = kalla.slice(pushIndex, pushIndex + 600)
+    expect(block).toContain('Budget överskriden')
+    expect(block).not.toContain('Lönsamhetslarm')
   })
 })

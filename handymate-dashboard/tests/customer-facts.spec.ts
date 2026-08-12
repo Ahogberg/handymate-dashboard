@@ -213,3 +213,96 @@ test.describe('konsumenterna läser fail-safe', () => {
     expect(gren).toContain("f.confirmed_at || f.created_at")
   })
 })
+
+test.describe('injektionspunkt 1: offertgenereringen (lib/ai-quote-generator.ts)', () => {
+  const GEN = 'lib/ai-quote-generator.ts'
+
+  test('fetchCustomerFactsForQuote filtrerar på superseded_by, business+customer och bara preference/constraint', () => {
+    const s = read(GEN)
+    const i = s.indexOf('async function fetchCustomerFactsForQuote')
+    expect(i, 'hjälpfunktionen saknas').toBeGreaterThan(-1)
+    const gren = s.slice(i, i + 1200)
+    expect(gren).toContain("from('customer_fact')")
+    expect(gren).toContain("eq('business_id', businessId)")
+    expect(gren).toContain("eq('customer_id', customerId)")
+    expect(gren).toContain(".is('superseded_by', null)")
+    expect(gren).toContain("in('fact_type', ['preference', 'constraint'])")
+    expect(gren).toContain('.limit(8)')
+  })
+
+  test('fetchCustomerFactsForQuote är fail-safe — try/catch runt frågan, tom lista vid fel', () => {
+    const s = read(GEN)
+    const i = s.indexOf('async function fetchCustomerFactsForQuote')
+    const gren = s.slice(i, i + 1200)
+    expect(gren).toContain('try {')
+    expect(gren).toContain('catch')
+    const returns = gren.match(/return \[\]/g) || []
+    expect(returns.length, 'både fel-grenen och catch ska returnera tom lista').toBeGreaterThanOrEqual(2)
+  })
+
+  test('anropas bara när input.customerId finns', () => {
+    const s = read(GEN)
+    expect(s).toContain('input.customerId ? fetchCustomerFactsForQuote(input.businessId, input.customerId)')
+  })
+
+  test('prompten injicerar kundfakta bara när listan inte är tom, med rubrik och [typ] content-rader', () => {
+    const s = read(GEN)
+    const i = s.indexOf('customerFactsContext')
+    expect(i, 'customerFactsContext saknas').toBeGreaterThan(-1)
+    const gren = s.slice(i, i + 700)
+    expect(gren).toContain('customerFacts.length > 0')
+    expect(gren).toContain('BEKRÄFTADE KUNDFAKTA')
+    expect(s).toContain('${customerFactsContext}')
+  })
+
+  test('customerFacts returneras i svaret bredvid lessons', () => {
+    const s = read(GEN)
+    expect(s).toContain('customerFacts: Array<{ fact_type:')
+    // Return-satsen ska faktiskt lämna tillbaka listan, inte bara typa den.
+    const returnIdx = s.indexOf('lessons,\n    customerFacts,')
+    expect(returnIdx, 'customerFacts saknas i return-objektet bredvid lessons').toBeGreaterThan(-1)
+  })
+})
+
+test.describe('injektionspunkt 2: projektsidan (Att tänka på)', () => {
+  const PAGE = 'app/dashboard/projects/[id]/page.tsx'
+  const CARD = 'components/projects/ProjectCustomerFactsCard.tsx'
+
+  test('projektsidan hämtar via det befintliga facts-API:et med projektets customer_id', () => {
+    const s = read(PAGE)
+    expect(s).toContain('const customerId = project?.customer?.customer_id')
+    expect(s).toContain('fetch(`/api/customers/${customerId}/facts`)')
+  })
+
+  test('hämtningen är fail-safe — try/catch, tom lista vid fel eller saknad kund', () => {
+    const s = read(PAGE)
+    const i = s.indexOf('const customerId = project?.customer?.customer_id')
+    const gren = s.slice(i, i + 1000)
+    expect(gren).toContain('if (!customerId)')
+    expect(gren).toContain('setProjectCustomerFacts([])')
+    expect(gren).toContain('try {')
+    expect(gren).toContain('catch')
+  })
+
+  test('kortet renderas i Översikt-tabben', () => {
+    const s = read(PAGE)
+    expect(s).toContain('import { ProjectCustomerFactsCard }')
+    expect(s).toContain('<ProjectCustomerFactsCard facts={projectCustomerFacts} />')
+  })
+
+  test('kortet renderar ingenting när listan är tom', () => {
+    const s = read(CARD)
+    const i = s.indexOf('export function ProjectCustomerFactsCard')
+    const gren = s.slice(i, i + 300)
+    expect(gren).toContain('if (facts.length === 0) return null')
+  })
+
+  test('kortet begränsar till max 6 rader och visar svenska typ-badges för alla fyra typerna', () => {
+    const s = read(CARD)
+    expect(s).toContain('facts.slice(0, 6)')
+    expect(s).toContain("preference: { label: 'Preferens'")
+    expect(s).toContain("constraint: { label: 'Förutsättning'")
+    expect(s).toContain("commitment: { label: 'Löfte'")
+    expect(s).toContain("contact: { label: 'Kontakt'")
+  })
+})

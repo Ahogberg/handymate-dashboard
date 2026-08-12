@@ -16,6 +16,8 @@ export interface GuardianOrsak {
   text: string
   kind: 'KÄNT' | 'UPPSKATTAT'
   amount_kr?: number
+  /** Kortet raden syftar på — sätts bara på ÄTA-väntar-raden, för deeplink. */
+  approval_id?: string
 }
 
 export interface GuardianProjekt {
@@ -27,6 +29,8 @@ export interface GuardianProjekt {
 /** Ålder på äldsta obesvarade ÄTA-förslags-kort för projektet, i dagar. */
 export interface GuardianAtaSignal {
   aldsta_dagar: number | null
+  /** Kortets id — så orsaksraden kan länka direkt till det. */
+  approval_id?: string | null
 }
 
 export interface LonsamhetsVarning {
@@ -114,6 +118,7 @@ export function byggLonsamhetsVarning(
     orsaker.push({
       text: `Ett ÄTA-förslag har väntat ${ataSignal.aldsta_dagar} dagar utan svar`,
       kind: 'KÄNT',
+      ...(ataSignal.approval_id ? { approval_id: ataSignal.approval_id } : {}),
     })
   }
   if (projectedOverrun > 0) {

@@ -87,6 +87,10 @@ export interface GeneratedQuote {
       Capture, 2026-08-12) — hantverkarens egna svar, inte AI-inferens.
       Tom lista är det normala när inga debrief-svar finns än. */
   lessons: Array<{ lesson_text: string; impact_hint: string | null }>
+  /** Bekräftade kundfakta (Customer Facts V1, 2026-08-12) — preferenser och
+      förutsättningar godkända av hantverkaren som prompten tog hänsyn till.
+      Tom lista är normalt: ingen kund, eller ingen bekräftad fakta än. */
+  customerFacts: Array<{ fact_type: 'preference' | 'constraint'; content: string }>
   priceListEmpty: boolean
   missingPriceCount: number
   /**
@@ -165,6 +169,46 @@ async function fetchRecentLessons(
     }))
   } catch (err) {
     console.error('[ai-quote-generator] project_lesson-läsning kastade (fail-safe, tom lista):', err)
+    return []
+  }
+}
+
+/**
+ * Customer Facts V1 (injektionspunkt offert, 2026-08-12): de senast
+ * bekräftade kundfakta (customer_fact, sql/v122_customer_fact.sql) som är
+ * relevanta i en offertkalkyl — bara preference och constraint. commitment
+ * (löften) och contact (kontaktvägar) hör inte hemma i en priskalkyl.
+ *
+ * Fail-safe: kastar aldrig. Tabellen kan saknas i någon miljö (v122 körs
+ * manuellt av Andreas) eller läsningen strula av annan anledning — då
+ * degraderas till en tom lista, precis som offertgenereringen fungerade
+ * innan denna feature fanns.
+ */
+async function fetchCustomerFactsForQuote(
+  businessId: string,
+  customerId: string,
+): Promise<Array<{ fact_type: 'preference' | 'constraint'; content: string }>> {
+  try {
+    const { data, error } = await getServerSupabase()
+      .from('customer_fact')
+      .select('fact_type, content, created_at')
+      .eq('business_id', businessId)
+      .eq('customer_id', customerId)
+      .in('fact_type', ['preference', 'constraint'])
+      .is('superseded_by', null)
+      .order('created_at', { ascending: false })
+      .limit(8)
+
+    if (error) {
+      console.error('[ai-quote-generator] customer_fact-läsning misslyckades (fail-safe, tom lista):', error.message)
+      return []
+    }
+    return (data || []).map(row => ({
+      fact_type: (row as any).fact_type as 'preference' | 'constraint',
+      content: (row as any).content as string,
+    }))
+  } catch (err) {
+    console.error('[ai-quote-generator] customer_fact-läsning kastade (fail-safe, tom lista):', err)
     return []
   }
 }
@@ -503,10 +547,11 @@ export async function generateQuoteFromInput(
   // genererar offerten. analyzeJobImage() lever kvar oförändrad — används
   // fortfarande av ai-generate/route.ts för att beskriva EXTRA bilder
   // (bild 2-5) som text innan de vävs in i textDescription här.
-  const [similarQuotes, priceStats, lessons] = await Promise.all([
+  const [similarQuotes, priceStats, lessons, customerFacts] = await Promise.all([
     description ? findSimilarQuotes(input.businessId, description) : Promise.resolve([]),
     description ? getAveragePrice(input.businessId, description) : Promise.resolve({ average: 0, min: 0, max: 0, count: 0 }),
     fetchRecentLessons(input.businessId, input.jobType),
+    input.customerId ? fetchCustomerFactsForQuote(input.businessId, input.customerId) : Promise.resolve([]),
   ])
 
   const fullDescription = [
@@ -543,13 +588,27 @@ Om bilden är ett FOTO:
         .join('\n')}`
     : ''
 
+  // Customer Facts V1 (injektionspunkt offert, 2026-08-12): bekräftade
+  // preferenser/förutsättningar — svenska etiketter för konsekvens med
+  // kundkortets "Det här vet Handymate". Utelämnas helt ur prompten när
+  // listan är tom.
+  const CUSTOMER_FACT_LABEL_SV: Record<'preference' | 'constraint', string> = {
+    preference: 'Preferens',
+    constraint: 'Förutsättning',
+  }
+  const customerFactsContext = customerFacts.length > 0
+    ? `\n\nBEKRÄFTADE KUNDFAKTA (godkända av hantverkaren — ta hänsyn där relevant):\n${customerFacts
+        .map(f => `- [${CUSTOMER_FACT_LABEL_SV[f.fact_type]}] ${f.content}`)
+        .join('\n')}`
+    : ''
+
   const priceContext = buildPriceContext(input.priceList, input.hourlyRate, input.templates, input.customerPriceList)
   const hasPriceList = (input.priceList?.length || 0) > 0
 
   const systemPrompt = `Du är en erfaren svensk kalkylator för bygg- och hantverksprojekt.
 
 Bransch: ${input.branch || 'Bygg/Hantverkare'}
-${priceContext}${historicalContext}${lessonsContext}
+${priceContext}${historicalContext}${lessonsContext}${customerFactsContext}
 
 Analysera beskrivningen (och en eventuellt bifogad bild — se instruktioner nedan) och ge ett detaljerat offertförslag.
 ${imageInstructions}
@@ -748,6 +807,7 @@ Svara ENDAST med JSON (ingen markdown):
       total: q.total
     })),
     lessons,
+    customerFacts,
     priceListEmpty: !hasPriceList,
     missingPriceCount,
     // B3: defensiv — modellen instrueras till 0-4 korta punkter, men det är

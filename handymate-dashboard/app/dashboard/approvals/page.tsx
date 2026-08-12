@@ -1032,7 +1032,7 @@ export default function ApprovalsPage() {
                         {approval.approval_type === 'profitability_warning' && approval.payload && (() => {
                           const pl = approval.payload as any
                           const orsaker = Array.isArray(pl.orsaker)
-                            ? (pl.orsaker as Array<{ text: string; kind: string; amount_kr?: number }>)
+                            ? (pl.orsaker as Array<{ text: string; kind: string; amount_kr?: number; approval_id?: string }>)
                             : []
                           return (
                             <div className="mt-2 bg-amber-50 rounded-lg p-3 space-y-2 border border-amber-200">
@@ -1043,7 +1043,16 @@ export default function ApprovalsPage() {
                                       key={i}
                                       className={`flex items-center gap-3 py-1.5 text-xs ${o.kind === 'UPPSKATTAT' ? 'text-gray-400 italic' : 'text-gray-700'}`}
                                     >
-                                      <span className="flex-1 min-w-0">{o.text}</span>
+                                      {o.approval_id ? (
+                                        <a
+                                          href={`/dashboard/approvals#approval-${o.approval_id}`}
+                                          className="flex-1 min-w-0 underline decoration-dotted hover:text-primary-700"
+                                        >
+                                          {o.text}
+                                        </a>
+                                      ) : (
+                                        <span className="flex-1 min-w-0">{o.text}</span>
+                                      )}
                                       {typeof o.amount_kr === 'number' && o.amount_kr > 0 && (
                                         <span className="font-medium text-right shrink-0 whitespace-nowrap">
                                           {o.amount_kr.toLocaleString('sv-SE')} kr

@@ -534,6 +534,51 @@ export const toolDefinitions = [
     },
   },
 
+  // Command Center — read-only översiktsverktyg (Matte). Alla fyra svarar
+  // med rådata som modellen formulerar svaret ur — ingen skriver något.
+  {
+    name: "get_projects_overview",
+    description: "Hämta en lista över projekt (jobb) med flaggor för vad som väntar på hantverkarens uppmärksamhet: öppet lönsamhetsvarningskort (Margin Guardian), obesvarat ÄTA-förslag, eller öppet fyra-ögon-kort för projektstängning. Använd för frågor som 'vilka projekt behöver mig?' eller 'vad ligger och väntar?'. Räknar INTE om projektekonomi per projekt (för dyrt i chatt) — flaggorna räcker för att peka ut vad som bör ses över. Svaret är rådata, formulera själv svaret till hantverkaren.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        status: { type: "string", enum: ["active", "completed", "all"], description: "Filtrera på projektstatus. Default 'active'." },
+        limit: { type: "number", description: "Max antal projekt, default 20, max 50." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_stale_quotes",
+    description: "Hämta skickade offerter som ännu inte fått svar och börjar bli gamla — samma tröskel som 'Pengar på bordet'-sidan. Använd för frågor som 'vilka offerter börjar bli gamla?' eller 'vad väntar på kundsvar?'. Svaret är rådata (kund, belopp, dagar sedan skickad), formulera själv svaret.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        days: { type: "number", description: "Hur många dagar sedan offerten skickades räknas som 'gammal'. Default 5." },
+        limit: { type: "number", description: "Max antal offerter, default 20, max 50." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_invoiceable_work",
+    description: "Hämta intjänade pengar som ännu inte fakturerats: signerade ÄTA:n utan fakturakoppling, ofakturerat material och avslutade projekt utan faktura. Samma svep som körs varje natt (missad intäkt-cronen). Använd för frågor som 'vilka jobb kan jag fakturera?' eller 'ligger det pengar kvar att ta hem?'. Skapar ALDRIG en faktura — bara fynd (typ, projekt, belopp, konfidens) som hantverkaren själv granskar. Svaret är rådata, formulera själv svaret.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "get_customer_commitments",
+    description: "Hämta löften och åtaganden som getts till kunder under möten — godkända kundfakta av typen 'commitment'. Använd för frågor som 'vad har vi lovat kunder?' eller 'vilka löften ligger öppna?'. Bygger på Customer Facts (mötesfynd hantverkaren själv godkänt) — tom lista kan betyda att inga möten analyserats än, inte att inga löften finns. Svaret är rådata, formulera själv svaret.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+
   // Inter-agent communication
   {
     name: "send_agent_message",

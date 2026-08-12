@@ -89,6 +89,7 @@ import { ProjectBookingsTable } from './components/ProjectBookingsTable'
 import { ProjectStageModal } from '@/components/pipeline/unified/ProjectStageModal'
 import { ProjectEconomicsCard } from '@/components/projects/ProjectEconomicsCard'
 import { ProjectInfoCard } from '@/components/projects/economy/ProjectInfoCard'
+import { ProjectCustomerFactsCard } from '@/components/projects/ProjectCustomerFactsCard'
 import { EkonomiPulsCard } from '@/components/projects/economy/EkonomiPulsCard'
 import { FramdriftCard } from '@/components/projects/economy/FramdriftCard'
 import { ProjectQuoteSpec } from '@/components/projects/ProjectQuoteSpec'
@@ -562,6 +563,12 @@ export default function ProjectDetailPage() {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [materials, setMaterials] = useState<ProjectMaterial[]>([])
   const [materialSummary, setMaterialSummary] = useState<MaterialSummary | null>(null)
+  // Att tänka på — Customer Facts V1 (injektionspunkt 2, 2026-08-12).
+  const [projectCustomerFacts, setProjectCustomerFacts] = useState<Array<{
+    id: string
+    fact_type: 'preference' | 'constraint' | 'commitment' | 'contact'
+    content: string
+  }>>([])
   const [showProductSearch, setShowProductSearch] = useState(false)
   const [editingMaterial, setEditingMaterial] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<{ quantity: number; markup_percent: number }>({ quantity: 1, markup_percent: 20 })
@@ -841,6 +848,32 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     fetchProjectData()
   }, [fetchProjectData])
+
+  // Att tänka på — Customer Facts V1 (injektionspunkt 2, 2026-08-12): samma
+  // läs-API som kundkortet (/api/customers/[id]/facts). Fail-safe: fel eller
+  // saknad kund ger tom lista, sektionen renderas då inte alls.
+  useEffect(() => {
+    const customerId = project?.customer?.customer_id
+    if (!customerId) {
+      setProjectCustomerFacts([])
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/customers/${customerId}/facts`)
+        if (!res.ok) {
+          if (!cancelled) setProjectCustomerFacts([])
+          return
+        }
+        const data = await res.json()
+        if (!cancelled) setProjectCustomerFacts(data.facts || [])
+      } catch {
+        if (!cancelled) setProjectCustomerFacts([])
+      }
+    })()
+    return () => { cancelled = true }
+  }, [project?.customer?.customer_id])
 
   useEffect(() => {
     // Projektvy Fas 1: economy/quote_spec/material/leverantorer är nu grupperade
@@ -2264,6 +2297,9 @@ export default function ProjectDetailPage() {
               description={project.description}
               formatDate={formatDate}
             />
+
+            {/* Att tänka på — Customer Facts V1 (injektionspunkt 2, 2026-08-12) */}
+            <ProjectCustomerFactsCard facts={projectCustomerFacts} />
 
             {/* Ekonomi-puls — samma state-källa som Ekonomi-fliken */}
             <EkonomiPulsCard

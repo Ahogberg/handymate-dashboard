@@ -21,6 +21,9 @@ import {
 import type { AgentId } from '@/lib/agent/capabilities'
 import { createQuote as createCanonicalQuote } from '@/lib/quotes/create-quote'
 import { classify } from '@/lib/approvals/action-contract'
+import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
+import { sweepMissedRevenue } from '@/lib/value/missed-revenue'
+import { arTestId, arTestNamn } from '@/lib/testdata'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
@@ -174,6 +177,14 @@ export async function executeTool(
         return await runCustomerBaseSweepTool(supabase, businessId, context)
       case 'book_site_visit':
         return await bookSiteVisitTool(supabase, businessId, input, context)
+      case 'get_projects_overview':
+        return await getProjectsOverview(supabase, businessId, input)
+      case 'get_stale_quotes':
+        return await getStaleQuotes(supabase, businessId, input)
+      case 'get_invoiceable_work':
+        return await getInvoiceableWork(supabase, businessId)
+      case 'get_customer_commitments':
+        return await getCustomerCommitments(supabase, businessId)
       default:
         return { success: false, error: `Okänt verktyg: ${name}` }
     }
@@ -2350,6 +2361,259 @@ async function runCustomerBaseSweepTool(
     return { success: true, data: { created: result.created, candidates_total: result.candidates_total, message } }
   } catch (err: any) {
     return { success: false, error: `Kundbassvepet misslyckades: ${err.message}` }
+  }
+}
+
+// ── Command Center overview tools (read-only) ──────────
+
+/** Default-tröskel för "gammal offert" — samma som pengar-på-bordet-sidan. */
+const STALE_QUOTE_DEFAULT_DAYS = 5
+
+/**
+ * "Vilka projekt behöver mig?" — projektlista berikad med flaggor ur
+ * BEFINTLIGA kö-källor (pending_approvals). Alla tre typer bär
+ * payload.project_id (profitability_warning: lib/profitability.ts,
+ * create_ata_draft: lib/ata/suggest-ata-draft.ts, four_eyes_project_close:
+ * lib/projects/four-eyes-gate.ts) — en enda bred läsning räcker, ingen
+ * per-projekt-query. Räknar medvetet INTE om projektekonomi (computeProjectEconomics)
+ * per projekt — för dyrt i chatt-latens.
+ */
+async function getProjectsOverview(
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+): Promise<ToolResult> {
+  const status = typeof params.status === 'string' ? params.status : 'active'
+  if (!['active', 'completed', 'all'].includes(status)) {
+    return { success: false, error: `Ogiltig status "${status}" — använd active, completed eller all.` }
+  }
+  const limit = Math.min(Number(params.limit) > 0 ? Number(params.limit) : 20, 50)
+
+  let q = supabase
+    .from('project')
+    .select('project_id, name, status, budget_amount, budget_hours, customer_id, created_at')
+    .eq('business_id', businessId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (status !== 'all') q = q.eq('status', status)
+
+  const { data: projects, error } = await q
+  if (error) return { success: false, error: error.message }
+  const rows = projects || []
+
+  const customerIds = Array.from(new Set(rows.map((p: any) => p.customer_id).filter(Boolean))) as string[]
+  let customerMap: Record<string, string> = {}
+  if (customerIds.length > 0) {
+    const { data: customers } = await supabase
+      .from('customer').select('customer_id, name').in('customer_id', customerIds)
+    customerMap = Object.fromEntries((customers || []).map((c: any) => [c.customer_id, c.name]))
+  }
+
+  const projectIds = new Set(rows.map((p: any) => p.project_id))
+  const guardianFlagged = new Set<string>()
+  const ataFlagged = new Set<string>()
+  const fourEyesFlagged = new Set<string>()
+
+  if (projectIds.size > 0) {
+    const { data: approvals, error: apprError } = await supabase
+      .from('pending_approvals')
+      .select('approval_type, payload')
+      .eq('business_id', businessId)
+      .eq('status', 'pending')
+      .in('approval_type', ['profitability_warning', 'create_ata_draft', 'four_eyes_project_close'])
+    if (apprError) return { success: false, error: apprError.message }
+
+    for (const a of approvals || []) {
+      const pid = (a.payload as Record<string, unknown> | null)?.project_id
+      if (typeof pid !== 'string' || !projectIds.has(pid)) continue
+      if (a.approval_type === 'profitability_warning') guardianFlagged.add(pid)
+      else if (a.approval_type === 'create_ata_draft') ataFlagged.add(pid)
+      else if (a.approval_type === 'four_eyes_project_close') fourEyesFlagged.add(pid)
+    }
+  }
+
+  const enriched = rows.map((p: any) => ({
+    project_id: p.project_id,
+    name: p.name,
+    status: p.status,
+    budget_amount: p.budget_amount,
+    budget_hours: p.budget_hours,
+    customer_id: p.customer_id,
+    customer_name: p.customer_id ? (customerMap[p.customer_id] || 'Okänd') : null,
+    har_oppet_guardian_kort: guardianFlagged.has(p.project_id),
+    har_obesvarat_ata_forslag: ataFlagged.has(p.project_id),
+    har_oppet_fyra_ogon_kort: fourEyesFlagged.has(p.project_id),
+  }))
+
+  return {
+    success: true,
+    data: {
+      status_filter: status,
+      count: enriched.length,
+      projects: enriched,
+      counts: {
+        har_oppet_guardian_kort: enriched.filter((p: any) => p.har_oppet_guardian_kort).length,
+        har_obesvarat_ata_forslag: enriched.filter((p: any) => p.har_obesvarat_ata_forslag).length,
+        har_oppet_fyra_ogon_kort: enriched.filter((p: any) => p.har_oppet_fyra_ogon_kort).length,
+      },
+    },
+  }
+}
+
+/**
+ * "Offerterna som börjar bli gamla" — samma OPEN_QUOTE_STATUSES + sent_at-
+ * tröskel som pengar-på-bordet-sidan (app/api/dashboard/pengar/route.ts).
+ */
+async function getStaleQuotes(
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+): Promise<ToolResult> {
+  const days = Number(params.days) > 0 ? Number(params.days) : STALE_QUOTE_DEFAULT_DAYS
+  const limit = Math.min(Number(params.limit) > 0 ? Number(params.limit) : 20, 50)
+  const staleGrans = new Date(Date.now() - days * 86_400_000).toISOString()
+
+  const { data, error } = await supabase
+    .from('quotes')
+    .select('quote_id, title, customer_id, total, sent_at')
+    .eq('business_id', businessId)
+    .in('status', [...OPEN_QUOTE_STATUSES])
+    .lt('sent_at', staleGrans)
+    .order('sent_at', { ascending: true })
+    .limit(limit)
+  if (error) return { success: false, error: error.message }
+  const rows = (data || []).filter((q: any) => !arTestNamn(q.title))
+
+  const customerIds = Array.from(new Set(rows.map((q: any) => q.customer_id).filter(Boolean))) as string[]
+  let customerMap: Record<string, string> = {}
+  if (customerIds.length > 0) {
+    const { data: customers } = await supabase
+      .from('customer').select('customer_id, name').in('customer_id', customerIds)
+    customerMap = Object.fromEntries((customers || []).map((c: any) => [c.customer_id, c.name]))
+  }
+
+  const now = Date.now()
+  const enriched = rows.map((q: any) => ({
+    quote_id: q.quote_id,
+    title: q.title,
+    customer_id: q.customer_id,
+    customer_name: q.customer_id ? (customerMap[q.customer_id] || 'Okänd') : null,
+    total: q.total,
+    sent_at: q.sent_at,
+    dagar_sedan_skickad: q.sent_at ? Math.floor((now - Date.parse(q.sent_at)) / 86_400_000) : null,
+  }))
+
+  return { success: true, data: { threshold_days: days, count: enriched.length, quotes: enriched } }
+}
+
+/**
+ * "Vilka jobb kan faktureras?" — samma tre regler och samma tomma dedupe som
+ * pengar-på-bordet-sidan kör (app/api/dashboard/pengar/route.ts): svaret ska
+ * visa ALLT på bordet, inte bara det som ännu inte blivit ett kort.
+ * sweepMissedRevenue är en ren funktion (lib/value/missed-revenue.ts) —
+ * ingen egen affärslogik här, bara I/O + testdatafilter.
+ */
+async function getInvoiceableWork(
+  supabase: SupabaseClient, businessId: string
+): Promise<ToolResult> {
+  const now = new Date()
+  const [atasRes, matsRes, projRes, invRes] = await Promise.all([
+    supabase.from('project_change')
+      .select('id:change_id, project_id, change_type, description, amount, signed_at, invoice_id, invoiced_at')
+      .eq('business_id', businessId)
+      .not('signed_at', 'is', null)
+      .is('invoiced_at', null),
+    supabase.from('project_material')
+      .select('id:material_id, project_id, total_sell, invoiced, invoice_id')
+      .eq('business_id', businessId)
+      .eq('invoiced', false),
+    supabase.from('project')
+      .select('project_id, name, project_type, status, completed_at')
+      .eq('business_id', businessId)
+      .eq('status', 'completed'),
+    supabase.from('invoice')
+      .select('project_id')
+      .eq('business_id', businessId)
+      .not('project_id', 'is', null),
+  ])
+
+  for (const [namn, res] of Object.entries({ atas: atasRes, material: matsRes, projekt: projRes, fakturor: invRes })) {
+    if (res.error) return { success: false, error: `Kunde inte läsa ${namn}: ${res.error.message}` }
+  }
+
+  const riktigaProjekt = (projRes.data ?? []).filter(
+    (p: any) => !arTestId(p.project_id) && !arTestNamn(p.name),
+  )
+
+  const findings = sweepMissedRevenue({
+    atas: (atasRes.data ?? []) as any,
+    materials: (matsRes.data ?? []) as any,
+    projects: riktigaProjekt as any,
+    invoices: (invRes.data ?? []) as any,
+    // Tom dedupe med flit — se filhuvudskommentaren.
+    alreadyReported: new Set(),
+    now,
+  })
+
+  return {
+    success: true,
+    data: {
+      count: findings.length,
+      findings: findings.map(f => ({
+        typ: f.kind,
+        project_id: f.projectId,
+        project_name: f.projectName,
+        belopp_kr: f.amountKr,
+        konfidens: f.confidence,
+        rekommenderad_atgard: f.action,
+        underlag: f.evidence,
+      })),
+    },
+  }
+}
+
+/**
+ * "Vad har vi lovat kunder?" — godkända customer_fact-rader (fact_type
+ * 'commitment', superseded_by IS NULL). Läsvägen är fail-safe: v122 kan
+ * ännu inte vara körd i alla miljöer (se sql/v122_customer_fact.sql), och
+ * en saknad tabell ska ge tom lista, inte ett trasigt agentsvar.
+ */
+async function getCustomerCommitments(
+  supabase: SupabaseClient, businessId: string
+): Promise<ToolResult> {
+  const { data, error } = await supabase
+    .from('customer_fact')
+    .select('customer_id, content, evidence_quote, created_at')
+    .eq('business_id', businessId)
+    .eq('fact_type', 'commitment')
+    .is('superseded_by', null)
+    .order('created_at', { ascending: false })
+    .limit(20)
+
+  if (error) {
+    if (error.message?.includes('schema cache') || error.message?.includes('does not exist')) {
+      return { success: true, data: { count: 0, commitments: [], note: 'Kundfakta är inte konfigurerat ännu.' } }
+    }
+    return { success: false, error: error.message }
+  }
+  const rows = data || []
+
+  const customerIds = Array.from(new Set(rows.map((r: any) => r.customer_id).filter(Boolean))) as string[]
+  let customerMap: Record<string, string> = {}
+  if (customerIds.length > 0) {
+    const { data: customers } = await supabase
+      .from('customer').select('customer_id, name').in('customer_id', customerIds)
+    customerMap = Object.fromEntries((customers || []).map((c: any) => [c.customer_id, c.name]))
+  }
+
+  return {
+    success: true,
+    data: {
+      count: rows.length,
+      commitments: rows.map((r: any) => ({
+        customer_id: r.customer_id,
+        customer_namn: customerMap[r.customer_id] || 'Okänd',
+        content: r.content,
+        evidence_quote: r.evidence_quote,
+        created_at: r.created_at,
+      })),
+    },
   }
 }
 

@@ -200,6 +200,8 @@ const CURATED_TOOL_NAMES = [
   'get_efterkalkyl_insight', 'run_customer_base_sweep', 'book_site_visit',
   // R5 (tasks/resurs-masterplan.md) — persondagen/beläggning per person.
   'get_person_schedule',
+  // Command Center — read-only översiktsverktyg (Matte).
+  'get_projects_overview', 'get_stale_quotes', 'get_invoiceable_work', 'get_customer_commitments',
 ]
 
 // ═══ PER-AGENT ALLOWLIST (Codex audit P0.2, 2026-08-08) ═══
