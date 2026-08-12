@@ -19,8 +19,7 @@ import { ScheduleTimeline, parseKonflikter, minuterFranIso } from '@/components/
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { QuoteDraftDetail, QuoteToolExit } from '@/components/jarvis/QuoteDraftDetail'
 import { KarinCalendarWidget } from '@/components/karin/KarinCalendarWidget'
-import { AttHamtaRailCard } from '@/components/jarvis/AttHamtaRailCard'
-import { byggAttHamta } from '@/lib/jarvis/att-hamta'
+import { PengarBand } from '@/components/jarvis/PengarBand'
 import type { PengarSummary } from '@/lib/value/pengar-pa-bordet'
 import type { Vardekvitto } from '@/lib/value/vardekvitto'
 import { approvalPreview, isEditable, buildApprovalEdit } from '@/lib/jarvis/approval-preview'
@@ -55,11 +54,22 @@ import { grindaNyheter, entityFrom } from '@/lib/jarvis/news-gates'
  *
  * ═══ DEN BÄRANDE IDÉN: ANATOMI, INTE FÄRG ═══
  *
- *   Kräver ditt beslut → vitt kort med ram och knappar, resultatet läsbart
- *                        på plats (AgentDecisionCard)
- *   Värt att veta      → platt rad, ingen ram, inga knappar (AgentNewsRow)
+ *   Det här behöver dig idag → vitt kort med ram och knappar, resultatet
+ *                              läsbart på plats (AgentDecisionCard)
+ *   Värt att veta            → platt rad, ingen ram, inga knappar (AgentNewsRow)
  *
  * Man skummar sidan på två sekunder och vet exakt vad som är ens jobb.
+ *
+ * ═══ SKELETTET — FYRA FRÅGOR, INTE EN WIDGETSTAPEL (designkontrakt 2026-08-12) ═══
+ *
+ *   1. Det här behöver dig idag — beslutskorten, agenten leder varje kort.
+ *   2. Pengar just nu           — PengarBand, tyst utelämnad utan ägarsvar.
+ *   3. Det här sköter teamet    — TeamBevakning (✓-lista) + dygnsdigesten
+ *                                 hopfälld under samma rubrik.
+ *   4. Värdekvittoraden         — sist, som tidigare.
+ *
+ * "Värt att veta" (agentobservationerna) är inte en av de fyra — den är kvar
+ * som ett eget litet flöde mellan 3 och 4, oförändrad sedan innan.
  *
  * ═══ ORÖRT FRÅN IdagCore ═══
  *
@@ -143,7 +153,6 @@ interface JarvisHomeProps {
   bookings: BookingRow[]
   bookingsLoaded: boolean
   pipelineStats: { totalDeals: number; totalValue: number; newLeadsToday: number } | null
-  economics: { unpaidCount: number; unpaidAmount: number } | null
 }
 
 function formatKr(n: number): string {
@@ -185,7 +194,6 @@ export default function JarvisHome({
   bookings,
   bookingsLoaded,
   pipelineStats,
-  economics,
 }: JarvisHomeProps) {
   const business = useBusiness()
   const { setIsOpen: openJobbkompisen, setPendingPrompt } = useJobbuddy()
@@ -564,21 +572,6 @@ export default function JarvisHome({
 
   const synliga = approvals.filter(a => !hiddenIds.has(a.id))
 
-  // Att hämta-raden "väntar ovan": finns ett faktureringskort i kön pekar
-  // raden upp till det i stället för ut till en sida.
-  const faktureringskort = synliga.find(
-    a => a.approval_type === 'fakturera_projekt' || a.approval_type === 'missad_intakt',
-  )
-  const attHamta = byggAttHamta({
-    obetalda: economics ? { antal: economics.unpaidCount, summaKr: economics.unpaidAmount } : null,
-    pengar: pengarData,
-    harFaktureringskort: Boolean(faktureringskort),
-  })
-  const scrollTillFaktureringskort = () => {
-    if (!faktureringskort) return
-    document.getElementById(`beslut-${faktureringskort.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }
-
   // Dygnsdigesten: 24 h rullande fönster + grindar (lib/jarvis/dygnsdigest.ts).
   // Färska rader från executeSend (doneRows) står alltid först — de är det
   // man nyss beslutade och ska synas direkt.
@@ -651,7 +644,7 @@ export default function JarvisHome({
              Högerspalten började tidigare i höjd med rubriken, så "Dagens
              plan" hamnade ovanför beslutssektionens kant. Nu spänner
              hälsningen över båda kolumnerna och railen börjar i linje med
-             "Kräver ditt beslut" — symmetrin Andreas efterfrågade. */}
+             "Det här behöver dig idag" — symmetrin Andreas efterfrågade. */}
         <div className="min-w-0 lg:col-span-2">
           <h1 className="font-heading text-[22px] sm:text-[26px] font-bold tracking-[-0.02em] text-slate-900 m-0">
             {greetingName ? `God morgon, ${greetingName}` : 'God morgon'}
@@ -677,16 +670,23 @@ export default function JarvisHome({
             </div>
           )}
 
-          {/* ── Kräver ditt beslut ── */}
-          <div className="flex items-baseline gap-2 mb-2.5">
-            <h2 className="m-0 text-[15px] font-semibold text-slate-900">Kräver ditt beslut</h2>
+          {/* ── Det här behöver dig idag (designkontraktet, fråga 1) — varje
+              kort nedan leder med agentens avatar och namn, se
+              AgentDecisionCard/ApprovalCard. ── */}
+          <div className="mb-2.5">
+            <div className="flex items-baseline gap-2">
+              <h2 className="m-0 text-[15px] font-semibold text-slate-900">Det här behöver dig idag</h2>
+              {beslut > 0 && (
+                <span className="font-heading text-xs font-bold bg-primary-700 text-white rounded-full min-w-[21px] h-[21px] px-1.5 inline-flex items-center justify-center">
+                  {beslut}
+                </span>
+              )}
+            </div>
             {beslut > 0 && (
-              <span className="font-heading text-xs font-bold bg-primary-700 text-white rounded-full min-w-[21px] h-[21px] px-1.5 inline-flex items-center justify-center">
-                {beslut}
-              </span>
+              <p className="mt-0.5 mb-0 text-xs text-slate-400">
+                {beslut} {beslut === 1 ? 'sak' : 'saker'} behöver ditt beslut
+              </p>
             )}
-            {/* Göms under sm — vid 390px trängde den ut rubriken. */}
-            <span className="ml-auto text-xs text-slate-400 hidden sm:inline">Allt annat sköter teamet själva</span>
           </div>
 
           {!queueLoaded ? (
@@ -773,11 +773,32 @@ export default function JarvisHome({
             </div>
           )}
 
-          {/* ── Senaste dygnet — digesten DIREKT under besluten (etapp 6).
-              24 h rullande fönster, grindarna i lib/jarvis/dygnsdigest.ts.
-              Kollapsbar, default hopfälld — den är kvitto, inte kö. ── */}
+          {/* ── Pengar just nu (designkontraktet, fråga 2) — NYTT band.
+              /api/dashboard/pengar är ägargrindad (403 för anställda); ett
+              uteblivet svar utelämnar sektionen helt och tyst, samma regel
+              som kalenderwidgeten. ── */}
+          {pengarData && (
+            <>
+              <div className="flex items-baseline gap-2 mt-6 mb-2.5">
+                <h2 className="m-0 text-[15px] font-semibold text-slate-900">Pengar just nu</h2>
+              </div>
+              <PengarBand summary={pengarData} />
+            </>
+          )}
+
+          {/* ── Det här sköter teamet (designkontraktet, fråga 3) —
+              bevakningen (TeamBevakning) och dygnsdigesten under SAMMA
+              rubrik, inte två sektioner. ── */}
+          <div className="flex items-baseline gap-2 mt-6 mb-2.5">
+            <h2 className="m-0 text-[15px] font-semibold text-slate-900">Det här sköter teamet</h2>
+            <span className="text-xs text-slate-400">Ingen åtgärd behövs — bara läget</span>
+          </div>
+
+          {/* Senaste dygnet — 24 h rullande fönster, grindarna i
+              lib/jarvis/dygnsdigest.ts. Kollapsbar, default hopfälld — den
+              är kvitto, inte kö. */}
           {dygnsRader.length > 0 && (
-            <div className="mt-4 bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div className="mb-2.5 bg-white border border-slate-200 rounded-xl overflow-hidden">
               <button
                 type="button"
                 onClick={() => setDoneOpen(o => !o)}
@@ -824,8 +845,6 @@ export default function JarvisHome({
             </div>
           )}
 
-          {/* ── Teamet just nu — EFTER besluten, aldrig före (3b: besluten
-              äger skärmen). Kompakt enkelrad så fort två beslut väntar. ── */}
           <TeamBevakning rader={bevakning} kompakt={beslut >= 2} fynd={fynd} />
 
           {/* ── Värt att veta ── */}
@@ -918,13 +937,6 @@ export default function JarvisHome({
               <div className="h-10 bg-slate-50 rounded-lg animate-pulse" />
             )}
           </RailCard>
-
-          {/* Att hämta ersätter Fakturor-kortet OCH Pengar på bordet — samma
-              pengar ska aldrig synas som två saker (etapp 5). null för
-              anställda: beloppen är see_financials-data. */}
-          {attHamta && (
-            <AttHamtaRailCard vy={attHamta} onVantarOvan={scrollTillFaktureringskort} />
-          )}
 
           {/* Karins bolagskalender. Renderar ingenting för anställda, och
               inget när profilen saknar uppgifter — en widget som säger

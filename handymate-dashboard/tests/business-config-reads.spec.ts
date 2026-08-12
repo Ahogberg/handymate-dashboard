@@ -83,7 +83,11 @@ const DOKUMENTYTOR = [
  * medvetet val i stället för en tyst tredje kategori.
  */
 const VISNINGSYTOR = [
-  'app/dashboard/page.tsx',
+  // Matte Command Center (2026-08-12): /dashboard renderar numera JarvisHome,
+  // som inte läser business_config direkt — den gamla Idag-vyn (med sina
+  // business_config-läsningar) flyttade oförändrad till
+  // app/dashboard/oversikt/page.tsx.
+  'app/dashboard/oversikt/page.tsx',
   'app/dashboard/pipeline/page.tsx',
   'app/dashboard/invoices/[id]/page.tsx',
   'app/dashboard/quotes/[id]/page.tsx',

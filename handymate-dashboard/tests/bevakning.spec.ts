@@ -198,19 +198,30 @@ test.describe('fynd-pekaren — pekare till Värt att veta, aldrig kopia', () =>
   })
 })
 
-test.describe('orkestratorn — hierarki genom layout, aldrig pilar', () => {
+test.describe('checklistan — kollegor, inte ett mini-dashboard (Matte Command Center, 2026-08-12)', () => {
   const s = read('components/jarvis/TeamBevakning.tsx')
 
-  test('Matte får fullbreddsraden överst, specialisterna gridden', () => {
-    expect(s).toContain("rader.find(r => r.agentId === 'matte')")
-    expect(s).toContain("rader.filter(r => r.agentId !== 'matte')")
-    expect(s).toContain('håller ihop teamet')
-    // Kompaktavatarerna leds av Matte — ordningen bär hierarkin.
-    expect(s).toContain('matte ? [matte, ...specialister] : specialister')
+  // Designkontraktets exempel ("✓ Karin bevakar 4 fakturor · ✓ Daniel följer
+  // 3 offerter · ✓ Matte har sammanfattat …") följer källans egen ordning —
+  // den gamla "Matte på egen fullbreddsrad överst"-hierarkin (Tur 4 etapp 3)
+  // är borta. Raderna kommer i exakt den ordning byggBevakning returnerar
+  // dem, ingen omsortering i komponenten.
+  test('raderna renderas i byggBevaknings egen ordning — ingen Matte-först-sortering', () => {
+    expect(s).not.toContain("rader.find(r => r.agentId === 'matte')")
+    expect(s).not.toContain('matte ? [matte, ...specialister] : specialister')
+    expect(s).toContain('rader.map(r =>')
   })
 
-  test('yrkesrollerna står i korten — ur personakartan, aldrig hårdkodade', () => {
-    expect(s).toContain('AGENT_INFO[r.agentId]?.role')
+  test('varje rad bär agentens namn OCH den riktiga rubriken/detaljen — aldrig en påhittad räkning', () => {
+    // Namnet härleds ur AGENT_INFO (aldrig hårdkodat), rubrik/detalj kommer
+    // ordagrant ur lib/jarvis/bevakning.ts — komponenten hittar inte på text.
+    expect(s).toContain('AGENT_INFO[r.agentId]?.name')
+    expect(s).toContain('r.rubrik')
+    expect(s).toContain('r.detalj')
+  })
+
+  test('checkmarkeringen speglar aktiv — aldrig ett kron-schema eller en fråga', () => {
+    expect(s).toContain('r.aktiv')
   })
 
   test('skrivraden säger vem man delegerar till', () => {

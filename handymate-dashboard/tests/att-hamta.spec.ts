@@ -109,18 +109,23 @@ test.describe('lugnt läge och tystnad', () => {
 test.describe('ytan', () => {
   const home = fs.readFileSync(path.join(ROOT, 'components/jarvis/JarvisHome.tsx'), 'utf8')
 
-  test('de två gamla korten är borta, det nya är där', () => {
+  // Matte Command Center (2026-08-12): AttHamtaRailCard lämnade högerspalten
+  // för PengarBand under "Pengar just nu" (designkontraktets fråga 2) — samma
+  // pengar, en gemensam yta i stället för två. lib/jarvis/att-hamta.ts och
+  // AttHamtaRailCard.tsx lever kvar oanvända (facit-testade nedan) tills de
+  // städas, men JarvisHome monterar dem inte längre.
+  test('AttHamtaRailCard är borta ur högerspalten — ersatt av PengarBand', () => {
     expect(home).not.toContain('PengarRailCard')
     expect(home).not.toContain('title="Fakturor"')
-    expect(home).toContain('<AttHamtaRailCard')
+    expect(home).not.toContain('<AttHamtaRailCard')
+    expect(home).toContain('<PengarBand')
   })
 
-  test('beslutskorten bär ankar-id och väntar-ovan scrollar dit', () => {
+  test('beslutskorten bär fortfarande sitt ankar-id', () => {
     expect(home).toContain('id={`beslut-${approval.id}`}')
-    expect(home).toContain('scrollIntoView')
   })
 
-  test('lugna beskedet finns i kortet', () => {
+  test('lugna beskedet finns kvar i den oanvända komponenten', () => {
     const kort = fs.readFileSync(path.join(ROOT, 'components/jarvis/AttHamtaRailCard.tsx'), 'utf8')
     expect(kort).toContain('Inget att hämta')
     expect(kort).toContain('Karin bevakar fakturor och offerter')

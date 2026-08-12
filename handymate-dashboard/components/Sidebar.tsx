@@ -78,16 +78,17 @@ const NAV: NavItem[] = [
     type: 'group', key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard,
     children: [
       { label: 'Översikt', href: '/dashboard', exact: true },
-      // Jarvis-first-hemskärmen (2026-08-07). Ligger BREDVID Översikt medan
-      // den utvärderas — Översikt är kvar som standardvy tills Christoffer
-      // sagt att den nya är bättre. Posten tas bort när routen byts.
-      { label: 'Hem (ny)', href: '/dashboard/hem', exact: true },
+      // Gamla Idag-vyn (IdagCore) — routebytet 2026-08-12 gjorde JarvisHome
+      // till /dashboard. Den här posten är TEMPORÄR: ta bort den så snart
+      // pilotkunderna bekräftat att den nya ytan är bättre (se
+      // app/dashboard/oversikt/page.tsx för bakgrunden).
+      { label: 'Gamla översikten', href: '/dashboard/oversikt', exact: true },
       { label: 'Analys', href: '/dashboard/analytics', featureGate: 'lead_intelligence' },
       // Pengar på bordet (2026-08-08) låg först på egen rad i toppnivån. Sidan
       // säger själv att den ÄR en sammanställning och att allt arbete sker på
       // länkmålen — den hör alltså hemma bland de andra överblickarna, inte
-      // bland ytorna man arbetar på. Hemskärmen har den redan som kort
-      // (AttHamtaRailCard); menyposten är vägen dit för den som står på Översikt.
+      // bland ytorna man arbetar på. Hemskärmen har den redan som "Pengar
+      // just nu"-bandet; menyposten är vägen dit för den som står på Översikt.
       { label: 'Pengar på bordet', href: '/dashboard/pengar' },
       { label: 'Månadsrapport', href: '/dashboard/monthly-review' },
       // Karins bolagskalender (2026-08-07). Ligger bredvid Månadsrapport —

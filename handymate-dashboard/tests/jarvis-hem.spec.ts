@@ -161,3 +161,32 @@ test.describe('profilbilderna når fram', () => {
     expect(kalla).toContain('agent.initials')
   })
 })
+
+test.describe('designkontraktet — fyra frågor, i ordning (Matte Command Center, 2026-08-12)', () => {
+  const home = fs.readFileSync(path.join(ROOT, 'components/jarvis/JarvisHome.tsx'), 'utf8')
+
+  test('rubrikerna står i exakt denna ordning: beslut, pengar, team, kvitto', () => {
+    const beslut = home.indexOf('Det här behöver dig idag')
+    const pengar = home.indexOf('Pengar just nu')
+    const team = home.indexOf('Det här sköter teamet')
+    const kvitto = home.indexOf('Värdekvitto')
+    for (const [namn, pos] of [['beslut', beslut], ['pengar', pengar], ['team', team], ['kvitto', kvitto]] as const) {
+      expect(pos, `${namn}-rubriken saknas`).toBeGreaterThan(-1)
+    }
+    expect(beslut).toBeLessThan(pengar)
+    expect(pengar).toBeLessThan(team)
+    expect(team).toBeLessThan(kvitto)
+  })
+
+  test('Pengar just nu renderas bara vid ett ok-svar från /api/dashboard/pengar', () => {
+    // 403 (anställd) eller fel sätter aldrig pengarData (se useEffect-fetchen)
+    // — sektionen är därför villkorad på samma state, aldrig ovillkorlig.
+    expect(home).toContain('{pengarData && (')
+    expect(home).toContain('<PengarBand summary={pengarData} />')
+  })
+
+  test('AttHamtaRailCard är borta ur JarvisHome — ersatt av pengabandet', () => {
+    expect(home).not.toContain('AttHamtaRailCard')
+    expect(home).toContain("import { PengarBand } from '@/components/jarvis/PengarBand'")
+  })
+})
