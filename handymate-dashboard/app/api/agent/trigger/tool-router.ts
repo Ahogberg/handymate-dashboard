@@ -138,9 +138,14 @@ export async function executeTool(
         return await checkPendingApprovals(supabase, businessId)
       case 'get_project_profitability': {
         try {
-          const { calculateProfitability } = await import('@/lib/profitability')
-          const prof = await calculateProfitability(String(input.project_id), businessId)
-          return { success: true, data: prof }
+          // Migrerad (2026-08-12) från legacy lib/profitability.ts till den
+          // kanoniska ekonomimotorn — samma migrering som mobile-routen och
+          // Margin Guardian. Returnerar hela ProjectEconomics-objektet så
+          // agenten kan resonera ärligt kring marginal.arbetskostnad_konfigurerad
+          // i stället för en förenklad legacy-shape.
+          const { computeProjectEconomics } = await import('@/lib/projects/compute-economics')
+          const economics = await computeProjectEconomics(supabase, String(input.project_id), businessId)
+          return { success: true, data: economics }
         } catch (err: any) {
           return { success: false, error: err.message }
         }

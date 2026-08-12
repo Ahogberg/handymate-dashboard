@@ -61,11 +61,22 @@ export async function analyzeQuoteBeforeSend(
 
   if (similarQuotes.length < 3) return null
 
-  // Hämta faktisk tid för dessa projekt
+  // Hämta faktisk tid för dessa projekt.
+  // OBS (2026-08-12, migrerings-audit): tidigare lästes även
+  // actual_labor_cost och budget_amount här och beräknade avgActualCost/
+  // avgBudget — men dessa två variabler konsumerades aldrig nedanför
+  // (overrun/suggested_price bygger enbart på timmar, inte kostnad).
+  // actual_labor_cost är dessutom en stale DB-trigger-kolumn som räknar
+  // arbetskostnad på time_entry.hourly_rate (kundens pris, inte intern
+  // kostnad) — se lib/projects/compute-economics.ts. Eftersom fältet
+  // aldrig användes tas läsningen bort helt istället för att migreras
+  // till computeProjectEconomics (hade bara lagt på N+1-anrop för ett
+  // värde ingen läser). actual_hours behålls — den är en ren summering
+  // av time_entry.duration_minutes och påverkas inte av samma bugg.
   const quoteIds = similarQuotes.map((q: any) => q.quote_id)
   const { data: projects } = await supabase
     .from('project')
-    .select('project_id, quote_id, budget_hours, actual_hours, actual_labor_cost, budget_amount')
+    .select('project_id, quote_id, budget_hours, actual_hours')
     .eq('business_id', businessId)
     .in('quote_id', quoteIds)
 
@@ -77,8 +88,6 @@ export async function analyzeQuoteBeforeSend(
 
   const avgActualHours = projectsWithData.reduce((sum: number, p: any) => sum + (p.actual_hours || 0), 0) / projectsWithData.length
   const avgQuotedHours = projectsWithData.reduce((sum: number, p: any) => sum + (p.budget_hours || 0), 0) / projectsWithData.length
-  const avgBudget = projectsWithData.reduce((sum: number, p: any) => sum + (p.budget_amount || 0), 0) / projectsWithData.length
-  const avgActualCost = projectsWithData.reduce((sum: number, p: any) => sum + (p.actual_labor_cost || 0), 0) / projectsWithData.length
 
   const overrunPercent = avgQuotedHours > 0
     ? Math.round(((avgActualHours - avgQuotedHours) / avgQuotedHours) * 100)

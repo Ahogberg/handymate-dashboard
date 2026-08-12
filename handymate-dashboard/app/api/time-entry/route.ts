@@ -396,14 +396,14 @@ export async function POST(request: NextRequest) {
         })
       } catch { /* non-blocking */ }
 
-      // Realtids-lönsamhetslarm — Karin kollar om projektet spårar ur
+      // Realtids-lönsamhetslarm — Karin kollar om projektet spårar ur.
+      // checkProfitabilityWarnings har sedan i natt sin egen kanoniska
+      // 75%/95%-gate (lib/projects/margin-guardian.ts) — det gamla
+      // förfiltret via legacy calculateProfitability (stale kolumner,
+      // arbetskostnad räknad på kundpris) är därför bara att ta bort.
       try {
-        const { calculateProfitability } = await import('@/lib/profitability')
-        const prof = await calculateProfitability(inserted.project_id, business.business_id)
-        if (prof && prof.status !== 'on_track') {
-          const { checkProfitabilityWarnings } = await import('@/lib/profitability')
-          await checkProfitabilityWarnings(business.business_id)
-        }
+        const { checkProfitabilityWarnings } = await import('@/lib/profitability')
+        await checkProfitabilityWarnings(business.business_id)
       } catch { /* non-blocking */ }
     }
 

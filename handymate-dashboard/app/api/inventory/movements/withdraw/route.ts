@@ -98,14 +98,14 @@ export async function POST(request: NextRequest) {
       results.push({ item_id, success: true, new_stock: newStock })
     }
 
-    // Realtids-lönsamhetslarm efter materialuttag
+    // Realtids-lönsamhetslarm efter materialuttag. checkProfitabilityWarnings
+    // har sedan i natt sin egen kanoniska 75%/95%-gate — det gamla
+    // förfiltret via legacy calculateProfitability (stale kolumner) är
+    // därför bara att ta bort.
     if (project_id) {
       try {
-        const { calculateProfitability, checkProfitabilityWarnings } = await import('@/lib/profitability')
-        const prof = await calculateProfitability(project_id, business.business_id)
-        if (prof && prof.status !== 'on_track') {
-          await checkProfitabilityWarnings(business.business_id)
-        }
+        const { checkProfitabilityWarnings } = await import('@/lib/profitability')
+        await checkProfitabilityWarnings(business.business_id)
       } catch { /* non-blocking */ }
     }
 

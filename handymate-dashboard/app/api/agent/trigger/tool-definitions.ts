@@ -362,7 +362,7 @@ export const toolDefinitions = [
   // Profitability
   {
     name: "get_project_profitability",
-    description: "Hämta lönsamhetsanalys för ett specifikt projekt. Returnerar budget, faktisk kostnad, marginal, prognos och status (on_track/at_risk/over_budget).",
+    description: "Hämta full projektekonomi för ett specifikt projekt: intakter (budget_amount, ata_signerat_kr, forvantad_intakt_kr, fakturerat_kr, betalt_kr), kostnader (arbete_kr — kan vara null, arbete_timmar, material_inkop_kr, extra_kr, total_kr — null om arbete_kr är null) och marginal (marginal_kr, marginal_pct, är_tomt, kostnad_sannolikt_komplett). VIKTIGT: om marginal.arbetskostnad_konfigurerad är false saknas intern timkostnad för minst en tidrad — marginal_kr/marginal_pct är då null. Uppfinn ALDRIG en marginal i det läget; säg i stället att intern timkostnad inte är konfigurerad.",
     input_schema: {
       type: "object" as const,
       properties: {

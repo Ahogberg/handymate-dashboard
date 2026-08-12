@@ -23,7 +23,6 @@ import { SCHEMA_BLOCK } from '@/lib/agents/shared/schema-block'
 import { type AgentObservation } from '@/lib/agents/shared/normalize'
 import {
   InvoiceRow,
-  ProjectRow,
   QuoteRow,
   InvoiceStats,
   computeInvoiceStats,
@@ -34,6 +33,10 @@ import {
   type AgentDebugInfo,
 } from '@/lib/agents/shared/thinking-call'
 import { saveAndPush } from '@/lib/agents/shared/save-and-push'
+import {
+  computeProjectEconomics,
+  type ProjectEconomics,
+} from '@/lib/projects/compute-economics'
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
@@ -66,7 +69,7 @@ export interface KarinRunResult {
 // indikerar att Vercel kör äldre commit. Trigga test-endpoint efter push och
 // kolla result.debug.code_version: matchar = ny kod kör; matchar inte =
 // deploy-problem (kolla Vercel dashboard, build-status, branch-konfiguration).
-export const KARIN_CODE_VERSION = 'shared-extract-A2-2026-05-18'
+export const KARIN_CODE_VERSION = 'economics-migration-2026-08-12'
 
 // KarinDebugInfo är ett alias för AgentDebugInfo från shared.
 // Behålls som re-export för bakåt-kompatibilitet.
@@ -108,6 +111,10 @@ export interface KarinAggregate {
     completed_count: number
     over_budget_count: number
     at_risk_count: number
+    // Projekt där marginal INTE kunde beräknas (ingen intern timkostnad
+    // konfigurerad på medlem/business-default). Exkluderade ur
+    // avg_margin_pct — ärlighetsprincip, se buildAggregate.
+    missing_cost_config_count: number
     over_budget_samples: Array<{
       project_id: string
       name: string
@@ -137,6 +144,43 @@ export interface KarinAggregate {
 // Aggregation (Karin-specifik — invoice + projects + quotes + cash flow)
 // computeInvoiceStats + ymKey importerade från shared/business-aggregate
 // ─────────────────────────────────────────────────────────────────
+
+// Migrering (2026-08-12): ProjectRow innehåller bara grunddata. Full
+// ekonomi (kostnad, marginal) hämtas via computeProjectEconomics per
+// projekt nedan — inga stale actual_hours/actual_labor_cost/
+// actual_material_cost/profitability_status-snapshots. Samma mönster
+// som Lars redan kör i produktion (lib/agents/lars/observation-prompt.ts,
+// Etapp 2.4): dessa kolumner sätts av en DB-trigger som räknar
+// arbetskostnad på time_entry.hourly_rate — KUNDENS pris, inte intern
+// kostnad — vilket gav falskt hög marginal.
+interface ProjectRow {
+  project_id: string
+  name: string | null
+  customer_id: string | null
+  status: string
+  budget_hours: number | null
+  budget_amount: number | null
+  completed_at: string | null
+  created_at: string
+}
+
+/** Avgör om ett projekt är "över budget" från helper-data. Kräver att
+ *  arbetskostnad är konfigurerad — annars vet vi inte (ärlighet). */
+function isOverBudgetFromEconomics(e: ProjectEconomics): boolean {
+  if (!e.marginal.arbetskostnad_konfigurerad) return false
+  if (e.kostnader.total_kr == null) return false
+  return e.kostnader.total_kr > e.intakter.forvantad_intakt_kr
+}
+
+/** "At risk" = kostnad har ätit upp 75-100% av förväntad intäkt men
+ *  har inte (ännu) gått förbi den. Kräver konfigurerad arbetskostnad. */
+function isAtRiskFromEconomics(e: ProjectEconomics): boolean {
+  if (!e.marginal.arbetskostnad_konfigurerad) return false
+  if (e.kostnader.total_kr == null) return false
+  if (e.intakter.forvantad_intakt_kr <= 0) return false
+  const ratio = e.kostnader.total_kr / e.intakter.forvantad_intakt_kr
+  return ratio >= 0.75 && ratio <= 1.0
+}
 
 async function buildAggregate(
   supabase: SupabaseClient,
@@ -271,24 +315,49 @@ async function buildAggregate(
   // ── Projects (90d) ─────────────────────────────────────────
   const { data: projectsData } = await supabase
     .from('project')
-    .select('project_id, name, customer_id, status, budget_hours, budget_amount, actual_hours, actual_labor_cost, actual_material_cost, profitability_status, completed_at, created_at')
+    .select('project_id, name, customer_id, status, budget_hours, budget_amount, completed_at, created_at')
     .eq('business_id', businessId)
     .gte('created_at', ninetyDaysAgo.toISOString())
     .limit(200)
 
-  const projects = (projectsData || []) as Array<ProjectRow & { created_at: string }>
+  const projects = (projectsData || []) as ProjectRow[]
   const completedProjects = projects.filter(p => p.status === 'completed')
-  const overBudget = projects.filter(p => p.profitability_status === 'over_budget')
-  const atRisk = projects.filter(p => p.profitability_status === 'at_risk')
 
-  const overBudgetSamples = overBudget
-    .map(p => {
-      const totalCost = Number(p.actual_labor_cost || 0) + Number(p.actual_material_cost || 0)
-      const budget = Number(p.budget_amount || 0)
+  // N+1: ett computeProjectEconomics-anrop per projekt (helpern gör ~7
+  // queries internt). Samma avvägning som Lars redan kör i produktion
+  // för upp till 300 projekt/business (Etapp 2.4) — observationspasset
+  // är cron-drivet, inte request-latency-känsligt, och ett företags
+  // 90-dagarsfönster ligger normalt på enstaka-till-tiotals projekt.
+  // Om .limit(200)-taket börjar träffas regelbundet bör detta batchas
+  // (samma TD-62 Lars redan flaggat i sin fil).
+  const economicsResults = await Promise.all(
+    projects.map(p => computeProjectEconomics(supabase, p.project_id, businessId)),
+  )
+  const economicsByProjectId = new Map<string, ProjectEconomics>()
+  for (let i = 0; i < projects.length; i++) {
+    const e = economicsResults[i]
+    if (e) economicsByProjectId.set(projects[i].project_id, e)
+  }
+
+  // Över/nära-budget bedöms nu på verklig kostnad vs förväntad intäkt
+  // (budget + signerad ÄTA) via helpern — inte på det stale
+  // profitability_status-fältet (samma trigger-bugg som actual_*).
+  const allEconomics = Array.from(economicsByProjectId.values())
+  const overBudgetEconomics = allEconomics.filter(isOverBudgetFromEconomics)
+  const atRiskEconomics = allEconomics.filter(isAtRiskFromEconomics)
+  const missingCostConfigCount = allEconomics.filter(
+    e => !e.marginal.arbetskostnad_konfigurerad,
+  ).length
+
+  const overBudgetSamples = overBudgetEconomics
+    .map(e => {
+      const proj = projects.find(p => p.project_id === e.project_id)
+      const budget = e.intakter.forvantad_intakt_kr
+      const totalCost = e.kostnader.total_kr || 0
       const pctOver = budget > 0 ? Math.round(((totalCost - budget) / budget) * 100) : 0
       return {
-        project_id: p.project_id,
-        name: p.name || '(namnlöst)',
+        project_id: e.project_id,
+        name: proj?.name || '(namnlöst)',
         budget_amount: Math.round(budget),
         actual_total_cost: Math.round(totalCost),
         pct_over: pctOver,
@@ -297,14 +366,22 @@ async function buildAggregate(
     .sort((a, b) => b.pct_over - a.pct_over)
     .slice(0, 5)
 
+  // Ärlighet (samma princip som Guardian/Lars): snittmarginal räknas
+  // BARA på färdiga projekt med konfigurerad intern arbetskostnad.
+  // Projekt utan kostnadsdata exkluderas helt — de skulle annars
+  // räknas som 0/null och skeva snittet fel.
   let avgMarginPct: number | null = null
-  const completedWithBudget = completedProjects.filter(p => Number(p.budget_amount || 0) > 0)
-  if (completedWithBudget.length > 0) {
-    const margins = completedWithBudget.map(p => {
-      const cost = Number(p.actual_labor_cost || 0) + Number(p.actual_material_cost || 0)
-      const budget = Number(p.budget_amount || 0)
-      return budget > 0 ? ((budget - cost) / budget) * 100 : 0
-    })
+  const completedWithMargin = completedProjects
+    .map(p => economicsByProjectId.get(p.project_id))
+    .filter(
+      (e): e is ProjectEconomics =>
+        !!e &&
+        e.marginal.arbetskostnad_konfigurerad &&
+        e.intakter.forvantad_intakt_kr > 0 &&
+        e.marginal.marginal_pct !== null,
+    )
+  if (completedWithMargin.length > 0) {
+    const margins = completedWithMargin.map(e => e.marginal.marginal_pct as number)
     avgMarginPct = Math.round(margins.reduce((s, m) => s + m, 0) / margins.length)
   }
 
@@ -380,8 +457,9 @@ async function buildAggregate(
     projects_90d: {
       total_count: projects.length,
       completed_count: completedProjects.length,
-      over_budget_count: overBudget.length,
-      at_risk_count: atRisk.length,
+      over_budget_count: overBudgetEconomics.length,
+      at_risk_count: atRiskEconomics.length,
+      missing_cost_config_count: missingCostConfigCount,
       over_budget_samples: overBudgetSamples,
       avg_margin_pct: avgMarginPct,
     },
@@ -453,6 +531,7 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
    - Är material-tunga projekt mindre lönsamma än arbetskraft-tunga?
    - Vilka projekt har gått 20%+ över estimat (ÄTA-kandidater)?
    - Finns kund-typer med systematiskt lägre marginal?
+   - **ÄRLIGHET:** \`projects_90d.avg_margin_pct\` räknas BARA på färdiga projekt med konfigurerad intern timkostnad. Om \`missing_cost_config_count > 0\`, nämn kort att X projekt saknar kostnadsdata och exkluderades — hitta ALDRIG på en marginal-siffra för dem.
 
 3. **Pricing-möjligheter:**
    - När justerades timpris senast? (Indirekt: har avg pris/h ökat eller stått stilla?)
