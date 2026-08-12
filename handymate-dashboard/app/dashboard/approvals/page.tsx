@@ -30,6 +30,7 @@ import {
   Award,
   KeyRound,
   Lightbulb,
+  Users,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -133,6 +134,9 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   autonomy_revoked: { label: 'Förtroende', icon: KeyRound, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
   // Project Debrief Capture (2026-08-12) — de korta frågorna vid projektstängning.
   project_debrief: { label: 'Efter jobbet', icon: Lightbulb, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
+  // Startkorten (docs/design/FORSTA-30-MINUTERNA.md) — teamet presenterar
+  // sig genom kortmekaniken vid onboarding-slut.
+  team_intro: { label: 'Ditt team', icon: Users, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 

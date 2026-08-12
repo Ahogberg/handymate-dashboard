@@ -158,6 +158,13 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // recordAutonomyFailure): "nyckeln togs bort" är ett konstaterande, inte
   // ett förslag. Godkänn = jag har läst den, ingenting att utföra.
   autonomy_revoked: 'INFORMATIONAL',
+
+  // Startkorten (lib/onboarding/starter-cards.ts, docs/design/
+  // FORSTA-30-MINUTERNA.md): teamet presenterar sig genom kortmekaniken
+  // själv vid onboarding-slut. Godkänn = jag har läst det — precis som
+  // agent_insight ovan, ingenting utförs (Karin-kortets fynd är redan
+  // riktigt/agerbart som TEXT, men själva godkännandet skickar inget).
+  team_intro: 'INFORMATIONAL',
 }
 
 /** Vad är det här kortet? `null` = okänt, och okänt godkänns inte. */

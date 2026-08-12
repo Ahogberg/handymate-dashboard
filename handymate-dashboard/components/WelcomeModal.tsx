@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { X, ArrowRight } from 'lucide-react'
 
 /**
@@ -10,6 +11,7 @@ import { X, ArrowRight } from 'lucide-react'
  */
 export default function WelcomeModal() {
   const [show, setShow] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     const dismissed = localStorage.getItem('handymate_welcome_dismissed')
@@ -21,6 +23,14 @@ export default function WelcomeModal() {
   const dismiss = () => {
     localStorage.setItem('handymate_welcome_dismissed', '1')
     setShow(false)
+  }
+
+  // "Visa mig kön" ska faktiskt visa kön. Modalen bor i dashboard-layouten
+  // och kan alltså trigga på VILKEN dashboard-sida som helst — utan denna
+  // navigering stannar den som klickar kvar där den redan var.
+  const visaKon = () => {
+    dismiss()
+    router.push('/dashboard')
   }
 
   return (
@@ -56,7 +66,7 @@ export default function WelcomeModal() {
         </p>
 
         <button
-          onClick={dismiss}
+          onClick={visaKon}
           className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary-700 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity"
         >
           Visa mig kön

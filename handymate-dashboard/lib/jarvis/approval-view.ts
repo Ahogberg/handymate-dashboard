@@ -61,6 +61,8 @@ export const TYPE_LABEL: Record<string, string> = {
   fakturera_projekt: 'Faktura',
   meeting_summary: 'Möte',
   meeting_followup: 'Uppföljning från möte',
+  // Startkorten (docs/design/FORSTA-30-MINUTERNA.md).
+  team_intro: 'Ditt team',
 }
 
 export function typeLabel(approvalType: string): string {
@@ -137,6 +139,9 @@ export function approveLabel(approvalType: string, payload?: Record<string, unkn
   // approve-knapp (voice='fragar' bygger annars sina egna alternativ, se
   // lib/jarvis/card-voice.ts reviewAlternatives).
   if (approvalType === 'profitability_warning') return 'Jag har sett det'
+  // Startkorten är INFORMATIONAL (action-contract.ts) — godkänn = "jag har
+  // läst det", ingenting utförs. Samma ord som profitability_warning ovan.
+  if (approvalType === 'team_intro') return 'Jag har läst det'
   return 'Godkänn'
 }
 
@@ -185,5 +190,10 @@ export function deepLinkFor(approval: ApprovalLike): { label: string; href: stri
   }
   if (t === 'publish_microsite') return { label: 'Visa först →', href: '/dashboard/website' }
   if (t.includes('booking')) return { label: 'Öppna kalendern →', href: '/dashboard/schedule' }
+  // Startkorten: bara Karins kort (payload.agent_id) länkar vidare — Lisas
+  // och Daniels är rena presentationskort utan en egen sida att öppna.
+  if (t === 'team_intro' && pl.agent_id === 'karin') {
+    return { label: 'Öppna pengar →', href: '/dashboard/pengar' }
+  }
   return null
 }
