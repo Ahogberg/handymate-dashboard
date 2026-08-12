@@ -4,6 +4,8 @@
  * Swedish language.
  */
 
+import { extractFirstName, halsning } from '@/lib/customers/namn'
+
 interface BusinessBranding {
   businessName: string
   accentColor?: string
@@ -84,11 +86,11 @@ export function quoteEmail(params: {
   totalAmount: string
   viewUrl: string
 }): { subject: string; html: string } {
-  const subject = `Offert: ${params.projectTitle}`
+  const subject = `Offert från ${params.branding.businessName}`
   const html = emailLayout(params.branding, `
-    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">Hej ${params.customerName}!</h2>
+    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">${halsning(params.customerName)}</h2>
     <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
-      Vi har tagit fram en offert för <strong>${params.projectTitle}</strong>.
+      Vi har tagit fram en offert åt dig.
     </p>
     <table width="100%" style="margin:0 0 24px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
       <tr>
@@ -118,11 +120,11 @@ export function quoteReminderEmail(params: {
   daysSinceSent: number
   viewUrl: string
 }): { subject: string; html: string } {
-  const subject = `Påminnelse: Offert för ${params.projectTitle}`
+  const subject = `Påminnelse: Din offert från ${params.branding.businessName}`
   const html = emailLayout(params.branding, `
-    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">Hej ${params.customerName}!</h2>
+    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">${halsning(params.customerName)}</h2>
     <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
-      Vi skickade en offert för <strong>${params.projectTitle}</strong> för ${params.daysSinceSent} dagar sedan.
+      Vi skickade en offert till dig för ${params.daysSinceSent} dagar sedan.
       Har du hunnit titta på den? Tveka inte att höra av dig om du har frågor.
     </p>
     <p style="margin:0 0 24px;">
@@ -148,7 +150,7 @@ export function bookingConfirmationEmail(params: {
 }): { subject: string; html: string } {
   const subject = `Bokningsbekräftelse: ${params.date} kl ${params.time}`
   const html = emailLayout(params.branding, `
-    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">Hej ${params.customerName}!</h2>
+    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">${halsning(params.customerName)}</h2>
     <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
       Din bokning är bekräftad!
     </p>
@@ -215,7 +217,7 @@ export function invoiceEmail(params: {
   const bankgiroLine = params.bankgiro ? `Bankgiro: ${params.bankgiro}. ` : ''
 
   const html = emailLayout(params.branding, `
-    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">Hej ${params.customerName}!</h2>
+    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">${halsning(params.customerName)}</h2>
     <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
       Här kommer faktura <strong>#${params.invoiceNumber}</strong>.
     </p>
@@ -255,8 +257,9 @@ export function jobCompletedEmail(params: {
   reviewUrl?: string
 }): { subject: string; html: string } {
   const subject = `Tack för att du valde ${params.branding.businessName}!`
+  const tackFirstName = extractFirstName(params.customerName)
   const html = emailLayout(params.branding, `
-    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">Tack ${params.customerName}!</h2>
+    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">${tackFirstName ? `Tack ${tackFirstName}!` : 'Tack!'}</h2>
     <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
       Vi hoppas att du är nöjd med arbetet. Det betyder mycket för oss att få förtroendet.
     </p>
@@ -285,10 +288,10 @@ export function reEngagementEmail(params: {
 }): { subject: string; html: string } {
   const subject = `Behöver du hjälp med något mer?`
   const html = emailLayout(params.branding, `
-    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">Hej ${params.customerName}!</h2>
+    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">${halsning(params.customerName)}</h2>
     <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
       Det var ett tag sedan vi hördes!
-      ${params.lastJobDescription ? ` Förra gången hjälpte vi dig med ${params.lastJobDescription}.` : ''}
+      ${params.lastJobDescription ? ` Förra gången hjälpte vi dig.` : ''}
     </p>
     <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
       Har du något nytt projekt på gång? Vi hjälper gärna till igen.

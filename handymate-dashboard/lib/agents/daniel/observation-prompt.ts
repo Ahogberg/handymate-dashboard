@@ -26,11 +26,11 @@ import { saveAndPush } from '@/lib/agents/shared/save-and-push'
 import {
   isUnopenedActionable,
   daysSinceSent,
-  extractFirstName,
   filterOutConflicting,
   buildUnopenedNudgeMessage,
   UNOPENED_CONFLICT_WINDOW_HOURS,
 } from '@/lib/agents/daniel/unopened-quotes'
+import { extractFirstName } from '@/lib/customers/namn'
 import {
   getEfterkalkylInsightsByJobType,
   type JobTypeEfterkalkylInsight,

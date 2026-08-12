@@ -1,6 +1,11 @@
+import { extractFirstName, halsning } from '@/lib/customers/namn'
+
 /**
  * Generera bekräftelse-SMS till kund efter offertacceptans.
  * Försöker använda Claude Haiku, fallback till mall.
+ *
+ * R1/R2: kundtext får BARA kundens förnamn, ALDRIG offertens interna
+ * arbetsnamn (quoteTitle) — referera generiskt till "offerten".
  */
 export async function generateCustomerSms(params: {
   businessName: string
@@ -9,7 +14,8 @@ export async function generateCustomerSms(params: {
   quoteTitle: string
   bookingDate?: string
 }): Promise<string> {
-  const { businessName, contactName, customerName, quoteTitle, bookingDate } = params
+  const { businessName, contactName, customerName, bookingDate } = params
+  const customerFirstName = extractFirstName(customerName)
 
   // Försök med Claude Haiku
   const apiKey = process.env.ANTHROPIC_API_KEY
@@ -31,7 +37,7 @@ export async function generateCustomerSms(params: {
           max_tokens: 200,
           messages: [{
             role: 'user',
-            content: `Skriv ett kort, vänligt SMS (max 160 tecken) till ${customerName} som bekräftar att vi tagit emot deras godkännande av offerten för "${quoteTitle}". ${bookingPart}Signera med ${contactName} från ${businessName}. Skriv på svenska. Bara SMS-texten, inget annat.`,
+            content: `Skriv ett kort, vänligt SMS (max 160 tecken) till ${customerFirstName || 'kunden'} som bekräftar att vi tagit emot deras godkännande av offerten. ${bookingPart}Signera med ${contactName} från ${businessName}. Skriv på svenska. Använd kundens förnamn (eller "Hej!" om inget namn finns). Referera till offerten generiskt — nämn ALDRIG interna arbetsnamn eller titlar. Bara SMS-texten, inget annat.`,
           }],
         }),
       })
@@ -48,5 +54,5 @@ export async function generateCustomerSms(params: {
 
   // Fallback-mall
   const bookingPart = bookingDate ? ` Vi föreslår start ${bookingDate}.` : ''
-  return `Hej ${customerName}! Tack för att du valt ${businessName} för "${quoteTitle}".${bookingPart} Vi återkommer snart med detaljer. //${contactName}`
+  return `${halsning(customerName)} Tack för att du valt ${businessName}.${bookingPart} Vi återkommer snart med detaljer. //${contactName}`
 }

@@ -9,6 +9,7 @@ import { resolveSenderId } from '@/lib/sms/sender-id'
 import { sendSmsViaElks } from '@/lib/sms-send'
 import { getBusinessPlanFromConfig } from '@/lib/auth'
 import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
+import { extractFirstName } from '@/lib/customers/namn'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -58,18 +59,18 @@ export const DEFAULT_SEQUENCES: Omit<NurtureSequence, 'id' | 'business_id' | 'cr
       {
         delay_days: 3,
         channel: 'sms',
-        template: 'Hej {customer_name}! Har du hunnit titta på offerten för {project_title}? Hör gärna av dig om du har frågor. //{business_name}',
+        template: 'Hej {customer_name}! Har du hunnit titta på offerten vi skickade? Hör gärna av dig om du har frågor. //{business_name}',
       },
       {
         delay_days: 7,
         channel: 'email',
-        subject: 'Påminnelse: Offert för {project_title}',
-        template: 'Hej {customer_name},\n\nVi skickade en offert för {project_title} för en vecka sedan. Vi vill bara försäkra oss om att du fått den och om du har några frågor.\n\nTveka inte att höra av dig – vi hjälper gärna till!\n\nMed vänlig hälsning,\n{business_name}',
+        subject: 'Påminnelse: Din offert från {business_name}',
+        template: 'Hej {customer_name},\n\nVi skickade en offert till dig för en vecka sedan. Vi vill bara försäkra oss om att du fått den och om du har några frågor.\n\nTveka inte att höra av dig – vi hjälper gärna till!\n\nMed vänlig hälsning,\n{business_name}',
       },
       {
         delay_days: 14,
         channel: 'sms',
-        template: 'Hej {customer_name}, sista påminnelsen om offerten för {project_title}. Offerten är giltig till {valid_until}. Hör av dig om du vill gå vidare! //{business_name}',
+        template: 'Hej {customer_name}, sista påminnelsen om offerten vi skickade. Offerten är giltig till {valid_until}. Hör av dig om du vill gå vidare! //{business_name}',
       },
     ],
   },
@@ -364,9 +365,10 @@ export async function processEnrollmentStep(enrollmentId: string): Promise<{
 
   if (!business) return { success: false, error: 'business_not_found' }
 
-  // Build variables for interpolation
+  // Build variables for interpolation.
+  // R1: customer_name interpoleras via FÖRNAMN, aldrig rått fullnamn.
   const variables: Record<string, string> = {
-    customer_name: customer.name || 'kund',
+    customer_name: extractFirstName(customer.name) || 'kund',
     business_name: business.business_name || 'Företaget',
     contact_name: business.contact_name || '',
     services: Array.isArray(business.services_offered)
@@ -374,16 +376,19 @@ export async function processEnrollmentStep(enrollmentId: string): Promise<{
       : business.services_offered || '',
   }
 
-  // Try to get deal/quote context if available
+  // Try to get deal/quote context if available.
+  // R2: deal.title är hantverkarens interna arbetsnamn — får aldrig
+  // interpoleras i kundtext. Ingen mall refererar längre {project_title}
+  // (se DEFAULT_SEQUENCES ovan, som säger "offerten" generiskt istället),
+  // men deal_value hämtas fortfarande här.
   if (enrollment.deal_id) {
     const { data: deal } = await supabase
       .from('deal')
-      .select('title, value')
+      .select('value')
       .eq('id', enrollment.deal_id)
       .single()
 
     if (deal) {
-      variables.project_title = deal.title || 'Projekt'
       variables.deal_value = deal.value?.toString() || ''
     }
   }

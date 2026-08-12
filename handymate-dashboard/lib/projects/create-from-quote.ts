@@ -7,6 +7,7 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { getQuoteBudgetDerivation } from '@/lib/quotes/get-quote-budget-derivation'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
+import { halsning } from '@/lib/customers/namn'
 
 interface CreateResult {
   success: boolean
@@ -209,7 +210,6 @@ export async function createProjectFromQuote(
       if (customer?.phone_number && customer?.portal_token && customer?.portal_enabled) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
         const portalUrl = `${appUrl}/portal/${customer.portal_token}?tab=projects`
-        const firstName = customer.name?.split(' ')[0] || ''
 
         const { data: biz } = await supabase
           .from('business_config')
@@ -217,12 +217,14 @@ export async function createProjectFromQuote(
           .eq('business_id', businessId)
           .single()
 
+        // R2: projectName kommer från quote.title (hantverkarens interna
+        // arbetsnamn) — refereras aldrig i kundtext, "ditt projekt" istället.
         await fetch(`${appUrl}/api/sms/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             to: customer.phone_number,
-            message: `Hej ${firstName}! Ditt projekt "${projectName}" har startats. Följ projektets gång här: ${portalUrl} // ${biz?.business_name || ''}`,
+            message: `${halsning(customer.name)} Ditt projekt hos ${biz?.business_name || ''} har startats. Följ projektets gång här: ${portalUrl}`,
             business_id: businessId,
           }),
         })

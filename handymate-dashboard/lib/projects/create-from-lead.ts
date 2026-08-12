@@ -5,6 +5,7 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
+import { halsning } from '@/lib/customers/namn'
 
 interface CreateResult {
   success: boolean
@@ -187,7 +188,6 @@ export async function createProjectFromLead(
         if (cust?.phone_number && cust?.portal_token && cust?.portal_enabled) {
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
           const portalUrl = `${appUrl}/portal/${cust.portal_token}?tab=projects`
-          const firstName = cust.name?.split(' ')[0] || ''
 
           const { data: biz } = await supabase
             .from('business_config')
@@ -195,12 +195,14 @@ export async function createProjectFromLead(
             .eq('business_id', businessId)
             .single()
 
+          // R2: projectName kan komma från lead.title/description (interna
+          // arbetsnamn) — refereras aldrig i kundtext, "ditt projekt" istället.
           await fetch(`${appUrl}/api/sms/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               to: cust.phone_number,
-              message: `Hej ${firstName}! Ditt projekt "${projectName}" har startats. Följ projektets gång här: ${portalUrl} // ${biz?.business_name || ''}`,
+              message: `${halsning(cust.name)} Ditt projekt hos ${biz?.business_name || ''} har startats. Följ projektets gång här: ${portalUrl}`,
               business_id: businessId,
             }),
           })

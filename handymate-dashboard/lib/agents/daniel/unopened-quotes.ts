@@ -20,6 +20,9 @@
  * Pure helpers — inga DB-anrop. Testbar via scripts/test-daniel-unopened.ts.
  */
 
+import { extractFirstName, halsning } from '@/lib/customers/namn'
+export { extractFirstName, halsning } from '@/lib/customers/namn'
+
 export const UNOPENED_WINDOW_MIN_DAYS = 5
 export const UNOPENED_WINDOW_MAX_DAYS = 14
 
@@ -69,20 +72,6 @@ export function isUnopenedActionable(
 
 /** SMS-max 160 tecken (en SMS-segment GSM-7). Lite marginal för säkerhet. */
 export const NUDGE_SMS_MAX_LENGTH = 160
-
-/**
- * Extrahera förnamn från fullt namn. Robust mot:
- *   - null / tom sträng → ''
- *   - "Erik Svensson" → "Erik"
- *   - "BRF Lindgården" → "BRF" (företagsnamn — accepterar, fallar tillbaka i meddelandet)
- *   - leading/trailing whitespace → trim
- */
-export function extractFirstName(fullName: string | null | undefined): string {
-  if (!fullName) return ''
-  const trimmed = fullName.trim()
-  if (!trimmed) return ''
-  return trimmed.split(/\s+/)[0] || ''
-}
 
 /**
  * Bygg SMS-text för obeöppnad-offert-nudge.

@@ -11,6 +11,7 @@ import { captureExpectedMarginSnapshot } from '@/lib/quotes/margin-snapshot'
 import { freezeProjectOutcome } from '@/lib/efterkalkyl/freeze-outcome'
 import { getProjectOutcome } from '@/lib/efterkalkyl/get-project-outcome'
 import { skapaDebriefKort } from '@/lib/debrief/create-debrief-card'
+import { halsning } from '@/lib/customers/namn'
 
 /**
  * lib/demo/seed-demo-account.ts (2026-07)
@@ -997,7 +998,9 @@ export async function resetDemoAccount(
         agent_id: 'daniel',
         quote_id: quotes.mikael_quote.quote_id,
         to: ownerPhone,
-        message: `Hej ${customers.mikael.name}! Jag såg att du tittade på offerten för "Altanbygge – Furuvägen 8". Har du några frågor? Hör gärna av dig! //${contactName}`,
+        // R1/R2 (kundröst-sveep 2026-08-12): förnamn, ingen intern offert-titel
+        // — speglar den fixade formen i lib/autopilot/quote-nudge.ts.
+        message: `${halsning(customers.mikael.name)} Jag såg att du tittade på offerten. Har du några frågor? Hör gärna av dig! //${contactName}`,
         customer_name: customers.mikael.name,
         view_count: 3,
       },

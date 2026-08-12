@@ -157,7 +157,9 @@ export async function GET(request: NextRequest) {
         const amount = amountRaw.toLocaleString('sv-SE')
         const firstName = (customer.name || '').split(' ')[0]
         const suffix = buildSmsSuffix(businessName, biz?.assigned_phone_number)
-        const message = `Hej${firstName ? ' ' + firstName : ''}! Din offert "${q.title || ''}" på ${amount} kr går ut om 3 dagar. Hör av dig om du har frågor eller vill gå vidare!\n${suffix}`
+        // R2: q.title är hantverkarens interna arbetsnamn — refereras
+        // aldrig i kundtext.
+        const message = `Hej${firstName ? ' ' + firstName : ''}! Din offert på ${amount} kr går ut om 3 dagar. Hör av dig om du har frågor eller vill gå vidare!\n${suffix}`
 
         // Beloppsgräns: ett belopp över gränsen tar godkännande-vägen även om
         // företaget annars fått autonomi — hög risk trumpar streak.

@@ -9,6 +9,7 @@ import { getOrCreatePortalLink } from '@/lib/portal-link'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { escapeHtml } from '@/lib/document-html'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
+import { extractFirstName, halsning } from '@/lib/customers/namn'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
@@ -124,7 +125,8 @@ function generateEmailHTML(
   // Escapa all användarstyrd text som interpoleras i HTML — offert-titel,
   // beskrivning och namn kan innehålla tecken som annars tolkas som markup.
   const businessName = escapeHtml(business.business_name)
-  const customerName = escapeHtml(quote.customer?.name || 'kund')
+  // R1: hälsningen använder kundens FÖRNAMN, aldrig rått fullnamn.
+  const customerGreeting = escapeHtml(halsning(quote.customer?.name))
   const quoteTitle = escapeHtml(quote.title || 'Offert')
   const quoteDescription = escapeHtml(quote.description)
   // Kontaktuppgifter = offertens SKAPARE när den finns (samma identitet som
@@ -188,7 +190,7 @@ function generateEmailHTML(
     <!-- Content -->
     <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px;">
       <p style="font-size: 16px; color: #1a1a1a; margin: 0 0 20px 0;">
-        Hej ${customerName}!
+        ${customerGreeting}
       </p>
 
       <p style="color: #444; line-height: 1.6;">
@@ -466,11 +468,10 @@ export async function POST(request: NextRequest) {
       }
 
       const suffix = buildSmsSuffix(business.business_name, business.assigned_phone_number)
-      const smsMessage = `Hej ${quote.customer.name}!
+      const smsMessage = `${halsning(quote.customer.name)}
 
 Här kommer din offert från ${business.business_name}:
 
-${quote.title || 'Offert'}
 Totalt: ${formatCurrency(quote.total)} kr${rotText}
 ${quote.valid_until ? `Giltig till: ${new Date(quote.valid_until).toLocaleDateString('sv-SE')}\n` : ''}
 Öppna din kundportal:

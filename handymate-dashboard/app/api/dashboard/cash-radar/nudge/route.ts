@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { halsning } from '@/lib/customers/namn'
 
 /**
  * POST /api/dashboard/cash-radar/nudge — { quote_id }
@@ -82,9 +83,11 @@ export async function POST(request: NextRequest) {
   const businessName: string = biz?.business_name || 'Handymate'
 
   const customerName = customer?.name || 'kund'
-  const firstName = String(customer?.name || '').split(' ')[0] || 'där'
   const title = (quote.title as string | null) || null
-  const message = `Hej ${firstName}! Ville bara höra om du hunnit titta på offerten${title ? ` "${title}"` : ''}. Hör gärna av dig vid frågor! /${businessName}`
+  // R1/R2: kundtexten får bara förnamn och refererar offerten generiskt —
+  // quote.title (interna arbetsnamnet) står kvar i title/description nedan
+  // (interna approval-fält), aldrig i SMS:et.
+  const message = `${halsning(customer?.name)} Ville bara höra om du hunnit titta på offerten. Hör gärna av dig vid frågor! /${businessName}`
 
   const totalKr = Math.round(Number(quote.total) || 0)
   const { error } = await supabase.from('pending_approvals').insert({

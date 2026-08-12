@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { halsning } from '@/lib/customers/namn'
 
 const STAGE_LABELS: Record<string, string> = {
   quote_accepted: 'Offert godkänd',
@@ -11,9 +12,12 @@ const STAGE_LABELS: Record<string, string> = {
   done: 'Klart',
 }
 
+// R1/R2: hälsning + förnamn interpoleras separat (se {name}-ersättningen
+// nedan) och mallarna refererar ALDRIG projektets interna arbetsnamn
+// ({project} borttaget — det var project.name, hantverkarens interna namn).
 const STAGE_SMS: Record<string, string> = {
-  work_started: 'Hej {name}! Vi har nu påbörjat arbetet med {project}. Du kan följa statusen i din kundportal. — {business}',
-  done: 'Hej {name}! {project} är nu klart. Tack för förtroendet! — {business}',
+  work_started: '{name} Vi har nu påbörjat arbetet. Du kan följa statusen i din kundportal. — {business}',
+  done: '{name} Arbetet är nu klart. Tack för förtroendet! — {business}',
 }
 
 /**
@@ -85,10 +89,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         if (customer?.phone_number) {
           {
             // Genom strypunkten (etapp 0 batch 4). Projektstatus går till
-            // KUNDEN — opt-out gäller.
+            // KUNDEN — opt-out gäller. R1: hälsningen bär förnamn/"Hej!".
             const message = STAGE_SMS[stage]
-              .replace('{name}', customer.name || '')
-              .replace('{project}', project.name || '')
+              .replace('{name}', halsning(customer.name))
               .replace('{business}', business.business_name || 'Handymate')
 
             const { sendSmsViaElks } = await import('@/lib/sms-send')

@@ -1,6 +1,7 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { canContactCustomer } from '@/lib/outbound/frequency-guard'
 import { logAutomationActivity } from '@/lib/automations'
+import { extractFirstName, halsning } from '@/lib/customers/namn'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
@@ -137,15 +138,16 @@ export async function checkWarrantyFollowups(businessId: string): Promise<Warran
       if (!freq.allowed) continue
     }
 
-    // Generera SMS-text
+    // Generera SMS-text. R1/R2: kundtext får BARA förnamn, ALDRIG
+    // projektets interna arbetsnamn — "jobbet vi gjorde hos dig" istället.
     const completedDate = new Date(project.completed_at)
     const monthsAgo = warrantyMonths
     const smsText = customMessage
       ? customMessage
-        .replace('{namn}', customer.name || 'kund')
-        .replace('{jobb}', project.name || 'jobbet')
+        .replace('{namn}', extractFirstName(customer.name) || '')
+        .replace('{jobb}', 'jobbet vi gjorde hos dig')
         .replace('{företag}', business?.business_name || '')
-      : `Hej ${customer.name || ''}! Det är ${monthsAgo} månader sedan vi avslutade ${project.name || 'jobbet'} hos dig. Allt fungerar som det ska? Vi erbjuder gärna en kostnadsfri kontroll. Hör av dig! /${business?.business_name || ''}`
+      : `${halsning(customer.name)} Det är ${monthsAgo} månader sedan vi avslutade jobbet vi gjorde hos dig. Allt fungerar som det ska? Vi erbjuder gärna en kostnadsfri kontroll. Hör av dig! /${business?.business_name || ''}`
 
     const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 

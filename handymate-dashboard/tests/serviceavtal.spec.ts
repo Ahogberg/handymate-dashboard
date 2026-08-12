@@ -201,7 +201,7 @@ test.describe('matchAgreementTypesByKeywords — fallback utan LLM', () => {
 })
 
 test.describe('buildFallbackAvtalSms — deterministisk mall-text', () => {
-  test('följer specens exakta mall', () => {
+  test('följer specens exakta mall (R2, 2026-08-12: refererar aldrig projektets interna arbetsnamn — alltid "jobbet")', () => {
     const sms = buildFallbackAvtalSms({
       customerFirstName: 'Anna Andersson',
       projectTitle: 'värmepumpsbyte',
@@ -211,9 +211,11 @@ test.describe('buildFallbackAvtalSms — deterministisk mall-text', () => {
       businessName: 'Svensson Bygg',
     })
     expect(sms).toBe(
-      'Hej Anna! Nu när värmepumpsbyte är klart: vi erbjuder Värmepumpsservice ' +
+      'Hej Anna! Nu när jobbet är klart: vi erbjuder Värmepumpsservice ' +
         'var 12:e månad (999 kr/besök). Svara JA så lägger vi upp det. /Svensson Bygg',
     )
+    // R2: projectTitle-parametern får aldrig läcka ordagrant i SMS:et.
+    expect(sms).not.toContain('värmepumpsbyte')
   })
 
   test('kund utan namn → generisk hälsning', () => {

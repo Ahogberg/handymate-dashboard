@@ -1,4 +1,5 @@
 import { getServerSupabase } from '@/lib/supabase'
+import { extractFirstName, halsning } from '@/lib/customers/namn'
 
 /**
  * Skapar en nudge-approval när en offert visats 3+ gånger utan svar.
@@ -51,8 +52,10 @@ export async function createQuoteNudge(
     .eq('business_id', businessId)
     .single()
 
-  // Generera nudge-SMS
-  let nudgeMessage = `Hej ${customer.name}! Jag såg att du tittade på offerten för "${quote.title}". Har du några frågor? Hör gärna av dig! //${business?.contact_name || ''}`
+  // Generera nudge-SMS. R1/R2: kundtext får BARA förnamn, ALDRIG
+  // offertens interna arbetsnamn — referera generiskt till "offerten".
+  const customerFirstName = extractFirstName(customer.name)
+  let nudgeMessage = `${halsning(customer.name)} Jag såg att du tittade på offerten. Har du några frågor? Hör gärna av dig! //${business?.contact_name || ''}`
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (apiKey) {
@@ -69,7 +72,7 @@ export async function createQuoteNudge(
           max_tokens: 160,
           messages: [{
             role: 'user',
-            content: `Skriv ett kort, naturligt SMS (max 160 tecken) till ${customer.name} som har tittat på offerten för "${quote.title}" ${viewCount} gånger utan att svara. Fråga varsamt om de har frågor. Signera med ${business?.contact_name || ''}. Skriv på svenska. Bara SMS-texten, inget annat.`,
+            content: `Skriv ett kort, naturligt SMS (max 160 tecken) till ${customerFirstName || 'kunden'} som har tittat på sin offert ${viewCount} gånger utan att svara. Fråga varsamt om de har frågor. Signera med ${business?.contact_name || ''}. Skriv på svenska. Använd kundens förnamn (eller "Hej!" om inget namn finns). Referera till offerten generiskt — nämn ALDRIG interna arbetsnamn eller titlar. Bara SMS-texten, inget annat.`,
           }],
         }),
       })

@@ -12,6 +12,7 @@ import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
+import { halsning } from '@/lib/customers/namn'
 
 // ── Stegdefinitioner med risknivåer ──────────────────────
 
@@ -831,7 +832,6 @@ async function executeReviewRequest(
       .single()
 
     const businessName = business?.business_name || 'Handymate'
-    const customerName = customer.name || 'kund'
     const suffix = buildSmsSuffix(businessName, business?.assigned_phone_number)
 
     // Schemalägg SMS-begäran om recension (24h fördröjning via nurture)
@@ -859,7 +859,7 @@ async function executeReviewRequest(
         businessId,
         businessName,
         to: customer.phone_number,
-        message: `Hej ${customerName}! Tack för att du anlitade ${businessName}. Vi hoppas du är nöjd! En kort recension hjälper oss och andra kunder.\n${suffix}`,
+        message: `${halsning(customer.name)} Tack för att du anlitade ${businessName}. Vi hoppas du är nöjd! En kort recension hjälper oss och andra kunder.\n${suffix}`,
         customerId: deal.customer_id || null,
         relatedId: dealId,
         messageType: 'deal_flow_review_request',

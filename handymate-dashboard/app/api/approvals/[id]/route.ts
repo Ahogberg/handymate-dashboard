@@ -14,6 +14,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { classify, nonExecutableResult } from '@/lib/approvals/action-contract'
 import { extractAgentId } from '@/lib/patterns/utils/extract-agent-id'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
+import { halsning } from '@/lib/customers/namn'
 
 export const dynamic = 'force-dynamic'
 
@@ -1797,7 +1798,7 @@ async function executeApprovalPayload(
         } catch { /* no calendar */ }
 
         const message = slotsText
-          ? `Hej ${pl.entity?.customerName || ''}! Vi skulle gärna komma och titta på jobbet. Passar någon av dessa tider?\n${slotsText}\nSvara med 1, 2 eller 3. //${pl.businessName || ''}`
+          ? `${halsning(pl.entity?.customerName)} Vi skulle gärna komma och titta på jobbet. Passar någon av dessa tider?\n${slotsText}\nSvara med 1, 2 eller 3. //${pl.businessName || ''}`
           : pl.customer_reply_pending || `Hej! Vi vill gärna boka in ett platsbesök. Vilken tid passar dig? //${pl.businessName || ''}`
 
         // Audit-3 Fix A (2026-06-01)

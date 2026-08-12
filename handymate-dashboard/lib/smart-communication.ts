@@ -1,5 +1,6 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { extractFirstName } from '@/lib/customers/namn'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -86,8 +87,10 @@ export async function resolveMessageVariables(
     .eq('customer_id', context.customerId)
     .single()
 
+  // R1: alla DB-mallar interpolerar {customer_name} härifrån — förnamn,
+  // aldrig rått fullnamn.
   const vars: MessageVariables = {
-    customer_name: customer?.name || 'Kund',
+    customer_name: extractFirstName(customer?.name) || 'Kund',
     business_name: business?.business_name || 'Handymate',
     business_phone: business?.phone_number || business?.assigned_phone_number || '',
   }

@@ -406,6 +406,14 @@ async function sendSMS(supabase: SupabaseClient, suggestion: any, actionData: an
 
     if (!phoneNumber) return { success: false, error: 'Inget telefonnummer' }
 
+    // VARNING (kundröst-sveep 2026-08-12): suggestion.description är en
+    // INTERN sammanfattningstext (skriven för hantverkaren i approval-kortet,
+    // t.ex. kan innehålla kundens fullständiga namn eller interna
+    // arbetsnamn/titlar) — som sista fallback här skulle den kunna gå ut
+    // ORDAGRANT som SMS till kunden om varken message_template eller message
+    // är satt. Rör INTE semantiken nu (denna väg är vilande/oanvänd i
+    // dagsläget — verifiera innan ändring), men detta är en R1/R2-risk om
+    // vägen någonsin aktiveras. Se tasks/lessons.md.
     const message = actionData.message_template || actionData.message || suggestion.description
     if (!message) return { success: false, error: 'Inget meddelande' }
 

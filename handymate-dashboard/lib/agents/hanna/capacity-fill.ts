@@ -46,7 +46,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { svDateStr, svDateStrPlusDays } from '@/lib/dates'
 import { getWeekCapacity, mondayOfWeek, THIN_WEEK_UTILIZATION_THRESHOLD } from '@/lib/capacity/week-capacity'
-import { daysSinceSent, extractFirstName } from '@/lib/agents/daniel/unopened-quotes'
+import { daysSinceSent } from '@/lib/agents/daniel/unopened-quotes'
+import { extractFirstName } from '@/lib/customers/namn'
 import { fetchPersonDays } from '@/lib/schedule/person-day'
 import { computePersonWeekUtilization } from '@/lib/schedule/utilization'
 import { computeFreeCapacity } from '@/lib/capacity/free-capacity'
@@ -594,7 +595,10 @@ export async function runCapacityFill(
     const freq = await canContactCustomer(supabase, businessId, c.customer_id)
     if (!freq.allowed) continue
 
-    const serviceHint = c.source === 'unsold_quote' ? c.title : c.job_type
+    // R2: quote.title är hantverkarens INTERNA arbetsnamn på offerten — får
+    // aldrig stå i kundtext. job_type (past_customer) är en generisk
+    // jobbtyp-term och är OK att nämna i SMS:et.
+    const serviceHint = c.source === 'unsold_quote' ? null : c.job_type
     const message = buildCapacityFillMessage({
       customerFirstName: c.customer_name,
       contactFirstName,

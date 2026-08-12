@@ -195,10 +195,15 @@ async function evaluateWithAI(
       .map((r) => `- ${r.id}: ${r.name} (${r.description || ''})`)
       .join('\n')
 
+    // R1/R2: skickar kundens FÖRNAMN till modellen, inte rått fullnamn —
+    // och samtalsnoteringen är en INTERN anteckning som får informera
+    // beslutet/tonen men aldrig citeras ordagrant i något som går till kunden.
+    const customerFirstName = state.customerName?.trim()?.split(/\s+/)[0] || ''
+
     const prompt = `Du är en smart assistent som hjälper hantverkare kommunicera med kunder.
 
 Kundens situation:
-- Namn: ${state.customerName}
+- Förnamn: ${customerFirstName || '(saknas)'}
 - Pipeline-steg: ${state.dealStage || 'Okänt'}
 - Senaste kontakt: ${state.daysSinceContact !== null ? `${state.daysSinceContact} dagar sedan` : 'Okänt'}
 - Senaste meddelande från oss: ${state.daysSinceMessage !== null ? `${state.daysSinceMessage} dagar sedan` : 'Aldrig'}
@@ -210,7 +215,7 @@ Status:
 - Kommande bokning: ${state.upcomingBooking ? `${state.upcomingBooking.date} kl ${state.upcomingBooking.time}` : 'Nej'}
 - Förfallen faktura: ${state.overdueInvoice ? `Ja (#${state.overdueInvoice.number}, ${state.overdueInvoice.amount} kr)` : 'Nej'}
 
-Senaste samtalsnotering: "${state.recentCallSummary || 'Ingen'}"
+Senaste samtalsnotering (INTERN — får bara informera din bedömning av läget/tonen, citera ALDRIG denna text i något som går till kunden): "${state.recentCallSummary || 'Ingen'}"
 
 Tillgängliga regler:
 ${rulesDesc}
@@ -228,7 +233,8 @@ Tänk på:
 - Skicka inte för ofta (max ${settings.max_sms_per_customer_per_week} per vecka)
 - Skicka inte om vi nyligen varit i kontakt
 - Prioritera viktiga saker (förfallna fakturor, kommande bokningar)
-- Var inte påträngande`
+- Var inte påträngande
+- Om du föreslår text till kunden: använd bara kundens förnamn (eller "Hej!" om det saknas), och referera till offert/projekt/jobb generiskt — nämn ALDRIG interna arbetsnamn eller titlar.`
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

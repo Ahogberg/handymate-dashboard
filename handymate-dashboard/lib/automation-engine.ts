@@ -12,6 +12,7 @@ import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { deriveAutonomyKey, isAutonomous as isAutonomyGranted, recordAutonomyFailure } from '@/lib/autonomy/earned-autonomy'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 import { arTestId, arTestNamn } from '@/lib/testdata'
+import { extractFirstName } from '@/lib/customers/namn'
 
 // ── Types ───────────────────────────────────────────────
 
@@ -1137,6 +1138,11 @@ async function queryThresholdEntities(
           id: q.quote_id,
           customer_id: q.customer_id,
           customer_name: kontakter.get(q.customer_id as string)?.namn ?? null,
+          // R1: NY context-variabel, används av send_sms-mallarnas kundtext
+          // istället för {{customer_name}} (fullnamn) — se sql/v123_kundrost_
+          // customer_first_name.sql. {{customer_name}} bevaras oförändrad för
+          // notify_owner/create_approval-mallar där fullnamn är rätt.
+          customer_first_name: extractFirstName(kontakter.get(q.customer_id as string)?.namn ?? null) || null,
           customer_phone: kontakter.get(q.customer_id as string)?.telefon ?? null,
           total: q.total,
           days: Math.floor((now.getTime() - new Date(q.sent_at as string).getTime()) / (24 * 60 * 60 * 1000)),
@@ -1164,6 +1170,7 @@ async function queryThresholdEntities(
           id: inv.invoice_id,
           customer_id: inv.customer_id,
           customer_name: (inv.customer as { name?: string } | null)?.name || null,
+          customer_first_name: extractFirstName((inv.customer as { name?: string } | null)?.name || null) || null,
           invoice_number: inv.invoice_number,
           total: inv.total,
           due_date: inv.due_date,
@@ -1196,8 +1203,12 @@ async function queryThresholdEntities(
           id: b.booking_id,
           customer_id: b.customer_id,
           customer_name: kontakter.get(b.customer_id as string)?.namn ?? null,
+          customer_first_name: extractFirstName(kontakter.get(b.customer_id as string)?.namn ?? null) || null,
           customer_phone: kontakter.get(b.customer_id as string)?.telefon ?? null,
           time: b.scheduled_start,
+          // R2: booking.notes är hantverkarens interna anteckning — bärs
+          // vidare här endast för notify_owner-mallar (internt), ALDRIG för
+          // kundtext. Ingen send_sms-mall får referera {{title}}.
           title: b.notes,
         }))
       }
@@ -1225,6 +1236,7 @@ async function queryThresholdEntities(
           id: c.customer_id,
           customer_id: c.customer_id,
           customer_name: c.name,
+          customer_first_name: extractFirstName(c.name as string | null) || null,
           phone: c.phone_number,
           email: c.email,
           months_since_last_job: Math.floor((now.getTime() - new Date(c.last_job_date as string).getTime()) / (30 * 24 * 60 * 60 * 1000)),

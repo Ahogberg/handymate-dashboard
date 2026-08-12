@@ -5,6 +5,7 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
+import { halsning } from '@/lib/customers/namn'
 
 export async function sendBookingReminders(
   businessId: string
@@ -69,10 +70,10 @@ export async function sendBookingReminders(
         timeZone: 'Europe/Stockholm',
       })
 
-      const customerName = customer.name?.split(' ')[0] || ''
-      const jobDesc = booking.notes?.split(' — ')[0]?.slice(0, 40) || 'ditt besök'
-
-      const message = `Hej ${customerName}! Påminnelse om ${jobDesc} imorgon kl ${time}. Vi ses!\n${suffix}`
+      // R2: bokningens interna anteckningsfält är hantverkarens ANTECKNING
+      // — får ALDRIG bli jobbeskrivning i kundtext. Alltid det generiska
+      // "ditt besök".
+      const message = `${halsning(customer.name)} Påminnelse om ditt besök imorgon kl ${time}. Vi ses!\n${suffix}`
 
       try {
         await fetch(`${appUrl}/api/sms/send`, {

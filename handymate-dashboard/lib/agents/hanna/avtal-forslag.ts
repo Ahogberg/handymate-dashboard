@@ -46,7 +46,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getClaudeModel } from '@/lib/ai/get-model'
 import { normalizeSwedishPhone } from '@/lib/phone-normalize'
 import { llmCostUsd } from '@/lib/costs/meter'
-import { extractFirstName } from '@/lib/agents/daniel/unopened-quotes'
+import { extractFirstName } from '@/lib/customers/namn'
 import { priceInclVatPerVisit, type PriceItemLike } from '@/lib/agreements/pricing'
 import { canContactCustomer } from '@/lib/outbound/frequency-guard'
 
@@ -113,11 +113,13 @@ export function matchAgreementTypesByKeywords(
 }
 
 /**
- * Deterministiskt mall-SMS när Haiku inte är tillgänglig — exakt formen
- * ur specen: "Hej {förnamn}! Nu när {projekttitel} är klart: vi erbjuder
- * {typnamn} var {intervall}:e månad ({pris} kr/besök). Svara JA så lägger
- * vi upp det. /{företagsnamn}". Nämner bara DEN BÄST matchande typen
- * (singular mall) även om upp till två type_id skickas med i payloaden.
+ * Deterministiskt mall-SMS när Haiku inte är tillgänglig — formen ur specen
+ * uppdaterad 2026-08-12 (kundröst-sveep): "Hej {förnamn}! Nu när jobbet är
+ * klart: vi erbjuder {typnamn} var {intervall}:e månad ({pris} kr/besök).
+ * Svara JA så lägger vi upp det. /{företagsnamn}". R2: refererar ALDRIG
+ * projektets interna arbetsnamn (opts.projectTitle) — bara generiska
+ * "jobbet". Nämner bara DEN BÄST matchande typen (singular mall) även om
+ * upp till två type_id skickas med i payloaden.
  */
 export function buildFallbackAvtalSms(opts: {
   customerFirstName: string | null | undefined
@@ -130,10 +132,9 @@ export function buildFallbackAvtalSms(opts: {
   const firstName = extractFirstName(opts.customerFirstName)
   const greeting = firstName ? `Hej ${firstName}!` : 'Hej!'
   const businessName = (opts.businessName || '').trim() || 'oss'
-  const projectTitle = opts.projectTitle || 'jobbet'
 
   const full =
-    `${greeting} Nu när ${projectTitle} är klart: vi erbjuder ${opts.typeName} ` +
+    `${greeting} Nu när jobbet är klart: vi erbjuder ${opts.typeName} ` +
     `var ${opts.intervalMonths}:e månad (${opts.priceInclVat} kr/besök). ` +
     `Svara JA så lägger vi upp det. /${businessName}`
 
@@ -193,8 +194,9 @@ VIKTIGA REGLER:
 - Du får ALDRIG hitta på eller ändra pris eller intervall — använd bara katalogens egna värden ordagrant.
 - Om inget i katalogen passar det avslutade jobbet väl: låt "matches" vara en tom lista.
 - SMS:et: max 300 tecken, varm men rak svensk ton, ska nämna tjänsten och intervallet, uppmana kunden att svara JA, och avsluta med företagsnamnet.
+- Använd kundens förnamn (eller "Hej!" om det saknas). Titeln nedan är BARA kontext för att välja rätt avtalstyp — nämn ALDRIG projektets titel eller interna arbetsnamn ordagrant i SMS:et. Referera till det avslutade arbetet generiskt ("jobbet", "arbetet hos dig").
 
-Avslutat jobb:
+Avslutat jobb (kontext för matchning — citera INTE titeln i SMS:et):
 Titel: ${opts.projectTitle}
 Offertrader:
 ${itemLines}

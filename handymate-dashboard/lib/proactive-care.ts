@@ -19,6 +19,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { canContactCustomer } from '@/lib/outbound/frequency-guard'
 import { logAutomationActivity } from '@/lib/automations'
 import { monthsSinceLastJob } from '@/lib/customers/quiet-customer'
+import { extractFirstName, halsning } from '@/lib/customers/namn'
 
 // Job type → months until proactive contact
 const JOB_LIFECYCLE: Record<string, {
@@ -98,7 +99,12 @@ async function generateProactiveSms(params: {
   suggestedService: string
   projectName: string
 }): Promise<string> {
-  const fallbackSms = `Hej ${params.customerName}! Det har gått ${params.monthsSince} månader sedan vi utförde ${params.projectName} hos dig. ${params.reason} — vi erbjuder gärna en kostnadsfri kontroll. /${params.businessName}`
+  // R1/R2: kundtext får BARA förnamn. project.name (arbetsnamnet) refereras
+  // ALDRIG — jobType är en generisk kategori (t.ex. "badrum", "vvs") och är
+  // OK, men "reason" bär redan den mänskliga formuleringen så vi behöver
+  // inte ens jobType i fallback-mallen.
+  const customerFirstName = extractFirstName(params.customerName)
+  const fallbackSms = `${halsning(params.customerName)} Det har gått ${params.monthsSince} månader sedan vi var hos dig senast. ${params.reason} — vi erbjuder gärna en kostnadsfri kontroll. /${params.businessName}`
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
@@ -121,14 +127,15 @@ async function generateProactiveSms(params: {
           content: `Skriv ett kort, vänligt SMS (max 160 tecken) på svenska från ett hantverksföretag till en befintlig kund.
 
 Kontext:
-- Kundnamn: ${params.customerName}
+- Kundens förnamn: ${customerFirstName || '(saknas — skriv "Hej!" utan namn)'}
 - Företagsnamn: ${params.businessName}
-- Jobbtyp: ${params.projectName}
+- Jobbtyp: ${params.jobType}
 - Månader sedan jobbet: ${params.monthsSince}
 - Anledning till kontakt: ${params.reason}
 - Föreslaget erbjudande: ${params.suggestedService}
 
 Tonen ska vara personlig och omtänksam, inte säljig. Avsluta med /${params.businessName}.
+Använd kundens förnamn (eller "Hej!" om det saknas). Referera till jobbet generiskt via jobbtypen ovan — nämn ALDRIG interna arbetsnamn eller titlar.
 Svara ENBART med SMS-texten, inget annat.`,
         }],
       }),
