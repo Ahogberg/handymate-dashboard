@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getServerSupabase } from '@/lib/supabase'
 import { matchGeneratedItem, type MatchableProduct } from '@/lib/products/match-generated-items'
 import { WON_QUOTE_STATUSES } from '@/lib/quotes/statuses'
+import { rapporteraTystFel, arSchemaSaknas } from '@/lib/observability/driftlarm'
 
 export interface PriceListItem {
   name: string
@@ -150,8 +151,9 @@ async function fetchRecentLessons(
   // byggs, så beteendet är verifierbart utan DB (se tests/project-debrief.spec.ts).
   if (!jobType) return []
 
+  const supabase = getServerSupabase()
   try {
-    const { data, error } = await getServerSupabase()
+    const { data, error } = await supabase
       .from('project_lesson')
       .select('lesson_text, impact_hint, created_at')
       .eq('business_id', businessId)
@@ -161,6 +163,11 @@ async function fetchRecentLessons(
 
     if (error) {
       console.error('[ai-quote-generator] project_lesson-läsning misslyckades (fail-safe, tom lista):', error.message)
+      // 42P01/42703 = tabellen/kolumnen finns inte än (v121 ej körd) —
+      // förväntat i vissa miljöer, larma inte om det. Andra fel ska synas.
+      if (!arSchemaSaknas(error)) {
+        await rapporteraTystFel(supabase, businessId, 'ai-quote-generator:fetchRecentLessons', error.message, { jobType })
+      }
       return []
     }
     return (data || []).map(row => ({
@@ -169,6 +176,15 @@ async function fetchRecentLessons(
     }))
   } catch (err) {
     console.error('[ai-quote-generator] project_lesson-läsning kastade (fail-safe, tom lista):', err)
+    if (!arSchemaSaknas(err)) {
+      await rapporteraTystFel(
+        supabase,
+        businessId,
+        'ai-quote-generator:fetchRecentLessons-unexpected',
+        err instanceof Error ? err.message : String(err),
+        { jobType },
+      )
+    }
     return []
   }
 }
@@ -188,8 +204,13 @@ async function fetchCustomerFactsForQuote(
   businessId: string,
   customerId: string,
 ): Promise<Array<{ fact_type: 'preference' | 'constraint'; content: string }>> {
+  const supabase = getServerSupabase()
+  // Rapporterar till driftlarmet, men aldrig för 42P01/42703 (schema saknas,
+  // väntat innan v122 körts — se filhuvudet).
+  const larma = (e: unknown, msg: string) =>
+    arSchemaSaknas(e) || rapporteraTystFel(supabase, businessId, 'ai-quote-generator:fetchCustomerFactsForQuote', msg, { customerId })
   try {
-    const { data, error } = await getServerSupabase()
+    const { data, error } = await supabase
       .from('customer_fact')
       .select('fact_type, content, created_at')
       .eq('business_id', businessId)
@@ -201,6 +222,7 @@ async function fetchCustomerFactsForQuote(
 
     if (error) {
       console.error('[ai-quote-generator] customer_fact-läsning misslyckades (fail-safe, tom lista):', error.message)
+      larma(error, error.message)
       return []
     }
     return (data || []).map(row => ({
@@ -209,6 +231,7 @@ async function fetchCustomerFactsForQuote(
     }))
   } catch (err) {
     console.error('[ai-quote-generator] customer_fact-läsning kastade (fail-safe, tom lista):', err)
+    larma(err, err instanceof Error ? err.message : String(err))
     return []
   }
 }

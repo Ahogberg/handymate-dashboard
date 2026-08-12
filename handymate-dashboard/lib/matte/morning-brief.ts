@@ -6,6 +6,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { assembleCashRadar } from '@/lib/cash-radar-data'
 import { svDateStr, svDateStrPlusDays } from '@/lib/dates'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
+import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 
 export interface BriefDetail {
   text: string
@@ -144,6 +145,12 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
     }
   } catch (err) {
     console.warn('[morning-brief] cash-radar hoppades över (icke-blockerande):', err)
+    await rapporteraTystFel(
+      supabase,
+      businessId,
+      'morning-brief:cash-radar',
+      err instanceof Error ? err.message : String(err),
+    )
   }
 
   const danielBrief = buildDanielBrief(openLeads.data || [], staleQuotes.data || [])
@@ -192,6 +199,12 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
     }
   } catch (err) {
     console.warn('[morning-brief] möteskontext hoppades över (icke-blockerande):', err)
+    await rapporteraTystFel(
+      supabase,
+      businessId,
+      'morning-brief:moteskontext',
+      err instanceof Error ? err.message : String(err),
+    )
   }
 
   // pending_approvals har project_id i payload, inte som egen kolumn.

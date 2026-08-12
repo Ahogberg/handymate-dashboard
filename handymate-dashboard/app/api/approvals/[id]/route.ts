@@ -13,6 +13,7 @@ import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { classify, nonExecutableResult } from '@/lib/approvals/action-contract'
 import { extractAgentId } from '@/lib/patterns/utils/extract-agent-id'
+import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 
 export const dynamic = 'force-dynamic'
 
@@ -1225,11 +1226,23 @@ async function executeApprovalPayload(
               .neq('id', fact.id)
             if (supersedeErr) {
               console.error('[approvals/customer_fact] supersede misslyckades (icke-blockerande):', supersedeErr.message)
+              await rapporteraTystFel(supabaseCF, businessId, 'approvals/customer_fact:supersede', supersedeErr.message, {
+                factId: fact.id,
+                customerId: pl.customer_id,
+                factType,
+              })
             }
           } catch (supersedeCatchErr: any) {
             console.error(
               '[approvals/customer_fact] supersede kastade (icke-blockerande):',
               supersedeCatchErr?.message || supersedeCatchErr,
+            )
+            await rapporteraTystFel(
+              supabaseCF,
+              businessId,
+              'approvals/customer_fact:supersede-unexpected',
+              supersedeCatchErr?.message ? String(supersedeCatchErr.message) : String(supersedeCatchErr),
+              { factId: fact.id, customerId: pl.customer_id, factType },
             )
           }
         }

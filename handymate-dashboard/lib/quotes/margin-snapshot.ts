@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { QuoteItem } from '@/lib/types/quote'
 import { calculateQuoteMargin } from '@/lib/quotes/margin'
+import { rapporteraTystFel, arSchemaSaknas } from '@/lib/observability/driftlarm'
 
 /**
  * Förväntad marginal vid accept (2026-08-12).
@@ -74,6 +75,11 @@ export async function captureExpectedMarginSnapshot(
 
     if (existingErr) {
       console.warn('[margin-snapshot] kunde inte läsa befintlig snapshot (icke-blockerande):', existingErr.message)
+      // 42703 här betyder samma sak som vid skrivningen nedan (kolumnen
+      // finns inte än, väntat innan v120 körts) — larma inte för det.
+      if (!arSchemaSaknas(existingErr)) {
+        await rapporteraTystFel(supabase, businessId, 'margin-snapshot:read-existing', existingErr.message, { quoteId })
+      }
       return
     }
     if (existing?.expected_margin_snapshot) {
@@ -91,6 +97,7 @@ export async function captureExpectedMarginSnapshot(
 
     if (itemsErr) {
       console.warn('[margin-snapshot] kunde inte läsa quote_items (icke-blockerande):', itemsErr.message)
+      await rapporteraTystFel(supabase, businessId, 'margin-snapshot:read-items', itemsErr.message, { quoteId })
       return
     }
 
@@ -105,8 +112,22 @@ export async function captureExpectedMarginSnapshot(
     if (updateErr) {
       // Förväntat fel innan v120 körts: kolumnen finns inte än (42703).
       console.warn('[margin-snapshot] kunde inte spara snapshot (icke-blockerande, väntat innan v120 körts):', updateErr.message)
+      // Larma bara på RIKTIGA fel — en 42703 fram tills v120 körs skulle
+      // annars spamma driftlarmet dagligen för ett känt, väntat tillstånd.
+      if (!arSchemaSaknas(updateErr)) {
+        await rapporteraTystFel(supabase, businessId, 'margin-snapshot:update', updateErr.message, { quoteId })
+      }
     }
   } catch (err) {
     console.warn('[margin-snapshot] oväntat fel vid snapshot-fångst (icke-blockerande):', err)
+    if (!arSchemaSaknas(err)) {
+      await rapporteraTystFel(
+        supabase,
+        businessId,
+        'margin-snapshot:unexpected',
+        err instanceof Error ? err.message : String(err),
+        { quoteId },
+      )
+    }
   }
 }

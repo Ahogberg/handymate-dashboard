@@ -23,6 +23,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { byggDebriefFragor } from '@/lib/debrief/build-debrief-questions'
+import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 
 export interface DebriefProjekt {
   project_id: string
@@ -53,6 +54,9 @@ export async function skapaDebriefKort(
 
     if (dedupeErr) {
       console.error('[skapaDebriefKort] dedupe-läsning misslyckades (fail-safe, skapar inte kortet):', dedupeErr.message)
+      await rapporteraTystFel(supabase, businessId, 'debrief-card:dedupe-read', dedupeErr.message, {
+        projectId: projekt.project_id,
+      })
       return
     }
     if (existing && existing.length > 0) return
@@ -86,9 +90,19 @@ export async function skapaDebriefKort(
 
     if (insertErr) {
       console.error('[skapaDebriefKort] kunde inte skapa kortet:', insertErr.message)
+      await rapporteraTystFel(supabase, businessId, 'debrief-card:insert', insertErr.message, {
+        projectId: projekt.project_id,
+      })
     }
   } catch (err) {
     // Fail-safe: får aldrig fälla projektstängningen.
     console.error('[skapaDebriefKort] oväntat fel (fail-safe):', err)
+    await rapporteraTystFel(
+      supabase,
+      businessId,
+      'debrief-card:unexpected',
+      err instanceof Error ? err.message : String(err),
+      { projectId: projekt.project_id },
+    )
   }
 }

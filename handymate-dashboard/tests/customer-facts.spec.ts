@@ -221,7 +221,10 @@ test.describe('injektionspunkt 1: offertgenereringen (lib/ai-quote-generator.ts)
     const s = read(GEN)
     const i = s.indexOf('async function fetchCustomerFactsForQuote')
     expect(i, 'hjälpfunktionen saknas').toBeGreaterThan(-1)
-    const gren = s.slice(i, i + 1200)
+    // Fönstret vidgat 2026-08-12 (driftlarm-rapportering): funktionen fick
+    // en rapporteraTystFel-inkoppling i båda fail-safe-grenarna, se testet
+    // nedan — den ryms inte längre i det gamla 1200-teckensfönstret.
+    const gren = s.slice(i, i + 1900)
     expect(gren).toContain("from('customer_fact')")
     expect(gren).toContain("eq('business_id', businessId)")
     expect(gren).toContain("eq('customer_id', customerId)")
@@ -233,11 +236,19 @@ test.describe('injektionspunkt 1: offertgenereringen (lib/ai-quote-generator.ts)
   test('fetchCustomerFactsForQuote är fail-safe — try/catch runt frågan, tom lista vid fel', () => {
     const s = read(GEN)
     const i = s.indexOf('async function fetchCustomerFactsForQuote')
-    const gren = s.slice(i, i + 1200)
+    const gren = s.slice(i, i + 1900)
     expect(gren).toContain('try {')
     expect(gren).toContain('catch')
     const returns = gren.match(/return \[\]/g) || []
     expect(returns.length, 'både fel-grenen och catch ska returnera tom lista').toBeGreaterThanOrEqual(2)
+  })
+
+  test('fetchCustomerFactsForQuote rapporterar tysta fel till driftlarmet, men aldrig för 42P01/42703', () => {
+    const s = read(GEN)
+    const i = s.indexOf('async function fetchCustomerFactsForQuote')
+    const gren = s.slice(i, i + 1900)
+    expect(gren).toContain('rapporteraTystFel')
+    expect(gren).toContain('arSchemaSaknas')
   })
 
   test('anropas bara när input.customerId finns', () => {
