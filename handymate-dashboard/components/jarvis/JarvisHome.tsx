@@ -15,6 +15,8 @@ import { AgentNewsRow } from '@/components/agents/AgentNewsRow'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { SkrivRad } from '@/components/jarvis/SkrivRad'
 import { RailCard } from '@/components/jarvis/RailCard'
+import { KomIgangRail } from '@/components/jarvis/KomIgangRail'
+import HemTur from '@/components/tour/HemTur'
 import { ScheduleTimeline, parseKonflikter, minuterFranIso } from '@/components/jarvis/ScheduleTimeline'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { QuoteDraftDetail, QuoteToolExit } from '@/components/jarvis/QuoteDraftDetail'
@@ -739,8 +741,9 @@ export default function JarvisHome({
 
           {/* ── Det här behöver dig idag (designkontraktet, fråga 1) — varje
               kort nedan leder med agentens avatar och namn, se
-              AgentDecisionCard/ApprovalCard. ── */}
-          <div className="mb-2.5">
+              AgentDecisionCard/ApprovalCard.
+              data-tour-target: Hemturens första stopp (components/tour/HemTur.tsx). ── */}
+          <div data-tour-target="hemtur-attn" className="mb-2.5">
             <div className="flex items-baseline gap-2">
               <h2 className="m-0 text-[15px] font-semibold text-slate-900">Det här behöver dig idag</h2>
               {beslut > 0 && (
@@ -845,12 +848,14 @@ export default function JarvisHome({
               uteblivet svar utelämnar sektionen helt och tyst, samma regel
               som kalenderwidgeten. ── */}
           {pengarData && (
-            <>
+            // data-tour-target: Hemturens andra stopp — hoppas över
+            // automatiskt om sektionen inte renderas (ingen pengarData).
+            <div data-tour-target="hemtur-pengar">
               <div className="flex items-baseline gap-2 mt-6 mb-2.5">
                 <h2 className="m-0 text-[15px] font-semibold text-slate-900">Pengar just nu</h2>
               </div>
               <PengarBand summary={pengarData} />
-            </>
+            </div>
           )}
 
           {/* ── Det här sköter teamet (designkontraktet, fråga 3) —
@@ -912,7 +917,10 @@ export default function JarvisHome({
             </div>
           )}
 
-          <TeamBevakning rader={bevakning} kompakt={beslut >= 2} fynd={fynd} />
+          {/* data-tour-target: Hemturens tredje stopp. */}
+          <div data-tour-target="hemtur-team">
+            <TeamBevakning rader={bevakning} kompakt={beslut >= 2} fynd={fynd} />
+          </div>
 
           {/* ── Värt att veta ── */}
           {vardAttVetaRader.length > 0 && (
@@ -999,6 +1007,10 @@ export default function JarvisHome({
 
         {/* ── Högerspalten — gräv-ingångarna ───────────────────────────── */}
         <aside className="flex flex-col gap-3 min-w-0 lg:row-start-2 lg:col-start-2">
+          {/* Kom igång-railen (docs/design/FORSTA-30-MINUTERNA.md DEL 4) —
+              bara nya konton, döljs för gott när alla tre uppdrag är klara. */}
+          <KomIgangRail />
+
           <RailCard title="Dagens plan" href="/dashboard/schedule">
             {!bookingsLoaded ? (
               <div className="h-16 bg-slate-50 rounded-lg animate-pulse" />
@@ -1047,7 +1059,12 @@ export default function JarvisHome({
           {/* Mötesassistenten (2026-08-13): byggd 08-11/12 men obesökt —
               ingen genväg fanns någonstans i navigationen. Sist i spalten,
               inte i huvudflödets fyra sektioner (designkontraktet rörs ej). */}
-          <RailCard title="Möte idag?" href="/dashboard/inkorg?tab=mote" leading={<Mic className="w-4 h-4 text-primary-600 shrink-0" />}>
+          <RailCard
+            title="Möte idag?"
+            href="/dashboard/inkorg?tab=mote"
+            leading={<Mic className="w-4 h-4 text-primary-600 shrink-0" />}
+            tourTarget="hemtur-mote"
+          >
             <p className="text-[13px] text-slate-500 m-0">
               Spela in platsbesöket — Matte sammanfattar och skriver offertutkastet.
             </p>
@@ -1071,8 +1088,14 @@ export default function JarvisHome({
           stor={beslut <= 1}
           onOppna={() => openJobbkompisen(true)}
           onChip={prompt => { setPendingPrompt(prompt); openJobbkompisen(true) }}
+          tourTarget="hemtur-skriv"
         />
       </div>
+
+      {/* Hemturen (docs/design/FORSTA-30-MINUTERNA.md) — spotlightar de fem
+          data-tour-target-noderna ovan. Gatead på welcome_tour_seen +
+          localStorage; renderar ingenting förrän gaten öppnar. */}
+      <HemTur />
 
       {/* Ångra-snackbaren. POST:en har INTE gått iväg än. */}
       {snack && (

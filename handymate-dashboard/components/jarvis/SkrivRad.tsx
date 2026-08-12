@@ -36,13 +36,27 @@ export const SKRIVRAD_CHIPS: Array<{ label: string; href: string; prompt: string
   { label: 'SMS till en kund', href: '/dashboard/sms-inbox', prompt: 'Skicka ett SMS till ' },
 ]
 
-export function SkrivRad({ stor, onOppna, onChip }: { stor: boolean; onOppna: () => void; onChip?: (prompt: string) => void }) {
+export function SkrivRad({
+  stor,
+  onOppna,
+  onChip,
+  tourTarget,
+}: {
+  stor: boolean
+  onOppna: () => void
+  onChip?: (prompt: string) => void
+  /** Hemturens sista stopp (components/tour/HemTur.tsx) markerar rotelementet
+   *  direkt i stället för att wrappas — SkrivRad äger sin egen grid-placering
+   *  (lg:row-start-3 lg:col-start-1) och en extern wrapper hade tystat den. */
+  tourTarget?: string
+}) {
   if (!stor) {
     // Pillen — flyttad ordagrant från JarvisHome (besluten äger skärmen).
     return (
       <button
         type="button"
         onClick={onOppna}
+        data-tour-target={tourTarget}
         className="lg:row-start-3 lg:col-start-1 w-full flex items-center gap-2.5 h-12 pl-[18px] pr-2 bg-white border border-slate-200 rounded-full text-sm text-slate-400 hover:border-slate-300 transition-colors"
       >
         <span className="flex-1 text-left truncate">Säg till Matte — eller tryck. Allt ovanför klaras utan tangentbord.</span>
@@ -54,7 +68,7 @@ export function SkrivRad({ stor, onOppna, onChip }: { stor: boolean; onOppna: ()
   }
 
   return (
-    <div className="lg:row-start-3 lg:col-start-1 bg-white border border-slate-200 rounded-2xl p-4">
+    <div data-tour-target={tourTarget} className="lg:row-start-3 lg:col-start-1 bg-white border border-slate-200 rounded-2xl p-4">
       <button
         type="button"
         onClick={onOppna}

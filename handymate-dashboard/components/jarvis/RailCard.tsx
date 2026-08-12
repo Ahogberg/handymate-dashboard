@@ -20,14 +20,17 @@ export function RailCard({
   href,
   leading,
   children,
+  tourTarget,
 }: {
   title: string
   href: string
   leading?: React.ReactNode
   children: React.ReactNode
+  /** Hemturens "Möte idag?"-stopp (components/tour/HemTur.tsx). */
+  tourTarget?: string
 }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-4">
+    <div data-tour-target={tourTarget} className="bg-white border border-slate-200 rounded-2xl p-4">
       {/* 44px träffyta, uttagen med negativ marginal så kortet inte växer. */}
       <Link
         href={href}

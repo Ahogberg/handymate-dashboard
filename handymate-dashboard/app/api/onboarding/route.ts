@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { seedAllDefaults } from '@/lib/seed-defaults'
+import { skapaStartkort } from '@/lib/onboarding/starter-cards'
 
 export const dynamic = 'force-dynamic'
 
@@ -278,6 +279,14 @@ export async function POST(request: NextRequest) {
       business.business_id,
       branch || 'other',
       extraBranches
+    )
+
+    // Startkorten (docs/design/FORSTA-30-MINUTERNA.md): fire-and-forget, får
+    // ALDRIG blockera eller fälla ett lyckat finalize-svar. Funktionen är
+    // själv fail-safe (kastar aldrig) — .catch här är bara ett extra
+    // skyddsnät, samma mönster som extractAndSaveMemory i agent/trigger.
+    skapaStartkort(supabase, business.business_id).catch((err) =>
+      console.error('[onboarding finalize] skapaStartkort failade (non-blocking):', err)
     )
 
     return NextResponse.json({ success: true, seeded: seedResult })
