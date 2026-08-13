@@ -189,8 +189,14 @@ export function deepLinkFor(approval: ApprovalLike): { label: string; href: stri
   if (t === 'fakturera_projekt' && pl.project_id) {
     return { label: 'Läs & ändra →', href: `/dashboard/projects/${pl.project_id}` }
   }
+  // Bara när Guardian själv sett en ÄTA-vinkel (osäkrad/väntande ÄTA-intäkt)
+  // pekar länken mot ÄTA-fliken — annars är det ett rent kostnadsöverdrag
+  // (t.ex. ineffektivt arbete) utan något att fakturera för, och "Skapa ÄTA"
+  // vore en gissning kortet inte har täckning för (lib/projects/margin-guardian.ts).
   if (t === 'profitability_warning' && pl.project_id) {
-    return { label: 'Öppna projektet →', href: `/dashboard/projects/${pl.project_id}` }
+    return pl.ata_signal
+      ? { label: 'Skapa ÄTA →', href: `/dashboard/projects/${pl.project_id}?tab=changes` }
+      : { label: 'Öppna projektet →', href: `/dashboard/projects/${pl.project_id}` }
   }
   if (t === 'publish_microsite') return { label: 'Visa först →', href: '/dashboard/website' }
   if (t.includes('booking')) return { label: 'Öppna kalendern →', href: '/dashboard/schedule' }

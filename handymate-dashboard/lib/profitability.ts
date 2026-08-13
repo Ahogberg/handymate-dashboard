@@ -244,6 +244,7 @@ export async function checkProfitabilityWarnings(businessId: string): Promise<nu
       projected_overrun: result.projected_overrun,
       status: result.status,
       orsaker: result.orsaker,
+      ata_signal: result.ata_signal,
       // Gratis radrendering på Jarvis-hemmet (JarvisHome.tsx:1158-1173) —
       // samma preview.items-form som create_ata_draft och review_auto_invoice.
       preview: {

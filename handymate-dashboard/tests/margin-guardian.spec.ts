@@ -216,8 +216,30 @@ test.describe('payload-kontraktet', () => {
     expect(r).toHaveProperty('margin_percent')
     expect(r).toHaveProperty('projected_overrun')
     expect(r).toHaveProperty('orsaker')
+    expect(r).toHaveProperty('ata_signal')
     expect(r?.margin_percent).toBe(4)
     expect(Array.isArray(r?.orsaker)).toBe(true)
+  })
+})
+
+test.describe('ata_signal — styr "Skapa ÄTA"-länken på hemskärmen (2026-08-13)', () => {
+  test('rent kostnadsöverdrag utan ÄTA-underlag ger ata_signal: false', () => {
+    const r = byggLonsamhetsVarning(eko({ material_inkop_kr: 80000 }), projekt(), ingenAta)
+    expect(r?.ata_signal).toBe(false)
+  })
+
+  test('osäkrad (osignerad) ÄTA-intäkt ger ata_signal: true', () => {
+    const r = byggLonsamhetsVarning(
+      eko({ material_inkop_kr: 80000, ata_pending_kr: 5000 }),
+      projekt(),
+      ingenAta,
+    )
+    expect(r?.ata_signal).toBe(true)
+  })
+
+  test('ett väntande ÄTA-förslag ger ata_signal: true, även utan belopp', () => {
+    const r = byggLonsamhetsVarning(eko({ material_inkop_kr: 80000 }), projekt(), { aldsta_dagar: 2 })
+    expect(r?.ata_signal).toBe(true)
   })
 })
 

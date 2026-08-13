@@ -39,6 +39,14 @@ export interface LonsamhetsVarning {
   margin_percent: number | null
   projected_overrun: number
   orsaker: GuardianOrsak[]
+  /**
+   * Finns osäkrad ÄTA-intäkt (skickad men osignerad, eller ett förslag som
+   * väntat på svar) som skulle kunna täcka överskridningen? Styr om ytan får
+   * föreslå "Skapa ÄTA" — ett rent kostnadsöverdrag utan ÄTA-underlag (t.ex.
+   * ineffektivt arbete) har inget att fakturera för, och ett sådant kort ska
+   * INTE peka mot ÄTA-fliken.
+   */
+  ata_signal: boolean
 }
 
 function formatKr(n: number): string {
@@ -135,5 +143,6 @@ export function byggLonsamhetsVarning(
     margin_percent: marginal.marginal_pct,
     projected_overrun: projectedOverrun,
     orsaker,
+    ata_signal: intakter.ata_pending_kr > 0 || ataSignal.aldsta_dagar != null,
   }
 }
