@@ -372,6 +372,81 @@ Do not prematurely create a giant generic “Business State Platform”. Prefer 
 
 ---
 
+## 11. Company Goals
+
+### Thesis
+
+The owner sets a small number of explicit numeric goals — revenue target,
+target margin %, invoice-within-N-days, quote response time — and Handymate
+becomes goal-aware rather than only reactive.
+
+### Current state (verified 2026-08-13)
+
+Only `business_config.margin_target_percent` exists today, and it is
+display/input-only — `lib/projects/margin-guardian.ts` never reads it, nor
+does any other agent logic. No revenue, invoicing-speed, or quote-response
+goal field exists at all.
+
+### Why it matters
+
+Without an explicit target, "the margin is 21%" is just a fact. With one,
+Handymate can say "you're at 21%, you set 28%" — the difference between
+reporting and operating toward something.
+
+### Guardrails
+
+- Two separate scopes, do not conflate them:
+  1. **Cheap, ungated**: capture one or more goal numbers at onboarding,
+     show progress against them (e.g. in the owner report). Buildable now.
+  2. **Deeper, gated**: goal-aware reasoning against HISTORICAL job-type
+     patterns (e.g. "this job type has run 21-23% three times") requires
+     the same `project_lesson` data as idea #7 — currently 0 rows in
+     production. Do not attempt this half until that data exists.
+- A goal is a target, never silently treated as a promise made to a
+  customer.
+
+---
+
+## 12. "Lär Handymate" — teach a business rule
+
+### Thesis
+
+The owner states a business rule in natural language ("we don't want
+kitchen jobs under 80,000kr anymore") and it becomes a structured rule
+that actually shapes future agent behavior (Daniel's quoting, Karin's
+warnings, etc.), not just a stored note.
+
+### Current state (verified 2026-08-13)
+
+`business_knowledge` is written ONLY passively, by each agent's own
+scheduled observation prompts (`lib/agents/*/observation-prompt.ts`) —
+there is no path for the owner to explicitly dictate a rule. More
+importantly, the three places that read `business_knowledge` today
+(`app/api/moments/route.ts`, `app/api/observations/route.ts`, a dedup
+check) are display-only. Nothing in the quote engine, pricing, or any
+agent's warning logic applies a `business_knowledge` row to a decision.
+
+### Why the sequencing matters
+
+Building the input (a "teach Handymate" voice/chat affordance) before the
+consumer (agents that actually read and apply a saved rule) would ship an
+input with no effect — the owner would be told "I'll remember that" and
+nothing downstream would change. That is the exact class of dishonest,
+unverifiable claim this codebase's own honesty principle exists to
+prevent (compare: Margin Guardian's conservative floor, `decision_record`'s
+deliberate PII-hash, `ProjectCloseoutModal`'s "no screen rather than a
+guessed number").
+
+### Guardrails
+
+- Build the rule engine + at least ONE real consumer (e.g. the quote
+  engine actually filtering/warning on a saved rule) FIRST.
+- The natural-language capture affordance comes LAST, only once a rule
+  can be shown to actually change a real decision.
+- Never ship the input half alone.
+
+---
+
 ## Suggested sequencing
 
 These are not a committed roadmap, but a plausible dependency order is:

@@ -82,6 +82,32 @@ det som är billigt och verkligt nytt, avvisa eller skjut upp resten.
 
 ---
 
+## Tillägg samma dag — ChatGPT-analys av en AI-native-company-podd
+
+Andreas lät ChatGPT analysera transkriptet av podden "How to Build an
+AI-Native Company in 2026" mot Handymate. Åtta punkter granskades mot
+faktisk kod (samma metod som ovan — läs koden, gissa aldrig). Fyra
+konkreta, tidigare overifierade påståenden kontrollerades explicit
+(Explore-agent, 2026-08-13):
+
+| Poddens punkt | Dom |
+|---|---|
+| Agenter som infrastruktur, människan sätter mål/eskalerar | **Redan vision.** = `BUSINESS_TWIN_VISION.md`s SENSE→UNDERSTAND→PREDICT→...-loop, skriven två dagar tidigare. Extern bekräftelse, ändrar inget. |
+| "Verkmästaren"/"Agent Council" (korrelera flera agenters signaler om samma projekt/kund till EN rekommendation) | **Inte byggd, bekräftat.** `lib/moments/derive.ts` mappar varje `pending_approvals`/`business_knowledge`-rad 1:1, ingen sammanslagning på delat project_id/customer_id. `agentForApproval()` routar varje typ till EN agent. Enda undantaget: "Inför mötet"-blocket i `lib/matte/morning-brief.ts` (rad 158-208), hårdkodat för mötesförberedelse. **Det här är BUSINESS_TWIN_IDEA_BACKLOG #1 (Next Best Action Engine) igen** — redan katalogiserad, redan bortvald i dagens "genuint nytt"-runda. Inte en ny idé, förnyad extern validering av en redan känd. |
+| Dashboards → visibility/anomaly/insight/action | **Redan byggt och levande.** = Command Center/JarvisHome, verifierat live i webbläsaren samma dag under Guardian-arbetet. |
+| Mål-driven agent-resonemang ("Do smart things") | **Genuint saknas — bekräftat.** Enda spåret är `business_config.margin_target_percent`, aldrig läst av `lib/projects/margin-guardian.ts` eller någon annan agent-logik (noll träffar, verifierat direkt). Poddens fulla exempel (mål + historiska mönster) kräver samma `project_lesson`-data som redan är data-gated (0 rader). Se backlog #11 nedan för den ogatade, billiga delen. |
+| Company Memory / "Lär Handymate" (rösta in en affärsregel) | **Viktig invändning, inte bara "obyggd".** `business_knowledge` skrivs ENBART passivt av agenternas observationsprompts — ingen väg där ägaren dikterar en regel. Och de tre läsplatserna (`app/api/moments/route.ts`, `app/api/observations/route.ts`, en dedup-koll) är ren VISNING — ingenting i offertmotorn eller Karins varningar tillämpar en enda rad. Att bygga input-knappen nu vore en input UTAN consumer — en ärlighetsregression, inte ett Business Twin-steg. Se backlog #12: regelmotor + minst en verklig konsument FÖRST, röst SIST. |
+| "Software Factory" (internt Claude/Codex-flöde som självständigt prioriterar nästa feature ur kundsignal) | **Post-launch, inte nu.** Kräver kundfeedback-/support-/pilot-volym som inte finns förrän efter kund 1. Matchar `POST_REALITY_LAUNCH_VALUE_WAVE.md`s eget gate. |
+| Earned Autonomy = "expand intelligence faster than authority" | **Redan arkitekturen.** = `lib/autonomy/earned-autonomy.ts` + Operating Principle §4 nedan. Validering, ingen ny idé. |
+
+**Slutsats:** poddens värde är extern validering, inte ny riktning. Ingen
+grind ändras, ingen kod skrivs. Två nya idéer tillagda i
+`docs/strategy/BUSINESS_TWIN_IDEA_BACKLOG.md` (#11 Company Goals, #12
+"Lär Handymate") så de inte tappas bort eller återuppfinns fel nästa gång
+ett externt dokument landar.
+
+---
+
 # Extern rapport 2026-08-10 — absorberat / avvisat / fanns redan
 
 En extern roadmap-rapport (ChatGPT med repo-tillgång) granskades 2026-08-10 mot detta
