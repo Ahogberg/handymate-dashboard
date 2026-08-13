@@ -15,6 +15,7 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { createNotification } from '@/lib/notifications'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
+import { advanceProjectStage, SYSTEM_STAGES } from '@/lib/project-stages/automation-engine'
 
 // ── Event Types ───────────────────────────────────────────────
 
@@ -222,6 +223,27 @@ async function onQuoteAccepted(businessId: string, quoteId: string): Promise<voi
   suggestChecklistForProject({ businessId, projectId: project.project_id }).catch(err => {
     console.error('[project-ai-engine] suggestChecklistForProject error (non-blocking):', err)
   })
+
+  // Stegkedjan startar VID födseln (auditens P1-1) — samma regel som
+  // lib/projects/create-from-quote.ts. FYND 2026-08-13 (Golden Path-
+  // harnesset, root-cause): DEN HÄR funktionen är den som FAKTISKT skapar
+  // projektet för en RPC-signerad offert (triggas tidigare i request-kedjan
+  // än create-from-quote.ts's egen anropare, se den filens motsvarande
+  // kommentar) — men saknade helt denna initiering. Bekräftat i produktion:
+  // 29 av 33 projekt hade current_workflow_stage_id=null, reproducerat
+  // lokalt. `.catch()`/if-check: ett fel här får aldrig fälla projekt-
+  // skapandet, och advanceProjectStage kastar inte vid fel (returnerar
+  // {moved:false,error}) — båda vägarna loggas explicit.
+  try {
+    const stageResult = await advanceProjectStage(project.project_id, SYSTEM_STAGES.CONTRACT_SIGNED, businessId)
+    if (!stageResult.moved) {
+      console.error('[project-ai-engine] stage init returnerade moved:false (non-blocking):', {
+        projectId: project.project_id, businessId, error: stageResult.error,
+      })
+    }
+  } catch (err) {
+    console.error('[project-ai-engine] stage init kastade (non-blocking):', err)
+  }
 
   // Create milestones from labor items
   const laborItems = items.filter((i) => i.type === 'labor')

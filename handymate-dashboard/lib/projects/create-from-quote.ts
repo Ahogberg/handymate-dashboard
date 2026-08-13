@@ -147,22 +147,21 @@ export async function createProjectFromQuote(
     // stod stage null tills första fakturahändelsen och projektlistan kunde
     // inte svara på var jobbet står.
     //
-    // Fynd 2026-08-13 (Golden Path-harnesset): bekräftat i produktion att
-    // current_workflow_stage_id stod kvar null EFTER en riktig signering —
-    // för 29 av 33 projekt totalt i produktionen, oavsett hur länge man
-    // väntar. Ett första fix-försök (bara await:a den tidigare fire-and-
-    // forget-kedjan) löste INTE symptomet, vilket utesluter en ren
-    // serverless-timing-race som ensam förklaring. Bytt till en STATISK
-    // import (var: `import('@/lib/project-stages/automation-engine')`)
-    // för att eliminera dynamisk chunk-laddning som en möjlig felkälla i
-    // Vercels serverless-miljö — samma modul, ingen cirkulär import (verifierat:
-    // automation-engine.ts importerar aldrig denna fil). `.catch()` kvar:
-    // ett fel här ska ALDRIG fälla själva projekt-skapandet.
-    // advanceProjectStage KASTAR inte vid fel — den returnerar {moved:false,
-    // error} (se automation-engine.ts). Ett bart .catch() ser alltså ALDRIG
-    // en sådan "mjuk" miss, bara genuina thrown exceptions. Loggar båda
-    // vägarna explicit så ett framtida fel går att se i Vercels function-
-    // loggar, inte bara försvinner tyst.
+    // Fynd 2026-08-13 (Golden Path-harnesset, fullständig root-cause): DEN
+    // HÄR KODVÄGEN nås i praktiken sällan för RPC-signerade offerter — se
+    // lib/project-ai-engine.ts's onQuoteAccepted, en HELT SEPARAT, duplicerad
+    // projekt-skapare som triggas TIDIGARE i samma request
+    // (handleProjectEvent({type:'quote_accepted'}) i app/api/quotes/public/
+    // [token]/route.ts, awaitad FÖRE finalizeAcceptedQuote). Den hinner
+    // alltid skapa projektet FÖRST, varpå dedup-kollen ovan (steg 1) alltid
+    // returnerar tidigt — koden nedan når man ALDRIG för den vägen.
+    // onQuoteAccepted saknade en egen advanceProjectStage-anrop, vilket är
+    // den FAKTISKA roten (bekräftat: 29/33 projekt i produktionen null,
+    // reproducerat lokalt oavsett await/statisk-import-försök här). Fixat
+    // vid KÄLLAN i onQuoteAccepted. Koden här behålls ändå — createProject
+    // FromQuote anropas fortfarande direkt av app/api/quotes/accept/route.ts
+    // (den kända divergerande interna vägen), som INTE går via
+    // handleProjectEvent — där gäller den här stage-initieringen på riktigt.
     try {
       const stageResult = await advanceProjectStage(projectId, SYSTEM_STAGES.CONTRACT_SIGNED, businessId)
       if (!stageResult.moved) {
