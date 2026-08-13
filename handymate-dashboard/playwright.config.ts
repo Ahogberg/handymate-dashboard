@@ -18,7 +18,7 @@ export default defineConfig({
   // user.json istället för demo-employee.json). De tre nya golden-path-*-
   // projekten längst ner sätter egen testIgnore:[] för att inte ärva
   // undantaget de själva behöver träffa.
-  testIgnore: [/.*\.integration\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/],
+  testIgnore: [/.*\.integration\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -84,6 +84,22 @@ export default defineConfig({
       testIgnore: [],
       use: { storageState: 'playwright/.auth/demo-employee.json' },
       dependencies: ['golden-path'],
+    },
+
+    // ── Margin Guardian — fristående "fungerar i praktiken"-test ─────────
+    // Egen fil/eget projekt (inte en Golden Path-station): en lönsamhets-
+    // varning är en villkorad gren, inte del av kundresans huvudspår.
+    // Riktig UI-lösenordsinloggning i testet självt (samma mönster som
+    // golden-path.spec.ts Station 1) — playwright/.auth/demo-owner.json
+    // (golden-path-setup) visade sig INTE bära en giltig session (landar på
+    // /login?redirect=... efter magic link, se fynd 2026-08-13), så en
+    // riktig inloggning är den bevisat pålitliga vägen.
+    {
+      name: 'margin-guardian',
+      testDir: './tests/e2e-margin-guardian',
+      testMatch: /margin-guardian\.spec\.ts/,
+      testIgnore: [],
+      use: { storageState: { cookies: [], origins: [] } },
     },
   ],
 })
