@@ -95,6 +95,18 @@ export interface QuoteTemplateItem {
       "Dold"-markering så hantverkaren ser vad kunden inte ser.
       Filtreringen sker i respektive renderare, aldrig i beräkningarna. */
   isHidden?: boolean
+  /** Kvittoprincipen Fall 3 (docs/design/SYNLIG-INTELLIGENS.md, 2026-08-13):
+      AI:n var under säkerhetströskeln på DENNA rad (QuoteItem.ai_uncertain,
+      app/dashboard/quotes/new/page.tsx). ENDAST satt av den KLIENT-sidiga
+      live-preview-byggaren (quoteTemplateData i quotes/new/page.tsx) — precis
+      som `id` ovan. buildQuoteTemplateData (lib/quote-templates/data-builder.ts)
+      bygger däremot alltid från quote_items i databasen, där fältet aldrig
+      finns (strippat innan spar) — kundens dokument (portal-token, PDF)
+      går ALLTID genom just den byggaren och kan därför aldrig visa detta.
+      Rör aldrig data-builder.ts för att sätta detta fält. */
+  aiUncertain?: boolean
+  /** Modellens egen not till aiUncertain — samma edit-läge-bara-regel. */
+  aiNote?: string | null
 }
 
 /** En komponentrad ur component_snapshot som får visas för kunden. */

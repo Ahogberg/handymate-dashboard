@@ -290,6 +290,11 @@ export const MODERN_DOCUMENT_CSS = `
    Delar teal/typografitokens med resten av .quote-document ovan — samma
    scope-princip (motorn används nu av BÅDE offert- och fakturaläge). */
 .quote-document .item-performed-by { color: #94A3B8; font-size: 10px; margin-top: 2px; }
+/* Kvittoprincipen Fall 3 (docs/design/SYNLIG-INTELLIGENS.md) — bara i
+   edit-läge (isEdit i QuoteDocumentRow), aldrig i kundens statiska dokument. */
+.quote-document .item-ai-uncertain { display: flex; align-items: flex-start; gap: 6px; margin-top: 4px; }
+.quote-document .item-ai-uncertain .pill { flex-shrink: 0; padding: 1px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: #FEF3C7; color: #B45309; }
+.quote-document .item-ai-uncertain .note { color: #B45309; font-size: 11px; line-height: 1.4; }
 .quote-document .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; background: #FEF2F2; color: #DC2626; border: 1px solid #FEE2E2; }
 .quote-document .status-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #DC2626; }
 .quote-document .status-badge.paid { background: #F0FDF4; color: #16A34A; border-color: #BBF7D0; }

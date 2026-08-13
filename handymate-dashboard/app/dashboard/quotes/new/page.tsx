@@ -694,6 +694,11 @@ export default function NewQuotePage() {
             isRotEligible: !!i.is_rot_eligible,
             isRutEligible: !!i.is_rut_eligible,
             rotRutType: i.rot_rut_type ?? (i.is_rot_eligible ? 'rot' : i.is_rut_eligible ? 'rut' : null),
+            // Kvittoprincipen Fall 3 — ENDAST här (klient-sidan live-preview).
+            // buildQuoteTemplateData (server, kundens dokument) rör aldrig
+            // dessa fält — se typkommentaren i lib/quote-templates/types.ts.
+            aiUncertain: i.ai_uncertain || undefined,
+            aiNote: i.ai_uncertain ? i.ai_note : undefined,
           }
         }),
         subtotalExVat: totals.subtotal,

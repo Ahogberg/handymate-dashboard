@@ -288,6 +288,15 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
             docType-agnostiskt fält (alltid undefined för offertrader idag,
             eftersom offertens data-builder aldrig sätter det). */}
         {item.performedByName ? <div className="item-performed-by">Utfört av {item.performedByName}</div> : null}
+        {/* Kvittoprincipen Fall 3 — gated på isEdit som EXTRA säkerhetslager
+            utöver att fältet aldrig ens finns i kundens dokument-data (se
+            typkommentaren i lib/quote-templates/types.ts). */}
+        {isEdit && item.aiUncertain ? (
+          <div className="item-ai-uncertain">
+            <span className="pill">Osäker</span>
+            {item.aiNote ? <span className="note">{item.aiNote}</span> : null}
+          </div>
+        ) : null}
         {componentSpec(item.components)}
       </td>
       {qtyCell}
