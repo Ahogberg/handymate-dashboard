@@ -278,6 +278,14 @@ export async function POST(request: NextRequest) {
     const anthropic = getAnthropic()
 
     // Hämta inspelningen med transkript
+    // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): customer.address
+    // finns inte längre — adressen delades upp i address_line/city/
+    // postal_code/region vid någon punkt, men denna embedded PostgREST-
+    // query uppdaterades aldrig. Postgres kastade "column customer_1.
+    // address does not exist" (42703) på VARJE anrop, vilket i sin tur
+    // gjorde att /api/admin/demo-seed-meeting alltid rapporterade
+    // "Recording not found" trots att raden fanns — hela analysvägen
+    // (telefoni OCH möte) har aldrig kunnat läsa en inspelning.
     const { data: recording, error: fetchError } = await supabase
       .from('call_recording')
       .select(`
@@ -287,11 +295,19 @@ export async function POST(request: NextRequest) {
           name,
           phone_number,
           email,
-          address
+          address_line,
+          postal_code,
+          city
         )
       `)
       .eq('recording_id', recording_id)
       .single()
+
+    if (recording?.customer) {
+      const c = recording.customer as { address_line?: string | null; postal_code?: string | null; city?: string | null }
+      ;(recording.customer as { address?: string | null }).address =
+        [c.address_line, [c.postal_code, c.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || null
+    }
 
     if (fetchError || !recording) {
       console.error('[voice/analyze] Recording not found:', { recording_id, fetchError: fetchError?.message, fetchCode: fetchError?.code })
@@ -612,12 +628,17 @@ Svara ENDAST med JSON i följande format:
       if (existingCustomer) {
         customerId = existingCustomer.customer_id
         // Uppdatera med ny info om det finns
+        // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): address är
+        // inte en kolumn på customer (address_line/postal_code/city sedan
+        // tidigare) — samma fynd som i embedded-selecten ovan. Skriver till
+        // address_line (bästa enkla platsen för en ostrukturerad AI-
+        // extraherad adress) istället för det obefintliga fältet.
         if (extractedInfo.address || extractedInfo.email) {
           await supabase
             .from('customer')
             .update({
               name: extractedInfo.customer_name,
-              address: extractedInfo.address || undefined,
+              address_line: extractedInfo.address || undefined,
               email: extractedInfo.email || undefined
             })
             .eq('customer_id', customerId)
