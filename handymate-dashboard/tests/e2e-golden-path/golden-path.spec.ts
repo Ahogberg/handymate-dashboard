@@ -569,7 +569,11 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
           ),
           modal.getByRole('button', { name: 'Skicka offert' }).click(),
         ])
-        expect(sendResponse.ok(), `POST /api/quotes/send svarade ${sendResponse.status()}`).toBeTruthy()
+        const sendBody = await sendResponse.json().catch(() => null)
+        expect(
+          sendResponse.ok(),
+          `POST /api/quotes/send svarade ${sendResponse.status()}: ${JSON.stringify(sendBody)}`,
+        ).toBeTruthy()
       })
 
       const sentQuote = await test.step('DB-bevis: status=sent, sent_at satt, portal_token på kunden', async () => {

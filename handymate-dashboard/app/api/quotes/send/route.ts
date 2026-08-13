@@ -33,7 +33,7 @@ async function sendSMS(
   from: string,
   customerId?: string | null,
   quoteId?: string | null,
-): Promise<boolean> {
+): Promise<{ sent: boolean; error?: string }> {
   const { sendSmsViaElks } = await import('@/lib/sms-send')
   const r = await sendSmsViaElks({
     supabase,
@@ -46,7 +46,7 @@ async function sendSMS(
     messageType: 'quote',
   })
   if (!r.success) console.error('[quotes/send] SMS misslyckades:', r.error)
-  return r.success
+  return { sent: r.success, error: r.error }
 }
 
 /**
@@ -460,6 +460,7 @@ export async function POST(request: NextRequest) {
     let emailSent = false
     let sentVia = ''
     let gmailError = ''
+    let smsError = ''
 
     // SMS
     if (method === 'sms' || method === 'both') {
@@ -480,7 +481,9 @@ ${portalUrl}
 Frågor? Ring ${business.phone_number}
 ${suffix}`
 
-      smsSent = await sendSMS(supabase, business.business_id, quote.customer.phone_number, smsMessage, business.business_name, quote.customer_id, quoteId)
+      const smsResult = await sendSMS(supabase, business.business_id, quote.customer.phone_number, smsMessage, business.business_name, quote.customer_id, quoteId)
+      smsSent = smsResult.sent
+      smsError = smsResult.error || ''
 
       if (smsSent) {
         // Logga SMS-aktivitet
@@ -566,11 +569,12 @@ ${suffix}`
 
     // Kontrollera att minst en metod lyckades
     if (!smsSent && !emailSent) {
-      const hint = gmailError
-        ? `Gmail misslyckades: ${gmailError}. `
-        : ''
+      const hint = [
+        smsError ? `SMS misslyckades: ${smsError}.` : '',
+        gmailError ? `Gmail misslyckades: ${gmailError}.` : '',
+      ].filter(Boolean).join(' ')
       return NextResponse.json({
-        error: `${hint}Kunde inte skicka offerten. Kontrollera att Gmail är kopplad i Inställningar eller att kundens mailadress stämmer.`
+        error: `${hint ? hint + ' ' : ''}Kunde inte skicka offerten. Kontrollera att Gmail är kopplad i Inställningar eller att kundens mailadress stämmer.`
       }, { status: 500 })
     }
 
