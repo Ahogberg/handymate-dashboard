@@ -62,14 +62,19 @@ export default defineConfig({
       testDir: './tests/e2e-golden-path/setup',
       testMatch: /.*\.setup\.ts/,
       testIgnore: [],
-      use: { storageState: undefined },
+      // `storageState: undefined` does NOT override the top-level default in
+      // this Playwright version — it falls through and tries to read
+      // playwright/.auth/user.json, which doesn't exist on a fresh checkout.
+      // An explicit empty state (the pattern tests/quote-document-width.spec.ts
+      // already uses) is what actually produces a truly blank context.
+      use: { storageState: { cookies: [], origins: [] } },
     },
     {
       name: 'golden-path',
       testDir: './tests/e2e-golden-path',
       testMatch: /golden-path\.spec\.ts/,
       testIgnore: [],
-      use: { storageState: undefined },
+      use: { storageState: { cookies: [], origins: [] } },
       dependencies: ['golden-path-setup'],
     },
     {

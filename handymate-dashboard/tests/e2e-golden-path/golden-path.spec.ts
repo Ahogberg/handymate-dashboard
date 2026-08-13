@@ -69,6 +69,72 @@ const ids: {
 
 let allStationsOk = true
 
+/**
+ * Kända, legitima overlays en FÄRSK webbläsarsession möter (en riktig
+ * förstagångsanvändare/nytt device hade sett samma sak) — se Station 1:s
+ * kommentar för research-bakgrunden. Varje post: en trigger-locator (något
+ * som bara finns när overlayn är öppen) + hur den stängs UTAN att godkänna
+ * något (bara döljer, ingen server-mutation).
+ */
+const KNOWN_OVERLAYS: {
+  name: string
+  trigger: (p: Page) => ReturnType<Page['getByText']> | ReturnType<Page['getByRole']>
+  dismiss: (p: Page, trigger: ReturnType<Page['getByRole']>) => Promise<void>
+}[] = [
+  // Ordning: högst z-index (mest sannolikt att ligga OVANPÅ en annan
+  // overlay just nu) prövas först varje omgång — se dismissKnownOverlays
+  // kommentar för race-scenariot detta skyddar mot.
+  {
+    name: 'Måndagsmötet-takeover',
+    trigger: (p) => p.getByRole('button', { name: 'Stäng' }),
+    dismiss: async (_p, t) => { await t.click({ timeout: 2000 }) },
+  },
+  {
+    name: 'WelcomeModal',
+    trigger: (p) => p.getByText('Välkommen — ditt team är på plats.'),
+    dismiss: async (p) => { await p.mouse.click(10, 10) },
+  },
+  {
+    name: 'Cookiebanner',
+    trigger: (p) => p.getByRole('button', { name: 'Godkänn alla' }),
+    dismiss: async (_p, t) => { await t.click({ timeout: 2000 }) },
+  },
+]
+
+/**
+ * Pollar under ett FAST tidsfönster (inte en tidig avbrytning — se Station
+ * 1:s kommentar för VARFÖR: Måndagsmötet-takeoverns egen gate väntar på en
+ * API-fetch och kan montera flera sekunder efter sidladdning, GOTT OCH VÄL
+ * efter att en snabbare overlay som cookiebannern redan hunnit stängas. Ett
+ * tidigt break på "en tom omgång" missade den varje gång i praktiken — ett
+ * fast fönster (helt normal engångskostnad vid Station 1) är den enda
+ * tillförlitliga lösningen.
+ *
+ * VARJE dismiss-klick har en KORT egen timeout (2s, inte Playwrights
+ * default ~30s actionability-väntan): en overlay kan montera OVANPÅ en
+ * annan MITT I klicket (en riktig körning visade exakt detta — cookie-
+ * bannerns klick blockerades av att Måndagsmötet-takeovern hann montera
+ * under väntan). Ett blockerat klick ska misslyckas snabbt och lämna
+ * ordet till nästa varv (som då hittar och stänger det som faktiskt ligger
+ * överst just då) — inte hänga kvar och äta hela testets tidsbudget.
+ */
+async function dismissKnownOverlays(page: Page, windowMs = 8000, pollMs = 400): Promise<string[]> {
+  const dismissed: string[] = []
+  const deadline = Date.now() + windowMs
+  while (Date.now() < deadline) {
+    for (const overlay of KNOWN_OVERLAYS) {
+      const trigger = overlay.trigger(page) as ReturnType<Page['getByRole']>
+      const visible = await trigger.isVisible().catch(() => false)
+      if (!visible) continue
+      const ok = await overlay.dismiss(page, trigger).then(() => true).catch(() => false)
+      if (ok) dismissed.push(overlay.name)
+      await page.waitForTimeout(300)
+    }
+    await page.waitForTimeout(pollMs)
+  }
+  return dismissed
+}
+
 /** Kör en stations kropp, bokför resultatet, och sätter allStationsOk=false
  *  + kastar vidare (så Playwright markerar testet som failed och describe.serial
  *  hoppar resten) om något går fel. */
@@ -142,6 +208,11 @@ async function cleanupCore(): Promise<string[]> {
   await del('quote_tracking_events', 'quote_id', ids.quoteId)
   await del('quotes', 'quote_id', ids.quoteId)
   await del('project', 'project_id', ids.projectId)
+  // KÄLLGRANSKAT (upptäckt under en riktig körning, 2026-08-13): en riktig
+  // /api/quotes/send-anrop loggar en customer_activity-rad (t.ex.
+  // 'sms_sent') — en FK (customer_activity_customer_id_fkey) blockerar då
+  // customer-raderingen om den här tas bort. Måste köras FÖRE customer.
+  await del('customer_activity', 'customer_id', ids.customerId)
   await del('customer', 'customer_id', ids.customerId)
   return leftover
 }
@@ -204,6 +275,26 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
         await ownerPage.waitForURL(/\/dashboard/, { timeout: 15_000 })
       })
 
+      // KÄLLGRANSKAT (upptäckt under en riktig körning, 2026-08-13): en
+      // FÄRSK webbläsarsession möter upp till TRE oberoende overlays, alla
+      // legitima (en riktig förstagångsanvändare/nytt device hade sett
+      // samma sak) — WelcomeModal.tsx (localStorage-gate),
+      // cookiebannern, och MandagsmoteTakeover.tsx (riktigt pending
+      // monday_brief-kort just DENNA vecka, se lib/jarvis/mandagsmote.ts —
+      // det ÄR faktiskt måndag idag). De monterar på OBEROENDE async-gates
+      // (Måndagsmötet väntar på queueLoaded/en API-fetch) — en fast
+      // sekvens "kolla A, stäng A, kolla B, stäng B" race:ar mot en overlay
+      // som monterar EFTER att en tidigare redan hunnit stängas mitt i
+      // klicket på en annan. En pollande loop är den enda tillförlitliga
+      // lösningen. Se dismissKnownOverlays ovan i filen.
+      await test.step('Dismissa kända overlays (WelcomeModal/cookiebanner/Måndagsmötet) — pollar tills inget nytt dyker upp', async () => {
+        const dismissed = await dismissKnownOverlays(ownerPage)
+        if (dismissed.length > 0) {
+          // eslint-disable-next-line no-console
+          console.log(`[golden-path] Station 1 dismissade: ${dismissed.join(', ')}`)
+        }
+      })
+
       const me = await test.step('DB-bevis: sessionen resolvar till DEMO_BUSINESS_ID via /api/me', async () => {
         const res = await ownerCtx.request.get('/api/me')
         expect(res.ok(), `/api/me svarade ${res.status()}`).toBeTruthy()
@@ -256,6 +347,12 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
     await station('3', 'Första kunden', async () => {
       await test.step('Navigera till Kunder', async () => {
         await ownerPage.goto('/dashboard/customers')
+        // Källgranskat fynd (2026-08-13): cookiebannern monterar inte alltid
+        // hunnit inom Station 1:s fönster — en riktig, fristående kontroll
+        // efter VARJE sidnavigering är den enda pålitliga lösningen (se
+        // dismissKnownOverlays filhuvud). Kort fönster här — det mesta är
+        // redan avklarat sen Station 1.
+        await dismissKnownOverlays(ownerPage, 2500)
       })
 
       await test.step('Öppna "Ny kund" och fyll i namn/telefon/e-post', async () => {
@@ -266,6 +363,20 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
         await ownerPage.getByPlaceholder('+46…').fill(E2E_TEST_PHONE)
         await ownerPage.locator('input[type="email"]').fill(E2E_TEST_EMAIL)
         await ownerPage.getByRole('button', { name: 'Skapa', exact: true }).click()
+
+        // KÄLLGRANSKAT fynd (2026-08-13, en riktig körning): E2E_TEST_PHONE
+        // är FAST (samma nummer varje körning) — om en tidigare körnings
+        // städning missat en rad (eller en samtidig körning pågår) triggar
+        // riktig dubblett-detektion ("Möjlig dubblett"-dialogen) och
+        // blockerar skapandet tills "Skapa ändå" klickas. Detta är en RIKTIG
+        // produktbeteende, inte en bugg att kringgå tyst — men harnesset ska
+        // vara motståndskraftigt mot sin egen ofullständiga städning.
+        const skapaAnda = ownerPage.getByRole('button', { name: 'Skapa ändå' })
+        const dupDialogAppeared = await skapaAnda
+          .waitFor({ state: 'visible', timeout: 3000 })
+          .then(() => true)
+          .catch(() => false)
+        if (dupDialogAppeared) await skapaAnda.click()
       })
 
       const customer = await test.step('DB-bevis: customer-rad finns med rätt fält', async () => {
@@ -288,17 +399,46 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
     await station('4', 'Offert skapas & skickas', async () => {
       await test.step('Navigera till Ny offert (kunden förvald via ?customerId=)', async () => {
         await ownerPage.goto(`/dashboard/quotes/new?customerId=${ids.customerId}`)
+        await dismissKnownOverlays(ownerPage, 2500)
+      })
+
+      // KÄLLGRANSKAT (upptäckt under en riktig körning, 2026-08-13):
+      // /dashboard/quotes/new öppnas i `mainView === 'document'` som
+      // default (app/dashboard/quotes/new/page.tsx) — sök/skriv-kombon
+      // (QuoteAddRowCombo.tsx) renderas bara i `mainView === 'list'`
+      // ("Listvy"-togglen). Klicka dit först.
+      await test.step('Växla till Listvy (sök/skriv-kombon finns bara där)', async () => {
+        await ownerPage.getByRole('button', { name: 'Listvy' }).click()
       })
 
       await test.step('Lägg till en rad via sök/skriv-kombon', async () => {
         const combo = ownerPage.getByPlaceholder('Sök produkt eller skriv ny beskrivning…')
+        await combo.waitFor({ state: 'visible', timeout: 10_000 })
         await combo.fill('Arbete — badrumsrenovering (E2E)')
         await combo.press('Enter')
       })
 
-      await test.step('Klicka "Skicka offert" (sparar utkast + navigerar till skicka-läget)', async () => {
-        await ownerPage.getByRole('button', { name: 'Skicka offert' }).click()
-        await ownerPage.waitForURL(/\/dashboard\/quotes\//, { timeout: 15_000 })
+      // KÄLLGRANSKAT (upptäckt under en riktig körning, 2026-08-13): utan en
+      // ifylld beskrivning visar "Skicka offert" en extra bekräftelse
+      // ("Beskrivning saknas — skicka ändå?") istället för att gå vidare —
+      // en riktig ägare skriver naturligtvis en beskrivning, så vi gör
+      // samma sak här (mer verklighetstroget än att bara klicka igenom
+      // varningen).
+      await test.step('Fyll i beskrivning (undviker "Beskrivning saknas"-bekräftelsen)', async () => {
+        await ownerPage.getByPlaceholder('Kort beskrivning av jobbet…').fill('E2E golden path — badrumsrenovering')
+      })
+
+      await test.step('Klicka "Skicka offert" (sparar utkast + öppnar skicka-modalen)', async () => {
+        await ownerPage.getByRole('button', { name: 'Skicka offert', exact: true }).click()
+        // OBS (fix efter en riktig körning): den gamla waitForURL-regexen
+        // (/\/dashboard\/quotes\//) matchade redan STARTSIDAN
+        // (/dashboard/quotes/new innehåller samma substräng) — ett no-op-
+        // villkor som aldrig faktiskt väntade på något. Vänta istället in
+        // skicka-modalen som "Bekräfta+skicka"-steget nedan ändå behöver.
+        await ownerPage
+          .locator('.fixed.inset-0')
+          .filter({ hasText: 'Skicka offert' })
+          .waitFor({ state: 'visible', timeout: 15_000 })
       })
 
       const quote = await test.step('Hämta den nyss skapade offerten', async () => {
@@ -324,8 +464,15 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
       await test.step('(Judgment call) Sätt två kända arbetsrader för Station 6/7:s budget-/milestone-bevis', async () => {
         const supabase = getSupabaseAdmin()
         await supabase.from('quote_items').delete().eq('quote_id', ids.quoteId)
+        // KÄLLGRANSKAT (upptäckt under en riktig körning, 2026-08-13):
+        // quote_items.id är TEXT utan DB-default (kolumnen genereras av
+        // applikationskoden vid riktiga inserts, t.ex. `qi_<slumpsträng>`
+        // i /api/quotes) — ett insert utan id kraschar med en NOT NULL-
+        // violation. Genererar samma sortens id här.
+        const itemId = (prefix: string) => `qi_e2e_${prefix}_${Date.now()}`
         const { error: itemsErr } = await supabase.from('quote_items').insert([
           {
+            id: itemId('1'),
             quote_id: ids.quoteId,
             business_id: DEMO_BUSINESS_ID,
             item_type: 'item',
@@ -337,6 +484,7 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
             sort_order: 1,
           },
           {
+            id: itemId('2'),
             quote_id: ids.quoteId,
             business_id: DEMO_BUSINESS_ID,
             item_type: 'item',
@@ -458,6 +606,15 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
 
       await test.step('Rita en riktig signatur på canvas (mouse move/down/move/up — ingen fejkad data-URL)', async () => {
         const canvas = customerPage!.locator('#signature-card canvas')
+        // KÄLLGRANSKAT (upptäckt under en riktig körning, 2026-08-13):
+        // canvasen ligger under vikningen (boundingBox() gav y≈782 i ett
+        // ≈720px viewport) — utan explicit scroll landar page.mouse-
+        // koordinaterna utanför den synliga ytan och onMouseDown/onMouseMove
+        // (app/quote/[token]/page.tsx) triggas aldrig, så hasDrawn förblir
+        // false och "Godkänn offert" stannar disabled i evighet. Detta är
+        // INTE samma sak som .click()/.fill(), som auto-scrollar internt —
+        // rå page.mouse gör det aldrig.
+        await canvas.scrollIntoViewIfNeeded()
         const box = await canvas.boundingBox()
         if (!box) throw new Error('Signatur-canvasen hittades inte / saknar boundingBox')
         const startX = box.x + box.width * 0.2
@@ -465,7 +622,7 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
         await customerPage!.mouse.move(startX, startY)
         await customerPage!.mouse.down()
         for (let i = 1; i <= 6; i++) {
-          await customerPage!.mouse.move(startX + i * (box.width * 0.1), startY + Math.sin(i) * 15)
+          await customerPage!.mouse.move(startX + i * (box.width * 0.1), startY + Math.sin(i) * 15, { steps: 5 })
         }
         await customerPage!.mouse.up()
       })
@@ -550,6 +707,7 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
       // "Boka platsbesök"-modal. Se slutrapportens judgment calls.
       await test.step('Skapa bokning via kundsidans "Boka platsbesök" (real UI → POST /api/bookings)', async () => {
         await ownerPage.goto(`/dashboard/customers/${ids.customerId}`)
+        await dismissKnownOverlays(ownerPage, 2500)
         await ownerPage.getByRole('button', { name: 'Platsbesök' }).click()
         const tomorrow = new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 10)
         await ownerPage.locator('input[type="date"]').fill(tomorrow)
@@ -590,6 +748,7 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
       // advanceProjectStage(JOB_STARTED) — app/api/projects/route.ts.
       await test.step('Statusändring "Aktivt" via projektsidans "Fler åtgärder"-meny (real UI → PUT /api/projects)', async () => {
         await ownerPage.goto(`/dashboard/projects/${ids.projectId}`)
+        await dismissKnownOverlays(ownerPage, 2500)
         await ownerPage.getByRole('button', { name: 'Fler åtgärder' }).click()
         const [statusResponse] = await Promise.all([
           ownerPage.waitForResponse(

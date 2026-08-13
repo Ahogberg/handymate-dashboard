@@ -83,6 +83,8 @@ test.describe('A9 — Behörighetstestet (anställd utan ekonomibehörighet)', (
     await del('quote_tracking_events', 'quote_id', handoff.quoteId)
     await del('quotes', 'quote_id', handoff.quoteId)
     await del('project', 'project_id', handoff.projectId)
+    // Samma FK-fynd som golden-path.spec.ts:s cleanupCore — se dess kommentar.
+    await del('customer_activity', 'customer_id', handoff.customerId)
     await del('customer', 'customer_id', handoff.customerId)
 
     pushResult({
@@ -160,11 +162,19 @@ test.describe('A9 — Behörighetstestet (anställd utan ekonomibehörighet)', (
       return
     }
 
+    // Källgranskat fynd (2026-08-13, en riktig körning): page.context().request
+    // gav 401 (inte 403) på den FÖRSTA raden i den här testfilens EGEN
+    // browser-context, trots giltig storageState — en riktig sidnavigering
+    // först säkerställer att sessionen faktiskt är "varm" innan de råa
+    // API-anropen görs (samma mönster som UI-bevis-testet redan gör via
+    // sitt page.goto()).
+    await page.goto('/dashboard')
+
     const results: string[] = []
     try {
       for (const check of SENSITIVE_API_CHECKS) {
         await test.step(`GET ${check.path(handoff)} → förväntar 403`, async () => {
-          const res = await page.context().request.get(check.path(handoff))
+          const res = await page.request.get(check.path(handoff))
           expect(res.status(), `${check.label}: förväntade 403, fick ${res.status()}`).toBe(403)
           results.push(`${check.label} -> 403`)
         })
