@@ -37,6 +37,16 @@ interface HandoffIds {
   bookingId: string | null
   timeEntryIds: string[]
   approvalId: string | null
+  // ── Fas 2 (station 8-14) ──────────────────────────────────────────────
+  invoiceId: string | null
+  debriefApprovalId: string | null
+  reviewInvoiceApprovalId: string | null
+  confirmPaymentApprovalId: string | null
+  customerFactApprovalId: string | null
+  customerFactIds: string[]
+  meetingRecordingId: string | null
+  lessonTexts: string[]
+  approvalIds: string[]
   allStationsOk: boolean
 }
 
@@ -78,6 +88,14 @@ test.describe('A9 — Behörighetstestet (anställd utan ekonomibehörighet)', (
       const { error } = await supabase.from(table).delete().eq(column, value)
       if (error) leftover.push(`${table}:${value} (${error.message})`)
     }
+    // Fas 2 (station 8-14) — FÖRE milestones/quote/project (FK-barn), samma
+    // ordning/motivering som golden-path.spec.ts:s egen cleanupCore().
+    await del('customer_fact', 'customer_id', handoff.customerId)
+    await del('call_recording', 'recording_id', handoff.meetingRecordingId)
+    for (const aId of handoff.approvalIds) await del('pending_approvals', 'id', aId)
+    await del('project_outcome', 'project_id', handoff.projectId)
+    await del('project_lesson', 'project_id', handoff.projectId)
+    await del('invoice', 'invoice_id', handoff.invoiceId)
     for (const mId of handoff.milestoneIds) await del('project_milestone', 'milestone_id', mId)
     await del('pending_approvals', 'id', handoff.approvalId)
     await del('quote_tracking_events', 'quote_id', handoff.quoteId)

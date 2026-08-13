@@ -550,6 +550,15 @@ export async function PUT(request: NextRequest) {
     if (body.description !== undefined) updates.description = body.description
     if (body.project_type !== undefined) updates.project_type = body.project_type
     if (body.status !== undefined) {
+      // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): updates.status
+      // sattes ALDRIG här — blocket nedan skrev bara sidofält (completed_at
+      // m.fl.) baserat på body.status, men aldrig själva statuskolumnen.
+      // En riktig stängning (PUT {status:'completed'}) körde HELA kedjan
+      // (fyra-ögon, stage->ps-05, autoInvoiceOnComplete, freezeProjectOutcome,
+      // skapaDebriefKort) men project.status blev tyst kvar på sitt gamla
+      // värde — samma gäller planning/active/paused/cancelled.
+      updates.status = body.status
+
       // ═══ FOUR-EYES-GRINDEN — DATABASENS VÄRDE, ALDRIG KLIENTENS ═══
       // (Projektauditen P1-5, lagad 2026-08-09.)
       //

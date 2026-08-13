@@ -56,6 +56,19 @@ const ids: {
   bookingId: string | null
   timeEntryIds: string[]
   approvalId: string | null
+  // ── Fas 2 (station 8-14) ──────────────────────────────────────────────
+  invoiceId: string | null
+  debriefApprovalId: string | null
+  reviewInvoiceApprovalId: string | null
+  confirmPaymentApprovalId: string | null
+  customerFactApprovalId: string | null
+  customerFactIds: string[]
+  meetingRecordingId: string | null
+  lessonTexts: string[]
+  /** ALLA Fas 2-godkännandekort (för städning) — ERSÄTTER inte approvalId
+   *  ovan (Fas 1:s Guardian-kort, som permission-check.spec.ts fortfarande
+   *  läser via handoff-filen oförändrat). */
+  approvalIds: string[]
 } = {
   customerId: null,
   quoteId: null,
@@ -65,6 +78,15 @@ const ids: {
   bookingId: null,
   timeEntryIds: [],
   approvalId: null,
+  invoiceId: null,
+  debriefApprovalId: null,
+  reviewInvoiceApprovalId: null,
+  confirmPaymentApprovalId: null,
+  customerFactApprovalId: null,
+  customerFactIds: [],
+  meetingRecordingId: null,
+  lessonTexts: [],
+  approvalIds: [],
 }
 
 let allStationsOk = true
@@ -203,6 +225,16 @@ async function cleanupCore(): Promise<string[]> {
     const { error } = await supabase.from(table).delete().eq(column, value)
     if (error) leftover.push(`${table}:${value} (${error.message})`)
   }
+  // ── Fas 2 (station 8-14) — FÖRE milestones/quote/project (FK-barn) ─────
+  // customer_fact: en enda bulk-delete på customer_id är säker trots den
+  // självrefererande superseded_by-FK:n (Postgres kontrollerar constraint-
+  // satisfiering vid statement-slut för rader som tas bort i SAMMA sats).
+  await del('customer_fact', 'customer_id', ids.customerId)
+  await del('call_recording', 'recording_id', ids.meetingRecordingId)
+  for (const aId of ids.approvalIds) await del('pending_approvals', 'id', aId)
+  await del('project_outcome', 'project_id', ids.projectId)
+  await del('project_lesson', 'project_id', ids.projectId)
+  await del('invoice', 'invoice_id', ids.invoiceId)
   for (const mId of ids.milestoneIds) await del('project_milestone', 'milestone_id', mId)
   await del('pending_approvals', 'id', ids.approvalId)
   await del('quote_tracking_events', 'quote_id', ids.quoteId)
@@ -926,6 +958,633 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
       return {
         ui: 'Boka platsbesök (kundsida) → statusändring Aktivt (projektsida) → Lägg till tid (projektsida) → 2× riktig POST /api/time-entry',
         db: `stage ps-01→ps-02→ps-03, ${ids.timeEntryIds.length} time_entry-rader, Guardian-kort ${ids.approvalId} (dedupe-with-update bevisat: samma id, count=1)`,
+      }
+    })
+  })
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Fas 2 (station 8-14) — SAMMA sammanhängande ägarresa, samma ids-objekt.
+  //
+  // Körordningen nedan avviker MEDVETET från körbokens nummerordning:
+  // stationerna körs i sin FAKTISKA beroendeordning (11 → 8 → 9 → 10 → 12
+  // → 13 → 14), eftersom Station 11:s stängning är vad som FAKTISKT
+  // triggar faktura-utkastet Station 8 sedan skickar (autoInvoiceOnComplete
+  // anropas FRÅN stängningskedjan, källgranskat i app/api/projects/
+  // route.ts:634-811 — inte tvärtom). Varje station() är ändå taggad med
+  // sitt KORREKTA nummer ur docs/GYLLENE-VAGEN.md, så rapporten läses i
+  // samma ordning som dokumentet — bara körningen är omordnad.
+  // ══════════════════════════════════════════════════════════════════════
+
+  test('Station 11 — Projektet stängs', async () => {
+    await station('11', 'Projektet stängs', async () => {
+      await test.step('(Judgment call) Sätt project.job_type="badrum" — krävs av Station 12/14:s lärdoms-/kundfakta-cirkel (fetchRecentLessons/skapaDebriefKort läser project.job_type)', async () => {
+        const supabase = getSupabaseAdmin()
+        const { error } = await supabase.from('project').update({ job_type: 'badrum' }).eq('project_id', ids.projectId)
+        if (error) throw new Error(`Kunde inte sätta project.job_type: ${error.message}`)
+      })
+
+      await test.step('Defensiv förkontroll: fyra-ögon-tröskeln får inte gata en stängning på 6000 kr (SEEDED_BUDGET_KR)', async () => {
+        const cfg = await assertRow<{ four_eyes_enabled: boolean | null; four_eyes_threshold_sek: number | null }>(
+          'business_config',
+          { business_id: DEMO_BUSINESS_ID },
+          'business_config (four-eyes)',
+        )
+        const enabled = !!cfg.four_eyes_enabled
+        const threshold = cfg.four_eyes_threshold_sek ?? 50000
+        if (enabled && threshold <= SEEDED_BUDGET_KR) {
+          throw new Error(
+            `four_eyes_enabled=true och threshold=${threshold} kr <= testbudgeten (${SEEDED_BUDGET_KR} kr) — ` +
+              'Fas 2:s antagande om en ogated stängning håller inte längre på demokontot.',
+          )
+        }
+      })
+
+      await test.step('Navigera till projektet', async () => {
+        await ownerPage.goto(`/dashboard/projects/${ids.projectId}`)
+        await dismissKnownOverlays(ownerPage, 2500)
+      })
+
+      await test.step('"Fler åtgärder" → "Avslutat" (real UI → PUT /api/projects {status:"completed"})', async () => {
+        await ownerPage.getByRole('button', { name: 'Fler åtgärder' }).click()
+        const [statusResponse] = await Promise.all([
+          ownerPage.waitForResponse(
+            (r) => r.url().endsWith('/api/projects') && r.request().method() === 'PUT',
+            { timeout: 15_000 },
+          ),
+          ownerPage.getByRole('button', { name: 'Avslutat' }).click(),
+        ])
+        expect(statusResponse.ok(), `PUT /api/projects svarade ${statusResponse.status()}`).toBeTruthy()
+        const body = await statusResponse.json().catch(() => null)
+        expect(body?.requires_approval, 'fyra-ögon-grinden ska INTE ha triggat (se förkontrollen ovan)').toBeFalsy()
+      })
+
+      const closedProject = await test.step('DB-bevis: project.status=completed, stage=ps-05 (FINAL_INSPECTION)', async () => {
+        return await waitForRow<{ completed_at: string }>(
+          'project',
+          { project_id: ids.projectId },
+          {
+            predicate: (r: any) => r.status === 'completed' && r.current_workflow_stage_id === 'ps-05',
+            timeoutMs: 15_000,
+            label: 'project.status -> completed, stage -> ps-05',
+          },
+        )
+      })
+
+      const invoice = await test.step('DB-bevis: autoInvoiceOnComplete skapade ett draft-utkast', async () => {
+        return await waitForRow<{ invoice_id: string }>(
+          'invoice',
+          { project_id: ids.projectId },
+          { predicate: (r: any) => r.status === 'draft', timeoutMs: 10_000, label: 'invoice.status -> draft' },
+        )
+      })
+      ids.invoiceId = invoice.invoice_id
+
+      const reviewCard = await test.step('DB-bevis: review_auto_invoice-kort skapat', async () => {
+        return await waitForRow<{ id: string }>(
+          'pending_approvals',
+          { business_id: DEMO_BUSINESS_ID, approval_type: 'review_auto_invoice', status: 'pending' },
+          {
+            predicate: (r: any) => r.payload?.project_id === ids.projectId,
+            timeoutMs: 10_000,
+            label: 'review_auto_invoice-kort',
+          },
+        )
+      })
+      ids.reviewInvoiceApprovalId = reviewCard.id
+      ids.approvalIds.push(reviewCard.id)
+
+      const outcome = await test.step('DB-bevis: project_outcome fryst (freezeProjectOutcome)', async () => {
+        return await waitForRow<{
+          job_type: string | null
+          hours_diff_pct: number | null
+          amount_diff_pct: number | null
+        }>('project_outcome', { project_id: ids.projectId }, { timeoutMs: 10_000, label: 'project_outcome' })
+      })
+      expect(outcome.job_type, 'project_outcome.job_type ska ha ärvt judgment-call-värdet ovan').toBe('badrum')
+
+      const debriefCard = await test.step('DB-bevis: project_debrief-kort skapat (skapaDebriefKort)', async () => {
+        return await waitForRow<{ id: string; payload: { questions: string[] } }>(
+          'pending_approvals',
+          { business_id: DEMO_BUSINESS_ID, approval_type: 'project_debrief', status: 'pending' },
+          {
+            predicate: (r: any) => r.payload?.project_id === ids.projectId,
+            timeoutMs: 10_000,
+            label: 'project_debrief-kort',
+          },
+        )
+      })
+      ids.debriefApprovalId = debriefCard.id
+      ids.approvalIds.push(debriefCard.id)
+
+      return {
+        ui: 'Fler åtgärder → "Avslutat" på projektsidan (real UI → PUT /api/projects)',
+        db: `project.status=completed (${closedProject.completed_at}), stage=ps-05, invoice=${ids.invoiceId} (draft), review_auto_invoice-kort ${reviewCard.id}, project_outcome (hours_diff_pct=${outcome.hours_diff_pct}, amount_diff_pct=${outcome.amount_diff_pct}), project_debrief-kort ${debriefCard.id} (${debriefCard.payload.questions.length} frågor)`,
+      }
+    })
+  })
+
+  test('Station 8 — Fakturan skickas', async () => {
+    await station('8', 'Fakturan skickas', async () => {
+      // Judgment call (se planen): godkänner Station 11:s auto-utkast
+      // (byggProjektFakturaUnderlag → quote_items, den korrekta 6000 kr-
+      // summan) — INTE den manuella ProjectInvoiceModal (/api/invoices/
+      // from-project bygger rader ur time_entry, som Station 7:s Guardian-
+      // bevis medvetet svällt med extra timmar).
+      await test.step('Navigera till Godkännanden', async () => {
+        await ownerPage.goto('/dashboard/approvals')
+        await dismissKnownOverlays(ownerPage, 2500)
+      })
+
+      await test.step('Godkänn "Granska faktura"-kortet (ej i SKIP_CONFIRM → bekräftelsemodal → Bekräfta)', async () => {
+        const card = ownerPage.locator(`#approval-${ids.reviewInvoiceApprovalId}`)
+        await card.scrollIntoViewIfNeeded()
+        await card.getByRole('button', { name: 'Godkänn' }).click()
+        const [sendResponse] = await Promise.all([
+          ownerPage.waitForResponse(
+            (r) => r.url().includes(`/api/approvals/${ids.reviewInvoiceApprovalId}`) && r.request().method() === 'POST',
+            { timeout: 15_000 },
+          ),
+          ownerPage.getByRole('button', { name: 'Bekräfta' }).click(),
+        ])
+        expect(sendResponse.ok(), `POST /api/approvals/:id svarade ${sendResponse.status()}`).toBeTruthy()
+      })
+
+      const sentInvoice = await test.step('DB-bevis: invoice.status=sent, stage=ps-06 (INVOICE_SENT)', async () => {
+        const inv = await waitForRow<{ sent_at: string }>(
+          'invoice',
+          { invoice_id: ids.invoiceId },
+          { predicate: (r: any) => r.status === 'sent' && !!r.sent_at, timeoutMs: 15_000, label: 'invoice.status -> sent' },
+        )
+        await waitForRow('project', { project_id: ids.projectId }, {
+          predicate: (r: any) => r.current_workflow_stage_id === 'ps-06',
+          timeoutMs: 10_000,
+          label: 'stage -> ps-06',
+        })
+        return inv
+      })
+
+      await test.step('DB-bevis: customer_activity(invoice_sent)', async () => {
+        await waitForRow('customer_activity', { customer_id: ids.customerId, activity_type: 'invoice_sent' }, {
+          label: 'customer_activity(invoice_sent)',
+        })
+      })
+
+      return {
+        ui: `Godkännanden → "Granska faktura"-kortet (${ids.reviewInvoiceApprovalId}) → Godkänn → Bekräfta`,
+        db: `invoice.status=sent (sent_at=${sentInvoice.sent_at}), stage=ps-06, customer_activity(invoice_sent) finns`,
+      }
+    })
+  })
+
+  test('Station 9 — Betalningen', async () => {
+    await station('9', 'Betalningen', async () => {
+      // Judgment call, VIKTIGT dokumenterat fynd (se planen): kundens
+      // "Jag har betalat" → confirm_payment-kort → ägar-godkännande är den
+      // KANONISKA vägen (applyInvoicePayment). Dashboardens "Markera
+      // betald"-knapp går källgranskat via en SEPARAT, icke-kanonisk rutt
+      // (PATCH /api/invoices/[id]/status) som DUBBLERAR tack-SMS/
+      // omdömeskort — ett verkligt produktionsfynd, medvetet EJ testat/
+      // fixat här (se Avvikelseloggen i slutrapporten).
+      const customerRow = await test.step('Läs customer.portal_token', async () => {
+        return await assertRow<{ portal_token: string }>('customer', { customer_id: ids.customerId }, 'customer (portal_token)')
+      })
+
+      const swishNumber = await test.step('Läs business_config.swish_number (avgör kundens UI-väg)', async () => {
+        const cfg = await assertRow<{ swish_number: string | null }>(
+          'business_config',
+          { business_id: DEMO_BUSINESS_ID },
+          'business_config (swish)',
+        )
+        return cfg.swish_number
+      })
+
+      await test.step('Kunden öppnar portalens Dokument-flik och sin faktura', async () => {
+        await customerPage!.goto(`/portal/${customerRow.portal_token}?tab=invoices`)
+        await customerPage!.getByText('Faktura ·').first().waitFor({ state: 'visible', timeout: 15_000 })
+        await customerPage!.getByText('Faktura ·').first().click()
+      })
+
+      if (swishNumber) {
+        await test.step('Klickar "Jag har betalat" (real UI → POST claim-paid)', async () => {
+          const [claimResponse] = await Promise.all([
+            customerPage!.waitForResponse(
+              (r) => r.url().includes('/claim-paid') && r.request().method() === 'POST',
+              { timeout: 15_000 },
+            ),
+            customerPage!.getByRole('button', { name: 'Jag har betalat' }).click(),
+          ])
+          expect(claimResponse.ok(), `POST claim-paid svarade ${claimResponse.status()}`).toBeTruthy()
+        })
+      } else {
+        // Judgment call: PortalSwishBlock renderas bara om paymentInfo.swish
+        // finns (inv.status!=='paid' && paymentInfo.swish, källgranskat i
+        // PortalInvoiceDetail.tsx:257) — ett kontonivå-fält vi INTE ska
+        // mutera bara för testet. Anropar samma RIKTIGA produktionsrutt
+        // direkt via kundens egen, redan autentiserings-fria context.
+        await test.step('(Judgment call) Inget swish_number konfigurerat — anropar samma produktionsrutt direkt', async () => {
+          const res = await customerCtx!.request.post(
+            `/api/portal/${customerRow.portal_token}/invoices/${ids.invoiceId}/claim-paid`,
+          )
+          expect(res.ok(), `POST claim-paid svarade ${res.status()}`).toBeTruthy()
+        })
+      }
+
+      const confirmCard = await test.step('DB-bevis: confirm_payment-kort skapat', async () => {
+        return await waitForRow<{ id: string }>(
+          'pending_approvals',
+          { business_id: DEMO_BUSINESS_ID, approval_type: 'confirm_payment', status: 'pending' },
+          {
+            predicate: (r: any) => r.payload?.invoice_id === ids.invoiceId,
+            timeoutMs: 10_000,
+            label: 'confirm_payment-kort',
+          },
+        )
+      })
+      ids.confirmPaymentApprovalId = confirmCard.id
+      ids.approvalIds.push(confirmCard.id)
+
+      await test.step('Ägaren godkänner confirm_payment-kortet (real UI → applyInvoicePayment, kanoniska vägen)', async () => {
+        await ownerPage.goto('/dashboard/approvals')
+        await dismissKnownOverlays(ownerPage, 2500)
+        const card = ownerPage.locator(`#approval-${confirmCard.id}`)
+        await card.scrollIntoViewIfNeeded()
+        await card.getByRole('button', { name: 'Godkänn' }).click()
+        const [approveResponse] = await Promise.all([
+          ownerPage.waitForResponse(
+            (r) => r.url().includes(`/api/approvals/${confirmCard.id}`) && r.request().method() === 'POST',
+            { timeout: 15_000 },
+          ),
+          ownerPage.getByRole('button', { name: 'Bekräfta' }).click(),
+        ])
+        expect(approveResponse.ok(), `POST /api/approvals/:id svarade ${approveResponse.status()}`).toBeTruthy()
+      })
+
+      const paidInvoice = await test.step('DB-bevis: invoice.status=paid, stage=ps-07 (INVOICE_PAID)', async () => {
+        const inv = await waitForRow<{ paid_at: string }>(
+          'invoice',
+          { invoice_id: ids.invoiceId },
+          { predicate: (r: any) => r.status === 'paid' && !!r.paid_at, timeoutMs: 15_000, label: 'invoice.status -> paid' },
+        )
+        await waitForRow('project', { project_id: ids.projectId }, {
+          predicate: (r: any) => r.current_workflow_stage_id === 'ps-07',
+          timeoutMs: 10_000,
+          label: 'stage -> ps-07',
+        })
+        return inv
+      })
+
+      await test.step('DB-bevis (best-effort): stegmotorns tack-/omdömeskort spåras för städning — exekveras ej (utanför scope)', async () => {
+        const supabase = getSupabaseAdmin()
+        const { data: rows, error } = await supabase
+          .from('pending_approvals')
+          .select('id, payload')
+          .eq('business_id', DEMO_BUSINESS_ID)
+          .in('approval_type', ['send_sms', 'review_request', 'scheduled_review_request'])
+        if (error) throw new Error(`Kunde inte läsa uppföljningskort: ${error.message}`)
+        const forThis = (rows || []).filter(
+          (r: any) => r.payload?.project_id === ids.projectId || r.payload?.invoice_id === ids.invoiceId,
+        )
+        forThis.forEach((r: any) => ids.approvalIds.push(r.id))
+      })
+
+      return {
+        ui: `Kundportalen (faktura) → "Jag har betalat" → ägaren godkänner confirm_payment-kortet (${confirmCard.id})`,
+        db: `invoice.status=paid (paid_at=${paidInvoice.paid_at}), stage=ps-07, ${ids.approvalIds.length} godkännandekort totalt spårade för städning`,
+      }
+    })
+  })
+
+  test('Station 10 — Bevisytorna', async () => {
+    await station('10', 'Bevisytorna', async () => {
+      await test.step('Cookie-uppvärmning: en riktig sidnavigering innan råa API-anrop', async () => {
+        await ownerPage.goto('/dashboard')
+        await dismissKnownOverlays(ownerPage, 2500)
+      })
+
+      await test.step('GET /api/automations/activity — Senaste dygnet', async () => {
+        const res = await ownerCtx.request.get('/api/automations/activity?limit=30')
+        expect(res.ok(), `svarade ${res.status()}`).toBeTruthy()
+      })
+
+      const teamActivity = await test.step('GET /api/dashboard/team-activity', async () => {
+        const res = await ownerCtx.request.get('/api/dashboard/team-activity')
+        expect(res.ok(), `svarade ${res.status()}`).toBeTruthy()
+        const body = await res.json()
+        expect(body).toHaveProperty('agents')
+        expect(body).toHaveProperty('summary')
+        return body
+      })
+
+      const approvalsQueue = await test.step('GET /api/approvals?status=pending — "Kräver ditt beslut"', async () => {
+        const res = await ownerCtx.request.get('/api/approvals?status=pending&limit=15')
+        expect(res.ok(), `svarade ${res.status()}`).toBeTruthy()
+        const body = await res.json()
+        expect(Array.isArray(body.approvals), 'body.approvals ska vara en array').toBeTruthy()
+        return body
+      })
+
+      const pengar = await test.step('GET /api/dashboard/pengar — "Pengar just nu" (motsvarar körbokens "Att hämta")', async () => {
+        const res = await ownerCtx.request.get('/api/dashboard/pengar')
+        expect(res.ok(), `svarade ${res.status()}`).toBeTruthy()
+        const body = await res.json()
+        expect(typeof body.totalKr).toBe('number')
+        expect(Array.isArray(body.kategorier)).toBeTruthy()
+        return body
+      })
+
+      const kvitto = await test.step('GET /api/value/kvitto — Värdekvittot', async () => {
+        const res = await ownerCtx.request.get('/api/value/kvitto')
+        expect(res.ok(), `svarade ${res.status()}`).toBeTruthy()
+        const body = await res.json()
+        expect(body.kvitto).toHaveProperty('confirmed_kr')
+        return body
+      })
+
+      const agarrapport = await test.step('GET /api/value/agarrapport — Ägarrapporten', async () => {
+        const res = await ownerCtx.request.get('/api/value/agarrapport')
+        expect(res.ok(), `svarade ${res.status()}`).toBeTruthy()
+        const body = await res.json()
+        expect(body.rapport).toHaveProperty('bekraftat')
+        return body
+      })
+
+      const ledger = await test.step('GET /api/value/ledger — Fyrstegsvyn', async () => {
+        const res = await ownerCtx.request.get('/api/value/ledger')
+        expect(res.ok(), `svarade ${res.status()}`).toBeTruthy()
+        const body = await res.json()
+        expect(body.ledger).toHaveProperty('identifierat')
+        expect(body.ledger).toHaveProperty('betalt')
+        return body
+      })
+
+      pushResult({
+        station: '10',
+        steg: 'Notering: "Att hämta"-kortet (AttHamtaRailCard) är död kod på Hem-sidan',
+        ui_bevis: '',
+        db_bevis: '',
+        verdict: 'SKIP' as Verdict,
+        detalj:
+          'Bekräftat via kodbasens EGNA tester (tests/jarvis-hem.spec.ts, tests/att-hamta.spec.ts) att ' +
+          'AttHamtaRailCard aldrig renderas på /dashboard. Motsvarande yta idag är "Pengar just nu" ' +
+          '(GET /api/dashboard/pengar, redan verifierad ovan) — inte en direkt 1:1-yta mot körboken.',
+      })
+
+      return {
+        ui: '/dashboard laddad (cookie-uppvärmning) — resten är rena, autentiserade API-bevis',
+        db: `7 ytor svarade 200 med rätt form: automations/activity, team-activity (${teamActivity.agents?.length ?? '?'} agenter), approvals (${approvalsQueue.approvals.length} pending), pengar (${pengar.totalKr} kr), kvitto (${kvitto.kvitto.confirmed_kr} kr bekräftat), agarrapport, ledger (identifierat=${ledger.ledger.identifierat.kr} kr)`,
+      }
+    })
+  })
+
+  test('Station 12 — Debriefen besvaras', async () => {
+    await station('12', 'Debriefen besvaras', async () => {
+      await test.step('Navigera till Godkännanden', async () => {
+        await ownerPage.goto('/dashboard/approvals')
+        await dismissKnownOverlays(ownerPage, 2500)
+      })
+
+      const questions = await test.step('Läs debriefkortets frågor (deterministiska, satta av Station 11)', async () => {
+        const row = await assertRow<{ payload: { questions: string[] } }>(
+          'pending_approvals',
+          { id: ids.debriefApprovalId },
+          'project_debrief-kortet',
+        )
+        return row.payload.questions
+      })
+
+      await test.step('"Svara" öppnar debrief-modalen (INTE "Godkänn" — egen gren i UI:t)', async () => {
+        const card = ownerPage.locator(`#approval-${ids.debriefApprovalId}`)
+        await card.scrollIntoViewIfNeeded()
+        await card.getByRole('button', { name: 'Svara' }).click()
+      })
+
+      const answers = questions.map((q, i) => `E2E-svar ${i + 1} på "${q}"`)
+
+      await test.step('Fyller i alla frågors textarea (strukturell selektor — inget label/id-koppling i modalen)', async () => {
+        const textareas = ownerPage.locator('textarea')
+        for (let i = 0; i < questions.length; i++) {
+          await textareas.nth(i).fill(answers[i])
+        }
+      })
+
+      await test.step('Klickar "Spara" (real UI → POST /api/approvals/:id {action:"edit"})', async () => {
+        const [saveResponse] = await Promise.all([
+          ownerPage.waitForResponse(
+            (r) => r.url().includes(`/api/approvals/${ids.debriefApprovalId}`) && r.request().method() === 'POST',
+            { timeout: 15_000 },
+          ),
+          ownerPage.getByRole('button', { name: 'Spara' }).click(),
+        ])
+        expect(saveResponse.ok(), `POST /api/approvals/:id svarade ${saveResponse.status()}`).toBeTruthy()
+      })
+
+      const lessons = await test.step(`DB-bevis: ${questions.length} project_lesson-rader skapade`, async () => {
+        const supabase = getSupabaseAdmin()
+        let rows: any[] | null = null
+        const deadline = Date.now() + 10_000
+        while (Date.now() < deadline) {
+          const { data } = await supabase.from('project_lesson').select('*').eq('project_id', ids.projectId)
+          if (data && data.length >= questions.length) {
+            rows = data
+            break
+          }
+          await new Promise((resolve) => setTimeout(resolve, 500))
+        }
+        if (!rows) throw new Error(`project_lesson gav aldrig ${questions.length} rader för projekt ${ids.projectId}`)
+        return rows
+      })
+      ids.lessonTexts = lessons.map((l: any) => l.lesson_text)
+
+      await test.step('DB-bevis: debriefkortet har flippat till approved', async () => {
+        await assertRow('pending_approvals', { id: ids.debriefApprovalId, status: 'approved' }, 'debriefkort -> approved')
+      })
+
+      return {
+        ui: `Godkännanden → "Svara" på debriefkortet → ${questions.length} svar ifyllda → Spara`,
+        db: `${lessons.length} project_lesson-rader (job_type=badrum), debriefkort -> approved`,
+      }
+    })
+  })
+
+  test('Station 13 — Mötet som blir minne', async () => {
+    await station('13', 'Mötet som blir minne', async () => {
+      // Judgment call (se planen): POST /api/admin/demo-seed-meeting — en
+      // redan existerande produktionsrutt (DEMO_BUSINESS_ID+owner/admin-
+      // gated), inte ett testbygge. Mikrofon/getUserMedia-UI:t
+      // (Motesassistenten.tsx, SEGMENT_SEKUNDER=300s hårdkodat) är en
+      // AVSIKTLIG, dokumenterad SKIP — ingen Playwright-teknik kan
+      // komprimera en 5+ minuters riktig inspelning utan att antingen
+      // fejka inspelaren (motverkar syftet) eller faktiskt vänta.
+      const testStartIso = new Date(Date.now() - 5000).toISOString()
+
+      const seedResult = await test.step('POST /api/admin/demo-seed-meeting (real rutt, explicit customerId/bookingId — annars defaultar den till kontots ÄLDSTA kund)', async () => {
+        const res = await ownerCtx.request.post('/api/admin/demo-seed-meeting', {
+          data: { customerId: ids.customerId, bookingId: ids.bookingId },
+        })
+        expect(res.ok(), `POST /api/admin/demo-seed-meeting svarade ${res.status()}`).toBeTruthy()
+        const body = await res.json()
+        expect(body.success, 'analysen ska ha lyckats synkront').toBeTruthy()
+        return body
+      })
+      ids.meetingRecordingId = seedResult.recording_id
+
+      const createdCards = await test.step('DB-bevis: pending_approvals skapade av analysen (meeting_summary alltid, customer_fact från default-transkriptets tydliga uttalanden)', async () => {
+        const supabase = getSupabaseAdmin()
+        let rows: any[] = []
+        const deadline = Date.now() + 15_000
+        while (Date.now() < deadline) {
+          const { data } = await supabase
+            .from('pending_approvals')
+            .select('*')
+            .eq('business_id', DEMO_BUSINESS_ID)
+            .gte('created_at', testStartIso)
+          rows = (data || []).filter((r: any) => r.payload?.recording_id === ids.meetingRecordingId)
+          if (rows.some((r) => r.approval_type === 'meeting_summary') && rows.some((r) => r.approval_type === 'customer_fact')) {
+            break
+          }
+          await new Promise((resolve) => setTimeout(resolve, 500))
+        }
+        if (!rows.some((r) => r.approval_type === 'meeting_summary')) throw new Error('Inget meeting_summary-kort hittades')
+        if (!rows.some((r) => r.approval_type === 'customer_fact')) {
+          throw new Error('Inget customer_fact-kort hittades (default-transkriptet nämner uttryckliga preferenser/villkor)')
+        }
+        return rows
+      })
+      createdCards.forEach((r: any) => ids.approvalIds.push(r.id))
+
+      const factCard = createdCards.find((r: any) => r.approval_type === 'customer_fact')
+
+      await test.step('Ägaren godkänner ETT customer_fact-kort (real UI → POST /api/approvals/:id)', async () => {
+        await ownerPage.goto('/dashboard/approvals')
+        await dismissKnownOverlays(ownerPage, 2500)
+        const card = ownerPage.locator(`#approval-${factCard.id}`)
+        await card.scrollIntoViewIfNeeded()
+        await card.getByRole('button', { name: 'Godkänn' }).click()
+        const [approveResponse] = await Promise.all([
+          ownerPage.waitForResponse(
+            (r) => r.url().includes(`/api/approvals/${factCard.id}`) && r.request().method() === 'POST',
+            { timeout: 15_000 },
+          ),
+          ownerPage.getByRole('button', { name: 'Bekräfta' }).click(),
+        ])
+        expect(approveResponse.ok(), `POST /api/approvals/:id svarade ${approveResponse.status()}`).toBeTruthy()
+      })
+      ids.customerFactApprovalId = factCard.id
+
+      const factRow = await test.step('DB-bevis: customer_fact-rad skapad', async () => {
+        return await waitForRow<{ id: string; fact_type: string; content: string }>(
+          'customer_fact',
+          { customer_id: ids.customerId },
+          {
+            predicate: (r: any) => r.source_type === 'meeting' && !!r.confirmed_at,
+            timeoutMs: 10_000,
+            label: 'customer_fact(source_type=meeting)',
+          },
+        )
+      })
+      ids.customerFactIds.push(factRow.id)
+
+      await test.step('API-bevis: GET /api/customers/[id]/facts speglar faktumet', async () => {
+        const res = await ownerCtx.request.get(`/api/customers/${ids.customerId}/facts`)
+        expect(res.ok(), `svarade ${res.status()}`).toBeTruthy()
+        const body = await res.json()
+        expect(body.facts.some((f: any) => f.id === factRow.id), 'faktumet ska synas i kundens facts-lista').toBeTruthy()
+      })
+
+      await test.step('UI-bevis: kundsidan visar "Det här vet Handymate"', async () => {
+        await ownerPage.goto(`/dashboard/customers/${ids.customerId}`)
+        await dismissKnownOverlays(ownerPage, 2500)
+        await ownerPage.getByText('Det här vet Handymate').waitFor({ state: 'visible', timeout: 10_000 })
+      })
+
+      return {
+        ui: `demo-seed-meeting → Godkännanden → Godkänn ett customer_fact-kort (${factCard.id}) → kundsidans "Det här vet Handymate"`,
+        db: `call_recording=${ids.meetingRecordingId}, ${createdCards.length} kort skapade (${createdCards.map((r: any) => r.approval_type).join(', ')}), customer_fact.fact_type=${factRow.fact_type} godkänt`,
+      }
+    })
+  })
+
+  test('Station 14 — Cirkeln sluts', async () => {
+    await station('14', 'Cirkeln sluts', async () => {
+      const lessonsInScope = await test.step('DB-bevis: fetchRecentLessons-filtret (business+job_type=badrum) ser Station 12:s lärdomar', async () => {
+        const supabase = getSupabaseAdmin()
+        const { data, error } = await supabase
+          .from('project_lesson')
+          .select('lesson_text, impact_hint, created_at')
+          .eq('business_id', DEMO_BUSINESS_ID)
+          .eq('job_type', 'badrum')
+          .order('created_at', { ascending: false })
+          .limit(3)
+        if (error) throw new Error(`fetchRecentLessons-filtret gav ett DB-fel: ${error.message}`)
+        const texts = (data || []).map((r: any) => r.lesson_text)
+        for (const expected of ids.lessonTexts) {
+          expect(texts, `Station 12:s lärdom "${expected}" ska synas i fetchRecentLessons-filtret`).toContain(expected)
+        }
+        return data || []
+      })
+
+      const factsInScope = await test.step('DB-bevis: fetchCustomerFactsForQuote-filtret (preference/constraint, superseded_by IS NULL)', async () => {
+        const supabase = getSupabaseAdmin()
+        const { data, error } = await supabase
+          .from('customer_fact')
+          .select('fact_type, content')
+          .eq('business_id', DEMO_BUSINESS_ID)
+          .eq('customer_id', ids.customerId)
+          .in('fact_type', ['preference', 'constraint'])
+          .is('superseded_by', null)
+          .limit(8)
+        if (error) throw new Error(`fetchCustomerFactsForQuote-filtret gav ett DB-fel: ${error.message}`)
+        return data || []
+      })
+
+      await test.step('Station 13:s godkända faktum — ska synas ovan BARA om preference/constraint', async () => {
+        const ourFact = await assertRow<{ fact_type: string; content: string }>(
+          'customer_fact',
+          { id: ids.customerFactIds[0] },
+          'Station 13:s faktum',
+        )
+        if (['preference', 'constraint'].includes(ourFact.fact_type)) {
+          expect(
+            factsInScope.some((f: any) => f.content === ourFact.content),
+            `Station 13:s ${ourFact.fact_type}-faktum ska synas i fetchCustomerFactsForQuote-filtret`,
+          ).toBeTruthy()
+        } else {
+          pushResult({
+            station: '14',
+            steg: `Notering: Station 13:s godkända faktum var fact_type="${ourFact.fact_type}"`,
+            ui_bevis: '',
+            db_bevis: '',
+            verdict: 'SKIP' as Verdict,
+            detalj: `${ourFact.fact_type} exkluderas MEDVETET ur offertunderlaget (bara preference/constraint vävs in — källgranskat i lib/ai-quote-generator.ts) — korrekt beteende, inte ett testfel.`,
+          })
+        }
+      })
+
+      pushResult({
+        station: '14',
+        steg: 'Notering: Guardian på ett NYTT projekt — avsiktligt hoppad',
+        ui_bevis: '',
+        db_bevis: '',
+        verdict: 'SKIP' as Verdict,
+        detalj:
+          'checkProfitabilityWarnings (75/95%-trösklar, dedupe-with-update) är redan uttömmande bevisat med ' +
+          'identisk kod i Fas 1 Station 7. Att upprepa på ett andra, nyskapat projekt kräver en hel ny ' +
+          'offert→signering→projekt-cykel för proportionerligt lite ny bevisstyrka.',
+      })
+
+      const ledger = await test.step('DB-bevis: /dashboard/pengar fyrstegsvy — delmängdsgarantin håller (identifierat >= agerat >= fakturerat >= betalt)', async () => {
+        const res = await ownerCtx.request.get('/api/value/ledger')
+        expect(res.ok(), `svarade ${res.status()}`).toBeTruthy()
+        const body = await res.json()
+        expect(body.ledger.identifierat.kr).toBeGreaterThanOrEqual(body.ledger.agerat.kr)
+        expect(body.ledger.agerat.kr).toBeGreaterThanOrEqual(body.ledger.fakturerat.kr)
+        expect(body.ledger.fakturerat.kr).toBeGreaterThanOrEqual(body.ledger.betalt.kr)
+        return body.ledger
+      })
+
+      return {
+        ui: '(rena DB-/API-bevis — Station 12/13 äger UI-interaktionerna som skapade det cirkeln bevisar)',
+        db: `${lessonsInScope.length} lärdomar synliga för job_type=badrum, ${factsInScope.length} kundfakta synliga för offertunderlag, ledger identifierat=${ledger.identifierat.kr}>=agerat=${ledger.agerat.kr}>=fakturerat=${ledger.fakturerat.kr}>=betalt=${ledger.betalt.kr}`,
       }
     })
   })
