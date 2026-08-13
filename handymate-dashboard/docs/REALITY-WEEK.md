@@ -20,6 +20,17 @@ körningen. Duplicera inte stationsdetaljerna hit; körboken äger dem.
   webbläsar-harness (`tests/e2e-golden-path/`), inte manuellt av Andreas —
   se stationstabellen nedan för resultat och docs/reality-week/pass1-
   2026-08-13.md för fullständiga UI-/DB-bevis per station.
+- 2026-08-13 (samma dag, Fas 2): station 8-14 tillagda i SAMMA
+  sammanhängande harness-fil/körning. Station 8-12 bevisligen gröna. Fem
+  riktiga produktionsbuggar hittades och fixades under körningen (se
+  Avvikelseloggen #5-9) — den allvarligaste (call_recording/customer.
+  address, #8-9) innebar att HELA röstanalysvägen (telefonsamtal OCH
+  mötesinspelningar) aldrig kunnat slutföra en analys i produktion, sedan
+  funktionen lanserades. Station 13:s EGEN slutgiltiga gröna körning är
+  dock inte bekräftad — en femte, orelaterad blockering (46elks-kontots
+  saldo slut, #10) avbröt körningen redan vid station 4 innan Station 13
+  kunde testas om från grunden. Kräver en ny körning (efter påfyllt
+  46elks-saldo) för att bekräfta stationen fullt ut.
 
 **Status-koder:** ☐ ej körd · ✅ PASS · 🔴 AVVIKELSE (länka fix-commit) ·
 🔧 FIXAD & omtestad · ⏭ hoppad (motivera)
@@ -47,13 +58,13 @@ körningen. Duplicera inte stationsdetaljerna hit; körboken äger dem.
 | 5 | Offerten öppnas (tracking på tre ytor) | ✅ | Oinloggad kund-context, status sent→opened, tracking-rader verifierade, idempotensbevis (dubbel öppning) grönt. Se pass1-2026-08-13.md. |
 | 6 | Kunden accepterar → projekt + snapshot + deal won | ✅ | Riktig canvas-signatur; quotes.status=accepted, project skapat (ps-01), 2 milestones med rätt belopp. Se pass1-2026-08-13.md. |
 | 7 | Projektsteget flyttar sig självt | ✅ | Bokning → ps-02, statusändring → ps-03 verifierat via riktiga UI-knappar. Guardian-kortet SKIPPAT (demokontot saknar intern timkostnad — kör F1 för att täcka den delen). Se pass1-2026-08-13.md. |
-| 8 | Fakturan | ☐ | |
-| 9 | Betalningen | ☐ | |
-| 10 | Bevisytorna (digest, kön, Pengar just nu, Värdekvittot) | ☐ | |
-| 11 | Projektet stängs → efterkalkyl + debrief-kort | ☐ | |
-| 12 | Debriefen besvaras → lärdomar | ☐ | |
-| 13 | Mötet som blir minne (kundfakta-kort → kundkort/projektsida) | ☐ | |
-| 14 | Cirkeln sluts (ny offert visar lärdom + kundfakta; Guardian vaktar) | ☐ | |
+| 8 | Fakturan | ✅ | review_auto_invoice-kortet godkänt direkt via API (UI:t döljer det MEDVETET, se Avvikelseloggen A16) → invoice.status=sent, stage=ps-06, customer_activity(invoice_sent). Se pass1-2026-08-13.md. |
+| 9 | Betalningen | ✅ | Kundportalens "Jag har betalat" → confirm_payment-kort → ägaren godkänner (samma A16-mönster) → applyInvoicePayment (kanoniska vägen) → invoice.status=paid, stage=ps-07. Se pass1-2026-08-13.md. |
+| 10 | Bevisytorna (digest, kön, Pengar just nu, Värdekvittot) | ✅ | 7 API-ytor verifierade (automations/activity, team-activity, approvals, pengar, kvitto, agarrapport, ledger). "Att hämta"-kortet är död kod (se Avvikelseloggen A17) — "Pengar just nu" är dagens motsvarighet. Se pass1-2026-08-13.md. |
+| 11 | Projektet stängs → efterkalkyl + debrief-kort | ✅ | "Fler åtgärder" → "Avslutat" → project.status=completed, stage=ps-05, draft-faktura, project_outcome fryst, debriefkort skapat. Se pass1-2026-08-13.md. |
+| 12 | Debriefen besvaras → lärdomar | ✅ | "Svara" → 3 frågor ifyllda → Spara → 3 project_lesson-rader (job_type=badrum), kortet → approved. Se pass1-2026-08-13.md. |
+| 13 | Mötet som blir minne (kundfakta-kort → kundkort/projektsida) | 🔧 | Två kritiska buggar hittade och fixade under körningen (call_recording.recording_id, customer.address — se Avvikelseloggen A18/A19) — stationens EGEN slutgiltiga gröna körning är dock INTE bekräftad, eftersom en efterföljande, orelaterad blockering (A20) avbröt körningen innan Station 13 kunde testas om från början. |
+| 14 | Cirkeln sluts (ny offert visar lärdom + kundfakta; Guardian vaktar) | ☐ | Ej nådd — beroende av Station 4/13 i samma körning. |
 
 ## Pass 2 — Adversarial (A1–A15, förväntad utgång i körboken)
 
@@ -92,6 +103,12 @@ körningen. Duplicera inte stationsdetaljerna hit; körboken äger dem.
 | 2 | Pass 1, station 6 | Projektets `current_workflow_stage_id` initierades aldrig efter signering (29/33 projekt i produktion) | `lib/project-ai-engine.ts`'s `onQuoteAccepted` — en duplicerad, separat projekt-skapare som vinner racet mot `createProjectFromQuote` — saknade helt stage-initiering | 7c59b2db | ✅ |
 | 3 | Pass 1, station 6 | Milestones/budget skapades aldrig för RPC-signerade offerter | Samma `onQuoteAccepted` läste budget/rader från tom `quote.items` JSONB istället för `quote_items`-tabellen (samma buggklass som fixades på annat håll 2026-05-22, men missad här) | ae400d22 | ✅ |
 | 4 | Pass 2, A9 | API-bevis-testet får 401 istället för 403 mot `/api/analytics/economics` | Ej rotorsakad — troligen harness-specifik cookie-timing, ej en produktionsbugg (UI-beviset bekräftar korrekt beteende) | — | 🔴 öppen, ej blockerande |
+| 5 | Pass 1, station 11 (Fas 2) | `PUT /api/projects` uppdaterade completed_at/stage/faktura/utfall/debrief korrekt vid EN status-ändring, men `project.status` självt skrevs ALDRIG — gäller alla övergångar (planning/active/paused/completed/cancelled), inte bara stängning | `updates.status = body.status` saknades helt i uppdateringsobjektet | 22391b87 | ✅ |
+| 6 | Pass 1, station 8 (Fas 2) | Fakturans status flippade korrekt till `sent`, men `sent_at`/`sent_method` sattes aldrig — InvoiceStatusTimeline visade "Skickad"-steget som "upcoming" trots att fakturan skickats | `POST /api/invoices/send` uppdaterade bara `status`, inte de stödjande fälten | 78242603 | ✅ |
+| 7 | Pass 1, station 8 (Fas 2) | `invoice_sent`-aktivitetsraden skapades aldrig efter ett fakturautskick — 100 % av skickade fakturor i produktion saknade loggraden | `customer_activity`-insertet saknade två NOT NULL-fält utan default (`activity_id`, `title`); ingen `.error`-koll fångade felet | 1473b02a | ✅ |
+| 8 | Pass 1, station 13 (Fas 2) | `call_recording` hade NOLL rader i hela produktionsdatabasen — varken telefonsamtal eller mötesinspelningar har någonsin kunnat sparas | `recording_id` NOT NULL utan default saknades i alla 4 kända insert-ställen; `from_number`/`to_number` (döda kolumner) blockerade även mötesvägen | 74727173 + sql/v127 (kört) | ✅ (insert-nivå) |
+| 9 | Pass 1, station 13 (Fas 2) | `/api/voice/analyze` kunde aldrig läsa en inspelning ens efter fynd #8 — "Recording not found" trots att raden fanns | Embedded PostgREST-query selectade `customer.address`, en kolumn som inte längre finns (uppdelad i address_line/postal_code/city vid en tidigare migration som aldrig synkades hit) | 7c44c02e | ✅ (query-nivå) — stationens EGEN helhetskörning ej omtestad än, se anteckning nedan |
+| 10 | Pass 1, station 4 (Fas 2) | `POST /api/quotes/send` svarar 500 ("Kunde inte skicka offerten") — blockerar hela kedjan station 4-14 i en enda körning | EJ en kodbugg: 46elks-kontots förbetalda saldo är slut ("Not enough credits on your account to send this SMS"), troligen uttömt av sessionens egna ~50 riktiga testutskick idag. Gmail är inte kopplat (ingen calendar_connection-rad), så det finns ingen fallback. | — (kräver saldopåfyllning hos 46elks, inte en git-commit) | 🔴 öppen, blockerande för vidare körning idag |
 
 ---
 
