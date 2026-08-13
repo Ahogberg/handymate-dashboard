@@ -144,8 +144,15 @@ export async function createProjectFromQuote(
     // Stegkedjan startar VID födseln (auditens P1-1): projektet föds ur en
     // signerad offert, så första steget är Avtal signerat. Utan initieringen
     // stod stage null tills första fakturahändelsen och projektlistan kunde
-    // inte svara på var jobbet står. Idempotent och fire-and-forget.
-    import('@/lib/project-stages/automation-engine')
+    // inte svara på var jobbet står. Idempotent — MEN måste avvaktas, inte
+    // fire-and-forget (fynd 2026-08-13, Golden Path-harnesset): Vercels
+    // serverless-miljö kan riva körningskontexten så fort HTTP-svaret gått
+    // iväg, vilket dödar en icke-avvaktad promise innan den hinner
+    // committa — precis det scenario kommentaren ovan beskriver att den
+    // skulle förhindra. Bekräftat i produktion: current_workflow_stage_id
+    // stod kvar null minuter efter en riktig signering. `.catch()` gör att
+    // ett fel här ändå aldrig fäller själva projekt-skapandet.
+    await import('@/lib/project-stages/automation-engine')
       .then(({ advanceProjectStage, SYSTEM_STAGES }) =>
         advanceProjectStage(projectId, SYSTEM_STAGES.CONTRACT_SIGNED, businessId))
       .catch(err => console.error('[createProjectFromQuote] stage init error (non-blocking):', err))
