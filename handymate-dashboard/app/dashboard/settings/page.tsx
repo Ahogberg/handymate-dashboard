@@ -117,6 +117,7 @@ interface BusinessConfig {
   pricing_settings: Record<string, any> | null
   overhead_monthly_sek: number
   margin_target_percent: number
+  revenue_target_annual_sek: number | null
   // Autopilot
   autopilot_enabled: boolean
   autopilot_auto_book: boolean
@@ -368,7 +369,7 @@ export default function SettingsPage() {
   const [newService, setNewService] = useState('')
 
   // Ekonomi-inställningar
-  const [econPrefs, setEconPrefs] = useState<{ hourly_cost_sek: number; overhead_monthly_sek: number; margin_target_percent: number }>({ hourly_cost_sek: 450, overhead_monthly_sek: 0, margin_target_percent: 50 })
+  const [econPrefs, setEconPrefs] = useState<{ hourly_cost_sek: number; overhead_monthly_sek: number; margin_target_percent: number; revenue_target_annual_sek: number | null }>({ hourly_cost_sek: 450, overhead_monthly_sek: 0, margin_target_percent: 50, revenue_target_annual_sek: null })
   const [econSaving, setEconSaving] = useState(false)
 
   // Phone provisioning state
@@ -625,6 +626,8 @@ export default function SettingsPage() {
         hourly_cost_sek: Number(data.default_internal_hourly_cost) || 450,
         overhead_monthly_sek: Number(data.overhead_monthly_sek) || 0,
         margin_target_percent: Number(data.margin_target_percent) || 50,
+        // Null (inget mål satt) skiljs medvetet från 0 — se v128_revenue_target.sql.
+        revenue_target_annual_sek: data.revenue_target_annual_sek == null ? null : Number(data.revenue_target_annual_sek),
       })
 
       if (data.working_hours && typeof data.working_hours === 'object') {
@@ -4422,6 +4425,21 @@ export default function SettingsPage() {
                 </div>
                 <p className="text-xs text-gray-400 mt-1">Din målmarginal — visar om du är över eller under mål</p>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Omsättningsmål</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={econPrefs.revenue_target_annual_sek ?? ''}
+                    onChange={e => setEconPrefs(p => ({ ...p, revenue_target_annual_sek: e.target.value === '' ? null : Number(e.target.value) || 0 }))}
+                    placeholder="Inget mål satt"
+                    className="w-40 px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:border-primary-500"
+                    min={0}
+                  />
+                  <span className="text-sm text-gray-400">kr/år</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Frivilligt — visas i Månadsrapporten om det är satt</p>
+              </div>
               <button
                 onClick={async () => {
                   setEconSaving(true)
@@ -4440,6 +4458,7 @@ export default function SettingsPage() {
                         ...(isOwnerOrAdmin ? { default_internal_hourly_cost: econPrefs.hourly_cost_sek } : {}),
                         overhead_monthly_sek: econPrefs.overhead_monthly_sek,
                         margin_target_percent: econPrefs.margin_target_percent,
+                        revenue_target_annual_sek: econPrefs.revenue_target_annual_sek,
                       })
                       .eq('business_id', business.business_id)
                     showToast('Ekonomi-inställningar sparade', 'success')

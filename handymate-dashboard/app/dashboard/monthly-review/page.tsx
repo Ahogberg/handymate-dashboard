@@ -6,6 +6,7 @@ import { BarChart3, TrendingUp, TrendingDown, ChevronDown, ChevronRight, Loader2
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
 import { AgarrapportBlock } from '@/components/value/AgarrapportBlock'
+import { MalBlock } from '@/components/value/MalBlock'
 import type { MonthlyReviewData } from '@/lib/matte/monthly-review'
 
 interface MonthlyReviewRow {
@@ -123,6 +124,10 @@ export default function MonthlyReviewPage() {
             Renderar ingenting för anställda (API:t svarar 403) och inget
             när det inte finns något att säga. */}
         <AgarrapportBlock />
+
+        {reviews[0] && (
+          <MalBlock monthLabel={reviews[0].data.month_label} profitability={reviews[0].data.profitability} />
+        )}
 
         {/* Content */}
         {loading ? (
