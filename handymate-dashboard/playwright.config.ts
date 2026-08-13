@@ -18,7 +18,7 @@ export default defineConfig({
   // user.json istället för demo-employee.json). De tre nya golden-path-*-
   // projekten längst ner sätter egen testIgnore:[] för att inte ärva
   // undantaget de själva behöver träffa.
-  testIgnore: [/.*\.integration\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/],
+  testIgnore: [/.*\.integration\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/, /tests[\\/]zzz-scratch-verify[\\/]/],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -98,6 +98,17 @@ export default defineConfig({
       name: 'margin-guardian',
       testDir: './tests/e2e-margin-guardian',
       testMatch: /margin-guardian\.spec\.ts/,
+      testIgnore: [],
+      use: { storageState: { cookies: [], origins: [] } },
+    },
+
+    // ── zzz-scratch-verify — engångs skarp-mot-prod-bevis, samma mönster ──
+    // som margin-guardian ovan. Filerna här SKA raderas efter körning (se
+    // mappens filhuvuden) — den här projekt-posten tas bort i samma
+    // städning, inte permanent infrastruktur.
+    {
+      name: 'scratch-verify',
+      testDir: './tests/zzz-scratch-verify',
       testIgnore: [],
       use: { storageState: { cookies: [], origins: [] } },
     },

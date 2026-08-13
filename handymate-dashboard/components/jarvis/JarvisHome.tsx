@@ -736,7 +736,18 @@ export default function JarvisHome({
     }
   }
 
-  const synliga = approvals.filter(a => !hiddenIds.has(a.id))
+  // Next Best Action-hero'n ovanför äger sin kandidat helt — utesluter den
+  // HÄR, innan gruppering, i stället för att försöka dölja den efteråt.
+  // Ett försök att dölja den EFTER gruppering missade fallet där kandidaten
+  // hamnar i en hopslagen grupp (samma agent+typ+dygn som ett annat kort):
+  // gruppen döljs aldrig i sig (rätt — syskonkort ska synas), men den
+  // hopslagna kortets EGEN radvisning visar ändå kandidatens titel som
+  // källrad, vilket dubblerade den bredvid hero'n (hittat live 2026-08-14).
+  // Att plocka bort kandidaten INNAN groupApprovals ser den löser båda
+  // fallen enhetligt: en ensam kandidat försvinner helt från kön, en
+  // kandidat som annars hade slagits ihop med syskon lämnar bara syskonen
+  // kvar som en egen, orörd grupp.
+  const synliga = approvals.filter(a => !hiddenIds.has(a.id) && !(nba && !heroHidden && a.id === nba.approval.id))
 
   // Dygnsdigesten: 24 h rullande fönster + grindar (lib/jarvis/dygnsdigest.ts).
   // Färska rader från executeSend (doneRows) står alltid först — de är det
@@ -947,13 +958,6 @@ export default function JarvisHome({
                 // fortfarande med i `beslut`/`grupper` (oförändrat), bara
                 // själva raden hoppas över vid rendering.
                 if (approval.approval_type === 'monday_brief') return null
-
-                // Next Best Action-hero'n ovanför äger redan den här raden
-                // (samma mönster som monday_brief-gaten ovan) — men bara när
-                // den faktiskt visas OCH gruppen är en ensam kandidat.
-                // Sammanslagna grupper (grupp.merged) lämnas orörda: att
-                // dölja hela gruppen hade gömt obesläktade syskonkort.
-                if (nba && !heroHidden && !grupp.merged && approval.id === nba.approval.id) return null
 
                 // "En händelse → hela företaget" (2026-08-13): projekt-
                 // stängningens kort (faktura/debrief/recension) delar ett
