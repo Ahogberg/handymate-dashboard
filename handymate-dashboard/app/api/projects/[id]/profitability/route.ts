@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { computeProjectEconomics, type ProjectEconomics } from '@/lib/projects/compute-economics'
+import { computeGuardianVarningForProject } from '@/lib/profitability'
+import type { LonsamhetsVarning } from '@/lib/projects/margin-guardian'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 
 /**
@@ -59,7 +61,29 @@ export async function GET(
     // quote_rot_rut docstring i compute-economics.ts).
     economics.quote_rot_rut = await getQuoteRotRut(supabase, params.id, business.business_id)
 
-    return NextResponse.json(economics)
+    // Kvittoprincipen Fall 2 (docs/design/SYNLIG-INTELLIGENS.md, 2026-08-13):
+    // samma kanoniska bedömning som skriver godkännandekortet, beräknad
+    // live här — "så länge motorn flaggar projektet", oavsett om kortet
+    // finns kvar eller redan hanterats. Icke-blockerande: ett fel här ska
+    // aldrig fälla resten av ekonomisvaret.
+    let guardian: LonsamhetsVarning | null = null
+    try {
+      const { data: projectRow } = await supabase
+        .from('project')
+        .select('name, budget_hours')
+        .eq('project_id', params.id)
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+      guardian = await computeGuardianVarningForProject(supabase, business.business_id, {
+        project_id: params.id,
+        name: projectRow?.name ?? null,
+        budget_hours: projectRow?.budget_hours ?? null,
+      })
+    } catch (guardianErr) {
+      console.error('[profitability] Guardian-beräkning misslyckades (icke-blockerande):', guardianErr)
+    }
+
+    return NextResponse.json({ ...economics, guardian })
   } catch (error: any) {
     console.error('Get profitability error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

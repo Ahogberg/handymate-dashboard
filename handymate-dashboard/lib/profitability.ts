@@ -5,9 +5,10 @@
  * Karins varningar triggas vid 75%, 90% och 100%+ av budget.
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { computeProjectEconomics } from '@/lib/projects/compute-economics'
-import { byggLonsamhetsVarning } from '@/lib/projects/margin-guardian'
+import { byggLonsamhetsVarning, type LonsamhetsVarning } from '@/lib/projects/margin-guardian'
 
 export interface ProjectProfitability {
   project_id: string
@@ -181,6 +182,52 @@ export async function calculateProfitability(
  * försämras igen ska däremot få ett nytt kort — därför dedupas bara mot
  * status='pending', inte mot hela projektets historik.
  */
+export interface GuardianProjektRad {
+  project_id: string
+  name: string | null
+  budget_hours: number | null
+}
+
+/**
+ * Guardians live-bedömning för ETT projekt — ren läsning, inga
+ * skrivningar. Delad kärna med checkProfitabilityWarnings nedan (som
+ * skriver pending_approvals-kortet) OCH med /api/projects/[id]/
+ * profitability (projektsidans ekonomiyta, Kvittoprincipen Fall 2,
+ * 2026-08-13) — samma beräkning på båda ytorna, aldrig två siffror för
+ * samma projekt.
+ */
+export async function computeGuardianVarningForProject(
+  supabase: SupabaseClient,
+  businessId: string,
+  project: GuardianProjektRad,
+): Promise<LonsamhetsVarning | null> {
+  const economics = await computeProjectEconomics(supabase, project.project_id, businessId)
+  if (!economics) return null
+
+  // Äldsta obesvarade ÄTA-förslags-kort för projektet — dess ålder är en
+  // av orsaksraderna (ett förslag som väntat länge kostar tid och pengar).
+  const { data: ataCards } = await supabase
+    .from('pending_approvals')
+    .select('id, created_at')
+    .eq('business_id', businessId)
+    .eq('approval_type', 'create_ata_draft')
+    .eq('status', 'pending')
+    .contains('payload', { project_id: project.project_id })
+    .order('created_at', { ascending: true })
+    .limit(1)
+
+  const oldestAta = ataCards?.[0]
+  const aldstaDagar = oldestAta
+    ? Math.floor((Date.now() - new Date(oldestAta.created_at).getTime()) / (24 * 60 * 60 * 1000))
+    : null
+
+  return byggLonsamhetsVarning(
+    economics,
+    { project_id: project.project_id, name: project.name || '', budget_hours: project.budget_hours || 0 },
+    { aldsta_dagar: aldstaDagar, approval_id: oldestAta?.id ?? null },
+  )
+}
+
 export async function checkProfitabilityWarnings(businessId: string): Promise<number> {
   const supabase = getServerSupabase()
 
@@ -196,31 +243,7 @@ export async function checkProfitabilityWarnings(businessId: string): Promise<nu
   let warningsCreated = 0
 
   for (const project of projects) {
-    const economics = await computeProjectEconomics(supabase, project.project_id, businessId)
-    if (!economics) continue
-
-    // Äldsta obesvarade ÄTA-förslags-kort för projektet — dess ålder är en
-    // av orsaksraderna (ett förslag som väntat länge kostar tid och pengar).
-    const { data: ataCards } = await supabase
-      .from('pending_approvals')
-      .select('id, created_at')
-      .eq('business_id', businessId)
-      .eq('approval_type', 'create_ata_draft')
-      .eq('status', 'pending')
-      .contains('payload', { project_id: project.project_id })
-      .order('created_at', { ascending: true })
-      .limit(1)
-
-    const oldestAta = ataCards?.[0]
-    const aldstaDagar = oldestAta
-      ? Math.floor((Date.now() - new Date(oldestAta.created_at).getTime()) / (24 * 60 * 60 * 1000))
-      : null
-
-    const result = byggLonsamhetsVarning(
-      economics,
-      { project_id: project.project_id, name: project.name || '', budget_hours: project.budget_hours || 0 },
-      { aldsta_dagar: aldstaDagar, approval_id: oldestAta?.id ?? null },
-    )
+    const result = await computeGuardianVarningForProject(supabase, businessId, project)
     if (!result) continue
 
     const isOverBudget = result.status === 'over_budget'

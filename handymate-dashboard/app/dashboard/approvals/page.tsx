@@ -38,6 +38,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { ringUppmaning } from '@/lib/jarvis/approval-view'
 import { MandagskortCard } from '@/components/jarvis/MandagskortCard'
+import { GuardianOrsaker } from '@/components/projects/GuardianOrsaker'
 import { formatSEK } from '@/lib/format-price'
 
 // SPÅR D1 (2026-08-06): kartan låg inlinead här och var en av fyra kopior av
@@ -1094,52 +1095,25 @@ export default function ApprovalsPage() {
                             </div>
                           )
                         })()}
-                        {/* Lönsamhetsvarning (Margin Guardian, 2026-08-12) — orsaksraderna
-                            ur lib/projects/margin-guardian.ts, samma mönster som
-                            dispatch_suggestion ovan. UPPSKATTAT-rader (prognosen) är
-                            grå/kursiva — de andra raderna är kända siffror. */}
+                        {/* Lönsamhetsvarning (Margin Guardian) — Kvittoprincipen Fall 2
+                            (docs/design/SYNLIG-INTELLIGENS.md, 2026-08-13): delad
+                            komponent med projektsidans motsvarande vy, en sanning. */}
                         {approval.approval_type === 'profitability_warning' && approval.payload && (() => {
                           const pl = approval.payload as any
-                          const orsaker = Array.isArray(pl.orsaker)
-                            ? (pl.orsaker as Array<{ text: string; kind: string; amount_kr?: number; approval_id?: string }>)
-                            : []
+                          const orsaker = Array.isArray(pl.orsaker) ? pl.orsaker : []
                           return (
-                            <div className="mt-2 bg-amber-50 rounded-lg p-3 space-y-2 border border-amber-200">
-                              {orsaker.length > 0 && (
-                                <div className="divide-y divide-amber-100">
-                                  {orsaker.map((o, i) => (
-                                    <div
-                                      key={i}
-                                      className={`flex items-center gap-3 py-1.5 text-xs ${o.kind === 'UPPSKATTAT' ? 'text-gray-400 italic' : 'text-gray-700'}`}
-                                    >
-                                      {o.approval_id ? (
-                                        <a
-                                          href={`/dashboard/approvals#approval-${o.approval_id}`}
-                                          className="flex-1 min-w-0 underline decoration-dotted hover:text-primary-700"
-                                        >
-                                          {o.text}
-                                        </a>
-                                      ) : (
-                                        <span className="flex-1 min-w-0">{o.text}</span>
-                                      )}
-                                      {typeof o.amount_kr === 'number' && o.amount_kr > 0 && (
-                                        <span className="font-medium text-right shrink-0 whitespace-nowrap">
-                                          {o.amount_kr.toLocaleString('sv-SE')} kr
-                                        </span>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              {pl.project_id && (
-                                <Link
-                                  href={`/dashboard/projects/${pl.project_id}`}
-                                  className="inline-flex items-center gap-1 text-xs text-primary-700 hover:text-primary-800 font-medium"
-                                >
-                                  Öppna projektet <ExternalLink className="w-3 h-3" />
-                                </Link>
-                              )}
-                            </div>
+                            <GuardianOrsaker
+                              varning={{
+                                status: pl.status === 'over_budget' ? 'over_budget' : 'at_risk',
+                                cost_percent: pl.cost_percent ?? 0,
+                                margin_percent: pl.margin_percent ?? null,
+                                projected_overrun: pl.projected_overrun ?? 0,
+                                orsaker,
+                                ata_signal: Boolean(pl.ata_signal),
+                              }}
+                              variant="rows"
+                              projectId={pl.project_id}
+                            />
                           )
                         })()}
                         {/* Måndagskortet (Måndagsmötet etapp 1, 2026-08-13) — de fyra

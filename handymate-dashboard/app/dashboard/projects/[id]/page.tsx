@@ -89,6 +89,7 @@ import TimeEntryModal from '@/components/time/TimeEntryModal'
 import { ProjectBookingsTable } from './components/ProjectBookingsTable'
 import { ProjectStageModal } from '@/components/pipeline/unified/ProjectStageModal'
 import { ProjectEconomicsCard } from '@/components/projects/ProjectEconomicsCard'
+import { GuardianOrsaker } from '@/components/projects/GuardianOrsaker'
 import { ProjectInfoCard } from '@/components/projects/economy/ProjectInfoCard'
 import { ProjectCustomerFactsCard } from '@/components/projects/ProjectCustomerFactsCard'
 import { EkonomiPulsCard } from '@/components/projects/economy/EkonomiPulsCard'
@@ -99,6 +100,7 @@ import { ProjectStatusCard, getStageBucket } from '@/components/projects/Project
 import ProjectTodoBlock, { type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
 import { formatSEK } from '@/lib/format-price'
 import type { ProjectEconomics } from '@/lib/projects/compute-economics'
+import type { LonsamhetsVarning } from '@/lib/projects/margin-guardian'
 import { svDateStr, svDateStrPlusDays, svStartOfDay } from '@/lib/dates'
 import {
   findProjectsMissingTimeEntry,
@@ -648,6 +650,10 @@ export default function ProjectDetailPage() {
   // Ägar-gating: hämtas bara om can('see_financials').
   const [statusEconomics, setStatusEconomics] = useState<ProjectEconomics | null>(null)
   const [statusEconomicsLoading, setStatusEconomicsLoading] = useState(true)
+  // Kvittoprincipen Fall 2 (docs/design/SYNLIG-INTELLIGENS.md, 2026-08-13):
+  // samma /api/projects/[id]/profitability-svar bär nu även Guardians
+  // live-bedömning — en kanonisk källa, inget separat anrop.
+  const [guardianVarning, setGuardianVarning] = useState<LonsamhetsVarning | null>(null)
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
 
   // Work orders
@@ -1049,8 +1055,12 @@ export default function ProjectDetailPage() {
     setStatusEconomicsLoading(true)
     fetch(`/api/projects/${projectId}/profitability`)
       .then(res => (res.ok ? res.json() : null))
-      .then((data: ProjectEconomics | null) => { if (!cancelled) setStatusEconomics(data) })
-      .catch(() => { if (!cancelled) setStatusEconomics(null) })
+      .then((data: (ProjectEconomics & { guardian?: LonsamhetsVarning | null }) | null) => {
+        if (cancelled) return
+        setStatusEconomics(data)
+        setGuardianVarning(data?.guardian ?? null)
+      })
+      .catch(() => { if (!cancelled) { setStatusEconomics(null); setGuardianVarning(null) } })
       .finally(() => { if (!cancelled) setStatusEconomicsLoading(false) })
     return () => { cancelled = true }
   }, [projectId, economicsRefreshKey, can])
@@ -1855,8 +1865,14 @@ export default function ProjectDetailPage() {
   // Röd över-budget-alert kräver ett specifikt delmoment med registrerad
   // överskriden timbudget (copy-mallen behöver {moment} + {n tim}) — annars
   // utelämnas alertet trots over_budget-läge (hitta inte på ett moment).
+  //
+  // Kvittoprincipen Fall 2 (2026-08-13): "den kanoniska motorn vinner" —
+  // så fort Guardian har en egen bedömning för projektet (synlig i
+  // Ekonomi-fliken via GuardianOrsaker) byggs INTE den här milstolpe-
+  // baserade texten, som annars kunde visa ett annat belopp för samma
+  // överdrag. Två motstridiga varningar på samma sida är förbjudna.
   let overBudgetAlert: OverBudgetAlert | null = null
-  if (todoMode === 'over_budget' && nedlagtKr != null) {
+  if (todoMode === 'over_budget' && nedlagtKr != null && !guardianVarning) {
     const worstMilestone = milestones
       .filter(m => m.budget_hours != null && m.budget_hours > 0 && m.actual_hours > (m.budget_hours as number))
       .sort((a, b) => (b.actual_hours - (b.budget_hours || 0)) - (a.actual_hours - (a.budget_hours || 0)))[0]
@@ -4079,11 +4095,21 @@ export default function ProjectDetailPage() {
 
         {/* === TAB: Ekonomi === (ägar-gated) */}
         {activeGroup === 'economy_offert' && canSeeFinancials && (
-          <ProjectEconomicsCard
-            projectId={projectId}
-            refreshKey={economicsRefreshKey}
-            onInvoiceProject={() => setShowInvoiceModal(true)}
-          />
+          <>
+            {/* Kvittoprincipen Fall 2 (docs/design/SYNLIG-INTELLIGENS.md,
+                2026-08-13): samma Guardian-bedömning som godkännandekortet,
+                beräknad live — oberoende av om kortet är hanterat. */}
+            {guardianVarning && (
+              <div className="mb-4">
+                <GuardianOrsaker varning={guardianVarning} variant="full" />
+              </div>
+            )}
+            <ProjectEconomicsCard
+              projectId={projectId}
+              refreshKey={economicsRefreshKey}
+              onInvoiceProject={() => setShowInvoiceModal(true)}
+            />
+          </>
         )}
         {/* === TAB: Arbetsorder === */}
         {activeGroup === 'planning' && (
