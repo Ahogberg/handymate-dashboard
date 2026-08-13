@@ -8,6 +8,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getQuoteBudgetDerivation } from '@/lib/quotes/get-quote-budget-derivation'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 import { halsning } from '@/lib/customers/namn'
+import { advanceProjectStage, SYSTEM_STAGES } from '@/lib/project-stages/automation-engine'
 
 interface CreateResult {
   success: boolean
@@ -144,18 +145,34 @@ export async function createProjectFromQuote(
     // Stegkedjan startar VID födseln (auditens P1-1): projektet föds ur en
     // signerad offert, så första steget är Avtal signerat. Utan initieringen
     // stod stage null tills första fakturahändelsen och projektlistan kunde
-    // inte svara på var jobbet står. Idempotent — MEN måste avvaktas, inte
-    // fire-and-forget (fynd 2026-08-13, Golden Path-harnesset): Vercels
-    // serverless-miljö kan riva körningskontexten så fort HTTP-svaret gått
-    // iväg, vilket dödar en icke-avvaktad promise innan den hinner
-    // committa — precis det scenario kommentaren ovan beskriver att den
-    // skulle förhindra. Bekräftat i produktion: current_workflow_stage_id
-    // stod kvar null minuter efter en riktig signering. `.catch()` gör att
-    // ett fel här ändå aldrig fäller själva projekt-skapandet.
-    await import('@/lib/project-stages/automation-engine')
-      .then(({ advanceProjectStage, SYSTEM_STAGES }) =>
-        advanceProjectStage(projectId, SYSTEM_STAGES.CONTRACT_SIGNED, businessId))
-      .catch(err => console.error('[createProjectFromQuote] stage init error (non-blocking):', err))
+    // inte svara på var jobbet står.
+    //
+    // Fynd 2026-08-13 (Golden Path-harnesset): bekräftat i produktion att
+    // current_workflow_stage_id stod kvar null EFTER en riktig signering —
+    // för 29 av 33 projekt totalt i produktionen, oavsett hur länge man
+    // väntar. Ett första fix-försök (bara await:a den tidigare fire-and-
+    // forget-kedjan) löste INTE symptomet, vilket utesluter en ren
+    // serverless-timing-race som ensam förklaring. Bytt till en STATISK
+    // import (var: `import('@/lib/project-stages/automation-engine')`)
+    // för att eliminera dynamisk chunk-laddning som en möjlig felkälla i
+    // Vercels serverless-miljö — samma modul, ingen cirkulär import (verifierat:
+    // automation-engine.ts importerar aldrig denna fil). `.catch()` kvar:
+    // ett fel här ska ALDRIG fälla själva projekt-skapandet.
+    // advanceProjectStage KASTAR inte vid fel — den returnerar {moved:false,
+    // error} (se automation-engine.ts). Ett bart .catch() ser alltså ALDRIG
+    // en sådan "mjuk" miss, bara genuina thrown exceptions. Loggar båda
+    // vägarna explicit så ett framtida fel går att se i Vercels function-
+    // loggar, inte bara försvinner tyst.
+    try {
+      const stageResult = await advanceProjectStage(projectId, SYSTEM_STAGES.CONTRACT_SIGNED, businessId)
+      if (!stageResult.moved) {
+        console.error('[createProjectFromQuote] stage init returnerade moved:false (non-blocking):', {
+          projectId, businessId, error: stageResult.error,
+        })
+      }
+    } catch (err) {
+      console.error('[createProjectFromQuote] stage init kastade (non-blocking):', err)
+    }
 
     // 5. Skapa milestones från offertens arbetsrader
     // Använder labor_items från budgetDerivation (samma helper) så
