@@ -774,10 +774,15 @@ export async function PUT(request: NextRequest) {
             businessName: config.business_name,
             reviewUrl: config.google_review_url,
           })
+          // KÄLLGRANSKAT FYND (2026-08-13): `type` är INTE en kolumn på
+          // pending_approvals (bara approval_type finns) — PostgREST
+          // avvisade hela inserten, tyst uppsvald av catch-blocket nedan.
+          // scheduled_review_request-kortet har alltså aldrig skapats i
+          // produktion, för någon business, sedan featuren byggdes (0 rader
+          // någonsin, verifierat via MCP innan denna fix).
           await supabase.from('pending_approvals').insert({
             business_id: business.business_id,
             approval_type: 'scheduled_review_request',
-            type: 'scheduled_review_request',
             title: `Recensionsförfrågan — ${customer.name}`,
             description: `Skicka Google-recensionsförfrågan till ${customer.name} för projekt "${project.name}"`,
             risk_level: 'low',
