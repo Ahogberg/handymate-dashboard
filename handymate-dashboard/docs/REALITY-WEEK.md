@@ -21,21 +21,19 @@ körningen. Duplicera inte stationsdetaljerna hit; körboken äger dem.
   se stationstabellen nedan för resultat och docs/reality-week/pass1-
   2026-08-13.md för fullständiga UI-/DB-bevis per station.
 - 2026-08-13 (samma dag, Fas 2): station 8-14 tillagda i SAMMA
-  sammanhängande harness-fil/körning. **Station 1-12 bevisligen gröna i EN
-  fullständig, sammanhängande körning.** Fem riktiga produktionsbuggar
-  hittades och fixades under körningen (se Avvikelseloggen #5-9) — den
-  allvarligaste (call_recording/customer.address, #8-9) innebar att HELA
-  röstanalysvägen (telefonsamtal OCH mötesinspelningar) aldrig kunnat
-  slutföra en analys i produktion, sedan funktionen lanserades. En sjätte,
-  extern blockering (46elks-kontots saldo slut, #10) stoppade en körning
-  vid station 4 — sidesteppad genom att växla testets leveransmetod till
-  Email (Resend, bekräftat konfigurerat och fungerande, #10 kvarstår som
-  historik men blockerar inte längre). Med det sidesteppat kom nästa
-  körning förbi BÅDA Station 13-buggarna och nådde själva AI-anropet —
-  men produktionens Anthropic-konto saknar API-kredit (#11), en sjunde
-  extern blockering. Station 13:s egna kodfynd är alltså fullt bekräftat
-  fixade; bara den sista, externa pusselbiten (Anthropic-kredit) och
-  Station 14 (aldrig nådd) återstår.
+  sammanhängande harness-fil/körning. **ALLA 14 STATIONER BEVISLIGEN
+  GRÖNA I EN FULLSTÄNDIG, SAMMANHÄNGANDE KÖRNING** (Station 14 nådd och
+  grön för första gången). Fem riktiga produktionsbuggar hittades och
+  fixades under körningen (se Avvikelseloggen #5-9) — den allvarligaste
+  (call_recording/customer.address, #8-9) innebar att HELA röstanalysvägen
+  (telefonsamtal OCH mötesinspelningar) aldrig kunnat slutföra en analys i
+  produktion, sedan funktionen lanserades — nu bekräftat fixad genom en
+  fullt grön körning av just den stationen. Två externa kreditblockeringar
+  hittades och löstes under dagen: 46elks-kontots saldo slut (#10,
+  sidesteppad genom att växla testets leveransmetod till Email — Resend
+  visade sig vara korrekt konfigurerat) och Anthropic-kontots API-kredit
+  slut (#11, Andreas fyllde på krediten). Enda kvarstående avvikelse:
+  A9:s kända, icke-blockerande API-bevis-harnesskvirk (401 vs 403).
 
 **Status-koder:** ☐ ej körd · ✅ PASS · 🔴 AVVIKELSE (länka fix-commit) ·
 🔧 FIXAD & omtestad · ⏭ hoppad (motivera)
@@ -68,8 +66,8 @@ körningen. Duplicera inte stationsdetaljerna hit; körboken äger dem.
 | 10 | Bevisytorna (digest, kön, Pengar just nu, Värdekvittot) | ✅ | 7 API-ytor verifierade (automations/activity, team-activity, approvals, pengar, kvitto, agarrapport, ledger). "Att hämta"-kortet är död kod (se Avvikelseloggen A17) — "Pengar just nu" är dagens motsvarighet. Se pass1-2026-08-13.md. |
 | 11 | Projektet stängs → efterkalkyl + debrief-kort | ✅ | "Fler åtgärder" → "Avslutat" → project.status=completed, stage=ps-05, draft-faktura, project_outcome fryst, debriefkort skapat. Se pass1-2026-08-13.md. |
 | 12 | Debriefen besvaras → lärdomar | ✅ | "Svara" → 3 frågor ifyllda → Spara → 3 project_lesson-rader (job_type=badrum), kortet → approved. Se pass1-2026-08-13.md. |
-| 13 | Mötet som blir minne (kundfakta-kort → kundkort/projektsida) | 🔴 | Två kritiska buggar (call_recording.recording_id, customer.address) bekräftat FIXADE — en full körning kom förbi BÅDA och nådde själva AI-analysanropet. Blockeras nu av att produktionens Anthropic-konto saknar API-kredit ("Your credit balance is too low"). Inte en kodbugg. Se pass1-2026-08-13.md. |
-| 14 | Cirkeln sluts (ny offert visar lärdom + kundfakta; Guardian vaktar) | ☐ | Ej nådd — beroende av att Station 13 slutförs (Anthropic-kredit). |
+| 13 | Mötet som blir minne (kundfakta-kort → kundkort/projektsida) | ✅ | Anthropic-krediten påfylld → full körning grön: demo-seed-meeting → customer_fact-kort godkänt → "Det här vet Handymate"-UI-bevis. Se pass1-2026-08-13.md. |
+| 14 | Cirkeln sluts (ny offert visar lärdom + kundfakta; Guardian vaktar) | ✅ | Nådd och grön för FÖRSTA GÅNGEN. Lärdomar synliga för job_type=badrum, ledger-delmängdsgarantin håller (identifierat≥agerat≥fakturerat≥betalt). Se pass1-2026-08-13.md. |
 
 ## Pass 2 — Adversarial (A1–A15, förväntad utgång i körboken)
 
@@ -114,7 +112,7 @@ körningen. Duplicera inte stationsdetaljerna hit; körboken äger dem.
 | 8 | Pass 1, station 13 (Fas 2) | `call_recording` hade NOLL rader i hela produktionsdatabasen — varken telefonsamtal eller mötesinspelningar har någonsin kunnat sparas | `recording_id` NOT NULL utan default saknades i alla 4 kända insert-ställen; `from_number`/`to_number` (döda kolumner) blockerade även mötesvägen | 74727173 + sql/v127 (kört) | ✅ (insert-nivå) |
 | 9 | Pass 1, station 13 (Fas 2) | `/api/voice/analyze` kunde aldrig läsa en inspelning ens efter fynd #8 — "Recording not found" trots att raden fanns | Embedded PostgREST-query selectade `customer.address`, en kolumn som inte längre finns (uppdelad i address_line/postal_code/city vid en tidigare migration som aldrig synkades hit) | 7c44c02e | ✅ (query-nivå) — stationens EGEN helhetskörning ej omtestad än, se anteckning nedan |
 | 10 | Pass 1, station 4 (Fas 2) | `POST /api/quotes/send` svarade 500 ("Kunde inte skicka offerten") när testet skickade via SMS | EJ en kodbugg: 46elks-kontots förbetalda saldo var slut, troligen uttömt av sessionens egna ~50 riktiga SMS idag. Gmail är inte kopplat (ingen calendar_connection-rad) — men Resend (Email) VISADE SIG vara konfigurerat och fungerande. | 15bc877c (testet växlade leveransmetod till Email) | ✅ sidesteppad — 46elks-saldot kvarstår obetalt men blockerar inte längre |
-| 11 | Pass 1, station 13 (Fas 2) | `POST /api/admin/demo-seed-meeting` svarar 502 — analysen misslyckas trots att BÅDA de tidigare buggarna (#8, #9) är fixade och bekräftat förbikomna | EJ en kodbugg: produktionens Anthropic-konto svarar "Your credit balance is too low to access the Anthropic API" — kontots köpta API-kredit är slut. | — (kräver kreditpåfyllning hos Anthropic, inte en git-commit) | 🔴 öppen, blockerande för Station 13:s slutgiltiga bekräftelse + Station 14 |
+| 11 | Pass 1, station 13 (Fas 2) | `POST /api/admin/demo-seed-meeting` svarade 502 — analysen misslyckades trots att BÅDA de tidigare buggarna (#8, #9) var fixade och bekräftat förbikomna | EJ en kodbugg: produktionens Anthropic-konto svarade "Your credit balance is too low to access the Anthropic API" — kontots köpta API-kredit var slut. | — (Andreas fyllde på krediten hos Anthropic, inte en git-commit) | ✅ löst — full körning bekräftar Station 13 OCH 14 gröna |
 
 ---
 
