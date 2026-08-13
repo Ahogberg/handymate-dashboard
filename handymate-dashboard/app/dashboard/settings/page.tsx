@@ -4474,6 +4474,8 @@ export default function SettingsPage() {
                 {econSaving ? 'Sparar...' : 'Spara'}
               </button>
             </div>
+
+            <BusinessRulesSection businessId={business.business_id} isOwnerOrAdmin={isOwnerOrAdmin} />
           </div>
         )}
 
@@ -4486,6 +4488,111 @@ export default function SettingsPage() {
       </div>
     </div>
     </PermissionGate>
+  )
+}
+
+/**
+ * "Lär Handymate" — capture-UI (Business Twin-backlog #12, 2026-08-13).
+ * En affärsregel ägaren dikterar i klartext, som Daniels offertmotor
+ * faktiskt läser (lib/ai-quote-generator.ts fetchBusinessRules) —
+ * inte bara en anteckning. Owner/admin-gated i API:t; knappen döljs här
+ * av samma skäl.
+ */
+function BusinessRulesSection({ businessId, isOwnerOrAdmin }: { businessId: string; isOwnerOrAdmin: boolean }) {
+  const [rules, setRules] = useState<Array<{ id: string; observation: string; created_at: string }>>([])
+  const [loading, setLoading] = useState(true)
+  const [newRule, setNewRule] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => { fetchRules() }, [businessId])
+
+  async function fetchRules() {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/business-rules')
+      if (res.ok) {
+        const { rules } = await res.json()
+        setRules(rules || [])
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleAdd() {
+    if (!newRule.trim()) return
+    setSaving(true)
+    setErr(null)
+    const res = await fetch('/api/business-rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ruleText: newRule.trim() }),
+    })
+    if (res.ok) {
+      setNewRule('')
+      await fetchRules()
+    } else {
+      const body = await res.json().catch(() => null)
+      setErr(body?.error || 'Kunde inte spara regeln')
+    }
+    setSaving(false)
+  }
+
+  async function handleDelete(id: string) {
+    await fetch(`/api/business-rules?id=${id}`, { method: 'DELETE' })
+    await fetchRules()
+  }
+
+  if (!isOwnerOrAdmin) return null
+
+  return (
+    <div className="mt-8 pt-6 border-t border-gray-100">
+      <h3 className="text-sm font-semibold text-gray-900 mb-1">Lär Handymate</h3>
+      <p className="text-xs text-gray-500 mb-4">
+        Affärsregler du skriver här läses av Daniels offertmotor för alla framtida offerter —
+        t.ex. "Vi tar inte köksjobb under 80 000 kr, de blir sällan lönsamma".
+      </p>
+
+      {loading ? (
+        <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+      ) : (
+        <div className="space-y-2 mb-4">
+          {rules.map(rule => (
+            <div key={rule.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+              <span className="flex-1 min-w-0 text-sm text-gray-700">{rule.observation}</span>
+              <button
+                onClick={() => handleDelete(rule.id)}
+                className="text-gray-400 hover:text-red-600 transition-colors shrink-0"
+                title="Ta bort regeln"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          {rules.length === 0 && <p className="text-sm text-gray-400">Inga regler sparade än.</p>}
+        </div>
+      )}
+
+      <div className="flex items-start gap-2">
+        <textarea
+          value={newRule}
+          onChange={e => setNewRule(e.target.value)}
+          placeholder="Skriv en affärsregel..."
+          rows={2}
+          maxLength={300}
+          className="flex-1 px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:border-primary-500 resize-none"
+        />
+        <button
+          onClick={handleAdd}
+          disabled={saving || !newRule.trim()}
+          className="px-4 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-800 disabled:opacity-50 transition-colors shrink-0"
+        >
+          {saving ? 'Sparar...' : 'Lägg till'}
+        </button>
+      </div>
+      {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
+    </div>
   )
 }
 

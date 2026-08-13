@@ -92,6 +92,11 @@ export interface GeneratedQuote {
       förutsättningar godkända av hantverkaren som prompten tog hänsyn till.
       Tom lista är normalt: ingen kund, eller ingen bekräftad fakta än. */
   customerFacts: Array<{ fact_type: 'preference' | 'constraint'; content: string }>
+  /** Ägar-dikterade affärsregler prompten fick se ("Lär Handymate", 2026-08-13).
+      Tom lista är normalt: inga regler sparade än. Returneras av samma skäl
+      som lessons/customerFacts — så anroparen (och UI:t) kan visa VAD som
+      faktiskt påverkade offerten, inte bara påstå att det hände. */
+  rules: Array<{ observation: string }>
   priceListEmpty: boolean
   missingPriceCount: number
   /**
@@ -232,6 +237,57 @@ async function fetchCustomerFactsForQuote(
   } catch (err) {
     console.error('[ai-quote-generator] customer_fact-läsning kastade (fail-safe, tom lista):', err)
     larma(err, err instanceof Error ? err.message : String(err))
+    return []
+  }
+}
+
+/**
+ * "Lär Handymate" (Business Twin-backlog #12, 2026-08-13) — konsument-
+ * halvan byggs FÖRE capture-halvan, med flit: en regel utan en verklig
+ * läsare vore en input utan effekt (se docs/strategy/BUSINESS_TWIN_
+ * IDEA_BACKLOG.md #12). De senaste, ägar-dikterade affärsreglerna
+ * (business_knowledge, knowledge_type='business_rule', confidence=1 —
+ * skiljer dem från agenternas egna lägre-confidence-observationer).
+ *
+ * Ingen job_type-kolumn finns på business_knowledge (till skillnad från
+ * project_lesson) — en regel är en generell policy ("vi tar inte kök
+ * under 80 000"), inte en jobbspecifik lärdom, så ALLA aktiva regler
+ * hämtas och modellen får själv avgöra relevans för just det här jobbet.
+ *
+ * Fail-safe: kastar aldrig, degraderar till tom lista.
+ */
+async function fetchBusinessRules(
+  businessId: string,
+): Promise<Array<{ observation: string }>> {
+  const supabase = getServerSupabase()
+  try {
+    const { data, error } = await supabase
+      .from('business_knowledge')
+      .select('observation, created_at')
+      .eq('business_id', businessId)
+      .eq('knowledge_type', 'business_rule')
+      .is('dismissed_at', null)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    if (error) {
+      console.error('[ai-quote-generator] business_knowledge-läsning misslyckades (fail-safe, tom lista):', error.message)
+      if (!arSchemaSaknas(error)) {
+        await rapporteraTystFel(supabase, businessId, 'ai-quote-generator:fetchBusinessRules', error.message)
+      }
+      return []
+    }
+    return (data || []).map(row => ({ observation: (row as any).observation as string }))
+  } catch (err) {
+    console.error('[ai-quote-generator] business_knowledge-läsning kastade (fail-safe, tom lista):', err)
+    if (!arSchemaSaknas(err)) {
+      await rapporteraTystFel(
+        supabase,
+        businessId,
+        'ai-quote-generator:fetchBusinessRules-unexpected',
+        err instanceof Error ? err.message : String(err),
+      )
+    }
     return []
   }
 }
@@ -570,11 +626,12 @@ export async function generateQuoteFromInput(
   // genererar offerten. analyzeJobImage() lever kvar oförändrad — används
   // fortfarande av ai-generate/route.ts för att beskriva EXTRA bilder
   // (bild 2-5) som text innan de vävs in i textDescription här.
-  const [similarQuotes, priceStats, lessons, customerFacts] = await Promise.all([
+  const [similarQuotes, priceStats, lessons, customerFacts, rules] = await Promise.all([
     description ? findSimilarQuotes(input.businessId, description) : Promise.resolve([]),
     description ? getAveragePrice(input.businessId, description) : Promise.resolve({ average: 0, min: 0, max: 0, count: 0 }),
     fetchRecentLessons(input.businessId, input.jobType),
     input.customerId ? fetchCustomerFactsForQuote(input.businessId, input.customerId) : Promise.resolve([]),
+    fetchBusinessRules(input.businessId),
   ])
 
   const fullDescription = [
@@ -625,13 +682,24 @@ Om bilden är ett FOTO:
         .join('\n')}`
     : ''
 
+  // "Lär Handymate" (2026-08-13): ägar-dikterade affärsregler, generella
+  // policys snarare än jobbspecifika lärdomar — explicit instruktion att
+  // FLAGGA relevans i "reasoning" (inte bara tyst följa dem), så det går
+  // att verifiera i efterhand att en regel faktiskt påverkade offerten
+  // och inte bara passivt lästes.
+  const rulesContext = rules.length > 0
+    ? `\n\nÄGARENS AFFÄRSREGLER (dikterade av hantverkaren själv — följ dessa, och om någon är relevant för DETTA jobb: nämn det uttryckligen i "reasoning"):\n${rules
+        .map(r => `- ${r.observation}`)
+        .join('\n')}`
+    : ''
+
   const priceContext = buildPriceContext(input.priceList, input.hourlyRate, input.templates, input.customerPriceList)
   const hasPriceList = (input.priceList?.length || 0) > 0
 
   const systemPrompt = `Du är en erfaren svensk kalkylator för bygg- och hantverksprojekt.
 
 Bransch: ${input.branch || 'Bygg/Hantverkare'}
-${priceContext}${historicalContext}${lessonsContext}${customerFactsContext}
+${priceContext}${historicalContext}${lessonsContext}${customerFactsContext}${rulesContext}
 
 Analysera beskrivningen (och en eventuellt bifogad bild — se instruktioner nedan) och ge ett detaljerat offertförslag.
 ${imageInstructions}
@@ -831,6 +899,7 @@ Svara ENDAST med JSON (ingen markdown):
     })),
     lessons,
     customerFacts,
+    rules,
     priceListEmpty: !hasPriceList,
     missingPriceCount,
     // B3: defensiv — modellen instrueras till 0-4 korta punkter, men det är
