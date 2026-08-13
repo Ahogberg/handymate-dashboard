@@ -53,6 +53,7 @@ import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
 
 // Nya komponenter unika för new-vyn
 import { QuoteNewHeader } from './components/QuoteNewHeader'
+import { DanielsBedomning } from './components/DanielsBedomning'
 import { QuoteNewAIHelper } from './components/QuoteNewAIHelper'
 import { QuoteNewCustomerSection } from './components/QuoteNewCustomerSection'
 import { QuoteNewAttachmentsCard } from './components/QuoteNewAttachmentsCard'
@@ -265,6 +266,14 @@ export default function NewQuotePage() {
   const [aiGenerated, setAiGenerated] = useState(false)
   const [aiTextInput, setAiTextInput] = useState('')
   const [aiConfidence, setAiConfidence] = useState<number | null>(null)
+  // Kvittoprincipen Fall 1 (docs/design/SYNLIG-INTELLIGENS.md): motorns
+  // eget resonemang + kunskapen som faktiskt påverkade offerten.
+  const [aiBedomning, setAiBedomning] = useState<{
+    reasoning: string | null
+    rules: Array<{ observation: string }>
+    lessons: Array<{ lesson_text: string }>
+    customerFacts: Array<{ content: string }>
+  } | null>(null)
   const [photos, setPhotos] = useState<string[]>([])
   const [photoDescription, setPhotoDescription] = useState('')
   const [showAiHelper, setShowAiHelper] = useState(false)
@@ -1275,6 +1284,12 @@ export default function NewQuotePage() {
     }
     setAiGenerated(true)
     setAiConfidence(quote.confidence || null)
+    setAiBedomning({
+      reasoning: typeof quote.reasoning === 'string' ? quote.reasoning : null,
+      rules: Array.isArray(quote.rules) ? quote.rules : [],
+      lessons: Array.isArray(quote.lessons) ? quote.lessons : [],
+      customerFacts: Array.isArray(quote.customerFacts) ? quote.customerFacts : [],
+    })
 
     // P4 (UX-revision 2026-08-03): positiv signal när produktbanken faktiskt
     // gjorde jobbet — räknas på de RÅA AI-raderna (fromPriceList finns bara
@@ -2109,6 +2124,19 @@ export default function NewQuotePage() {
             setShowSaveTemplateModal(true)
           }}
         />
+
+        {/* Kvittoprincipen Fall 1: motorns eget resonemang, direkt under
+            headern före radlistan. Renderar ingenting utan reasoning;
+            expanderat från start när en affärsregel aktiverats. */}
+        {aiGenerated && aiBedomning && (
+          <DanielsBedomning
+            reasoning={aiBedomning.reasoning}
+            rules={aiBedomning.rules}
+            lessons={aiBedomning.lessons}
+            customerFacts={aiBedomning.customerFacts}
+            confidence={aiConfidence}
+          />
+        )}
 
         {/* ETAPP 2b (offert-masterplan.md): canvas-first-layouten. Dokumentet
             är huvudytan (majoritetsbredd) — assistentkolumnen innehåller bara
