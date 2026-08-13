@@ -4,6 +4,25 @@ import { resolveDisplayLevel, displayLevelToColumns, groupItemsForSummary } from
 
 const DEFAULT_ACCENT = '#0F766E'
 
+/**
+ * business_config.default_quote_terms är JSONB DEFAULT '{}' (sql/quote_
+ * enhancements.sql:22 — troligen felaktigt typad vid tillägget; borde
+ * varit TEXT). Samtliga 22 företag i produktion står fortfarande kvar på
+ * default-värdet `{}` — ingen UI har någonsin skrivit en riktig sträng dit
+ * (app/api/settings/route.ts skriver bara igenom whitelisten rakt av, ingen
+ * typvalidering). Utan det här skyddet blir `paymentTerms` en RÅ TOM OBJEKT
+ * så fort en offert saknar egen payment_terms_text OCH kundens egna
+ * default_payment_days — och QuoteDocument.tsx renderar `{data.quote.
+ * paymentTerms}` direkt som JSX-barn i visningsläge. React kraschar då med
+ * "Objects are not valid as a React child" (bekräftat 2026-08-13, kraschade
+ * VARJE ny offerts visningssida). Ett skalbyte av kolumnen är en separat,
+ * egen migrationsfråga — det här skyddet gör bara att kodens LÄSNING
+ * stämmer med vad kolumnen FAKTISKT kan innehålla idag.
+ */
+export function asTermsString(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
 function unitLabel(unit: string | null | undefined): string {
   switch ((unit || '').toLowerCase()) {
     case 'hour':
@@ -299,7 +318,7 @@ export function buildQuoteTemplateData(
       paymentTerms: quote.payment_terms_text
         || (quote.customer?.default_payment_days
           ? `${quote.customer.default_payment_days} dagar`
-          : config?.default_quote_terms || ''),
+          : asTermsString(config?.default_quote_terms)),
       warrantyText: quote.warranty_text || null,
       introductionText: quote.introduction_text || null,
       conclusionText: quote.conclusion_text || null,

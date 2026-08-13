@@ -331,3 +331,35 @@ fråga "finns den konkreta leveransen på disk/i svaret just nu, eller har jag
 bara startat något som ska leverera den senare?". Om det senare — fortsätt
 jobba (vänta in bakgrundsagenter i SAMMA körning, eller gör jobbet själv om
 det är enklare) istället för att rapportera ett mellansteg som slutresultat.
+
+## 2026-08-13: En minifierad "objekt-som-barn"-krasch kräver dev-mode, inte fler gissningar
+
+**Vad hände:** Golden Path-harnesset hittade en riktig produktionskrasch när
+en offert öppnas (React error #31, minifierat). Grep efter uppenbara
+misstänkta ("terms", "quoteIntelligence" etc.) i ~10 komponentfiler gav
+inget napp — komponentstacken från `componentDidCatch` visade bara Next.js
+egna route-wrappers, aldrig appens egna sid-/kortkomponenter. Löstes till
+slut genom att (1) starta `npm run dev` lokalt mot SAMMA produktions-Supabase
+(anon-nyckeln är inte hemlig, extraherades ur ett riktigt request-headers-
+anrop; service-role-nyckeln fanns redan i .env.test) för att få OMINIFIERADE
+felmeddelanden, (2) bisekera genom att temporärt kommentera bort en hel
+underkomponent och testa om kraschen försvann, (3) därefter läsa BARA den
+komponenten i sin helhet i stället för att grep:a i hela filträdet.
+
+**Root cause (produktbuggen):** `business_config.default_quote_terms` är
+`JSONB DEFAULT '{}'` (sql/quote_enhancements.sql) men läses som om den vore
+en sträng i `lib/quote-templates/data-builder.ts`. `{} || ''` ger `{}`
+(sant i JS) — och `QuoteDocument.tsx` renderar värdet direkt som JSX-barn.
+Samtliga 22 företag i produktion stod på detta default-värde — kraschen
+träffade alltså VARJE ny offerts visningssida, inte bara testdata.
+
+**Regel:** när en minifierad React-krasch inte har ett uppenbart grep-bart
+mönster, byt metod tidigare — sätt upp lokal dev (även mot skarp databas,
+service-role-nyckeln är redan betrodd i .env.test; anon-nyckeln är per
+design publik) för riktiga felmeddelanden, och bisekera genom att
+temporärt ta bort halva komponentträdet i taget snarare än att fortsätta
+gissa i källkoden. Kontrollera ALLTID den faktiska DB-kolumntypen
+(`information_schema.columns`) när ett fält "borde" vara en sträng men
+kommer från en generisk/oreglerad settings-kolumn (ALLOWED_COLUMNS-mönstret
+utan typvalidering, se app/api/settings/route.ts) — koden och schemat kan
+ha glidit isär utan att någon UI någonsin skrev ett verkligt värde dit.
