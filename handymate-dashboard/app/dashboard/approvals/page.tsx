@@ -39,6 +39,7 @@ import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { ringUppmaning } from '@/lib/jarvis/approval-view'
 import { MandagskortCard } from '@/components/jarvis/MandagskortCard'
 import { GuardianOrsaker } from '@/components/projects/GuardianOrsaker'
+import { DispatchReasoning } from '@/components/dispatch/DispatchReasoning'
 import { formatSEK } from '@/lib/format-price'
 
 // SPÅR D1 (2026-08-06): kartan låg inlinead här och var en av fyra kopior av
@@ -1047,7 +1048,9 @@ export default function ApprovalsPage() {
                             </div>
                           )
                         })()}
-                        {/* Dispatch suggestion details */}
+                        {/* Dispatch suggestion details — "Visa varför"-utrullning
+                            Fall 4 (docs/design/SYNLIG-INTELLIGENS.md): delad
+                            komponent, samma mönster som GuardianOrsaker. */}
                         {approval.approval_type === 'dispatch_suggestion' && approval.payload && (() => {
                           const pl = approval.payload as any
                           return (
@@ -1061,37 +1064,12 @@ export default function ApprovalsPage() {
                                   <p className="text-xs text-gray-400">{pl.job_title}</p>
                                 </div>
                               </div>
-                              {pl.reasons && (
-                                <div className="flex flex-wrap gap-1">
-                                  {(pl.reasons as string[]).map((r: string, i: number) => (
-                                    <span key={i} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">{r}</span>
-                                  ))}
-                                </div>
-                              )}
-                              {/* R5 (tasks/resurs-masterplan.md) — beläggning + cert-data för kandidaten */}
-                              {typeof pl.week_utilization_pct === 'number' && (
-                                <p className="text-xs text-gray-500">
-                                  Beläggning denna vecka:{' '}
-                                  <span className={
-                                    pl.week_utilization_pct < 50 ? 'text-emerald-600 font-medium'
-                                      : pl.week_utilization_pct < 80 ? 'text-amber-600 font-medium'
-                                      : 'text-red-600 font-medium'
-                                  }>{pl.week_utilization_pct}%</span>
-                                </p>
-                              )}
-                              {pl.certificates && ((pl.certificates.valid as string[] | undefined)?.length || (pl.certificates.expiring_soon as any[] | undefined)?.length) ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {(pl.certificates.valid as string[]).map((cert: string, i: number) => (
-                                    <span key={`cert-${i}`} className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">{cert}</span>
-                                  ))}
-                                  {(pl.certificates.expiring_soon as { cert_type: string; valid_until: string }[]).map((cert, i: number) => (
-                                    <span key={`cert-exp-${i}`} className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">{cert.cert_type} går ut {cert.valid_until}</span>
-                                  ))}
-                                </div>
-                              ) : null}
-                              {pl.alternatives && (pl.alternatives as any[]).length > 0 && (
-                                <p className="text-[10px] text-gray-400">Alternativ: {(pl.alternatives as any[]).map((a: any) => a.name).join(', ')}</p>
-                              )}
+                              <DispatchReasoning
+                                reasons={pl.reasons}
+                                alternatives={pl.alternatives}
+                                week_utilization_pct={pl.week_utilization_pct}
+                                certificates={pl.certificates}
+                              />
                             </div>
                           )
                         })()}

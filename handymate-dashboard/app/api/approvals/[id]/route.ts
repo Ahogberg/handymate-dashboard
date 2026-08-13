@@ -1019,14 +1019,29 @@ async function executeApprovalPayload(
         const ctxType = plDispatch.context_type
         const ctxId = plDispatch.context_id
 
+        // "Visa varför"-utrullning, Fall 4 (docs/design/SYNLIG-INTELLIGENS.md,
+        // 2026-08-13): sparar ÖGONBLICKSBESLUTET — vem som var bäst lämpad
+        // NÄR tilldelningen gjordes. Kan inte räknas om senare (poäng/
+        // tillgänglighet ändras), måste alltså sparas här, inte härledas
+        // live som Guardian gör. v130_dispatch_reasoning.sql.
+        const dispatchReasoning = {
+          reasons: plDispatch.reasons,
+          score: plDispatch.score,
+          alternatives: plDispatch.alternatives,
+          week_utilization_pct: plDispatch.week_utilization_pct,
+          certificates: plDispatch.certificates,
+        }
+
         if (ctxType === 'booking' && ctxId) {
           await supabaseDispatch.from('booking').update({
             assigned_to: memberName,
             assigned_user_id: memberId,
+            dispatch_reasoning: dispatchReasoning,
           }).eq('booking_id', ctxId)
         } else if (ctxType === 'work_order' && ctxId) {
           await supabaseDispatch.from('work_orders').update({
             assigned_to: memberName,
+            dispatch_reasoning: dispatchReasoning,
           }).eq('id', ctxId)
         }
 
