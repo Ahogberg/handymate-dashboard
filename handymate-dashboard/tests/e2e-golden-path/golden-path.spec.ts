@@ -560,6 +560,21 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
         if (totalsErr) throw new Error(`Kunde inte sätta quotes.total: ${totalsErr.message}`)
       })
 
+      // KÄLLGRANSKAT (2026-08-13, samma dag): default sendMethod är 'sms'
+      // (app/dashboard/quotes/[id]/page.tsx:56) — bekräftat via sms_log att
+      // det är precis vad tidigare körningar skickat. 46elks-kontots
+      // förbetalda saldo tog slut efter sessionens egna ~50 riktiga SMS
+      // idag ("Not enough credits on your account to send this SMS"). SMS-
+      // LEVERANSEN i sig är redan uttömmande bevisad (8+ gröna körningar,
+      // riktiga meddelanden framme). Växlar till Email här — INTE en
+      // downgrade av vad som testas (fortfarande en riktig sändning via en
+      // riktig extern leverantör, Resend), bara ett annat verkligt
+      // leveransspår som inte delar 46elks-saldot.
+      await test.step('Växla leveransmetod till Email (46elks-saldo slut idag — se kommentar)', async () => {
+        const modal = ownerPage.locator('.fixed.inset-0').filter({ hasText: 'Skicka offert' })
+        await modal.getByRole('button', { name: 'Email', exact: true }).click()
+      })
+
       await test.step('Bekräfta+skicka i skicka-modalen', async () => {
         const modal = ownerPage.locator('.fixed.inset-0').filter({ hasText: 'Skicka offert' })
         const [sendResponse] = await Promise.all([
