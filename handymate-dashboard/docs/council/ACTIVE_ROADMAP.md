@@ -17,6 +17,71 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-13 — Gyllene vägen grön (alla 14 stationer) + två externa ChatGPT-rapporter stämda av
+
+**Gyllene vägen är klar.** `tests/e2e-golden-path/` (byggt 2026-08-13) körde
+station 1-14 i EN sammanhängande, riktig webbläsarresa mot produktion — alla
+gröna, första gången i projektets historia (`docs/REALITY-WEEK.md`,
+`docs/reality-week/pass1-2026-08-13.md`). Åtta riktiga produktionsbuggar
+hittades och fixades under körningen (bl.a. `project.status` skrevs aldrig
+vid statusändring, `invoice.sent_at`/`sent_method` skrevs aldrig,
+`call_recording.recording_id` saknade default — hela röstanalysvägen hade
+aldrig kunnat slutföra en analys). Detta löser den här filens gamla NEXT
+ACTION-punkt 1 ("Kör och dokumentera pilotens gyllene väg") — se
+uppdaterad lista längst ner.
+
+**Två nya externa dokument** landade i repot 2026-08-12/13 (git-identitet
+"Ahogberg", ChatGPT/Codex-genererade, repo-ROTEN `docs/roadmap/` och
+`docs/strategy/` — inte den nästlade appmappens `docs/`): `POST_REALITY_
+LAUNCH_VALUE_WAVE.md` (8 idéer, uttryckligen gated "efter Reality Week är
+grön" — precis det läge vi nu är i) och `BUSINESS_TWIN_VISION.md` +
+`BUSINESS_TWIN_IDEA_BACKLOG.md` (ett större arkitekturramverk + 10 idéer).
+Samma "stäm av mot koden innan bygge"-disciplin som 2026-08-10-rapporten
+nedan, med samma metod (läs dokumenten, verifiera varje påstående mot
+faktiska filer, inte gissa).
+
+**Domen: en majoritet av topplistans förslag är redan byggda eller
+delvis byggda, oberoende, av Andreas mellan 2026-08-11 och idag —
+dokumenten skrevs innan de landade.**
+
+| Förslag (källa) | Dom |
+|---|---|
+| Första 30 minuterna/Company Scan (POST_REALITY #1) | **Byggd.** `components/tour/CompanyScan.tsx` + `app/api/onboarding/company-scan/route.ts`, matchar exemplet i rapporten nästan ordagrant. |
+| Weekly Owner Report (POST_REALITY #5) | **Delvis.** Måndagsmötet (`lib/jarvis/monday-brief.ts`+`mandagsmote.ts`, byggt 2026-08-13) har 4 sektioner (Resultat/Lärdomar/Risker/Förtroende) mot rapportens föreslagna 5 — saknar egna Projekt- och Sälj-sektioner samt per-agent-aktivitetsbrytning. |
+| Agent Presence Everywhere (POST_REALITY #2) | **Delvis.** Global "Moments"-overlay (`components/moments/`) täcker UX-principerna (en i taget, prioriterad, avvisbar) som EN flytande overlay — men offert-/kund-/faktura-sidorna saknar helt inbäddad agent-copy PÅ sidan själv, vilket är vad förslaget faktiskt vill ha. |
+| Explainability "Varför vet Handymate det?" (POST_REALITY #3) | **Delvis.** `customer_fact.evidence_quote` visas redan (kundsidan, alltid synlig kursiv text) — men som en fast bildtext, inte förslagets expanderbara "Varför?"-reveal. `decision_record` finns bara i backend-payloaden, ingen UI läser den. |
+| Distributed Value Receipts (POST_REALITY #4) | **Inte byggd.** Bara den samlade månadsvisa Värdekvitto-vyn finns. Efter ett godkännande är feedbacken generisk ("Godkänt", "SMS skickat!") utan kronbelopp (`app/dashboard/approvals/page.tsx`). |
+| Mobil "Säg det en gång" (POST_REALITY #6) | **Delvis, dold kapacitet.** `app/api/voice/process/route.ts` gör REDAN exakt detta (en inspelning → flera strukturerade förslag med typ+confidence) — men har INGEN anropare i det här repot, dokumenterad död kod sedan `docs/audits/ROSTVAGAR_KARTLAGGNING_2026-08-08.md`. Mobilappens repo (separat, ej granskat härifrån) kan möjligen redan anropa den. |
+| Project Closeout Magic (POST_REALITY #7) | **Delvis.** Hela backend-kedjan (autoInvoiceOnComplete/freezeProjectOutcome/skapaDebriefKort) körs redan korrekt vid stängning (bevisat idag, Golden Path Station 11) — men ingen visuell sammanfattningsskärm finns, bara ett debriefkort som dyker upp senare i kön. |
+| Next Best Action Engine (BUSINESS_TWIN #1) | **Inte byggd.** Godkännandekön sorteras bara på `created_at` (`app/api/approvals/route.ts:47`), ingen impact/risk-ranking. |
+| One Decision → Whole Company (BUSINESS_TWIN #2) | **Delvis.** `lib/autopilot/trigger.ts` fläktar redan ut EN händelse (offert accepterad) till flera bundlade åtgärder med ett "Godkänn allt"-läge (`autopilot_package`) — men bara för DEN triggern. Fritextyttranden i agent-loopen ger fortfarande separata kort per verktygsanrop. |
+| Owner-by-Exception (BUSINESS_TWIN #3) | **Delvis.** Dygnsdigest + Måndagsmötet täcker "vad hände"-halvan; Earned Autonomy täcker bara 4 hårdkodade åtgärdstyper — långt ifrån den självständiga volym förslaget beskriver. |
+| Business Simulation (BUSINESS_TWIN #4) | **Inte byggd.** Noll träffar på simulation/scenario/forecast i `lib/`. |
+| AI Leadership Meeting/Company Pulse (BUSINESS_TWIN #5) | **Delvis.** Måndagsmötet är EN enhetlig sammanfattning, inte per-agent-röster ("Karin säger X, Lars säger Y") som förslaget vill ha. Ingen Firmapuls-poäng finns alls. |
+| Autonomous Recovery (BUSINESS_TWIN #6) | **Delvis.** Value Ledger har 4 av de 7 föreslagna livscykelstegen (Identifierat→Agerat→Fakturerat→Betalt); saknar egna "Verifierad" och "Levererad" som distinkta, spårade steg. |
+| Firm-specific Operating Model/Playbook (BUSINESS_TWIN #7) | **Inte byggd — bekräftat data-gated.** Matchar next-moat-wave steg 6. `MIN_SAMPLE_SIZE=3` i `lib/profitability.ts`; `project_lesson` har **0 rader totalt** i produktion just nu. |
+| Owner Absence Mode (BUSINESS_TWIN #8) | **Inte byggd.** Earned Autonomy är permanent per nyckel — inget tidsboxat "borta till måndag"-läge existerar. |
+| Business State/Project Reality-modell (BUSINESS_TWIN #9) | **Delvis.** Byggstenarna finns (project.status, Margin Guardian, ProjectEconomicsCard, FramdriftCard) men renderas separat sida vid sida — ingen sammanhållen härledd typ. Samma "vänta på andra konsument"-princip som redan gäller i den här filens Operating Principles §5 talar för att INTE bygga detta i förtid. |
+
+**Distillerad "genuint nytt, billigast först"-lista** (ingen är beslutad
+— presenterad för Andreas 2026-08-13, väntar på hans val):
+1. Koppla in `voice/process` (mobil "Säg det en gång") — backend klar, bara oanvänd.
+2. Distributed Value Receipts — värde-rama de generiska godkännande-texterna.
+3. Project Closeout Magic — presentationslager ovanpå redan bevisad backend.
+4. Explainability-reveal — UI-affordans ovanpå redan existerande `evidence_quote`/`source_text`/`decision_record`.
+5. Allt annat i tabellen ovan är antingen data-gated (Playbook), medvetet uppskjutet enligt redan existerande principer i den här filen (Business State), eller för stort för fönstret fram till frysningen.
+
+**Separat, icke-"innovation"-spår som fortfarande är öppet:**
+- **B8 Stripe LIVE-växlingen** — ren ops, noll kod, körbok klar (`tasks/b8-live-vaxling.md`). Förutsättningarna B7 ✅ och Gyllene vägen ✅ är nu uppfyllda. STOPP-provet och tvåtenantprovet har oklar status (se nedan).
+- **C2/Google-verifiering** — Andreas egen inlämning till Googles Verification Center (`docs/PRODUCTION_SETUP.md` §4); kodfixarna som en gång hörde ihop med utredningen är redan LIVE.
+- **STOPP-provet** — refereras som en namngiven grind på flera ställen men **ingen skriven testprocedur hittades**; mekaniken finns i kod (`sql/v86_customer_optout.sql`). Kräver riktiga SMS — blockerat av att 46elks-kontots saldo tog slut under dagens Golden Path-körning.
+- **sql/v123_kundrost_customer_first_name.sql** + **sql/demo_seed_internal_cost.sql** — båda skrivna, ingen körd. Den senare är varför Golden Path Station 7:s Guardian-bevis hoppades över i varje körning idag.
+
+**Ingen grind ändras av detta.** Samma disciplin som 2026-08-10: absorbera
+det som är billigt och verkligt nytt, avvisa eller skjut upp resten.
+
+---
+
 # Extern rapport 2026-08-10 — absorberat / avvisat / fanns redan
 
 En extern roadmap-rapport (ChatGPT med repo-tillgång) granskades 2026-08-10 mot detta
@@ -696,8 +761,16 @@ Tre tal som aldrig slås ihop: **identifierad ≠ fakturerad ≠ betald.**
 ---
 
 ```text
-NEXT ACTION (uppdaterad 2026-08-09):
-1. Kör och dokumentera pilotens gyllene väg i ett separat testföretag.
+NEXT ACTION (uppdaterad 2026-08-09, punkt 1 stängd 2026-08-13 — se
+"Läge 2026-08-13"-sektionen längst upp för fullständig status och vad
+som föreslås härnäst):
+1. [KLAR 2026-08-13] Gyllene vägen körd och dokumenterad — men INTE i ett
+   separat testföretag som ursprungligen tänkt, utan via ett automatiserat
+   webbläsar-harness (tests/e2e-golden-path/) mot demokontot i produktion.
+   Alla 14 stationer gröna. Åtta produktionsbuggar hittade+fixade under
+   körningen. STOPP-provet (nämnt i punkt 4 nedan som B8:s andra grind)
+   är INTE samma sak som gyllene vägen och är fortfarande okört — se
+   2026-08-13-sektionen.
 2. Res den disponibla tvåtenantmiljön (sql/testbed_tenant_isolation.sql i ett
    nytt gratis Supabase-projekt) och kör npm run test:tenant-isolation.
 3. [KLAR 2026-08-09] X1a: konservativt klassningskontrakt, falska
