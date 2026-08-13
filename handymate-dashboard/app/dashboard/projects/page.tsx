@@ -24,6 +24,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import Link from 'next/link'
 import { JobTypeBadge, type JobTypeMeta } from './components/JobTypeBadge'
+import { ProjectDeleteConfirmModal } from '@/components/projects/ProjectDeleteConfirmModal'
 
 interface Project {
   project_id: string
@@ -72,6 +73,8 @@ export default function ProjectsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [creating, setCreating] = useState(false)
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const [newProject, setNewProject] = useState({
     name: '',
@@ -228,27 +231,29 @@ export default function ProjectsPage() {
   }
 
   async function handleDeleteProject(projectId: string) {
-    if (!confirm('Är du säker på att du vill ta bort detta projekt?')) return
-
+    setDeleting(true)
     try {
       const response = await fetch(`/api/projects?projectId=${projectId}`, { method: 'DELETE' })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Kunde inte ta bort')
       showToast('Projekt borttaget', 'success')
+      setDeleteTarget(null)
       fetchProjects()
     } catch (error: any) {
       showToast(error.message || 'Något gick fel', 'error')
+    } finally {
+      setDeleting(false)
     }
   }
 
   const getStatusStyle = (status: string) => {
     switch (status) {
-      case 'planning': return 'bg-gray-100 text-gray-500 border-gray-300'
+      case 'planning': return 'bg-slate-100 text-slate-500 border-slate-300'
       case 'active': return 'bg-primary-100 text-primary-600 border-primary-600/30'
       case 'paused': return 'bg-amber-100 text-amber-600 border-amber-200'
       case 'completed': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
       case 'cancelled': return 'bg-red-100 text-red-600 border-red-200'
-      default: return 'bg-gray-100 text-gray-500 border-gray-300'
+      default: return 'bg-slate-100 text-slate-500 border-slate-300'
     }
   }
 
@@ -269,20 +274,24 @@ export default function ProjectsPage() {
    * väntar. Saknas lifecycle (cachat svar från före deployen) faller raden
    * tillbaka på gamla statusbadgen.
    */
+  // Fyra semantiska lägen, inte nio nyanser (redesign 2026-08-14): slate =
+  // ej igång, teal = pågår, amber = kräver handling, emerald = klart/betalt.
+  // 'fakturerat' delar emerald med 'betalt' — båda är "pengarna är i rörelse
+  // eller hemma", ingen anledning till en egen sky-nyans mellan dem.
   const getLifecycleStyle = (phase: string, needsAction: boolean) => {
     if (needsAction) return 'bg-amber-100 text-amber-700 border-amber-300 font-medium'
     switch (phase) {
-      case 'planering': return 'bg-gray-100 text-gray-500 border-gray-300'
+      case 'planering': return 'bg-slate-100 text-slate-500 border-slate-300'
       case 'pagar': return 'bg-primary-100 text-primary-600 border-primary-600/30'
-      case 'fakturerat': return 'bg-sky-100 text-sky-600 border-sky-200'
+      case 'fakturerat': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
       case 'betalt': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
       case 'avbrutet': return 'bg-red-100 text-red-600 border-red-200'
-      default: return 'bg-gray-100 text-gray-500 border-gray-300'
+      default: return 'bg-slate-100 text-slate-500 border-slate-300'
     }
   }
 
   const getBudgetColor = (actual: number, budget: number) => {
-    if (!budget || budget === 0) return 'text-gray-500'
+    if (!budget || budget === 0) return 'text-slate-500'
     const usage = (actual / budget) * 100
     if (usage > 100) return 'text-red-600'
     if (usage > 80) return 'text-amber-600'
@@ -290,7 +299,7 @@ export default function ProjectsPage() {
   }
 
   const getBudgetBarColor = (actual: number, budget: number) => {
-    if (!budget || budget === 0) return 'bg-gray-300'
+    if (!budget || budget === 0) return 'bg-slate-300'
     const usage = (actual / budget) * 100
     if (usage > 100) return 'bg-red-500'
     if (usage > 80) return 'bg-amber-500'
@@ -331,11 +340,6 @@ export default function ProjectsPage() {
 
   return (
     <div className="p-8 bg-[#F8FAFC] min-h-screen">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
-      </div>
-
       {toast.show && (
         <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl border ${
           toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
@@ -460,21 +464,21 @@ export default function ProjectsPage() {
         <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 text-secondary-700 animate-spin" />
+              <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
             </div>
           ) : filteredProjects.length === 0 ? (
             <div className="text-center py-20">
-              <FolderKanban className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500 mb-2">Inga projekt ännu</p>
-              <p className="text-sm text-gray-400">Skapa ett projekt eller konvertera en accepterad offert</p>
+              <FolderKanban className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500 mb-2">Inga projekt ännu</p>
+              <p className="text-sm text-slate-400">Skapa ett projekt eller konvertera en accepterad offert</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-slate-200">
               {filteredProjects.map(project => (
                 <Link
                   key={project.project_id}
                   href={`/dashboard/projects/${project.project_id}`}
-                  className="group block p-5 hover:bg-gray-100/30 transition-all"
+                  className="group block p-5 hover:bg-slate-100/30 transition-all"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
@@ -482,9 +486,9 @@ export default function ProjectsPage() {
                         {/* Bara riktiga projektnummer — ett rått id-fragment
                             (P-877e3f) är tekniskt läckage, inte information. */}
                         {project.project_number && (
-                          <span className="text-xs font-mono text-gray-400 flex-shrink-0">{project.project_number}</span>
+                          <span className="text-xs font-mono text-slate-400 flex-shrink-0">{project.project_number}</span>
                         )}
-                        <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
+                        <h3 className="font-semibold text-slate-900 truncate">{project.name}</h3>
                         <JobTypeBadge slug={project.job_type} jobTypes={jobTypes} />
                         {project.lifecycle ? (
                           <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${getLifecycleStyle(project.lifecycle.phase, project.lifecycle.needsAction)}`}>
@@ -513,7 +517,7 @@ export default function ProjectsPage() {
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-400">
+                      <div className="flex items-center gap-4 text-sm text-slate-500">
                         {/* Avatar stack */}
                         {projectAssignments[project.project_id]?.length > 0 && (
                           <div className="flex -space-x-1.5">
@@ -564,63 +568,75 @@ export default function ProjectsPage() {
                            plus det offererade räcker — staplarna kommer när
                            det finns något att rita. */
                         <div className="text-right">
-                          <span className="block text-sm font-medium text-gray-500">Inte påbörjat</span>
+                          <span className="block text-sm font-medium text-slate-500">Inte påbörjat</span>
                           {project.budget_amount ? (
-                            <span className="block text-xs text-gray-400">
+                            <span className="block text-xs text-slate-400">
                               offererat {Math.round(project.budget_amount).toLocaleString('sv-SE')} kr <span className="text-[10px]">exkl. moms</span>
                             </span>
                           ) : project.budget_hours ? (
-                            <span className="block text-xs text-gray-400">{project.budget_hours} tim budgeterat</span>
+                            <span className="block text-xs text-slate-400">{project.budget_hours} tim budgeterat</span>
                           ) : null}
                         </div>
                       ) : (
-                        <>
-                          {/* Budget */}
-                          {project.budget_hours ? (
-                            <div className="text-right min-w-[120px]">
+                        /* En stapel — den som faktiskt begränsar jobbet —
+                           inte tre som säger samma sak tre gånger (redesign
+                           2026-08-14). Löpande/blandade projekt begränsas av
+                           timmarna, fastprisprojekt av kronorna; resten blir
+                           läsbar brödtext under stapeln i stället för en till
+                           mätare. */
+                        <div className="text-right min-w-[150px]">
+                          {project.project_type !== 'fixed_price' && project.budget_hours ? (
+                            <>
                               <div className="flex items-center gap-1 justify-end mb-1">
-                                <Clock className="w-3 h-3 text-gray-400" />
+                                <Clock className="w-3 h-3 text-slate-400" />
                                 <span className={`text-sm font-medium ${getBudgetColor(project.actual_hours, project.budget_hours)}`}>
                                   {project.actual_hours}/{project.budget_hours} tim
                                 </span>
                               </div>
-                              <div className="h-1.5 bg-gray-100 rounded-full w-24 ml-auto">
+                              <div className="h-1.5 bg-slate-100 rounded-full w-full ml-auto">
                                 <div
                                   className={`h-full rounded-full transition-all ${getBudgetBarColor(project.actual_hours, project.budget_hours)}`}
                                   style={{ width: `${Math.min(100, (project.actual_hours / project.budget_hours) * 100)}%` }}
                                 />
                               </div>
-                            </div>
-                          ) : null}
-
-                          {project.budget_amount ? (
-                            <div className="text-right min-w-[130px] hidden md:block">
+                              <p className="mt-1.5 text-xs text-slate-500 tabular-nums">
+                                {project.budget_amount ? (
+                                  <>
+                                    <b className="text-slate-700 font-semibold">{Math.round(project.actual_amount).toLocaleString('sv-SE')} kr</b> av {Math.round(project.budget_amount).toLocaleString('sv-SE')} kr
+                                    <br />
+                                  </>
+                                ) : null}
+                                {project.progress_percent}% färdigt
+                              </p>
+                            </>
+                          ) : project.budget_amount ? (
+                            <>
                               <div className="flex items-center gap-1 justify-end mb-1">
-                                <DollarSign className="w-3 h-3 text-gray-400" />
+                                <DollarSign className="w-3 h-3 text-slate-400" />
                                 <span className={`text-sm font-medium ${getBudgetColor(project.actual_amount, project.budget_amount)}`}>
-                                  {Math.round(project.actual_amount).toLocaleString('sv-SE')} / {Math.round(project.budget_amount).toLocaleString('sv-SE')} kr <span className="text-[10px] text-gray-400 font-normal">exkl. moms</span>
+                                  {Math.round(project.actual_amount).toLocaleString('sv-SE')}/{Math.round(project.budget_amount).toLocaleString('sv-SE')} kr
                                 </span>
                               </div>
-                              <div className="h-1.5 bg-gray-100 rounded-full w-28 ml-auto">
+                              <div className="h-1.5 bg-slate-100 rounded-full w-full ml-auto">
                                 <div
                                   className={`h-full rounded-full transition-all ${getBudgetBarColor(project.actual_amount, project.budget_amount)}`}
                                   style={{ width: `${Math.min(100, (project.actual_amount / project.budget_amount) * 100)}%` }}
                                 />
                               </div>
-                            </div>
-                          ) : null}
-
-                          {/* Progress */}
-                          <div className="text-right min-w-[60px]">
-                            <span className="text-sm font-medium text-gray-900">{project.progress_percent}%</span>
-                            <div className="h-1.5 bg-gray-100 rounded-full w-14 ml-auto mt-1">
-                              <div
-                                className="h-full rounded-full bg-primary-700 transition-all"
-                                style={{ width: `${project.progress_percent}%` }}
-                              />
-                            </div>
-                          </div>
-                        </>
+                              <p className="mt-1.5 text-xs text-slate-500">{project.progress_percent}% färdigt</p>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-sm font-medium text-slate-900">{project.progress_percent}%</span>
+                              <div className="h-1.5 bg-slate-100 rounded-full w-full ml-auto mt-1">
+                                <div
+                                  className="h-full rounded-full bg-primary-700 transition-all"
+                                  style={{ width: `${project.progress_percent}%` }}
+                                />
+                              </div>
+                            </>
+                          )}
+                        </div>
                       )}
 
                       {/* Radering — destruktiv åtgärd, inte blickfång. Syns
@@ -628,10 +644,10 @@ export default function ProjectsPage() {
                           och bara på oskrivna planeringsprojekt. */}
                       {project.status === 'planning' && project.actual_hours === 0 && (
                         <button
-                          onClick={(e) => { e.preventDefault(); handleDeleteProject(project.project_id) }}
+                          onClick={(e) => { e.preventDefault(); setDeleteTarget({ id: project.project_id, name: project.name }) }}
                           aria-label="Ta bort projektet"
                           title="Ta bort projektet"
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -648,32 +664,32 @@ export default function ProjectsPage() {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#E2E8F0] rounded-[14px] p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Nytt projekt</h3>
-              <button onClick={() => { setShowCreateModal(false); setPendingFiles([]) }} className="text-gray-400 hover:text-gray-900">
+              <h3 className="font-heading text-lg font-bold text-slate-900 tracking-[-0.02em]">Nytt projekt</h3>
+              <button onClick={() => { setShowCreateModal(false); setPendingFiles([]) }} className="text-slate-400 hover:text-slate-900">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-500 mb-2">Projektnamn *</label>
+                <label className="block text-xs font-semibold text-slate-800 mb-2">Projektnamn *</label>
                 <input
                   type="text"
                   value={newProject.name}
                   onChange={e => setNewProject({ ...newProject, name: e.target.value })}
                   placeholder="T.ex. Badrumsrenovering Svensson"
-                  className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
+                  className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-[10px] text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-gray-500 mb-2">Kund</label>
+                <label className="block text-xs font-semibold text-slate-800 mb-2">Kund</label>
                 <select
                   value={newProject.customer_id}
                   onChange={e => setNewProject({ ...newProject, customer_id: e.target.value })}
-                  className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
+                  className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-[10px] text-slate-900 focus:outline-none focus:border-[#0F766E]"
                 >
                   <option value="">Välj kund...</option>
                   {customers.map(c => <option key={c.customer_id} value={c.customer_id}>{c.name}</option>)}
@@ -681,11 +697,11 @@ export default function ProjectsPage() {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-500 mb-2">Projekttyp</label>
+                <label className="block text-xs font-semibold text-slate-800 mb-2">Projekttyp</label>
                 <select
                   value={newProject.project_type}
                   onChange={e => setNewProject({ ...newProject, project_type: e.target.value })}
-                  className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
+                  className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-[10px] text-slate-900 focus:outline-none focus:border-[#0F766E]"
                 >
                   <option value="hourly">Löpande räkning</option>
                   <option value="fixed_price">Fast pris</option>
@@ -695,13 +711,13 @@ export default function ProjectsPage() {
 
               {/* Jobbtyp — branschtagg som visas som färgad badge på projekt-listan */}
               <div>
-                <label className="block text-sm text-gray-500 mb-2">
-                  Jobbtyp <span className="text-xs text-gray-400 font-normal">(valfri)</span>
+                <label className="block text-xs font-semibold text-slate-800 mb-2">
+                  Jobbtyp <span className="text-xs text-slate-400 font-normal">(valfri)</span>
                 </label>
                 {jobTypes.length === 0 ? (
                   <Link
                     href="/dashboard/settings/job-types"
-                    className="block px-4 py-3 bg-gray-50 border border-dashed border-[#E2E8F0] rounded-lg text-sm text-gray-500 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+                    className="block px-4 py-3 bg-slate-50 border border-dashed border-[#E2E8F0] rounded-[10px] text-sm text-slate-500 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 transition-colors"
                   >
                     + Lägg till jobbtyper i Inställningar
                   </Link>
@@ -742,44 +758,44 @@ export default function ProjectsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-2">Budget timmar</label>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">Budget timmar</label>
                   <input
                     type="number"
                     value={newProject.budget_hours}
                     onChange={e => setNewProject({ ...newProject, budget_hours: e.target.value })}
                     placeholder="0"
-                    className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
+                    className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-[10px] text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-2">Budget belopp (kr exkl. moms)</label>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">Budget belopp (kr exkl. moms)</label>
                   <input
                     type="number"
                     value={newProject.budget_amount}
                     onChange={e => setNewProject({ ...newProject, budget_amount: e.target.value })}
                     placeholder="0"
-                    className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
+                    className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-[10px] text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-2">Startdatum</label>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">Startdatum</label>
                   <input
                     type="date"
                     value={newProject.start_date}
                     onChange={e => setNewProject({ ...newProject, start_date: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
+                    className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-[10px] text-slate-900 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-2">Slutdatum</label>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">Slutdatum</label>
                   <input
                     type="date"
                     value={newProject.end_date}
                     onChange={e => setNewProject({ ...newProject, end_date: e.target.value })}
-                    className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
+                    className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-[10px] text-slate-900 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
               </div>
@@ -787,10 +803,10 @@ export default function ProjectsPage() {
               {/* Teammedlemmar */}
               {teamMembers.length > 0 && (
                 <div>
-                  <label className="block text-sm text-gray-500 mb-2">Utförare</label>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">Utförare</label>
                   <div className="space-y-1.5 max-h-32 overflow-y-auto">
                     {teamMembers.map(member => (
-                      <label key={member.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-[#E2E8F0] cursor-pointer hover:bg-gray-100 transition">
+                      <label key={member.id} className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-[10px] border border-[#E2E8F0] cursor-pointer hover:bg-slate-100 transition">
                         <input
                           type="checkbox"
                           checked={selectedTeam.includes(member.id)}
@@ -798,10 +814,10 @@ export default function ProjectsPage() {
                             if (e.target.checked) setSelectedTeam(prev => [...prev, member.id])
                             else setSelectedTeam(prev => prev.filter(id => id !== member.id))
                           }}
-                          className="w-4 h-4 rounded border-gray-300 text-primary-700 focus:ring-primary-600"
+                          className="w-4 h-4 rounded border-slate-300 text-primary-700 focus:ring-primary-600"
                         />
-                        <span className="text-sm text-gray-700">{member.name}</span>
-                        <span className="text-xs text-gray-400 ml-auto">{member.role === 'owner' ? 'Ägare' : member.role === 'admin' ? 'Admin' : 'Anställd'}</span>
+                        <span className="text-sm text-slate-700">{member.name}</span>
+                        <span className="text-xs text-slate-400 ml-auto">{member.role === 'owner' ? 'Ägare' : member.role === 'admin' ? 'Admin' : 'Anställd'}</span>
                       </label>
                     ))}
                   </div>
@@ -810,8 +826,8 @@ export default function ProjectsPage() {
 
               {/* Dokument */}
               <div>
-                <label className="block text-sm text-gray-500 mb-2">Dokument</label>
-                <label className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 cursor-pointer hover:border-primary-500 hover:text-primary-700 transition">
+                <label className="block text-xs font-semibold text-slate-800 mb-2">Dokument</label>
+                <label className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 border-2 border-dashed border-slate-300 rounded-[10px] text-slate-500 cursor-pointer hover:border-primary-500 hover:text-primary-700 transition">
                   <Upload className="w-4 h-4" />
                   <span className="text-sm">Välj filer att bifoga...</span>
                   <input
@@ -829,14 +845,14 @@ export default function ProjectsPage() {
                 {pendingFiles.length > 0 && (
                   <div className="mt-2 space-y-1.5">
                     {pendingFiles.map((file, idx) => (
-                      <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-[#E2E8F0]">
-                        <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        <span className="text-sm text-gray-700 truncate flex-1">{file.name}</span>
-                        <span className="text-xs text-gray-400 flex-shrink-0">{(file.size / 1024).toFixed(0)} KB</span>
+                      <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-[10px] border border-[#E2E8F0]">
+                        <FileText className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        <span className="text-sm text-slate-700 truncate flex-1">{file.name}</span>
+                        <span className="text-xs text-slate-400 flex-shrink-0">{(file.size / 1024).toFixed(0)} KB</span>
                         <button
                           type="button"
                           onClick={() => setPendingFiles(prev => prev.filter((_, i) => i !== idx))}
-                          className="p-0.5 text-gray-400 hover:text-red-500 transition"
+                          className="p-0.5 text-slate-400 hover:text-red-500 transition"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -850,14 +866,14 @@ export default function ProjectsPage() {
                 <button
                   onClick={handleCreateProject}
                   disabled={creating || !newProject.name.trim()}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-b from-primary-600 to-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 shadow-brand"
                 >
                   {creating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
                   {creating && pendingFiles.length > 0 ? 'Skapar & laddar upp...' : 'Skapa projekt'}
                 </button>
                 <button
                   onClick={() => { setShowCreateModal(false); setPendingFiles([]) }}
-                  className="px-6 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-500 hover:text-gray-900"
+                  className="px-6 py-3 bg-white border border-[#E2E8F0] rounded-xl text-slate-500 hover:text-slate-900"
                 >
                   Avbryt
                 </button>
@@ -866,6 +882,14 @@ export default function ProjectsPage() {
           </div>
         </div>
       )}
+
+      <ProjectDeleteConfirmModal
+        show={deleteTarget !== null}
+        projectName={deleteTarget?.name || ''}
+        deleting={deleting}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && handleDeleteProject(deleteTarget.id)}
+      />
     </div>
   )
 }

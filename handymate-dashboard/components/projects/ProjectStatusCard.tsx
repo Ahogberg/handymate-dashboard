@@ -95,9 +95,9 @@ export function ProjectStatusCard({
     <div className={`bg-white border rounded-xl p-4 sm:p-5 ${overBudget ? 'border-red-200' : 'border-[#E2E8F0]'}`}>
       {/* Rubrikrad */}
       <div className="flex items-center justify-between gap-2 mb-4">
-        <h2 className="text-[15px] font-semibold text-gray-900">Hur ligger vi till?</h2>
+        <h2 className="text-[15px] font-semibold text-slate-900">Hur ligger vi till?</h2>
         {chip && (
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 whitespace-nowrap">
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 whitespace-nowrap">
             {chip}
           </span>
         )}
@@ -125,7 +125,7 @@ export function ProjectStatusCard({
                         ? isGreenActive
                           ? 'bg-white ring-2 ring-emerald-500'
                           : 'bg-white ring-2 ring-primary-600'
-                        : 'bg-gray-100'
+                        : 'bg-slate-100'
                   }`}
                 >
                   {status === 'done' ? (
@@ -133,7 +133,7 @@ export function ProjectStatusCard({
                   ) : status === 'current' ? (
                     <span className={`w-2 h-2 rounded-full ${isGreenActive ? 'bg-emerald-500' : 'bg-primary-600'}`} />
                   ) : (
-                    <span className="w-2 h-2 rounded-full bg-gray-300" />
+                    <span className="w-2 h-2 rounded-full bg-slate-300" />
                   )}
                 </span>
                 <span
@@ -142,7 +142,7 @@ export function ProjectStatusCard({
                       ? 'text-primary-700'
                       : status === 'current'
                         ? isGreenActive ? 'text-emerald-600' : 'text-primary-700'
-                        : 'text-gray-400'
+                        : 'text-slate-400'
                   }`}
                 >
                   {f.label}
@@ -151,7 +151,7 @@ export function ProjectStatusCard({
               {i < FASER.length - 1 && (
                 <span
                   className={`h-0.5 flex-1 mx-1.5 -mt-4 rounded ${
-                    FAS_ORDER[f.key] < bucketPos ? 'bg-primary-700' : 'bg-gray-200'
+                    FAS_ORDER[f.key] < bucketPos ? 'bg-primary-700' : 'bg-slate-200'
                   }`}
                 />
               )}
@@ -162,15 +162,15 @@ export function ProjectStatusCard({
 
       {/* Ekonomistaplar + prognosrad — ägar-gating */}
       {canSeeFinancials && (
-        <div className="mt-5 pt-4 border-t border-gray-100">
+        <div className="mt-5 pt-4 border-t border-slate-100">
           {economicsLoading && !economics ? (
             <div className="h-16 flex items-center justify-center">
-              <span className="text-xs text-gray-400">Laddar ekonomi…</span>
+              <span className="text-xs text-slate-400">Laddar ekonomi…</span>
             </div>
           ) : economics ? (
             <EkonomiStaplar economics={economics} state={state!} />
           ) : (
-            <p className="text-xs text-gray-400">Kunde inte hämta ekonomi</p>
+            <p className="text-xs text-slate-400">Kunde inte hämta ekonomi</p>
           )}
         </div>
       )}
@@ -263,14 +263,14 @@ function EkonomiStaplar({ economics, state }: { economics: ProjectEconomics; sta
 
       <div className="flex items-center gap-2 pt-1">
         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotClass}`} />
-        <span className="text-xs font-medium text-gray-700">{prognosText}</span>
+        <span className="text-xs font-medium text-slate-700">{prognosText}</span>
       </div>
 
       {showRotRow && (
-        <p className="text-xs text-gray-500 pt-3 mt-1 border-t border-gray-100">
-          Varav arbete <span className="font-semibold text-gray-700">{formatSEK(rotWork!)}</span>{' '}
-          → {rotLabel}-avdrag <span className="font-semibold text-gray-700">{formatSEK(rotDeduction!)}</span>{' '}
-          · kunden betalar <span className="font-semibold text-gray-700">{formatSEK(rotCustomerPays!)}</span>
+        <p className="text-xs text-slate-500 pt-3 mt-1 border-t border-slate-100">
+          Varav arbete <span className="font-semibold text-slate-700">{formatSEK(rotWork!)}</span>{' '}
+          → {rotLabel}-avdrag <span className="font-semibold text-slate-700">{formatSEK(rotDeduction!)}</span>{' '}
+          · kunden betalar <span className="font-semibold text-slate-700">{formatSEK(rotCustomerPays!)}</span>
         </p>
       )}
     </div>
@@ -295,15 +295,15 @@ function Ebar({
   return (
     <div>
       <div className="flex items-baseline justify-between mb-1">
-        <span className="text-xs font-medium text-gray-500">{label}</span>
-        <span className={`text-sm font-bold tabular-nums ${valueClass || 'text-gray-900'}`}>
+        <span className="text-xs font-medium text-slate-500">{label}</span>
+        <span className={`text-sm font-bold tabular-nums ${valueClass || 'text-slate-900'}`}>
           {value == null ? '—' : formatSEK(value)}
         </span>
       </div>
-      <div className="h-2 bg-gray-100 rounded overflow-hidden">
+      <div className="h-2 bg-slate-100 rounded overflow-hidden">
         <div className={`h-full rounded transition-all ${barClass}`} style={{ width: `${Math.max(0, Math.min(pct, 100))}%` }} />
       </div>
-      {sub && <p className="text-[11px] text-gray-400 mt-1">{sub}</p>}
+      {sub && <p className="text-[11px] text-slate-400 mt-1">{sub}</p>}
     </div>
   )
 }

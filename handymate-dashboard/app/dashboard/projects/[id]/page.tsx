@@ -1826,7 +1826,7 @@ export default function ProjectDetailPage() {
   if (loading) {
     return (
       <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-secondary-700 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -2349,12 +2349,12 @@ export default function ProjectDetailPage() {
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-secondary-700" />
+                  <Users className="w-5 h-5 text-primary-700" />
                   Personal ({projectTeam.length})
                 </h2>
                 <button
                   onClick={() => setActiveTab('team')}
-                  className="text-sm text-secondary-700 hover:text-primary-700 flex items-center gap-1"
+                  className="text-sm text-primary-700 hover:text-primary-800 flex items-center gap-1"
                 >
                   Hantera <ChevronRight className="w-4 h-4" />
                 </button>
@@ -2399,7 +2399,7 @@ export default function ProjectDetailPage() {
                 onClick={() => openTimeModal()}
                 className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 transition-all text-center"
               >
-                <Timer className="w-5 h-5 text-secondary-700" />
+                <Timer className="w-5 h-5 text-primary-700" />
                 <span className="text-sm text-gray-700">Lägg till tid</span>
               </button>
               <button
@@ -2451,7 +2451,7 @@ export default function ProjectDetailPage() {
             {/* Schemalagt team — schedule_entry-baserad team-planering */}
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-secondary-700" />
+                <Calendar className="w-5 h-5 text-primary-700" />
                 Schemalagt team ({projectSchedule.length})
               </h2>
               <Link
@@ -2640,15 +2640,20 @@ export default function ProjectDetailPage() {
               <div className="space-y-3">
                 {changes.map(change => {
                   const isExpanded = expandedAtaId === change.change_id
+                  // Fyra semantiska lägen, inte nio nyanser (Projektytor-
+                  // redesign 2026-08-14): draft/gray→slate (ej igång),
+                  // sent/blue→teal (pågår, väntar på kund), invoiced/purple
+                  // →emerald (samma "pengarna är i rörelse eller hemma"-
+                  // semantik som getLifecycleStyle i projects/page.tsx).
                   const statusConfig: Record<string, { label: string; bg: string; text: string; border: string }> = {
-                    draft: { label: 'Utkast', bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-300' },
+                    draft: { label: 'Utkast', bg: 'bg-slate-100', text: 'text-slate-500', border: 'border-slate-300' },
                     pending: { label: 'Väntande', bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },
-                    sent: { label: 'Skickad', bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
+                    sent: { label: 'Skickad', bg: 'bg-primary-50', text: 'text-primary-700', border: 'border-primary-200' },
                     signed: { label: 'Signerad', bg: 'bg-primary-50', text: 'text-primary-700', border: 'border-primary-200' },
                     approved: { label: 'Godkänd', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
                     rejected: { label: 'Avslagen', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
                     declined: { label: 'Avböjd', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
-                    invoiced: { label: 'Fakturerad', bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' },
+                    invoiced: { label: 'Fakturerad', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
                   }
                   const sc = statusConfig[change.status] || statusConfig.draft
 
@@ -2750,7 +2755,7 @@ export default function ProjectDetailPage() {
                               <button
                                 onClick={() => sendAta(change.change_id)}
                                 disabled={sendingAtaId === change.change_id}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-sm font-medium hover:bg-blue-100 disabled:opacity-50 transition-all"
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 border border-primary-200 rounded-lg text-sm font-medium hover:bg-primary-100 disabled:opacity-50 transition-all"
                               >
                                 {sendingAtaId === change.change_id
                                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -3041,7 +3046,7 @@ export default function ProjectDetailPage() {
               <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-400">Inga tidrapporter annu</p>
-                <button onClick={() => openTimeModal()} className="text-sm text-secondary-700 hover:text-primary-700 mt-2 inline-block">
+                <button onClick={() => openTimeModal()} className="text-sm text-primary-700 hover:text-primary-800 mt-2 inline-block">
                   Lägg till din första tidrapport
                 </button>
               </div>
@@ -3068,7 +3073,7 @@ export default function ProjectDetailPage() {
                           <span className="text-sm text-gray-900">{formatDate(entry.work_date)}</span>
                           <div className="flex items-center gap-2">
                             {entry.work_type?.name && (
-                              <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-secondary-700 border border-[#E2E8F0]">
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-primary-700 border border-[#E2E8F0]">
                                 {entry.work_type.name}
                               </span>
                             )}
@@ -3097,7 +3102,7 @@ export default function ProjectDetailPage() {
                         <div className="col-span-2 text-sm text-gray-900 text-right font-medium tabular-nums">{formatCurrency(Math.round(total))}</div>
                         <div className="col-span-2 flex items-center justify-end gap-2">
                           {entry.work_type?.name && (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-secondary-700 border border-[#E2E8F0]">
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-primary-700 border border-[#E2E8F0]">
                               {entry.work_type.name}
                             </span>
                           )}
@@ -3322,7 +3327,7 @@ export default function ProjectDetailPage() {
                                   setEditingMaterial(mat.material_id)
                                   setEditValues({ quantity: mat.quantity, markup_percent: mat.markup_percent })
                                 }}
-                                className="p-1 text-gray-400 hover:text-secondary-700"
+                                className="p-1 text-gray-400 hover:text-primary-700"
                               >
                                 <Edit className="w-3.5 h-3.5" />
                               </button>
@@ -3357,7 +3362,7 @@ export default function ProjectDetailPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Users className="w-5 h-5 text-secondary-700" />
+                <Users className="w-5 h-5 text-primary-700" />
                 Tilldelade ({projectTeam.length})
               </h2>
               {can('see_all_projects') && (
@@ -3570,7 +3575,7 @@ export default function ProjectDetailPage() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-[15px] font-semibold text-gray-900">Malldokument</h3>
-                  <a href="/dashboard/documents" className="text-xs text-secondary-700 hover:text-primary-700">Alla dokument &rarr;</a>
+                  <a href="/dashboard/documents" className="text-xs text-primary-700 hover:text-primary-800">Alla dokument &rarr;</a>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {generatedDocs.map((gd: any) => (
@@ -3581,7 +3586,7 @@ export default function ProjectDetailPage() {
                     >
                       <div className="flex items-center gap-3 mb-2">
                         <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center">
-                          <FileText className="w-4 h-4 text-secondary-700" />
+                          <FileText className="w-4 h-4 text-primary-700" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{gd.title}</p>
@@ -3636,7 +3641,7 @@ export default function ProjectDetailPage() {
                     <div key={doc.id} className="bg-white rounded-xl border border-[#E2E8F0] p-4 hover:border-gray-300 transition">
                       <div className="flex items-start gap-3">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isImage ? 'bg-primary-600/20' : 'bg-primary-100'}`}>
-                          {isImage ? <Image className="w-5 h-5 text-primary-500" /> : <FileText className="w-5 h-5 text-secondary-700" />}
+                          {isImage ? <Image className="w-5 h-5 text-primary-500" /> : <FileText className="w-5 h-5 text-primary-700" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{doc.name}</p>
@@ -3648,7 +3653,7 @@ export default function ProjectDetailPage() {
                       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
                         <button
                           onClick={() => handleDocDownload(doc.id)}
-                          className="flex items-center gap-1 text-xs text-secondary-700 hover:text-primary-700"
+                          className="flex items-center gap-1 text-xs text-primary-700 hover:text-primary-800"
                         >
                           <Download className="w-3.5 h-3.5" /> Ladda ner
                         </button>
@@ -3776,7 +3781,7 @@ export default function ProjectDetailPage() {
                       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
                         <button
                           onClick={() => { setEditingLog(log); setShowLogModal(true) }}
-                          className="flex items-center gap-1 text-xs text-secondary-700 hover:text-primary-700"
+                          className="flex items-center gap-1 text-xs text-primary-700 hover:text-primary-800"
                         >
                           <Edit className="w-3.5 h-3.5" /> Redigera
                         </button>
@@ -3834,7 +3839,7 @@ export default function ProjectDetailPage() {
               <div className="space-y-4">
                 <button
                   onClick={() => setActiveChecklist(null)}
-                  className="flex items-center gap-1 text-sm text-secondary-700 hover:text-primary-700"
+                  className="flex items-center gap-1 text-sm text-primary-700 hover:text-primary-800"
                 >
                   <ArrowLeft className="w-4 h-4" /> Tillbaka till lista
                 </button>
@@ -3873,7 +3878,7 @@ export default function ProjectDetailPage() {
                           type="checkbox"
                           checked={item.checked || false}
                           onChange={() => handleToggleChecklistItem(activeChecklist.id, idx)}
-                          className="w-4 h-4 rounded border-gray-300 text-secondary-700 bg-gray-100 focus:ring-primary-600"
+                          className="w-4 h-4 rounded border-gray-300 text-primary-700 bg-gray-100 focus:ring-primary-600"
                         />
                         <span className={`text-sm ${item.checked ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
                           {item.text}
@@ -3989,7 +3994,7 @@ export default function ProjectDetailPage() {
                         </div>
                         <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-secondary-500 rounded-full transition-all"
+                            className="h-full bg-primary-500 rounded-full transition-all"
                             style={{ width: `${fs.progress?.percent || 0}%` }}
                           />
                         </div>
@@ -6021,7 +6026,7 @@ function FormCreateModal({ templates, onClose, onCreate }: {
               onClick={() => setSelectedTemplate(t)}
               className={`w-full p-4 rounded-xl text-left border transition ${
                 selectedTemplate?.id === t.id
-                  ? 'bg-secondary-50 border-primary-300 ring-1 ring-primary-300'
+                  ? 'bg-primary-50 border-primary-300 ring-1 ring-primary-300'
                   : 'bg-gray-50 border-gray-200 hover:border-gray-300'
               }`}
             >
@@ -6183,7 +6188,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
     <div className="space-y-4">
       <button
         onClick={onBack}
-        className="flex items-center gap-1 text-sm text-secondary-700 hover:text-primary-700"
+        className="flex items-center gap-1 text-sm text-primary-700 hover:text-primary-800"
       >
         <ArrowLeft className="w-4 h-4" /> Tillbaka till lista
       </button>
@@ -6211,7 +6216,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
               <span>{progressPercent}%</span>
             </div>
             <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-secondary-500 rounded-full transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+              <div className="h-full bg-primary-500 rounded-full transition-all duration-300" style={{ width: `${progressPercent}%` }} />
             </div>
           </div>
         )}
@@ -6374,7 +6379,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
                             const sigData = getSignatureData()
                             if (sigData) updateAnswer(field.id, 'signature_data', sigData)
                           }}
-                          className="text-xs text-primary-700 hover:text-secondary-700 ml-auto"
+                          className="text-xs text-primary-700 hover:text-primary-800 ml-auto"
                         >
                           Spara signatur
                         </button>
@@ -6461,7 +6466,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
         <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
           <button
             onClick={() => window.open(`/api/form-submissions/${submission.id}/pdf`, '_blank')}
-            className="flex items-center gap-1 text-xs text-secondary-700 hover:text-primary-700"
+            className="flex items-center gap-1 text-xs text-primary-700 hover:text-primary-800"
           >
             <Printer className="w-3.5 h-3.5" /> Exportera PDF
           </button>

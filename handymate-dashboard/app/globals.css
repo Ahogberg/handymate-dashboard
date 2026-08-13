@@ -78,17 +78,22 @@ h1, h2, h3, h4, h5, h6 {
   background: #5eead4; /* primary-300 */
 }
 
-/* Card elevation system */
+/* Card elevation system.
+   OBS (redesign 2026-08-14): denna klass har idag ingen faktisk användning
+   i app/ eller components/ — de flesta korten sätter border-[#E2E8F0] inline
+   istället. Färgen rättad ändå (samma slate-ton som resten av appen redan
+   använder inline) så klassen är korrekt om/när den börjar konsumeras,
+   men rättningen ändrar inget synligt just nu — flaggat i rapporten. */
 .card-base {
   background: white;
   border-radius: 0.75rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e2e8f0;
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.03);
 }
 
 .card-base:hover {
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  border-color: #d1d5db;
+  border-color: #cbd5e1;
 }
 
 .card-elevated {

@@ -43,6 +43,16 @@ const config: Config = {
           light: '#2a4a5a',
         },
       },
+      // Skuggtokens (saknades helt — ad hoc-skuggor spreds ut i varje
+      // komponent istället). `brand` matchar de nya knapp-CTA:erna i
+      // Projektytor-redesignen (2026-08-14).
+      boxShadow: {
+        xs: '0 1px 2px rgba(15,23,42,.04)',
+        sm: '0 2px 8px rgba(15,23,42,.05)',
+        md: '0 8px 24px rgba(15,23,42,.06)',
+        lg: '0 20px 40px rgba(15,23,42,.08)',
+        brand: '0 10px 25px -5px rgba(13,148,136,.25)',
+      },
       // Rörelse-tokens som Tailwind-klasser (2026-08-06) — samma värden som
       // CSS-variablerna i app/globals.css, så transitions och animationer
       // delar tempo oavsett vilken av de två vägarna man använder.

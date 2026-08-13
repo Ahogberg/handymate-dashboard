@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<title>Projektytor — före/efter</title>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="fore-efter.css">
+</head>
+<body style="width:1500px;height:3520px">
+
+<div class="doc-h" style="left:80px;top:56px">
+<h1>Projektytor — före/efter</h1>
+<p>Fem konkreta rättningar i projektöversikten och projektdetaljvyn, var och en visad mot dagens produktionskod. Sist en token-patch som tar bort grundorsaken till färgdriften.</p>
+</div>
+
+<!-- ============ A ============ -->
+<div class="sec" style="left:80px;top:220px">
+<div class="n">01</div>
+<h2>Projektöversiktens rader</h2>
+<p>Blandade neutraler (<code>gray-*</code> i raderna, <code>slate-*</code> i jobbtyp-chipsen), himmelblå fakturabadge och tre staplar per rad. Efter: en slate-skala, semantisk badge, och bara den stapel som faktiskt begränsar jobbet — resten som siffror.</p>
+</div>
+
+<div class="fr" style="left:80px;top:320px;padding:0"><div class="tag bad" style="left:20px"><b>FÖRE</b> — app/dashboard/projects/page.tsx</div>
+<div class="blob"></div>
+<div class="rowhead"><h2 class="old" style="color:#111827">Projekt</h2><span class="chip c-slate">12 aktiva</span></div>
+<div class="row old">
+<div class="main"><h3>Badrumsrenovering Svensson</h3><div class="sub">Anna Svensson · Bromma</div>
+<div style="display:flex;gap:6px;margin-top:9px"><span class="chip c-sky">Fakturerat</span><span class="chip c-slate">Badrum</span></div></div>
+<div class="rt">
+<div class="mb"><div class="lr"><span class="l">Timmar</span><span class="v">96 / 120</span></div><div class="track"><div class="fill f-sky" style="width:80%"></div></div></div>
+<div class="mb"><div class="lr"><span class="l">Budget</span><span class="v">128k / 185k</span></div><div class="track"><div class="fill f-purple" style="width:69%"></div></div></div>
+<div class="mb"><div class="lr"><span class="l">Färdigt</span><span class="v">72%</span></div><div class="track"><div class="fill f-gray" style="width:72%"></div></div></div>
+</div></div>
+<div class="row old">
+<div class="main"><h3>Köksmontage Lind</h3><div class="sub">Peter Lind · Sundbyberg</div>
+<div style="display:flex;gap:6px;margin-top:9px"><span class="chip c-blue">Offert skickad</span><span class="chip c-slate">Kök</span></div></div>
+<div class="rt">
+<div class="mb"><div class="lr"><span class="l">Timmar</span><span class="v">0 / 60</span></div><div class="track"><div class="fill f-gray" style="width:0%"></div></div></div>
+<div class="mb"><div class="lr"><span class="l">Budget</span><span class="v">0 / 92k</span></div><div class="track"><div class="fill f-gray" style="width:0%"></div></div></div>
+<div class="mb"><div class="lr"><span class="l">Färdigt</span><span class="v">0%</span></div><div class="track"><div class="fill f-gray" style="width:0%"></div></div></div>
+</div></div>
+</div>
+
+<div class="fr" style="left:620px;top:320px;padding:0"><div class="tag good" style="left:20px"><b>EFTER</b></div>
+<div class="rowhead"><h2>Projekt</h2><span class="chip c-slate">12 aktiva</span></div>
+<div class="row">
+<div class="main"><h3>Badrumsrenovering Svensson</h3><div class="sub">Anna Svensson · Bromma</div>
+<div style="display:flex;gap:6px;margin-top:9px"><span class="chip c-green"><span class="cd"></span>Fakturerat</span><span class="chip c-slate">Badrum</span></div></div>
+<div class="rt">
+<div class="bar"><div class="lr"><span class="l">Timmar</span><span class="v">96 / 120</span></div><div class="track"><div class="fill f-teal" style="width:80%"></div></div></div>
+<div class="facts"><b>128 000 kr</b> av 185 000 kr<br>72 % färdigt</div>
+</div></div>
+<div class="row">
+<div class="main"><h3>Köksmontage Lind</h3><div class="sub">Peter Lind · Sundbyberg</div>
+<div style="display:flex;gap:6px;margin-top:9px"><span class="chip c-slate"><span class="cd"></span>Offert skickad</span><span class="chip c-slate">Kök</span></div></div>
+<div class="rt">
+<div class="facts" style="margin-top:0">Startar 3 sep<br><b>92 000 kr</b> offererat</div>
+</div></div>
+</div>
+
+<div class="note" style="left:1120px;top:320px">
+<b>Vinsten</b>
+<ul>
+<li>Ögat får ett mål per rad i stället för tre.</li>
+<li>Icke-påbörjade projekt visar ingen 0 %-stapel — de har inget att mäta än.</li>
+<li>Badgen bär status i färg (<code>emerald</code> = betalt, <code>slate</code> = ej igång), inte dekoration.</li>
+<li>Blobben bakom listan bort: hero-mönster hör inte hemma bakom tät data.</li>
+</ul>
+</div>
+
+<!-- ============ B ============ -->
+<div class="sec" style="left:80px;top:640px">
+<div class="n">02</div>
+<h2>”Var står jobbet” — en sanning, inga emoji</h2>
+<p><code>ProjectStageStrip</code> renderar åtta faser som emoji-pills, och <code>ProjectStatusCard</code> säger samma sak igen som 3-stegs-stepper. Efter: steppern äger förstasidan, de åtta faserna flyttar till modalen med Lucide-ikoner.</p>
+</div>
+
+<div class="fr" style="left:80px;top:740px"><div class="tag bad"><b>FÖRE</b> — ProjectStageStrip + ProjectStatusCard</div>
+<div class="blk old">
+<div class="bh"><h3>Projektfas</h3></div>
+<div class="estrip">
+<span class="epill">📋 Förfrågan</span><span class="epill">📝 Offert</span><span class="epill">✅ Accepterad</span><span class="epill on">🔨 Pågår</span><span class="epill">🧹 Slutstäd</span><span class="epill">📸 Dokumentation</span><span class="epill">💰 Faktura</span><span class="epill">🎉 Klart</span>
+</div>
+<div class="divider"></div>
+<div class="stepper">
+<div class="step done"><span class="dot">✓</span>Planering</div><div class="step-line done"></div>
+<div class="step now"><span class="dot">●</span>Pågår</div><div class="step-line"></div>
+<div class="step"><span class="dot">3</span>Klart</div>
+</div>
+<div style="margin-top:14px;font-size:12.5px;color:#6b7280">Väder på plats: ☀️ &nbsp; ⛅ &nbsp; 🌧️ &nbsp; ❄️</div>
+</div>
+</div>
+
+<div class="fr" style="left:620px;top:740px"><div class="tag good"><b>EFTER</b></div>
+<div class="blk">
+<div class="bh"><h3>Pågår — dag 9 av 14</h3><a href="#faser">Alla faser</a></div>
+<div class="stepper" style="margin-bottom:16px">
+<div class="step done"><span class="dot"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Planering</div><div class="step-line done"></div>
+<div class="step now"><span class="dot"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg></span>Pågår</div><div class="step-line"></div>
+<div class="step"><span class="dot"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Klart</div>
+</div>
+<div class="divider" style="background:var(--slate-100)"></div>
+<div class="phaserow done"><span class="pi"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Offert accepterad<span style="margin-left:auto;font-size:12px;color:var(--slate-400)" class="num">12 aug</span></div>
+<div class="phaserow now"><span class="pi"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.4 8.4a2.1 2.1 0 0 1-3-3L12 9"/><path d="M17.6 6.4 22 2"/><path d="m13 6 5 5 4-4-5-5-4 4Z"/></svg></span>Arbete pågår<span style="margin-left:auto;font-size:12px;color:var(--slate-400)" class="num">t.o.m. 5 sep</span></div>
+<div class="phaserow"><span class="pi"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg></span>Slutbesiktning<span style="margin-left:auto;font-size:12px;color:var(--slate-400)" class="num">6 sep</span></div>
+</div>
+</div>
+
+<div class="note" style="left:1120px;top:740px">
+<b>Vinsten</b>
+<ul>
+<li>Emoji renderas olika på Android, iOS och Windows — ikoner gör det inte.</li>
+<li>Stroke 1,75 matchar resten av appens Lucide-set.</li>
+<li>Rubriken svarar direkt på frågan (”dag 9 av 14”) i stället för att bara namnge fasen.</li>
+<li>Väderväljaren blir <code>Sun / CloudSun / CloudRain / Snowflake</code>.</li>
+</ul>
+</div>
+
+<!-- ============ C ============ -->
+<div class="sec" style="left:80px;top:1160px">
+<div class="n">03</div>
+<h2>Statusfärger — fyra, inte nio</h2>
+<p>Idag lever <code>sky</code>, <code>blue</code> och <code>purple</code> parallellt i offert- och fakturastatus, och spinnern ärver <code>secondary-700</code> som pekar på sky. Två-färgsregeln säger teal + slate, med en tredje nyans bara när den betyder något.</p>
+</div>
+
+<div class="fr" style="left:80px;top:1260px"><div class="tag bad"><b>FÖRE</b> — nio nyanser, fyra betydelser</div>
+<div class="swatches">
+<div class="sw-row"><span class="sw-cap">bg-blue-50 / bg-purple-50 / bg-sky-100</span>
+<span class="chip c-blue">Offert skickad</span><span class="chip c-purple">Faktura väntar</span><span class="chip c-sky">Fakturerat</span><span class="chip c-green">Pågår</span><span class="chip c-amber">Försenad</span></div>
+<div class="wgrid" style="margin-top:4px">
+<div class="wcell old" style="border-color:#e5e7eb"><div class="t">laddar</div><div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#0369a1"><span class="spin"></span>Hämtar projekt…</div></div>
+<div class="wcell old" style="border-color:#e5e7eb"><div class="t">text-secondary-700</div><div style="font-size:13px;color:#0369a1;font-weight:600">Visa alla 12</div></div>
+</div>
+</div>
+</div>
+
+<div class="fr" style="left:620px;top:1260px"><div class="tag good"><b>EFTER</b> — fyra semantiska lägen</div>
+<div class="swatches">
+<div class="sw-row"><span class="sw-cap">slate · teal · amber · emerald · red</span>
+<span class="chip c-slate"><span class="cd"></span>Planering</span><span class="chip c-teal"><span class="cd"></span>Pågår</span><span class="chip c-amber"><span class="cd"></span>Kräver handling</span><span class="chip c-green"><span class="cd"></span>Klart</span><span class="chip c-red"><span class="cd"></span>Risk</span></div>
+<div class="wgrid" style="margin-top:4px">
+<div class="wcell"><div class="t">laddar</div><div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--teal-700)"><span class="spin good"></span>Hämtar projekt…</div></div>
+<div class="wcell"><div class="t">text-teal-700</div><div style="font-size:13px;color:var(--teal-700);font-weight:600">Visa alla 12</div></div>
+</div>
+</div>
+</div>
+
+<div class="note" style="left:1120px;top:1260px">
+<b>Vinsten</b>
+<ul>
+<li>Hantverkaren lär sig fyra färger, inte nio. Amber = gör något nu.</li>
+<li>Offert och faktura är inte egna huer — de är <em>steg</em>, och tar stegets färg.</li>
+<li>Blått försvinner ur appen när <code>secondary</code> slutar peka på sky (se patchen).</li>
+</ul>
+</div>
+
+<!-- ============ D ============ -->
+<div class="sec" style="left:80px;top:1590px">
+<div class="n">04</div>
+<h2>Kort, knappar, radier</h2>
+<p><code>card-base</code> i globals.css ritar <code>#e5e7eb</code> mot brandens <code>#E2E8F0</code>, och tailwind.config har inga shadow-tokens — därför är skuggorna ad hoc. Primärknappen är platt teal-700; branden är gradient plus teal skugga. I nya-projekt-modalen blandas radie 12 och 8.</p>
+</div>
+
+<div class="fr" style="left:80px;top:1690px"><div class="tag bad"><b>FÖRE</b> — globals.css .card-base</div>
+<div class="card old" style="padding:18px">
+<div style="font-family:var(--font-heading);font-size:17px;font-weight:700;color:#111827;margin-bottom:14px">Nytt projekt</div>
+<label class="lbl old">Projektnamn</label>
+<input class="inp old" value="Badrumsrenovering Svensson" style="margin-bottom:14px">
+<label class="lbl old">Budget</label>
+<input class="inp old" value="185000" style="margin-bottom:18px">
+<div style="display:flex;gap:8px"><button class="btn btn-old">Skapa projekt</button><button class="btn btn-sec old">Avbryt</button></div>
+<div style="margin-top:14px;font-family:var(--font-mono);font-size:11px;color:#9ca3af">border #e5e7eb · knapp r12 · avbryt r8 · input r8 · skugga ad hoc</div>
+</div>
+</div>
+
+<div class="fr" style="left:620px;top:1690px"><div class="tag good"><b>EFTER</b></div>
+<div class="card" style="padding:18px">
+<div style="font-family:var(--font-heading);font-size:17px;font-weight:700;color:var(--slate-900);letter-spacing:-.02em;margin-bottom:14px">Nytt projekt</div>
+<label class="lbl">Projektnamn</label>
+<input class="inp" value="Badrumsrenovering Svensson" style="margin-bottom:14px">
+<label class="lbl">Budget</label>
+<input class="inp" value="185 000 kr">
+<div class="hint" style="margin-bottom:18px">Arbetskostnad inkl. moms — ROT räknas automatiskt.</div>
+<div style="display:flex;gap:10px"><button class="btn btn-new">Skapa projekt</button><button class="btn btn-sec">Avbryt</button></div>
+<div style="margin-top:14px;font-family:var(--font-mono);font-size:11px;color:var(--slate-400)">border #e2e8f0 · knapp r12 · input r10 · shadow-sm / shadow-brand</div>
+</div>
+</div>
+
+<div class="note" style="left:1120px;top:1690px">
+<b>Vinsten</b>
+<ul>
+<li>En rad i globals.css lyfter varje kort i appen samtidigt.</li>
+<li>Regel att hålla: knapp 12, input 10, kort 14.</li>
+<li>Labels går från <code>gray-500</code> till <code>slate-800</code> — hjälptexten tar över den svaga vikten.</li>
+<li><code>tabular-nums</code> och tusentalsmellanslag överallt, så siffror slutar hoppa.</li>
+</ul>
+</div>
+
+<!-- ============ E ============ -->
+<div class="sec" style="left:80px;top:2160px">
+<div class="n">05</div>
+<h2>Radera projekt</h2>
+<p>Raderingen går via webbläsarens <code>confirm()</code>. Den bryter varumärket helt, kan inte visa vad som faktiskt försvinner, och ser identisk ut oavsett hur allvarlig åtgärden är.</p>
+</div>
+
+<div class="fr" style="left:80px;top:2280px"><div class="tag bad"><b>FÖRE</b> — window.confirm()</div>
+<div class="native">
+<div class="nh">app.handymate.se</div>
+<div class="nb">Är du säker på att du vill ta bort projektet?</div>
+<div class="nf"><button>Avbryt</button><button class="p">OK</button></div>
+</div>
+<div style="margin-top:16px;font-family:var(--font-mono);font-size:11.5px;color:var(--slate-400);line-height:1.6">Systemfont, blå systemknapp, ingen information om 42 tidrader och 3 ÄTA som följer med.</div>
+</div>
+
+<div class="fr" style="left:620px;top:2280px"><div class="tag good"><b>EFTER</b></div>
+<div class="modal">
+<div class="mi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></div>
+<h3>Ta bort Badrumsrenovering Svensson?</h3>
+<p>42 tidrader, 3 ÄTA och 11 bilder tas bort med projektet. Det går inte att ångra. Fakturan på 149 000 kr finns kvar i bokföringen.</p>
+<div class="mf"><button class="btn btn-red">Ta bort projektet</button><button class="btn btn-sec">Avbryt</button></div>
+</div>
+</div>
+
+<div class="note" style="left:1120px;top:2280px">
+<b>Vinsten</b>
+<ul>
+<li>Konsekvensen står i klartext innan valet, inte efter.</li>
+<li>Röd är destruktiv — samma röd som brandens <code>red-500</code>, ingen systemblå.</li>
+<li>Samma modal återanvänds för alla destruktiva åtgärder i appen.</li>
+</ul>
+</div>
+
+<!-- ============ F ============ -->
+<div class="sec" style="left:80px;top:2680px">
+<div class="n">06</div>
+<h2>Token-patchen</h2>
+<p>Grundorsaken till att blått kommer tillbaka: <code>secondary</code> i tailwind.config är en sky-skala. Så länge den finns kommer nya komponenter plocka den i god tro. Tre filer, ungefär tjugo rader.</p>
+</div>
+
+<div class="patch" style="left:80px;top:2780px">
+<div class="ph">tailwind.config.ts + app/globals.css</div>
+<div class="fname">tailwind.config.ts — theme.extend.colors</div>
+<div><span class="del">- secondary: { 50:'#f0f9ff', 100:'#e0f2fe', 500:'#0ea5e9', 700:'#0369a1' },  </span><span class="cmt">// sky = källan till färgdriften</span></div>
+<div><span class="add">+ </span><span class="cmt">// secondary borttagen. Neutralerna är slate, accenten är teal.</span></div>
+<div><span class="add">+ status: {</span></div>
+<div><span class="add">+   plan:   { bg:'#f1f5f9', fg:'#475569' },  </span><span class="cmt">// slate — ej igång</span></div>
+<div><span class="add">+   active: { bg:'#f0fdf9', fg:'#0f766e' },  </span><span class="cmt">// teal — pågår</span></div>
+<div><span class="add">+   action: { bg:'#fef3c7', fg:'#b45309' },  </span><span class="cmt">// amber — kräver handling</span></div>
+<div><span class="add">+   done:   { bg:'#d1fae5', fg:'#047857' },  </span><span class="cmt">// emerald — klart / betalt</span></div>
+<div><span class="add">+   risk:   { bg:'#fee2e2', fg:'#b91c1c' },  </span><span class="cmt">// red — risk</span></div>
+<div><span class="add">+ },</span></div>
+<div class="fname">tailwind.config.ts — theme.extend.boxShadow <span class="cmt">(saknas helt idag)</span></div>
+<div><span class="add">+ xs: '0 1px 2px rgba(15,23,42,.04)',</span></div>
+<div><span class="add">+ sm: '0 2px 8px rgba(15,23,42,.05)',</span></div>
+<div><span class="add">+ md: '0 8px 24px rgba(15,23,42,.06)',</span></div>
+<div><span class="add">+ lg: '0 20px 40px rgba(15,23,42,.08)',</span></div>
+<div><span class="add">+ brand: '0 10px 25px -5px rgba(13,148,136,.25)',</span></div>
+<div class="fname">app/globals.css — .card-base</div>
+<div><span class="del">- border: 1px solid #e5e7eb;</span></div>
+<div><span class="add">+ border: 1px solid #e2e8f0;</span></div>
+<div><span class="del">- &amp;:hover { border-color: #d1d5db; }</span></div>
+<div><span class="add">+ &amp;:hover { border-color: #cbd5e1; }</span></div>
+<div style="margin-top:18px;color:rgba(255,255,255,.5)">Sök-och-ersätt efteråt: <span class="add">gray- → slate-</span> i app/dashboard/projects/, och de fem <span class="del">bg-blue-50 / bg-purple-50 / bg-sky-100</span>-förekomsterna till <span class="add">status.*</span>.</div>
+</div>
+
+</body>
+</html>
