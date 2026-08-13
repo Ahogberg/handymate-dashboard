@@ -91,6 +91,7 @@ export default function PortalContact({ portal, onChat }: PortalContactProps) {
       <PortalShellHeader
         business={business}
         unreadMessages={portal.unreadMessages}
+        onNotificationClick={onChat}
       />
 
       <div className="bp-body">

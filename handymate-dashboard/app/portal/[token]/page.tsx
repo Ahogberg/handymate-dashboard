@@ -319,6 +319,7 @@ export default function CustomerPortalPage() {
             setSelectedProject(id)
             setSubRoute('project-detail')
           }}
+          onOpenMessages={() => navigate('messages')}
         />
       )}
 
@@ -331,6 +332,7 @@ export default function CustomerPortalPage() {
           initialFilter={docsSection}
           onOpenQuote={() => setSubRoute('quote')}
           onOpenInvoice={(id) => { setSelectedInvoice(id); setSubRoute('invoice') }}
+          onOpenMessages={() => navigate('messages')}
         />
       )}
 
@@ -357,15 +359,17 @@ function ProjectsListView({
   projects,
   loadingTab,
   onSelectProject,
+  onOpenMessages,
 }: {
   portal: PortalData
   projects: Project[]
   loadingTab: boolean
   onSelectProject: (id: string) => void
+  onOpenMessages: () => void
 }) {
   return (
     <>
-      <PortalShellHeader business={portal.business} unreadMessages={portal.unreadMessages} />
+      <PortalShellHeader business={portal.business} unreadMessages={portal.unreadMessages} onNotificationClick={onOpenMessages} />
       <div className="bp-body">
         <div className="bp-page-title">
           <h1>Projekt</h1>

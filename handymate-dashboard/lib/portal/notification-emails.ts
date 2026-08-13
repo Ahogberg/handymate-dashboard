@@ -286,8 +286,13 @@ function eventToPortalAnchor(event: PortalNotificationEvent, ctx?: Record<string
     case 'new_message': return '?tab=messages'
     case 'quote_sent': return '?tab=quotes'
     case 'invoice_sent':
-    case 'invoice_paid':
     case 'invoice_overdue': return '?tab=invoices'
+    // invoice_paid delade tidigare case med invoice_sent/invoice_overdue,
+    // så knappen "Lämna en recension" pekade på fakturafliken istället för
+    // recensionsvyn (PortalReviewCTA, redan byggd och redan rutt-bar via
+    // ?tab=review) — hittat 2026-08-14. ctx.review_already_sent sätts
+    // redan ovan i sendPortalNotification, bara aldrig LÄST här förut.
+    case 'invoice_paid': return ctx?.review_already_sent ? '?tab=invoices' : '?tab=review'
     case 'photos_added': return '?tab=photos'
     case 'project_update': return '?tab=project'
     case 'review_request': return '?tab=review'

@@ -16,6 +16,9 @@ interface PortalDocumentsListProps {
   initialFilter?: FilterId
   onOpenQuote: (id: string) => void
   onOpenInvoice: (id: string) => void
+  /** Meddelandeikonen i headern — utan denna var knappen en <button> utan
+      onClick (hittat 2026-08-14, samma lucka i PortalContact/ProjectsListView). */
+  onOpenMessages: () => void
 }
 
 type FilterId = 'all' | 'quotes' | 'invoices'
@@ -42,6 +45,7 @@ export default function PortalDocumentsList({
   initialFilter,
   onOpenQuote,
   onOpenInvoice,
+  onOpenMessages,
 }: PortalDocumentsListProps) {
   const [filter, setFilter] = useState<FilterId>(initialFilter ?? 'all')
 
@@ -77,6 +81,7 @@ export default function PortalDocumentsList({
       <PortalShellHeader
         business={portal.business}
         unreadMessages={portal.unreadMessages}
+        onNotificationClick={onOpenMessages}
       />
 
       <div className="bp-body">
