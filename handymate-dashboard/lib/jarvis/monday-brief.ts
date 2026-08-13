@@ -42,6 +42,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { svStartOfDay } from '@/lib/dates'
 import { currentWeekMonday } from '@/lib/capacity/week-capacity'
 import { getManadsLedger, type ManadsLedgerSteg } from '@/lib/value/ledger'
+import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import {
   isAutonomous,
   computeStreak,
@@ -347,5 +348,15 @@ export async function insertMandagskort(
     if (error.code === '23505') return 'duplicate' // samma företag+vecka — förväntat, inte ett fel
     throw new Error(`pending_approvals insert (monday_brief) misslyckades: ${error.message}`)
   }
+
+  // Fire-and-forget, samma mönster som saveAndPush (lib/agents/shared/
+  // save-and-push.ts) — en push-miss får aldrig fälla kort-skapandet, som
+  // redan lyckades ovan. Bara på 'inserted', aldrig på 'duplicate'.
+  void sendApprovalPush({
+    business_id: kort.business_id,
+    approval_type: 'monday_brief',
+    payload: {},
+  })
+
   return 'inserted'
 }

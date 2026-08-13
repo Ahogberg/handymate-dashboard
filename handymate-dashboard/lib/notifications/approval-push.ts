@@ -168,6 +168,18 @@ function buildPushTemplate(
       }
     }
 
+    case 'monday_brief': {
+      // Måndagsmötet (2026-08-13) — url pekar på startsidan, inte
+      // godkännande-listan: JarvisHomes egen auto-öppningsgrind
+      // (lib/jarvis/mandagsmote.ts) tar över därifrån och öppnar takeovern
+      // direkt, se components/jarvis/JarvisHome.tsx.
+      return {
+        title: 'Ditt måndagsmöte är redo',
+        body: 'Ta del av veckans sammanfattning från teamet',
+        url: '/dashboard',
+      }
+    }
+
     default:
       return null
   }
