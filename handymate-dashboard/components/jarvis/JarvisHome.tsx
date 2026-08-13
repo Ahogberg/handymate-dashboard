@@ -18,6 +18,13 @@ import { RailCard } from '@/components/jarvis/RailCard'
 import { KomIgangRail } from '@/components/jarvis/KomIgangRail'
 import HemTur from '@/components/tour/HemTur'
 import CompanyScan from '@/components/tour/CompanyScan'
+import MandagsmoteTakeover from '@/components/jarvis/MandagsmoteTakeover'
+import {
+  mandagsmoteSeenKey,
+  onboardingGatesResolved,
+  shouldAutoOpenMandagsmote,
+  mandagsmoteSectionOrder,
+} from '@/lib/jarvis/mandagsmote'
 import { ScheduleTimeline, parseKonflikter, minuterFranIso } from '@/components/jarvis/ScheduleTimeline'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { QuoteDraftDetail, QuoteToolExit } from '@/components/jarvis/QuoteDraftDetail'
@@ -104,6 +111,16 @@ const NYHETER_SEDDA_MAX = 200
 const NYHET_SEDD_EFTER_MS = 8000
 /** Momentraderna i Värt att veta — en permanent yta, inte en kö. */
 const MAX_MOMENT_RADER = 3
+
+/**
+ * Måndagsmötets auto-öppningsgrind läser SAMMA localStorage-nyckel HemTur.tsx
+ * skriver (SEEN_KEY där, 'hm_hemtur_klar') — literalen upprepas här hellre än
+ * att exportera konstanten ur en fil som annars är helt orörd av det här
+ * spåret (docs/design/FORSTA-30-MINUTERNA.md). Se lib/jarvis/mandagsmote.ts
+ * onboardingGatesResolved för varför både denna OCH business.welcome_tour_seen
+ * kollas — PUT:en HemTur skickar vid avslut är fire-and-forget.
+ */
+const HEMTUR_SEEN_KEY = 'hm_hemtur_klar'
 
 interface Approval {
   id: string
@@ -220,6 +237,14 @@ export default function JarvisHome({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
+
+  // Måndagsmötets kort — ur SAMMA lista JarvisHome redan hämtar
+  // (/api/approvals?status=pending, se fetchQueue). Beräknad tidigt (inte
+  // bara vid synliga/grupper längre ned) eftersom auto-öppnings-effekten
+  // ovan i komponenten behöver den. !hiddenIds.has(...) speglar synliga —
+  // bannern/takeovern ska försvinna direkt när godkännandet köas, precis
+  // som ett vanligt kort.
+  const mandagskortApproval = approvals.find(a => a.approval_type === 'monday_brief' && !hiddenIds.has(a.id)) ?? null
   const [snack, setSnack] = useState<{ approvalId: string; text: string } | null>(null)
   const [feedback, setFeedback] = useState<{ text: string; isError: boolean } | null>(null)
   const [proof, setProof] = useState<string | null>(null)
@@ -236,6 +261,13 @@ export default function JarvisHome({
   // hoppad, eller aldrig aktuell för kontot). HemTur behåller sina egna
   // gates orörda — den öppnar bara inte förrän den här flaggan är sann.
   const [scanKlar, setScanKlar] = useState(false)
+
+  // Måndagsmötet-takeovern (Måndagsmötet etapp 2, 2026-08-13): egen,
+  // OBEROENDE gate — rör inte scanKlar/CompanyScan/HemTur-kedjan ovan, läser
+  // bara samma "är onboardingen förbi"-signaler (se
+  // lib/jarvis/mandagsmote.ts onboardingGatesResolved).
+  const [mandagsmoteOpen, setMandagsmoteOpen] = useState(false)
+  const mandagsmoteAutoOpenTried = useRef(false)
 
   // ═══ GRIND 1: HAR NÅGOT HÄNT SEDAN DU TITTADE SIST? ═══
   //
@@ -434,6 +466,62 @@ export default function JarvisHome({
       flushRef.current()
     }
   }, [])
+
+  // ═══ MÅNDAGSMÖTETS AUTO-ÖPPNING ═══
+  //
+  // Öppnar takeovern EN gång per vecka (mandagsmoteSeenKey är skopad på
+  // approval-id:t, som redan är deterministiskt per företag+ISO-vecka).
+  // Väntar in queueLoaded (så mandagskortApproval hunnit bli sant/falskt
+  // innan grinden prövas — annars kunde en tom första render permanent
+  // stämpla "sett" på ingenting) OCH onboardingGatesResolved (CompanyScan/
+  // HemTur-kedjan ska ALDRIG avbrytas av en till takeover ovanpå). Ett
+  // ref-vakt (inte bara localStorage) förhindrar att effekten öppnar om igen
+  // om användaren stänger takeovern och något annat i listan triggar en
+  // omrendering samma session.
+  useEffect(() => {
+    if (!queueLoaded || !mandagskortApproval) return
+    if (mandagsmoteAutoOpenTried.current) return
+    let hemturSeenLocally = false
+    try { hemturSeenLocally = localStorage.getItem(HEMTUR_SEEN_KEY) === '1' } catch { /* fail-closed nedan */ }
+    const onboardingResolved = onboardingGatesResolved({
+      welcomeTourSeen: Boolean(business.welcome_tour_seen),
+      hemturSeenLocally,
+    })
+    let alreadySeen = true // trasig localStorage → fail-closed, precis som CompanyScan/HemTur
+    try { alreadySeen = localStorage.getItem(mandagsmoteSeenKey(mandagskortApproval.id)) === '1' } catch { /* alreadySeen stannar true */ }
+
+    if (!shouldAutoOpenMandagsmote({ approvalId: mandagskortApproval.id, onboardingResolved, alreadySeen })) return
+
+    mandagsmoteAutoOpenTried.current = true
+    try { localStorage.setItem(mandagsmoteSeenKey(mandagskortApproval.id), '1') } catch { /* best effort */ }
+    setMandagsmoteOpen(true)
+  }, [queueLoaded, mandagskortApproval, business.welcome_tour_seen])
+
+  /** Manuell öppning — den ständiga bannern i "Det här behöver dig idag".
+   *  Sätter samma sedd-flagga (defensivt/idempotent) så en efterföljande
+   *  sidladdning inte auto-öppnar ovanpå ett kort användaren redan valt att
+   *  öppna själv. */
+  function openMandagsmote() {
+    if (!mandagskortApproval) return
+    try { localStorage.setItem(mandagsmoteSeenKey(mandagskortApproval.id), '1') } catch { /* best effort */ }
+    setMandagsmoteOpen(true)
+  }
+
+  /** Escape-luckan: döljer takeovern UTAN att godkänna — kortet ligger kvar
+   *  pending, bannern kvar synlig. */
+  function dismissMandagsmote() {
+    setMandagsmoteOpen(false)
+  }
+
+  /** "Jag har läst det" — SAMMA godkänn-väg som varje annat kort
+   *  (queueAction → executeSend → POST /api/approvals/:id), aldrig en egen
+   *  endpoint. Stänger takeovern direkt; queueAction sköter sitt eget
+   *  ångra-fönster precis som vanligt. */
+  function approveMandagsmote() {
+    if (!mandagskortApproval) return
+    queueAction(mandagskortApproval, 'approve')
+    setMandagsmoteOpen(false)
+  }
 
   function flash(text: string, isError = false) {
     setFeedback({ text, isError })
@@ -765,6 +853,41 @@ export default function JarvisHome({
             )}
           </div>
 
+          {/* Måndagsmötets ständiga återingång (Måndagsmötet etapp 2,
+              2026-08-13) — så länge kortet är pending, oavsett om
+              auto-öppningen redan visats/stängts. Egen, teal-accentuerad
+              stil (inte AgentDecisionCard) så den läses som något annat än
+              de vanliga besluten — ett möte, inte ett ärende. Kortets egen
+              rad i "Det här behöver dig idag" utelämnas nedan (se
+              approval.approval_type === 'monday_brief'-gaten i .map) — den
+              här bannern ÄR dess representation här, takeovern är detaljvyn. */}
+          {mandagskortApproval && (() => {
+            const pl = (mandagskortApproval.payload || {}) as Record<string, unknown>
+            const isoWeek = typeof pl.iso_week === 'number' ? (pl.iso_week as number) : null
+            const antal = mandagsmoteSectionOrder({
+              resultat: pl.resultat as unknown[] | null,
+              lardomar: pl.lardomar,
+              risker: pl.risker as unknown[] | null,
+              fortroende: pl.fortroende as unknown[] | null,
+            }).length
+            return (
+              <button
+                type="button"
+                onClick={openMandagsmote}
+                className="w-full flex items-center gap-3 bg-primary-50 border border-primary-200 rounded-2xl px-4 py-3.5 mb-2.5 text-left hover:border-primary-300 transition-colors"
+              >
+                <AgentAvatar agentKey="matte" size="md" />
+                <div className="flex-1 min-w-0">
+                  <p className="m-0 text-sm font-semibold text-primary-900">Måndagsmötet väntar</p>
+                  <p className="m-0 text-xs text-primary-700">
+                    {antal} punkt{antal === 1 ? '' : 'er'}{isoWeek ? ` — vecka ${isoWeek}` : ''}
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-primary-400 shrink-0" />
+              </button>
+            )
+          })()}
+
           {!queueLoaded ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-center min-h-[88px]">
               <Loader2 className="w-4 h-4 text-slate-300 animate-spin" />
@@ -775,6 +898,13 @@ export default function JarvisHome({
             <div className="space-y-2.5">
               {grupper.map((grupp, i) => {
                 const approval = grupp.primary
+                // Måndagsmötet representeras av den egna bannern +
+                // takeovern ovan, inte av ett generiskt kort här — annars
+                // hade samma veckosammanfattning stått på två ställen i
+                // samma sektion (se bannern strax ovanför). Den räknas
+                // fortfarande med i `beslut`/`grupper` (oförändrat), bara
+                // själva raden hoppas över vid rendering.
+                if (approval.approval_type === 'monday_brief') return null
                 return (
                 <div key={approval.id} id={`beslut-${approval.id}`}>
                 <ApprovalCard
@@ -1109,6 +1239,19 @@ export default function JarvisHome({
           localStorage; renderar ingenting förrän gaten öppnar OCH skannen
           har stängts (scanKlar). */}
       {scanKlar && <HemTur />}
+
+      {/* Måndagsmötet — egen, oberoende gate (se useEffect ovan). Kan öppna
+          sig SAMTIDIGT som CompanyScan/HemTur teoretiskt existerar i DOM:en,
+          men auto-öppningen kan aldrig TRIGGA förrän onboardingGatesResolved
+          är sant — vilket i praktiken betyder att HemTur redan är färdig. */}
+      {mandagsmoteOpen && mandagskortApproval && (
+        <MandagsmoteTakeover
+          approval={mandagskortApproval}
+          approveLabel={approveLabel('monday_brief', mandagskortApproval.payload)}
+          onApprove={approveMandagsmote}
+          onDismiss={dismissMandagsmote}
+        />
+      )}
 
       {/* Ångra-snackbaren. POST:en har INTE gått iväg än. */}
       {snack && (
