@@ -16,6 +16,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { createNotification } from '@/lib/notifications'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 import { advanceProjectStage, SYSTEM_STAGES } from '@/lib/project-stages/automation-engine'
+import { getQuoteBudgetDerivation } from '@/lib/quotes/get-quote-budget-derivation'
 
 // ── Event Types ───────────────────────────────────────────────
 
@@ -172,26 +173,24 @@ async function onQuoteAccepted(businessId: string, quoteId: string): Promise<voi
   // Fetch quote data
   const { data: quote, error: quoteError } = await supabase
     .from('quotes')
-    .select('quote_id, title, customer_id, items, total, labor_total, material_total')
+    .select('quote_id, title, customer_id, total, labor_total, material_total')
     .eq('quote_id', quoteId)
     .eq('business_id', businessId)
     .single()
 
   if (quoteError || !quote) return
 
-  // Calculate budget from quote items
-  const items = (quote.items || []) as Array<{ type?: string; quantity?: number; total?: number; name?: string; description?: string }>
-  const laborHours = items
-    .filter((i) => i.type === 'labor')
-    .reduce((sum: number, i) => sum + (i.quantity || 0), 0)
-  const totalAmount = items.reduce((sum: number, i) => sum + (i.total || 0), 0)
-
-  // Determine project type
-  let projectType = 'hourly'
-  const hasLabor = laborHours > 0
-  const hasMaterial = items.some((i) => i.type === 'material')
-  if (hasLabor && hasMaterial) projectType = 'mixed'
-  else if (!hasLabor) projectType = 'fixed_price'
+  // FYND 2026-08-13 (Golden Path-harnesset): denna funktion läste tidigare
+  // BARA quote.items (JSONB) — exakt samma bugg som getQuoteBudgetDerivation
+  // skrevs för att fixa 2026-05-22 (se den filens huvudkommentar), men
+  // onQuoteAccepted missades när fixen rullades ut i create-from-quote.ts/
+  // /api/projects POST. För nya offerter är JSONB:en tom → budget_amount/
+  // milestones blev alltid noll för RPC-signerade offerter (den väg den
+  // här funktionen faktiskt hanterar, se create-from-quote.ts:s kommentar).
+  const budgetDerivation = await getQuoteBudgetDerivation(supabase, quoteId, businessId)
+  const laborHours = budgetDerivation.budget_hours || 0
+  const totalAmount = budgetDerivation.budget_amount || 0
+  const projectType = budgetDerivation.project_type
 
   // Create the project
   const { data: project, error: projectError } = await supabase
@@ -245,14 +244,15 @@ async function onQuoteAccepted(businessId: string, quoteId: string): Promise<voi
     console.error('[project-ai-engine] stage init kastade (non-blocking):', err)
   }
 
-  // Create milestones from labor items
-  const laborItems = items.filter((i) => i.type === 'labor')
-  if (laborItems.length > 1) {
-    const milestones = laborItems.map((item, idx) => ({
+  // Create milestones from labor items — via budgetDerivation.labor_items
+  // (quote_items-tabellen), inte den gamla quote.items JSONB-filtreringen
+  // (se fyndkommentaren ovan vid budgetDerivation).
+  if (budgetDerivation.labor_items.length > 1) {
+    const milestones = budgetDerivation.labor_items.map((item, idx) => ({
       business_id: businessId,
       project_id: project.project_id,
-      name: item.name || item.description || `Moment ${idx + 1}`,
-      budget_hours: item.quantity || null,
+      name: item.description || `Moment ${idx + 1}`,
+      budget_hours: item.unit === 'tim' || item.unit === 'h' ? item.quantity : null,
       budget_amount: item.total || null,
       sort_order: idx,
       status: 'pending',
@@ -265,7 +265,7 @@ async function onQuoteAccepted(businessId: string, quoteId: string): Promise<voi
     quote_id: quoteId,
     budget_hours: laborHours,
     budget_amount: totalAmount,
-    milestones_created: laborItems.length > 1 ? laborItems.length : 0,
+    milestones_created: budgetDerivation.labor_items.length > 1 ? budgetDerivation.labor_items.length : 0,
   })
 
   // Fetch customer name for notification
