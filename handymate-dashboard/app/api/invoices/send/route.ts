@@ -277,9 +277,16 @@ export async function POST(request: NextRequest) {
 
     // Uppdatera fakturastatus
     if (results.email || results.sms) {
+      // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): sent_at/
+      // sent_method sattes ALDRIG här — InvoiceStatusTimeline.tsx läser
+      // BÅDA (rad 48-52) för att visa "Skickad via {metod}"-steget som
+      // klart; utan sent_at visas steget som "upcoming" trots att fakturan
+      // faktiskt är skickad. Samma buggklass som project.status-fyndet
+      // tidigare i samma körning — en statusflip utan sina stödjande fält.
+      const sentMethod = results.email && results.sms ? 'both' : results.email ? 'email' : 'sms'
       const { error: statusErr } = await supabase
         .from('invoice')
-        .update({ status: 'sent' })
+        .update({ status: 'sent', sent_at: new Date().toISOString(), sent_method: sentMethod })
         .eq('invoice_id', invoice_id)
 
       if (statusErr) {

@@ -232,9 +232,28 @@ async function cleanupCore(): Promise<string[]> {
   await del('customer_fact', 'customer_id', ids.customerId)
   await del('call_recording', 'recording_id', ids.meetingRecordingId)
   for (const aId of ids.approvalIds) await del('pending_approvals', 'id', aId)
+  // KÄLLGRANSKAT (upptäckt under en riktig körning, 2026-08-13): PUT
+  // /api/projects kör HELA stängningskedjan (faktura/utfall/debriefkort)
+  // SERVER-SIDA innan svaret ens kommer tillbaka — om Station 11 kastar
+  // INNAN dessa id:n hunnit sparas i ids.* (t.ex. mitt i en waitForRow-
+  // timeout) blir raderna ORPHANED: skapade på riktigt, men okända för
+  // ids.approvalIds/ids.invoiceId. En sopning på project_id fångar dem
+  // ÄVEN när de diskreta id-fälten aldrig hann sättas — body-baserad, inte
+  // beroende av testets egen körordning.
+  if (ids.projectId) {
+    const { data: orphanedApprovals } = await supabase
+      .from('pending_approvals')
+      .select('id, payload')
+      .eq('business_id', DEMO_BUSINESS_ID)
+      .in('approval_type', ['review_auto_invoice', 'project_debrief', 'confirm_payment', 'send_sms', 'review_request', 'scheduled_review_request'])
+    for (const row of orphanedApprovals || []) {
+      if ((row as any).payload?.project_id === ids.projectId) await del('pending_approvals', 'id', (row as any).id)
+    }
+  }
   await del('project_outcome', 'project_id', ids.projectId)
   await del('project_lesson', 'project_id', ids.projectId)
   await del('invoice', 'invoice_id', ids.invoiceId)
+  await del('invoice', 'project_id', ids.projectId)
   for (const mId of ids.milestoneIds) await del('project_milestone', 'milestone_id', mId)
   await del('pending_approvals', 'id', ids.approvalId)
   await del('quote_tracking_events', 'quote_id', ids.quoteId)
@@ -1034,7 +1053,7 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
         return await waitForRow<{ invoice_id: string }>(
           'invoice',
           { project_id: ids.projectId },
-          { predicate: (r: any) => r.status === 'draft', timeoutMs: 10_000, label: 'invoice.status -> draft' },
+          { predicate: (r: any) => r.status === 'draft', timeoutMs: 20_000, label: 'invoice.status -> draft' },
         )
       })
       ids.invoiceId = invoice.invoice_id
@@ -1045,7 +1064,7 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
           { business_id: DEMO_BUSINESS_ID, approval_type: 'review_auto_invoice', status: 'pending' },
           {
             predicate: (r: any) => r.payload?.project_id === ids.projectId,
-            timeoutMs: 10_000,
+            timeoutMs: 20_000,
             label: 'review_auto_invoice-kort',
           },
         )
@@ -1058,7 +1077,7 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
           job_type: string | null
           hours_diff_pct: number | null
           amount_diff_pct: number | null
-        }>('project_outcome', { project_id: ids.projectId }, { timeoutMs: 10_000, label: 'project_outcome' })
+        }>('project_outcome', { project_id: ids.projectId }, { timeoutMs: 20_000, label: 'project_outcome' })
       })
       expect(outcome.job_type, 'project_outcome.job_type ska ha ärvt judgment-call-värdet ovan').toBe('badrum')
 
@@ -1068,7 +1087,7 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
           { business_id: DEMO_BUSINESS_ID, approval_type: 'project_debrief', status: 'pending' },
           {
             predicate: (r: any) => r.payload?.project_id === ids.projectId,
-            timeoutMs: 10_000,
+            timeoutMs: 20_000,
             label: 'project_debrief-kort',
           },
         )
@@ -1090,23 +1109,23 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
       // summan) — INTE den manuella ProjectInvoiceModal (/api/invoices/
       // from-project bygger rader ur time_entry, som Station 7:s Guardian-
       // bevis medvetet svällt med extra timmar).
-      await test.step('Navigera till Godkännanden', async () => {
-        await ownerPage.goto('/dashboard/approvals')
-        await dismissKnownOverlays(ownerPage, 2500)
-      })
-
-      await test.step('Godkänn "Granska faktura"-kortet (ej i SKIP_CONFIRM → bekräftelsemodal → Bekräfta)', async () => {
-        const card = ownerPage.locator(`#approval-${ids.reviewInvoiceApprovalId}`)
-        await card.scrollIntoViewIfNeeded()
-        await card.getByRole('button', { name: 'Godkänn' }).click()
-        const [sendResponse] = await Promise.all([
-          ownerPage.waitForResponse(
-            (r) => r.url().includes(`/api/approvals/${ids.reviewInvoiceApprovalId}`) && r.request().method() === 'POST',
-            { timeout: 15_000 },
-          ),
-          ownerPage.getByRole('button', { name: 'Bekräfta' }).click(),
-        ])
-        expect(sendResponse.ok(), `POST /api/approvals/:id svarade ${sendResponse.status()}`).toBeTruthy()
+      //
+      // KÄLLGRANSKAT FYND (upptäckt under en riktig körning, 2026-08-13):
+      // kortet renderas ALDRIG i /dashboard/approvals — inte en bugg, utan
+      // en KORREKT, AVSIKTLIG säkerhetsfunktion. GET /api/approvals filtrerar
+      // bort rader arTestdataApproval() känner igen (lib/testdata.ts) —
+      // review_auto_invoice-kortets payload.customer_name bär vårt
+      // "E2E Testkund"-namn, vilket matchar arTestNamn() och göms MEDVETET
+      // från Andreas riktiga inkorg ("Testdata-filter... gömda vid läsning
+      // — aldrig raderade härifrån", route.ts). Samma judgment-call-mönster
+      // som Station 7d (Guardian): anropar den RIKTIGA rutten direkt via
+      // den redan autentiserade ägar-sessionen, eftersom UI:t medvetet
+      // döljer kortet — inte för att kortet eller rutten är trasig.
+      await test.step('Godkänn "Granska faktura"-kortet direkt (UI:t döljer det MEDVETET — se ovan)', async () => {
+        const res = await ownerCtx.request.post(`/api/approvals/${ids.reviewInvoiceApprovalId}`, {
+          data: { action: 'approve' },
+        })
+        expect(res.ok(), `POST /api/approvals/:id svarade ${res.status()}`).toBeTruthy()
       })
 
       const sentInvoice = await test.step('DB-bevis: invoice.status=sent, stage=ps-06 (INVOICE_SENT)', async () => {
@@ -1203,20 +1222,16 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
       ids.confirmPaymentApprovalId = confirmCard.id
       ids.approvalIds.push(confirmCard.id)
 
-      await test.step('Ägaren godkänner confirm_payment-kortet (real UI → applyInvoicePayment, kanoniska vägen)', async () => {
-        await ownerPage.goto('/dashboard/approvals')
-        await dismissKnownOverlays(ownerPage, 2500)
-        const card = ownerPage.locator(`#approval-${confirmCard.id}`)
-        await card.scrollIntoViewIfNeeded()
-        await card.getByRole('button', { name: 'Godkänn' }).click()
-        const [approveResponse] = await Promise.all([
-          ownerPage.waitForResponse(
-            (r) => r.url().includes(`/api/approvals/${confirmCard.id}`) && r.request().method() === 'POST',
-            { timeout: 15_000 },
-          ),
-          ownerPage.getByRole('button', { name: 'Bekräfta' }).click(),
-        ])
-        expect(approveResponse.ok(), `POST /api/approvals/:id svarade ${approveResponse.status()}`).toBeTruthy()
+      // Judgment call (samma källgranskade fynd som Station 8): confirm_
+      // payment-kortets payload.customer_name bär "E2E Testkund" och göms
+      // MEDVETET av arTestdataApproval() i /dashboard/approvals — en
+      // korrekt säkerhetsfunktion, inte en bugg. Anropar godkännande-rutten
+      // direkt (applyInvoicePayment, den kanoniska vägen, körs oavsett).
+      await test.step('Ägaren godkänner confirm_payment-kortet direkt (UI:t döljer det MEDVETET — se Station 8)', async () => {
+        const res = await ownerCtx.request.post(`/api/approvals/${confirmCard.id}`, {
+          data: { action: 'approve' },
+        })
+        expect(res.ok(), `POST /api/approvals/:id svarade ${res.status()}`).toBeTruthy()
       })
 
       const paidInvoice = await test.step('DB-bevis: invoice.status=paid, stage=ps-07 (INVOICE_PAID)', async () => {

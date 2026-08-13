@@ -93,9 +93,24 @@ test.describe('A9 — Behörighetstestet (anställd utan ekonomibehörighet)', (
     await del('customer_fact', 'customer_id', handoff.customerId)
     await del('call_recording', 'recording_id', handoff.meetingRecordingId)
     for (const aId of handoff.approvalIds) await del('pending_approvals', 'id', aId)
+    // Samma project_id-sopning som golden-path.spec.ts:s cleanupCore() —
+    // fångar Fas 2-kort som skapades server-sida men aldrig hann in i
+    // handoff.approvalIds (se den filens kommentar för det källgranskade
+    // scenariot detta täcker).
+    if (handoff.projectId) {
+      const { data: orphanedApprovals } = await supabase
+        .from('pending_approvals')
+        .select('id, payload')
+        .eq('business_id', DEMO_BUSINESS_ID)
+        .in('approval_type', ['review_auto_invoice', 'project_debrief', 'confirm_payment', 'send_sms', 'review_request', 'scheduled_review_request'])
+      for (const row of orphanedApprovals || []) {
+        if ((row as any).payload?.project_id === handoff.projectId) await del('pending_approvals', 'id', (row as any).id)
+      }
+    }
     await del('project_outcome', 'project_id', handoff.projectId)
     await del('project_lesson', 'project_id', handoff.projectId)
     await del('invoice', 'invoice_id', handoff.invoiceId)
+    await del('invoice', 'project_id', handoff.projectId)
     for (const mId of handoff.milestoneIds) await del('project_milestone', 'milestone_id', mId)
     await del('pending_approvals', 'id', handoff.approvalId)
     await del('quote_tracking_events', 'quote_id', handoff.quoteId)
