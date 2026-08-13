@@ -134,6 +134,11 @@ function normalizeUnit(unit: string): string {
   return map[unit.toLowerCase()] || unit
 }
 
+// Kvittoprincipen Fall 3 (docs/design/SYNLIG-INTELLIGENS.md): samma
+// tröskel som strategin föreslår — under den visas "Osäker", över den
+// visas ingenting (tystnad är normalläget, ingen grön bock på varje rad).
+const AI_ITEM_CONFIDENCE_THRESHOLD = 70
+
 /**
  * Konverterar legacy AI/mall-rader (type: labor/material/service) till
  * strukturerade QuoteItem-rader. `suggestedDeductionType` styr ROT/RUT via
@@ -172,6 +177,7 @@ function convertLegacyItems(
     total: number
     note?: string | null
     fromPriceList?: boolean
+    confidence?: number
   }>,
   suggestedDeductionType: 'rot' | 'rut' | 'none' | null | undefined = null,
   itemType: 'item' | 'option' = 'item',
@@ -181,6 +187,10 @@ function convertLegacyItems(
     const { description, quantity, unitPrice } = resolveLegacyItemFields(item)
     const priceMissing =
       sourceIsAi && (unitPrice === 0 || !!(item.note && item.note.includes('PRIS SAKNAS')))
+    // Kvittoprincipen Fall 3: under tröskeln OCH inte redan täckt av
+    // "PRIS SAKNAS" (den markeringen säger redan mer, ska inte dubbla).
+    const uncertain =
+      sourceIsAi && !priceMissing && typeof item.confidence === 'number' && item.confidence < AI_ITEM_CONFIDENCE_THRESHOLD
     return applyOptionRowDefaults(
       setItemRotRut(
         {
@@ -195,6 +205,7 @@ function convertLegacyItems(
           is_rut_eligible: false,
           sort_order: idx,
           ...(priceMissing ? { ai_price_missing: true, save_to_products: true } : {}),
+          ...(uncertain ? { ai_uncertain: true, ai_note: item.note || null } : {}),
         },
         legacyItemRotRutType(item.type, suggestedDeductionType),
       ),
@@ -1854,8 +1865,9 @@ export default function NewQuotePage() {
 
       const finalItems = recalculateItems(workingItems)
         .map((item, idx) => ({ ...item, sort_order: idx }))
-        // Editor-interna flaggor (P4) ska inte fastna i den sparade offerten.
-        .map(({ ai_price_missing, save_to_products, ...rest }) => rest)
+        // Editor-interna flaggor (P4 + Kvittoprincipen Fall 3) ska inte
+        // fastna i den sparade offerten.
+        .map(({ ai_price_missing, save_to_products, ai_uncertain, ai_note, ...rest }) => rest)
 
       const res = await fetch('/api/quotes', {
         method: 'POST',

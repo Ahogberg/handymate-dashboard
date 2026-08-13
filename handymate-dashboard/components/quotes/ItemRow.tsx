@@ -477,6 +477,22 @@ export default function ItemRow({
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {/* Kvittoprincipen Fall 3 (docs/design/SYNLIG-INTELLIGENS.md,
+          2026-08-13): tyst markör ENDAST under säkerhetströskeln — rader
+          därover visar ingenting (en grön bock på varje säker rad vore
+          brus). Procenttalet visas medvetet inte per rad, bara pillen +
+          modellens egen not. Delad rad för mobil+desktop-layouten ovan. */}
+      {item.ai_uncertain && (
+        <div className="px-3 pb-2 md:px-2 md:pb-1.5 flex items-start gap-1.5">
+          <span className="shrink-0 mt-0.5 px-1.5 py-0.5 text-[9px] rounded font-semibold uppercase tracking-wider bg-amber-100 text-amber-700">
+            Osäker
+          </span>
+          {item.ai_note && (
+            <span className="text-xs text-amber-700/90 leading-snug">{item.ai_note}</span>
+          )}
+        </div>
+      )}
     </div>
   )
 }

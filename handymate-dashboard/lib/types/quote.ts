@@ -66,6 +66,18 @@ export interface QuoteItem {
       Kryssade rader med unit_price > 0 POSTas till /api/products vid
       offert-spar, sedan strippas fältet innan quote_items skickas. */
   save_to_products?: boolean
+  /** Kvittoprincipen Fall 3 (docs/design/SYNLIG-INTELLIGENS.md, 2026-08-13):
+      AI:n var under säkerhetströskeln (70%) på just DENNA rad
+      (GeneratedQuoteItem.confidence, lib/ai-quote-generator.ts). Samma
+      livscykel som ai_price_missing — sätts endast vid AI-konvertering,
+      editor-internt, strippas innan quote_items POSTas. Själva
+      procenttalet visas medvetet aldrig per rad (falsk precision i en
+      lista) — bara en "Osäker"-markör + modellens egen not. */
+  ai_uncertain?: boolean
+  /** Modellens egen fritext-motivering för osäkerheten (t.ex. "Mängden är
+      svår att bedöma från fotot"). Tom/undefined på rader ≥ tröskeln —
+      tystnad är normalläget. Samma strip-regel som ai_uncertain. */
+  ai_note?: string | null
 }
 
 export interface QuoteTemplate {
