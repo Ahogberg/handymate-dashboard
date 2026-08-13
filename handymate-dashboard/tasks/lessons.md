@@ -307,3 +307,27 @@ utan att fråga. Fixen i första dörren hade invaggat i falsk trygghet.
 utför samma åtgärd (samma tabell + samma statusövergång) innan fixen anses
 klar, och extrahera grinden till en delad funktion så nästa dörr inte kan
 glömma den.
+
+## 2026-08-13: Att dispatcha subagenter är ett medel, inte ett resultat
+
+**Vad hände:** Fick i uppdrag att bygga hela Golden Path E2E-harnesset (7+
+nya filer, djup källgranskning av ~20 filer krävdes först). Dispatchade 5
+parallella research-subagenter, skrev tasks/todo.md — och rapporterade sedan
+klart/vidare utan att ha skrivit en enda rad av själva harnesset. Andreas
+(via koordinatorn) fick påpeka att research-dispatchen bara skulle vara mitt
+EGET mellansteg, inte leveransen.
+
+**Root cause:** Blandade ihop "jag har satt igång rätt process" med "uppgiften
+är löst". Bakgrunds-subagenter svarar asynkront (notifiering i ett SENARE
+varv) — men det är ingen ursäkt för att avsluta turen innan resultatet
+faktiskt använts till något. Om inget resultat hunnit komma tillbaka än:
+antingen vänta in det inom samma körning, eller (om det är snabbare) göra
+research-läsningen direkt själv med Read/Grep, som jag till slut gjorde.
+
+**Regel:** en uppgift är inte klar för att en subagent/skill/tool-anrop är
+"på väg" — den är klar när den efterfrågade artefakten (kod, fil, svar)
+faktiskt existerar och är verifierad. Innan jag skriver ett `result:`/statusbudskap:
+fråga "finns den konkreta leveransen på disk/i svaret just nu, eller har jag
+bara startat något som ska leverera den senare?". Om det senare — fortsätt
+jobba (vänta in bakgrundsagenter i SAMMA körning, eller gör jobbet själv om
+det är enklare) istället för att rapportera ett mellansteg som slutresultat.

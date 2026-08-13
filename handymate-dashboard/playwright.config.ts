@@ -7,7 +7,18 @@ export default defineConfig({
   testDir: './tests',
   // Riktiga DB-integrationstester är destruktiva och körs endast via
   // playwright.integration.config.ts / npm run test:tenant-isolation.
-  testIgnore: /.*\.integration\.spec\.ts/,
+  //
+  // tests/e2e-golden-path/** exkluderas HÄR (globalt) medvetet: de tre
+  // befintliga projekten nedan (setup/chromium/mobile) har ingen egen
+  // testMatch och ärver annars global testDir/testIgnore rakt av — utan
+  // undantaget hade de TYST plockat upp golden-path.spec.ts/permission-
+  // check.spec.ts också (dubbel-/trippelkörning av RIKTIGA UI-klick+SMS+
+  // mejl via chromium+mobile+det nya golden-path-projektet samtidigt, och
+  // permission-check.spec.ts hade körts med FEL storageState — ägarens
+  // user.json istället för demo-employee.json). De tre nya golden-path-*-
+  // projekten längst ner sätter egen testIgnore:[] för att inte ärva
+  // undantaget de själva behöver träffa.
+  testIgnore: [/.*\.integration\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -37,6 +48,37 @@ export default defineConfig({
       name: 'mobile',
       use: { ...devices['iPhone 14'] },
       dependencies: ['setup'],
+    },
+
+    // ── Golden Path E2E-harness (Fas 1) — helt separat projektgrupp ──────
+    // Skild från setup/chromium/mobile ovan (som inte rörs): egna
+    // storageState-filer, egen körordning (setup -> golden-path ->
+    // permissions, samma dependencies-mönster som setup -> chromium redan
+    // använder). testIgnore:[] åsidosätter det globala e2e-golden-path-
+    // undantaget ovan — annars hade de här projekten exkluderat sina egna
+    // filer.
+    {
+      name: 'golden-path-setup',
+      testDir: './tests/e2e-golden-path/setup',
+      testMatch: /.*\.setup\.ts/,
+      testIgnore: [],
+      use: { storageState: undefined },
+    },
+    {
+      name: 'golden-path',
+      testDir: './tests/e2e-golden-path',
+      testMatch: /golden-path\.spec\.ts/,
+      testIgnore: [],
+      use: { storageState: undefined },
+      dependencies: ['golden-path-setup'],
+    },
+    {
+      name: 'golden-path-permissions',
+      testDir: './tests/e2e-golden-path',
+      testMatch: /permission-check\.spec\.ts/,
+      testIgnore: [],
+      use: { storageState: 'playwright/.auth/demo-employee.json' },
+      dependencies: ['golden-path'],
     },
   ],
 })
