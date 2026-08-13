@@ -174,9 +174,16 @@ export async function processMeetingJob(
   }))
   const assembled = assembleTranscript(transcriptSegments)
 
+  // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): recording_id är
+  // NOT NULL utan DEFAULT — se app/api/admin/demo-seed-meeting/route.ts
+  // för hela fyndet (bekräftat: call_recording hade NOLL rader i
+  // produktion, denna insert kraschade tyst-ish (fångas nedan, men
+  // meeting_job markerades bara 'failed' — inget möte har någonsin
+  // faktiskt sparats sedan V2 lanserades).
   const { data: recording, error: insertError } = await supabase
     .from('call_recording')
     .insert({
+      recording_id: 'rec_' + Math.random().toString(36).substr(2, 9),
       business_id: job.business_id,
       customer_id: job.customer_id,
       booking_id: job.booking_id,

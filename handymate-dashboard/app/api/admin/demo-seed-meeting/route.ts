@@ -128,9 +128,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): recording_id är
+    // NOT NULL utan DEFAULT på call_recording (id är en separat uuid-PK
+    // med egen default — recording_id är den textbaserade identifieraren
+    // all annan kod frågar efter). Utan denna rad kraschar VARJE insert
+    // med en NOT NULL-violation — bekräftat: call_recording hade NOLL
+    // rader alls i produktion, samma bugg fanns i alla 4 kända insert-
+    // ställen (denna, lib/meetings/process-job.ts, voice/recording,
+    // voice/incoming). Se sql/v127_call_recording_id_default.sql för
+    // schemafixen som täcker framtida ställen också.
     const { data: recording, error: insertError } = await supabase
       .from('call_recording')
       .insert({
+        recording_id: 'rec_' + Math.random().toString(36).substr(2, 9),
         business_id: business.business_id,
         customer_id: customerId,
         booking_id: bookingId,

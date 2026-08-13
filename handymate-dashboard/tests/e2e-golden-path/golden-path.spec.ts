@@ -1436,9 +1436,9 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
         const res = await ownerCtx.request.post('/api/admin/demo-seed-meeting', {
           data: { customerId: ids.customerId, bookingId: ids.bookingId },
         })
-        expect(res.ok(), `POST /api/admin/demo-seed-meeting svarade ${res.status()}`).toBeTruthy()
-        const body = await res.json()
-        expect(body.success, 'analysen ska ha lyckats synkront').toBeTruthy()
+        const body = await res.json().catch(() => null)
+        expect(res.ok(), `POST /api/admin/demo-seed-meeting svarade ${res.status()}: ${JSON.stringify(body)}`).toBeTruthy()
+        expect(body.success, `analysen ska ha lyckats synkront: ${JSON.stringify(body)}`).toBeTruthy()
         return body
       })
       ids.meetingRecordingId = seedResult.recording_id

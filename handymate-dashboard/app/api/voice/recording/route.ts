@@ -100,15 +100,21 @@ export async function POST(request: NextRequest) {
       recording = result.data
       error = result.error
     } else {
+      // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): recording_id är
+      // NOT NULL utan DEFAULT — se app/api/admin/demo-seed-meeting/route.ts
+      // för hela fyndet (call_recording hade NOLL rader i produktion).
       const result = await supabase
         .from('call_recording')
         .insert({
+          recording_id: 'rec_' + Math.random().toString(36).substr(2, 9),
           business_id: businessId,
           customer_id: customerId,
           elks_recording_id: recordingId,
           recording_url: recordingUrl,
           duration_seconds: duration,
           phone_number: direction === 'inbound' ? from : to,
+          from_number: from,
+          to_number: to,
           direction: direction || 'inbound',
           created_at: new Date().toISOString()
         })
