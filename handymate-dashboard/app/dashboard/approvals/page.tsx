@@ -38,6 +38,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { ringUppmaning } from '@/lib/jarvis/approval-view'
 import { MandagskortCard } from '@/components/jarvis/MandagskortCard'
+import { formatSEK } from '@/lib/format-price'
 
 // SPÅR D1 (2026-08-06): kartan låg inlinead här och var en av fyra kopior av
 // teamet som hunnit gå isär. Härleds nu ur den enda källan (lib/agents/team.ts).
@@ -58,6 +59,62 @@ function getAgentFromApproval(approval: Approval): { name: string; role: string;
   if (type.includes('booking') || type.includes('project') || type.includes('dispatch') || type.includes('job_report') || type.includes('warranty')) return AGENT_INFO.lars
   if (type.includes('call') || type.includes('sms')) return AGENT_INFO.lisa
   return null
+}
+
+/**
+ * Distributed Value Receipts (2026-08-13): "Godkänt!"/"SMS skickat!" säger
+ * inget om vad godkännandet faktiskt var värt. Beloppet finns redan i
+ * payload för de flesta pengarelevanta korttyper — bara create_ata_draft
+ * behöver läsa exekveringssvarets EXAKTA belopp (payload bär bara en
+ * uppskattning). Nycklar på approval_type direkt, INTE på exec.quote_id —
+ * en projekt-kopplad ÄTA svarar utan quote_id, till skillnad från
+ * reserv-vägen (offert utan projekt), som fortfarande får sin länk med.
+ */
+function buildValueReceipt(
+  approval: Approval | undefined,
+  exec: Record<string, unknown> | null | undefined,
+): { text: string; link?: string } | null {
+  if (!approval) return null
+  const p = approval.payload || {}
+  switch (approval.approval_type) {
+    case 'confirm_payment': {
+      const total = p.total as number | undefined
+      return typeof total === 'number' ? { text: `Betalning bekräftad — ${formatSEK(total)} inbetalt` } : null
+    }
+    case 'review_auto_invoice': {
+      const total = p.total as number | undefined
+      if (typeof total !== 'number') return null
+      const invoiceNumber = p.invoice_number as string | undefined
+      return {
+        text: invoiceNumber
+          ? `Faktura ${invoiceNumber} skickad — ${formatSEK(total)} fakturerat`
+          : `Faktura skickad — ${formatSEK(total)} fakturerat`,
+      }
+    }
+    case 'invoice_reminder': {
+      const amount = p.amount_kr as number | undefined
+      return typeof amount === 'number' ? { text: `Påminnelsen skickad — ${formatSEK(amount)} bevakas nu` } : null
+    }
+    case 'missad_intakt': {
+      const amount = p.amount_kr as number | undefined
+      return typeof amount === 'number' ? { text: `Fakturaunderlag skapat — ${formatSEK(amount)}` } : null
+    }
+    case 'fakturera_projekt': {
+      const amount = p.amount_kr as number | undefined
+      return typeof amount === 'number' ? { text: `Faktura skapad — ${formatSEK(amount)}` } : null
+    }
+    case 'create_ata_draft': {
+      const total = exec?.total as number | undefined
+      if (typeof total !== 'number') return null
+      const quoteId = exec?.quote_id as string | undefined
+      return {
+        text: `ÄTA godkänt — ${formatSEK(total)} har gått från möjlig intäkt → godkänt arbete`,
+        link: quoteId ? `/dashboard/quotes/${quoteId}` : undefined,
+      }
+    }
+    default:
+      return null
+  }
 }
 
 interface Approval {
@@ -387,7 +444,11 @@ export default function ApprovalsPage() {
             setFeedbackMsg('Påminnelse noterad — ring kunden när du har möjlighet')
           } else {
             const exec = result?.execution
-            if (exec?.quote_id) {
+            const valueReceipt = buildValueReceipt(approvedItem, exec)
+            if (valueReceipt) {
+              setFeedbackMsg(valueReceipt.text)
+              if (valueReceipt.link) setFeedbackLink(valueReceipt.link)
+            } else if (exec?.quote_id) {
               setFeedbackMsg(
                 approvedItem?.approval_type === 'create_ata_draft' ? 'ÄTA-utkast skapat!' : 'Offertutkast skapat!',
               )
