@@ -163,14 +163,16 @@ export default function SchemaOverviewPage() {
     (shift: PersonDayShift, member: ResourceTeamMember) => {
       let customerName: string | null = null
       let projectName: string | null = null
+      let dispatchReasoning = null as WeekBooking['dispatch_reasoning'] | undefined
       if (shift.source === 'booking') {
         const b = weekBookingsById.get(shift.refId)
         customerName = b?.customer?.name || null
         projectName = b?.project?.name || (shift.projectId ? projectNames.get(shift.projectId) || null : null)
+        dispatchReasoning = b?.dispatch_reasoning || null
       } else if (shift.projectId) {
         projectName = projectNames.get(shift.projectId) || null
       }
-      setDetailContext({ shift, memberName: member.name, customerName, projectName })
+      setDetailContext({ shift, memberName: member.name, customerName, projectName, dispatchReasoning })
     },
     [weekBookingsById, projectNames],
   )

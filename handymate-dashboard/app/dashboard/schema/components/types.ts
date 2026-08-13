@@ -21,6 +21,10 @@ export interface WeekBooking {
   customer_id: string | null
   customer?: { name: string } | null
   project?: { name: string } | null
+  /** "Visa varför"-utrullning, Fall 4 (docs/design/SYNLIG-INTELLIGENS.md) —
+      Lars sparade tilldelningsresonemang. GET /api/bookings selectar redan
+      '*' så fältet följer med utan API-ändring. */
+  dispatch_reasoning?: import('@/components/dispatch/DispatchReasoning').DispatchReasoningData | null
 }
 
 export function bookingTitle(b: WeekBooking): string {

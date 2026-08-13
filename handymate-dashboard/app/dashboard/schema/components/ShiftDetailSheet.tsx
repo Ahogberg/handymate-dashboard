@@ -5,6 +5,7 @@ import { X, AlertTriangle, ArrowRight } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import type { PersonDayShift } from '@/lib/schedule/person-day'
+import { DispatchReasoning, type DispatchReasoningData } from '@/components/dispatch/DispatchReasoning'
 
 const TYPE_LABEL: Record<string, string> = {
   booking: 'Kundjobb',
@@ -19,6 +20,12 @@ export interface ShiftDetailContext {
   memberName: string
   customerName?: string | null
   projectName?: string | null
+  /** "Visa varför"-utrullning, Fall 4 (docs/design/SYNLIG-INTELLIGENS.md) —
+      Lars sparade tilldelningsresonemang (booking.dispatch_reasoning).
+      Null/undefined för pass utan dispatch-förslag (manuell tilldelning,
+      eller tilldelat innan v130) — då visas ingenting, aldrig ett gissat
+      "varför". */
+  dispatchReasoning?: DispatchReasoningData | null
 }
 
 interface ShiftDetailSheetProps {
@@ -34,7 +41,7 @@ interface ShiftDetailSheetProps {
  */
 export function ShiftDetailSheet({ context, onClose }: ShiftDetailSheetProps) {
   if (!context) return null
-  const { shift, memberName, customerName, projectName } = context
+  const { shift, memberName, customerName, projectName, dispatchReasoning } = context
   const timeLabel = shift.allDay
     ? 'Heldag'
     : `${format(parseISO(shift.start), 'HH:mm')}–${format(parseISO(shift.end), 'HH:mm')}`
@@ -61,6 +68,14 @@ export function ShiftDetailSheet({ context, onClose }: ShiftDetailSheetProps) {
             <span className="text-slate-500">Person</span>
             <span className="font-medium text-gray-900">{memberName}</span>
           </div>
+          {/* "Visa varför"-utrullning, Fall 4 — inline, inte bakom klick:
+              samma resonemang som GuardianOrsaker på projektsidan (en
+              enskild-detaljvy man redan aktivt klickat sig in i). */}
+          {dispatchReasoning && (
+            <div className="py-2 border-b border-slate-100">
+              <DispatchReasoning {...dispatchReasoning} />
+            </div>
+          )}
           <div className="flex items-center justify-between py-2 border-b border-slate-100">
             <span className="text-slate-500">Datum</span>
             <span className="font-medium text-gray-900 capitalize">{dateLabel}</span>
