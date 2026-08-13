@@ -84,6 +84,7 @@ import Link from 'next/link'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import dynamic from 'next/dynamic'
 import ProjectInvoiceModal from '@/components/invoices/ProjectInvoiceModal'
+import ProjectCloseoutModal from '@/components/projects/ProjectCloseoutModal'
 import TimeEntryModal from '@/components/time/TimeEntryModal'
 import { ProjectBookingsTable } from './components/ProjectBookingsTable'
 import { ProjectStageModal } from '@/components/pipeline/unified/ProjectStageModal'
@@ -712,6 +713,7 @@ export default function ProjectDetailPage() {
   const [savingStatus, setSavingStatus] = useState(false)
   const [creatingInvoice, setCreatingInvoice] = useState(false)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [showCloseoutModal, setShowCloseoutModal] = useState(false)
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type })
@@ -1559,6 +1561,14 @@ export default function ProjectDetailPage() {
       // Trigga ProjectEconomicsCard att refetcha vid statusbyte
       setEconomicsRefreshKey(k => k + 1)
       await fetchProjectData()
+
+      // Project Closeout Magic (2026-08-13): bara på den RIKTIGA
+      // inte-klart→klart-övergången (samma villkor som redan skyddat
+      // ovan mot fyra-ögon-kortets gated fall — den grenen har redan
+      // return:at innan vi når hit).
+      if (newStatus === 'completed' && prevStatus !== 'completed') {
+        setShowCloseoutModal(true)
+      }
     } catch {
       // Rollback optimistic update
       setProject({ ...project, status: prevStatus })
@@ -4623,6 +4633,15 @@ export default function ProjectDetailPage() {
         onBookingChange={handleTimeBookingChange}
         onWorkTypeChange={handleTimeWorkTypeChange}
       />
+
+      {/* Projektet är klart — resultatskärm (Project Closeout Magic) */}
+      {showCloseoutModal && project && (
+        <ProjectCloseoutModal
+          projectId={project.project_id}
+          projectName={project.name}
+          onClose={() => setShowCloseoutModal(false)}
+        />
+      )}
 
       {/* Fakturera projekt-modal */}
       {showInvoiceModal && project && (

@@ -80,10 +80,33 @@ export async function GET(
       }
     }
 
+    // ÄTA-sammanställning för Project Closeout-skärmen (2026-08-13) — antal
+    // ÄTA-förslag som förekommit på projektet, oavsett utfall (godkänt/
+    // avvisat/väntande). ata_signed_kr på outcome-raden är BELOPPET av de
+    // signerade — den här räknar hur många som HITTADES, en annan siffra.
+    // Icke-blockerande: en trasig räkning ska aldrig fälla hela sidan.
+    let ataCount: number | null = null
+    try {
+      const { count, error: ataErr } = await supabase
+        .from('pending_approvals')
+        .select('id', { count: 'exact', head: true })
+        .eq('business_id', business.business_id)
+        .eq('approval_type', 'create_ata_draft')
+        .contains('payload', { project_id: params.id })
+      if (ataErr) {
+        console.warn('[efterkalkyl] ÄTA-räkning misslyckades (icke-blockerande):', ataErr.message)
+      } else {
+        ataCount = count ?? 0
+      }
+    } catch (err) {
+      console.warn('[efterkalkyl] oväntat fel vid ÄTA-räkning (icke-blockerande):', err)
+    }
+
     return NextResponse.json({
       project_status: project.status,
       outcome: outcome || null,
       expected_margin_snapshot: expectedMarginSnapshot,
+      ata_count: ataCount,
     })
   } catch (error: any) {
     console.error('Get efterkalkyl error:', error)
