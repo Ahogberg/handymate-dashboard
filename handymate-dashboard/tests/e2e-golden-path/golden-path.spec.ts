@@ -1437,11 +1437,15 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
           data: { customerId: ids.customerId, bookingId: ids.bookingId },
         })
         const body = await res.json().catch(() => null)
+        // Fånga recording_id INNAN assertions — routen skapar call_recording-
+        // raden även om den efterföljande analysen failar (502), så ett
+        // kastat test nedan ska ändå kunna städa upp raden (annars blockerar
+        // den customer-raderingen via call_recording_customer_id_fkey).
+        if (body?.recording_id) ids.meetingRecordingId = body.recording_id
         expect(res.ok(), `POST /api/admin/demo-seed-meeting svarade ${res.status()}: ${JSON.stringify(body)}`).toBeTruthy()
         expect(body.success, `analysen ska ha lyckats synkront: ${JSON.stringify(body)}`).toBeTruthy()
         return body
       })
-      ids.meetingRecordingId = seedResult.recording_id
 
       const createdCards = await test.step('DB-bevis: pending_approvals skapade av analysen (meeting_summary alltid, customer_fact från default-transkriptets tydliga uttalanden)', async () => {
         const supabase = getSupabaseAdmin()

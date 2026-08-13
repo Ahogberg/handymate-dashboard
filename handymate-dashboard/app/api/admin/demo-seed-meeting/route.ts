@@ -195,6 +195,7 @@ export async function POST(request: NextRequest) {
           recording_id: recording.recording_id,
           customer_id: customerId,
           booking_id: bookingId,
+          debug: analysis?.debug || null,
         },
         { status: 502 }
       )

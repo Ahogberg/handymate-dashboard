@@ -294,7 +294,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (fetchError || !recording) {
-      return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
+      console.error('[voice/analyze] Recording not found:', { recording_id, fetchError: fetchError?.message, fetchCode: fetchError?.code })
+      return NextResponse.json(
+        { error: 'Recording not found', debug: { recording_id, fetchError: fetchError?.message || null, fetchCode: fetchError?.code || null } },
+        { status: 404 },
+      )
     }
 
     // Auth fanns — men ingen jämförelse mellan inloggat företag och
