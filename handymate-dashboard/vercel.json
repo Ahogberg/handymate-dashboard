@@ -26,6 +26,10 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/next-best-action",
+      "schedule": "0 7 * * *"
+    },
+    {
       "path": "/api/cron/quote-follow-up",
       "schedule": "0 8 * * *"
     },

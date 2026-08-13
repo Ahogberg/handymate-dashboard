@@ -52,6 +52,7 @@ import { groupApprovals, groupTitle, groupTotalKr } from '@/lib/jarvis/group-app
 import { grindaNyheter, entityFrom } from '@/lib/jarvis/news-gates'
 import { pengaFynd } from '@/lib/jarvis/moment-rows'
 import type { AgentMoment } from '@/lib/moments/derive'
+import { GorDettaForst, type NextBestActionRecommendation } from '@/components/jarvis/GorDettaForst'
 
 /**
  * JarvisHome — teamets rapportbord (2026-08-07).
@@ -245,6 +246,15 @@ export default function JarvisHome({
   // bannern/takeovern ska försvinna direkt när godkännandet köas, precis
   // som ett vanligt kort.
   const mandagskortApproval = approvals.find(a => a.approval_type === 'monday_brief' && !hiddenIds.has(a.id)) ?? null
+
+  // Next Best Action Engine (2026-08-13) — dagens rangordnade rekommendation,
+  // egen hämtning (se app/api/next-best-action/route.ts för varför: den
+  // vanliga kön är begränsad till 15 senaste, toppvalet kan vara äldre).
+  // heroHidden är en LOKAL, optimistisk döljning — både vid godkänn (kortet
+  // är hanterat) och vid "Inte nu" (bara ytan döljs, ärendet lever kvar och
+  // återgår till att vara en vanlig rad i kön nedanför).
+  const [nba, setNba] = useState<NextBestActionRecommendation | null>(null)
+  const [heroHidden, setHeroHidden] = useState(false)
   const [snack, setSnack] = useState<{ approvalId: string; text: string } | null>(null)
   const [feedback, setFeedback] = useState<{ text: string; isError: boolean } | null>(null)
   const [proof, setProof] = useState<string | null>(null)
@@ -307,6 +317,20 @@ export default function JarvisHome({
   }, [authHeaders])
 
   useEffect(() => { void fetchQueue() }, [fetchQueue])
+
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const res = await fetch('/api/next-best-action', { headers: await authHeaders() })
+        if (res.ok) {
+          const data = await res.json()
+          if (active) setNba(data.recommendation || null)
+        }
+      } catch { /* ingen rankning idag är ett giltigt, tyst utfall */ }
+    })()
+    return () => { active = false }
+  }, [authHeaders])
 
   useEffect(() => {
     if (!business?.business_id) return
@@ -888,6 +912,24 @@ export default function JarvisHome({
             )
           })()}
 
+          {nba && !heroHidden && !hiddenIds.has(nba.approval.id) && (
+            <GorDettaForst
+              recommendation={nba}
+              approveLabelText={approveLabel(nba.approval.approval_type, nba.approval.payload)}
+              onApprove={() => {
+                setHeroHidden(true)
+                // GorDettaForst deklarerar en minimal Approval-form (samma
+                // konvention som varje annan konsument i kodbasen — se
+                // ProjectApprovalsBlock/IdagCore/approvals/page.tsx, alla
+                // har sin egen lokala Approval-interface). Den faktiska
+                // raden bär alla fält (API:t gör select('*') mot
+                // pending_approvals), så dubbel-cast här är säker.
+                queueAction(nba.approval as unknown as Approval, 'approve')
+              }}
+              onDismiss={() => setHeroHidden(true)}
+            />
+          )}
+
           {!queueLoaded ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-center min-h-[88px]">
               <Loader2 className="w-4 h-4 text-slate-300 animate-spin" />
@@ -905,6 +947,13 @@ export default function JarvisHome({
                 // fortfarande med i `beslut`/`grupper` (oförändrat), bara
                 // själva raden hoppas över vid rendering.
                 if (approval.approval_type === 'monday_brief') return null
+
+                // Next Best Action-hero'n ovanför äger redan den här raden
+                // (samma mönster som monday_brief-gaten ovan) — men bara när
+                // den faktiskt visas OCH gruppen är en ensam kandidat.
+                // Sammanslagna grupper (grupp.merged) lämnas orörda: att
+                // dölja hela gruppen hade gömt obesläktade syskonkort.
+                if (nba && !heroHidden && !grupp.merged && approval.id === nba.approval.id) return null
 
                 // "En händelse → hela företaget" (2026-08-13): projekt-
                 // stängningens kort (faktura/debrief/recension) delar ett
