@@ -295,15 +295,27 @@ export async function POST(request: NextRequest) {
       }
 
       // Logga aktivitet (customer_activity — gamla namnet activity fanns inte)
-      await supabase
+      // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): activity_id och
+      // title är NOT NULL utan default på customer_activity — insertet
+      // saknade båda och floppade TYST vid VARJE fakturautskick (ingen
+      // .error-koll här, samma tysta-fel-mönster som redan dokumenterat i
+      // auto-invoice-on-complete.ts). Fältformen kopierad från den
+      // fungerande app/api/quotes/send/route.ts.
+      const { error: activityErr } = await supabase
         .from('customer_activity')
         .insert({
+          activity_id: 'act_' + Math.random().toString(36).substr(2, 9),
           business_id: invoice.business_id,
           customer_id: invoice.customer_id,
           activity_type: 'invoice_sent',
+          title: `Faktura ${invoice.invoice_number} skickad`,
           description: `Faktura ${invoice.invoice_number} skickad${results.email ? ' via email' : ''}${results.sms ? ' via SMS' : ''}`,
-          metadata: { invoice_id, ...results }
+          metadata: { invoice_id, ...results },
+          created_by: 'user',
         })
+      if (activityErr) {
+        console.error('[invoices/send] customer_activity insert failed:', activityErr)
+      }
 
       // Pipeline: move deal to invoiced
       try {
