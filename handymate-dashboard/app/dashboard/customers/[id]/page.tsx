@@ -899,7 +899,17 @@ export default function CustomerDetailPage() {
                         </div>
                         <p className="text-sm text-gray-900">{fact.content}</p>
                         {fact.evidence_quote && (
-                          <p className="text-xs text-gray-500 italic mt-1">"{fact.evidence_quote}"</p>
+                          // Explainability (2026-08-13): samma citat som redan visades,
+                          // bara tydligt märkt som BEVIS istället för en bar kursiv rad.
+                          // Visas fortfarande alltid — att gömma bakom ett expand/collapse
+                          // hade varit en transparens-regression, inte en förbättring.
+                          <div className="mt-2 pl-3 border-l-2 border-primary-200 bg-primary-50/40 rounded-r-lg py-1.5 pr-2">
+                            <p className="flex items-center gap-1 text-[10px] font-medium text-primary-700 uppercase tracking-wide mb-0.5">
+                              <MessageSquare className="w-3 h-3" />
+                              Varför vet Handymate detta?
+                            </p>
+                            <p className="text-xs text-gray-600 italic">"{fact.evidence_quote}"</p>
+                          </div>
                         )}
                       </div>
                     )
