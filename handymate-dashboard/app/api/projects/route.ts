@@ -646,6 +646,15 @@ export async function PUT(request: NextRequest) {
     // om hela kedjan — recensionsbegäran, nurture och Lars-triggern gick ut
     // en gång per klick på ett redan stängt projekt.
     if (blirKlart && project) {
+      // "En händelse → hela företaget" (Business Twin-backlog #2, 2026-08-13):
+      // den här övergången skapar flera FRISTÅENDE godkännandekort (faktura,
+      // debrief, recensionsförfrågan) som idag visas som obesvikta,
+      // orelaterade kort. Ett delat batch-id stämplas in på var och en
+      // (sista steget i blocket, se längre ner) så ytan kan gruppera dem
+      // under en gemensam rubrik — INTE bunta ihop dem till ett enda
+      // "godkänn allt"-klick (fakturan är en pengarörelse och förtjänar sitt
+      // eget medvetna klick, samma resonemang som fyra-ögon-grinden).
+      const completionBatchId = crypto.randomUUID()
       try {
         const { fireEvent } = await import('@/lib/automation-engine')
         await fireEvent(supabase, 'job_completed', business.business_id, {
@@ -817,6 +826,29 @@ export async function PUT(request: NextRequest) {
           })
         }
       } catch { /* non-blocking */ }
+
+      // Stämpla completion_batch_id på de kort just DENNA stängning skapade
+      // — sista steget, efter att alla ovanstående haft sin chans att skapa
+      // sina kort. Icke-blockerande: en misslyckad stämpling ska aldrig
+      // fälla stängningen, den gör bara ytan omedvetet om grupperingen.
+      try {
+        const { data: batchRows } = await supabase
+          .from('pending_approvals')
+          .select('id, payload')
+          .eq('business_id', business.business_id)
+          .eq('status', 'pending')
+          .in('approval_type', ['review_auto_invoice', 'project_debrief', 'scheduled_review_request'])
+        for (const row of batchRows || []) {
+          if ((row as any).payload?.project_id === project.project_id) {
+            await supabase
+              .from('pending_approvals')
+              .update({ payload: { ...(row as any).payload, completion_batch_id: completionBatchId } })
+              .eq('id', (row as any).id)
+          }
+        }
+      } catch (batchErr) {
+        console.error('[projects] completion_batch_id-stämpling misslyckades (icke-blockerande):', batchErr)
+      }
     }
 
     return NextResponse.json({ project })

@@ -905,8 +905,39 @@ export default function JarvisHome({
                 // fortfarande med i `beslut`/`grupper` (oförändrat), bara
                 // själva raden hoppas över vid rendering.
                 if (approval.approval_type === 'monday_brief') return null
+
+                // "En händelse → hela företaget" (2026-08-13): projekt-
+                // stängningens kort (faktura/debrief/recension) delar ett
+                // completion_batch_id (app/api/projects/route.ts). Visar en
+                // gemensam rubrik ovanför klustret FÖRSTA gången det dyker
+                // upp i listan — varje kort behåller sin egen knapp, aldrig
+                // ett bundlat "godkänn allt" (en faktura förtjänar sitt eget
+                // medvetna klick, samma resonemang som fyra-ögon-grinden).
+                const batchId = (approval.payload as any)?.completion_batch_id as string | undefined
+                const prevBatchId = i > 0
+                  ? ((grupper[i - 1].primary.payload as any)?.completion_batch_id as string | undefined)
+                  : undefined
+                const batchMembers = batchId
+                  ? grupper.filter(g => (g.primary.payload as any)?.completion_batch_id === batchId)
+                  : []
+                const batchSize = batchMembers.length
+                // project_debrief bär inget project_name i sin payload (bara
+                // project_id) — leta i HELA klustret, inte bara det egna
+                // kortet, annars visar rubriken det generiska fallbacket
+                // varje gång debriefkortet råkar renderas först.
+                const batchProjectName = batchMembers
+                  .map(g => (g.primary.payload as any)?.project_name as string | undefined)
+                  .find(Boolean)
+                const showBatchHeader = !!batchId && batchId !== prevBatchId && batchSize > 1
+
                 return (
                 <div key={approval.id} id={`beslut-${approval.id}`}>
+                {showBatchHeader && (
+                  <p className="m-0 mb-1.5 px-1 text-xs font-medium text-slate-400">
+                    {batchProjectName ? `Projektet ${batchProjectName} avslutades` : 'Ett projekt avslutades'}
+                    {' — '}{batchSize} sak{batchSize === 1 ? '' : 'er'} väntar
+                  </p>
+                )}
                 <ApprovalCard
                   approval={approval}
                   // Sammanslagen grupp: samma agent, samma typ, samma dygn.
