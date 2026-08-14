@@ -51,7 +51,7 @@ export function FuelWarningCard() {
       </h3>
       <p className="text-sm text-slate-500 mb-3">
         {level.weeksRemaining != null
-          ? `${weeksRemainingPhrase(level.weeksRemaining)} i nuvarande takt.`
+          ? `${weeksRemainingPhrase(level.weeksRemaining, level.daysRemaining)} i nuvarande takt.`
           : 'Håll ett öga på förbrukningen den här perioden.'}
       </p>
 

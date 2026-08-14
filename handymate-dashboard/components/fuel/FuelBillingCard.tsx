@@ -41,7 +41,7 @@ export function FuelBillingCard() {
   }
 
   const estimateText = level.weeksRemaining != null
-    ? `${weeksRemainingPhrase(level.weeksRemaining)} som vanligt.`
+    ? `${weeksRemainingPhrase(level.weeksRemaining, level.daysRemaining)} som vanligt.`
     : 'Ingen förbrukning ännu den här perioden.'
   const calmText = level.state === 'normal'
     ? 'Ingen fara — teamet jobbar på som vanligt.'

@@ -21,6 +21,7 @@ import {
   bucketForRefType,
   fuelBudgetOreForPlan,
   resolveFuelWindowStart,
+  weeksRemainingPhrase,
   FUEL_PLAN_BUDGET_ORE,
   type FuelCostRow,
 } from '../lib/costs/fuel'
@@ -131,6 +132,30 @@ test.describe('Bränsle — beräkningskärnan (ren funktion, ingen DB)', () => 
     const alldelesForGammal = new Date('2026-01-01T00:00:00Z')
     expect(resolveFuelWindowStart(senareNow, alldelesForGammal.toISOString()).toISOString().slice(0, 10))
       .toBe(MEASUREMENT_STARTED_AT)
+  })
+
+  test('daysRemaining och weeksRemaining kommer från samma bråktal', () => {
+    // 100 000 öre budget, 700 öre/dag förbrukat, 30-dagarsfönster →
+    // 300 kr kvar / 700 öre/dag ≈ 42,9 dagar ≈ 6 veckor.
+    const rows: FuelCostRow[] = new Array(30).fill(0).map((_, i) => ({
+      resource: 'llm', cost_ore: 700, ref_type: 'agent_run',
+      created_at: new Date(windowStart.getTime() + i * 86_400_000).toISOString(),
+    }))
+    const level = computeFuelLevel({ rows, planBudgetOre: 100_000, topupOreInWindow: 0, windowStart, windowEnd })
+    expect(level.daysRemaining).not.toBeNull()
+    expect(Math.round(level.daysRemaining! / 7)).toBe(level.weeksRemaining)
+  })
+
+  test('weeksRemainingPhrase växlar till dagar under en vecka i stället för "0 veckor"', () => {
+    expect(weeksRemainingPhrase(0, 4)).toBe('Räcker ungefär 4 dagar till')
+    expect(weeksRemainingPhrase(0, 1)).toBe('Räcker ungefär en dag till')
+    expect(weeksRemainingPhrase(0, 0)).toBe('Tar snart slut')
+    expect(weeksRemainingPhrase(0, null)).toBe('Tar snart slut')
+  })
+
+  test('weeksRemainingPhrase säger veckor så fort minst en hel vecka återstår', () => {
+    expect(weeksRemainingPhrase(1, 9)).toBe('Räcker ungefär en vecka till')
+    expect(weeksRemainingPhrase(4, 30)).toBe('Räcker ungefär 4 veckor till')
   })
 
   test('state-trösklar: normal >30%, low <=30%, critical <=10%', () => {

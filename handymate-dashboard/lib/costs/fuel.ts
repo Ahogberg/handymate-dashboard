@@ -57,17 +57,27 @@ export function fuelBudgetOreForPlan(plan: string | null | undefined): number {
 
 /**
  * Delad text för "räcker ungefär X till" — båda klientytorna (hemvisten,
- * kortkö-varningen) formulerar samma sak olika utförligt, men "0 veckor"
- * (helt reell utfallsrymd: hög burn rate på kort fönster) läste tonlöst
- * innan den här funktionen fanns, upptäckt vid en riktig skärmdumps-
- * verifiering av kritiskt läge, 2026-08-14. Anropas bara när weeksRemaining
- * inte är null — null (ingen förbrukning ännu) hanteras skilt per yta,
- * eftersom "i nuvarande takt" inte är en meningsfull uppföljning då.
+ * kortkö-varningen) formulerar samma sak olika utförligt.
+ *
+ * Växlar till DAGAR under en vecka kvar (Andreas-beslut 2026-08-14, efter
+ * att "Räcker ungefär 0 veckor till" visade sig vara den vanliga texten
+ * just i kritiskt läge — det är per definition när färre än 7 dagar
+ * återstår, så avrundning till hela veckor gömde exakt den siffra
+ * användaren mest behöver se). weeksRemaining/daysRemaining kommer från
+ * SAMMA bråktal i computeFuelLevel — ingen risk att de säger olika saker.
+ *
+ * Anropas bara när weeksRemaining inte är null — null (ingen förbrukning
+ * ännu) hanteras skilt per yta, eftersom "i nuvarande takt" inte är en
+ * meningsfull uppföljning då.
  */
-export function weeksRemainingPhrase(weeksRemaining: number): string {
-  if (weeksRemaining <= 0) return 'Tar snart slut'
+export function weeksRemainingPhrase(weeksRemaining: number, daysRemaining: number | null): string {
+  if (weeksRemaining >= 2) return `Räcker ungefär ${weeksRemaining} veckor till`
   if (weeksRemaining === 1) return 'Räcker ungefär en vecka till'
-  return `Räcker ungefär ${weeksRemaining} veckor till`
+  // Under en vecka kvar — visa dagar i stället för "0 veckor".
+  const dagar = daysRemaining ?? 0
+  if (dagar <= 0) return 'Tar snart slut'
+  if (dagar === 1) return 'Räcker ungefär en dag till'
+  return `Räcker ungefär ${dagar} dagar till`
 }
 
 export type FuelBucket = 'calls_sms' | 'quotes_analysis' | 'night_work'
@@ -188,6 +198,10 @@ export interface FuelLevel {
   remainingPercent: number
   /** null = ingen förbrukning ännu (oändligt räcker). */
   weeksRemaining: number | null
+  /** Samma prognos som weeksRemaining, fast i dagar — grunden för
+   *  weeksRemainingPhrase när mindre än en vecka återstår. null under
+   *  exakt samma villkor som weeksRemaining (ingen förbrukning ännu). */
+  daysRemaining: number | null
   buckets: Array<{ key: FuelBucket; label: string; percent: number }>
   /** 30 tal, äldst→nyast, daglig kostnad i öre. */
   history: number[]
@@ -244,15 +258,22 @@ export function computeFuelLevel(params: {
     if (maxVal >= restAvg * 2) highlightIndex = maxIdx
   }
 
-  // Veckor kvar: snittförbrukning/dag i fönstret, projicerat mot resterande budget.
+  // Dagar/veckor kvar: snittförbrukning/dag i fönstret, projicerat mot
+  // resterande budget. Samma bråktal (remainingOre / avgDailyOre) ligger
+  // bakom båda — weeksRemaining avrundar till hela veckor och tappar all
+  // upplösning under en vecka (blev "0 veckor", se weeksRemainingPhrase),
+  // daysRemaining behåller den för att texten ska kunna säga "4 dagar"
+  // i stället för att bara säga att det snart tar slut.
   const avgDailyOre = usedOre / windowDays
   const remainingOre = Math.max(0, budgetOre - usedOre)
-  const weeksRemaining = avgDailyOre > 0 ? Math.round(remainingOre / avgDailyOre / 7) : null
+  const daysExact = avgDailyOre > 0 ? remainingOre / avgDailyOre : null
+  const weeksRemaining = daysExact != null ? Math.round(daysExact / 7) : null
+  const daysRemaining = daysExact != null ? Math.round(daysExact) : null
 
   const state: FuelLevel['state'] =
     remainingPercent <= 10 ? 'critical' : remainingPercent <= 30 ? 'low' : 'normal'
 
-  return { usedOre, budgetOre, usedRatio, remainingPercent, weeksRemaining, buckets, history, highlightIndex, state }
+  return { usedOre, budgetOre, usedRatio, remainingPercent, weeksRemaining, daysRemaining, buckets, history, highlightIndex, state }
 }
 
 /**
