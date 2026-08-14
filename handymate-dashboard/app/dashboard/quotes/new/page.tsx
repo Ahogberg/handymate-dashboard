@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2, X } from 'lucide-react'
+import { ArrowLeft, Loader2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
@@ -59,6 +59,7 @@ import { QuoteNewCustomerSection } from './components/QuoteNewCustomerSection'
 import { QuoteNewAttachmentsCard } from './components/QuoteNewAttachmentsCard'
 import { QuoteNewStartChooser } from './components/QuoteNewStartChooser'
 import { QuickIntake } from './components/quick/QuickIntake'
+import { QuickBlankStart } from './components/quick/QuickBlankStart'
 import { QuickBuilding } from './components/quick/QuickBuilding'
 import { QuickReviewBar } from './components/quick/QuickReviewBar'
 import { QuickReceipt } from './components/quick/QuickReceipt'
@@ -422,7 +423,7 @@ export default function NewQuotePage() {
   //
   // "Öppna i fullständiga editorn" är därför bokstavligen quickMode = null:
   // samma offert, samma state, andra verktyget. Inget behöver överföras.
-  const [quickMode, setQuickMode] = useState<'intake' | 'building' | 'review' | 'overview' | null>(null)
+  const [quickMode, setQuickMode] = useState<'intake' | 'blank' | 'building' | 'review' | 'overview' | null>(null)
   /** Snabbofferten öppnas automatiskt EN gång vid kallstart. Utan den här
       vakten hade "Öppna fullständiga editorn" (som sätter quickMode = null)
       studsat tillbaka in i intaget direkt. */
@@ -1445,6 +1446,19 @@ export default function NewQuotePage() {
   // Vid fel går vi tillbaka till intaget med texten kvar. Att slänga
   // hantverkaren in i en tom editor efter ett misslyckat AI-anrop hade
   // betytt att han fick skriva om hela beskrivningen.
+  /**
+   * Delad svans för alla tre startvägar (AI-beskrivning, mall, blankt) —
+   * Andreas fynd (2026-08-14): steg-för-steg-granskningen ska vara standard
+   * oavsett hur offerten startades, inte bara AI-vägen. Bara EN plats som
+   * bestämmer "gå in i granskningen", så mall- och blank-vägarna aldrig kan
+   * glida isär från AI-vägens beteende (t.ex. femte-offerten-genvägen).
+   */
+  function enterQuickReview() {
+    setQuickSection('inkluderat')
+    setQuickApproved([])
+    setQuickMode(shouldSkipSequence(getCompletedCount()) ? 'overview' : 'review')
+  }
+
   async function buildQuickDraft() {
     const inputText = quickInput.trim()
     if (!inputText) return
@@ -1483,14 +1497,23 @@ export default function NewQuotePage() {
       // ETAPP D: efter fem genomförda snabbofferter landar utkastet direkt i
       // översikten. Granskningen finns kvar — den slutar bara vara startläget,
       // och kvittots amber-chips leder tillbaka in i den vid behov.
-      setQuickSection('inkluderat')
-      setQuickApproved([])
-      setQuickMode(shouldSkipSequence(getCompletedCount()) ? 'overview' : 'review')
+      enterQuickReview()
     } catch (err) {
       console.error('[Snabboffert] Kunde inte bygga utkastet:', err)
       toast.error('Nätverksfel — försök igen')
       setQuickMode('intake')
     }
+  }
+
+  /** Blank-starten (2026-08-14) — kund+titel är redan satta av QuickBlankStart
+   *  via title/setTitle och selectedCustomer/setSelectedCustomer direkt (samma
+   *  page-state, ingen kopia). items är redan [] (ny offert). Nollställer bara
+   *  AI-relaterade fält defensivt innan granskningen öppnas utan innehåll. */
+  function startBlankQuickDraft() {
+    if (!title.trim()) return
+    setDescription('')
+    setSourceTranscript('')
+    enterQuickReview()
   }
 
   // ETAPP C3: scrolla fram sektionen som granskas. scroll-margin-top i
@@ -2064,7 +2087,7 @@ export default function NewQuotePage() {
       <QuoteNewStartChooser
         show={templatePickerOpen}
         onClose={() => setTemplatePickerOpen(false)}
-        onSelectTemplate={t => { handleTemplateSelect(t); setQuickMode(null) }}
+        onSelectTemplate={t => { handleTemplateSelect(t); enterQuickReview() }}
       />
       <QuickIntake
         customers={customers}
@@ -2089,8 +2112,26 @@ export default function NewQuotePage() {
         // så texten hade skrivits över i nästa andetag ändå.
         onUseTemplate={() => { leaveQuickMode('template', false); setTemplatePickerOpen(true) }}
         hasContent={items.length > 0}
+        onSkipDescription={() => setQuickMode('blank')}
       />
       </>
+    )
+  }
+
+  // Blank-starten (Andreas fynd 2026-08-14): samma guidade granskning som
+  // AI-vägen, bara utan beskrivningen — se startBlankQuickDraft ovan.
+  if (quickMode === 'blank') {
+    return (
+      <QuickBlankStart
+        customers={customers}
+        selectedCustomer={selectedCustomer}
+        onSelectCustomer={setSelectedCustomer}
+        title={title}
+        onTitleChange={setTitle}
+        onStart={startBlankQuickDraft}
+        onClose={() => setQuickMode('intake')}
+        onOpenFullEditor={() => { leaveQuickMode('editor', false); setQuickMode(null) }}
+      />
     )
   }
 
@@ -2111,16 +2152,140 @@ export default function NewQuotePage() {
       <QuoteNewStartChooser
         show={templatePickerOpen}
         onClose={() => setTemplatePickerOpen(false)}
-        onSelectTemplate={handleTemplateSelect}
+        onSelectTemplate={t => { handleTemplateSelect(t); enterQuickReview() }}
       />
 
-      {/* Granskningsbaren är fäst i nederkanten och täcker sidans slut — utan
-          utrymme nedtill hamnar summeringen under den och går inte att nå.
-          Höjden var tidigare en hårdkodad gissning (260px); baren mäter och
-          publicerar nu sin faktiska höjd som --qk-review-bar-h. */}
+      {/* Steg-för-steg-läget (Andreas fynd 2026-08-14): "man ska inte få
+          helhetsbilden förrän man är klar". Isolerad, minimal yta — bara
+          det som faktiskt krävs (spara, kund, dokumentet med sektions-
+          fokus) — matchar samma fixed-overlay-mönster som intake/blank/
+          building redan använder, fast inne i den delade returen så att
+          RowEditSheet/AddRowSheet/ReservationReviewSheet/ProductModal och
+          QuickReviewBar (som redan självgatear på quickMode) längre ned
+          kan återanvändas oförändrade i stället för att dupliceras. Den
+          fulla "allt-på-en-gång"-vyn (kundpanel, AI-badges, Mer-raden,
+          listvyn) väntar till quickMode blir null. */}
+      {(quickMode === 'review' || quickMode === 'overview') ? (
+        <div
+          className="max-w-3xl mx-auto px-4 sm:px-6 py-4 sm:py-6"
+          style={quickMode === 'review' ? { paddingBottom: 'calc(var(--qk-review-bar-h, 220px) + 1.5rem)' } : undefined}
+        >
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard/quotes')}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors shrink-0"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Offerter
+            </button>
+            <div className="flex items-center gap-2 min-w-0">
+              {/* Enda platsen kund går att välja under granskningen —
+                  QuoteNewCustomerSection är dold här (se motivering ovan).
+                  QuickReceipts skicka-knapp är disabled utan kund, så det
+                  här är inte kosmetiskt. */}
+              <select
+                value={selectedCustomer}
+                onChange={e => setSelectedCustomer(e.target.value)}
+                className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 bg-white focus:outline-none focus:border-primary-700 max-w-[140px] truncate"
+              >
+                <option value="">Välj kund…</option>
+                {customers.map(c => (
+                  <option key={c.customer_id} value={c.customer_id}>{c.name}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => saveQuote(false)}
+                disabled={saving}
+                className="px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
+              >
+                Spara utkast
+              </button>
+            </div>
+          </div>
+
+          {/* Måste finnas HÄR också, inte bara i null-grenen — mallvägen
+              går numera hit direkt (enterQuickReview), så den som escapat
+              tre gånger via mallvalet ska fortfarande se frågan. */}
+          {askPreferredFor && (
+            <div className="mb-4">
+              <QuickStartPreferenceBanner
+                route={askPreferredFor}
+                onAccept={() => {
+                  setPreferredStart(askPreferredFor)
+                  markAskedPreferred(askPreferredFor)
+                  setAskPreferredFor(null)
+                  toast.success('Sparat — vi börjar här nästa gång.')
+                }}
+                onDecline={() => {
+                  markAskedPreferred(askPreferredFor)
+                  setAskPreferredFor(null)
+                }}
+              />
+            </div>
+          )}
+
+          {/* Daniels bedömning och AI-badges syns bara i översikten, inte
+              under granskningen — den medvetna konsekvensen av "ingen
+              helhetsbild förrän klar". Den fulla editorn (quickMode=null)
+              visar dem alltid, oförändrat. */}
+          {quickMode === 'overview' && aiGenerated && aiBedomning && (
+            <DanielsBedomning
+              reasoning={aiBedomning.reasoning}
+              rules={aiBedomning.rules}
+              lessons={aiBedomning.lessons}
+              customerFacts={aiBedomning.customerFacts}
+              confidence={aiConfidence}
+            />
+          )}
+
+          {quickMode === 'overview' && (
+            <QuickReceipt
+              summaries={quickSummaries}
+              approved={quickApproved}
+              amountToPay={formatCurrency(
+                totals.gronBase > 0
+                  ? totals.customerPaysAfterDeductions
+                  : hasRotItems
+                    ? totals.rotCustomerPays
+                    : hasRutItems
+                      ? totals.rutCustomerPays
+                      : totals.total,
+              )}
+              customerName={selectedCustomerObj?.name || null}
+              onGoToSection={section => { setQuickSection(section); setQuickMode('review') }}
+              onSend={() => {
+                recordCompletedQuickQuote()
+                void saveQuote(true)
+              }}
+              onOpenFullEditor={() => setQuickMode(null)}
+              sending={saving}
+            />
+          )}
+
+          <div className="mt-4">
+            <QuotePreviewPanel
+              open={showPreviewPanel}
+              setOpen={setShowPreviewPanel}
+              previewMode={previewMode}
+              setPreviewMode={setPreviewMode}
+              liveEnabled={liveAvailable}
+              liveTemplateData={quoteTemplateData}
+              liveHandlers={
+                quickMode === 'review' ? sectionHandlers(quickSection, liveHandlers) : liveHandlers
+              }
+              focusSection={quickMode === 'review' ? quickSection : null}
+              quickReveal={quickMode !== null}
+              onRowTap={quickMode === 'review' && quickSection !== 'inkluderat' ? undefined : setSheetItemId}
+              onAddRowTap={() => setAddRowSheetOpen(true)}
+              templatePreviewPayload={templatePreviewPayload}
+            />
+          </div>
+        </div>
+      ) : (
       <div
         className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6"
-        style={quickMode === 'review' ? { paddingBottom: 'calc(var(--qk-review-bar-h, 220px) + 1.5rem)' } : undefined}
       >
         <QuoteNewHeader
           aiGenerated={aiGenerated}
@@ -2144,7 +2309,9 @@ export default function NewQuotePage() {
 
         {/* Kvittoprincipen Fall 1: motorns eget resonemang, direkt under
             headern före radlistan. Renderar ingenting utan reasoning;
-            expanderat från start när en affärsregel aktiverats. */}
+            expanderat från start när en affärsregel aktiverats. Ogated på
+            quickMode här (till skillnad från ovan) — en färdig eller till
+            editorn escapad offert ska fortfarande visa den. */}
         {aiGenerated && aiBedomning && (
           <DanielsBedomning
             reasoning={aiBedomning.reasoning}
@@ -2539,6 +2706,7 @@ export default function NewQuotePage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* ETAPP 3: bottom-sheet-radeditorn (mobil) — se sheetItem/sheetItemId
           ovan. Ersätter QuoteEditMobilePreviewModal/FAB:en (borttagen):

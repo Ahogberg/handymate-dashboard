@@ -80,6 +80,14 @@ interface QuickIntakeProps {
    * ett flöde vi försöker tömma på beslut.
    */
   hasContent: boolean
+  /**
+   * En tredje väg in i samma guidade, sektion-för-sektion-upplevelse — bara
+   * utan AI-beskrivningen. Andreas fynd (2026-08-14): steg-för-steg ska vara
+   * standard oavsett starttyp, inte bara AI-vägen. Leder till en egen liten
+   * skärm (kund + titel) i stället för direkt till 'blank', så granskningen
+   * alltid har en titel att visa.
+   */
+  onSkipDescription: () => void
 }
 
 export function QuickIntake({
@@ -98,6 +106,7 @@ export function QuickIntake({
   building,
   onUseTemplate,
   hasContent,
+  onSkipDescription,
 }: QuickIntakeProps) {
   const recording = useAudioRecording()
   const [transcribing, setTranscribing] = useState(false)
@@ -355,6 +364,17 @@ export function QuickIntake({
           <p className="text-center text-xs text-slate-400 mt-2.5 min-h-[16px] m-0">
             {!canBuild && !building && !transcribing ? 'Beskriv jobbet först — sedan bygger vi utkastet åt dig.' : ''}
           </p>
+          {!hasContent && (
+            <p className="text-center mt-1 m-0">
+              <button
+                type="button"
+                onClick={onSkipDescription}
+                className="text-xs text-slate-400 hover:text-primary-700 underline underline-offset-2 transition-colors"
+              >
+                Hoppa över beskrivningen — jag fyller i själv
+              </button>
+            </p>
+          )}
         </div>
       </div>
     </div>
