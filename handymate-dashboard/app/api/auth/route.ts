@@ -445,6 +445,8 @@ if (action === 'login') {
     }
 
     // ==================== RESET PASSWORD ====================
+    // (från /reset-password — sessionen kommer från återställningslänkens
+    // recovery-token, inget nuvarande lösenord att verifiera mot.)
     if (action === 'reset_password') {
       const { password } = data
 
@@ -454,6 +456,41 @@ if (action === 'login') {
 
       if (error) {
         console.error('Update password error:', error)
+        return NextResponse.json({ error: 'Kunde inte uppdatera lösenord' }, { status: 400 })
+      }
+
+      return NextResponse.json({ success: true })
+    }
+
+    // ==================== CHANGE PASSWORD (inloggad) ====================
+    // Skiljs medvetet från reset_password ovan: den som redan sitter
+    // inloggad ska INTE kunna byta lösenord på ett övergivet/kapat
+    // sessionsfönster utan att bevisa att den känner till det nuvarande —
+    // annars är "byt lösenord" en tyst väg att stänga ute den riktiga
+    // ägaren av kontot. Verifierar därför nuvarande lösenord med
+    // signInWithPassword INNAN updateUser — ändrar ingenting om det felar.
+    if (action === 'change_password') {
+      const { currentPassword, newPassword } = data
+      if (!currentPassword || !newPassword) {
+        return NextResponse.json({ error: 'Ange både nuvarande och nytt lösenord' }, { status: 400 })
+      }
+
+      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser()
+      if (userError || !currentUser?.email) {
+        return NextResponse.json({ error: 'Ingen aktiv session' }, { status: 401 })
+      }
+
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: currentUser.email,
+        password: currentPassword,
+      })
+      if (verifyError) {
+        return NextResponse.json({ error: 'Fel nuvarande lösenord' }, { status: 400 })
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
+      if (updateError) {
+        console.error('Change password error:', updateError)
         return NextResponse.json({ error: 'Kunde inte uppdatera lösenord' }, { status: 400 })
       }
 

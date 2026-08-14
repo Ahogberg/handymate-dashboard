@@ -38,7 +38,8 @@ import {
   Star,
   RefreshCw,
   Zap,
-  MailCheck
+  MailCheck,
+  KeyRound
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -1445,6 +1446,15 @@ export default function SettingsPage() {
         { id: 'autopilot', label: 'Autopilot', icon: Zap },
         { id: 'integrations', label: 'Integrationer', icon: Link2 },
         { id: 'preferences', label: 'Preferenser', icon: Star },
+      ],
+    },
+    {
+      // Personligt, inte företagsdata — egen liten grupp i stället för att
+      // gömmas i "Företag" (dit alla andra flikar hör). Ingen ägare/admin-
+      // gate: var och en äger sitt eget lösenord, oavsett roll.
+      label: 'Mitt konto',
+      tabs: [
+        { id: '_link_byt_losenord', label: 'Byt lösenord', icon: KeyRound, href: '/dashboard/settings/byt-losenord' },
       ],
     },
   ]
