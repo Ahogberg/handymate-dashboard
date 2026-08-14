@@ -60,6 +60,67 @@ rader" + "+ Lägg till rad". Exakt vad Andreas bad om.
 
 ---
 
+# Byt lösenord — ny sida i Inställningar
+
+Källa: Andreas eget testkonto-lösenord slutade fungera efter en admin-
+ändring jag gjorde under felsökning, och "Glömt lösenord"-återställningen
+visade "Ogiltig länk" på det bifogade mejlet — akut felrapport. Jag sa
+initialt fel att man kunde byta lösenord från kontoinställningarna; Andreas
+påpekade korrekt att det inte fanns någon sådan yta. "Det behöver vi, bygg
+det och lägg på ett vettigt ställe i Inställningar."
+
+## Två separata buggar hittades och fixades under felsökningen
+
+1. **Root cause till "lösenordet funkar plötsligt inte"**: min egen admin-
+   ändring av testkontots lösenord under en tidigare del av sessionen —
+   inte en produktionsbugg.
+2. **Verklig, förproducerad bugg, opåverkad av (1)**: `/reset-password`
+   läste aldrig hash-fragment-tokens (`#access_token=...`) från
+   återställningsmejlet — bara en befintlig cookie-session via
+   `/api/auth {action:'check'}`. Samma rotorsaksfamilj som magic link-
+   buggen från tidigare i sessionen (ingen kod i kodbasen hanterade
+   implicit-flow-hashen någonstans). Detta gjorde att ALLA lösenords-
+   återställningar för ALLA konton visade "Ogiltig länk", oavsett giltighet.
+   Fixad (commit `b6a21ce6`): `supabase.auth.setSession({access_token,
+   refresh_token})` läser hashen och sätter en riktig cookie-session INNAN
+   `/api/auth`-kontrollen frågas. Se kod-kommentar i
+   `app/reset-password/page.tsx` för full förklaring.
+
+## Byggt (commit d0b00240 — pushat, deployat)
+
+- Ny action `change_password` i `app/api/auth/route.ts`: verifierar
+  nuvarande lösenord server-side via `signInWithPassword` INNAN
+  `updateUser({password})` anropas — en redan inloggad, olåst session ska
+  inte kunna byta lösenord tyst utan att ägaren bekräftar det befintliga.
+  Medvetet en egen action, skild från `reset_password` (som i stället
+  litar på en färskt konsumerad recovery-token).
+- Ny sida `app/dashboard/settings/byt-losenord/page.tsx`: tre fält
+  (nuvarande/nytt/bekräfta), samma FALT_CLS/kort-stil som Bolagsprofil,
+  visar inloggad e-post, länk till "Glömt lösenord" för den som inte
+  minns sitt nuvarande.
+- Ny "Mitt konto"-grupp i `app/dashboard/settings/page.tsx` (efter
+  "AI & Integrationer"). Synlig för alla roller — inte ägare/admin-gated
+  som Bolagsprofil/Intern timkostnad, eftersom var och en äger sitt eget
+  lösenord.
+
+## Verifierat
+
+- `npx tsc --noEmit` — noll fel.
+- `npx next build` — ren.
+- **Riktig, live browserverifiering (scratch-test, raderad efter)**: fel
+  nuvarande lösenord avvisas med "Fel nuvarande lösenord" (2 scenarion
+  testade), rätt lösenord byts och ger "Lösenordet är bytt".
+- **Oberoende serverside-bekräftelse**: `playwright/.auth/user.json`
+  raderades och en helt ny inloggning kördes mot det NYA lösenordet —
+  lyckades. Bekräftar att bytet verkligen slog igenom i Supabase, inte
+  bara en UI-framgångstext.
+- Full svit (sista säkerhetskontroll efter denna ändring, då den rörde
+  både den delade `app/api/auth/route.ts` och den stora
+  `app/dashboard/settings/page.tsx`): **5760 gröna, 0 failed**, exit
+  code 0.
+
+---
+
 # Project Reality + Cross-Agent Case (Business Twin #9 V1)
 
 Källa: plan `jaunty-pondering-hummingbird.md` (godkänd). Andreas delade
