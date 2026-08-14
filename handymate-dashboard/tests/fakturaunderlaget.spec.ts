@@ -9,6 +9,17 @@
  * fastprisprojekt byggdes alltså utan offertens rader: enbart ÄTA, eller
  * "Inga fakturarader" — medan summan på kortet såg rimlig ut.
  *
+ * ═══ FLYTTAD, INTE BORTA (Tur 4 etapp 2, 2026-08-10) ═══
+ *
+ * Kompositionen som facit skyddar bodde ursprungligen i
+ * lib/projects/auto-invoice-on-complete.ts, men flyttades till
+ * lib/invoices/project-invoice-draft.ts (byggProjektFakturaUnderlag) så att
+ * missad-intäkt-svepets fakturera_projekt-kort och godkännande-drift-vakten
+ * kan dela samma sanning i stället för tre kopior som glider isär. Facit
+ * pekade kvar på den gamla filen i flera dagar utan att någon märkte det —
+ * hittat vid en full-svit-körning 2026-08-14, verifierat mot koden (inte
+ * antaget) att alla fyra skyddsregler fortfarande gäller, bara på ny adress.
+ *
  *   npx playwright test tests/fakturaunderlaget.spec.ts --no-deps --project=chromium
  */
 import { test, expect } from '@playwright/test'
@@ -22,7 +33,7 @@ const kod = (p: string) =>
     .replace(/^[ \t]*\/\*[\s\S]*?\*\//gm, '')
     .replace(/^\s*\/\/.*$/gm, '')
 
-const FIL = 'lib/projects/auto-invoice-on-complete.ts'
+const FIL = 'lib/invoices/project-invoice-draft.ts'
 
 test.describe('fakturan byggs ur sanningen, inte speglingen', () => {
   test('quote_items läses FÖRST, JSONB:n bara som legacy-fallback', () => {

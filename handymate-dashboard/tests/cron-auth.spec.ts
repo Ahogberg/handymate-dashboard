@@ -55,11 +55,17 @@ test.describe('cron-auth failar stängt', () => {
 
 test('alla cron-rutter utanför Claudes Karin-fillås använder helpern', () => {
   const files = routeFiles(CRON_DIR)
-  expect(files).toHaveLength(34)
+  // Talet 34 var stelt kodat och blev tyst fel när tre nya rutter tillkom
+  // (meeting-reminders + meeting-worker 2026-08-11, next-best-action
+  // 2026-08-13) — hittat vid en full-svit-körning 2026-08-14. Alla tre
+  // använder redan helpern korrekt (verifierat nedan av samma loop som
+  // skulle ha fångat dem om de INTE gjorde det) — det var bara siffran
+  // som var föråldrad, ingen faktisk auth-lucka.
+  expect(files).toHaveLength(37)
 
   const karinRoute = path.join(CRON_DIR, 'karin-deadlines', 'route.ts')
   const ownedRoutes = files.filter(file => file !== karinRoute)
-  expect(ownedRoutes).toHaveLength(33)
+  expect(ownedRoutes).toHaveLength(36)
 
   const missing = ownedRoutes
     .filter(file => {
