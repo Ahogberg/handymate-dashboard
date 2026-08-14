@@ -468,3 +468,47 @@ Andreas: "bättre upplevelse" att räkna i dagar när mindre än en vecka
 "X dagar"/"en dag" under en vecka, "Tar snart slut" bara vid 0 dagar eller
 ingen prognos. 3 nya tester, 66/66 kostnadsfacit gröna. Deployat, verifierat
 live (`daysRemaining` finns i /api/billing/fuel-svaret).
+
+---
+
+# Pågående — Distributed Value Receipts, sanningshärdning (2026-08-14)
+
+## Fynd före implementation
+
+Funktionen var redan byggd i `de26aac1`, men låg otestad inline i
+godkännandesidan. Källgranskningen hittade tre falska kvitton: `skipped`
+behandlades som lyckat, `missad_intakt` påstod att ett underlag skapats trots
+att typen är `REVIEW_REQUIRED`, och ett internt ÄTA-utkast kallades
+"godkänt arbete" innan kunden godkänt något.
+
+- [x] Extrahera en ren, delad kvittobyggare ur godkännandesidan.
+- [x] Kräv serverklassat `success`, positivt ändligt belopp och handlingens
+  verkliga artefakt-/leveransbevis innan ett värdekvitto får visas.
+- [x] Ta bort `missad_intakt` ur generiska kvitton och kalla ÄTA-resultatet
+  ett utkast att granska.
+- [x] Låt lyckad omkörning använda samma kvittokontrakt.
+- [x] Lägg browserlösa facit för samtliga tillåtna typer, skipped/failed,
+  trasiga belopp och förbjudna sanningspåståenden.
+- [x] Kör riktat facit, `npx tsc --noEmit`, browserlös regressionssvit och
+  `npx next build`.
+- [x] Granska slutdiff och dokumentera resultatet här.
+
+## Review
+
+Den befintliga UI-funktionen har sanningshärdats i stället för att dupliceras.
+Kvittot byggs nu av en ren funktion som kräver `success`, rätt handling,
+positivt ändligt belopp och handlingstypsspecifikt exekveringsbevis. `skipped`
+klassas fail-closed, `missad_intakt` ger inget falskt kvitto och ÄTA-copy säger
+uttryckligen att det är ett utkast att granska. Första körning och omkörning
+använder samma kontrakt och samma kontextlänk.
+
+Verifiering: `npx tsc --noEmit` rent, `npx next build` grönt (420 statiska
+sidor), 51/51 riktade tester och 194/194 relevanta regressionsfacit gröna.
+Den breda browserlösa sviten är fortsatt röd i befintliga, orelaterade
+källkontrakt (bland annat cron-route-antal, MalBlock-klassificering och
+stegkedjans fire-and-forget-facit); inga fel träffade ändrade filer eller
+kvittosviter. Inga SQL-, databas- eller utskicksändringar gjordes.
+
+En read-only webbläsarkontroll kunde inte startas eftersom ingen in-app-
+webbläsare fanns tillgänglig i sessionen. Ingen verklig godkännandehandling
+utfördes; bygg- och källfacit täcker renderingskopplingen.

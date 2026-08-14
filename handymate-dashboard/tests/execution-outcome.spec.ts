@@ -64,6 +64,17 @@ test.describe('classifyExecutionResult', () => {
     expect(r.error_text).toBeNull()
   })
 
+  test('executed:false → skipped — ett review-kort har inte utfört en handling', () => {
+    const r = classifyExecutionResult({
+      action: 'missad_intakt',
+      executed: false,
+      action_class: 'REVIEW_REQUIRED',
+      note: 'Öppna ärendet och granska det innan något skickas.',
+    })
+    expect(r.outcome).toBe('skipped')
+    expect(r.error_text).toBeNull()
+  })
+
   test('null (reject-actions kör aldrig exekvering) → skipped, null text', () => {
     const r = classifyExecutionResult(null)
     expect(r.outcome).toBe('skipped')

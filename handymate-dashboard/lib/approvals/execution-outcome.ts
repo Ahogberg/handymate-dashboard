@@ -129,7 +129,10 @@ export function classifyExecutionResult(
     return { outcome: 'failed', error_text: errorText }
   }
 
-  if (result.skipped) {
+  // REVIEW_REQUIRED/INFORMATIONAL-kort returnerar `executed:false` från
+  // nonExecutableResult(). Det är en lyckad kvittens av kortet, men INGEN
+  // utförd handling — och får därför aldrig driva ett värdekvitto.
+  if (result.skipped || result.executed === false) {
     return { outcome: 'skipped', error_text: null }
   }
 
