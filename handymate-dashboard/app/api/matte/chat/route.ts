@@ -30,6 +30,8 @@ import {
 } from '@/lib/agent/external-confirm'
 import { getRelevantMemories, buildMemoryPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
 import { getAgentTools } from '@/lib/agents/personalities'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd, type TokenUsage } from '@/lib/costs/meter'
 import { createQuote } from '@/lib/quotes/create-quote'
 import {
   validateNextStep,
@@ -535,6 +537,9 @@ interface AgentTurnResult {
    * precis den part som kan ha fel om saken.
    */
   toolOutcomes: ToolOutcome[]
+  /** Ackumulerad usage över ALLA callClaude-anrop i denna tur (initial +
+      varje tool-iteration) — grunden för COGS-mätningen (etapp 1, 2026-08-14). */
+  usage: TokenUsage
 }
 
 /**
@@ -569,6 +574,21 @@ async function runAgentTurn(opts: {
     tools: agentTools,
   })
 
+  // Ackumulerad usage — se AgentTurnResult.usage för varför.
+  const usage: TokenUsage = {
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_creation_input_tokens: 0,
+    cache_read_input_tokens: 0,
+  }
+  const ackumulera = (u: any) => {
+    usage.input_tokens = (usage.input_tokens || 0) + (u?.input_tokens || 0)
+    usage.output_tokens = (usage.output_tokens || 0) + (u?.output_tokens || 0)
+    usage.cache_creation_input_tokens = (usage.cache_creation_input_tokens || 0) + (u?.cache_creation_input_tokens || 0)
+    usage.cache_read_input_tokens = (usage.cache_read_input_tokens || 0) + (u?.cache_read_input_tokens || 0)
+  }
+  ackumulera(response.usage)
+
   const toolMessages: any[] = []
   const toolOutcomes: ToolOutcome[] = []
   let finalAction: any = null
@@ -596,6 +616,7 @@ async function runAgentTurn(opts: {
         },
         pendingExternal: null,
         toolOutcomes,
+        usage,
       }
     }
 
@@ -619,6 +640,7 @@ async function runAgentTurn(opts: {
           handoff: null,
           pendingExternal: { toolName: gatedBlock.name, toolInput: gatedBlock.input || {} },
           toolOutcomes,
+          usage,
         }
       }
     }
@@ -673,6 +695,7 @@ async function runAgentTurn(opts: {
       messages: [...opts.initialMessages, ...trimmed],
       tools: agentTools,
     })
+    ackumulera(response.usage)
   }
 
   const finalText = (response.content || [])
@@ -681,7 +704,7 @@ async function runAgentTurn(opts: {
     .join('\n')
     .trim()
 
-  return { text: finalText, action: finalAction, handoff: null, pendingExternal: null, toolOutcomes }
+  return { text: finalText, action: finalAction, handoff: null, pendingExternal: null, toolOutcomes, usage }
 }
 
 /**
@@ -1001,6 +1024,29 @@ export async function POST(request: NextRequest) {
     }
     const steps: AgentResult[] = []
     const visitedSpecialists: AgentId[] = []
+    // Ackumulerad usage över HELA requesten — kan spänna flera specialiststeg
+    // (varje steg är en egen runAgentTurn, ibland flera Sonnet-anrop var).
+    // Bokförs EN gång per request, oavsett vilken av de två return-vägarna
+    // nedan som träffas (COGS-mätaren etapp 1, 2026-08-14 — Matte-chatten var
+    // tidigare helt omätt, se tasks/cost-cap-analysis.md §7).
+    const requestUsage: TokenUsage = {
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+    }
+    const bokforMatteUsage = async (refId: string) => {
+      const costUsd = llmCostUsd(requestUsage, 'claude-sonnet-4-6')
+      await meterDirectLlmCall({
+        supabase,
+        businessId,
+        usage: requestUsage,
+        costUsd,
+        refType: 'matte_chat_turn',
+        refId,
+        meta: { thread_id: thread?.id || null, specialist_steps: visitedSpecialists },
+      })
+    }
 
     while (true) {
       // Minne: samma funktioner (getRelevantMemories/buildMemoryPrompt) som
@@ -1046,6 +1092,13 @@ export async function POST(request: NextRequest) {
         requireConfirmExternal,
       })
 
+      requestUsage.input_tokens = (requestUsage.input_tokens || 0) + (turn.usage.input_tokens || 0)
+      requestUsage.output_tokens = (requestUsage.output_tokens || 0) + (turn.usage.output_tokens || 0)
+      requestUsage.cache_creation_input_tokens =
+        (requestUsage.cache_creation_input_tokens || 0) + (turn.usage.cache_creation_input_tokens || 0)
+      requestUsage.cache_read_input_tokens =
+        (requestUsage.cache_read_input_tokens || 0) + (turn.usage.cache_read_input_tokens || 0)
+
       if (turn.action && !finalAction) finalAction = turn.action
 
       // Säkerhetsräcke: Claude ville skicka något ut ur huset. Persistera ev.
@@ -1071,6 +1124,8 @@ export async function POST(request: NextRequest) {
           threadId: thread?.id || null,
           agent: currentAgent,
         })
+
+        await bokforMatteUsage(`matte_${thread?.id || businessId}_${Date.now()}`)
 
         return NextResponse.json({
           messages: turn.text ? [{ agent: currentAgent, content: turn.text }] : [],
@@ -1254,6 +1309,8 @@ export async function POST(request: NextRequest) {
       projectId,
       userMessage: newUserText,
     }).catch((err) => console.error('[matte/chat] extractAndSaveMemory failed (non-blocking):', err))
+
+    await bokforMatteUsage(`matte_${thread?.id || businessId}_${Date.now()}`)
 
     return NextResponse.json({
       messages: responseMessages,

@@ -10,7 +10,8 @@ import { executeTool } from './tool-router'
 import { getBusinessPreferences } from '@/lib/business-preferences'
 import { routeToAgent, getAgentPromptSuffix, getAgentTools } from '@/lib/agents/personalities'
 import { getRelevantMemories, buildMemoryPrompt, getAgentMessages as fetchAgentMessages, buildMessagesPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
-import { checkCostGuards } from '@/lib/agents/shared/cost-guard'
+import { checkCostGuards, meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 import {
   MAX_SPECIALIST_STEPS,
   outcomeFromToolResult,
@@ -439,6 +440,17 @@ export async function POST(request: NextRequest) {
     // modellens egen beskrivning av vad den gjort.
     const outcomes: ToolOutcome[] = []
     let totalTokens = 0
+    // Ackumulerad usage över alla steg i loopen — inte bara in+ut, även
+    // cache-tokens (systemprompten cachas, se cache_control nedan). Behövs
+    // för att kunna räkna riktig kostnad per faktisk modell (llmCostUsd),
+    // i stället för den tidigare platta $9/Mtok-taxan som ignorerade både
+    // modellval och cache-rabatten (COGS-mätaren etapp 1, 2026-08-14).
+    const cumulativeUsage = {
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+    }
     let toolCallCount = 0
     let finalResponse = ''
 
@@ -477,6 +489,10 @@ export async function POST(request: NextRequest) {
       totalTokens +=
         (response.usage?.input_tokens || 0) +
         (response.usage?.output_tokens || 0)
+      cumulativeUsage.input_tokens += response.usage?.input_tokens || 0
+      cumulativeUsage.output_tokens += response.usage?.output_tokens || 0
+      cumulativeUsage.cache_creation_input_tokens += response.usage?.cache_creation_input_tokens || 0
+      cumulativeUsage.cache_read_input_tokens += response.usage?.cache_read_input_tokens || 0
 
       const textBlocks = (response.content || []).filter(
         (b: any) => b.type === 'text'
@@ -536,7 +552,11 @@ export async function POST(request: NextRequest) {
     }
 
     const durationMs = Date.now() - startTime
-    const estimatedCost = +(totalTokens * 0.000009).toFixed(4)
+    // Riktig kostnad för DENNA modell (Sonnet live / Haiku bakgrund), inte en
+    // blandtaxa. Oavrundad här — avrundning sker i ytterlagren (samma
+    // princip som lib/costs/meter.ts, se dess kommentar om varför).
+    const estimatedCostRaw = llmCostUsd(cumulativeUsage, MODEL)
+    const estimatedCost = Math.round(estimatedCostRaw * 10000) / 10000
 
     // Log to agent_runs
     const runId =
@@ -563,6 +583,21 @@ export async function POST(request: NextRequest) {
     } catch (insertErr: any) {
       console.error('[agent] Failed to insert agent_run:', insertErr?.message || insertErr)
     }
+
+    // COGS-boken (cost_event) — samma princip som observation-cronarnas
+    // logAgentRun: agent_runs.estimated_cost är governorn (USD, dygnstak),
+    // cost_event är boken (öre, per konto). meterDirectLlmCall är kodbasens
+    // enda tillåtna extra-skrivare av resource:'llm' (facit i
+    // tests/cogs-matare.spec.ts håller cost-guard.ts som enda källan).
+    await meterDirectLlmCall({
+      supabase,
+      businessId,
+      usage: cumulativeUsage,
+      costUsd: estimatedCostRaw,
+      refType: 'agent_run',
+      refId: runId,
+      meta: { agent_id: agentId, trigger_type, model: MODEL },
+    })
 
     // Extract and save memory (fire-and-forget)
     extractAndSaveMemory(businessId, agentId, finalResponse, trigger_type, trigger_data || {}).catch((err) =>

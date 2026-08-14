@@ -5,6 +5,8 @@ import { createHash } from 'crypto'
 import Anthropic from '@anthropic-ai/sdk'
 import { formatKnowledgeForPrompt, formatGuardrailsForPrompt } from '@/lib/widget-activation'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -201,11 +203,18 @@ ${config.widget_collect_contact ? '- Försök naturligt samla: namn, telefon, em
 
 ${config.widget_collect_contact ? 'När du har fått kontaktuppgifter (minst namn + telefon eller email), säg: "Tack! Vi hör av oss inom 24 timmar med mer information."' : ''}`
 
-    // Call Claude (Sonnet for speed + cost)
+    // Call Claude. Haiku, inte Sonnet (COGS-mätaren etapp 1, 2026-08-14):
+    // systempromptet är hårt styrt (fasta regler, kort svar, inga exakta
+    // priser) och den här ytan är PUBLIK och otakad på LLM-kostnad — Sonnet
+    // här var både onödigt dyrt och en öppen missbruksvektor (se
+    // tasks/cost-cap-analysis.md §7-8). Rate-limit fanns redan (IP-spärr +
+    // per-konversation + dygnstak ovan) — det som saknades var mätning och
+    // rätt modell, inte en spärr.
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+    const WIDGET_MODEL = 'claude-haiku-4-5-20251001'
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: WIDGET_MODEL,
       max_tokens: 300,
       system: systemPrompt,
       messages: [
@@ -215,6 +224,17 @@ ${config.widget_collect_contact ? 'När du har fått kontaktuppgifter (minst nam
     })
 
     const reply = response.content[0].type === 'text' ? response.content[0].text : 'Jag kunde inte svara just nu.'
+
+    // COGS-boken — widgeten var tidigare helt omätt.
+    await meterDirectLlmCall({
+      supabase,
+      businessId: business_id,
+      usage: response.usage,
+      costUsd: llmCostUsd(response.usage, WIDGET_MODEL),
+      refType: 'widget_conversation',
+      refId: conversation.id,
+      meta: { session_id },
+    })
 
     // Save messages to conversation
     const updatedMessages = [

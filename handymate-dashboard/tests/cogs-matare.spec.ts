@@ -304,6 +304,37 @@ test.describe('LLM-kostnaden: samma värde, två mottagare', () => {
   })
 })
 
+test.describe('COGS-mätaren etapp 1 — de tre förut omätta ytorna (2026-08-14)', () => {
+  // tasks/cost-cap-analysis.md §7: agent-triggerns flat-taxa, Matte-chatten,
+  // den publika widgeten var kodbasens tre största mätluckor. Detta facit
+  // låser att de faktiskt går genom mätaren nu — inte bara att de gjorde det
+  // dagen de byggdes.
+
+  test('agent-triggern räknar riktig kostnad per modell — flat-taxan är borta', () => {
+    const s = kod('app/api/agent/trigger/route.ts')
+    expect(s, 'den gamla blandtaxan finns kvar').not.toMatch(/totalTokens\s*\*\s*0\.000009/)
+    expect(s).toContain('llmCostUsd(cumulativeUsage, MODEL)')
+    expect(s).toContain('meterDirectLlmCall({')
+    expect(s).toContain("refType: 'agent_run'")
+  })
+
+  test('Matte-chatten bokför kostnad — tidigare helt omätt', () => {
+    const s = kod('app/api/matte/chat/route.ts')
+    expect(s).toContain('meterDirectLlmCall({')
+    expect(s).toContain("refType: 'matte_chat_turn'")
+    // Bokförs på BÅDA return-vägarna (klart-svar och pending_confirmation),
+    // inte bara den vanliga — annars läcker en tyst gren igen.
+    expect(s.match(/await bokforMatteUsage\(/g)?.length).toBe(2)
+  })
+
+  test('den publika widgeten kör Haiku och mäts, inte längre obevakad Sonnet', () => {
+    const s = kod('app/api/widget/chat/route.ts')
+    expect(s, 'widgeten kör fortfarande Sonnet').not.toMatch(/model:\s*'claude-sonnet-4-6'/)
+    expect(s).toContain("WIDGET_MODEL = 'claude-haiku-4-5-20251001'")
+    expect(s).toContain('meterDirectLlmCall({')
+  })
+})
+
 test.describe('spärrhaken — läckaget får bara krympa', () => {
   /**
    * ═══ VARFÖR EN ALLOWLIST OCH INTE EN REFAKTORERING ═══
