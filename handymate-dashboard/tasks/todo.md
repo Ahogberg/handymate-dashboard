@@ -261,3 +261,60 @@ portera fixen in i `tests/auth.setup.ts` — inte gjort här.
 projektets `storageState: undefined` gav ENOENT på en färsk checkout utan
 `playwright/.auth/user.json` — samma fälla som `golden-path-setup` redan
 dokumenterar i samma fil. Ett explicit tomt state löser det.
+
+---
+
+# COGS-mätaren etapp 1 — de tre största omätta LLM-ytorna
+
+Källa: `tasks/cost-cap-analysis.md` §7 (kostnadsmodell-underlaget). Andreas:
+"kan vi på ett säkert sätt nu efter inventering... bygga en usage-mätare per
+konto?" → "Yes, kör!" — etapp 1 = agent-triggern, Matte-chatten, widgeten
+(de tre största mätluckorna; svansen av mindre ytor är etapp 2, inte gjord).
+
+## Byggt (commit 7d0d13a9 — pushat, deployat)
+
+- **`app/api/agent/trigger/route.ts`**: bytte den platta $9/Mtok-blandtaxan
+  (`totalTokens * 0.000009`, samma taxa oavsett Sonnet/Haiku) mot
+  `llmCostUsd(cumulativeUsage, MODEL)` — riktig kostnad per faktisk modell,
+  inklusive cache-tokens (systemprompten cachas). Skriver nu `cost_event`
+  via `meterDirectLlmCall`, vilket den aldrig gjorde förut — kodbasens
+  största LLM-volym var alltså helt osynlig i COGS-boken.
+- **`app/api/matte/chat/route.ts`**: usage ackumuleras nu över HELA
+  requesten (alla specialiststeg i orkestreringsloopen, `runAgentTurn`
+  returnerar `usage`), bokförs en gång per tur på BÅDA return-vägarna
+  (klart-svar och `pending_confirmation`). Tidigare helt omätt — upp till
+  ~15 Sonnet-anrop/meddelande syntes ingenstans.
+- **`app/api/widget/chat/route.ts`**: Sonnet → Haiku (styrt system-prompt
+  med fasta regler/kort svar — kundvärdet ligger i att den FÖLJER
+  guardrails, inte i modellens allmänna resonemangsförmåga) + mätning.
+  Rate-limit fanns redan (IP-spärr 50/dygn + 500 konv/dygn + 20 msg/konv) —
+  korrigerar min tidigare formulering "helt otakad" till Andreas, det var
+  bara kostnaden som var omätt, inte volymen okontrollerad.
+
+## Verifierat
+
+- `npx tsc --noEmit` — noll fel.
+- Nytt facit i `tests/cogs-matare.spec.ts` (3 nya tester): flat-taxan är
+  borta, Matte bokför på båda return-vägarna, widgeten kör Haiku. Den
+  befintliga "en skrivare per faktum"-invarianten (bara `cost-guard.ts` får
+  skriva `resource:'llm'`) står KVAR intakt — inget nytt direktskrivande.
+- `npx next build` — ren.
+- Full svit: 5766 gröna, 0 failed.
+- **Riktig, skarp verifiering i prod, alla tre ytor, riktiga `cost_event`-
+  rader:**
+  - Matte-chatt (Sonnet): `ref_type:'matte_chat_turn'`, 26 öre.
+  - Widget: `ref_type:'widget_conversation'`, 1 öre (Haiku, kort svar).
+  - agent/trigger: `ref_type:'agent_run'`, 14 öre, `meta.model:'claude-haiku-4-5-20251001'`
+    — samma körning gav `agent_runs.estimated_cost = 0.0144` USD för 366
+    tokens (den gamla taxan hade gett $0.0033 — nästan 4× fel, konkret bevis
+    på att fixen ändrar verkliga siffror, inte bara kod).
+  - Testkontots `widget_enabled` och `trial_ends_at` tillfälligt ändrade för
+    att kunna trigga live-anrop, återställda till exakt ursprungsvärde
+    direkt efteråt (verifierat med en avslutande SELECT).
+
+## Kvar (etapp 2, inte gjord)
+
+Svansen av mindre ytor från cost-cap-analysis.md §7-8: offertgenerering,
+intent-klassificering, gmail-leadfilter, autopilot, leads-brev, insights-
+cron, monthly-review, Whisper-luckorna (matte/transcribe, jobbkompisen,
+voice/process), och den fortfarande medvetet omätta samtalskostnaden.
