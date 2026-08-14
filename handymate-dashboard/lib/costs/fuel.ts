@@ -205,8 +205,14 @@ export function computeFuelLevel(params: {
     percent: usedOre > 0 ? Math.round((bucketOre[key] / usedOre) * 100) : 0,
   }))
 
-  // 30 dagliga staplar, äldst→nyast.
-  const dayCount = FUEL_WINDOW_DAYS
+  // Dagliga staplar, äldst→nyast. Fönstret är inte längre alltid exakt 30
+  // dagar (kan vara ankrat till en förnyelsedag, ~28-31 dagar beroende på
+  // månad) — dayCount räknas ur det FAKTISKA fönstret så ingen dag tyst
+  // faller utanför arrayen. Klampat till [1, 31]: en Stripe-månadsperiod
+  // blir aldrig längre, och ett nyss startat konto (fönster < 1 dag) ska
+  // ändå få minst en stapel.
+  const windowDays = Math.max(1, Math.min(31, Math.round((windowEnd.getTime() - windowStart.getTime()) / 86_400_000)))
+  const dayCount = windowDays
   const history = new Array(dayCount).fill(0)
   for (const r of relevanta) {
     const idx = Math.floor((new Date(r.created_at).getTime() - windowStart.getTime()) / 86_400_000)
@@ -224,7 +230,6 @@ export function computeFuelLevel(params: {
   }
 
   // Veckor kvar: snittförbrukning/dag i fönstret, projicerat mot resterande budget.
-  const windowDays = Math.max(1, Math.round((windowEnd.getTime() - windowStart.getTime()) / 86_400_000))
   const avgDailyOre = usedOre / windowDays
   const remainingOre = Math.max(0, budgetOre - usedOre)
   const weeksRemaining = avgDailyOre > 0 ? Math.round(remainingOre / avgDailyOre / 7) : null
@@ -236,21 +241,46 @@ export function computeFuelLevel(params: {
 }
 
 /**
- * IO-wrapper. Golvet mot MEASUREMENT_STARTED_AT gör att ett fönster som
- * sträcker sig längre bak än mätstarten bara ger fler tomma dagar — ofarligt
- * här (till skillnad från COGS-admin-rapporten) eftersom "0 kr förbrukat"
- * är sant både vid mätfrånvaro och vid genuint nollanvändning, och Bränslet
- * aldrig används för marginalbeslut.
+ * Fönstrets startpunkt: ANKRAT till senaste förnyelsedatumet
+ * (business_config.billing_period_start, skrivet av Stripe-webhooken vid
+ * varje customer.subscription.updated/checkout.session.completed) om det
+ * finns och inte ligger i framtiden — Andreas-beslut 2026-08-14: "rullande
+ * 30" ska betyda "från köp-/förnyelsedatumet varje månad", inte ett
+ * fritt glidande 30-dagarsfönster från just nu. En Stripe-månadsperiod är
+ * i praktiken alltid ~30 dagar, så mätaren nollställs när kunden faktiskt
+ * betalar — samma mentala modell som att tanka en bil, inte ett fönster
+ * som aldrig riktigt återställs.
+ *
+ * Fallback till ett rent glidande 30-dagarsfönster när ingen
+ * billing_period_start finns (t.ex. trial utan aktiv Stripe-prenumeration
+ * ännu) — mätaren ska fungera innan första betalningen också.
+ *
+ * Golvet mot MEASUREMENT_STARTED_AT gör att ett fönster som sträcker sig
+ * längre bak än mätstarten bara ger fler tomma dagar — ofarligt här (till
+ * skillnad från COGS-admin-rapporten) eftersom "0 kr förbrukat" är sant
+ * både vid mätfrånvaro och vid genuint nollanvändning, och Bränslet aldrig
+ * används för marginalbeslut.
  */
+export function resolveFuelWindowStart(now: Date, billingPeriodStart: string | null | undefined): Date {
+  const measurementStart = new Date(MEASUREMENT_STARTED_AT)
+  const anchored = billingPeriodStart ? new Date(billingPeriodStart) : null
+  const anchoredValid = anchored && !isNaN(anchored.getTime()) && anchored <= now
+
+  const windowStart = anchoredValid
+    ? anchored!
+    : new Date(now.getTime() - FUEL_WINDOW_DAYS * 86_400_000)
+
+  return windowStart < measurementStart ? measurementStart : windowStart
+}
+
 export async function getFuelLevel(
   supabase: SupabaseClient,
   businessId: string,
   plan: string | null,
+  billingPeriodStart?: string | null,
 ): Promise<FuelLevel> {
   const now = new Date()
-  const windowStartRaw = new Date(now.getTime() - FUEL_WINDOW_DAYS * 86_400_000)
-  const measurementStart = new Date(MEASUREMENT_STARTED_AT)
-  const windowStart = windowStartRaw < measurementStart ? measurementStart : windowStartRaw
+  const windowStart = resolveFuelWindowStart(now, billingPeriodStart)
 
   const [{ data: events, error: eventsError }, { data: topups, error: topupError }] = await Promise.all([
     supabase

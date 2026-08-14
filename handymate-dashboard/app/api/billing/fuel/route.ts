@@ -19,11 +19,16 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabase()
     const { data: config } = await supabase
       .from('business_config')
-      .select('subscription_plan')
+      .select('subscription_plan, billing_period_start')
       .eq('business_id', business.business_id)
       .maybeSingle()
 
-    const level = await getFuelLevel(supabase, business.business_id, config?.subscription_plan ?? null)
+    const level = await getFuelLevel(
+      supabase,
+      business.business_id,
+      config?.subscription_plan ?? null,
+      config?.billing_period_start ?? null,
+    )
     return NextResponse.json(level)
   } catch (error: any) {
     console.error('[fuel] GET-fel:', error)

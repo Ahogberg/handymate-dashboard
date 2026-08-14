@@ -20,9 +20,11 @@ import {
   computeFuelLevel,
   bucketForRefType,
   fuelBudgetOreForPlan,
+  resolveFuelWindowStart,
   FUEL_PLAN_BUDGET_ORE,
   type FuelCostRow,
 } from '../lib/costs/fuel'
+import { MEASUREMENT_STARTED_AT } from '../lib/costs/report'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
@@ -102,6 +104,33 @@ test.describe('Bränsle — beräkningskärnan (ren funktion, ingen DB)', () => 
     const medTopp = jamn.map((r, i) => (i === 5 ? { ...r, cost_ore: 5_000 } : r))
     const toppLevel = computeFuelLevel({ rows: medTopp, planBudgetOre: 37_400, topupOreInWindow: 0, windowStart, windowEnd })
     expect(toppLevel.highlightIndex).toBe(5)
+  })
+
+  // "now" satt långt efter MEASUREMENT_STARTED_AT (2026-08-08) så att
+  // golvtestet nedan är det ENDA som avsiktligt triggar golvet — annars
+  // döljer golvet vad ankrings-/fallback-logiken faktiskt gör.
+  const senareNow = new Date('2026-09-20T12:00:00Z')
+
+  test('fönstret ankras till förnyelsedatumet — Andreas-beslut 2026-08-14', () => {
+    const forra = new Date('2026-09-01T00:00:00Z') // < 30 dagar sen, ny period
+    expect(resolveFuelWindowStart(senareNow, forra.toISOString()).getTime()).toBe(forra.getTime())
+  })
+
+  test('saknad förnyelsedag faller tillbaka till rent glidande 30 dagar', () => {
+    const utanFornyelse = resolveFuelWindowStart(senareNow, null)
+    expect(utanFornyelse.getTime()).toBe(senareNow.getTime() - 30 * 86_400_000)
+  })
+
+  test('en förnyelsedag i framtiden (klockskev/testdata) ignoreras, faller tillbaka', () => {
+    const framtid = new Date('2026-10-01T00:00:00Z')
+    const fallback = resolveFuelWindowStart(senareNow, framtid.toISOString())
+    expect(fallback.getTime()).toBe(senareNow.getTime() - 30 * 86_400_000)
+  })
+
+  test('golvet mot MEASUREMENT_STARTED_AT vinner alltid, oavsett anledning', () => {
+    const alldelesForGammal = new Date('2026-01-01T00:00:00Z')
+    expect(resolveFuelWindowStart(senareNow, alldelesForGammal.toISOString()).toISOString().slice(0, 10))
+      .toBe(MEASUREMENT_STARTED_AT)
   })
 
   test('state-trösklar: normal >30%, low <=30%, critical <=10%', () => {
