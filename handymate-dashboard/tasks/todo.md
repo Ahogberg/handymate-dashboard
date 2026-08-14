@@ -457,3 +457,14 @@ driftsättning.
 
 Inget — alla tre ytor + Stripe-flödet är levande i prod. Möjlig framtida
 förfining: beloppsväljare i "Tanka" (idag fast belopp = en månads budget).
+
+## Uppföljning samma dag: dagsprognos under en vecka (commit bdc17b46)
+
+Andreas: "bättre upplevelse" att räkna i dagar när mindre än en vecka
+återstår — direkt uppföljning på fyndet från skärmdumpsverifieringen.
+`computeFuelLevel` returnerar nu `daysRemaining` vid sidan av
+`weeksRemaining` (samma bråktal, olika avrundning — kan aldrig glida isär).
+`weeksRemainingPhrase(weeksRemaining, daysRemaining)` växlar till
+"X dagar"/"en dag" under en vecka, "Tar snart slut" bara vid 0 dagar eller
+ingen prognos. 3 nya tester, 66/66 kostnadsfacit gröna. Deployat, verifierat
+live (`daysRemaining` finns i /api/billing/fuel-svaret).
