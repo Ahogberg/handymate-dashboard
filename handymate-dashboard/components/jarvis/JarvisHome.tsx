@@ -55,6 +55,8 @@ import { pengaFynd } from '@/lib/jarvis/moment-rows'
 import type { AgentMoment } from '@/lib/moments/derive'
 import { GorDettaForst, type NextBestActionRecommendation } from '@/components/jarvis/GorDettaForst'
 import { ProjektCaseKort, type ProjektCaseData } from '@/components/jarvis/ProjektCaseKort'
+import { FuelWarningCard } from '@/components/jarvis/FuelWarningCard'
+import { useFuel } from '@/components/fuel/FuelProvider'
 
 /**
  * JarvisHome — teamets rapportbord (2026-08-07).
@@ -224,6 +226,8 @@ export default function JarvisHome({
   pipelineStats,
 }: JarvisHomeProps) {
   const business = useBusiness()
+  const { level: fuelLevel } = useFuel()
+  const fuelCritical = fuelLevel?.state === 'critical'
   const { setIsOpen: openJobbkompisen, setPendingPrompt } = useJobbuddy()
 
   const [approvals, setApprovals] = useState<Approval[]>([])
@@ -792,7 +796,7 @@ export default function JarvisHome({
   // samma agent samma dygn är ett beslut — "4" när tre av korten är samma
   // ärende läser som att man ligger efter mer än man gör.
   const grupper = groupApprovals(synliga)
-  const beslut = grupper.length + reschedules.length
+  const beslut = grupper.length + reschedules.length + (fuelCritical ? 1 : 0)
   const koTom = queueLoaded && beslut === 0
 
   // Cross-Agent Case — filtrera bort hanterade signaler (samma !hiddenIds-
@@ -961,6 +965,12 @@ export default function JarvisHome({
           {synligaCases.map(c => (
             <ProjektCaseKort key={c.project_id} data={c} />
           ))}
+
+          {fuelCritical && (
+            <div className="mb-2.5">
+              <FuelWarningCard />
+            </div>
+          )}
 
           {nba && !heroHidden && !hiddenIds.has(nba.approval.id) && (
             <GorDettaForst

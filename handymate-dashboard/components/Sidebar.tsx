@@ -36,6 +36,7 @@ import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useBusiness } from '@/lib/BusinessContext'
 import { hasFeature, PlanType, getPlanLabel } from '@/lib/feature-gates'
 import { isLaunchHidden, isComingSoon, COMING_SOON_LABEL } from '@/lib/launch-visibility'
+import { FuelSidebarBadge } from '@/components/fuel/FuelSidebarBadge'
 
 interface SidebarProps {
   businessName: string
@@ -713,6 +714,9 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
               </div>
             )}
           </div>
+
+          {/* Bränsle-badge — tyst tills lågt/kritiskt läge, se FuelSidebarBadge */}
+          <FuelSidebarBadge />
         </div>
       </div>
 

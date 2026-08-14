@@ -178,6 +178,31 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
     return
   }
 
+  // Bränsle-påfyllning: engångsköp, ingen prenumeration att röra. Samma
+  // mönster som leads-addon-grenen ovan — early return, ingen plan-
+  // uppdatering, ingen referral (det är inte en första betalning).
+  if (session.metadata?.addon === 'fuel_topup') {
+    const amountOre = Number(session.metadata?.amount_ore || session.amount_total || 0)
+    if (amountOre > 0) {
+      await supabase.from('fuel_ledger').insert({
+        id: 'fuel_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10),
+        business_id: businessId,
+        amount_ore: amountOre,
+        source: 'stripe_checkout',
+        stripe_checkout_session_id: session.id,
+        stripe_payment_intent_id: typeof session.payment_intent === 'string' ? session.payment_intent : null,
+      })
+    }
+    await supabase.from('business_config')
+      .update({ stripe_customer_id: session.customer as string })
+      .eq('business_id', businessId)
+    await supabase.from('billing_event').insert({
+      business_id: businessId, event_type: 'fuel_topup_completed', stripe_event_id: event.id,
+      data: { amount_ore: amountOre, customer_id: session.customer, checkout_session_id: session.id },
+    })
+    return
+  }
+
   // Vi speglar Stripes verkliga prenumerationsstatus i stället för att hårdkoda
   // 'active'. INGEN trial (Handymate debiterar direkt) → status blir 'active' med
   // en gång för både onboarding-checkouten och uppgradering i Inställningar. Att

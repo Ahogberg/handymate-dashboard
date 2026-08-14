@@ -19,6 +19,7 @@ import {
   ArrowDownRight,
   Receipt
 } from 'lucide-react'
+import { FuelBillingCard } from '@/components/fuel/FuelBillingCard'
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 }).format(amount)
@@ -382,6 +383,9 @@ export default function BillingPage() {
                     SMS-mätaren ovan är kvar: den läser sms_usage och är sann. */}
               </div>
             </div>
+
+            {/* ===== BRÄNSLE ===== */}
+            <FuelBillingCard />
 
             {/* ===== PLAN COMPARISON ===== */}
             <div>

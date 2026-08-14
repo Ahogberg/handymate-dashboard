@@ -52,6 +52,17 @@ h1, h2, h3, h4, h5, h6 {
   .anim-fade, .anim-rise, .anim-pop { animation: none; }
 }
 
+/* Bränsle-badgens kritiska puls (Sidebar, 2026-08-14) — egen klass, samma
+   skäl som qk-*: reduced-motion-skyddet ska bo på ETT ställe. */
+@keyframes hm-badge-pulse {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+.fuel-badge-pulse { animation: hm-badge-pulse 1.8s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .fuel-badge-pulse { animation: none; }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
