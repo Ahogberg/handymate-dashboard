@@ -391,3 +391,69 @@ Tre förbefintliga, orelaterade gap som ytan blev synlig av att köra hela
    allt arbete idag — troligen en drift sedan en tidigare, orelaterad
    commit. Rör fakturagenerering, så förtjänar en egen, noggrann titt —
    INTE en snabbfix inbakad i ett kostnadsmätnings-pass.
+
+---
+
+# Bränsle — AI/API-kostnadsmätare med Stripe-självbetjänings-påfyllning
+
+Källa: Claude Design levererade en mockup (Bränslemätaren.dc.html) med tre
+ytor. Produktbeslut via klargörande frågor: rullande fönster, informativt
+vid 0% (ingen koppling till agent-cost-cap), och — Andreas avvisade explicit
+mitt förslag om admin-manuell registrering — självbetjäning via Stripe.
+Byggt i plan mode, verifierad av två Explore-pass + en Plan-agent innan
+kodning, sedan en uppföljande justering (fönster-ankring) efter första
+driftsättning.
+
+## Byggt (commit 7f58d6f3, f5148c1e, 8bac176d — pushat, deployat, migrerat)
+
+- `sql/v133_fuel_ledger.sql` — append-only ledger, samma RLS-mönster som
+  cost_event (v100). Körd via Supabase MCP efter Andreas "Kör SQL!" — verifierad
+  med SELECT direkt efteråt (RLS + exakt en policy).
+- `lib/costs/fuel.ts` — kundsäker aggregering ovanpå cost_event, separat
+  fönster från report.ts:s kalendermånad. 39 kända ref_type kategoriserade
+  i tre hinkar (Samtal & SMS / Offerter & analyser / Teamets nattarbete),
+  facit säkerställer uttömmande täckning (ingen faller tyst igenom).
+- **Fönstret ANKRAS till förnyelsedatumet** (business_config.
+  billing_period_start), inte ett fritt glidande "nu minus 30 dagar" —
+  Andreas-justering EFTER första driftsättning, samma dag. Fallback till
+  rent glidande 30 dagar för konton utan aktiv prenumeration.
+- `app/api/billing/fuel(+topup)/route.ts` — läsning (alla teammedlemmar) +
+  Stripe checkout (ägare/admin, mode:'payment', price_data inline).
+- Webhook-utökning: ny `fuel_topup`-gren i `handleCheckoutCompleted`,
+  mirrors leads-addon-mönstret.
+- Tre UI-ytor: `FuelBillingCard` (billing-sidan, mellan Användning och
+  Planval), `FuelSidebarBadge` (tyst tills lågt/kritiskt läge),
+  `FuelWarningCard` (kortkö, bara vid kritisk nivå, INTE en
+  pending_approvals-rad — bespoke JSX, samma mönster som
+  mandagskortApproval).
+
+## Verifierat
+
+- `npx tsc --noEmit`, `npx next build` — rent genom alla tre pass.
+- Facit: `tests/bransle-matare.spec.ts` (17 tester, inkl. uttömmande
+  ref_type-täckning och COGS-språkläckage) + `tests/cogs-matare.spec.ts`
+  (46) — 63/63 gröna, "en skrivare per faktum"-invarianten intakt.
+- Full svit: samma 25 förbefäntliga, orelaterade fel som redan
+  rotorsaksbestämts under COGS-etapp 2 (cron-auth route-count-drift,
+  MalBlock.tsx-klassificering, auto-invoice-on-complete.ts-facit-drift) —
+  ingen ny regression.
+- **Skarp Stripe-verifiering, riktigt end-to-end-flöde**: skapade en äkta
+  test-mode Checkout Session via det levande fuel-topup-API:et, hämtade
+  tillbaka sessionen från Stripe, byggde och SIGNERADE en
+  checkout.session.completed-webhook med Stripes egen
+  `generateTestHeaderString`-hjälpare, levererade den mot den riktiga
+  deployade webhook-routen. Resultat: riktig `fuel_ledger`-rad (900 kr),
+  riktig `billing_event`-rad, och `/api/billing/fuel` visade budgeten höjd
+  från 90 000 → 180 000 öre — hela kedjan bevisad, inte bara kodgranskad.
+- **Skärmdumpsverifiering**: normalläget på billing-sidan (gauge, buckets,
+  30-dagarsdiagram — allt renderar med riktig data). Kritiskt läge
+  framtvingat med en tillfällig cost_event-rad (borttagen efteråt): röd
+  pulserande Sidebar-badge + FuelWarningCard i kön, header-räknaren
+  stämde. Hittade och fixade en textbugg på köpet: "0 veckor kvar" (helt
+  matematiskt sant vid hög burn rate, men lät konstigt) → delad
+  `weeksRemainingPhrase()`-funktion.
+
+## Kvar / medvetet inte byggt
+
+Inget — alla tre ytor + Stripe-flödet är levande i prod. Möjlig framtida
+förfining: beloppsväljare i "Tanka" (idag fast belopp = en månads budget).
