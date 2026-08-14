@@ -54,6 +54,7 @@ import { grindaNyheter, entityFrom } from '@/lib/jarvis/news-gates'
 import { pengaFynd } from '@/lib/jarvis/moment-rows'
 import type { AgentMoment } from '@/lib/moments/derive'
 import { GorDettaForst, type NextBestActionRecommendation } from '@/components/jarvis/GorDettaForst'
+import { ProjektCaseKort, type ProjektCaseData } from '@/components/jarvis/ProjektCaseKort'
 
 /**
  * JarvisHome — teamets rapportbord (2026-08-07).
@@ -258,6 +259,10 @@ export default function JarvisHome({
   // fler av dem (upp till tre). Ingen egen hämtning: kommer ur samma svar
   // som `nba` ovan, se fetch-effekten nedan.
   const [nbaList, setNbaList] = useState<NextBestActionRecommendation[]>([])
+  // Cross-Agent Case (2026-08-14) — flera agenters signaler om samma
+  // projekt, se app/api/project-cases/route.ts. Egen hämtning av samma
+  // skäl som NBA ovan (huvudkön är kapad till 15 senaste).
+  const [projektCases, setProjektCases] = useState<ProjektCaseData[]>([])
   const [heroHidden, setHeroHidden] = useState(false)
   const [snack, setSnack] = useState<{ approvalId: string; text: string } | null>(null)
   const [feedback, setFeedback] = useState<{ text: string; isError: boolean } | null>(null)
@@ -335,6 +340,20 @@ export default function JarvisHome({
           }
         }
       } catch { /* ingen rankning idag är ett giltigt, tyst utfall */ }
+    })()
+    return () => { active = false }
+  }, [authHeaders])
+
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const res = await fetch('/api/project-cases', { headers: await authHeaders() })
+        if (res.ok) {
+          const data = await res.json()
+          if (active) setProjektCases(data.cases || [])
+        }
+      } catch { /* inga case idag är ett giltigt, tyst utfall */ }
     })()
     return () => { active = false }
   }, [authHeaders])
@@ -776,6 +795,15 @@ export default function JarvisHome({
   const beslut = grupper.length + reschedules.length
   const koTom = queueLoaded && beslut === 0
 
+  // Cross-Agent Case — filtrera bort hanterade signaler (samma !hiddenIds-
+  // logik som hero'n ovan), och dölj hela caset om under 2 distinkta typer
+  // återstår (en enda kvarvarande signal är inte längre en berättelse med
+  // flera röster). INGEN borttagning ur kön nedanför — bara den här ytans
+  // egen, oberoende vy. Se lib/jarvis/project-case.ts för samma regel.
+  const synligaCases = projektCases
+    .map(c => ({ ...c, signals: c.signals.filter(s => !hiddenIds.has(s.approval_id)) }))
+    .filter(c => new Set(c.signals.map(s => s.approval_type)).size >= 2)
+
   // Hälsningens bevisrad — rullande dygn, ärligt om något behövde ägaren.
   const bevis = halsningsBevis(proof, beslut)
 
@@ -929,6 +957,10 @@ export default function JarvisHome({
               </button>
             )
           })()}
+
+          {synligaCases.map(c => (
+            <ProjektCaseKort key={c.project_id} data={c} />
+          ))}
 
           {nba && !heroHidden && !hiddenIds.has(nba.approval.id) && (
             <GorDettaForst
