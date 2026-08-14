@@ -15,6 +15,8 @@ import {
   onboardingGatesResolved,
   shouldAutoOpenMandagsmote,
   mandagsmoteSectionOrder,
+  byggVeckomoteRepliker,
+  beslutText,
 } from '../lib/jarvis/mandagsmote'
 import { approveLabel } from '../lib/jarvis/approval-view'
 
@@ -95,6 +97,102 @@ test.describe('mandagsmoteSectionOrder — ordningen på den stegvisa avslöjnin
   })
 })
 
+test.describe('beslutText — svensk pluralisering', () => {
+  test('1 → "ett beslut", inte "1 beslut"', () => {
+    expect(beslutText(1)).toBe('ett beslut')
+  })
+
+  test('0 och 2+ → siffran utskriven', () => {
+    expect(beslutText(0)).toBe('0 beslut')
+    expect(beslutText(2)).toBe('2 beslut')
+    expect(beslutText(3)).toBe('3 beslut')
+  })
+})
+
+test.describe('byggVeckomoteRepliker — de fyra sektionerna som en ordnad dialog', () => {
+  test('tomt allt → tom lista, hittar aldrig på en replik', () => {
+    expect(byggVeckomoteRepliker({ resultat: null, lardomar: null, risker: null, fortroende: null })).toEqual([])
+  })
+
+  test('ordningen är resultat → lärdomar → risker → förtroende, samma som mandagsmoteSectionOrder', () => {
+    const repliker = byggVeckomoteRepliker({
+      resultat: [{ key: 'identifierat', kr: 10000, antal: 2 }],
+      lardomar: { antal: 3 },
+      risker: [{ project_id: 'p1', project_name: 'Villa Ek', cost_percent: 80, status: 'at_risk' }],
+      fortroende: [{ key: 'invoice_reminder' as any, label: 'Betalningspåminnelser', agent: 'karin', agentName: 'Karin', streak: 5, cap_kr: 5000 }],
+    })
+    expect(repliker.map(r => r.agentId)).toEqual(['matte', 'daniel', 'karin', 'karin'])
+  })
+
+  test('resultat: flera rader blir EN sammanhängande replik, inte en per rad', () => {
+    const repliker = byggVeckomoteRepliker({
+      resultat: [
+        { key: 'identifierat', kr: 45000, antal: 3 },
+        { key: 'agerat', kr: 30000, antal: 2 },
+      ],
+      lardomar: null, risker: null, fortroende: null,
+    })
+    expect(repliker).toHaveLength(1)
+    expect(repliker[0].agentId).toBe('matte')
+    // toLocaleString('sv-SE') infogar en icke-brytande blanksteg som
+    // tusentalsavskiljare (U+00A0) — inte ett vanligt mellanslag. Bygg
+    // det förväntade beloppet på samma sätt i stället för att gissa tecknet.
+    const kr45k = (45000).toLocaleString('sv-SE')
+    const kr30k = (30000).toLocaleString('sv-SE')
+    expect(repliker[0].text).toBe(`Den här månaden: Identifierat 3 st · ${kr45k} kr, Agerat 2 st · ${kr30k} kr.`)
+  })
+
+  test('lärdomar: singular/plural-formen matchar antalet', () => {
+    expect(byggVeckomoteRepliker({ resultat: null, lardomar: { antal: 1 }, risker: null, fortroende: null })[0].text)
+      .toBe('1 ny lärdom sedan förra veckan, från avslutade projekt.')
+    expect(byggVeckomoteRepliker({ resultat: null, lardomar: { antal: 4 }, risker: null, fortroende: null })[0].text)
+      .toBe('4 nya lärdomar sedan förra veckan, från avslutade projekt.')
+  })
+
+  test('risker: ett projekt får singular-rubrik, flera får plural + antal', () => {
+    const ett = byggVeckomoteRepliker({
+      resultat: null, lardomar: null, fortroende: null,
+      risker: [{ project_id: 'p1', project_name: 'Villa Ek', cost_percent: 80, status: 'at_risk' }],
+    })
+    expect(ett[0].text).toBe('Ett projekt att hålla koll på: Villa Ek — 80% av kalkylen använt.')
+
+    const tva = byggVeckomoteRepliker({
+      resultat: null, lardomar: null, fortroende: null,
+      risker: [
+        { project_id: 'p1', project_name: 'Villa Ek', cost_percent: 80, status: 'at_risk' },
+        { project_id: 'p2', project_name: 'Brf Tallen', cost_percent: 105, status: 'over_budget' },
+      ],
+    })
+    expect(tva[0].text).toBe('2 projekt att hålla koll på: Villa Ek — 80% av kalkylen använt; Brf Tallen — 105% av kalkylen använt (budgeten är överskriden).')
+  })
+
+  test('risker: cost_percent null (okänt format) visas utan procent, gissas aldrig', () => {
+    const repliker = byggVeckomoteRepliker({
+      resultat: null, lardomar: null, fortroende: null,
+      risker: [{ project_id: 'p1', project_name: 'Villa Ek', cost_percent: null, status: null }],
+    })
+    expect(repliker[0].text).toBe('Ett projekt att hålla koll på: Villa Ek.')
+  })
+
+  test('förtroende: EN replik PER rad (inte hopslaget), varje replik bär radens egen agent', () => {
+    const repliker = byggVeckomoteRepliker({
+      resultat: null, lardomar: null, risker: null,
+      fortroende: [
+        { key: 'invoice_reminder' as any, label: 'Betalningspåminnelser', agent: 'karin', agentName: 'Karin', streak: 5, cap_kr: 5000 },
+        { key: 'schedule_move' as any, label: 'Schemaflyttar', agent: 'lars', agentName: 'Lars', streak: 3, cap_kr: null },
+      ],
+    })
+    expect(repliker).toHaveLength(2)
+    const kr5k = (5000).toLocaleString('sv-SE')
+    expect(repliker[0]).toEqual({ agentId: 'karin', text: `Betalningspåminnelser sköts automatiskt — 5 godkända i rad, upp till ${kr5k} kr.` })
+    expect(repliker[1]).toEqual({ agentId: 'lars', text: 'Schemaflyttar sköts automatiskt — 3 godkända i rad.' })
+  })
+
+  test('en tom array (inte null) räknas inte som "finns" — samma n>0-anda som resten av filen', () => {
+    expect(byggVeckomoteRepliker({ resultat: [], lardomar: null, risker: [], fortroende: [] })).toEqual([])
+  })
+})
+
 test.describe('approveLabel — samma etikett som knappen faktiskt visar', () => {
   test('"Jag har läst det" för monday_brief, oförändrat av refaktoreringen', () => {
     expect(approveLabel('monday_brief')).toBe('Jag har läst det')
@@ -109,9 +207,12 @@ test.describe('MandagsmoteTakeover.tsx — ren presentation, ingen egen fetch/en
     expect(s).not.toContain("from '@/lib/supabase'")
   })
 
-  test('återanvänder MandagskortCard — duplicerar aldrig sektions-renderingen', () => {
-    expect(s).toContain("import { MandagskortCard } from '@/components/jarvis/MandagskortCard'")
-    expect(s).toContain('<MandagskortCard')
+  test('Veckomötet (2026-08-14): bygger repliker via byggVeckomoteRepliker, återanvänder inte MandagskortCard i dialogen', () => {
+    expect(s).toContain("import { byggVeckomoteRepliker, beslutText, UNDO_WINDOW_MS, type VeckomoteReplik } from '@/lib/jarvis/mandagsmote'")
+    // Bara importen/JSX-bruket förbjuds — filhuvudets historik FÅR nämna
+    // MandagskortCard i löptext (etapp 1/2-bakgrunden).
+    expect(s).not.toContain("from '@/components/jarvis/MandagskortCard'")
+    expect(s).not.toContain('<MandagskortCard')
   })
 
   test('dismiss (handleDismiss) anropar ALDRIG onApprove — bara onDismiss', () => {
@@ -127,8 +228,9 @@ test.describe('MandagsmoteTakeover.tsx — ren presentation, ingen egen fetch/en
     expect(fn).not.toContain('onDismissRef.current()')
   })
 
-  test('godkänn-knappen visar approveLabel-propen, inte en hårdkodad text', () => {
-    expect(s).toContain('{approveLabel}')
+  test('godkänn-knappen visar approveLabel-basen, plus "— N beslut kvar" när något beslutskort inte är avgjort', () => {
+    expect(s).toContain('const knappText = remaining > 0 ? `${approveLabel} — ${beslutText(remaining)} kvar` : approveLabel')
+    expect(s).toContain('{knappText}')
   })
 
   test('X-knappen (escape-luckan) triggar handleDismiss', () => {
@@ -138,14 +240,33 @@ test.describe('MandagsmoteTakeover.tsx — ren presentation, ingen egen fetch/en
 
   test('prefers-reduced-motion läses via matchMedia, samma mönster som CompanyScan/HemTur', () => {
     expect(s).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches")
-    expect(s).toContain('if (reducedMotion) { setVisibleCount(order.length); return }')
+    expect(s).toContain('if (reducedMotion) { setVisibleCount(steg.length); return }')
   })
 
-  test('B7-säkerhetsnätet: 5 s tvingar fram nästa sektion om avslöjningen fastnar', () => {
+  test('B7-säkerhetsnätet: 5 s tvingar fram nästa steg om avslöjningen fastnar', () => {
     expect(s).toContain('HANG_TIMEOUT_MS = 5000')
     const net = s.slice(s.indexOf('Säkerhetsnätet (B7-mönstret)'), s.length)
     expect(net).toContain('if (reducedMotion) return')
-    expect(net).toContain('Math.min(v + 1, order.length)')
+    expect(net).toContain('Math.min(v + 1, steg.length)')
+  })
+
+  test('beslutskorten fryses vid mount (candidates), inte den levande decisionCandidates-propen — annars försvinner ett kort man just avgjorde', () => {
+    expect(s).toContain('const [candidates] = useState(() => decisionCandidates)')
+    expect(s).not.toContain('decisionCandidates.map')
+    expect(s).not.toContain('decisionCandidates.filter')
+  })
+
+  test('Ångra på ett beslutskort tystnar efter UNDO_WINDOW_MS — knappen låtsas aldrig kunna ångra ett redan skickat godkännande', () => {
+    expect(s).toContain("import { byggVeckomoteRepliker, beslutText, UNDO_WINDOW_MS, type VeckomoteReplik } from '@/lib/jarvis/mandagsmote'")
+    expect(s).toContain('undoAvailable={!undoExpired[c.approval.id]}')
+    const fn = s.slice(s.indexOf('function handleYes('), s.indexOf('function handleNo('))
+    expect(fn).toContain('setUndoExpired(u => ({ ...u, [id]: true })), UNDO_WINDOW_MS)')
+  })
+
+  test('varje beslutskorts Ja/Nej går genom de callbacks som pekar på queueAction i JarvisHome, ingen egen väg', () => {
+    expect(s).toContain('onApproveDecision(c)')
+    expect(s).toContain('onRejectDecision(c)')
+    expect(s).toContain('onUndoDecision(id)')
   })
 })
 

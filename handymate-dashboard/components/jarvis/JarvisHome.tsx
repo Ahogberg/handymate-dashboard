@@ -24,6 +24,7 @@ import {
   onboardingGatesResolved,
   shouldAutoOpenMandagsmote,
   mandagsmoteSectionOrder,
+  UNDO_WINDOW_MS,
 } from '@/lib/jarvis/mandagsmote'
 import { ScheduleTimeline, parseKonflikter, minuterFranIso } from '@/components/jarvis/ScheduleTimeline'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
@@ -103,7 +104,6 @@ const NYHETS_IKON: Record<NyhetsIkon, React.ReactNode> = {
   pengar: <Banknote className="w-3.5 h-3.5" />,
 }
 
-const UNDO_WINDOW_MS = 5000
 const MAX_FULL_CARDS = 3
 /** Sedd-nyckel för nyhetsraderna — samma mönster som hm_moments_seen. */
 const NYHETER_SEDDA_KEY = 'hm_nyheter_sedda'
@@ -254,6 +254,10 @@ export default function JarvisHome({
   // är hanterat) och vid "Inte nu" (bara ytan döljs, ärendet lever kvar och
   // återgår till att vara en vanlig rad i kön nedanför).
   const [nba, setNba] = useState<NextBestActionRecommendation | null>(null)
+  // Veckomötets beslutskort (2026-08-14) — SAMMA dagens rangordning, bara
+  // fler av dem (upp till tre). Ingen egen hämtning: kommer ur samma svar
+  // som `nba` ovan, se fetch-effekten nedan.
+  const [nbaList, setNbaList] = useState<NextBestActionRecommendation[]>([])
   const [heroHidden, setHeroHidden] = useState(false)
   const [snack, setSnack] = useState<{ approvalId: string; text: string } | null>(null)
   const [feedback, setFeedback] = useState<{ text: string; isError: boolean } | null>(null)
@@ -325,7 +329,10 @@ export default function JarvisHome({
         const res = await fetch('/api/next-best-action', { headers: await authHeaders() })
         if (res.ok) {
           const data = await res.json()
-          if (active) setNba(data.recommendation || null)
+          if (active) {
+            setNba(data.recommendation || null)
+            setNbaList(data.recommendations || [])
+          }
         }
       } catch { /* ingen rankning idag är ett giltigt, tyst utfall */ }
     })()
@@ -913,7 +920,7 @@ export default function JarvisHome({
               >
                 <AgentAvatar agentKey="matte" size="md" />
                 <div className="flex-1 min-w-0">
-                  <p className="m-0 text-sm font-semibold text-primary-900">Måndagsmötet väntar</p>
+                  <p className="m-0 text-sm font-semibold text-primary-900">Veckomötet väntar</p>
                   <p className="m-0 text-xs text-primary-700">
                     {antal} punkt{antal === 1 ? '' : 'er'}{isoWeek ? ` — vecka ${isoWeek}` : ''}
                   </p>
@@ -1331,9 +1338,28 @@ export default function JarvisHome({
       {mandagsmoteOpen && mandagskortApproval && (
         <MandagsmoteTakeover
           approval={mandagskortApproval}
+          greetingName={greetingName}
           approveLabel={approveLabel('monday_brief', mandagskortApproval.payload)}
+          decisionCandidates={nbaList.filter(r => !hiddenIds.has(r.approval.id))}
           onApprove={approveMandagsmote}
           onDismiss={dismissMandagsmote}
+          onApproveDecision={c => {
+            // INTE setHeroHidden — den flaggan hör bara till hero-kortets
+            // egen "Inte nu" (döljning utan att köa något). Ett beslutskort
+            // som faktiskt godkänns/avvisas läggs i hiddenIds av queueAction
+            // nedan, vilket räcker för att hero'n (om samma kandidat) och
+            // beslutskortet själva döljer sig — ett dubbelt döljningsspår
+            // hade dolt FEL kort om detta inte var hero'ns egen kandidat.
+            //
+            // Samma dubbel-cast-motivering som Gör detta först-hero'n ovan
+            // (rad ~938): API:t gör select('*') mot pending_approvals, så
+            // formen bär alla fält Approval kräver, bara typad smalare här.
+            queueAction(c.approval as unknown as Approval, 'approve')
+          }}
+          onRejectDecision={c => {
+            queueAction(c.approval as unknown as Approval, 'reject')
+          }}
+          onUndoDecision={undo}
         />
       )}
 

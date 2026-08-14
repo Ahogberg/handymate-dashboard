@@ -8,6 +8,11 @@ import { svDateStr } from '@/lib/dates'
 
 export const dynamic = 'force-dynamic'
 
+/** Veckomötets beslutskort (2026-08-14) visar upp till tre kandidater —
+ *  samma rangordnade rader, bara fler av dem. Ingen egen selektion: Veckomötet
+ *  återanvänder exakt denna lista, den beräknar aldrig en egen "veckans tre". */
+const MAX_RECOMMENDATIONS = 3
+
 /**
  * GET /api/next-best-action
  *
@@ -17,15 +22,18 @@ export const dynamic = 'force-dynamic'
  * missas helt. Den här endpointen gör uppslaget mot en känd approval-id
  * istället för att lita på en redan hämtad, begränsad lista.
  *
- * Går igenom dagens next_best_action.ranked_candidates I ORDNING tills en
- * kandidat fortfarande är 'pending' (samma arTestdataApproval +
- * canActOnApproval-filter som huvudkön). Träffen kan vara #1 ELLER en
- * lägre rankad om toppvalet redan hanterades innan sidan laddades — då
- * används DEN kandidatens EGEN sparade rationale, aldrig en påhittad
- * förklaring för varför #1 försvann.
+ * Går igenom dagens next_best_action.ranked_candidates I ORDNING och samlar
+ * alla som fortfarande är 'pending' (samma arTestdataApproval +
+ * canActOnApproval-filter som huvudkön) — `recommendation` är den FÖRSTA
+ * träffen (oförändrat, samma kontrakt som innan), `recommendations` är upp
+ * till MAX_RECOMMENDATIONS av dem i samma ordning (additiv, för Veckomötets
+ * beslutskort). En kandidat som redan hanterades innan sidan laddades hoppas
+ * bara över — träffarna använder alltid SIN EGEN sparade rationale, aldrig
+ * en påhittad förklaring för varför en högre rankad kandidat försvann.
  *
- * Ingen rad för idag, eller ingen kandidat kvar pending → { recommendation: null }.
- * Det är det ärliga svaret, inte ett fel.
+ * Ingen rad för idag, eller ingen kandidat kvar pending →
+ * { recommendation: null, recommendations: [] }. Det är det ärliga svaret,
+ * inte ett fel.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -68,26 +76,28 @@ export async function GET(request: NextRequest) {
     const permits = await Promise.all(visibleRows.map(row => canActOnApproval(supabase, currentUser, row)))
     const permittedIds = new Set(visibleRows.filter((_, i) => permits[i]).map(row => (row as any).id as string))
 
-    for (let rank = 0; rank < ranked.length; rank++) {
+    const recommendations: Array<Record<string, unknown>> = []
+    for (let rank = 0; rank < ranked.length && recommendations.length < MAX_RECOMMENDATIONS; rank++) {
       const entry = ranked[rank]
       const approval = byId.get(entry.approval_id)
       if (!approval || !permittedIds.has(entry.approval_id)) continue
 
-      return NextResponse.json({
-        recommendation: {
-          approval,
-          rank,
-          rationale: entry.rationale,
-          financialImpactKr: entry.financial_impact_kr,
-          financialImpactKind: entry.financial_impact_kind,
-          urgencyNote: entry.urgency_note,
-          reasoning: nba.reasoning,
-          principlesApplied: nba.principles_applied || [],
-        },
+      recommendations.push({
+        approval,
+        rank,
+        rationale: entry.rationale,
+        financialImpactKr: entry.financial_impact_kr,
+        financialImpactKind: entry.financial_impact_kind,
+        urgencyNote: entry.urgency_note,
+        reasoning: nba.reasoning,
+        principlesApplied: nba.principles_applied || [],
       })
     }
 
-    return NextResponse.json({ recommendation: null })
+    return NextResponse.json({
+      recommendation: recommendations[0] ?? null,
+      recommendations,
+    })
   } catch (error: any) {
     console.error('GET /api/next-best-action error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
