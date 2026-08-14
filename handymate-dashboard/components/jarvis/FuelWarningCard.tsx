@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useFuel } from '@/components/fuel/FuelProvider'
 import { FuelGauge } from '@/components/fuel/FuelGauge'
+import { weeksRemainingPhrase } from '@/lib/costs/fuel'
 
 /**
  * Bränsle-varningen i "Det här behöver dig idag" — bespoke JSX, INTE en
@@ -50,8 +51,8 @@ export function FuelWarningCard() {
       </h3>
       <p className="text-sm text-slate-500 mb-3">
         {level.weeksRemaining != null
-          ? `Räcker ungefär ${level.weeksRemaining === 1 ? 'en vecka' : `${level.weeksRemaining} veckor`} till i nuvarande takt.`
-          : 'Håll ett öga på förbrukningen den här månaden.'}
+          ? `${weeksRemainingPhrase(level.weeksRemaining)} i nuvarande takt.`
+          : 'Håll ett öga på förbrukningen den här perioden.'}
       </p>
 
       <div className="flex items-center gap-3 mb-3">

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Zap } from 'lucide-react'
 import { useFuel } from './FuelProvider'
 import { FuelGauge } from './FuelGauge'
+import { weeksRemainingPhrase } from '@/lib/costs/fuel'
 
 /**
  * Bränsle-sektionen på /dashboard/settings/billing — mellan USAGE OVERVIEW
@@ -40,7 +41,7 @@ export function FuelBillingCard() {
   }
 
   const estimateText = level.weeksRemaining != null
-    ? `Räcker till ungefär ${level.weeksRemaining === 1 ? '1 vecka' : `${level.weeksRemaining} veckor`} till som vanligt.`
+    ? `${weeksRemainingPhrase(level.weeksRemaining)} som vanligt.`
     : 'Ingen förbrukning ännu den här perioden.'
   const calmText = level.state === 'normal'
     ? 'Ingen fara — teamet jobbar på som vanligt.'

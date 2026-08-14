@@ -55,6 +55,21 @@ export function fuelBudgetOreForPlan(plan: string | null | undefined): number {
   return FUEL_DEFAULT_BUDGET_ORE
 }
 
+/**
+ * Delad text för "räcker ungefär X till" — båda klientytorna (hemvisten,
+ * kortkö-varningen) formulerar samma sak olika utförligt, men "0 veckor"
+ * (helt reell utfallsrymd: hög burn rate på kort fönster) läste tonlöst
+ * innan den här funktionen fanns, upptäckt vid en riktig skärmdumps-
+ * verifiering av kritiskt läge, 2026-08-14. Anropas bara när weeksRemaining
+ * inte är null — null (ingen förbrukning ännu) hanteras skilt per yta,
+ * eftersom "i nuvarande takt" inte är en meningsfull uppföljning då.
+ */
+export function weeksRemainingPhrase(weeksRemaining: number): string {
+  if (weeksRemaining <= 0) return 'Tar snart slut'
+  if (weeksRemaining === 1) return 'Räcker ungefär en vecka till'
+  return `Räcker ungefär ${weeksRemaining} veckor till`
+}
+
 export type FuelBucket = 'calls_sms' | 'quotes_analysis' | 'night_work'
 
 export const FUEL_BUCKET_LABEL: Record<FuelBucket, string> = {
