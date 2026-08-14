@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Zap, Loader2, Lock, Check, AlertTriangle } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 function ResetPasswordForm() {
   const router = useRouter()
@@ -14,10 +15,39 @@ function ResetPasswordForm() {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
 
-  // Check if we have a valid recovery session (set by /auth/callback)
+  /**
+   * Kritisk bugg fixad 2026-08-14: återställningsmejlet levererar tokens
+   * som URL-HASH (#access_token=...&refresh_token=...&type=recovery,
+   * Supabases implicit-flow-format) — men den koden här ropade tidigare
+   * BARA /api/auth {action:'check'} rakt av, som bara läser en befintlig
+   * cookie-session. Hashen bytes aldrig in i en session först, så
+   * kontrollen misslyckades ALLTID, oavsett om länken faktiskt var giltig
+   * — "Ogiltig länk" visades på varenda återställning, för alla konton.
+   * Samma rotorsaksfamilj som magic link-buggen (ingen kod i den här
+   * kodbasen hanterade hash-fragment-tokens någonstans). Fixen: byt in
+   * tokens via klientens supabase.auth.setSession() (samma
+   * createClientComponentClient som resten av appen redan litar på för
+   * att skriva cookien i rätt format, se lib/supabase.ts) INNAN
+   * /api/auth-kontrollen frågas.
+   */
   useEffect(() => {
     async function checkSession() {
       try {
+        const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : ''
+        const params = new URLSearchParams(hash)
+        const access_token = params.get('access_token')
+        const refresh_token = params.get('refresh_token')
+        if (access_token && refresh_token) {
+          const { error: setSessionError } = await supabase.auth.setSession({ access_token, refresh_token })
+          if (setSessionError) {
+            setSessionValid(false)
+            setError('Återställningslänken är ogiltig eller har gått ut. Begär en ny.')
+            return
+          }
+          // Tokens ska inte ligga kvar synliga i URL:en (kan kopieras/delas av misstag).
+          window.history.replaceState(null, '', window.location.pathname)
+        }
+
         const response = await fetch('/api/auth', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
