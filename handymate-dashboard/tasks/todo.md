@@ -43,4 +43,38 @@ mockupens exempeldata.
 - [ ] Städa eventuell testdata, sista SELECT bekräftar prod rent.
 
 ## Review
-(fylls i efter implementation)
+
+**Byggt och skeppat** (commit 838561be + d96ded4c, pushat, deployat):
+alla filer i planen ovan, exakt som beskrivet. `npx tsc --noEmit` rent,
+`npx next build` rent, full testsvit 5467 gröna/0 failed (upp från 5451 —
++16 nya/uppdaterade tester i tests/mandagsmote-takeover.spec.ts).
+
+**Verifierat via Supabase MCP** (seedad testdata för biz_al7pjuu5smi,
+sedan städad — sista SELECT bekräftar 0 kvar): `next_best_action`-radens
+form matchar exakt vad `/api/next-best-action`s nya `recommendations`-fält
+förväntar sig, och `pending_approvals`-payloaden för `monday_brief` matchar
+exakt vad `byggVeckomoteRepliker` konsumerar. Detta bevisar datakontraktet,
+INTE den faktiska renderingen/interaktionen i webbläsaren.
+
+**INTE verifierat — en riktig, oberoende upptäckt under detta pass:**
+`tests/auth.setup.ts`s magic link-inloggning (via
+`supabase.auth.admin.generateLink`) studsar tillbaka till `/login` inom
+någon sekund för testkontot (`andreashogberg93@gmail.com` /
+`biz_al7pjuu5smi`) — reproducerat tre gånger, även mot en helt orörd,
+existerande test (`tests/navigation.spec.ts`). Trolig orsak: admingenererade
+länkar är inte kompatibla med appens PKCE-baserade `/auth/callback`
+(`exchangeCodeForSession` väntar en `?code=`-parameter; adminlänkar levererar
+troligen sessionen som url-fragment istället, vilket aldrig når servern).
+`navigation.spec.ts` och liknande tester märker inte av detta eftersom de
+bara kollar HTTP-status (200/302, inte 500) — en redirect till /login
+räknas som "godkänt" där. Det här är alltså inte en flake i just den här
+sessionen utan en trolig systemisk lucka: riktig inloggd browser-verifiering
+har sannolikt inte fungerat på ett tag, dolt av att de flesta chromium-
+testerna inte faktiskt kollar att man ÄR inloggad. Flaggat till Andreas,
+inte fixat här (kräver ett beslut om test-inloggningsstrategin, utanför
+detta uppdrag).
+
+**Fixat i samma veva** (commit d96ded4c, litet och oberoende): `setup`-
+projektets `storageState: undefined` gav ENOENT på en färsk checkout utan
+`playwright/.auth/user.json` — samma fälla som `golden-path-setup` redan
+dokumenterar i samma fil. Ett explicit tomt state löser det.
