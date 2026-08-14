@@ -33,11 +33,16 @@ export default defineConfig({
   },
 
   projects: [
-    // Auth setup — körs först, sparar session
+    // Auth setup — körs först, sparar session.
+    // `storageState: undefined` överskrider INTE toppnivåns default i den
+    // här Playwright-versionen (samma fälla som golden-path-setup nedan
+    // redan dokumenterar) — på en färsk checkout utan playwright/.auth/
+    // user.json ger det ENOENT innan setup:en ens hunnit skapa filen.
+    // Ett explicit tomt state är vad som faktiskt ger en blank kontext.
     {
       name: 'setup',
       testMatch: /.*\.setup\.ts/,
-      use: { storageState: undefined },
+      use: { storageState: { cookies: [], origins: [] } },
     },
     {
       name: 'chromium',
