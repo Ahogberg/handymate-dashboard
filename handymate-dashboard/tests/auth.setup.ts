@@ -57,6 +57,13 @@ setup('authenticate', async ({ page, baseURL }) => {
   await page.waitForLoadState('networkidle')
   expect(page.url(), `Sessionen gav inloggad åtkomst till /dashboard — URL: ${page.url()}`).not.toContain('/login')
 
+  // WelcomeModal.tsx (dag 0-rutan) gatear PÅ EN REN localStorage-flagga,
+  // helt separat från business_config.welcome_tour_seen — en färsk
+  // Playwright-profil har den aldrig satt och ser rutan varje körning.
+  // Sätts direkt i stället för att jaga en klickbar stängknapp i varje
+  // testfil som råkar landa på en dashboard-sida.
+  await page.evaluate(() => localStorage.setItem('handymate_welcome_dismissed', '1'))
+
   await page.context().storageState({ path: AUTH_FILE })
   console.log('Auth setup — Session sparad till', AUTH_FILE)
 })
