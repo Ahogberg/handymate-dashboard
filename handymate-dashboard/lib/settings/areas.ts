@@ -240,6 +240,7 @@ export const SETTINGS_AREAS: SettingsArea[] = [
           // en sidoeffekt av en menyomstrukturering.
           { id: '_link_billing', label: 'Abonnemang & fakturering', desc: 'Plan, användning och betalningshistorik', icon: 'credit-card', href: '/dashboard/settings/billing' },
           { id: 'subscription', label: 'Nuvarande plan', desc: 'Vad som ingår i din nivå', icon: 'credit-card', supersededBy: '/dashboard/settings/billing' },
+          { id: '_link_byt_losenord', label: 'Byt lösenord', desc: 'Ditt eget personliga lösenord', icon: 'key', href: '/dashboard/settings/byt-losenord' },
         ],
       },
       {
