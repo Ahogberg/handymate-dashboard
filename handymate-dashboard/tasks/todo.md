@@ -1,3 +1,65 @@
+# Snabbofferten — steg-för-steg blir standard, review isoleras
+
+Källa: Andreas skärmdump + fynd (2026-08-14) — review-steget visade allt
+samtidigt trots att det "guidar steg för steg". Plan godkänd i plan mode
+efter två research-pass (Explore + Plan-agent) som kartlade exakt
+render-trädet i `app/dashboard/quotes/new/page.tsx` innan något byggdes.
+
+## Byggt (commit b37a8cbe, 73cd31fa, ce18b524 — pushat, deployat)
+
+- `enterQuickReview()` — delad svans för alla tre startvägar.
+- Review/overview isolerat till en egen, minimal region (ny topbar: Offerter-
+  länk, kompakt kundväljare, Spara utkast, preferensbanner) i stället för
+  att lägga granskningskortet ovanpå hela den befintliga "allt-på-en-gång"-
+  vyn. DanielsBedömning + AI-badges omgatade till bara `overview`, inte
+  `review`. INGEN duplicering av RowEditSheet/AddRowSheet/
+  ReservationReviewSheet/ProductModal — de låg redan utanför grid-diven som
+  delade siblings, så en ternary runt bara den regionen räckte (enklare än
+  planens ursprungliga "två fulla early-return-grenar").
+- Mallvägen går nu genom `enterQuickReview()` i stället för rakt till
+  `quickMode=null` (båda `QuoteNewStartChooser`-anropen).
+- Ny `QuickBlankStart.tsx` + `onSkipDescription`-länk i `QuickIntake.tsx`:
+  tredje startväg (kund+titel, inget AI) som landar i samma granskning med
+  0 rader — review-läget tålde redan tomt innehåll (`sectionSummary` gav
+  "Inga rader än" som ett vanligt attention-läge, inte en krasch).
+
+## Verifierat
+
+- `npx tsc --noEmit` — noll fel.
+- Befintliga facit (offertbyggaren, quote-new-context, quote.spec.ts) —
+  15/15 gröna.
+- `npx next build` — ren.
+- Full svit: 5762 gröna, 0 failed (oförändrat från Project Reality-passet).
+- **Riktig, live, skärmdumpad verifiering av alla tre startvägar** (AI,
+  mall, blankt) — se auth-genombrottet nedan för hur.
+
+## Auth-genombrott, del 2: riktig browser-inloggning löst på riktigt
+
+Den kända buggen (magic link → studsar till /login) är nu FIXAD, inte bara
+kringgången. `tests/auth.setup.ts` postar till `/api/auth` {action:'login'}
+— samma `createRouteHandlerClient`/`signInWithPassword`-väg som appens
+egen inloggningssida redan använder — i stället för att gissa cookie-
+formatet från en admin-genererad magic link. `TEST_USER_PASSWORD` satt en
+gång via `admin.updateUserById` (skrevs aldrig till stdout), sparad i
+`.env.test` (gitignorad). **Riktig, inloggd Playwright-browserverifiering
+fungerar nu igen för ALLA framtida sessioner**, inte bara via verifyOtp-
+Bearer-tricket.
+
+En andra, orelaterad bugg hittades under samma verifiering: en färsk
+Playwright-profil saknar `handymate_welcome_dismissed` i localStorage
+(WelcomeModal.tsx, dag 0-rutan) och blockerade klick med sin backdrop på
+varje ny körning. Fixad genom att sätta flaggan en gång i `auth.setup.ts`
+innan storageState sparas.
+
+## Skärmdumpar (tagna, granskade, raderade efter — inte checkade in)
+
+Review-läget (AI-väg): minimal topbar, INGEN kundpanel, INGA AI-badges,
+INGEN Mer-rad — bara det fokuserade/dimmade dokumentet + "Ser bra ut →".
+Blank-väg: samma isolerade vy, ärligt "Inga rader än"/"Offerten har inga
+rader" + "+ Lägg till rad". Exakt vad Andreas bad om.
+
+---
+
 # Project Reality + Cross-Agent Case (Business Twin #9 V1)
 
 Källa: plan `jaunty-pondering-hummingbird.md` (godkänd). Andreas delade
