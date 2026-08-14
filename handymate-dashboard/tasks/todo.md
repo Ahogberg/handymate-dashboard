@@ -557,6 +557,19 @@ Ingen databasmutation kördes. `sql/v134_margin_target_explicit.sql` måste
 köras manuellt före utrullning av koden och därefter verifieras med filens
 två SELECT-frågor.
 
+## Korrigering 2026-08-15 — inställningsfältet måste kunna vara tomt
+
+Efter granskning fångades att formuläret fortfarande materialiserade ett
+osatt mål som 50 och skrev tillbaka det vid nästa Spara. Datakontraktet var
+alltså korrekt men skrivytan kunde inte uttrycka `null`.
+
+- [ ] Gör marginalmålet nullable i formulärstate och laddning.
+- [ ] Tomt fält + placeholder ska spara `null`; ett faktiskt inskrivet 50
+  ska fortsätta räknas som ett uttryckligt mål via v134-triggern.
+- [ ] Läs Supabase-update-felet innan framgång visas.
+- [ ] Lägg källfacit och kör tsc, riktade regressioner och build.
+- [ ] Dokumentera och committa korrigeringen separat.
+
 ## Claude-verifiering av Codex commit 94e0f472 (samma kväll)
 
 Codex byggde INTE en dubblett — Distributed Value Receipts fanns redan
@@ -576,3 +589,64 @@ bekräftat flakiga genom att isolerad omkörning gav olika utfall mellan
 körningarna, och rutterna har ingen kodkoppling till de ändrade filerna.
 
 Pushat och deployat (`94e0f472`).
+
+---
+
+# Natt-pass 2026-08-14→15 — två föråldrade facit fixade, ett nytt fynd flaggat
+
+Källa: Andreas "vad sätter vi dig på över natten?" medan Codex jobbar på
+Goal-driven Margin Guardian V1. Valde två redan diagnostiserade,
+orelaterade poster (ingen filkrock med margin-guardian.ts/business_config-
+ekonomifält/inställningssidans ekonomisektion/MalBlock.tsx).
+
+## Fixat (commit 0a287a7a — pushat, deployat)
+
+- `tests/fakturaunderlaget.spec.ts`: pekade på fel fil (`lib/projects/
+  auto-invoice-on-complete.ts`) sedan en refaktorering flyttade
+  kompositionen till `lib/invoices/project-invoice-draft.ts`
+  (`byggProjektFakturaUnderlag`, Tur 4 etapp 2, 2026-08-10). Verifierade
+  rad för rad att alla fyra skyddsregler (quote_items-sanning,
+  tenant-filter+sortering, tillvalsregeln, ROT/RUT-villkoret) fortfarande
+  gäller — bara på ny adress. Ingen produktionsbugg.
+- `tests/cron-auth.spec.ts`: hårdkodat routeantal (34) stämde inte mot
+  verkliga 37 — tre rutter tillkom utan att facit uppdaterades
+  (meeting-reminders + meeting-worker 2026-08-11, next-best-action
+  2026-08-13). Verifierade att alla 36 icke-Karin-rutter redan använder
+  `verifyCronSecret` korrekt — ingen auth-lucka, bara talet var föråldrat.
+
+Full svit efteråt: 5866 gröna, 16 failed — samma kända förbefintliga
+kluster minus dessa två, plus en genuint ny upptäckt nedan.
+
+## Flaggat, INTE fixat — kräver ett affärsbeslut, inte en kodfix
+
+`tests/invoice-derive-status.spec.ts`, test (e) "FACIT-BUGGEN": felar
+KONSEKVENT (received: 21, expected: <=20), inte flaky — verifierat med
+tre isolerade omkörningar + ett fristående diagnostikskript.
+
+Rotorsak: `deriveStatus` (`lib/invoice-templates/data-builder.ts:49`)
+räknar `daysOverdue = Math.ceil((Date.now() - due.getTime()) / DAY_MS)`.
+Testets fixture (`isoDaysAgo(20)`) fångar `Date.now()` en gång vid
+fixture-skapandet; `deriveStatus` fångar `Date.now()` IGEN några
+millisekunder senare. Den minimala skillnaden gör att kvoten alltid blir
+`N + epsilon`, och `Math.ceil` av vilket epsilon-tal som helst över N
+rundar till N+1 — INTE en avrundningsbugg i klassisk mening, utan en
+strukturell egenskap hos `Math.ceil` på två separata `Date.now()`-anrop.
+
+**Varför jag inte fixade det**: samma mönster gäller i PRODUKTION — varje
+förfallen faktura får sitt `daysOverdue` uppräknat till närmaste HELA dag
+även om bara en bråkdel av en dag passerat, vilket direkt matar
+`lateInterest`-beräkningen (dröjsmålsränta) i samma fil. Om det här är
+avsiktligt ("varje påbörjad dag räknas som hel, precis som
+dröjsmålsränta ofta beräknas") eller en genuin överskattning av alla
+kunders sena avgifter är en affärsfråga, inte en kodfråga — jag ändrar
+inte en formel som påverkar vad riktiga kunder faktureras utan att
+Andreas sagt hur den SKA fungera. Testets tolerans-band ([19,20] resp.
+[4,5] i test d) döljer normalt problemet eftersom det bara är 1 dags
+marginal — så det märks bara på vissa körningar/dagräkningar, inte alla.
+
+Nästa steg (Andreas beslut): antingen (a) `Math.floor` i stället för
+`Math.ceil` (räkna bara HELT passerade dagar), (b) behåll `Math.ceil`
+men uppdatera testets facit till att förvänta N+1 (dokumentera att det
+är avsiktligt), eller (c) räkna med kalenderdagar (midnatt-till-midnatt)
+i stället för 24-timmarsblock, vilket är en tredje semantik. Rör inget
+förrän valt.
