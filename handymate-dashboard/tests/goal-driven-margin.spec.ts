@@ -15,6 +15,7 @@ const migration = read('sql/v134_margin_target_explicit.sql')
 const profitability = read('lib/profitability.ts')
 const malBlock = read('components/value/MalBlock.tsx')
 const profitabilityRoute = read('app/api/projects/[id]/profitability/route.ts')
+const settingsPage = read('app/dashboard/settings/page.tsx')
 
 test.describe('v134 — defaultvärde är aldrig bevis för ett ägarmål', () => {
   test('explicithetskolumnen skapas före backfill och trigger', () => {
@@ -42,6 +43,7 @@ test.describe('konsumenterna kräver explicithetsbeviset', () => {
   test('Mål-blocket väljer inte margin_target_percent utan margin_target_set_at', () => {
     expect(malBlock).toContain(".select('margin_target_percent, margin_target_set_at, revenue_target_annual_sek')")
     expect(malBlock).toContain('data.margin_target_set_at && typeof data.margin_target_percent')
+    expect(malBlock).toContain("logBusinessConfigError('MalBlock', error)")
   })
 
   test('Guardian läser målet en gång före projektloopen, inte N+1', () => {
@@ -69,5 +71,33 @@ test.describe('konsumenterna kräver explicithetsbeviset', () => {
     expect(profitability).toContain('margin_target_percent: result.margin_target_percent')
     expect(profitability).toContain('margin_target_breached: result.margin_target_breached')
     expect(profitability).toContain('Marginalmålet underskrids')
+  })
+})
+
+test.describe('Inställningar bevarar skillnaden mellan osatt och 50 %', () => {
+  test('formulärstate är nullable och startar tomt — aldrig implicit 50', () => {
+    expect(settingsPage).toContain('margin_target_percent: number | null')
+    expect(settingsPage).toContain('margin_target_percent: null, revenue_target_annual_sek: null')
+    expect(settingsPage).not.toContain('margin_target_percent: Number(data.margin_target_percent) || 50')
+  })
+
+  test('laddningen kräver samma explicithetsstämpel som övriga konsumenter', () => {
+    expect(settingsPage).toContain('data.margin_target_set_at && data.margin_target_percent != null')
+  })
+
+  test('tom input renderas och sparas som null; inskrivet 50 förblir 50', () => {
+    expect(settingsPage).toContain("value={econPrefs.margin_target_percent ?? ''}")
+    expect(settingsPage).toContain('placeholder="Inget mål satt"')
+    expect(settingsPage).toContain("margin_target_percent: e.target.value === '' ? null : Number(e.target.value)")
+    expect(settingsPage).toContain('margin_target_percent: econPrefs.margin_target_percent')
+  })
+
+  test('Supabase-felet läses innan framgång visas', () => {
+    const updateStart = settingsPage.indexOf('const { error: econSaveError } = await supabase')
+    const errorCheck = settingsPage.indexOf('if (econSaveError) throw econSaveError', updateStart)
+    const successToast = settingsPage.indexOf("showToast('Ekonomi-inställningar sparade', 'success')", updateStart)
+    expect(updateStart).toBeGreaterThan(-1)
+    expect(errorCheck).toBeGreaterThan(updateStart)
+    expect(successToast).toBeGreaterThan(errorCheck)
   })
 })

@@ -563,12 +563,24 @@ Efter granskning fångades att formuläret fortfarande materialiserade ett
 osatt mål som 50 och skrev tillbaka det vid nästa Spara. Datakontraktet var
 alltså korrekt men skrivytan kunde inte uttrycka `null`.
 
-- [ ] Gör marginalmålet nullable i formulärstate och laddning.
-- [ ] Tomt fält + placeholder ska spara `null`; ett faktiskt inskrivet 50
+- [x] Gör marginalmålet nullable i formulärstate och laddning.
+- [x] Tomt fält + placeholder ska spara `null`; ett faktiskt inskrivet 50
   ska fortsätta räknas som ett uttryckligt mål via v134-triggern.
-- [ ] Läs Supabase-update-felet innan framgång visas.
-- [ ] Lägg källfacit och kör tsc, riktade regressioner och build.
-- [ ] Dokumentera och committa korrigeringen separat.
+- [x] Läs Supabase-update-felet innan framgång visas.
+- [x] Lägg källfacit och kör tsc, riktade regressioner och build.
+- [x] Dokumentera och committa korrigeringen separat.
+
+### Review
+
+- Ett osatt mål laddas och visas nu som tomt, och en tom input skrivs som
+  `null`. Ett uttryckligen inskrivet `50` förblir `50` och får
+  explicithetsstämpeln av v134-triggern.
+- Inställningsytan visar inte längre framgång om Supabase-update misslyckas.
+  `MalBlock` klassas samtidigt som visningsyta och loggar läsfel i stället
+  för att degradera helt tyst.
+- Verifierat: `npx tsc --noEmit` rent, 90/90 relevanta browserlösa facit
+  gröna och `npx next build` grön med 420/420 statiska sidor. Endast
+  repots sedan tidigare kända buildvarningar kvarstår.
 
 ## Claude-verifiering av Codex commit 94e0f472 (samma kväll)
 

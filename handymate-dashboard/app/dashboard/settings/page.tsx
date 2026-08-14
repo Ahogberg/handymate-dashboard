@@ -117,7 +117,8 @@ interface BusinessConfig {
   // Ekonomi
   pricing_settings: Record<string, any> | null
   overhead_monthly_sek: number
-  margin_target_percent: number
+  margin_target_percent: number | null
+  margin_target_set_at: string | null
   revenue_target_annual_sek: number | null
   // Autopilot
   autopilot_enabled: boolean
@@ -370,7 +371,7 @@ export default function SettingsPage() {
   const [newService, setNewService] = useState('')
 
   // Ekonomi-inställningar
-  const [econPrefs, setEconPrefs] = useState<{ hourly_cost_sek: number; overhead_monthly_sek: number; margin_target_percent: number; revenue_target_annual_sek: number | null }>({ hourly_cost_sek: 450, overhead_monthly_sek: 0, margin_target_percent: 50, revenue_target_annual_sek: null })
+  const [econPrefs, setEconPrefs] = useState<{ hourly_cost_sek: number; overhead_monthly_sek: number; margin_target_percent: number | null; revenue_target_annual_sek: number | null }>({ hourly_cost_sek: 450, overhead_monthly_sek: 0, margin_target_percent: null, revenue_target_annual_sek: null })
   const [econSaving, setEconSaving] = useState(false)
 
   // Phone provisioning state
@@ -626,7 +627,12 @@ export default function SettingsPage() {
       setEconPrefs({
         hourly_cost_sek: Number(data.default_internal_hourly_cost) || 450,
         overhead_monthly_sek: Number(data.overhead_monthly_sek) || 0,
-        margin_target_percent: Number(data.margin_target_percent) || 50,
+        // DEFAULT 50 är inte ett uttalat mål. Bara v134:s explicithetsstämpel
+        // får materialisera värdet i formuläret; annars visas tomt.
+        margin_target_percent:
+          data.margin_target_set_at && data.margin_target_percent != null
+            ? Number(data.margin_target_percent)
+            : null,
         // Null (inget mål satt) skiljs medvetet från 0 — se v128_revenue_target.sql.
         revenue_target_annual_sek: data.revenue_target_annual_sek == null ? null : Number(data.revenue_target_annual_sek),
       })
@@ -4425,15 +4431,19 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
-                    value={econPrefs.margin_target_percent}
-                    onChange={e => setEconPrefs(p => ({ ...p, margin_target_percent: Number(e.target.value) || 0 }))}
+                    value={econPrefs.margin_target_percent ?? ''}
+                    onChange={e => setEconPrefs(p => ({
+                      ...p,
+                      margin_target_percent: e.target.value === '' ? null : Number(e.target.value),
+                    }))}
+                    placeholder="Inget mål satt"
                     className="w-32 px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:border-primary-500"
                     min={0}
                     max={100}
                   />
                   <span className="text-sm text-gray-400">%</span>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">Din målmarginal — visar om du är över eller under mål</p>
+                <p className="text-xs text-gray-400 mt-1">Frivilligt — används av lönsamhetsvarningen när det är satt</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Omsättningsmål</label>
@@ -4462,7 +4472,7 @@ export default function SettingsPage() {
                     // Endast owner/admin skickar med fältet (matchar rollskyddet
                     // på /api/business-config/internal-cost-default och gatingen
                     // på inputen ovan).
-                    await supabase
+                    const { error: econSaveError } = await supabase
                       .from('business_config')
                       .update({
                         ...(isOwnerOrAdmin ? { default_internal_hourly_cost: econPrefs.hourly_cost_sek } : {}),
@@ -4471,6 +4481,7 @@ export default function SettingsPage() {
                         revenue_target_annual_sek: econPrefs.revenue_target_annual_sek,
                       })
                       .eq('business_id', business.business_id)
+                    if (econSaveError) throw econSaveError
                     showToast('Ekonomi-inställningar sparade', 'success')
                     fetchConfig()
                   } catch {

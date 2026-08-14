@@ -95,6 +95,9 @@ const VISNINGSYTOR = [
   'app/dashboard/settings/phone/page.tsx',
   'app/dashboard/settings/quote-style/page.tsx',
   'app/dashboard/settings/website-widget/page.tsx',
+  // Månadsrapportens målblock — ren visning. Om konfigurationen inte kan
+  // läsas utelämnas blocket och felet loggas; inget dokument produceras.
+  'components/value/MalBlock.tsx',
   'components/widget/GuardrailsEditor.tsx',
   'components/widget/KnowledgeEditor.tsx',
 ]

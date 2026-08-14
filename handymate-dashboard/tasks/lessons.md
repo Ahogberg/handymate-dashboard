@@ -1,5 +1,20 @@
 # Lessons Learned
 
+## 2026-08-15: En nullable sanning måste kunna uttryckas i skrivytan
+
+**Vad hände:** Goal-driven Margin Guardian fick ett korrekt DB-bevis för
+skillnaden mellan schema-default 50 och ett uttryckligt marginalmål, och
+läsytorna respekterade beviset. Men Inställningar laddade fortfarande
+`Number(value) || 50`, hade state-typen `number` och kunde aldrig visa eller
+spara “inget mål”. Nästa generella Spara hade därför materialiserat samma
+oartikulerade default igen.
+
+**Regel:** När en migration inför semantiken “osatt ≠ default” ska hela
+rundresan verifieras: DB → läsning → formulärstate → tomt input → skrivning →
+DB. Ett nullable backendkontrakt är inte färdigt förrän den kanoniska
+skrivytan kan representera och bevara `null`. Facit ska uttryckligen förbjuda
+fallbackmönster som `Number(value) || default` för sådana fält.
+
 ## 2026-08-10: PowerShell 5.1 + git commit -m: inga raka citattecken i meddelandet
 
 **Vad hände:** Ett commit-meddelande med `"Företagsmail → förfrågningar"` i

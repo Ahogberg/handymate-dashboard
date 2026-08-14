@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Target } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { logBusinessConfigError } from '@/lib/business/quote-surface-select'
 
 /**
  * "Mål" — Company Goals (Business Twin-backlog #11, 2026-08-13). Litet
@@ -43,8 +44,12 @@ export function MalBlock({ monthLabel, profitability }: Props) {
       .select('margin_target_percent, margin_target_set_at, revenue_target_annual_sek')
       .eq('business_id', business.business_id)
       .single()
-      .then(({ data }: { data: { margin_target_percent: number | null; margin_target_set_at: string | null; revenue_target_annual_sek: number | null } | null }) => {
-        if (!aktiv || !data) return
+      .then(({ data, error }: { data: { margin_target_percent: number | null; margin_target_set_at: string | null; revenue_target_annual_sek: number | null } | null; error: { message?: string } | null }) => {
+        if (!aktiv) return
+        if (error || !data) {
+          logBusinessConfigError('MalBlock', error)
+          return
+        }
         setMarginTarget(
           data.margin_target_set_at && typeof data.margin_target_percent === 'number'
             ? data.margin_target_percent
@@ -54,7 +59,9 @@ export function MalBlock({ monthLabel, profitability }: Props) {
           data.revenue_target_annual_sek == null ? null : Number(data.revenue_target_annual_sek),
         )
       })
-      .catch(() => { /* blocket är grädde, aldrig mjölk — se AgarrapportBlock */ })
+      .catch((error: unknown) => {
+        logBusinessConfigError('MalBlock', error instanceof Error ? error : { message: String(error) })
+      })
     return () => { aktiv = false }
   }, [business.business_id])
 
