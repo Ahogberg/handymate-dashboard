@@ -279,7 +279,7 @@ export async function processInboundEmail(
         workEnd: '17:00',
       }
 
-      const decision = await runIntentAgent(signal, entity, businessConf, availableSlots)
+      const decision = await runIntentAgent(signal, entity, businessConf, availableSlots, businessId, supabase)
       await executeMatteActions(decision, entity, signal, businessId, supabase, availableSlots)
     } catch (err) {
       console.error('[Matte Gmail Intelligence] Error:', err)

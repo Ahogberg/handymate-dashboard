@@ -1,5 +1,9 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { extractFirstName, halsning } from '@/lib/customers/namn'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
+
+const QUOTE_NUDGE_MODEL = 'claude-haiku-4-5-20251001'
 
 /**
  * Skapar en nudge-approval när en offert visats 3+ gånger utan svar.
@@ -68,7 +72,7 @@ export async function createQuoteNudge(
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: QUOTE_NUDGE_MODEL,
           max_tokens: 160,
           messages: [{
             role: 'user',
@@ -78,6 +82,20 @@ export async function createQuoteNudge(
       })
       if (res.ok) {
         const data = await res.json()
+
+        // COGS-boken — quote-nudge-SMS-genereringen var tidigare helt omätt.
+        if (data.usage) {
+          await meterDirectLlmCall({
+            supabase,
+            businessId,
+            usage: data.usage,
+            costUsd: llmCostUsd(data.usage, QUOTE_NUDGE_MODEL),
+            refType: 'quote_nudge_sms',
+            refId: quoteId,
+            meta: { viewCount },
+          })
+        }
+
         const text = data.content?.[0]?.text
         if (text) nudgeMessage = text.trim()
       }

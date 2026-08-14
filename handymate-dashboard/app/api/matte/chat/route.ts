@@ -930,6 +930,7 @@ export async function POST(request: NextRequest) {
       if (persisted.length > 0) {
         const { summary, kept } = await summarizeIfNeeded({
           threadId: thread.id,
+          businessId,
           rows: persisted,
           apiKey,
         })

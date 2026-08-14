@@ -1,6 +1,8 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { getClaudeModel } from '@/lib/ai/get-model'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 import {
   getCommunicationSettings,
   resolveMessageVariables,
@@ -79,7 +81,7 @@ export async function evaluateCustomerCommunication(
 
   // If no clear rule matches, use AI for complex cases
   if (ANTHROPIC_API_KEY && state.daysSinceContact !== null && state.daysSinceContact > 5) {
-    return await evaluateWithAI(state, conditionRules, settings)
+    return await evaluateWithAI(state, conditionRules, settings, businessId, supabase)
   }
 
   return { shouldSend: false, reason: 'Ingen åtgärd behövs just nu', confidence: 80 }
@@ -188,7 +190,9 @@ function evaluateSimpleRules(
 async function evaluateWithAI(
   state: CustomerCommunicationState,
   rules: CommunicationRule[],
-  settings: CommunicationSettings
+  settings: CommunicationSettings,
+  businessId: string,
+  supabase: ReturnType<typeof getServerSupabase>
 ): Promise<AIDecision> {
   try {
     const rulesDesc = rules
@@ -257,6 +261,17 @@ Tänk på:
     }
 
     const result = await response.json()
+
+    // COGS-boken — raw fetch mot Anthropic, tidigare helt omätt.
+    await meterDirectLlmCall({
+      supabase,
+      businessId,
+      usage: result.usage,
+      costUsd: llmCostUsd(result.usage, getClaudeModel('background')),
+      refType: 'communication_ai_evaluation',
+      refId: state.customerId,
+    })
+
     const text = result.content?.[0]?.text || ''
 
     // Extract JSON from response

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
+import { getServerSupabase } from '@/lib/supabase'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
+
+const JOBBUDDY_PHOTO_MODEL = 'claude-sonnet-4-6'
 
 function getAnthropic() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
@@ -27,7 +32,7 @@ export async function POST(request: NextRequest) {
     const anthropic = getAnthropic()
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: JOBBUDDY_PHOTO_MODEL,
       max_tokens: 1000,
       system: `Du är en expert på hantverksarbete i Sverige. Du analyserar bilder av jobb som behöver göras och ger praktisk information.
 
@@ -58,6 +63,15 @@ Var konkret och praktisk. Tänk som en erfaren hantverkare som ger en snabb bed�
           },
         ],
       }],
+    })
+
+    await meterDirectLlmCall({
+      supabase: getServerSupabase(),
+      businessId: authBusiness.business_id,
+      usage: response.usage,
+      costUsd: llmCostUsd(response.usage, JOBBUDDY_PHOTO_MODEL),
+      refType: 'jobbuddy_photo',
+      refId: `jobbuddy_photo_${Date.now()}`,
     })
 
     const analysis = response.content[0].type === 'text'

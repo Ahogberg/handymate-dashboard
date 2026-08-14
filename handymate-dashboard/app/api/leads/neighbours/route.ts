@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
       phone: config.phone_number || '',
       jobType: job_type || '',
       address: source_address,
+      businessId: business.business_id,
     })
   }
 

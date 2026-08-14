@@ -7,6 +7,8 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 const MODEL = 'claude-sonnet-4-6'
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001'
@@ -165,6 +167,16 @@ Om det inte finns data att analysera, returnera health "strong" med tom insights
 
     const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0)
 
+    // COGS-boken — nattlig kontextanalys (Sonnet), tidigare helt omätt.
+    await meterDirectLlmCall({
+      supabase,
+      businessId,
+      usage: response.usage,
+      costUsd: llmCostUsd(response.usage, MODEL),
+      refType: 'agent_context_nightly',
+      refId: `${businessId}_${today}`,
+    })
+
     // 4. Parsa svar
     const textContent = response.content.find(b => b.type === 'text')
     if (!textContent || textContent.type !== 'text') {
@@ -285,6 +297,16 @@ Basera svaret enbart på faktiska mönster. Om otillräcklig data — returnera 
           content: `Analysera dessa ${events.length} inlärningshändelser:\n${JSON.stringify(events, null, 2)}`,
         },
       ],
+    })
+
+    // COGS-boken — nattlig preferensanalys (Haiku), tidigare helt omätt.
+    await meterDirectLlmCall({
+      supabase,
+      businessId,
+      usage: response.usage,
+      costUsd: llmCostUsd(response.usage, HAIKU_MODEL),
+      refType: 'business_preferences_nightly',
+      refId: `${businessId}_${new Date().toISOString().split('T')[0]}`,
     })
 
     const textContent = response.content.find(b => b.type === 'text')

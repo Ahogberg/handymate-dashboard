@@ -4,8 +4,12 @@
  */
 
 import type { PropertyLead } from './types'
+import { getServerSupabase } from '@/lib/supabase'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
+const LETTER_MODEL = 'claude-haiku-4-5-20251001'
 
 interface LetterResult {
   content: string
@@ -20,6 +24,10 @@ export async function generateLetter(
     phone_number: string
     branch: string | null
     website?: string | null
+    /** COGS-mätaren (etapp "svansen", 2026-08-14) — optional av samma skäl
+        som övriga mätpunkter i denna sprint: utan den skippas mätningen
+        tyst i stället för att krascha en anropare som inte skickar med den. */
+    business_id?: string
   },
   letterAngle: string
 ): Promise<LetterResult> {
@@ -40,7 +48,7 @@ export async function generateLetter(
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: LETTER_MODEL,
         max_tokens: 400,
         messages: [{
           role: 'user',
@@ -77,6 +85,22 @@ REGLER:
     })
 
     const data = await res.json()
+
+    // COGS-boken (etapp "svansen", 2026-08-14) — outbound-brevgenereringen
+    // var tidigare helt omätt. Mäts oavsett om Claude-svaret innehöll text
+    // eller föll tillbaka på malltexten — tokens förbrukades ändå.
+    if (business.business_id && data.usage) {
+      await meterDirectLlmCall({
+        supabase: getServerSupabase(),
+        businessId: business.business_id,
+        usage: data.usage,
+        costUsd: llmCostUsd(data.usage, LETTER_MODEL),
+        refType: 'outbound_letter',
+        refId: 'letter_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+        meta: { address: property.address },
+      })
+    }
+
     const content = data.content?.[0]?.text || buildMockLetter(property, business, letterAngle)
     return { content, mock: false }
   } catch (err) {

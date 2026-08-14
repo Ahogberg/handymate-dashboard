@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
 import { buildPriceContext, PriceListItem } from '@/lib/ai-quote-generator'
+import { getServerSupabase } from '@/lib/supabase'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 function getAnthropic() {
   return new Anthropic({
@@ -79,13 +82,25 @@ Svara ENDAST med JSON (ingen markdown):
   ]
 }`
 
+    const GENERATE_MODEL = 'claude-sonnet-4-6'
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: GENERATE_MODEL,
       max_tokens: 1500,
       system: systemPrompt,
       messages: [
         { role: 'user', content: `Skapa en offert för: ${prompt}` }
       ]
+    })
+
+    // COGS-boken (etapp "svansen", 2026-08-14) — äldre offertvägen var
+    // tidigare helt omätt. Mäts oavsett om JSON-parsningen nedan lyckas.
+    await meterDirectLlmCall({
+      supabase: getServerSupabase(),
+      businessId: business.business_id,
+      usage: response.usage,
+      costUsd: llmCostUsd(response.usage, GENERATE_MODEL),
+      refType: 'quote_ai_generate_legacy',
+      refId: 'qgenlegacy_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
     })
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''

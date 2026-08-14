@@ -3,8 +3,11 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ResolvedEntity } from './resolver'
 import type { TimeSlot } from './calendar-slots'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 export interface IncomingSignal {
   channel: 'sms' | 'email'
@@ -83,6 +86,8 @@ BEGRÄNSNINGAR:
 - Ge ALDRIG prisuppgifter utan prislista
 - Om meddelandet är otydligt — be om förtydligande, skapa inga actions`
 
+const INTENT_AGENT_MODEL = 'claude-haiku-4-5-20251001'
+
 export async function runIntentAgent(
   signal: IncomingSignal,
   entity: ResolvedEntity,
@@ -93,14 +98,16 @@ export async function runIntentAgent(
     workStart: string
     workEnd: string
   },
-  availableSlots?: TimeSlot[]
+  availableSlots: TimeSlot[] | undefined,
+  businessId: string,
+  supabase: SupabaseClient
 ): Promise<MatteDecision> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
   const context = buildContext(signal, entity, businessConfig, availableSlots)
 
   const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: INTENT_AGENT_MODEL,
     max_tokens: 1500,
     system: SYSTEM_PROMPT,
     messages: [{
@@ -130,6 +137,18 @@ Analysera meddelandet och returnera ENDAST JSON (ingen markdown):
   "reasoning": "Kort förklaring"
 }`
     }]
+  })
+
+  // COGS-boken — intent-agenten körs på VARJE inkommande SMS/mail och var
+  // tidigare helt omätt trots hög volym.
+  await meterDirectLlmCall({
+    supabase,
+    businessId,
+    usage: response.usage,
+    costUsd: llmCostUsd(response.usage, INTENT_AGENT_MODEL),
+    refType: 'matte_intent_agent',
+    refId: `${signal.channel}_${businessId}_${Date.now()}`,
+    meta: { channel: signal.channel },
   })
 
   const text = response.content[0].type === 'text' ? response.content[0].text : ''

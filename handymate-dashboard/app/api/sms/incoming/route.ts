@@ -242,7 +242,7 @@ export async function POST(request: NextRequest) {
           workEnd: '17:00',
         }
 
-        const decision = await runIntentAgent(signal, entity, businessConf, availableSlots)
+        const decision = await runIntentAgent(signal, entity, businessConf, availableSlots, businessId, supabase)
         await executeMatteActions(decision, entity, signal, businessId, supabase, availableSlots)
 
         // V34: Delegera till specialist-agent om Matte rekommenderar det

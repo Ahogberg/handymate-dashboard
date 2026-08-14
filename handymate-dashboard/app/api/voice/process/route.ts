@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getServerSupabase } from '@/lib/supabase'
+import { recordCost } from '@/lib/costs/record'
+import { whisperCostOre, llmCostUsd } from '@/lib/costs/meter'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+
+const VOICE_PROCESS_MODEL = 'claude-haiku-4-5-20251001'
 
 /**
  * POST /api/voice/process
@@ -27,6 +33,9 @@ export async function POST(request: NextRequest) {
   whisperForm.append('file', audio)
   whisperForm.append('model', 'whisper-1')
   whisperForm.append('language', 'sv')
+  // verbose_json ger en FAKTISK ljudlängd (Whisper mäter, gissar inte ur
+  // filstorlek) — se app/api/voice/transcribe/route.ts.
+  whisperForm.append('response_format', 'verbose_json')
 
   const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
@@ -40,7 +49,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Transkribering misslyckades' }, { status: 500 })
   }
 
-  const { text: transcript } = await whisperRes.json()
+  const whisperJson = await whisperRes.json()
+  const transcript = whisperJson.text
+
+  const ljudSekunder = Number(whisperJson.duration) || 0
+  if (ljudSekunder > 0) {
+    await recordCost({
+      supabase: getServerSupabase(),
+      businessId: business.business_id,
+      resource: 'whisper',
+      units: ljudSekunder,
+      costOre: whisperCostOre(ljudSekunder),
+      refType: 'voice_process',
+      refId: `voice_process_${Date.now()}`,
+    })
+  }
 
   if (!transcript || transcript.trim().length === 0) {
     return NextResponse.json({
@@ -102,7 +125,7 @@ Inkludera bara actions med confidence > 0.7.`
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: VOICE_PROCESS_MODEL,
         max_tokens: 1000,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -120,6 +143,17 @@ Inkludera bara actions med confidence > 0.7.`
 
     const claudeData = await claudeRes.json()
     const rawText = claudeData.content?.[0]?.text || ''
+
+    if (claudeData.usage) {
+      await meterDirectLlmCall({
+        supabase: getServerSupabase(),
+        businessId: business.business_id,
+        usage: claudeData.usage,
+        costUsd: llmCostUsd(claudeData.usage, VOICE_PROCESS_MODEL),
+        refType: 'voice_process',
+        refId: `voice_process_${Date.now()}`,
+      })
+    }
 
     const parsed = JSON.parse(rawText.replace(/```json|```/g, '').trim())
     const actions = (parsed.actions || []).filter((a: { confidence: number }) => a.confidence > 0.7)

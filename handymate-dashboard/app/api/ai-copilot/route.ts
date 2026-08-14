@@ -13,6 +13,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
+
+const AI_COPILOT_MODEL = 'claude-sonnet-4-6'
 
 function getAnthropic() {
   return new Anthropic({
@@ -190,7 +194,7 @@ KONTEXT OM VERKSAMHETEN:
 ${JSON.stringify(businessContext, null, 2)}`
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: AI_COPILOT_MODEL,
       max_tokens: isJobbuddyMode ? 800 : 400,
       system: systemPrompt,
       messages: [
@@ -201,6 +205,16 @@ ${JSON.stringify(businessContext, null, 2)}`
             : question
         }
       ],
+    })
+
+    await meterDirectLlmCall({
+      supabase: getServerSupabase(),
+      businessId: authBusiness.business_id,
+      usage: response.usage,
+      costUsd: llmCostUsd(response.usage, AI_COPILOT_MODEL),
+      refType: 'ai_copilot',
+      refId: `ai_copilot_${isJobbuddyMode ? 'jobbuddy' : 'copilot'}_${Date.now()}`,
+      meta: { mode: isJobbuddyMode ? 'jobbuddy' : 'copilot' },
     })
 
     const rawText = response.content[0].type === 'text'

@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getServerSupabase } from '@/lib/supabase'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
+
+const ONBOARDING_CHAT_MODEL = 'claude-haiku-4-5-20251001'
 
 const SYSTEM_PROMPT = `Du är Handymate AI-assistenten som hjälper nya användare under onboarding.
 Svara kort och hjälpsamt på svenska. Max 3-4 meningar per svar.
@@ -69,13 +75,30 @@ export async function POST(request: NextRequest) {
     messages.push({ role: 'user', content: message })
 
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: ONBOARDING_CHAT_MODEL,
       max_tokens: 300,
       system: SYSTEM_PROMPT,
       messages,
     })
 
     const reply = response.content[0]?.type === 'text' ? response.content[0].text : 'Kunde inte generera svar.'
+
+    // COGS-boken — bara mätbar om anroparen är inloggad. Denna route körs
+    // före kontoskapande i vissa onboarding-lägen (ingen session ännu), och
+    // cost_event kräver ett business_id — utan session finns ingen kund att
+    // bokföra kostnaden på (recordCost hoppar tyst över annars).
+    const business = await getAuthenticatedBusiness(request).catch(() => null)
+    if (business) {
+      const supabase = getServerSupabase()
+      await meterDirectLlmCall({
+        supabase,
+        businessId: business.business_id,
+        usage: response.usage,
+        costUsd: llmCostUsd(response.usage, ONBOARDING_CHAT_MODEL),
+        refType: 'onboarding_chat',
+        refId: `onboarding_chat_${Date.now()}`,
+      })
+    }
 
     return NextResponse.json({ reply })
   } catch (error: unknown) {

@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
       phone_number: biz.phone_number,
       branch: biz.branch,
       website: biz.website,
+      business_id: business.business_id,
     }, segment.letterAngle)
 
     leads.push({

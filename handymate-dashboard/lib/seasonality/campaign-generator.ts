@@ -3,8 +3,13 @@
  * Max 1 förslag per månad per företag.
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { getSeasonalTheme } from './industry-themes'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
+
+const SEASONAL_CAMPAIGN_MODEL = 'claude-haiku-4-5-20251001'
 
 const MONTH_NAMES: Record<number, string> = {
   1: 'januari', 2: 'februari', 3: 'mars', 4: 'april',
@@ -64,7 +69,9 @@ export async function generateSeasonalCampaign(
     business.contact_name || '',
     branch,
     theme,
-    MONTH_NAMES[month] || ''
+    MONTH_NAMES[month] || '',
+    businessId,
+    supabase
   )
 
   // 6. Skapa approval
@@ -124,7 +131,9 @@ async function generateSmsText(
   contactName: string,
   branch: string,
   theme: { theme: string; angle: string; projectTypes: string[]; callToAction: string },
-  monthName: string
+  monthName: string,
+  businessId: string,
+  supabase: SupabaseClient
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (apiKey) {
@@ -137,7 +146,7 @@ async function generateSmsText(
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: SEASONAL_CAMPAIGN_MODEL,
           max_tokens: 200,
           messages: [{
             role: 'user',
@@ -158,6 +167,17 @@ Skriv på svenska. Bara SMS-texten, inget annat.`,
 
       if (res.ok) {
         const data = await res.json()
+
+        // COGS-boken — säsongskampanj-SMS (Haiku), tidigare helt omätt.
+        await meterDirectLlmCall({
+          supabase,
+          businessId,
+          usage: data?.usage,
+          costUsd: llmCostUsd(data?.usage, SEASONAL_CAMPAIGN_MODEL),
+          refType: 'seasonal_campaign_sms',
+          refId: `${businessId}_${Date.now()}`,
+        })
+
         const text = data.content?.[0]?.text
         if (text) return text.trim()
       }

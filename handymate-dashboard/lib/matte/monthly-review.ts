@@ -7,6 +7,10 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
+
+const MONTHLY_REVIEW_MODEL = 'claude-sonnet-4-6'
 
 export interface MonthlyReviewData {
   month: string                // "2026-03-01"
@@ -252,7 +256,11 @@ export async function collectMonthlyData(
 /**
  * Kör Claude-analys och extraherar strukturerade rekommendationer.
  */
-export async function generateAnalysis(data: MonthlyReviewData): Promise<{ analysis: string; recommendations: MonthlyReview['recommendations'] }> {
+export async function generateAnalysis(
+  data: MonthlyReviewData,
+  businessId: string,
+  supabase: SupabaseClient
+): Promise<{ analysis: string; recommendations: MonthlyReview['recommendations'] }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return {
@@ -297,7 +305,7 @@ Max 300 ord totalt.`
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: MONTHLY_REVIEW_MODEL,
         max_tokens: 1200,
         system,
         messages: [{ role: 'user', content: userMsg }],
@@ -310,6 +318,17 @@ Max 300 ord totalt.`
       }
     }
     const json = await res.json()
+
+    // COGS-boken — månadsrapportens AI-analys (Sonnet), tidigare helt omätt.
+    await meterDirectLlmCall({
+      supabase,
+      businessId,
+      usage: json?.usage,
+      costUsd: llmCostUsd(json?.usage, MONTHLY_REVIEW_MODEL),
+      refType: 'monthly_review_analysis',
+      refId: `${businessId}_${data.month}`,
+    })
+
     const analysis: string = json.content?.[0]?.text || ''
 
     // Extrahera rekommendationer (numrerade rader under "REKOMMENDATIONER")
@@ -358,7 +377,7 @@ export async function generateMonthlyReview(
 ): Promise<MonthlyReview> {
   const { start, end } = getReviewMonth(monthDate ? new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1) : undefined)
   const data = await collectMonthlyData(supabase, businessId, start, end)
-  const { analysis, recommendations } = await generateAnalysis(data)
+  const { analysis, recommendations } = await generateAnalysis(data, businessId, supabase)
   return { data, analysis, recommendations }
 }
 

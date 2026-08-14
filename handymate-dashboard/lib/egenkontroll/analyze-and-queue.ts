@@ -37,7 +37,7 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
-import { checkCostGuards, type CostGuardBusiness } from '@/lib/agents/shared/cost-guard'
+import { checkCostGuards, meterDirectLlmCall, type CostGuardBusiness } from '@/lib/agents/shared/cost-guard'
 import {
   assessPhotoAgainstChecklist,
   type ChecklistPunkt,
@@ -221,8 +221,8 @@ export async function analyzeProjectPhoto(input: AnalyzeProjectPhotoInput): Prom
       // resultat) medan assessPhotoAgainstChecklist returnerar usage/
       // estimated_cost_usd direkt på toppnivå.
       if (result.usage && typeof result.estimated_cost_usd === 'number') {
+        const runId = 'agentrun_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10)
         try {
-          const runId = 'agentrun_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10)
           await supabase.from('agent_runs').insert({
             run_id: runId,
             business_id: businessId,
@@ -234,6 +234,18 @@ export async function analyzeProjectPhoto(input: AnalyzeProjectPhotoInput): Prom
         } catch (logErr) {
           console.warn('[egenkontroll/analyze-and-queue] agent_runs insert misslyckades:', logErr)
         }
+
+        // COGS-boken (cost_event) — agent_runs ovan är governorn, denna är
+        // boken. Skrevs aldrig hit tidigare (COGS-mätaren etapp 2, 2026-08-14).
+        await meterDirectLlmCall({
+          supabase,
+          businessId,
+          usage: result.usage,
+          costUsd: result.estimated_cost_usd,
+          refType: 'egenkontroll_foto',
+          refId: runId,
+          meta: { checklist_id: checklist.id },
+        })
       }
 
       const { forslag, avvikelser } = buildQueueActionsFromAssessment(result.bedömningar, items)

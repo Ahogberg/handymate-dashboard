@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
+
+const GENERATE_INSIGHTS_MODEL = 'claude-haiku-4-5-20251001'
 
 export const dynamic = 'force-dynamic'
 
@@ -97,9 +101,19 @@ Generera 3-4 konkreta, actionbara affärsinsikter. Returnera ENDAST ett JSON-arr
 ]`
 
         const response = await anthropic.messages.create({
-          model: 'claude-haiku-4-5-20251001',
+          model: GENERATE_INSIGHTS_MODEL,
           max_tokens: 1024,
           messages: [{ role: 'user', content: prompt }],
+        })
+
+        // COGS-boken — nattliga affärsinsikter (Haiku), tidigare helt omätt.
+        await meterDirectLlmCall({
+          supabase,
+          businessId: biz.business_id,
+          usage: response.usage,
+          costUsd: llmCostUsd(response.usage, GENERATE_INSIGHTS_MODEL),
+          refType: 'generate_insights_cron',
+          refId: `${biz.business_id}_${Date.now()}`,
         })
 
         const text = response.content[0].type === 'text' ? response.content[0].text : ''

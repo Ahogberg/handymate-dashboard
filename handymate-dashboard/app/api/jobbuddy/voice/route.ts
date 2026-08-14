@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
+import { recordCost } from '@/lib/costs/record'
+import { whisperCostOre } from '@/lib/costs/meter'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
+
+const JOBBUDDY_VOICE_MODEL = 'claude-sonnet-4-6'
 
 function getAnthropic() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
@@ -28,12 +34,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No audio file' }, { status: 400 })
     }
 
-    // Step 1: Transcribe with Whisper
+    // Ett spårbart id för hela röstförfrågan — delas av Whisper- och
+    // Sonnet-kostnadsraderna nedan så de går att koppla ihop i cost_event.
+    const requestId = `jobbuddy_voice_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
+    // Step 1: Transcribe with Whisper. response_format=verbose_json ger en
+    // FAKTISK ljudlängd (Whisper mäter den, gissar inte ur filstorlek) —
+    // det var just den skillnaden som höll den här routen omätt tidigare
+    // (se app/api/voice/transcribe/route.ts, som varnar för att uppskatta
+    // längd ur filstorlek).
     const audioBuffer = Buffer.from(await audioFile.arrayBuffer())
     const whisperFormData = new FormData()
     whisperFormData.append('file', new Blob([audioBuffer], { type: audioFile.type }), 'recording.webm')
     whisperFormData.append('model', 'whisper-1')
     whisperFormData.append('language', 'sv')
+    whisperFormData.append('response_format', 'verbose_json')
 
     const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
@@ -49,6 +64,19 @@ export async function POST(request: NextRequest) {
 
     const whisperData = await whisperResponse.json()
     const transcript = whisperData.text
+
+    const ljudSekunder = Number(whisperData.duration) || 0
+    if (ljudSekunder > 0) {
+      await recordCost({
+        supabase: getServerSupabase(),
+        businessId: authBusiness.business_id,
+        resource: 'whisper',
+        units: ljudSekunder,
+        costOre: whisperCostOre(ljudSekunder),
+        refType: 'jobbuddy_voice',
+        refId: requestId,
+      })
+    }
 
     // Matte-flytten (Andreas 2026-08-03): hörnbubblan skickar transcribe_only
     // och matar transkriptet genom /api/matte/chat (multi-agent, dirigering,
@@ -104,7 +132,7 @@ export async function POST(request: NextRequest) {
     const anthropic = getAnthropic()
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: JOBBUDDY_VOICE_MODEL,
       max_tokens: 1000,
       system: `Du är "Jobbkompisen" — en AI som tolkar hantverkares röstkommandon och omvandlar dem till konkreta åtgärder.
 
@@ -131,6 +159,15 @@ Svara med JSON: { "understood": "sammanfattning av vad du förstod", "actions": 
         role: 'user',
         content: `Hantverkaren sa: "${transcript}"`,
       }],
+    })
+
+    await meterDirectLlmCall({
+      supabase: getServerSupabase(),
+      businessId: authBusiness.business_id,
+      usage: response.usage,
+      costUsd: llmCostUsd(response.usage, JOBBUDDY_VOICE_MODEL),
+      refType: 'jobbuddy_voice',
+      refId: requestId,
     })
 
     const rawText = response.content[0].type === 'text' ? response.content[0].text : ''

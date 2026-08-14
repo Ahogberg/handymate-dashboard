@@ -142,7 +142,7 @@ export async function genereraNextBestAction(supabase: SupabaseClient, businessI
   const candidates = await enrichAndNormalize(supabase, rawRows, nowIso)
   if (candidates.length < MIN_CANDIDATES) return { status: 'skipped_too_few_candidates' }
 
-  const modelOutput = await callNextBestActionModel(candidates, principles)
+  const modelOutput = await callNextBestActionModel(candidates, principles, businessId, supabase)
   if (!modelOutput) return { status: 'skipped_model_failed' }
 
   const nba = byggNextBestAction({ businessId, computedDate, candidates, modelOutput })

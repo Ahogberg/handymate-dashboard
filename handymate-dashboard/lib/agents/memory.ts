@@ -12,6 +12,8 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001'
 
@@ -53,6 +55,23 @@ Agentens svar: ${finalResponse.slice(0, 500)}`
     if (!extractionRes.ok) return
 
     const extraction = await extractionRes.json()
+
+    // COGS-boken — extractAndSaveMemory anropas fire-and-forget från både
+    // agent/trigger och matte/chat; mäts EN gång här inne så den bokförs
+    // exakt en gång oavsett anropare.
+    if (extraction.usage) {
+      const supabaseForCost = getServerSupabase()
+      await meterDirectLlmCall({
+        supabase: supabaseForCost,
+        businessId,
+        usage: extraction.usage,
+        costUsd: llmCostUsd(extraction.usage, HAIKU_MODEL),
+        refType: 'agent_memory',
+        refId: `${agentId}_${triggerType}_${Date.now()}`,
+        meta: { agent_id: agentId, trigger_type: triggerType },
+      })
+    }
+
     const memoryContent = extraction.content?.[0]?.text?.trim()
 
     if (!memoryContent || memoryContent === 'INGEN' || memoryContent.length < 10) return

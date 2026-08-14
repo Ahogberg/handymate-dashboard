@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 export const dynamic = 'force-dynamic'
+
+const CAMPAIGN_TEXT_MODEL = 'claude-haiku-4-5-20251001'
 
 /**
  * POST /api/campaigns/generate-text
@@ -52,9 +56,18 @@ Regler:
 - Returnera BARA SMS-texten, inget annat`
 
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: CAMPAIGN_TEXT_MODEL,
       max_tokens: 256,
       messages: [{ role: 'user', content: prompt }],
+    })
+
+    await meterDirectLlmCall({
+      supabase,
+      businessId: business.business_id,
+      usage: response.usage,
+      costUsd: llmCostUsd(response.usage, CAMPAIGN_TEXT_MODEL),
+      refType: 'campaign_generate_text',
+      refId: `campaign_${type || 'reactivation'}_${Date.now()}`,
     })
 
     const text = response.content[0].type === 'text'

@@ -17,7 +17,10 @@
  * tvingat/trunkerat till något som ser giltigt ut.
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { NormalizedCandidate } from './next-best-action-normalize'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 export const NEXT_BEST_ACTION_MODEL = 'claude-sonnet-4-6'
 
@@ -140,6 +143,8 @@ export function validateModelOutput(raw: unknown, candidateIds: string[]): NextB
 export async function callNextBestActionModel(
   candidates: NormalizedCandidate[],
   principles: string[],
+  businessId: string,
+  supabase: SupabaseClient,
 ): Promise<NextBestActionModelOutput | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
@@ -171,6 +176,19 @@ export async function callNextBestActionModel(
     }
 
     const data: any = await res.json()
+
+    // COGS-boken — Next Best Action-rankningen (Sonnet), tidigare helt
+    // omätt. Mäts oavsett om svaret sedan klarar valideringen — Anthropic
+    // debiterar oss redan här.
+    await meterDirectLlmCall({
+      supabase,
+      businessId,
+      usage: data?.usage,
+      costUsd: llmCostUsd(data?.usage, NEXT_BEST_ACTION_MODEL),
+      refType: 'next_best_action_ranking',
+      refId: `${businessId}_${Date.now()}`,
+    })
+
     const textBlock = (data.content || []).find((b: any) => b.type === 'text')
     const text: string | undefined = textBlock?.text
     if (!text) {

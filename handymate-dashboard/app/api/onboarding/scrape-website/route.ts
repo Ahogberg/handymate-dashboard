@@ -4,6 +4,9 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getClaudeModel } from '@/lib/ai/get-model'
 import { checkRateLimitDb } from '@/lib/rate-limit-db'
+import { getServerSupabase } from '@/lib/supabase'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 import {
   normalizeWebsiteUrl,
   isBlockedHostname,
@@ -234,11 +237,28 @@ export async function POST(request: NextRequest) {
     let extraction = null
     try {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+      const extractionModel = getClaudeModel('extraction')
       const response = await anthropic.messages.create({
-        model: getClaudeModel('extraction'),
+        model: extractionModel,
         max_tokens: 1024,
         messages: [{ role: 'user', content: `${EXTRACTION_PROMPT_HEADER}\n${text}\n"""` }],
       })
+
+      // COGS-boken — bokförs bara om vi har en inloggad session (se
+      // doc-kommentaren ovan: routen tillåts köra utan session, och utan
+      // business_id finns ingen kund att bokföra kostnaden på).
+      if (business) {
+        const supabase = getServerSupabase()
+        await meterDirectLlmCall({
+          supabase,
+          businessId: business.business_id,
+          usage: response.usage,
+          costUsd: llmCostUsd(response.usage, extractionModel),
+          refType: 'onboarding_scrape_website',
+          refId: normalized.url,
+        })
+      }
+
       const textBlock = response.content.find(b => b.type === 'text')
       if (textBlock && textBlock.type === 'text') {
         extraction = parseExtractionJson(textBlock.text)

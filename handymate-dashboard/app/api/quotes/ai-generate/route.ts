@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     if (allImages.length > 1) {
       try {
         const extraAnalyses = await Promise.all(
-          allImages.slice(1, 5).map(img => analyzeJobImage(img, branch))
+          allImages.slice(1, 5).map(img => analyzeJobImage(img, branch, business.business_id))
         )
         const extraDesc = extraAnalyses
           .map((a, i) => `Foto ${i + 2}: ${a.description}`)

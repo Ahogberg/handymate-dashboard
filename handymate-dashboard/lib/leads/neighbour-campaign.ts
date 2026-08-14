@@ -4,8 +4,11 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 const COST_PER_LETTER = 15
+const NEIGHBOUR_LETTER_MODEL = 'claude-haiku-4-5-20251001'
 
 const JOB_TYPE_ANGLES: Record<string, string> = {
   badrum: 'Vi renoverade nyligen ett badrum i ditt område',
@@ -35,6 +38,9 @@ export async function generateNeighbourLetter(params: {
   phone: string
   jobType: string
   address: string
+  /** COGS-mätaren (etapp "svansen", 2026-08-14) — optional, se samma
+      resonemang som lib/leads/generate-letter.ts. */
+  businessId?: string
 }): Promise<string> {
   const angle = getAngle(params.jobType)
   const apiKey = process.env.ANTHROPIC_API_KEY
@@ -49,7 +55,7 @@ export async function generateNeighbourLetter(params: {
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: NEIGHBOUR_LETTER_MODEL,
           max_tokens: 400,
           messages: [{
             role: 'user',
@@ -73,6 +79,20 @@ Skriv på svenska. Bara brevtexten, inget annat.`,
 
       if (res.ok) {
         const data = await res.json()
+
+        // COGS-boken — grannbrevet var tidigare helt omätt.
+        if (params.businessId && data.usage) {
+          await meterDirectLlmCall({
+            supabase: getServerSupabase(),
+            businessId: params.businessId,
+            usage: data.usage,
+            costUsd: llmCostUsd(data.usage, NEIGHBOUR_LETTER_MODEL),
+            refType: 'neighbour_letter',
+            refId: 'nletter_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+            meta: { address: params.address, jobType: params.jobType },
+          })
+        }
+
         const text = data.content?.[0]?.text
         if (text) return text.trim()
       }

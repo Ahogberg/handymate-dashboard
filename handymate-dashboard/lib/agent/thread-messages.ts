@@ -12,6 +12,10 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
+
+const SUMMARY_MODEL = 'claude-haiku-4-5-20251001'
 
 function getSupabase() {
   return createClient(
@@ -246,6 +250,7 @@ export function buildUserContentWithImages(text: string, images: ThreadImage[]):
  */
 export async function summarizeIfNeeded(opts: {
   threadId: string
+  businessId: string
   rows: ThreadMessage[]
   tokenBudget?: number
   apiKey: string
@@ -282,7 +287,7 @@ export async function summarizeIfNeeded(opts: {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: SUMMARY_MODEL,
         max_tokens: 400,
         system: 'Du sammanfattar konversationer mellan en hantverkare och AI-assistent. Skriv kort på svenska — max 5 punkter. Behåll viktig kontext (kund, projekt, belopp, åtgärder). Hoppa över småprat.',
         messages: [
@@ -296,6 +301,19 @@ export async function summarizeIfNeeded(opts: {
     if (res.ok) {
       const data = await res.json()
       summary = (data.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n').trim() || null
+
+      // COGS-boken — trådsammanfattningen var tidigare omätt.
+      if (opts.businessId && data.usage) {
+        const supabase = getSupabase()
+        await meterDirectLlmCall({
+          supabase,
+          businessId: opts.businessId,
+          usage: data.usage,
+          costUsd: llmCostUsd(data.usage, SUMMARY_MODEL),
+          refType: 'thread_summary',
+          refId: opts.threadId,
+        })
+      }
     }
   } catch (err) {
     console.error('[thread-messages] summarize failed (non-blocking):', err)

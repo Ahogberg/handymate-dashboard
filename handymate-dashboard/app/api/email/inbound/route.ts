@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
   }
 
   // ── 3. Stage 1: lead-detektion ────────────────────────────────
-  const likely = await isLikelyLead(emailInput, [], [])
+  const likely = await isLikelyLead(emailInput, [], [], { businessId, refId: payload.MessageID || 'no_message_id_' + Date.now() })
   if (!likely) {
     // Spam/nyhetsbrev/system-mail — logga men skapa inget
     console.log('[email/inbound] Ej lead enligt Stage 1', {
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
   }
 
   // ── 4. Stage 2: fullständig parsning ──────────────────────────
-  const parsed = await parseLeadFromEmail(emailInput)
+  const parsed = await parseLeadFromEmail(emailInput, { businessId, refId: payload.MessageID || 'no_message_id_' + Date.now() })
 
   // Säkerhetsprincip: utan namn + telefon kan vi inte rimligen skapa
   // en lead — manuell granskning behövs ändå. Logga och returnera.

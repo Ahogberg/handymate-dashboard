@@ -6,7 +6,10 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 const MODEL = 'claude-haiku-4-5-20251001'
 
@@ -47,7 +50,8 @@ interface QuoteRecord {
  * Använder Claude Haiku för att kategorisera baserat på offertens rader.
  */
 async function classifyJobTypes(
-  _businessId: string,
+  businessId: string,
+  supabase: SupabaseClient,
   quotes: QuoteForClassification[]
 ): Promise<Map<string, string>> {
   if (quotes.length === 0) return new Map()
@@ -76,6 +80,16 @@ QUOTE_ID|jobbtyp
 Offerter:
 ${quoteSummaries}`
       }],
+    })
+
+    // COGS-boken — jobbtypsklassificering (Haiku), tidigare helt omätt.
+    await meterDirectLlmCall({
+      supabase,
+      businessId,
+      usage: response.usage,
+      costUsd: llmCostUsd(response.usage, MODEL),
+      refType: 'pricing_job_classification',
+      refId: `${businessId}_${Date.now()}`,
     })
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
@@ -165,7 +179,7 @@ export async function updatePricingIntelligence(businessId: string): Promise<{
       }
 
       for (const batch of batches) {
-        const classifications = await classifyJobTypes(businessId, batch)
+        const classifications = await classifyJobTypes(businessId, supabase, batch)
 
         const entries = Array.from(classifications.entries())
         for (const entry of entries) {

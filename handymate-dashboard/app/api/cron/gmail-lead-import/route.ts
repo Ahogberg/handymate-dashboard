@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
           const emailInput = { subject, from, body: bodyText, date }
 
           // Stage 1: Haiku first-pass
-          const likelyLead = await isLikelyLead(emailInput, approvedSenders, blockedSenders)
+          const likelyLead = await isLikelyLead(emailInput, approvedSenders, blockedSenders, { businessId, refId: msg.id })
 
           if (!likelyLead) {
             // Icke-lead: registrera i idempotens-tabellen direkt (inget lead att tappa).
@@ -189,7 +189,7 @@ export async function GET(request: NextRequest) {
           // och leadet tappades permanent.
 
           // Stage 2: Sonnet full parse
-          const leadData = await parseLeadFromEmail(emailInput)
+          const leadData = await parseLeadFromEmail(emailInput, { businessId, refId: msg.id })
 
           // Dedup customer by email or phone
           let customerId: string | null = null

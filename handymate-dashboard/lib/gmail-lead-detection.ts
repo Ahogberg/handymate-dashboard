@@ -1,6 +1,28 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { getServerSupabase } from '@/lib/supabase'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 const anthropic = new Anthropic()
+
+const LEAD_DETECTION_MODEL = 'claude-haiku-4-5-20251001'
+
+/**
+ * COGS-mätaren (etapp "svansen", 2026-08-14): isLikelyLead/parseLeadFromEmail
+ * körs per inkommande mail i en 15-minuters-cron OCH i den synkrona
+ * inbound-webhooken — inget lead-id finns ännu när dessa anrop görs.
+ * meterCtx är optional och FRIVILLIG av bakåtkompatibilitetsskäl (t.ex.
+ * scripts/test-parser-webolia.ts som kör utan business-kontext) — utan den
+ * skippas mätningen tyst. Mätning sker BARA inne i try-blocken nedan, efter
+ * att ett riktigt Anthropic-anrop faktiskt gjorts — aldrig i catch-grenarna
+ * eller för de tidiga return-vägarna (blockerad/no-reply-avsändare) där
+ * inget anrop skedde. */
+export interface LeadDetectionMeterCtx {
+  businessId: string
+  /** Något som pekar tillbaka till mailet som orsakade anropet — Gmail
+      message-id eller Postmark MessageID. */
+  refId: string
+}
 
 export interface LeadData {
   name: string | null
@@ -33,7 +55,8 @@ export interface EmailInput {
 export async function isLikelyLead(
   email: EmailInput,
   approvedSenders: string[],
-  blockedSenders: string[]
+  blockedSenders: string[],
+  meterCtx?: LeadDetectionMeterCtx
 ): Promise<boolean> {
   const fromEmail = extractEmailAddress(email.from)
 
@@ -76,10 +99,21 @@ Svar (YES/NO):`
 
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: LEAD_DETECTION_MODEL,
       max_tokens: 5,
       messages: [{ role: 'user', content: prompt }],
     })
+
+    if (meterCtx) {
+      await meterDirectLlmCall({
+        supabase: getServerSupabase(),
+        businessId: meterCtx.businessId,
+        usage: message.usage,
+        costUsd: llmCostUsd(message.usage, LEAD_DETECTION_MODEL),
+        refType: 'gmail_lead_is_likely',
+        refId: meterCtx.refId,
+      })
+    }
 
     const text = (message.content[0] as any)?.text?.trim().toUpperCase() || ''
     return text.startsWith('YES')
@@ -92,7 +126,9 @@ Svar (YES/NO):`
 /**
  * Stage 2 (Sonnet): Full parsing of lead details from email.
  */
-export async function parseLeadFromEmail(email: EmailInput): Promise<LeadData> {
+const LEAD_PARSE_MODEL = 'claude-haiku-4-5-20251001'
+
+export async function parseLeadFromEmail(email: EmailInput, meterCtx?: LeadDetectionMeterCtx): Promise<LeadData> {
   const prompt = `Du är en assistent som extraherar lead-information från e-postmeddelanden till svenska hantverkare.
 
 Analysera detta e-postmeddelande och extrahera all relevant information. Returnera BARA ett JSON-objekt (inget annat).
@@ -120,10 +156,21 @@ Returnera detta JSON-schema (använd null om info saknas):
 
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: LEAD_PARSE_MODEL,
       max_tokens: 500,
       messages: [{ role: 'user', content: prompt }],
     })
+
+    if (meterCtx) {
+      await meterDirectLlmCall({
+        supabase: getServerSupabase(),
+        businessId: meterCtx.businessId,
+        usage: message.usage,
+        costUsd: llmCostUsd(message.usage, LEAD_PARSE_MODEL),
+        refType: 'gmail_lead_parse',
+        refId: meterCtx.refId,
+      })
+    }
 
     const text = (message.content[0] as any)?.text?.trim() || '{}'
     const jsonMatch = text.match(/\{[\s\S]*\}/)

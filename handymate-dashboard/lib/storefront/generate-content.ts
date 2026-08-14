@@ -1,6 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import { getImagesForBranch } from '@/lib/industry-images'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
+
+const STOREFRONT_MODEL = 'claude-sonnet-4-6'
 
 /**
  * lib/storefront/generate-content.ts (hemsida-nudgen, 2026-07-25)
@@ -115,9 +119,19 @@ Företagsdata:
 Svara med ENBART JSON (inget annat). Ingen markdown, inga code blocks.`
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: STOREFRONT_MODEL,
       max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
+    })
+
+    // COGS-boken — hemsida-innehåll (Sonnet), tidigare helt omätt.
+    await meterDirectLlmCall({
+      supabase,
+      businessId,
+      usage: response.usage,
+      costUsd: llmCostUsd(response.usage, STOREFRONT_MODEL),
+      refType: 'storefront_generate',
+      refId: `${businessId}_${Date.now()}`,
     })
 
     const textBlock = response.content.find(b => b.type === 'text')

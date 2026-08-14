@@ -173,6 +173,8 @@ export async function triggerAutopilot(
         customerName,
         quoteTitle: quote.title || 'er offert',
         bookingDate: bookingDateFormatted,
+        businessId,
+        refId: quoteId,
       })
 
       actions.push({

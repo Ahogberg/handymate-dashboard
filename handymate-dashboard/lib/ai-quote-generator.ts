@@ -3,6 +3,8 @@ import { getServerSupabase } from '@/lib/supabase'
 import { matchGeneratedItem, type MatchableProduct } from '@/lib/products/match-generated-items'
 import { WON_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 import { rapporteraTystFel, arSchemaSaknas } from '@/lib/observability/driftlarm'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 export interface PriceListItem {
   name: string
@@ -470,12 +472,18 @@ export async function resolveCustomerPriceList(
 
 export async function analyzeJobImage(
   imageBase64: string,
-  branch: string
+  branch: string,
+  /** COGS-mätaren (etapp "svansen", 2026-08-14): businessId behövs för att
+      kunna bokföra anropets kostnad. Optional av bakåtkompatibilitetsskäl
+      (t.ex. framtida anropare utan business-kontext) — utan den skippas
+      mätningen tyst, precis som meterDirectLlmCall redan gör vid saknad usage. */
+  businessId?: string,
 ): Promise<ImageAnalysis> {
   const anthropic = getAnthropic()
+  const IMAGE_ANALYZE_MODEL = 'claude-sonnet-4-6'
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: IMAGE_ANALYZE_MODEL,
     max_tokens: 1000,
     messages: [
       {
@@ -528,6 +536,21 @@ Svara ENDAST med JSON:
       }
     ]
   })
+
+  // COGS-boken (etapp "svansen", 2026-08-14) — vision-anropet var tidigare
+  // helt omätt. Mäts oavsett om JSON-parsningen nedan lyckas: tokens
+  // förbrukades och kostade pengar oavsett svarsform.
+  if (businessId) {
+    await meterDirectLlmCall({
+      supabase: getServerSupabase(),
+      businessId,
+      usage: response.usage,
+      costUsd: llmCostUsd(response.usage, IMAGE_ANALYZE_MODEL),
+      refType: 'quote_ai_image_analyze',
+      refId: 'qimg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      meta: { branch },
+    })
+  }
 
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
   const jsonMatch = text.match(/\{[\s\S]*\}/)
@@ -777,6 +800,20 @@ Svara ENDAST med JSON (ingen markdown):
     max_tokens: 3000,
     system: systemPrompt,
     messages: [{ role: 'user', content: userContent }]
+  })
+
+  // COGS-boken (etapp "svansen", 2026-08-14) — huvudanropet för offert-
+  // generering var tidigare helt omätt. Mäts oavsett om JSON-parsningen
+  // nedan lyckas (samma princip som analyzeJobImage ovan): tokens
+  // förbrukades och kostade pengar även vid ett trunkerat/oparsbart svar.
+  await meterDirectLlmCall({
+    supabase: getServerSupabase(),
+    businessId: input.businessId,
+    usage: response.usage,
+    costUsd: llmCostUsd(response.usage, MODEL),
+    refType: 'quote_ai_generate',
+    refId: 'qgen_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+    meta: { branch: input.branch, hasImage: !!input.imageBase64 },
   })
 
   const text = response.content[0].type === 'text' ? response.content[0].text : ''

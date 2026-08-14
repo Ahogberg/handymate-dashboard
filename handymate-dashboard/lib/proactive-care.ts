@@ -15,11 +15,16 @@
  * före kortskapande, och månader räknas via tyst-kund-primitiven.
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { canContactCustomer } from '@/lib/outbound/frequency-guard'
 import { logAutomationActivity } from '@/lib/automations'
 import { monthsSinceLastJob } from '@/lib/customers/quiet-customer'
 import { extractFirstName, halsning } from '@/lib/customers/namn'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
+
+const PROACTIVE_CARE_MODEL = 'claude-haiku-4-5-20251001'
 
 // Job type → months until proactive contact
 const JOB_LIFECYCLE: Record<string, {
@@ -90,15 +95,20 @@ function matchJobType(projectName: string, projectDescription?: string | null): 
  * Generate a suggested SMS using Claude Haiku.
  * Falls back to a template-based message if API is unavailable.
  */
-async function generateProactiveSms(params: {
-  customerName: string
-  businessName: string
-  jobType: string
-  monthsSince: number
-  reason: string
-  suggestedService: string
-  projectName: string
-}): Promise<string> {
+async function generateProactiveSms(
+  params: {
+    customerName: string
+    businessName: string
+    jobType: string
+    monthsSince: number
+    reason: string
+    suggestedService: string
+    projectName: string
+    projectId: string
+  },
+  businessId: string,
+  supabase: SupabaseClient
+): Promise<string> {
   // R1/R2: kundtext får BARA förnamn. project.name (arbetsnamnet) refereras
   // ALDRIG — jobType är en generisk kategori (t.ex. "badrum", "vvs") och är
   // OK, men "reason" bär redan den mänskliga formuleringen så vi behöver
@@ -120,7 +130,7 @@ async function generateProactiveSms(params: {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: PROACTIVE_CARE_MODEL,
         max_tokens: 200,
         messages: [{
           role: 'user',
@@ -147,6 +157,17 @@ Svara ENBART med SMS-texten, inget annat.`,
     }
 
     const data = await response.json()
+
+    // COGS-boken — proaktiv kundvård-SMS (Haiku), tidigare helt omätt.
+    await meterDirectLlmCall({
+      supabase,
+      businessId,
+      usage: data?.usage,
+      costUsd: llmCostUsd(data?.usage, PROACTIVE_CARE_MODEL),
+      refType: 'proactive_care_sms',
+      refId: params.projectId,
+    })
+
     const content = data?.content?.[0]?.text?.trim()
     return content || fallbackSms
   } catch (err) {
@@ -307,15 +328,20 @@ export async function checkProactiveCare(businessId: string): Promise<{
       if (!freq.allowed) continue
 
       // Generate suggested SMS
-      const suggestedSms = await generateProactiveSms({
-        customerName: customer.name || 'kund',
-        businessName: business.business_name || '',
-        jobType,
-        monthsSince,
-        reason: lifecycle.reason,
-        suggestedService: lifecycle.suggestedService,
-        projectName: project.name || 'jobbet',
-      })
+      const suggestedSms = await generateProactiveSms(
+        {
+          customerName: customer.name || 'kund',
+          businessName: business.business_name || '',
+          jobType,
+          monthsSince,
+          reason: lifecycle.reason,
+          suggestedService: lifecycle.suggestedService,
+          projectName: project.name || 'jobbet',
+          projectId: project.project_id,
+        },
+        businessId,
+        supabase
+      )
 
       // Create pending_approval
       const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`

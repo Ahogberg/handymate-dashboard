@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getServerSupabase } from '@/lib/supabase'
+import { recordCost } from '@/lib/costs/record'
+import { whisperCostOre } from '@/lib/costs/meter'
 
 export const maxDuration = 30
 
@@ -36,7 +39,9 @@ export async function POST(request: NextRequest) {
     whisperForm.append('file', file, file.name || 'audio.m4a')
     whisperForm.append('model', 'whisper-1')
     whisperForm.append('language', 'sv')
-    whisperForm.append('response_format', 'json')
+    // verbose_json ger en FAKTISK ljudlängd (Whisper mäter, gissar inte ur
+    // filstorlek) — det är vad som gör den mätbar, se app/api/voice/transcribe/route.ts.
+    whisperForm.append('response_format', 'verbose_json')
 
     const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
@@ -56,6 +61,19 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await res.json()
+
+    const ljudSekunder = Number(data.duration) || 0
+    if (ljudSekunder > 0) {
+      await recordCost({
+        supabase: getServerSupabase(),
+        businessId: business.business_id,
+        resource: 'whisper',
+        units: ljudSekunder,
+        costOre: whisperCostOre(ljudSekunder),
+        refType: 'matte_transcribe',
+        refId: `matte_transcribe_${Date.now()}`,
+      })
+    }
 
     return NextResponse.json({
       text: data.text || '',
