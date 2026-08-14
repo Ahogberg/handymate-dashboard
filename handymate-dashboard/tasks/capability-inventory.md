@@ -1,8 +1,9 @@
 # Handymate — Ärlig kapabilitets-inventering
 
 _För pitch-/GTM-ändamål. Ingen hype — vad som FAKTISKT finns._
-_Genererad 2026-07-01 · **Helt omskriven 2026-08-12** (kod-, git- OCH
-prod-DB-verifierad via Supabase samma dag — radantal nedan är verkliga)._
+_Genererad 2026-07-01 · Helt omskriven 2026-08-12 · **Uppdaterad 2026-08-14**
+(kod-, git- OCH prod-DB-verifierad via Supabase — radantal nedan är
+verkliga, inklusive alla nya sedan 08-12)._
 
 ## Statusdefinitioner (läs först)
 - **LIVE** = deployat OCH driftsatt/körande i prod, rimligt bekräftat
@@ -11,9 +12,19 @@ prod-DB-verifierad via Supabase samma dag — radantal nedan är verkliga)._
 - **SPEC** = inte byggt.
 
 **Epistemisk not:** den här versionen är starkare än tidigare — statusen är
-inte bara kodläsning utan avstämd mot prod-databasen (radantal per tabell,
-2026-08-12). Där det står "0 rader i prod" är det uppmätt, inte gissat.
+inte bara kodläsning utan avstämd mot prod-databasen (radantal per tabell).
+Där det står "0 rader i prod" är det uppmätt, inte gissat.
 **En pitch byggd på fejk-kapabilitet dör vid första demon.**
+
+**08-14-uppdateringen specifikt:** ~70 commits sedan 08-12 lästes (rubrik
+OCH diff, inte bara commit-meddelandet), fyra parallella researchpass +
+direkta Supabase MCP-frågor från huvudsessionen låg till grund. Ett
+återkommande mönster hittades och är värt att säga rakt ut: flera tabeller
+som stod på "0 rader" i 08-12-versionen har nu 1-2 rader — men nästan alla
+spårar tillbaka till EN SAMMANHÄNGANDE testkörning (Golden Path-harnesset,
+natten 08-13→08-14, mot DEMOKONTOT Svensson Bygg AB) — inte till spridd
+organisk kundanvändning. Det redovisas ärligt per sektion nedan i stället
+för att räknas som separata framsteg.
 
 ---
 
@@ -43,8 +54,44 @@ inte bara kodläsning utan avstämd mot prod-databasen (radantal per tabell,
 | Observability: tysta fail-safe-fel → driftlarmet; e2e-lifecycle-rökprov; Reality Week-protokoll | 08-12 | BYGGT |
 | Buggrundan: 4 ruttnade facit-tester fixade (alla var TESTBUGGAR — inga produktregressioner); rena sviten 4 875 gröna, NOLL röda | 08-12 | — |
 
-**Migrationsläget:** v116–v122 KÖRDA och verifierade. Prod-skulden är noll.
-Väntar på engångskörning: `sql/demo_seed_internal_cost.sql` (demokontot).
+**Migrationsläget (08-12):** v116–v122 KÖRDA och verifierade. Prod-skulden
+var noll.
+
+---
+
+## 0b. NYTT sedan 2026-08-12 (~70 commits, 08-12 kväll → 08-14 förmiddag)
+
+| Vad | Datum | Status |
+|---|---|---|
+| Måndagskortet etapp 1 (veckovis lägesbild ur ledger+lärdomar+Guardian+autonomi) | 08-13 | BYGGT → takeover ersattes av Veckomötets dialogform 08-14, se §10 |
+| Måndagsmötet etapp 2 (fullskärms-takeover) + pushnotis vid nytt kort | 08-13 | BYGGT → samma |
+| Business Twin-strategidokument (vision + återskapad idébacklogg, `docs/strategy/`) | 08-13 | Dokument |
+| **Golden Path E2E-harness: station 1-14 gröna i EN sammanhängande körning** (demokontot) — första gången någonsin | 08-13 | **LIVE, harness-bekräftad** — se uppdaterat §4 |
+| 8 produktionsbuggar hittade+fixade av harnesset (bl.a. en offert-visningskrasch som träffade alla 22 företag, och en röstanalysväg som ALDRIG fungerat sedan lansering) | 08-13 | Fixat+deployat, se §4 |
+| Kvittoprincipen (synlig intelligens, Fall 1-4): Daniels resonemang synligt, Guardian-orsaker delade, radnivå-osäkerhet, Lars dispatch-resonemang sparat | 08-13 | BYGGT — se §12, i praktiken 0 rader i prod på det som går att räkna |
+| Guardian → ÄTA-länk vid lönsamhetsvarning (testbevisat E2E) | 08-13 | BYGGT, 0 varningar i prod ännu |
+| Project Closeout Magic (resultatskärm när ett projekt avslutas) | 08-13 | BYGGT |
+| "Varför vet Handymate detta?" — kundfaktabevis | 08-13 | BYGGT — se §6/§8 för var den enda datapunkten kommer ifrån |
+| Värde-ramade godkännande-kvitton | 08-13 | BYGGT — 2 riktiga godkännanden sedan deploy skulle triggat texten, ingen rendering bevisad |
+| Company Goals — omsättningsmål (#11, v128) | 08-13 | BYGGT — **0/22 företag** har satt ett mål |
+| "Lär Handymate" — ägar-dikterade affärsregler i offertmotorn (#12, v129) | 08-13 | BYGGT — **0 regler** skrivna i prod |
+| Next Best Action Engine — Christoffers prioriteringsramverk (v131, v132) | 08-13 | BYGGT — **0 `priority_rule`, 0 `next_best_action`-rader**; väntar på Christoffers dokument, se §10 |
+| Claude Design-redesignen på projektytorna + två portalbuggar fixade (meddelandeikon, recensionslänk) | 08-14 | BYGGT |
+| **Veckomötet** — Måndagsmötets takeover blir en dialog med riktiga NBA-beslutskort | 08-14 | BYGGT, datakontrakt MCP-verifierat, EJ browserverifierat (blockerat) — se §10 |
+| **Project Reality + Cross-Agent Case** (Business Twin #9 V1) | 08-14 | BYGGT, **live-verifierat via autentiserat API-anrop** (seedad+städad data) — 0 naturliga case i hela prod, se §11 |
+| Snabbofferten-omskrivning (steg-för-steg standard, review isoleras, ny "blank start"-väg) | 08-14 | BYGGT — **fullt browserverifierad** (riktig inloggning, skärmdumpar av alla tre startvägar: AI/mall/blankt, granskade och bekräftat korrekta, sedan raderade per konvention) |
+| F30 "De första 30 minuterna" (hemtur på riktiga startsidan, startkort, Company Scan) | 08-12/13 | BYGGT — hade en dold bugg (turen "död vid ankomst", flaggan skrevs för tidigt), fixad 08-13; 1 äkta genomförd tur sedan fixen (ser ut som internt test, inte kund) |
+| Kundröst-fix — förnamn i stället för fullnamn i 3 kundvända SMS-mallar (v123, 31 utskicksvägar svepta) | 08-12 | **LIVE** — 33/33 mallar bekräftat omskrivna i prod, 0 kvar på gamla formen |
+| Mötesassistenten synliggjord (genväg på startsidan + onboardingpost) | 08-12 | BYGGT |
+| Auth-genombrott i testriggen — `tests/auth.setup.ts` bytt från trasig magic link till riktig `/api/auth`-lösenordsinloggning (samma väg som appens egen inloggningssida) | 08-14 | Test-infrastruktur — ingen produktfunktion, men löst PÅ RIKTIGT (inte bara kringgått): riktig inloggd Playwright-browserverifiering fungerar nu igen för alla framtida sessioner |
+
+**Migrationsläget (08-14):** v123–v132 samtliga KÖRDA och verifierade direkt
+mot schema/data (constraint-definitioner, kolumn-defaults, tabellexistens,
+0-pending-backfills). Prod-skulden är fortsatt noll. `sql/
+demo_seed_internal_cost.sql` (demokontots interna timkostnad) är
+**fortfarande INTE körd** — bekräftat: `default_internal_hourly_cost` är
+`null` på demokontot i prod, vilket är exakt varför Golden Path-harnessets
+Guardian-station (lönsamhetsvarning) fick hoppas över i sin körning.
 
 ---
 
@@ -71,6 +118,27 @@ Andreas eget skarptest är kört. Bee har aldrig använt den. Kortvägen
 mötesfynd→kort är enhetstestad (facit) och demo-körbar via demokontots
 "Skapa testmöte"-knapp — men ingen riktig kund, inget riktigt möte.
 **Status: BYGGT.** Förmötespushen ("Möte om 15 min") är BYGGT med samma noll.
+
+**Rörelse sedan 08-12 (uppmätt 08-14) — ingen av delarna räknas som ett
+riktigt möte:**
+- `meeting_job` har nu **1 rad**: Bee Service AB (den riktiga piloten,
+  `biz_21wswuhrbhy`), skapad 2026-08-12 19:13, `status='finalized'` — men
+  `segment_count=1`, `total_duration_seconds=2` och `recording_id=null`.
+  Två sekunder utan inspelnings-id är ett tekniskt testförsök, inte ett
+  möte; ingen transkribering eller analys kan ha kört på den.
+- `call_recording` har nu **1 rad** (`source='site_visit'`, 18 minuter,
+  riktig transkript) — men den kommer från Golden Path-harnessets Station
+  13 (§4), körd mot DEMOKONTOT (Svensson Bygg AB), natten 08-13→08-14.
+  Inte en riktig kund.
+- Bakomliggande bugg fixad under samma harnesskörning (v127, se §4): fram
+  till 2026-08-13 kraschade VARJE insert i `call_recording` (saknat
+  NOT NULL-fält) — hela röstanalysvägen, telefonsamtal OCH möten, kan
+  alltså aldrig ha sparat en rad förrän det fixades. Det förklarar
+  delvis varför tabellen stod på exakt 0 i 08-12-versionen.
+
+**Slutsats oförändrad: fortfarande inget bekräftat riktigt kundmöte genom
+hela kedjan.** De två nya raderna är ett testförsök och en harness-körning
+mot demokontot — inte kundbevis.
 
 **Får sägas i demo/annons:** "Spela in kundmötet — Handymate sammanfattar,
 skriver offertutkastet och fångar det kunden sa, du godkänner innan något
@@ -104,7 +172,7 @@ Center" som produktnamn (det finns inte i produkten).
 
 | Integration | Status | Ärlig kommentar (prod-data 2026-08-12) |
 |---|---|---|
-| **46elks** (SMS + röst) | **LIVE** | Rullar i prod (SMS-rader senaste veckan). Strypunkten: allt går via sendSmsViaElks med opt-out-spärr. Telefonins inspelning/analys: 0 nya inspelningar på 30 dagar — vägen finns men används inte just nu. |
+| **46elks** (SMS + röst) | **LIVE** | Rullar i prod (SMS-rader senaste veckan). Strypunkten: allt går via sendSmsViaElks med opt-out-spärr. Telefonins inspelning/analys: fram till 08-13 kraschade VARJE `call_recording`-insert (saknat NOT NULL-fält, fixat v127, se §1/§4) — ingen lyckad skarp analys bekräftad ännu efter fixen heller. |
 | **Stripe** | **LIVE** (betalväg bevisad) | **B7-testköpet KÖRT** — billing_event-rader finns i prod (senast 2026-08-09). 4 aktiva prenumerationer varav 1 verifierat riktig pilot (Bee). Webhook hanterar checkout/subscription/invoice-events. Kvar: B8 (skarp betalning från riktig ny kund). |
 | **Google Calendar** | **LIVE** | 3 kopplingar (inkl. Bee), **91 synkade externa händelser i prod**. OAuth-klienten flyttad till eget handymate.se-projekt 08-12, synk om-verifierad. **Google-VERIFIERINGEN är EJ inskickad** — nya kunder möter varningsskärm tills dess. Gmail-delen pausad ("kommer snart"). |
 | **Fortnox** | **BYGGT men LICENS-BLOCKERAD** | Rutträdet konsoliderat + api-logg (08-10) — men `fortnox_sync` har **0 rader i prod**: ingen synk har någonsin körts skarpt. Kundens integrationslicens 149 kr/mån är fortfarande grinden (Christoffer har inte köpt). Funktionellt = går ej att demoa med riktig data. |
@@ -115,14 +183,52 @@ Center" som produktnamn (det finns inte i produkten).
 
 `lead → deal → offert → projekt → faktura → betalning`
 
-**Uppmätt i prod 2026-08-12: Bee Service AB (riktiga piloten) har 4 vunna
-deals och 2 betalda fakturor.** Tillsammans med A-testet (godkänt),
-B7-betalningsbeviset (billing_event) och körboken ger det:
-**Golden Path = LIVE med brasklapp** — kedjan har bevisligen producerat vunna
-affärer och betalda fakturor hos en riktig kund, men vi har inte spårat EN
-enskild deal dokumenterat genom VARJE station i följd (det är Reality Week
-pass 1:s jobb, protokoll: docs/REALITY-WEEK.md). Säg "kedjan är i drift hos
-pilot", lova inte "felfri hela vägen varje gång".
+**Uppmätt i prod: Bee Service AB (riktiga piloten) har 4 vunna deals och 2
+betalda fakturor** (oförändrat sedan 08-12). Till det kommer nu ett
+mycket hårdare bevis: **2026-08-13 kördes ett E2E-harness (Playwright,
+riktig browser) genom ALLA 14 stationer i EN sammanhängande körning mot
+verklig produktionskod/DB** — första gången i hela projektets historia
+(`docs/REALITY-WEEK.md`, commit bf29d749: *"station 1-14 gröna i EN enda
+sammanhängande browser-resa, för första gången i hela projektets
+historia"*). Körningen gick mot DEMOKONTOT (Svensson Bygg AB), inte en
+riktig kunds affär.
+
+Under vägen dit hittade harnesset **8 produktionsbuggar**, alla fixade
+samma dag:
+- Offertens visningssida kraschade för VARJE ny offert (JSONB-fält läst
+  som sträng, React-fel) — träffade alla 22 produktionsföretag som saknar
+  en egen `payment_terms_text`, inte bara testdata (`be549e44`).
+- Projektets stegkedja (`current_workflow_stage_id`) initierades aldrig
+  vid signering, pga en dubblerad projektskapare som race:ade —
+  bekräftat 29/33 prod-projekt påverkade (`7c59b2db`, `ae400d22`).
+- `PUT /api/projects` skrev aldrig statuskolumnen vid avslut — 3 projekt
+  i prod hade fel status (`22391b87`, backfillat v125, **0 kvar**).
+- `POST /api/invoices/send` skrev aldrig `sent_at`/`sent_method` — 4
+  fakturor i prod visade fel tidslinje (`78242603`, backfillat v126,
+  **0 kvar**).
+- `customer_activity`-loggningen vid fakturautskick floppade tyst — 100 %
+  av utskicken saknade sin logg-rad (`1473b02a`, ingen backfill möjlig
+  utan att hitta på historik).
+- `call_recording` hade NOLL rader i hela produktionsdatabasen sedan
+  tabellen skapades — ett saknat NOT NULL-fält plus en föråldrad
+  `customer.address`-referens gjorde att INGEN röstanalys (telefonsamtal
+  ELLER mötesinspelning) någonsin kunnat sparas (`74727173`, `7c44c02e`,
+  v127, se §1).
+
+Två icke-kodrelaterade blockerare (46elks SMS-saldo, Anthropic
+API-kredit) löstes samma dag. En känd, icke-blockerande harness-kvirk
+(A9, 401 vs 403) kvarstår öppen.
+
+**Golden Path = LIVE, harness-bekräftad.** Kedjan har nu BÅDE bevisligen
+producerat vunna affärer och betalda fakturor hos en riktig kund (Bee),
+OCH körts felfritt station-för-station i en enda sammanhängande körning
+mot skarp produktionskod (demokontot). Det som fortfarande INTE finns:
+en enskild RIKTIG kunds affär spårad dokumenterat genom varje station i
+följd — demokörningen bevisar att mekaniken fungerar, inte att en riktig
+kund haft den resan. Säg "kedjan är bevisad end-to-end mot skarp kod och
+i drift hos pilot" — lova inte "vi har sett en riktig kund gå igenom
+varje steg i följd", och inte "felfri hela vägen varje gång" (det krävdes
+8 fixar för att komma dit).
 
 ## 5. "Guardian" / Margin Guardian — namnsanning
 
@@ -134,11 +240,26 @@ knappen "Jag har sett det" + "Öppna projektet". På Pengar på bordet heter
 kategorin **"Marginal i riskzonen"** (gruppen "Risk"). Byggd på kanoniska
 ekonomimotorn (ärlighetsprincip: ingen marginal utan konfigurerad intern
 timkostnad — hellre "ej konfigurerad" än påhitt). Push endast vid
-över-budget. **Prod: 0 varningskort hittills** (inga projekt över tröskeln,
-eller ingen data ännu). **Status: BYGGT.** I GTM: beskriv funktionen
-("Karin varnar innan projektet äter marginalen — med orsaker"), använd inte
-"Guardian" som produktnamn. KÄND SKÖNHETSFLÄCK: kortets typ-etikett i kön
-visar "Övrigt" (etikett saknas i TYPE_CONFIG) — fixas i polish.
+över-budget. **Prod: fortfarande 0 varningskort (`profitability_warning`)
+någonsin** — oförändrat sedan 08-12. Två funktioner byggda ovanpå Guardian
+sedan dess har därför heller ingen skarp data att visa: Guardian→ÄTA-länken
+(kortet kopplar automatiskt till ett ÄTA-underlag om Karin ser ett,
+testbevisat med ett eget fristående E2E-test, men aldrig kört mot en riktig
+varning) och Lars tilldelningsresonemang i dispatch (`dispatch_reasoning`
+JSONB på `booking`/`work_orders`, v130 — **0 rader ifyllda** i prod).
+
+**Nytt sedan 08-12, och faktiskt levande — men från samma harness-körning
+som §1/§4, inte organisk kundanvändning:** projektstängningens
+godkännandekort grupperas nu under en delad rubrik
+(`completion_batch_id`). Det har verkligen hänt en gång: **2 kort delar 1
+batch i prod**, båda för demokontot (`biz_0lovw5vcwzqn`), natten
+2026-08-13→14 (samma fönster som Golden Path-harnessets Station 13-14).
+**Status: BYGGT** (Guardian-kärnan, ÄTA-länken, dispatch-resonemanget) /
+**LIVE** (bara closeout-grupperingen, och bara mot demokontot). I GTM:
+beskriv funktionen ("Karin varnar innan projektet äter marginalen — med
+orsaker"), använd inte "Guardian" som produktnamn. KÄND SKÖNHETSFLÄCK:
+kortets typ-etikett i kön visar "Övrigt" (etikett saknas i TYPE_CONFIG) —
+kvarstår, fixas i polish.
 
 ## 6. "Value Ledger" — namnsanning
 
@@ -156,6 +277,18 @@ en riktig kunds ledger är nästan tom första veckorna. **Status: BYGGT.**
 Får sägas: "Handymate visar vad den hittat, vad som agerats och vad som
 bevisligen betalats — åtskilt". Får INTE sägas: "har drivit in X åt kunder"
 (ingen historik finns).
+
+**Rörelse sedan 08-12 (uppmätt 08-14):** `customer_fact` gick från 0 till
+**1 rad** — men den kommer också från Golden Path-harnessets körning mot
+demokontot (`biz_0lovw5vcwzqn`, 2026-08-14 04:32, ett riktigt
+`evidence_quote`-citat om ett telefonnummer), inte en riktig kund. Första
+gången ytan "Varför vet Handymate detta?" (§12, Kvittoprincipen Fall 1) har
+NÅGOT alls att visa, men fortfarande obefintligt för alla 22 riktiga
+företag. Nya värde-ramade godkännande-kvitton (de26aac1) har svagare men
+äkta tecken på skarp användning: minst 2 riktiga godkännanden
+(`confirm_payment` ×1, `review_auto_invoice` ×1) sedan de deployades 08-13
+som skulle triggat den nya texten — men ingen loggning bevisar att en
+användare faktiskt såg den renderad.
 
 ## 7. Mobil (Expo-appen) — sämre än förra inventeringen trodde
 
@@ -177,15 +310,24 @@ lanseringen** — och den är LIVE. Säg aldrig "ladda ner appen".
 | Förtjänad autonomi (streak → nyckel; nu med beloppsgräns + nåbar nedgradering + förtroendebevis-UI) | **0 kunder har beviljat autonomi** | BYGGT — säg "förtjänar", aldrig "brukar" |
 | Expected-margin-snapshot vid offertaccept | 0 snapshots | BYGGT — ackumulerar från nu |
 | Project Debrief → lärdomar → Daniels offertrad | 0 lärdomar | BYGGT — jobbtyps-scopad (fix 08-12) |
-| Customer Facts ("Det här vet Handymate", offertprompt, projektsidans "Att tänka på") | 0 fakta | BYGGT — supersede + åtkomstkodförbud på plats |
+| Customer Facts ("Det här vet Handymate", offertprompt, projektsidans "Att tänka på") | **1 fakta** (upp från 0 — demokontot, Golden Path-harnesset 08-14, se §6) | BYGGT — supersede + åtkomstkodförbud på plats, 0 för alla 22 riktiga företag |
 | Margin Guardian (kanonisk motor, orsaksrader) | 0 varningar | BYGGT |
 | Värdeattribution (kort → artefakt → faktura → betalning, direktreferens) | börjar 08-12 | BYGGT |
 | Egenkontroll-agenten (foto→bedömning) | 0 skarp användning | BYGGT (08-02) |
+| Company Goals (omsättningsmål, #11) | **0/22 företag** har satt ett mål | BYGGT (08-13) |
+| "Lär Handymate" (ägar-dikterade affärsregler i offertmotorn, #12) | **0 regler** skrivna i prod | BYGGT (08-13) |
+| Next Best Action-rankning (Christoffers prioriteringsramverk) | **0 `priority_rule`, 0 `next_best_action`-rader** | BYGGT (08-13) — väntar på Christoffers dokument, se §10 |
+| Dispatch-resonemang (Lars tilldelning synlig och sparad) | **0 rader ifyllda** | BYGGT (08-13), se §12 |
+| Closeout-kortgruppering (`completion_batch_id`) | **2 rader / 1 batch** (demokontot, samma harness-körning) | LIVE mot demokontot, 0 mot riktig kund |
 
-**Moaten är oförändrad i tes, kraftigt starkare i kod, och HELT obevisad i
-data:** varje lärande-primitiv finns nu och ackumulerar från idag — men
-ingen firma har ännu en enda bekräftad lärdom, ett kundfaktum eller en
-autonominyckel. Tid-i-drift är moatens råvara; den börjar räknas nu.
+**Moaten är oförändrad i tes, kraftigt starkare i kod, och NÄSTAN HELT
+obevisad i data:** varje lärande-primitiv finns nu och ackumulerar från
+idag — men ingen RIKTIG firma har ännu en enda bekräftad lärdom, ett
+kundfaktum eller en autonominyckel. Den enda datapunkten som rört sig
+(1 kundfaktum, 2 closeout-kort) kommer från en och samma harness-körning
+mot demokontot, inte från en betalande kund. Tid-i-drift är moatens
+råvara; den börjar räknas när en riktig kund använder produkten, inte när
+ett test gör det.
 
 ## 9. Vad som INTE finns (ärligt)
 
@@ -195,26 +337,154 @@ autonominyckel. Tid-i-drift är moatens råvara; den börjar räknas nu.
 - **ROT-fil inlämnad till Skatteverket** — nej (byggd, aldrig inlämnad).
 - **Google-verifieringen inskickad** — nej (nya kunder får varningsskärm).
 - **Mobilapp som går att visa** — nej (kraschar på iOS 26; PWA är svaret).
-- **Ett enda riktigt möte genom mötesassistenten** — nej (0 i prod).
-- **En enda riktig lärdom/kundfaktum/autonominyckel/Guardian-varning** — nej.
+- **Ett enda riktigt möte genom mötesassistenten** — nej. `meeting_job` har
+  1 rad men är ett 2-sekunders testförsök utan `recording_id`;
+  `call_recording` har 1 rad men är demokontots harness-körning. Se §1.
+- **En enda riktig lärdom/autonominyckel/Guardian-varning** — nej,
+  fortfarande 0. **Kundfaktum:** teknisk gång 0→1, men den ena raden är
+  demokontot (samma harness-körning), inte en riktig kund — se §6/§8.
+- **Company Goals, "Lär Handymate"-regler, Next Best Action-rankning** —
+  byggda 08-13, 0 rader/mål/regler i prod på alla tre, se §0b/§8/§10.
+- **Ett riktigt projekt-case (Project Reality)** — nej, 0 naturligt
+  förekommande i hela databasen trots ett skarpt API-bevis, se §11.
 - **Företagskollen-leads** — 0 inskickade hittills (sidan är live).
+
+## 10. VECKOMÖTET & NEXT BEST ACTION ENGINE — exakt sanning (GTM-kritisk)
+
+Måndagsmötets fullskärms-takeover (byggd 08-13, `MandagsmoteTakeover.tsx`)
+skrevs om 08-14 till en riktig dialog: agenterna (Karin/Daniel/Matte/Lars)
+pratar i tur och ordning genom resultat → lärdomar → risker → förtroende,
+och `lib/jarvis/mandagsmote.ts` (`byggVeckomoteRepliker`) genererar
+replikerna ur samma data Måndagskortet redan visar. `/api/next-best-action`
+fick ett additivt `recommendations`-fält (topp 3) som dialogens beslutskort
+bygger på — RIKTIG NBA-rankning, inte mockup-exempeldata. Vad som INTE
+ändrades (blast radius minimerad): `lib/jarvis/monday-brief.ts` äger
+fortfarande n>0-regeln för de fyra sektionerna, och godkänn-vägen är
+fortfarande samma `/api/approvals/:id` — ingen ny endpoint.
+
+**Verifierat:** `npx tsc --noEmit` rent, 75/75 nya/uppdaterade facit gröna
+(`mandagsmote-takeover.spec.ts`), `npx next build` rent, full svit 5467
+gröna/0 failed. Datakontraktet MCP-verifierat mot seedad (sedan städad)
+testdata på Andreas eget interna testkonto (`business_name='Test'`,
+`biz_al7pjuu5smi` — INTE Bee, den riktiga piloten) — bekräftar att
+`next_best_action`-radens form och `monday_brief`-payloaden matchar exakt
+vad koden förväntar sig. Det bevisar datakontraktet, INTE den faktiska
+renderingen/interaktionen i en webbläsare, och inte mot en betalande
+kunds data.
+
+**Blockerat:** en riktig, inloggad browser-klick-genom gick INTE att köra.
+`tests/auth.setup.ts`s magic link-inloggning studsar tillbaka till
+`/login` inom en sekund (reproducerat tre gånger, även mot en helt orörd
+befintlig test) — trolig orsak: admin-genererade länkar är inte
+kompatibla med appens PKCE-baserade `/auth/callback`. En fungerande omväg
+hittades samma natt under Project Reality-passet (§11) men har inte
+porterats in i den delade testriggen.
+
+**Prod-verkligheten: `next_best_action` = 0 rader, `business_knowledge`
+med `knowledge_type='priority_rule'` = 0 rader.** Motorn kan alltså i
+praktiken inte visa något förrän minst en `priority_rule` finns — väntar
+på Christoffers prioriteringsdokument.
+
+**Status: BYGGT**, deployat, datakontrakt bevisat, INTE
+browserverifierat, NOLL skarp data att rangordna ännu. Får sägas:
+"Handymate rankar dina konkurrerande beslut efter dina egna
+prioriteringar" (som bevisad mekanism). Får INTE sägas: "visar dig vad
+som är viktigast idag" som om det redan sker hos en kund — det gör det
+inte förrän en `priority_rule` finns och beräkningen faktiskt körts.
+
+## 11. PROJECT REALITY + CROSS-AGENT CASE (Business Twin #9 V1) — exakt sanning (GTM-kritisk)
+
+Ny funktion 08-14: när minst två OLIKA agenter (t.ex. Karin + Daniel) har
+en pending-approval-signal på SAMMA projekt, grupperas de till ett
+"projekt-case" på startsidan (`hittaProjektCase` i
+`lib/jarvis/project-case.ts`, ren funktion, kräver ≥2 distinkta
+signaltyper) med projektets ekonomi och fas
+(`deriveProjectReality`/`lib/projects/project-reality.ts`, komposition av
+redan kanoniska `computeProjectEconomics`+`deriveProjectLifecycle` — inga
+nya beräkningar, inget nytt lagrat). `ProjektCaseKort.tsx` har inga egna
+knappar (fyra-ögon-regeln bevarad, samma mönster som
+`completion_batch_id`).
+
+**Verifierat:** `npx tsc --noEmit` rent, 26 nya facit-tester gröna
+(`tests/project-case.spec.ts`, `tests/project-reality.spec.ts`), full
+svit 5762 gröna/0 failed, `npx next build` rent.
+
+**Live-verifierat mot skarp prod — ett genombrott i testmetoden i sig:**
+ett engångsskript kringgick den kända auth-luckan (ovan, §10) genom att
+generera OCH konsumera en magic link server-side
+(`supabase.auth.verifyOtp({token_hash, type:'magiclink'})`) i stället för
+att navigera en webbläsare dit — gav ett riktigt `access_token`, använt
+som `Authorization: Bearer` direkt mot den skarpa routen. Seedad testdata
+(2 signaler, olika typ, på ett riktigt existerande projekt på Andreas
+eget interna testkonto, `business_name='Test'`, `biz_al7pjuu5smi` — INTE
+Bee, den riktiga piloten) → `GET /api/project-cases` → **HTTP 200**, exakt
+förväntat svar (ett case, rätt agentId, `fasLabel: "Pågår"`, marginal
+ärligt `null` när kostnad saknas — hellre tyst än gissat). Städat direkt
+efter, 0 kvar.
+
+**Prod-verkligheten: 0 naturligt förekommande case i hela databasen.** Av
+de fyra signaltyperna har bara `missad_intakt` några rader alls (2
+pending, 1 rejected) — `profitability_warning`, `create_ata_draft` och
+`fakturera_projekt` har ZERO rader totalt i hela prod. Funktionen är
+korrekt byggd och skarpt API-verifierad, men väntar på verklig
+signalvolym — samma mönster som Måndagsmötet/NBA.
+
+**Status: BYGGT, API-lagret skarpt bevisat, 0 naturlig data.** Får sägas:
+"Handymate kopplar ihop flera agenters observationer om samma projekt"
+(bevisat att fungera mot skarp kod). Får INTE sägas att det redan HÄNDER
+hos en kund — det har det inte.
+
+## 12. KVITTOPRINCIPEN — synlig intelligens (Fall 1-4)
+
+Designstrategi (`docs/design/SYNLIG-INTELLIGENS.md`, 08-13, kallad
+"Fable 5" internt): "en slutsats får bara visas med sitt kvitto, skrivet
+av beräkningen själv, aldrig i efterhand." Fyra fall byggda samma dag:
+
+- **Fall 1** — Daniels bedömning (resonemang, regler, lärdomar,
+  kundfakta) syns nu i offerteditorn. Ren klient-rendering av redan
+  beräknad `GeneratedQuote`-data, inget nytt att räkna i prod. **BYGGT.**
+- **Fall 2** — Guardians orsaksrader delas mellan godkännandekortet och
+  projektsidan via en gemensam `computeGuardianVarningForProject`-kärna +
+  `GuardianOrsaker.tsx`. **BYGGT** — men `profitability_warning` = 0
+  rader i prod (§5), så komponenten har aldrig renderats mot riktig data.
+- **Fall 3** — radnivå-osäkerhet (`ai_uncertain`/`ai_note`) syns nu även i
+  dokument-canvasen, inte bara editorn. Fälten är avsiktligt flyktiga
+  (sätts bara vid AI-konvertering, strippas innan `quote_items` sparas)
+  — designat för att INTE lämna ett DB-spår, går alltså inte att räkna i
+  prod. **BYGGT.**
+- **Fall 4** — Lars tilldelningsresonemang sparas nu i stället för att
+  kastas (`dispatch_reasoning` JSONB på `booking`/`work_orders`, v130,
+  syns i schema-vyn). **BYGGT** — 0 rader ifyllda i prod ännu.
+
+**Status: alla fyra BYGGT, ingen LIVE ännu** — samma mönster som resten av
+denna klunga: kräver att Guardian eller dispatch faktiskt producerar en
+signal i prod först, vilket inte har hänt.
 
 ---
 
-## Bottom line för pitchen (2026-08-12)
+## Bottom line för pitchen (2026-08-12, uppdaterad 08-14)
 
 **Kan visas/lovas UTAN att ljuga:**
 - Missat samtal → SMS → bokning (kärnkilen; 46elks LIVE).
 - **Startsidan**: "öppna appen — se vad som behöver dig, vad teamet sköter,
-  var pengarna riskeras" (demoa; deployad idag, säg inte "beprövad").
-- **Hela livscykeln på DEMOKONTOT**: möte → kort → offert → projekt →
-  Guardian-varning → efterkalkyl → debrief → lärdom → nästa offert. Seedad
-  och demo-körbar. Formulering: "så här fungerar det" — inte "så här har
+  var pengarna riskeras" (demoa; deployad 08-12, säg inte "beprövad").
+- **Hela livscykeln på DEMOKONTOT, nu bevisad i EN sammanhängande körning**:
+  möte → transkript → kort → offert → projekt → efterkalkyl → debrief →
+  lärdom → nästa offert → stängning (Golden Path-harnesset, §4, 08-13).
+  Seedad och demo-körbar (Guardian-varningen hoppas fortfarande över —
+  demokontot saknar konfigurerad timkostnad). Formulering: "så här
+  fungerar det, och vi har kört det själva end-to-end" — inte "så här har
   det fungerat för våra kunder".
-- Golden Path i pilotdrift (Bee: vunna affärer + betalda fakturor finns).
+- Golden Path i pilotdrift (Bee: vunna affärer + betalda fakturor finns)
+  OCH harness-bekräftad mot skarp kod (§4).
 - Betalvägen (Stripe B7 bevisad). Kalendersynk (LIVE hos pilot).
 - Värdesynlighet: "identifierat/agerat/fakturerat/betalt hålls åtskilt".
 - PWA på mobilen (installera + push).
+- Veckomötet (§10) och projekt-case (§11): datakontrakt/API-lagret är
+  skarpt bevisat mot skarp kod (via Andreas eget interna testkonto, INTE
+  Bee) — beskriv som "mekaniken fungerar", aldrig som en pågående
+  kundupplevelse (0 rader i naturlig prod-data på båda, hos alla riktiga
+  företag).
 
 **Får INTE sägas i demo/annons (dödar trovärdighet):**
 - ❌ "AI:n lyssnar på dina möten" / "i realtid" — den SPELAR IN på
@@ -232,18 +502,29 @@ autonominyckel. Tid-i-drift är moatens råvara; den börjar räknas nu.
   kunden möter — de heter Startsidan, Karins varningar och Pengar på
   bordet/Värdekvittot i produkten. (GTM får gärna DÖPA koncepten i
   marknadsföring — men demon måste då säga "det här kallar vi X".)
+- ❌ "Handymate rankar dina beslut åt dig" / "vet vilket projekt som
+  behöver dig mest" som om det redan sker för en kund — Next Best Action
+  och Project Reality har 0 naturliga rader i prod (§10, §11); mekaniken
+  är bevisad, upplevelsen är inte levd av någon kund än.
+- ❌ "Har haft ett riktigt kundmöte" — meeting_job/call_recordings rörelse
+  sedan 08-12 är ett testförsök + en demokontokörning, inte en kund (§1).
 
 **Verifieringar som flyttar BYGGT → LIVE (= Reality Week, protokoll i
 docs/REALITY-WEEK.md):**
-1. Pass 1: gyllene vägen station 1-14 på demokontot (inkl. första mötet
-   genom mötesassistenten — någonsin).
-2. Pass 2: adversarial A1-A15.
-3. Pass 3: integrationsfelvägar + PWA på riktig iPhone + Google-verifiering
-   inskickad.
-4. Första RIKTIGA kundmötet/lärdomen/autonominyckeln hos pilot (post-launch
-   räcker — men först då får "beprövat" användas).
+1. ~~Pass 1: gyllene vägen station 1-14 på demokontot~~ — **KLART
+   2026-08-13** (bf29d749, se §4). Undantag som kvarstår öppet: "mötet
+   genom mötesassistenten" i harnesset var en 18-minuters demokörning
+   (och den tidigare Bee-raden ett 2-sekunders testförsök) — INGET av
+   dem räknas som ett riktigt kundmöte (§1).
+2. Pass 2: adversarial A1-A15 — kvarstår.
+3. Pass 3: integrationsfelvägar + PWA på riktig iPhone + Google-
+   verifiering inskickad — kvarstår.
+4. Första RIKTIGA kundmötet/lärdomen/autonominyckeln/projekt-caset hos
+   pilot (post-launch räcker — men först då får "beprövat" användas).
+   Kundfaktum har rört sig tekniskt (0→1) men på demokontot, inte hos
+   Bee — räknas alltså INTE som uppfyllt än.
 
-## §10 Planstruktur (oförändrad sedan 2026-07-31)
+## §13 Planstruktur (oförändrad sedan 2026-07-31)
 
 Firman 5 995 kr/mån (professional) + Storfirman 11 995 kr/mån (business) +
 "Anpassad — kontakta oss". Starter/Bas (2 495) FÖRBJUDEN i allt publikt.
