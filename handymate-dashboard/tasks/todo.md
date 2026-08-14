@@ -318,3 +318,76 @@ Svansen av mindre ytor från cost-cap-analysis.md §7-8: offertgenerering,
 intent-klassificering, gmail-leadfilter, autopilot, leads-brev, insights-
 cron, monthly-review, Whisper-luckorna (matte/transcribe, jobbkompisen,
 voice/process), och den fortfarande medvetet omätta samtalskostnaden.
+
+---
+
+# COGS-mätaren etapp 2 — svansen av omätta LLM/Whisper-ytor
+
+Källa: "Yes, kör vidare med ALLA andra kostnadsytor och rapportera tillbaka
+när det är klart" — direkt fortsättning på etapp 1. 29 anropsställen
+kartlagda i `tasks/cost-cap-analysis.md` §7-8, körda via tre parallella
+bakgrundsagenter (kluster: offert & lead-intake / klassificering &
+nattcronar / chatthjälpare+jobbkompisen+Whisper) + en egen fix
+(egenkontroll-foto).
+
+## Byggt (commit 08826ac0 — pushat, deployat)
+
+39 filer. Samma mönster som etapp 1 rakt igenom: `meterDirectLlmCall` för
+LLM-anrop, `recordCost(resource:'whisper')` för Whisper. Fullständig lista
+med refType per yta i commit-meddelandet.
+
+**Anmärkningsvärt:** fyra Whisper-ytor (matte/transcribe, jobbkompisens
+röst, quotes/transcribe-voice, voice/process) var MEDVETET lämnade omätta
+sedan tidigare — kommentaren i `voice/transcribe/route.ts` varnade för att
+uppskatta ljudlängd ur filstorlek ("ser exakt ut men är det inte"). Löst
+genom att byta alla fyra till `response_format: 'verbose_json'`, som ger en
+FAKTISK Whisper-uppmätt `duration` i svaret — samma grundprincip som
+originalytan, ingen gissning införd. Granskat rad för rad av mig personligen
+innan commit (svarsformatbyte = risk för att transkript-extraktionen
+går sönder — verifierat att `.text` fortfarande läses korrekt på alla fyra
+ställen).
+
+`lib/egenkontroll/analyze-and-queue.ts` skrev redan `agent_runs`
+(governorn) men aldrig `cost_event` (boken) — samma lucka som trigger-routen
+i etapp 1, fixad separat.
+
+## Verifierat
+
+- `npx tsc --noEmit` — noll fel, kört färskt EFTER alla tre klustrens
+  sammanslagna ändringar (varje agent körde det individuellt också, men en
+  kombinerad körning behövdes för att fånga eventuella interaktioner).
+- Facit (`tests/cogs-matare.spec.ts`) — 46/46, "en skrivare per
+  faktum"-invarianten intakt.
+- Personlig diff-granskning av de fyra Whisper-omskrivningarna och de två
+  mest riskfyllda signatur-trådningarna (`runIntentAgent` två anropsställen,
+  `callNextBestActionModel`) — korrekta, inga trasiga anrop.
+- `npx next build` — ren.
+- **Full svit gav 28 "failed" — ALLA verifierade förbefintliga, orelaterade
+  till dagens 39 filer** (se separat sektion nedan). En av dem
+  (`settings-areas.spec.ts`) var min egen missade registrering av
+  Byt lösenord-sidan från igår — fixad (commit 888d2643).
+- **Riktig prod-verifiering:** `campaign_generate_text` (0 öre, för litet
+  meddelande för att runda upp — korrekt beteende) och `onboarding_chat`
+  (1 öre) avfyrade skarpt mot prod, båda gav riktiga `cost_event`-rader.
+  Inte samtliga 29 ytor liveavfyrade — flera kräver riktiga externa
+  triggers (inkommande mail, foton, röstinspelningar) som inte är
+  meningsfullt att simulera bara för en mätningsverifiering; kod- och
+  facitgranskningen bär tyngden där.
+
+## Sidofynd under full-svit-körningen — INTE åtgärdade, flaggade till Andreas
+
+Tre förbefintliga, orelaterade gap som ytan blev synlig av att köra hela
+5808-testsviten (vilket annars sällan görs i sin helhet):
+
+1. **`tests/cron-auth.spec.ts`**: förväntar 34 cron-rutter, det finns nu 37
+   — tre nya cron-filer har tillkommit utan att facit uppdaterats. Okänt om
+   de tre nya rutterna faktiskt använder auth-helpern korrekt eller inte.
+2. **`tests/business-config-reads.spec.ts`**: `components/value/MalBlock.tsx`
+   läser `business_config` direkt utan att vara klassad i någon av de två
+   listorna (dokumentyta/visningsyta).
+3. **`tests/fakturaunderlaget.spec.ts`** (4 tester): `lib/projects/
+   auto-invoice-on-complete.ts` matchar inte längre facitets förväntade
+   mönster (`if (quote && quoteItems.length > 0)` saknas). Filen är orörd av
+   allt arbete idag — troligen en drift sedan en tidigare, orelaterad
+   commit. Rör fakturagenerering, så förtjänar en egen, noggrann titt —
+   INTE en snabbfix inbakad i ett kostnadsmätnings-pass.
