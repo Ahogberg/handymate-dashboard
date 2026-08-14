@@ -512,3 +512,23 @@ kvittosviter. Inga SQL-, databas- eller utskicksändringar gjordes.
 En read-only webbläsarkontroll kunde inte startas eftersom ingen in-app-
 webbläsare fanns tillgänglig i sessionen. Ingen verklig godkännandehandling
 utfördes; bygg- och källfacit täcker renderingskopplingen.
+
+## Claude-verifiering av Codex commit 94e0f472 (samma kväll)
+
+Codex byggde INTE en dubblett — Distributed Value Receipts fanns redan
+(commit `de26aac1`, 2026-08-13) som en inline-funktion i
+`app/dashboard/approvals/page.tsx`, otestad. Codex hittade tre riktiga
+sanningsbuggar (skipped visades som lyckat, missad_intakt påstod ett
+underlag skapats trots REVIEW_REQUIRED, ÄTA-utkast kallades "godkänt
+arbete" innan kunden sett något) och härdade i stället för att duplicera.
+
+Oberoende ombekräftat av mig innan push: `npx tsc --noEmit` rent, ren
+`next build` (420 sidor), 33/33 färska körningar av de riktade faciten
+(`tests/value-receipt.spec.ts` + `tests/execution-outcome.spec.ts`), och
+en fullständig testsvit (5829 gröna). De 27 "failed" var samma kända
+förbefintliga kluster från idag PLUS två genuint flakiga
+externtjänst-diagnostikrutter (`api.spec.ts` SMS/mail-koll mot 46elks) —
+bekräftat flakiga genom att isolerad omkörning gav olika utfall mellan
+körningarna, och rutterna har ingen kodkoppling till de ändrade filerna.
+
+Pushat och deployat (`94e0f472`).
