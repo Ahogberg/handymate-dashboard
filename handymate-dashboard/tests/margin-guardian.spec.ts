@@ -11,7 +11,12 @@
 import fs from 'fs'
 import path from 'path'
 import { test, expect } from '@playwright/test'
-import { byggLonsamhetsVarning, type GuardianProjekt, type GuardianAtaSignal } from '../lib/projects/margin-guardian'
+import {
+  byggLonsamhetsVarning,
+  normalizeExplicitMarginTarget,
+  type GuardianProjekt,
+  type GuardianAtaSignal,
+} from '../lib/projects/margin-guardian'
 import type { ProjectEconomics } from '../lib/projects/compute-economics'
 
 const ROOT = path.join(__dirname, '..')
@@ -96,6 +101,65 @@ test.describe('trösklar', () => {
   test('96% ger over_budget', () => {
     const r = byggLonsamhetsVarning(eko({ material_inkop_kr: 96000 }), projekt(), ingenAta)
     expect(r?.status).toBe('over_budget')
+  })
+})
+
+test.describe('explicit ägarmål — Goal-driven Margin Guardian', () => {
+  test('osatt mål behåller produktens 75 %-gräns exakt', () => {
+    expect(byggLonsamhetsVarning(eko({ material_inkop_kr: 75_000 }), projekt(), ingenAta)).toBeNull()
+    expect(byggLonsamhetsVarning(eko({ material_inkop_kr: 76_000 }), projekt(), ingenAta)?.status).toBe('at_risk')
+  })
+
+  test('35 % mål flyttar at_risk-gränsen till strikt över 65 % kostnad', () => {
+    const goals = { margin_target_percent: 35 }
+    expect(byggLonsamhetsVarning(eko({ material_inkop_kr: 65_000 }), projekt(), ingenAta, goals)).toBeNull()
+
+    const r = byggLonsamhetsVarning(eko({ material_inkop_kr: 66_000 }), projekt(), ingenAta, goals)
+    expect(r?.status).toBe('at_risk')
+    expect(r?.margin_target_percent).toBe(35)
+    expect(r?.margin_target_breached).toBe(true)
+    expect(r?.orsaker[0]).toEqual({
+      text: 'Marginalmål: 35 % — registrerade kostnader lämnar högst 34 % med dagens säkrade intäkt',
+      kind: 'KÄNT',
+    })
+  })
+
+  test('ett uttryckligt lägre mål ersätter basgränsen i stället för att ignoreras', () => {
+    const goals = { margin_target_percent: 20 }
+    expect(byggLonsamhetsVarning(eko({ material_inkop_kr: 76_000 }), projekt(), ingenAta, goals)).toBeNull()
+    expect(byggLonsamhetsVarning(eko({ material_inkop_kr: 81_000 }), projekt(), ingenAta, goals)?.status).toBe('at_risk')
+  })
+
+  test('den hårda 95 %-gränsen gäller även om ägarmålet är 0 %', () => {
+    const r = byggLonsamhetsVarning(
+      eko({ material_inkop_kr: 96_000 }),
+      projekt(),
+      ingenAta,
+      { margin_target_percent: 0 },
+    )
+    expect(r?.status).toBe('over_budget')
+    expect(r?.margin_target_breached).toBe(false)
+    expect(r?.orsaker.some(o => o.text.startsWith('Marginalmål:'))).toBe(false)
+  })
+
+  test('ogiltiga mål ignoreras fail-closed', () => {
+    for (const value of [-1, 101, Number.NaN, Number.POSITIVE_INFINITY, '35', null, undefined]) {
+      expect(normalizeExplicitMarginTarget(value)).toBeNull()
+    }
+    expect(normalizeExplicitMarginTarget(0)).toBe(0)
+    expect(normalizeExplicitMarginTarget(100)).toBe(100)
+  })
+
+  test('saknad arbetskostnad får bara varna när det kända kostnadsgolvet redan bryter målet', () => {
+    const r = byggLonsamhetsVarning(
+      eko({ arbete_kr: null, arbete_timmar: 20, material_inkop_kr: 66_000 }),
+      projekt(),
+      ingenAta,
+      { margin_target_percent: 35 },
+    )
+    expect(r?.margin_target_breached).toBe(true)
+    expect(r?.orsaker.some(o => o.text.includes('Intern timkostnad ej konfigurerad'))).toBe(true)
+    expect(r?.orsaker.some(o => o.text.includes('registrerade kostnader'))).toBe(true)
   })
 })
 

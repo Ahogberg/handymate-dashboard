@@ -53,14 +53,22 @@ kort och sin egen knapp i kön nedanför, samma fyra-ögon-regel som
 
 ## #11 Company Goals → beslut
 
-**Status: DATA FINNS, KONSUMENT SAKNAS.**
+**Status: MARGINALMÅL V1 KOD KLAR 2026-08-14 — V134 SKA KÖRAS MANUELLT.
+OMSÄTTNINGSMÅLETS BESLUTSKONSUMENT ÅTERSTÅR.**
 
-`business_config.margin_target_percent` (OBS: DEFAULT 50 — en orörd
-default får ALDRIG behandlas som ägarens uttalade mål; kräver en
-satt-flagga/timestamp innan agent-logik får läsa den) +
-`revenue_target_annual_sek` (nytt, v128, nullable — ett osatt mål visar
-ingen rad, aldrig "0 kr"). Nästa steg: Guardian-orsaksrad + NBA-
-promptinput läser målen NÄR satt-flaggan finns.
+`business_config.margin_target_percent` har nu ett separat
+`margin_target_set_at`-bevis (v134): värden som avviker från default 50
+backfillas säkert; tvetydiga 50 lämnas osatta tills ägaren sparar igen.
+Margin Guardian använder därefter det uttryckliga målet som sin
+`at_risk`-gräns och bär jämförelsen till samma orsaksrader på projektet och
+i kön. Utan bevisstämpeln gäller den tidigare 75/95-semantiken exakt; den
+hårda 95-gränsen kan aldrig sänkas av målet.
+
+`revenue_target_annual_sek` (v128, nullable) visas fortfarande i
+Månadsrapporten men påverkar ännu inget beslut. Nästa eventuella steg är en
+separat, källmärkt målkontext till Next Best Action — först efter att
+marginalmålskonsumenten verifierats i skarp UI och utan att kalla mål för
+prioriteringsregler.
 
 ---
 

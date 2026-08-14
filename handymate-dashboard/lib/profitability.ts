@@ -2,13 +2,18 @@
  * V25 — Lönsamhetsanalys
  *
  * Beräknar projektlönsamhet baserat på offert, tid, material, ÄTA och extrakostnader.
- * Karins varningar triggas vid 75%, 90% och 100%+ av budget.
+ * Karins varningar triggas vid produktens 75/95-gränser eller ett
+ * uttryckligen sparat marginalmål (Goal-driven Margin Guardian V1).
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { computeProjectEconomics } from '@/lib/projects/compute-economics'
-import { byggLonsamhetsVarning, type LonsamhetsVarning } from '@/lib/projects/margin-guardian'
+import {
+  byggLonsamhetsVarning,
+  normalizeExplicitMarginTarget,
+  type LonsamhetsVarning,
+} from '@/lib/projects/margin-guardian'
 
 export interface ProjectProfitability {
   project_id: string
@@ -189,6 +194,32 @@ export interface GuardianProjektRad {
 }
 
 /**
+ * Hämtar bara ett BEVISAT ägarmål. margin_target_percent har historiskt
+ * DEFAULT 50; utan margin_target_set_at är det omöjligt att veta om ägaren
+ * valt värdet eller om databasen gjorde det. Saknad migration/fel degraderar
+ * till basgränsen — Guardian får aldrig falla eller gissa ett mål.
+ */
+export async function getExplicitMarginTarget(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('business_config')
+    .select('margin_target_percent, margin_target_set_at')
+    .eq('business_id', businessId)
+    .maybeSingle()
+
+  if (error) {
+    console.warn('[MarginGuardian] explicit marginalmål kunde inte läsas, använder basgränsen:', error.message)
+    return null
+  }
+  if (!data?.margin_target_set_at) return null
+
+  const value = data.margin_target_percent == null ? null : Number(data.margin_target_percent)
+  return normalizeExplicitMarginTarget(value)
+}
+
+/**
  * Guardians live-bedömning för ETT projekt — ren läsning, inga
  * skrivningar. Delad kärna med checkProfitabilityWarnings nedan (som
  * skriver pending_approvals-kortet) OCH med /api/projects/[id]/
@@ -200,6 +231,7 @@ export async function computeGuardianVarningForProject(
   supabase: SupabaseClient,
   businessId: string,
   project: GuardianProjektRad,
+  marginTargetPercent: number | null = null,
 ): Promise<LonsamhetsVarning | null> {
   const economics = await computeProjectEconomics(supabase, project.project_id, businessId)
   if (!economics) return null
@@ -225,11 +257,16 @@ export async function computeGuardianVarningForProject(
     economics,
     { project_id: project.project_id, name: project.name || '', budget_hours: project.budget_hours || 0 },
     { aldsta_dagar: aldstaDagar, approval_id: oldestAta?.id ?? null },
+    { margin_target_percent: marginTargetPercent },
   )
 }
 
 export async function checkProfitabilityWarnings(businessId: string): Promise<number> {
   const supabase = getServerSupabase()
+
+  // En läsning per företag/körning — aldrig en business_config-query per
+  // projekt. Projektdetaljrutten gör motsvarande enda läsning för sitt projekt.
+  const marginTargetPercent = await getExplicitMarginTarget(supabase, businessId)
 
   const { data: projects } = await supabase
     .from('project')
@@ -243,13 +280,15 @@ export async function checkProfitabilityWarnings(businessId: string): Promise<nu
   let warningsCreated = 0
 
   for (const project of projects) {
-    const result = await computeGuardianVarningForProject(supabase, businessId, project)
+    const result = await computeGuardianVarningForProject(supabase, businessId, project, marginTargetPercent)
     if (!result) continue
 
     const isOverBudget = result.status === 'over_budget'
     const title = isOverBudget
       ? `Budget överskriden — ${project.name}`
-      : `Riskerar överskridning — ${project.name}`
+      : result.margin_target_breached
+        ? `Marginalmålet underskrids — ${project.name}`
+        : `Riskerar överskridning — ${project.name}`
 
     const enMening = isOverBudget
       ? `${result.cost_percent}% av kalkylerad kostnad använt — budgeten är överskriden.`
@@ -264,6 +303,8 @@ export async function checkProfitabilityWarnings(businessId: string): Promise<nu
       project_name: project.name,
       cost_percent: result.cost_percent,
       margin_percent: result.margin_percent,
+      margin_target_percent: result.margin_target_percent,
+      margin_target_breached: result.margin_target_breached,
       projected_overrun: result.projected_overrun,
       status: result.status,
       orsaker: result.orsaker,

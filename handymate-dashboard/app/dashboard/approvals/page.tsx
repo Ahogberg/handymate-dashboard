@@ -1041,6 +1041,10 @@ export default function ApprovalsPage() {
                                 status: pl.status === 'over_budget' ? 'over_budget' : 'at_risk',
                                 cost_percent: pl.cost_percent ?? 0,
                                 margin_percent: pl.margin_percent ?? null,
+                                // Äldre pending-kort saknar målfälten och
+                                // degraderar därför till "inget bevisat mål".
+                                margin_target_percent: pl.margin_target_percent ?? null,
+                                margin_target_breached: Boolean(pl.margin_target_breached),
                                 projected_overrun: pl.projected_overrun ?? 0,
                                 orsaker,
                                 ata_signal: Boolean(pl.ata_signal),

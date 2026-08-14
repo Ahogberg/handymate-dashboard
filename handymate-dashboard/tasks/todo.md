@@ -513,6 +513,50 @@ En read-only webbläsarkontroll kunde inte startas eftersom ingen in-app-
 webbläsare fanns tillgänglig i sessionen. Ingen verklig godkännandehandling
 utfördes; bygg- och källfacit täcker renderingskopplingen.
 
+---
+
+# Pågående — Goal-driven Margin Guardian V1 (2026-08-14)
+
+## Kontrakt
+
+Ett lagrat standardvärde är inte ett uttalat ägarmål. Guardian får därför
+bara använda `margin_target_percent` när databasen också kan bevisa att
+värdet uttryckligen sparats. Utan det beviset behålls dagens konservativa
+75/95-gränser exakt. Ett explicit mål får påverka `at_risk`, men aldrig
+sänka den hårda `over_budget`-gränsen eller skapa en varning ur ofullständig
+aritmetik som inte redan är ett säkert kostnadsgolv.
+
+- [x] Reservera nästa migrationsnummer och lägg till explicithetsstämpel för
+  marginalmålet; backfilla endast värden som bevisligen avviker från default.
+- [x] Låt Margin Guardian läsa målet en gång per företag och använda det i
+  den rena beräkningen utan N+1-frågor.
+- [x] Bär målbeviset till befintliga Guardian-ytor och formulera skillnaden
+  mellan marginalmål och budgetöverskridning sanningsenligt.
+- [x] Dölj defaultvärdet i Mål-blocket tills det är uttryckligen sparat.
+- [x] Lägg browserlösa facit för osatt, explicit, ogiltigt och exakt
+  tröskelvärde samt ofullständig kostnadsdata.
+- [x] Kör riktade tester, `npx tsc --noEmit`, browserlös regression och
+  `npx next build`.
+- [x] Granska slutdiff, dokumentera manuell migrationskörning och fyll i
+  review här.
+
+## Review
+
+V1 använder `margin_target_set_at` som explicithetsbevis. v134 backfillar
+bara befintliga värden som avviker från schema-defaulten 50; ett tvetydigt
+50 %-värde förblir osatt tills ekonomiinställningarna sparas igen. Guardian
+läser målet en gång per företag, validerar 0–100 fail-closed och ersätter
+bara `at_risk`-gränsen. Den hårda 95 %-gränsen ligger kvar. Målavvikelsen
+visas i samma kanoniska orsaksrader på projektsidan och i kön; gamla kort
+degraderar till inget mål.
+
+Verifiering: `npx tsc --noEmit` rent, 37/37 riktade facit och 221/221
+relevanta browserlösa regressionsfacit gröna. `npx next build` grönt med
+420 statiska sidor och enbart befintliga metadata/dynamic/sitemap-varningar.
+Ingen databasmutation kördes. `sql/v134_margin_target_explicit.sql` måste
+köras manuellt före utrullning av koden och därefter verifieras med filens
+två SELECT-frågor.
+
 ## Claude-verifiering av Codex commit 94e0f472 (samma kväll)
 
 Codex byggde INTE en dubblett — Distributed Value Receipts fanns redan

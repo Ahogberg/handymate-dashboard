@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { computeProjectEconomics, type ProjectEconomics } from '@/lib/projects/compute-economics'
-import { computeGuardianVarningForProject } from '@/lib/profitability'
+import { computeGuardianVarningForProject, getExplicitMarginTarget } from '@/lib/profitability'
 import type { LonsamhetsVarning } from '@/lib/projects/margin-guardian'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 
@@ -74,11 +74,12 @@ export async function GET(
         .eq('project_id', params.id)
         .eq('business_id', business.business_id)
         .maybeSingle()
+      const marginTargetPercent = await getExplicitMarginTarget(supabase, business.business_id)
       guardian = await computeGuardianVarningForProject(supabase, business.business_id, {
         project_id: params.id,
         name: projectRow?.name ?? null,
         budget_hours: projectRow?.budget_hours ?? null,
-      })
+      }, marginTargetPercent)
     } catch (guardianErr) {
       console.error('[profitability] Guardian-beräkning misslyckades (icke-blockerande):', guardianErr)
     }

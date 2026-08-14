@@ -11,10 +11,11 @@ import { useBusiness } from '@/lib/BusinessContext'
  * ekonomiyta (samma regel som A1: en andra ekonomiyta blir en
  * konkurrerande sanning).
  *
- * Läser business_config.margin_target_percent (fanns redan, men lästes
- * aldrig av någon UI — hittat 2026-08-13) + revenue_target_annual_sek
- * (nytt fält, v128). Jämför mot redan beräknad MonthlyReviewData —
- * ingen ny ekonomilogik, bara en jämförelse av tal som redan finns.
+ * Läser business_config.margin_target_percent BARA när
+ * margin_target_set_at bevisar att ägaren sparat värdet uttryckligen, samt
+ * revenue_target_annual_sek (v128). Jämför mot redan beräknad
+ * MonthlyReviewData — ingen ny ekonomilogik, bara en jämförelse av tal som
+ * redan finns.
  *
  * Ärlighetsprincip: ett osatt omsättningsmål (null) visar ingen rad
  * alls — aldrig "0 kr" eller ett påhittat procenttal.
@@ -39,12 +40,16 @@ export function MalBlock({ monthLabel, profitability }: Props) {
     let aktiv = true
     supabase
       .from('business_config')
-      .select('margin_target_percent, revenue_target_annual_sek')
+      .select('margin_target_percent, margin_target_set_at, revenue_target_annual_sek')
       .eq('business_id', business.business_id)
       .single()
-      .then(({ data }: { data: { margin_target_percent: number | null; revenue_target_annual_sek: number | null } | null }) => {
+      .then(({ data }: { data: { margin_target_percent: number | null; margin_target_set_at: string | null; revenue_target_annual_sek: number | null } | null }) => {
         if (!aktiv || !data) return
-        setMarginTarget(typeof data.margin_target_percent === 'number' ? data.margin_target_percent : null)
+        setMarginTarget(
+          data.margin_target_set_at && typeof data.margin_target_percent === 'number'
+            ? data.margin_target_percent
+            : null,
+        )
         setRevenueTargetAnnual(
           data.revenue_target_annual_sek == null ? null : Number(data.revenue_target_annual_sek),
         )

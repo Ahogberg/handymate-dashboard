@@ -37,6 +37,10 @@ export interface LonsamhetsVarning {
   status: 'at_risk' | 'over_budget'
   cost_percent: number
   margin_percent: number | null
+  /** Bara uttryckligen sparat ägarmål. Schema-defaulten får aldrig hamna här. */
+  margin_target_percent: number | null
+  /** Sant när det uttryckliga målet faktiskt underskrids av kostnadsgolvet. */
+  margin_target_breached: boolean
   projected_overrun: number
   orsaker: GuardianOrsak[]
   /**
@@ -47,6 +51,18 @@ export interface LonsamhetsVarning {
    * INTE peka mot ÄTA-fliken.
    */
   ata_signal: boolean
+}
+
+export interface GuardianGoals {
+  /** `null`/undefined = inget bevisat ägarmål; använd produktens basgräns. */
+  margin_target_percent?: number | null
+}
+
+/** Ogiltiga eller manipulerade mål får aldrig påverka en varning. */
+export function normalizeExplicitMarginTarget(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100
+    ? value
+    : null
 }
 
 function formatKr(n: number): string {
@@ -61,6 +77,7 @@ export function byggLonsamhetsVarning(
   economics: ProjectEconomics,
   projekt: GuardianProjekt,
   ataSignal: GuardianAtaSignal,
+  goals: GuardianGoals = {},
 ): LonsamhetsVarning | null {
   const { intakter, kostnader, marginal } = economics
 
@@ -73,9 +90,17 @@ export function byggLonsamhetsVarning(
   const kandKostnad = (kostnader.arbete_kr ?? 0) + kostnader.material_inkop_kr + kostnader.extra_kr
   const costPercent = Math.round((kandKostnad / bas) * 100)
 
+  // 75 % är produktens historiska, konservativa basgräns. Ett bevisat
+  // ägarmål ersätter bara at_risk-gränsen: mål 35 % innebär varning först
+  // när registrerade kostnader passerar 65 %. Den hårda 95 %-gränsen för
+  // over_budget ligger kvar oavsett mål.
+  const marginTarget = normalizeExplicitMarginTarget(goals.margin_target_percent)
+  const atRiskCostThreshold = marginTarget === null ? 75 : 100 - marginTarget
+  const marginTargetBreached = marginTarget !== null && costPercent > atRiskCostThreshold
+
   let status: 'at_risk' | 'over_budget'
   if (costPercent > 95) status = 'over_budget'
-  else if (costPercent > 75) status = 'at_risk'
+  else if (costPercent > atRiskCostThreshold) status = 'at_risk'
   else return null
 
   // Prognos kräver minst 10% timförbrukning mot budget — under det är
@@ -88,6 +113,13 @@ export function byggLonsamhetsVarning(
   }
 
   const orsaker: GuardianOrsak[] = []
+
+  if (marginTarget !== null && marginTargetBreached) {
+    orsaker.push({
+      text: `Marginalmål: ${marginTarget.toLocaleString('sv-SE')} % — registrerade kostnader lämnar högst ${100 - costPercent} % med dagens säkrade intäkt`,
+      kind: 'KÄNT',
+    })
+  }
 
   if (projekt.budget_hours > 0 && kostnader.arbete_timmar > 0) {
     orsaker.push({
@@ -141,6 +173,8 @@ export function byggLonsamhetsVarning(
     status,
     cost_percent: costPercent,
     margin_percent: marginal.marginal_pct,
+    margin_target_percent: marginTarget,
+    margin_target_breached: marginTargetBreached,
     projected_overrun: projectedOverrun,
     orsaker,
     ata_signal: intakter.ata_pending_kr > 0 || ataSignal.aldsta_dagar != null,
