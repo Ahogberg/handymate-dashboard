@@ -23,19 +23,19 @@ test('fakturabetalning hittar projekt via invoice.project_id', () => {
 })
 
 test('complete-job sätter inte project_completed=true vid Supabase-fel', () => {
-  const source = fs.readFileSync(
+  const route = fs.readFileSync(
     path.join(ROOT, 'app', 'api', 'booking', 'complete-job', 'route.ts'),
     'utf8',
   )
-  const projectUpdate = source.slice(
-    source.indexOf('// 1. Markera projektet som slutfört'),
-    source.indexOf('// 2. Trigga auto-faktura'),
+  const command = fs.readFileSync(
+    path.join(ROOT, 'lib', 'projects', 'complete-project.ts'),
+    'utf8',
   )
 
-  expect(projectUpdate).toContain('const { error: projectCompletionError } = await supabase')
-  expect(projectUpdate).toContain('if (projectCompletionError)')
-  expect(projectUpdate).toContain('throw projectCompletionError')
-  expect(projectUpdate.indexOf('throw projectCompletionError')).toBeLessThan(
-    projectUpdate.indexOf('projectCompleted = true'),
-  )
+  const errorCheck = command.indexOf('if (transition.error)')
+  const effectCall = command.indexOf('await runCompletionEffects(')
+  expect(errorCheck).toBeGreaterThan(-1)
+  expect(errorCheck).toBeLessThan(effectCall)
+  expect(route).toContain('project_completed: closeoutResult?.completed ?? false')
+  expect(route).not.toContain('projectCompleted = true')
 })

@@ -15,6 +15,7 @@ import { classify, nonExecutableResult } from '@/lib/approvals/action-contract'
 import { extractAgentId } from '@/lib/patterns/utils/extract-agent-id'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 import { halsning } from '@/lib/customers/namn'
+import { completeProject } from '@/lib/projects/complete-project'
 
 export const dynamic = 'force-dynamic'
 
@@ -1831,46 +1832,23 @@ async function executeApprovalPayload(
         if (!pl.project_id) return { action: 'four_eyes_project_close', skipped: 'no project_id' }
 
         const supabase4p = (await import('@/lib/supabase')).getServerSupabase()
+        const closeout = await completeProject({
+          supabase: supabase4p,
+          businessId,
+          projectId: pl.project_id,
+          authorization: { kind: 'approved', approvalId: approval.id },
+        })
 
-        // Tenantfiltret saknades — uppdateringen körs med service_role och
-        // kunde stänga ett projekt i vilket företag som helst om payloadens
-        // project_id pekade fel. Kortets businessId är sanningen.
-        const { error: closeError } = await supabase4p
-          .from('project')
-          .update({ status: 'completed', completed_at: new Date().toISOString() })
-          .eq('project_id', pl.project_id)
-          .eq('business_id', businessId)
-
-        // P0-fix 2026-08-15: felet lästes aldrig — ett misslyckat write
-        // (RLS, fel tenant, nätverk) returnerade ändå ok:true, så fakturering/
-        // debrief/recension gick vidare mot ett projekt som aldrig stängdes.
-        if (closeError) {
-          console.error('[four_eyes_project_close] projektstängningen misslyckades:', closeError.message, {
-            project_id: pl.project_id,
-            businessId,
-          })
-          return { action: 'four_eyes_project_close', ok: false, error: closeError.message, project_id: pl.project_id }
+        return {
+          action: 'four_eyes_project_close',
+          ok: closeout.ok && closeout.completed,
+          error: closeout.ok ? undefined : closeout.error,
+          project_id: pl.project_id,
+          invoice_id: closeout.invoice_created?.invoice_id,
+          total: closeout.invoice_created?.total,
+          closeout,
+          warnings: closeout.warnings,
         }
-
-        // Fire job_completed
-        try {
-          const { fireEvent } = await import('@/lib/automation-engine')
-          const { data: proj } = await supabase4p
-            .from('project')
-            .select('customer_id, name')
-            .eq('project_id', pl.project_id)
-            .single()
-
-          if (proj) {
-            await fireEvent(supabase4p, 'job_completed', businessId, {
-              project_id: pl.project_id,
-              customer_id: proj.customer_id,
-              project_name: proj.name,
-            })
-          }
-        } catch { /* non-blocking */ }
-
-        return { action: 'four_eyes_project_close', ok: true, project_id: pl.project_id }
       }
 
       case 'price_adjustment': {

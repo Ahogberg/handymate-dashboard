@@ -23,6 +23,7 @@ const kod = (p: string) =>
     .replace(/^\s*\/\/.*$/gm, '')
 
 const PUT = 'app/api/projects/route.ts'
+const COMMAND = 'lib/projects/complete-project.ts'
 
 /** PUT-hanteraren — från föregående-uppslaget och nedåt. */
 function hanteraren(): string {
@@ -36,39 +37,35 @@ test.describe('sidoeffekter eldas på övergången, inte på statusen', () => {
   test('föregående tillstånd hämtas FÖRE uppdateringen', () => {
     const s = kod(PUT)
     const uppslag = s.indexOf("select('status, completed_at')")
-    const uppdatering = s.indexOf('.update(updates)')
+    const uppdatering = s.indexOf('completeProject(')
     expect(uppslag, 'föregående status slås aldrig upp').toBeGreaterThan(-1)
     expect(uppslag).toBeLessThan(uppdatering)
   })
 
   test('job_completed-kedjan vaktas av blirKlart', () => {
-    const h = hanteraren()
-    // Inga sidoeffektsblock får längre trigga på body.status === completed.
-    const eventBlock = h.indexOf('fireEvent')
-    expect(eventBlock).toBeGreaterThan(-1)
-    const fore = h.slice(0, eventBlock)
-    const vakt = fore.lastIndexOf('blirKlart && project')
-    expect(vakt, 'eventkedjan vaktas inte av övergången').toBeGreaterThan(-1)
-    expect(h, "gamla villkoret är kvar någonstans").not.toContain("body.status === 'completed' && project")
+    const route = hanteraren()
+    const command = kod(COMMAND)
+    expect(route).toContain('if (blirKlart)')
+    expect(route).toContain('completeProject(')
+    expect(route).not.toContain('fireEvent')
+
+    const compareAndSet = command.indexOf("or('status.neq.completed,status.is.null')")
+    const eventBlock = command.indexOf("fireEvent(supabase, 'job_completed'")
+    expect(compareAndSet).toBeGreaterThan(-1)
+    expect(eventBlock).toBeGreaterThan(compareAndSet)
   })
 
   test('four-eyes-grinden prövas bara på övergången', () => {
-    // Ett redan stängt projekt som PUT:as igen ska inte generera nya kort.
-    const h = hanteraren()
-    const grind = h.indexOf('checkFourEyesGate(')
-    const vakt = h.indexOf('if (blirKlart)')
-    expect(vakt).toBeGreaterThan(-1)
-    expect(vakt).toBeLessThan(grind)
+    const route = hanteraren()
+    expect(route.indexOf('if (blirKlart)')).toBeLessThan(route.indexOf('completeProject('))
+    expect(kod(COMMAND)).toContain("if (authorization.kind === 'direct')")
   })
 
   test('upprepad stängning skriver inte om stängningsdatumet', () => {
-    // completed_at är datumet projektet stängdes — inte senaste klicket.
-    // Sätts bara inne i blirKlart-grenen.
-    const h = hanteraren()
-    const satt = h.indexOf('updates.completed_at = new Date()')
-    const vakt = h.lastIndexOf('if (blirKlart)', satt)
-    expect(satt).toBeGreaterThan(-1)
-    expect(vakt, 'completed_at sätts utanför övergångsvakten').toBeGreaterThan(-1)
+    const command = kod(COMMAND)
+    expect(command).toContain("or('status.neq.completed,status.is.null')")
+    expect(command).toContain('already_completed: true')
+    expect(command).toContain('effects: []')
   })
 })
 

@@ -25,13 +25,14 @@ const kod = (p: string) =>
 
 const PUT = 'app/api/projects/route.ts'
 const APPROVE = 'app/api/approvals/[id]/route.ts'
+const COMMAND = 'lib/projects/complete-project.ts'
 
-/** Grindblocket: från completed-kontrollen till completed_at-sättningen. */
+/** Grindblocket i det kanoniska kommandot, före den atomiska övergången. */
 function grinden(): string {
-  const s = kod(PUT)
-  const start = s.indexOf("if (body.status === 'completed')")
-  expect(start, 'completed-grenen hittas inte').toBeGreaterThan(-1)
-  return s.slice(start, s.indexOf('updates.completed_at', start))
+  const s = kod(COMMAND)
+  const start = s.indexOf("if (authorization.kind === 'direct')")
+  expect(start, 'direktgrenen hittas inte').toBeGreaterThan(-1)
+  return s.slice(start, s.indexOf('await transitionProjectToCompleted(', start))
 }
 
 test.describe('grinden frågar databasen, aldrig klienten', () => {
@@ -72,18 +73,19 @@ test.describe('en policy, ett lås — alla dörrar', () => {
     // PUT /api/projects och mobilens complete-job stänger projekt. Två
     // kopior av grinden hade glidit isär — precis som de redan gjort en gång.
     expect(kod('lib/projects/four-eyes-gate.ts')).toContain('export async function checkFourEyesGate')
-    expect(kod(PUT)).toContain('checkFourEyesGate(')
-    expect(kod('app/api/booking/complete-job/route.ts')).toContain('checkFourEyesGate(')
+    expect(kod(COMMAND)).toContain('checkFourEyesGate(')
+    expect(kod(PUT)).toContain('completeProject(')
+    expect(kod('app/api/booking/complete-job/route.ts')).toContain('completeProject(')
   })
 
   test('sidodörren grindar FÖRE projektskrivningen, men bokningen bockas ändå', () => {
-    const s = kod('app/api/booking/complete-job/route.ts')
-    const bokning = s.indexOf("job_status: 'completed'")
-    const grind = s.indexOf('checkFourEyesGate(')
-    const stangning = s.indexOf("status: 'completed'", grind)
-    expect(bokning, 'bokningen bockas inte av före grinden').toBeLessThan(grind)
-    expect(grind, 'grinden ligger efter projektstängningen').toBeLessThan(stangning)
-    expect(s).toContain('project_completed: false')
+    const booking = kod('app/api/booking/complete-job/route.ts')
+    const command = kod(COMMAND)
+    expect(booking.indexOf("job_status: 'completed'"), 'bokningen bockas inte av före kommandot')
+      .toBeLessThan(booking.indexOf('completeProject('))
+    expect(command.indexOf('checkFourEyesGate('), 'grinden ligger efter projektstängningen')
+      .toBeLessThan(command.indexOf('await transitionProjectToCompleted('))
+    expect(booking).toContain('project_completed: closeoutResult?.completed ?? false')
   })
 
   test('ett trasigt kort öppnar inte låset', () => {
@@ -106,18 +108,23 @@ test.describe('godkännandet är en utväg, inte en återvändsgränd', () => {
     const fall = s.indexOf("case 'four_eyes_project_close'")
     expect(fall, 'utföraren saknas — godkännandet leder ingenvart').toBeGreaterThan(-1)
     const block = s.slice(fall, s.indexOf('case ', fall + 10))
-    expect(block).toContain("update({ status: 'completed'")
-    expect(block, 'stängningen saknar tenantfilter').toContain("eq('business_id', businessId)")
+    expect(block).toContain('completeProject(')
+    expect(block).toContain('businessId,')
+    expect(block).toContain("authorization: { kind: 'approved'")
   })
 
   test('godkännandets projektuppdatering läser Supabase-felet — påstår inte ok:true på ett misslyckat write (P0, 2026-08-15)', () => {
     const s = kod(APPROVE)
     const fall = s.indexOf("case 'four_eyes_project_close'")
     const block = s.slice(fall, s.indexOf('case ', fall + 10))
-    expect(block, 'uppdateringens felfält destruktureras aldrig').toContain('error: closeError')
-    const errCheck = block.indexOf('if (closeError)')
-    expect(errCheck, 'closeError kontrolleras aldrig').toBeGreaterThan(-1)
-    expect(block.slice(errCheck, errCheck + 400), 'ett misslyckat write returnerar ändå ok:true').toContain('ok: false')
+    const command = kod(COMMAND)
+    const errCheck = command.indexOf('if (transition.error)')
+    const effects = command.indexOf('await runCompletionEffects(')
+    expect(errCheck, 'primärfelet kontrolleras aldrig').toBeGreaterThan(-1)
+    expect(errCheck).toBeLessThan(effects)
+    expect(command.slice(errCheck, effects)).toContain('ok: false')
+    expect(block).toContain('ok: closeout.ok && closeout.completed')
+    expect(block).toContain('error: closeout.ok ? undefined : closeout.error')
   })
 })
 
@@ -157,20 +164,17 @@ test.describe('fail-closed vid overifierbar grind (P0, 2026-08-15)', () => {
 
 test.describe('anroparna respekterar overifierbar-signalen (P0, 2026-08-15)', () => {
   test('PUT /api/projects blockerar stängning vid overifierbar grind, i stället för att tyst fortsätta', () => {
-    const s = kod(PUT)
-    const grind = s.indexOf('checkFourEyesGate(')
-    expect(grind).toBeGreaterThan(-1)
-    const verifCheck = s.indexOf("grind.reason === 'verification_failed'", grind)
-    const completedAt = s.indexOf('updates.completed_at = new Date()', grind)
-    expect(verifCheck, 'overifierbar grind kollas aldrig i PUT /api/projects').toBeGreaterThan(-1)
-    expect(verifCheck).toBeLessThan(completedAt)
+    const command = kod(COMMAND)
+    const verifCheck = command.indexOf("gate.reason === 'verification_failed'")
+    const transition = command.indexOf('await transitionProjectToCompleted(', verifCheck)
+    expect(verifCheck, 'overifierbar grind kollas aldrig i kommandot').toBeGreaterThan(-1)
+    expect(verifCheck).toBeLessThan(transition)
+    expect(kod(PUT)).toContain("closeoutResult.error_code === 'verification_failed'")
   })
 
   test('mobilens complete-job blockerar projektstängning vid overifierbar grind', () => {
     const s = kod('app/api/booking/complete-job/route.ts')
-    const grind = s.indexOf('checkFourEyesGate(')
-    const verifCheck = s.indexOf("grind.reason === 'verification_failed'", grind)
-    expect(verifCheck, 'overifierbar grind kollas aldrig i complete-job').toBeGreaterThan(-1)
-    expect(s.indexOf('project_completed: false', verifCheck), 'overifierbart läge påstår inte att projektet stängdes').toBeGreaterThan(-1)
+    expect(s).toContain('else if (!closeoutResult.ok)')
+    expect(s).toContain('project_completed: closeoutResult?.completed ?? false')
   })
 })

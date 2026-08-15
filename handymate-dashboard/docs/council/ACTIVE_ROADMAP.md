@@ -17,6 +17,43 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-15 — Canonical Project Completion V1 stängd
+
+De tre produktionsdörrarna för projektavslut — desktop-API:t, mobilens
+`complete-job` och fyra-ögon-godkännandet — använder nu samma kanoniska
+serverfunktion i `lib/projects/complete-project.ts`. Claude-fixen i
+`7e32413d` stängde de två akuta P0-felen; denna leverans stänger de tre
+separata P1-fynden utan ny SQL eller nya affärsregler.
+
+**Det som nu är sant:**
+
+- En tenantfiltrerad compare-and-set-övergång avgör exakt vilket anrop som får
+  utföra avslutskedjan. Återanrop och samtidiga förlorare skapar inte en andra
+  faktura, review-begäran eller agentkedja.
+- Ett fel i den primära projektuppdateringen stoppar alla sidoeffekter. Varje
+  befintlig effekt rapporteras därefter separat som lyckad, misslyckad,
+  överhoppad, utskickad eller försökt — partiella fel maskeras inte som ett
+  fullständigt lyckat avslut.
+- Workflow-steg, `job_completed`, auto-faktura, fryst efterkalkyl, debrief,
+  Lars-trigger, review-begäran, dealsteg och completion-batch ligger i samma
+  kedja oavsett ingång.
+- Desktop och fyra-ögon visar samma befintliga `ProjectCloseoutModal`, inklusive
+  varningar. Mobil-API:t returnerar samma strukturerade closeout-kontrakt.
+- Ett kontraktsfacit spärrar nya direkta `project.status = completed`-skrivare
+  utanför den kanoniska övergången.
+
+**Verifiering:** TypeScript och produktionsbuild är gröna. Den avgränsade
+closeout-/fyra-ögon-/efterkalkylsviten är grön. Hela browserfacitet startades,
+men sessions- och nätverksberoende tester mot `app.handymate.se` blockeras i
+den lokala sandboxen med `connect EACCES`; detta är inte redovisat som en grön
+fullsvit.
+
+**Nästa större Business Twin-insats:** Cross-Agent Customer Case V1 ligger
+kvar som nästa kandidat. Den ska återanvända den nu kanoniska avslutshändelsen
+och får inte återinföra en separat projektavslutskedja.
+
+---
+
 # Läge 2026-08-13 — Gyllene vägen grön (alla 14 stationer) + två externa ChatGPT-rapporter stämda av
 
 **Gyllene vägen är klar.** `tests/e2e-golden-path/` (byggt 2026-08-13) körde

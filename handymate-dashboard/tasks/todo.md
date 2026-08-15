@@ -1,3 +1,65 @@
+# Canonical Project Completion V1 — klar 2026-08-15
+
+Andreas beslutade att stänga de kvarvarande P1-fynden innan nästa Business
+Twin-insats (Cross-Agent Customer Case V1). P0-fixarna i `7e32413d` är
+förutsättningen men inte konsolideringen: desktop, mobil och fyra-ögon-
+godkännandet har fortfarande separata avslutskedjor.
+
+## Plan
+
+- [x] Inventera alla direkta `project.status = completed`-skrivare och skriv
+  ett spärrhake-/paritetsfacit innan flytten.
+- [x] Inför en kanonisk serverfunktion med tenantfiltrerad projektläsning,
+  fyra-ögon-grind för direkta anrop, atomisk övergångsvakt, kontrollerad
+  primär write och strukturerat resultat per sidoeffekt.
+- [x] Flytta befintlig kedja utan nya produktbeslut: workflow-steg,
+  `job_completed`, auto-faktura, fryst efterkalkyl, debrief, Lars-trigger,
+  recensionskort och completion-batch.
+- [x] Koppla `/api/projects`, `/api/booking/complete-job` och
+  `four_eyes_project_close` till samma funktion. Ingen sidoeffekt får köras
+  efter misslyckad primär statusuppdatering.
+- [x] Bevara befintlig `ProjectCloseoutModal` och ge övriga dörrar samma
+  sanningsenliga closeout-resultat; ingen ny parallell presentationsyta.
+- [x] Bevisa parity, fail-closed, idempotent återanrop och synlig partial
+  failure med browserlösa tester.
+- [x] Verifiera `npx tsc --noEmit`, relevanta facit, hela browserlösa sviten
+  och `npx next build`; granska exakt diff före separat commit.
+
+## Avgränsning
+
+- Ingen SQL och ingen ny tabell.
+- Ingen automatisk rollback av redan skapad faktura/recension vid återöppning.
+- Ingen förändring av fakturerings-, debrief-, review- eller agenternas
+  affärsregler; endast en gemensam orkestrering av befintliga primitiver.
+- Cross-Agent Customer Case V1 ligger kvar som nästa insats efter detta.
+
+## Resultat
+
+- `lib/projects/complete-project.ts` äger nu tenantkontroll, fyra-ögon-grind,
+  atomisk statusövergång och hela den befintliga avslutskedjan.
+- Desktop, mobil och fyra-ögon-godkännandet använder samma tjänst. Den gamla
+  E2E-debugskrivaren använder den kanoniska atomiska övergången.
+- Resultatet redovisar varje effekt separat och återanvänds av både API och
+  den befintliga closeout-modalen; ett saknat resultatunderlag kan inte längre
+  dölja en varning.
+- Nya facit täcker dörrparitet, förbud mot nya direkta completed-skrivare,
+  tenantfilter, compare-and-set, fail-closed, återanrop och synliga partiella
+  fel.
+- Ingen migration eller annan SQL tillkom.
+
+## Verifiering
+
+- `npx tsc --noEmit` — grön.
+- Avgränsad closeout-/fyra-ögon-/efterkalkylsvit — 58/58 grön efter den
+  avslutande säkerhetsgranskningen.
+- `npx next build` — grön (befintliga miljö-/metadata-varningar kvarstår).
+- Hela Chromium-facitet startades. De nya closeout-faciten var gröna, men
+  externa sessions-/nätverkstester mot `app.handymate.se` blockerades av
+  sandboxen med `connect EACCES`; körningen avbröts efter att samma externa
+  blockerare upprepats och redovisas därför inte som en grön fullsvit.
+
+---
+
 # Project Closeout P0-fixar — fyra-ögon fail-closed + godkännandets tysta fel
 
 Källa: Codex granskade project closeout (desktop `app/api/projects/route.ts`,

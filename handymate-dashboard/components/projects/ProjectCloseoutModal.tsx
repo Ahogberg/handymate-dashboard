@@ -35,6 +35,7 @@ interface ExpectedMarginSnapshot {
 interface Props {
   projectId: string
   projectName: string
+  warnings?: string[]
   onClose: () => void
 }
 
@@ -43,7 +44,7 @@ function formatKr(n: number | null | undefined): string {
   return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(n) + ' kr'
 }
 
-export default function ProjectCloseoutModal({ projectId, projectName, onClose }: Props) {
+export default function ProjectCloseoutModal({ projectId, projectName, warnings = [], onClose }: Props) {
   const [outcome, setOutcome] = useState<ProjectOutcome | null>(null)
   const [expectedMargin, setExpectedMargin] = useState<ExpectedMarginSnapshot | null>(null)
   const [ataCount, setAtaCount] = useState<number | null>(null)
@@ -72,12 +73,13 @@ export default function ProjectCloseoutModal({ projectId, projectName, onClose }
     }
   }, [projectId])
 
-  // Ärlighetsprincip: ingen frusen outcome-rad → inget att visa. Skickar
-  // hellre ingen skärm alls än en skärm med gissade siffror.
-  if (loading || !outcome) return null
+  // Ärlighetsprincip: ingen frusen outcome-rad → inga gissade siffror. Har
+  // closeout-kommandot samtidigt rapporterat ett fel måste det däremot synas;
+  // då visas modalen med varningen men utan ekonomital.
+  if (loading || (!outcome && warnings.length === 0)) return null
 
-  const ataAmount = outcome.ata_signed_kr || 0
-  const slutvarde = (outcome.quoted_amount || 0) + ataAmount
+  const ataAmount = outcome?.ata_signed_kr || 0
+  const slutvarde = (outcome?.quoted_amount || 0) + ataAmount
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -96,7 +98,16 @@ export default function ProjectCloseoutModal({ projectId, projectName, onClose }
         </div>
 
         <div className="p-5 space-y-4">
-          {outcome.quote_id ? (
+          {warnings.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              <p className="font-semibold">Projektet stängdes, men allt efterarbete blev inte klart:</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                {warnings.map((warning, index) => <li key={`${index}-${warning}`}>{warning}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {outcome?.quote_id ? (
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-slate-500">Offert</span>
@@ -113,11 +124,13 @@ export default function ProjectCloseoutModal({ projectId, projectName, onClose }
                 <span className="font-bold text-slate-900 tabular-nums">{formatKr(slutvarde)}</span>
               </div>
             </div>
-          ) : (
+          ) : outcome ? (
             <p className="text-sm text-slate-500">Ingen offert kopplad — inget resultat att visa.</p>
+          ) : (
+            <p className="text-sm text-slate-500">Resultatunderlaget kunde inte läsas in.</p>
           )}
 
-          {outcome.labor_cost_configured ? (
+          {outcome && (outcome.labor_cost_configured ? (
             <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-slate-500">Marginal (utfall)</span>
@@ -136,7 +149,7 @@ export default function ProjectCloseoutModal({ projectId, projectName, onClose }
             <p className="text-xs text-amber-700">
               Intern timkostnad ej konfigurerad — marginal visas inte.
             </p>
-          )}
+          ))}
 
           <Link
             href="/dashboard/approvals"

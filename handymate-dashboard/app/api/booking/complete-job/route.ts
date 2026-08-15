@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { computeBookingDayProgress, fetchProjectBookings } from '@/lib/bookings/day-progress'
-import { checkFourEyesGate } from '@/lib/projects/four-eyes-gate'
+import { completeProject, type CompleteProjectResult } from '@/lib/projects/complete-project'
 
 /**
  * POST /api/booking/complete-job
@@ -42,13 +42,17 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
 
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('booking')
       .select('booking_id, project_id, agreement_id, scheduled_start')
       .eq('booking_id', booking_id)
       .eq('business_id', business.business_id)
       .maybeSingle()
 
+    if (existingError) {
+      console.error('[booking/complete-job] booking lookup error:', existingError)
+      return NextResponse.json({ error: existingError.message }, { status: 500 })
+    }
     if (!existing) {
       return NextResponse.json({ error: 'Bokning hittades inte' }, { status: 404 })
     }
@@ -71,10 +75,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // ── Final-day-detection — om denna booking är sista i projektets
-    // sekvens, slutför projektet + skapa faktura. Non-blocking varje steg
-    // så booking-completion lyckas även om sidoeffekter failar.
-    let projectCompleted = false
+    // ── Final-day-detection — sista bokningen använder exakt samma
+    // projektkommando som desktop och fyra-ögon-godkännandet.
+    let closeoutResult: CompleteProjectResult | null = null
+    let closeoutMessage: string | null = null
     let invoiceCreated: {
       invoice_id?: string
       invoice_number?: string
@@ -90,185 +94,19 @@ export async function POST(request: NextRequest) {
       const dayProgress = computeBookingDayProgress(existing.booking_id, bookingsForThisProject)
 
       if (dayProgress.is_final_day) {
-        console.log('[booking/complete-job] final day — completing project:', {
-          booking_id,
-          project_id: existing.project_id,
-          day: `${dayProgress.current_day}/${dayProgress.total_days}`,
+        closeoutResult = await completeProject({
+          supabase,
+          businessId: business.business_id,
+          projectId: existing.project_id,
+          authorization: { kind: 'direct' },
         })
+        invoiceCreated = closeoutResult.invoice_created ?? null
 
-        // ═══ FOUR-EYES-GRINDEN GÄLLER ÄVEN SIDODÖRREN (P1-5) ═══
-        //
-        // PUT /api/projects grindade stora projektstängningar — men den här
-        // vägen stängde projektet direkt när sista bokningen bockades av.
-        // Samma policy, samma lås: är projektet över tröskeln skapas kortet
-        // och stängningen (plus autofakturan) väntar på godkännandet.
-        // Bokningen bockas ändå av — det är PROJEKTET som kräver fyra ögon,
-        // inte hantverkarens arbetsdag.
-        const grind = await checkFourEyesGate(supabase, business.business_id, existing.project_id)
-        if (grind.reason === 'verification_failed') {
-          // Fail-closed (2026-08-15): kunde inte verifiera grinden — stäng inte tyst.
-          // Bokningen är redan avbockad (rätt — det är projektet som väntar,
-          // inte hantverkarens arbetsdag), men projektet lämnas öppet.
-          console.error('[booking/complete-job] four-eyes gate kunde inte verifieras — blockerar projektstängning:', grind.error, {
-            project_id: existing.project_id,
-          })
-          return NextResponse.json({
-            success: true,
-            booking: updated,
-            booking_completed: true,
-            project_completed: false,
-            requires_approval: false,
-            message: 'Kunde inte verifiera godkännandereglerna för projektstängning just nu. Försök stänga projektet igen om en liten stund.',
-          })
-        }
-        if (grind.gated) {
-          console.log('[booking/complete-job] four-eyes gate — completion queued for approval:', {
-            project_id: existing.project_id,
-            approval_id: grind.approvalId,
-          })
-          return NextResponse.json({
-            success: true,
-            booking: updated,
-            booking_completed: true,
-            project_completed: false,
-            requires_approval: true,
-            approval_id: grind.approvalId ?? null,
-            message: `Sista bokningen är klar. Projektstängningen (${(grind.budgetAmount || 0).toLocaleString('sv-SE')} kr) väntar på admin-godkännande.`,
-          })
-        }
-
-        // 1. Markera projektet som slutfört
-        try {
-          const { error: projectCompletionError } = await supabase
-            .from('project')
-            .update({
-              status: 'completed',
-              completed_at: now,
-              updated_at: now,
-            })
-            .eq('project_id', existing.project_id)
-            .eq('business_id', business.business_id)
-
-          if (projectCompletionError) {
-            throw projectCompletionError
-          }
-
-          projectCompleted = true
-        } catch (projErr) {
-          console.error('[booking/complete-job] project completion failed:', projErr)
-        }
-
-        // 2. Trigga auto-faktura (samma helper som PUT /api/projects status='completed')
-        try {
-          const { autoInvoiceOnComplete } = await import('@/lib/projects/auto-invoice-on-complete')
-          const result = await autoInvoiceOnComplete(business.business_id, existing.project_id)
-          if (result.success && result.invoice_id) {
-            invoiceCreated = {
-              invoice_id: result.invoice_id,
-              invoice_number: result.invoice_number,
-              total: result.total,
-              status: result.status,
-            }
-            console.log('[booking/complete-job] invoice created:', invoiceCreated)
-          } else if (!result.success) {
-            console.warn('[booking/complete-job] auto-invoice skipped:', result.error)
-          }
-        } catch (invErr) {
-          console.error('[booking/complete-job] auto-invoice failed:', invErr)
-        }
-
-        // 2.5. Motor 1: frys utfall-vs-offert (efterkalkyl). Fail-safe —
-        // kastar aldrig, får inte fälla booking-completion. Körs bara här
-        // eftersom projektet faktiskt precis stängdes (is_final_day).
-        let outcomeForTrigger: {
-          job_type: string | null
-          hours_diff_pct: number | null
-          amount_diff_pct: number | null
-          margin_pct: number | null
-        } | null = null
-        try {
-          const { freezeProjectOutcome } = await import('@/lib/efterkalkyl/freeze-outcome')
-          await freezeProjectOutcome(supabase, business.business_id, existing.project_id)
-
-          const { getProjectOutcome } = await import('@/lib/efterkalkyl/get-project-outcome')
-          const outcome = await getProjectOutcome(supabase, business.business_id, existing.project_id)
-          outcomeForTrigger = {
-            job_type: outcome.job_type,
-            hours_diff_pct: outcome.hours_diff_pct,
-            amount_diff_pct: outcome.amount_diff_pct,
-            margin_pct: outcome.margin_pct,
-          }
-        } catch (outcomeErr) {
-          console.error('[booking/complete-job] freezeProjectOutcome failed:', outcomeErr)
-        }
-
-        // 2.55. Project Debrief Capture (2026-08-12): samma kort som den
-        // andra dörren (PUT /api/projects) skapar — se
-        // lib/debrief/create-debrief-card.ts. Fail-safe, får aldrig fälla
-        // booking-completion. project.name/quote_id hämtas separat här
-        // eftersom `existing` ovan bara valde ut booking-fälten.
-        try {
-          const { data: projectForDebrief } = await supabase
-            .from('project')
-            .select('name, quote_id')
-            .eq('project_id', existing.project_id)
-            .eq('business_id', business.business_id)
-            .maybeSingle()
-
-          const { skapaDebriefKort } = await import('@/lib/debrief/create-debrief-card')
-          await skapaDebriefKort(supabase, business.business_id, {
-            project_id: existing.project_id,
-            project_name: projectForDebrief?.name ?? null,
-            quote_id: projectForDebrief?.quote_id ?? null,
-            job_type: outcomeForTrigger?.job_type ?? null,
-            hours_diff_pct: outcomeForTrigger?.hours_diff_pct ?? null,
-            amount_diff_pct: outcomeForTrigger?.amount_diff_pct ?? null,
-            margin_pct: outcomeForTrigger?.margin_pct ?? null,
-          })
-        } catch (debriefErr) {
-          console.error('[booking/complete-job] skapaDebriefKort failed:', debriefErr)
-        }
-
-        // 2.6. Våg 2d (tasks/value-chain-plan.md) — väck Lars (job_completed-
-        // trigger, matchAgentByPrefix routar 'job_*' till honom). Fire-and-
-        // forget, fail-safe, får aldrig fälla booking-completion.
-        try {
-          const { triggerAgentFireAndForget, makeIdempotencyKey } = await import('@/lib/agent-trigger')
-          triggerAgentFireAndForget(
-            business.business_id,
-            'job_completed',
-            {
-              project_id: existing.project_id,
-              job_type: outcomeForTrigger?.job_type ?? null,
-              hours_diff_pct: outcomeForTrigger?.hours_diff_pct ?? null,
-              amount_diff_pct: outcomeForTrigger?.amount_diff_pct ?? null,
-              margin_pct: outcomeForTrigger?.margin_pct ?? null,
-              instruction: `Projektet (project_id: ${existing.project_id}) avslutades just. Bedöm om det gick enligt plan utifrån avvikelsen i tid/belopp mot offert och föreslå åtgärd om något sticker ut — annars räcker en kort notering. Använd get_project_outcome om du behöver fler detaljer.`,
-            },
-            makeIdempotencyKey('job_completed', business.business_id, existing.project_id)
-          )
-        } catch (triggerErr) {
-          console.error('[booking/complete-job] job_completed agent trigger failed:', triggerErr)
-        }
-
-        // 3. Avancera workflow-stage till slutbesiktning (ps-05). Mobile
-        // visar progress-bar baserat på detta. Non-blocking.
-        try {
-          const { advanceProjectStage, SYSTEM_STAGES } = await import(
-            '@/lib/project-stages/automation-engine'
-          )
-          // Motorn kastar inte — den svarar { moved, error }. Utan läsningen
-          // var ett misslyckande osynligt här (2026-08-10).
-          const stegflytt = await advanceProjectStage(
-            existing.project_id,
-            SYSTEM_STAGES.FINAL_INSPECTION,
-            business.business_id,
-          )
-          if (!stegflytt.moved) {
-            console.error('[booking/complete-job] stegflytten misslyckades (non-blocking):', stegflytt.error, { projectId: existing.project_id })
-          }
-        } catch (stageErr) {
-          console.error('[booking/complete-job] stage advance failed:', stageErr)
+        if (closeoutResult.requires_approval) {
+          closeoutMessage = 'Sista bokningen är klar. Projektstängningen väntar på admin-godkännande.'
+        } else if (!closeoutResult.ok) {
+          closeoutMessage = closeoutResult.error
+            || 'Bokningen är klar, men projektet kunde inte stängas. Försök igen från projektet.'
         }
       }
     }
@@ -301,14 +139,18 @@ export async function POST(request: NextRequest) {
 
     console.log('[booking/complete-job] ok:', {
       booking_id,
-      project_completed: projectCompleted,
+      project_completed: closeoutResult?.completed ?? false,
       invoice_created: !!invoiceCreated,
     })
     return NextResponse.json({
       success: true,
       booking: updated,
-      project_completed: projectCompleted,
+      booking_completed: true,
+      project_completed: closeoutResult?.completed ?? false,
+      requires_approval: closeoutResult?.requires_approval ?? false,
       invoice_created: invoiceCreated,
+      closeout: closeoutResult,
+      message: closeoutMessage,
     })
   } catch (error: any) {
     console.error('[booking/complete-job] exception:', error)

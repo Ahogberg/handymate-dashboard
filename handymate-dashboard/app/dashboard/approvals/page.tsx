@@ -41,6 +41,7 @@ import { MandagskortCard } from '@/components/jarvis/MandagskortCard'
 import { GuardianOrsaker } from '@/components/projects/GuardianOrsaker'
 import { DispatchReasoning } from '@/components/dispatch/DispatchReasoning'
 import { buildValueReceipt } from '@/lib/approvals/value-receipt'
+import ProjectCloseoutModal from '@/components/projects/ProjectCloseoutModal'
 
 // SPÅR D1 (2026-08-06): kartan låg inlinead här och var en av fyra kopior av
 // teamet som hunnit gå isär. Härleds nu ur den enda källan (lib/agents/team.ts).
@@ -224,6 +225,11 @@ export default function ApprovalsPage() {
   // av — knappen öppnar den här modalen med de 2-3 frågorna som textareor.
   const [debriefModal, setDebriefModal] = useState<Approval | null>(null)
   const [debriefAnswers, setDebriefAnswers] = useState<string[]>([])
+  const [closeoutProject, setCloseoutProject] = useState<{
+    id: string
+    name: string
+    warnings: string[]
+  } | null>(null)
 
   useEffect(() => {
     if (!business?.business_id) return
@@ -384,6 +390,18 @@ export default function ApprovalsPage() {
         if (action === 'approve') {
           setFeedbackLink(null)
           setFeedbackLinkLabel('Öppna utkastet')
+          const closeout = result?.execution?.closeout
+          if (
+            approvedItem?.approval_type === 'four_eyes_project_close'
+            && closeout?.completed
+            && closeout?.project?.project_id
+          ) {
+            setCloseoutProject({
+              id: closeout.project.project_id,
+              name: closeout.project.name || approvedItem.title,
+              warnings: Array.isArray(closeout.warnings) ? closeout.warnings : [],
+            })
+          }
           // Ärlighets-grenen FÖRST (Fas 0-härdningen): säg aldrig "Godkänt"
           // när utförandet misslyckades. Server-klassningen
           // (classifyExecutionResult) är facit — inte klientens fälttolkning.
@@ -1454,6 +1472,15 @@ export default function ApprovalsPage() {
           </>
         )
       })()}
+
+      {closeoutProject && (
+        <ProjectCloseoutModal
+          projectId={closeoutProject.id}
+          projectName={closeoutProject.name}
+          warnings={closeoutProject.warnings}
+          onClose={() => setCloseoutProject(null)}
+        />
+      )}
     </div>
   )
 }

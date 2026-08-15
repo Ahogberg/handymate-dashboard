@@ -720,6 +720,7 @@ export default function ProjectDetailPage() {
   const [creatingInvoice, setCreatingInvoice] = useState(false)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [showCloseoutModal, setShowCloseoutModal] = useState(false)
+  const [closeoutWarnings, setCloseoutWarnings] = useState<string[]>([])
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type })
@@ -1577,6 +1578,7 @@ export default function ProjectDetailPage() {
       // ovan mot fyra-ögon-kortets gated fall — den grenen har redan
       // return:at innan vi når hit).
       if (newStatus === 'completed' && prevStatus !== 'completed') {
+        setCloseoutWarnings(Array.isArray(data?.closeout?.warnings) ? data.closeout.warnings : [])
         setShowCloseoutModal(true)
       }
     } catch {
@@ -4670,6 +4672,7 @@ export default function ProjectDetailPage() {
         <ProjectCloseoutModal
           projectId={project.project_id}
           projectName={project.name}
+          warnings={closeoutWarnings}
           onClose={() => setShowCloseoutModal(false)}
         />
       )}

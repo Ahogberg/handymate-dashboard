@@ -6,7 +6,7 @@ import { getNextProjectNumber, bumpCounter } from '@/lib/numbering'
 import { getQuoteBudgetDerivation } from '@/lib/quotes/get-quote-budget-derivation'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 import { verifyOwnership } from '@/lib/auth/verify-ownership'
-import { checkFourEyesGate } from '@/lib/projects/four-eyes-gate'
+import { completeProject, type CompleteProjectResult } from '@/lib/projects/complete-project'
 import { deriveProjectLifecycle } from '@/lib/projects/derive-lifecycle'
 
 /**
@@ -530,13 +530,14 @@ export async function PUT(request: NextRequest) {
     // eldas på ÖVERGÅNGEN inte-klart → klart. Upprepad PUT med samma status
     // dubblerade tidigare job_completed-eventet — recensionsbegäran och
     // nurture gick ut en gång per klick.
-    const { data: foregaende } = await supabase
+    const { data: foregaende, error: previousProjectError } = await supabase
       .from('project')
       .select('status, completed_at')
       .eq('project_id', project_id)
       .eq('business_id', business.business_id)
       .maybeSingle()
 
+    if (previousProjectError) throw previousProjectError
     if (!foregaende) {
       return NextResponse.json({ error: 'Projektet hittades inte' }, { status: 404 })
     }
@@ -544,12 +545,45 @@ export async function PUT(request: NextRequest) {
     const blirKlart = body.status === 'completed' && !varRedanKlart
     const aterOppnas = varRedanKlart && (body.status === 'active' || body.status === 'planning')
 
+    // Stängningen är ett eget serverkommando. Den kör grinden på den
+    // befintliga DB-raden och vinner statusövergången atomiskt innan någon
+    // sidoeffekt får börja. Övriga PUT-fält hanteras fortfarande nedan.
+    let closeoutResult: CompleteProjectResult | null = null
+    if (blirKlart) {
+      closeoutResult = await completeProject({
+        supabase,
+        businessId: business.business_id,
+        projectId: project_id,
+        authorization: { kind: 'direct' },
+      })
+
+      if (closeoutResult.requires_approval) {
+        return NextResponse.json({
+          requires_approval: true,
+          approval_id: closeoutResult.approval_id,
+          message: 'Projektstängningen väntar på admin-godkännande.',
+          closeout: closeoutResult,
+        })
+      }
+      if (!closeoutResult.ok) {
+        const status = closeoutResult.error_code === 'verification_failed'
+          ? 503
+          : closeoutResult.error_code === 'not_found'
+            ? 404
+            : 500
+        return NextResponse.json({
+          error: closeoutResult.error || 'Projektstängningen misslyckades',
+          closeout: closeoutResult,
+        }, { status })
+      }
+    }
+
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
 
     if (body.name !== undefined) updates.name = body.name
     if (body.description !== undefined) updates.description = body.description
     if (body.project_type !== undefined) updates.project_type = body.project_type
-    if (body.status !== undefined) {
+    if (body.status !== undefined && !blirKlart) {
       // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): updates.status
       // sattes ALDRIG här — blocket nedan skrev bara sidofält (completed_at
       // m.fl.) baserat på body.status, men aldrig själva statuskolumnen.
@@ -559,39 +593,9 @@ export async function PUT(request: NextRequest) {
       // värde — samma gäller planning/active/paused/cancelled.
       updates.status = body.status
 
-      // ═══ FOUR-EYES-GRINDEN — DATABASENS VÄRDE, ALDRIG KLIENTENS ═══
-      // (Projektauditen P1-5, lagad 2026-08-09.)
-      //
-      // Grinden löd `body.budget_amount || 0` och kontrollen kördes bara när
-      // det var falsy. Ett anrop med `{status:'completed', budget_amount: 1}`
-      // hoppade alltså över HELA kontrollen — klienten kunde stänga vilket
-      // projekt som helst förbi fyra ögon genom att skicka en krona.
-      // En policygrind som frågar den grindade parten om värdet är ingen grind.
-      if (body.status === 'completed') {
-        // Grinden prövas bara på övergången — ett redan stängt projekt som
-        // PUT:as igen ska inte generera nya godkännandekort.
-        if (blirKlart) {
-          // Delade grinden (lib/projects/four-eyes-gate.ts) — samma lås som
-          // mobilens complete-job. Beslutet fattas på databasens värde.
-          const grind = await checkFourEyesGate(supabase, business.business_id, project_id)
-          if (grind.reason === 'verification_failed') {
-            // Fail-closed (2026-08-15): kunde inte verifiera grinden — stäng inte tyst.
-            return NextResponse.json({
-              error: 'Kunde inte verifiera godkännandereglerna för stängning just nu. Försök igen om en liten stund.',
-            }, { status: 503 })
-          }
-          if (grind.gated) {
-            return NextResponse.json({
-              requires_approval: true,
-              approval_id: grind.approvalId,
-              message: `Projektstängning kräver admin-godkännande (${(grind.budgetAmount || 0).toLocaleString('sv-SE')} kr)`,
-            })
-          }
-          updates.completed_at = new Date().toISOString()
-        }
-        // Upprepad stängning: behåll ursprungligt completed_at — datumet
-        // projektet faktiskt stängdes, inte senaste klicket.
-      }
+      // Upprepad stängning: behåll ursprungligt completed_at — datumet
+      // projektet faktiskt stängdes, inte senaste klicket. Den verkliga
+      // övergången hanterades av completeProject ovan.
       if (body.status === 'active' || body.status === 'planning') {
         updates.completed_at = null
         if (aterOppnas) {
@@ -614,15 +618,20 @@ export async function PUT(request: NextRequest) {
     if (body.end_date !== undefined) updates.end_date = body.end_date
     if (body.customer_id !== undefined) updates.customer_id = body.customer_id
 
-    const { data: project, error } = await supabase
-      .from('project')
-      .update(updates)
-      .eq('project_id', project_id)
-      .eq('business_id', business.business_id)
-      .select('*')
-      .single()
+    let project: any = closeoutResult?.project ?? null
+    const hasNonCloseoutUpdates = Object.keys(updates).length > 1
+    if (!blirKlart || hasNonCloseoutUpdates) {
+      const { data: updatedProject, error } = await supabase
+        .from('project')
+        .update(updates)
+        .eq('project_id', project_id)
+        .eq('business_id', business.business_id)
+        .select('*')
+        .single()
 
-    if (error) throw error
+      if (error) throw error
+      project = updatedProject
+    }
 
     // Project workflow stage: 'Jobb påbörjat' när status blir 'active'
     if (body.status === 'active' && project) {
@@ -634,235 +643,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Project workflow stage: 'Slutbesiktning' när status blir 'completed'.
-    // Bara på ÖVERGÅNGEN (P2-4) — steget är idempotent, men vakten här gör
-    // avsikten läsbar och håller mönstret enhetligt med blocket nedan.
-    if (blirKlart && project) {
-      try {
-        const { advanceProjectStage, SYSTEM_STAGES } = await import('@/lib/project-stages/automation-engine')
-        await advanceProjectStage(project.project_id, SYSTEM_STAGES.FINAL_INSPECTION, business.business_id)
-      } catch (err) {
-        console.error('[projects] advanceProjectStage failed:', err)
-      }
-    }
-
-    // Fire job_completed event → triggar review request + nurture.
-    // ═══ BARA PÅ ÖVERGÅNGEN inte-klart → klart (P2-4) ═══
-    // Villkoret var body.status === 'completed': varje upprepad PUT eldade
-    // om hela kedjan — recensionsbegäran, nurture och Lars-triggern gick ut
-    // en gång per klick på ett redan stängt projekt.
-    if (blirKlart && project) {
-      // "En händelse → hela företaget" (Business Twin-backlog #2, 2026-08-13):
-      // den här övergången skapar flera FRISTÅENDE godkännandekort (faktura,
-      // debrief, recensionsförfrågan) som idag visas som obesvikta,
-      // orelaterade kort. Ett delat batch-id stämplas in på var och en
-      // (sista steget i blocket, se längre ner) så ytan kan gruppera dem
-      // under en gemensam rubrik — INTE bunta ihop dem till ett enda
-      // "godkänn allt"-klick (fakturan är en pengarörelse och förtjänar sitt
-      // eget medvetna klick, samma resonemang som fyra-ögon-grinden).
-      const completionBatchId = crypto.randomUUID()
-      try {
-        const { fireEvent } = await import('@/lib/automation-engine')
-        await fireEvent(supabase, 'job_completed', business.business_id, {
-          project_id: project.project_id,
-          customer_id: project.customer_id,
-          project_name: project.name,
-        })
-      } catch { /* non-blocking */ }
-
-      // Auto-faktura vid projektavslut
-      try {
-        const { autoInvoiceOnComplete } = await import('@/lib/projects/auto-invoice-on-complete')
-        await autoInvoiceOnComplete(business.business_id, project.project_id)
-      } catch (invoiceErr) {
-        console.error('Auto-invoice on complete error (non-blocking):', invoiceErr)
-      }
-
-      // Motor 1: frys utfall-vs-offert (efterkalkyl). Fail-safe — kastar
-      // aldrig, får inte fälla projektstängningen. Körs bara här eftersom
-      // vi passerat 4-eyes-gaten ovan och status faktiskt blev 'completed'.
-      let outcomeForTrigger: {
-        job_type: string | null
-        hours_diff_pct: number | null
-        amount_diff_pct: number | null
-        margin_pct: number | null
-      } | null = null
-      try {
-        const { freezeProjectOutcome } = await import('@/lib/efterkalkyl/freeze-outcome')
-        await freezeProjectOutcome(supabase, business.business_id, project.project_id)
-
-        const { getProjectOutcome } = await import('@/lib/efterkalkyl/get-project-outcome')
-        const outcome = await getProjectOutcome(supabase, business.business_id, project.project_id)
-        outcomeForTrigger = {
-          job_type: outcome.job_type,
-          hours_diff_pct: outcome.hours_diff_pct,
-          amount_diff_pct: outcome.amount_diff_pct,
-          margin_pct: outcome.margin_pct,
-        }
-      } catch (outcomeErr) {
-        console.error('[projects] freezeProjectOutcome error (non-blocking):', outcomeErr)
-      }
-
-      // Project Debrief Capture (2026-08-12): 2-3 frivilliga frågor ur
-      // deltat ovan. Fail-safe, får aldrig fälla projektstängningen — se
-      // lib/debrief/create-debrief-card.ts för dedupe/detaljer.
-      try {
-        const { skapaDebriefKort } = await import('@/lib/debrief/create-debrief-card')
-        await skapaDebriefKort(supabase, business.business_id, {
-          project_id: project.project_id,
-          project_name: project.name,
-          quote_id: project.quote_id ?? null,
-          job_type: outcomeForTrigger?.job_type ?? null,
-          hours_diff_pct: outcomeForTrigger?.hours_diff_pct ?? null,
-          amount_diff_pct: outcomeForTrigger?.amount_diff_pct ?? null,
-          margin_pct: outcomeForTrigger?.margin_pct ?? null,
-        })
-      } catch (debriefErr) {
-        console.error('[projects] skapaDebriefKort error (non-blocking):', debriefErr)
-      }
-
-      // Våg 2d (tasks/value-chain-plan.md) — väck Lars (job_completed-
-      // trigger, matchAgentByPrefix routar 'job_*' till honom). Fire-and-
-      // forget, fail-safe, får aldrig fälla projektstängningen.
-      try {
-        const { triggerAgentFireAndForget, makeIdempotencyKey } = await import('@/lib/agent-trigger')
-        triggerAgentFireAndForget(
-          business.business_id,
-          'job_completed',
-          {
-            project_id: project.project_id,
-            job_type: outcomeForTrigger?.job_type ?? null,
-            hours_diff_pct: outcomeForTrigger?.hours_diff_pct ?? null,
-            amount_diff_pct: outcomeForTrigger?.amount_diff_pct ?? null,
-            margin_pct: outcomeForTrigger?.margin_pct ?? null,
-            instruction: `Projektet (project_id: ${project.project_id}) avslutades just. Bedöm om det gick enligt plan utifrån avvikelsen i tid/belopp mot offert och föreslå åtgärd om något sticker ut — annars räcker en kort notering. Använd get_project_outcome om du behöver fler detaljer.`,
-          },
-          makeIdempotencyKey('job_completed', business.business_id, project.project_id)
-        )
-      } catch (triggerErr) {
-        console.error('[projects] job_completed agent trigger failed (non-blocking):', triggerErr)
-      }
-
-      // Schemalägg Google-recension 24h efter projektslut.
-      //
-      // Buggfix 2026-08-10: payloaden byggdes tidigare UTAN `to`/`message`
-      // — exekveringscaset (app/api/approvals/[id]/route.ts, case
-      // 'scheduled_review_request') läser just de fälten, så godkännandet
-      // failade tyst med "payload saknar to eller message" så fort
-      // hantverkaren klickade Godkänn. Kanonisk form nu, samma som cronens
-      // (app/api/cron/review-requests/route.ts).
-      try {
-        const { data: customer } = await supabase
-          .from('customer')
-          .select('name, phone_number, review_request_sent_at')
-          .eq('customer_id', project.customer_id)
-          .single()
-
-        const { data: config } = await supabase
-          .from('business_config')
-          .select('business_name, google_review_url')
-          .eq('business_id', business.business_id)
-          .single()
-
-        // 180-dagarsspärr (review_request_sent_at) — samma spärr som cronen
-        // respekterar. Utan den kan denna projekt-avslutade väg och cronen
-        // be samma kund om recension två gånger.
-        const reviewSentAt = customer?.review_request_sent_at as string | null | undefined
-        const askedRecently = !!reviewSentAt
-          && new Date(reviewSentAt) > new Date(Date.now() - 180 * 24 * 3600000)
-
-        if (customer?.phone_number && config?.google_review_url && !askedRecently) {
-          const scheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h from now
-          const { buildReviewRequestMessage } = await import('@/lib/notifications/review-request-message')
-          const message = buildReviewRequestMessage({
-            customerName: customer.name,
-            projectName: project.name,
-            businessName: config.business_name,
-            reviewUrl: config.google_review_url,
-          })
-          // KÄLLGRANSKAT FYND (2026-08-13): `type` är INTE en kolumn på
-          // pending_approvals (bara approval_type finns) — PostgREST
-          // avvisade hela inserten, tyst uppsvald av catch-blocket nedan.
-          // scheduled_review_request-kortet har alltså aldrig skapats i
-          // produktion, för någon business, sedan featuren byggdes (0 rader
-          // någonsin, verifierat via MCP innan denna fix).
-          await supabase.from('pending_approvals').insert({
-            business_id: business.business_id,
-            approval_type: 'scheduled_review_request',
-            title: `Recensionsförfrågan — ${customer.name}`,
-            description: `Skicka Google-recensionsförfrågan till ${customer.name} för projekt "${project.name}"`,
-            risk_level: 'low',
-            status: 'pending',
-            expires_at: scheduledAt.toISOString(),
-            payload: {
-              customer_id: project.customer_id,
-              customer_name: customer.name,
-              customer_phone: customer.phone_number,
-              project_id: project.project_id,
-              project_name: project.name,
-              business_name: config.business_name,
-              google_review_url: config.google_review_url,
-              to: customer.phone_number,
-              message,
-              agent_id: 'hanna',
-            },
-          })
-        }
-      } catch (reviewErr) {
-        console.error('Review request scheduling error (non-blocking):', reviewErr)
-      }
-
-      // Flytta deal till "Slutfört" i pipeline
-      try {
-        const { data: linkedDeal } = await supabase
-          .from('deal')
-          .select('id')
-          .eq('business_id', business.business_id)
-          .or(`quote_id.eq.${project.quote_id},lead_id.eq.${project.lead_id}`)
-          .maybeSingle()
-
-        if (linkedDeal) {
-          const { moveDeal } = await import('@/lib/pipeline')
-          await moveDeal({
-            dealId: linkedDeal.id,
-            businessId: business.business_id,
-            // V80: Ingen 'invoiced'-stage finns längre ('quote_accepted' är
-            // borttaget, sql/v80_merge_accepted_into_won.sql) — flytta direkt
-            // till 'won'. Riktningsskyddet i moveDeal hindrar att en redan
-            // vunnen deal dras tillbaka. Betalstatus är fakturamodulens ansvar,
-            // inte pipeline-stegets.
-            toStageSlug: 'won',
-            triggeredBy: 'system',
-            aiReason: 'Projekt markerat som slutfört',
-          })
-        }
-      } catch { /* non-blocking */ }
-
-      // Stämpla completion_batch_id på de kort just DENNA stängning skapade
-      // — sista steget, efter att alla ovanstående haft sin chans att skapa
-      // sina kort. Icke-blockerande: en misslyckad stämpling ska aldrig
-      // fälla stängningen, den gör bara ytan omedvetet om grupperingen.
-      try {
-        const { data: batchRows } = await supabase
-          .from('pending_approvals')
-          .select('id, payload')
-          .eq('business_id', business.business_id)
-          .eq('status', 'pending')
-          .in('approval_type', ['review_auto_invoice', 'project_debrief', 'scheduled_review_request'])
-        for (const row of batchRows || []) {
-          if ((row as any).payload?.project_id === project.project_id) {
-            await supabase
-              .from('pending_approvals')
-              .update({ payload: { ...(row as any).payload, completion_batch_id: completionBatchId } })
-              .eq('id', (row as any).id)
-          }
-        }
-      } catch (batchErr) {
-        console.error('[projects] completion_batch_id-stämpling misslyckades (icke-blockerande):', batchErr)
-      }
-    }
-
-    return NextResponse.json({ project })
+    return NextResponse.json({ project, closeout: closeoutResult })
 
   } catch (error: any) {
     console.error('Update project error:', error)

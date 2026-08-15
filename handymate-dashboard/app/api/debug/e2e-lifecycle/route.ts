@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { isAdmin } from '@/lib/admin-auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { transitionProjectToCompleted } from '@/lib/projects/complete-project'
 
 /**
  * POST /api/debug/e2e-lifecycle
@@ -243,14 +244,18 @@ export async function POST(request: NextRequest) {
 
     // ── STEG 5: Stäng projektet — samma byggstenar som PUT-routens
     //    stängningsgren, anropade direkt (se filhuvudet) ──
-    const { error: closeErr } = await supabase
-      .from('project')
-      .update({ status: 'completed', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq('project_id', projectId)
-      .eq('business_id', business.business_id)
+    const closeTransition = await transitionProjectToCompleted(
+      supabase,
+      business.business_id,
+      projectId,
+    )
 
-    if (closeErr) {
-      steps.push({ step: '5. Stäng projektet', status: 'fail', detail: closeErr.message })
+    if (!closeTransition.ok) {
+      steps.push({
+        step: '5. Stäng projektet',
+        status: 'fail',
+        detail: closeTransition.error || 'Statusövergången misslyckades',
+      })
       throw new StepFailure()
     }
 
