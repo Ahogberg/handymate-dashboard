@@ -105,6 +105,22 @@ export async function POST(request: NextRequest) {
         // Bokningen bockas ändå av — det är PROJEKTET som kräver fyra ögon,
         // inte hantverkarens arbetsdag.
         const grind = await checkFourEyesGate(supabase, business.business_id, existing.project_id)
+        if (grind.reason === 'verification_failed') {
+          // Fail-closed (2026-08-15): kunde inte verifiera grinden — stäng inte tyst.
+          // Bokningen är redan avbockad (rätt — det är projektet som väntar,
+          // inte hantverkarens arbetsdag), men projektet lämnas öppet.
+          console.error('[booking/complete-job] four-eyes gate kunde inte verifieras — blockerar projektstängning:', grind.error, {
+            project_id: existing.project_id,
+          })
+          return NextResponse.json({
+            success: true,
+            booking: updated,
+            booking_completed: true,
+            project_completed: false,
+            requires_approval: false,
+            message: 'Kunde inte verifiera godkännandereglerna för projektstängning just nu. Försök stänga projektet igen om en liten stund.',
+          })
+        }
         if (grind.gated) {
           console.log('[booking/complete-job] four-eyes gate — completion queued for approval:', {
             project_id: existing.project_id,

@@ -574,6 +574,12 @@ export async function PUT(request: NextRequest) {
           // Delade grinden (lib/projects/four-eyes-gate.ts) — samma lås som
           // mobilens complete-job. Beslutet fattas på databasens värde.
           const grind = await checkFourEyesGate(supabase, business.business_id, project_id)
+          if (grind.reason === 'verification_failed') {
+            // Fail-closed (2026-08-15): kunde inte verifiera grinden — stäng inte tyst.
+            return NextResponse.json({
+              error: 'Kunde inte verifiera godkännandereglerna för stängning just nu. Försök igen om en liten stund.',
+            }, { status: 503 })
+          }
           if (grind.gated) {
             return NextResponse.json({
               requires_approval: true,

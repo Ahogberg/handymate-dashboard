@@ -1835,11 +1835,22 @@ async function executeApprovalPayload(
         // Tenantfiltret saknades — uppdateringen körs med service_role och
         // kunde stänga ett projekt i vilket företag som helst om payloadens
         // project_id pekade fel. Kortets businessId är sanningen.
-        await supabase4p
+        const { error: closeError } = await supabase4p
           .from('project')
           .update({ status: 'completed', completed_at: new Date().toISOString() })
           .eq('project_id', pl.project_id)
           .eq('business_id', businessId)
+
+        // P0-fix 2026-08-15: felet lästes aldrig — ett misslyckat write
+        // (RLS, fel tenant, nätverk) returnerade ändå ok:true, så fakturering/
+        // debrief/recension gick vidare mot ett projekt som aldrig stängdes.
+        if (closeError) {
+          console.error('[four_eyes_project_close] projektstängningen misslyckades:', closeError.message, {
+            project_id: pl.project_id,
+            businessId,
+          })
+          return { action: 'four_eyes_project_close', ok: false, error: closeError.message, project_id: pl.project_id }
+        }
 
         // Fire job_completed
         try {

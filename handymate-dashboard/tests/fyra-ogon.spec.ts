@@ -109,4 +109,68 @@ test.describe('godkännandet är en utväg, inte en återvändsgränd', () => {
     expect(block).toContain("update({ status: 'completed'")
     expect(block, 'stängningen saknar tenantfilter').toContain("eq('business_id', businessId)")
   })
+
+  test('godkännandets projektuppdatering läser Supabase-felet — påstår inte ok:true på ett misslyckat write (P0, 2026-08-15)', () => {
+    const s = kod(APPROVE)
+    const fall = s.indexOf("case 'four_eyes_project_close'")
+    const block = s.slice(fall, s.indexOf('case ', fall + 10))
+    expect(block, 'uppdateringens felfält destruktureras aldrig').toContain('error: closeError')
+    const errCheck = block.indexOf('if (closeError)')
+    expect(errCheck, 'closeError kontrolleras aldrig').toBeGreaterThan(-1)
+    expect(block.slice(errCheck, errCheck + 400), 'ett misslyckat write returnerar ändå ok:true').toContain('ok: false')
+  })
+})
+
+test.describe('fail-closed vid overifierbar grind (P0, 2026-08-15)', () => {
+  const GATE = 'lib/projects/four-eyes-gate.ts'
+
+  test('business_config-läsfel stänger — inte öppnar', () => {
+    const g = kod(GATE)
+    const configErrCheck = g.indexOf('if (configError)')
+    expect(configErrCheck, 'config-läsfelet kontrolleras aldrig').toBeGreaterThan(-1)
+    const retur = g.indexOf('return { gated: true', configErrCheck)
+    expect(retur, 'config-läsfel ger inte gated: true').toBeGreaterThan(configErrCheck)
+    expect(retur).toBeLessThan(g.indexOf('if (!config?.four_eyes_enabled)'))
+  })
+
+  test('project-läsfel stänger — inte öppnar', () => {
+    const g = kod(GATE)
+    const projectErrCheck = g.indexOf('if (projectError)')
+    expect(projectErrCheck, 'project-läsfelet kontrolleras aldrig').toBeGreaterThan(-1)
+    const retur = g.indexOf('return { gated: true', projectErrCheck)
+    expect(retur, 'project-läsfel ger inte gated: true').toBeGreaterThan(projectErrCheck)
+  })
+
+  test('en kastad exception stänger också — ingen fail-open-katch kvar', () => {
+    const g = kod(GATE)
+    const catchBlock = g.slice(g.lastIndexOf('} catch'))
+    expect(catchBlock).toContain('gated: true')
+    expect(catchBlock).not.toContain('gated: false')
+  })
+
+  test('overifierbar grind märks reason: verification_failed, skiljbar från ett väntande kort', () => {
+    const g = kod(GATE)
+    expect(g).toContain("reason: 'verification_failed'")
+    expect(g).toContain("reason: 'approval_required'")
+  })
+})
+
+test.describe('anroparna respekterar overifierbar-signalen (P0, 2026-08-15)', () => {
+  test('PUT /api/projects blockerar stängning vid overifierbar grind, i stället för att tyst fortsätta', () => {
+    const s = kod(PUT)
+    const grind = s.indexOf('checkFourEyesGate(')
+    expect(grind).toBeGreaterThan(-1)
+    const verifCheck = s.indexOf("grind.reason === 'verification_failed'", grind)
+    const completedAt = s.indexOf('updates.completed_at = new Date()', grind)
+    expect(verifCheck, 'overifierbar grind kollas aldrig i PUT /api/projects').toBeGreaterThan(-1)
+    expect(verifCheck).toBeLessThan(completedAt)
+  })
+
+  test('mobilens complete-job blockerar projektstängning vid overifierbar grind', () => {
+    const s = kod('app/api/booking/complete-job/route.ts')
+    const grind = s.indexOf('checkFourEyesGate(')
+    const verifCheck = s.indexOf("grind.reason === 'verification_failed'", grind)
+    expect(verifCheck, 'overifierbar grind kollas aldrig i complete-job').toBeGreaterThan(-1)
+    expect(s.indexOf('project_completed: false', verifCheck), 'overifierbart läge påstår inte att projektet stängdes').toBeGreaterThan(-1)
+  })
 })

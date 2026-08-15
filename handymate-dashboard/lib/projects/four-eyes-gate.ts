@@ -14,15 +14,24 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * Regler:
  *   - Beslutet fattas ALLTID på databasens budget_amount — aldrig klientens.
  *   - Ett pending-kort återanvänds; upprepade försök ger inte kort på hög.
- *   - Fail-open är avsiktligt fel riktning här: kan konfig/projekt inte
- *     läsas svarar grinden gated=false men med error satt, så anroparen
- *     själv får välja. Stängningsvägar som redan är i drift ska inte börja
- *     440:a för att en konfigläsning hickade.
+ *   - FAIL-CLOSED (ändrat 2026-08-15, Andreas beslut efter Codex fynd P0):
+ *     kan konfig/projekt inte läsas — vare sig via ett Supabase-fel eller
+ *     en kastad exception — blockeras stängningen. Ursprungsversionen
+ *     (2026-08-09) tänkte "fail-open, men med error satt så anroparen
+ *     själv får välja" — i praktiken läste ingen av de tre dörrarna
+ *     `.error`, bara `.gated`, så en transient läshicka på ETT konto med
+ *     fyra ögon påslaget stängde tysta miljonprojekt förbi kontrollen.
+ *     En blockerad stängning är synlig och går att försöka igen; en
+ *     kringgången kontroll är osynlig. `reason` skiljer det overifierbara
+ *     låget ('verification_failed') från ett äkta väntande kort
+ *     ('approval_required') så anroparen kan visa rätt besked.
  */
 
 export interface FourEyesGateResult {
-  /** Sant = stäng INTE projektet; ett godkännandekort väntar i stället. */
+  /** Sant = stäng INTE projektet — antingen väntar ett kort, eller så gick grinden inte att verifiera säkert. */
   gated: boolean
+  /** Varför grinden slog till — avgör vilket besked anroparen ska visa. */
+  reason?: 'approval_required' | 'verification_failed'
   approvalId?: string
   /** Projektets databasvärde — för anroparens besked till användaren. */
   budgetAmount?: number
@@ -35,20 +44,30 @@ export async function checkFourEyesGate(
   projectId: string,
 ): Promise<FourEyesGateResult> {
   try {
-    const { data: config } = await supabase
+    const { data: config, error: configError } = await supabase
       .from('business_config')
       .select('four_eyes_enabled, four_eyes_threshold_sek')
       .eq('business_id', businessId)
       .single()
 
+    if (configError) {
+      console.error('[four-eyes-gate] business_config kunde inte läsas — blockerar fail-closed:', configError.message, { businessId, projectId })
+      return { gated: true, reason: 'verification_failed', error: configError.message }
+    }
+
     if (!config?.four_eyes_enabled) return { gated: false }
 
-    const { data: project } = await supabase
+    const { data: project, error: projectError } = await supabase
       .from('project')
       .select('budget_amount, name')
       .eq('project_id', projectId)
       .eq('business_id', businessId)
       .single()
+
+    if (projectError) {
+      console.error('[four-eyes-gate] project kunde inte läsas — blockerar fail-closed:', projectError.message, { businessId, projectId })
+      return { gated: true, reason: 'verification_failed', error: projectError.message }
+    }
 
     const budgetAmount = project?.budget_amount || 0
     const threshold = config.four_eyes_threshold_sek || 50000
@@ -65,7 +84,7 @@ export async function checkFourEyesGate(
       .limit(1)
       .maybeSingle()
 
-    if (existing) return { gated: true, approvalId: existing.id, budgetAmount }
+    if (existing) return { gated: true, approvalId: existing.id, budgetAmount, reason: 'approval_required' }
 
     const approvalId = `appr_4e_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
     const { error: insertError } = await supabase.from('pending_approvals').insert({
@@ -86,12 +105,12 @@ export async function checkFourEyesGate(
       // Kortet gick inte att skapa — men grinden GÄLLER fortfarande.
       // Att stänga för att kön var trasig vore att låta felet öppna låset.
       console.error('[four-eyes-gate] kortet kunde inte skapas:', insertError.message, { projectId })
-      return { gated: true, budgetAmount, error: insertError.message }
+      return { gated: true, reason: 'verification_failed', budgetAmount, error: insertError.message }
     }
 
-    return { gated: true, approvalId, budgetAmount }
+    return { gated: true, approvalId, budgetAmount, reason: 'approval_required' }
   } catch (err: any) {
-    console.error('[four-eyes-gate] kontrollen kastade:', err?.message || err, { projectId })
-    return { gated: false, error: err?.message || 'okänt fel' }
+    console.error('[four-eyes-gate] kontrollen kastade — blockerar fail-closed:', err?.message || err, { projectId })
+    return { gated: true, reason: 'verification_failed', error: err?.message || 'okänt fel' }
   }
 }
