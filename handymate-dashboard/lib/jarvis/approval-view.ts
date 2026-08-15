@@ -26,7 +26,12 @@ interface ApprovalLike {
  */
 export function agentForApproval(approval: ApprovalLike): string {
   const routed =
-    (approval.payload?.routed_agent as string) || (approval.payload?.agent_id as string) || null
+    (approval.payload?.routed_agent as string)
+    || (approval.payload?.agent_id as string)
+    // Äldre Hanna-producenter (garanti/proactive care) använder `agent`.
+    // Det är fortfarande explicit metadata och ska vinna över typgissningen.
+    || (approval.payload?.agent as string)
+    || null
   if (routed && AGENT_INFO[routed]) return routed
 
   const t = approval.approval_type

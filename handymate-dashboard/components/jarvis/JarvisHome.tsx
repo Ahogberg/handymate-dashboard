@@ -55,6 +55,7 @@ import { pengaFynd } from '@/lib/jarvis/moment-rows'
 import type { AgentMoment } from '@/lib/moments/derive'
 import { GorDettaForst, type NextBestActionRecommendation } from '@/components/jarvis/GorDettaForst'
 import { ProjektCaseKort, type ProjektCaseData } from '@/components/jarvis/ProjektCaseKort'
+import { KundCaseKort, type KundCaseData } from '@/components/jarvis/KundCaseKort'
 import { MalNudge } from '@/components/jarvis/MalNudge'
 import { FuelWarningCard } from '@/components/jarvis/FuelWarningCard'
 import { useFuel } from '@/components/fuel/FuelProvider'
@@ -268,6 +269,7 @@ export default function JarvisHome({
   // projekt, se app/api/project-cases/route.ts. Egen hämtning av samma
   // skäl som NBA ovan (huvudkön är kapad till 15 senaste).
   const [projektCases, setProjektCases] = useState<ProjektCaseData[]>([])
+  const [kundCases, setKundCases] = useState<KundCaseData[]>([])
   const [heroHidden, setHeroHidden] = useState(false)
   const [snack, setSnack] = useState<{ approvalId: string; text: string } | null>(null)
   const [feedback, setFeedback] = useState<{ text: string; isError: boolean } | null>(null)
@@ -349,6 +351,18 @@ export default function JarvisHome({
     return () => { active = false }
   }, [authHeaders])
 
+  const fetchCustomerCases = useCallback(async () => {
+    try {
+      const res = await fetch('/api/customer-cases', { headers: await authHeaders() })
+      if (res.ok) {
+        const data = await res.json()
+        setKundCases(data.cases || [])
+      }
+    } catch { /* inga kund-case idag är ett giltigt, tyst utfall */ }
+  }, [authHeaders])
+
+  useEffect(() => { void fetchCustomerCases() }, [fetchCustomerCases])
+
   useEffect(() => {
     let active = true
     ;(async () => {
@@ -369,10 +383,13 @@ export default function JarvisHome({
       .channel('jarvis-queue')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'pending_approvals', filter: `business_id=eq.${business.business_id}` },
-        () => { void fetchQueue() })
+        () => {
+          void fetchQueue()
+          void fetchCustomerCases()
+        })
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [business?.business_id, fetchQueue])
+  }, [business?.business_id, fetchCustomerCases, fetchQueue])
 
   // Värt att veta: observationerna agenterna skrivit, minus de som redan har
   // ett kort i beslutssektionen — annars stod samma sak på två ställen.
@@ -809,6 +826,13 @@ export default function JarvisHome({
     .map(c => ({ ...c, signals: c.signals.filter(s => !hiddenIds.has(s.approval_id)) }))
     .filter(c => new Set(c.signals.map(s => s.approval_type)).size >= 2)
 
+  // Samma lokala sanningsregel som projekt-caset: när en signal hanteras
+  // försvinner den direkt, och ett kvarvarande ensamt ärende är inte längre
+  // ett tvärfunktionellt kund-case.
+  const synligaKundCases = kundCases
+    .map(c => ({ ...c, signals: c.signals.filter(s => !hiddenIds.has(s.approval_id)) }))
+    .filter(c => new Set(c.signals.map(s => s.approval_type)).size >= 2)
+
   // Hälsningens bevisrad — rullande dygn, ärligt om något behövde ägaren.
   const bevis = halsningsBevis(proof, beslut)
 
@@ -967,6 +991,10 @@ export default function JarvisHome({
 
           {synligaCases.map(c => (
             <ProjektCaseKort key={c.project_id} data={c} />
+          ))}
+
+          {synligaKundCases.map(c => (
+            <KundCaseKort key={c.customer_id} data={c} />
           ))}
 
           {fuelCritical && (

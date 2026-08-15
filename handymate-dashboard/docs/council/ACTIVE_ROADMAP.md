@@ -17,6 +17,40 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-15 — Cross-Agent Customer Case V1 byggd
+
+Jarvis kan nu sammanföra flera olika väntande signaler om samma kund till en
+gemensam läsbild ovanför den ordinarie godkännandekön. Kund-caset ersätter
+inga approvals och har inga egna beslutsknappar; varje underliggande handling
+behåller sin befintliga riskgräns och sitt eget godkännande.
+
+**Det som nu är sant:**
+
+- En explicit allowlist beskriver 13 approval-typer och exakt EN kundväg per
+  typ: tenantfiltrerat projekt-, offert- eller fakturauppslag, direkt
+  tenantverifierad kundreferens eller `autopilot_package.package_data`.
+  Okända typer och saknade nycklar gissas aldrig fram.
+- Ett case kräver minst två distinkta `approval_type`, samma tröskel som
+  Project Case. Två dublettrader av samma typ blir inget case.
+- Projektet äger en delad signal. Approval-id:n som redan ingår i ett synligt
+  projekt-case tas bort innan kund-casets tröskel räknas, så samma fynd inte
+  berättas i två staplade kort.
+- Routen använder autentiserad tenant, tenantbunden `getCurrentUser`, samma
+  `canActOnApproval`-kontroll som kön och tenantfilter på varje service-role-
+  uppslag.
+- Jarvis visar Matte som samordnare och varje signal med producentens agent.
+  Om minst två olika kundriktade signaltyper kan leda till kontakt visas den
+  läsande varningen “Samordna kontakten”; den blockerar eller skickar inget.
+- Ingen SQL, ingen ny approvalmekanik och inga ändringar i SMS- eller
+  exekveringskedjan tillkom.
+
+**Verifiering:** `npx tsc --noEmit` är grön, 143/143 riktade Jarvis-/approval-
+facit är gröna och produktionsbuilden är grön. En read-only liveprob mot
+databasen kunde inte köras eftersom den lokala arbetsytan saknar Supabase-URL
+och service-role-nyckel; inget live-DB-bevis påstås därför i denna leverans.
+
+---
+
 # Läge 2026-08-15 — Canonical Project Completion V1 stängd
 
 De tre produktionsdörrarna för projektavslut — desktop-API:t, mobilens

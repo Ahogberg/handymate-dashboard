@@ -86,6 +86,7 @@ test.describe('KNAPPEN SÄGER VAD SOM HÄNDER', () => {
 test.describe('agentroutingen', () => {
   test('explicit routing i payloaden går alltid först', () => {
     expect(agentForApproval({ approval_type: 'send_invoice', payload: { routed_agent: 'lisa' } })).toBe('lisa')
+    expect(agentForApproval({ approval_type: 'warranty_followup', payload: { agent: 'hanna' } })).toBe('hanna')
   })
 
   test('okänd routad agent ignoreras — typen får avgöra', () => {
