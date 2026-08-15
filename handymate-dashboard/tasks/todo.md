@@ -662,3 +662,63 @@ men uppdatera testets facit till att förvänta N+1 (dokumentera att det
 är avsiktligt), eller (c) räkna med kalenderdagar (midnatt-till-midnatt)
 i stället för 24-timmarsblock, vilket är en tredje semantik. Rör inget
 förrän valt.
+
+---
+
+# Claude-verifiering av Codex Goal-driven Margin Guardian V1 (natten 2026-08-14→15)
+
+Två commits: `f2be1337` (kärnlogik: margin-guardian.ts, lib/profitability.ts,
+v134-migrationen, MalBlock.tsx, projektets profitability-route) och
+`49d3b19d` (inställningssidans fält — min egen rekommendation till Codex
+igår kväll, nu byggd).
+
+## VIKTIGT PROCESSFYND: git push kan bära med sig andras opushade commits
+
+`f2be1337` hamnade LIVE i prod redan för några timmar sen — inte för att
+jag pushade den medvetet, utan för att den låg lokalt committad (Codex,
+23:57) INNAN jag körde `git push` för mina egna hygienfixar (00:03). Vi
+delar uppenbarligen samma lokala arbetskatalog/gren, och `git push`
+skickar ALLA lokala commits framför origin, inte bara ens egna. Jag hade
+bara kollat `git status --short` (arbetsträdets renlighet), inte
+`git log origin/main..HEAD` (vilka COMMITS som faktiskt skulle pushas).
+Från och med nu: alltid `git log origin/main..HEAD --oneline` innan push,
+så inget går live oreviewat igen.
+
+Ingen skada skedd — se nedan — men ren tur att Codex byggde felsäkert.
+
+## Var det farligt att f2be1337 låg live utan att v134 var körd?
+
+Nej — kontrollerat explicit, inte antaget. Alla tre konsumenter
+(`getExplicitMarginTarget` i lib/profitability.ts, MalBlock.tsx,
+inställningssidans `fetchConfig`) är byggda att tåla den saknade
+kolumnen: `getExplicitMarginTarget` fångar Supabase-felet och degraderar
+till `null` (samma beteende som innan ändringen), och både MalBlock.tsx
+och inställningssidan läser med `select('*')`/tyst-fail-mönster där en
+saknad kolumn bara ger `undefined`, aldrig en krasch. Verifierat: allt
+beteende för alla 22 konton är i praktiken OFÖRÄNDRAT tills v134 körs —
+Guardian faller tillbaka till 75%-basgränsen precis som innan.
+
+## Oberoende ombekräftat innan push av 49d3b19d
+
+`npx tsc --noEmit` rent, `npx next build` grön, riktade facit
+(`goal-driven-margin.spec.ts` + `margin-guardian.spec.ts` +
+`business-config-reads.spec.ts`) 50/50 gröna, full svit 5876 gröna/14
+failed (samma kända förbefintliga kluster — INKLUSIVE bekräftelse att
+`business-config-reads.spec.ts`s tidigare flaggade MalBlock.tsx-fynd nu
+är löst som en bieffekt av Codex arbete).
+
+Läste igenom kärnlogiken själv (inte bara facit): `byggLonsamhetsVarning`s
+nya 4:e parameter `goals: GuardianGoals = {}` är bakåtkompatibel (alla
+befintliga anropare fortsätter fungera oförändrat), 95%-taket för
+over_budget gäller alltid oavsett mål, `checkProfitabilityWarnings` läser
+det bevisade målet EN gång per företag/körning (inte per projekt).
+
+Pushat: `49d3b19d`. Deployat, verifierat.
+
+## KVARSTÅR — v134-migrationen är INTE körd
+
+`sql/v134_margin_target_explicit.sql` väntar på manuell körning i Supabase
+(lägger till `margin_target_set_at`, backfill, trigger). Kod är redan live
+och fail-safe utan den, men Guardian kommer inte att kunna använda något
+ägarmål förrän den kört. Rör den INTE utan att Andreas sagt "kör" —
+samma regel som Bränsle-migrationen tidigare i kväll.
