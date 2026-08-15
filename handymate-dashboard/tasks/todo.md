@@ -1,3 +1,58 @@
+# Fortnox historik-widening — betald historik, inte bara obetalt
+
+Källa: Andreas fråga "Borde vi bygga vidare på historisk finansiell data
+nu?" (uppföljning på Bolagsverket-diskussionen). Research visade att
+Fortnox-importen bara pullade ÖPPNA/OBETALDA fakturor — aldrig betald
+historik — och att ett ORELATERAT bugg-fynd dök upp under vägen (se
+separat sektion nedan, redan fixad `a667fb77`). Andreas godkände fullt
+scope efter tre AskUserQuestion-avstämningar: 12 månaders fönster,
+"Hämta historik"-knapp för befintliga anslutna kunder också, och en
+positiv rad i onboardingens payoff-yta.
+
+## Byggt (commit `5ec28b83` — pushat, deployat, Vercel-verifierad)
+
+- **`lib/fortnox.ts`**: `getFortnoxInvoices` gör nu TVÅ Fortnox-anrop,
+  ihopslagna via ny `mergeFortnoxInvoiceLists` (ren, testad): `filter=
+  unpaid` UTAN tidsgräns (ett obetalt ärende ska aldrig tappas bort för
+  att det är gammalt) + `fromdate=<12 månader sedan>` UTAN statusfilter
+  (ger betald historik + senaste årets öppna). `fromdate` verifierat mot
+  Fortnox egen utvecklardokumentation (fetchbar, till skillnad från
+  Bolagsverkets CAPTCHA-skydd) — inte gissat. Ingen ny OAuth-scope krävs.
+- **`lib/fortnox/map-invoice.ts`**: ny `status:'paid'`-gren. `outstanding
+  = 0` OVILLKORAT för betalda fakturor (aldrig beroende av om Fortnox
+  Balance-fält råkar vara satt/korrekt — en fallback till Total hade
+  kunnat räkna en betald faktura som skuld). `paid_at` sätts ALDRIG
+  (denna Fortnox-endpoint bär inget betalningsdatum — gissa aldrig ett).
+- **"Hämta historik"-knapp** i Inställningar → Integrationer: samma två
+  import-rutter (kunder, fakturor) som onboardingen. Båda redan
+  idempotenta (dedup på fortnox_document_number/customer_number/e-post/
+  telefon) — säkert för en redan ansluten kund att klicka flera gånger.
+- **Onboardingens payoff-yta** (`Step6LiveTour.tsx`): ny stödjande rad
+  "N fakturor värda X kr sedan [månad år]" — separat fält
+  (`historical_revenue`), tävlar ALDRIG om headline-platsen.
+  `pickHeadline`s test-låsta förfallet/obetalt-prioritet är helt orörd.
+
+## Verifierat
+
+- 35 nya/ändrade facit gröna: TDD för de rena delarna (merge-logik,
+  paid-status-mappning, historical_revenue-aggregering), källskanning
+  för route/UI-lagret.
+- `npx tsc --noEmit` rent, `npx next build` ren.
+- Full svit: 3057/3064. 5 av 7 failande var miljö-flakiga (GET-endpoint-
+  checkar helt orelaterade till det jag ändrat — bekräftat med en
+  isolerad omkörning, alla 5 gröna direkt). De 2 kvarvarande är Codex
+  pågående konsolideringsarbete, sedan tidigare bekräftat orört.
+
+## Kan skarptestas direkt (ingen extern registrering krävs, till skillnad
+från Bolagsverket-bygget)
+
+Fortnox-anslutningen finns redan (existerande OAuth-integration) — nästa
+gång ett anslutet testkonto klickar "Hämta historik" eller går igenom
+onboarding med Fortnox-koppling går det att verifiera skarpt mot riktig
+data direkt, ingen väntan på en manuell registreringsprocess.
+
+---
+
 # Bolagsverket-uppslag som start av onboarding — V1 klart
 
 Källa: Andreas "Nu när du byggt resten vill jag att vi gör en plan för
