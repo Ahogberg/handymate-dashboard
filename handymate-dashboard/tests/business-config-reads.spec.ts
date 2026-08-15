@@ -98,6 +98,9 @@ const VISNINGSYTOR = [
   // Månadsrapportens målblock — ren visning. Om konfigurationen inte kan
   // läsas utelämnas blocket och felet loggas; inget dokument produceras.
   'components/value/MalBlock.tsx',
+  // Mål-nudgen i JarvisHome (2026-08-15) — samma disciplin: läsfel loggas,
+  // nudgen visas bara när fältet BEVISAT saknas, aldrig vid osäkerhet.
+  'components/jarvis/MalNudge.tsx',
   'components/widget/GuardrailsEditor.tsx',
   'components/widget/KnowledgeEditor.tsx',
 ]

@@ -55,6 +55,7 @@ import { pengaFynd } from '@/lib/jarvis/moment-rows'
 import type { AgentMoment } from '@/lib/moments/derive'
 import { GorDettaForst, type NextBestActionRecommendation } from '@/components/jarvis/GorDettaForst'
 import { ProjektCaseKort, type ProjektCaseData } from '@/components/jarvis/ProjektCaseKort'
+import { MalNudge } from '@/components/jarvis/MalNudge'
 import { FuelWarningCard } from '@/components/jarvis/FuelWarningCard'
 import { useFuel } from '@/components/fuel/FuelProvider'
 
@@ -961,6 +962,8 @@ export default function JarvisHome({
               </button>
             )
           })()}
+
+          <MalNudge />
 
           {synligaCases.map(c => (
             <ProjektCaseKort key={c.project_id} data={c} />

@@ -59,6 +59,14 @@ export interface OnboardingFormData {
    * falsk (se lib/projects/compute-economics.ts arbetskostnad_konfigurerad).
    */
   internalHourlyCost?: number
+  /**
+   * Omsättnings-/marginalmål (2026-08-15, Business Twin-backlog #11).
+   * Frivilliga, precis som intern timkostnad ovan. Lämnas de tomma sätts
+   * inget värde alls (aldrig 0/null skrivet i onboarding-API:et) — samma
+   * ärlighetsprincip: ett osatt mål ska aldrig se ut som ett mål på 0 kr.
+   */
+  revenueTargetAnnual?: number
+  marginTargetPercent?: number
 
   // ── Step 4: Telefonnummer ────────────────────────────────
   lisaNumber?: string

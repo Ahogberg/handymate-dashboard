@@ -134,6 +134,11 @@ export async function PUT(request: NextRequest) {
         // Intern timkostnad (2026-08-12) — Guardians lönsamhetsmotor läser
         // den via compute-economics.ts; frivillig, se Step3HowYouWork.tsx.
         'default_internal_hourly_cost',
+        // Mål (2026-08-15, backlog #11) — läses av Next Best Action
+        // (lib/jarvis/next-best-action-goals.ts) och Månadsrapporten
+        // (components/value/MalBlock.tsx); frivillig, se Step3HowYouWork.tsx.
+        'revenue_target_annual_sek',
+        'margin_target_percent',
       ] as const
       for (const col of ALLOWED_COLUMNS) {
         if (col in config) updates[col] = (config as Record<string, unknown>)[col]

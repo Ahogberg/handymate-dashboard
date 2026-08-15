@@ -16,23 +16,14 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { svDateStr } from '@/lib/dates'
-
-function isLeapYear(year: number): boolean {
-  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
-}
-
-function dayOfYear(todayIso: string): { year: number; day: number; daysInYear: number } {
-  const [y, m, d] = todayIso.split('-').map(Number)
-  const startOfYearMs = Date.UTC(y, 0, 1)
-  const todayMs = Date.UTC(y, m - 1, d)
-  const day = Math.floor((todayMs - startOfYearMs) / 86_400_000) + 1
-  return { year: y, day, daysInYear: isLeapYear(y) ? 366 : 365 }
-}
+import { computeRevenuePace } from '@/lib/economy/revenue-pace'
 
 /**
  * Ren. Ingen I/O. `null` om inget mål är satt eller om målet inte är ett
  * positivt tal — ett osatt/ogiltigt mål ska ALDRIG visas som "mål: 0 kr"
- * (samma ärlighetsprincip som MalBlock.tsx redan följer).
+ * (samma ärlighetsprincip som MalBlock.tsx redan följer). Talen kommer
+ * från den delade lib/economy/revenue-pace.ts — samma takt-siffra som en
+ * människa ser i MalBlock.tsx, bara formaterad till en LLM-mening här.
  */
 export function buildGoalContextLine(input: {
   revenueTargetAnnualSek: number | null
@@ -40,16 +31,13 @@ export function buildGoalContextLine(input: {
   todayIso: string
 }): string | null {
   const { revenueTargetAnnualSek, invoicedYtdSek, todayIso } = input
-  if (revenueTargetAnnualSek == null || !(revenueTargetAnnualSek > 0)) return null
+  const pace = computeRevenuePace({ revenueTargetAnnualSek, invoicedYtdSek, todayIso })
+  if (!pace) return null
 
-  const { year, day, daysInYear } = dayOfYear(todayIso)
-  const paceTargetSek = revenueTargetAnnualSek * (day / daysInYear)
-  const pacePct = paceTargetSek > 0 ? Math.round((invoicedYtdSek / paceTargetSek) * 100) : 0
-
-  const målKr = Math.round(revenueTargetAnnualSek).toLocaleString('sv-SE')
+  const målKr = Math.round(revenueTargetAnnualSek as number).toLocaleString('sv-SE')
   const hittillsKr = Math.round(invoicedYtdSek).toLocaleString('sv-SE')
 
-  return `Årsmål ${year}: ${målKr} kr. Fakturerat hittills i år: ${hittillsKr} kr (${pacePct}% av förväntad takt vid dag ${day}/${daysInYear}).`
+  return `Årsmål ${pace.year}: ${målKr} kr. Fakturerat hittills i år: ${hittillsKr} kr (${pace.pacePct}% av förväntad takt vid dag ${pace.day}/${pace.daysInYear}).`
 }
 
 /**

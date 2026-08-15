@@ -179,6 +179,16 @@ export default function OnboardingPage() {
         if (typeof data.internalHourlyCost === 'number') {
           config.default_internal_hourly_cost = data.internalHourlyCost
         }
+
+        // Mål (2026-08-15, backlog #11) — samma frivillig-mönster. Ett
+        // osatt mål ska aldrig skrivas som 0 — `undefined` betyder
+        // "hoppades över", inte "målet är noll".
+        if (typeof data.revenueTargetAnnual === 'number') {
+          config.revenue_target_annual_sek = data.revenueTargetAnnual
+        }
+        if (typeof data.marginTargetPercent === 'number') {
+          config.margin_target_percent = data.marginTargetPercent
+        }
       }
 
       if (step === 3 && data.lisaNumber) {

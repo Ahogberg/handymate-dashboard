@@ -5,6 +5,8 @@ import { Target } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { logBusinessConfigError } from '@/lib/business/quote-surface-select'
+import { svDateStr } from '@/lib/dates'
+import { computeRevenuePace } from '@/lib/economy/revenue-pace'
 
 /**
  * "Mål" — Company Goals (Business Twin-backlog #11, 2026-08-13). Litet
@@ -18,8 +20,17 @@ import { logBusinessConfigError } from '@/lib/business/quote-surface-select'
  * MonthlyReviewData — ingen ny ekonomilogik, bara en jämförelse av tal som
  * redan finns.
  *
+ * Takt-procenten (2026-08-15) räknas via den delade lib/economy/
+ * revenue-pace.ts — samma dag-i-året-matematik som Next Best Action redan
+ * använder (lib/jarvis/next-best-action-goals.ts), inte den tidigare grova
+ * "denna månad / (årsmål÷12)"-uppskattningen. Kräver en egen YTD-summa
+ * (ett separat, litet uppslag mot invoice — MonthlyReviewData bär bara
+ * DENNA månads fakturerade belopp).
+ *
  * Ärlighetsprincip: ett osatt omsättningsmål (null) visar ingen rad
- * alls — aldrig "0 kr" eller ett påhittat procenttal.
+ * alls — aldrig "0 kr" eller ett påhittat procenttal. Medan takten
+ * fortfarande laddas visas ett neutralt "Räknar takt…", aldrig en
+ * halvfärdig/gissad siffra.
  */
 interface Profitability {
   invoiced_total: number
@@ -36,6 +47,7 @@ export function MalBlock({ monthLabel, profitability }: Props) {
   const business = useBusiness()
   const [marginTarget, setMarginTarget] = useState<number | null>(null)
   const [revenueTargetAnnual, setRevenueTargetAnnual] = useState<number | null>(null)
+  const [invoicedYtdSek, setInvoicedYtdSek] = useState<number | null>(null)
 
   useEffect(() => {
     let aktiv = true
@@ -65,11 +77,39 @@ export function MalBlock({ monthLabel, profitability }: Props) {
     return () => { aktiv = false }
   }, [business.business_id])
 
+  // Bara hämtad om ett mål faktiskt är satt — annars finns inget att
+  // räkna takt mot. Egen, liten query (inte MonthlyReviewData, som bara
+  // bär DENNA månads summa).
+  useEffect(() => {
+    if (revenueTargetAnnual == null) return
+    let aktiv = true
+    const year = new Date().getFullYear()
+    supabase
+      .from('invoice')
+      .select('total')
+      .eq('business_id', business.business_id)
+      .gte('created_at', `${year}-01-01T00:00:00.000Z`)
+      .then(({ data, error }: { data: { total: number | null }[] | null; error: { message?: string } | null }) => {
+        if (!aktiv) return
+        if (error) {
+          logBusinessConfigError('MalBlock', error)
+          return
+        }
+        const summa = (data || []).reduce((s: number, i: { total: number | null }) => s + (Number(i.total) || 0), 0)
+        setInvoicedYtdSek(summa)
+      })
+    return () => { aktiv = false }
+  }, [business.business_id, revenueTargetAnnual])
+
   const kr = (n: number) => `${Math.round(n).toLocaleString('sv-SE')} kr`
   const { best_project: best, worst_project: worst } = profitability
 
   const harNagot = revenueTargetAnnual != null || best || worst
   if (!harNagot) return null
+
+  const pace = revenueTargetAnnual != null && invoicedYtdSek != null
+    ? computeRevenuePace({ revenueTargetAnnualSek: revenueTargetAnnual, invoicedYtdSek, todayIso: svDateStr() })
+    : null
 
   return (
     <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 sm:p-6 mb-8">
@@ -88,7 +128,9 @@ export function MalBlock({ monthLabel, profitability }: Props) {
               {kr(profitability.invoiced_total)}
             </p>
             <p className="m-0 mt-0.5 text-[11px] text-gray-500">
-              mål ~{kr(revenueTargetAnnual / 12)} kr/mån ({Math.round((profitability.invoiced_total / (revenueTargetAnnual / 12)) * 100)}% av månadsmålet)
+              {pace
+                ? `${pace.pacePct}% av förväntad takt (dag ${pace.day}/${pace.daysInYear}) — mål ${kr(revenueTargetAnnual)} kr/år`
+                : 'Räknar takt…'}
             </p>
           </div>
         )}
