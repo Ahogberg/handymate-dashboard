@@ -53,22 +53,32 @@ kort och sin egen knapp i kön nedanför, samma fyra-ögon-regel som
 
 ## #11 Company Goals → beslut
 
-**Status: MARGINALMÅL V1 KOD KLAR 2026-08-14 — V134 SKA KÖRAS MANUELLT.
-OMSÄTTNINGSMÅLETS BESLUTSKONSUMENT ÅTERSTÅR.**
+**Status: BÅDA HALVORNA KOD KLARA. V134 KÖRD 2026-08-15 (Andreas "Kör v134
+då!"). Omsättningsmålets beslutskonsument byggd samma natt (`a997039c`) —
+men i PRAKTIKEN SOVANDE, se nedan.**
 
 `business_config.margin_target_percent` har nu ett separat
-`margin_target_set_at`-bevis (v134): värden som avviker från default 50
-backfillas säkert; tvetydiga 50 lämnas osatta tills ägaren sparar igen.
-Margin Guardian använder därefter det uttryckliga målet som sin
-`at_risk`-gräns och bär jämförelsen till samma orsaksrader på projektet och
-i kön. Utan bevisstämpeln gäller den tidigare 75/95-semantiken exakt; den
-hårda 95-gränsen kan aldrig sänkas av målet.
+`margin_target_set_at`-bevis (v134, KÖRD och verifierad): värden som
+avviker från default 50 backfillades säkert (1/22 konton bevisat
+explicit); tvetydiga 50 lämnades osatta. Margin Guardian använder därefter
+det uttryckliga målet som sin `at_risk`-gräns och bär jämförelsen till
+samma orsaksrader på projektet och i kön. Utan bevisstämpeln gäller den
+tidigare 75/95-semantiken exakt; den hårda 95-gränsen kan aldrig sänkas av
+målet.
 
-`revenue_target_annual_sek` (v128, nullable) visas fortfarande i
-Månadsrapporten men påverkar ännu inget beslut. Nästa eventuella steg är en
-separat, källmärkt målkontext till Next Best Action — först efter att
-marginalmålskonsumenten verifierats i skarp UI och utan att kalla mål för
-prioriteringsregler.
+`revenue_target_annual_sek` (v128, nullable) visas i Månadsrapporten OCH
+(sedan `a997039c`, 2026-08-15) i `lib/jarvis/next-best-action-goals.ts`:
+en källmärkt takt-kontext ("fakturerat i år vs förväntad takt") till Next
+Best Action, uttryckligen märkt som bakgrundsfakta, aldrig en
+prioriteringsregel, och hämtad EFTER motorns egna MIN_CANDIDATES/
+MIN_PRINCIPLES-spärrar (kan aldrig kringgå dem).
+
+**Sovande i produktion just nu, kontrollerat direkt i DB:** noll av 22
+konton har satt `revenue_target_annual_sek`, och noll konton har någon
+aktiv `priority_rule`-rad — Next Best Action-motorns egen spärr (byggd
+2026-08-13) har alltså aldrig klarat sig för något konto än. Samma mönster
+som Margin Guardian före v134: kapaciteten är klar och testad, riktig
+användning (en ägare skriver en princip + sätter ett mål) slår på den.
 
 ---
 

@@ -1,3 +1,103 @@
+# Natt-pass 2026-08-15 — Company Goals-kontext i Next Best Action (backlog #11)
+
+Källa: Andreas "Vad kan vi sätta dig på för lite större utveckling som tar
+produkten framåt innan jag vaknar?", medan Codex jobbade vidare (troligen
+mot closeout/lärslingan efter min tidigare korrigering samma natt).
+
+## Vägen dit — vad jag avfärdade INNAN jag byggde något
+
+`docs/council/ACTIVE_ROADMAP.md`s egen "genuint nytt, billigast först"-lista
+(2026-08-13, 4 punkter) var min utgångspunkt i stället för att gissa en ny
+idé:
+
+1. **"Koppla in `voice/process`" (mobil "Säg det en gång")** — kontrollerad
+   mot både dashboard- och mobile-repot. Backend (`app/api/voice/process/
+   route.ts`) finns och fungerar, men `components/VoiceButton.tsx` i
+   handymate-mobile är byggd och ANROPAR routen — bara aldrig monterad i
+   någon skärm. **Avfärdad när jag läste `app/matte/voice.tsx`**: en
+   NYARE, redan skeppad röstyta finns redan (on-device taligenkänning →
+   `sendToMatte()`, textbaserat mot agentteamet), som helt ersätter det
+   äldre Whisper→Claude-extraktionsflödet. Att koppla in VoiceButton hade
+   byggt en andra, sämre röstingång — inte fört produkten framåt.
+2. Distributed Value Receipts — redan byggt av Codex tidigare i natt.
+3. Project Closeout Magic — redan byggd sedan tidigare (2026-08-13).
+4. Explainability-reveal — redan täckt av Kvittoprincipen Fall 1-4.
+
+Alla fyra var alltså antingen döda spår eller redan klara. Läste vidare i
+`docs/strategy/BUSINESS_TWIN_IDEA_BACKLOG.md` och hittade #11 (Company
+Goals): margin_target-delen är klar (v134 kördes tidigare i natt), men
+posten säger uttryckligen "OMSÄTTNINGSMÅLETS BESLUTSKONSUMENT ÅTERSTÅR" —
+`revenue_target_annual_sek` (v128) visas bara i Månadsrapporten
+(MalBlock.tsx), läses av INGEN agent-logik. Nästa steg var redan
+föreslaget i samma dokument: "en separat, källmärkt målkontext till Next
+Best Action... utan att kalla mål för prioriteringsregler."
+
+## Byggt (commit a997039c — pushat, deployat, verifierat i Vercel)
+
+- `lib/jarvis/next-best-action-goals.ts` (ny): `buildGoalContextLine`
+  (ren) räknar takt-procent (fakturerat i år / förväntad takt vid dagens
+  andel av året) helt i egen kod — modellen får aldrig räkna en summa
+  ("en summa är inte en åsikt"). `null` om inget mål är satt eller om
+  målet är 0/negativt — aldrig "mål: 0 kr". `getGoalContext` (IO) hämtar
+  `business_config.revenue_target_annual_sek` + årets fakturerade summa
+  (samma "alla statusar"-semantik som `lib/matte/monthly-review.ts`s
+  `invoiced_total`), fail-soft genomgående (varje fel → `null`, NBA-
+  generering stoppas aldrig av att målkontexten inte gick att hämta).
+- `lib/jarvis/next-best-action-prompt.ts`: `buildUserMessage` och
+  `callNextBestActionModel` tar en ny valfri `goalContextLine`-parameter.
+  Läggs till som en EGEN sektion "ÄGARENS MÅL (bakgrundsfakta, inte en
+  prioriteringsregel)" — separat från `ÄGARENS PRIORITERINGSPRINCIPER`,
+  aldrig ihopblandad. Systemprompten instruerar modellen att bara väga in
+  den om en skriven princip faktiskt handlar om takt/mål.
+- `lib/jarvis/next-best-action.ts`: `getGoalContext` anropas EFTER båda
+  spärrarna (MIN_CANDIDATES, MIN_PRINCIPLES) — ett omsättningsmål kan
+  aldrig få en rankning att skrivas när ägaren inte har skrivit några
+  principer. Källkontrakt-test bevakar ordningen explicit.
+- Migrationsfritt: `revenue_target_annual_sek`-kolumnen finns redan
+  (v128). Presentationsfritt: `reasoning`-fältet renderas redan inline i
+  `components/jarvis/GorDettaForst.tsx` ("Gör detta först"-kortet) — om
+  modellen väver in målkontexten i sin motivering syns det direkt, ingen
+  UI-ändring behövdes.
+
+## Verifierat
+
+- `npx tsc --noEmit` — noll fel.
+- Nya + befintliga NBA-facit (`next-best-action-goals.spec.ts` [6 nya],
+  `next-best-action.spec.ts` [+3 nya: buildUserMessage-sektionering +
+  källkontrakt för spärrordningen], `next-best-action-normalize.spec.ts`)
+  — 35/35 gröna.
+- `npx next build` — ren build, 420 sidor.
+- Full testsvit: 2944/2950 gröna. 6 failed, alla ur samma redan kända
+  förbefintliga kluster (46elks-diagnostik i `api.spec.ts`/`sms.spec.ts`/
+  `comprehensive.spec.ts` + en timing-känslig `stegkedjan.spec.ts`-test)
+  — ombekräftat genom en ISOLERAD omkörning av exakt de 6 (samma resultat,
+  ingen koppling till någon fil jag rörde).
+- Pushat (`a997039c`) efter `git log origin/main..HEAD` visade att bara
+  min egen commit låg i kön (ingen Codex-commit att granska separat den
+  här gången). Vercel-deployen verifierad `Ready` innan jag skrev det här.
+
+## Viktigt att veta: koden är körbar men INAKTIV i praktiken just nu
+
+Kontrollerat direkt i produktions-DB (Supabase MCP) innan jag skrev det
+här:
+- **Noll konton har satt `revenue_target_annual_sek`** — målkontexten
+  returnerar `null` för alla 22 konton tills en ägare sparar ett
+  omsättningsmål i Inställningar.
+- **Noll konton har någon aktiv `priority_rule`-rad** — Next Best Action-
+  motorns egen MIN_PRINCIPLES-spärr (byggd 2026-08-13) har alltså ALDRIG
+  klarat sig för något konto än. Hela "Gör detta först"-ytan är i
+  praktiken sovande i produktion, oavsett min ändring.
+
+Det här är INTE ett fel i mitt bygge — samma mönster som Margin Guardian
+före v134 och Bränsle före första köpet: kapaciteten är klar och testad,
+riktig användning slår på den. Men Andreas bör veta att ingenting SYNS
+förrän (a) minst en ägare skriver en `priority_rule` (samma "Lär
+Handymate"-väg som redan skeppat `business_rule`, se [[BUSINESS_TWIN_IDEA_
+BACKLOG.md#12]]) OCH (b) samma ägare sätter ett omsättningsmål i
+Inställningar. Ingen åtgärd krävs av mig — bara satt förväntan rätt.
+
+---
+
 # Snabbofferten — steg-för-steg blir standard, review isoleras
 
 Källa: Andreas skärmdump + fynd (2026-08-14) — review-steget visade allt
