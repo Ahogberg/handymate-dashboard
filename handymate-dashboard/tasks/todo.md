@@ -1,3 +1,256 @@
+# Bolagsverket-uppslag som start av onboarding — V1 klart
+
+Källa: Andreas "Nu när du byggt resten vill jag att vi gör en plan för
+Bolagsverket-implementation som start av onboardingen" — uppföljning på
+[[bolagsverket-not-implemented]]. Plan skriven i plan mode med extern
+research (Bolagsverkets egen dokumentation är CAPTCHA-skyddad mot
+automatiserad läsning — bekräftade endpoints via en publicerad
+tredjeparts-klients dokumentation i stället för att gissa). Scope
+avstämt med Andreas: bara namn/adress/bolagsform-prefill nu; historisk
+ekonomisk data (årsredovisningar/iXBRL) blir en egen, senare etapp —
+fungerar dessutom bara för AB/ekonomisk förening (enskild firma har
+normalt ingen årsredovisningsskyldighet, vanligt bland hantverkare).
+
+## Vad research visade
+
+Bolagsverkets "värdefulla datamängder"-API (EU-direktivets öppna data):
+genuint gratis, inget avtal — Andreas uppgift stämde. Registrering är
+självbetjäning ("kundanmälan": e-post+telefon → API-nycklar via e-post/
+SMS), INTE en lång godkännandeprocess — men är ändå ett manuellt steg
+BARA Andreas kan göra; blockerar skarpt bruk tills
+`BOLAGSVERKET_CLIENT_ID`/`SECRET` finns i miljön. OAuth2-autentisering
+(inte mTLS/certifikat — det gäller bara Bolagsverkets separata,
+avgiftsbelagda API). Endpoints bekräftade via en publicerad tredjeparts-
+klients dokumentation (`gw.api.bolagsverket.se`), eftersom
+bolagsverket.se:s egna sidor är CAPTCHA-skyddade mot automatiserad
+läsning — exakt request/svar-schema för `POST /organisationer` är en
+välgrundad gissning som behöver verifieras mot den riktiga tekniska
+dokumentationen som följer med API-nycklarna.
+
+## Byggt (commit `f15661b9` — pushat tillsammans med Codex `d782cb00`
+(Cross-Agent Customer Case V1, granskad separat innan push), deployat,
+Vercel-verifierad)
+
+- **`lib/bolagsverket/client.ts`** (ny): OAuth2 client-credentials-token
+  + cache, `lookupCompany(orgNumber)`. Defensiv svarstolkning
+  (`parseOrganisationResponse`) — validerar formen innan den litar på
+  den, `null`/`invalid_response` hellre än att gissa fram ett fält.
+  Saknade credentials → `not_configured` direkt, ingen nätverksrundtur.
+- **`app/api/onboarding/bolagsverket-lookup/route.ts`** (ny): exakt
+  samma mall som befintliga `scrape-website/route.ts` — valfri auth
+  (frågan ställs innan kontot finns), egen rate-limit-bucket-namnrymd
+  (`bolagsverket:` — kolliderar inte med `scrape:`), svarar ALLTID 200
+  utom 429, kastar aldrig.
+- **`Step2Business.tsx`**: ny `'orgnr'`/`'orgnrLookup'`-fas FÖRST i
+  state-maskinen, före hemsides-frågan. Skäl till ordningen: org.nr är
+  den mest auktoritativa källan, så när hemsides-scrapen (om den körs)
+  når sina egna fill-only-empty-kontroller är namn/adress redan satta —
+  ingen egen konfliktlösningslogik behövdes. Mid-form-org.nr-fältet
+  BEHÖLLS oförändrat (säkerhetsnät för konton redan mitt i onboarding
+  när detta släpps, och en naturlig redigeringspunkt om uppslaget gav
+  fel data).
+- **`sql/v135_business_registered_address.sql`** (SKRIVEN, EJ KÖRD):
+  tre nullable adresskolumner (`address_street/postal_code/city`). Det
+  gamla, redan döda `business_config.address`-fältet rörs INTE.
+  `company_form`/`company_profile_source` behövde ingen ny kolumn —
+  fanns redan sedan v94, bara aldrig skrivna av kod förrän nu.
+- **`app/api/auth/route.ts`**: nya fälten skrivs villkorat vid
+  registrering, skyddade av det redan existerande `saknadKolumn`-
+  migrationsfönstret (samma mönster som Margin Guardian-deployen förra
+  natten) — säkert att köra i produktion INNAN v135 körs.
+
+## Verifierat
+
+- `npx tsc --noEmit` — noll fel.
+- 28 nya facit gröna (`bolagsverket-client.spec.ts` 9 st,
+  `bolagsverket-onboarding.spec.ts` 19 st) — TDD för klientens rena
+  delar, källskanning för route/UI/migration.
+- `npx next build` — ren build.
+- Full testsvit: 3034/3036 gröna. De 2 failande
+  (`stegkedjan.spec.ts:52`+`:101`) är Codex konsolideringsarbete från
+  igår kväll, bekräftat orört.
+- Pushat efter `git log origin/main..HEAD` visade Codex `d782cb00`
+  (Cross-Agent Customer Case V1) i kön — granskad innan push:
+  `lib/jarvis/customer-case.ts` byggde in EXAKT de tre förfiningarna jag
+  flaggade i min tidigare rekommendation (explicit per-typ-resolver
+  inkl. det nästlade `package_data.customer_id`-fallet för
+  `autopilot_package`, och uttrycklig exkludering av signaler som redan
+  ägs av ett synligt projekt-case) — höll måttet, pushade båda.
+- Vercel-deployen verifierad `Ready`.
+
+## Kvar innan skarpt bruk (inte en kodfråga — Andreas manuella steg)
+
+1. Genomför Bolagsverkets "kundanmälan" (självbetjäning, gratis).
+2. Lägg `BOLAGSVERKET_CLIENT_ID`/`SECRET` i Vercel-miljön.
+3. Verifiera `POST /organisationer`-svarets EXAKTA fältnamn mot den
+   riktiga tekniska dokumentationen som följer med nycklarna — min
+   `parseOrganisationResponse`-gissning kan behöva justeras (degraderar
+   snällt till `invalid_response` om den har fel, kraschar aldrig).
+4. Kör v135 (`Kör v135!`) när redo — inte förr.
+
+---
+
+# Mål i onboarding + synlig ekonomiprojektion — backlog #11 klart
+
+Källa: Andreas fråga "Borde vi redan i onboarding eller direkt efter också
+fråga kunderna vad deras mål för omsättning och marginal är?" — uppföljning
+på gårdagens NBA-bygge (`a997039c`) som visade att 0/22 konton någonsin
+satt `revenue_target_annual_sek`/`margin_target_percent`. Plan godkänd i
+plan mode efter research (onboarding är 7 steg, inte 10 som gamla docs
+säger; steg 2 har redan ett etablerat frivillig-fråge-mönster). Andreas
+godkände planen ("Kör planen!") och bad separat att verifiera ett minne om
+Bolagsverket-prefill i onboarding — bekräftat INTE byggt, se egen sektion
+längst ner. Bolagsverket-delen skjuts medvetet upp (Andreas: "vill nog köra
+Bolagsverket-delen sen, deras API ska vara gratis").
+
+## Byggt (commit `c21022f3` — pushat tillsammans med Codex `d53c90d4`
+(Canonical Project Completion, granskad separat innan push), deployat,
+Vercel-verifierad)
+
+- **`lib/economy/revenue-pace.ts`** (ny): `computeRevenuePace` — dag-i-
+  året-taktmatematiken extraherad ur `next-best-action-goals.ts` så NBA:s
+  LLM-kontext och en människa (MalBlock) räknar på EXAKT samma sätt.
+  `buildGoalContextLine` refaktorerad att anropa den — extern signatur/
+  textutdata oförändrad, NBA:s egna 27 facit gröna oförändrat.
+- **Onboarding steg 2** (`Step3HowYouWork.tsx`): två nya frivilliga fält
+  (omsättningsmål kr/år, marginalmål %) i samma "hoppa över"-stil som
+  intern timkostnad. Ingen ny steg, ingen steg-omnumrering behövdes.
+- **Kritisk fälla fixad**: `app/api/onboarding/route.ts`s `ALLOWED_
+  COLUMNS`-vitlista saknade båda de nya kolumnnamnen — koden varnar
+  själv uttryckligen om exakt den här bugklassen ("den tysta fällan").
+  Utan fixen hade fälten försvunnit ospårat, precis som `f_skatt_
+  registered` en gång gjorde.
+- **`MalBlock.tsx`** (Månadsrapporten): bytte ut den gamla grova "denna
+  månad / (årsmål÷12)"-uppskattningen mot riktig YTD-takt via
+  `computeRevenuePace`. Egen tenant-filtrerad YTD-fakturasumma-hämtning,
+  bara körd när ett mål faktiskt är satt. Neutralt "Räknar takt…" under
+  laddning — aldrig en halvfärdig/gissad siffra.
+- **`MalNudge.tsx`** (ny, i JarvisHome): de 22 befintliga kontona som
+  onboardat FÖRE det här bygget hade annars aldrig sett att fälten
+  finns. Avvisningsbar (localStorage, per företag), fail-soft — visas
+  BARA när fältet bevisat saknas, aldrig vid laddning/fel. Monterad i
+  systemnivå-zonen ovanför ProjektCaseKort, samma plats som mandags-
+  kortsbannern.
+
+## Verifierat
+
+- `npx tsc --noEmit` — noll fel genom hela bygget.
+- 30 nya/ändrade riktade facit gröna: `revenue-pace.spec.ts` (5, TDD),
+  `next-best-action-goals.spec.ts` + `next-best-action.spec.ts` (27,
+  oförändrat beteende efter refaktorn), `onboarding-goals.spec.ts` (7),
+  `malblock-pace.spec.ts` (5), `mal-nudge.spec.ts` (6).
+- **Sidofynd fixat under vägen**: `business-config-reads.spec.ts` slog
+  rött på `MalNudge.tsx`s nya klient-läsning av `business_config` —
+  facit kräver att VARJE ny läsning klassas explicit (dokumentyta vs
+  visningsyta) i stället för att glida in oklassad. Klassad som
+  visningsyta (samma kategori som MalBlock, ren visning, fail-soft).
+- `npx next build` — ren build.
+- Full testsvit: 2995/2997 gröna. De 2 failande (`stegkedjan.spec.ts:52`
+  + `:101`) är Codex pågående `completeProject`-konsolidering
+  (commit `d53c90d4`, "Canonical Project Completion V1") — bekräftat
+  orört av något jag ändrat (varken filen eller testet nämner någon av
+  mina filer).
+- **Delad arbetskatalog**: `git log origin/main..HEAD` visade Codex
+  `d53c90d4` liggande före min egen commit i kön. Granskad innan push
+  (inte bara litat på att testerna gick igenom): läste `lib/projects/
+  complete-project.ts` i sin helhet — korrekt tenant-filtrerad, atomisk
+  compare-and-set-övergång, återanvänder min fail-closed `checkFourEyesGate`
+  rakt av. Pushade båda tillsammans (`c21022f3`).
+- Vercel-deployen verifierad `Ready`.
+
+## Kontrollerat direkt i prod-DB (innan bygget, för att grunda planen)
+
+0/22 konton hade `revenue_target_annual_sek` satt. Samma mönster som
+Margin Guardian före v134 och Bränsle före första köpet: kapaciteten
+byggd, riktig användning slår på den. Onboarding-fixen löser det för NYA
+konton; nudgen för de befintliga 22.
+
+---
+
+# Verifierat: Bolagsverket-prefill i onboarding — INTE byggt
+
+Andreas mindes en tidigare diskussion om att onboarding skulle inledas med
+organisationsnummer → automatisk Bolagsverket-hämtning (adress m.m.
+prefyllt) + historisk ekonomisk information. Kontrollerat mot faktisk kod,
+inget gissat (Explore-pass, källor: `Step2Business.tsx`, `sql/
+v94_company_profile.sql`, `app/api/business-config/company-profile/
+route.ts`, `docs/council/COUNCIL_SYNTHESIS.md`):
+
+**Finns**: ett manuellt org.nr-textfält med lokal Luhn-validering
+(`lib/karin/org-number.ts`) och en hjälptext som skickar ANVÄNDAREN att
+slå upp det själv hos Bolagsverket — ingen automatisk hämtning triggas.
+`business_config.company_profile_source` har en DB-CHECK som tillåter
+`'bolagsverket'` som värde, men det skrivs ALDRIG någonstans i kodbasen —
+bara `'user'`, hårdkodat, ovillkorat, på varje spara. Internt redan
+dokumenterad brist i `docs/council/COUNCIL_SYNTHESIS.md`.
+
+**Företagskollen** (handymate.se/foretagskollen) är en helt annan sak —
+ett marknadsförings-lead-quiz på den separata landningssajten, 0
+inskickade leads. Ingen registeruppslag. **Ingen** historisk ekonomisk
+information hämtas från någon extern källa någonstans i kodbasen.
+
+**Återanvändbart mönster om detta byggs senare**: onboarding har redan
+AI-driven auto-fyll från hantverkarens EGEN hemsida (`app/api/onboarding/
+scrape-website/route.ts`, Claude Haiku-extraktion) — samma arkitektur
+(extern källa → extraktion → prefyll) skulle passa en Bolagsverket-
+integration. Andreas vill köra den separat senare — noterat att
+Bolagsverkets öppna data-API ska vara gratis (obekräftat av mig, hans
+uppgift).
+
+---
+
+# Cross-Agent Customer Case V1 — klar 2026-08-15
+
+## Beslutade designregler
+
+- Kundkoppling härleds med en explicit allowlist per approval-typ: direkt
+  `customer_id`, nästlad `package_data.customer_id` eller tenantfiltrerat
+  offert-/fakturauppslag. Ingen generell fallbackkedja.
+- Projektet äger en delad signal. Approval-rader som redan ingår i ett synligt
+  projekt-case exkluderas från kund-caset.
+- Ett kund-case kräver minst två distinkta `approval_type`. Agentdomän är
+  presentation, inte kvalificering.
+- V1 är helt läsande: ingen SQL, ingen ny approval-, lås-, SMS- eller
+  exekveringsmekanik.
+
+## Plan
+
+- [x] Inventera faktiska approval-payloads och lås den minsta säkra typallowlisten.
+- [x] Skriv facit för explicit tenant-säker kundresolver, projektägarskap,
+  tvåtypsgräns och fail-visible uppslag.
+- [x] Bygg ren kund-case-härledning och en route med befintlig auth,
+  behörighetskontroll och testdatafilter.
+- [x] Bygg ett återanvänt Jarvis-kort utan egna åtgärdsknappar och montera det
+  vid Project Case ovanför NBA.
+- [x] Verifiera TypeScript, riktade browserlösa tester, produktionsbuild och
+  exakt diff. Uppdatera roadmap/resultat och skapa en isolerad commit.
+
+## Resultat
+
+- `lib/jarvis/customer-case.ts` innehåller en ren, explicit resolver för 13
+  approval-typer och den gemensamma tvåtypshärledningen.
+- `/api/customer-cases` återanvänder auth, per-rad-behörighet och testdatafilter
+  från kön. Alla indirekta service-role-uppslag är tenantfiltrerade och varje
+  Supabase-fel läses.
+- Synliga Project Case-signaler reserveras före kundgrupperingen. Kundkortet
+  visar därför bara signaler som inte redan berättas av projektkortet.
+- `KundCaseKort` återanvänder Matte-/agentavatarerna, länkar till den riktiga
+  kundsidan och visar en rent rådgivande kontaktvarning vid överlapp.
+- Äldre `payload.agent` respekteras nu av den delade agentpresentationen, så
+  garantiuppföljning attribueras till Hanna i stället för typfallbacken Lars.
+- Ingen SQL eller skrivande affärslogik tillkom.
+
+## Verifiering
+
+- `npx tsc --noEmit` — grön.
+- 143/143 riktade customer/project-case-, Jarvis-, approval-routing-, preview-
+  och action-contract-facit — gröna.
+- `npx next build` — grön med samma befintliga miljö-/metadata-varningar.
+- Read-only liveproben kunde inte ansluta: `.env.test` saknar Supabase-URL och
+  service-role-nyckel. Leveransen påstår därför inget live-DB-bevis.
+
+---
+
 # Canonical Project Completion V1 — klar 2026-08-15
 
 Andreas beslutade att stänga de kvarvarande P1-fynden innan nästa Business
