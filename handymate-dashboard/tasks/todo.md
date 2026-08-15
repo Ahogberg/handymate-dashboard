@@ -1,3 +1,83 @@
+# Project Closeout P0-fixar — fyra-ögon fail-closed + godkännandets tysta fel
+
+Källa: Codex granskade project closeout (desktop `app/api/projects/route.ts`,
+mobil `app/api/booking/complete-job/route.ts`, godkännandet
+`app/api/approvals/[id]/route.ts`) och rapporterade två P0-fynd + tre P1
+(ojämn parity, saknad closeout-modal på två av tre vägar, ingen atomisk
+övergångsvakt) plus en större "Canonical Project Completion V1"-plan.
+Claude verifierade båda P0-fynden byte-för-byte mot faktisk kod INNAN
+något gjordes — se metod i tidigare pass ikväll. Andreas beslutade:
+fixa bara de två P0:orna nu (litet, isolerat), fail-closed-riktning
+bekräftad; P1:orna och den större konsolideringen är en separat framtida
+diskussion, inte del av den här fixen.
+
+## Byggt (commit `7e32413d` — pushat, deployat, Vercel-verifierad)
+
+**P0-1 — fyra-ögon-grinden fail-closed vid läsfel** (`lib/projects/
+four-eyes-gate.ts`): koden var 2026-08-09 dokumenterad som medvetet
+fail-open ("kan konfig/projekt inte läsas svarar grinden gated=false men
+med error satt, så anroparen själv får välja") — men VERIFIERAT att ingen
+av de tre dörrarna någonsin läste `.error`, bara `.gated`. Värre: de
+ursprungliga `.select().single()`-anropen destrukturerade inte ens
+`error` från Supabase-svaret, så en vanlig (icke-kastande) läsfel-rad
+gav `config: null`/`project: null` och tystade returnerade `{gated:
+false}` — omöjlig att skilja från "fyra ögon är genuint avstängt". Ny
+`reason: 'verification_failed' | 'approval_required'` skiljer
+overifierbart läge från ett äkta väntande kort. Båda dörrarna
+(`app/api/projects/route.ts` PUT, `app/api/booking/complete-job/
+route.ts`) uppdaterade att kolla `reason === 'verification_failed'`
+FÖRE `.gated` och blockera med ett tydligt fel i stället för att tyst
+fortsätta stänga.
+
+**P0-2 — godkännandets projektuppdatering läste aldrig felet**
+(`app/api/approvals/[id]/route.ts`, case `four_eyes_project_close`):
+`await supabase.from('project').update(...)` kördes utan att
+destrukturera `{ error }`, och returnerade ändå ok:true oavsett utfall.
+Ett misslyckat write (RLS, fel tenant, nätverk) lät fakturering/
+efterkalkyl/debrief/recensionsbegäran gå vidare mot ett projekt som
+aldrig faktiskt stängdes — och (bonus, ingen extra kod behövdes) den
+redan byggda Distributed Value Receipts-kedjan (`lib/approvals/
+execution-outcome.ts`s `classifyExecutionResult`, `result.ok === false`)
+plockar nu upp detta automatiskt och visar en ärlig "misslyckades"-status
+i stället för en tyst lögn.
+
+## Verifierat
+
+- `npx tsc --noEmit` — noll fel.
+- 7 nya facit i `tests/fyra-ogon.spec.ts` (fail-closed på config-läsfel,
+  project-läsfel, kastad exception; `reason`-fältet finns; båda
+  anroparna kollar `verification_failed` före `.gated`; godkännandet
+  läser `closeError` och returnerar `ok:false`) — TDD, röda innan fixen,
+  gröna efter. 23/23 i `fyra-ogon.spec.ts` + `projektstangningen.spec.ts`
+  totalt.
+- `npx next build` — ren build.
+- Full testsvit: 2956/2957 gröna. Den enda failande
+  (`stegkedjan.spec.ts:52`, "fire-and-forget") är INTE flaky (körd 3x i
+  rad, samma fel varje gång) men är HELT OROELATERAD till de här filerna
+  — grundorsak identifierad: `lib/projects/create-from-quote.ts` använder
+  ett synkront `try { await advanceProjectStage(...) }` (med egen
+  dokumenterad motivering: den "kända divergerande interna vägen" som
+  `app/api/quotes/accept/route.ts` anropar direkt), medan de andra två
+  stegkedje-skaparna använder fire-and-forget `.then().catch()`.
+  Facit-testet antar samma mönster+felsträng i alla tre och har inte
+  hängt med i divergensen. Samma failure fanns redan i den fristående
+  NBA-testsviten tidigare i natt, innan jag rörde någon av de här
+  filerna — bekräftat förbefintlig, inte en regression. Flaggas separat,
+  fixas inte här (utanför kvällens godkända scope).
+- Pushat (`7e32413d`) efter `git log origin/main..HEAD` visade att bara
+  min egen commit låg i kön. Vercel-deployen verifierad `Ready`.
+
+## Ej gjort (medvetet, utanför scope)
+
+Codex tre P1-fynd (mobilvägen kör vidare trots misslyckad statusuppdatering,
+bara desktopvägen öppnar `ProjectCloseoutModal.tsx`, tre implementationer
+kan glida isär utan gemensam atomisk vakt) och den föreslagna "Canonical
+Project Completion V1"-konsolideringen rördes INTE — Andreas beslut att
+hålla kvällens fix till bara de två P0:orna. `stegkedjan.spec.ts:52`-fyndet
+ovan likaså flaggat men inte fixat.
+
+---
+
 # Natt-pass 2026-08-15 — Company Goals-kontext i Next Best Action (backlog #11)
 
 Källa: Andreas "Vad kan vi sätta dig på för lite större utveckling som tar
