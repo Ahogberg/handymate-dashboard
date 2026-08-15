@@ -715,10 +715,11 @@ det bevisade målet EN gång per företag/körning (inte per projekt).
 
 Pushat: `49d3b19d`. Deployat, verifierat.
 
-## KVARSTÅR — v134-migrationen är INTE körd
+## v134-migrationen KÖRD (2026-08-15, efter Andreas "Kör v134 då!")
 
-`sql/v134_margin_target_explicit.sql` väntar på manuell körning i Supabase
-(lägger till `margin_target_set_at`, backfill, trigger). Kod är redan live
-och fail-safe utan den, men Guardian kommer inte att kunna använda något
-ägarmål förrän den kört. Rör den INTE utan att Andreas sagt "kör" —
-samma regel som Bränsle-migrationen tidigare i kväll.
+`sql/v134_margin_target_explicit.sql` kördes via Supabase MCP och
+verifierades direkt: kolumnen `margin_target_set_at` + triggern finns,
+och backfillen gav exakt rätt resultat — 1/22 konton (det som avviker
+från default, 20%) är nu bevisat explicit, resterande 21/22 (alla på
+default-50%) förblir korrekt obevisade. Guardian kan från och med nu
+faktiskt använda ett bevisat ägarmål när ett sparas.
