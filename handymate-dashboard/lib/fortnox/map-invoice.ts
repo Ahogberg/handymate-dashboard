@@ -19,7 +19,7 @@ import type { FortnoxInvoiceListItem } from '../fortnox'
 export interface MappedInvoiceRow {
   invoice_number: string
   invoice_type: 'standard'
-  status: 'sent' | 'overdue'
+  status: 'sent' | 'overdue' | 'paid'
   total: number
   invoice_date: string
   due_date: string | null
@@ -52,13 +52,21 @@ export function mapFortnoxInvoice(fi: FortnoxInvoiceListItem, today: string): Ma
   if (!docNumber) return null
 
   const total = Number(fi.Total) || 0
-  // Balance = utestående. Saknas fältet → obetald faktura, hela beloppet utestående.
-  const outstanding = fi.Balance != null ? Number(fi.Balance) || 0 : total
+  const isPaid = !!fi.FullyPaid
+  // Balance = utestående. Saknas fältet på en OBETALD faktura → hela beloppet
+  // utestående. En BETALD faktura har per definition inget utestående oavsett
+  // vad Balance råkar säga (2026-08-15, historik-widening — Fortnox kan
+  // utelämna/felaktigt sätta Balance på betalda rader; en fallback till Total
+  // hade riskerat att räkna en betald faktura som skuld).
+  const outstanding = isPaid ? 0 : (fi.Balance != null ? Number(fi.Balance) || 0 : total)
 
   const invoice_date = fi.InvoiceDate ?? today
   const due_date = fi.DueDate ?? null
-  // Förfallen om förfallodatum passerat, annars bara skickad.
-  const status: 'sent' | 'overdue' = due_date && due_date < today ? 'overdue' : 'sent'
+  // Betald slår allt (en betald faktura är aldrig "förfallen"), annars
+  // förfallen om förfallodatum passerat, annars bara skickad.
+  const status: 'sent' | 'overdue' | 'paid' = isPaid
+    ? 'paid'
+    : (due_date && due_date < today ? 'overdue' : 'sent')
 
   return {
     docNumber,

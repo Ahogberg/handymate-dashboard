@@ -661,51 +661,107 @@ interface FortnoxInvoicesListResponse {
   }
 }
 
+const INVOICE_PULL_MAX_PAGES = 4 // ~500/sida × 4 = 2000, rimlig cap PER pull
+
 /**
- * Hämta ÖPPNA/OBETALDA fakturor från Fortnox.
+ * Paginerad hämtning mot Fortnox /invoices med givna query-parametrar.
+ * Loopar via `?page=N` tills MetaInformation säger att vi är på sista sidan,
+ * med en säkerhetscap (INVOICE_PULL_MAX_PAGES) så en trasig meta inte ger
+ * oändlig loop. Återanvänder fortnoxRequest → token-refresh + audit-logg
+ * sköts där.
+ */
+async function fetchFortnoxInvoicePages(
+  businessId: string,
+  queryParams: string,
+): Promise<FortnoxInvoiceListItem[]> {
+  const all: FortnoxInvoiceListItem[] = []
+  for (let page = 1; page <= INVOICE_PULL_MAX_PAGES; page++) {
+    const response = await fortnoxRequest<FortnoxInvoicesListResponse>(
+      businessId,
+      'GET',
+      `/invoices?${queryParams}&page=${page}`
+    )
+
+    const rows = response.Invoices ?? []
+    all.push(...rows)
+
+    const totalPages = response.MetaInformation?.['@TotalPages'] ?? 1
+    const currentPage = response.MetaInformation?.['@CurrentPage'] ?? page
+    if (rows.length === 0 || currentPage >= totalPages) break
+  }
+  return all
+}
+
+/**
+ * Ren. Ingen I/O. Deduperar två Fortnox-fakturalistor på DocumentNumber
+ * (fallback InvoiceNumber, samma identitetslogik som mapFortnoxInvoice
+ * använder senare) — `primary` vinner vid krock. Rader utan identitet i
+ * NÅGON av listorna hoppas tyst över här (mapFortnoxInvoice hade gjort
+ * detsamma längre fram i kedjan ändå — samma "gissa aldrig ett dokument-id"
+ * -princip, bara tillämpad en gång i stället för två).
+ */
+export function mergeFortnoxInvoiceLists(
+  primary: FortnoxInvoiceListItem[],
+  secondary: FortnoxInvoiceListItem[],
+): FortnoxInvoiceListItem[] {
+  const keyFor = (inv: FortnoxInvoiceListItem): string | null => inv.DocumentNumber ?? inv.InvoiceNumber ?? null
+  const byDoc = new Map<string, FortnoxInvoiceListItem>()
+  for (const inv of primary) {
+    const key = keyFor(inv)
+    if (key) byDoc.set(key, inv)
+  }
+  for (const inv of secondary) {
+    const key = keyFor(inv)
+    if (key && !byDoc.has(key)) byDoc.set(key, inv)
+  }
+  return Array.from(byDoc.values())
+}
+
+/**
+ * Hämta Fortnox-fakturor: alla ÖPPNA/OBETALDA (oavsett ålder) + betalda/
+ * övriga senaste 12 månaderna (2026-08-15, historik-widening — se
+ * tasks/todo.md).
  *
- * Använder Fortnox list-filter `?filter=unpaid` (öppna, ej fullbetalda — inte
- * bara förfallna, så Karin ser hela bilden). Fortnox stödjer även
- * `unpaidoverdue`, men vi vill ha ALLA obetalda. Se Fortnox API v3-docs:
- * GET /3/invoices?filter=unpaid.
+ * TVÅ separata Fortnox-anrop, ihopslagna:
+ *   1. `?filter=unpaid`, ingen tidsgräns — ett obetalt ärende ska ALDRIG
+ *      tappas bort för att det är gammalt (Karin ska fortfarande kunna jaga
+ *      en tvåårig obetald faktura).
+ *   2. `?fromdate=<12 månader sedan>`, inget filter — ger betalda fakturor
+ *      (historik för marginal-/omsättningsanalys) OCH senaste årets öppna,
+ *      men INTE äldre öppna (de täcks redan av pull 1). `fromdate` är ett
+ *      dokumenterat Fortnox-parameter för invoices (format YYYY-MM-DD).
  *
- * PAGINERING: Fortnox paginerar (~500/sida). Vi loopar via `?page=N` tills
- * MetaInformation säger att vi är på sista sidan, med en säkerhetscap
- * (MAX_PAGES) så en trasig meta inte ger oändlig loop.
+ * Krockar (samma faktura i båda pullarna) dedupas — pull 1:s data vinner,
+ * även om innehållet är identiskt i praktiken.
  *
- * Filtrerar bort Cancelled/FullyPaid klient-sidan som skyddsnät (om Fortnox-
- * filtret skulle släppa igenom något).
+ * PAGINERINGSCAP gäller PER pull (INVOICE_PULL_MAX_PAGES vardera) — värsta
+ * fall alltså ~4000 rader totalt, inte 2000. Rimligt för pilot-volym; om ett
+ * etablerat bolags obetalda lista ensam skulle slå taket är det redan ett
+ * tecken på att importen behöver ses över separat.
  *
- * Återanvänder fortnoxRequest → token-refresh + audit-logg sköts där.
+ * Filtrerar bort Cancelled klient-sidan som skyddsnät. FullyPaid filtreras
+ * INTE längre bort (det är hela poängen med historik-pullen) — mappningen
+ * (lib/fortnox/map-invoice.ts) sätter status:'paid' och outstanding:0 för
+ * dem.
  */
 export async function getFortnoxInvoices(
   businessId: string
 ): Promise<FortnoxInvoiceListItem[]> {
-  const MAX_PAGES = 4 // ~500/sida × 4 = 2000, rimlig cap för pilot-volym
-  const all: FortnoxInvoiceListItem[] = []
+  const twelveMonthsAgo = new Date()
+  twelveMonthsAgo.setUTCMonth(twelveMonthsAgo.getUTCMonth() - 12)
+  const fromDate = twelveMonthsAgo.toISOString().slice(0, 10)
 
   try {
-    for (let page = 1; page <= MAX_PAGES; page++) {
-      const response = await fortnoxRequest<FortnoxInvoicesListResponse>(
-        businessId,
-        'GET',
-        `/invoices?filter=unpaid&page=${page}`
-      )
-
-      const rows = response.Invoices ?? []
-      all.push(...rows)
-
-      const totalPages = response.MetaInformation?.['@TotalPages'] ?? 1
-      const currentPage = response.MetaInformation?.['@CurrentPage'] ?? page
-      if (rows.length === 0 || currentPage >= totalPages) break
-    }
+    const [unpaid, recent] = await Promise.all([
+      fetchFortnoxInvoicePages(businessId, 'filter=unpaid'),
+      fetchFortnoxInvoicePages(businessId, `fromdate=${fromDate}`),
+    ])
+    const merged = mergeFortnoxInvoiceLists(unpaid, recent)
+    return merged.filter(inv => !inv.Cancelled)
   } catch (error) {
     console.error('Get Fortnox invoices error:', error)
     throw error
   }
-
-  // Skyddsnät: filtrera bort makulerade och fullbetalda även om filtret missar.
-  return all.filter(inv => !inv.Cancelled && !inv.FullyPaid)
 }
 
 /**

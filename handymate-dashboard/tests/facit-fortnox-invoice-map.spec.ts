@@ -40,6 +40,36 @@ test.describe('mapFortnoxInvoice — status', () => {
     expect(m?.row.status).toBe('sent')
     expect(m?.row.due_date).toBeNull()
   })
+
+  test('betald (FullyPaid) slår igenom OAVSETT due_date — en betald faktura är aldrig "förfallen" (2026-08-15, historik-widening)', () => {
+    const m = mapFortnoxInvoice({ DocumentNumber: '1', Total: 1000, DueDate: '2026-01-01', FullyPaid: true }, TODAY)
+    expect(m?.row.status).toBe('paid')
+  })
+})
+
+test.describe('mapFortnoxInvoice — betald historik (2026-08-15)', () => {
+  test('betald faktura får outstanding = 0 ÄVEN om Balance-fältet saknas', () => {
+    // Fortnox kan utelämna Balance för betalda rader — en fallback till Total
+    // hade felaktigt räknat en betald faktura som obetald skuld.
+    const m = mapFortnoxInvoice({ DocumentNumber: '1', Total: 8000, FullyPaid: true }, TODAY)
+    expect(m?.outstanding).toBe(0)
+  })
+
+  test('betald faktura får outstanding = 0 även om Balance råkar vara felaktigt satt', () => {
+    const m = mapFortnoxInvoice({ DocumentNumber: '1', Total: 8000, Balance: 8000, FullyPaid: true }, TODAY)
+    expect(m?.outstanding).toBe(0)
+  })
+
+  test('paid_at sätts ALDRIG — Fortnox invoice-listan bär inget betalningsdatum, gissa aldrig ett', () => {
+    const m = mapFortnoxInvoice({ DocumentNumber: '1', Total: 8000, FullyPaid: true }, TODAY)
+    expect(m).not.toBeNull()
+    expect(Object.keys(m!.row)).not.toContain('paid_at')
+  })
+
+  test('invoice_date bevaras för betalda fakturor precis som för obetalda', () => {
+    const m = mapFortnoxInvoice({ DocumentNumber: '1', Total: 8000, InvoiceDate: '2025-11-03', FullyPaid: true }, TODAY)
+    expect(m?.row.invoice_date).toBe('2025-11-03')
+  })
 })
 
 test.describe('mapFortnoxInvoice — belopp & utestående', () => {

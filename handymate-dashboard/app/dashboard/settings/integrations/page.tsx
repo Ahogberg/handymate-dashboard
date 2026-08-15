@@ -2,7 +2,7 @@
 
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
-import { ArrowLeft, Globe, Calendar, Mail, Code, ChevronRight, Copy, Check, Loader2, Lock, Receipt, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Globe, Calendar, Mail, Code, ChevronRight, Copy, Check, Loader2, Lock, Receipt, RefreshCw, Download } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 
@@ -30,7 +30,7 @@ export default function IntegrationsPage() {
   const [widgetEnabled, setWidgetEnabled] = useState(false)
   const [statusLoading, setStatusLoading] = useState(true)
   const [fortnox, setFortnox] = useState<FortnoxStatus | null>(null)
-  const [fortnoxAction, setFortnoxAction] = useState<'syncing' | 'disconnecting' | null>(null)
+  const [fortnoxAction, setFortnoxAction] = useState<'syncing' | 'disconnecting' | 'importing' | null>(null)
   const [fortnoxToast, setFortnoxToast] = useState<string | null>(null)
   const [emailLead, setEmailLead] = useState<{ address: string | null; last_received_at: string | null } | null>(null)
   const [emailLeadLoading, setEmailLeadLoading] = useState(true)
@@ -129,6 +129,36 @@ export default function IntegrationsPage() {
     } finally {
       setFortnoxAction(null)
       setTimeout(() => setFortnoxToast(null), 5000)
+    }
+  }
+
+  /**
+   * "Hämta historik" (2026-08-15) — samma två import-rutter som onboardingens
+   * StepImportData.tsx anropar (kunder, sedan fakturor), bara exponerade här
+   * för REDAN anslutna kunder som kopplade Fortnox innan historik-widening
+   * fanns, eller som vill köra om senare. Idempotent: båda rutterna dedupar
+   * redan (fortnox_customer_number/e-post/telefon respektive
+   * fortnox_document_number) — säkert att klicka flera gånger.
+   */
+  async function handleFortnoxImportHistory() {
+    setFortnoxAction('importing')
+    try {
+      await fetch('/api/integrations/fortnox/import/customers', { method: 'POST' })
+      const res = await fetch('/api/integrations/fortnox/import/invoices', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setFortnoxToast(
+          `Historik hämtad: ${data.imported} fakturor importerade${data.skipped ? `, ${data.skipped} redan kända` : ''}`
+        )
+      } else {
+        setFortnoxToast(`Historik-hämtning misslyckades: ${data.error || 'okänt fel'}`)
+      }
+      await refreshFortnox()
+    } catch (err: any) {
+      setFortnoxToast(`Historik-hämtning misslyckades: ${err.message || 'okänt fel'}`)
+    } finally {
+      setFortnoxAction(null)
+      setTimeout(() => setFortnoxToast(null), 6000)
     }
   }
 
@@ -288,6 +318,19 @@ export default function IntegrationsPage() {
                 </a>
               ) : (
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={handleFortnoxImportHistory}
+                    disabled={fortnoxAction !== null}
+                    title="Hämta betalda och obetalda fakturor senaste 12 månaderna, plus alla öppna oavsett ålder"
+                    className="flex items-center gap-1.5 text-xs font-medium text-[#0F766E] border border-[#E2E8F0] hover:border-[#0F766E] px-3 py-1.5 rounded-lg disabled:opacity-50"
+                  >
+                    {fortnoxAction === 'importing' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Download className="w-3.5 h-3.5" />
+                    )}
+                    Hämta historik
+                  </button>
                   <button
                     onClick={handleFortnoxSyncNow}
                     disabled={fortnoxAction !== null}

@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { ListChecks, Rocket, Target, Crown } from 'lucide-react'
+import { ListChecks, Rocket, Target, Crown, TrendingUp } from 'lucide-react'
 import { TEAM, getAgentById } from '@/lib/agents/team'
 import { TourTarget, SpotlightOverlay, type TourStepBase } from '@/components/tour/TourPrimitives'
 import type { OnboardingFormData } from '../types-redesign'
@@ -37,6 +37,8 @@ interface InstantValue {
   customer_count: number
   open_deals_count: number
   open_deals_value_kr: number
+  /** Betald historik (2026-08-15) — stödjande stat, tävlar aldrig om headline-platsen. */
+  historical_revenue: { count: number; sum_kr: number; since_date: string } | null
   headline: {
     agent: string
     text: string
@@ -734,6 +736,39 @@ function PayoffHero({
           <Target size={13} /> {nf(h.amount_kr)} kr att driva in
         </div>
       )}
+      {/* Historisk omsättning (2026-08-15) — en STÖDJANDE rad, alltid under
+          huvudrubriken, aldrig konkurrerande om den dramatiska förstaplatsen
+          (som fortfarande styrs av pickHeadline/förfallet-obetalt-prioriteten). */}
+      {instant.historical_revenue && (
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 8,
+            marginLeft: typeof h.amount_kr === 'number' && h.amount_kr > 0 ? 8 : 0,
+            padding: '6px 12px',
+            borderRadius: 'var(--ob-r-pill)',
+            background: 'rgba(255,255,255,0.10)',
+            color: 'rgba(255,255,255,0.92)',
+            fontSize: 12.5,
+            fontWeight: 600,
+          }}
+        >
+          <TrendingUp size={13} />
+          {instant.historical_revenue.count} fakturor värda {nf(instant.historical_revenue.sum_kr)} kr
+          {formatSedan(instant.historical_revenue.since_date)}
+        </div>
+      )}
     </div>
   )
+}
+
+/** "sedan mars 2026" ur ett YYYY-MM-DD-datum. Tomt datum → ingen "sedan"-svans. */
+function formatSedan(sinceDateIso: string): string {
+  if (!sinceDateIso) return ''
+  const d = new Date(sinceDateIso)
+  if (Number.isNaN(d.getTime())) return ''
+  const label = d.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })
+  return ` sedan ${label}`
 }

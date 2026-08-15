@@ -42,12 +42,20 @@ export async function GET(request: NextRequest) {
   // aldrig vänta på tung analys.
   const nittioDagar = new Date(Date.now() - 90 * 86_400_000).toISOString()
 
-  const [invoicesRes, customerRes, dealRows, stagesRes, quotesCountRes, projectsCountRes, invoicesCountRes] = await Promise.all([
+  const [invoicesRes, paidInvoicesRes, customerRes, dealRows, stagesRes, quotesCountRes, projectsCountRes, invoicesCountRes] = await Promise.all([
     supabase
       .from('invoice')
       .select('total, status')
       .eq('business_id', businessId)
       .in('status', ['sent', 'overdue'])
+      .limit(5000),
+    // Betald historik (2026-08-15, Fortnox-historik-widening) — stödjande
+    // statistik för payoff-heron, se lib/onboarding/instant-value.ts.
+    supabase
+      .from('invoice')
+      .select('total, invoice_date')
+      .eq('business_id', businessId)
+      .eq('status', 'paid')
       .limit(5000),
     supabase
       .from('customer')
@@ -91,6 +99,7 @@ export async function GET(request: NextRequest) {
     quotesAnalyzed: quotesCountRes.count ?? 0,
     projectsAnalyzed: projectsCountRes.count ?? 0,
     invoicesAnalyzed: invoicesCountRes.count ?? 0,
+    paidInvoices: paidInvoicesRes.data ?? [],
   })
 
   return NextResponse.json(result)

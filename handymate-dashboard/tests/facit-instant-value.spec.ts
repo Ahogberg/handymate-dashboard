@@ -61,6 +61,53 @@ test.describe('pickHeadline — prioritet (starkaste ärliga fyndet)', () => {
   })
 })
 
+test.describe('computeInstantValue — historisk omsättning (2026-08-15, Fortnox-historik-widening)', () => {
+  test('inga betalda fakturor → historical_revenue är null, inte en nolla', () => {
+    const r = computeInstantValue({ invoices: [], customerCount: 0, deals: [], stages: [] })
+    expect(r.historical_revenue).toBeNull()
+  })
+
+  test('summerar och räknar betalda fakturor, äldsta invoice_date blir since_date', () => {
+    const r = computeInstantValue({
+      invoices: [],
+      customerCount: 0, deals: [], stages: [],
+      paidInvoices: [
+        { total: 10000, invoice_date: '2026-03-15' },
+        { total: 25000, invoice_date: '2025-11-02' },
+        { total: 5000, invoice_date: '2026-01-10' },
+      ],
+    })
+    expect(r.historical_revenue).not.toBeNull()
+    expect(r.historical_revenue!.count).toBe(3)
+    expect(r.historical_revenue!.sum_kr).toBe(40000)
+    expect(r.historical_revenue!.since_date).toBe('2025-11-02')
+  })
+
+  test('rader utan invoice_date räknas i summan men påverkar inte since_date', () => {
+    const r = computeInstantValue({
+      invoices: [],
+      customerCount: 0, deals: [], stages: [],
+      paidInvoices: [
+        { total: 1000, invoice_date: null },
+        { total: 2000, invoice_date: '2026-02-01' },
+      ],
+    })
+    expect(r.historical_revenue!.sum_kr).toBe(3000)
+    expect(r.historical_revenue!.since_date).toBe('2026-02-01')
+  })
+
+  test('historical_revenue tävlar ALDRIG om headline-platsen — förfallna vinner ändå', () => {
+    const r = computeInstantValue({
+      invoices: [{ total: 5000, status: 'overdue' }],
+      customerCount: 0, deals: [], stages: [],
+      paidInvoices: [{ total: 999999, invoice_date: '2026-01-01' }],
+    })
+    expect(r.headline.agent).toBe('Karin')
+    expect(r.headline.text).toContain('förfallna')
+    expect(r.historical_revenue!.sum_kr).toBe(999999)
+  })
+})
+
 test.describe('computeInstantValue — aggregering', () => {
   test('partitionerar obetald/förfallen korrekt', () => {
     const r = computeInstantValue({

@@ -37,6 +37,13 @@ export interface InstantValue {
   quotes_analyzed: number
   projects_analyzed: number
   invoices_analyzed: number
+  /**
+   * Betald fakturahistorik (2026-08-15, Fortnox-historik-widening) — en
+   * STÖDJANDE statistik, tävlar ALDRIG om headline-platsen (se pickHeadline).
+   * `null` om inga betalda fakturor finns — visas då inte alls, aldrig som
+   * "0 kr sedan okänt datum".
+   */
+  historical_revenue: { count: number; sum_kr: number; since_date: string } | null
   headline: InstantHeadline
 }
 
@@ -73,6 +80,12 @@ export function fmt(n: number): string {
  *   eller stängd stage → exkluderas (konservativt, undviker överskattning).
  * - Belopp rundas till heltal kronor (matchar cash-radarns heltalskonvention).
  */
+/** Betald fakturarad ur historik-pullen — bara det beräkningen bryr sig om. */
+export interface InstantPaidInvoiceRow {
+  total: number | string | null
+  invoice_date: string | null
+}
+
 export function computeInstantValue(input: {
   invoices: InstantInvoiceRow[]
   customerCount: number
@@ -82,6 +95,8 @@ export function computeInstantValue(input: {
   quotesAnalyzed?: number
   projectsAnalyzed?: number
   invoicesAnalyzed?: number
+  /** Betalda fakturor (historik) — valfri, utelämnad/tom ger historical_revenue: null. */
+  paidInvoices?: InstantPaidInvoiceRow[]
 }): InstantValue {
   let overdue_count = 0
   let overdue_sum_kr = 0
@@ -129,11 +144,29 @@ export function computeInstantValue(input: {
     open_deals_value_kr,
   }
 
+  // Historisk omsättning — stödjande statistik, räknas EFTER base/headline
+  // och påverkar aldrig pickHeadline (den ser bara `base`).
+  let historical_revenue: InstantValue['historical_revenue'] = null
+  const paidInvoices = input.paidInvoices ?? []
+  if (paidInvoices.length > 0) {
+    const sum_kr = paidInvoices.reduce((s, i) => s + Math.round(Number(i.total) || 0), 0)
+    const dates = paidInvoices
+      .map(i => i.invoice_date)
+      .filter((d): d is string => !!d)
+      .sort()
+    historical_revenue = {
+      count: paidInvoices.length,
+      sum_kr,
+      since_date: dates[0] ?? '',
+    }
+  }
+
   return {
     ...base,
     quotes_analyzed: Math.max(0, Math.round(input.quotesAnalyzed ?? 0)),
     projects_analyzed: Math.max(0, Math.round(input.projectsAnalyzed ?? 0)),
     invoices_analyzed: Math.max(0, Math.round(input.invoicesAnalyzed ?? input.invoices.length)),
+    historical_revenue,
     headline: pickHeadline(base),
   }
 }
@@ -147,7 +180,7 @@ export function computeInstantValue(input: {
  *   4. Kunder importerade   → Hanna (redo att jobba)
  *   5. Tomt (skippad import) → Lisa, mjuk default, aldrig fabricerat
  */
-export function pickHeadline(v: Omit<InstantValue, 'headline' | 'quotes_analyzed' | 'projects_analyzed' | 'invoices_analyzed'>): InstantHeadline {
+export function pickHeadline(v: Omit<InstantValue, 'headline' | 'quotes_analyzed' | 'projects_analyzed' | 'invoices_analyzed' | 'historical_revenue'>): InstantHeadline {
   if (v.overdue_count > 0) {
     return {
       agent: 'Karin',
