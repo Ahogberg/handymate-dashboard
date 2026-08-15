@@ -131,6 +131,14 @@ export async function PUT(request: NextRequest) {
         'company_form',
         'f_skatt_registered',
         'company_profile_source',
+        // Bolagsverket-uppslag (2026-08-15) — se lib/bolagsverket/client.ts
+        // + app/onboarding/components/Step2Business.tsx. Primärt skrivna via
+        // /api/auth vid registrering, men vitlistade här också så en
+        // efterföljande PUT (t.ex. en framtida redigeringsyta) kan uppdatera
+        // dem utan att gå via samma "tysta fälla".
+        'address_street',
+        'address_postal_code',
+        'address_city',
         // Intern timkostnad (2026-08-12) — Guardians lönsamhetsmotor läser
         // den via compute-economics.ts; frivillig, se Step3HowYouWork.tsx.
         'default_internal_hourly_cost',

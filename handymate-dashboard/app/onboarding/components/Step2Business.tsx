@@ -92,18 +92,31 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
   // extraktionen kan förifylla formuläret istället för att komma för sent.
   // Skrap-routen fungerar nu utan session (IP-baserad rate limit), se
   // app/api/onboarding/scrape-website/route.ts.
-  // 'question' → 'urlInput' → 'scraping' → 'form' (förifyllt) = normalflödet.
+  // 'orgnr' → 'orgnrLookup' → 'question' → 'urlInput' → 'scraping' → 'form'
+  // (förifyllt av Bolagsverket OCH/eller hemsidan) = normalflödet.
   // 'question' → Nej/Hoppa över → 'form' (tomt) = samma slutpunkt.
   // Redan besvarad (resume, eller tillbaka-navigering inom samma session)
-  // hoppar rakt till 'form' — frågan ställs aldrig två gånger.
-  type WebPhase = 'form' | 'question' | 'urlInput' | 'scraping'
+  // hoppar rakt till 'form' — varken org.nr- eller hemsides-frågan ställs
+  // två gånger. Org.nr frågas FÖRST (2026-08-15, backlog: Bolagsverket-
+  // uppslag som start av onboarding) — den mest auktoritativa källan går
+  // före hemsidans AI-gissning, så fill-only-empty-mönstret (se
+  // applyExtraction nedan) automatiskt låter Bolagsverkets namn vinna.
+  type WebPhase = 'form' | 'orgnr' | 'orgnrLookup' | 'question' | 'urlInput' | 'scraping'
   const [webPhase, setWebPhase] = useState<WebPhase>(
-    () => (data.hasWebsite !== undefined ? 'form' : 'question'),
+    () => (data.hasWebsite !== undefined ? 'form' : 'orgnr'),
   )
   const [webUrlInput, setWebUrlInput] = useState('')
   const [webInputError, setWebInputError] = useState('')
   const [webResultError, setWebResultError] = useState('')
   const [webFoundSummary, setWebFoundSummary] = useState<string[]>([])
+  const [orgNumberInput, setOrgNumberInput] = useState(data.orgNumber || '')
+  const [orgInputError, setOrgInputError] = useState('')
+  const [orgResultError, setOrgResultError] = useState('')
+  const [orgFoundSummary, setOrgFoundSummary] = useState<string[]>([])
+  // Skiljer "uppslaget lyckades" från "fälten råkade redan vara ifyllda" —
+  // company_profile_source ska bara bli 'bolagsverket' när Bolagsverket
+  // faktiskt svarade, inte bara för att formuläret ser ifyllt ut.
+  const [orgLookupSucceeded, setOrgLookupSucceeded] = useState(false)
   const mountedRef = useRef(true)
   useEffect(() => () => { mountedRef.current = false }, [])
 
@@ -161,6 +174,84 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
       // Silent — samma "aldrig fastna"-mönster som saveProgress i page.tsx.
       // website_url finns kvar i data.websiteUrl (skickas med vid register).
     }
+  }
+
+  /**
+   * Bolagsverket-uppslag (2026-08-15) — samma fill-only-empty-disciplin som
+   * applyExtraction nedan. Kommer FÖRE hemsides-scrapen i flödet, så när
+   * scrapen (om den körs) når sina egna tomma-fält-kontroller är namn/adress
+   * redan satta av den mer auktoritativa källan — ingen egen konfliktlösning
+   * behövs.
+   */
+  function applyBolagsverketData(company: {
+    name: string | null
+    companyForm: string | null
+    address: { street: string | null; postalCode: string | null; city: string | null } | null
+  }) {
+    const patch: Partial<OnboardingFormData> = {}
+    if (company.name && !data.companyName?.trim()) patch.companyName = company.name
+    if (company.companyForm && !data.companyForm?.trim()) patch.companyForm = company.companyForm
+    if (company.address?.street && !data.addressStreet?.trim()) patch.addressStreet = company.address.street
+    if (company.address?.postalCode && !data.addressPostalCode?.trim()) patch.addressPostalCode = company.address.postalCode
+    if (company.address?.city && !data.addressCity?.trim()) patch.addressCity = company.address.city
+    if (Object.keys(patch).length > 0) update(patch)
+    setOrgLookupSucceeded(true)
+
+    const found: string[] = []
+    if (company.name) found.push('företagsnamn')
+    if (company.companyForm) found.push('bolagsform')
+    if (company.address) found.push('adress')
+    setOrgFoundSummary(found)
+  }
+
+  /**
+   * Slår upp org.nr hos Bolagsverket. ALDRIG blockerande — oavsett utfall
+   * går flödet vidare till hemsides-frågan; org.nr-värdet är redan sparat
+   * i data innan uppslaget ens startar, så ett misslyckat/långsamt/
+   * ej-konfigurerat uppslag kan bara missa PREFYLLNINGEN, aldrig hindra
+   * användaren från att fortsätta och fylla i manuellt.
+   */
+  async function runOrgLookup(formattedOrgNumber: string) {
+    update({ orgNumber: formattedOrgNumber })
+    setWebPhase('orgnrLookup')
+    setOrgResultError('')
+    const controller = new AbortController()
+    const clientTimeout = setTimeout(() => controller.abort(), 10_000)
+    try {
+      const res = await fetch('/api/onboarding/bolagsverket-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgNumber: formattedOrgNumber }),
+        signal: controller.signal,
+      })
+      const json = await res.json().catch(() => null)
+      if (!mountedRef.current) return
+      if (json?.ok && json.data) {
+        applyBolagsverketData(json.data)
+      } else {
+        setOrgResultError(json?.reason || 'Kunde inte slå upp företaget — fyll i manuellt istället.')
+      }
+    } catch {
+      if (mountedRef.current) setOrgResultError('Kunde inte slå upp företaget — fyll i manuellt istället.')
+    } finally {
+      clearTimeout(clientTimeout)
+    }
+    if (mountedRef.current) setWebPhase('question')
+  }
+
+  function submitOrgNumber() {
+    const check = checkOrgNumber(orgNumberInput)
+    if (!check.valid) {
+      setOrgInputError(check.error || 'Ogiltigt organisationsnummer')
+      return
+    }
+    setOrgInputError('')
+    runOrgLookup(check.formatted)
+  }
+
+  /** "Hoppa över" — inget att slå upp, gå rakt till hemsides-frågan. Org.nr fylls i manuellt längre ner i formuläret. */
+  function skipOrgNumber() {
+    setWebPhase('question')
   }
 
   /**
@@ -262,6 +353,8 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
   function goBackWebFlow() {
     if (webPhase === 'urlInput') { setWebPhase('question'); return }
     if (webPhase === 'scraping') { setWebPhase('urlInput'); return }
+    if (webPhase === 'question') { setWebPhase('orgnr'); return }
+    if (webPhase === 'orgnrLookup') { setWebPhase('orgnr'); return }
     onBack()
   }
 
@@ -417,6 +510,13 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
             // flyttad till början) — frågan besvarades INNAN kontot fanns,
             // så det finns ingen session att spara via förrän nu.
             websiteUrl: data.hasWebsite ? (data.websiteUrl || null) : null,
+            // Bolagsverket-uppslag (2026-08-15) — samma "ingen session än"-
+            // logik: skickas med här, inte via en separat PUT.
+            companyForm: data.companyForm || undefined,
+            addressStreet: data.addressStreet || undefined,
+            addressPostalCode: data.addressPostalCode || undefined,
+            addressCity: data.addressCity || undefined,
+            companyProfileSource: orgLookupSucceeded ? 'bolagsverket' : undefined,
           },
         }),
       })
@@ -444,6 +544,56 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
       <div className="ob-screen">
         <OnboardingHeader step={0} total={5} onBack={goBackWebFlow} />
         <div className="ob-body" style={{ display: 'flex', flexDirection: 'column' }}>
+          {webPhase === 'orgnr' && (
+            <>
+              <h1 className="ob-headline">Vad är ditt organisationsnummer?</h1>
+              <p className="ob-sub">
+                Matte slår upp företaget hos Bolagsverket och fyller i namn, adress och
+                bolagsform åt dig.
+              </p>
+              <div className="ob-field">
+                <label className="ob-label">Organisationsnummer</label>
+                <input
+                  className="ob-input"
+                  placeholder="556677-8899"
+                  autoFocus
+                  inputMode="numeric"
+                  value={orgNumberInput}
+                  onChange={e => { setOrgNumberInput(formatOrg(e.target.value)); setOrgInputError('') }}
+                  onKeyDown={e => e.key === 'Enter' && submitOrgNumber()}
+                />
+                {orgInputError && (
+                  <p className="ob-help" style={{ color: '#B91C1C' }}>{orgInputError}</p>
+                )}
+                {orgResultError && (
+                  <p className="ob-help" style={{ color: '#B91C1C' }}>{orgResultError}</p>
+                )}
+              </div>
+            </>
+          )}
+
+          {webPhase === 'orgnrLookup' && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '20px 0' }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  marginBottom: 16,
+                  border: '3px solid var(--ob-primary-100)',
+                  borderTopColor: 'var(--ob-primary-700)',
+                  borderRadius: '50%',
+                  animation: 'ob-spin 0.9s linear infinite',
+                }}
+              />
+              <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--ob-ink)' }}>
+                Matte frågar Bolagsverket…
+              </p>
+              <p style={{ fontSize: 13, color: 'var(--ob-muted)', marginTop: 4 }}>
+                Tar bara några sekunder
+              </p>
+            </div>
+          )}
+
           {webPhase === 'question' && (
             <>
               <h1 className="ob-headline">Har du en hemsida?</h1>
@@ -529,13 +679,23 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
         </div>
 
         <div className="ob-footer">
+          {webPhase === 'orgnr' && (
+            <button type="button" className="ob-cta" onClick={submitOrgNumber} disabled={!orgNumberInput.trim()}>
+              Slå upp <ArrowRight size={18} />
+            </button>
+          )}
           {webPhase === 'urlInput' && (
             <button type="button" className="ob-cta" onClick={submitWebsiteUrl} disabled={!webUrlInput.trim()}>
               Fortsätt <ArrowRight size={18} />
             </button>
           )}
-          {(webPhase === 'question' || webPhase === 'urlInput') && (
-            <button type="button" className="ob-cta ghost" onClick={answerNoWebsite} style={{ height: 44, fontSize: 13 }}>
+          {(webPhase === 'orgnr' || webPhase === 'question' || webPhase === 'urlInput') && (
+            <button
+              type="button"
+              className="ob-cta ghost"
+              onClick={webPhase === 'orgnr' ? skipOrgNumber : answerNoWebsite}
+              style={{ height: 44, fontSize: 13 }}
+            >
               Hoppa över
             </button>
           )}
@@ -552,6 +712,36 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
         <p className="ob-sub">
           <Clock size={14} /> Tar ca 60 sekunder
         </p>
+
+        {/* Bolagsverket-uppslaget: samma diskreta bekräftelse-mönster som
+            hemsides-scrapen nedan. Ingen låsning: fälten går att ändra. */}
+        {(orgFoundSummary.length > 0 || orgResultError) && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 8,
+              background: orgResultError ? 'var(--ob-rose-50)' : 'var(--ob-green-50)',
+              border: `1px solid ${orgResultError ? '#FECACA' : 'var(--ob-green-100)'}`,
+              borderRadius: 'var(--ob-r-md)',
+              padding: '10px 12px',
+              fontSize: 13,
+              color: orgResultError ? '#B91C1C' : 'var(--ob-green-600)',
+              marginBottom: 16,
+            }}
+          >
+            {orgResultError ? (
+              <Globe size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+            ) : (
+              <Check size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+            )}
+            <span>
+              {orgResultError
+                ? orgResultError
+                : <>Hämtat från Bolagsverket: <strong>{orgFoundSummary.join(', ')}</strong> — ändra gärna om något blivit fel.</>}
+            </span>
+          </div>
+        )}
 
         {/* Hemsida-förgreningen: diskret bekräftelse att fälten nedan kom
             från kundens hemsida (eller vänligt fel om läsningen misslyckades)

@@ -58,7 +58,7 @@ if (action === 'register') {
   if (!data?.email || !data?.password || !data?.businessName || !data?.contactName) {
     return NextResponse.json({ error: 'Fyll i alla obligatoriska fält' }, { status: 400 })
   }
-  const { email, password, businessName, displayName, contactName, phone, branch, serviceArea, referralCode, orgNumber, bankgiro, plusgiro, bankAccount, websiteUrl, fSkatt, secondaryBranches } = data
+  const { email, password, businessName, displayName, contactName, phone, branch, serviceArea, referralCode, orgNumber, bankgiro, plusgiro, bankAccount, websiteUrl, fSkatt, secondaryBranches, companyForm, addressStreet, addressPostalCode, addressCity, companyProfileSource } = data
 
   // 1. Skapa auth user via admin API (skippar e-postverifiering)
   const supabaseAdmin = getServerSupabase()
@@ -139,6 +139,17 @@ if (action === 'register') {
     // hittas på för anropare som inte besvarat frågan (DB-default false
     // är det ärliga läget — "inte intygat").
     ...(typeof fSkatt === 'boolean' ? { f_skatt_registered: fSkatt } : {}),
+    // Bolagsverket-uppslag (2026-08-15) — bara med när uppslaget faktiskt
+    // gav ett värde. Ett osatt fält ska aldrig se ut som en tom sträng.
+    // company_profile_source skickas ENDAST som 'bolagsverket' av klienten
+    // när uppslaget lyckades (se Step2Business.tsx) — annars utelämnas
+    // fältet helt och DB-defaulten (om någon) eller 'user' via Inställningar
+    // gäller precis som innan.
+    ...(companyForm ? { company_form: companyForm } : {}),
+    ...(addressStreet ? { address_street: addressStreet } : {}),
+    ...(addressPostalCode ? { address_postal_code: addressPostalCode } : {}),
+    ...(addressCity ? { address_city: addressCity } : {}),
+    ...(companyProfileSource === 'bolagsverket' ? { company_profile_source: 'bolagsverket' } : {}),
   }
 
   // secondary_branches (v93): bara med när listan är icke-tom — då slipper

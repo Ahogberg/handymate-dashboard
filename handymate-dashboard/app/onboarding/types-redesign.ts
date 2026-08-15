@@ -30,6 +30,16 @@ export interface OnboardingFormData {
   fSkatt?: boolean
   area?: string
   logoDataUrl?: string
+  /**
+   * Bolagsverket-uppslag (2026-08-15) — org.nr flyttat till start av
+   * Step2Business. Frivilliga: uppslaget kan misslyckas (API nere, inga
+   * credentials än, okänt org.nr) utan att blockera onboarding — då förblir
+   * de här tomma och användaren fyller i manuellt precis som innan.
+   */
+  companyForm?: string
+  addressStreet?: string
+  addressPostalCode?: string
+  addressCity?: string
 
   // Betalmottagare (krävs för fakturor — TD-27 pre-flight)
   paymentMethod?: 'bankgiro' | 'plusgiro' | 'bankAccount'
