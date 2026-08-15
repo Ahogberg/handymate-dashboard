@@ -320,6 +320,20 @@ export async function POST(request: NextRequest) {
 
     // Create from quote
     if (body.from_quote_id) {
+      // Idempotens (TD-57, tasks/tech-debt.md — verifierat i Bee Service-
+      // piloten: dubbel-klick/nätverks-retransmission skapade två projekt av
+      // samma offert en sekund isär). Ett projekt per offert — hittas ett
+      // befintligt returneras det i stället för att skapa ett nytt.
+      const { data: existingProject } = await supabase
+        .from('project')
+        .select('*')
+        .eq('business_id', businessId)
+        .eq('quote_id', body.from_quote_id)
+        .maybeSingle()
+      if (existingProject) {
+        return NextResponse.json({ project: existingProject, deduplicated: true })
+      }
+
       const { data: quote, error: quoteError } = await supabase
         .from('quotes')
         .select('*')
@@ -445,6 +459,21 @@ export async function POST(request: NextRequest) {
     }
 
     if (insertError) {
+      // Äkta samtidighet (två nästan samtidiga requests hann båda förbi
+      // dedup-kollen ovan) fångas här av det partiella unika indexet (v136)
+      // — 23505 betyder "en annan request vann kapplöpningen", inte ett fel.
+      // Returnera vinnaren i stället för ett 500:a på en godartad dubblett.
+      if (insertError.code === '23505' && body.from_quote_id) {
+        const { data: winner } = await supabase
+          .from('project')
+          .select('*')
+          .eq('business_id', businessId)
+          .eq('quote_id', body.from_quote_id)
+          .maybeSingle()
+        if (winner) {
+          return NextResponse.json({ project: winner, deduplicated: true })
+        }
+      }
       console.error('Project insert error:', insertError)
       return NextResponse.json({ error: insertError.message || 'Kunde inte skapa projekt' }, { status: 500 })
     }
