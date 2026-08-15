@@ -40,7 +40,7 @@ test.describe('bolagsverket-lookup/route.ts — samma "aldrig fastna"-disciplin 
   test('svarar alltid 200 med {ok,...} — aldrig ett okontrollerat 500, utom 429', () => {
     // Samma teknik som verifierar scrape-website-mönstret: räkna NextResponse.json-
     // anrop och kontrollera att INGET av dem sätter en annan status än 429.
-    const statusCalls = [...route.matchAll(/NextResponse\.json\([^)]*\{[\s\S]*?\},\s*\{\s*status:\s*(\d+)/g)]
+    const statusCalls = Array.from(route.matchAll(/NextResponse\.json\([^)]*\{[\s\S]*?\},\s*\{\s*status:\s*(\d+)/g))
     const statuses = statusCalls.map(m => m[1])
     expect(statuses.every(s => s === '429')).toBe(true)
   })

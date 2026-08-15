@@ -72,11 +72,15 @@ export async function GET(request: NextRequest) {
       .select('project_id', { count: 'exact', head: true })
       .eq('business_id', businessId)
       .gte('created_at', nittioDagar),
+    // invoice_date, inte created_at: Fortnox-importerade fakturor (onboarding
+    // steg 5) bevarar sitt riktiga invoice_date men får created_at stämplat
+    // med import-ögonblicket — created_at hade räknat gammal, historisk
+    // fakturering som "senaste 90 dagarna".
     supabase
       .from('invoice')
       .select('invoice_id', { count: 'exact', head: true })
       .eq('business_id', businessId)
-      .gte('created_at', nittioDagar),
+      .gte('invoice_date', nittioDagar),
   ])
 
   const result = computeInstantValue({

@@ -86,11 +86,18 @@ export async function collectMonthlyData(
   const prevEnd = monthStart
 
   // ── FAKTUROR ──
+  // Filtreras på invoice_date (fakturans EKONOMISKA period), inte created_at
+  // (när raden skrevs i vår databas). Skillnaden märks knappt för organiskt
+  // skapade fakturor (samma dag i praktiken) men är avgörande för Fortnox-
+  // importerade: de får sitt riktiga invoice_date bevarat (lib/fortnox/
+  // map-invoice.ts) men created_at stämplas med IMPORT-ögonblicket
+  // (DB-default now()) — en importerad faktura från förra året såg annars
+  // ut som "denna månads" omsättning.
   const [{ data: monthInvoices }, { data: prevInvoices }] = await Promise.all([
     supabase.from('invoice').select('invoice_id, status, total, customer_id, paid_at, due_date, invoice_date, created_at')
-      .eq('business_id', businessId).gte('created_at', startIso).lt('created_at', endIso),
-    supabase.from('invoice').select('invoice_id, total, status')
-      .eq('business_id', businessId).gte('created_at', prevStart.toISOString()).lt('created_at', prevEnd.toISOString()),
+      .eq('business_id', businessId).gte('invoice_date', startIso).lt('invoice_date', endIso),
+    supabase.from('invoice').select('invoice_id, total, status, invoice_date')
+      .eq('business_id', businessId).gte('invoice_date', prevStart.toISOString()).lt('invoice_date', prevEnd.toISOString()),
   ])
 
   const invoicedTotal = (monthInvoices || []).reduce((s, i) => s + (Number(i.total) || 0), 0)
