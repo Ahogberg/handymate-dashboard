@@ -5,10 +5,15 @@
  *
  *   npx playwright test tests/next-best-action.spec.ts --no-deps --project=chromium
  */
+import fs from 'fs'
+import path from 'path'
 import { test, expect } from '@playwright/test'
 import { byggNextBestAction, nextBestActionId } from '../lib/jarvis/next-best-action'
-import { validateModelOutput } from '../lib/jarvis/next-best-action-prompt'
+import { buildUserMessage, validateModelOutput } from '../lib/jarvis/next-best-action-prompt'
 import type { NormalizedCandidate } from '../lib/jarvis/next-best-action-normalize'
+
+const ROOT = path.resolve(__dirname, '..')
+const read = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
 
 test.describe('nextBestActionId — deterministisk primärnyckel', () => {
   test('formatet är nba_{businessId}_{ÅÅÅÅ-MM-DD}', () => {
@@ -134,5 +139,31 @@ test.describe('byggNextBestAction', () => {
       approval_id: 'appr_a',
       rationale: 'Kan vänta en dag.',
     })
+  })
+})
+
+test.describe('buildUserMessage — Company Goals-kontext (backlog #11)', () => {
+  test('utan målkontext (null/utelämnad) finns ingen "ÄGARENS MÅL"-sektion alls', () => {
+    const msg = buildUserMessage([CAND_A, CAND_B], ['En princip.'])
+    expect(msg).not.toContain('ÄGARENS MÅL')
+  })
+
+  test('med målkontext läggs den till som en EGEN, tydligt märkt sektion — inte ihopblandad med principerna', () => {
+    const msg = buildUserMessage([CAND_A, CAND_B], ['En princip.'], 'Årsmål 2026: 1 200 000 kr.')
+    expect(msg).toContain('ÄGARENS MÅL (bakgrundsfakta, inte en prioriteringsregel')
+    expect(msg).toContain('Årsmål 2026: 1 200 000 kr.')
+    // Sektionen kommer efter principerna, inte insprängd i dem.
+    expect(msg.indexOf('ÄGARENS PRIORITERINGSPRINCIPER')).toBeLessThan(msg.indexOf('ÄGARENS MÅL'))
+  })
+})
+
+test.describe('genereraNextBestAction — målkontexten kan aldrig kringgå principspärren', () => {
+  const källa = read('lib/jarvis/next-best-action.ts')
+
+  test('spärren för minst 1 priority_rule körs FÖRE målkontexten hämtas', () => {
+    const spärr = källa.indexOf('principles.length < MIN_PRINCIPLES')
+    const målkontext = källa.indexOf('getGoalContext(')
+    expect(spärr).toBeGreaterThan(-1)
+    expect(målkontext).toBeGreaterThan(spärr)
   })
 })

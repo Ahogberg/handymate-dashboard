@@ -54,6 +54,11 @@ ordagrant i principles_applied. Om ingen princip tydligt avgör en given
 rangordning, lämna principles_applied tom snarare än att hitta på en
 koppling.
 
+Du kan ibland också få en sektion "ÄGARENS MÅL" — bakgrundsfakta om
+omsättningstakt, aldrig en egen princip. Väg bara in den i din motivering
+om en av de skrivna principerna faktiskt handlar om takt, mål eller
+omsättning; annars ignorera den helt.
+
 Svara ENDAST med ett JSON-objekt, exakt denna form, inget annat:
 {
   "top_pick_approval_id": "<id ur listan>",
@@ -67,7 +72,11 @@ Svara ENDAST med ett JSON-objekt, exakt denna form, inget annat:
 "ranked" måste innehålla VARJE kandidat-id exakt en gång, topplatsen
 ("top_pick_approval_id") först.`
 
-export function buildUserMessage(candidates: NormalizedCandidate[], principles: string[]): string {
+export function buildUserMessage(
+  candidates: NormalizedCandidate[],
+  principles: string[],
+  goalContextLine: string | null = null,
+): string {
   const candidateLines = candidates
     .map(c => {
       const belopp =
@@ -82,7 +91,11 @@ export function buildUserMessage(candidates: NormalizedCandidate[], principles: 
 
   const principleLines = principles.length > 0 ? principles.map(p => `- ${p}`).join('\n') : '(inga principer skrivna än)'
 
-  return `KONKURRERANDE BESLUT SOM VÄNTAR:\n${candidateLines}\n\nÄGARENS PRIORITERINGSPRINCIPER:\n${principleLines}\n\nRangordna kandidaterna och peka ut vilken som ska göras först.`
+  const goalSection = goalContextLine
+    ? `\n\nÄGARENS MÅL (bakgrundsfakta, inte en prioriteringsregel):\n${goalContextLine}`
+    : ''
+
+  return `KONKURRERANDE BESLUT SOM VÄNTAR:\n${candidateLines}\n\nÄGARENS PRIORITERINGSPRINCIPER:\n${principleLines}${goalSection}\n\nRangordna kandidaterna och peka ut vilken som ska göras först.`
 }
 
 /**
@@ -145,6 +158,7 @@ export async function callNextBestActionModel(
   principles: string[],
   businessId: string,
   supabase: SupabaseClient,
+  goalContextLine: string | null = null,
 ): Promise<NextBestActionModelOutput | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
@@ -166,7 +180,7 @@ export async function callNextBestActionModel(
         model: NEXT_BEST_ACTION_MODEL,
         max_tokens: 1500,
         system: NEXT_BEST_ACTION_SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: buildUserMessage(candidates, principles) }],
+        messages: [{ role: 'user', content: buildUserMessage(candidates, principles, goalContextLine) }],
       }),
     })
 

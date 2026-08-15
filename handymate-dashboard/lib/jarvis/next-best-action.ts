@@ -13,6 +13,10 @@
  *      verklig konkurrent).
  *   2. Minst 1 aktiv priority_rule.
  * Endera saknas → inget skrivs, ingen "Gör detta först"-yta visas.
+ *
+ * Företagets omsättningsmål (next-best-action-goals.ts, backlog #11:s
+ * kvarvarande steg) hämtas EFTER båda spärrarna klarat sig — en
+ * målkontext gör aldrig att en rankning skrivs när principer saknas.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -25,6 +29,7 @@ import {
   type RawCandidateRow,
 } from './next-best-action-normalize'
 import { callNextBestActionModel, NEXT_BEST_ACTION_MODEL, type NextBestActionModelOutput } from './next-best-action-prompt'
+import { getGoalContext } from './next-best-action-goals'
 
 const MIN_CANDIDATES = 2
 const MIN_PRINCIPLES = 1
@@ -142,7 +147,8 @@ export async function genereraNextBestAction(supabase: SupabaseClient, businessI
   const candidates = await enrichAndNormalize(supabase, rawRows, nowIso)
   if (candidates.length < MIN_CANDIDATES) return { status: 'skipped_too_few_candidates' }
 
-  const modelOutput = await callNextBestActionModel(candidates, principles, businessId, supabase)
+  const goalContext = await getGoalContext(supabase, businessId, new Date())
+  const modelOutput = await callNextBestActionModel(candidates, principles, businessId, supabase, goalContext)
   if (!modelOutput) return { status: 'skipped_model_failed' }
 
   const nba = byggNextBestAction({ businessId, computedDate, candidates, modelOutput })
