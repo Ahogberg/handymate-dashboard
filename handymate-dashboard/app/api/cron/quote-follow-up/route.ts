@@ -240,6 +240,8 @@ export async function GET(request: NextRequest) {
               customerId: q.customer_id,
               relatedId: q.quote_id,
               messageType: 'quote_expiry_nudge',
+              recipient: 'customer',
+              purpose: 'proactive',
             })
             if (smsResult.success) {
               expiryNudgesSent++

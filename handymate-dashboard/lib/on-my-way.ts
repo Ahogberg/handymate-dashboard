@@ -128,6 +128,8 @@ export async function sendOnMyWaySms(args: OnMyWaySmsArgs): Promise<OnMyWaySmsRe
       to: normalizedPhone,
       message: smsText,
       messageType: 'on_my_way',
+      recipient: 'customer',
+      purpose: 'transactional',
     })
     smsSuccess = r.success
     if (!r.success) {

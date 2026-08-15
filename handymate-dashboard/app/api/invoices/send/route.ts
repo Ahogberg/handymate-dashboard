@@ -262,6 +262,8 @@ export async function POST(request: NextRequest) {
           customerId: invoice.customer_id || null,
           relatedId: invoice_id,
           messageType: 'invoice',
+          recipient: 'customer',
+          purpose: 'transactional',
         })
 
         if (smsResult.success) {

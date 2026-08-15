@@ -134,6 +134,8 @@ export async function POST(
           customerId: invoice.customer_id || null,
           relatedId: invoiceId,
           messageType: 'invoice_reminder',
+          recipient: 'customer',
+          purpose: 'transactional',
         })
 
         if (smsResponse.success) {

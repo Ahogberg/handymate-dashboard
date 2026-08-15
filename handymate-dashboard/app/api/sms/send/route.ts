@@ -73,6 +73,8 @@ export async function POST(request: NextRequest) {
       to,
       message,
       messageType: 'manual',
+      recipient: 'customer',
+      purpose: 'conversational',
     })
 
     if (!smsResult.success) {

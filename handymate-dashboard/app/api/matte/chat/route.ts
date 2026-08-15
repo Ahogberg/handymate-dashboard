@@ -333,6 +333,8 @@ async function executeTool(
         to: String(phone),
         message: String(message),
         messageType: 'matte_chat',
+        recipient: 'customer',
+        purpose: 'conversational',
       })
 
       if (!r.success) {

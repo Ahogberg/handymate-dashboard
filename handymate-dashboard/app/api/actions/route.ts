@@ -41,6 +41,8 @@ export async function POST(request: NextRequest) {
           to,
           message,
           messageType: 'action_sms',
+          recipient: 'customer',
+          purpose: 'conversational',
         })
 
         if (!r.success) throw new Error(r.error || 'Failed to send SMS')
@@ -402,6 +404,8 @@ case 'create_booking': {
         message,
         customerId,
         messageType: 'booking_confirmation',
+        recipient: 'customer',
+        purpose: 'transactional',
       })
       if (!r.success) console.error('[actions] bokningsbekräftelse misslyckades:', r.error)
     } catch (smsError) {

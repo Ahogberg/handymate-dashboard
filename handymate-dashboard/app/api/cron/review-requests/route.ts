@@ -291,6 +291,8 @@ export async function GET(request: NextRequest) {
           customerId: customer.customer_id,
           relatedId: project.project_id,
           messageType: 'review_request',
+          recipient: 'customer',
+          purpose: 'proactive',
         })
 
         const { error: logError } = await supabase.from('v3_automation_logs').insert({

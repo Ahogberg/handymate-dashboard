@@ -143,6 +143,8 @@ export async function POST(
         customerId,
         relatedId: ata.change_id,
         messageType: 'ata_send',
+        recipient: 'customer',
+        purpose: 'transactional',
       })
 
       if (!smsResult.success) {

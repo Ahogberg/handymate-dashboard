@@ -94,6 +94,8 @@ export async function deliverInvoiceReminder(
       customerId,
       relatedId: invoiceId,
       messageType: 'invoice_reminder',
+      recipient: 'customer',
+      purpose: 'transactional',
     })
     smsSent = r.success
     // Felet kastades tidigare bort — spärrhakens/46elks besked är exakt den

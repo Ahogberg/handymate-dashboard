@@ -270,6 +270,8 @@ export async function sendSmartMessage(params: {
       customerId: params.customerId || null,
       relatedId: params.context?.dealId || params.context?.invoiceId || null,
       messageType: 'smart_communication',
+      recipient: 'customer',
+      purpose: 'proactive',
     })
     sendSuccess = r.success
     if (!r.success) errorMessage = r.error || 'SMS failed'

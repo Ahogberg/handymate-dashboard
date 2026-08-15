@@ -116,6 +116,8 @@ export async function POST(request: NextRequest) {
         customerId: recipient.customer_id || null,
         relatedId: campaignId,
         messageType: 'campaign',
+        recipient: 'customer',
+        purpose: 'proactive',
       })
 
       if (result.success) {

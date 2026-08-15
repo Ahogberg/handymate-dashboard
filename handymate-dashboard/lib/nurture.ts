@@ -742,6 +742,8 @@ async function sendNurtureSMS(params: {
     message: params.message,
     customerId: params.customerId,
     messageType: 'nurture_sequence',
+    recipient: 'customer',
+    purpose: 'proactive',
   })
 
   if (!result.success) {

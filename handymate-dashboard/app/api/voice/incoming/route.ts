@@ -118,6 +118,8 @@ export async function POST(request: NextRequest) {
           customerId: custId,
           relatedId: leadId,
           messageType: 'onboarding_test',
+          recipient: 'customer',
+          purpose: 'conversational',
         })
 
         // 3. Skriv stegen + AVARMERA (nästa samtal behandlas normalt)

@@ -300,6 +300,8 @@ async function handleSendSms(
     message,
     customerId: (context.customer_id as string) || null,
     messageType: 'automation_rule',
+    recipient: 'customer',
+    purpose: 'proactive',
   })
 
   if (!r.success) {

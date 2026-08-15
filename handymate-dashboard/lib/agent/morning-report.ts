@@ -163,6 +163,7 @@ export async function sendMorningReport(businessId: string): Promise<{
       message,
       messageType: 'morning_report',
       recipient: 'internal',
+      purpose: 'internal',
     })
 
     if (!smsResult.success) {

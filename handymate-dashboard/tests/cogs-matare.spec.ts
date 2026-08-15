@@ -437,11 +437,10 @@ test.describe('spärrhaken — läckaget får bara krympa', () => {
   })
 
   test("opt-out gäller kunder, inte hantverkaren — och listan är kort", () => {
-    // customer.sms_opt_out är ett KUNDSKYDD. Tre utskick går till
-    // hantverkarens egen telefon (morgonrapport, månadsrapport). Råkar hans
-    // nummer finnas som en kundrad i hans EGET företag med opt-out satt —
-    // vanligt i test- och demokonton — skulle han tyst sluta få sin egen
-    // rapport. recipient:'owner' hoppar därför över opt-out-uppslaget.
+    // customer.sms_opt_out är ett KUNDSKYDD. Några utskick går till företagets
+    // ägare eller medarbetare, inte till kunden. Råkar deras nummer finnas som
+    // en kundrad i samma företag med opt-out satt — vanligt i test- och
+    // demokonton — skulle interna rapporter/notiser annars tyst försvinna.
     //
     // Flaggan är farlig om den sprider sig till kundmeddelanden, så listan
     // hålls kort och explicit här.
@@ -449,9 +448,11 @@ test.describe('spärrhaken — läckaget får bara krympa', () => {
       'lib/agent/morning-report.ts',
       'app/api/cron/monthly-review/route.ts',
       'lib/leads/golden-path.ts',
+      'lib/onboarding/first-event-sms.ts',
       'lib/referral/discounts.ts',
       'app/api/work-orders/[id]/send/route.ts',
       'app/api/field-reports/[id]/sign/route.ts',
+      'app/api/public/book/[slug]/route.ts',
     ]
     const träffar: string[] = []
     const gå = (dir: string) => {
@@ -471,9 +472,12 @@ test.describe('spärrhaken — läckaget får bara krympa', () => {
     expect(träffar.sort(), `oväntad internal-flagga: ${träffar.join(', ')}`)
       .toEqual(TILLATNA_INTERNA_SITES.sort())
 
-    // Och helpern måste faktiskt hoppa över spärren för dem.
+    // Callsite-kontraktet går genom samma centrala grind; ingen callsite
+    // implementerar ett eget undantag från kundskyddet.
     const s = kod('lib/sms-send.ts')
-    expect(s).toContain("args.recipient === 'internal'")
+    expect(s).toContain('gateCustomerSms({')
+    expect(s).toContain('recipient,')
+    expect(s).toContain('purpose,')
   })
 
   test('strypunkten mäter kostnad och delar', () => {

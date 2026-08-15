@@ -30,8 +30,10 @@
  *   2. sms_log — faktiskt loggat utgående agent-SMS (sendSmsViaElks loggar
  *      ALLTID, även fail) inom fönstret.
  *
- * Fail-open (tillåter kontakt) på alla DB-fel — en guard-krasch får aldrig
- * blockera hela outbound-motorn, bara logga en varning.
+ * Detta är en rådgivande PRODUCENTVAKT: DB-fel får hellre skapa ett extra
+ * approval-kort än stoppa hela outbound-motorn. Den är inte exekverings-
+ * skyddet. Den centrala grinden i lib/outbound/sms-gate.ts kör precis före
+ * 46elks, kontrollerar faktisk skickad historik och failar stängt.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'

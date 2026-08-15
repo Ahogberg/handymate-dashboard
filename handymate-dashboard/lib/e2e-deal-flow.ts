@@ -863,6 +863,8 @@ async function executeReviewRequest(
         customerId: deal.customer_id || null,
         relatedId: dealId,
         messageType: 'deal_flow_review_request',
+        recipient: 'customer',
+        purpose: 'proactive',
       })
       if (!r.success) console.error('[deal-flow] recensionsbegäran misslyckades:', r.error)
     }

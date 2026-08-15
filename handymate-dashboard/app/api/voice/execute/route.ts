@@ -242,6 +242,8 @@ export async function POST(request: NextRequest) {
           message: action.data.message || '',
           customerId: customer.customer_id,
           messageType: 'voice_action',
+          recipient: 'customer',
+          purpose: 'conversational',
         })
 
         if (!smsResult.success) {

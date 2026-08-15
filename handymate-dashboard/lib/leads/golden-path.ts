@@ -51,6 +51,7 @@ async function sendSMS(
       message,
       messageType: 'new_lead_notice',
       recipient: 'internal',
+      purpose: 'internal',
     })
     if (!r.success) console.error('[golden-path] SMS misslyckades:', r.error)
     return r.success

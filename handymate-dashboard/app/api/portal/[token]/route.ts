@@ -77,6 +77,8 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
             message,
             customerId: customer.customer_id,
             messageType: 'portal_welcome',
+            recipient: 'customer',
+            purpose: 'transactional',
           })
           if (!r.success) console.error('[portal] välkomst-SMS misslyckades:', r.error)
         } catch (err) {

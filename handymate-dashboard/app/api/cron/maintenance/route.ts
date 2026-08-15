@@ -151,6 +151,8 @@ export async function GET(request: NextRequest) {
           customerId: p.customer_id || null,
           relatedId: p.invoice_id || null,
           messageType: 'review_request',
+          recipient: 'customer',
+          purpose: 'proactive',
         })
 
         if (smsRes.success) {

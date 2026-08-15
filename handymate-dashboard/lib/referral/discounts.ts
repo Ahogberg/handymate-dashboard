@@ -192,6 +192,7 @@ export async function handleFirstPaymentReferral(
         message: 'Din kollega har nu aktiverat Handymate! Du får 50% rabatt på nästa månads faktura. Tack för att du spred ordet!',
         messageType: 'referral_reward',
         recipient: 'internal',
+        purpose: 'internal',
       })
       if (!r.success) console.error('[referral] rabattnotis misslyckades:', r.error)
     }

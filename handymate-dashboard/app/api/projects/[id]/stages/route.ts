@@ -104,6 +104,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
               customerId: project.customer_id,
               relatedId: params.id,
               messageType: `project_stage_${stage}`,
+              recipient: 'customer',
+              purpose: 'transactional',
             })
             if (!r.success) console.error('[project-stages] SMS misslyckades:', r.error)
           }

@@ -4,6 +4,12 @@ import { sanitizeSenderId } from './sms/sender-id'
 import { smsPartCount, smsCostOre, normalizeIfCheaper } from './costs/meter'
 import { recordCost } from './costs/record'
 import { PRICE_VERSION } from './costs/price-list'
+import {
+  gateCustomerSms,
+  type SmsGateCode,
+  type SmsPurpose,
+  type SmsRecipient,
+} from './outbound/sms-gate'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -49,7 +55,13 @@ export interface SendSmsArgs {
    * Facit i tests/cogs-matare.spec.ts håller listan över tillåtna
    * 'internal'-callsites kort.
    */
-  recipient?: 'customer' | 'internal'
+  recipient: SmsRecipient
+  /**
+   * Obligatorisk avsiktsklass. Proaktiva utskick samordnas mot de senaste
+   * sju dagarnas faktiska kundkontakt; transaktionella/konversationella gör
+   * inte det. Alla kundklasser respekterar STOPP.
+   */
+  purpose: SmsPurpose
 }
 
 export interface SendSmsResult {
@@ -62,6 +74,10 @@ export interface SendSmsResult {
   status?: number | null
   /** Felmeddelande när success=false. PostgrestError-detalj om sms_log INSERT failade. */
   error?: string
+  /** Maskinläsbar orsak från den centrala säkerhetsgrinden. */
+  blockedReason?: SmsGateCode
+  /** true = samma approval hade redan ett levererat SMS; inget nytt skickades. */
+  idempotent?: boolean
 }
 
 export type OptOutCommand = 'stop' | 'start' | null
@@ -81,85 +97,6 @@ export function parseOptOutCommand(message: string): OptOutCommand {
 }
 
 /**
- * Slår upp en kund via telefonnummer när customer_id inte är känt av
- * callern. Kunddata lagras i blandade format (E.164 eller lokalt
- * 0-prefix) — provar båda vanligaste formerna istället för en full
- * tabellscan. Delad mellan opt-out-kollen nedan och STOPP/START-
- * hanteringen i app/api/sms/incoming/route.ts.
- *
- * Fail-soft: ett DB-fel på en kandidat (t.ex. kolumn saknas om sql/v86
- * inte körts) hoppar tyst vidare till nästa kandidat/null — kraschar
- * aldrig anroparen.
- */
-export async function findCustomerByPhone(
-  supabase: SupabaseClient,
-  businessId: string,
-  phoneE164: string,
-): Promise<{ customer_id: string; sms_opt_out?: boolean } | null> {
-  const local = phoneE164.startsWith('+46') ? '0' + phoneE164.slice(3) : null
-  const candidates = [phoneE164, ...(local ? [local] : [])]
-
-  for (const candidate of candidates) {
-    try {
-      const { data, error } = await supabase
-        .from('customer')
-        .select('customer_id, sms_opt_out')
-        .eq('business_id', businessId)
-        .eq('phone_number', candidate)
-        .maybeSingle()
-      if (error) {
-        console.warn('[findCustomerByPhone] uppslag misslyckades (icke-blockerande):', error.message)
-        continue
-      }
-      if (data) return data
-    } catch (err: any) {
-      console.warn('[findCustomerByPhone] uppslag kastade (icke-blockerande):', err?.message || err)
-    }
-  }
-  return null
-}
-
-/**
- * Opt-out-spärr (VP1, gap 7 — tasks/vilande-pengar-masterplan.md): en kund
- * som svarat STOPP/STOP/SLUTA eller manuellt markerats som avböjd på
- * kundkortet ska ALDRIG få ett agent-SMS, oavsett vilken väg som utlöste
- * sändningen — sendSmsViaElks är den gemensamma nämnaren för alla
- * system-/agent-triggade utskick, så kollen sitter här en gång.
- *
- * Fail-open (tillåter sändning) på ALLA fel, inklusive "kolumn saknas" om
- * sql/v86_customer_optout.sql inte körts än — en opt-out-koll får aldrig
- * krascha eller tyst blockera ett SMS-utskick pga migrations-status.
- */
-async function isCustomerOptedOut(
-  supabase: SupabaseClient,
-  businessId: string,
-  customerId: string | null | undefined,
-  phoneE164: string,
-): Promise<boolean> {
-  try {
-    if (customerId) {
-      const { data, error } = await supabase
-        .from('customer')
-        .select('sms_opt_out')
-        .eq('customer_id', customerId)
-        .eq('business_id', businessId)
-        .maybeSingle()
-      if (error) {
-        console.warn('[sendSmsViaElks] opt-out-uppslag (customer_id) misslyckades, tillåter sändning:', error.message)
-        return false
-      }
-      return data?.sms_opt_out === true
-    }
-
-    const match = await findCustomerByPhone(supabase, businessId, phoneE164)
-    return match?.sms_opt_out === true
-  } catch (err: any) {
-    console.warn('[sendSmsViaElks] opt-out-uppslag kastade, tillåter sändning:', err?.message || err)
-    return false
-  }
-}
-
-/**
  * Skickar SMS direkt mot 46elks och loggar till sms_log.
  *
  * Återanvänd från andra routes (t.ex. /api/ata/[id]/send) istället för
@@ -175,7 +112,19 @@ async function isCustomerOptedOut(
  * system-flow ska räknas mot kvoten, gör det manuellt på callsite.
  */
 export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> {
-  const { supabase, businessId, businessName, to, message: råMeddelande, customerId, relatedId, messageType, approvalId } = args
+  const {
+    supabase,
+    businessId,
+    businessName,
+    to,
+    message: råMeddelande,
+    customerId,
+    relatedId,
+    messageType,
+    approvalId,
+    recipient,
+    purpose,
+  } = args
 
   // ═══ TYPOGRAFITVÄTT (fynd ur mätaren, 2026-08-08) ═══
   //
@@ -197,10 +146,6 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
     )
   }
 
-  if (!ELKS_API_USER || !ELKS_API_PASSWORD) {
-    return { success: false, error: '46elks credentials not configured' }
-  }
-
   // E.164-normalisering. Idempotent — redan E.164-input passerar oförändrat.
   const phone = normalizeSwedishPhone(to)
   if (!phone || !phone.startsWith('+')) {
@@ -214,16 +159,42 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
   let status: number | null = null
   let errorMsg: string | undefined
   let success = false
+  let blockedReason: SmsGateCode | undefined
+  let resolvedCustomerId: string | null = customerId || null
 
-  // Meddelanden till hantverkaren själv omfattas inte av kundens opt-out —
-  // se noten vid `recipient` i SendSmsArgs.
-  const optedOut =
-    args.recipient === 'internal'
-      ? false
-      : await isCustomerOptedOut(supabase, businessId, customerId, phone)
-  if (optedOut) {
-    errorMsg = 'Kunden har avböjt SMS'
+  // En enda fail-closed grind precis före den externa effekten. Den verifierar
+  // tenant + telefon + STOPP och, för proaktiva utskick, senaste kundkontakt.
+  const gate = await gateCustomerSms({
+    supabase,
+    businessId,
+    phoneE164: phone,
+    customerId,
+    recipient,
+    purpose,
+    messageType: messageType || '',
+    approvalId,
+  })
+  if (!gate.allowed && gate.code === 'already_sent' && gate.previous) {
+    return {
+      success: true,
+      smsId: gate.previous.smsId,
+      elksId: gate.previous.elksId,
+      idempotent: true,
+    }
+  }
+
+  if (!gate.allowed) {
+    errorMsg = gate.error
+    blockedReason = gate.code
   } else {
+    resolvedCustomerId = gate.customerId
+  }
+
+  if (!errorMsg && (!ELKS_API_USER || !ELKS_API_PASSWORD)) {
+    errorMsg = '46elks credentials not configured'
+  }
+
+  if (!errorMsg) {
     try {
       const response = await fetch('https://api.46elks.com/a1/sms', {
         method: 'POST',
@@ -301,7 +272,7 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
       price_version: PRICE_VERSION,
       sms_id: smsId,
       business_id: businessId,
-      customer_id: customerId || null,
+      customer_id: resolvedCustomerId,
       direction: 'outbound',
       phone_from: fromName,
       phone_to: phone,
@@ -328,5 +299,6 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
     elksId,
     status,
     error: success ? undefined : errorMsg,
+    blockedReason,
   }
 }

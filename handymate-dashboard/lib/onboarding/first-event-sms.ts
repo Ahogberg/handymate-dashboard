@@ -81,6 +81,8 @@ export async function sendFirstEventSms(
       to: ownerPhone,
       message,
       messageType: 'onboarding_first_event',
+      recipient: 'internal',
+      purpose: 'internal',
     })
 
     if (!result.success) {

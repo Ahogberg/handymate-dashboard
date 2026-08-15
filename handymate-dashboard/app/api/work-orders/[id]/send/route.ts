@@ -113,6 +113,7 @@ export async function POST(
       relatedId: wo.id || null,
       messageType: 'work_order',
       recipient: 'internal',
+      purpose: 'internal',
     })
 
     if (!smsRes.success) {

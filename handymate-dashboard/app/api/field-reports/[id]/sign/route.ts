@@ -55,6 +55,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           relatedId: params.id,
           messageType: 'field_report_signed',
           recipient: 'internal',
+          purpose: 'internal',
         })
         if (!r.success) console.error('[field-reports] signeringsnotis misslyckades:', r.error)
       }
@@ -118,6 +119,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           relatedId: params.id,
           messageType: 'field_report_rejected',
           recipient: 'internal',
+          purpose: 'internal',
         })
         if (!r.success) console.error('[field-reports] invändningsnotis misslyckades:', r.error)
       }

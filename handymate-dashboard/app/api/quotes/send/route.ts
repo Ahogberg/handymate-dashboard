@@ -44,6 +44,8 @@ async function sendSMS(
     customerId: customerId || null,
     relatedId: quoteId || null,
     messageType: 'quote',
+    recipient: 'customer',
+    purpose: 'transactional',
   })
   if (!r.success) console.error('[quotes/send] SMS misslyckades:', r.error)
   return { sent: r.success, error: r.error }

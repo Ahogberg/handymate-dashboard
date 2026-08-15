@@ -1205,6 +1205,8 @@ async function sendSms(
     message,
     customerId: (params.customer_id as string) || null,
     messageType: 'agent_sms',
+    recipient: 'customer',
+    purpose: 'conversational',
   })
 
   if (!smsResult.success) {

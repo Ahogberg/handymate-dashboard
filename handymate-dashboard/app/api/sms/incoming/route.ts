@@ -3,7 +3,8 @@ import { getServerSupabase } from '@/lib/supabase'
 import { triggerAgentFireAndForget, makeIdempotencyKey } from '@/lib/agent-trigger'
 import { createHash } from 'crypto'
 import { verifyElksSignature } from '@/lib/elks-signature'
-import { sendSmsViaElks, findCustomerByPhone, parseOptOutCommand } from '@/lib/sms-send'
+import { sendSmsViaElks, parseOptOutCommand } from '@/lib/sms-send'
+import { resolveSmsCustomer } from '@/lib/outbound/sms-gate'
 
 /**
  * Incoming SMS webhook from 46elks.
@@ -121,47 +122,63 @@ export async function POST(request: NextRequest) {
     const isStartCommand = optOutCommand === 'start'
 
     if (isStopCommand || isStartCommand) {
-      try {
-        const matchedCustomer = await findCustomerByPhone(supabase, business.business_id, from)
-        if (matchedCustomer) {
-          const confirmMessage = isStopCommand
-            ? 'Du får inga fler SMS från oss. Svara START för att ändra dig.'
-            : 'Du får SMS från oss igen. Tack!'
-
-          // Skicka bekräftelsen FÖRE opt-out-flaggan sätts — annars
-          // blockerar sendSmsViaElks:s egen opt-out-koll bekräftelsen
-          // själv i STOPP-fallet (kunden hinner sättas som avböjd innan
-          // "du får inga fler SMS"-svaret går ut).
-          const { data: bizCfg } = await supabase
-            .from('business_config')
-            .select('business_name')
-            .eq('business_id', business.business_id)
-            .maybeSingle()
-
-          await sendSmsViaElks({
-            supabase,
-            businessId: business.business_id,
-            businessName: bizCfg?.business_name || business.business_name,
-            to: from,
-            message: confirmMessage,
-            customerId: matchedCustomer.customer_id,
-            messageType: isStopCommand ? 'opt_out_confirm' : 'opt_in_confirm',
-          })
-
-          await supabase
-            .from('customer')
-            .update({
-              sms_opt_out: isStopCommand,
-              sms_opt_out_at: isStopCommand ? new Date().toISOString() : null,
-              sms_opt_out_source: isStopCommand ? 'sms_stop' : null,
-            })
-            .eq('customer_id', matchedCustomer.customer_id)
-            .eq('business_id', business.business_id)
+      const resolution = await resolveSmsCustomer({
+        supabase,
+        businessId: business.business_id,
+        phoneE164: from,
+      })
+      if (!resolution.ok) {
+        if (resolution.code === 'guard_unavailable') {
+          console.error('[SMS Incoming] STOPP/START kunde inte verifiera kundskyddet:', resolution.error)
+          return new NextResponse('Temporary error', { status: 503 })
         }
-      } catch (err) {
-        // Tål att sql/v86 inte körts (kolumn saknas) eller andra DB-fel —
-        // loggar men svarar ändå 200 så 46elks inte retryar i onödan.
-        console.error('[SMS Incoming] STOPP/START-hantering misslyckades (icke-blockerande):', err)
+        // Ett okänt nummer har ingen kundrad att spärra. Inget agentflöde
+        // triggas, men retry hjälper inte och ska därför inte begäras.
+        console.warn('[SMS Incoming] STOPP/START saknar entydig kund:', resolution.error)
+        return new NextResponse('OK')
+      }
+
+      const matchedCustomer = resolution.customer
+      // Spara samtyckesläget FÖRE kvittensen. Supabase kastar inte på query-
+      // fel, därför läses både error och den returnerade raden uttryckligen.
+      const { data: updatedCustomer, error: optOutUpdateError } = await supabase
+        .from('customer')
+        .update({
+          sms_opt_out: isStopCommand,
+          sms_opt_out_at: isStopCommand ? new Date().toISOString() : null,
+          sms_opt_out_source: isStopCommand ? 'sms_stop' : null,
+        })
+        .eq('customer_id', matchedCustomer.customerId)
+        .eq('business_id', business.business_id)
+        .select('customer_id')
+        .maybeSingle()
+
+      if (optOutUpdateError || !updatedCustomer) {
+        console.error(
+          '[SMS Incoming] STOPP/START kunde inte sparas — begär webhook-retry:',
+          optOutUpdateError?.message || 'kundraden uppdaterades inte',
+        )
+        return new NextResponse('Temporary error', { status: 503 })
+      }
+
+      const confirmMessage = isStopCommand
+        ? 'Du får inga fler SMS från oss. Svara START för att ändra dig.'
+        : 'Du får SMS från oss igen. Tack!'
+      const confirmation = await sendSmsViaElks({
+        supabase,
+        businessId: business.business_id,
+        businessName: business.business_name,
+        to: from,
+        message: confirmMessage,
+        customerId: matchedCustomer.customerId,
+        messageType: isStopCommand ? 'opt_out_confirm' : 'opt_in_confirm',
+        recipient: 'customer',
+        purpose: 'consent_confirmation',
+      })
+      if (!confirmation.success) {
+        // Flaggan är redan sann och får aldrig rullas tillbaka för att själva
+        // kvittensen misslyckades. Felet är synligt i sms_log och Vercel-logg.
+        console.error('[SMS Incoming] STOPP/START-kvittens misslyckades:', confirmation.error)
       }
       return new NextResponse('OK')
     }

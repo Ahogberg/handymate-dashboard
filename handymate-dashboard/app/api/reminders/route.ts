@@ -43,6 +43,8 @@ async function sendSMS(
     customerId: customerId || null,
     relatedId: bookingId || null,
     messageType: 'booking_reminder',
+    recipient: 'customer',
+    purpose: 'transactional',
   })
   if (!r.success) console.error('[reminders] SMS misslyckades:', r.error)
   return r.success

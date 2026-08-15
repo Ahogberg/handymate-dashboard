@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
           message: smsText,
           messageType: 'monthly_review',
           recipient: 'internal',
+          purpose: 'internal',
         })
         if (!r.success) console.error('[cron/monthly-review] SMS misslyckades:', r.error)
       }

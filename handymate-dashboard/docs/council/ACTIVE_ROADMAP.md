@@ -17,6 +17,42 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-15 — Outbound Safety & STOPP Closure V1 byggd
+
+Alla kund-SMS som använder den kanoniska 46elks-sändaren passerar nu en enda
+fail-closed exekveringsgrind. Det stänger luckan där ett trasigt kund-/STOPP-
+uppslag tidigare tolkades som tillåtelse att skicka.
+
+**Det som nu är sant:**
+
+- Kund-id, telefon och tenant verifieras tillsammans före den externa
+  effekten. Saknad, främmande eller tvetydig kund samt DB-fel blockerar.
+- Varje sändväg anger explicit intern, transaktionell, konversationell,
+  proaktiv eller samtyckeskvittens. Interna mottagare är allowlistade och kan
+  inte användas som ett tyst kundundantag.
+- Alla kundklasser respekterar STOPP. Bara den exakta STOPP-kvittensen får gå
+  efter att spärrflaggan bevisligen sparats.
+- STOPP/START läser Supabase-felet och returnerar 503 vid persistensfel i
+  stället för att bekräfta ett skydd som inte finns.
+- Proaktiva utskick kontrollerar faktisk `sent`/`delivered` historik över alla
+  agentvägar i sju dagar. Transaktionella utskick och pågående samtal
+  frekvensblockeras inte.
+- Ett redan levererat approval-SMS blir en idempotent retry och kvoträknas
+  inte igen. Skyddet är sekventiellt; absolut samtidighet kräver en framtida
+  unik DB-claim och påstås inte här.
+- Ingen SQL, ny sändare, ny approvalmekanik eller ändrad SMS-copy infördes.
+
+**Verifiering:** TypeScript och produktionsbuilden (420 routes/sidor) är
+gröna. 127/127 riktade SMS-/approval-/kolumnfacit är gröna. Hela Chromium-
+sviten gav 2 953 gröna och 128 röda: 126 nät-/sessionsberoende tester
+blockerades av `connect EACCES`, och två föråldrade stegkedje-facit från den
+tidigare projektrefaktorn träffar inga filer i denna diff. En read-only prob
+mot den konfigurerade testdatabasen verifierade de använda `customer`- och
+`sms_log`-kolumnerna. Ett verkligt 46elks STOPP-prov återstår tills ett
+uttryckligt testnummer finns; ingen extern sändning gjordes i verifieringen.
+
+---
+
 # Läge 2026-08-15 — Cross-Agent Customer Case V1 byggd
 
 Jarvis kan nu sammanföra flera olika väntande signaler om samma kund till en

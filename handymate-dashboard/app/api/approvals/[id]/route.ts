@@ -4,6 +4,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/permissions'
 import { recordLearningEvent } from '@/lib/agent/learning-engine'
 import { sendSmsViaElks } from '@/lib/sms-send'
+import type { SmsPurpose } from '@/lib/outbound/sms-gate'
 import { classifyExecutionResult, extractExecutionArtifacts } from '@/lib/approvals/execution-outcome'
 import { canActOnApproval } from '@/lib/approvals/routing'
 import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
@@ -609,6 +610,7 @@ async function executeApprovalPayload(
     customerId?: string | null
     relatedId?: string | null
     messageType: string
+    purpose: Exclude<SmsPurpose, 'internal'>
   }): Promise<{
     sms_sent: boolean
     sms_id?: string
@@ -635,9 +637,11 @@ async function executeApprovalPayload(
       relatedId: opts.relatedId,
       messageType: opts.messageType,
       approvalId,
+      recipient: 'customer',
+      purpose: opts.purpose,
     })
 
-    if (result.success) {
+    if (result.success && !result.idempotent) {
       try {
         await trackSmsSent(businessId, plan)
       } catch (trackErr) {
@@ -674,6 +678,7 @@ async function executeApprovalPayload(
           customerId: (payload.customer_id as string | undefined) || null,
           relatedId: (payload.related_id as string | undefined) || null,
           messageType: approval_type,
+          purpose: approval_type === 'quote_nudge' ? 'proactive' : 'conversational',
         })
 
         // Hanna v2 spel 4 (bärande princip #6): denna case delas av MÅNGA
@@ -858,6 +863,7 @@ async function executeApprovalPayload(
           customerId,
           relatedId: projectId,
           messageType: 'review_request',
+          purpose: 'proactive',
         })
 
         // Hanna v2 spel 2 (bärande princip #6): logga utfallet till
@@ -970,6 +976,7 @@ async function executeApprovalPayload(
                 message,
                 customerId: (act.data.customer_id as string | undefined) || null,
                 messageType: 'autopilot_customer_sms',
+                purpose: 'transactional',
               })
               results.push({ id: act.id, type: 'sms', ok: r.sms_sent, error: r.error })
               break
@@ -1279,6 +1286,7 @@ async function executeApprovalPayload(
           customerId: pl.customer_id || null,
           relatedId: pl.project_id || null,
           messageType: 'proactive_care',
+          purpose: 'proactive',
         })
 
         // Logga i v3_automation_logs
@@ -1325,6 +1333,7 @@ async function executeApprovalPayload(
           customerId: pl.customer_id || null,
           relatedId: pl.project_id || null,
           messageType: 'warranty_followup',
+          purpose: 'proactive',
         })
 
         // Sanering 2026-08-05: skrev till "automation_logs" som inte finns
@@ -1378,6 +1387,7 @@ async function executeApprovalPayload(
           message,
           customerId: pl.entity?.customerId || null,
           messageType: approval_type,
+          purpose: 'conversational',
         })
         return {
           action: 'propose_booking_times',
@@ -1638,6 +1648,7 @@ async function executeApprovalPayload(
           message: msg,
           customerId: pl.entity?.customerId || null,
           messageType: 'matte_customer_reply',
+          purpose: 'conversational',
         })
         return { action: 'send_matte_customer_reply', sms_sent: r.sms_sent, error: r.error }
       }
@@ -1712,6 +1723,7 @@ async function executeApprovalPayload(
                 customerId: pl.customer_id,
                 relatedId: pl.quote_id || null,
                 messageType: 'portal_reply_notice',
+                purpose: 'conversational',
               })
               smsSent = r.sms_sent
               smsError = r.error
@@ -1823,6 +1835,7 @@ async function executeApprovalPayload(
           message,
           customerId: pl.entity?.customerId || null,
           messageType: 'propose_site_visit',
+          purpose: 'conversational',
         })
         return { action: 'propose_site_visit', sms_sent: r.sms_sent, error: r.error }
       }
@@ -1884,6 +1897,7 @@ async function executeApprovalPayload(
             message: pl.suggested_sms,
             customerId: pl.customer_id || null,
             messageType: 'customer_reactivation',
+            purpose: 'proactive',
           })
           return { action: 'customer_reactivation', sms_sent: r.sms_sent, error: r.error }
         }

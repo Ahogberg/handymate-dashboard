@@ -322,6 +322,8 @@ async function sendSMS(supabase: SupabaseClient, suggestion: any, actionData: an
       message,
       customerId: suggestion.call_recording?.customer?.customer_id || null,
       messageType: 'suggestion_sms',
+      recipient: 'customer',
+      purpose: 'conversational',
     })
 
     if (!r.success) {
@@ -465,6 +467,8 @@ async function rescheduleBooking(supabase: SupabaseClient, suggestion: any, acti
         customerId: suggestion.call_recording?.customer?.customer_id || null,
         relatedId: bookingId,
         messageType: 'reschedule',
+        recipient: 'customer',
+        purpose: 'transactional',
       })
       // Icke-blockerande: ombokningen är redan skriven i databasen.
       if (!r.success) console.error('[suggestions/approve] ombokningsbekräftelse misslyckades:', r.error)

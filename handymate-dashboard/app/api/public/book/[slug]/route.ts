@@ -131,6 +131,7 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
       supabase, businessId, businessName: config?.business_name, to: phone,
       message: `Hej ${name.split(' ')[0]}! Din tid hos ${company} är bokad: ${niceTime}. Vi hör av oss om något behöver ändras.`,
       customerId, relatedId: bookingId, messageType: 'booking_confirmation',
+      recipient: 'customer', purpose: 'transactional',
     })
   } catch (e) { console.error('[public/book] customer SMS error:', e) }
 
@@ -140,6 +141,7 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
         supabase, businessId, businessName: config?.business_name, to: config.phone_number,
         message: `Ny bokning via hemsidan: ${name} (${phone}), ${niceTime}${service_type ? ` — ${service_type}` : ''}.`,
         relatedId: bookingId, messageType: 'booking_internal',
+        recipient: 'internal', purpose: 'internal',
       })
     } catch (e) { console.error('[public/book] internal SMS error:', e) }
   }

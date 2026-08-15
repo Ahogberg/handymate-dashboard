@@ -1273,3 +1273,72 @@ och backfillen gav exakt rätt resultat — 1/22 konton (det som avviker
 från default, 20%) är nu bevisat explicit, resterande 21/22 (alla på
 default-50%) förblir korrekt obevisade. Guardian kan från och med nu
 faktiskt använda ett bevisat ägarmål när ett sparas.
+
+# Outbound Safety & STOPP Closure V1 — 2026-08-15
+
+## Mål
+
+Stäng den kvarvarande lanseringsluckan där kundens STOPP-skydd och den
+gemensamma kontaktfrekvensen uttryckligen failar öppet. Alla kund-SMS ska
+passera en central, tenantbunden grind precis före 46elks-anropet. Interna
+notiser och kundmeddelanden ska ha olika, explicita kontrakt.
+
+## Plan
+
+- [x] Inventera samtliga `sendSmsViaElks`-anrop och klassificera dem som
+  interna, transaktionella, konversationella, proaktiva eller ren
+  STOPP-bekräftelse.
+- [x] Skriv browserlösa facit för fail-closed tenant-/opt-out-uppslag,
+  exekveringstida proaktiv frekvens, approval-idempotens och STOPP-ordningen.
+- [x] Bygg en central outbound-grind och gör sändkontraktet explicit på alla
+  callsites utan att ändra SMS-innehåll eller affärshändelser.
+- [x] Gör STOPP/START-persistensen kontrollerad: skriv flaggan före kvittens,
+  läs Supabase-felet och returnera retrybart fel om skyddet inte kunde sparas.
+- [x] Verifiera TypeScript, riktade facit, produktionsbuild, diff och
+  dokumentera vad som fortfarande kräver ett riktigt 46elks-prov.
+
+## Avgränsning
+
+- Ingen ny meddelandeplattform och ingen parallell SMS-sändare.
+- Inga ändringar av SMS-copy, approval-semantik eller vilka affärshändelser
+  som skapar meddelanden.
+- Transaktionella utskick frekvensblockeras inte; proaktiva utskick gör det.
+  Alla kundklasser respekterar STOPP.
+- Ingen produktionsmigration körs programmatiskt.
+
+## Resultat
+
+- `lib/outbound/sms-gate.ts` är nu den enda exekveringsgrinden precis före
+  46elks. Kund-id/telefon verifieras inom samma `business_id`; saknad,
+  främmande eller tvetydig kund och varje DB-fel blockerar utskicket.
+- Alla direkta `sendSmsViaElks`-anrop anger nu mottagarklass och avsikt.
+  Interna notiser har en kort allowlist; alla kundklasser respekterar STOPP.
+- Bara proaktiva utskick samordnas mot de senaste sju dagarnas faktiskt
+  skickade eller levererade kund-SMS. Transaktionella och pågående
+  konversationer förblir möjliga.
+- Approval-retries återanvänder tidigare `sent`/`delivered` leverans i stället
+  för att skicka och kvoträkna en gång till. Detta skyddar sekventiella
+  retries; en verkligt samtidig race kräver i framtiden en unik DB-claim.
+- STOPP/START skriver och kontrollerar kundflaggan före kvittensen. Ett
+  persistensfel ger 503 så webhooksändaren kan försöka igen; falsk bekräftelse
+  returneras aldrig. Den särskilda STOPP-kvittensen får skickas först efter
+  att spärren är sann.
+- Ingen SQL eller ny sändare tillkom. Den äldre producentvakten är fortsatt
+  rådgivande, men kan inte kringgå den fail-closed exekveringsgrinden.
+
+## Verifiering
+
+- `npx tsc --noEmit`: grön.
+- Riktad slutsvit inklusive kolumnkontrakt: 127/127 grön.
+- `npx next build`: grön, 420 routes/sidor; endast kända miljö-/metadata-
+  varningar.
+- Hela Chromium-sviten lästes till felsammanfattningen: 2 953 gröna, 128
+  röda. 126 kräver nät/session mot `app.handymate.se` och blockeras av
+  sandboxens `connect EACCES`; två är föråldrade `stegkedjan`-källfacit efter
+  tidigare projektrefaktorering och träffar inga filer i denna diff.
+- Read-only prob mot den konfigurerade testdatabasen verifierade att samtliga
+  använda STOPP- och `sms_log`-kolumner finns (`customer=OK`, `sms_log=OK`).
+- Ett riktigt STOPP-webhookprov genom 46elks är inte kört; det kräver ett
+  uttryckligt testnummer och skulle vara en extern affärshändelse.
+
+---
