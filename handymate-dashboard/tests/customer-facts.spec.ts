@@ -46,14 +46,15 @@ test.describe('mötesgrenen bygger korrekt kort', () => {
 
   test('kortbygget läser fact_type, evidence_quote och confidence ur fyndet', () => {
     const s = read(ANALYZE)
+    // Sedan Customer Memory V2 (2026-08-16) bygger BÅDA grenarna kortet via
+    // den delade buildCustomerFactCard — de faktiska fälten testas där
+    // (se "kortbygget är en delad funktion"-testet nedan), det här testet
+    // verifierar bara att mötesgrenen faktiskt anropar den, med rätt evidens.
     const i = s.indexOf("s.type === 'customer_fact'")
     expect(i, 'grenen för customer_fact saknas i kortbygget').toBeGreaterThan(-1)
-    const gren = s.slice(i, i + 1200)
-    expect(gren).toContain("approval_type: 'customer_fact'")
-    expect(gren).toContain('fact_type:')
-    expect(gren).toContain('evidence_quote:')
-    expect(gren).toContain('confidence:')
-    expect(gren).toContain('recording_id')
+    const gren = s.slice(i, i + 500)
+    expect(gren).toContain('buildCustomerFactCard(s')
+    expect(gren).toContain("evidensKalla: 'mötet'")
   })
 
   test('inget kort skapas utan en härledd kund — hoppas tyst', () => {
@@ -70,13 +71,74 @@ test.describe('mötesgrenen bygger korrekt kort', () => {
   })
 })
 
+test.describe('telefongrenen bygger korrekt kort (Customer Memory V2, 2026-08-16)', () => {
+  const ANALYZE = 'app/api/voice/analyze/route.ts'
+
+  test('telefongrenens prompt lär modellen customer_fact-reglerna, inte bara mötesgrenen', () => {
+    const s = read(ANALYZE)
+    const elseIdx = s.indexOf(': `VIKTIGT: En kollega (AI-agenten Lisa)')
+    expect(elseIdx, 'telefongrenens instruktionsblock hittades inte').toBeGreaterThan(-1)
+    const svarsformatIdx = s.indexOf('=== SVARSFORMAT ===')
+    const gren = s.slice(elseIdx, svarsformatIdx)
+    expect(gren, 'telefongrenen saknar customer_fact-punkten').toContain('"customer_fact"')
+    expect(gren).toMatch(/fact_type.*preference.*constraint.*commitment.*contact/s)
+  })
+
+  test('schemats hint är generaliserad — inte längre "endast vid platsbesök"', () => {
+    const s = read(ANALYZE)
+    expect(s).not.toMatch(/endast för customer_fact, endast vid platsbesök/)
+  })
+
+  test('telefongrenen routar customer_fact via pending_approvals, inte ai_suggestion', () => {
+    const s = read(ANALYZE)
+    // Mötesgrenens "s.type === 'customer_fact'"-förekomst kommer först i
+    // filen (rad ~727) — telefongrenens är den SISTA förekomsten.
+    const i = s.lastIndexOf("suggestion.type === 'customer_fact'")
+    expect(i, 'telefongrenen har ingen egen gren för customer_fact').toBeGreaterThan(-1)
+    // Filen har en TIDIGARE, orelaterad from('ai_suggestion')-fråga (en
+    // dubblettkontroll långt innan förslagsloopen) — den riktiga inserten
+    // som customer_fact-grenen måste ligga FÖRE är den SISTA förekomsten.
+    const aiSuggestionInsertIdx = s.lastIndexOf("from('ai_suggestion')")
+    expect(i, 'customer_fact-grenen ska ligga FÖRE ai_suggestion-inserten (early continue)').toBeLessThan(aiSuggestionInsertIdx)
+    const gren = s.slice(i, i + 900)
+    expect(gren).toContain('buildCustomerFactCard(suggestion')
+    expect(gren).toContain("evidensKalla: 'samtalet'")
+    expect(gren).toContain("from('pending_approvals')")
+    expect(gren).not.toContain("from('ai_suggestion')")
+    expect(gren, 'grenen måste hoppa vidare — aldrig falla igenom till ai_suggestion-inserten').toContain('continue')
+  })
+
+  test('telefongrenen hoppar tyst utan känd kund — samma vakt som mötesgrenen', () => {
+    const s = read(ANALYZE)
+    const i = s.lastIndexOf("suggestion.type === 'customer_fact'")
+    const gren = s.slice(i, i + 300)
+    expect(gren, 'ingen vakt mot saknad kund i telefongrenen').toContain('if (!customerId) continue')
+  })
+
+  test('kortbygget är en delad funktion — mötes- och telefongrenen kan inte glida isär', () => {
+    const s = read(ANALYZE)
+    const i = s.indexOf('function buildCustomerFactCard')
+    expect(i, 'ingen delad kortbyggare hittades').toBeGreaterThan(-1)
+    const gren = s.slice(i, i + 1000)
+    expect(gren).toContain("approval_type: 'customer_fact'")
+    expect(gren).toContain('fact_type:')
+    expect(gren).toContain('evidence_quote:')
+    expect(gren).toContain('confidence:')
+    expect(gren).toContain('recording_id:')
+    // Båda anropsställena (möte + telefon) ska gå genom samma funktion.
+    const anrop = s.match(/buildCustomerFactCard\(/g) || []
+    expect(anrop.length, 'kortbyggaren ska anropas från både mötes- och telefongrenen').toBeGreaterThanOrEqual(3)
+  })
+})
+
 test.describe('säkerhet: åtkomstkoder får aldrig extraheras', () => {
-  test('mötesanalysens tre prompter förbjuder åtkomstkoder explicit', () => {
+  test('mötes-, telefon-, MAP- och REDUCE-prompterna förbjuder åtkomstkoder explicit', () => {
     const s = read('app/api/voice/analyze/route.ts')
-    // Engångsprompten, MAP-prompten och REDUCE-prompten ska alla bära den
-    // explicita förbudsraden — inte bara nämna "kontaktuppgift" i förbigående.
+    // Engångsprompten (möte OCH telefon, sedan Customer Memory V2), MAP-
+    // prompten och REDUCE-prompten ska alla bära den explicita
+    // förbudsraden — inte bara nämna "kontaktuppgift" i förbigående.
     const forbudsrader = s.match(/SÄKERHET: extrahera[^\n]*ALDRIG åtkomstkoder/g) || []
-    expect(forbudsrader.length, 'förbudsraden saknas i minst en av de tre prompterna').toBeGreaterThanOrEqual(3)
+    expect(forbudsrader.length, 'förbudsraden saknas i minst en av de fyra prompterna').toBeGreaterThanOrEqual(4)
   })
 
   test('"portkod" nämns inte längre som exempel på en kontaktuppgift', () => {
@@ -211,6 +273,20 @@ test.describe('konsumenterna läser fail-safe', () => {
     expect(gren).toContain('try {')
     expect(gren).toContain('catch')
     expect(gren).toContain("f.confirmed_at || f.created_at")
+  })
+
+  test('Matte-chattens get_customer-verktyg (Customer Memory V2) läser bekräftade fakta, fail-safe', () => {
+    const s = read('app/api/agent/trigger/tool-router.ts')
+    const i = s.indexOf('async function getCustomer(')
+    expect(i, 'getCustomer-funktionen hittades inte').toBeGreaterThan(-1)
+    const naestaFunktion = s.indexOf('\nasync function ', i + 10)
+    const gren = s.slice(i, naestaFunktion > -1 ? naestaFunktion : i + 1500)
+    expect(gren, 'get_customer läser inte customer_fact').toContain("from('customer_fact')")
+    expect(gren).toContain('.is(\'superseded_by\', null)')
+    expect(gren).toContain('.limit(10)')
+    expect(gren).toContain('confirmed_facts')
+    expect(gren, 'saknar fail-safe try/catch').toContain('try {')
+    expect(gren).toContain('catch')
   })
 })
 

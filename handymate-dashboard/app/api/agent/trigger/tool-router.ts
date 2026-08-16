@@ -252,7 +252,27 @@ async function getCustomer(
     .order('scheduled_start', { ascending: false })
     .limit(5)
 
-  return { success: true, data: { ...data, recent_bookings: bookings || [] } }
+  // Customer Memory V2 (2026-08-16): Matte-chattens dashboard-läge läste
+  // aldrig customer_fact trots att offertgeneratorn och SMS/mejl-
+  // automationen redan gjorde det via lib/matte/resolver.ts — en fråga om
+  // "vad vet vi om den här kunden?" i chatten kunde alltså inte besvaras ur
+  // sparade fakta. Fail-safe: ett fel här ska aldrig fälla hela verktyget.
+  let confirmedFacts: Array<{ fact_type: string; content: string }> = []
+  try {
+    const { data: facts } = await supabase
+      .from('customer_fact')
+      .select('fact_type, content')
+      .eq('business_id', businessId)
+      .eq('customer_id', params.customer_id as string)
+      .is('superseded_by', null)
+      .order('created_at', { ascending: false })
+      .limit(10)
+    confirmedFacts = facts || []
+  } catch {
+    confirmedFacts = []
+  }
+
+  return { success: true, data: { ...data, recent_bookings: bookings || [], confirmed_facts: confirmedFacts } }
 }
 
 async function searchCustomers(

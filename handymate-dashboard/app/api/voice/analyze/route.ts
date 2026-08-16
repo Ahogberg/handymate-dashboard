@@ -5,7 +5,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { getClaudeModel } from '@/lib/ai/get-model'
 import { filtreraAnalysforslag, type AnalysForslagsTyp } from '@/lib/voice/analysis-scope'
-import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
+import { buildDecisionRecord, withDecisionRecord, type DecisionRecord } from '@/lib/ai/decision-record'
 import { splitTranscript, MAP_REDUCE_TROSKEL_TECKEN } from '@/lib/meetings/split-transcript'
 
 function getAnthropic() {
@@ -31,6 +31,36 @@ interface AISuggestion {
   source_text?: string
   // Customer Facts V1 (2026-08-12): bara satt när type === 'customer_fact'.
   fact_type?: 'preference' | 'constraint' | 'commitment' | 'contact'
+}
+
+/**
+ * Bygger ett customer_fact-kort ur ett AI-fynd — DELAD av mötesgrenen och
+ * telefongrenen (Customer Memory V2, 2026-08-16) så formen inte kan glida
+ * isär mellan de två källorna. Anroparen ansvarar för att bara kalla denna
+ * med en säkert härledd kund (ingen gissning här).
+ */
+function buildCustomerFactCard(
+  s: AISuggestion,
+  opts: { customerId: string; recordingId: string; decisionRecord: DecisionRecord; evidensKalla: string }
+): Record<string, unknown> {
+  const evidens = s.source_text ? ` Ur ${opts.evidensKalla}: "${s.source_text}"` : ''
+  const kortInnehall = s.description || s.title
+  return {
+    approval_type: 'customer_fact',
+    title: `Matte hörde: ${kortInnehall.length > 60 ? kortInnehall.slice(0, 60) + '…' : kortInnehall}`,
+    description: `${s.description || ''}${evidens}`,
+    risk_level: 'low',
+    payload: {
+      customer_id: opts.customerId,
+      fact_type: s.fact_type || 'preference',
+      content: s.description,
+      evidence_quote: s.source_text || null,
+      confidence: s.confidence,
+      recording_id: opts.recordingId,
+      agent_id: 'matte',
+      decision_record: opts.decisionRecord,
+    },
+  }
 }
 
 /**
@@ -477,7 +507,17 @@ dessa — då görs samma sak två gånger. Du föreslår ENBART:
 - Om uppföljning behövs → "follow_up"
 - Om något ska påminnas om → "reminder"
 - Om kund vill flytta/ändra tid → "reschedule" (flytta bokning)
-  Triggerfraser: "kan vi flytta", "passar inte", "annan tid", "ändra tiden", "boka om", "flytta bokningen"`}
+  Triggerfraser: "kan vi flytta", "passar inte", "annan tid", "ändra tiden", "boka om", "flytta bokningen"
+- Sa kunden eller hantverkaren EXPLICIT något om en preferens (t.ex.
+  tidpreferens, önskemål om utförande), en begränsning (t.ex. tillträdestider,
+  allergier), ett löfte (t.ex. "vi hör av oss senast fredag") eller en
+  kontaktuppgift (t.ex. bästa telefonnummer, föredragen kontaktväg) →
+  "customer_fact". Max 5 per samtal. BARA saker som uttryckligen sades — gissa
+  aldrig. Ange alltid "fact_type": "preference", "constraint", "commitment"
+  eller "contact", och citera ordagrant i source_text.
+  SÄKERHET: extrahera ALDRIG åtkomstkoder — portkoder, larmkoder,
+  nyckelgömmor, lösenord eller liknande. Sådant får inte lagras, även om det
+  sägs uttryckligen. Hoppa över det helt.`}
 
 === SVARSFORMAT ===
 
@@ -507,7 +547,7 @@ Svara ENDAST med JSON i följande format:
       "priority": "low|medium|high|urgent",
       "confidence": 0.0-1.0,
       "source_text": "Relevant citat från samtalet",
-      "fact_type": "preference|constraint|commitment|contact (endast för customer_fact, endast vid platsbesök)",
+      "fact_type": "preference|constraint|commitment|contact (endast för customer_fact)",
       "action_data": {
         "customer_name": "Namn om känt",
         "phone_number": "Telefon",
@@ -728,23 +768,12 @@ Svara ENDAST med JSON i följande format:
           // Ingen kund härledd → hoppa helt, tyst. Inte ens ett loggat fel —
           // det är ett förväntat läge (möte utan bokningskoppling), inte en bugg.
           if (!factCustomerId) continue
-          const kortInnehall = s.description || s.title
-          kort.push({
-            approval_type: 'customer_fact',
-            title: `Matte hörde: ${kortInnehall.length > 60 ? kortInnehall.slice(0, 60) + '…' : kortInnehall}`,
-            description: `${s.description || ''}${evidens}`,
-            risk_level: 'low',
-            payload: {
-              customer_id: factCustomerId,
-              fact_type: s.fact_type || 'preference',
-              content: s.description,
-              evidence_quote: s.source_text || null,
-              confidence: s.confidence,
-              recording_id,
-              agent_id: 'matte',
-              decision_record: beslutsstampel,
-            },
-          })
+          kort.push(buildCustomerFactCard(s, {
+            customerId: factCustomerId,
+            recordingId: recording_id,
+            decisionRecord: beslutsstampel,
+            evidensKalla: 'mötet',
+          }))
         } else {
           // follow_up / reminder / reschedule → uppföljningskort → task.
           kort.push({
@@ -815,6 +844,37 @@ Svara ENDAST med JSON i följande format:
     for (const suggestion of suggestions) {
       // Skippa förslag med låg confidence
       if (suggestion.confidence < 0.4) continue
+
+      // ═══ CUSTOMER MEMORY V2 (2026-08-16) ═══
+      // customer_fact hör INTE hemma i ai_suggestion (dagens tabell för
+      // resten av telefonförslagen) — det landar på samma pending_approvals
+      // →customer_fact-räls som mötesgrenen redan använder, annars godkänns
+      // det via app/api/suggestions/approve/route.ts som saknar ett case för
+      // typen och gör tyst ingenting. Ingen kund härledd → hoppa helt, tyst,
+      // samma vakt som mötesgrenen.
+      if (suggestion.type === 'customer_fact') {
+        if (!customerId) continue
+        const kort = buildCustomerFactCard(suggestion, {
+          customerId,
+          recordingId: recording_id,
+          decisionRecord: buildDecisionRecord({
+            model: analysModell,
+            prompt: 'callAnalysis',
+            input: recording.transcript,
+            now: new Date(),
+          }),
+          evidensKalla: 'samtalet',
+        })
+        const { error: faktaKortFel } = await supabase.from('pending_approvals').insert({
+          id: `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+          business_id: recording.business_id,
+          status: 'pending',
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          ...kort,
+        })
+        if (faktaKortFel) console.error('[voice/analyze] telefon-faktakort kunde inte skapas:', faktaKortFel.message)
+        continue
+      }
 
       // Lägg till extraherad kundinfo i action_data
       const actionData = withDecisionRecord(
