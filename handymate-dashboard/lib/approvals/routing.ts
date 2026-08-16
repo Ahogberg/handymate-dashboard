@@ -39,6 +39,12 @@ const ROUTING_TABLE: Partial<Record<string, RoutingRole>> = {
   // som dispatch_suggestion: kö-routing fungerar redan för owner_admin,
   // och kortet redigerar inget som en enskild anställd äger.
   cert_expiry_reminder: 'owner_admin',
+  // Playbook Pattern Confirmation V1 (2026-08-16 natt) — medveten avvikelse
+  // från project_debrief (som är 'any'): en debrief är en persons
+  // reflektion om ETT jobb, men en bekräftad playbook-regel formar ALLA
+  // framtida offerter av jobbtypen — samma företagsomfattande blast radius
+  // som four_eyes_project_close/dispatch_suggestion ovan.
+  playbook_pattern_confirmation: 'owner_admin',
 
   // can_approve_time
   time_attestation: 'can_approve_time',

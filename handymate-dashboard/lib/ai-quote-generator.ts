@@ -295,6 +295,64 @@ async function fetchBusinessRules(
 }
 
 /**
+ * Playbook Pattern Confirmation V1 (Debrief → Playbook, V2-lagret,
+ * 2026-08-16 natt): bekräftade, företagsomfattande mönster
+ * (business_knowledge, knowledge_type='pattern', job_type satt av
+ * sql/v141_business_knowledge_pattern.sql) — skiljer sig från
+ * fetchRecentLessons (enskilda per-projekt-citat) och fetchBusinessRules
+ * (ägar-dikterade generella policys utan jobbtyp): en bekräftad regel HAR
+ * en jobbtyp och gäller bara den, uppkommen genom att flera lärdomar för
+ * samma jobbtyp upprepat samma tema (lib/playbook/detect-pattern.ts) och
+ * ägaren godkänt förslaget (app/api/approvals/[id]/route.ts).
+ *
+ * Sanningsprincipen (samma fix som fetchRecentLessons fick 2026-08-12):
+ * utan jobType hämtas INGA mönster — en badrumsregel ska aldrig kunna
+ * dyka upp i altanoffertens prompt.
+ *
+ * Fail-safe: kastar aldrig. Tabellkolumnen kan saknas (v141 körs manuellt
+ * av Andreas) eller läsningen strula av annan anledning — då degraderas
+ * till en tom lista, precis som offertgenereringen fungerade innan denna
+ * feature fanns.
+ */
+async function fetchConfirmedPatterns(
+  businessId: string,
+  jobType?: string,
+): Promise<Array<{ pattern_text: string }>> {
+  if (!jobType) return []
+
+  const supabase = getServerSupabase()
+  try {
+    const { data, error } = await supabase
+      .from('business_knowledge')
+      .select('observation, created_at')
+      .eq('business_id', businessId)
+      .eq('knowledge_type', 'pattern')
+      .eq('job_type', jobType)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    if (error) {
+      console.error('[ai-quote-generator] business_knowledge(pattern)-läsning misslyckades (fail-safe, tom lista):', error.message)
+      if (!arSchemaSaknas(error)) {
+        await rapporteraTystFel(supabase, businessId, 'ai-quote-generator:fetchConfirmedPatterns', error.message, { jobType })
+      }
+      return []
+    }
+    return (data || []).map(row => ({ pattern_text: (row as any).observation as string }))
+  } catch (err) {
+    console.error('[ai-quote-generator] business_knowledge(pattern)-läsning kastade (fail-safe, tom lista):', err)
+    if (!arSchemaSaknas(err)) {
+      await rapporteraTystFel(
+        supabase, businessId, 'ai-quote-generator:fetchConfirmedPatterns-unexpected',
+        err instanceof Error ? err.message : String(err), { jobType },
+      )
+    }
+    return []
+  }
+}
+
+/**
  * Bygger prisliste-kontext för AI-prompten.
  * Om prislistan är tom returneras en tydlig markering.
  */
@@ -649,12 +707,13 @@ export async function generateQuoteFromInput(
   // genererar offerten. analyzeJobImage() lever kvar oförändrad — används
   // fortfarande av ai-generate/route.ts för att beskriva EXTRA bilder
   // (bild 2-5) som text innan de vävs in i textDescription här.
-  const [similarQuotes, priceStats, lessons, customerFacts, rules] = await Promise.all([
+  const [similarQuotes, priceStats, lessons, customerFacts, rules, patterns] = await Promise.all([
     description ? findSimilarQuotes(input.businessId, description) : Promise.resolve([]),
     description ? getAveragePrice(input.businessId, description) : Promise.resolve({ average: 0, min: 0, max: 0, count: 0 }),
     fetchRecentLessons(input.businessId, input.jobType),
     input.customerId ? fetchCustomerFactsForQuote(input.businessId, input.customerId) : Promise.resolve([]),
     fetchBusinessRules(input.businessId),
+    fetchConfirmedPatterns(input.businessId, input.jobType),
   ])
 
   const fullDescription = [
@@ -716,13 +775,24 @@ Om bilden är ett FOTO:
         .join('\n')}`
     : ''
 
+  // Playbook Pattern Confirmation V1 (2026-08-16 natt): bekräftade,
+  // jobbtyp-specifika mönster — skild sektion från både LÄRDOMAR (rå,
+  // obekräftad per-projekt-text) och AFFÄRSREGLER (manuellt inmatade,
+  // utan jobbtyp). Det här är regler som VUXIT FRAM ur upprepade lärdomar
+  // och blivit "så här jobbar vi" för just den här jobbtypen.
+  const patternsContext = patterns.length > 0
+    ? `\n\nSÅ HÄR JOBBAR VI (bekräftade mönster — upprepade lärdomar som blivit en fast regel för denna jobbtyp):\n${patterns
+        .map(p => `- ${p.pattern_text}`)
+        .join('\n')}`
+    : ''
+
   const priceContext = buildPriceContext(input.priceList, input.hourlyRate, input.templates, input.customerPriceList)
   const hasPriceList = (input.priceList?.length || 0) > 0
 
   const systemPrompt = `Du är en erfaren svensk kalkylator för bygg- och hantverksprojekt.
 
 Bransch: ${input.branch || 'Bygg/Hantverkare'}
-${priceContext}${historicalContext}${lessonsContext}${customerFactsContext}${rulesContext}
+${priceContext}${historicalContext}${lessonsContext}${customerFactsContext}${rulesContext}${patternsContext}
 
 Analysera beskrivningen (och en eventuellt bifogad bild — se instruktioner nedan) och ge ett detaljerat offertförslag.
 ${imageInstructions}

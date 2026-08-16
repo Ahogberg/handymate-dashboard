@@ -160,6 +160,10 @@
     {
       "path": "/api/cron/meeting-worker",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/playbook-pattern",
+      "schedule": "20 5 * * 2"
     }
   ]
 }

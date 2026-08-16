@@ -63,11 +63,13 @@ test('alla cron-rutter utanför Claudes Karin-fillås använder helpern', () => 
   // som var föråldrad, ingen faktisk auth-lucka.
   // 38 (2026-08-16): expectation-drift tillkom (Expectation Drift Signal 1,
   // docs/audits/NEXT_MOAT_WAVE.md Koncept 3) och använder helpern korrekt.
-  expect(files).toHaveLength(38)
+  // 39 (2026-08-16 natt): playbook-pattern tillkom (Playbook Pattern
+  // Confirmation V1, tasks/todo.md) och använder helpern korrekt.
+  expect(files).toHaveLength(39)
 
   const karinRoute = path.join(CRON_DIR, 'karin-deadlines', 'route.ts')
   const ownedRoutes = files.filter(file => file !== karinRoute)
-  expect(ownedRoutes).toHaveLength(37)
+  expect(ownedRoutes).toHaveLength(38)
 
   const missing = ownedRoutes
     .filter(file => {

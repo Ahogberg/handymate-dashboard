@@ -103,6 +103,15 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // krav.
   project_debrief: 'EXECUTABLE_ACTION',
 
+  // Playbook Pattern Confirmation V1 (Debrief → Playbook, V2-lagret,
+  // 2026-08-16 natt): flera bekräftade lärdomar (project_lesson) som
+  // upprepar samma tema för en jobbtyp föreslås som ett
+  // företagsomfattande mönster. Godkännande skriver EN rad i
+  // business_knowledge (knowledge_type='pattern') — fältlokalt, ingen
+  // extern sidoeffekt, samma klass som project_debrief/customer_fact.
+  // Se lib/playbook/propose-pattern.ts.
+  playbook_pattern_confirmation: 'EXECUTABLE_ACTION',
+
   // ── Kräver mänsklig granskning, aldrig ett klick ────────────────────
   //
   // `missad_intakt` är hela grinden för intäktsåtervinningen: ett fynd är ett

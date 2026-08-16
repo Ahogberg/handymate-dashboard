@@ -2439,6 +2439,48 @@ async function executeApprovalPayload(
         return { action: 'project_debrief', ok: true, saved: ifyllda.length }
       }
 
+      case 'playbook_pattern_confirmation': {
+        // Playbook Pattern Confirmation V1 (2026-08-16 natt): godkännande
+        // skriver EN rad i business_knowledge (knowledge_type='pattern')
+        // — samma tabell Daniels offertmotor redan läser för business_rule
+        // (fetchBusinessRules, lib/ai-quote-generator.ts), nu utökad med
+        // job_type så fetchConfirmedPatterns kan filtrera per jobbtyp.
+        // Avvisning kräver ingen skrivning här — dedup-logiken i
+        // lib/playbook/propose-pattern.ts (wasRecentlyRejected) läser
+        // direkt ur pending_approvals-historiken, ingen egen tabell.
+        const pl = payload as any
+        if (!pl.job_type || !pl.pattern_text) {
+          return { action: 'playbook_pattern_confirmation', ok: false, error: 'Kortet saknar jobbtyp eller mönstertext.' }
+        }
+        const supabasePP = await getSupabase()
+        const { data: knowledge, error: knowledgeErr } = await supabasePP
+          .from('business_knowledge')
+          .insert({
+            business_id: businessId,
+            agent_id: 'daniel',
+            knowledge_type: 'pattern',
+            job_type: pl.job_type,
+            title: `Mönster: ${pl.job_type}`,
+            observation: pl.pattern_text,
+            confidence: pl.confidence ?? null,
+            data_basis: {
+              evidence_lesson_ids: pl.evidence_lesson_ids ?? [],
+              sample_count: pl.sample_count ?? null,
+            },
+            status: 'active',
+            related_approval_id: approvalId,
+          })
+          .select('id')
+          .single()
+
+        if (knowledgeErr || !knowledge) {
+          console.error('[approvals/playbook_pattern_confirmation] kunde inte spara mönstret:', knowledgeErr?.message)
+          return { action: 'playbook_pattern_confirmation', ok: false, error: 'Kunde inte spara — försök igen om en stund' }
+        }
+
+        return { action: 'playbook_pattern_confirmation', ok: true, knowledge_id: knowledge.id }
+      }
+
       default: {
         // ═══ OKÄND TYP FAILAR STÄNGT (N5, 2026-08-07) ═══
         //

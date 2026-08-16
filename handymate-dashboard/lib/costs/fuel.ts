@@ -163,6 +163,10 @@ const REF_TYPE_BUCKET: Record<string, FuelBucket> = {
   agent_memory: 'night_work',
   thread_summary: 'night_work',
   generate_insights_cron: 'night_work',
+  // Playbook Pattern Confirmation V1 (2026-08-16 natt): en veckovis
+  // cron-detektion (lib/playbook/detect-pattern.ts) — ingen kund ser den
+  // hända, samma bucket som övriga schemalagda bakgrundsanalyser här.
+  playbook_pattern_detect: 'night_work',
 
   // ── Diagnostik (når aldrig hit i praktiken, se docstring) ──────────────
   probe: 'night_work',

@@ -1,3 +1,108 @@
+# Playbook Pattern Confirmation V1 (Debrief → Playbook, V2-lagret) — 2026-08-16 natt
+
+## Mål
+
+Koncept 2 i docs/audits/NEXT_MOAT_WAVE.md ("Debrief → Firmans Playbook") hade
+sitt MVP redan byggt och skarpt sedan 2026-08-12/13 (project_debrief-kort →
+project_lesson-rad → redan tyst konsumerad av offertgenereringens
+"LÄRDOMAR"-sektion) — verifierat av en läsande agent innan bygget startade,
+så det byggs INTE om. Det som faktiskt saknas är V2: när flera lärdomar
+upprepar samma sak för samma jobbtyp, föreslå mönstret som en bekräftbar
+regel ("Ja, så jobbar vi") som sedan formar VARJE framtida offert av den
+jobbtypen — inte bara den enskilda offert lärdomen kom ifrån.
+
+Körs autonomt natten 2026-08-16→17 (Andreas sover, gav uttryckligt mandat:
+"något av våra större byggen ... som du kan köra under natten tills det är
+perfekt"). Ingen interaktiv brainstorming möjlig — designval nedan är gjorda
+och motiverade av mig, inte av Andreas; flaggade tydligt för morgongranskning.
+
+## Varför X2 inte är i vägen
+
+Konceptets egen poäng: en ägares egen bekräftelse vid stängning ("rivningen
+tog en dag mer") är sanning vid källan, oberoende av X2-skuldens
+telemetrifullständighet. Mönsterlagret ärver samma egenskap — det aggregerar
+BEKRÄFTADE lärdomar (mänskligt godkända citat), aldrig råa ekonomital ur
+compute-economics.ts/freeze-outcome.ts. Rör inte de filerna (namngiven
+kollisionsrisk med Codex i ACTIVE_ROADMAP.md rad 1082).
+
+## Designbeslut (motiverade, för morgongranskning)
+
+1. **Återanvänd `business_knowledge`, bygg ingen ny tabell.** Tabellen har
+   redan `knowledge_type IN ('insight','pattern','anomaly','recommendation',
+   'business_rule')` — `'pattern'` finns redan definierad
+   ("återkommande beteende") men används av ingen kod. `fetchBusinessRules()`
+   i `lib/ai-quote-generator.ts:261` läser redan `business_rule`-raderna in i
+   offertprompten — samma tabell, bara ett nytt `knowledge_type`-värde och en
+   ny nullable `job_type`-kolumn (additiv migration, stör ingen befintlig
+   läsning eftersom ingen idag filtrerar på den).
+2. **Kortflödet följer `project_debrief`/`customer_fact`-mönstret**: AI
+   föreslår ALDRIG direkt till tabellen. Mönsterkandidat → `pending_approvals`
+   (`approval_type: 'playbook_pattern_confirmation'`) → godkännande skriver EN
+   rad i `business_knowledge`.
+3. **Routing: `owner_admin`**, INTE `any` (skiljer sig medvetet från
+   `project_debrief` som är `any`). Motivering: en debrief är en persons
+   reflektion om ETT jobb; en bekräftad playbook-regel formar ALLA framtida
+   offerter av den jobbtypen — samma blast radius-logik som
+   `four_eyes_project_close`/`dispatch_suggestion` (`lib/approvals/
+   routing.ts`). Läggs till i `ROUTING_TABLE`.
+4. **Klassificering: `EXECUTABLE_ACTION`** i action-contract.ts — samma
+   klass som `project_debrief`/`customer_fact` (godkännande skriver
+   fältlokalt, ingen extern sidoeffekt som SMS/faktura).
+5. **Trigger: veckovis, inte daglig cron.** Lärdomar ackumuleras långsamt
+   (bara vid projektstängning) — ingen anledning till en ny daglig
+   Hobby-cron-rad. Ny dedikerad rutt `app/api/cron/playbook-pattern/route.ts`
+   på en ledig veckoslot (kontrollera vercel.json för en ledig
+   `M H * * D`-rad, kolliderar inte med någon befintlig — verifiera innan
+   commit, samma disciplin som expectation-drift-cronen ikväll).
+6. **"Hellre missa än gissa"**: detektionen (en Haiku-analys av
+   `project_lesson`-raderna för en jobbtyp, MIN_SAMPLE_SIZE=5 — högre än
+   `aggregateOutcomesByJobType`s 3, eftersom detta är en företagsomfattande
+   regel, inte en enskild offerts varningsbanner) måste kunna svara "inget
+   tydligt mönster" och då INTE skapa ett kort. Prompten förbjuds gissa ihop
+   ett mönster av orelaterade lärdomar.
+7. **Dedup**: högst ett aktivt/väntande förslag per jobbtyp åt gången;
+   avvisat förslag återkommer inte inom en rimlig karens (t.ex. 30 dagar) —
+   detaljerad mekanism (dedupe_key i payload, samma stil som
+   expectation-drift-signalen) avgörs av implementeraren, facit-testad.
+8. **Konsumtion**: ny `fetchConfirmedPatterns(businessId, jobType)` i
+   `lib/ai-quote-generator.ts`, parallell med befintlig `fetchRecentLessons`/
+   `fetchBusinessRules`, egen promptsektion ("SÅ HÄR JOBBAR VI") skild från
+   både LÄRDOMAR (obekräftade per-projekt-citat) och AFFÄRSREGLER (manuellt
+   inmatade via `POST /api/business-rules`).
+9. **UI-yta**: undersök var `knowledge_type='business_rule'`-raderna visas
+   idag (troligen en Inställningar-sida för "Lär Handymate", #12/v129) och
+   lägg mönsterrader där, tydligt märkta som AI-föreslagna+ägarbekräftade
+   (skilj visuellt från manuellt inmatade regler). Om ingen sådan yta hittas
+   eller är för stor att utöka säkert på en natt: hoppa över UI-ytan denna
+   omgång (konsumtionen i offertgenereringen är själva värdet) och notera
+   det som medveten avgränsning, inte en miss.
+
+## Explicit avgränsning
+
+- Ingen ändring av `lib/projects/compute-economics.ts`,
+  `lib/efterkalkyl/freeze-outcome.ts`, `lib/business-twin/scenario-engine.ts`
+  — läses aldrig ens.
+- Ingen ändring av `project_debrief`/`project_lesson`-flödet (redan klart).
+- Ingen ny generell "AI-regelmotor" — bara jobbtyp-mönster ur bekräftade
+  lärdomar, inget annat datakällsflöde.
+- Ingen retroaktiv bakåtskanning av gamla stängda projekt utan lärdomar —
+  börjar räkna framåt från befintliga `project_lesson`-rader.
+
+## Verifiering (samma disciplin som resten av sessionen)
+
+- TDD: facit skrivna först, röda mot orörd kod, sedan implementation.
+- `npx tsc --noEmit` rent, targeted Playwright-facit gröna, full svit
+  bakgrundskörd och diffad mot känd baseline, `npx next build` ren.
+- SQL-migrationen SKRIVS men körs INTE — kräver Andreas "kör" per husregeln.
+  Funktionen är alltså inert i prod tills migrationen körs manuellt.
+- `git log origin/main..HEAD` kontrolleras före varje push (delad
+  arbetskatalog — Codex kan committa parallellt under natten).
+- Rapport till Andreas i morse: vad som byggdes, vad som verifierades, och
+  ett explicit "kör sql/vNNN_... när du är redo" om migrationen inte redan
+  är körd.
+
+---
+
 # Project Closeout Copilot V1 — 2026-08-16
 
 ## Mål
