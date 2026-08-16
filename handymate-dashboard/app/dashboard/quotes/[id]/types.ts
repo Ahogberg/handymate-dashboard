@@ -127,14 +127,4 @@ export interface Quote {
   total_view_seconds?: number
 }
 
-export interface QuoteIntelligence {
-  show_warning: boolean
-  analysis: {
-    similar_jobs: number
-    overrun_percent: number
-    suggested_price: number
-    current_price: number
-    confidence: string
-    message: string
-  } | null
-}
+export type { QuoteIntelligence } from '@/lib/daniel-intelligence'

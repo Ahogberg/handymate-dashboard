@@ -17,6 +17,47 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-16 — Business Twin Quote Reality Check V1 byggd
+
+Offertens sista kontroll före utskick använder nu företagets egna
+kvalitetsgrindade projektutfall i stället för den tidigare skenbara
+Daniel-varningen. Den gamla vägen matchade accepterade offerter via ett brett
+prisintervall, läste legacy-projekttimmar och visade en knapp som inte ändrade
+någonting.
+
+**Det som nu är sant:**
+
+- Offert, offertrader och utfall läses tenantbundet. Jämförelsen kräver en
+  explicit offertmall eller jobbtyp; ingen keyword- eller prislikhet får skapa
+  ett falskt jämförelseunderlag.
+- Offerttimmar härleds av den kanoniska budgetmotorn och historiken kommer från
+  Outcome Quality Gate. Minst tre kvalificerade utfall krävs.
+- Bara en positiv genomsnittlig tidsavvikelse på minst tio procent ger en
+  rådgivande tidsbuffert. Rekommenderade timmar avrundas uppåt till närmaste
+  halvtimme och verklighetskontrollen sänker aldrig en offert automatiskt.
+- `ready`, `insufficient` och `unavailable` är skilda tillstånd. Ett källfel
+  ser därför aldrig ut som att företaget bara saknar historik.
+- UI:t visar Business Twin-evidens i den befintliga utskicksmodalen. Det finns
+  ingen LLM-matte, prisrekommendation, automatisk radändring eller sändspärr;
+  enda ändringsvägen går till den riktiga offerteditorn.
+- Realiserad marginal redigeras bort på servern om användaren saknar
+  `see_financials`. Jobbtyp från en affär sparas nu på nya offerter och både
+  `template_id` och `job_type` överlever duplicering/versionering.
+
+**Aktivering:** ingen ny SQL tillkom. Funktionen kräver att den redan skrivna
+[`sql/v138_outcome_quality_gate.sql`](../../sql/v138_outcome_quality_gate.sql)
+körs manuellt; innan dess visar kontrollen ett ärligt otillgängligt tillstånd.
+V139 behövs endast för Watch & Verify, inte för själva offertkontrollen.
+
+**Verifiering:** `npx tsc --noEmit` och produktionsbuilden (421 routes/sidor)
+är gröna. 89/89 riktade Reality Check-, outcome-, scenario-, tenant- och
+kolumnfacit är gröna. Full Chromium-svit: 3 118/3 248 gröna; 126
+sessions-/nätfall blockeras av sandboxens `connect EACCES` mot
+`app.handymate.se`, och fyra orelaterade Jarvis-, stegkedje- och parallella
+Bränsle-facit är röda utanför denna diff.
+
+---
+
 # Läge 2026-08-16 — Business Twin Watch & Verify V1 byggd, V138/V139 väntar
 
 Business Twin har nu sin första stängda prognosloop: en ägare eller admin kan

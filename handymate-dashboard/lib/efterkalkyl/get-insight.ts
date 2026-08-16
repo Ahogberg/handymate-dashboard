@@ -9,8 +9,8 @@
  * Lazy backfill: completed-projekt med quote_id som saknar outcome-rad
  * fryses on-demand, max LAZY_BACKFILL_LIMIT per anrop. Fail-safe: om
  * backfill eller project_outcome-läsningen misslyckas (t.ex. v73-
- * migrationen inte körd än) degraderar vi till { count: 0, insufficient:
- * true } istället för att kasta.
+ * migrationen inte körd än) degraderar vi till ett explicit unavailable-
+ * tillstånd istället för att kasta eller låtsas att urvalet bara är litet.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -23,7 +23,9 @@ export interface EfterkalkylInsight {
   count: number
   financial_count?: number
   insufficient: boolean
-  avg_hours_diff_pct?: number
+  /** Källfel/migrationsgap — får aldrig presenteras som ett äkta litet urval. */
+  unavailable?: boolean
+  avg_hours_diff_pct?: number | null
   avg_amount_diff_pct?: number | null
   avg_margin_pct?: number | null
   sample_job_types?: string[]
@@ -63,8 +65,8 @@ export async function getEfterkalkylInsight(
   const { data: rows, error } = await query
 
   if (error) {
-    console.error('[efterkalkyl-insikt] läsning misslyckades, degraderar till insufficient:', error)
-    return { count: 0, insufficient: true }
+    console.error('[efterkalkyl-insikt] läsning misslyckades, markerar unavailable:', error)
+    return { count: 0, insufficient: true, unavailable: true }
   }
 
   const qualityRows = (rows || []) as Array<{

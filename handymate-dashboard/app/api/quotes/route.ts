@@ -253,6 +253,10 @@ export async function POST(request: NextRequest) {
         detail_level: source.detail_level,
         show_unit_prices: source.show_unit_prices,
         show_quantities: source.show_quantities,
+        // Samma offertfamilj ska behålla samma explicita jämförelsenyckel;
+        // annars tappar en ny version sitt historiska Reality Check-underlag.
+        template_id: source.template_id,
+        job_type: source.job_type,
         template_style: source.template_style,
         attachments: source.attachments,
         deal_id: source.deal_id,
@@ -420,6 +424,11 @@ export async function POST(request: NextRequest) {
       ai_confidence: body.ai_confidence || null,
       source_transcript: body.source_transcript || null,
       template_id: body.template_id || null,
+      // Business Twin Reality Check: bevara en explicit källklassificering
+      // från deal/offertflödet. Ingen fritextinferens görs här.
+      job_type: typeof body.job_type === 'string'
+        ? body.job_type.trim().slice(0, 120) || null
+        : null,
       template_style: ['modern', 'premium', 'friendly'].includes(body.template_style)
         ? body.template_style
         : null,

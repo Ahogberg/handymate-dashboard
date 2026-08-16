@@ -344,6 +344,9 @@ export default function NewQuotePage() {
   const [templateName, setTemplateName] = useState('')
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [templateId, setTemplateId] = useState<string | undefined>(undefined)
+  // Explicit jobbtyp från kopplad deal. Sparas på offerten så samma
+  // Outcome Quality Gate-nyckel finns kvar vid kontrollen före utskick.
+  const [quoteJobType, setQuoteJobType] = useState<string | null>(null)
 
   // Visuell stil
   const [templateStyle, setTemplateStyle] = useState<'modern' | 'premium' | 'friendly' | null>(null)
@@ -939,6 +942,7 @@ export default function NewQuotePage() {
       // Motor 1: deal-prefill gav ev. en jobbtyp — hämta efterkalkyl-insikt
       // som sekundär nyckel (mall vinner om användaren sen väljer en).
       if (deal.job_type) {
+        setQuoteJobType(deal.job_type)
         fetchEfterkalkylInsight({ jobType: deal.job_type })
       }
     } catch (err) {
@@ -1927,6 +1931,7 @@ export default function NewQuotePage() {
           ai_confidence: aiConfidence || null,
           source_transcript: sourceTranscript || null,
           template_id: templateId || null,
+          job_type: quoteJobType,
           template_style: templateStyle,
           attachments: attachments.length > 0 ? attachments : [],
           deal_id: dealIdFromQuery,

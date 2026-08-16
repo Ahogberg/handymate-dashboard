@@ -1,3 +1,53 @@
+# Business Twin Quote Reality Check V1 — 2026-08-16
+
+## Mål
+
+Ersätt den befintliga skenbara Daniel-varningen före offertutskick med ett
+tenant-säkert, kvalitetsgrindat beslutsstöd från företagets egna avslutade
+jobb. Offerten ska jämföras på explicit mall eller jobbtyp — aldrig bara för
+att totalsumman råkar ligga i samma breda prisintervall.
+
+## Plan
+
+- [x] Lås ett litet serverkontrakt för `ready`, `insufficient` och
+  `unavailable`, med ren deterministisk matte och synlig evidens.
+- [x] Läs offerten tenantfiltrerat, härled dess riktiga offerttimmar via den
+  kanoniska budgetmotorn och återanvänd Outcome Quality Gates aggregat.
+- [x] Ta bort den oanvända keyword-matchningen, legacy-projekttimmarna,
+  den falska prisrekommendationen och UI-knappen som inte ändrar någonting.
+- [x] Visa verklighetskontrollen i befintlig utskicksmodal: historiskt urval,
+  genomsnittlig tidsavvikelse och föreslagen tidsbuffert; enda CTA går till
+  riktig offertredigering.
+- [x] Facit-testa matte, minsta urval, tenantfilter, explicit matchning,
+  fail-closed-fel och att no-op-/prisheuristiken är borta.
+- [x] Kör TypeScript, riktade browserlösa facit, produktionsbuild och hela
+  facitsvitens felsammanfattning; uppdatera roadmap och separat commit.
+
+## Avgränsning
+
+- Ingen SQL, LLM-matte, automatisk offertändring eller utskicksspärr.
+- Ingen generell rekommendationsmotor; endast offertens sista kontroll före
+  befintligt utskick.
+- Claudes produktregister- och kundkommunikationsfiler rörs inte.
+
+## Resultat
+
+- Den tidigare breda prisintervallsjämförelsen och den falska
+  `Justera till`-handlingen är borttagna. Reality Check använder explicit
+  offertmall eller jobbtyp, kanoniska offerttimmar och kvalitetsgrindade
+  projektutfall.
+- Minst tre jämförbara utfall krävs. Endast positiv historisk tidsavvikelse
+  ger en rådgivande buffert, avrundad uppåt till närmaste halvtimme; offerten
+  ändras aldrig automatiskt.
+- Källfel skiljs från otillräckligt underlag och realiserad marginal lämnar
+  aldrig servern utan `see_financials`.
+- `npx tsc --noEmit` och produktionsbuilden är gröna. 89/89 riktade facit är
+  gröna. Full Chromium-svit: 3 118/3 248 gröna; 126 nätfall blockeras av
+  sandboxens `connect EACCES`, och fyra orelaterade Jarvis-, stegkedje- och
+  parallella Bränsle-facit är röda.
+
+---
+
 # Produktregister i onboarding — guidat granskningssteg + products/price_list-synk (2026-08-16)
 
 Källa: Andreas ville researcha hur Easofts produktregister är strukturerat,

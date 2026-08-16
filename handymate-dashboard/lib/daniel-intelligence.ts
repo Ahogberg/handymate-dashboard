@@ -1,149 +1,180 @@
 /**
- * V26 — Daniels offert-intelligens
+ * Business Twin Quote Reality Check V1.
  *
- * Analyserar historiska jobb och varnar om en offert verkar underprissatt.
+ * Kontrollpunkten före offertutskick jämför bara med kvalitetsgrindade,
+ * avslutade jobb för samma explicita mall eller jobbtyp. Ingen LLM räknar,
+ * inget pris ändras automatiskt och ett källfel blir aldrig "ingen risk".
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
+import {
+  getEfterkalkylInsight,
+  type EfterkalkylInsight,
+} from '@/lib/efterkalkyl/get-insight'
+import {
+  getQuoteBudgetDerivation,
+  type QuoteBudgetDerivation,
+} from '@/lib/quotes/get-quote-budget-derivation'
+
+export type QuoteRealityStatus = 'ready' | 'insufficient' | 'unavailable'
+export type QuoteRealityConfidence = 'begränsat' | 'gott' | 'starkt'
+
+export interface QuoteRealityAnalysis {
+  matched_by: 'template' | 'job_type'
+  match_label: string
+  similar_jobs: number
+  financial_jobs: number
+  quoted_hours: number
+  avg_hours_diff_pct: number
+  recommended_hours: number
+  suggested_buffer_hours: number
+  avg_realized_margin_pct: number | null
+  confidence: QuoteRealityConfidence
+  message: string
+}
 
 export interface QuoteIntelligence {
-  similar_jobs: number
-  avg_actual_hours: number
-  avg_quoted_hours: number
-  overrun_percent: number
-  suggested_price: number
-  current_price: number
-  confidence: 'low' | 'medium' | 'high'
-  message: string
+  status: QuoteRealityStatus
   show_warning: boolean
+  analysis: QuoteRealityAnalysis | null
+  reason: string | null
 }
 
-export async function analyzeQuoteBeforeSend(
-  quoteId: string,
-  businessId: string
-): Promise<QuoteIntelligence | null> {
-  const supabase = getServerSupabase()
+interface RealityCheckInput {
+  insight: EfterkalkylInsight
+  budget: QuoteBudgetDerivation
+  matchedBy: 'template' | 'job_type'
+  matchLabel: string
+}
 
-  // Hämta offerten
-  const { data: quote } = await supabase
-    .from('quotes')
-    .select('quote_id, title, total, labor_total, material_total, description')
-    .eq('quote_id', quoteId)
-    .single()
+const MIN_SAMPLE_SIZE = 3
+const WARNING_THRESHOLD_PCT = 10
 
-  if (!quote || !quote.total) return null
+function round1(value: number): number {
+  return Math.round(value * 10) / 10
+}
 
-  // Hämta offertrader för att identifiera jobbtyp
-  const { data: items } = await supabase
-    .from('quote_items')
-    .select('description, category_slug, quantity, unit, unit_price, total')
-    .eq('quote_id', quoteId)
-    .eq('item_type', 'item')
+function roundUpHalfHour(value: number): number {
+  return Math.ceil(value * 2) / 2
+}
 
-  // Identifiera jobbtyp baserat på titel, beskrivning och kategorier
-  const jobKeywords = extractJobType(quote.title, quote.description, items || [])
+function insufficient(reason: string): QuoteIntelligence {
+  return { status: 'insufficient', show_warning: false, analysis: null, reason }
+}
 
-  // Hämta historiska accepterade offerter med samma typ
-  const { data: historicQuotes } = await supabase
-    .from('quotes')
-    .select('quote_id, total, labor_total')
-    .eq('business_id', businessId)
-    .in('status', ['accepted', 'completed'])
-    .neq('quote_id', quoteId)
+function unavailable(reason: string): QuoteIntelligence {
+  return { status: 'unavailable', show_warning: false, analysis: null, reason }
+}
 
-  if (!historicQuotes || historicQuotes.length === 0) return null
+/** Ren jämförelsekärna: samma indata ger alltid samma kvitto. */
+export function buildQuoteRealityCheck(input: RealityCheckInput): QuoteIntelligence {
+  const { insight, budget, matchedBy, matchLabel } = input
+  if (insight.unavailable) {
+    return unavailable('Efterkalkylerna kunde inte läsas säkert just nu.')
+  }
+  if (insight.insufficient || insight.count < MIN_SAMPLE_SIZE) {
+    return insufficient(`Minst ${MIN_SAMPLE_SIZE} jämförbara avslutade jobb krävs.`)
+  }
 
-  // Filtrera liknande jobb (±30% av pris + liknande keywords)
-  const priceRange = { min: quote.total * 0.5, max: quote.total * 2.0 }
-  const similarQuotes = historicQuotes.filter(
-    (q: any) => q.total >= priceRange.min && q.total <= priceRange.max
-  )
+  const quotedHours = Number(budget.budget_hours)
+  if (!Number.isFinite(quotedHours) || quotedHours <= 0) {
+    return insufficient('Offerten saknar jämförbara timmar.')
+  }
 
-  if (similarQuotes.length < 3) return null
+  if (insight.avg_hours_diff_pct == null) {
+    return insufficient('De jämförbara jobben saknar säker tidsavvikelse.')
+  }
+  const averageDiff = Number(insight.avg_hours_diff_pct)
+  if (!Number.isFinite(averageDiff)) {
+    return insufficient('De jämförbara jobben saknar säker tidsavvikelse.')
+  }
 
-  // Hämta faktisk tid för dessa projekt.
-  // OBS (2026-08-12, migrerings-audit): tidigare lästes även
-  // actual_labor_cost och budget_amount här och beräknade avgActualCost/
-  // avgBudget — men dessa två variabler konsumerades aldrig nedanför
-  // (overrun/suggested_price bygger enbart på timmar, inte kostnad).
-  // actual_labor_cost är dessutom en stale DB-trigger-kolumn som räknar
-  // arbetskostnad på time_entry.hourly_rate (kundens pris, inte intern
-  // kostnad) — se lib/projects/compute-economics.ts. Eftersom fältet
-  // aldrig användes tas läsningen bort helt istället för att migreras
-  // till computeProjectEconomics (hade bara lagt på N+1-anrop för ett
-  // värde ingen läser). actual_hours behålls — den är en ren summering
-  // av time_entry.duration_minutes och påverkas inte av samma bugg.
-  const quoteIds = similarQuotes.map((q: any) => q.quote_id)
-  const { data: projects } = await supabase
-    .from('project')
-    .select('project_id, quote_id, budget_hours, actual_hours')
-    .eq('business_id', businessId)
-    .in('quote_id', quoteIds)
+  const positiveOverrun = Math.max(0, averageDiff)
+  const recommendedHours = roundUpHalfHour(quotedHours * (1 + positiveOverrun / 100))
+  const bufferHours = round1(Math.max(0, recommendedHours - quotedHours))
+  const showWarning = averageDiff >= WARNING_THRESHOLD_PCT
+  const confidence: QuoteRealityConfidence = insight.count >= 10
+    ? 'starkt'
+    : insight.count >= 5
+      ? 'gott'
+      : 'begränsat'
 
-  if (!projects || projects.length < 3) return null
-
-  // Beräkna snitt
-  const projectsWithData = projects.filter((p: any) => p.actual_hours > 0 && p.budget_hours > 0)
-  if (projectsWithData.length < 3) return null
-
-  const avgActualHours = projectsWithData.reduce((sum: number, p: any) => sum + (p.actual_hours || 0), 0) / projectsWithData.length
-  const avgQuotedHours = projectsWithData.reduce((sum: number, p: any) => sum + (p.budget_hours || 0), 0) / projectsWithData.length
-
-  const overrunPercent = avgQuotedHours > 0
-    ? Math.round(((avgActualHours - avgQuotedHours) / avgQuotedHours) * 100)
-    : 0
-
-  // Confidence baserat på antal jobb
-  const confidence: 'low' | 'medium' | 'high' =
-    projectsWithData.length >= 10 ? 'high' :
-    projectsWithData.length >= 5 ? 'medium' :
-    'low'
-
-  // Föreslagen justering
-  const adjustmentFactor = overrunPercent > 0 ? 1 + (overrunPercent / 100) : 1
-  const suggestedPrice = Math.round(quote.total * adjustmentFactor)
-
-  // Visa bara varning om överskridning > 10% och confidence >= medium
-  const showWarning = overrunPercent > 10 && confidence !== 'low'
-
-  // Generera meddelande
   const message = showWarning
-    ? `Dina senaste ${projectsWithData.length} liknande jobb tog i snitt ${overrunPercent}% längre tid än estimerat. Den här offerten kan vara ${overrunPercent}% för låg. Vill du justera till ${formatSEK(suggestedPrice)} istället?`
-    : ''
+    ? `Liknande jobb har i snitt tagit ${round1(averageDiff).toLocaleString('sv-SE')} % mer tid än offererat. En historiskt förankrad kontrollnivå är ${recommendedHours.toLocaleString('sv-SE')} timmar.`
+    : `Kontrollerad mot ${insight.count} liknande jobb. Historiken visar ingen tydlig återkommande tidsrisk.`
 
   return {
-    similar_jobs: projectsWithData.length,
-    avg_actual_hours: Math.round(avgActualHours * 10) / 10,
-    avg_quoted_hours: Math.round(avgQuotedHours * 10) / 10,
-    overrun_percent: overrunPercent,
-    suggested_price: suggestedPrice,
-    current_price: quote.total,
-    confidence,
-    message,
+    status: 'ready',
     show_warning: showWarning,
+    analysis: {
+      matched_by: matchedBy,
+      match_label: matchLabel,
+      similar_jobs: insight.count,
+      financial_jobs: insight.financial_count ?? 0,
+      quoted_hours: round1(quotedHours),
+      avg_hours_diff_pct: round1(averageDiff),
+      recommended_hours: recommendedHours,
+      suggested_buffer_hours: bufferHours,
+      avg_realized_margin_pct: insight.avg_margin_pct == null || !Number.isFinite(Number(insight.avg_margin_pct))
+        ? null
+        : round1(Number(insight.avg_margin_pct)),
+      confidence,
+      message,
+    },
+    reason: null,
   }
 }
 
-function extractJobType(title: string | null, description: string | null, items: any[]): string[] {
-  const text = [title, description, ...items.map(i => i.description)].filter(Boolean).join(' ').toLowerCase()
-  const keywords: string[] = []
+/**
+ * Tenantbunden I/O-gräns. Offertens egna, explicit sparade klassificering
+ * avgör jämförelsen; fritext eller prisintervall används aldrig som gissning.
+ */
+export async function analyzeQuoteBeforeSend(
+  quoteId: string,
+  businessId: string,
+  supabase: SupabaseClient = getServerSupabase(),
+): Promise<QuoteIntelligence> {
+  const { data: quote, error: quoteError } = await supabase
+    .from('quotes')
+    .select('quote_id, template_id, job_type')
+    .eq('business_id', businessId)
+    .eq('quote_id', quoteId)
+    .maybeSingle()
 
-  const jobTypes: Record<string, string[]> = {
-    badrum: ['badrum', 'dusch', 'kakel', 'klinker', 'våtrum'],
-    kök: ['kök', 'bänkskiva', 'diskbänk', 'köksluckor'],
-    el: ['el', 'elcentral', 'jordfelsbrytare', 'belysning', 'uttag'],
-    vvs: ['vvs', 'rör', 'avlopp', 'värmepump', 'radiator'],
-    måleri: ['målning', 'tapetsering', 'spackling'],
-    bygg: ['bygg', 'renovering', 'tillbyggnad', 'attefall'],
+  if (quoteError) {
+    console.error('[quote-reality-check] offertuppslag misslyckades:', quoteError)
+    return unavailable('Offerten kunde inte läsas säkert just nu.')
+  }
+  if (!quote) return unavailable('Offerten hittades inte i företaget.')
+
+  const templateId = typeof quote.template_id === 'string' && quote.template_id.trim()
+    ? quote.template_id.trim()
+    : null
+  const jobType = typeof quote.job_type === 'string' && quote.job_type.trim()
+    ? quote.job_type.trim()
+    : null
+  if (!templateId && !jobType) {
+    return insufficient('Offerten saknar mall eller jobbtyp att jämföra på.')
   }
 
-  for (const [type, words] of Object.entries(jobTypes)) {
-    if (words.some(w => text.includes(w))) keywords.push(type)
+  let budget: QuoteBudgetDerivation
+  try {
+    budget = await getQuoteBudgetDerivation(supabase, quoteId, businessId)
+  } catch (error) {
+    console.error('[quote-reality-check] budgethärledning misslyckades:', error)
+    return unavailable('Offertens timmar kunde inte läsas säkert just nu.')
   }
 
-  return keywords.length > 0 ? keywords : ['general']
-}
+  const insight = await getEfterkalkylInsight(supabase, businessId, {
+    templateId,
+    jobType: templateId ? null : jobType,
+  })
 
-function formatSEK(amount: number): string {
-  return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(amount) + ' kr'
+  return buildQuoteRealityCheck({
+    insight,
+    budget,
+    matchedBy: templateId ? 'template' : 'job_type',
+    matchLabel: templateId || jobType || '',
+  })
 }

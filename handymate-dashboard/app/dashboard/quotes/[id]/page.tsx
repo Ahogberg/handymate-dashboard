@@ -70,6 +70,7 @@ export default function QuoteDetailPage() {
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
   const [quoteIntelligence, setQuoteIntelligence] = useState<QuoteIntelligence | null>(null)
+  const [quoteIntelligenceLoading, setQuoteIntelligenceLoading] = useState(false)
   const [versions, setVersions] = useState<QuoteVersion[]>([])
   const [creatingVersion, setCreatingVersion] = useState(false)
   const [trackingEvents, setTrackingEvents] = useState<QuoteTrackingEvent[]>([])
@@ -427,10 +428,22 @@ export default function QuoteDetailPage() {
   const onOpenSendModal = () => {
     setShowSendModal(true)
     if (quote) {
+      setQuoteIntelligence(null)
+      setQuoteIntelligenceLoading(true)
       fetch(`/api/quotes/intelligence?quoteId=${quote.quote_id}`)
-        .then(r => r.json())
-        .then(data => setQuoteIntelligence(data))
-        .catch(() => {})
+        .then(async response => {
+          const data = await response.json().catch(() => null)
+          if (data?.status) return data as QuoteIntelligence
+          throw new Error('Ogiltigt svar från verklighetskontrollen')
+        })
+        .then(setQuoteIntelligence)
+        .catch(() => setQuoteIntelligence({
+          status: 'unavailable',
+          show_warning: false,
+          analysis: null,
+          reason: 'Verklighetskontrollen kunde inte köras.',
+        }))
+        .finally(() => setQuoteIntelligenceLoading(false))
     }
   }
 
@@ -538,6 +551,7 @@ export default function QuoteDetailPage() {
         bccEmails={bccEmails}
         setBccEmails={setBccEmails}
         quoteIntelligence={quoteIntelligence}
+        quoteIntelligenceLoading={quoteIntelligenceLoading}
         setQuoteIntelligence={setQuoteIntelligence}
         onClose={() => setShowSendModal(false)}
         onSend={sendQuote}

@@ -3,11 +3,13 @@
 import Link from 'next/link'
 import {
   AlertTriangle,
+  CheckCircle2,
   FileText,
   Loader2,
   Mail,
   MessageSquare,
   Send,
+  ShieldCheck,
   XCircle,
 } from 'lucide-react'
 import type { Quote, QuoteIntelligence } from '../types'
@@ -24,6 +26,7 @@ interface QuoteSendModalProps {
   bccEmails: string
   setBccEmails: (s: string) => void
   quoteIntelligence: QuoteIntelligence | null
+  quoteIntelligenceLoading: boolean
   setQuoteIntelligence: (q: QuoteIntelligence | null) => void
   onClose: () => void
   onSend: () => void
@@ -41,6 +44,7 @@ export function QuoteSendModal({
   bccEmails,
   setBccEmails,
   quoteIntelligence,
+  quoteIntelligenceLoading,
   setQuoteIntelligence,
   onClose,
   onSend,
@@ -84,36 +88,88 @@ export function QuoteSendModal({
             </div>
           )}
 
-          {/* Daniel's intelligence warning */}
-          {quoteIntelligence?.show_warning && quoteIntelligence.analysis && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          {quoteIntelligenceLoading && (
+            <div className="flex items-center gap-2 rounded-xl border border-teal-100 bg-teal-50 px-3 py-2.5 text-xs font-medium text-teal-800">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              Business Twin jämför med verifierade efterkalkyler…
+            </div>
+          )}
+
+          {!quoteIntelligenceLoading && quoteIntelligence?.status === 'unavailable' && (
+            <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+              <div>
+                <p className="m-0 font-semibold text-slate-700">Verklighetskontrollen är inte tillgänglig</p>
+                <p className="m-0 mt-0.5">{quoteIntelligence.reason} Offerten har inte ändrats.</p>
+              </div>
+            </div>
+          )}
+
+          {!quoteIntelligenceLoading && quoteIntelligence?.status === 'ready' && quoteIntelligence.analysis && (
+            <div className={`rounded-xl border p-4 ${
+              quoteIntelligence.show_warning
+                ? 'border-amber-200 bg-amber-50'
+                : 'border-teal-100 bg-teal-50'
+            }`}>
               <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-full bg-amber-600 flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">
-                  D
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-1 mb-1">
-                    <span className="text-sm font-semibold text-gray-900">Daniel</span>
-                    <span className="text-xs text-gray-400">· Säljare</span>
+                {quoteIntelligence.show_warning
+                  ? <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden />
+                  : <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-teal-700" aria-hidden />}
+                <div className="min-w-0 flex-1">
+                  <p className="m-0 text-[10px] font-bold uppercase tracking-[0.12em] text-teal-700">
+                    Business Twin · verklighetskontroll
+                  </p>
+                  <p className={`m-0 mt-1 text-sm ${quoteIntelligence.show_warning ? 'text-amber-900' : 'text-teal-900'}`}>
+                    {quoteIntelligence.analysis.message}
+                  </p>
+                  <div className={`mt-3 grid gap-2 text-center ${
+                    quoteIntelligence.analysis.avg_realized_margin_pct != null
+                      ? 'grid-cols-2 sm:grid-cols-4'
+                      : 'grid-cols-3'
+                  }`}>
+                    <div className="rounded-lg bg-white/75 px-2 py-2">
+                      <p className="m-0 text-[10px] text-slate-500">Offerten</p>
+                      <p className="m-0 text-xs font-bold text-slate-800">{quoteIntelligence.analysis.quoted_hours.toLocaleString('sv-SE')} h</p>
+                    </div>
+                    <div className="rounded-lg bg-white/75 px-2 py-2">
+                      <p className="m-0 text-[10px] text-slate-500">Liknande jobb</p>
+                      <p className="m-0 text-xs font-bold text-slate-800">{quoteIntelligence.analysis.similar_jobs} st</p>
+                    </div>
+                    <div className="rounded-lg bg-white/75 px-2 py-2">
+                      <p className="m-0 text-[10px] text-slate-500">Tidsavvikelse</p>
+                      <p className="m-0 text-xs font-bold text-slate-800">
+                        {quoteIntelligence.analysis.avg_hours_diff_pct > 0 ? '+' : ''}{quoteIntelligence.analysis.avg_hours_diff_pct.toLocaleString('sv-SE')} %
+                      </p>
+                    </div>
+                    {quoteIntelligence.analysis.avg_realized_margin_pct != null && (
+                      <div className="rounded-lg bg-white/75 px-2 py-2">
+                        <p className="m-0 text-[10px] text-slate-500">Realiserad marginal</p>
+                        <p className="m-0 text-xs font-bold text-slate-800">
+                          {quoteIntelligence.analysis.avg_realized_margin_pct.toLocaleString('sv-SE')} %
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-sm text-amber-800 mb-3">{quoteIntelligence.analysis.message}</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        // TODO: Justera pris-logik
-                        setQuoteIntelligence(null)
-                      }}
-                      className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700"
-                    >
-                      Justera till {new Intl.NumberFormat('sv-SE').format(quoteIntelligence.analysis.suggested_price)} kr
-                    </button>
-                    <button
-                      onClick={() => setQuoteIntelligence(null)}
-                      className="px-3 py-1.5 border border-amber-300 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100"
-                    >
-                      Skicka ändå
-                    </button>
-                  </div>
+                  {quoteIntelligence.show_warning && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link
+                        href={`/dashboard/quotes/${quote.quote_id}/edit`}
+                        className="rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-800"
+                      >
+                        Granska timmarna
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => setQuoteIntelligence(null)}
+                        className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                      >
+                        Jag har tagit höjd
+                      </button>
+                    </div>
+                  )}
+                  <p className="m-0 mt-2 text-[10px] text-slate-500">
+                    Beräknat från {quoteIntelligence.analysis.matched_by === 'template' ? 'samma offertmall' : 'samma jobbtyp'} · inga belopp eller rader ändras automatiskt.
+                  </p>
                 </div>
               </div>
             </div>
