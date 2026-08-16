@@ -150,6 +150,10 @@
       "schedule": "40 6 * * *"
     },
     {
+      "path": "/api/cron/expectation-drift",
+      "schedule": "50 6 * * *"
+    },
+    {
       "path": "/api/cron/meeting-reminders",
       "schedule": "*/5 * * * *"
     },

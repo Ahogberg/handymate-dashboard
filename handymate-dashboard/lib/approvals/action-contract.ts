@@ -170,6 +170,15 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // agent_insight ovan, ingenting utförs (Karin-kortets fynd är redan
   // riktigt/agerbart som TEXT, men själva godkännandet skickar inget).
   team_intro: 'INFORMATIONAL',
+
+  // Expectation Drift — Signal 1 (docs/audits/NEXT_MOAT_WAVE.md, Koncept 3,
+  // 2026-08-16): ren kö-ålder på befintliga kundvända åtagande-kort
+  // (create_quote_draft/meeting_followup/create_ata_draft), se
+  // lib/expectation-drift/stale-signals.ts. Kortet är en nudge — "det här
+  // ligger obehandlat" — inte ett förslag att skicka något till kunden.
+  // Godkänn = jag har sett det, precis som monday_brief/agent_insight.
+  // Aldrig auto-exekverat, aldrig auto-godkänt.
+  expectation_drift_signal: 'INFORMATIONAL',
 }
 
 /** Vad är det här kortet? `null` = okänt, och okänt godkänns inte. */
