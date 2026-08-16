@@ -231,7 +231,9 @@ export async function processInboundEmail(
     : message.snippet || ''
 
   // 5. Store in email_conversations
-  const { error } = await supabase
+  // .select('id') för att kunna referera raden från fakta-korten nedan
+  // (payload.email_conversation_id) och kostnadsmätningen (cost_event.refId).
+  const { data: insertedEmail, error } = await supabase
     .from('email_conversations')
     .insert({
       business_id: businessId,
@@ -248,6 +250,8 @@ export async function processInboundEmail(
       direction: 'inbound',
       status: 'new',
     })
+    .select('id')
+    .single()
 
   if (error) {
     console.error('[gmail-processor] Insert error:', error.message)
@@ -277,6 +281,79 @@ export async function processInboundEmail(
     }
   } catch (err) {
     console.error('[gmail-processor] fireEvent error:', err)
+  }
+
+  // ── Customer Memory V1.1 (2026-08-16): kundfakta ur inkommande mejl ──
+  //
+  // Körs BARA när en kund finns (match.customer_id) — fakta är alltid
+  // kundnycklade, samma "ingen kund → hoppa tyst"-vakt som mötes- och
+  // telefongrenen i voice/analyze. Ett lead räcker inte.
+  //
+  // Dedup: steg 2 ovan avvisar redan dubbletter på gmail_message_id innan
+  // vi når hit, så extraktionen körs högst en gång per lagrat mejl — ingen
+  // egen dedup-nyckel behövs.
+  //
+  // Awaitas men helskyddas: extraktion är berikning, aldrig kärnflöde —
+  // ett fel här får inte fälla mejlhanteringen.
+  if (match.customer_id && insertedEmail?.id) {
+    // Fångas i konstanter före await:arna så typerna håller genom hela blocket.
+    const faktaKundId = match.customer_id
+    const mejlRadId = String(insertedEmail.id)
+    try {
+      const { extractCustomerFacts, EMAIL_FAKTA_MODELL } = await import('@/lib/customer-facts/extract-from-text')
+
+      const fakta = await extractCustomerFacts({
+        text: bodyPreview,
+        channel: 'email',
+        businessId,
+        refId: mejlRadId,
+        supabase,
+      })
+
+      if (fakta.length > 0) {
+        const { buildCustomerFactCard } = await import('@/lib/customer-facts/build-card')
+        const { buildDecisionRecord } = await import('@/lib/ai/decision-record')
+        const beslutsstampel = buildDecisionRecord({
+          model: EMAIL_FAKTA_MODELL,
+          prompt: 'emailFactExtraction',
+          input: bodyPreview,
+          now: new Date(),
+        })
+
+        for (const f of fakta) {
+          const kort = buildCustomerFactCard(
+            // ExtractedFact → kortbyggarens fyndform: content är både titel
+            // och beskrivning (mejl har ingen separat AI-titel), citatet
+            // blir evidensen.
+            {
+              title: f.content,
+              description: f.content,
+              source_text: f.evidence_quote,
+              confidence: f.confidence,
+              fact_type: f.fact_type,
+            },
+            {
+              customerId: faktaKundId,
+              emailConversationId: mejlRadId,
+              decisionRecord: beslutsstampel,
+              evidensKalla: 'mejlet',
+              verb: 'läste',
+            }
+          )
+          // Samma id/status/utgångsmönster som mötesgrenen — 7 dagars expiry.
+          const { error: kortFel } = await supabase.from('pending_approvals').insert({
+            id: `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+            business_id: businessId,
+            status: 'pending',
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            ...kort,
+          })
+          if (kortFel) console.error('[gmail-processor] e-post-faktakort kunde inte skapas:', kortFel.message)
+        }
+      }
+    } catch (factErr) {
+      console.error('[gmail-processor] kundfakta-extraktion misslyckades (icke-blockerande):', factErr)
+    }
   }
 
   // ── Matte Gmail Intelligence (fire-and-forget) ──

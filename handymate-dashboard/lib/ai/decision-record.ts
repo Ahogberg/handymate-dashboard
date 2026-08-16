@@ -61,6 +61,12 @@ export const PROMPT_VERSIONS = {
    * Lisa saknar verktyg för, mötesvinkel för source='site_visit'.
    */
   callAnalysis: 1,
+  /**
+   * lib/customer-facts/extract-from-text.ts — kundfakta ur inkommande e-post
+   * (Customer Memory V1.1, 2026-08-16). v1 = fyra fact_types, ordagrant
+   * citat, max 5, åtkomstkodsförbudet.
+   */
+  emailFactExtraction: 1,
 } as const
 
 export type PromptKey = keyof typeof PROMPT_VERSIONS

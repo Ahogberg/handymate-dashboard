@@ -12,6 +12,7 @@ import fs from 'fs'
 import path from 'path'
 import { classify, mayExecute, ACTION_CONTRACT } from '../lib/approvals/action-contract'
 import { ANALYS_TILLATNA_TYPER } from '../lib/voice/analysis-scope'
+import { parseFaktaSvar, MIN_TEXT_LANGD } from '../lib/customer-facts/extract-from-text'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
@@ -115,19 +116,128 @@ test.describe('telefongrenen bygger korrekt kort (Customer Memory V2, 2026-08-16
     expect(gren, 'ingen vakt mot saknad kund i telefongrenen').toContain('if (!customerId) continue')
   })
 
-  test('kortbygget är en delad funktion — mötes- och telefongrenen kan inte glida isär', () => {
-    const s = read(ANALYZE)
-    const i = s.indexOf('function buildCustomerFactCard')
+  test('kortbygget är en delad funktion — mötes-, telefon- och e-postgrenen kan inte glida isär', () => {
+    // Customer Memory V1.1 (2026-08-16): definitionen flyttade från
+    // voice/analyze till lib/customer-facts/build-card.ts så att även
+    // e-postgrenen (lib/gmail/processor.ts) kan bygga exakt samma kort.
+    const delad = read('lib/customer-facts/build-card.ts')
+    const i = delad.indexOf('function buildCustomerFactCard')
     expect(i, 'ingen delad kortbyggare hittades').toBeGreaterThan(-1)
-    const gren = s.slice(i, i + 1000)
+    const gren = delad.slice(i, i + 2800)
     expect(gren).toContain("approval_type: 'customer_fact'")
     expect(gren).toContain('fact_type:')
     expect(gren).toContain('evidence_quote:')
     expect(gren).toContain('confidence:')
     expect(gren).toContain('recording_id:')
-    // Båda anropsställena (möte + telefon) ska gå genom samma funktion.
+    expect(gren).toContain('email_conversation_id:')
+    // voice/analyze importerar den delade — ingen lokal kopia får återuppstå.
+    const s = read(ANALYZE)
+    expect(s).toContain("from '@/lib/customer-facts/build-card'")
+    expect(s, 'lokal kopia av kortbyggaren i voice/analyze').not.toContain('function buildCustomerFactCard')
+    // Båda talgrenarna (möte + telefon) ska gå genom samma funktion.
     const anrop = s.match(/buildCustomerFactCard\(/g) || []
-    expect(anrop.length, 'kortbyggaren ska anropas från både mötes- och telefongrenen').toBeGreaterThanOrEqual(3)
+    expect(anrop.length, 'kortbyggaren ska anropas från både mötes- och telefongrenen').toBeGreaterThanOrEqual(2)
+  })
+})
+
+test.describe('e-postgrenen (Customer Memory V1.1)', () => {
+  const EXTRACTOR = 'lib/customer-facts/extract-from-text.ts'
+  const PROCESSOR = 'lib/gmail/processor.ts'
+
+  test('processorn extraherar bara under kundvakten — fakta är alltid kundnycklade', () => {
+    const s = read(PROCESSOR)
+    // Vakten är distinkt: den generella "if (match.customer_id || match.lead_id)"
+    // för events räcker inte — extraktionen kräver en KUND, aldrig ett lead.
+    const vakt = s.indexOf('if (match.customer_id && insertedEmail?.id)')
+    expect(vakt, 'kundvakten runt extraktionen saknas').toBeGreaterThan(-1)
+    const gren = s.slice(vakt, vakt + 3200)
+    expect(gren, 'extraktionen ligger inte under kundvakten').toContain('extractCustomerFacts(')
+    // Fel får aldrig fälla mejlhanteringen — berikning, inte kärnflöde.
+    expect(gren).toContain('try {')
+    expect(gren).toContain('catch')
+    // Inget anrop före vakten — extraktionen har exakt en väg in.
+    expect(s.slice(0, vakt)).not.toContain('extractCustomerFacts(')
+  })
+
+  test('e-postfakta blir kort i pending_approvals — aldrig direkt i customer_fact', () => {
+    const proc = read(PROCESSOR)
+    expect(proc).toContain("from('pending_approvals')")
+    expect(proc, 'processorn får inte skriva customer_fact direkt').not.toContain("from('customer_fact')")
+    const ex = read(EXTRACTOR)
+    expect(ex, 'extraktorn får inte skriva customer_fact direkt').not.toContain("from('customer_fact')")
+    // Extraktorn extraherar — anroparen äger kortbygget och inserten.
+    expect(ex).not.toContain("from('pending_approvals')")
+    // Samma id/status/utgångsmönster som mötesgrenen (7 dagar).
+    const i = proc.indexOf("from('pending_approvals')")
+    const gren = proc.slice(Math.max(0, i - 1800), i + 600)
+    expect(gren).toContain('buildCustomerFactCard(')
+    expect(gren).toContain("status: 'pending'")
+    expect(gren).toContain('7 * 24 * 60 * 60 * 1000')
+  })
+
+  test('kortet stämplas med beslutspost och e-postkälla', () => {
+    const s = read(PROCESSOR)
+    expect(s).toContain("prompt: 'emailFactExtraction'")
+    expect(s).toContain('emailConversationId')
+    expect(s).toContain("evidensKalla: 'mejlet'")
+  })
+
+  test('extraktorns prompt bär de fyra fact_types, citatkravet och åtkomstkodsförbudet', () => {
+    const s = read(EXTRACTOR)
+    expect(s).toMatch(/fact_type.*preference.*constraint.*commitment.*contact/s)
+    expect(s).toContain('ordagrant citat')
+    expect(s).toContain('Max 5')
+    // voice/analyze-facitet räknar sina fyra förbudsrader filskopat (testet
+    // ovan) — e-postprompten låses separat här med exakt samma radform.
+    const forbud = s.match(/SÄKERHET: extrahera[^\n]*ALDRIG åtkomstkoder/g) || []
+    expect(forbud.length, 'förbudsraden saknas i e-postprompten').toBeGreaterThanOrEqual(1)
+  })
+
+  test('extraktorn mäts via cost-guard — cogs-facitets enda tillåtna LLM-skrivare', () => {
+    const s = read(EXTRACTOR)
+    expect(s).toContain('meterDirectLlmCall')
+    expect(s).toContain('llmCostUsd(')
+    // En egen cost_event-skrivare här hade fällt cogs-facitets
+    // "en skrivare per faktum"-test — mätningen går GENOM cost-guard.
+    expect(s).not.toMatch(/resource:\s*'llm'/)
+  })
+
+  test('extraktionsfel ger tom lista — aldrig ett kastat fel upp till mejlflödet', () => {
+    const s = read(EXTRACTOR)
+    const returns = s.match(/return \[\]/g) || []
+    // Minst tre tomma utvägar: för kort text, saknad API-nyckel, catch.
+    expect(returns.length).toBeGreaterThanOrEqual(3)
+    expect(s).toContain('catch')
+  })
+
+  test('parseFaktaSvar returnerar [] för skräp och upprätthåller max 5 i kod', () => {
+    expect(parseFaktaSvar('')).toEqual([])
+    expect(parseFaktaSvar('inte json alls')).toEqual([])
+    expect(parseFaktaSvar('{"fel": "form"}')).toEqual([])
+    expect(parseFaktaSvar('{"fakta": "inte en lista"}')).toEqual([])
+    // Okänd fact_type filtreras bort — aldrig en gissad typ.
+    expect(parseFaktaSvar(JSON.stringify({
+      fakta: [{ fact_type: 'password', content: 'x', evidence_quote: 'y', confidence: 1 }],
+    }))).toEqual([])
+    // Text runt JSON tolereras — modellen svamlar ibland trots instruktionen.
+    const giltig = {
+      fact_type: 'preference',
+      content: 'Vill ha ekparkett i hallen',
+      evidence_quote: 'vi vill gärna ha ekparkett i hallen',
+      confidence: 0.9,
+    }
+    expect(parseFaktaSvar('Här är svaret: ' + JSON.stringify({ fakta: [giltig] }))).toEqual([giltig])
+    // Max 5 är kod, inte prompttillit — sju in ger fem ut.
+    const sju = Array.from({ length: 7 }, (_, i) => ({ ...giltig, content: `faktum ${i}` }))
+    expect(parseFaktaSvar(JSON.stringify({ fakta: sju })).length).toBe(5)
+  })
+
+  test('korta mejl hoppas över före AI-anropet — tröskeln är 80 tecken', () => {
+    // "Ok tack!" och "Vi ses imorgon" bär aldrig ett varaktigt faktum men
+    // hade annars kostat ett Haiku-anrop per mejl.
+    expect(MIN_TEXT_LANGD).toBe(80)
+    const s = read(EXTRACTOR)
+    expect(s).toContain('MIN_TEXT_LANGD')
   })
 })
 

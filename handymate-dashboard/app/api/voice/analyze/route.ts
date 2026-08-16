@@ -5,7 +5,8 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { getClaudeModel } from '@/lib/ai/get-model'
 import { filtreraAnalysforslag, type AnalysForslagsTyp } from '@/lib/voice/analysis-scope'
-import { buildDecisionRecord, withDecisionRecord, type DecisionRecord } from '@/lib/ai/decision-record'
+import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
+import { buildCustomerFactCard } from '@/lib/customer-facts/build-card'
 import { splitTranscript, MAP_REDUCE_TROSKEL_TECKEN } from '@/lib/meetings/split-transcript'
 
 function getAnthropic() {
@@ -33,35 +34,9 @@ interface AISuggestion {
   fact_type?: 'preference' | 'constraint' | 'commitment' | 'contact'
 }
 
-/**
- * Bygger ett customer_fact-kort ur ett AI-fynd — DELAD av mötesgrenen och
- * telefongrenen (Customer Memory V2, 2026-08-16) så formen inte kan glida
- * isär mellan de två källorna. Anroparen ansvarar för att bara kalla denna
- * med en säkert härledd kund (ingen gissning här).
- */
-function buildCustomerFactCard(
-  s: AISuggestion,
-  opts: { customerId: string; recordingId: string; decisionRecord: DecisionRecord; evidensKalla: string }
-): Record<string, unknown> {
-  const evidens = s.source_text ? ` Ur ${opts.evidensKalla}: "${s.source_text}"` : ''
-  const kortInnehall = s.description || s.title
-  return {
-    approval_type: 'customer_fact',
-    title: `Matte hörde: ${kortInnehall.length > 60 ? kortInnehall.slice(0, 60) + '…' : kortInnehall}`,
-    description: `${s.description || ''}${evidens}`,
-    risk_level: 'low',
-    payload: {
-      customer_id: opts.customerId,
-      fact_type: s.fact_type || 'preference',
-      content: s.description,
-      evidence_quote: s.source_text || null,
-      confidence: s.confidence,
-      recording_id: opts.recordingId,
-      agent_id: 'matte',
-      decision_record: opts.decisionRecord,
-    },
-  }
-}
+// Kortbygget för customer_fact är sedan Customer Memory V1.1 (2026-08-16)
+// DELAT med e-postgrenen och bor i lib/customer-facts/build-card.ts —
+// mötes- och telefongrenen nedan anropar den importerade buildCustomerFactCard.
 
 /**
  * ═══ MAP-REDUCE FÖR LÅNGA MÖTESTRANSKRIPT (Mötesassistenten V2) ═══

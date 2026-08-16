@@ -132,6 +132,10 @@ const REF_TYPE_BUCKET: Record<string, FuelBucket> = {
   quote_transcribe_voice: 'calls_sms',
   meeting_segment: 'calls_sms',
   widget_conversation: 'calls_sms',
+  // Customer Memory V1.1 (2026-08-16): fakta-extraktion ur inkommande
+  // e-post (lib/customer-facts/extract-from-text.ts) — kommunikationsnära,
+  // samma bucket som samtalen/SMS:en den kompletterar.
+  email_conversation: 'calls_sms',
 
   // ── Offerter & analyser ───────────────────────────────────────────────
   quote_ai_generate: 'quotes_analysis',
