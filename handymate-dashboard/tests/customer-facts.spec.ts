@@ -28,9 +28,13 @@ test.describe('godkännande-kontraktet', () => {
     const s = read('app/api/approvals/[id]/route.ts')
     const i = s.indexOf("case 'customer_fact':")
     expect(i, 'hanteraren saknas i executeApprovalPayload').toBeGreaterThan(-1)
-    const gren = s.slice(i, i + 1700)
+    // Fönstret vidgat 2026-08-16: kanal-härledningskommentaren (source_type
+    // email/meeting) sköt fel-strängen förbi det gamla 1700-teckensfönstret.
+    const gren = s.slice(i, i + 2200)
     expect(gren).toContain("from('customer_fact')")
     expect(gren).toContain('.insert(')
+    // Kanalen härleds ur payloaden — e-post får aldrig etiketten 'meeting'.
+    expect(gren).toContain("pl.email_conversation_id ? 'email' : 'meeting'")
     // Misslyckad insert ska ge det svenska felet, aldrig en tyst krasch.
     expect(gren).toContain('Kunde inte spara — försök igen om en stund')
   })

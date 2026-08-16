@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
 import { getCommunicationTrail, normalizeTrailRange } from '@/lib/compliance/communication-trail'
 
@@ -15,6 +16,14 @@ export async function GET(
   const auth = await getAuthenticatedBusiness(request)
   if (!auth) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Rollskydd (Andreas beslut 2026-08-16): underlaget innehåller kompletta
+  // transkript och meddelanden — samma see_financials-grind som offert-PDF:en
+  // (TD-71-mönstret). Owner/admin auto.
+  const currentUser = await getCurrentUser(request)
+  if (!currentUser || !hasPermission(currentUser, 'see_financials')) {
+    return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
   }
 
   try {

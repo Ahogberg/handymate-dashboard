@@ -1215,8 +1215,12 @@ async function executeApprovalPayload(
             customer_id: pl.customer_id,
             fact_type: factType,
             content: pl.content,
-            source_type: 'meeting',
-            source_id: pl.recording_id ?? null,
+            // Kanal härledd ur payloaden (Customer Memory V1.1, 2026-08-16):
+            // e-postfakta bär email_conversation_id, tal-fakta (möte/telefon)
+            // bär recording_id. Hårdkodningen 'meeting' gav e-postfakta fel
+            // käll-etikett. Ingen CHECK på kolumnen (v122) — fri TEXT.
+            source_type: pl.email_conversation_id ? 'email' : 'meeting',
+            source_id: pl.recording_id ?? pl.email_conversation_id ?? null,
             evidence_quote: pl.evidence_quote ?? null,
             confidence: pl.confidence ?? null,
             confirmed_at: new Date().toISOString(),
