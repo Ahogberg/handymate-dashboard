@@ -1,5 +1,35 @@
 # NBA-prioriteringsprinciper ur Christoffers intervju — 2026-08-16→17 natt
 
+## Resultat (klart, pushat 2026-08-17, commit dbe04259)
+
+Byggt av en Sonnet 5-subagent, oberoende verifierat (tsc/60 riktade
+facit/build) innan commit. Två separata, honesta åtgärder enligt planen:
+
+1. `NEXT_BEST_ACTION_SYSTEM_PROMPT` (`lib/jarvis/next-best-action-prompt.ts`)
+   fick ett nytt stycke med fyra generella mönster (blockerande arbete,
+   enkla-först, bajsmackor skjuts men försvinner aldrig, stort engagerat
+   ärende > flera små) — uttryckligen märkt som motorns EGET resonemang,
+   med en explicit spärr mot att citera dem i `principles_applied`. Den
+   redan existerande spärren ("lämna principles_applied tom") lämnad
+   oförändrad, facit-testad att den fortfarande finns ordagrant.
+2. `PriorityRulesSection` (Inställningar) visar nu fyra klickbara
+   startförslag när ytan är tom (vilket den är på alla 22 konton) —
+   generaliserade mönster, INTE Christoffers faktiska kr-belopp. Klick
+   kör exakt samma `handleAdd`→POST `/api/priority-rules` som en manuellt
+   skriven princip — ingen bakgrundsseedning, ingen låtsad ägarröst.
+   Chipsen försvinner så fort minst en princip finns.
+
+Medvetet UTANFÖR scope (se analysen nedan): relationslängd/humör-mönstret
+(Christoffer själv: "beror på"), de exakta beloppströsklarna (hans egna,
+likviditetsberoende), och "mina kollegor alltid först" (inget
+motsvarande approval_type finns — idé för framtiden, inte ett bygge).
+
+**Kvar för Andreas**: inget tekniskt — funktionen är redan skarp. Nästa
+gång ett konto (t.ex. ditt eget) klickar minst en princip aktiveras
+rankningen automatiskt vid nästa `/api/cron/next-best-action`-körning.
+
+---
+
 ## Mål
 
 Christoffer (20-årig hantverkare/ägare) intervjuades med 10 konkurrerande
