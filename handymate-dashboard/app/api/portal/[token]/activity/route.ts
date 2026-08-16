@@ -1,16 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-
-async function getCustomerFromToken(token: string) {
-  const supabase = getServerSupabase()
-  const { data } = await supabase
-    .from('customer')
-    .select('customer_id, business_id, portal_enabled')
-    .eq('portal_token', token)
-    .single()
-  if (!data || !data.portal_enabled) return null
-  return data
-}
+import { getCustomerFromPortalToken } from '@/lib/portal-link'
 
 interface ActivityItem {
   id: string
@@ -31,18 +21,19 @@ interface ActivityItem {
  */
 export async function GET(_request: NextRequest, { params }: { params: { token: string } }) {
   try {
-    const customer = await getCustomerFromToken(params.token)
+    const supabase = getServerSupabase()
+    const customer = await getCustomerFromPortalToken(supabase, params.token)
     if (!customer) return NextResponse.json({ error: 'Ogiltig länk' }, { status: 404 })
 
-    const supabase = getServerSupabase()
     const sinceIso = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString() // 90d window
 
     // Hämta projekt-id:n för denna kund (för photo + tracker join)
-    const { data: projects } = await supabase
+    const { data: projects, error: projectsError } = await supabase
       .from('project')
       .select('project_id')
       .eq('business_id', customer.business_id)
       .eq('customer_id', customer.customer_id)
+    if (projectsError) console.error('[portal/activity] projects-hämtning misslyckades:', projectsError.message)
     const projectIds = (projects || []).map((p: any) => p.project_id)
 
     const [quotesRes, invoicesRes, photosRes, messagesRes, stagesRes] = await Promise.all([
@@ -95,6 +86,13 @@ export async function GET(_request: NextRequest, { params }: { params: { token: 
             .limit(20)
         : Promise.resolve({ data: [] }),
     ])
+
+    // Aggregerad feed över fem oberoende tabeller — ett fel i en källa ska
+    // inte tömma HELA aktivitetslistan (samma resonemang som /projects'
+    // sekundärfrågor), men får aldrig förbli tyst (TD-22).
+    for (const [namn, res] of Object.entries({ quotes: quotesRes, invoices: invoicesRes, photos: photosRes, messages: messagesRes, stages: stagesRes })) {
+      if ((res as any)?.error) console.error(`[portal/activity] ${namn}-hämtning misslyckades:`, (res as any).error.message)
+    }
 
     const events: ActivityItem[] = []
 

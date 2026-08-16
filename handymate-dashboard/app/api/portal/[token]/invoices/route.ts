@@ -1,26 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { generateOCR } from '@/lib/ocr'
-
-async function getCustomerFromToken(token: string) {
-  const supabase = getServerSupabase()
-  const { data } = await supabase
-    .from('customer')
-    .select('customer_id, business_id, portal_enabled')
-    .eq('portal_token', token)
-    .single()
-  if (!data || !data.portal_enabled) return null
-  return data
-}
+import { getCustomerFromPortalToken } from '@/lib/portal-link'
 
 export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
   try {
-    const customer = await getCustomerFromToken(params.token)
+    const supabase = getServerSupabase()
+    const customer = await getCustomerFromPortalToken(supabase, params.token)
     if (!customer) return NextResponse.json({ error: 'Ogiltig länk' }, { status: 404 })
 
-    const supabase = getServerSupabase()
-
-    const { data: invoices } = await supabase
+    const { data: invoices, error: invoicesError } = await supabase
       .from('invoice')
       .select(`
         invoice_id, invoice_number, invoice_type, status,
@@ -37,18 +26,27 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
       .in('status', ['sent', 'paid', 'overdue'])
       .order('created_at', { ascending: false })
 
+    // TD-22: tidigare bara `{ data: invoices }` — en kolumnmissmatch eller
+    // RLS-miss gav en tyst tom lista med HTTP 200, ingen spår i loggen.
+    if (invoicesError) {
+      console.error('[portal/invoices] query error:', invoicesError)
+      return NextResponse.json({ error: 'Kunde inte hämta fakturorna just nu' }, { status: 500 })
+    }
+
     // Enrich with OCR numbers
     const enrichedInvoices = (invoices || []).map((inv: any) => ({
       ...inv,
       ocr_number: inv.ocr_number || generateOCR(inv.invoice_number || ''),
     }))
 
-    // Get business payment info
-    const { data: biz } = await supabase
+    // Get business payment info — sekundär, best-effort: en trasig
+    // affärsprofil ska inte blockera fakturalistan, men loggas.
+    const { data: biz, error: bizError } = await supabase
       .from('business_config')
       .select('business_name, bankgiro, plusgiro, swish_number, bank_account_number, phone_number, penalty_interest, late_fee_percent, reminder_fee, f_skatt_registered, org_number')
       .eq('business_id', customer.business_id)
       .single()
+    if (bizError) console.error('[portal/invoices] business_config-hämtning misslyckades:', bizError.message)
 
     return NextResponse.json({
       invoices: enrichedInvoices,

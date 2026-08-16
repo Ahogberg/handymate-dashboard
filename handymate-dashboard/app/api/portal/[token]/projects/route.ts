@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { getCustomerFromPortalToken } from '@/lib/portal-link'
 
 // Force-dynamic så Vercel Edge inte cachar respons. Token-baserade publika
 // routes är cache-känsliga (samma URL = samma key) och nyligen ändrade rader
@@ -7,26 +8,11 @@ import { getServerSupabase } from '@/lib/supabase'
 // debug-session.
 export const dynamic = 'force-dynamic'
 
-async function getCustomerFromToken(token: string) {
-  const supabase = getServerSupabase()
-  const { data, error } = await supabase
-    .from('customer')
-    .select('customer_id, business_id, portal_enabled')
-    .eq('portal_token', token)
-    .single()
-  if (error) {
-    console.error('[portal/projects] customer lookup error:', error)
-  }
-  if (!data || !data.portal_enabled) return null
-  return data
-}
-
 export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
   try {
-    const customer = await getCustomerFromToken(params.token)
-    if (!customer) return NextResponse.json({ error: 'Ogiltig länk' }, { status: 404 })
-
     const supabase = getServerSupabase()
+    const customer = await getCustomerFromPortalToken(supabase, params.token)
+    if (!customer) return NextResponse.json({ error: 'Ogiltig länk' }, { status: 404 })
 
     // Hämta ALLA projekt för kunden — inkl. completed/cancelled. Kunden ska
     // ha full insyn i sin historik, och ÄTA kan skickas i efterhand på

@@ -121,7 +121,7 @@ Logg över kända optimeringar och skalproblem som inte är akuta men ska adress
 
 ---
 
-## TD-4 (2026-05-07) — `/api/checkin/approve` saknar permission-check
+## TD-4 (2026-05-07) — `/api/checkin/approve` saknar permission-check  *[RESOLVED — verifierat 2026-08-16: `getCurrentUser`+`hasPermission(currentUser, 'approve_time')` finns på route.ts:14-17, exakt föreslagen fix]*
 
 **Plats:** [app/api/checkin/approve/route.ts](handymate-dashboard/app/api/checkin/approve/route.ts)
 
@@ -976,7 +976,7 @@ Layout-skiss:
 
 ---
 
-## TD-29 (2026-05-11) — create-final-invoice är inte atomic (INSERT invoice + UPDATE project_change)
+## TD-29 (2026-05-11) — create-final-invoice är inte atomic (INSERT invoice + UPDATE project_change)  *[RESOLVED — verifierat 2026-08-16: `mark_invoice_sources`-RPC (sql/v104) live i prod, `lib/invoices/mark-sources.ts` är primärvägen, route.ts anropar den. Kvarvarande TD-29-kommentarer i route.ts syftar på det GAMLA läget, inte nuvarande kod]*
 
 **Plats:** [app/api/projects/[id]/create-final-invoice/route.ts](handymate-dashboard/app/api/projects/[id]/create-final-invoice/route.ts) rad ~330-360.
 
@@ -1024,7 +1024,7 @@ Routen anropar `supabase.rpc('create_final_invoice', {...})` istället. Antingen
 
 ---
 
-## TD-30 (2026-05-11) — invoice_number-bump är inte atomic (race condition vid samtidiga POST)
+## TD-30 (2026-05-11) — invoice_number-bump är inte atomic (race condition vid samtidiga POST)  *[RESOLVED — verifierat 2026-08-16: `next_invoice_number`-RPC (sql/v81, UPDATE...RETURNING) live i prod, `lib/invoices/create-invoice.ts` konsoliderar alla åtta fakturaskapande-vägar genom den]*
 
 **Plats:** [app/api/projects/[id]/create-final-invoice/route.ts](handymate-dashboard/app/api/projects/[id]/create-final-invoice/route.ts) rad ~315-325. Samma anti-pattern i [app/api/invoices/route.ts:328-331](handymate-dashboard/app/api/invoices/route.ts) (befintlig invoice POST-route).
 
@@ -1067,7 +1067,7 @@ c) **Returning + retry** — `UPDATE business_config SET next_invoice_number = n
 
 ---
 
-## TD-31 (2026-05-11) — invoice-tabellen saknar project_id-kolumn
+## TD-31 (2026-05-11) — invoice-tabellen saknar project_id-kolumn  *[RESOLVED — verifierat 2026-08-16 mot prod-schemat: invoice.project_id finns]*
 
 **Plats:** [app/api/projects/[id]/create-final-invoice/route.ts](handymate-dashboard/app/api/projects/[id]/create-final-invoice/route.ts) rad ~347-376 (INSERT) + alla framtida invoice-listings som vill filtrera på projekt.
 
