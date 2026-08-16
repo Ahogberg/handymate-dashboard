@@ -56,6 +56,8 @@ import type { AgentMoment } from '@/lib/moments/derive'
 import { GorDettaForst, type NextBestActionRecommendation } from '@/components/jarvis/GorDettaForst'
 import { ProjektCaseKort, type ProjektCaseData } from '@/components/jarvis/ProjektCaseKort'
 import { KundCaseKort, type KundCaseData } from '@/components/jarvis/KundCaseKort'
+import { RevenueRecoveryCaseKort } from '@/components/jarvis/RevenueRecoveryCaseKort'
+import type { RevenueRecoveryCase } from '@/lib/value/revenue-recovery-case'
 import { MalNudge } from '@/components/jarvis/MalNudge'
 import { FuelWarningCard } from '@/components/jarvis/FuelWarningCard'
 import { useFuel } from '@/components/fuel/FuelProvider'
@@ -270,6 +272,8 @@ export default function JarvisHome({
   // skäl som NBA ovan (huvudkön är kapad till 15 senaste).
   const [projektCases, setProjektCases] = useState<ProjektCaseData[]>([])
   const [kundCases, setKundCases] = useState<KundCaseData[]>([])
+  const [revenueRecoveryCases, setRevenueRecoveryCases] = useState<RevenueRecoveryCase[]>([])
+  const [revenueRecoveryError, setRevenueRecoveryError] = useState(false)
   const [heroHidden, setHeroHidden] = useState(false)
   const [snack, setSnack] = useState<{ approvalId: string; text: string } | null>(null)
   const [feedback, setFeedback] = useState<{ text: string; isError: boolean } | null>(null)
@@ -363,6 +367,25 @@ export default function JarvisHome({
 
   useEffect(() => { void fetchCustomerCases() }, [fetchCustomerCases])
 
+  const fetchRevenueRecoveryCases = useCallback(async () => {
+    try {
+      const res = await fetch('/api/revenue-recovery-cases', { headers: await authHeaders() })
+      if (res.ok) {
+        const data = await res.json()
+        setRevenueRecoveryCases(data.cases || [])
+        setRevenueRecoveryError(false)
+      } else if (res.status >= 500) {
+        setRevenueRecoveryError(true)
+      }
+    } catch {
+      // Ett nätfel får aldrig se ut som att intäktskedjan är tom. 401/403
+      // hanteras däremot tyst ovan eftersom ytan är owner/admin-grindad.
+      setRevenueRecoveryError(true)
+    }
+  }, [authHeaders])
+
+  useEffect(() => { void fetchRevenueRecoveryCases() }, [fetchRevenueRecoveryCases])
+
   useEffect(() => {
     let active = true
     ;(async () => {
@@ -386,10 +409,20 @@ export default function JarvisHome({
         () => {
           void fetchQueue()
           void fetchCustomerCases()
+          void fetchRevenueRecoveryCases()
         })
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'project_change', filter: `business_id=eq.${business.business_id}` },
+        () => { void fetchRevenueRecoveryCases() })
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'project', filter: `business_id=eq.${business.business_id}` },
+        () => { void fetchRevenueRecoveryCases() })
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'invoice', filter: `business_id=eq.${business.business_id}` },
+        () => { void fetchRevenueRecoveryCases() })
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [business?.business_id, fetchCustomerCases, fetchQueue])
+  }, [business?.business_id, fetchCustomerCases, fetchQueue, fetchRevenueRecoveryCases])
 
   // Värt att veta: observationerna agenterna skrivit, minus de som redan har
   // ett kort i beslutssektionen — annars stod samma sak på två ställen.
@@ -1147,14 +1180,22 @@ export default function JarvisHome({
               /api/dashboard/pengar är ägargrindad (403 för anställda); ett
               uteblivet svar utelämnar sektionen helt och tyst, samma regel
               som kalenderwidgeten. ── */}
-          {pengarData && (
+          {(pengarData || revenueRecoveryCases.length > 0 || revenueRecoveryError) && (
             // data-tour-target: Hemturens andra stopp — hoppas över
             // automatiskt om sektionen inte renderas (ingen pengarData).
             <div data-tour-target="hemtur-pengar">
               <div className="flex items-baseline gap-2 mt-6 mb-2.5">
                 <h2 className="m-0 text-[15px] font-semibold text-slate-900">Pengar just nu</h2>
               </div>
-              <PengarBand summary={pengarData} />
+              {pengarData && <PengarBand summary={pengarData} />}
+              {revenueRecoveryCases.map(recoveryCase => (
+                <RevenueRecoveryCaseKort key={recoveryCase.case_id} data={recoveryCase} />
+              ))}
+              {revenueRecoveryError && (
+                <div className="mt-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Intäktskedjan kunde inte läsas. Uppdatera sidan och försök igen.
+                </div>
+              )}
             </div>
           )}
 

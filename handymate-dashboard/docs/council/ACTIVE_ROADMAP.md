@@ -17,6 +17,39 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-16 — Revenue Recovery Case V1 byggd
+
+Business Twin kan nu följa en identifierad missad intäkt eller ett ÄTA-utkast
+hela vägen från fynd till verifierad betalning. Kedjan är en härledd,
+read-only sanningsbild ovanpå befintliga approvals, projekt, ÄTA-rader och
+fakturor; den inför inget parallellt workflow.
+
+**Det som nu är sant:**
+
+- En central tenantbunden loader läser `pending_approvals`, `project_change`,
+  `project` och `invoice`. Varje service-role-fråga har `business_id`-filter
+  och varje databasfel blir synligt i stället för att tolkas som tomt läge.
+- Härledningen använder bara direkta referenser. Saknad, främmande eller
+  tvetydig koppling blir `unknown`; systemet gissar aldrig kund, projekt,
+  ÄTA eller faktura.
+- Leverans anses bevisad först av kanoniskt projektavslut. Betalning anses
+  bevisad först när fakturan både är markerad betald och har `paid_at`.
+- Identifierad potential och fakturans belopp visas separat och summeras
+  aldrig till ett påhittat värde.
+- Owner/admin får högst tre prioriterade case under “Pengar just nu”. Kortet
+  är Matte-attribuerat, visar varje evidenssteg och länkar endast till
+  befintliga approval-, projekt- eller fakturaytor.
+- Ingen SQL, ny approvalmekanik, skrivväg eller extern effekt infördes.
+
+**Verifiering:** `npx tsc --noEmit` och produktionsbuilden (420 routes/sidor)
+är gröna, 270/270 riktade domän-, auth-, kolumn- och permission-facit är gröna,
+och de exakta läskolumnerna verifierades read-only mot den konfigurerade
+testdatabasen. Den stora Chromium-sviten
+startades men avbröts när samtliga nätberoende fall konsekvent blockerades av
+sandboxens `connect EACCES`; detta redovisas inte som en grön fullsvit.
+
+---
+
 # Läge 2026-08-15 — Outbound Safety & STOPP Closure V1 byggd
 
 Alla kund-SMS som använder den kanoniska 46elks-sändaren passerar nu en enda

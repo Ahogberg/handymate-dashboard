@@ -182,6 +182,11 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       why: 'Ägarrapporten: bekräftat värde, abonnemangskostnad och retention-argumentet — företagets ekonomi och avtal med oss, aldrig personaldata.',
     },
     {
+      route: 'revenue-recovery-cases',
+      requires: 'owner-admin',
+      why: 'Följer identifierad intäkt genom ÄTA, faktura och bekräftad betalning — både företagets affärsläge och ekonomiska utfall i samma read model.',
+    },
+    {
       route: 'dashboard/economy-summary',
       requires: 'see_financials',
       why: 'Fakturerat i månaden och obetalda belopp.',
