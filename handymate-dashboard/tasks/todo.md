@@ -1,3 +1,104 @@
+# NBA-prioriteringsprinciper ur Christoffers intervju — 2026-08-16→17 natt
+
+## Mål
+
+Christoffer (20-årig hantverkare/ägare) intervjuades med 10 konkurrerande
+prioriteringsscenarier (tasks/todo.md-historik, se chattloggen) för att
+kalibrera Next Best Action-motorn (`lib/jarvis/next-best-action.ts`,
+byggd 2026-08-13). Viktigt att först konstatera hur motorn FAKTISKT
+fungerar (verifierat genom att läsa koden, inte anta): den är INTE en
+numerisk viktningsformel — den är en LLM-rankning (Sonnet) som väger
+konkurrerande `pending_approvals`-kort mot ÄGARENS EGNA skrivna
+`priority_rule`-principer (business_knowledge, samma "Lär Handymate"-
+mekanism som affärsregler). Motorn kräver minst 1 skriven princip innan
+den ens körs — annars ingen rankning alls ("hellre missa än gissa").
+Problemet är därför inte att formeln är fel kalibrerad, utan att NOLL av
+22 konton någonsin skrivit en enda princip — funktionen är i praktiken
+sovande överallt.
+
+## Analys av svaren (full genomgång i chattloggen)
+
+Mönster som återkommer och är GENERELLA (oavsett vilket företag) —
+kandidater för motorns inbyggda resonemang:
+- Ett ärende som blockerar riktigt arbete inom kort (t.ex. imorgon på
+  plats) väger tyngre än ett som bara väntar, oavsett belopp.
+- Enkla, redan klara åtgärder klaras undan först — inte för att de är
+  viktigast, utan för att de kostar nästan inget och frigör uppmärksamhet.
+- Tunga, obekväma utredningar ("bajsmackor") skjuts ofta bakom en enklare
+  åtgärd — men ska aldrig försvinna helt ur sikte, bara sekvenseras om.
+- Ett stort, redan engagerat ärende (offert öppnad flera gånger) väger
+  tyngre än flera små påminnelser.
+
+Mönster som är PERSONLIGA/situationsberoende — INTE lämpliga att koda in
+som allmän sanning:
+- Relationslängd som slagträ ("gammal kund vs ny kund") — Christoffer
+  själv: "beror på vilket mode man är i". Ska inte hårdkodas.
+- De exakta beloppen (900 000 kr offert / 450 000 kr faktura) är HANS
+  likviditetsberoende siffror, inte en generell Handymate-kund vars
+  snittjobb ofta är en bråkdel av det. Generaliseras till mönstret, inte
+  siffrorna.
+- "Mina kollegor" (alltid prio) — finns ingen motsvarande approval_type i
+  systemet idag (teamsäkerhet, inte ett ekonomiskt beslut). Utanför scope,
+  noteras bara som en framtida idé.
+
+## Bygget (två separata, honesta åtgärder — INGEN tyst ägarattribuering)
+
+### 1. Generella mönster in i motorns inbyggda resonemang
+
+`lib/jarvis/next-best-action-prompt.ts`s `NEXT_BEST_ACTION_SYSTEM_PROMPT`:
+lägg till ett nytt stycke med de generella mönstren ovan, TYDLIGT märkt som
+allmänt resonemang — INTE ägarens ord. Kritiskt: modellen får redan
+instruktionen "citera dem ordagrant i principles_applied" för SKRIVNA
+principer, och "om ingen princip tydligt avgör, lämna principles_applied
+tom". De nya generella mönstren får ALDRIG citeras i principles_applied
+(de är inte en skriven princip) — skriv detta som en explicit negativ
+instruktion i prompten, facit-testa att den formuleringen faktiskt finns.
+
+### 2. Föreslagna startprinciper i Prioriteringsprinciper-ytan (ärlig adoption)
+
+`app/dashboard/settings/page.tsx`s `PriorityRulesSection`: när `rules.length
+=== 0` (den sovande startpunkten för i praktiken alla 22 konton), visa 3-4
+färdigformulerade förslagschips (Christoffers personliga mönster
+generaliserade till neutral text, INTE hans faktiska belopp) som ägaren kan
+klicka för att lägga till DIREKT (samma POST-anrop som `handleAdd` — äkta
+ägarhandling, ingen bakgrundsseedning, ingen förifylld-men-osparad text
+som låtsas vara sparad). Döljs helt så fort minst en princip finns (skräpar
+inte ner en redan aktiv yta). Formulering, terse svenska i "Lär
+Handymate"-tonen:
+1. "En stor obesvarad offert som kunden visat intresse för väger tyngre än
+   en enskild sen påminnelse, om beloppet är klart större."
+2. "Om något imorgon kräver ett beslut innan arbetet kan fortsätta ute hos
+   kund, gör det före sådant utan lika hård tidsgräns."
+3. "Enkla, redan färdiga åtgärder skickas direkt — det frigör tid till det
+   som kräver mer eftertanke."
+4. "En stor offert som riskerar gå till en konkurrent efter flera dagars
+   tystnad prioriteras högt."
+
+## Avgränsning
+
+- Ingen ändring av rankningslogiken, valideringen eller kandidat-
+  normaliseringen (`next-best-action.ts`/`-normalize.ts`) — bara
+  prompttext + en UI-yta.
+- Ingen bakgrundsseedning av `priority_rule`-rader för befintliga konton —
+  skulle se ut som ägarens egna ord men vore det inte (bryter mot samma
+  provenensprincip som customer_fact/Kvittoprincipen).
+- Inget nytt "teamsäkerhet"-koncept för "mina kollegor"-svaret — noteras,
+  byggs inte.
+- Ingen ändring av de exakta beloppströsklarna Christoffer nämnde — för
+  personliga/likviditetsberoende för att generalisera till kod.
+
+## Verifiering
+
+- Facit: prompten innehåller den nya, tydligt märkta stycket OCH den
+  negativa instruktionen (aldrig citera i principles_applied) — källskanning
+  i `tests/next-best-action.spec.ts` eller ny fil.
+- Facit: förslagschipsen finns i `PriorityRulesSection`, döljs när
+  `rules.length > 0`, klick anropar samma POST som manuell inmatning.
+- `npx tsc --noEmit` rent, riktade facit gröna, `npx next build` ren.
+- `git log origin/main..HEAD` kontrollerat före push.
+
+---
+
 # Playbook Pattern Confirmation V1 (Debrief → Playbook, V2-lagret) — 2026-08-16 natt
 
 ## Resultat (klart, pushat 2026-08-16→17 natt)
