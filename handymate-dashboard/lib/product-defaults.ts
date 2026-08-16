@@ -513,6 +513,8 @@ export function getSeededBranches(): string[] {
 
 /** price_list-formen — bakåtkompatibel med telefonagent/widget/storefront. */
 export interface PriceListEntry {
+  /** products.sku — länken seedPriceList använder för att sätta price_list.product_id. */
+  sku: string
   category: 'labor' | 'material' | 'service'
   name: string
   unit: string
@@ -538,6 +540,7 @@ export function getDefaultPriceList(branch: string | string[]): PriceListEntry[]
     // hör hemma i synkroniseringen mellan tabellerna, inte här.
     .filter(p => p.unit_price > 0)
     .map(p => ({
+    sku: p.sku,
     category: p.legacy_category,
     name: p.name,
     unit: p.unit,

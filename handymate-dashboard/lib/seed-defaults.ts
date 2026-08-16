@@ -266,7 +266,7 @@ async function seedChecklistTemplates(supabase: SupabaseClient, businessId: stri
  * Idempotent — hoppar helt om businessen redan har produkter, så en kund som
  * hunnit lägga upp eget sortiment aldrig får seed-rader ovanpå.
  */
-async function seedProducts(supabase: SupabaseClient, businessId: string, branch: string | string[]) {
+export async function seedProducts(supabase: SupabaseClient, businessId: string, branch: string | string[]) {
   const { data: existing } = await supabase
     .from('products')
     .select('id')
@@ -367,7 +367,22 @@ async function seedReservations(supabase: SupabaseClient, businessId: string, br
   }
 }
 
-async function seedPriceList(supabase: SupabaseClient, businessId: string, branch: string | string[]) {
+/**
+ * Seedar den äldre `price_list`-tabellen (telefonagent/widget/storefront).
+ *
+ * `product_id` (sql/v137_price_list_product_link.sql) länkar varje rad till
+ * sin `products`-motsvarighet, så en prisändring i produktbanken kan
+ * skriva-igenom hit (lib/products/sync-price-list.ts) — utan den länken
+ * fastnar telefonagenten på seed-priset för alltid (den kända luckan i
+ * kommentaren ovanför getDefaultPriceList).
+ *
+ * Ingen extra DB-fråga behövs för att hitta product_id: getDefaultProducts
+ * är en ren, deterministisk funktion — samma branschargument ger samma
+ * array i samma ordning varje gång, så seedProducts id-schema
+ * (`prod_${businessId}_${index}`) kan räknas fram här igen utan att fråga
+ * databasen om vad som just seedades.
+ */
+export async function seedPriceList(supabase: SupabaseClient, businessId: string, branch: string | string[]) {
   const { data: existing } = await supabase
     .from('price_list')
     .select('id')
@@ -375,6 +390,9 @@ async function seedPriceList(supabase: SupabaseClient, businessId: string, branc
     .limit(1)
 
   if (existing && existing.length > 0) return
+
+  const skuToProductId = new Map<string, string>()
+  getDefaultProducts(branch).forEach((p, i) => skuToProductId.set(p.sku, `prod_${businessId}_${i}`))
 
   const entries = getDefaultPriceList(branch)
   await supabase.from('price_list').insert(
@@ -385,6 +403,7 @@ async function seedPriceList(supabase: SupabaseClient, businessId: string, branc
       name: e.name,
       unit: e.unit,
       unit_price: e.unit_price,
+      product_id: skuToProductId.get(e.sku) ?? null,
     }))
   )
 }

@@ -1,0 +1,26 @@
+-- Länkar price_list-rader till sin products-motsvarighet (produktregister-
+-- onboardingen, 2026-08-16).
+--
+-- Bakgrund: `products` (produktbanken, AI-kopplad) och `price_list` (den
+-- äldre tabell telefonagenten Lisa + publika storefronten/widgeten läser)
+-- seedas ur samma källa (lib/product-defaults.ts) men är två separata
+-- tabeller utan gemensam nyckel. Ändrar hantverkaren ett pris i Settings →
+-- Produkter syns det ALDRIG i price_list — en känd, dokumenterad lucka
+-- (lib/product-defaults.ts, kommentaren ovanför getDefaultPriceList).
+--
+-- Den här kolumnen är den saknade länken: lib/products/sync-price-list.ts
+-- skriver-igenom pris/namn/enhet/kategori-ändringar från products till
+-- den matchande price_list-raden, matchat i första hand på product_id.
+--
+-- Additiv och nullable — noll risk för de fem befintliga läsställena
+-- (widget/chat, site/[slug], storefront/generate-content, agent/agents/
+-- shared, dashboard/projects/[id]): ingen av dem selectar product_id, så
+-- en ny kolumn stör dem inte.
+--
+-- Ingen backfill av befintliga rader: gamla, förmigrations-seedade
+-- price_list-rader får product_id=NULL för alltid. sync-price-list.ts
+-- faller då tillbaka på (business_id, name)-matchning för dem — ett
+-- medvetet scope-beslut, se docs/superpowers/plans (produktregister-
+-- onboarding-planen).
+ALTER TABLE price_list ADD COLUMN IF NOT EXISTS product_id TEXT REFERENCES products(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_price_list_business_product ON price_list (business_id, product_id);

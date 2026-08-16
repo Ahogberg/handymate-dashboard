@@ -354,7 +354,7 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
 
   return (
     <div className="ob-screen">
-      <OnboardingHeader step={2} total={5} onBack={onBack} />
+      <OnboardingHeader step={2} total={6} onBack={onBack} />
       <div className="ob-body" style={{ display: 'flex', flexDirection: 'column' }}>
         <h1 className="ob-headline">Här är ditt Handymate-nummer</h1>
         <p className="ob-sub">

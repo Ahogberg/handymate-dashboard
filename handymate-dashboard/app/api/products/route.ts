@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { expandSynonyms, rankBySearchMatch } from '@/lib/products/search-ranking'
+import { syncPriceListRow } from '@/lib/products/sync-price-list'
 
 /**
  * GET /api/products?search=&category=&category_id=&favorites=&include=components
@@ -239,6 +240,19 @@ export async function PUT(request: NextRequest) {
 
     if (error) throw error
 
+    // Skriv-igenom till price_list (v137) — best-effort, kastar aldrig, se
+    // lib/products/sync-price-list.ts. En prisändring här ska synas för
+    // telefonagenten/widgeten/storefronten utan manuell ombyggnad.
+    if (data) {
+      await syncPriceListRow(
+        supabase,
+        business.business_id,
+        data.id,
+        { name: data.name, unit: data.unit, unit_price: data.sales_price, is_active: data.is_active },
+        data.name,
+      )
+    }
+
     return NextResponse.json({ product: data })
   } catch (error: any) {
     console.error('PUT products error:', error)
@@ -270,6 +284,12 @@ export async function DELETE(request: NextRequest) {
       .eq('business_id', business.business_id)
 
     if (error) throw error
+
+    // Skriv-igenom till price_list (v137) — best-effort, kastar aldrig.
+    // Bara product_id-matchning (ingen namn-fallback tillgänglig här utan
+    // en extra fråga) — förmigrations-rader utan länk avaktiveras inte,
+    // ett känt, accepterat gap (se sql/v137_price_list_product_link.sql).
+    await syncPriceListRow(supabase, business.business_id, id, { is_active: false })
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

@@ -1,3 +1,223 @@
+# Produktregister i onboarding — guidat granskningssteg + products/price_list-synk (2026-08-16)
+
+Källa: Andreas ville researcha hur Easofts produktregister är strukturerat,
+med målet att göra det snabbt/intuitivt för kunder att bygga upp sitt eget
+register — eftersom AI-agenterna på sikt ska kunna skapa offerter till
+stor del automatiskt när registret är genomarbetat. Fullständig plan
+skriven via plan-mode (tre research-agenter: Easoft/konkurrensanalys +
+två kodbas-kartläggningar, plus två konkurrerande implementationsplaner
+syntetiserade till en), godkänd av Andreas via ExitPlanMode. Se
+`C:\Users\Gaming\.claude\plans\jaunty-pondering-hummingbird.md` för hela
+kontexten och avgränsningen.
+
+**Viktigt research-fynd**: målbilden ("AI bygger offerter") var redan till
+stor del byggd — `lib/products/match-generated-items.ts` kopplar redan AI-
+genererade offertrader mot produktbanken via alla fyra AI-offert-vägar.
+Den här insatsen handlar om UPPBYGGNADS-upplevelsen, inte AI-kopplingen.
+
+**Sidofynd under verifiering** (loggat separat, INTE åtgärdat här): Karins
+cron-genererade "prisjustering"-godkännandekort (`lib/agent/
+price-analysis.ts`) skickar `suggested_rate`+`price_list_id`, men
+exekveraren i `app/api/approvals/[id]/route.ts:1867-1884` letar efter
+`item_id`+`suggested_price` — matchar aldrig, så ett godkänt kort gör
+tyst ingenting. Ska in i `tasks/tech-debt.md` som ett eget ärende.
+
+## Byggt och verifierat (ej pushat än — se nästa steg i konversationen)
+
+- **`lib/product-defaults.ts`**: `PriceListEntry` bär nu med sig `sku` —
+  den stabila länken seedningen använder för att koppla ihop `products`
+  och `price_list` utan en extra DB-fråga (`getDefaultProducts` är en ren,
+  deterministisk funktion — samma indexordning varje gång).
+- **`lib/seed-defaults.ts`**: `seedProducts`/`seedPriceList` exporterade
+  (tidigare modulprivata). `seedPriceList` sätter `price_list.product_id`
+  genom att räkna fram samma `prod_${businessId}_${index}`-schema som
+  `seedProducts` redan använder.
+- **`sql/v137_price_list_product_link.sql`** (skriven, EJ körd — kräver
+  Andreas "kör"): additiv, nullable `price_list.product_id` + index. Ingen
+  backfill av gamla rader (medvetet scope-beslut).
+- **`lib/products/sync-price-list.ts`** (ny): `syncPriceListRow` — skriver
+  igenom pris/namn/enhet/aktiv-status från `products` till matchande
+  `price_list`-rad. Matchar i första hand på `product_id`, faller tillbaka
+  på `(business_id, name)` för förmigrations-rader. Best-effort, loggar,
+  kastar aldrig. Synkar MEDVETET aldrig `category` (inte en 1:1-mappning).
+- **`app/api/products/route.ts`**: `PUT`/`DELETE` anropar synken efter
+  lyckad uppdatering.
+- **`lib/onboarding/payment-gate.ts`** (ny): `isOnboardingPaymentBlocked`
+  — den befintliga betalgrinden extraherad ur `app/api/onboarding/
+  route.ts` (POST/finalize) till en delad helper, delad med det nya
+  seed-anropet nedan så grindarna aldrig kan glida isär.
+- **`app/api/onboarding/seed-products/route.ts`** (ny): tunn POST — seedar
+  BARA `products`+`price_list` (inte hela `seedAllDefaults`), tidigt vid
+  steg-inträde. Fail-soft: ett seed-fel ger `{ok:false}`, aldrig en krasch.
+- **`app/onboarding/components/StepProductRegister.tsx`** (ny): nytt
+  onboarding-steg mellan `StepImportData` och `Step6LiveTour`. Reveal +
+  granskningslista av de redan prissatta startartiklarna (grupperat löst
+  efter kategori), tryck öppnar den BEFINTLIGA `ProductEditorModal`
+  återanvänd rakt av. Sekundär CSV-import via den BEFINTLIGA
+  `ProductCsvImportModal` — wrappad i en lokal `<ToastProvider>` eftersom
+  onboarding-trädet saknar den providern som Settings-sidan har. Skip
+  alltid tillgängligt, seedning sker ändå tyst i bakgrunden.
+- **`app/onboarding/page.tsx`**: `TOTAL_STEPS` 7→8, nya steget monterat vid
+  index 6, `Step6LiveTour` flyttad till index 7. Steg 0-5 helt orörda.
+- 6 `OnboardingHeader total={5}`-ställen bumpade till `total={6}`
+  (`Step2Business.tsx` ×2, `Step3HowYouWork.tsx`, `Step4PhoneNumber.tsx`,
+  `Step5Activate.tsx`, `StepImportData.tsx`) + det nya steget `total={6}`.
+
+## Verifierat
+
+- 22 nya facit gröna: `tests/price-list-sync.spec.ts` (7, enhetstest av
+  synk-helpern mot en fejk-Supabase-klient) + `tests/
+  onboarding-product-register.spec.ts` (15, beteendetest av
+  seedPriceList:s produkt_id-härledning + källskanning av hela
+  ledningsdragningen — onboarding-flödet, betalgrinden, synken, UI-
+  återanvändningen).
+- Baseline-facit (måste inte gå sönder, körda enligt planens
+  verifieringsavsnitt): `tests/product-register.spec.ts`,
+  `tests/facit-produktbank.spec.ts`, `tests/produktbanken-komplement.spec.ts`,
+  `tests/pricing-state.spec.ts` — 58/58 gröna.
+- `npx tsc --noEmit` rent.
+- Full svit: 3142/3145 gröna — de 3 röda är samma sedan tidigare kända,
+  orelaterade fynd som i TD-22-körningen (2 `stegkedjan.spec.ts` + 1
+  `jarvis-hem.spec.ts` mot Codex pågående, ocommittade ändring i
+  `JarvisHome.tsx`).
+- `npx next build` ren — `/api/onboarding/seed-products` byggd, inga fel
+  refererar något av de nya filerna.
+
+## Kvar
+
+- Migrationen `sql/v137_price_list_product_link.sql` är EJ körd — väntar
+  på Andreas "kör".
+- Karins trasiga prisjustering (se sidofynd ovan) ska loggas i
+  `tasks/tech-debt.md` — inte gjort än i den här sessionen.
+- Manuell/E2E-kontroll (registrera ett riktigt testkonto genom hela
+  `/onboarding`) är INTE körd — kräver en levande miljö, inte bara
+  källkodsverifiering.
+- Commit/push/deploy-verifiering är INTE gjord än vid den här
+  dokumentationspunkten — Codex har en egen ocommittad/opushad commit
+  (`c1f1bb3f`, Revenue Recovery-uppföljning) som måste granskas innan en
+  gemensam push, se den delade-arbetskatalog-disciplinen.
+
+---
+
+# TD-22 — kundportalens routes slutar svälja Supabase-fel tyst (2026-08-16)
+
+Källa: `tasks/tech-debt.md` TD-22, dokumenterad 2026-05-09. Andra
+självvalda posten samma kväll — efter att Codex tog Revenue Recovery
+Case-spåret (Customer Case → Coordinated Resolution, avgränsat till
+intäktsåtervinning) satte jag mig själv på nästa öppna post. En Explore-
+agent svepte de återstående ~50 okontrollerade TD-posterna (avsiktligt
+undvikande allt som rör faktura-mutation, project_change/ÄTA-övergångar,
+pending_approvals-exekvering, Value Ledger, Fortnox-betalningssynk, samt
+`lib/outbound/*`/SMS-grinden — Codex respektive tidigare SMS-gate-arbetes
+revir) och hittade TD-22 som den starkaste kandidaten: fem av sex
+`app/api/portal/[token]/*`-routes hade exakt samma bevisade anti-pattern
+som redan orsakat en riktig incident (`/projects` läste en obefintlig
+kolumn 2026-05-09, kunden såg en tom portal trots att projekten fanns i
+databasen — inget felmeddelande, ingenting i loggarna).
+
+## Byggt, verifierat och pushat (commit `de8e399d`)
+
+- **`lib/portal-link.ts`**: ny `getCustomerFromPortalToken()` — konsoliderar
+  sex duplicerade inline-implementationer av token→kund-uppslaget till en
+  plats (Sweep A). Behåller den redan bevisade risk-profilen: både ett
+  genuint DB-fel och en riktig "token finns inte" ger 404, men felet loggas
+  nu alltid i stället för att tyst försvinna.
+- **`activity/invoices/messages/quotes/reports/route.ts`**: primärfrågan i
+  var och en destrukturerar nu `{ data, error }` (Sweep B). De fyra rena
+  listnings-routorna (invoices/messages/quotes/reports) svarar 500 med ett
+  svenskt meddelande vid ett verkligt DB-fel i stället för en tyst tom
+  lista. `activity` är en aggregerad femtabellers Promise.all-feed — där
+  loggas varje käll-fel för sig (samma redan bevisade mönster som
+  `/projects` sekundärfrågor) i stället för att ett enskilt käll-fel tömmer
+  HELA aktivitetslistan.
+- **`projects/route.ts`**: migrerades till samma delade helper för full
+  konsolidering (den var redan felsäker sedan tidigare, bara duplicerad).
+
+## Verifierat
+
+- 16 nya facit (`tests/portal-error-swallow.spec.ts`): enhetstester av
+  helpern (lyckat uppslag, avstängd portal, okänd token, genuint DB-fel
+  loggas+404, custom select-argument) + källskanning av alla sex routes
+  (ingen kvarvarande dubblett-implementation, primärfrågan har en 500-gren,
+  activity-routens Promise.all loggar per källa).
+- `npx tsc --noEmit` rent.
+- Full svit: 3119/3122 gröna. De 3 röda är samtliga sedan tidigare kända
+  och orelaterade: 2 `stegkedjan.spec.ts` (Codex egen pågående
+  konsolidering) + 1 `jarvis-hem.spec.ts` mot en pågående, ocommittad lokal
+  ändring i `components/jarvis/JarvisHome.tsx` (bekräftat via `git diff`
+  att den ändringen fanns INNAN jag rörde något denna kväll — troligen del
+  av Codex Revenue Recovery Case-bygge, som även syns i nya oträckta filer
+  `app/api/revenue-recovery-cases/` m.fl.).
+- `npx next build` ren.
+- `git log origin/main..HEAD` kontrollerad före push (inga främmande
+  commits i kö) → pushat → Vercel-deploy pollad till `Ready`
+  (`app.handymate.se`-aliaset pekar på den nya deployen).
+
+## Sidoeffekt: tech-debt.md-hygien
+
+Under urvalsprocessen kontrollerades TD-4, TD-29, TD-30 och TD-31 mot
+aktuell kod/prod-schema och visade sig ALLA redan åtgärdade (permission-
+check, atomiskt fakturanummer via RPC v81, atomisk källmarkering via RPC
+v104, `invoice.project_id`-kolumnen finns). Märkta `[RESOLVED]` i
+`tasks/tech-debt.md` med verifieringsbevis, så nästa sweep (mänsklig eller
+agent) inte behöver kontrollera dem igen.
+
+---
+
+# TD-57 — idempotent projekt-skapande från offert (2026-08-16)
+
+Källa: `tasks/tech-debt.md` TD-57, dokumenterad 2026-05-20 (Bee Service-
+piloten: dubbel-klick/nätverks-retransmission skapade två `project`-rader
+av samma offert, en sekund isär, orphan-spöken utan timmar/ÄTA/bokningar).
+Självvald nästa post — Andreas gav explicit mandat ("Jag väljer och bygger
+nästa öppna post själv") efter att Outbound Safety & STOPP Closure V1
+(Codex) verifierats och pushats. Flera andra tech-debt-poster (TD-8, TD-9,
+TD-52) kontrollerades först och visade sig redan åtgärdade — TD-57 var den
+enda som överlevde en färsk kod- + live-DB-kontroll (`pg_constraint`:
+ingen unik-constraint fanns; `quote_id`-dubblettsökning: noll i prod idag).
+
+## Byggt, verifierat och pushat (commit `7df3540a`)
+
+- **`app/api/projects/route.ts`** (POST, `from_quote_id`-grenen): en tidig
+  lookup på `business_id`+`quote_id` (`.maybeSingle()`) före offert-
+  hämtningen — hittas ett befintligt projekt returneras det direkt
+  (`{ project, deduplicated: true }`) i stället för att skapa ett nytt.
+  Vid insert-fel: om felkoden är `23505` (unik-krock) och `from_quote_id`
+  var satt, slås vinnaren upp och returneras i stället för ett 500:a —
+  backstoppet mot äkta samtidighet (två requests som båda hann förbi
+  dedup-kollen).
+- **`sql/v136_unique_quote_project.sql`** (skriven, EJ körd — kräver
+  Andreas "kör"): partiellt unikt index `project_quote_id_unique ON
+  project(quote_id) WHERE quote_id IS NOT NULL`. Verifierat mot prod
+  innan skrivning: noll befintliga dubbletter, ingen cleanup-migration
+  behövs.
+- **`tests/project-quote-idempotency.spec.ts`** (ny, 4 tester,
+  källskanning i samma stil som `quote-uniqueness-migration.spec.ts`):
+  dedup-lookupen sker källordningsmässigt före offert-hämtningen,
+  träffen returneras direkt, 23505-grenen finns i insert-error-blocket,
+  migrationsfilen innehåller rätt `WHERE`-klausul och ingen destruktiv SQL.
+  TDD: bekräftat röda mot ordinarie kod innan implementation, gröna efter.
+
+## Verifierat
+
+- `npx tsc --noEmit` rent.
+- Riktad körning: 4/4 gröna (`project-quote-idempotency.spec.ts`).
+- Full svit: 3083/3085 gröna — de 2 röda är de sedan tidigare kända,
+  orelaterade `stegkedjan.spec.ts`-faciten (Codex egen pågående
+  konsolidering), ingen regression av denna ändring.
+- `npx next build` ren.
+- `git log origin/main..HEAD` kontrollerad före push (inga främmande
+  commits i kö) → pushat → Vercel-deploy pollad till `Ready`.
+
+## Migrationen körd (2026-08-16, Andreas "Kör!")
+
+`sql/v136_unique_quote_project.sql` kört via Supabase MCP, verifierat
+direkt efteråt med `SELECT ... FROM pg_indexes`: `project_quote_id_unique`
+existerar, `UNIQUE`, partiell (`WHERE quote_id IS NOT NULL`) — exakt som
+filen. TD-57 stängd i båda lagren, inget kvar.
+
+---
+
 # Fortnox historik-widening — betald historik, inte bara obetalt
 
 Källa: Andreas fråga "Borde vi bygga vidare på historisk finansiell data

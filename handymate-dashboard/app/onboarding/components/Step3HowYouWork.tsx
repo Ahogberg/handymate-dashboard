@@ -77,7 +77,7 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
 
   return (
     <div className="ob-screen">
-      <OnboardingHeader step={1} total={5} onBack={onBack} />
+      <OnboardingHeader step={1} total={6} onBack={onBack} />
       <div className="ob-body">
         <h1 className="ob-headline">Hur jobbar du?</h1>
         {/* "svara rätt i telefonen" är FÖRBJUDEN copy (låter som talande

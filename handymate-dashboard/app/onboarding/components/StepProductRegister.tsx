@@ -1,0 +1,247 @@
+'use client'
+
+/**
+ * StepProductRegister — "Ditt produktregister" (onboarding-steg, efter
+ * kundimporten StepImportData).
+ *
+ * Produkter/price_list seedas TIDIGT här (POST /api/onboarding/
+ * seed-products) i stället för vid onboarding-avslut som tidigare —
+ * seedProducts/seedPriceList är idempotenta, så finalize-anropet i
+ * seedAllDefaults blir automatiskt en no-op andra gången.
+ *
+ * Granskningslistan visar bara de redan PRISSATTA startartiklarna
+ * (sales_price > 0) — den prislösa långsvansen finns redan i registret
+ * och prissätter sig själv vid första användning (lib/products/
+ * pricing-state.ts), ingen ny logik för det här.
+ *
+ * Återanvänder den BEFINTLIGA ProductEditorModal och ProductCsvImportModal
+ * (Inställningar → Produkter) rakt av — ingen ny editor byggs.
+ * ProductCsvImportModal använder useToast() internt, vilket kräver en
+ * <ToastProvider> — den finns bara i app/dashboard/layout.tsx, inte i
+ * onboarding-trädet, så den monteras lokalt runt importmodalen här.
+ *
+ * Bygger på produktregister-onboarding-planen (2026-08-16).
+ */
+
+import { useCallback, useEffect, useState } from 'react'
+import { ArrowRight, AlertTriangle, Package, Upload } from 'lucide-react'
+import OnboardingHeader from './OnboardingHeader'
+import { ToastProvider } from '@/components/Toast'
+import { ProductEditorModal } from '@/app/dashboard/settings/products/components/ProductEditorModal'
+import { ProductCsvImportModal } from '@/app/dashboard/settings/products/components/ProductCsvImportModal'
+import { priceLabel } from '@/lib/products/pricing-state'
+import type { ComponentPayload, ProductRow } from '@/app/dashboard/settings/products/types'
+import type { OnboardingFormData } from '../types-redesign'
+
+interface Props {
+  onNext: () => void
+  onBack: () => void
+  data: OnboardingFormData
+  setData: (updater: (d: OnboardingFormData) => OnboardingFormData) => void
+}
+
+type View = 'loading' | 'ready'
+
+const CATEGORY_LABELS: Record<string, string> = {
+  arbete: 'Arbete',
+  material: 'Material',
+  hyra: 'Uthyrning',
+  övrigt: 'Övrigt',
+}
+
+const CATEGORY_ORDER = ['arbete', 'material', 'hyra', 'övrigt']
+
+export default function StepProductRegister({ onNext, onBack }: Props) {
+  const [view, setView] = useState<View>('loading')
+  const [products, setProducts] = useState<ProductRow[]>([])
+  const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchPriced = useCallback(async () => {
+    try {
+      const res = await fetch('/api/products?include_inactive=true')
+      if (res.ok) {
+        const d = await res.json()
+        const list: ProductRow[] = d.products || []
+        setProducts(list.filter(p => p.sales_price > 0))
+      }
+    } catch { /* granskningslistan visas ändå tom — Settings har alltid det fulla registret */ }
+  }, [])
+
+  // Seeda tidigt vid steg-inträde. fail-soft: ett seed-fel visar bara ett
+  // tomt register, blockerar aldrig onboardingen.
+  useEffect(() => {
+    let cancelled = false
+    async function seedThenLoad() {
+      try {
+        await fetch('/api/onboarding/seed-products', { method: 'POST' })
+      } catch { /* fail-soft */ }
+      if (cancelled) return
+      await fetchPriced()
+      if (!cancelled) setView('ready')
+    }
+    seedThenLoad()
+    return () => { cancelled = true }
+  }, [fetchPriced])
+
+  async function handleSave(payload: Record<string, unknown>, components: ComponentPayload[] | null) {
+    setSaving(true)
+    setError(null)
+    try {
+      const isEdit = !!payload.id
+      const res = await fetch('/api/products', {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setError(d.error || 'Kunde inte spara produkten')
+        return
+      }
+      const { product } = await res.json()
+      if (components !== null && product?.id) {
+        await fetch(`/api/products/${product.id}/components`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ components }),
+        })
+      }
+      setEditingProduct(null)
+      await fetchPriced()
+    } catch {
+      setError('Kunde inte spara produkten')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const grouped: Record<string, ProductRow[]> = {}
+  for (const p of products) {
+    (grouped[p.category] ||= []).push(p)
+  }
+
+  return (
+    <div className="ob-screen">
+      <OnboardingHeader step={5} total={6} onBack={onBack} onSkip={onNext} />
+      <div className="ob-body">
+        {view === 'loading' && (
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '100%' }}>
+            <div className="obi-loadcard">
+              <div className="obi-spinner" />
+              <div className="obi-load-title">Bygger ditt register…</div>
+            </div>
+          </div>
+        )}
+
+        {view === 'ready' && (
+          <>
+            <h1 className="ob-headline">Ditt register står redan klart.</h1>
+            <p className="ob-sub">
+              De flesta system låter dig bygga ett produktregister själv, artikel för
+              artikel. Hos oss är det redan gjort — du finslipar det, du börjar inte om.
+              Resten av artiklarna prissätter sig själva när du använder dem första
+              gången. Ju bättre registret är, desto bättre offertförslag kan Daniel
+              skriva åt dig.
+            </p>
+
+            {error && <FallbackNote text={error} />}
+
+            {products.length === 0 ? (
+              <p className="ob-sub">
+                Inga startartiklar hittades för din bransch — inget problem, du bygger
+                registret i Inställningar när du vill.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 18 }}>
+                {CATEGORY_ORDER.filter(cat => grouped[cat]?.length).map(cat => (
+                  <div key={cat}>
+                    <div className="obi-unlock-label">{CATEGORY_LABELS[cat]} · {grouped[cat].length}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                      {grouped[cat].map(p => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className="obi-choice"
+                          style={{ padding: '10px 14px' }}
+                          onClick={() => setEditingProduct(p)}
+                        >
+                          <span className="obi-choice-ic soft"><Package size={18} /></span>
+                          <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                            <span className="obi-choice-title" style={{ fontSize: 14 }}>{p.name}</span>
+                          </span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ob-primary-700)' }}>
+                            {priceLabel(p.sales_price, p.unit)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button type="button" className="obi-choice" onClick={() => setShowImport(true)}>
+              <span className="obi-choice-ic teal"><Upload size={22} strokeWidth={2.2} /></span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span className="obi-choice-title">Ladda upp min egen prislista</span>
+                <span className="obi-choice-sub">Ett tillägg till det redan seedade registret — inte en ersättning.</span>
+              </span>
+              <span className="obi-choice-arrow"><ArrowRight size={20} /></span>
+            </button>
+
+            <button type="button" className="obi-skiplink" style={{ marginTop: 16 }} onClick={onNext}>
+              Hoppa över — jag gör det senare
+            </button>
+          </>
+        )}
+      </div>
+
+      <div className="ob-footer">
+        {view === 'ready' && (
+          <button type="button" className="ob-cta" onClick={onNext}>
+            Fortsätt <ArrowRight size={18} />
+          </button>
+        )}
+      </div>
+
+      {editingProduct && (
+        <ProductEditorModal
+          product={editingProduct}
+          categories={[]}
+          saving={saving}
+          onSave={handleSave}
+          onClose={() => setEditingProduct(null)}
+          onError={msg => setError(msg)}
+        />
+      )}
+
+      {showImport && (
+        <ToastProvider>
+          <ProductCsvImportModal
+            onClose={() => setShowImport(false)}
+            onImported={() => { setShowImport(false); fetchPriced() }}
+          />
+        </ToastProvider>
+      )}
+    </div>
+  )
+}
+
+function FallbackNote({ text }: { text: string }) {
+  return (
+    <div
+      style={{
+        display: 'flex', gap: 10, alignItems: 'flex-start',
+        background: '#FFFBEB', border: '1px solid #FDE68A',
+        borderRadius: 'var(--ob-r-md)', padding: '12px 14px',
+        fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.45, marginBottom: 16,
+      }}
+    >
+      <AlertTriangle size={17} style={{ color: 'var(--ob-amber-600)', flexShrink: 0, marginTop: 1 }} />
+      <span>{text}</span>
+    </div>
+  )
+}

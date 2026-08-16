@@ -8,23 +8,25 @@ import Step3HowYouWork from './components/Step3HowYouWork'
 import Step4PhoneNumber from './components/Step4PhoneNumber'
 import Step5Activate from './components/Step5Activate'
 import StepImportData from './components/StepImportData'
+import StepProductRegister from './components/StepProductRegister'
 import Step6LiveTour from './components/Step6LiveTour'
 import type { OnboardingFormData } from './types-redesign'
 import { hasStep2Draft } from './step2-draft'
 
-const TOTAL_STEPS = 7
+const TOTAL_STEPS = 8
 
 /**
  * Onboarding-orchestrator (Claude Design redesign).
  *
  * Step-mappning till business_config.onboarding_step:
- *   0 = Step1MeetTheTeam (intro, ingen DB)
- *   1 = Step2Business    (account skapas, businessId sätts)
- *   2 = Step3HowYouWork  (specialties + hours + price)
- *   3 = Step4PhoneNumber (phone reserveras)
- *   4 = Step5Activate    (Stripe payment)
- *   5 = StepImportData   (hämta in kunder + öppna fakturor — Fortnox/CSV)
- *   6 = Step6LiveTour    (live tour, klar = onboarding_completed_at)
+ *   0 = Step1MeetTheTeam    (intro, ingen DB)
+ *   1 = Step2Business       (account skapas, businessId sätts)
+ *   2 = Step3HowYouWork     (specialties + hours + price)
+ *   3 = Step4PhoneNumber    (phone reserveras)
+ *   4 = Step5Activate       (Stripe payment)
+ *   5 = StepImportData      (hämta in kunder + öppna fakturor — Fortnox/CSV)
+ *   6 = StepProductRegister (granska det redan seedade produktregistret, 2026-08-16)
+ *   7 = Step6LiveTour       (live tour, klar = onboarding_completed_at)
  *
  * Resume-logik: Vid sidvisning hämtas onboarding_step från DB.
  * Användaren landar på rätt steg om de stängt mitt i flödet.
@@ -300,12 +302,15 @@ export default function OnboardingPage() {
         {step === 5 && (
           <StepImportData onNext={next} onBack={back} data={data} setData={setDataUpdater} />
         )}
-        {step === 6 && <Step6LiveTour onFinish={finish} data={data} />}
+        {step === 6 && (
+          <StepProductRegister onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+        )}
+        {step === 7 && <Step6LiveTour onFinish={finish} data={data} />}
       </div>
 
       {/* Finalize-fel (Fynd 6): navigera ALDRIG till dashboarden på ett
           misslyckat finalize-anrop — visa fel + låt kunden försöka igen. */}
-      {step === 6 && finishError && (
+      {step === 7 && finishError && (
         <div
           role="alert"
           style={{

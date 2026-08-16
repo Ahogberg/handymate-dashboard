@@ -122,7 +122,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
 
   return (
     <div className="ob-screen">
-      <OnboardingHeader step={3} total={5} onBack={onBack} />
+      <OnboardingHeader step={3} total={6} onBack={onBack} />
       <div className="ob-body">
         {/* Guarantee banner — DOMINERANDE, inte fotnot */}
         <div
