@@ -17,6 +17,48 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-16 — Business Twin Watch & Verify V1 byggd, V138/V139 väntar
+
+Business Twin har nu sin första stängda prognosloop: en ägare eller admin kan
+uttryckligen bevaka ett projektmarginalscenario, låta projektet löpa och få ett
+sanningskvitto när den kanoniska efterkalkylen fryses. Funktionen lär ännu inte
+om modellen automatiskt; V1 bevisar först att prognosen kan följas till ett
+kvalitetsgrindat facit.
+
+**Det som nu är sant:**
+
+- Endast projektmarginal på ett öppet projekt är bevakningsbart. Kassa och
+  omsättningstakt förblir read-only tills de har entydiga observationsfönster.
+- Knappen `Bevaka detta` visas bara för owner/admin. Klientens belopp lagras
+  aldrig blint: servern kör om scenariot mot aktuell tenantdata och vägrar en
+  stale fingerprint.
+- Prognos, request och beräkningsversion fryses i ett smalt service-only
+  kontrakt. Dubbletter stoppas deterministiskt per tenant och fingerprint.
+- Projektstängningen jämför först efter lyckad `freezeProjectOutcome` och bara
+  mot finansiellt lärbart realiserat utfall. Otillräckligt facit blir
+  `unverifiable`, aldrig en påhittad träff.
+- Samma prognoskvitto återanvänds i scenariokortet och projektets Efterkalkyl:
+  bevakas → verifierad avvikelse och ledtid, eller en tydlig blockeringsorsak.
+- Verifieringen är idempotent även vid samtidiga stängningsanrop. Inga
+  trösklar självjusteras och ingen autonom handling eller ny approvalväg har
+  tillkommit.
+
+**Aktivering:** databasen saknar enligt read-only prob fortfarande V138.
+Kör därför [`sql/v138_outcome_quality_gate.sql`](../../sql/v138_outcome_quality_gate.sql)
+manuellt först och därefter
+[`sql/v139_business_twin_forecast.sql`](../../sql/v139_business_twin_forecast.sql).
+Ingen migration kördes från kod eller test; UI:t failar säkert till read-only
+innan V139 finns.
+
+**Verifiering:** `npx tsc --noEmit` och produktionsbuilden (421 routes/sidor)
+är gröna. 94/94 riktade scenario-, outcome-, auth-, tenant- och
+migrationsfacit är gröna. Full Chromium-svit: 3 076/3 205 gröna; 126
+sessions-/nätfall blockeras av sandboxens `connect EACCES` mot
+`app.handymate.se`, och tre sedan tidigare kända Jarvis/stegkedje-facit är
+röda utanför denna diff.
+
+---
+
 # Läge 2026-08-16 — Business Twin Scenario Engine V1 byggd
 
 Matte kan nu besvara tre typer av kontrafaktiska “vad händer om?”-frågor

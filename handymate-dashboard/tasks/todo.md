@@ -103,6 +103,64 @@ fullsvit-körning) innan gemensam push. Vercel-deploy pollad till `Ready`,
 
 ---
 
+# Business Twin Watch & Verify V1 — 2026-08-16
+
+## Mål
+
+Stäng Business Twins första verkliga prognosloop: ett uttryckligt
+projektmarginalscenario ska kunna frysas som bevakning, följas till kanoniskt
+projektutfall och jämföras deterministiskt. Handymate ska visa vad som
+förutsågs, vad som faktiskt hände och hur tidigt signalen fanns — utan att
+självjustera modeller eller kalla en hypotes för ett utfall.
+
+## Plan
+
+- [x] Verifiera produktionsschema och lås en smal tenant-/rollsäkrad
+  lagringsmodell för endast `project_margin`; skriv nästa manuella migration.
+- [x] Bygg en serverägd frysväg som återkör scenariot mot aktuella källor,
+  deduplicerar deterministiskt och aldrig litar på klientens belopp.
+- [x] Bygg en ren jämförelsemotor och idempotent verifiering mot kvalitetsgrindat
+  `project_outcome`; koppla den efter den kanoniska utfallsfrysningen.
+- [x] Lägg `Bevaka detta` och ett verifierat prognos→utfallskvitto i samma
+  delade Business Twin-kort, med svenska mobiltexter och tydliga spärrlägen.
+- [x] Facit-testa matte, auth/tenant/roll, idempotens, felhantering,
+  projektavslutskoppling, migration och att övriga scenariokategorier inte
+  felaktigt kan bevakas.
+- [x] Kör TypeScript, riktade browserlösa facit, produktionsbuild, read-only
+  databasschemaprob och fullsvitens felsammanfattning; dokumentera och committa
+  endast denna lane.
+
+## Avgränsning
+
+- En bevakning skapas bara genom en uttrycklig owner/admin-handling.
+- Endast projektmarginal har verifieringssemantik i V1. Kassa och årstakt får
+  ingen falsk observationsperiod.
+- Ingen automatisk tröskeljustering, autonom åtgärd, ny approvalmekanik eller
+  LLM-aritmetik.
+- Migrationen skrivs i `sql/` men körs aldrig programmatiskt.
+
+## Resultat
+
+- Endast projektmarginalscenarier på öppna projekt kan bevakas. Servern kör
+  om exakt samma scenario mot aktuell tenantdata och kräver identisk
+  fingerprint innan den fryser en oföränderlig snapshot.
+- Owner/admin kan starta bevakningen i scenariokortet. Samma delade
+  prognoskvitto visas senare i projektets Efterkalkyl som `watching`,
+  `verified` eller `unverifiable`.
+- Kanonisk projektstängning verifierar prognosen först efter lyckad
+  `freezeProjectOutcome` och använder endast `financial_learning_eligible`
+  realiserad marginal. Samtidiga/upprepade stängningar räknar aldrig en rad
+  två gånger.
+- `sql/v139_business_twin_forecast.sql` är skriven men **inte körd**. En
+  read-only schemaprob mot konfigurerad testdatabas visar att även V138 ännu
+  saknas. Kör därför manuellt V138 och därefter V139 i Supabase SQL Editor.
+- Verifiering: TypeScript rent, produktionsbuild grön, 94/94 riktade facit
+  gröna. Full Chromium-svit: 3 076/3 205 gröna; 126 sessions-/nätfall är röda
+  med sandboxens `connect EACCES` mot `app.handymate.se`, plus tre sedan
+  tidigare kända Jarvis/stegkedje-facit utanför denna diff.
+
+---
+
 # Outcome Quality Gate V1 — pålitlig inlärning från avslutade jobb (2026-08-16)
 
 Källa: Andreas “Kör!” efter verifiering mot roadmapens X2. Codex äger

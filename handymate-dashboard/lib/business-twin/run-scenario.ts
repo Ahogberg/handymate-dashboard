@@ -11,7 +11,12 @@ import { assembleCashRadar } from '@/lib/cash-radar-data'
 import { svDateStr } from '@/lib/dates'
 import { getExplicitMarginTarget } from '@/lib/profitability'
 import { computeProjectEconomics } from '@/lib/projects/compute-economics'
-import type { BusinessScenarioKind, BusinessScenarioResult } from './scenario-contract'
+import { buildProjectMarginFingerprint } from './forecast-fingerprint'
+import type {
+  BusinessScenarioKind,
+  BusinessScenarioResult,
+  ProjectMarginWatchRequest,
+} from './scenario-contract'
 import {
   buildBlockedBusinessScenario,
   simulateCashDelay,
@@ -33,6 +38,7 @@ export interface BusinessScenarioRequest {
 interface ProjectRef {
   project_id: string
   name: string | null
+  status: string | null
 }
 
 function nowIso(now: Date): string {
@@ -62,7 +68,7 @@ async function resolveProject(
   if (input.project_id) {
     const { data, error } = await supabase
       .from('project')
-      .select('project_id, name')
+      .select('project_id, name, status')
       .eq('business_id', businessId)
       .eq('project_id', input.project_id)
       .maybeSingle()
@@ -77,7 +83,7 @@ async function resolveProject(
 
   const { data, error } = await supabase
     .from('project')
-    .select('project_id, name')
+    .select('project_id, name, status')
     .eq('business_id', businessId)
     .limit(100)
   if (error) throw new Error(`Projektuppslag misslyckades: ${error.message}`)
@@ -109,7 +115,7 @@ export async function runBusinessScenario(
     if (!economics) return block('project_margin', 'Projektets ekonomi kunde inte läsas.', now)
     const explicitMarginTargetPct = await getExplicitMarginTarget(supabase, businessId)
 
-    return simulateProjectMargin({
+    const result = simulateProjectMargin({
       projectId: resolved.project.project_id,
       projectName: resolved.project.name || 'Namnlöst projekt',
       economics,
@@ -119,6 +125,23 @@ export async function runBusinessScenario(
       explicitMarginTargetPct,
       nowIso: nowIso(now),
     })
+    if (result.status !== 'ready' || resolved.project.status === 'completed') return result
+
+    const request: ProjectMarginWatchRequest = {
+      scenario_type: 'project_margin',
+      project_id: resolved.project.project_id,
+      extra_hours: Number(input.extra_hours ?? 0),
+      material_cost_change_pct: Number(input.material_cost_change_pct ?? 0),
+      additional_revenue_kr: Number(input.additional_revenue_kr ?? 0),
+    }
+    return {
+      ...result,
+      watch: {
+        projectId: resolved.project.project_id,
+        fingerprint: buildProjectMarginFingerprint(request, result),
+        request,
+      },
+    }
   }
 
   if (input.scenario_type === 'cash_delay') {

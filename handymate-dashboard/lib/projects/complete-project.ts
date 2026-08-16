@@ -13,6 +13,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { checkFourEyesGate } from '@/lib/projects/four-eyes-gate'
+import type { ProjectOutcomeRow } from '@/lib/efterkalkyl/freeze-outcome'
 
 export type ProjectCompletionAuthorization =
   | { kind: 'direct' }
@@ -23,6 +24,7 @@ export type CloseoutEffectName =
   | 'job_completed_event'
   | 'auto_invoice'
   | 'project_outcome'
+  | 'business_twin_forecasts'
   | 'project_debrief'
   | 'agent_trigger'
   | 'review_request'
@@ -402,10 +404,12 @@ async function runCompletionEffects(params: {
     amount_diff_pct: number | null
     margin_pct: number | null
   } | null = null
+  let frozenOutcome: ProjectOutcomeRow | null = null
   try {
     const { freezeProjectOutcome } = await import('@/lib/efterkalkyl/freeze-outcome')
     const frozen = await freezeProjectOutcome(supabase, businessId, project.project_id)
     if (frozen.ok) {
+      frozenOutcome = frozen.row
       outcome = {
         found: true,
         job_type: frozen.row.job_type,
@@ -423,6 +427,54 @@ async function runCompletionEffects(params: {
     }
   } catch (error) {
     effects.push(effectFailure('project_outcome', error))
+  }
+
+  // 4b. En bevakad Business Twin-prognos får sitt facit först här: efter
+  // samma kvalitetsgrindade outcome som nästa offert får lära av. Missad
+  // migration/fel blir en synlig closeout-varning, aldrig ett falskt utfall.
+  if (!frozenOutcome) {
+    effects.push({
+      effect: 'business_twin_forecasts',
+      status: 'skipped',
+      message: 'Ingen verifierad efterkalkyl att jämföra mot',
+    })
+  } else {
+    try {
+      const { verifyProjectMarginForecasts } = await import('@/lib/business-twin/watch-forecast')
+      const verified = await verifyProjectMarginForecasts({
+        supabase,
+        businessId,
+        projectId: project.project_id,
+        outcome: frozenOutcome,
+      })
+      if (!verified.ok) {
+        effects.push({
+          effect: 'business_twin_forecasts',
+          status: 'failed',
+          message: verified.error || 'Prognoserna kunde inte verifieras',
+        })
+      } else if (!verified.available) {
+        effects.push({
+          effect: 'business_twin_forecasts',
+          status: 'skipped',
+          message: 'Business Twin-bevakning är inte aktiverad',
+        })
+      } else if (verified.verified + verified.unverifiable === 0) {
+        effects.push({
+          effect: 'business_twin_forecasts',
+          status: 'skipped',
+          message: 'Inga bevakade prognoser för projektet',
+        })
+      } else {
+        effects.push({
+          effect: 'business_twin_forecasts',
+          status: 'succeeded',
+          message: `${verified.verified} verifierade · ${verified.unverifiable} utan tillräckligt facit`,
+        })
+      }
+    } catch (error) {
+      effects.push(effectFailure('business_twin_forecasts', error))
+    }
   }
 
   // 5. Debriefkortet har livstids-dedupe. Verifiera raden efter anropet så
@@ -670,6 +722,7 @@ function userWarningForEffect(effect: CloseoutEffectName): string {
     job_completed_event: 'Projektets automatiska uppföljningar kunde inte startas.',
     auto_invoice: 'Fakturaunderlaget kunde inte skapas automatiskt.',
     project_outcome: 'Efterkalkylen kunde inte sparas.',
+    business_twin_forecasts: 'Business Twin-prognoserna kunde inte verifieras.',
     project_debrief: 'Lärandefrågorna kunde inte skapas.',
     agent_trigger: 'Lars kunde inte starta sin projektuppföljning.',
     review_request: 'Recensionsförfrågan kunde inte förberedas.',

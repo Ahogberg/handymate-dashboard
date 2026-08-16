@@ -1,8 +1,11 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, FlaskConical, ShieldAlert } from 'lucide-react'
+import { ArrowRight, Eye, FlaskConical, Loader2, ShieldAlert } from 'lucide-react'
+import { useCurrentUser } from '@/lib/CurrentUserContext'
 import type { BusinessScenarioResult, ScenarioMetric } from '@/lib/business-twin/scenario-contract'
+import { ForecastReceipt, type ForecastReceiptData } from '@/components/business-twin/ForecastReceipt'
 
 function formatValue(value: number, unit: ScenarioMetric['unit']): string {
   if (unit === 'kr') return `${Math.round(value).toLocaleString('sv-SE')} kr`
@@ -30,6 +33,57 @@ function Delta({ metric }: { metric: ScenarioMetric }) {
  * serverns strukturerade räkningsresultat — inga belopp räknas i UI:t.
  */
 export function BusinessScenarioCard({ scenario }: { scenario: BusinessScenarioResult }) {
+  const { isOwnerOrAdmin, loading: userLoading } = useCurrentUser()
+  const [forecast, setForecast] = useState<ForecastReceiptData | null>(null)
+  const [watchAvailable, setWatchAvailable] = useState(false)
+  const [watchLoading, setWatchLoading] = useState(false)
+  const [watchError, setWatchError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (userLoading || !isOwnerOrAdmin || !scenario.watch) return
+    const controller = new AbortController()
+    fetch(`/api/business-twin/forecasts?fingerprint=${encodeURIComponent(scenario.watch.fingerprint)}`, {
+      signal: controller.signal,
+    })
+      .then(async response => {
+        if (!response.ok) throw new Error('Kunde inte läsa bevakningen')
+        return response.json()
+      })
+      .then(data => {
+        setWatchAvailable(data.available === true)
+        setForecast(data.forecast || null)
+      })
+      .catch(error => {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        setWatchError('Kunde inte läsa bevakningen')
+      })
+    return () => controller.abort()
+  }, [isOwnerOrAdmin, scenario.watch, userLoading])
+
+  async function startWatching() {
+    if (!scenario.watch || watchLoading) return
+    setWatchLoading(true)
+    setWatchError(null)
+    try {
+      const response = await fetch('/api/business-twin/forecasts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fingerprint: scenario.watch.fingerprint,
+          request: scenario.watch.request,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || 'Bevakningen kunde inte startas')
+      setWatchAvailable(data.available === true)
+      setForecast(data.forecast || null)
+    } catch (error) {
+      setWatchError(error instanceof Error ? error.message : 'Bevakningen kunde inte startas')
+    } finally {
+      setWatchLoading(false)
+    }
+  }
+
   if (scenario.status === 'blocked') {
     return (
       <section className="mt-2 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/70" aria-label="Blockerat scenario">
@@ -125,6 +179,27 @@ export function BusinessScenarioCard({ scenario }: { scenario: BusinessScenarioR
           </Link>
         )}
       </div>
+
+      {scenario.watch && isOwnerOrAdmin && (
+        <div className="border-t border-teal-100 bg-teal-50/60 px-4 py-3">
+          {forecast ? (
+            <ForecastReceipt forecast={forecast} />
+          ) : watchAvailable ? (
+            <button
+              type="button"
+              onClick={startWatching}
+              disabled={watchLoading}
+              className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary-700 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            >
+              {watchLoading
+                ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                : <Eye className="h-4 w-4" aria-hidden />}
+              {watchLoading ? 'Startar bevakning…' : 'Bevaka detta'}
+            </button>
+          ) : null}
+          {watchError && <p className="m-0 mt-2 text-xs font-medium text-rose-700">{watchError}</p>}
+        </div>
+      )}
     </section>
   )
 }

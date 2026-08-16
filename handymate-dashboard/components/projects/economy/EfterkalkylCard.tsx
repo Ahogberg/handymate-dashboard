@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ClipboardCheck } from 'lucide-react'
+import { ClipboardCheck, Sparkles } from 'lucide-react'
+import { useCurrentUser } from '@/lib/CurrentUserContext'
+import { ForecastReceipt, type ForecastReceiptData } from '@/components/business-twin/ForecastReceipt'
 
 /**
  * EfterkalkylCard (Motor 1: Lärande prissättning — steg 1, 2026-07-16).
@@ -87,10 +89,12 @@ const VARIANT_CARD: Record<string, string> = {
 }
 
 export function EfterkalkylCard({ projectId }: EfterkalkylCardProps) {
+  const { isOwnerOrAdmin, loading: userLoading } = useCurrentUser()
   const [outcome, setOutcome] = useState<ProjectOutcome | null>(null)
   const [expectedMargin, setExpectedMargin] = useState<ExpectedMarginSnapshot | null>(null)
   const [projectStatus, setProjectStatus] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [forecasts, setForecasts] = useState<ForecastReceiptData[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -114,6 +118,21 @@ export function EfterkalkylCard({ projectId }: EfterkalkylCardProps) {
       cancelled = true
     }
   }, [projectId])
+
+  useEffect(() => {
+    if (userLoading || !isOwnerOrAdmin) return
+    const controller = new AbortController()
+    fetch(`/api/business-twin/forecasts?project_id=${encodeURIComponent(projectId)}`, {
+      signal: controller.signal,
+    })
+      .then(async response => response.ok ? response.json() : null)
+      .then(data => setForecasts(data?.forecasts || []))
+      .catch(error => {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        setForecasts([])
+      })
+    return () => controller.abort()
+  }, [isOwnerOrAdmin, projectId, userLoading])
 
   if (loading || projectStatus !== 'completed' || !outcome) return null
 
@@ -198,6 +217,22 @@ export function EfterkalkylCard({ projectId }: EfterkalkylCardProps) {
               ekonomikorten ovan).
             </p>
           )}
+        </div>
+      )}
+
+      {isOwnerOrAdmin && forecasts.length > 0 && (
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <p className="mb-3 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-teal-700">
+            <Sparkles className="h-3.5 w-3.5" aria-hidden />
+            Business Twin · prognoskvittot
+          </p>
+          <div className="space-y-2">
+            {forecasts.slice(0, 3).map(forecast => (
+              <div key={forecast.id} className="rounded-xl border border-teal-100 bg-teal-50/60 p-3.5">
+                <ForecastReceipt forecast={forecast} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

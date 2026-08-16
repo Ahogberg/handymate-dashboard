@@ -30,6 +30,21 @@ export interface ScenarioEvidence {
   truth: 'known' | 'estimated'
 }
 
+export interface ProjectMarginWatchRequest {
+  scenario_type: 'project_margin'
+  project_id: string
+  extra_hours: number
+  material_cost_change_pct: number
+  additional_revenue_kr: number
+}
+
+export interface ProjectMarginWatchRef {
+  projectId: string
+  /** Servergenererat av exakt request + scenarioresultat. Inget authbevis. */
+  fingerprint: string
+  request: ProjectMarginWatchRequest
+}
+
 export interface BusinessScenarioResult {
   version: 1
   kind: BusinessScenarioKind
@@ -45,6 +60,8 @@ export interface BusinessScenarioResult {
   evidence: ScenarioEvidence[]
   recommendation: string
   target?: { label: string; href: string }
+  /** Finns bara för ett öppet projektmarginalscenario med framtida facit. */
+  watch?: ProjectMarginWatchRef
   generatedAt: string
 }
 
@@ -58,7 +75,14 @@ export function isBusinessScenarioPresentation(value: unknown): value is Busines
   const p = value as Record<string, unknown>
   if (p.kind !== 'business_scenario' || !p.scenario || typeof p.scenario !== 'object') return false
   const scenario = p.scenario as Record<string, unknown>
-  return scenario.version === 1 &&
+  const watch = scenario.watch
+  const validWatch = watch == null || (
+    typeof watch === 'object'
+    && typeof (watch as Record<string, unknown>).projectId === 'string'
+    && /^btw_v1_[a-f0-9]{64}$/.test(String((watch as Record<string, unknown>).fingerprint || ''))
+    && typeof (watch as Record<string, unknown>).request === 'object'
+  )
+  return validWatch && scenario.version === 1 &&
     ['project_margin', 'cash_delay', 'revenue_pace'].includes(String(scenario.kind)) &&
     ['ready', 'blocked'].includes(String(scenario.status))
 }
