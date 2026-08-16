@@ -26,6 +26,7 @@
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { agentForApproval, TYPE_LABEL } from '@/lib/jarvis/approval-view'
 import type { AgentMoment } from '@/lib/moments/derive'
+import type { BusinessScenarioPresentation } from '@/lib/business-twin/scenario-contract'
 
 /** Statusspråket är Epic 2:s — samma ord i koden som på skärmen. */
 export type InteractionStatus =
@@ -50,6 +51,7 @@ export interface AgentInteraction {
   value?: { amountKr: number; label: string }
   target?: { label: string; href: string }
   approvalId?: string
+  presentation?: BusinessScenarioPresentation
 }
 
 export interface AgentIdentity {
@@ -123,6 +125,7 @@ export interface ChatMessageLike {
   is_handoff_announcement?: boolean
   /** Sätts av orkestreringen på Mattes sammanfattning (Epic 2). */
   status?: InteractionStatus | null
+  presentation?: BusinessScenarioPresentation
 }
 
 export function fromChatMessage(msg: ChatMessageLike, index = 0): AgentInteraction {
@@ -136,6 +139,7 @@ export function fromChatMessage(msg: ChatMessageLike, index = 0): AgentInteracti
     status,
     body: msg.content,
     byline: byline(agentKey),
+    ...(msg.presentation ? { presentation: msg.presentation } : {}),
   }
 }
 

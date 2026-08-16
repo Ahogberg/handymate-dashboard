@@ -80,6 +80,12 @@ export async function assembleCashRadar(
       .eq('business_id', businessId),
   ])
 
+  // Scenario Engine och radarn delar denna läsning. Ett källfel får inte
+  // degraderas till [] och därmed presenteras som ”0 kr i kassan”.
+  if (paidRes.error) throw new Error(`Betalda fakturor kunde inte läsas: ${paidRes.error.message}`)
+  if (unpaidRes.error) throw new Error(`Obetalda fakturor kunde inte läsas: ${unpaidRes.error.message}`)
+  if (stagesRes.error) throw new Error(`Pipeline-steg kunde inte läsas: ${stagesRes.error.message}`)
+
   const paidRows = paidRes.data || []
 
   // Median-försening: endast rader MED due_date (annars går förseningen inte att mäta).
@@ -103,11 +109,12 @@ export async function assembleCashRadar(
     stageById.set(String(s.id), { slug: String(s.slug), is_won: !!s.is_won, is_lost: !!s.is_lost })
   }
 
-  const { data: dealRows } = await supabase
+  const { data: dealRows, error: dealError } = await supabase
     .from('deal')
     .select('id, value, stage_id, expected_close_date, quote_id, customer_id, title, invoice_id')
     .eq('business_id', businessId)
     .limit(1000)
+  if (dealError) throw new Error(`Öppna affärer kunde inte läsas: ${dealError.message}`)
 
   const openDeals: Array<{
     id: string
@@ -156,13 +163,14 @@ export async function assembleCashRadar(
     // Dedup-flagga: öppna quote_nudge-förslag → set av quote_id (JS-set,
     // samma mönster som Hanna — slipper JSON-path-in per deal).
     const pendingQuoteIds = new Set<string>()
-    const { data: pendingNudges } = await supabase
+    const { data: pendingNudges, error: pendingNudgesError } = await supabase
       .from('pending_approvals')
       .select('payload')
       .eq('business_id', businessId)
       .eq('approval_type', 'quote_nudge')
       .eq('status', 'pending')
       .limit(500)
+    if (pendingNudgesError) throw new Error(`Väntande offertuppföljningar kunde inte läsas: ${pendingNudgesError.message}`)
     for (const p of pendingNudges || []) {
       const qid = (p.payload as Record<string, unknown> | null)?.quote_id
       if (qid) pendingQuoteIds.add(String(qid))

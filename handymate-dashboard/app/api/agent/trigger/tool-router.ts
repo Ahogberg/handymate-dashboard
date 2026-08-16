@@ -153,6 +153,11 @@ export async function executeTool(
           return { success: false, error: err.message }
         }
       }
+      case 'simulate_business_scenario': {
+        const { runBusinessScenario } = await import('@/lib/business-twin/run-scenario')
+        const scenario = await runBusinessScenario(supabase, businessId, input as any)
+        return { success: true, data: scenario }
+      }
       case 'update_business_preference':
         return await updateBusinessPreference(supabase, businessId, input)
       case 'get_automation_settings':

@@ -1592,3 +1592,61 @@ notiser och kundmeddelanden ska ha olika, explicita kontrakt.
   uttryckligt testnummer och skulle vara en extern affärshändelse.
 
 ---
+# Business Twin Scenario Engine V1 — 2026-08-16
+
+## Mål
+
+Gör Handymates befintliga företagsmodell kontrafaktisk: ägaren ska kunna
+fråga Matte "vad händer om?" och få en deterministisk, read-only jämförelse
+mellan nuläge och scenario. Demo-wow ska vara samma riktiga produktkontrakt
+som kunden använder — inga mockbelopp, ingen LLM-aritmetik och ingen ny sida.
+
+## Plan
+
+- [x] Lås ett litet typat scenariokontrakt och rena beräkningar för
+  projektmarginal, försenade kundinbetalningar och omsättningstakt.
+- [x] Bygg en tenantbunden loader + ett enda read-only agentverktyg med
+  fail-closed källäsning, entydig projektmatchning och synliga antaganden.
+- [x] För presentationen genom Mattes tool-loop och trådmetadata utan att
+  skapa en ny chatt-/eventsmodell.
+- [x] Bygg ett delat, mobilanpassat scenariokort för båda Matte-ytorna:
+  nuläge → scenario, delta, KÄNT/UPPSKATTAT, "Visa antaganden" och riktig CTA.
+- [x] Gör demoögonblicket upptäckbart från en riktig projektsida med en
+  kontextfråga som fyller chatten men aldrig kör något automatiskt.
+- [x] Facit-testa matematiken, kvalitetsgrindarna, tenant/auth/tool-allowlist,
+  presentationens persistens och att ingen scenariofunktion skriver data.
+- [x] Kör `npx tsc --noEmit`, riktade browserlösa facit, `npx next build`,
+  läs fullsvitens felsammanfattning och dokumentera resultatet i roadmapen.
+
+## Avgränsning
+
+- Ingen SQL och ingen ny lagringsmodell; `thread_message.metadata` återanvänds.
+- Ingen mutation, approval, extern sändning eller autonom scenariokörning.
+- Ingen produktregister-/prisjusteringskod och ingen X2d-deduplicering.
+- Scenarioresultat är uppskattningar ovanpå namngivna kända källor; saknad
+  timkostnad eller tvetydigt materialunderlag blockerar marginalscenariot.
+
+## Resultat
+
+- Tre scenarier använder ett gemensamt, versionerat presentationskontrakt:
+  projektmarginal, försenade kundbetalningar och omsättningstakt. Modellen
+  väljer argument; all aritmetik sker deterministiskt i kod.
+- Ett enda read-only verktyg laddar tenantfiltrerade källor och gissar aldrig
+  ett tvetydigt projekt. Kassascenariot håller kända fakturainflöden skilda
+  från pipelinepotential, och marginalscenariot stoppar vid saknad intern
+  timkostnad eller möjligt materialöverlapp.
+- Resultatet följer med genom Mattes befintliga tool-loop och
+  `thread_message.metadata`, och återöppnade trådar visar samma kort.
+- Både Jobbkompisen och MatteChatModal återanvänder samma mobilanpassade kort
+  med nuläge → scenario, delta, KÄNT/UPPSKATTAT, synliga antaganden och CTA.
+- Projektsidan har ett färdigt demo-chip. En samtidig kontroll visade att
+  klientens `projectId` tidigare aldrig nådde modellprompten; nu injiceras en
+  strikt sanerad sidreferens, medan varje verktyg fortfarande tenantverifierar.
+- `npx tsc --noEmit` och produktionsbuilden (421 routes/sidor) är gröna.
+  93/93 riktade scenario-, Matte-, orchestration-, cash-radar- och
+  agentgränsfacit är gröna. Read-only prob mot testdatabasen verifierade alla
+  nya läskolumner. Full Chromium-svit: 3 041 gröna; 126 nät-/sessionsfall
+  blockerades av `connect EACCES`, och fem orelaterade samtidiga baselinefel
+  återstod (`customer-facts` 2, `jarvis-hem` 1, `stegkedjan` 2).
+
+---

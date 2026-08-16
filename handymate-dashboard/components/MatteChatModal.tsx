@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { X, Send, Plus, MessageCircle, Sparkles, Trash2, Menu } from 'lucide-react'
 import { AgentMessage } from '@/components/agents/AgentMessage'
 import type { InteractionStatus } from '@/lib/agents/interaction'
+import type { BusinessScenarioPresentation } from '@/lib/business-twin/scenario-contract'
 
 interface ChatMessage {
   id?: string
@@ -15,6 +16,7 @@ interface ChatMessage {
   is_handoff_announcement?: boolean
   /** Orkestreringens status på Mattes sammanfattning (Epic 2) — aldrig gissad i UI:t. */
   status?: InteractionStatus | null
+  presentation?: BusinessScenarioPresentation
 }
 
 interface Conversation {
@@ -76,6 +78,7 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
         content: string
         is_handoff_announcement?: boolean
         status?: InteractionStatus | null
+        presentation?: BusinessScenarioPresentation
       }> = data.messages?.length
         ? data.messages
         : [{ agent: data.current_agent || 'matte', content: data.reply || '' }]
@@ -86,6 +89,7 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
         agent: m.agent ?? null,
         is_handoff_announcement: m.is_handoff_announcement,
         status: m.status ?? null,
+        presentation: m.presentation,
         created_at: now,
       }))])
     } catch {
@@ -125,13 +129,14 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
       if (res.ok) {
         const data = await res.json()
         // Trådmeddelanden bär agent + handoff-flagga → mappa till ChatMessage.
-        setMessages((data.messages || []).map((m: { id: string; role: 'user' | 'assistant'; content: string; created_at: string; agent?: string | null; is_handoff_announcement?: boolean }) => ({
+        setMessages((data.messages || []).map((m: { id: string; role: 'user' | 'assistant'; content: string; created_at: string; agent?: string | null; is_handoff_announcement?: boolean; presentation?: BusinessScenarioPresentation }) => ({
           id: m.id,
           role: m.role,
           content: m.content,
           created_at: m.created_at,
           agent: m.agent ?? null,
           is_handoff_announcement: m.is_handoff_announcement,
+          presentation: m.presentation,
         })))
       }
     } catch { /* noop */ }
@@ -225,6 +230,7 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
         content: string
         is_handoff_announcement?: boolean
         status?: InteractionStatus | null
+        presentation?: BusinessScenarioPresentation
       }> = data.messages?.length
         ? data.messages
         : [{ agent: data.current_agent || 'matte', content: data.reply || '' }]
@@ -235,6 +241,7 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
         agent: m.agent ?? null,
         is_handoff_announcement: m.is_handoff_announcement,
         status: m.status ?? null,
+        presentation: m.presentation,
         created_at: now,
       }))])
       fetchConversations()

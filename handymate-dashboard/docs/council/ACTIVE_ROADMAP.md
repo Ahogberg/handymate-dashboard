@@ -17,6 +17,41 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-16 — Business Twin Scenario Engine V1 byggd
+
+Matte kan nu besvara tre typer av kontrafaktiska “vad händer om?”-frågor
+med deterministisk matte ovanpå företagets riktiga data. Det är samma
+read-only produktfunktion i demo och produktion — ingen separat simulator,
+mockad AI-text eller ny lagringsmodell.
+
+**Det som nu är sant:**
+
+- Projektmarginal, försenade kundbetalningar och omsättningstakt delar ett
+  litet versionerat scenariokontrakt. Modellen väljer scenario och argument;
+  den räknar aldrig beloppen själv.
+- En central tenantbunden loader läser befintlig projektekonomi, Cash Radar
+  och uttryckligt omsättningsmål. Källfel blir synliga och ett projekt matchas
+  aldrig genom gissning.
+- Marginalscenarier blockeras vid saknad intern timkostnad eller möjligt
+  överlapp mellan leverantörsfakturor och manuellt material. Kassascenariot
+  summerar aldrig pipelinepotential med kända fakturainflöden.
+- Scenarioresultatet persisteras i befintlig `thread_message.metadata` och
+  renderas av samma mobilanpassade kort i Jobbkompisen och MatteChatModal:
+  nuläge → scenario, delta, KÄNT/UPPSKATTAT, antaganden och riktig CTA.
+- En projektsida erbjuder demo-frågan om 20 extra timmar och 10 procent dyrare
+  material. Matte får den aktuella sidans strikt sanerade projekt-id, men
+  verktygets `business_id`-kontroll förblir den auktoritativa tenantgränsen.
+- Funktionen är helt läsande: ingen SQL, mutation, approval eller extern
+  handling har tillkommit.
+
+**Verifiering:** `npx tsc --noEmit` och produktionsbuilden (421 routes/sidor)
+är gröna. 93/93 riktade facit är gröna. De använda läskolumnerna verifierades
+read-only mot testdatabasen. Full Chromium-svit gav 3 041 gröna; 126
+nät-/sessionsfall blockerades av sandboxens `connect EACCES` och fem
+parallella, orelaterade baselinefacit var röda.
+
+---
+
 # Läge 2026-08-16 — Outcome Quality Gate V1 byggd, V138 väntar på manuell körning
 
 Offer-to-Reality-loopen har nu en explicit sanningsgräns mellan ett fryst

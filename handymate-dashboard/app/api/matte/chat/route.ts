@@ -44,6 +44,10 @@ import {
   type OrchestrationIntent,
   type ToolOutcome,
 } from '@/lib/agent/orchestration'
+import {
+  isBusinessScenarioPresentation,
+  type BusinessScenarioPresentation,
+} from '@/lib/business-twin/scenario-contract'
 
 const MAX_IMAGES_PER_MESSAGE = 4
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -51,6 +55,12 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
 export const maxDuration = 30
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+
+/** Klientens sidkontext får aldrig bli fri text i systemprompten. */
+function safeContextId(value: unknown): string | null {
+  const text = typeof value === 'string' ? value.trim() : ''
+  return /^[A-Za-z0-9_-]{1,100}$/.test(text) ? text : null
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Business context — verklig data till system-promptet
@@ -199,6 +209,7 @@ const CURATED_TOOL_NAMES = [
   'qualify_lead', 'update_lead_status', 'get_lead', 'search_leads',
   'get_daily_stats', 'create_approval_request', 'check_pending_approvals',
   'get_project_profitability', 'get_pricing_suggestion', 'check_fortnox_status',
+  'simulate_business_scenario',
   'get_efterkalkyl_insight', 'run_customer_base_sweep', 'book_site_visit',
   // R5 (tasks/resurs-masterplan.md) — persondagen/beläggning per person.
   'get_person_schedule',
@@ -513,6 +524,8 @@ VID HANDOFF: Var transparent men kort. Använd handoff_to_agent-verktyget — s�
 
 ÄRENDEN SOM RÖR FLERA OMRÅDEN: gör klart DIN del först, lämna sedan över till nästa specialist för deras del. Ärendet får passera högst tre specialister, och du får bara komma in en gång — planera därför din del färdigt innan du lämnar. Matte sammanfattar för hantverkaren till sist, så du behöver inte upprepa vad andra gjort. Påstå ALDRIG att något är gjort som du inte själv utfört med ett verktyg; blev det fel, säg det rakt.
 
+VAD HÄNDER OM: använd simulate_business_scenario för kontrafaktiska frågor om projektmarginal, sena kundbetalningar eller omsättningstakt. Återge verktygets resultat och antaganden; räkna aldrig om eller komplettera siffrorna själv. Ett blockerat scenario är ett ärligt svar — gissa inte saknade värden.
+
 Du har tillgång till verktyg för kunder, offerter (skapa riktiga offerter med ROT/RUT), fakturor, bokningar, kalender, tidrapporter, leads, SMS, e-post och navigering. Använd dem för att faktiskt UTFÖRA det hantverkaren ber om — men bara inom ditt expertområde.${imageBlock}
 
 Var vänlig, professionell och effektiv. Använd du-tilltal.`
@@ -539,6 +552,8 @@ interface AgentTurnResult {
    * precis den part som kan ha fel om saken.
    */
   toolOutcomes: ToolOutcome[]
+  /** Strukturerat, läsande scenario som båda befintliga chattytor kan visa. */
+  presentation: BusinessScenarioPresentation | null
   /** Ackumulerad usage över ALLA callClaude-anrop i denna tur (initial +
       varje tool-iteration) — grunden för COGS-mätningen (etapp 1, 2026-08-14). */
   usage: TokenUsage
@@ -593,6 +608,7 @@ async function runAgentTurn(opts: {
 
   const toolMessages: any[] = []
   const toolOutcomes: ToolOutcome[] = []
+  let presentation: BusinessScenarioPresentation | null = null
   let finalAction: any = null
   let iterations = 0
 
@@ -618,6 +634,7 @@ async function runAgentTurn(opts: {
         },
         pendingExternal: null,
         toolOutcomes,
+        presentation,
         usage,
       }
     }
@@ -642,6 +659,7 @@ async function runAgentTurn(opts: {
           handoff: null,
           pendingExternal: { toolName: gatedBlock.name, toolInput: gatedBlock.input || {} },
           toolOutcomes,
+          presentation,
           usage,
         }
       }
@@ -670,6 +688,10 @@ async function runAgentTurn(opts: {
           }
         }
         const r: any = await executeSharedTool(block.name, block.input || {}, opts.supabase, opts.businessId, opts.toolContext as any)
+        if (block.name === 'simulate_business_scenario') {
+          const candidate = { kind: 'business_scenario', scenario: r?.data }
+          if (isBusinessScenarioPresentation(candidate)) presentation = candidate
+        }
         // Epic 2: bokför utfallet som routern rapporterade det. Ett verktyg
         // som la något i godkännandekön är INTE verkställt — den skillnaden
         // är hela poängen med statusen längre upp.
@@ -706,7 +728,7 @@ async function runAgentTurn(opts: {
     .join('\n')
     .trim()
 
-  return { text: finalText, action: finalAction, handoff: null, pendingExternal: null, toolOutcomes, usage }
+  return { text: finalText, action: finalAction, handoff: null, pendingExternal: null, toolOutcomes, presentation, usage }
 }
 
 /**
@@ -800,8 +822,8 @@ export async function POST(request: NextRequest) {
     const businessId = business.business_id
     // Optionella thread-params — bakåtkompat: utan dessa beter sig endpoint
     // som tidigare (Matte tar varje meddelande, ingen thread skapas).
-    const customerId: string | null = context?.customerId || null
-    const projectId: string | null = context?.projectId || null
+    const customerId: string | null = safeContextId(context?.customerId)
+    const projectId: string | null = safeContextId(context?.projectId)
     const explicitThreadId: string | null = context?.threadId || null
 
     // ── Bilder: normalisera + validera ─────────────────────────────────
@@ -1005,6 +1027,7 @@ export async function POST(request: NextRequest) {
       is_handoff_announcement?: boolean
       /** Epic 3: statusen UI:t visar. Sätts bara där orkestreringen härlett en. */
       status?: AgentResult['status']
+      presentation?: BusinessScenarioPresentation
     }> = []
     let finalAction: any = null
     let outerMessages = initialMessages
@@ -1073,6 +1096,22 @@ export async function POST(request: NextRequest) {
         },
         { type: 'text', text: contextSection },
       ]
+      // Sidkontexten är referensen bakom ”det här projektet/offerten”. Den
+      // bär bara ID:n; alla verktygsuppslag gör fortfarande sin egen
+      // business_id-kontroll. Utan blocket hade klienten skickat projectId
+      // men modellen aldrig sett det — demo-frågan hade då behövt gissa.
+      const pageRefs = [
+        projectId ? `project_id: ${projectId}` : null,
+        customerId ? `customer_id: ${customerId}` : null,
+        safeContextId(context?.quoteId) ? `quote_id: ${safeContextId(context?.quoteId)}` : null,
+        safeContextId(context?.invoiceId) ? `invoice_id: ${safeContextId(context?.invoiceId)}` : null,
+      ].filter(Boolean)
+      if (pageRefs.length > 0) {
+        systemArray.push({
+          type: 'text',
+          text: `AKTUELL PRODUKTVY (använd vid ”den här”):\n${pageRefs.join('\n')}\nID:t är en referens, inte ett tenantbevis; verktyget måste fortfarande verifiera ägarskap.`,
+        })
+      }
       // Inkludera summary av äldre meddelanden om token-budgeten översteg
       if (historySummary) {
         systemArray.push({
@@ -1108,13 +1147,14 @@ export async function POST(request: NextRequest) {
       // text den redan sa (t.ex. "Visst, skickar nu...") och returnera direkt
       // — inget verktyg har körts, inget mer sker förrän klienten bekräftar.
       if (turn.pendingExternal) {
-        if (turn.text && thread) {
+        if ((turn.text || turn.presentation) && thread) {
           saveThreadMessage({
             threadId: thread.id,
             businessId,
             role: 'assistant',
             agent: currentAgent,
-            content: turn.text,
+            content: turn.text || 'Här är scenariot.',
+            ...(turn.presentation ? { metadata: { presentation: turn.presentation } } : {}),
           }).catch(() => {})
         }
         if (thread) touchThread(thread.id).catch(() => {})
@@ -1131,7 +1171,7 @@ export async function POST(request: NextRequest) {
         await bokforMatteUsage(`matte_${thread?.id || businessId}_${Date.now()}`)
 
         return NextResponse.json({
-          messages: turn.text ? [{ agent: currentAgent, content: turn.text }] : [],
+          messages: (turn.text || turn.presentation) ? [{ agent: currentAgent, content: turn.text || 'Här är scenariot.', ...(turn.presentation ? { presentation: turn.presentation } : {}) }] : [],
           current_agent: currentAgent,
           thread_id: thread?.id || null,
           reply: turn.text || summary,
@@ -1156,8 +1196,9 @@ export async function POST(request: NextRequest) {
 
       if (!turn.handoff || !plan?.ok) {
         // Klart: lägg sista textsvaret om det finns
-        if (turn.text) {
-          responseMessages.push({ agent: currentAgent, content: turn.text })
+        if (turn.text || turn.presentation) {
+          const content = turn.text || 'Här är scenariot.'
+          responseMessages.push({ agent: currentAgent, content, ...(turn.presentation ? { presentation: turn.presentation } : {}) })
           // Persistera assistant-svar (non-blocking)
           if (thread) {
             saveThreadMessage({
@@ -1165,7 +1206,8 @@ export async function POST(request: NextRequest) {
               businessId,
               role: 'assistant',
               agent: currentAgent,
-              content: turn.text,
+              content,
+              ...(turn.presentation ? { metadata: { presentation: turn.presentation } } : {}),
             }).catch(() => {})
           }
         }
@@ -1184,7 +1226,7 @@ export async function POST(request: NextRequest) {
           thread = await getOrCreateThread({ businessId, customerId, projectId })
         } catch { /* om vi inte kan skapa, vägra handoff men returnera textsvar */ }
         if (!thread) {
-          if (turn.text) responseMessages.push({ agent: currentAgent, content: turn.text })
+          if (turn.text || turn.presentation) responseMessages.push({ agent: currentAgent, content: turn.text || 'Här är scenariot.', ...(turn.presentation ? { presentation: turn.presentation } : {}) })
           break
         }
       }
@@ -1199,7 +1241,7 @@ export async function POST(request: NextRequest) {
 
       if (!result.ok) {
         // Refused (max-loop, not_allowed, etc.) — stanna kvar hos current agent
-        if (turn.text) responseMessages.push({ agent: currentAgent, content: turn.text })
+        if (turn.text || turn.presentation) responseMessages.push({ agent: currentAgent, content: turn.text || 'Här är scenariot.', ...(turn.presentation ? { presentation: turn.presentation } : {}) })
         if (result.refused_reason === 'max_handoffs_reached') {
           responseMessages.push({
             agent: currentAgent,
@@ -1218,6 +1260,7 @@ export async function POST(request: NextRequest) {
         agent: previousAgent,
         content: announcementContent,
         is_handoff_announcement: true,
+        ...(turn.presentation ? { presentation: turn.presentation } : {}),
       })
       // Persistera handoff-announcement med flag (skippas i Claude messages-
       // historik nästa gång, men UI kan hämta dem för audit)
@@ -1229,7 +1272,11 @@ export async function POST(request: NextRequest) {
           agent: previousAgent,
           content: announcementContent,
           isHandoffAnnouncement: true,
-          metadata: { to_agent: result.current_agent, reason: turn.handoff.reason },
+          metadata: {
+            to_agent: result.current_agent,
+            reason: turn.handoff.reason,
+            ...(turn.presentation ? { presentation: turn.presentation } : {}),
+          },
         }).catch(() => {})
       }
 

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { ArrowRight } from 'lucide-react'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
+import { BusinessScenarioCard } from '@/components/agents/BusinessScenarioCard'
 import { fromChatMessage, statusLabel, type ChatMessageLike } from '@/lib/agents/interaction'
 
 /**
@@ -90,6 +91,9 @@ export function AgentMessage({
             <StatusChip status={interaction.status} label={status} />
           )}
         </div>
+        {interaction.presentation?.kind === 'business_scenario' && (
+          <BusinessScenarioCard scenario={interaction.presentation.scenario} />
+        )}
         {children}
         {timestamp && <Tidsstämpel iso={timestamp} />}
       </div>

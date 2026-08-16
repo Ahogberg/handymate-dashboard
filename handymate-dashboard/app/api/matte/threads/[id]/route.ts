@@ -31,12 +31,17 @@ export async function GET(
 
   const { data: messages } = await supabase
     .from('thread_message')
-    .select('id, role, agent, content, is_handoff_announcement, created_at')
+    .select('id, role, agent, content, is_handoff_announcement, metadata, created_at')
     .eq('thread_id', id)
     .eq('business_id', business.business_id)
     .order('created_at', { ascending: true })
 
-  return NextResponse.json({ messages: messages || [] })
+  return NextResponse.json({
+    messages: (messages || []).map(message => ({
+      ...message,
+      presentation: (message.metadata as Record<string, unknown> | null)?.presentation,
+    })),
+  })
 }
 
 /**

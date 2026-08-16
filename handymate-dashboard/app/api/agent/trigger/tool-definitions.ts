@@ -374,6 +374,28 @@ export const toolDefinitions = [
       required: ["project_id"],
     },
   },
+  {
+    name: "simulate_business_scenario",
+    description: "Kör ett LÄSANDE Business Twin-scenario med deterministisk matte på företagets riktiga data. Använd vid 'vad händer om'-frågor om projektmarginal, sena kundbetalningar eller omsättningstakt. Verktyget gör inga ändringar. Återge verktygets tal och antaganden; räkna aldrig om dem själv. För project_margin: skicka project_id när sidkontexten har det, annars project_name och låt verktyget stoppa vid tvetydighet.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        scenario_type: {
+          type: "string",
+          enum: ["project_margin", "cash_delay", "revenue_pace"],
+          description: "project_margin = extra tid/material/intäkt, cash_delay = kundbetalningar dröjer, revenue_pace = ytterligare fakturering mot årsmål",
+        },
+        project_id: { type: "string", description: "Projekt-ID från sidkontext eller säkert uppslag" },
+        project_name: { type: "string", description: "Projektets namn om ID saknas; tvetydighet stoppas" },
+        extra_hours: { type: "number", description: "Extra arbetstimmar i projektscenariot, default 0" },
+        material_cost_change_pct: { type: "number", description: "Förändring av materialets inköpskostnad i procent, default 0" },
+        additional_revenue_kr: { type: "number", description: "Förändrad projektintäkt i kronor, default 0" },
+        delay_days: { type: "number", description: "Antal dagar kundbetalningarna antas dröja" },
+        invoice_amount_kr: { type: "number", description: "Ytterligare belopp som antas faktureras i år" },
+      },
+      required: ["scenario_type"],
+    },
+  },
   // Business preferences
   {
     name: "update_business_preference",

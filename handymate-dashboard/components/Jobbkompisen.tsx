@@ -31,6 +31,7 @@ import { formatKr } from '@/lib/moments/derive'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { AgentMessage } from '@/components/agents/AgentMessage'
 import type { InteractionStatus } from '@/lib/agents/interaction'
+import type { BusinessScenarioPresentation } from '@/lib/business-twin/scenario-contract'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,7 @@ interface ChatMessage {
   is_handoff_announcement?: boolean
   /** Orkestreringens status på Mattes sammanfattning (Epic 2) — aldrig gissad i UI:t. */
   status?: InteractionStatus | null
+  presentation?: BusinessScenarioPresentation
 }
 
 /** Fas 0-säkerhetsräcke: kort som visas när Matte vill skicka något ut ur huset. */
@@ -207,12 +209,14 @@ export default function Jobbkompisen() {
             content: string
             is_handoff_announcement?: boolean
             status?: InteractionStatus | null
+            presentation?: BusinessScenarioPresentation
           }) => ({
             role: 'assistant' as const,
             content: m.content,
             agent: m.agent,
             is_handoff_announcement: m.is_handoff_announcement,
             status: m.status ?? null,
+            presentation: m.presentation,
           })),
         ])
       } else if (data.reply) {
@@ -254,12 +258,14 @@ export default function Jobbkompisen() {
             content: string
             is_handoff_announcement?: boolean
             status?: InteractionStatus | null
+            presentation?: BusinessScenarioPresentation
           }) => ({
             role: 'assistant' as const,
             content: m.content,
             agent: m.agent,
             is_handoff_announcement: m.is_handoff_announcement,
             status: m.status ?? null,
+            presentation: m.presentation,
           })),
         ])
       } else {

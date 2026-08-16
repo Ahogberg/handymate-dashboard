@@ -68,6 +68,7 @@ export function pageContextFromPathname(pathname: string | null | undefined): Ma
       quickActions: [
         'Hur ligger det här projektet mot kalkylen?',
         'Finns det arbete här som borde bli en ÄTA?',
+        'Vad händer med marginalen om jobbet tar 20 timmar extra och materialet blir 10 % dyrare?',
       ],
     }
   }
