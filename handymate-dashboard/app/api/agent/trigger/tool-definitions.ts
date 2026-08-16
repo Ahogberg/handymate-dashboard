@@ -497,7 +497,7 @@ export const toolDefinitions = [
   // Våg 2d (tasks/value-chain-plan.md) — enskild-projekt-efterkalkyl (job_completed-triggern)
   {
     name: "get_project_outcome",
-    description: "Hämta den frusna efterkalkylen (utfall vs offert) för ETT specifikt avslutat projekt: offererade/faktiska timmar, arbets- och materialkostnad, ÄTA-signerat, fakturerat, marginal och avvikelse i procent mot offerten. Skiljer sig från get_efterkalkyl_insight som är ett AGGREGAT över flera jobb av samma jobbtyp/mall — detta är enskild-projekt-nivå. Använd direkt efter att ett jobb avslutats för att bedöma om DET jobbet gick enligt plan.",
+    description: "Hämta den frusna efterkalkylen (utfall vs offert) för ETT specifikt avslutat projekt: offererade/faktiska timmar, kostnader, ÄTA, förväntad respektive realiserad intäkt/marginal samt kvalitetsflaggor. Använd realized_margin_* endast när financial_learning_eligible=true; margin_* är förväntad marginal mot budget och får inte beskrivas som faktiskt fakturerat utfall. Skiljer sig från get_efterkalkyl_insight som är ett AGGREGAT över flera jobb av samma jobbtyp/mall.",
     input_schema: {
       type: "object" as const,
       properties: {

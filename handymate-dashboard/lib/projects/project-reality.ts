@@ -51,11 +51,16 @@ export async function deriveProjectReality(
     return null
   }
 
-  const { data: invoiceRows } = await supabase
+  const { data: invoiceRows, error: invoiceError } = await supabase
     .from('invoice')
     .select('status')
     .eq('business_id', businessId)
     .eq('project_id', projectId)
+
+  if (invoiceError) {
+    console.error('[project-reality] invoice read failed', { projectId, businessId, error: invoiceError })
+    throw new Error(`Projektets fakturastatus kunde inte härledas: ${invoiceError.message}`)
+  }
 
   const economics = await computeProjectEconomics(supabase, projectId, businessId)
   if (!economics) return null

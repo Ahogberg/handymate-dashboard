@@ -103,6 +103,32 @@ fullsvit-körning) innan gemensam push. Vercel-deploy pollad till `Ready`,
 
 ---
 
+# Outcome Quality Gate V1 — pålitlig inlärning från avslutade jobb (2026-08-16)
+
+Källa: Andreas “Kör!” efter verifiering mot roadmapens X2. Codex äger
+ekonomi-/utfalls-/inlärningslagret. Claudes produktregister, X2d:s framtida
+materialdubblettbeslut och det separat loggade `price_adjustment`-felet rörs
+inte i den här leveransen.
+
+## Plan
+
+- [x] Gör `computeProjectEconomics` fail-closed för varje källtabell och
+  tenantfiltrera även medlemskostnader; ett läsfel får aldrig bli `0 kr`.
+- [x] Versionera `project_outcome` med offertkälla, källräknare,
+  fullständighetsflaggor och tydlig learning-eligibility i nästa lediga
+  manuella migration.
+- [x] Låt frysningen returnera ett strukturerat utfall och skriv aldrig en
+  partiell snapshot efter källfel.
+- [x] Centralisera idempotent avstämning av saknade/legacy-utfall och använd
+  samma väg från efterkalkylens konsumenter.
+- [x] Kvalitetsgrinda offertinsikt, jobbtypsaggregat och prisanalys: bara
+  jämförbara V2-rader och minst tre kvalificerade utfall får påverka råd.
+- [x] Facit för varje källfel, tenantfilter, metadata, reconciliation,
+  urvalsgrind och migrationskontrakt; därefter TypeScript, riktad svit,
+  produktionsbuild, roadmap och separat commit.
+
+---
+
 # TD-22 — kundportalens routes slutar svälja Supabase-fel tyst (2026-08-16)
 
 Källa: `tasks/tech-debt.md` TD-22, dokumenterad 2026-05-09. Andra

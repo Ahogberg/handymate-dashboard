@@ -70,6 +70,9 @@ function baseInput(overrides: Partial<BuildOutcomeRowInput> = {}): BuildOutcomeR
     jobType: 'badrum',
     templateId: null,
     closedAt: '2026-07-20T10:00:00.000Z',
+    frozenAt: '2026-07-20T10:00:01.000Z',
+    reconciledAt: null,
+    projectCompleted: true,
     economics: {
       kostnader: {
         arbete_kr: 26000,
@@ -94,11 +97,24 @@ function baseInput(overrides: Partial<BuildOutcomeRowInput> = {}): BuildOutcomeR
         ata_signerat_kr: 4000,
         ata_pending_kr: 0,
         fakturerat_kr: 90000,
+        fakturerat_ex_moms_kr: 72000,
         betalt_kr: 90000,
         forvantad_intakt_kr: 90000,
       },
+      meta: {
+        computed_at: '2026-07-20T10:00:00.500Z',
+        invoice_count: 1,
+        ata_count: 1,
+        time_entry_count: 4,
+        supplier_invoice_count: 1,
+        project_material_count: 0,
+        realized_invoice_count: 1,
+        invoice_net_amount_complete: true,
+        extra_cost_count: 0,
+      },
     } as BuildOutcomeRowInput['economics'],
     budget: {
+      source: 'quote_items_table',
       budget_hours: 40,
       budget_amount: 86000,
       labor_items: [
@@ -120,6 +136,12 @@ test.describe('buildProjectOutcomeRow', () => {
     expect(row.amount_diff_pct).toBe(-48.8) // 44 000 kostnad mot 86 000 offererat
     expect(row.margin_pct).toBe(48.8)
     expect(row.labor_cost_configured).toBe(true)
+    expect(row.calculation_version).toBe(2)
+    expect(row.time_learning_eligible).toBe(true)
+    expect(row.financial_learning_eligible).toBe(true)
+    expect(row.realized_revenue_kr).toBe(72000)
+    expect(row.realized_margin_kr).toBe(28000)
+    expect(row.realized_margin_pct).toBe(38.9)
   })
 
   test('utan kopplad offert (budget null) → alla quoted-fält och diffar null', () => {

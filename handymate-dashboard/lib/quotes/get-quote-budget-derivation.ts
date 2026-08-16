@@ -102,6 +102,10 @@ function isLaborByJsonbItem(j: QuoteJsonbItem): boolean {
   return LABOR_UNITS.has((j.unit || '').toLowerCase().trim())
 }
 
+function isTrueHourUnit(unit: string | null | undefined): boolean {
+  return LABOR_UNITS.has((unit || '').toLowerCase().trim())
+}
+
 function deriveProjectType(
   laborCount: number,
   materialCount: number,
@@ -121,14 +125,19 @@ export async function getQuoteBudgetDerivation(
   businessId: string,
 ): Promise<QuoteBudgetDerivation> {
   // ── 1. Försök quote_items-tabellen först ─────────────────────
-  const { data: tableData } = await supabase
+  const { data: tableData, error: tableError } = await supabase
     .from('quote_items')
     .select(
       'id, item_type, description, quantity, unit, unit_price, total, ' +
         'is_rot_eligible, is_rut_eligible, sort_order',
     )
     .eq('quote_id', quoteId)
+    .eq('business_id', businessId)
     .order('sort_order', { ascending: true })
+
+  if (tableError) {
+    throw new Error(`quote_items-uppslag misslyckades: ${tableError.message}`)
+  }
 
   const tableRows = (tableData || []) as unknown as QuoteItemTableRow[]
 
@@ -151,7 +160,9 @@ export async function getQuoteBudgetDerivation(
 
       if (isLabor) {
         laborCount += 1
-        laborHours += qty
+        // ROT/RUT-behörighet klassar raden som arbete men gör inte "2 st"
+        // till två timmar. Bara riktiga timenheter får påverka tidslärandet.
+        if (isTrueHourUnit(r.unit)) laborHours += qty
         laborItems.push({
           description: r.description || 'Arbete',
           quantity: qty,
@@ -173,12 +184,16 @@ export async function getQuoteBudgetDerivation(
   }
 
   // ── 2. Fallback: quote.items JSONB ───────────────────────────
-  const { data: quoteRow } = await supabase
+  const { data: quoteRow, error: quoteError } = await supabase
     .from('quotes')
     .select('items, total')
     .eq('quote_id', quoteId)
     .eq('business_id', businessId)
-    .single()
+    .maybeSingle()
+
+  if (quoteError) {
+    throw new Error(`quotes-uppslag misslyckades: ${quoteError.message}`)
+  }
 
   if (!quoteRow) {
     return {
@@ -213,7 +228,7 @@ export async function getQuoteBudgetDerivation(
 
       if (isLabor) {
         laborCount += 1
-        laborHours += qty
+        if (isTrueHourUnit(j.unit)) laborHours += qty
         laborItems.push({
           description: j.description || j.name || 'Arbete',
           quantity: qty,

@@ -20,12 +20,44 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { computeProjectEconomics, type ProjectEconomics } from '@/lib/projects/compute-economics'
+import {
+  computeProjectEconomics,
+  ProjectEconomicsSourceError,
+  type ProjectEconomics,
+} from '@/lib/projects/compute-economics'
 import {
   getQuoteBudgetDerivation,
   type QuoteBudgetDerivation,
+  type QuoteBudgetSource,
 } from '@/lib/quotes/get-quote-budget-derivation'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
+
+export const OUTCOME_CALCULATION_VERSION = 2
+
+export interface OutcomeSourceCounts {
+  ata: number
+  invoice: number
+  realized_invoice: number
+  time_entry: number
+  supplier_invoice: number
+  project_material: number
+  project_cost: number
+}
+
+export interface OutcomeCompletenessFlags {
+  project_completed: boolean
+  quote_linked: boolean
+  quote_budget_present: boolean
+  quote_hours_present: boolean
+  time_entries_present: boolean
+  cost_rows_present: boolean
+  material_source_overlap_free: boolean
+  labor_cost_complete: boolean
+  invoice_present: boolean
+  invoice_net_amount_complete: boolean
+  realized_revenue_present: boolean
+  source_reads_complete: true
+}
 
 // ─────────────────────────────────────────────────────────────────
 // Ren kärna — testbar utan Supabase (facit-tester i tests/efterkalkyl.spec.ts)
@@ -90,10 +122,25 @@ export interface ProjectOutcomeRow {
   invoiced_kr: number
   margin_kr: number | null
   margin_pct: number | null
+  expected_revenue_kr: number
+  realized_revenue_kr: number | null
+  realized_margin_kr: number | null
+  realized_margin_pct: number | null
   labor_cost_configured: boolean
 
   hours_diff_pct: number | null
   amount_diff_pct: number | null
+
+  calculation_version: number
+  quote_source_type: QuoteBudgetSource | 'none'
+  source_counts: OutcomeSourceCounts
+  completeness_flags: OutcomeCompletenessFlags
+  time_learning_eligible: boolean
+  financial_learning_eligible: boolean
+  learning_blockers: string[]
+  computed_at: string
+  frozen_at: string
+  reconciled_at: string | null
 
   closed_at: string
 }
@@ -105,12 +152,15 @@ export interface BuildOutcomeRowInput {
   jobType: string | null
   templateId: string | null
   closedAt: string
+  frozenAt: string
+  reconciledAt: string | null
+  projectCompleted: boolean
   /** Endast de delar av ProjectEconomics vi faktiskt använder — pure
       function, ingen DB-läsning. */
-  economics: Pick<ProjectEconomics, 'kostnader' | 'marginal' | 'intakter'>
+  economics: Pick<ProjectEconomics, 'kostnader' | 'marginal' | 'intakter' | 'meta'>
   /** Null om projektet saknar quote_id (ingen offert kopplad — ingen
       jämförelse möjlig, se ärlighetsprincipen). */
-  budget: Pick<QuoteBudgetDerivation, 'budget_hours' | 'budget_amount' | 'labor_items'> | null
+  budget: Pick<QuoteBudgetDerivation, 'source' | 'budget_hours' | 'budget_amount' | 'labor_items'> | null
 }
 
 /**
@@ -144,6 +194,78 @@ export function buildProjectOutcomeRow(input: BuildOutcomeRowInput): ProjectOutc
 
   const ataSignedKr = input.economics.intakter.ata_signerat_kr
   const invoicedKr = input.economics.intakter.fakturerat_kr
+  const realizedRevenueKr = input.economics.intakter.fakturerat_ex_moms_kr
+
+  const sourceCounts: OutcomeSourceCounts = {
+    ata: input.economics.meta.ata_count,
+    invoice: input.economics.meta.invoice_count,
+    realized_invoice: input.economics.meta.realized_invoice_count,
+    time_entry: input.economics.meta.time_entry_count,
+    supplier_invoice: input.economics.meta.supplier_invoice_count,
+    project_material: input.economics.meta.project_material_count,
+    project_cost: input.economics.meta.extra_cost_count,
+  }
+  const costRowsPresent =
+    sourceCounts.time_entry + sourceCounts.supplier_invoice +
+      sourceCounts.project_material + sourceCounts.project_cost > 0
+  // Supplierfakturor och manuella materialrader kan i dagens modell avse
+  // samma inköp. Tills X2d äger dedupliceringen får sådana projekt visas,
+  // men de får inte bli finansiell lärdata.
+  const materialSourceOverlapFree = !(
+    sourceCounts.supplier_invoice > 0 && sourceCounts.project_material > 0
+  )
+  const quoteSourceType = input.budget?.source ?? 'none'
+  const completenessFlags: OutcomeCompletenessFlags = {
+    project_completed: input.projectCompleted,
+    quote_linked: input.quoteId !== null,
+    quote_budget_present: Boolean(input.budget && input.budget.budget_amount && input.budget.budget_amount > 0),
+    quote_hours_present: Boolean(input.budget && input.budget.budget_hours && input.budget.budget_hours > 0),
+    time_entries_present: sourceCounts.time_entry > 0,
+    cost_rows_present: costRowsPresent,
+    material_source_overlap_free: materialSourceOverlapFree,
+    labor_cost_complete: laborCostConfigured,
+    invoice_present: sourceCounts.realized_invoice > 0,
+    invoice_net_amount_complete: input.economics.meta.invoice_net_amount_complete,
+    realized_revenue_present: realizedRevenueKr != null && realizedRevenueKr > 0,
+    source_reads_complete: true,
+  }
+  const timeLearningEligible =
+    completenessFlags.project_completed &&
+    completenessFlags.quote_linked &&
+    completenessFlags.quote_budget_present &&
+    completenessFlags.quote_hours_present &&
+    completenessFlags.time_entries_present
+  const financialLearningEligible =
+    completenessFlags.project_completed &&
+    completenessFlags.quote_linked &&
+    completenessFlags.quote_budget_present &&
+    completenessFlags.cost_rows_present &&
+    completenessFlags.material_source_overlap_free &&
+    completenessFlags.labor_cost_complete &&
+    completenessFlags.invoice_present &&
+    completenessFlags.invoice_net_amount_complete &&
+    completenessFlags.realized_revenue_present &&
+    totalActualKr !== null
+
+  const realizedMarginKr = financialLearningEligible && totalActualKr != null
+    ? Math.round((realizedRevenueKr as number) - totalActualKr)
+    : null
+  const realizedMarginPct = realizedMarginKr != null && realizedRevenueKr != null && realizedRevenueKr > 0
+    ? Math.round((realizedMarginKr / realizedRevenueKr) * 1000) / 10
+    : null
+
+  const learningBlockers: string[] = []
+  if (!completenessFlags.project_completed) learningBlockers.push('project_not_completed')
+  if (!completenessFlags.quote_linked) learningBlockers.push('quote_not_linked')
+  else if (!completenessFlags.quote_budget_present) learningBlockers.push('quote_budget_missing')
+  if (!completenessFlags.quote_hours_present) learningBlockers.push('quoted_hours_missing')
+  if (!completenessFlags.time_entries_present) learningBlockers.push('time_entries_missing')
+  if (!completenessFlags.cost_rows_present) learningBlockers.push('cost_rows_missing')
+  if (!completenessFlags.material_source_overlap_free) learningBlockers.push('material_source_overlap_unresolved')
+  if (!completenessFlags.labor_cost_complete) learningBlockers.push('labor_cost_incomplete')
+  if (!completenessFlags.invoice_present) learningBlockers.push('invoice_missing')
+  else if (!completenessFlags.invoice_net_amount_complete) learningBlockers.push('invoice_net_amount_incomplete')
+  else if (!completenessFlags.realized_revenue_present) learningBlockers.push('realized_revenue_missing')
 
   const { hours_diff_pct, amount_diff_pct } = computeOutcomeDiffs({
     quotedHours,
@@ -175,10 +297,25 @@ export function buildProjectOutcomeRow(input: BuildOutcomeRowInput): ProjectOutc
     invoiced_kr: invoicedKr,
     margin_kr: marginKr,
     margin_pct: marginPct,
+    expected_revenue_kr: input.economics.intakter.forvantad_intakt_kr,
+    realized_revenue_kr: realizedRevenueKr,
+    realized_margin_kr: realizedMarginKr,
+    realized_margin_pct: realizedMarginPct,
     labor_cost_configured: laborCostConfigured,
 
     hours_diff_pct,
     amount_diff_pct,
+
+    calculation_version: OUTCOME_CALCULATION_VERSION,
+    quote_source_type: quoteSourceType,
+    source_counts: sourceCounts,
+    completeness_flags: completenessFlags,
+    time_learning_eligible: timeLearningEligible,
+    financial_learning_eligible: financialLearningEligible,
+    learning_blockers: learningBlockers,
+    computed_at: input.economics.meta.computed_at,
+    frozen_at: input.frozenAt,
+    reconciled_at: input.reconciledAt,
 
     closed_at: input.closedAt,
   }
@@ -194,9 +331,10 @@ interface ProjectRowForFreeze {
   status: string | null
   quote_id: string | null
   job_type: string | null
+  completed_at: string | null
 }
 
-/** Loggas bara en gång per körande process — v73-migrationen körs manuellt
+/** Loggas bara en gång per körande process — migrationerna körs manuellt
     av Andreas, ingen anledning att spamma loggen vid varje projektstängning
     innan den är körd. */
 let missingTableWarned = false
@@ -205,6 +343,47 @@ function isMissingTableError(error: { code?: string; message?: string } | null |
   if (!error) return false
   // Postgres undefined_table, eller PostgREST-felmeddelandet för samma sak.
   return error.code === '42P01' || /relation .* does not exist/i.test(error.message || '')
+}
+
+function isMissingQualitySchemaError(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false
+  return isMissingTableError(error) || error.code === '42703' || error.code === 'PGRST204'
+}
+
+export type FreezeOutcomeFailureCode =
+  | 'project_not_found'
+  | 'project_not_completed'
+  | 'completion_timestamp_missing'
+  | 'source_read_failed'
+  | 'quote_read_failed'
+  | 'schema_missing'
+  | 'upsert_failed'
+  | 'unexpected'
+
+export type FreezeOutcomeResult =
+  | { ok: true; row: ProjectOutcomeRow }
+  | { ok: false; code: FreezeOutcomeFailureCode; message: string }
+
+async function freezeFailure(
+  supabase: SupabaseClient,
+  businessId: string,
+  projectId: string,
+  code: FreezeOutcomeFailureCode,
+  message: string,
+): Promise<FreezeOutcomeResult> {
+  console.error('[freeze-outcome] frysning misslyckades', { projectId, code, message })
+  try {
+    await rapporteraTystFel(
+      supabase,
+      businessId,
+      `freeze-outcome:${code}`,
+      message,
+      { projectId },
+    )
+  } catch (reportError) {
+    console.error('[freeze-outcome] driftlarmet kunde inte sparas', { projectId, code, reportError })
+  }
+  return { ok: false, code, message }
 }
 
 /**
@@ -217,44 +396,53 @@ export async function freezeProjectOutcome(
   supabase: SupabaseClient,
   businessId: string,
   projectId: string,
-): Promise<void> {
+  options: { reconciliation?: boolean; now?: Date } = {},
+): Promise<FreezeOutcomeResult> {
   try {
     const { data: projectRow, error: projectErr } = await supabase
       .from('project')
-      .select('project_id, business_id, status, quote_id, job_type')
+      .select('project_id, business_id, status, quote_id, job_type, completed_at')
       .eq('project_id', projectId)
       .eq('business_id', businessId)
-      .single()
+      .maybeSingle()
 
     if (projectErr || !projectRow) {
-      console.error('[freeze-outcome] projekt hittades inte, skippar frysning', {
-        projectId,
-        businessId,
-        error: projectErr,
-      })
-      await rapporteraTystFel(
+      return freezeFailure(
         supabase,
         businessId,
-        'freeze-outcome:project-not-found',
+        projectId,
+        'project_not_found',
         projectErr?.message || 'projekt hittades inte',
-        { projectId },
       )
-      return
     }
 
     const project = projectRow as ProjectRowForFreeze
+    if (project.status !== 'completed') {
+      return {
+        ok: false,
+        code: 'project_not_completed',
+        message: 'Projektet är inte avslutat och får inte bli träningsdata.',
+      }
+    }
+    if (!project.completed_at) {
+      return freezeFailure(
+        supabase,
+        businessId,
+        projectId,
+        'completion_timestamp_missing',
+        'Projektet saknar completed_at och får inte få ett påhittat stängningsdatum.',
+      )
+    }
 
     const economics = await computeProjectEconomics(supabase, projectId, businessId)
     if (!economics) {
-      console.error('[freeze-outcome] computeProjectEconomics gav null, skippar frysning', { projectId })
-      await rapporteraTystFel(
+      return freezeFailure(
         supabase,
         businessId,
-        'freeze-outcome:no-economics',
+        projectId,
+        'source_read_failed',
         'computeProjectEconomics gav null',
-        { projectId },
       )
-      return
     }
 
     let quoteId: string | null = project.quote_id || null
@@ -263,14 +451,34 @@ export async function freezeProjectOutcome(
     let budget: QuoteBudgetDerivation | null = null
 
     if (quoteId) {
-      budget = await getQuoteBudgetDerivation(supabase, quoteId, businessId)
+      try {
+        budget = await getQuoteBudgetDerivation(supabase, quoteId, businessId)
+      } catch (quoteBudgetError) {
+        return freezeFailure(
+          supabase,
+          businessId,
+          projectId,
+          'quote_read_failed',
+          quoteBudgetError instanceof Error ? quoteBudgetError.message : String(quoteBudgetError),
+        )
+      }
 
-      const { data: quoteRow } = await supabase
+      const { data: quoteRow, error: quoteError } = await supabase
         .from('quotes')
         .select('template_id, job_type')
         .eq('quote_id', quoteId)
         .eq('business_id', businessId)
         .maybeSingle()
+
+      if (quoteError) {
+        return freezeFailure(
+          supabase,
+          businessId,
+          projectId,
+          'quote_read_failed',
+          quoteError.message,
+        )
+      }
 
       if (quoteRow) {
         templateId = (quoteRow as { template_id: string | null }).template_id || null
@@ -280,13 +488,18 @@ export async function freezeProjectOutcome(
       }
     }
 
+    const nowIso = (options.now ?? new Date()).toISOString()
+
     const row = buildProjectOutcomeRow({
       projectId,
       businessId,
       quoteId,
       jobType,
       templateId,
-      closedAt: new Date().toISOString(),
+      closedAt: project.completed_at,
+      frozenAt: nowIso,
+      reconciledAt: options.reconciliation ? nowIso : null,
+      projectCompleted: true,
       economics,
       budget,
     })
@@ -296,33 +509,41 @@ export async function freezeProjectOutcome(
       .upsert(row, { onConflict: 'project_id' })
 
     if (upsertErr) {
-      if (isMissingTableError(upsertErr)) {
-        // Väntat innan v73 körts (se filhuvudet) — larma inte driftlarmet
+      if (isMissingQualitySchemaError(upsertErr)) {
+        // Väntat innan kvalitetsschemat körts — larma inte driftlarmet
         // för ett känt, väntat tillstånd. Samma konvention som arSchemaSaknas
         // i lib/observability/driftlarm.ts.
         if (!missingTableWarned) {
           missingTableWarned = true
           console.error(
-            '[freeze-outcome] project_outcome-tabellen saknas (kör sql/v73_efterkalkyl.sql) — skippar frysning tyst tills vidare',
+            '[freeze-outcome] kvalitetsschemat saknas (kör först v73 och därefter sql/v138_outcome_quality_gate.sql) — skippar frysning tills vidare',
             upsertErr,
           )
         }
-        return
+        return {
+          ok: false,
+          code: 'schema_missing',
+          message: 'Kör sql/v138_outcome_quality_gate.sql manuellt före aktivering.',
+        }
       }
-      console.error('[freeze-outcome] upsert misslyckades, skippar frysning', { projectId, error: upsertErr })
-      await rapporteraTystFel(supabase, businessId, 'freeze-outcome:upsert', upsertErr.message, { projectId })
-      return
+      return freezeFailure(
+        supabase,
+        businessId,
+        projectId,
+        'upsert_failed',
+        upsertErr.message,
+      )
     }
+    return { ok: true, row }
   } catch (err) {
     // Absolut sista skyddsnät — freezeProjectOutcome får ALDRIG fälla
     // anroparen (projektstängning/autofakturering har redan körts).
-    console.error('[freeze-outcome] oväntat fel (fail-safe, ignoreras)', { projectId, businessId, error: err })
-    await rapporteraTystFel(
+    return freezeFailure(
       supabase,
       businessId,
-      'freeze-outcome:unexpected',
+      projectId,
+      err instanceof ProjectEconomicsSourceError ? 'source_read_failed' : 'unexpected',
       err instanceof Error ? err.message : String(err),
-      { projectId },
     )
   }
 }

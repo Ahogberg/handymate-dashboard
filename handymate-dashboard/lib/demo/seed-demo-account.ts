@@ -1481,8 +1481,15 @@ export async function resetDemoAccount(
   // Riktiga freezeProjectOutcome + skapaDebriefKort — SAMMA två anrop som
   // BÅDA produktionsvägarna gör (app/api/projects/route.ts PUT,
   // app/api/booking/complete-job/route.ts) direkt efter att ett projekt
-  // stängs. Båda fail-safe i sig själva — ingen extra try/catch krävs.
-  await freezeProjectOutcome(supabase, businessId, johanProject.project_id)
+  // stängs. Resultatet måste kontrolleras: en demo får aldrig påstå att
+  // lärloopen fungerar om den aktuella frysningen faktiskt misslyckades.
+  const johanFreeze = await freezeProjectOutcome(supabase, businessId, johanProject.project_id)
+  if (!johanFreeze.ok) {
+    return failReset(
+      `Kunde inte frysa efterkalkyl (${johanFreeze.code}): ${johanFreeze.message}`,
+      'project_outcome_freeze_failed',
+    )
+  }
   const johanOutcome = await getProjectOutcome(supabase, businessId, johanProject.project_id)
   await skapaDebriefKort(supabase, businessId, {
     project_id: johanProject.project_id,

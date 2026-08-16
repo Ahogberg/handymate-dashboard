@@ -36,6 +36,7 @@ interface ProjectEconomics {
     ata_signerat_kr: number
     ata_pending_kr: number
     fakturerat_kr: number
+    fakturerat_ex_moms_kr: number | null
     betalt_kr: number
     forvantad_intakt_kr: number
   }
@@ -63,6 +64,9 @@ interface ProjectEconomics {
     ata_count: number
     time_entry_count: number
     supplier_invoice_count: number
+    project_material_count: number
+    realized_invoice_count: number
+    invoice_net_amount_complete: boolean
     extra_cost_count: number
   }
   // Lokal duplicat av lib/projects/compute-economics.ts ProjectEconomics

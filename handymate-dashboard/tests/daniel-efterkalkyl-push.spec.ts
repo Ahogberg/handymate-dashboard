@@ -30,8 +30,20 @@ function outcomeRow(
   jobType: string | null,
   hoursDiffPct: number | null,
   amountDiffPct: number | null = null,
+  quality: {
+    calculationVersion?: number | null
+    timeEligible?: boolean
+    financialEligible?: boolean
+  } = {},
 ) {
-  return { job_type: jobType, hours_diff_pct: hoursDiffPct, amount_diff_pct: amountDiffPct }
+  return {
+    job_type: jobType,
+    calculation_version: quality.calculationVersion ?? 2,
+    time_learning_eligible: quality.timeEligible ?? true,
+    financial_learning_eligible: quality.financialEligible ?? true,
+    hours_diff_pct: hoursDiffPct,
+    amount_diff_pct: amountDiffPct,
+  }
 }
 
 test.describe('aggregateOutcomesByJobType — ärlighetströskel (MIN_SAMPLE_SIZE=3)', () => {
@@ -96,14 +108,29 @@ test.describe('aggregateOutcomesByJobType — ärlighetströskel (MIN_SAMPLE_SIZ
     expect(result[0].avg_amount_diff_pct).toBeNull()
   })
 
-  test('amount_diff_pct beräknas bara från raderna som faktiskt har den satt', () => {
+  test('amount_diff_pct kräver tre finansiellt kvalificerade rader', () => {
     const rows = [
       outcomeRow('badrum', 10, 5),
       outcomeRow('badrum', 20, 15),
       outcomeRow('badrum', 30, null), // saknar belopp — utelämnas ur belopps-snittet
     ]
     const result = aggregateOutcomesByJobType(rows)
-    expect(result[0].avg_amount_diff_pct).toBe(10.0) // (5+15)/2
+    expect(result[0].avg_amount_diff_pct).toBeNull()
+  })
+
+  test('legacy och kvalitetsblockerade rader blir aldrig lärdata', () => {
+    const rows = [
+      outcomeRow('badrum', 10, 5),
+      outcomeRow('badrum', 20, 15),
+      outcomeRow('badrum', 30, 25),
+      outcomeRow('badrum', 999, 999, { calculationVersion: 1 }),
+      outcomeRow('badrum', 999, 999, { timeEligible: false }),
+    ]
+    const result = aggregateOutcomesByJobType(rows)
+    expect(result[0].count).toBe(3)
+    expect(result[0].financial_count).toBe(3)
+    expect(result[0].avg_hours_diff_pct).toBe(20)
+    expect(result[0].avg_amount_diff_pct).toBe(15)
   })
 
   test('flera jobbtyper: sorteras efter störst absolut avvikelse först', () => {

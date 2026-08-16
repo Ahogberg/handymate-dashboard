@@ -29,6 +29,10 @@ interface ProjectOutcome {
   actual_hours: number
   margin_kr: number | null
   margin_pct: number | null
+  realized_margin_kr: number | null
+  realized_margin_pct: number | null
+  financial_learning_eligible: boolean
+  learning_blockers: string[]
   labor_cost_configured: boolean
   hours_diff_pct: number | null
   amount_diff_pct: number | null
@@ -168,9 +172,20 @@ export function EfterkalkylCard({ projectId }: EfterkalkylCardProps) {
               </div>
               <p className="text-xs text-slate-500 mt-1 tabular-nums">
                 {outcome.quoted_amount != null ? `Offererat ${formatKr(outcome.quoted_amount)} · ` : ''}
-                Marginal {formatKr(outcome.margin_kr)}
-                {outcome.margin_pct != null ? ` (${outcome.margin_pct}%)` : ''}
+                {outcome.financial_learning_eligible
+                  ? `Realiserad marginal ${formatKr(outcome.realized_margin_kr)}`
+                  : `Förväntad marginal ${formatKr(outcome.margin_kr)}`}
+                {outcome.financial_learning_eligible && outcome.realized_margin_pct != null
+                  ? ` (${outcome.realized_margin_pct}%)`
+                  : !outcome.financial_learning_eligible && outcome.margin_pct != null
+                    ? ` (${outcome.margin_pct}%)`
+                    : ''}
               </p>
+              {!outcome.financial_learning_eligible && (
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Realiserad marginal visas först när utfärdad faktura och kostnadsunderlag är kompletta.
+                </p>
+              )}
               {expectedMargin?.margin_pct != null && (
                 <p className="text-xs text-slate-400 mt-0.5 tabular-nums">
                   Förväntad vid accept: {expectedMargin.margin_pct}%

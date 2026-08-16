@@ -45,6 +45,9 @@ export interface ProjectEconomics {
     ata_signerat_kr: number  // signed/invoiced project_change-tillägg
     ata_pending_kr: number  // skickade men ej signerade ÄTAs
     fakturerat_kr: number  // sum(invoice.total) för detta projekt
+    /** Utfärdad fakturering exklusive moms. Null om någon relevant faktura
+        saknar subtotal — används av lärloopen, aldrig total inkl. moms. */
+    fakturerat_ex_moms_kr: number | null
     betalt_kr: number  // sum(invoice.total WHERE status='paid')
     /** Aktuell intäktsförväntning = budget + signerade ÄTA. */
     forvantad_intakt_kr: number
@@ -100,6 +103,9 @@ export interface ProjectEconomics {
     ata_count: number
     time_entry_count: number
     supplier_invoice_count: number
+    project_material_count: number
+    realized_invoice_count: number
+    invoice_net_amount_complete: boolean
     extra_cost_count: number  // antal project_cost-rader
   }
 
@@ -152,6 +158,7 @@ interface ProjectChangeRow {
 }
 
 interface InvoiceRow {
+  subtotal: number | null
   total: number | null
   status: string | null
 }
@@ -180,6 +187,35 @@ interface BusinessUserCost {
 
 interface BusinessConfigCost {
   default_internal_hourly_cost: number | null
+}
+
+export type ProjectEconomicsSource =
+  | 'project'
+  | 'project_change'
+  | 'invoice'
+  | 'time_entry'
+  | 'business_users'
+  | 'business_config'
+  | 'supplier_invoices'
+  | 'project_material'
+  | 'project_cost'
+
+/** Ett källfel får aldrig degraderas till en tom lista eller 0 kr. */
+export class ProjectEconomicsSourceError extends Error {
+  constructor(
+    public readonly source: ProjectEconomicsSource,
+    cause: { message?: string; code?: string } | null | undefined,
+  ) {
+    super(`${source}-uppslag misslyckades: ${cause?.message || 'okänt databasfel'}`)
+    this.name = 'ProjectEconomicsSourceError'
+  }
+}
+
+function assertSourceRead(
+  source: ProjectEconomicsSource,
+  error: { message?: string; code?: string } | null | undefined,
+): void {
+  if (error) throw new ProjectEconomicsSourceError(source, error)
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -223,20 +259,20 @@ export async function computeProjectEconomics(
     .select('project_id, business_id, status, budget_amount, budget_hours')
     .eq('project_id', projectId)
     .eq('business_id', businessId)
-    .single()
+    .maybeSingle()
 
-  if (projectError || !projectRow) {
-    console.warn('[compute-economics] project not found', { projectId, businessId, error: projectError })
-    return null
-  }
+  assertSourceRead('project', projectError)
+  if (!projectRow) return null
   const project = projectRow as ProjectRow
 
   // ── 2. ÄTA (project_change) ──────────────────────────────────
-  const { data: changesData } = await supabase
+  const { data: changesData, error: changesError } = await supabase
     .from('project_change')
     .select('amount, status, signed_at, sent_at, declined_at')
     .eq('business_id', businessId)
     .eq('project_id', projectId)
+
+  assertSourceRead('project_change', changesError)
 
   const changes = (changesData || []) as ProjectChangeRow[]
   let ataSigneratKr = 0
@@ -253,27 +289,42 @@ export async function computeProjectEconomics(
   }
 
   // ── 3. Invoices (v52: WHERE project_id) ──────────────────────
-  const { data: invoicesData } = await supabase
+  const { data: invoicesData, error: invoicesError } = await supabase
     .from('invoice')
-    .select('total, status')
+    .select('subtotal, total, status')
     .eq('business_id', businessId)
     .eq('project_id', projectId)
 
+  assertSourceRead('invoice', invoicesError)
+
   const invoices = (invoicesData || []) as InvoiceRow[]
   let fakturerat = 0
+  let faktureratExMoms = 0
   let betalt = 0
+  let invoiceNetAmountComplete = true
+  let realizedInvoiceCount = 0
   for (const inv of invoices) {
     const v = Number(inv.total || 0)
     fakturerat += v
     if (inv.status === 'paid') betalt += v
+    // Utkast är ännu inte en realiserad intäkt. Makulerade/krediterade
+    // original ska inte heller träna marginalen. En eventuell kreditnota
+    // representeras av sin egen negativa subtotal när den är utfärdad.
+    if (['sent', 'overdue', 'paid'].includes(inv.status || '')) {
+      realizedInvoiceCount += 1
+      if (inv.subtotal == null) invoiceNetAmountComplete = false
+      else faktureratExMoms += Number(inv.subtotal)
+    }
   }
 
   // ── 4. Time entries + intern kostnad ─────────────────────────
-  const { data: timeData } = await supabase
+  const { data: timeData, error: timeError } = await supabase
     .from('time_entry')
     .select('duration_minutes, business_user_id, hourly_rate, is_billable')
     .eq('business_id', businessId)
     .eq('project_id', projectId)
+
+  assertSourceRead('time_entry', timeError)
 
   const timeEntries = (timeData || []) as TimeEntryRow[]
 
@@ -284,10 +335,13 @@ export async function computeProjectEconomics(
 
   const memberCostMap = new Map<string, number | null>()
   if (uniqueUserIds.length > 0) {
-    const { data: usersData } = await supabase
+    const { data: usersData, error: usersError } = await supabase
       .from('business_users')
       .select('id, internal_hourly_cost')
+      .eq('business_id', businessId)
       .in('id', uniqueUserIds)
+
+    assertSourceRead('business_users', usersError)
 
     for (const u of (usersData || []) as BusinessUserCost[]) {
       memberCostMap.set(u.id, u.internal_hourly_cost)
@@ -295,11 +349,12 @@ export async function computeProjectEconomics(
   }
 
   // Business default
-  const { data: configData } = await supabase
+  const { data: configData, error: configError } = await supabase
     .from('business_config')
     .select('default_internal_hourly_cost')
     .eq('business_id', businessId)
-    .single()
+    .maybeSingle()
+  assertSourceRead('business_config', configError)
   const defaultCost = ((configData || null) as BusinessConfigCost | null)?.default_internal_hourly_cost ?? null
 
   let arbeteKr = 0
@@ -327,11 +382,13 @@ export async function computeProjectEconomics(
   const arbeteKrFinal = arbetskostnadKonfigurerad ? arbeteKr : null
 
   // ── 5. Supplier invoices (material-inköp) ────────────────────
-  const { data: supplierData } = await supabase
+  const { data: supplierData, error: supplierError } = await supabase
     .from('supplier_invoices')
     .select('total_amount, billable_to_customer')
     .eq('business_id', businessId)
     .eq('project_id', projectId)
+
+  assertSourceRead('supplier_invoices', supplierError)
 
   const supplierInvoices = (supplierData || []) as SupplierInvoiceRow[]
   let materialInkop = 0
@@ -345,11 +402,12 @@ export async function computeProjectEconomics(
   // Material registrerat via materials-UI (project_material) — saknades helt i
   // marginalberäkningen förut (bara supplier_invoices räknades) → material_inkop
   // blev 0 och marginalen uppblåst. Inköp = total_purchase, fakturerbart = total_sell.
-  const { data: projectMaterials } = await supabase
+  const { data: projectMaterials, error: projectMaterialsError } = await supabase
     .from('project_material')
     .select('total_purchase, total_sell')
     .eq('business_id', businessId)
     .eq('project_id', projectId)
+  assertSourceRead('project_material', projectMaterialsError)
   for (const m of (projectMaterials || []) as Array<{ total_purchase: number | null; total_sell: number | null }>) {
     materialInkop += Number(m.total_purchase || 0)
     materialBillable += Number(m.total_sell || 0)
@@ -359,11 +417,13 @@ export async function computeProjectEconomics(
   // project_cost (sql/easoft_parity.sql:48) — användarinmatade kostnader
   // utöver tid och leverantörsfakturor. Återinfört i Etapp 2.3 efter att
   // ha varit urkopplat sedan 2.2-omskrivningen.
-  const { data: costData } = await supabase
+  const { data: costData, error: costError } = await supabase
     .from('project_cost')
     .select('amount, category')
     .eq('business_id', businessId)
     .eq('project_id', projectId)
+
+  assertSourceRead('project_cost', costError)
 
   const extraCosts = (costData || []) as ProjectCostRow[]
   let extraTotalKr = 0
@@ -423,6 +483,9 @@ export async function computeProjectEconomics(
       ata_signerat_kr: Math.round(ataSigneratKr),
       ata_pending_kr: Math.round(ataPendingKr),
       fakturerat_kr: Math.round(fakturerat),
+      fakturerat_ex_moms_kr: invoiceNetAmountComplete
+        ? Math.round(faktureratExMoms)
+        : null,
       betalt_kr: Math.round(betalt),
       forvantad_intakt_kr: Math.round(forvantadIntakt),
     },
@@ -452,6 +515,9 @@ export async function computeProjectEconomics(
       ata_count: changes.length,
       time_entry_count: timeEntries.length,
       supplier_invoice_count: supplierInvoices.length,
+      project_material_count: (projectMaterials || []).length,
+      realized_invoice_count: realizedInvoiceCount,
+      invoice_net_amount_complete: invoiceNetAmountComplete,
       extra_cost_count: extraCosts.length,
     },
     // Sätts av routen (se fältets docstring ovan) — helpern har ingen

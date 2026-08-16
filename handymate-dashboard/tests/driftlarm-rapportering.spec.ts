@@ -154,25 +154,29 @@ test.describe('källskanning — de fem fail-safe-vägarna ropar in rapporteraTy
     expect(s).toContain("from '@/lib/observability/driftlarm'")
     expect(s).toContain('rapporteraTystFel')
 
+    const helperStart = s.indexOf('async function freezeFailure')
     const fnStart = s.indexOf('export async function freezeProjectOutcome')
+    expect(helperStart).toBeGreaterThan(-1)
     expect(fnStart).toBeGreaterThan(-1)
+    const helperBody = s.slice(helperStart, fnStart)
     const fnBody = s.slice(fnStart)
 
-    // Fyra distinkta anropsställen: projekt-hittades-inte, economics-null,
-    // upsert (icke-schema-fel) och top-level catch.
-    const count = (fnBody.match(/rapporteraTystFel\(/g) || []).length
-    expect(count, 'förväntar minst ett anrop per icke-schema fail-safe-gren').toBeGreaterThanOrEqual(4)
+    // Felrapporteringen är centraliserad: varje icke-schema-fel går genom
+    // freezeFailure, som i sin tur anropar rapporteraTystFel exakt en gång.
+    expect(helperBody).toContain('rapporteraTystFel(')
+    const count = (fnBody.match(/freezeFailure\(/g) || []).length
+    expect(count, 'förväntar central felväg för samtliga fail-safe-grenar').toBeGreaterThanOrEqual(6)
 
     // Den kända "tabellen saknas ännu" (v73 ej körd) grenen ska INTE larma —
     // samma konvention som arSchemaSaknas skippar 42P01/42703 på andra håll.
-    const missingTableIdx = fnBody.indexOf('isMissingTableError(upsertErr)')
+    const missingTableIdx = fnBody.indexOf('isMissingQualitySchemaError(upsertErr)')
     expect(missingTableIdx).toBeGreaterThan(-1)
     const missingTableGren = fnBody.slice(missingTableIdx, fnBody.indexOf('return', missingTableIdx))
     expect(missingTableGren).not.toContain('rapporteraTystFel')
 
-    // Top-level catch ska rapportera (absolut sista skyddsnätet).
+    // Top-level catch ska gå genom samma rapporterande helper.
     const catchIdx = fnBody.indexOf('} catch (err) {')
     expect(catchIdx).toBeGreaterThan(-1)
-    expect(fnBody.slice(catchIdx)).toContain('rapporteraTystFel')
+    expect(fnBody.slice(catchIdx)).toContain('freezeFailure(')
   })
 })

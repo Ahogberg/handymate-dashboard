@@ -162,6 +162,11 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
 
   'Ekonomi och lönsamhet': [
     {
+      route: 'admin/project-outcomes/reconcile',
+      requires: 'owner-admin',
+      why: 'Räknar om företagets historiska projektutfall som kan bli lärdata för prissättning och agentinsikter.',
+    },
+    {
       route: 'observations',
       requires: 'owner-admin',
       why: 'Karins observationer om marginaler, obetalda fakturor och förfallna kundfordringar — plus bolagskalenderns moms, preliminärskatt och bokslut. Låg öppen för alla anställda fram till 2026-08-07.',

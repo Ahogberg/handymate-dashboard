@@ -392,8 +392,9 @@ async function runCompletionEffects(params: {
     effects.push(effectFailure('auto_invoice', error))
   }
 
-  // 4. Frys och verifiera efterkalkylen. freezeProjectOutcome är fail-safe;
-  // getProjectOutcome.found är därför det observerbara facitet.
+  // 4. Frys och verifiera efterkalkylen. Använd resultatet från JUST DENNA
+  // beräkning: en gammal rad får aldrig maskera att den aktuella frysningen
+  // misslyckades.
   let outcome: {
     found: boolean
     job_type: string | null
@@ -403,12 +404,23 @@ async function runCompletionEffects(params: {
   } | null = null
   try {
     const { freezeProjectOutcome } = await import('@/lib/efterkalkyl/freeze-outcome')
-    const { getProjectOutcome } = await import('@/lib/efterkalkyl/get-project-outcome')
-    await freezeProjectOutcome(supabase, businessId, project.project_id)
-    outcome = await getProjectOutcome(supabase, businessId, project.project_id)
-    effects.push(outcome.found
-      ? { effect: 'project_outcome', status: 'succeeded' }
-      : { effect: 'project_outcome', status: 'failed', message: 'Efterkalkylen kunde inte frysas' })
+    const frozen = await freezeProjectOutcome(supabase, businessId, project.project_id)
+    if (frozen.ok) {
+      outcome = {
+        found: true,
+        job_type: frozen.row.job_type,
+        hours_diff_pct: frozen.row.hours_diff_pct,
+        amount_diff_pct: frozen.row.amount_diff_pct,
+        margin_pct: frozen.row.margin_pct,
+      }
+      effects.push({ effect: 'project_outcome', status: 'succeeded' })
+    } else {
+      effects.push({
+        effect: 'project_outcome',
+        status: 'failed',
+        message: `${frozen.code}: ${frozen.message}`,
+      })
+    }
   } catch (error) {
     effects.push(effectFailure('project_outcome', error))
   }

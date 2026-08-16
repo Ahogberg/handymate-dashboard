@@ -10,6 +10,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
+import { OUTCOME_CALCULATION_VERSION } from '@/lib/efterkalkyl/freeze-outcome'
 
 const MODEL = 'claude-haiku-4-5-20251001'
 
@@ -234,19 +235,24 @@ export async function updatePricingIntelligence(businessId: string): Promise<{
     try {
       const { data: outcomeRows, error: outcomeErr } = await supabase
         .from('project_outcome')
-        .select('job_type, margin_pct')
+        .select('job_type, realized_margin_pct')
         .eq('business_id', businessId)
+        .eq('calculation_version', OUTCOME_CALCULATION_VERSION)
+        .eq('financial_learning_eligible', true)
         .not('job_type', 'is', null)
-        .not('margin_pct', 'is', null)
+        .not('realized_margin_pct', 'is', null)
 
-      if (!outcomeErr && outcomeRows) {
+      if (outcomeErr) {
+        console.error('[PricingEngine] kvalitetssäkrat project_outcome-uppslag misslyckades:', outcomeErr)
+      } else if (outcomeRows) {
         const marginsByJobType: Record<string, number[]> = {}
-        for (const row of outcomeRows as Array<{ job_type: string; margin_pct: number }>) {
+        for (const row of outcomeRows as Array<{ job_type: string; realized_margin_pct: number }>) {
           if (!marginsByJobType[row.job_type]) marginsByJobType[row.job_type] = []
-          marginsByJobType[row.job_type].push(Number(row.margin_pct))
+          marginsByJobType[row.job_type].push(Number(row.realized_margin_pct))
         }
         for (const jt of Object.keys(marginsByJobType)) {
           const vals = marginsByJobType[jt]
+          if (vals.length < 3) continue
           avgMarginByJobType[jt] = Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 100) / 100
         }
       }

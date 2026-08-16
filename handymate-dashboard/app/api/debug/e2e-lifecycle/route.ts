@@ -260,7 +260,15 @@ export async function POST(request: NextRequest) {
     }
 
     const { freezeProjectOutcome } = await import('@/lib/efterkalkyl/freeze-outcome')
-    await freezeProjectOutcome(supabase, business.business_id, projectId)
+    const frozen = await freezeProjectOutcome(supabase, business.business_id, projectId)
+    if (!frozen.ok) {
+      steps.push({
+        step: '5. Stäng projektet',
+        status: 'fail',
+        detail: `Efterkalkylen kunde inte frysas (${frozen.code}): ${frozen.message}`,
+      })
+      throw new StepFailure()
+    }
 
     const { getProjectOutcome } = await import('@/lib/efterkalkyl/get-project-outcome')
     const outcome = await getProjectOutcome(supabase, business.business_id, projectId)

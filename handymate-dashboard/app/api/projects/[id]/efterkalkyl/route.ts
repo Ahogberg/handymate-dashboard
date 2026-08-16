@@ -34,13 +34,17 @@ export async function GET(
 
     const supabase = getServerSupabase()
 
-    const { data: project } = await supabase
+    const { data: project, error: projectError } = await supabase
       .from('project')
       .select('project_id, status')
       .eq('project_id', params.id)
       .eq('business_id', business.business_id)
       .maybeSingle()
 
+    if (projectError) {
+      console.error('[efterkalkyl] projektläsning misslyckades:', projectError)
+      return NextResponse.json({ error: 'Projektet kunde inte läsas' }, { status: 500 })
+    }
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }

@@ -17,6 +17,53 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-16 — Outcome Quality Gate V1 byggd, V138 väntar på manuell körning
+
+Offer-to-Reality-loopen har nu en explicit sanningsgräns mellan ett fryst
+projektutfall och data som faktiskt får påverka nästa offert eller agentråd.
+X2a, X2b, X2c, X2e och X2f är byggda i kod. X2d är fortsatt ett separat
+produktregister-/materialbeslut; tills det är löst utesluts överlappande
+materialkällor från finansiell lärdata.
+
+**Det som nu är sant:**
+
+- Den kanoniska ekonomihärledningen läser fel från samtliga nio källor och
+  tenantfiltrerar även medlemskostnader. Ett trasigt uppslag kan inte längre
+  bli en trovärdig nolla.
+- `project_outcome` V2 bär beräkningsversion, offertkälla, källräknare,
+  fullständighetsflaggor, blockeringsorsaker och separata eligibility-flaggor
+  för tids- respektive finansiell inlärning.
+- Förväntad intäkt och realiserad intäkt är två olika tal. Realiserad marginal
+  använder bara utfärdade fakturors `subtotal` exklusive moms; utkast,
+  makulerade/krediterade original och rader med saknad nettosumma tränar inte.
+- ROT/RUT-behörighet klassar en rad som arbete men får inte längre göra `st`
+  eller andra enheter till timmar. Bara riktiga timenheter påverkar tidslärandet.
+- En frysning returnerar strukturerat resultat. Projektstängningen, demoseed och
+  E2E-livscykeln kontrollerar just den körningen; en gammal rad kan inte maskera
+  ett aktuellt fel. Saknat `completed_at` ersätts aldrig av ett påhittat datum.
+- En tenantbunden owner/admin-rutt räknar idempotent om saknade och legacy-
+  utfall. Legacy-rader får aldrig V2-status genom en blind `UPDATE`.
+- Efterkalkylinsikter, jobbtypsaggregat och prisintelligens kräver V2,
+  relevant eligibility och minst tre jämförbara utfall. Projektkortet märker
+  samtidigt förväntad respektive realiserad marginal korrekt.
+
+**Aktivering:** [`sql/v138_outcome_quality_gate.sql`](../../sql/v138_outcome_quality_gate.sql)
+ska köras **manuellt** i Supabase SQL Editor. Ingen migration kördes från kod
+eller test. Efter körningen kan owner/admin anropa
+`POST /api/admin/project-outcomes/reconcile`; läskonsumenterna gör även en
+begränsad idempotent avstämning.
+
+**Verifiering:** `npx tsc --noEmit` och produktionsbuilden (421 routes/sidor)
+är gröna. 206/206 riktade ekonomi-, efterkalkyl-, auth- och migrationsfacit
+är gröna. Fullsviten lästes via felsammanfattningen: 6 051 tester passerade;
+sessions-/nätfallen blockerades av sandboxens `connect EACCES`, och tre äldre
+Jarvis/stegkedje-facit är fortsatt röda utanför denna diff. Det enda
+Outcome-relaterade fullsvitsfelet var ett äldre facit som krävde fyra
+duplicerade driftlarmsanrop; facitet är uppdaterat till den nya centrala
+felvägen och är grönt i den riktade sviten.
+
+---
+
 # Läge 2026-08-16 — Revenue Recovery Case V1 byggd
 
 Business Twin kan nu följa en identifierad missad intäkt eller ett ÄTA-utkast
@@ -764,6 +811,10 @@ datakvalitet, uppdelat i självständigt granskbara skivor — **inte ett "engin
 | X2d | Materialdubbletter: avgör om `supplier_invoices` och `project_material` beskriver samma inköp |
 | X2e | Realiserad vs förväntad intäkt som **två** märkta tal; arbetstimmar räknas bara för äkta timenheter — ROT/RUT-behörighet får inte förvandla kvantitet till timmar |
 | X2f | Inlärningsgrind: prisråd kräver minsta jämförbara urval och tillräcklig fullständighet |
+
+**Status 2026-08-16:** X2a/b/c/e/f byggda; aktivering väntar på manuell V138.
+X2d är inte byggd. V1 blockerar i stället finansiell inlärning när både
+`supplier_invoices` och `project_material` förekommer på samma projekt.
 
 **Dependencies** — X1:s pilotbevis och källkvalitetsfynd.
 **Suggested builder** — Codex (backend) · Claude (UI/copy **efter** att backend-kontraktet
