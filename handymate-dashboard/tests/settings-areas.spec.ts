@@ -143,12 +143,14 @@ test.describe('rollskydd och synlighet', () => {
     const ids = allEntries().filter(e => e.ownerOnly).map(e => e.id)
     expect(ids).toContain('_link_bolagsprofil')
     expect(ids).toContain('_link_internal_costs')
+    expect(ids).toContain('_link_business_twin_data')
   })
 
   test('en montör ser inte de ägargrindade posterna', () => {
     const ids = allEntries(visibleAreas({ isOwnerOrAdmin: false })).map(e => e.id)
     expect(ids).not.toContain('_link_bolagsprofil')
     expect(ids).not.toContain('_link_internal_costs')
+    expect(ids).not.toContain('_link_business_twin_data')
   })
 
   test('ägaren ser allt som inte är lanseringsdolt', () => {

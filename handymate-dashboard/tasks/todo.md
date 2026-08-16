@@ -1,3 +1,57 @@
+# Business Twin Benchmark Readiness V1 — 2026-08-16
+
+## Mål
+
+Så nätverkseffekten nu utan att visa påhittade branschvärden: företagets
+owner/admin kan uttryckligen samtycka till framtida anonymiserad
+branschstatistik, se hur mycket av den egna projektutfallsdatan som är
+kvalitetsgodkänd och lämna igen med omedelbar verkan.
+
+## Plan
+
+- [x] Lås ett versionerat samtyckes- och kohortkontrakt: opt-in som default,
+  minst fem företag och trettio kvalificerade utfall innan en framtida
+  branschinsikt får visas.
+- [x] Skriv en atomisk, service-only migration för aktuellt samtycke och smal
+  revisionslogg. Demo-tenanter ska alltid nekas.
+- [x] Bygg tenantbunden readiness från Outcome Quality Gate utan någon
+  tvärtenantfråga eller kopia av projekt-/kunddata.
+- [x] Bygg owner/admin-grindat API samt en avancerad inställningsyta där
+  samtycke kan ges och återkallas uttryckligen.
+- [x] Facit-testa policy, migration, tenantfilter, rollgrind, demo-spärr,
+  sanningsspråk och att ingen benchmarkmotor eller branschsiffra smugit in.
+- [x] Kör TypeScript, riktade browserlösa facit, produktionsbuild och hela
+  facitsvitens felsammanfattning; uppdatera roadmap och separat commit.
+
+## Avgränsning
+
+- Ingen tvärtenant-aggregering, ranking, geografisk segmentering eller
+  branschrekommendation i V1.
+- Ingen data kopieras ut ur `project_outcome`; samtycket registrerar endast
+  tillåtelsen och readiness läser enbart det egna företagets kvalitetsflaggor.
+- Migrationen skrivs som fil och körs aldrig programmatiskt.
+
+## Resultat
+
+- Ett versionerat opt-in/opt-out-kontrakt finns nu med fasta framtida
+  kohortgolv: minst fem företag och trettio kvalificerade utfall. Samtycke är
+  `false` som default och en ny samtyckesversion kräver ett nytt aktivt val.
+- V140 gör ändringen atomisk via en service-only `SECURITY DEFINER`-RPC,
+  verifierar owner/admin i samma tenant, blockerar demo-företag före första
+  mutation och skriver en smal revisionsrad utan projekt- eller kunddata.
+- Den nya inställningsytan visar bara det egna företagets readiness från V2:s
+  eligibility-flaggor. Tre utfall måste finnas inom samma jobbtyp; tre
+  utspridda jobb blir aldrig ett falskt redo-läge.
+- Den publika integritetspolicyn och UI:t beskriver samma separata, frivilliga
+  ändamål. Ett nej påverkar inte tjänsten och återkallelse är direkt.
+- Ingen tvärtenantmotor, benchmarkkopia, ranking eller branschsiffra byggdes.
+- `npx tsc --noEmit` och produktionsbuilden (422 routes/sidor) är gröna.
+  88/88 riktade facit är gröna. Full Chromium-svit: 3 131/3 260 gröna; 126
+  nätfall blockeras av sandboxens `connect EACCES` och tre kända
+  Jarvis/stegkedje-facit är röda utanför denna diff.
+
+---
+
 # Business Twin Quote Reality Check V1 — 2026-08-16
 
 ## Mål

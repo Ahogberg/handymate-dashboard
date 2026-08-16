@@ -17,6 +17,46 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-16 — Benchmark Readiness V1 byggd, V140 väntar
+
+Business Twin har nu fröet till en verklig nätverkseffekt utan att Handymate
+låtsas ha ett branschunderlag innan datan finns. Företag kan uttryckligen
+ansluta kvalitetsgodkända projektutfall till framtida anonymiserad
+branschstatistik och lämna igen med omedelbar verkan.
+
+**Det som nu är sant:**
+
+- Samtycke är `false` som default, versionerat och separat från tjänstens
+  vanliga funktioner. Ett nej eller en återkallelse försämrar ingenting.
+- Endast owner/admin får ändra samtycket. En atomisk service-only RPC verifierar
+  aktören mot samma tenant och revisionsloggar varje opt-in/opt-out utan kund-
+  eller projektdata.
+- Demo-tenanter blockeras i RPC:n före första mutation så syntetiska utfall
+  aldrig kan förorena ett framtida benchmark.
+- Inställningar → Så ska teamet jobba → Avancerat → Business Twin-data visar
+  enbart det egna företagets readiness. Endast Outcome V2-rader med relevanta
+  eligibility-flaggor räknas, och tre utfall måste finnas inom samma jobbtyp.
+- Framtida kohortgolv är låsta i kod till minst fem företag och trettio
+  kvalificerade utfall. V1 gör ingen tvärtenantfråga, kopierar ingen
+  `project_outcome`, visar ingen ranking och genererar ingen branschsiffra.
+- Integritetspolicyn beskriver samma frivilliga, specifika och återkalleliga
+  ändamål som samtyckesytan.
+
+**Aktivering:** kör först den sedan tidigare väntande
+[`sql/v138_outcome_quality_gate.sql`](../../sql/v138_outcome_quality_gate.sql)
+och därefter
+[`sql/v140_benchmark_readiness.sql`](../../sql/v140_benchmark_readiness.sql)
+manuellt i Supabase SQL Editor. Ingen migration kördes från kod eller test.
+
+**Verifiering:** `npx tsc --noEmit` och produktionsbuilden (422 routes/sidor)
+är gröna. 88/88 riktade benchmark-, inställnings-, outcome-, offert-, kolumn-
+och behörighetsfacit är gröna. Full Chromium-svit: 3 131/3 260 gröna; 126
+sessions-/nätfall blockeras av sandboxens `connect EACCES` mot
+`app.handymate.se`, och tre kända Jarvis/stegkedje-facit är röda utanför denna
+diff.
+
+---
+
 # Läge 2026-08-16 — Business Twin Quote Reality Check V1 byggd
 
 Offertens sista kontroll före utskick använder nu företagets egna

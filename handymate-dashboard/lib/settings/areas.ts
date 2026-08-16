@@ -212,6 +212,7 @@ export const SETTINGS_AREAS: SettingsArea[] = [
         label: 'Avancerat',
         entries: [
           { id: 'preferences', label: 'Detaljerade inställningar', desc: 'Enskilda värden teamet rättar sig efter', icon: 'star', advanced: true },
+          { id: '_link_business_twin_data', label: 'Business Twin-data', desc: 'Samtycke och beredskap för branschstatistik', icon: 'database', href: '/dashboard/settings/business-twin', ownerOnly: true, advanced: true },
           { id: '_link_automations', label: 'Automationer', desc: 'Vad som händer av sig självt', icon: 'zap', href: '/dashboard/automations', advanced: true },
         ],
       },

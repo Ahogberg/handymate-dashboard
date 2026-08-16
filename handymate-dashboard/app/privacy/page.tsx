@@ -10,7 +10,7 @@ export default function PrivacyPage() {
       <div className="max-w-3xl mx-auto px-4 py-12 sm:py-16">
         <Link href="/" className="text-sm text-primary-700 hover:underline mb-6 inline-block">&larr; Tillbaka</Link>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Integritetspolicy</h1>
-        <p className="text-sm text-gray-500 mb-8">Senast uppdaterad: 2026-02-11</p>
+        <p className="text-sm text-gray-500 mb-8">Senast uppdaterad: 2026-08-16</p>
 
         <div className="prose prose-gray max-w-none space-y-8">
           <section>
@@ -44,6 +44,12 @@ export default function PrivacyPage() {
                 <p className="font-medium text-gray-900">Teknisk data</p>
                 <p className="text-sm text-gray-600">IP-adress, webbläsartyp, enhet och användningsmönster.</p>
               </div>
+              <div>
+                <p className="font-medium text-gray-900">Frivillig branschstatistik</p>
+                <p className="text-sm text-gray-600">
+                  Om företagets ägare eller administratör aktivt ansluter företaget registrerar vi samtycket. När funktionen senare aktiveras får endast kvalitetssäkrade, aggregerade utfallsprocent per jobbtyp användas; kundnamn, adresser, texter, dokument och personuppgifter ingår inte.
+                </p>
+              </div>
             </div>
           </section>
 
@@ -53,6 +59,7 @@ export default function PrivacyPage() {
               <li><strong>Avtal:</strong> För att tillhandahålla våra tjänster enligt avtalet med dig.</li>
               <li><strong>Berättigat intresse:</strong> För att förbättra plattformen, förhindra missbruk och ge support.</li>
               <li><strong>Samtycke:</strong> För samtalsinspelning (samtycke inhämtas per samtal).</li>
+              <li><strong>Frivilligt samtycke:</strong> För framtida anonymiserad branschstatistik. Det är valfritt, påverkar inte tjänstens vanliga funktioner och kan återkallas när som helst under Inställningar.</li>
               <li><strong>Rättslig förpliktelse:</strong> Bokföringslagen kräver att vi bevarar ekonomisk data i 7 år.</li>
             </ul>
           </section>

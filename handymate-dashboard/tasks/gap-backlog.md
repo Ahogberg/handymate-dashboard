@@ -194,13 +194,14 @@ FLERA hantverkare. I dag noll återvinning av exponeringen.
   moat-listan) omramad som FÖRVÄRVSKANAL: kundens fastighetshistorik drar
   in nästa hantverkare hen anlitar.
 
-### BF2. Benchmark-nätverkseffekten ur Motor 1-datan (trigger: samtycke NU, motor vid kund 10–20)
+### BF2. Benchmark-nätverkseffekten ur Motor 1-datan (samtyckesfrö byggt 2026-08-16, motor vid kund 10–20)
 project_outcome tvärs firmor = "firmor som din tar 14 % mer för badrum i
 Stockholm och vinner ändå" — anonymiserad benchmarking ingen nordisk
 konkurrent kan kopiera i efterhand (de samlar ingen utfallsdata).
 Nätverkseffekt: värdet växer per ansluten kund.
-- Frö (1 h): samtyckes-kryssruta "Bidra till anonymiserad branschstatistik"
-  i inställningarna — juridiskt kladdigt att eftermontera, billigt nu.
+- Frö: **BYGGT.** Versionerat, återkalleligt owner/admin-samtycke under
+  Business Twin-data, demo-spärr, revisionslogg och tenantbunden readiness.
+  Ingen tvärtenantdata eller branschsiffra används ännu.
 - Vid kund 10–20: aggregerings-motorn + benchmark-insikter i offertflödet.
 
 ### BF3. Pengaflödena runt jobbet — andra intäktsströmmar (trigger: kund 20+)
