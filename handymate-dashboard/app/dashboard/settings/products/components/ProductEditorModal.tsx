@@ -68,6 +68,13 @@ export function ProductEditorModal({
   const [salesPrice, setSalesPrice] = useState(
     product?.sales_price ? product.sales_price.toString() : ''
   )
+  // Samma "tomt = okänt"-disciplin som säljpriset — vi känner inte
+  // hantverkarens inköpsavtal, och 0 skulle se ut som 100 % marginal i
+  // efterkalkylen (samma resonemang som seedProducts redan följer för
+  // seedade artiklar, lib/seed-defaults.ts).
+  const [purchasePrice, setPurchasePrice] = useState(
+    product?.purchase_price ? product.purchase_price.toString() : ''
+  )
   const [vatRate, setVatRate] = useState(product?.vat_rate?.toString() ?? '0.25')
   const [rotEligible, setRotEligible] = useState(product?.rot_eligible ?? false)
   const [rutEligible, setRutEligible] = useState(product?.rut_eligible ?? false)
@@ -110,6 +117,15 @@ export function ProductEditorModal({
   const calcCost = calcComponents.reduce((s, c) => s + c.quantity_per_unit * c.unit_cost, 0)
   const liveShare = resolveLaborShare(calcComponents, shareEnabled ? sharePct / 100 : null)
 
+  // Live marginal — samma formel som PUT/POST /api/products räknar
+  // markup_percent med, bara en förhandsvisning innan sparning.
+  const marginPct = useMemo(() => {
+    const purchase = parseFloat(purchasePrice)
+    const sale = parseFloat(salesPrice)
+    if (!(purchase > 0) || !(sale > 0)) return null
+    return Math.round(((sale - purchase) / purchase) * 100)
+  }, [purchasePrice, salesPrice])
+
   function updateRow(index: number, patch: Partial<ComponentDraft>) {
     setRows(prev => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
   }
@@ -137,6 +153,14 @@ export function ProductEditorModal({
     const sales = salesPrice.trim() === '' ? 0 : parseFloat(salesPrice)
     if (Number.isNaN(sales) || sales < 0) {
       onError('Ange ett giltigt pris')
+      return
+    }
+
+    // Samma "tomt = okänt"-princip som säljpriset — null skiljer "vet inte"
+    // från "0 kr i inköp", vilket annars hade sett ut som 100 % marginal.
+    const purchase = purchasePrice.trim() === '' ? null : parseFloat(purchasePrice)
+    if (purchase !== null && (Number.isNaN(purchase) || purchase < 0)) {
+      onError('Ange en giltig egenkostnad')
       return
     }
 
@@ -173,6 +197,7 @@ export function ProductEditorModal({
       sku: sku.trim() || null,
       unit,
       sales_price: sales,
+      purchase_price: purchase,
       vat_rate: parseFloat(vatRate),
       rot_eligible: rotEligible,
       rut_eligible: rutEligible,
@@ -308,6 +333,30 @@ export function ProductEditorModal({
                   </option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={LABEL_CLS}>Egenkostnad (exkl. moms)</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  value={purchasePrice}
+                  onChange={e => setPurchasePrice(e.target.value)}
+                  placeholder="Okänd"
+                  className={`${INPUT_CLS} pr-8`}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">kr</span>
+              </div>
+            </div>
+            <div className="flex flex-col justify-end pb-2.5">
+              {marginPct !== null && (
+                <p className="text-sm font-medium text-slate-700">
+                  Marginal: <span className={marginPct < 0 ? 'text-red-600' : 'text-slate-900'}>{marginPct} %</span>
+                </p>
+              )}
             </div>
           </div>
 
