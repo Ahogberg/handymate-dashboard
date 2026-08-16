@@ -35,7 +35,7 @@ interface TimelineEvent {
   metadata: Record<string, unknown>
 }
 
-type TimelineFilter = 'all' | 'calls' | 'sms' | 'quotes' | 'invoices' | 'bookings' | 'leads' | 'agent' | 'time' | 'notes' | 'email'
+type TimelineFilter = 'all' | 'calls' | 'sms' | 'quotes' | 'invoices' | 'bookings' | 'leads' | 'agent' | 'time' | 'notes' | 'email' | 'portal' | 'chat'
 
 interface Props {
   customerId: string
@@ -47,6 +47,9 @@ const FILTERS: { key: TimelineFilter; label: string }[] = [
   { key: 'calls', label: 'Samtal' },
   { key: 'sms', label: 'SMS' },
   { key: 'email', label: 'E-post' },
+  // API-nycklarna matchar timeline-routens sektioner 3d/3g exakt.
+  { key: 'portal', label: 'Portal' },
+  { key: 'chat', label: 'Webbchatt' },
   { key: 'quotes', label: 'Offerter' },
   { key: 'invoices', label: 'Fakturor' },
   { key: 'bookings', label: 'Bokningar' },

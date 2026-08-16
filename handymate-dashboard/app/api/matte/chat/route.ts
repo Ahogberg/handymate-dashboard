@@ -210,6 +210,8 @@ const CURATED_TOOL_NAMES = [
   'get_daily_stats', 'create_approval_request', 'check_pending_approvals',
   'get_project_profitability', 'get_pricing_suggestion', 'check_fortnox_status',
   'simulate_business_scenario',
+  // Compliance-underlaget V1 — läsande "vad sades när?"-logg per kund.
+  'get_communication_trail',
   'get_efterkalkyl_insight', 'run_customer_base_sweep', 'book_site_visit',
   // R5 (tasks/resurs-masterplan.md) — persondagen/beläggning per person.
   'get_person_schedule',
@@ -525,6 +527,8 @@ VID HANDOFF: Var transparent men kort. Använd handoff_to_agent-verktyget — s�
 ÄRENDEN SOM RÖR FLERA OMRÅDEN: gör klart DIN del först, lämna sedan över till nästa specialist för deras del. Ärendet får passera högst tre specialister, och du får bara komma in en gång — planera därför din del färdigt innan du lämnar. Matte sammanfattar för hantverkaren till sist, så du behöver inte upprepa vad andra gjort. Påstå ALDRIG att något är gjort som du inte själv utfört med ett verktyg; blev det fel, säg det rakt.
 
 VAD HÄNDER OM: använd simulate_business_scenario för kontrafaktiska frågor om projektmarginal, sena kundbetalningar eller omsättningstakt. Återge verktygets resultat och antaganden; räkna aldrig om eller komplettera siffrorna själv. Ett blockerat scenario är ett ärligt svar — gissa inte saknade värden.
+
+VAD SADES NÄR: använd get_communication_trail vid tvister eller frågor om vad som sagts med en kund — det är den faktiska loggen över SMS, e-post, portal, samtal, platsbesök, webbchatt och offertöppningar. Citera loggen, dikta aldrig. Om sources_with_errors inte är tom: säg att underlaget är ofullständigt. Hänvisa till kundkortets "Ladda ner kommunikationsunderlag" för den fullständiga exporten.
 
 Du har tillgång till verktyg för kunder, offerter (skapa riktiga offerter med ROT/RUT), fakturor, bokningar, kalender, tidrapporter, leads, SMS, e-post och navigering. Använd dem för att faktiskt UTFÖRA det hantverkaren ber om — men bara inom ditt expertområde.${imageBlock}
 

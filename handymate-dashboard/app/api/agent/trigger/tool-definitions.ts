@@ -396,6 +396,21 @@ export const toolDefinitions = [
       required: ["scenario_type"],
     },
   },
+  // Compliance — kommunikationsunderlaget
+  {
+    name: "get_communication_trail",
+    description: "Hämta det LÄSANDE kommunikationsunderlaget för en kund: kronologisk logg över all registrerad kommunikation (SMS, e-post, portal, samtal, platsbesök, webbchatt, offertöppningar, anteckningar) med kanal, riktning och tidsstämpel. Använd vid frågor som 'vad sades när?' eller vid tvister. Verktyget ändrar ingenting. Svaret är avkortat (kroppar ~200 tecken, senaste posterna) — hänvisa till kundkortets nedladdningsbara underlag för den fullständiga exporten. Om sources_with_errors inte är tom: säg ärligt att de källorna inte kunde hämtas — påstå aldrig att underlaget är komplett då.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        customer_id: { type: "string", description: "Kundens ID" },
+        from_date: { type: "string", description: "Startdatum (YYYY-MM-DD), valfritt" },
+        to_date: { type: "string", description: "Slutdatum (YYYY-MM-DD), valfritt" },
+        max_entries: { type: "number", description: "Max antal poster i svaret (de senaste), default 30" },
+      },
+      required: ["customer_id"],
+    },
+  },
   // Business preferences
   {
     name: "update_business_preference",

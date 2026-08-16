@@ -158,6 +158,37 @@ export async function executeTool(
         const scenario = await runBusinessScenario(supabase, businessId, input as any)
         return { success: true, data: scenario }
       }
+      case 'get_communication_trail': {
+        // Läsande — hela underlaget lever i lib/compliance, verktyget gör
+        // bara ett kompakt urklipp (prompter tål inte 500 fulla kroppar).
+        const { getCommunicationTrail, normalizeTrailRange } = await import('@/lib/compliance/communication-trail')
+        const { fromIso, toIso } = normalizeTrailRange(
+          typeof input.from_date === 'string' ? input.from_date : undefined,
+          typeof input.to_date === 'string' ? input.to_date : undefined,
+        )
+        const trail = await getCommunicationTrail(supabase, businessId, String(input.customer_id || ''), { fromIso, toIso })
+        if (!trail) return { success: false, error: 'Kunden hittades inte i det här företaget' }
+        const max = Math.max(1, Math.min(100, Number(input.max_entries) || 30))
+        const compact = trail.entries.slice(-max).map(e => ({
+          channel: e.channel,
+          direction: e.direction,
+          timestamp: e.timestamp,
+          title: e.title,
+          body: e.body ? (e.body.length > 200 ? `${e.body.slice(0, 200)}…` : e.body) : null,
+        }))
+        return {
+          success: true,
+          data: {
+            customer_name: trail.customer.name,
+            total_entries: trail.entries.length,
+            shown_entries: compact.length,
+            entries: compact,
+            sources_with_errors: trail.sources_with_errors,
+            truncated_sources: trail.truncated_sources,
+            note: 'Urklipp: kroppar avkortade till 200 tecken och bara de senaste posterna visas. Den fullständiga exporten laddas ner från kundkortet ("Ladda ner kommunikationsunderlag").',
+          },
+        }
+      }
       case 'update_business_preference':
         return await updateBusinessPreference(supabase, businessId, input)
       case 'get_automation_settings':

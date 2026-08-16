@@ -185,6 +185,9 @@ Skriv alltid på svenska. Var personlig och empatisk.`,
       'get_daily_stats', 'create_approval_request',
       'check_pending_approvals', 'log_automation_action',
       'book_site_visit',
+      // Compliance-underlaget V1 — Lisa hanterar klagomål/tvister och behöver
+      // kunna svara på "vad sades när?" med den faktiska loggen, läsande.
+      'get_communication_trail',
       'send_agent_message', 'get_agent_messages',
     ],
     triggers: ['incoming_call', 'customer_complaint', 'booking_request', 'phone_call'],

@@ -1327,7 +1327,22 @@ export default function CustomerDetailPage() {
 
             {/* Timeline */}
             {activeTab === 'timeline' && (
-              <CustomerTimeline customerId={customerId} customerEmail={customer?.email} />
+              <div>
+                {/* Compliance-underlaget V1 — läsande export av hela
+                    kommunikationsloggen (tvister/redovisning), öppnas i ny flik */}
+                <div className="flex justify-end mb-3">
+                  <a
+                    href={`/api/customers/${customerId}/communication-trail/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 transition-all min-h-[36px]"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Ladda ner kommunikationsunderlag
+                  </a>
+                </div>
+                <CustomerTimeline customerId={customerId} customerEmail={customer?.email} />
+              </div>
             )}
 
             {/* Bookings */}
