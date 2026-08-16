@@ -177,10 +177,53 @@ export async function POST(request: NextRequest) {
     date: payload.Date || new Date().toISOString(),
   }
 
+  // ── 2.9 Spara HELA brödtexten FÖRE all klassificering ─────────────
+  // Kontextrevisionen 2026-08-16, fynd 6 — det enda FÖRSTÖRANDE fyndet:
+  // tidigare sparades brödtexten aldrig (bara en Haiku-tolkad beskrivning +
+  // 1000-tecken preview i approval-payloaden), och mejl Stage 1 klassade
+  // som "inte en lead" kastades med bara en console.log. Ett riktigt kund-
+  // mejl felklassat som skräp lämnade noll sökbart spår — går inte att
+  // fixa i efterhand, datan fanns aldrig. Nu skrivs varje inkommande mejl
+  // till email_conversations (samma tabell som Gmail-pollern) INNAN någon
+  // AI får avgöra dess öde. Dedup på Postmark-MessageID. Best-effort —
+  // en loggmiss får aldrig stoppa lead-flödet.
+  try {
+    const inboundMsgId = payload.MessageID ? `pm_${payload.MessageID}` : `pm_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+    const { data: dupe } = await supabase
+      .from('email_conversations')
+      .select('id')
+      .eq('gmail_message_id', inboundMsgId)
+      .maybeSingle()
+    if (!dupe) {
+      const senderEmail = (payload.From || '').toLowerCase().trim()
+      const { data: knownCustomer } = senderEmail
+        ? await supabase.from('customer').select('customer_id').eq('business_id', businessId).eq('email', senderEmail).maybeSingle()
+        : { data: null }
+      const { error: keepErr } = await supabase.from('email_conversations').insert({
+        business_id: businessId,
+        gmail_message_id: inboundMsgId,
+        gmail_thread_id: `pmthread_${inboundMsgId}`,
+        customer_id: knownCustomer?.customer_id || null,
+        matched_by: knownCustomer ? 'email' : 'unmatched',
+        from_email: senderEmail || 'unknown',
+        from_name: payload.FromName || null,
+        subject: emailInput.subject,
+        body_text: emailInput.body.substring(0, 5000),
+        received_at: emailInput.date,
+        direction: 'inbound',
+        status: 'new',
+      })
+      if (keepErr) console.error('[email/inbound] email_conversations-arkivering misslyckades:', keepErr.message)
+    }
+  } catch (keepEx) {
+    console.error('[email/inbound] email_conversations-arkivering exception:', keepEx)
+  }
+
   // ── 3. Stage 1: lead-detektion ────────────────────────────────
   const likely = await isLikelyLead(emailInput, [], [], { businessId, refId: payload.MessageID || 'no_message_id_' + Date.now() })
   if (!likely) {
-    // Spam/nyhetsbrev/system-mail — logga men skapa inget
+    // Spam/nyhetsbrev/system-mail — skapar ingen lead, men brödtexten är
+    // redan arkiverad ovan (2.9) så ett felklassat kundmejl går att hitta.
     console.log('[email/inbound] Ej lead enligt Stage 1', {
       from: payload.From,
       subject: payload.Subject,

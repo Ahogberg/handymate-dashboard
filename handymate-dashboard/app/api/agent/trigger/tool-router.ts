@@ -1239,18 +1239,9 @@ async function sendSms(
   }
   const result = { id: smsResult.elksId }
 
-  // Also log to sms_conversation for conversation history continuity
-  try {
-    await supabase.from('sms_conversation').insert({
-      business_id: businessId,
-      phone_number: to,
-      role: 'assistant',
-      content: message,
-      created_at: new Date().toISOString(),
-    })
-  } catch (err: any) {
-    console.error('[sendSms] sms_conversation insert failed (non-blocking):', businessId, to, err?.message || err)
-  }
+  // sms_conversation-speglingen sker numera i sendSmsViaElks självt
+  // (kontextrevisionen 2026-08-16) — den lokala kopian här togs bort för
+  // att inte dubbelskriva samma rad.
 
   return { success: true, data: { message: `SMS skickat till ${to}`, sms_id: result.id } }
 }
@@ -1276,6 +1267,19 @@ async function sendEmail(
         context.googleConnection.access_token,
         { to: params.to as string, subject: params.subject as string, body: params.body as string }
       )
+      // Kontextrevisionen 2026-08-16: utgående e-post sparades aldrig — nu
+      // loggas varje skickat mejl till email_conversations (best-effort).
+      const { logOutboundEmail } = await import('@/lib/comm/log-outbound-email')
+      await logOutboundEmail(supabase, {
+        businessId,
+        toEmail: params.to as string,
+        subject: params.subject as string,
+        body: params.body as string,
+        gmailMessageId: result.messageId,
+        gmailThreadId: result.threadId,
+        customerId: (params.customer_id as string) || null,
+        sentVia: 'gmail',
+      })
       return { success: true, data: {
         message: `E-post skickad via Gmail till ${params.to}`,
         message_id: result.messageId, thread_id: result.threadId, sent_via: 'gmail',
@@ -1304,6 +1308,18 @@ async function sendEmail(
 
   const result = await response.json()
   if (!response.ok) return { success: false, error: `E-postfel: ${result.message}` }
+
+  // Kontextrevisionen 2026-08-16: samma loggning på Resend-vägen.
+  const { logOutboundEmail } = await import('@/lib/comm/log-outbound-email')
+  await logOutboundEmail(supabase, {
+    businessId,
+    toEmail: params.to as string,
+    subject: params.subject as string,
+    body: params.body as string,
+    customerId: (params.customer_id as string) || null,
+    sentVia: 'resend',
+  })
+
   return { success: true, data: { message: `E-post skickad till ${params.to}`, email_id: result.id, sent_via: 'resend' } }
 }
 

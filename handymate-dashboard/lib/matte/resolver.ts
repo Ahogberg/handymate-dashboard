@@ -35,7 +35,7 @@ export interface ResolvedEntity {
     direction: 'in' | 'out'
     body: string
     timestamp: string
-    channel: 'sms' | 'email'
+    channel: 'sms' | 'email' | 'portal'
   }[]
   // Customer Facts V1 (2026-08-12): godkända kundfakta ur möten
   // (customer_fact, superseded_by IS NULL). Tom array för leads/okänd —
@@ -136,7 +136,7 @@ export async function resolveEntity(
 
   // ── Steg 2: Hämta kontext parallellt ──
 
-  const [projects, deals, invoices, smsHistory, customerFacts] = await Promise.all([
+  const [projects, deals, invoices, smsHistory, emailHistory, portalHistory, customerFacts] = await Promise.all([
     customerId
       ? supabase
           .from('booking')
@@ -186,6 +186,35 @@ export async function resolveEntity(
           .limit(10)
       : Promise.resolve({ data: [] as any[] }),
 
+    // E-posthistorik (kontextrevisionen 2026-08-16, fynd 2): channel:'email'
+    // var deklarerad i typen men frågan fanns aldrig — Mattes e-post-
+    // intelligens körde på VARJE inkommande mejl med tom historik trots att
+    // brödtexterna låg sparade i email_conversations. Nu läses de senaste 10
+    // mejlen (båda riktningar — direction-kolumnen skiljer dem åt).
+    !isPhone
+      ? supabase
+          .from('email_conversations')
+          .select('direction, subject, body_text, received_at')
+          .eq('business_id', businessId)
+          .eq('from_email', cleanFrom)
+          .order('received_at', { ascending: false })
+          .limit(10)
+      : Promise.resolve({ data: [] as any[] }),
+
+    // Portal-tråden (kontextrevisionen 2026-08-16, fynd 5): customer_message
+    // fångades väl men lästes av NOLL kontextkonsumenter — en kund som
+    // frågade något i portalen och sedan följde upp via SMS/mejl mötte en
+    // Matte utan portal-halvan av dialogen.
+    customerId
+      ? supabase
+          .from('customer_message')
+          .select('direction, message, created_at')
+          .eq('business_id', businessId)
+          .eq('customer_id', customerId)
+          .order('created_at', { ascending: false })
+          .limit(10)
+      : Promise.resolve({ data: [] as any[] }),
+
     // Customer Facts V1: senaste 10 icke-ersatta godkända fakta för kunden.
     // Fail-safe genom formen — Supabase returnerar {data:null, error} om
     // tabellen inte finns än (sql/v122 körs senare), och (customerFacts.data
@@ -228,14 +257,28 @@ export async function resolveEntity(
       status: i.status,
       dueDate: i.due_date,
     })),
-    conversationHistory: (smsHistory.data || [])
-      .reverse()
-      .map((m: any) => ({
+    // Alla tre kanaler sammanflätade kronologiskt (äldst först — samma
+    // ordning som den gamla SMS-enkanaliga listan hade efter .reverse()).
+    conversationHistory: [
+      ...(smsHistory.data || []).map((m: any) => ({
         direction: m.role === 'user' ? 'in' as const : 'out' as const,
-        body: m.content,
-        timestamp: m.created_at,
+        body: m.content as string,
+        timestamp: m.created_at as string,
         channel: 'sms' as const,
       })),
+      ...(emailHistory.data || []).map((m: any) => ({
+        direction: m.direction === 'outbound' ? 'out' as const : 'in' as const,
+        body: [m.subject, m.body_text].filter(Boolean).join(' — ') as string,
+        timestamp: m.received_at as string,
+        channel: 'email' as const,
+      })),
+      ...(portalHistory.data || []).map((m: any) => ({
+        direction: m.direction === 'outbound' ? 'out' as const : 'in' as const,
+        body: m.message as string,
+        timestamp: m.created_at as string,
+        channel: 'portal' as const,
+      })),
+    ].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
     confirmedFacts: (customerFacts.data || []).map((f: any) => ({
       fact_type: f.fact_type,
       content: f.content,

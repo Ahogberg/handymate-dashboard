@@ -293,6 +293,31 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
     console.error('[sendSmsViaElks] sms_log insert exception:', logErr)
   }
 
+  // ═══ SPEGLA TILL KONVERSATIONSHISTORIKEN (kontextrevisionen 2026-08-16) ═══
+  //
+  // sms_log är revisionsspåret; sms_conversation är vad ALLA historik-
+  // konsumenter läser (Mattes resolver, inkommande-SMS-triggern, dashboard-
+  // tråden, kundtidslinjen). Tidigare speglade bara tre av ~20 utgående
+  // vägar hit — godkännandekorts-svar, påminnelser, offert-nudgar, ÄTA-
+  // utskick m.m. var osynliga i varje konversationsvy, så agenten såg en
+  // dialog där företagets halva saknades. Ett enda speglingsställe här i
+  // strypunkten fixar alla vägar på en gång (samma princip som gjorde
+  // SMS-strypunkten och sms-gaten rätt). Bara lyckade kundutskick — interna
+  // notiser hör inte hemma i en kundkonversation. Best-effort, kastar aldrig.
+  if (success && recipient === 'customer') {
+    try {
+      const { error: convErr } = await supabase.from('sms_conversation').insert({
+        business_id: businessId,
+        phone_number: phone,
+        role: 'assistant',
+        content: message,
+      })
+      if (convErr) console.error('[sendSmsViaElks] sms_conversation spegling misslyckades:', convErr.message)
+    } catch (convEx) {
+      console.error('[sendSmsViaElks] sms_conversation spegling exception:', convEx)
+    }
+  }
+
   return {
     success,
     smsId,

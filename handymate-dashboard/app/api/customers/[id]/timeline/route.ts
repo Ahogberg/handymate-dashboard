@@ -117,6 +117,177 @@ export async function GET(
     }
   }
 
+  // ═══ Sektionerna 3b-3f: kontextrevisionen 2026-08-16 ═══
+  // Tidslinjen såg ut som en "allt"-vy men saknade samtal/möten (nuvarande
+  // pipeline), e-post, portal-tråden, utgående transaktions-SMS och offert-
+  // öppningar — dvs. INGEN komplett per-kund-kommunikationslogg fanns
+  // någonstans i produkten. Direkt blockerare för Compliance Agent-idén
+  // (kunna peka på vad som sades när, per kanal, vid tvist/redovisning).
+
+  // ── 3b. call_recording — riktiga samtal + platsbesök/möten ────
+  if (filter === 'all' || filter === 'calls') {
+    const { data: recordings } = await supabase
+      .from('call_recording')
+      .select('recording_id, source, phone_number, transcript_summary, duration_seconds, created_at')
+      .eq('business_id', businessId)
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+      .limit(30)
+
+    for (const r of recordings || []) {
+      const arMote = r.source === 'site_visit'
+      events.push({
+        id: `rec_${r.recording_id}`,
+        type: arMote ? 'meeting_recorded' : 'call_recorded',
+        title: arMote ? 'Platsbesök inspelat' : 'Samtal inspelat',
+        description: r.transcript_summary ? String(r.transcript_summary).substring(0, 300) : null,
+        timestamp: r.created_at,
+        metadata: { phone: r.phone_number, source: r.source, duration_seconds: r.duration_seconds, recording_id: r.recording_id },
+      })
+    }
+  }
+
+  // ── 3c. email_conversations — e-post, båda riktningar ─────────
+  if ((filter === 'all' || filter === 'email') ) {
+    const { data: emails } = await supabase
+      .from('email_conversations')
+      .select('id, direction, subject, body_text, received_at')
+      .eq('business_id', businessId)
+      .eq('customer_id', customerId)
+      .order('received_at', { ascending: false })
+      .limit(50)
+
+    for (const e of emails || []) {
+      const utgaende = e.direction === 'outbound'
+      events.push({
+        id: `email_${e.id}`,
+        type: utgaende ? 'email_sent' : 'email_received',
+        title: utgaende ? `E-post skickad: ${e.subject || '(utan ämne)'}` : `E-post mottagen: ${e.subject || '(utan ämne)'}`,
+        description: e.body_text ? String(e.body_text).substring(0, 300) : null,
+        timestamp: e.received_at,
+        metadata: { direction: e.direction, subject: e.subject },
+      })
+    }
+  }
+
+  // ── 3d. customer_message — portal-tråden ──────────────────────
+  if (filter === 'all' || filter === 'portal') {
+    const { data: portalMsgs } = await supabase
+      .from('customer_message')
+      .select('id, direction, message, created_at')
+      .eq('business_id', businessId)
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    for (const p of portalMsgs || []) {
+      const utgaende = p.direction === 'outbound'
+      events.push({
+        id: `portal_${p.id}`,
+        type: utgaende ? 'portal_message_sent' : 'portal_message_received',
+        title: utgaende ? 'Portalmeddelande skickat' : 'Portalmeddelande mottaget',
+        description: p.message,
+        timestamp: p.created_at,
+        metadata: { direction: p.direction, channel: 'portal' },
+      })
+    }
+  }
+
+  // ── 3e. sms_log — utgående transaktions-/proaktiva SMS ────────
+  // Historiska utskick (före 2026-08-16 speglades bara ~3 av ~20 utgående
+  // vägar till sms_conversation) — sms_log har ALLTID haft allt. Dedupas
+  // klient-side mot sms_conversation-raderna via innehåll+minut vore
+  // överkurs; i stället visas bara rader ÄLDRE än speglingens deploy-datum
+  // härifrån när de gäller kunder (framåt är sms_conversation komplett).
+  if ((filter === 'all' || filter === 'sms')) {
+    const { data: smsLogRows } = await supabase
+      .from('sms_log')
+      .select('sms_id, message, message_type, status, sent_at')
+      .eq('business_id', businessId)
+      .eq('customer_id', customerId)
+      .eq('direction', 'outbound')
+      .in('status', ['sent', 'delivered'])
+      .lt('sent_at', '2026-08-17T00:00:00Z')
+      .order('sent_at', { ascending: false })
+      .limit(50)
+
+    for (const s of smsLogRows || []) {
+      events.push({
+        id: `smslog_${s.sms_id}`,
+        type: 'sms_sent',
+        title: 'SMS skickat',
+        description: s.message,
+        timestamp: s.sent_at,
+        metadata: { message_type: s.message_type, source: 'sms_log' },
+      })
+    }
+  }
+
+  // ── 3f. quote_tracking_events — kunden öppnade offerten ───────
+  if (filter === 'all' || filter === 'quotes') {
+    const { data: quoteIdRows } = await supabase
+      .from('quotes')
+      .select('quote_id, quote_number')
+      .eq('business_id', businessId)
+      .eq('customer_id', customerId)
+    const quoteIds = (quoteIdRows || []).map((q: any) => q.quote_id)
+    if (quoteIds.length > 0) {
+      const nummerAv = new Map((quoteIdRows || []).map((q: any) => [q.quote_id, q.quote_number]))
+      const { data: views } = await supabase
+        .from('quote_tracking_events')
+        .select('id, quote_id, event_type, created_at')
+        .eq('business_id', businessId)
+        .in('quote_id', quoteIds)
+        .eq('event_type', 'opened')
+        .order('created_at', { ascending: false })
+        .limit(30)
+      for (const v of views || []) {
+        events.push({
+          id: `qtrack_${v.id}`,
+          type: 'quote_viewed',
+          title: `Kunden öppnade offert ${nummerAv.get(v.quote_id) || ''}`.trim(),
+          description: null,
+          timestamp: v.created_at,
+          metadata: { quote_id: v.quote_id, event_type: v.event_type },
+        })
+      }
+    }
+  }
+
+  // ── 3g. widget_conversation — försäljningschatten på hemsidan ─
+  // Ingen customer_id-länk finns (spekulanten var inte kund än) — matchas
+  // via telefon/e-post besökaren själv angav. AI-gjorda prisuttalanden
+  // före köpet blir därmed åtkomliga i kundens historik efteråt.
+  if ((filter === 'all' || filter === 'chat') && (customerPhone || customer?.email)) {
+    const orVillkor = [
+      customerPhone ? `visitor_phone.eq.${customerPhone}` : null,
+      customer?.email ? `visitor_email.eq.${customer.email}` : null,
+    ].filter(Boolean).join(',')
+    const { data: widgetConvos } = await supabase
+      .from('widget_conversation')
+      .select('id, messages, message_count, created_at')
+      .eq('business_id', businessId)
+      .or(orVillkor)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    for (const w of widgetConvos || []) {
+      const msgs = Array.isArray(w.messages) ? w.messages : []
+      const preview = msgs
+        .slice(0, 6)
+        .map((m: any) => `${m.role === 'user' ? 'Kund' : 'AI'}: ${String(m.content || '').substring(0, 80)}`)
+        .join(' · ')
+      events.push({
+        id: `widget_${w.id}`,
+        type: 'widget_chat',
+        title: `Webbchatt (${w.message_count || msgs.length} meddelanden)`,
+        description: preview || null,
+        timestamp: w.created_at,
+        metadata: { conversation_id: w.id, message_count: w.message_count },
+      })
+    }
+  }
+
   // ── 4. quotes — Offerter ──────────────────────────────────────
   if (filter === 'all' || filter === 'quotes') {
     const { data: quotes } = await supabase

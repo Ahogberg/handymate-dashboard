@@ -204,7 +204,11 @@ ${entity.recentInvoices.map(i =>
 
 KONVERSATIONSHISTORIK (senaste ${entity.conversationHistory.length}):
 ${entity.conversationHistory.map(m =>
-    `  ${m.direction === 'in' ? '←' : '→'} [${m.timestamp.split('T')[0]}]: "${m.body.slice(0, 80)}${m.body.length > 80 ? '...' : ''}"`
+    // 80 tecken dolde kärnan i längre meddelanden (kontextrevisionen
+    // 2026-08-16) — 300 räcker för nästan alla SMS/portal-meddelanden och
+    // e-postingresser utan att spränga prompten. Kanalen visas nu också —
+    // historiken är flerkanalig (sms/email/portal) sedan samma revision.
+    `  ${m.direction === 'in' ? '←' : '→'} [${m.timestamp.split('T')[0]} ${m.channel}]: "${m.body.slice(0, 300)}${m.body.length > 300 ? '...' : ''}"`
   ).join('\n') || '  Ingen historik'}
 ${entity.confirmedFacts.length > 0
   ? `\nBEKRÄFTADE KUNDFAKTA (godkända av hantverkaren):\n${entity.confirmedFacts.map(f => `  • [${f.fact_type}] ${f.content}`).join('\n')}\n`

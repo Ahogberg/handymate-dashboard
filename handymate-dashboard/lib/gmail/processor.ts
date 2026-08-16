@@ -159,9 +159,44 @@ export async function processInboundEmail(
   message: GmailMessage,
   ownerEmail: string
 ): Promise<{ stored: boolean; reason?: string }> {
-  // 1. Skip outbound
+  // 1. Ägarens egna skickade mejl (kontextrevisionen 2026-08-16): hoppades
+  // tidigare över helt — systemet behöll då permanent bara ENA sidan av
+  // varje e-postkonversation. Nu sparas de som direction='outbound'-rader
+  // (dedup + kundmatchning via mottagaradressen), så konversationen blir
+  // komplett för både agentkontext och ett framtida revisionsspår. Inga
+  // events triggas för utgående — automationer ska reagera på KUNDENS mejl.
   if (isFromOwner(message, ownerEmail)) {
-    return { stored: false, reason: 'outbound' }
+    const { data: existingOut } = await supabase
+      .from('email_conversations')
+      .select('id')
+      .eq('gmail_message_id', message.messageId)
+      .maybeSingle()
+    if (existingOut) return { stored: false, reason: 'duplicate' }
+
+    const toEmail = extractEmail(message.to || '')
+    const match = toEmail
+      ? await matchSender(supabase, businessId, toEmail, '')
+      : { customer_id: null, lead_id: null, matched_by: 'unmatched' as const }
+
+    const { error: outErr } = await supabase.from('email_conversations').insert({
+      business_id: businessId,
+      gmail_thread_id: message.threadId,
+      gmail_message_id: message.messageId,
+      customer_id: match.customer_id,
+      lead_id: match.lead_id,
+      matched_by: `outbound_${match.matched_by}`,
+      from_email: toEmail || ownerEmail, // motparten (mottagaren), samma konvention som lib/comm/log-outbound-email.ts
+      subject: message.subject,
+      body_text: message.bodyText ? message.bodyText.substring(0, 5000) : message.snippet || '',
+      received_at: message.date ? new Date(message.date).toISOString() : new Date().toISOString(),
+      direction: 'outbound',
+      status: 'read',
+    })
+    if (outErr) {
+      console.error('[gmail-processor] outbound insert error:', outErr.message)
+      return { stored: false, reason: outErr.message }
+    }
+    return { stored: true, reason: 'outbound' }
   }
 
   // 2. Dedup check

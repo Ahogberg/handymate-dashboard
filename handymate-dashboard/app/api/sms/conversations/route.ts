@@ -162,14 +162,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: sendResult.error || 'SMS kunde inte skickas' }, { status: 500 })
   }
 
-  // Logga i sms_conversation så svaret dyker upp i tråden
-  await supabase.from('sms_conversation').insert({
-    business_id: business.business_id,
-    phone_number,
-    role: 'assistant',
-    content: message, // Utan suffix i konversationshistoriken
-    created_at: new Date().toISOString(),
-  })
+  // sms_conversation-speglingen sker numera i sendSmsViaElks självt
+  // (kontextrevisionen 2026-08-16) — den lokala kopian här togs bort för att
+  // inte dubbelskriva. Tråden visar nu det FAKTISKT skickade meddelandet
+  // (inkl. suffix) — sannare för både agenten och ett framtida revisionsspår.
 
   return NextResponse.json({ success: true })
 }
