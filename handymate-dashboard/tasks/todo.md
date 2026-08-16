@@ -1,3 +1,53 @@
+# Project Closeout Copilot V1 — 2026-08-16
+
+## Mål
+
+Lars ska hitta projekt som med starka, verifierbara signaler verkar vara
+färdiga. Matte presenterar förslaget, men ingen agent får själv stänga ett
+projekt: användaren går vidare till den riktiga projektvyn och den befintliga
+kanoniska avslutningen förblir enda skrivvägen.
+
+## Plan
+
+- [x] Lås en ren, deterministisk readiness-kärna med tydlig skillnad mellan
+  avslutssignal, datalucka och blockerande framtida arbete.
+- [x] Bygg en tenantbunden Lars-loader som läser projekt, bokningar,
+  milstolpar, tid och kostnadskällor med synliga källfel.
+- [x] Exponera en owner/admin-grindad read-only-rutt; klientens body eller
+  query får aldrig kunna välja tenant eller utföra projektstängning.
+- [x] Visa ett Matte-samordnat Lars-kort på hemskärmen med evidens och en enda
+  CTA till det riktiga projektet — aldrig en direkt mutationsknapp.
+- [x] Facit-testa kandidatregler, tenantfilter, rollgrind, agentägarskap,
+  sanningsspråk och att `completeProject` inte dupliceras eller kringgås.
+- [x] Kör TypeScript, riktade browserlösa facit, produktionsbuild och hela
+  facitsvitens felsammanfattning; uppdatera roadmap och separat commit.
+
+## Avgränsning
+
+- Ingen ny SQL, approvaltyp, workflowmotor eller automatisk projektstängning.
+- Ingen LLM får avgöra om projektet är klart; Lars formulerar ett förslag
+  ovanpå deterministiskt underlag.
+- Claudes pågående expectation-drift-filer och övriga orelaterade ändringar
+  rörs inte.
+
+## Resultat
+
+- En ren Lars-kärna klassar bara strukturerat underbyggda kandidater som
+  `strong` eller `review`. Slutdatum ensamt räcker inte, framtida bokningar
+  blockerar och pågående fyra-ögon-avslut filtreras bort.
+- Samtliga sju källor läses tenantfiltrerat. Källfel ger `unavailable` i
+  stället för ett falskt tomt resultat, och rutten kräver owner/admin.
+- JarvisHome visar högst ett Matte-samordnat Lars-kort med faktisk evidens,
+  synliga lärandeluckor och endast en länk till den riktiga projektvyn.
+- Ingen SQL, ny approvaltyp, direkt mutation eller parallell avslutsväg
+  infördes. Den kanoniska `completeProject`-kedjan är fortsatt ensam skrivväg.
+- `npx tsc --noEmit` och produktionsbuilden (422 routes/sidor) är gröna.
+  57/57 riktade facit är gröna. Full Chromium-svit: 3 167/3 296 gröna; 126
+  nät-/sessionsfall blockeras av `connect EACCES` och tre kända
+  Jarvis/stegkedje-facit är röda utanför denna diff.
+
+---
+
 # Business Twin Benchmark Readiness V1 — 2026-08-16
 
 ## Mål

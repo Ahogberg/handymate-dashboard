@@ -56,6 +56,8 @@ import type { AgentMoment } from '@/lib/moments/derive'
 import { GorDettaForst, type NextBestActionRecommendation } from '@/components/jarvis/GorDettaForst'
 import { ProjektCaseKort, type ProjektCaseData } from '@/components/jarvis/ProjektCaseKort'
 import { KundCaseKort, type KundCaseData } from '@/components/jarvis/KundCaseKort'
+import { ProjectCloseoutCopilotCard } from '@/components/jarvis/ProjectCloseoutCopilotCard'
+import type { CloseoutCandidate } from '@/lib/agents/lars/closeout-copilot'
 import { RevenueRecoveryCaseKort } from '@/components/jarvis/RevenueRecoveryCaseKort'
 import type { RevenueRecoveryCase } from '@/lib/value/revenue-recovery-case'
 import { MalNudge } from '@/components/jarvis/MalNudge'
@@ -273,6 +275,7 @@ export default function JarvisHome({
   const [projektCases, setProjektCases] = useState<ProjektCaseData[]>([])
   const [kundCases, setKundCases] = useState<KundCaseData[]>([])
   const [revenueRecoveryCases, setRevenueRecoveryCases] = useState<RevenueRecoveryCase[]>([])
+  const [closeoutCandidates, setCloseoutCandidates] = useState<CloseoutCandidate[]>([])
   const [revenueRecoveryError, setRevenueRecoveryError] = useState(false)
   const [heroHidden, setHeroHidden] = useState(false)
   const [snack, setSnack] = useState<{ approvalId: string; text: string } | null>(null)
@@ -386,6 +389,24 @@ export default function JarvisHome({
 
   useEffect(() => { void fetchRevenueRecoveryCases() }, [fetchRevenueRecoveryCases])
 
+  const fetchCloseoutCandidates = useCallback(async () => {
+    try {
+      const res = await fetch('/api/project-closeout-copilot', { headers: await authHeaders() })
+      if (res.ok) {
+        const data = await res.json()
+        setCloseoutCandidates(data.candidates || [])
+      } else {
+        setCloseoutCandidates([])
+      }
+    } catch {
+      // Ett gammalt förslag får aldrig ligga kvar när underlaget inte längre
+      // går att verifiera. Avsaknad av kort är UI:ts fail-closed-läge.
+      setCloseoutCandidates([])
+    }
+  }, [authHeaders])
+
+  useEffect(() => { void fetchCloseoutCandidates() }, [fetchCloseoutCandidates])
+
   useEffect(() => {
     let active = true
     ;(async () => {
@@ -410,19 +431,26 @@ export default function JarvisHome({
           void fetchQueue()
           void fetchCustomerCases()
           void fetchRevenueRecoveryCases()
+          void fetchCloseoutCandidates()
         })
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'project_change', filter: `business_id=eq.${business.business_id}` },
         () => { void fetchRevenueRecoveryCases() })
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'project', filter: `business_id=eq.${business.business_id}` },
-        () => { void fetchRevenueRecoveryCases() })
+        () => {
+          void fetchRevenueRecoveryCases()
+          void fetchCloseoutCandidates()
+        })
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'booking', filter: `business_id=eq.${business.business_id}` },
+        () => { void fetchCloseoutCandidates() })
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'invoice', filter: `business_id=eq.${business.business_id}` },
         () => { void fetchRevenueRecoveryCases() })
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [business?.business_id, fetchCustomerCases, fetchQueue, fetchRevenueRecoveryCases])
+  }, [business?.business_id, fetchCloseoutCandidates, fetchCustomerCases, fetchQueue, fetchRevenueRecoveryCases])
 
   // Värt att veta: observationerna agenterna skrivit, minus de som redan har
   // ett kort i beslutssektionen — annars stod samma sak på två ställen.
@@ -847,7 +875,7 @@ export default function JarvisHome({
   // samma agent samma dygn är ett beslut — "4" när tre av korten är samma
   // ärende läser som att man ligger efter mer än man gör.
   const grupper = groupApprovals(synliga)
-  const beslut = grupper.length + reschedules.length + (fuelCritical ? 1 : 0)
+  const beslut = grupper.length + reschedules.length + (fuelCritical ? 1 : 0) + (closeoutCandidates.length > 0 ? 1 : 0)
   const koTom = queueLoaded && beslut === 0
 
   // Cross-Agent Case — filtrera bort hanterade signaler (samma !hiddenIds-
@@ -1021,6 +1049,10 @@ export default function JarvisHome({
           })()}
 
           <MalNudge />
+
+          {closeoutCandidates[0] && (
+            <ProjectCloseoutCopilotCard candidate={closeoutCandidates[0]} />
+          )}
 
           {synligaCases.map(c => (
             <ProjektCaseKort key={c.project_id} data={c} />

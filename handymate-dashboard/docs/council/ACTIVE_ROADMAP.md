@@ -17,6 +17,41 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-16 — Project Closeout Copilot V1 byggd
+
+Projektagenten Lars hittar nu projekt som med strukturerade, verifierbara
+signaler ser färdiga ut. Matte äger den samordnade presentationen, medan
+hantverkaren fortfarande själv granskar och avslutar projektet i den riktiga
+projektvyn.
+
+**Det som nu är sant:**
+
+- Kandidatbedömningen är deterministisk. Slutförda bokningar, 100 procents
+  progress eller slutförda milstolpar efter slutdatum kan ge ett förslag;
+  slutdatum ensamt räcker aldrig och framtida arbete blockerar alltid.
+- En redan väntande `four_eyes_project_close` filtreras bort så samma beslut
+  inte visas två gånger.
+- Lars visar den projektspecifika evidensen. Matte står som användarens
+  samordnare och kortet attribuerar inget deterministiskt räknat värde till en
+  agent.
+- Saknad offertkoppling, jobbtyp, tid eller kostnadsunderlag visas som
+  förbättringspunkter för efterkontrollen. Luckorna stoppar inte ett sant
+  avslutsförslag och blandas inte ihop med blockerande arbete.
+- Läsningen är tenantfiltrerad för varje källa, fel stänger funktionen som
+  `unavailable`, och API:t är begränsat till owner/admin.
+- Kortets enda handling är att öppna den riktiga projektvyn. Ingen ny
+  mutation, approvaltyp eller LLM-styrd stängning har byggts; den kanoniska
+  `completeProject`-vägen och fyra-ögon-grinden är oförändrade.
+
+**Verifiering:** `npx tsc --noEmit` och produktionsbuilden (422 routes/sidor)
+är gröna. 57/57 riktade closeout-, kanonisk-avslut-, fyra-ögon- och
+AgentInteraction-facit är gröna. Full Chromium-svit: 3 167/3 296 gröna; 126
+sessions-/nätfall blockeras av sandboxens `connect EACCES` mot
+`app.handymate.se`, och tre kända Jarvis/stegkedje-facit är röda utanför denna
+diff. Ingen migration krävs.
+
+---
+
 # Läge 2026-08-16 — Benchmark Readiness V1 byggd, V140 väntar
 
 Business Twin har nu fröet till en verklig nätverkseffekt utan att Handymate
