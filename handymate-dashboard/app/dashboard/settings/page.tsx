@@ -39,7 +39,8 @@ import {
   RefreshCw,
   Zap,
   MailCheck,
-  KeyRound
+  KeyRound,
+  Sparkles
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -4497,6 +4498,7 @@ export default function SettingsPage() {
             </div>
 
             <BusinessRulesSection businessId={business.business_id} isOwnerOrAdmin={isOwnerOrAdmin} />
+            <PlaybookPatternsSection businessId={business.business_id} />
             <PriorityRulesSection businessId={business.business_id} isOwnerOrAdmin={isOwnerOrAdmin} />
           </div>
         )}
@@ -4614,6 +4616,79 @@ function BusinessRulesSection({ businessId, isOwnerOrAdmin }: { businessId: stri
         </button>
       </div>
       {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
+    </div>
+  )
+}
+
+/**
+ * PlaybookPatternsSection — visningshalvan av Playbook Pattern
+ * Confirmation V1 (Debrief → Playbook, V2-lagret, commit 73f887ec,
+ * 2026-08-16). Skrivsidan finns redan (godkännandeflödet skriver EN rad
+ * i business_knowledge när en ägare/admin bekräftar ett upprepat mönster
+ * ur project_lesson), och lib/ai-quote-generator.ts läser den tyst i
+ * offertprompten — men ingen yta lät ägaren SE vad Handymate lärt sig.
+ *
+ * Skiljer sig medvetet från BusinessRulesSection ovan: helt read-only
+ * (ingen ta-bort-knapp — ett bekräftat mönster är en tyngre, mer
+ * konsekvent grej än en manuellt skriven regel; en borttagningsflöde är
+ * ett eget beslut, inte något att uppfinna i den här omgången), och
+ * visas bara alls när listan faktiskt har rader — en tom platshållare
+ * ("inga mönster än") hade bara fått produkten att kännas ofärdig dag
+ * ett för alla de företag som ännu inte hunnit ackumulera fem lärdomar.
+ */
+function PlaybookPatternsSection({ businessId }: { businessId: string }) {
+  const [patterns, setPatterns] = useState<Array<{
+    id: string
+    job_type: string
+    observation: string
+    confidence: number | null
+    created_at: string
+  }>>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    async function fetchPatterns() {
+      try {
+        const res = await fetch('/api/playbook/patterns')
+        if (res.ok && !cancelled) {
+          const { patterns } = await res.json()
+          setPatterns(patterns || [])
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    fetchPatterns()
+    return () => { cancelled = true }
+  }, [businessId])
+
+  if (loading || patterns.length === 0) return null
+
+  return (
+    <div className="mt-8 pt-6 border-t border-gray-100">
+      <h3 className="text-sm font-semibold text-gray-900 mb-1">Så här jobbar vi — bekräftade mönster</h3>
+      <p className="text-xs text-gray-500 mb-4">
+        Mönster som en ägare/admin bekräftat utifrån upprepade lärdomar från tidigare projekt.
+        De formar nu Daniels offertmotor för alla framtida offerter av respektive jobbtyp.
+      </p>
+      <div className="space-y-2">
+        {patterns.map(pattern => (
+          <div key={pattern.id} className="p-3 bg-gray-50 rounded-xl">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-primary-50 text-primary-700 border border-primary-100">
+                <Sparkles className="w-3 h-3" />
+                AI-föreslaget, av dig bekräftat
+              </span>
+              <span className="text-xs font-medium text-gray-500">{pattern.job_type}</span>
+            </div>
+            <p className="text-sm text-gray-700">{pattern.observation}</p>
+            <p className="text-[11px] text-gray-400 mt-1">
+              Bekräftat {new Date(pattern.created_at).toLocaleDateString('sv-SE')}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
