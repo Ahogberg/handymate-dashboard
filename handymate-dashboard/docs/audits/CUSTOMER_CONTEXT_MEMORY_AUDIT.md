@@ -1,5 +1,22 @@
 # Customer/Project Context & Memory Flow — Code-Verified Audit
 
+> **ÅTGÄRDSSTATUS (2026-08-16, samma kväll, commit `0cf4152f`):** Andreas
+> beordrade en omfattande fix av samtliga punkter. Fynd 1 (utgående e-post
+> — `lib/comm/log-outbound-email.ts` + send_email-verktyget + Gmail-pollern
+> arkiverar nu ägarens mejl), 2 (resolverns e-posthistorik), 3 (SMS-
+> speglingen i strypunkten `sendSmsViaElks`, dubbelskrivarna borttagna),
+> 4+7 (tidslinjen utökad med samtal/möten/e-post/portal/sms_log-historik/
+> offertöppningar/webbchatt), 5 (portal-tråden i resolvern), 6 (Postmark-
+> arkivering FÖRE klassificering) och 9:s trunkering (80→300 tecken +
+> kanal-tagg) är FIXADE och facit-låsta i
+> `tests/customer-context-trail.spec.ts` (18 tester). Fynd 8 är ett
+> pitch/verklighets-glapp, ingen kodåtgärd. Kvarstående ur fynd 9:
+> STOPP/START-uteslutningen (medvetet beslut, ändrades inte),
+> `agent_memories` företags-nyckling + null-embeddings (egen, större
+> insats), döda `conversations`-läsningen i tidslinjen (ofarlig, lämnad).
+> OBS: fynd 6-fixen räddar bara mejl FRAMÅT — historiskt kastade mejl är
+> borta för alltid, precis som rapporten varnade.
+
 **Datum:** 2026-08-16. **Utförd av:** Fable 5-agent (bakgrundskörd), på Andreas
 uppdrag, parallellt med Customer Memory V2-bygget (telefonsamtal →
 `customer_fact`, se `tasks/todo.md`). Läsanvisning: allt nedan är verifierat
