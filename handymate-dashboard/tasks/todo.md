@@ -83,19 +83,23 @@ tyst ingenting. Ska in i `tasks/tech-debt.md` som ett eget ärende.
 - `npx next build` ren — `/api/onboarding/seed-products` byggd, inga fel
   refererar något av de nya filerna.
 
+## Pushat och deployat (commit `499ab621`, tillsammans med Codex `c1f1bb3f`)
+
+`git log origin/main..HEAD` visade Codex egen, ocommittade Revenue
+Recovery-uppföljning (`c1f1bb3f`) i kö — granskad (`git show --stat`,
+inga filöverlapp med det här arbetet, egna facit redan gröna i samma
+fullsvit-körning) innan gemensam push. Vercel-deploy pollad till `Ready`,
+`app.handymate.se`-aliaset bekräftat peka på den nya deployen.
+
 ## Kvar
 
 - Migrationen `sql/v137_price_list_product_link.sql` är EJ körd — väntar
   på Andreas "kör".
-- Karins trasiga prisjustering (se sidofynd ovan) ska loggas i
-  `tasks/tech-debt.md` — inte gjort än i den här sessionen.
+- Karins trasiga prisjustering (sidofynd, se ovan) ska loggas i
+  `tasks/tech-debt.md` — inte gjort än.
 - Manuell/E2E-kontroll (registrera ett riktigt testkonto genom hela
   `/onboarding`) är INTE körd — kräver en levande miljö, inte bara
   källkodsverifiering.
-- Commit/push/deploy-verifiering är INTE gjord än vid den här
-  dokumentationspunkten — Codex har en egen ocommittad/opushad commit
-  (`c1f1bb3f`, Revenue Recovery-uppföljning) som måste granskas innan en
-  gemensam push, se den delade-arbetskatalog-disciplinen.
 
 ---
 

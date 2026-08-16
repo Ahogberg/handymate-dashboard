@@ -2544,3 +2544,23 @@ UNDANTAGEN per beslut (ägar-armerad, kommenterad). #7 delvis: agent-gating.ts
 användarstartade kedjor (över-gating, medvetet konservativt — Andreas kan
 lätta senare), (ii) förtjänad autonomi är inert på generiska tool-vägen tills
 en kontext-nyckel plumbas in i ToolContext (v3-regelmotorns autonomi opåverkad).
+
+---
+
+## 2026-08-16 — Prisjustering-godkännande är ett dolt no-op (fältnamns-mismatch) (TD-83)
+
+**Plats:** `lib/agent/price-analysis.ts` (producent, `analyzePriceAdjustments`) vs `app/api/approvals/[id]/route.ts:1867-1884` (`price_adjustment`-caset i exekveraren).
+
+**Symtom:** Karins cron-genererade "prisjustering"-godkännandekort (skapas när ett jobb konsekvent tar längre tid än estimerat) skickar payload-fälten `suggested_rate` + `price_list_id`. Exekveraren letar efter `item_id` + `suggested_price` — inget av dessa fält finns någonsin i payloaden. `if (!pl.item_id || !pl.suggested_price)` är därför ALLTID sant, så caset returnerar tyst `{ action: 'price_adjustment', skipped: 'no item_id or suggested_price' }` — inget pris uppdateras någonsin, oavsett hur många gånger hantverkaren godkänner kortet.
+
+**Upptäckt:** 2026-08-16, under verifiering inför produktregister-onboarding-planen (research visade att `price_list` har fler skrivvägar än väntat — den här visade sig vara trasig, inte aktiv).
+
+**Konsekvens:** En hel godkännande-korttyp är dekorativ. Hantverkaren tror att de justerar sitt pris genom att godkänna kortet, men ingenting händer — och inget synligt fel avslöjar det.
+
+**Två separata beslut krävs innan fix:**
+1. **Vilken tabell ska faktiskt uppdateras?** `analyzePriceAdjustments` läser sitt nuvarande timpris från `price_lists_v2` (kundsegment-prissättning, `hourly_rate_normal`) — INTE `price_list` (den äldre, branschseedade tabellen exekveraren faktiskt skriver till). Två helt olika prissystem. En blind fältnamns-fix (byt `item_id`→`price_list_id`, `suggested_price`→`suggested_rate`) flyttar bara buggen: exekveraren skulle fortfarande skriva mot `price_list`, men förslaget är beräknat från `price_lists_v2`.
+2. **Ska den knytas till nya `price_list.product_id`-länken** (sql/v137, se produktregister-onboarding-planen 2026-08-16) eller till `price_lists_v2` direkt? Beror på om Karins prisjustering ska påverka det generella branschregistret eller kundspecifik prissättning — ett produktbeslut, inte bara en kodfix.
+
+**Trigger:** När Karin/prisjustering prioriteras för skarpt bruk, eller om en pilot rapporterar att godkända prisjusteringar inte syns någonstans.
+
+**Relaterat:** Samma mönster som TD-22 (tyst no-op i stället för ett synligt fel), fast i approval-exekveraren i stället för en portal-route.
