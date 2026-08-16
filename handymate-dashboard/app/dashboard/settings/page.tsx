@@ -4694,17 +4694,36 @@ function PlaybookPatternsSection({ businessId }: { businessId: string }) {
 }
 
 /**
+ * Föreslagna startprinciper (2026-08-16→17, ur Christoffers intervju —
+ * se tasks/todo.md). Generaliserade mönster, INTE hans faktiska belopp.
+ * Rent UI-facit — ingen bakgrundsseedning: en klickning kör exakt samma
+ * POST som en manuellt skriven+skickad princip (se handleAdd nedan).
+ */
+const SUGGESTED_PRIORITY_RULES = [
+  'En stor obesvarad offert som kunden visat intresse för väger tyngre än en enskild sen påminnelse, om beloppet är klart större.',
+  'Om något imorgon kräver ett beslut innan arbetet kan fortsätta ute hos kund, gör det före sådant utan lika hård tidsgräns.',
+  'Enkla, redan färdiga åtgärder skickas direkt — det frigör tid till det som kräver mer eftertanke.',
+  'En stor offert som riskerar gå till en konkurrent efter flera dagars tystnad prioriteras högt.',
+]
+
+/**
  * Next Best Action Engine — capture-UI för prioriteringsprinciper
  * (2026-08-13). Samma mönster som BusinessRulesSection ovan, men egen
  * pool (knowledge_type='priority_rule', app/api/priority-rules/route.ts)
  * — de här principerna styr INTE Daniels offerter, de styr vilket beslut
  * som lyfts fram som "Gör detta först" i inkorgen.
+ *
+ * Sedan 2026-08-16→17 natt: när ytan är tom (i praktiken alla 22 konton,
+ * motorn kör aldrig utan minst 1 princip) visas fyra klickbara förslag
+ * ur Christoffers intervju. Klick = handleAdd(text) = exakt samma
+ * POST-anrop som textarean skickar — ingen egen insert-väg.
  */
 function PriorityRulesSection({ businessId, isOwnerOrAdmin }: { businessId: string; isOwnerOrAdmin: boolean }) {
   const [rules, setRules] = useState<Array<{ id: string; observation: string; created_at: string }>>([])
   const [loading, setLoading] = useState(true)
   const [newRule, setNewRule] = useState('')
   const [saving, setSaving] = useState(false)
+  const [pendingSuggestion, setPendingSuggestion] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => { fetchRules() }, [businessId])
@@ -4722,23 +4741,26 @@ function PriorityRulesSection({ businessId, isOwnerOrAdmin }: { businessId: stri
     }
   }
 
-  async function handleAdd() {
-    if (!newRule.trim()) return
+  async function handleAdd(overrideText?: string) {
+    const text = (overrideText ?? newRule).trim()
+    if (!text) return
     setSaving(true)
     setErr(null)
+    if (overrideText) setPendingSuggestion(overrideText)
     const res = await fetch('/api/priority-rules', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ruleText: newRule.trim() }),
+      body: JSON.stringify({ ruleText: text }),
     })
     if (res.ok) {
-      setNewRule('')
+      if (!overrideText) setNewRule('')
       await fetchRules()
     } else {
       const body = await res.json().catch(() => null)
       setErr(body?.error || 'Kunde inte spara principen')
     }
     setSaving(false)
+    setPendingSuggestion(null)
   }
 
   async function handleDelete(id: string) {
@@ -4777,6 +4799,24 @@ function PriorityRulesSection({ businessId, isOwnerOrAdmin }: { businessId: stri
         </div>
       )}
 
+      {!loading && rules.length === 0 && (
+        <div className="mb-4">
+          <p className="text-xs font-medium text-gray-500 mb-2">Förslag att komma igång</p>
+          <div className="flex flex-col gap-2">
+            {SUGGESTED_PRIORITY_RULES.map(text => (
+              <button
+                key={text}
+                onClick={() => handleAdd(text)}
+                disabled={saving}
+                className="text-left px-3 py-2 bg-primary-50 text-primary-800 border border-primary-100 rounded-lg text-sm hover:bg-primary-100 disabled:opacity-50 transition-colors"
+              >
+                {pendingSuggestion === text ? 'Sparar...' : text}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-start gap-2">
         <textarea
           value={newRule}
@@ -4787,7 +4827,7 @@ function PriorityRulesSection({ businessId, isOwnerOrAdmin }: { businessId: stri
           className="flex-1 px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:border-primary-500 resize-none"
         />
         <button
-          onClick={handleAdd}
+          onClick={() => handleAdd()}
           disabled={saving || !newRule.trim()}
           className="px-4 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-800 disabled:opacity-50 transition-colors shrink-0"
         >

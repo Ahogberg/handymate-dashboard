@@ -9,7 +9,7 @@ import fs from 'fs'
 import path from 'path'
 import { test, expect } from '@playwright/test'
 import { byggNextBestAction, nextBestActionId } from '../lib/jarvis/next-best-action'
-import { buildUserMessage, validateModelOutput } from '../lib/jarvis/next-best-action-prompt'
+import { buildUserMessage, validateModelOutput, NEXT_BEST_ACTION_SYSTEM_PROMPT } from '../lib/jarvis/next-best-action-prompt'
 import type { NormalizedCandidate } from '../lib/jarvis/next-best-action-normalize'
 
 const ROOT = path.resolve(__dirname, '..')
@@ -154,6 +154,41 @@ test.describe('buildUserMessage — Company Goals-kontext (backlog #11)', () => 
     expect(msg).toContain('Årsmål 2026: 1 200 000 kr.')
     // Sektionen kommer efter principerna, inte insprängd i dem.
     expect(msg.indexOf('ÄGARENS PRIORITERINGSPRINCIPER')).toBeLessThan(msg.indexOf('ÄGARENS MÅL'))
+  })
+})
+
+test.describe('NEXT_BEST_ACTION_SYSTEM_PROMPT — Christoffer-intervjuns generella mönster (2026-08-16→17)', () => {
+  test('mönster 1: ärenden som blockerar riktigt arbete inom kort väger tyngre, oavsett belopp', () => {
+    expect(NEXT_BEST_ACTION_SYSTEM_PROMPT).toContain('blockerar riktigt arbete')
+    expect(NEXT_BEST_ACTION_SYSTEM_PROMPT).toContain('oavsett belopp')
+  })
+
+  test('mönster 2: enkla, klara åtgärder klaras undan först eftersom de frigör uppmärksamhet', () => {
+    expect(NEXT_BEST_ACTION_SYSTEM_PROMPT).toContain('Enkla, redan klara åtgärder klaras undan först')
+    expect(NEXT_BEST_ACTION_SYSTEM_PROMPT).toContain('frigör uppmärksamhet')
+  })
+
+  test('mönster 3 ("bajsmackor"): tunga utredningar får skjutas bakom en enklare åtgärd men får aldrig försvinna ur sikte', () => {
+    expect(NEXT_BEST_ACTION_SYSTEM_PROMPT).toContain('Tunga, obekväma utredningar skjuts ofta bakom en enklare åtgärd')
+    expect(NEXT_BEST_ACTION_SYSTEM_PROMPT).toContain('aldrig försvinna helt ur sikte')
+    expect(NEXT_BEST_ACTION_SYSTEM_PROMPT).toContain('sekvenseras om')
+  })
+
+  test('mönster 4: ett stort, redan engagerat ärende väger tyngre än flera små påminnelser', () => {
+    expect(NEXT_BEST_ACTION_SYSTEM_PROMPT).toContain('redan engagerat ärende')
+    expect(NEXT_BEST_ACTION_SYSTEM_PROMPT).toContain('flera små påminnelser')
+  })
+
+  test('explicit instruktion: de fyra mönstren får ALDRIG citeras i principles_applied — det fältet är förbehållet ägarens skrivna principer', () => {
+    expect(NEXT_BEST_ACTION_SYSTEM_PROMPT).toContain('citera dem ALDRIG i principles_applied')
+    expect(NEXT_BEST_ACTION_SYSTEM_PROMPT).toContain('INTE en\nskriven princip från ägaren')
+    expect(NEXT_BEST_ACTION_SYSTEM_PROMPT).toContain('reserverat uteslutande för ordagranna citat ur ÄGARENS')
+  })
+
+  test('den ursprungliga spärren ("lämna principles_applied tom") finns kvar oförändrad, inte försvagad', () => {
+    expect(NEXT_BEST_ACTION_SYSTEM_PROMPT).toContain(
+      'Om ingen princip tydligt avgör en given\nrangordning, lämna principles_applied tom snarare än att hitta på en\nkoppling.',
+    )
   })
 })
 
