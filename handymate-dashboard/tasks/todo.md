@@ -1,5 +1,43 @@
 # Playbook Pattern Confirmation V1 (Debrief → Playbook, V2-lagret) — 2026-08-16 natt
 
+## Resultat (klart, pushat 2026-08-16→17 natt)
+
+Byggt i två Sonnet 5-deltag, båda oberoende verifierade (tsc/riktade
+facit/build) innan commit: backend (`73f887ec`) + read-only UI-yta
+(`25449012`). Codex bekräftade oberoende samma nattplan innan bygget
+startade — ingen krock, noll filöverlapp genom hela natten.
+
+- `lib/playbook/detect-pattern.ts` + `propose-pattern.ts`: en Haiku-analys
+  per jobbtyp (MIN_SAMPLE_SIZE=5), "hellre missa än gissa" both i prompten
+  OCH som kodspärr (minst 2 oberoende belägg krävs, inte bara prompttillit).
+  Trippel dedup (väntande kort / redan bekräftat mönster / avvisat senaste
+  30 dagarna).
+- Kortet (`playbook_pattern_confirmation`) är `EXECUTABLE_ACTION`,
+  routing `owner_admin` (medveten avvikelse från `project_debrief`s `any`
+  — en företagsomfattande regel har större blast radius än en enskild
+  projektreflektion).
+- Godkännande skriver EN rad i befintliga `business_knowledge`
+  (`knowledge_type='pattern'`, redan definierad men oanvänd sedan tabellens
+  start) — ingen ny tabell. `sql/v141_business_knowledge_pattern.sql`
+  SKRIVEN, EJ körd — kör manuellt när redo, funktionen är inert tills dess.
+- Offertgenereringen läser bekräftade mönster (`fetchConfirmedPatterns`,
+  ny sektion "SÅ HÄR JOBBAR VI" i prompten, skild från LÄRDOMAR/
+  AFFÄRSREGLER).
+- Ny veckovis cron `/api/cron/playbook-pattern` (tisdag 05:20, verifierat
+  kollisionsfritt mot alla 40 befintliga schemarader).
+- Settings-yta: tyst sektion under "Lär Handymate" — visar INGET förrän
+  minst ett mönster finns, AI-föreslaget/ägarbekräftat-märkt, read-only
+  (ingen radera/redigera i denna omgång, medveten avgränsning).
+- 125 nya facit totalt (85 backend + 15 detektion/dedup-relaterade + 15
+  UI/route), alla gröna. `npx tsc --noEmit` rent, `npx next build` ren,
+  båda gångerna.
+
+**Kvar för Andreas**: kör `sql/v141_business_knowledge_pattern.sql`
+manuellt i Supabase SQL Editor när redo — funktionen aktiveras då automatiskt
+(alla läsningar har `arSchemaSaknas`-failsafe till dess).
+
+---
+
 ## Mål
 
 Koncept 2 i docs/audits/NEXT_MOAT_WAVE.md ("Debrief → Firmans Playbook") hade
