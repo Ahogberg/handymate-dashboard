@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, Camera, FileText, Loader2, Mic, Square, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Camera, FileText, Loader2, Mic, PenLine, Square, X } from 'lucide-react'
 import { useAudioRecording } from '@/hooks/useAudioRecording'
 /** Bara det intaget faktiskt behöver. Strukturell typ i stället för en import
     av sidans Customer: det finns tre olika Customer-typer i kodbasen, och den
@@ -332,10 +332,13 @@ export function QuickIntake({
         </div>
 
         <div className="mt-auto pt-6">
-          {/* Två riktiga knappar, inte en hjälte och två fotnoter. Bygg
-              utkast är primär; mallen är en synlig sekundär (döljs när
-              offerten har innehåll — se hasContent). Editorlänken bor i
-              headern. */}
+          {/* TRE riktiga knappar, inte en hjälte och två fotnoter (fix
+              2026-08-17, Andreas fynd): "jag fyller i själv"-vägen — som
+              leder till SAMMA sektionsvisa granskning, bara utan AI — var
+              en ljusgrå fotnotlänk. Den som ville jobba manuellt kände
+              inte igen den som sin väg och tog editorlänken i headern i
+              stället, rakt in i den gamla fullvyn. Nu är alla tre starterna
+              likvärdigt synliga; bara legacy-editorn bor kvar i headern. */}
           <div className="flex flex-col sm:flex-row gap-2.5">
             <button
               type="button"
@@ -351,6 +354,16 @@ export function QuickIntake({
             {!hasContent && (
               <button
                 type="button"
+                onClick={onSkipDescription}
+                className="sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-4 bg-white border-2 border-slate-200 hover:border-primary-700 rounded-2xl text-base font-semibold text-slate-700 hover:text-primary-700 transition-colors"
+              >
+                <PenLine className="w-4 h-4" />
+                Bygg själv
+              </button>
+            )}
+            {!hasContent && (
+              <button
+                type="button"
                 onClick={onUseTemplate}
                 className="sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-4 bg-white border-2 border-slate-200 hover:border-primary-700 rounded-2xl text-base font-semibold text-slate-700 hover:text-primary-700 transition-colors"
               >
@@ -362,19 +375,8 @@ export function QuickIntake({
           {/* Den inaktiverade knappen förklarar sig — höjden är reserverad
               så förklaringen inte knuffar knapparna när den försvinner. */}
           <p className="text-center text-xs text-slate-400 mt-2.5 min-h-[16px] m-0">
-            {!canBuild && !building && !transcribing ? 'Beskriv jobbet först — sedan bygger vi utkastet åt dig.' : ''}
+            {!canBuild && !building && !transcribing ? 'Beskriv jobbet — eller bygg själv, sektion för sektion.' : ''}
           </p>
-          {!hasContent && (
-            <p className="text-center mt-1 m-0">
-              <button
-                type="button"
-                onClick={onSkipDescription}
-                className="text-xs text-slate-400 hover:text-primary-700 underline underline-offset-2 transition-colors"
-              >
-                Hoppa över beskrivningen — jag fyller i själv
-              </button>
-            </p>
-          )}
         </div>
       </div>
     </div>
