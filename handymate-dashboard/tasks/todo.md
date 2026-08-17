@@ -1,3 +1,89 @@
+# Playbook Kickoff Copilot V1 — 2026-08-17 (04:00)
+
+## Mål
+
+Codex förslag: låt Playbook-mönster (byggt inatt) påverka INTE bara
+offerten utan projektstarten. När ett projekt av en jobbtyp med ett
+ägarbekräftat mönster skapas, ska Lars kunna föreslå en kontrollpunkt
+("på liknande badrumsjobb har rivningen ofta tagit längre tid") med
+belägg och källprojekt — ett godkännandekort, aldrig en tyst skrivning.
+
+En läsande research-agent granskade förslaget mot verklig kod FÖRE bygget
+(samma disciplin som X2-utredningen och Playbook-planen inatt) och hittade
+tre reella problem — korrigerade nedan, INTE byggda som ursprungligen
+föreslaget:
+
+## Korrigeringar mot ursprungsförslaget
+
+1. **"En extra dag" har ingen plats i schemat.** Inget buffert-/
+   slack-days-fält finns på `project` eller `project_milestone`. DROPPAT
+   ur V1 — ingen ny kolumn improviseras under natten. V1 föreslår bara en
+   kontrollpunkt (checklist-item), som redan har en verklig datamodell.
+2. **Closeout-copilot (`lib/agents/lars/closeout-copilot.ts`) är INTE
+   prejudikatet det såg ut som.** Den skapar aldrig ett kort — bara en
+   länk, ingen kö-rad, ingen granskningshistorik. Det verkliga
+   prejudikatet för "kort med riktig skrivning vid godkännande" är
+   `checklist_forslag`/`playbook_pattern_confirmation` (inatt).
+3. **Att kroka in i projekt-SKAPANDET är instabilt av ett redan känt skäl**:
+   den faktiska produktionsvägen för signering (`onQuoteAccepted` i
+   `lib/project-ai-engine.ts`) förbigår `create-from-quote.ts` i de
+   flesta fall — rotorsak 2026-08-13 (29/33 projekt fick `stage: null` av
+   exakt denna divergens). En skapande-krok skulle tyst missa de flesta
+   riktiga projekt. I stället: en periodisk svepning över projektets
+   AKTUELLA tillstånd (samma princip som fixade stage:null-buggen), inte
+   ett händelse-hook.
+4. **"Kvalitetsgodkända projektutfall"-kravet DROPPAT.** Det är
+   `v138_outcome_quality_gate`s maskineri för RÅ, numerisk
+   lärande-behörighet (fakturor/tidrapporter) — hör inte hemma här. Ett
+   mönster är redan ägarbekräftat innan det ens finns i business_knowledge;
+   att lägga bokföringsfullständighet ovanpå skulle kunna tyst blockera
+   ett mönster ägaren redan sagt är sant, av ett skäl hen aldrig gick med
+   på. Troligen en förväxling med X2-diskussionen, inte ett verkligt krav.
+
+## Korrigerad V1
+
+- Ny veckovis(-ish) cron, `app/api/cron/playbook-kickoff/route.ts` —
+  svep över projekt skapade de senaste N dagarna, `status` inte redan
+  `completed`, med ett `job_type` som matchar en aktiv, bekräftad
+  `business_knowledge`-rad (`knowledge_type='pattern'`). Läser NUVARANDE
+  tillstånd, litar inte på att någon skapande-händelse fyrat.
+- Dedup: högst ett kort per projekt (kolla `pending_approvals` för redan
+  skapat/hanterat `playbook_kickoff_suggestion`-kort för samma project_id).
+- Käll-bevis: `evidence_lesson_ids` → `project_lesson.project_id` →
+  `project.name` — riktiga källprojekt-namn i kortet, fail-safe om ett
+  källprojekt inte längre går att slå upp.
+- Nytt `approval_type: 'playbook_kickoff_suggestion'`, klassad
+  `EXECUTABLE_ACTION` (godkännande gör en riktig skrivning), routing
+  `project_team` (samma bucket som `checklist_forslag` — projektteamet,
+  inte hela företaget, äger den här typen av beslut).
+- Godkännande skriver ETT `project_checklist`-item (kontrollpunkt),
+  samma tabellform som `checklist_forslag`s hanterare redan använder —
+  ingen ny tabell.
+- Lars äger kortet (agent_id), Matte kan sammanfatta i chatt/Idag —
+  ingen ny agent-trigger-mekanism byggs; kortet skapas direkt av cronen,
+  inte via en händelse Lars "vaknar av".
+- Helt fail-safe kring `v141` (business_knowledge.job_type) — funktionen
+  producerar tyst noll kort tills Andreas kört den migrationen (samma
+  `arSchemaSaknas`-mönster som resten av Playbook-bygget).
+
+## Avgränsning
+
+- Ingen buffert-/extra-dag-funktion (se korrigering 1).
+- Ingen ny agent-väckningsmekanism, inget nytt projekt-skapande-hook.
+- Ingen ändring av `create-from-quote.ts` eller `project-ai-engine.ts`.
+- Ingen koppling till `v138_outcome_quality_gate`/`project_outcome`.
+- Full Expectation Drift börjas fortsatt INTE (saknar fortfarande en
+  säker koppling kundlöfte↔datum↔rätt projekt, oförändrat av det här
+  bygget).
+
+## Verifiering
+
+Samma disciplin som resten av natten: TDD, `npx tsc --noEmit` rent,
+riktade + regressions-facit gröna, `npx next build` ren, `git log
+origin/main..HEAD` kontrollerat före push.
+
+---
+
 # NBA-prioriteringsprinciper ur Christoffers intervju — 2026-08-16→17 natt
 
 ## Resultat (klart, pushat 2026-08-17, commit dbe04259)
