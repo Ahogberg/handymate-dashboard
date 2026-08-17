@@ -348,12 +348,104 @@ function asRows<T>(data: unknown): T[] {
   return Array.isArray(data) ? (data as T[]) : []
 }
 
+/** Ett mission-korts approval-rad, MED title — samma rad som
+    MissionApprovalInput men med kolumnen expansionspanelen (Etapp G)
+    behöver för att lista beslutet begripligt. Egen lokal typ i stället för
+    att bredda MissionApprovalInput: bara loadMissionProgressInputs/
+    getMissionProgressWithDecisions bryr sig om title, resten av filen
+    (byggMissionProgress) rör den aldrig. */
+type MissionApprovalRow = MissionApprovalInput & { title?: string | null }
+
 /**
- * I/O: läser exakt de tre indata-mängderna den rena kärnan behöver —
- * mission-kort via payload.mission_id (samma .contains-konvention som
- * lib/autopilot/quote-nudge.ts), fakturor och offerter via planstegens/
- * artefakternas referenser. Fail-soft: vilket fel som helst (inklusive
- * att mission-tabellens grannar saknas) → nollprogress + loggad varning.
+ * I/O: läser exakt de indata-mängder den rena kärnan behöver — mission-kort
+ * via payload.mission_id (samma .contains-konvention som lib/autopilot/
+ * quote-nudge.ts), fakturor och offerter via planstegens/artefakternas
+ * referenser, plus (Etapp F) kapacitetsuppdragets bokade timmar. Delad av
+ * getMissionProgress OCH getMissionProgressWithDecisions (Etapp G) — samma
+ * approvals-rader ska inte läsas två gånger för samma sida.
+ */
+async function loadMissionProgressInputs(
+  supabase: SupabaseClient,
+  mission: MissionRow,
+  nowMs: number,
+): Promise<{
+  invoices: MissionInvoiceInput[]
+  missionApprovals: MissionApprovalRow[]
+  quotes: MissionQuoteInput[]
+  capacityWeek: MissionCapacityWeekInput | null
+}> {
+  const { data: approvalRows, error: approvalError } = await supabase
+    .from('pending_approvals')
+    .select('id, status, approval_type, payload, title')
+    .eq('business_id', mission.business_id)
+    .contains('payload', { mission_id: mission.id })
+  if (approvalError) throw new Error(`pending_approvals-uppslag misslyckades: ${approvalError.message}`)
+  const missionApprovals = asRows<MissionApprovalRow>(approvalRows)
+    .map(row => ({ ...row, payload: (row.payload ?? {}) as Record<string, unknown> }))
+
+  const steps = Array.isArray(mission.plan_snapshot?.steps) ? mission.plan_snapshot.steps : []
+  const invoiceIds = new Set<string>()
+  const quoteIds = new Set<string>()
+  for (const step of steps) {
+    if (step.evidence?.table === 'invoice' && typeof step.evidence.ref_id === 'string') {
+      invoiceIds.add(step.evidence.ref_id)
+    }
+    if (step.evidence?.table === 'quotes' && typeof step.evidence.ref_id === 'string') {
+      quoteIds.add(step.evidence.ref_id)
+    }
+  }
+  for (const approval of missionApprovals) {
+    const invoiceId = approvalArtifactInvoiceId(approval.payload)
+    if (invoiceId) invoiceIds.add(invoiceId)
+  }
+
+  let invoices: MissionInvoiceInput[] = []
+  if (invoiceIds.size > 0) {
+    const { data, error } = await supabase
+      .from('invoice')
+      .select('invoice_id, total, status, paid_at')
+      .eq('business_id', mission.business_id)
+      .in('invoice_id', Array.from(invoiceIds))
+    if (error) throw new Error(`invoice-uppslag misslyckades: ${error.message}`)
+    invoices = asRows<MissionInvoiceInput>(data)
+  }
+
+  let quotes: MissionQuoteInput[] = []
+  if (quoteIds.size > 0) {
+    const { data, error } = await supabase
+      .from('quotes')
+      .select('quote_id, status')
+      .eq('business_id', mission.business_id)
+      .in('quote_id', Array.from(quoteIds))
+    if (error) throw new Error(`quotes-uppslag misslyckades: ${error.message}`)
+    quotes = asRows<MissionQuoteInput>(data)
+  }
+
+  // ── Etapp F: kapacitetsuppdragets bokade timmar i målveckan. ──────────
+  // Egen try/catch: ett kapacitetsfel ska degradera till
+  // capacity_unconfigured, aldrig fälla hela progress-läsningen (samma
+  // fail-soft-linje som invoice-/quotes-uppslagen ovan hör till den
+  // gemensamma try:n, men det här är en extra, separat I/O-källa).
+  let capacityWeek: MissionCapacityWeekInput | null = null
+  if (resolveGoalType(mission.goal_type) === 'capacity') {
+    try {
+      const targetWeek = capacityTargetWeekMonday(mission.deadline, new Date(nowMs))
+      const wc = await getWeekCapacity(supabase, mission.business_id, targetWeek)
+      capacityWeek = { bookedHours: wc.booked_hours, configured: wc.configured }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn('[mission-progress] kapacitet kunde inte läsas (gap_hours blir okonfigurerat):', msg)
+      capacityWeek = null
+    }
+  }
+
+  return { invoices, missionApprovals, quotes, capacityWeek }
+}
+
+/**
+ * Fail-soft I/O: läser via loadMissionProgressInputs och kör den rena
+ * kärnan. Vilket fel som helst (inklusive att mission-tabellens grannar
+ * saknas) → nollprogress + loggad varning.
  */
 export async function getMissionProgress(
   supabase: SupabaseClient,
@@ -361,75 +453,55 @@ export async function getMissionProgress(
 ): Promise<MissionProgress> {
   const nowMs = Date.now()
   try {
-    const { data: approvalRows, error: approvalError } = await supabase
-      .from('pending_approvals')
-      .select('id, status, approval_type, payload')
-      .eq('business_id', mission.business_id)
-      .contains('payload', { mission_id: mission.id })
-    if (approvalError) throw new Error(`pending_approvals-uppslag misslyckades: ${approvalError.message}`)
-    const missionApprovals = asRows<MissionApprovalInput>(approvalRows)
-      .map(row => ({ ...row, payload: (row.payload ?? {}) as Record<string, unknown> }))
-
-    const steps = Array.isArray(mission.plan_snapshot?.steps) ? mission.plan_snapshot.steps : []
-    const invoiceIds = new Set<string>()
-    const quoteIds = new Set<string>()
-    for (const step of steps) {
-      if (step.evidence?.table === 'invoice' && typeof step.evidence.ref_id === 'string') {
-        invoiceIds.add(step.evidence.ref_id)
-      }
-      if (step.evidence?.table === 'quotes' && typeof step.evidence.ref_id === 'string') {
-        quoteIds.add(step.evidence.ref_id)
-      }
-    }
-    for (const approval of missionApprovals) {
-      const invoiceId = approvalArtifactInvoiceId(approval.payload)
-      if (invoiceId) invoiceIds.add(invoiceId)
-    }
-
-    let invoices: MissionInvoiceInput[] = []
-    if (invoiceIds.size > 0) {
-      const { data, error } = await supabase
-        .from('invoice')
-        .select('invoice_id, total, status, paid_at')
-        .eq('business_id', mission.business_id)
-        .in('invoice_id', Array.from(invoiceIds))
-      if (error) throw new Error(`invoice-uppslag misslyckades: ${error.message}`)
-      invoices = asRows<MissionInvoiceInput>(data)
-    }
-
-    let quotes: MissionQuoteInput[] = []
-    if (quoteIds.size > 0) {
-      const { data, error } = await supabase
-        .from('quotes')
-        .select('quote_id, status')
-        .eq('business_id', mission.business_id)
-        .in('quote_id', Array.from(quoteIds))
-      if (error) throw new Error(`quotes-uppslag misslyckades: ${error.message}`)
-      quotes = asRows<MissionQuoteInput>(data)
-    }
-
-    // ── Etapp F: kapacitetsuppdragets bokade timmar i målveckan. ──────────
-    // Egen try/catch: ett kapacitetsfel ska degradera till
-    // capacity_unconfigured, aldrig fälla hela progress-läsningen (samma
-    // fail-soft-linje som invoice-/quotes-uppslagen ovan hör till den
-    // gemensamma try:n, men det här är en extra, separat I/O-källa).
-    let capacityWeek: MissionCapacityWeekInput | null = null
-    if (resolveGoalType(mission.goal_type) === 'capacity') {
-      try {
-        const targetWeek = capacityTargetWeekMonday(mission.deadline, new Date(nowMs))
-        const wc = await getWeekCapacity(supabase, mission.business_id, targetWeek)
-        capacityWeek = { bookedHours: wc.booked_hours, configured: wc.configured }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err)
-        console.warn('[mission-progress] kapacitet kunde inte läsas (gap_hours blir okonfigurerat):', msg)
-        capacityWeek = null
-      }
-    }
-
+    const { invoices, missionApprovals, quotes, capacityWeek } = await loadMissionProgressInputs(supabase, mission, nowMs)
     return byggMissionProgress({ mission, invoices, missionApprovals, quotes, nowMs, capacityWeek })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     console.warn('[mission-progress] kunde inte härleda progress (nollprogress):', msg)
     return byggMissionProgress({ mission, invoices: [], missionApprovals: [], quotes: [], nowMs, capacityWeek: null })
+  }
+}
+
+/** En öppen (status 'pending') beslutsrad kopplad till uppdraget —
+    expansionspanelens (Etapp G) "Beslut"-sektion. Samma räknare som
+    MissionProgress.decisions_outstanding, bara med id/title/typ per rad. */
+export interface MissionDecision {
+  id: string
+  title: string
+  status: string
+  approval_type: string
+}
+
+/**
+ * Etapp G (expansionspanelen): samma I/O-källa som getMissionProgress —
+ * läses EN gång, delas mellan progress och beslutslistan — men svarar också
+ * med de öppna besluten så panelen kan lista dem utan en andra fråga.
+ * Fail-soft identiskt med getMissionProgress: ett läsfel ger nollprogress +
+ * tom beslutslista, aldrig ett kastat fel.
+ */
+export async function getMissionProgressWithDecisions(
+  supabase: SupabaseClient,
+  mission: MissionRow,
+): Promise<{ progress: MissionProgress; decisions: MissionDecision[] }> {
+  const nowMs = Date.now()
+  try {
+    const { invoices, missionApprovals, quotes, capacityWeek } = await loadMissionProgressInputs(supabase, mission, nowMs)
+    const progress = byggMissionProgress({ mission, invoices, missionApprovals, quotes, nowMs, capacityWeek })
+    const decisions: MissionDecision[] = missionApprovals
+      .filter(a => a.status === 'pending')
+      .map(a => ({
+        id: a.id,
+        title: typeof a.title === 'string' && a.title ? a.title : 'Beslut väntar på dig',
+        status: a.status,
+        approval_type: a.approval_type,
+      }))
+    return { progress, decisions }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.warn('[mission-progress] kunde inte härleda progress (nollprogress):', msg)
+    return {
+      progress: byggMissionProgress({ mission, invoices: [], missionApprovals: [], quotes: [], nowMs, capacityWeek: null }),
+      decisions: [],
+    }
   }
 }

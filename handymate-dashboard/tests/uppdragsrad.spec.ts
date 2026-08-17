@@ -56,6 +56,14 @@ test.describe('Uppdragsrad.tsx — startsidans andra fråga', () => {
     expect(src).not.toContain('Uppdrag:')
   })
 
+  test('aktivt uppdrag öppnar expansionspanelen (setPanelOpen), inte chatten direkt (Etapp G)', () => {
+    // MissionPanel (components/mission/MissionPanel.tsx) är nu den större
+    // arbetsytan för ett pågående uppdrag — "Öppna →" leder dit.
+    // "Fråga Matte" i panelens footer är den kvarvarande vägen till chatten.
+    expect(src).toContain("setPanelOpen } = useMission()")
+    expect(src).toContain('onClick={() => setPanelOpen(true)}')
+  })
+
   test('den signal-lösa pillen erbjuder en öppen text, inte ett påhittat förslag', () => {
     expect(src).toContain('Skriv vad du vill uppnå')
   })

@@ -72,4 +72,27 @@ test.describe('Jobbkompisen.tsx — bubbelpillarna (källskanning, EN pill-slot)
   test('den befintliga kr-pillens text "hittat" finns kvar oförändrad', () => {
     expect(src).toContain('hittat')
   })
+
+  // Etapp G (expansionspanelen): 'aktivt_uppdrag' öppnar nu panelen i
+  // stället för chatten — panelen ÄR den större arbetsytan för uppdraget.
+  // 'kraver_beslut' fortsätter öppna chatten oförändrat: beslut är
+  // konversationella, inte något panelen ska ta över.
+  test('importerar setPanelOpen ur useMission()', () => {
+    expect(src).toContain('setPanelOpen')
+  })
+
+  test('"Uppdrag pågår"-pillen öppnar expansionspanelen (setPanelOpen), inte chatten', () => {
+    const idx = src.indexOf("bubbleState === 'aktivt_uppdrag'")
+    expect(idx).toBeGreaterThan(-1)
+    const block = src.slice(idx, idx + 250)
+    expect(block).toContain('setPanelOpen(true)')
+    expect(block).not.toContain('setIsOpen(true)')
+  })
+
+  test('"Matte behöver ditt beslut"-pillen öppnar fortfarande chatten (setIsOpen) — beslut är konversationella', () => {
+    const idx = src.indexOf("bubbleState === 'kraver_beslut'")
+    expect(idx).toBeGreaterThan(-1)
+    const block = src.slice(idx, idx + 250)
+    expect(block).toContain('setIsOpen(true)')
+  })
 })

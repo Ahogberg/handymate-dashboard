@@ -18,6 +18,7 @@ import { ToastProvider } from '@/components/Toast'
 import { MomentsProvider } from '@/components/moments/MomentsProvider'
 import { FuelProvider } from '@/components/fuel/FuelProvider'
 import { MissionProvider } from '@/lib/mission/MissionProvider'
+import { MissionPanel } from '@/components/mission/MissionPanel'
 import { useAuth } from '@/lib/useAuth'
 import { checkSubscriptionStatus } from '@/lib/auth'
 import { useSessionKeepalive } from '@/lib/hooks/useSessionKeepalive'
@@ -105,6 +106,12 @@ export default function DashboardLayout({
                         {children}
                       </main>
                       <Jobbkompisen />
+                      {/* Expansionspanelen (Etapp G, Goal-to-Plan V2): mission-
+                          bandets "Öppna →" och bubblans "Uppdrag pågår"-pill
+                          öppnar den här i stället för chatten. Läser
+                          panelOpen ur useMission() själv — renderar inget
+                          när panelen är stängd eller inget uppdrag är aktivt. */}
+                      <MissionPanel />
                       <WelcomeModal />
                       <FeedbackWidget />
                       <PWAInstallBanner />

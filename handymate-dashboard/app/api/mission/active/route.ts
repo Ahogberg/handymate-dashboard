@@ -2,14 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
-import { getMissionProgress, type MissionRow } from '@/lib/mission/mission-progress'
+import { getMissionProgressWithDecisions, type MissionRow } from '@/lib/mission/mission-progress'
 import { resolveGoalType } from '@/lib/mission/goal-type'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/mission/active — det (högst) ena aktiva uppdraget + härledd
- * progress (Goal-to-Plan V1, Etapp A).
+ * progress + öppna beslut (Goal-to-Plan V1, Etapp A; decisions tillagt i
+ * Etapp G: expansionspanelen).
+ *
+ * Svarsformen: { mission, progress, decisions }. decisions är uppdragets
+ * öppna (status 'pending') mission-kort — components/mission/MissionPanel.tsx
+ * listar dem utan en egen fråga (samma läsning som progress kommer ur, se
+ * getMissionProgressWithDecisions).
  *
  * Fail-soft hela vägen: mission-tabellen körs manuellt (sql/v144_mission.sql)
  * och kan saknas i produktion — då, och vid varje annat läsfel, svarar
@@ -95,8 +101,10 @@ export async function GET(request: NextRequest) {
       mission.resolved_at = resolvedAt
     }
 
-    const progress = await getMissionProgress(supabase, mission)
-    return NextResponse.json({ mission, progress })
+    // Etapp G (expansionspanelen): samma läsning som förut, bara med
+    // uppdragets öppna beslut med i svaret — panelen slipper en andra fråga.
+    const { progress, decisions } = await getMissionProgressWithDecisions(supabase, mission)
+    return NextResponse.json({ mission, progress, decisions })
   } catch (error: any) {
     console.error('GET /api/mission/active error:', error)
     return NextResponse.json({ mission: null })

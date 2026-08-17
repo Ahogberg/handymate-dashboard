@@ -101,7 +101,10 @@ export default function Jobbkompisen() {
   // Goal-to-Plan V1 (Etapp C, tasks/jaunty-pondering-hummingbird.md): det
   // aktiva uppdraget styr bubblans stängda pillar (deriveBubbleState nedan)
   // och MissionPlanCards "Starta uppdraget"-knapp (startMissionFromCard).
-  const { mission, progress, refresh: refreshMission } = useMission()
+  // setPanelOpen (Etapp G): 'aktivt_uppdrag'-pillen öppnar expansionspanelen
+  // i stället för chatten — 'kraver_beslut' öppnar chatten oförändrat,
+  // beslut är konversationella.
+  const { mission, progress, refresh: refreshMission, setPanelOpen } = useMission()
   const pathname = usePathname()
   const pageContext = pageContextFromPathname(pathname)
 
@@ -545,7 +548,7 @@ export default function Jobbkompisen() {
         )}
         {bubbleState === 'aktivt_uppdrag' && (
           <button
-            onClick={() => setIsOpen(true)}
+            onClick={() => setPanelOpen(true)}
             className="px-3 h-8 rounded-full bg-primary-700 text-white text-xs font-bold shadow-lg shadow-primary-700/20 whitespace-nowrap"
           >
             Uppdrag pågår · öppna

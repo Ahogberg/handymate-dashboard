@@ -20,14 +20,16 @@ import type { MissionSuggestion } from '@/lib/mission/suggestions'
  *  1. Uppdraget laddar ELLER förslagen laddar (suggestions === null) →
  *     skelettrad.
  *  2. Aktivt uppdrag → EN kompakt "Öppna →"-yta. Heron visar redan
- *     rubrik+progress ovanför — bandet ska inte upprepa dem.
+ *     rubrik+progress ovanför — bandet ska inte upprepa dem. Öppnar
+ *     expansionspanelen (Etapp G, components/mission/MissionPanel.tsx),
+ *     INTE chatten — panelen ÄR den större arbetsytan för uppdraget.
  *  3. Inget uppdrag, minst ett förslag → chip-rad, klick förifyller chatten.
  *  4. Inget uppdrag, inga förslag → en smal pill som öppnar chatten tom.
  *
  * SkrivRad längst ner i JarvisHome rörs inte (en merge är V2).
  */
 export function Uppdragsrad({ suggestions }: { suggestions: MissionSuggestion[] | null }) {
-  const { mission, loading: missionLoading } = useMission()
+  const { mission, loading: missionLoading, setPanelOpen } = useMission()
   const { setPendingPrompt, setActiveTab, setIsOpen } = useJobbuddy()
 
   const oppnaMatte = (prefill?: string) => {
@@ -42,11 +44,13 @@ export function Uppdragsrad({ suggestions }: { suggestions: MissionSuggestion[] 
   }
 
   // ── Läge 2: aktivt uppdrag — heron visar redan rubrik+progress ovanför ──
+  // Öppnar expansionspanelen (Etapp G), inte chatten — "Fråga Matte" i
+  // panelens footer är vägen dit om hantverkaren ändå vill prata.
   if (mission && mission.status === 'active') {
     return (
       <button
         type="button"
-        onClick={() => oppnaMatte()}
+        onClick={() => setPanelOpen(true)}
         className="min-h-[40px] w-full flex items-center justify-between px-3.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-sm text-white/70"
       >
         <span>Uppdraget pågår</span>
