@@ -91,6 +91,23 @@ export default defineConfig({
       dependencies: ['golden-path'],
     },
 
+    // ── Flywheel-beviset (tests/e2e-golden-path/flywheel.spec.ts) ────────
+    // Egen projektgrupp, MEDVETET inte inlagd i golden-path-projektets
+    // testMatch: golden-path-permissions beror på det projektet
+    // (dependencies: ['golden-path']) — hade flywheel delat testMatch skulle
+    // ett flywheel-fel blockera permission-check.spec.ts och ändra det
+    // befintliga harnessets semantik. Samma mönster som margin-guardian
+    // nedan i stället: egen riktig UI-inloggning i specen, ingen
+    // dependency-kedja, explicit tomt storageState (toppnivåns default
+    // pekar på Andreas eget konto).
+    {
+      name: 'flywheel',
+      testDir: './tests/e2e-golden-path',
+      testMatch: /flywheel\.spec\.ts/,
+      testIgnore: [],
+      use: { storageState: { cookies: [], origins: [] } },
+    },
+
     // ── Margin Guardian — fristående "fungerar i praktiken"-test ─────────
     // Egen fil/eget projekt (inte en Golden Path-station): en lönsamhets-
     // varning är en villkorad gren, inte del av kundresans huvudspår.
