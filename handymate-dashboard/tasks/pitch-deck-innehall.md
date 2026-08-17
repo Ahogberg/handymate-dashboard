@@ -5,6 +5,10 @@ noggrannheten sitter. Strikt mot "får inte sägas"-listan i
 capability-inventory.md. Christoffer presenterar; ~10 slides, ~8 min + demo.
 [CASE STUDY] = fylls med Christoffers riktiga siffror efter genomkörningen._
 
+_Reviderad 2026-08-17: "Ge teamet ett uppdrag" (mål → plan ur riktiga
+siffror → godkännandekö) infogad som ny mittakt på slide 6, tillsammans med
+moat-beviset som tidigare låg där. 10-slides-disciplinen är oförändrad._
+
 ---
 
 ## Slide 1 — Omslag
@@ -49,15 +53,38 @@ Och teamet lär sig av varje OK: **första veckan frågar det mycket — efter t
 månader vet det hur du prissätter och vilka kunder som betalar sent. En
 chatbot är lika dum dag 100 som dag 1.** _(arsenal #2)_
 _(Demo-hook: här visar Christoffer godkänn-kön live.)_
+_(Leder rakt in i nästa: vad händer när du GER teamet ett uppdrag.)_
 
-## Slide 6 — Det svenska kontoret (moaten — det ingen utländsk kopia klarar)
-ROT- och grön teknik-avdrag uträknat rätt, på arbetsandelen, med årstak —
-**uppdelat per rad, och varje skickad offert fryst som ett kvitto** (ändrar du
-prislistan imorgon rubbas inga gamla offerter). Produktbank med dina priser.
-Fakturor mot Fortnox. ROT-filen till Skatteverket.
-**Det här är byggt för svenska hantverkare — inte översatt från ett amerikanskt
-program.** _(Talpunkt, arsenal #3: "Fråga din nuvarande leverantör hur de löser
-ROT per rad.")_
+## Slide 6 — Ge teamet ett uppdrag (mittakten — tre kedjor, byggt på svensk botten)
+Du har sett godkännandekön. Så här ser det ut när du faktiskt sätter riktningen:
+- **Ge teamet ett uppdrag** — skriv målet i klartext ("Frigör 150 000 kr före
+  fredag", "Fyll nästa veckas luckor", "Kontakta 20 gamla kunder"). Planen
+  byggs ur verkliga siffror — förfallna fakturor, ofakturerat arbete, gamla
+  offerter, tysta kunder — **aldrig påhittat: planen kan bara peka på poster
+  som faktiskt finns.** Teamet genomför den i din godkännandekö och du ser
+  verifierad framdrift: "72 000 kr bekräftat betalt · 2 beslut väntar."
+- **Löften som hålls** — "Vi hör av oss före fredag" fångas ur samtal och
+  mejl, får ett datum när DU bekräftar, bevakas med en påminnelse innan
+  deadline, och kvitteras med bevis när det är gjort. Missade kundlöften är
+  hur småfirmor tappar kunder — nu har de en väktare.
+- **Rätt betalt för utfört arbete** — innan fakturan: "Är Andersson klart att
+  fakturera?" Svaret namnger exakt vad som saknas ("ÄTA:n väntar på
+  kundgodkännande") eller ger grönt med underlaget listat.
+
+Det här går på svensk botten: ROT- och grön teknik-avdrag uträknat rätt, på
+arbetsandelen, med årstak — uppdelat per rad, och varje skickad offert fryst
+som ett kvitto (ändrar du prislistan imorgon rubbas inga gamla offerter).
+Produktbank med dina priser. Fakturor mot Fortnox. ROT-filen till
+Skatteverket. **Det är därför planen kan bygga på riktiga siffror — inte
+generella AI-löften, och inte översatt från ett amerikanskt program.**
+_(Talpunkt, arsenal #3: "Fråga din nuvarande leverantör hur de löser ROT per
+rad.")_
+
+**Kvittoprincipen: teamet påstår aldrig mer än det bevisat. Pipeline kallas
+aldrig "säkrade pengar."**
+
+_(Demo-hook — Mission Control: Christoffer skriver målet i chatten — se
+planen komma ur firmans egna siffror, live.)_
 
 ## Slide 6b — Sovande pengar (NY — används mot ETABLERADE firmor)
 Hur många kunder har du i registret? När hörde de från dig senast?
@@ -92,7 +119,7 @@ anpassat upplägg för stora företag — "hör av dig så tar vi det".
 OBS: Bas/Starter finns inte längre i utbudet — nämn den aldrig.)_
 
 ## Slide 9 — Så kommer du igång
-Registrering tar 10 minuter. Ditt nummer kopplas, dina kunder importeras,
+Registrering tar 15 minuter. Ditt nummer kopplas, dina kunder importeras,
 och teamet är på plats samma dag. **Vi tar det tillsammans nu, direkt efter
 demon.**
 
@@ -110,11 +137,14 @@ _(Kontakt: Christoffer + Andreas.)_
 - Om prospekten inte köper på plats: lämna kvar fällefrågorna (arsenalen) —
   "Fråga er nuvarande leverantör: vad kan er AI GÖRA? Hur delas ROT per rad?
   Lär den sig hur JAG prissätter?"
-- Slide 5 och 7 är hjärtat — förtroendet och beviset. Sakta ner där.
-- Demon (separat manus, tasks/demo-manus.md) körs mellan slide 5 och 8.
+- Slide 5, 6 och 7 är hjärtat — förtroendet, uppdraget och beviset. Sakta ner där.
+- Demon (separat manus, tasks/demo-manus.md) körs mellan slide 5 och 8, med
+  Mission Control-beaten (mål → plan ur riktiga siffror) på slide 6.
 - FÖRBJUDET (inventeringens lista): påstå talande röst-AI, "kopplar till din
   Fortnox" utan licens-brasklappen, "betala i appen" före B7 grön, "senaste
-  appen" före TestFlight, nya features som "beprövade i drift".
+  appen" före TestFlight, nya features som "beprövade i drift", aldrig kalla
+  pipeline "säkrade pengar", aldrig visa en totalsiffra som blandar
+  bekräftat och potentiellt.
 - **Grannutskick (fysiska brev till grannar):** INTE färdigbyggt — får ALDRIG
   pitchas som nutid. Om kunden själv frågar: "det är på väg". SMS-kampanjerna
   däremot är i drift och FÅR lyftas fritt (slide 4 + 6b).

@@ -121,3 +121,44 @@ Sök igenom hela decket och bekräfta noll förekomster av: "svarar på samtal",
 "tar samtal", "svarar i telefon", "pratar med dina kunder", "skickas
 automatiskt" (i nutid om utskick), "nöjda kunder om recensioner", samt att
 alla tre värdesiffrorna (180/240/920 tkr) bär ordet "räkneexempel".
+
+---
+
+## Tillägg 2026-08-17 — nya sanna påståenden (nu tillåtna att använda)
+
+Sedan förra genomgången har fyra saker gått från plan till skarp, byggd
+produkt. De var INTE tillåtna att pitcha förut — de är det nu. Om nästa
+version av decket (eller en ny slide) ska visa upp detta, är det här språket
+att utgå från. Referens-formuleringar finns redan skarpa i
+`handymate-landing/index.html` (hero + sektionen "Tre kedjor") och i
+`tasks/pitch-deck-innehall.md` (slide 6, "Ge teamet ett uppdrag").
+
+1. **Mål/uppdrag ur riktiga siffror.** Ägaren kan skriva ett mål i klartext
+   — "Frigör 150 000 kr före fredag", "Fyll nästa veckas luckor", "Kontakta
+   20 gamla kunder" — och teamet bygger en plan ur företagets egna siffror
+   (förfallna fakturor, ofakturerat arbete, gamla offerter, tysta kunder).
+   Planen kan bara peka på poster som faktiskt finns i systemet — den hittar
+   aldrig på belopp. Får pitchas som nutid.
+2. **Löftesbevakning ("löften som hålls").** Ett muntligt eller skriftligt
+   löfte till en kund ("Vi hör av oss före fredag") fångas ur samtal och
+   mejl, får ett datum när ägaren bekräftar det, bevakas med en påminnelse
+   innan deadline, och kvitteras med bevis när det är gjort. Får pitchas som
+   nutid.
+3. **Faktureringsklart-verdikt.** Innan en faktura går ut kan systemet svara
+   på frågan "Är [kund] klart att fakturera?" — antingen namnger det exakt
+   vad som saknas (t.ex. "ÄTA:n väntar på kundgodkännande"), eller ger grönt
+   ljus med underlaget listat. Får pitchas som nutid.
+4. **Redovisning per medhjälpare, bekräftat vs väntande.** Ägaren kan se
+   verifierad framdrift uppdelad på vad som är bekräftat och vad som väntar
+   på beslut — t.ex. "72 000 kr bekräftat betalt · 2 beslut väntar". Detta
+   är också där kvittoprincipen blir ett explicit säljbudskap, inte bara en
+   bakgrundsregel: **teamet påstår aldrig mer än det bevisat — en
+   totalsiffra får aldrig blanda bekräftat med potentiellt, och pipeline
+   kallas aldrig "säkrade pengar".** Det är värt en egen rad eller badge i
+   decket, inte bara en fotnot.
+
+Alla fyra går genom samma godkännandekö som redan gäller för allt annat i
+decket — inget av detta är nytt undantag från grundregel 2 (inget skickas
+automatiskt). Det som är nytt är VAD som går in i kön: ett mål, ett löfte
+med deadline, eller en faktureringsfråga — inte bara ett samtal eller en
+offert.
