@@ -252,16 +252,22 @@ export function AddRowSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4">
       <div onClick={onClose} className="absolute inset-0 bg-slate-900/45 rowsheet-fade" aria-hidden />
 
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Lägg till rad"
-        className="relative w-full max-w-lg max-h-[85vh] bg-white rounded-t-2xl shadow-2xl flex flex-col rowsheet-up"
+        className="relative w-full max-w-lg max-h-[85vh] sm:max-h-[80vh] bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col rowsheet-up"
       >
-        <div className="flex justify-center pt-2.5 pb-1 shrink-0" aria-hidden>
+        {/* Draghandtaget signalerar "svep ner för att stänga" — bara
+            meningsfullt på mobilens bottom-sheet. Från sm och uppåt är
+            sheeten en centrerad dialog (se sm:items-center ovan): flush mot
+            skärmkanten med fyrkantiga hörn läste som avklippt, inte som en
+            avsiktlig dialog, på en riktig desktopbredd (Andreas fynd,
+            2026-08-17). */}
+        <div className="flex justify-center pt-2.5 pb-1 shrink-0 sm:hidden" aria-hidden>
           <div className="w-10 h-1 rounded-full bg-slate-300" />
         </div>
 
