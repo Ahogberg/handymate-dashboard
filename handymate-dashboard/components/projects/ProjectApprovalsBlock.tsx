@@ -93,6 +93,9 @@ const TYPE_LABEL: Record<string, string> = {
   create_quote_draft: 'Offertutkast',
   // ÄTA-kedjan (etapp 2b, tasks/value-chain-plan.md).
   create_ata_draft: 'ÄTA-förslag',
+  // Playbook Kickoff Copilot V1 (2026-08-17) — kontrollpunktsförslag ur
+  // ägarbekräftade mönster, se lib/playbook/propose-kickoff.ts.
+  playbook_kickoff_suggestion: 'Kontrollpunkt',
 }
 
 export default function ProjectApprovalsBlock({ projectId, onCountChange }: ProjectApprovalsBlockProps) {

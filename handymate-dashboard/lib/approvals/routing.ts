@@ -56,6 +56,12 @@ const ROUTING_TABLE: Partial<Record<string, RoutingRole>> = {
   checklist_forslag: 'project_team',
   // Våg 2b (tasks/value-chain-plan.md) — ÄTA hör till projektteamet.
   create_ata_draft: 'project_team',
+  // Playbook Kickoff Copilot V1 (tasks/todo.md, 2026-08-17): en föreslagen
+  // kontrollpunkt gäller ETT projekt, inte hela företaget — samma bucket
+  // som checklist_forslag (medveten avvikelse från playbook_pattern_
+  // confirmations owner_admin ovan, som formar ALLA framtida offerter av
+  // en jobbtyp).
+  playbook_kickoff_suggestion: 'project_team',
 }
 
 export function getRoutingBucket(approvalType: string): RoutingRole {

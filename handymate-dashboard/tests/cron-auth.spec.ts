@@ -65,11 +65,13 @@ test('alla cron-rutter utanför Claudes Karin-fillås använder helpern', () => 
   // docs/audits/NEXT_MOAT_WAVE.md Koncept 3) och använder helpern korrekt.
   // 39 (2026-08-16 natt): playbook-pattern tillkom (Playbook Pattern
   // Confirmation V1, tasks/todo.md) och använder helpern korrekt.
-  expect(files).toHaveLength(39)
+  // 40 (2026-08-17): playbook-kickoff tillkom (Playbook Kickoff Copilot
+  // V1, tasks/todo.md) och använder helpern korrekt.
+  expect(files).toHaveLength(40)
 
   const karinRoute = path.join(CRON_DIR, 'karin-deadlines', 'route.ts')
   const ownedRoutes = files.filter(file => file !== karinRoute)
-  expect(ownedRoutes).toHaveLength(38)
+  expect(ownedRoutes).toHaveLength(39)
 
   const missing = ownedRoutes
     .filter(file => {

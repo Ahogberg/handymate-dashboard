@@ -2481,6 +2481,47 @@ async function executeApprovalPayload(
         return { action: 'playbook_pattern_confirmation', ok: true, knowledge_id: knowledge.id }
       }
 
+      case 'playbook_kickoff_suggestion': {
+        // Playbook Kickoff Copilot V1 (tasks/todo.md, 2026-08-17):
+        // godkännande skriver EN kontrollpunkt i project_checklist —
+        // samma tabellform som 'checklist_forslag' ovan (id/project_id/
+        // business_id/name/items/status), med pattern_text som
+        // checklistpunktens text. Avvisning kräver ingen skrivning här —
+        // dedup-logiken i lib/playbook/kickoff-candidates.ts
+        // (hasExistingKickoffCard) läser direkt ur pending_approvals-
+        // historiken oavsett status, ingen egen tabell.
+        const plKo = payload as any
+        const projectIdKo = plKo.project_id as string | undefined
+        const patternTextKo = plKo.pattern_text as string | undefined
+        if (!projectIdKo || !patternTextKo) {
+          return { action: 'playbook_kickoff_suggestion', ok: false, error: 'Kortet saknar projekt eller kontrollpunkt.' }
+        }
+
+        const supabaseKo = await getSupabase()
+        const checklistIdKo = `cl_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+        const itemsKo = [{
+          id: `ci_${Math.random().toString(36).substring(2, 9)}`,
+          text: patternTextKo,
+          required: false,
+          checked: false,
+        }]
+
+        const { error: insertKoErr } = await supabaseKo.from('project_checklist').insert({
+          id: checklistIdKo,
+          project_id: projectIdKo,
+          business_id: businessId,
+          name: `Kontrollpunkt: ${plKo.job_type || ''}`.trim(),
+          items: itemsKo,
+          status: 'in_progress',
+        })
+
+        if (insertKoErr) {
+          return { action: 'playbook_kickoff_suggestion', ok: false, error: insertKoErr.message }
+        }
+
+        return { action: 'playbook_kickoff_suggestion', ok: true, checklist_id: checklistIdKo, project_id: projectIdKo }
+      }
+
       default: {
         // ═══ OKÄND TYP FAILAR STÄNGT (N5, 2026-08-07) ═══
         //

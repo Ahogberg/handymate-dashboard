@@ -164,6 +164,10 @@
     {
       "path": "/api/cron/playbook-pattern",
       "schedule": "20 5 * * 2"
+    },
+    {
+      "path": "/api/cron/playbook-kickoff",
+      "schedule": "25 5 * * 4"
     }
   ]
 }

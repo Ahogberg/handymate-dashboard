@@ -112,6 +112,17 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // Se lib/playbook/propose-pattern.ts.
   playbook_pattern_confirmation: 'EXECUTABLE_ACTION',
 
+  // Playbook Kickoff Copilot V1 (tasks/todo.md, 2026-08-17): ett nyligen
+  // skapat, icke avslutat projekt vars jobbtyp matchar ett AKTIVT
+  // bekräftat mönster får en föreslagen kontrollpunkt. Godkännande
+  // skriver EN rad i project_checklist — fältlokalt, ingen extern
+  // sidoeffekt, samma klass som playbook_pattern_confirmation/
+  // project_debrief (medveten skillnad från checklist_forslags egen
+  // REVIEW_REQUIRED nedan — checklist_forslag väljer bland flera
+  // mallpunkter, den här skriver en enda, redan formulerad kontrollpunkt).
+  // Se lib/playbook/propose-kickoff.ts.
+  playbook_kickoff_suggestion: 'EXECUTABLE_ACTION',
+
   // ── Kräver mänsklig granskning, aldrig ett klick ────────────────────
   //
   // `missad_intakt` är hela grinden för intäktsåtervinningen: ett fynd är ett
