@@ -26,12 +26,17 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getClaudeModel } from '@/lib/ai/get-model'
+import { normalizeDueDateIso } from '@/lib/customer-facts/build-card'
 
 export interface ExtractedFact {
   fact_type: 'preference' | 'constraint' | 'commitment' | 'contact'
   content: string
   evidence_quote: string
   confidence: number
+  // Promise-to-Proof (Etapp N, 2026-08-17): bara satt på commitment-fynd,
+  // och bara när mejlet EXPLICIT nämnde ett datum — se byggPrompt nedan.
+  // Ett odaterat löfte bevakas aldrig, det är den avsedda defaulten.
+  due_date_iso?: string | null
 }
 
 /**
@@ -87,6 +92,11 @@ export function parseFaktaSvar(text: string): ExtractedFact[] {
         content: (f.content as string).trim(),
         evidence_quote: (f.evidence_quote as string).trim(),
         confidence: typeof f.confidence === 'number' ? Math.min(Math.max(f.confidence, 0), 1) : 0.5,
+        // Bara commitment kan bära ett datumförslag — och bara efter samma
+        // kod-gräns (aldrig prompttillit) som resten av gränserna här.
+        // Nyckeln utelämnas HELT för övriga typer så befintliga fixturer
+        // (preference/constraint/contact) förblir byte-för-byte identiska.
+        ...(f.fact_type === 'commitment' ? { due_date_iso: normalizeDueDateIso(f.due_date_iso) } : {}),
       }))
   } catch {
     return []
@@ -112,6 +122,11 @@ Regler (strikta):
   (löfte, t.ex. "vi hör av oss senast fredag") eller "contact" (kontaktuppgift,
   t.ex. bästa telefonnummer, föredragen kontaktväg).
 - "evidence_quote" MÅSTE vara ett ordagrant citat ur mejlet — aldrig en omskrivning.
+- ENDAST för "commitment": nämner mejlet EXPLICIT ett datum eller en tidsram
+  för löftet (t.ex. "senast fredag", "imorgon", "den 20 augusti") — sätt
+  "due_date_iso" till det datumet i formatet YYYY-MM-DD.
+  Gissa ALDRIG ett datum om det inte uttryckligen sades — sätt då
+  "due_date_iso" till null. För övriga fact_types: utelämna fältet helt.
 - SÄKERHET: extrahera ALDRIG åtkomstkoder — portkoder, larmkoder,
   nyckelgömmor, lösenord eller liknande. Sådant får inte lagras, även om det
   skrivs uttryckligen. Hoppa över det helt.
@@ -123,7 +138,8 @@ Svara ENDAST med JSON i detta format:
       "fact_type": "preference|constraint|commitment|contact",
       "content": "Kort beskrivning av faktumet på svenska",
       "evidence_quote": "Ordagrant citat ur mejlet",
-      "confidence": 0.0-1.0
+      "confidence": 0.0-1.0,
+      "due_date_iso": "YYYY-MM-DD eller null (endast för commitment, ENDAST om datum uttryckligen nämndes)"
     }
   ]
 }

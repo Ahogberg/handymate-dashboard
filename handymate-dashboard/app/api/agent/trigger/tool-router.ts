@@ -2669,9 +2669,15 @@ async function getInvoiceableWork(
 async function getCustomerCommitments(
   supabase: SupabaseClient, businessId: string
 ): Promise<ToolResult> {
+  // Promise-to-Proof (Etapp N, 2026-08-17): select('*') i stället för en
+  // explicit kolumnlista — due_at/promise_status (sql/v147_promise_dates.sql)
+  // kan saknas i en omigrerad miljö, och en explicit '...,due_at,promise_status'
+  // hade 42703:at HELA frågan (ingen löften-lista alls) tills v147 körs.
+  // select('*') kan aldrig misslyckas på en saknad kolumn — de nya fälten
+  // läses defensivt ur raden nedan (r.due_at ?? null) i stället.
   const { data, error } = await supabase
     .from('customer_fact')
-    .select('customer_id, content, evidence_quote, created_at')
+    .select('*')
     .eq('business_id', businessId)
     .eq('fact_type', 'commitment')
     .is('superseded_by', null)
@@ -2704,6 +2710,10 @@ async function getCustomerCommitments(
         content: r.content,
         evidence_quote: r.evidence_quote,
         created_at: r.created_at,
+        // v147 (kan saknas i en omigrerad miljö — select('*') ovan gör att
+        // frågan aldrig 42703:ar på dem, defensiv läsning här räcker).
+        due_at: r.due_at ?? null,
+        promise_status: r.promise_status ?? null,
       })),
     },
   }

@@ -17,6 +17,7 @@ import { extractAgentId } from '@/lib/patterns/utils/extract-agent-id'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 import { halsning } from '@/lib/customers/namn'
 import { completeProject } from '@/lib/projects/complete-project'
+import { normalizeDueDateIso } from '@/lib/customer-facts/build-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -412,6 +413,43 @@ export async function POST(
         // innehåller ändå det faktiska utfallet. Men loggas synligt så vi
         // upptäcker om persisteringen systematiskt failar.
         console.error(`[approvals/${params.id}] Kunde inte spara execution_result:`, persistError)
+      }
+
+      // Promise-to-Proof — uppfyllnadslänken (Etapp N, 2026-08-17, sql/v147):
+      // VILKET kort som helst vars payload bär promise_fact_id och som
+      // EXEKVERAR FRAMGÅNGSRIKT stänger löftet det restes för — payload-
+      // konventionen är generisk, inte bunden till deadline-svepets kort
+      // (lib/promises/deadline-sweep.ts) specifikt. Non-blocking, fail-soft
+      // pre-v147 (promise_status-kolumnen kan saknas) och rör ALDRIG det
+      // avvisade tillståndet — bara godkännandet (ovan) öppnar ett löfte,
+      // och bara en människa som läser deadline-svepets kort avgör om ett
+      // löfte bröts. Den här hooken flyttar ENDAST öppna löften till uppfyllda.
+      const promiseFactId = (finalPayload as Record<string, unknown> | null)?.promise_fact_id
+      if (typeof promiseFactId === 'string' && promiseFactId && outcome === 'success') {
+        try {
+          const { error: fulfillErr } = await supabase
+            .from('customer_fact')
+            .update({
+              promise_status: 'fulfilled',
+              fulfilled_by_ref: params.id,
+              fulfilled_at: new Date().toISOString(),
+            })
+            .eq('id', promiseFactId)
+            .eq('business_id', business.business_id)
+            .eq('promise_status', 'open')
+          if (
+            fulfillErr &&
+            fulfillErr.code !== '42703' &&
+            !/column .* does not exist|schema cache/i.test(fulfillErr.message || '')
+          ) {
+            console.error(`[approvals/${params.id}] löftesuppfyllnad misslyckades (icke-blockerande):`, fulfillErr.message)
+          }
+        } catch (fulfillCatchErr: any) {
+          console.error(
+            `[approvals/${params.id}] löftesuppfyllnad kastade (icke-blockerande):`,
+            fulfillCatchErr?.message || fulfillCatchErr,
+          )
+        }
       }
     }
 
@@ -1209,25 +1247,62 @@ async function executeApprovalPayload(
         }
         const factType = pl.fact_type || 'preference'
         const supabaseCF = await getSupabase()
-        const { data: fact, error: factErr } = await supabaseCF
+
+        // Promise-to-Proof (Etapp N, 2026-08-17, sql/v147_promise_dates.sql):
+        // bara ett BEKRÄFTAT commitment med ett giltigt datum blir ett
+        // bevakat löfte — rådets breda "Promise Ledger" avvisades
+        // (ACTIVE_ROADMAP.md:508, grinden vid :1029: aldrig ur rå
+        // AI-extraktion). Det är DETTA klick — godkännandet — som aktiverar
+        // bevakningen, aldrig extraktionens förslag på egen hand. Validerat
+        // defensivt igen här (kortets payload är inte en trovärdig källa i
+        // sig, samma princip som normalizeDueDateIso-anropet vid kortbygget).
+        const promiseDueAt = factType === 'commitment' ? normalizeDueDateIso(pl.due_date_iso) : null
+
+        const factInsert: Record<string, unknown> = {
+          business_id: businessId,
+          customer_id: pl.customer_id,
+          fact_type: factType,
+          content: pl.content,
+          // Kanal härledd ur payloaden (Customer Memory V1.1, 2026-08-16):
+          // e-postfakta bär email_conversation_id, tal-fakta (möte/telefon)
+          // bär recording_id. Hårdkodningen 'meeting' gav e-postfakta fel
+          // käll-etikett. Ingen CHECK på kolumnen (v122) — fri TEXT.
+          source_type: pl.email_conversation_id ? 'email' : 'meeting',
+          source_id: pl.recording_id ?? pl.email_conversation_id ?? null,
+          evidence_quote: pl.evidence_quote ?? null,
+          confidence: pl.confidence ?? null,
+          confirmed_at: new Date().toISOString(),
+        }
+        // Samma insert-form som innan v147 för VARJE faktum utan datum —
+        // bara ett daterat commitment får de nya kolumnerna alls, så ett
+        // vanligt kundfaktum aldrig ens FÖRSÖKER skriva dem i en omigrerad
+        // miljö (samma avvägning som Etapp F:s mission-insert).
+        if (promiseDueAt) {
+          factInsert.due_at = promiseDueAt
+          factInsert.promise_status = 'open'
+        }
+
+        let { data: fact, error: factErr } = await supabaseCF
           .from('customer_fact')
-          .insert({
-            business_id: businessId,
-            customer_id: pl.customer_id,
-            fact_type: factType,
-            content: pl.content,
-            // Kanal härledd ur payloaden (Customer Memory V1.1, 2026-08-16):
-            // e-postfakta bär email_conversation_id, tal-fakta (möte/telefon)
-            // bär recording_id. Hårdkodningen 'meeting' gav e-postfakta fel
-            // käll-etikett. Ingen CHECK på kolumnen (v122) — fri TEXT.
-            source_type: pl.email_conversation_id ? 'email' : 'meeting',
-            source_id: pl.recording_id ?? pl.email_conversation_id ?? null,
-            evidence_quote: pl.evidence_quote ?? null,
-            confidence: pl.confidence ?? null,
-            confirmed_at: new Date().toISOString(),
-          })
+          .insert(factInsert)
           .select('id')
           .single()
+
+        // Fail-soft: v147-kolumnerna (due_at/promise_status) saknas ännu i
+        // den här miljön — kör om UTAN dem i stället för att fälla hela
+        // bekräftelsen. Ett kundfaktum måste gå att spara även om
+        // löftesbevakningen inte är påkopplad än.
+        if (
+          factErr &&
+          promiseDueAt &&
+          (factErr.code === '42703' || /column .* does not exist|schema cache/i.test(factErr.message || ''))
+        ) {
+          delete factInsert.due_at
+          delete factInsert.promise_status
+          const retry = await supabaseCF.from('customer_fact').insert(factInsert).select('id').single()
+          fact = retry.data
+          factErr = retry.error
+        }
 
         if (factErr || !fact) {
           console.error('[approvals/customer_fact] kunde inte spara faktumet:', factErr?.message)

@@ -331,6 +331,9 @@ export async function processInboundEmail(
               source_text: f.evidence_quote,
               confidence: f.confidence,
               fact_type: f.fact_type,
+              // Promise-to-Proof: extraktorns datumförslag (bara satt för
+              // commitment) följer med — kortbygget normaliserar/validerar det.
+              due_date_iso: f.due_date_iso ?? null,
             },
             {
               customerId: faktaKundId,

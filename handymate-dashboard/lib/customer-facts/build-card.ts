@@ -21,6 +21,30 @@ export interface CustomerFactFynd {
   source_text?: string | null
   confidence: number
   fact_type?: 'preference' | 'constraint' | 'commitment' | 'contact'
+  // Promise-to-Proof (Etapp N, 2026-08-17): extraktionens FÖRSLAG på ett
+  // datum, bara satt av modellen på commitment-fynd där källan uttryckligen
+  // nämnde ett datum ("vi hör av oss senast fredag"). Bevakar INGENTING på
+  // egen hand — kortet är fortfarande bara ett okänt förslag i Inkorgen.
+  // Först ett ägar-godkännande (app/api/approvals/[id]/route.ts, case
+  // 'customer_fact') aktiverar bevakningen. Se sql/v147_promise_dates.sql.
+  due_date_iso?: string | null
+}
+
+/**
+ * Validerar en modell-föreslagen datumsträng. Gränsen är kod, inte
+ * prompttillit (samma princip som parseFaktaSvar): en relativ fras som
+ * "nästa vecka" eller en hallucinerad sträng ska ALDRIG tolkas som ett
+ * datum bara för att fältet råkar vara satt — kräv explicit ISO-form
+ * (YYYY-MM-DD, eventuellt med tid/offset) och att den faktiskt parsar.
+ * Returnerar null för allt annat, inklusive tomma/skräp-strängar.
+ */
+export function normalizeDueDateIso(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (!/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return null
+  if (Number.isNaN(Date.parse(trimmed))) return null
+  return trimmed
 }
 
 export function buildCustomerFactCard(
@@ -51,6 +75,10 @@ export function buildCustomerFactCard(
       content: s.description,
       evidence_quote: s.source_text || null,
       confidence: s.confidence,
+      // Promise-to-Proof: bara commitment-fynd kan bära ett datumförslag —
+      // en preference/constraint/contact som råkar bära due_date_iso (bugg
+      // hos en framtida producent) ska ALDRIG kunna aktivera en löftesbevakning.
+      due_date_iso: s.fact_type === 'commitment' ? normalizeDueDateIso(s.due_date_iso) : null,
       // Källreferensen skiljer sig per kanal: talgrenarna bär recording_id
       // (godkännande-handlern läser den till customer_fact.source_id),
       // e-postgrenen bär email_conversation_id. Handlern ignorerar okända

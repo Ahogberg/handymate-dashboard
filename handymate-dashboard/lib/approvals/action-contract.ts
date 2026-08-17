@@ -199,6 +199,18 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // Godkänn = jag har sett det, precis som monday_brief/agent_insight.
   // Aldrig auto-exekverat, aldrig auto-godkänt.
   expectation_drift_signal: 'INFORMATIONAL',
+
+  // Promise-to-Proof — daterade kundlöften (Etapp N, 2026-08-17, sql/v147_
+  // promise_dates.sql): bara ÄGAR-BEKRÄFTADE commitment-fakta med ett datum
+  // blir ett bevakat löfte — rådets breda "Promise Ledger" avvisades
+  // (ACTIVE_ROADMAP.md:508, grinden vid :1029: aldrig ur rå AI-extraktion),
+  // den här skivan respekterar gränsen genom att bara läsa
+  // customer_fact.promise_status='open', som bara sätts vid ett explicit
+  // godkännande. Kortet informerar att ett löfte förfaller inom 48 timmar
+  // eller har passerat sitt datum — sätter ALDRIG automatiskt löftet som
+  // brutet, en människa avgör. Se lib/promises/deadline-sweep.ts. Samma
+  // klass som expectation_drift_signal ovan.
+  promise_deadline_signal: 'INFORMATIONAL',
 }
 
 /** Vad är det här kortet? `null` = okänt, och okänt godkänns inte. */

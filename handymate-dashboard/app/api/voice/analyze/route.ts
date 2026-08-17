@@ -32,6 +32,11 @@ interface AISuggestion {
   source_text?: string
   // Customer Facts V1 (2026-08-12): bara satt när type === 'customer_fact'.
   fact_type?: 'preference' | 'constraint' | 'commitment' | 'contact'
+  // Promise-to-Proof (Etapp N, 2026-08-17): extraktionens datumförslag,
+  // bara relevant när fact_type === 'commitment'. Se lib/customer-facts/
+  // build-card.ts normalizeDueDateIso för valideringen — gränsen är kod,
+  // inte prompttillit.
+  due_date_iso?: string | null
 }
 
 // Kortbygget för customer_fact är sedan Customer Memory V1.1 (2026-08-16)
@@ -64,6 +69,8 @@ interface MapReduceFynd {
   confidence: number
   // Customer Facts V1 (2026-08-12): bara satt när type === 'customer_fact'.
   fact_type?: 'preference' | 'constraint' | 'commitment' | 'contact'
+  // Promise-to-Proof (Etapp N, 2026-08-17): se AISuggestion ovan.
+  due_date_iso?: string | null
 }
 
 /** Plockar ut ett JSON-objekt ur ett AI-svar — svaret är nästan alltid ren
@@ -112,6 +119,11 @@ Regler för "customer_fact" (striktare än övriga typer):
   (löfte, t.ex. "vi hör av oss senast fredag") eller "contact" (kontaktuppgift,
   t.ex. bästa telefonnummer, föredragen kontaktväg).
 - "source_text" MÅSTE vara ett ordagrant citat — aldrig en omskrivning.
+- ENDAST för fact_type "commitment": nämns ett datum eller en tidsram
+  EXPLICIT för löftet (t.ex. "senast fredag", "imorgon", "den 20 augusti") —
+  sätt "due_date_iso" till det datumet i formatet YYYY-MM-DD.
+  Gissa ALDRIG ett datum om det inte uttryckligen sades — sätt då
+  "due_date_iso" till null. För övriga fact_types: utelämna fältet helt.
 - SÄKERHET: extrahera ALDRIG åtkomstkoder — portkoder, larmkoder,
   nyckelgömmor, lösenord eller liknande. Sådant får inte lagras, även om det
   sägs uttryckligen. Hoppa över det helt.
@@ -126,7 +138,8 @@ Svara ENDAST med JSON i detta format:
       "source_text": "Relevant citat från transkriptdelen",
       "tidsstampel": "Närmaste [mm:ss]-markör i den här delen, eller null",
       "confidence": 0.0-1.0,
-      "fact_type": "preference|constraint|commitment|contact (endast för customer_fact)"
+      "fact_type": "preference|constraint|commitment|contact (endast för customer_fact)",
+      "due_date_iso": "YYYY-MM-DD eller null (endast för commitment, ENDAST om datum uttryckligen nämndes)"
     }
   ]
 }
@@ -170,9 +183,10 @@ ${JSON.stringify(alltFynd, null, 2)}
 2. Deduplicera fynd som beskriver SAMMA sak (samma typ + liknande titel/innehåll) — behåll bara det bäst underbyggda (tydligast source_text, högst confidence).
 3. Sätt en prioritet (low/medium/high/urgent) för varje kvarvarande förslag — "urgent" ENDAST vid akuta problem (läcka, strömavbrott etc).
 4. Har ett fynd en tidsstämpel (fältet "tidsstampel") — inled dess source_text med den, t.ex. "[05:30] ...", så den syns i det slutgiltiga förslaget.
-5. "customer_fact"-fynd: behåll fältet "fact_type" oförändrat. Finns fler än 5
-   kvar efter dedupe för hela mötet, behåll bara de 5 med högst confidence —
-   resten faller bort.
+5. "customer_fact"-fynd: behåll fälten "fact_type" och "due_date_iso"
+   OFÖRÄNDRADE — hitta inte på ett datum här, det är redan avgjort i
+   kandidatfyndet. Finns fler än 5 kvar efter dedupe för hela mötet, behåll
+   bara de 5 med högst confidence — resten faller bort.
 6. SÄKERHET: extrahera eller behåll ALDRIG åtkomstkoder — portkoder,
    larmkoder, nyckelgömmor, lösenord eller liknande — i description eller
    source_text. Kasta sådana fynd helt, även om de kom med i kandidatlistan.
@@ -188,7 +202,8 @@ Svara ENDAST med JSON i exakt detta format:
       "priority": "low|medium|high|urgent",
       "confidence": 0.0-1.0,
       "source_text": "Relevant citat, med [mm:ss]-prefix om tidsstämpel finns",
-      "fact_type": "preference|constraint|commitment|contact (endast för customer_fact)"
+      "fact_type": "preference|constraint|commitment|contact (endast för customer_fact)",
+      "due_date_iso": "YYYY-MM-DD eller null (oförändrat från kandidatfyndet, endast för commitment)"
     }
   ]
 }
@@ -464,6 +479,10 @@ affären framåt efter besöket:
   "customer_fact". Max 5 per möte. BARA saker som uttryckligen sades — gissa
   aldrig. Ange alltid "fact_type": "preference", "constraint", "commitment"
   eller "contact", och citera ordagrant i source_text.
+  ENDAST för fact_type "commitment": nämns ett datum eller en tidsram
+  EXPLICIT för löftet (t.ex. "senast fredag", "imorgon", "den 20 augusti") —
+  sätt "due_date_iso" till det datumet (YYYY-MM-DD). Gissa ALDRIG ett datum
+  om det inte uttryckligen sades — sätt då "due_date_iso" till null.
   SÄKERHET: extrahera ALDRIG åtkomstkoder — portkoder, larmkoder,
   nyckelgömmor, lösenord eller liknande. Sådant får inte lagras, även om det
   sägs uttryckligen. Hoppa över det helt.
@@ -490,6 +509,10 @@ dessa — då görs samma sak två gånger. Du föreslår ENBART:
   "customer_fact". Max 5 per samtal. BARA saker som uttryckligen sades — gissa
   aldrig. Ange alltid "fact_type": "preference", "constraint", "commitment"
   eller "contact", och citera ordagrant i source_text.
+  ENDAST för fact_type "commitment": nämns ett datum eller en tidsram
+  EXPLICIT för löftet (t.ex. "senast fredag", "imorgon", "den 20 augusti") —
+  sätt "due_date_iso" till det datumet (YYYY-MM-DD). Gissa ALDRIG ett datum
+  om det inte uttryckligen sades — sätt då "due_date_iso" till null.
   SÄKERHET: extrahera ALDRIG åtkomstkoder — portkoder, larmkoder,
   nyckelgömmor, lösenord eller liknande. Sådant får inte lagras, även om det
   sägs uttryckligen. Hoppa över det helt.`}
@@ -523,6 +546,7 @@ Svara ENDAST med JSON i följande format:
       "confidence": 0.0-1.0,
       "source_text": "Relevant citat från samtalet",
       "fact_type": "preference|constraint|commitment|contact (endast för customer_fact)",
+      "due_date_iso": "YYYY-MM-DD eller null (endast för commitment, ENDAST om datum uttryckligen nämndes)",
       "action_data": {
         "customer_name": "Namn om känt",
         "phone_number": "Telefon",

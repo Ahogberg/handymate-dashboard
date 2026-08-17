@@ -30,7 +30,10 @@ test.describe('godkännande-kontraktet', () => {
     expect(i, 'hanteraren saknas i executeApprovalPayload').toBeGreaterThan(-1)
     // Fönstret vidgat 2026-08-16: kanal-härledningskommentaren (source_type
     // email/meeting) sköt fel-strängen förbi det gamla 1700-teckensfönstret.
-    const gren = s.slice(i, i + 2200)
+    // Vidgat igen 2026-08-17 (Promise-to-Proof, Etapp N): promiseDueAt-
+    // uträkningen och den villkorade due_at/promise_status-inserten sköt
+    // felmeddelandet förbi det gamla 2200-teckensfönstret.
+    const gren = s.slice(i, i + 4200)
     expect(gren).toContain("from('customer_fact')")
     expect(gren).toContain('.insert(')
     // Kanalen härleds ur payloaden — e-post får aldrig etiketten 'meeting'.
@@ -287,7 +290,9 @@ test.describe('supersede — senaste vinner bara för contact/commitment', () =>
   test('bara contact och commitment superseder — preference/constraint behåller alla aktiva', () => {
     const s = read(ROUTE)
     const i = s.indexOf("case 'customer_fact':")
-    const gren = s.slice(i, i + 3000)
+    // Vidgat 2026-08-17 (Promise-to-Proof, Etapp N): promiseDueAt/factInsert-
+    // blocket sköt supersede-villkoret förbi det gamla 3000-teckensfönstret.
+    const gren = s.slice(i, i + 5200)
     expect(gren).toContain("factType === 'contact' || factType === 'commitment'")
     expect(gren).not.toContain("factType === 'preference'")
     expect(gren).not.toContain("factType === 'constraint'")
