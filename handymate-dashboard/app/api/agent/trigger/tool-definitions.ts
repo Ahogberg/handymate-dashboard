@@ -616,6 +616,60 @@ export const toolDefinitions = [
     },
   },
 
+  // Goal-to-Plan V1 (Etapp B, tasks/jaunty-pondering-hummingbird.md) — Matte
+  // bygger en sanningsmärkt uppdragsplan ur möjlighetsportfölj-kontextblocket
+  // som injiceras i systempromptet (app/api/matte/chat/route.ts). ENBART
+  // Matte har dessa två verktyg — se CURATED_TOOL_NAMES i samma fil och
+  // lib/agents/personalities.ts (ingen specialist listar dem).
+  {
+    name: "propose_mission_plan",
+    description: "Föreslå en uppdragsplan för hantverkarens pengamål — visas som ett plankort i chatten, INTE skapat än (hantverkaren måste bekräfta, se confirm_mission). item_id MÅSTE komma ordagrant från möjlighetsportfölj-kontextblocket i systempromptet — hitta ALDRIG på ett eget id. Hitta ALDRIG på belopp: alla belopp kopieras alltid från portföljen server-side, oavsett vad du anger. Högst 5 steg.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        goal_kr: { type: "number", description: "Pengamålet i kronor, t.ex. 150000" },
+        deadline: { type: "string", description: "Deadline, format ÅÅÅÅ-MM-DD — måste vara ett datum efter idag" },
+        steps: {
+          type: "array",
+          description: "Högst 5 steg. Varje item_id måste finnas ordagrant i möjlighetsportfölj-kontextblocket — hitta aldrig på ett eget.",
+          items: {
+            type: "object",
+            properties: {
+              item_id: { type: "string", description: "Portföljens item-id (pf_...), taget ordagrant ur kontextblocket" },
+              motivation: { type: "string", description: "Kort motivering till varför steget hör till planen" },
+            },
+            required: ["item_id", "motivation"],
+          },
+        },
+      },
+      required: ["goal_kr", "deadline", "steps"],
+    },
+  },
+  {
+    name: "confirm_mission",
+    description: "Bekräfta och starta uppdraget hantverkaren precis godkänt av ett tidigare propose_mission_plan-förslag — skapar den riktiga uppdragsraden. Räknar om möjlighetsportföljen färskt och omvaliderar planen (dödar inaktuella belopp) innan den sparas, så skicka in exakt samma plan hantverkaren såg. Samma indataform som propose_mission_plan: item_id MÅSTE komma ordagrant från det AKTUELLA möjlighetsportfölj-kontextblocket, hitta ALDRIG på belopp. Bara ETT uppdrag kan vara aktivt åt gången — finns redan ett måste det avslutas först.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        goal_kr: { type: "number", description: "Pengamålet i kronor, t.ex. 150000" },
+        deadline: { type: "string", description: "Deadline, format ÅÅÅÅ-MM-DD — måste vara ett datum efter idag" },
+        steps: {
+          type: "array",
+          description: "Högst 5 steg. Varje item_id måste finnas ordagrant i den AKTUELLA möjlighetsportföljen — hitta aldrig på ett eget.",
+          items: {
+            type: "object",
+            properties: {
+              item_id: { type: "string", description: "Portföljens item-id (pf_...), taget ordagrant ur kontextblocket" },
+              motivation: { type: "string", description: "Kort motivering till varför steget hör till planen" },
+            },
+            required: ["item_id", "motivation"],
+          },
+        },
+      },
+      required: ["goal_kr", "deadline", "steps"],
+    },
+  },
+
   // Inter-agent communication
   {
     name: "send_agent_message",

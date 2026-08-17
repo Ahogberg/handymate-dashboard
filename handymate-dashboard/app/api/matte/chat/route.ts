@@ -48,6 +48,18 @@ import {
   isBusinessScenarioPresentation,
   type BusinessScenarioPresentation,
 } from '@/lib/business-twin/scenario-contract'
+import {
+  loadOpportunityPortfolioForBusiness,
+  TRUTH_CLASSES,
+  type OpportunityPortfolio,
+  type PortfolioMeasure,
+  type TruthClass,
+} from '@/lib/mission/opportunity-portfolio'
+import {
+  isMissionPlanPresentation,
+  type MissionPlanPresentation,
+} from '@/lib/mission/mission-presentation'
+import { buildMissionHeadline } from '@/lib/mission/mission-summary'
 
 const MAX_IMAGES_PER_MESSAGE = 4
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -193,6 +205,52 @@ function buildContextSection(ctx: Awaited<ReturnType<typeof getBusinessContext>>
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Möjlighetsportfölj — Goal-to-Plan V1 (Etapp B,
+// tasks/jaunty-pondering-hummingbird.md). Kontextblocket som gör
+// propose_mission_plan/confirm_mission möjliga: modellen får ALDRIG hitta på
+// item_id eller belopp — bara peka ordagrant på det som står här, servern
+// kopierar resten (lib/mission/plan-validation.ts).
+// ────────────────────────────────────────────────────────────────────────────
+
+const TRUTH_CLASS_LABELS: Record<TruthClass, string> = {
+  indrivningsbart: 'indrivningsbart',
+  faktureringsklart: 'faktureringsklart',
+  pipeline: 'pipeline (ALDRIG säkrade pengar)',
+  ateraktivering: 'ateraktivering (ANTAL kunder, aldrig kr)',
+  marginalskydd: 'marginalskydd',
+}
+
+function formatPortfolioMeasure(m: PortfolioMeasure): string {
+  return m.kind === 'kr' ? `${m.amountKr.toLocaleString('sv-SE')} kr` : `${m.count} st`
+}
+
+/** Gaten: bara injicera kontextblocket när det finns något att peka på. */
+function portfolioHasItems(portfolio: OpportunityPortfolio): boolean {
+  return TRUTH_CLASSES.some(cls => portfolio.by_class[cls].length > 0)
+}
+
+function buildPortfolioContextSection(portfolio: OpportunityPortfolio): string {
+  const lines: string[] = []
+  lines.push('[MÖJLIGHETSPORTFÖLJ — underlag för uppdrag. Referera ENDAST dessa item_id:n i propose_mission_plan/confirm_mission. Belopp är serverns — hitta aldrig på egna.]')
+  for (const cls of TRUTH_CLASSES) {
+    const items = portfolio.by_class[cls]
+    if (items.length === 0) continue
+    const rader = items.map(it => `${it.id} '${it.title}' ${formatPortfolioMeasure(it.measure)}`).join(' | ')
+    lines.push(`${TRUTH_CLASS_LABELS[cls]}: ${rader}`)
+  }
+  if (portfolio.degraded_sources.length > 0) {
+    lines.push(`[Källor som inte kunde läsas: ${portfolio.degraded_sources.join(', ')}]`)
+  }
+  return lines.join('\n')
+}
+
+function buildActiveMissionContextSection(mission: { id: string; goal_kr: number; deadline: string }): string {
+  const deadline = String(mission.deadline).slice(0, 10)
+  const headline = buildMissionHeadline(Number(mission.goal_kr), deadline)
+  return `[AKTIVT UPPDRAG: ${headline}, deadline ${deadline}, mission_id ${mission.id}. Nya åtgärdskort för uppdraget ska bära payload.mission_id och payload.truth_class. Bara ETT uppdrag kan vara aktivt åt gången — föreslå aldrig ett nytt förrän det här är avslutat.]`
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Tool definitions — Tier 1 + send_invoice_reminder
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -217,6 +275,9 @@ const CURATED_TOOL_NAMES = [
   'get_person_schedule',
   // Command Center — read-only översiktsverktyg (Matte).
   'get_projects_overview', 'get_stale_quotes', 'get_invoiceable_work', 'get_customer_commitments',
+  // Goal-to-Plan V1 (Etapp B) — Matte-scopat (se isToolAllowedForAgent/
+  // getAgentTools nedan; ingen specialist listar dem i personalities.ts).
+  'propose_mission_plan', 'confirm_mission',
 ]
 
 // ═══ PER-AGENT ALLOWLIST (Codex audit P0.2, 2026-08-08) ═══
@@ -556,8 +617,9 @@ interface AgentTurnResult {
    * precis den part som kan ha fel om saken.
    */
   toolOutcomes: ToolOutcome[]
-  /** Strukturerat, läsande scenario som båda befintliga chattytor kan visa. */
-  presentation: BusinessScenarioPresentation | null
+  /** Strukturerat, läsande scenario ELLER en uppdragsplan (Etapp B) som
+      chattytorna kan visa. */
+  presentation: BusinessScenarioPresentation | MissionPlanPresentation | null
   /** Ackumulerad usage över ALLA callClaude-anrop i denna tur (initial +
       varje tool-iteration) — grunden för COGS-mätningen (etapp 1, 2026-08-14). */
   usage: TokenUsage
@@ -612,7 +674,7 @@ async function runAgentTurn(opts: {
 
   const toolMessages: any[] = []
   const toolOutcomes: ToolOutcome[] = []
-  let presentation: BusinessScenarioPresentation | null = null
+  let presentation: BusinessScenarioPresentation | MissionPlanPresentation | null = null
   let finalAction: any = null
   let iterations = 0
 
@@ -695,6 +757,13 @@ async function runAgentTurn(opts: {
         if (block.name === 'simulate_business_scenario') {
           const candidate = { kind: 'business_scenario', scenario: r?.data }
           if (isBusinessScenarioPresentation(candidate)) presentation = candidate
+        }
+        // Goal-to-Plan V1 (Etapp B) — samma mekanism som business_scenario
+        // ovan: verktygets data bär en typad presentation som går vidare
+        // till thread_message.metadata (se saveThreadMessage-anropen nedan).
+        if (block.name === 'propose_mission_plan' || block.name === 'confirm_mission') {
+          const candidate = (r?.data as { presentation?: unknown } | undefined)?.presentation
+          if (isMissionPlanPresentation(candidate)) presentation = candidate
         }
         // Epic 2: bokför utfallet som routern rapporterade det. Ett verktyg
         // som la något i godkännandekön är INTE verkställt — den skillnaden
@@ -1031,7 +1100,7 @@ export async function POST(request: NextRequest) {
       is_handoff_announcement?: boolean
       /** Epic 3: statusen UI:t visar. Sätts bara där orkestreringen härlett en. */
       status?: AgentResult['status']
-      presentation?: BusinessScenarioPresentation
+      presentation?: BusinessScenarioPresentation | MissionPlanPresentation
     }> = []
     let finalAction: any = null
     let outerMessages = initialMessages
@@ -1092,6 +1161,37 @@ export async function POST(request: NextRequest) {
         console.error('[matte/chat] memory fetch failed (non-blocking):', err)
       }
 
+      // Möjlighetsportfölj + aktivt uppdrag (Goal-to-Plan V1, Etapp B) — bara
+      // Matte har propose_mission_plan/confirm_mission, så vi beräknar bara
+      // här när hon är aktuell agent. KÄND KOSTNADSPUNKT: portföljen kör
+      // flera (billiga, indexerade) frågor per Matte-tur — ingen cache
+      // mellan requests i V1, se lib/mission/opportunity-portfolio.ts.
+      let missionContextBlock = ''
+      if (currentAgent === 'matte') {
+        try {
+          const portfolio = await loadOpportunityPortfolioForBusiness(supabase, businessId)
+          const { data: activeMissionRow, error: missionErr } = await supabase
+            .from('mission')
+            .select('id, goal_kr, deadline')
+            .eq('business_id', businessId)
+            .eq('status', 'active')
+            .maybeSingle()
+          // Fail-soft på 42P01 — sql/v144_mission.sql körs manuellt av
+          // Andreas och kan alltså saknas i vissa miljöer tills dess.
+          if (missionErr && missionErr.code !== '42P01') {
+            console.error('[matte/chat] aktivt uppdrag kunde inte läsas (non-blocking):', missionErr.message)
+          }
+          const mission = missionErr ? null : activeMissionRow
+          if (portfolioHasItems(portfolio) || mission) {
+            const blocks = [buildPortfolioContextSection(portfolio)]
+            if (mission) blocks.push(buildActiveMissionContextSection(mission))
+            missionContextBlock = blocks.join('\n\n')
+          }
+        } catch (err) {
+          console.error('[matte/chat] möjlighetsportfölj kunde inte byggas (non-blocking):', err)
+        }
+      }
+
       const systemArray: any[] = [
         {
           type: 'text',
@@ -1125,6 +1225,9 @@ export async function POST(request: NextRequest) {
       }
       if (memorySuffix) {
         systemArray.push({ type: 'text', text: memorySuffix })
+      }
+      if (missionContextBlock) {
+        systemArray.push({ type: 'text', text: missionContextBlock })
       }
 
       const turn = await runAgentTurn({

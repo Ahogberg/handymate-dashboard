@@ -34,6 +34,10 @@ import { computePersonWeekUtilization } from '@/lib/schedule/utilization'
 import { svDateStr, svDateStrPlusDays } from '@/lib/dates'
 import { mondayOfWeek } from '@/lib/capacity/week-capacity'
 import { computeFreeCapacity } from '@/lib/capacity/free-capacity'
+import { loadOpportunityPortfolioForBusiness } from '@/lib/mission/opportunity-portfolio'
+import { validateMissionPlan, type MissionPlanInput } from '@/lib/mission/plan-validation'
+import type { MissionPlanPresentation } from '@/lib/mission/mission-presentation'
+import { buildMissionSummaryText, buildMissionHeadline } from '@/lib/mission/mission-summary'
 
 interface ToolResult {
   success: boolean
@@ -221,6 +225,11 @@ export async function executeTool(
         return await getInvoiceableWork(supabase, businessId)
       case 'get_customer_commitments':
         return await getCustomerCommitments(supabase, businessId)
+      // Goal-to-Plan V1 (Etapp B) — Matte-scopat, se tool-definitions.ts.
+      case 'propose_mission_plan':
+        return await proposeMissionPlanTool(supabase, businessId, input)
+      case 'confirm_mission':
+        return await confirmMissionTool(supabase, businessId, input)
       default:
         return { success: false, error: `Okänt verktyg: ${name}` }
     }
@@ -2688,6 +2697,151 @@ async function getCustomerCommitments(
         created_at: r.created_at,
       })),
     },
+  }
+}
+
+// ── Goal-to-Plan V1 (Etapp B, tasks/jaunty-pondering-hummingbird.md) ──────
+
+/**
+ * Tolkar de rå tool-input-fälten till MissionPlanInput. Defensiv typning —
+ * en modell som skickar fel typ (t.ex. sträng där tal förväntas) ska ge ett
+ * begripligt valideringsfel via validateMissionPlan, aldrig en krasch här.
+ */
+function parseMissionPlanInput(params: Record<string, unknown>): MissionPlanInput {
+  const rawSteps = Array.isArray(params.steps) ? params.steps : []
+  return {
+    goal_kr: typeof params.goal_kr === 'number' ? params.goal_kr : Number(params.goal_kr),
+    deadline: typeof params.deadline === 'string' ? params.deadline : '',
+    steps: rawSteps.map((raw) => {
+      const step = (raw ?? {}) as Record<string, unknown>
+      return {
+        item_id: typeof step.item_id === 'string' ? step.item_id : '',
+        motivation: typeof step.motivation === 'string' ? step.motivation : '',
+      }
+    }),
+  }
+}
+
+/**
+ * propose_mission_plan — visar ett OBEKRÄFTAT plankort i chatten, sparar
+ * ingenting. LLM:en pekar bara på item_id:n ur den möjlighetsportfölj som
+ * redan injicerats i systempromptet (app/api/matte/chat/route.ts); portföljen
+ * läses om här (billiga, indexerade frågor — se
+ * lib/mission/opportunity-portfolio.ts) så avvisningar alltid bedöms mot
+ * färsk data, och validateMissionPlan KOPIERAR varje stegs mått ur
+ * portföljens item — ett belopp modellen hittar på ignoreras helt.
+ */
+async function proposeMissionPlanTool(
+  supabase: SupabaseClient,
+  businessId: string,
+  params: Record<string, unknown>,
+): Promise<ToolResult> {
+  const plan = parseMissionPlanInput(params)
+  const portfolio = await loadOpportunityPortfolioForBusiness(supabase, businessId)
+  const result = validateMissionPlan(plan, portfolio, new Date())
+  if (!result.ok) {
+    // Detail är redan svensk och skriven för att modellen ska kunna
+    // korrigera sig (t.ex. "okänt item_id" → försök igen med rätt id).
+    return { success: false, error: result.detail }
+  }
+
+  const presentation: MissionPlanPresentation = {
+    kind: 'mission_plan',
+    version: 1,
+    state: 'proposal',
+    mission_id: null,
+    goal_kr: plan.goal_kr,
+    deadline: plan.deadline,
+    headline: buildMissionHeadline(plan.goal_kr, plan.deadline),
+    steps: result.steps,
+    degraded_sources: portfolio.degraded_sources,
+  }
+
+  return {
+    success: true,
+    data: {
+      presentation,
+      summary: buildMissionSummaryText(presentation),
+    },
+  }
+}
+
+/**
+ * confirm_mission — skapar den RIKTIGA mission-raden när hantverkaren
+ * bekräftat ett tidigare propose_mission_plan-förslag.
+ *
+ * ═══ ÄRLIGHETSGRINDEN: OMVALIDERAS ALLTID MOT EN FÄRSK PORTFÖLJ ═══
+ *
+ * Ett förslag kan ha visats minuter — eller en hel chattsession — tidigare:
+ * fakturor kan ha betalats, offerter kan ha gått ut. Det tidigare presenterade
+ * plankortet litar vi ALDRIG på; portföljen räknas om och planen omvalideras
+ * precis som i propose_mission_plan innan något skrivs till databasen. Det
+ * dödar inaktuella belopp.
+ */
+async function confirmMissionTool(
+  supabase: SupabaseClient,
+  businessId: string,
+  params: Record<string, unknown>,
+): Promise<ToolResult> {
+  const plan = parseMissionPlanInput(params)
+  const portfolio = await loadOpportunityPortfolioForBusiness(supabase, businessId)
+  const result = validateMissionPlan(plan, portfolio, new Date())
+  if (!result.ok) {
+    return { success: false, error: result.detail }
+  }
+
+  const id = generateId('mis')
+  const { error } = await supabase.from('mission').insert({
+    id,
+    business_id: businessId,
+    goal_kr: plan.goal_kr,
+    deadline: plan.deadline,
+    status: 'active',
+    plan_snapshot: { steps: result.steps },
+    portfolio_generated_at: portfolio.generated_at,
+    // Routerns ToolContext bär ingen inloggad business_user_id — bara
+    // agentidentiteten (context.agentId, t.ex. 'matte'). NULL tills den
+    // kopplingen finns (sql/v144_mission.sql tillåter NULL i created_by).
+    created_by: null,
+  })
+
+  if (error) {
+    // Max ETT aktivt uppdrag per företag (partiellt unikt index,
+    // sql/v144_mission.sql, idx_mission_one_active) — en krock är väntat,
+    // inte trasigt: be hantverkaren avsluta det gamla först.
+    if (error.code === '23505' || /idx_mission_one_active/.test(error.message || '')) {
+      return {
+        success: false,
+        error: 'Det finns redan ett aktivt uppdrag. Avsluta det först — säg till mig så avslutar jag det.',
+      }
+    }
+    // sql/v144_mission.sql körs manuellt av Andreas — tabellen kan alltså
+    // saknas i vissa miljöer tills dess (samma fail-soft-idiom som andra
+    // v1xx-migrationer i den här filen).
+    if (error.code === '42P01') {
+      return {
+        success: false,
+        error: 'Uppdragsfunktionen är inte påkopplad ännu i den här miljön — be din admin köra den senaste databasmigrationen.',
+      }
+    }
+    return { success: false, error: error.message }
+  }
+
+  const presentation: MissionPlanPresentation = {
+    kind: 'mission_plan',
+    version: 1,
+    state: 'confirmed',
+    mission_id: id,
+    goal_kr: plan.goal_kr,
+    deadline: plan.deadline,
+    headline: buildMissionHeadline(plan.goal_kr, plan.deadline),
+    steps: result.steps,
+    degraded_sources: portfolio.degraded_sources,
+  }
+
+  return {
+    success: true,
+    data: { mission_id: id, presentation },
   }
 }
 
