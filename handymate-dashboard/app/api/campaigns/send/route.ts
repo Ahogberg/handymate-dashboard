@@ -3,7 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
 import { sendSmsViaElks } from '@/lib/sms-send'
-import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
+import { checkSmsAllowance } from '@/lib/sms-usage'
 
 
 
@@ -122,7 +122,12 @@ export async function POST(request: NextRequest) {
 
       if (result.success) {
         deliveredCount++
-        await trackSmsSent(businessId, plan) // räkna mot kvoten
+        // Etapp K (SMS-kvoten i strypunkten, 2026-08-17): sendSmsViaElks
+        // räknar nu upp kvoten själv per SMS — och kollar den fail-closed
+        // FÖR VARJE mottagare, inte bara en gång vid kampanjstart. Träffar
+        // kampanjen hardCap:et halvvägs igenom mottagarlistan blockeras
+        // resterande mottagare individuellt (status 'failed' nedan) i
+        // stället för att blåsa förbi taket som tidigare.
         await supabase
           .from('sms_campaign_recipient')
           .update({

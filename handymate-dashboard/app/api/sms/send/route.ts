@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness, getBusinessPlanFromConfig, isBillingActive } from '@/lib/auth'
 import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
-import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
+import { checkSmsAllowance } from '@/lib/sms-usage'
 import { getServerSupabase } from '@/lib/supabase'
 
 
@@ -92,12 +92,10 @@ export async function POST(request: NextRequest) {
 
     const result = { id: smsResult.elksId || 'unknown' }
 
-    // Räkna upp SMS-usage
-    try {
-      await trackSmsSent(business.business_id, plan)
-    } catch (trackErr) {
-      console.error('SMS tracking error (non-blocking):', trackErr)
-    }
+    // Etapp K (SMS-kvoten i strypunkten, 2026-08-17): sendSmsViaElks räknar
+    // nu upp kvoten själv efter en lyckad sändning — ett separat anrop här
+    // hade dubbelräknat samma SMS. smsCheck ovan är fortfarande kvar som
+    // förhandskoll (snabbt, ärligt 429-svar innan vi ens komponerar SMS:et).
 
     // V4 Automation Engine: fire 'contacted' event
     try {

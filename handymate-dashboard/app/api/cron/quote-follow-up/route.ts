@@ -6,7 +6,7 @@ import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { isAutonomous, getAutonomyCap, underAutonomyCap, recordAutonomyFailure } from '@/lib/autonomy/earned-autonomy'
 import { sendSmsViaElks } from '@/lib/sms-send'
 import { getBusinessPlanFromConfig } from '@/lib/auth'
-import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
+import { checkSmsAllowance } from '@/lib/sms-usage'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 import { arTestId, arTestNamn } from '@/lib/testdata'
 
@@ -244,12 +244,13 @@ export async function GET(request: NextRequest) {
               purpose: 'proactive',
             })
             if (smsResult.success) {
+              // Etapp K (SMS-kvoten i strypunkten, 2026-08-17): sendSmsViaElks
+              // räknar nu upp kvoten själv efter en lyckad sändning. Förhands-
+              // kollen ovan (checkSmsAllowance) är kvar — den skyddar
+              // recordAutonomyFailure nedan från att straffa autonomin för
+              // ett kvot-fullt läge som inte har med sändningskvaliteten att
+              // göra (skip:ar hela else-grenen i stället för att logga fail).
               expiryNudgesSent++
-              try {
-                await trackSmsSent(q.business_id, plan)
-              } catch (trackErr) {
-                console.error('[quote-follow-up] trackSmsSent misslyckades (icke-blockerande):', trackErr)
-              }
             } else {
               console.error('[quote-follow-up] expiry-nudge SMS send failed (non-blocking):', q.business_id, q.quote_id, smsResult.error)
               // Autonomt utskick nådde ingen kund — räknas mot nedgraderings-

@@ -266,8 +266,17 @@ test.describe('alla sändvägar uttrycker säkerhetskontraktet', () => {
     expect(incoming).toContain("recipient: 'customer'")
   })
 
-  test('en idempotent approval-retry räknas inte som ett nytt kvot-SMS', () => {
+  // Etapp K (SMS-kvoten i strypunkten, 2026-08-17): den här garantin — att
+  // en idempotent approval-retry inte räknas som ett nytt kvot-SMS — låg
+  // tidigare som en explicit `if (result.success && !result.idempotent)`-
+  // vakt HÄR, runt ett eget trackSmsSent-anrop. Uppräkningen flyttade in i
+  // sendSmsViaElks självt (lib/sms-send.ts) och gäller nu ALLA ~24
+  // sändvägar, inte bara denna route — så garantin testas fullständigt i
+  // tests/sms-quota-chokepoint.spec.ts (idempotent-early-return ligger
+  // textuellt före trackSmsSent-anropet i chokepointen). Kvar här: att
+  // routen inte själv återinför ett dubbelräknande anrop.
+  test('approval-routen räknar inte längre upp SMS-kvoten själv (chokepointen gör det, se sms-quota-chokepoint.spec.ts)', () => {
     const approvalRoute = source('app/api/approvals/[id]/route.ts')
-    expect(approvalRoute).toContain('if (result.success && !result.idempotent)')
+    expect(approvalRoute).not.toContain('trackSmsSent(')
   })
 })

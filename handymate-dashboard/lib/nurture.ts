@@ -7,8 +7,6 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { resolveSenderId } from '@/lib/sms/sender-id'
 import { sendSmsViaElks } from '@/lib/sms-send'
-import { getBusinessPlanFromConfig } from '@/lib/auth'
-import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
 import { extractFirstName } from '@/lib/customers/namn'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -711,29 +709,16 @@ async function sendNurtureSMS(params: {
 
   const supabase = getServerSupabase()
 
-  // VP1 (gap 8, tasks/vilande-pengar-masterplan.md): nurture-utskick gick
-  // tidigare via en egen inline-46elks-fetch, helt förbi SMS-kvoten/
-  // hardCap. Kollar kvoten FÖRE sändning — samma kontroll som /api/sms/send
-  // och den delade sendSms-helpern i app/api/approvals/[id]/route.ts.
-  const { data: bizConfig } = await supabase
-    .from('business_config')
-    .select('subscription_plan')
-    .eq('business_id', params.businessId)
-    .maybeSingle()
-  const plan = getBusinessPlanFromConfig(bizConfig || {})
-
-  const quota = await checkSmsAllowance(params.businessId, plan)
-  if (!quota.allowed) {
-    return { success: false, error: quota.error || 'SMS-kvoten för månaden är nådd' }
-  }
-
   // Avsändar-ID = hantverkarens företagsnamn (ej hårdkodat 'Handymate' — det
   // såg ut som spam och bröt white-label).
   const fromName = await resolveSenderId(supabase, { businessId: params.businessId })
 
   // sendSmsViaElks ersätter den tidigare egna inline-46elks-fetchen — ger
-  // opt-out-kollen (VP1 gap 7) och sms_log-loggning gratis, ingen
-  // beteendeändring i själva SMS-innehållet/avsändaren.
+  // opt-out-kollen (VP1 gap 7), sms_log-loggning och SMS-kvotkontroll/
+  // uppräkning (Etapp K, 2026-08-17 — se doc-kommentaren i lib/sms-send.ts)
+  // gratis. Denna funktion behövde tidigare hämta plan och kolla/räkna
+  // kvoten själv (VP1 gap 8) — det görs nu i chokepointen, så samma
+  // svenska felmeddelande kommer tillbaka i result.error om kvoten är slut.
   const result = await sendSmsViaElks({
     supabase,
     businessId: params.businessId,
@@ -748,12 +733,6 @@ async function sendNurtureSMS(params: {
 
   if (!result.success) {
     return { success: false, error: result.error || 'SMS failed' }
-  }
-
-  try {
-    await trackSmsSent(params.businessId, plan)
-  } catch (trackErr) {
-    console.error('[nurture] trackSmsSent misslyckades (icke-blockerande):', trackErr)
   }
 
   // Log to communication_log

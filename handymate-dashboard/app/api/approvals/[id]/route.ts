@@ -10,7 +10,7 @@ import { canActOnApproval } from '@/lib/approvals/routing'
 import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
 import { resolveTimeEntryBusinessUserId } from '@/lib/egenkontroll/suggest-time-entry'
 import { getBusinessPlanFromConfig } from '@/lib/auth'
-import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
+import { checkSmsAllowance } from '@/lib/sms-usage'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { classify, nonExecutableResult } from '@/lib/approvals/action-contract'
 import { extractAgentId } from '@/lib/patterns/utils/extract-agent-id'
@@ -601,8 +601,12 @@ async function executeApprovalPayload(
    * proactive_care/warranty_followup/review_request/booking-förslag/
    * customer_reactivation/autopilot_package customer_sms/default-fallback)
    * så kvoten omfattar dem alla utan att varje case behöver egen kod.
-   * trackSmsSent räknas upp EFTER lyckad sändning, icke-blockerande om
-   * uppräkningen själv skulle faila.
+   *
+   * Etapp K (SMS-kvoten i strypunkten, 2026-08-17): förhandskollen nedan
+   * är kvar (ärligt, tidigt fel i approval-svaret i stället för ett
+   * generiskt sendSmsViaElks-fel), men UPPRÄKNINGEN (trackSmsSent) görs
+   * inte längre här — sendSmsViaElks räknar upp sig själv efter en
+   * faktiskt lyckad sändning nu. Ett eget anrop här hade dubbelräknat.
    */
   async function sendSms(opts: {
     to: string
@@ -641,13 +645,10 @@ async function executeApprovalPayload(
       purpose: opts.purpose,
     })
 
-    if (result.success && !result.idempotent) {
-      try {
-        await trackSmsSent(businessId, plan)
-      } catch (trackErr) {
-        console.error('[approvals] trackSmsSent misslyckades (icke-blockerande):', trackErr)
-      }
-    }
+    // Etapp K (SMS-kvoten i strypunkten, 2026-08-17): sendSmsViaElks räknar
+    // nu upp kvoten själv efter en lyckad sändning (och aldrig för en
+    // idempotent omsändning — den early-returnar innan uppräkningen körs).
+    // Ett eget trackSmsSent-anrop här hade dubbelräknat samma SMS.
 
     return {
       sms_sent: result.success,

@@ -10,6 +10,9 @@ import {
   type SmsPurpose,
   type SmsRecipient,
 } from './outbound/sms-gate'
+import { getBusinessPlanFromConfig } from './auth'
+import { checkSmsAllowance, trackSmsSent } from './sms-usage'
+import type { PlanType } from './feature-gates'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -97,6 +100,33 @@ export function parseOptOutCommand(message: string): OptOutCommand {
 }
 
 /**
+ * Slår upp företagets plan för SMS-kvotkontrollen (Etapp K, se nedan).
+ * Fail-SAFE: om uppslaget failar (DB nere, oväntat fel) returneras null —
+ * kvoten kollas/räknas inte den gången, sändningen fortsätter ändå. En
+ * mätningsutfall får aldrig fälla ett SMS.
+ */
+async function resolveSmsQuotaPlan(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<PlanType | null> {
+  try {
+    const { data, error } = await supabase
+      .from('business_config')
+      .select('subscription_plan')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (error) {
+      console.warn('[sendSmsViaElks] SMS-kvot: kunde inte läsa plan (fail-open):', error.message)
+      return null
+    }
+    return getBusinessPlanFromConfig(data || {})
+  } catch (err: any) {
+    console.warn('[sendSmsViaElks] SMS-kvot: planuppslag kastade (fail-open):', err?.message || err)
+    return null
+  }
+}
+
+/**
  * Skickar SMS direkt mot 46elks och loggar till sms_log.
  *
  * Återanvänd från andra routes (t.ex. /api/ata/[id]/send) istället för
@@ -107,9 +137,26 @@ export function parseOptOutCommand(message: string): OptOutCommand {
  * Loggar både success och fail i sms_log så audit-spår alltid finns.
  * Fail-loggning sker även om INSERT failar (logging är non-blocking).
  *
- * Tracking av SMS-quota (trackSmsSent) görs INTE här — det är ett
- * separat feature-gate som user-facing /api/sms/send hanterar. Om
- * system-flow ska räknas mot kvoten, gör det manuellt på callsite.
+ * ═══ SMS-KVOTEN (Etapp K, strypunkten, 2026-08-17) ═══
+ *
+ * Kvoten kollas och räknas nu HÄR, inte hos callsites. Tidigare gjorde
+ * bara fem av ~24 sändvägar (app/api/sms/send, app/api/approvals/[id],
+ * lib/nurture.ts, cron/quote-follow-up, campaigns/send) ett eget
+ * checkSmsAllowance/trackSmsSent-par — alla ANDRA vägar (Karins rapporter,
+ * ÄTA-utskick, morgonrapporten m.fl.) skickade helt förbi kvoten och
+ * hardCap:et. Samma princip som SMS-strypunkten/sms-gaten redan bevisat:
+ * en enda chokepoint-regel slår alla callsite-regler.
+ *
+ * Asymmetrin är avsiktlig: hardCap är ett DEFINITIVT svar — nås det
+ * blockeras sändningen (fail-closed på taket, precis som STOPP-grinden).
+ * Men om planuppslaget/kvotkollen själv failar (DB nere) skickas SMS:et
+ * ändå — en mätningsutfall får aldrig blockera ett kundutskick
+ * (fail-open på METERINGEN). Samma mönster som resten av kodbasen:
+ * säkerhet stänger, mätning stör aldrig.
+ *
+ * De fem gamla callsites är städade (tests/sms-quota-chokepoint.spec.ts
+ * håller listan) så varje SMS räknas EXAKT en gång — dubbelräkning vore
+ * lika fel som ingen räkning alls.
  */
 export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> {
   const {
@@ -161,6 +208,9 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
   let success = false
   let blockedReason: SmsGateCode | undefined
   let resolvedCustomerId: string | null = customerId || null
+  // Cachar planuppslaget mellan kvotkollen (nedan) och uppräkningen (efter
+  // en lyckad sändning) — slipper slå upp business_config två gånger.
+  let quotaPlan: PlanType | null = null
 
   // En enda fail-closed grind precis före den externa effekten. Den verifierar
   // tenant + telefon + STOPP och, för proaktiva utskick, senaste kundkontakt.
@@ -192,6 +242,27 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
 
   if (!errorMsg && (!ELKS_API_USER || !ELKS_API_PASSWORD)) {
     errorMsg = '46elks credentials not configured'
+  }
+
+  // Kvotkollen — se doc-kommentaren ovan vid funktionsdeklarationen. Körs
+  // sist av förhandskontrollerna, precis före den externa sändningen, så
+  // ett redan blockerat/felkonfigurerat SMS inte i onödan triggar ett
+  // extra business_config-uppslag.
+  if (!errorMsg) {
+    quotaPlan = await resolveSmsQuotaPlan(supabase, businessId)
+    if (quotaPlan) {
+      try {
+        const quota = await checkSmsAllowance(businessId, quotaPlan)
+        if (!quota.allowed) {
+          errorMsg = quota.error || 'SMS-kvoten för månaden är nådd'
+        }
+      } catch (quotaErr: any) {
+        console.warn(
+          '[sendSmsViaElks] SMS-kvot: checkSmsAllowance kastade (fail-open, skickar ändå):',
+          quotaErr?.message || quotaErr,
+        )
+      }
+    }
   }
 
   if (!errorMsg) {
@@ -233,6 +304,28 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
     } catch (err: any) {
       errorMsg = err?.message || 'fetch exception'
       console.error('[sendSmsViaElks] fetch exception:', err)
+    }
+  }
+
+  // ═══ SMS-KVOTEN RÄKNAS UPP (Etapp K, 2026-08-17) ═══
+  //
+  // Enda platsen i kodbasen som räknar upp kvoten nu — de fem gamla
+  // callsites är städade (tests/sms-quota-chokepoint.spec.ts). Körs bara
+  // vid en FAKTISKT lyckad extern sändning — aldrig för idempotenta
+  // omsändningar (de early-returnar innan denna punkt nås). Icke-
+  // blockerande: en trasig uppräkning får aldrig fälla ett redan skickat
+  // SMS.
+  if (success) {
+    try {
+      const trackPlan = quotaPlan ?? (await resolveSmsQuotaPlan(supabase, businessId))
+      if (trackPlan) {
+        await trackSmsSent(businessId, trackPlan)
+      }
+    } catch (trackErr: any) {
+      console.warn(
+        '[sendSmsViaElks] trackSmsSent misslyckades (icke-blockerande):',
+        trackErr?.message || trackErr,
+      )
     }
   }
 
