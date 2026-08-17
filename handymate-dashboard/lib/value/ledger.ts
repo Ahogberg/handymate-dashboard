@@ -84,6 +84,36 @@ export interface ManadsLedgerSteg {
   antal: number
 }
 
+/** Kohortens avvisade kort — "föll bort på vägen" (Etapp B3, 2026-08-17).
+    Delmängd av Identifierat (kortets egen uppskattning i kronor), aldrig
+    inräknad i något av de fyra stegen. */
+export interface ManadsLedgerBortfall {
+  avvisade_antal: number
+  avvisade_kr: number
+}
+
+/** Vilket steg ETT kort nått — delmängdssemantiken per rad (Etapp B4).
+    'betalt' implicerar att kortet passerat stegen före (invoice_reminder
+    hoppar fakturerat by design, se byggManadsLedger steg 3). */
+export type LedgerItemSteg = 'identifierat' | 'agerat' | 'fakturerat' | 'betalt' | 'avvisad'
+
+/** En rad i "Varje krona, med sin historia" — ren exponering av det
+    byggManadsLedger redan vet, aldrig en egen härledning. kr är fakturans
+    belopp när fakturan är bevisad (fakturerat/betalt), annars kortets egen
+    uppskattning — samma regel som aggregaten. invoice_id exponeras BARA
+    när fakturan är bevisad. */
+export interface LedgerItem {
+  approval_id: string
+  title: string | null
+  approval_type: string
+  /** ISO-tidsstämpel — kortets skapande (kohortnyckeln). */
+  created_at: string
+  steg: LedgerItemSteg
+  kr: number
+  invoice_id: string | null
+  paid_at: string | null
+}
+
 export interface ManadsLedger {
   /** 'ÅÅÅÅ-MM' — kalendermånaden kortet SKAPADES i, inte händelsens månad. */
   period: string
@@ -91,6 +121,10 @@ export interface ManadsLedger {
   agerat: ManadsLedgerSteg
   fakturerat: ManadsLedgerSteg
   betalt: ManadsLedgerSteg
+  /** Additivt (B3): avvisade kort ur samma kohort. Ändrar ingen stegmatte. */
+  bortfall: ManadsLedgerBortfall
+  /** Additivt (B4): en rad per kohortkort, nyast först. Ändrar ingen stegmatte. */
+  items: LedgerItem[]
   method_version: number
 }
 
@@ -127,6 +161,8 @@ export interface LedgerCard {
   amount_kr: number
   invoice_id: string | null
   invoice_verified: boolean
+  /** Kortets rubrik (pending_approvals.title) — bara för items-raderna. */
+  title?: string | null
 }
 
 export interface LedgerInvoiceFacit {
@@ -153,6 +189,8 @@ export function byggManadsLedger(input: {
       agerat: tomtSteg(),
       fakturerat: tomtSteg(),
       betalt: tomtSteg(),
+      bortfall: Object.freeze({ avvisade_antal: 0, avvisade_kr: 0 }),
+      items: Object.freeze([]) as unknown as LedgerItem[],
       method_version: MANADS_LEDGER_METHOD_VERSION,
     })
   }
@@ -173,6 +211,18 @@ export function byggManadsLedger(input: {
     antal: agerade.length,
   }
 
+  // ── Additiv spårning (B4): vilket steg varje kort nått. Uppgraderas i
+  // stegloopar nedan — ren bokföring bredvid aggregaten, aldrig egen matte.
+  const stegPerKort = new Map<string, LedgerItemSteg>()
+  for (const c of identifierade) {
+    stegPerKort.set(
+      c.id,
+      c.status === 'rejected' ? 'avvisad'
+      : APPROVED_STATUSES.has(c.status) ? 'agerat'
+      : 'identifierat',
+    )
+  }
+
   // ── Steg 3: Fakturerat — delmängd av agerade MED en bevisad faktura. ─
   // invoice_reminder hoppar alltid över det här steget: fakturan fanns
   // redan innan kortet skapades (kortet ÄR en påminnelse om en befintlig
@@ -187,6 +237,7 @@ export function byggManadsLedger(input: {
     if (!faktura) continue
     raknadeFakturor.add(c.invoice_id)
     fakturerade.push({ kort: c, faktura })
+    stegPerKort.set(c.id, 'fakturerat')
   }
   const fakturerat: ManadsLedgerSteg = {
     // Fakturans BELOPP — aldrig kortets uppskattning.
@@ -210,6 +261,7 @@ export function byggManadsLedger(input: {
     raknadeBetalda.add(kort.invoice_id as string)
     betaltKr += faktura.total_kr
     betaltAntal += 1
+    stegPerKort.set(kort.id, 'betalt')
   }
   for (const c of agerade) {
     if (c.approval_type !== 'invoice_reminder') continue
@@ -221,7 +273,40 @@ export function byggManadsLedger(input: {
     raknadeBetalda.add(c.invoice_id)
     betaltKr += faktura.total_kr
     betaltAntal += 1
+    stegPerKort.set(c.id, 'betalt')
   }
+
+  // ── Additivt (B3): bortfallet — avvisade ur samma kohort, kortets egen
+  // uppskattning (samma sort som Identifierat, aldrig fakturakronor).
+  const avvisade = identifierade.filter(c => c.status === 'rejected')
+  const bortfall: ManadsLedgerBortfall = {
+    avvisade_antal: avvisade.length,
+    avvisade_kr: Math.round(avvisade.reduce((s, c) => s + c.amount_kr, 0)),
+  }
+
+  // ── Additivt (B4): en rad per kohortkort, nyast först. Fakturans belopp
+  // först när fakturan är bevisad (steget säger det) — annars kortets egen
+  // uppskattning. invoice_id/paid_at exponeras bara när de är bevisade.
+  const items: LedgerItem[] = identifierade
+    .map(c => {
+      const steg = stegPerKort.get(c.id) as LedgerItemSteg
+      const fakturaBevisad = steg === 'fakturerat' || steg === 'betalt'
+      const faktura = fakturaBevisad && c.invoice_id ? input.invoices.get(c.invoice_id) : undefined
+      return Object.freeze({
+        approval_id: c.id,
+        title: c.title ?? null,
+        approval_type: c.approval_type,
+        created_at: new Date(c.created_at_ms).toISOString(),
+        steg,
+        kr: Math.round(faktura ? faktura.total_kr : c.amount_kr),
+        invoice_id: fakturaBevisad ? c.invoice_id : null,
+        paid_at:
+          steg === 'betalt' && faktura && faktura.paid_at_ms !== null
+            ? new Date(faktura.paid_at_ms).toISOString()
+            : null,
+      })
+    })
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
 
   return Object.freeze({
     period: input.period,
@@ -229,6 +314,8 @@ export function byggManadsLedger(input: {
     agerat: Object.freeze(agerat),
     fakturerat: Object.freeze(fakturerat),
     betalt: Object.freeze({ kr: Math.round(betaltKr), antal: betaltAntal }),
+    bortfall: Object.freeze(bortfall),
+    items: Object.freeze(items) as unknown as LedgerItem[],
     method_version: MANADS_LEDGER_METHOD_VERSION,
   })
 }
@@ -250,7 +337,7 @@ export async function getManadsLedger(
 
   const { data: rows, error } = await supabase
     .from('pending_approvals')
-    .select('id, approval_type, status, created_at, resolved_at, payload')
+    .select('id, approval_type, status, created_at, resolved_at, payload, title')
     .eq('business_id', businessId)
     .in('approval_type', VALUE_LEDGER_APPROVAL_TYPES as unknown as string[])
     .gte('created_at', new Date(fonster.fromMs).toISOString())
@@ -320,6 +407,7 @@ export async function getManadsLedger(
         amount_kr: ledgerCardAmountKr(row.approval_type, (row.payload || {}) as Record<string, unknown>),
         invoice_id: invoiceId,
         invoice_verified: invoiceVerified,
+        title: typeof (row as { title?: unknown }).title === 'string' ? (row as { title?: string }).title! : null,
       }
     })
     .filter(c => Number.isFinite(c.created_at_ms))

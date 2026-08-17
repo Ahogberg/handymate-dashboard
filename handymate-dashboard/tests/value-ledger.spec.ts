@@ -235,6 +235,169 @@ test.describe('tom månad → ärliga nollor', () => {
   })
 })
 
+test.describe('bortfall — avvisade kort ur samma kohort (B3)', () => {
+  test('avvisade kort räknas i antal och kronor ur samma kohort', () => {
+    const cards = [
+      kort({ id: 'a', status: 'approved', amount_kr: 5000 }),
+      kort({ id: 'b', status: 'rejected', amount_kr: 3000 }),
+      kort({ id: 'c', status: 'rejected', amount_kr: 2000 }),
+      kort({ id: 'd', status: 'pending', amount_kr: 1000 }),
+    ]
+    const l = byggManadsLedger({ period: '2026-08', cards, invoices: new Map() })
+    expect(l.bortfall).toEqual({ avvisade_antal: 2, avvisade_kr: 5000 })
+  })
+
+  test('avvisade kort UTANFÖR perioden räknas inte', () => {
+    const cards = [kort({ status: 'rejected', created_at_ms: Date.UTC(2026, 6, 15) })]
+    const l = byggManadsLedger({ period: '2026-08', cards, invoices: new Map() })
+    expect(l.bortfall).toEqual({ avvisade_antal: 0, avvisade_kr: 0 })
+  })
+
+  test('inga avvisade ger ärliga nollor, och tom månad likaså', () => {
+    const l1 = byggManadsLedger({
+      period: '2026-08',
+      cards: [kort({ status: 'approved' })],
+      invoices: new Map(),
+    })
+    expect(l1.bortfall).toEqual({ avvisade_antal: 0, avvisade_kr: 0 })
+    const l2 = byggManadsLedger({ period: '2026-06', cards: [], invoices: new Map() })
+    expect(l2.bortfall).toEqual({ avvisade_antal: 0, avvisade_kr: 0 })
+  })
+
+  test('bortfallet ändrar INTE de fyra stegen — avvisade stannar i identifierat', () => {
+    const cards = [
+      kort({ id: 'a', status: 'approved', amount_kr: 5000 }),
+      kort({ id: 'b', status: 'rejected', amount_kr: 3000 }),
+    ]
+    const l = byggManadsLedger({ period: '2026-08', cards, invoices: new Map() })
+    expect(l.identifierat).toEqual({ kr: 8000, antal: 2 })
+    expect(l.agerat).toEqual({ kr: 5000, antal: 1 })
+  })
+})
+
+test.describe('items — varje krona med sin historia (B4)', () => {
+  const richCards = () => [
+    kort({ id: 'p', status: 'pending', amount_kr: 1000, created_at_ms: AUG1 + 1 * DAY_MS }),
+    kort({ id: 'g', status: 'approved', amount_kr: 2000, created_at_ms: AUG1 + 2 * DAY_MS }),
+    kort({
+      id: 'f', status: 'approved', amount_kr: 3000,
+      invoice_id: 'inv_f', invoice_verified: true, created_at_ms: AUG1 + 3 * DAY_MS,
+    }),
+    kort({
+      id: 'b', status: 'approved', amount_kr: 4000,
+      invoice_id: 'inv_b', invoice_verified: true, created_at_ms: AUG1 + 4 * DAY_MS,
+    }),
+    kort({ id: 'r', status: 'rejected', amount_kr: 5000, created_at_ms: AUG1 + 5 * DAY_MS }),
+  ]
+  const richInvoices = () =>
+    new Map([
+      ['inv_f', faktura({ total_kr: 3300, paid: false })],
+      ['inv_b', faktura({ total_kr: 4400, paid: true, paid_at_ms: AUG1 + 10 * DAY_MS })],
+    ])
+
+  test('varje kort får sitt ärliga steg', () => {
+    const l = byggManadsLedger({ period: '2026-08', cards: richCards(), invoices: richInvoices() })
+    const steg = Object.fromEntries(l.items.map(i => [i.approval_id, i.steg]))
+    expect(steg).toEqual({
+      p: 'identifierat',
+      g: 'agerat',
+      f: 'fakturerat',
+      b: 'betalt',
+      r: 'avvisad',
+    })
+  })
+
+  test('kronan per item: fakturans belopp först när fakturan är bevisad, annars kortets', () => {
+    const l = byggManadsLedger({ period: '2026-08', cards: richCards(), invoices: richInvoices() })
+    const perId = new Map(l.items.map(i => [i.approval_id, i]))
+    expect(perId.get('g')!.kr).toBe(2000) // kortets uppskattning
+    expect(perId.get('f')!.kr).toBe(3300) // fakturans belopp
+    expect(perId.get('b')!.kr).toBe(4400)
+    expect(perId.get('r')!.kr).toBe(5000)
+    expect(perId.get('b')!.paid_at).toBe(new Date(AUG1 + 10 * DAY_MS).toISOString())
+    expect(perId.get('f')!.paid_at).toBeNull()
+    // invoice_id exponeras bara när fakturan är bevisad (fakturerat/betalt).
+    expect(perId.get('f')!.invoice_id).toBe('inv_f')
+    expect(perId.get('b')!.invoice_id).toBe('inv_b')
+    expect(perId.get('g')!.invoice_id).toBeNull()
+  })
+
+  test('aggregaten är identiska med och utan exponeringen — items ändrar ingen matte', () => {
+    const l = byggManadsLedger({ period: '2026-08', cards: richCards(), invoices: richInvoices() })
+    expect(l.identifierat).toEqual({ kr: 15000, antal: 5 })
+    expect(l.agerat).toEqual({ kr: 9000, antal: 3 })
+    expect(l.fakturerat).toEqual({ kr: 7700, antal: 2 })
+    expect(l.betalt).toEqual({ kr: 4400, antal: 1 })
+  })
+
+  test('items antal matchar stegens antal — delmängden består per item', () => {
+    const l = byggManadsLedger({ period: '2026-08', cards: richCards(), invoices: richInvoices() })
+    expect(l.items).toHaveLength(l.identifierat.antal)
+    expect(l.items.filter(i => i.steg === 'betalt')).toHaveLength(l.betalt.antal)
+    // fakturerade = de som stannade på fakturerat + de (icke-påminnelser) som gick vidare till betalt
+    const fakturaVagen = l.items.filter(
+      i => i.steg === 'fakturerat' || (i.steg === 'betalt' && i.approval_type !== 'invoice_reminder'),
+    )
+    expect(fakturaVagen).toHaveLength(l.fakturerat.antal)
+  })
+
+  test('invoice_reminder: betald i fönstret ger betalt, annars stannar den i agerat', () => {
+    const resolved = AUG1 + 2 * DAY_MS
+    const bygg = (paidAtMs: number) =>
+      byggManadsLedger({
+        period: '2026-08',
+        cards: [
+          kort({
+            id: 'rem', approval_type: 'invoice_reminder', status: 'approved',
+            invoice_id: 'inv_1', resolved_at_ms: resolved,
+          }),
+        ],
+        invoices: new Map([
+          ['inv_1', faktura({ total_kr: 4200, paid: true, paid_at_ms: paidAtMs })],
+        ]),
+      })
+    expect(bygg(resolved + 5 * DAY_MS).items[0].steg).toBe('betalt')
+    expect(bygg(resolved + 5 * DAY_MS).items[0].kr).toBe(4200)
+    expect(bygg(resolved + 20 * DAY_MS).items[0].steg).toBe('agerat')
+  })
+
+  test('dubblettfaktura: andra kortet stannar i agerat — fakturan räknas en gång', () => {
+    const cards = [
+      kort({ id: 'a', status: 'approved', invoice_id: 'inv_1', invoice_verified: true, created_at_ms: AUG1 + 1 * DAY_MS }),
+      kort({ id: 'b', status: 'approved', invoice_id: 'inv_1', invoice_verified: true, created_at_ms: AUG1 + 2 * DAY_MS }),
+    ]
+    const invoices = new Map([['inv_1', faktura({ total_kr: 5000, paid: true, paid_at_ms: AUG1 + 3 * DAY_MS })]])
+    const l = byggManadsLedger({ period: '2026-08', cards, invoices })
+    expect(l.items.filter(i => i.steg === 'betalt')).toHaveLength(1)
+    expect(l.items.filter(i => i.steg === 'agerat')).toHaveLength(1)
+    expect(l.betalt).toEqual({ kr: 5000, antal: 1 })
+  })
+
+  test('nyast först', () => {
+    const l = byggManadsLedger({ period: '2026-08', cards: richCards(), invoices: richInvoices() })
+    const tider = l.items.map(i => i.created_at)
+    expect(tider).toEqual([...tider].sort().reverse())
+    expect(l.items[0].approval_id).toBe('r')
+  })
+
+  test('titeln följer med när kortet har en', () => {
+    const l = byggManadsLedger({
+      period: '2026-08',
+      cards: [kort({ title: 'Förfallen faktura 2081' }), kort({ id: 'x' })],
+      invoices: new Map(),
+    })
+    const perId = new Map(l.items.map(i => [i.approval_id, i]))
+    expect(perId.get('appr_1')!.title).toBe('Förfallen faktura 2081')
+    expect(perId.get('x')!.title).toBeNull()
+  })
+
+  test('tom och ogiltig period ger tomma items och bortfall-nollor', () => {
+    const l = byggManadsLedger({ period: 'inte-en-period', cards: [kort()], invoices: new Map() })
+    expect(l.items).toEqual([])
+    expect(l.bortfall).toEqual({ avvisade_antal: 0, avvisade_kr: 0 })
+  })
+})
+
 test.describe('ledgerCardAmountKr — rätt fält per korttyp', () => {
   test('profitability_warning läser projected_overrun', () => {
     expect(ledgerCardAmountKr('profitability_warning', { projected_overrun: 3000 })).toBe(3000)

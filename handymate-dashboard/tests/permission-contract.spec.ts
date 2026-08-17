@@ -187,6 +187,16 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       why: 'Ägarrapporten: bekräftat värde, abonnemangskostnad och retention-argumentet — företagets ekonomi och avtal med oss, aldrig personaldata.',
     },
     {
+      route: 'value/ledger',
+      requires: 'owner-admin',
+      why: 'Value Ledger-fyrstegsvyn: identifierade möjligheter till bekräftat betalda kronor — företagets intäktsutfall, samma känslighet som kvittot. Saknades i kartan tills history-rutten tillkom 2026-08-17.',
+    },
+    {
+      route: 'value/ledger/history',
+      requires: 'owner-admin',
+      why: 'Samma ledger som tidsserie: bekräftat betalda kronor per månad bakåt. Sidodörr till value/ledger — måste bära exakt samma grind.',
+    },
+    {
       route: 'revenue-recovery-cases',
       requires: 'owner-admin',
       why: 'Följer identifierad intäkt genom ÄTA, faktura och bekräftad betalning — både företagets affärsläge och ekonomiska utfall i samma read model.',
