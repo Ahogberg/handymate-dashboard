@@ -33,6 +33,7 @@ import { getRelevantMemories, buildMemoryPrompt, extractAndSaveMemory } from '@/
 import { getAgentTools } from '@/lib/agents/personalities'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd, type TokenUsage } from '@/lib/costs/meter'
+import { byggAskCoverage } from '@/lib/matte/ask-coverage'
 import { createQuote } from '@/lib/quotes/create-quote'
 import {
   validateNextStep,
@@ -1133,6 +1134,9 @@ export async function POST(request: NextRequest) {
     }> = []
     let finalAction: any = null
     let outerMessages = initialMessages
+    // Ask-täckningsmätningen (Etapp L) — sista strukturerade vyn turen visade,
+    // om någon. Bara `kind` sparas nedan i byggAskCoverage, aldrig innehållet.
+    let presentationKind: string | null = null
 
     // ═══ SEKVENTIELL MULTI-AGENT V1 (Epic 2) ═══
     //
@@ -1165,6 +1169,15 @@ export async function POST(request: NextRequest) {
     }
     const bokforMatteUsage = async (refId: string) => {
       const costUsd = llmCostUsd(requestUsage, 'claude-sonnet-4-6')
+      // Ask-täckningsmätningen (Etapp L) — mekanisk klassificering av vad
+      // som FAKTISKT hände i turen, härledd ur samma `steps`/`visitedSpecialists`
+      // orkestreringsloopen redan bokfört. Ingen ny tabell: bara ett fält till
+      // vidare i samma meta-blob som redan går till meterDirectLlmCall.
+      const coverage = byggAskCoverage({
+        steps,
+        handoffCount: visitedSpecialists.length,
+        presentation: presentationKind ? { kind: presentationKind } : null,
+      })
       await meterDirectLlmCall({
         supabase,
         businessId,
@@ -1172,7 +1185,7 @@ export async function POST(request: NextRequest) {
         costUsd,
         refType: 'matte_chat_turn',
         refId,
-        meta: { thread_id: thread?.id || null, specialist_steps: visitedSpecialists },
+        meta: { thread_id: thread?.id || null, specialist_steps: visitedSpecialists, coverage },
       })
     }
 
@@ -1285,6 +1298,11 @@ export async function POST(request: NextRequest) {
         (requestUsage.cache_read_input_tokens || 0) + (turn.usage.cache_read_input_tokens || 0)
 
       if (turn.action && !finalAction) finalAction = turn.action
+      // Ask-täckningsmätningen (Etapp L): fånga vilken presentation TURENS
+      // visade, om någon — presentation är lokal till runAgentTurn och finns
+      // inte kvar i scope efter loopen, så den måste speglas hit precis som
+      // finalAction ovan.
+      if (turn.presentation && !presentationKind) presentationKind = turn.presentation.kind
 
       // Säkerhetsräcke: Claude ville skicka något ut ur huset. Persistera ev.
       // text den redan sa (t.ex. "Visst, skickar nu...") och returnera direkt
