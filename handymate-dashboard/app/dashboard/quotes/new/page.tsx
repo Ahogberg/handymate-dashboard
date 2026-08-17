@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Loader2, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Loader2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
@@ -14,7 +14,7 @@ import { RowEditSheet } from '@/components/quotes/document/RowEditSheet'
 import { AddRowSheet } from '@/components/quotes/document/AddRowSheet'
 import {
   generateItemId, recalculateItems, setItemRotRut, legacyItemRotRutType, applyOptionRowDefaults,
-  getItemRotRutType, resolveLegacyItemFields,
+  getItemRotRutType, resolveLegacyItemFields, applyGlobalDeductionType,
 } from '@/lib/quote-calculations'
 import { compressImageFile } from '@/lib/images/compress-photo'
 import { getAllCategories, type CustomCategory } from '@/lib/constants/categories'
@@ -62,6 +62,7 @@ import { QuickIntake } from './components/quick/QuickIntake'
 import { QuickBlankStart } from './components/quick/QuickBlankStart'
 import { QuickBuilding } from './components/quick/QuickBuilding'
 import { QuickReviewBar } from './components/quick/QuickReviewBar'
+import { PaymentPlanSheet } from './components/quick/PaymentPlanSheet'
 import { QuickReceipt } from './components/quick/QuickReceipt'
 import {
   sectionHandlers,
@@ -400,6 +401,9 @@ export default function NewQuotePage() {
   // Mobilens "lägg till rad"-sheet: sök i artikelbanken i stället för att få
   // en tom rad att fylla i för hand (~9 interaktioner → 2-3).
   const [addRowSheetOpen, setAddRowSheetOpen] = useState(false)
+  // Del 2 (2026-08-17): betalplanens sheet i det guidade flödets Prisbild-
+  // sektion — samma "lägg till"-mönster som addRowSheetOpen ovan.
+  const [paymentPlanSheetOpen, setPaymentPlanSheetOpen] = useState(false)
 
   // ETAPP 2b (offert-masterplan.md): canvas-first-layouten. `activePanel`
   // styr "Mer"-verktygsraden ovanför dokumentet — en sektion synlig i taget,
@@ -843,6 +847,7 @@ export default function NewQuotePage() {
       },
       onDiscountChange: setDiscountPercent,
       onNotIncludedChange: setNotIncluded,
+      onAtaTermsChange: setAtaTerms,
       onItemChange: (id, patch) => {
         if (patch.name !== undefined) updateItem(id, 'description', patch.name)
         if (patch.quantity !== undefined) updateItem(id, 'quantity', patch.quantity)
@@ -876,7 +881,7 @@ export default function NewQuotePage() {
     }),
     [
       setTitle, setDescription, setPaymentTermsText, setTermsText, setValidDays, setDiscountPercent,
-      setNotIncluded, updateItem, addItem, removeItem, items, moveItemById,
+      setNotIncluded, setAtaTerms, updateItem, addItem, removeItem, items, moveItemById,
       reservations.removeReservation,
     ],
   )
@@ -2801,8 +2806,68 @@ export default function NewQuotePage() {
               className="w-full px-3 py-2.5 border border-amber-300 rounded-xl text-sm text-slate-900 placeholder:text-amber-700/60 bg-white focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors"
             />
           )}
+          {/* Del 2 (2026-08-17): fastighetsbeteckning i Prisbild-sektionen —
+              exakt samma villkor/styling som personnummerfältet ovan, bunden
+              till samma state som gamla editorns QuoteEditRotSection redan
+              skriver till (app/dashboard/quotes/new/page.tsx:317). */}
+          {quickSection === 'prisbild' && hasRotItems && !fastighetsbeteckning.trim() && (
+            <input
+              type="text"
+              value={fastighetsbeteckning}
+              onChange={e => setFastighetsbeteckning(e.target.value)}
+              placeholder="Fastighetsbeteckning — krävs för ROT-avdraget"
+              className="w-full mt-2 px-3 py-2.5 border border-amber-300 rounded-xl text-sm text-slate-900 placeholder:text-amber-700/60 bg-white focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors"
+            />
+          )}
+          {/* Del 2: betalplan + ROT/RUT-bulkväxel — fristående kontroller i
+              children-sloten, precis som personnummer-/fastighetsbeteckning-
+              fälten ovan. Ingen ny SECTION_KEYS-nyckel behövs (se briefen). */}
+          {quickSection === 'prisbild' && (
+            <div className="flex flex-col sm:flex-row gap-2 mt-2">
+              <button
+                type="button"
+                onClick={() => setPaymentPlanSheetOpen(true)}
+                className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                {paymentPlan.length === 0 ? (
+                  '+ Lägg till betalplan'
+                ) : (
+                  <>
+                    {!paymentPlanValid && <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />}
+                    <span>Betalplan: {paymentPlan.length} delbetalningar</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setItems(prev => applyGlobalDeductionType(prev, hasRotItems ? null : 'rot'))}
+                className={`flex-1 min-h-[44px] px-4 py-2.5 text-xs font-semibold rounded-xl border transition-colors ${
+                  hasRotItems
+                    ? 'bg-primary-50 border-primary-200 text-primary-700'
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {hasRotItems ? 'ROT/RUT satt på alla rader' : 'Sätt ROT/RUT på alla rader'}
+              </button>
+            </div>
+          )}
         </QuickReviewBar>
       )}
+
+      {/* Del 2 (2026-08-17): betalplanens sheet — öppnas från Prisbild-
+          sektionens knapp i QuickReviewBar. Monterar QuoteEditPaymentPlanSection
+          oförändrad, samma handlers som gamla editorns 'betalplan'-panel. */}
+      <PaymentPlanSheet
+        open={paymentPlanSheetOpen}
+        onClose={() => setPaymentPlanSheetOpen(false)}
+        paymentPlan={paymentPlan}
+        calculatedPaymentPlan={calculatedPaymentPlan}
+        paymentPlanValid={paymentPlanValid}
+        onAddEntry={addPaymentPlanEntry}
+        onUpdateEntry={updatePaymentPlanEntry}
+        onRemoveEntry={removePaymentPlanEntry}
+        formatCurrency={formatCurrency}
+      />
 
       {/* Granskningsvyn för reservationsförslag — förbockade, redigerbara,
           med raderna som utlöste dem som motivering. */}

@@ -63,7 +63,7 @@ const SECTION_KEYS: Record<QuoteSection, Array<keyof QuoteDocumentHandlers>> = {
     'onItemRotRutCycle',
     'onOptionDefaultToggle',
   ],
-  exkluderat: ['onNotIncludedChange', 'onTermsChange'],
+  exkluderat: ['onNotIncludedChange', 'onTermsChange', 'onAtaTermsChange'],
   reservationer: ['onReservationRemove'],
   prisbild: ['onDiscountChange', 'onPaymentTermsChange', 'onValidUntilChange'],
 }

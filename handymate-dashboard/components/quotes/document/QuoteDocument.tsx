@@ -564,8 +564,25 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             {data.quote.warrantyText && <><br /><br /><strong>Garanti:</strong> {data.quote.warrantyText}</>}
             {/* ÄTA (etapp A4): renderades aldrig — se kommentaren i static-
                 grenen nedan. Båda grenarna får samma tillägg så de inte kan
-                divergera. */}
-            {data.quote.ataTerms && <><br /><br /><strong>Ändringar och tilläggsarbeten:</strong> {data.quote.ataTerms}</>}
+                divergera. Del 1 (2026-08-17): nu dokumentredigerbart via
+                samma mönster som "Ej inkluderat" två block ovan — gatas på
+                onAtaTermsChange (lib/quotes/section-handlers.ts:
+                SECTION_KEYS.exkluderat). */}
+            {(data.quote.ataTerms || handlers.onAtaTermsChange) ? (
+              <>
+                <br /><br /><strong>Ändringar och tilläggsarbeten:</strong>{' '}
+                {handlers.onAtaTermsChange
+                  ? (
+                    <EditableText
+                      value={data.quote.ataTerms || ''}
+                      onChange={handlers.onAtaTermsChange}
+                      placeholder="T.ex. hur prissätts tilläggsarbete"
+                      multiline
+                    />
+                  )
+                  : data.quote.ataTerms}
+              </>
+            ) : null}
           </p>
         ) : (
           <p className="terms" {...section('exkluderat')}>

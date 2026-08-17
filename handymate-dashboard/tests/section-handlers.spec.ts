@@ -44,6 +44,7 @@ const FULL: QuoteDocumentHandlers = {
   onValidUntilChange: noop,
   onDiscountChange: noop,
   onNotIncludedChange: noop,
+  onAtaTermsChange: noop,
   onItemChange: noop,
   onItemAdd: noop,
   onItemRemove: noop,
@@ -70,7 +71,7 @@ test.describe('exakta nycklar per sektion — inget läckage åt något håll', 
   })
 
   test('Exkluderat äger bara villkorstexterna', () => {
-    expect(keysOf('exkluderat')).toEqual(['onNotIncludedChange', 'onTermsChange'])
+    expect(keysOf('exkluderat')).toEqual(['onAtaTermsChange', 'onNotIncludedChange', 'onTermsChange'])
   })
 
   test('Reservationer äger bara borttagningen', () => {

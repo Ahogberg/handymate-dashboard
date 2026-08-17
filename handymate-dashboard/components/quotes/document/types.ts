@@ -76,6 +76,9 @@ export interface QuoteDocumentHandlers {
   /** "Ej inkluderat"-texten i villkorsstycket — multiline, samma mönster som
       onTermsChange. */
   onNotIncludedChange?: (v: string) => void
+  /** ÄTA-villkoret (ändringar och tilläggsarbeten) i villkorsstycket —
+      multiline, samma mönster som onNotIncludedChange/onTermsChange. */
+  onAtaTermsChange?: (v: string) => void
   onItemChange?: (id: string, patch: QuoteItemPatch) => void
   /** Lägger till en ny tom 'item'-rad sist — samma beteende som dagens
       "+ Lägg till rad". Radtypsväljare (rubrik/text/etc) ägs av "Mer"-
