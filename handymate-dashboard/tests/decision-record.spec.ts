@@ -164,3 +164,21 @@ test.describe('producenterna stämplar — kopplingen kan inte tyst försvinna',
     expect((s.match(/model: analysModell/g) || []).length).toBeGreaterThanOrEqual(2)
   })
 })
+
+test.describe('playbookPatternDetection — detect-pattern.ts bygger, propose-pattern.ts stämplar payloaden', () => {
+  // Ovanligt mot övriga PRODUCENTER-raderna ovan: den här AI-vägen bygger
+  // DecisionRecord i EN fil (detect-pattern.ts, där modellanropet sker) och
+  // hänger den på kortets payload i EN ANNAN fil (propose-pattern.ts, där
+  // pending_approvals-raden skapas) — ansvaret är redan uppdelat så i
+  // koden, se lib/playbook/propose-pattern.ts filhuvud.
+  test('detect-pattern.ts bygger en DecisionRecord med rätt prompt-nyckel', () => {
+    const s = fs.readFileSync(path.join(ROOT, 'lib/playbook/detect-pattern.ts'), 'utf8')
+    expect(s, 'detect-pattern.ts bygger inte en DecisionRecord').toContain('buildDecisionRecord')
+    expect(s, 'detect-pattern.ts stämplar inte med nyckeln playbookPatternDetection').toContain("prompt: 'playbookPatternDetection'")
+  })
+
+  test('propose-pattern.ts hänger DecisionRecord på kortets payload via withDecisionRecord', () => {
+    const s = fs.readFileSync(path.join(ROOT, 'lib/playbook/propose-pattern.ts'), 'utf8')
+    expect(s, 'propose-pattern.ts importerar inte withDecisionRecord').toContain('withDecisionRecord')
+  })
+})

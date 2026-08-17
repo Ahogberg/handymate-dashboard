@@ -27,6 +27,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { rapporteraTystFel, arSchemaSaknas } from '@/lib/observability/driftlarm'
+import { withDecisionRecord } from '@/lib/ai/decision-record'
 import { detectPattern, MIN_SAMPLE_SIZE, type LessonForDetection } from './detect-pattern'
 
 /** Karensen i dedup-gren c) — se filhuvudet. */
@@ -196,25 +197,22 @@ export async function proposePattern(
       status: 'pending',
       expires_at: new Date(Date.now() + PATTERN_CARD_EXPIRES_DAYS * 24 * 60 * 60 * 1000).toISOString(),
       approval_type: 'playbook_pattern_confirmation',
-      // Etapp 3b (multi-employee-parity-plan.md): samma bucket som
-      // four_eyes_project_close/dispatch_suggestion — en bekräftad regel
-      // formar ALLA framtida offerter av jobbtypen, inte bara ett enskilt
-      // projekt eller en enskild anställds jobb.
+      // owner_admin: en bekräftad regel formar ALLA framtida offerter av
+      // jobbtypen (multi-employee-parity-plan.md, etapp 3b).
       routing_role: 'owner_admin',
       title,
       description,
       risk_level: 'low',
-      payload: {
+      // _decision (lib/ai/decision-record.ts): modell/prompt/version/
+      // inputhash för Haiku-anropet som avgjorde mönstret.
+      payload: withDecisionRecord({
         job_type: jobType,
         pattern_text: detected.pattern_text,
         confidence: detected.confidence,
         evidence_lesson_ids: detected.evidence_lesson_ids,
         sample_count: lessons.length,
-        // Daniel äger offertjakten/offertmotorn (se t.ex. app/api/cron/
-        // quote-follow-up/route.ts, "Daniel äger offertjakten") — den här
-        // regeln formar just hans domän.
-        agent_id: 'daniel',
-      },
+        agent_id: 'daniel', // Daniel äger offertjakten/offertmotorn.
+      }, detected.decision),
     })
 
     if (insertErr) {

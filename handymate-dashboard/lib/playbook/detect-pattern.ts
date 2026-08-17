@@ -37,6 +37,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getClaudeModel } from '@/lib/ai/get-model'
+import { buildDecisionRecord, type DecisionRecord } from '@/lib/ai/decision-record'
 
 /** Högre än de 3 som gäller för en enskild offerts varningsbanner (se
  *  filhuvudet) — det här föreslår en regel som gäller ALLA framtida
@@ -60,10 +61,18 @@ export interface DetectedPattern {
   evidence_lesson_ids: string[]
 }
 
-function buildPrompt(jobType: string, lessons: LessonForDetection[]): string {
-  const lista = lessons
+/** Detsamma som skickas till Haiku (buildPrompt) — utdraget till en egen
+ *  funktion så att beslutspostens inputHash (lib/ai/decision-record.ts)
+ *  hashar EXAKT det underlag modellen faktiskt fick, inte en omgjord
+ *  approximation som kan glida isär från prompten. */
+function buildLessonsText(lessons: LessonForDetection[]): string {
+  return lessons
     .map((l, i) => `${i}. "${l.lesson_text}"${l.impact_hint ? ` (fråga: ${l.impact_hint})` : ''}`)
     .join('\n')
+}
+
+function buildPrompt(jobType: string, lessons: LessonForDetection[]): string {
+  const lista = buildLessonsText(lessons)
 
   return `Du analyserar bekräftade lärdomar från ett hantverksföretags avslutade projekt, alla av jobbtypen "${jobType}". Lärdomarna är hantverkarens egna ord från projektstängningar — inte AI-gissningar.
 
@@ -147,13 +156,19 @@ export function parsePatternDetectionSvar(
  *
  * `supabase` behövs för den obligatoriska kostnadsmätningen (samma
  * cost-guard-mönster som customer-facts/extract-from-text.ts).
+ *
+ * Returnerar `DetectedPattern` UTÖKAT med en `decision`-stämpel (lib/ai/
+ * decision-record.ts) — bara när ett mönster faktiskt hittades. Svarade
+ * modellen "inget mönster" togs inget AI-BESLUT att stämpla (jfr.
+ * price_adjustment-korten, decision-record.ts:s egen princip), så det
+ * fallet returnerar null precis som förut, utan någon DecisionRecord.
  */
 export async function detectPattern(params: {
   businessId: string
   jobType: string
   lessons: LessonForDetection[]
   supabase: SupabaseClient
-}): Promise<DetectedPattern | null> {
+}): Promise<(DetectedPattern & { decision: DecisionRecord }) | null> {
   const { businessId, jobType, lessons, supabase } = params
   if (lessons.length < MIN_SAMPLE_SIZE) return null
   if (!process.env.ANTHROPIC_API_KEY) return null
@@ -185,7 +200,18 @@ export async function detectPattern(params: {
     }
 
     const svarstext = response.content[0]?.type === 'text' ? response.content[0].text : ''
-    return parsePatternDetectionSvar(svarstext, lessons)
+    const parsed = parsePatternDetectionSvar(svarstext, lessons)
+    if (!parsed) return null
+
+    return {
+      ...parsed,
+      decision: buildDecisionRecord({
+        model: PLAYBOOK_PATTERN_DETECT_MODEL,
+        prompt: 'playbookPatternDetection',
+        input: buildLessonsText(lessons),
+        now: new Date(),
+      }),
+    }
   } catch (err) {
     console.warn('[playbook/detect-pattern] detektion misslyckades (fail-safe, inget mönster):', err)
     return null

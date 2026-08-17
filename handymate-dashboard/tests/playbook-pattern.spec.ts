@@ -326,6 +326,27 @@ test.describe('propose-pattern.ts — kortet som skapas', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────
+// _decision — Decision Twin Lars-slice (2026-08-17): mönsterdetektionen
+// är en riktig AI-inferens (Haiku) som tidigare inte stämplade provenience.
+// ─────────────────────────────────────────────────────────────────
+
+test.describe('propose-pattern.ts — kortets payload stämplas med _decision', () => {
+  const kalla = read('lib/playbook/propose-pattern.ts')
+
+  test('payloaden hängs på via withDecisionRecord(..., detected.decision) — inte ett löst objekt', () => {
+    const insertIdx = kalla.indexOf(".from('pending_approvals').insert(")
+    expect(insertIdx).toBeGreaterThan(-1)
+    const gren = kalla.slice(insertIdx, insertIdx + 1200)
+    expect(gren).toContain('withDecisionRecord(')
+    expect(gren).toContain('detected.decision')
+  })
+
+  test('withDecisionRecord importeras från den facit-låsta beslutsposten', () => {
+    expect(kalla).toContain("from '@/lib/ai/decision-record'")
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────
 // action-contract + routing
 // ─────────────────────────────────────────────────────────────────
 

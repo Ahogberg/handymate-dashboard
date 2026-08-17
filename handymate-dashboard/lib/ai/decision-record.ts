@@ -67,6 +67,13 @@ export const PROMPT_VERSIONS = {
    * citat, max 5, åtkomstkodsförbudet.
    */
   emailFactExtraction: 1,
+  /**
+   * lib/playbook/detect-pattern.ts — mönsterdetektionen (Debrief → Playbook
+   * V2, Decision Twin Lars-slice, 2026-08-17): avgör om flera lärdomar för
+   * samma jobbtyp upprepar samma tema. v1 = "hellre missa än gissa"-
+   * prompten, minst två oberoende belägg krävs i kod (inte bara prompt).
+   */
+  playbookPatternDetection: 1,
 } as const
 
 export type PromptKey = keyof typeof PROMPT_VERSIONS
