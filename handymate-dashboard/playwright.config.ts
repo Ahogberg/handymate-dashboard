@@ -108,6 +108,21 @@ export default defineConfig({
       use: { storageState: { cookies: [], origins: [] } },
     },
 
+    // ── Mission-beviset (tests/e2e-golden-path/mission-proof.spec.ts) ────
+    // Egen projektgrupp, samma skäl som flywheel ovan (isolerat, ingen
+    // dependencies-kedja mot golden-path/golden-path-permissions). Ingen
+    // UI-inloggning i specen (se filhuvudet: hela kedjan går via
+    // service-role + direkta funktionsanrop) — explicit tomt storageState
+    // ändå, för att aldrig råka ärva toppnivåns default (Andreas eget
+    // konto) om ett framtida tillägg skulle behöva en session.
+    {
+      name: 'mission-proof',
+      testDir: './tests/e2e-golden-path',
+      testMatch: /mission-proof\.spec\.ts/,
+      testIgnore: [],
+      use: { storageState: { cookies: [], origins: [] } },
+    },
+
     // ── Margin Guardian — fristående "fungerar i praktiken"-test ─────────
     // Egen fil/eget projekt (inte en Golden Path-station): en lönsamhets-
     // varning är en villkorad gren, inte del av kundresans huvudspår.
