@@ -8,9 +8,29 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Kopplade till next/font-variablerna i app/layout.tsx (2026-08-17) —
+      // self-hostade, inte Google-CDN. font-mono är för stora belopp/räknare
+      // i hero-ytor (mockupens JetBrains Mono-mönster), inte löptext.
       fontFamily: {
-        heading: ['Space Grotesk', 'system-ui', 'sans-serif'],
-        body: ['DM Sans', 'system-ui', 'sans-serif'],
+        heading: ['var(--font-heading)', 'system-ui', 'sans-serif'],
+        body: ['var(--font-body)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
+      },
+      // Radie-tokens ur mockupens system (Business Twin-mockups 2026-08-17):
+      // card för standardkort, input för fält, hero för stora mörka ytor.
+      // rounded-2xl (16px) förblir giltig — card är samma värde med namn.
+      borderRadius: {
+        card: '16px',
+        input: '10px',
+        hero: '20px',
+      },
+      // Gradienter (används sparsamt): grad-dark-hero är mockupens mörka
+      // teal-hero (Command Center/Value Ledger), grad-brand CTA-knapparna,
+      // grad-tint det svaga teal-tonade kortet (Value Ledger-teasern).
+      backgroundImage: {
+        'grad-dark-hero': 'linear-gradient(135deg, #0f2e2a, #134e4a)',
+        'grad-brand': 'linear-gradient(135deg, #0f766e, #14b8a6)',
+        'grad-tint': 'linear-gradient(135deg, rgba(13,148,136,0.10), rgba(20,184,166,0.04))',
       },
       colors: {
         primary: {

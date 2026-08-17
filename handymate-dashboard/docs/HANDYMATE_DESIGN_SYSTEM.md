@@ -85,18 +85,30 @@ Bara för kategori-indikatorer eller avatar-tinting där en specifik betydelse b
 
 ### Font-stackar
 
-**App (dashboard, onboarding, portal):**
+**App (dashboard, onboarding, portal) — sedan 2026-08-17 (designfundamentet):**
 ```
--apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif
+Headings: var(--font-heading)  → Space Grotesk   (500/600/700)
+Body:     var(--font-body)     → DM Sans         (400/500/600/700)
+Siffror:  var(--font-mono)     → JetBrains Mono  (400/500) — SPARSAMT
 ```
-Native rendering på alla plattformar — laddar inget extra, snabbt på mobil.
+Laddas self-hostade via `next/font/google` i [app/layout.tsx](../app/layout.tsx)
+(swap, latin+latin-ext), exponerade som CSS-variabler och kopplade till
+Tailwinds `font-heading`/`font-body`/`font-mono`. Inter är BORTTAGEN — den
+var aldrig del av varumärket men vann tidigare över DM Sans på all body-text.
+
+**Sifferregeln:** alla kr-belopp och räknare sätts `tabular-nums` (inbyggd
+Tailwind-klass) + `font-heading`. `font-mono` är reserverad för stora
+hero-belopp och monospace-tider — aldrig löptext.
 
 **Quote/invoice-templates (kund-vänd PDF/HTML):**
 ```
 Headings: 'Space Grotesk', sans-serif    (500/600/700)
 Body:     'DM Sans', sans-serif          (400/500/600/700)
 ```
-Dessa laddas via `<link>` från Google Fonts i template-headern. Används bara i [lib/quote-templates/modern.ts](../lib/quote-templates/modern.ts) och [lib/invoice-templates/modern.ts](../lib/invoice-templates/modern.ts).
+Dessa laddas via `<link>` från Google Fonts i template-headern (egen
+renderingskontext — Chromium-PDF ser inte appens next/font). Används bara i
+[lib/quote-templates/modern.ts](../lib/quote-templates/modern.ts) och
+[lib/invoice-templates/modern.ts](../lib/invoice-templates/modern.ts).
 
 **Pipeline (Flödet):**
 ```
@@ -214,6 +226,23 @@ Subtila, från onboarding.css/portal.css:
 ---
 
 ## 4. Komponentmönster
+
+### 4.0 Tokens i Tailwind (2026-08-17, mockup-integrationen)
+
+Radier: `rounded-card` (16px, standardkort) · `rounded-input` (10px, fält)
+· `rounded-hero` (20px, mörka hero-ytor). `rounded-2xl` = samma 16px och
+förblir giltig i befintlig kod.
+
+Gradienter (används SPARSAMT): `bg-grad-dark-hero`
+(`linear-gradient(135deg,#0f2e2a,#134e4a)` — Command Centers Matte-hero och
+Value Ledger-heron, ALDRIG fler än en mörk hero per sida) · `bg-grad-brand`
+(CTA-knappar) · `bg-grad-tint` (svagt teal-tonade betoningskort, t.ex.
+Value Ledger-teasern).
+
+**Mörk hero-mönstret:** eyebrow i `text-primary-300` uppercase tracking-wide,
+huvudtal i `font-heading` 700 `tabular-nums` vitt, undertext
+`text-white/60`, högerställda sekundärtal avdelade med `border-white/10`.
+Text på mörk yta är alltid vit/vit-med-opacitet — aldrig slate-tonerna.
 
 ### 4.1 Cards
 

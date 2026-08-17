@@ -1,9 +1,34 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Space_Grotesk, DM_Sans, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import CookieConsent from '@/components/CookieConsent'
 
-const inter = Inter({ subsets: ['latin'] })
+// Designfundament (mockup-integrationen 2026-08-17): varumärkets tre
+// typsnitt laddas self-hostade via next/font (swap, latin+latin-ext) i
+// stället för det render-blockerande @import:et i globals.css. Inter är
+// borttagen — den var aldrig del av varumärket men VANN över DM Sans på
+// all body-text via className-specificitet (inter.className på <body>).
+// Tailwinds font-heading/font-body/font-mono pekar på CSS-variablerna.
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['500', '600', '700'],
+  display: 'swap',
+  variable: '--font-heading',
+})
+const dmSans = DM_Sans({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-body',
+})
+// JetBrains Mono används sparsamt: stora belopp/räknare i hero-ytor och
+// monospace-tider — inte all löptext.
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  display: 'swap',
+  variable: '--font-mono',
+})
 
 export const metadata: Metadata = {
   title: 'Handymate - Dashboard',
@@ -27,7 +52,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="sv">
+    <html lang="sv" className={`${spaceGrotesk.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0F766E" />
@@ -35,7 +60,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Handymate" />
       </head>
-      <body className={inter.className}>
+      <body className="font-body">
         {children}
         <CookieConsent />
         <script
