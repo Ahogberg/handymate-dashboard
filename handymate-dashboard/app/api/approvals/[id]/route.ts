@@ -174,6 +174,19 @@ export async function POST(
         console.error(`[approvals/${params.id}] retry: kunde inte spara execution_result:`, retryPersistError)
       }
 
+      // TD-85 (2026-08-17): retry-vägen körde tidigare INTE uppfyllnadshooken
+      // — en payload som bar promise_fact_id och lyckades först vid omkörning
+      // (första försöket 'failed') stängde aldrig löftet, trots att
+      // bevislänken (execution_result) fanns. Samma delade funktion som
+      // primärvägen, samma semantik: bara outcome 'success', bara öppna löften.
+      await fulfillPromiseIfPresent(
+        supabase,
+        params.id,
+        business.business_id,
+        approval.payload as Record<string, unknown> | null,
+        retryClassified.outcome,
+      )
+
       return NextResponse.json({
         success: true,
         action,
@@ -415,42 +428,11 @@ export async function POST(
         console.error(`[approvals/${params.id}] Kunde inte spara execution_result:`, persistError)
       }
 
-      // Promise-to-Proof — uppfyllnadslänken (Etapp N, 2026-08-17, sql/v147):
+      // Promise-to-Proof — uppfyllnadslänken (Etapp N, 2026-08-17, sql/v147;
+      // delad med retry-vägen sedan TD-85, se fulfillPromiseIfPresent nedan):
       // VILKET kort som helst vars payload bär promise_fact_id och som
-      // EXEKVERAR FRAMGÅNGSRIKT stänger löftet det restes för — payload-
-      // konventionen är generisk, inte bunden till deadline-svepets kort
-      // (lib/promises/deadline-sweep.ts) specifikt. Non-blocking, fail-soft
-      // pre-v147 (promise_status-kolumnen kan saknas) och rör ALDRIG det
-      // avvisade tillståndet — bara godkännandet (ovan) öppnar ett löfte,
-      // och bara en människa som läser deadline-svepets kort avgör om ett
-      // löfte bröts. Den här hooken flyttar ENDAST öppna löften till uppfyllda.
-      const promiseFactId = (finalPayload as Record<string, unknown> | null)?.promise_fact_id
-      if (typeof promiseFactId === 'string' && promiseFactId && outcome === 'success') {
-        try {
-          const { error: fulfillErr } = await supabase
-            .from('customer_fact')
-            .update({
-              promise_status: 'fulfilled',
-              fulfilled_by_ref: params.id,
-              fulfilled_at: new Date().toISOString(),
-            })
-            .eq('id', promiseFactId)
-            .eq('business_id', business.business_id)
-            .eq('promise_status', 'open')
-          if (
-            fulfillErr &&
-            fulfillErr.code !== '42703' &&
-            !/column .* does not exist|schema cache/i.test(fulfillErr.message || '')
-          ) {
-            console.error(`[approvals/${params.id}] löftesuppfyllnad misslyckades (icke-blockerande):`, fulfillErr.message)
-          }
-        } catch (fulfillCatchErr: any) {
-          console.error(
-            `[approvals/${params.id}] löftesuppfyllnad kastade (icke-blockerande):`,
-            fulfillCatchErr?.message || fulfillCatchErr,
-          )
-        }
-      }
+      // EXEKVERAR FRAMGÅNGSRIKT stänger löftet det restes för.
+      await fulfillPromiseIfPresent(supabase, params.id, business.business_id, finalPayload, outcome)
     }
 
     return NextResponse.json({
@@ -462,6 +444,57 @@ export async function POST(
   } catch (error: any) {
     console.error('POST /api/approvals/[id] error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+/**
+ * Promise-to-Proof — delad uppfyllnadshook (TD-85, 2026-08-17).
+ *
+ * Extraherad ur primärvägens (Etapp N, sql/v147) inline-block: BÅDA vägar
+ * som kan exekvera en payload framgångsrikt — förstaförsöket (approve/edit)
+ * OCH omkörningen (retry, efter ett tidigare misslyckat försök) — måste
+ * stänga löftet det restes för. Innan denna extraktion körde bara
+ * primärvägen hooken, så ett löfte som diskonterades via retry blev kvar
+ * 'open' för alltid trots att bevislänken (execution_result) faktiskt fanns.
+ *
+ * Non-blocking, fail-soft pre-v147 (promise_status-kolumnen kan saknas) och
+ * rör ALDRIG det avvisade tillståndet — bara godkännandet öppnar ett löfte
+ * (case 'customer_fact'), och bara en människa som läser deadline-svepets
+ * kort avgör om ett löfte bröts. Den här funktionen flyttar ENDAST öppna
+ * löften till uppfyllda, och bara vid outcome 'success'.
+ */
+async function fulfillPromiseIfPresent(
+  supabase: SupabaseClient,
+  approvalId: string,
+  businessId: string,
+  payload: Record<string, unknown> | null,
+  outcome: string,
+): Promise<void> {
+  const promiseFactId = (payload as Record<string, unknown> | null)?.promise_fact_id
+  if (typeof promiseFactId !== 'string' || !promiseFactId || outcome !== 'success') return
+  try {
+    const { error: fulfillErr } = await supabase
+      .from('customer_fact')
+      .update({
+        promise_status: 'fulfilled',
+        fulfilled_by_ref: approvalId,
+        fulfilled_at: new Date().toISOString(),
+      })
+      .eq('id', promiseFactId)
+      .eq('business_id', businessId)
+      .eq('promise_status', 'open')
+    if (
+      fulfillErr &&
+      fulfillErr.code !== '42703' &&
+      !/column .* does not exist|schema cache/i.test(fulfillErr.message || '')
+    ) {
+      console.error(`[approvals/${approvalId}] löftesuppfyllnad misslyckades (icke-blockerande):`, fulfillErr.message)
+    }
+  } catch (fulfillCatchErr: any) {
+    console.error(
+      `[approvals/${approvalId}] löftesuppfyllnad kastade (icke-blockerande):`,
+      fulfillCatchErr?.message || fulfillCatchErr,
+    )
   }
 }
 

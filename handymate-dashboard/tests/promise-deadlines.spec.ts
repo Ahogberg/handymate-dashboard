@@ -252,41 +252,66 @@ test.describe('godkännandet aktiverar löftet (app/api/approvals/[id]/route.ts,
 })
 
 // ─────────────────────────────────────────────────────────────────
-// e) uppfyllnadshooken — bara vid lyckad exekvering + promise_fact_id
+// e) uppfyllnadshooken — delad funktion, kallas från BÅDA vägar
+//    (TD-85, 2026-08-17): tidigare körde bara primärvägen (approve/edit)
+//    hooken — en retry-diskonterad payload (första försöket 'failed',
+//    omkörningen lyckades) läckte 'open' för alltid trots att
+//    bevislänken (execution_result) fanns. fulfillPromiseIfPresent är
+//    nu den enda platsen som skriver 'fulfilled', kallad från båda vägar.
 // ─────────────────────────────────────────────────────────────────
 
 test.describe('uppfyllnadslänken efter exekvering (app/api/approvals/[id]/route.ts)', () => {
   const ROUTE = 'app/api/approvals/[id]/route.ts'
 
-  test('hooken finns, läser promise_fact_id ur finalPayload', () => {
+  test('den delade funktionen fulfillPromiseIfPresent finns', () => {
     const s = read(ROUTE)
-    const i = s.indexOf('const promiseFactId = (finalPayload')
-    expect(i, 'uppfyllnadshooken saknas').toBeGreaterThan(-1)
+    const i = s.indexOf('async function fulfillPromiseIfPresent(')
+    expect(i, 'fulfillPromiseIfPresent saknas').toBeGreaterThan(-1)
   })
 
-  test("hooken kräver outcome === 'success' — skippade/misslyckade kort uppfyller aldrig ett löfte", () => {
+  test("funktionen kräver outcome === 'success' — skippade/misslyckade kort uppfyller aldrig ett löfte", () => {
     const s = read(ROUTE)
-    const i = s.indexOf('const promiseFactId = (finalPayload')
-    const gren = s.slice(i, i + 400)
-    expect(gren).toContain("outcome === 'success'")
+    const i = s.indexOf('async function fulfillPromiseIfPresent(')
+    const gren = s.slice(i, i + 700)
+    expect(gren).toContain("outcome !== 'success'")
   })
 
   test('uppdateringen sätter fulfilled + fulfilled_by_ref (godkännandets id) + fulfilled_at, bara på öppna löften', () => {
     const s = read(ROUTE)
-    const i = s.indexOf('const promiseFactId = (finalPayload')
-    const gren = s.slice(i, i + 1200)
+    const i = s.indexOf('async function fulfillPromiseIfPresent(')
+    const gren = s.slice(i, i + 1400)
     expect(gren).toContain("promise_status: 'fulfilled'")
-    expect(gren).toContain('fulfilled_by_ref: params.id')
+    expect(gren).toContain('fulfilled_by_ref: approvalId')
     expect(gren).toContain('fulfilled_at:')
     expect(gren).toContain(".eq('promise_status', 'open')")
   })
 
-  test('hooken är non-blocking — eget try/catch, loggar men kastar aldrig', () => {
+  test('funktionen är non-blocking — eget try/catch, loggar men kastar aldrig', () => {
     const s = read(ROUTE)
-    const i = s.indexOf('const promiseFactId = (finalPayload')
-    const gren = s.slice(i, i + 1400)
+    const i = s.indexOf('async function fulfillPromiseIfPresent(')
+    const gren = s.slice(i, i + 1800)
     expect(gren).toContain('try {')
     expect(gren).toContain('catch (fulfillCatchErr')
+  })
+
+  test('primärvägen (approve/edit) kallar den delade funktionen', () => {
+    const s = read(ROUTE)
+    const start = s.indexOf("if (action === 'approve' || action === 'edit') {")
+    expect(start, 'approve/edit-grenen hittades inte').toBeGreaterThan(-1)
+    const end = s.indexOf('return NextResponse.json({', start)
+    expect(end, 'slutet på approve/edit-grenen hittades inte').toBeGreaterThan(start)
+    const gren = s.slice(start, end)
+    expect(gren).toContain('fulfillPromiseIfPresent(')
+  })
+
+  test('retry-vägen kallar SAMMA delade funktion — TD-85, tidigare saknades den helt här', () => {
+    const s = read(ROUTE)
+    const start = s.indexOf("if (action === 'retry') {")
+    expect(start, 'retry-grenen hittades inte').toBeGreaterThan(-1)
+    const end = s.indexOf("if (approval.status !== 'pending')", start)
+    expect(end, 'slutet på retry-grenen hittades inte').toBeGreaterThan(start)
+    const gren = s.slice(start, end)
+    expect(gren).toContain('fulfillPromiseIfPresent(')
   })
 })
 
