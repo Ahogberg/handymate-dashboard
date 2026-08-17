@@ -32,6 +32,9 @@ import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { AgentMessage } from '@/components/agents/AgentMessage'
 import type { InteractionStatus } from '@/lib/agents/interaction'
 import type { BusinessScenarioPresentation } from '@/lib/business-twin/scenario-contract'
+import type { MissionPlanPresentation } from '@/lib/mission/mission-presentation'
+import { useMission } from '@/lib/mission/MissionProvider'
+import { deriveBubbleState } from '@/lib/mission/bubble-state'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -44,7 +47,7 @@ interface ChatMessage {
   is_handoff_announcement?: boolean
   /** Orkestreringens status på Mattes sammanfattning (Epic 2) — aldrig gissad i UI:t. */
   status?: InteractionStatus | null
-  presentation?: BusinessScenarioPresentation
+  presentation?: BusinessScenarioPresentation | MissionPlanPresentation
 }
 
 /** Fas 0-säkerhetsräcke: kort som visas när Matte vill skicka något ut ur huset. */
@@ -95,6 +98,10 @@ export default function Jobbkompisen() {
   // sidkontexten så chatten vet var hantverkaren står (API:et har läst
   // context.customerId/projectId hela tiden — ingen skickade in dem).
   const { badge: momentBadge, panel: momentPanel, unseenKr, markSeen } = useMoments()
+  // Goal-to-Plan V1 (Etapp C, tasks/jaunty-pondering-hummingbird.md): det
+  // aktiva uppdraget styr bubblans stängda pillar (deriveBubbleState nedan)
+  // och MissionPlanCards "Starta uppdraget"-knapp (startMissionFromCard).
+  const { mission, progress, refresh: refreshMission } = useMission()
   const pathname = usePathname()
   const pageContext = pageContextFromPathname(pathname)
 
@@ -209,7 +216,7 @@ export default function Jobbkompisen() {
             content: string
             is_handoff_announcement?: boolean
             status?: InteractionStatus | null
-            presentation?: BusinessScenarioPresentation
+            presentation?: BusinessScenarioPresentation | MissionPlanPresentation
           }) => ({
             role: 'assistant' as const,
             content: m.content,
@@ -231,6 +238,16 @@ export default function Jobbkompisen() {
     } finally {
       setChatLoading(false)
     }
+  }
+
+  // MissionPlanCards "Starta uppdraget"-knapp (Etapp C): skickar chatt-
+  // meddelandet genom SAMMA sendChat som allt annat, och hämtar sedan om
+  // det aktiva uppdraget — confirm_mission må ha skapat mis_-raden på
+  // servern, men bubblan/Uppdragsraden vet inget om det förrän en ny
+  // /api/mission/active-läsning gjorts.
+  async function startMissionFromCard(text: string) {
+    await sendChat(text)
+    refreshMission()
   }
 
   // Vid [Skicka]: återanropar matte/chat med bekräftelse-token:en — routen
@@ -258,7 +275,7 @@ export default function Jobbkompisen() {
             content: string
             is_handoff_announcement?: boolean
             status?: InteractionStatus | null
-            presentation?: BusinessScenarioPresentation
+            presentation?: BusinessScenarioPresentation | MissionPlanPresentation
           }) => ({
             role: 'assistant' as const,
             content: m.content,
@@ -501,13 +518,39 @@ export default function Jobbkompisen() {
     const antalFynd = suggestions.length + momentBadge.length
     const hasActiveJob = !!activeTimer
     const matte = getAgentById('matte')
+    // Bubblans EN pill-slot (Etapp C, tasks/jaunty-pondering-hummingbird.md):
+    // ett aktivt uppdrag vinner alltid över kronpillen (precedensen bor i
+    // deriveBubbleState, inte här) — hasActiveJob (pågående samtal) tystar
+    // kronläget precis som förut, genom att aldrig mata in ett unseenKr som
+    // når tröskeln.
+    const bubbleState = deriveBubbleState({
+      hasActiveMission: !!mission && mission.status === 'active',
+      decisionsOutstanding: progress?.decisions_outstanding ?? 0,
+      unseenKr: hasActiveJob ? 0 : unseenKr,
+    })
     // Beloppsläget: när osedda fynd summerar till riktiga pengar bär bubblan
-    // summan i stället för en anonym siffra. Tröskeln matchar interruption-
-    // motorns globala golv — under den är beloppet inte skäl nog att skrika.
-    const visaBelopp = !hasActiveJob && unseenKr >= 10_000
+    // summan i stället för en anonym siffra — bara när bubbelstate faktiskt
+    // landar på kr-läget (mission-lägena har redan företräde ovan).
+    const visaBelopp = bubbleState === 'kr_pill'
 
     return (
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-1.5">
+        {bubbleState === 'kraver_beslut' && (
+          <button
+            onClick={() => setIsOpen(true)}
+            className="px-3 h-8 rounded-full bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-500/20 whitespace-nowrap"
+          >
+            Matte behöver ditt beslut
+          </button>
+        )}
+        {bubbleState === 'aktivt_uppdrag' && (
+          <button
+            onClick={() => setIsOpen(true)}
+            className="px-3 h-8 rounded-full bg-primary-700 text-white text-xs font-bold shadow-lg shadow-primary-700/20 whitespace-nowrap"
+          >
+            Uppdrag pågår · öppna
+          </button>
+        )}
         {visaBelopp && (
           <button
             onClick={() => setIsOpen(true)}
@@ -618,6 +661,7 @@ export default function Jobbkompisen() {
             pendingConfirmation={pendingConfirmation}
             onInputChange={setChatInput}
             onSend={() => sendChat()}
+            onSendChat={startMissionFromCard}
             onExecuteAction={executeAction}
             onClearSuggestion={clearSuggestion}
             onConfirmPending={confirmPendingAction}
@@ -677,6 +721,7 @@ function ChatTab({
   pendingConfirmation,
   onInputChange,
   onSend,
+  onSendChat,
   onExecuteAction,
   onClearSuggestion,
   onConfirmPending,
@@ -694,6 +739,8 @@ function ChatTab({
   pendingConfirmation: PendingConfirmation | null
   onInputChange: (v: string) => void
   onSend: () => void
+  /** MissionPlanCards "Starta uppdraget" — se Jobbkompisen.startMissionFromCard. */
+  onSendChat: (text: string) => void
   onExecuteAction: (action: AIAction) => void
   onClearSuggestion: (id: string) => void
   onConfirmPending: () => void
@@ -791,7 +838,7 @@ function ChatTab({
             med Mattes formspråk runt; nu ÄR porträttet avsändaren, och
             överlämningar och statusar ser likadana ut på båda ytorna. */}
         {messages.map((message, i) => (
-          <AgentMessage key={i} message={message} index={i}>
+          <AgentMessage key={i} message={message} index={i} onSendChat={onSendChat} onPrefill={onInputChange}>
             {/* Actions from AI */}
             {message.actions && message.actions.length > 0 && (
               <div className="mt-2 ml-1 space-y-1.5">

@@ -27,6 +27,11 @@ import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { agentForApproval, TYPE_LABEL } from '@/lib/jarvis/approval-view'
 import type { AgentMoment } from '@/lib/moments/derive'
 import type { BusinessScenarioPresentation } from '@/lib/business-twin/scenario-contract'
+import type { MissionPlanPresentation } from '@/lib/mission/mission-presentation'
+
+/** De två presentationskorten AgentMessage.tsx kan rendera under en bubbla —
+ *  widened i Etapp C (Goal-to-Plan V1) utan att röra business-scenario-grenen. */
+export type AgentPresentation = BusinessScenarioPresentation | MissionPlanPresentation
 
 /** Statusspråket är Epic 2:s — samma ord i koden som på skärmen. */
 export type InteractionStatus =
@@ -51,7 +56,7 @@ export interface AgentInteraction {
   value?: { amountKr: number; label: string }
   target?: { label: string; href: string }
   approvalId?: string
-  presentation?: BusinessScenarioPresentation
+  presentation?: AgentPresentation
 }
 
 export interface AgentIdentity {
@@ -125,7 +130,7 @@ export interface ChatMessageLike {
   is_handoff_announcement?: boolean
   /** Sätts av orkestreringen på Mattes sammanfattning (Epic 2). */
   status?: InteractionStatus | null
-  presentation?: BusinessScenarioPresentation
+  presentation?: AgentPresentation
 }
 
 export function fromChatMessage(msg: ChatMessageLike, index = 0): AgentInteraction {

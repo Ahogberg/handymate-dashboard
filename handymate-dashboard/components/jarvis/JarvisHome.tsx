@@ -65,6 +65,8 @@ import { FuelWarningCard } from '@/components/jarvis/FuelWarningCard'
 import { ReaktiveringsInsikt, type ReaktiveringsSignal } from '@/components/jarvis/ReaktiveringsInsikt'
 import { useFuel } from '@/components/fuel/FuelProvider'
 import { MatteHero } from '@/components/jarvis/home/MatteHero'
+import { Uppdragsrad } from '@/components/jarvis/home/Uppdragsrad'
+import type { MissionSuggestion } from '@/lib/mission/suggestions'
 import { SkottUtanDig } from '@/components/jarvis/home/SkottUtanDig'
 import { FirmanJustNu } from '@/components/jarvis/home/FirmanJustNu'
 import { ProjektPulsRad } from '@/components/jarvis/home/ProjektPulsRad'
@@ -283,6 +285,11 @@ export default function JarvisHome({
   // och components/jarvis/ReaktiveringsInsikt.tsx. Egen hämtning, samma
   // mönster som NBA-hämtningen nedan.
   const [reactivationSignal, setReactivationSignal] = useState<ReaktiveringsSignal | null>(null)
+  // Uppdragsradens förslagschips (Goal-to-Plan V1, Etapp C,
+  // tasks/jaunty-pondering-hummingbird.md) — null = fortfarande laddar (så
+  // Uppdragsrad kan visa en skelettrad i stället för att blinka tom→chips).
+  // Samma tysta-utfall-mönster som reaktiveringssignalen ovan.
+  const [missionSuggestions, setMissionSuggestions] = useState<MissionSuggestion[] | null>(null)
   // Cross-Agent Case (2026-08-14) — flera agenters signaler om samma
   // projekt, se app/api/project-cases/route.ts. Egen hämtning av samma
   // skäl som NBA ovan (huvudkön är kapad till 15 senaste).
@@ -382,6 +389,24 @@ export default function JarvisHome({
           if (active) setReactivationSignal(data.signal || null)
         }
       } catch { /* ingen signal idag är ett giltigt, tyst utfall */ }
+    })()
+    return () => { active = false }
+  }, [authHeaders])
+
+  // Uppdragsradens förslag (Etapp C) — samma mönster som reaktiverings-
+  // signalen ovan. Ett fel lämnar missionSuggestions som null (Uppdragsrad
+  // tolkar det som "fortfarande laddar", aldrig som ett tomt förslagsläge —
+  // en permanent skelettrad är ärligare än ett gissat "inget att göra").
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const res = await fetch('/api/mission/suggestions', { headers: await authHeaders() })
+        if (res.ok) {
+          const data = await res.json()
+          if (active) setMissionSuggestions(data.suggestions || [])
+        }
+      } catch { /* laddningsläget består — se kommentaren ovan */ }
     })()
     return () => { active = false }
   }, [authHeaders])
@@ -1016,6 +1041,12 @@ export default function JarvisHome({
             bevis={bevis}
             autoCount={dygnsRader.filter(r => r.auto).length}
           />
+          {/* Uppdragsrad — startsidans andra fråga (Goal-to-Plan V1, Etapp C,
+              tasks/jaunty-pondering-hummingbird.md). Syskon DIREKT under
+              heron, inte inuti den: heron sammanfattar dagen, den här raden
+              frågar "vad vill du att vi får gjort?" eller redovisar det
+              aktiva uppdraget. SkrivRad längst ner är oberörd. */}
+          <Uppdragsrad suggestions={missionSuggestions} />
         </div>
 
         {/* ── Huvudspalten ─────────────────────────────────────────────── */}

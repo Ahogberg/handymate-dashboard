@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import { ArrowRight } from 'lucide-react'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { BusinessScenarioCard } from '@/components/agents/BusinessScenarioCard'
+import { MissionPlanCard } from '@/components/agents/MissionPlanCard'
 import { fromChatMessage, statusLabel, type ChatMessageLike } from '@/lib/agents/interaction'
 
 /**
@@ -39,6 +40,8 @@ export function AgentMessage({
   index = 0,
   timestamp,
   children,
+  onSendChat,
+  onPrefill,
 }: {
   message: ChatMessageLike
   index?: number
@@ -46,6 +49,10 @@ export function AgentMessage({
   timestamp?: string | null
   /** Åtgärdsknappar under bubblan (Jobbkompisens actions). */
   children?: ReactNode
+  /** Vidarebefordras till MissionPlanCard — "Starta uppdraget som föreslaget." */
+  onSendChat?: (text: string) => void
+  /** Vidarebefordras till MissionPlanCard — "Justera"-knappen. */
+  onPrefill?: (text: string) => void
 }) {
   const isUser = message.role === 'user'
 
@@ -93,6 +100,9 @@ export function AgentMessage({
         </div>
         {interaction.presentation?.kind === 'business_scenario' && (
           <BusinessScenarioCard scenario={interaction.presentation.scenario} />
+        )}
+        {interaction.presentation?.kind === 'mission_plan' && (
+          <MissionPlanCard presentation={interaction.presentation} onSendChat={onSendChat} onPrefill={onPrefill} />
         )}
         {children}
         {timestamp && <Tidsstämpel iso={timestamp} />}

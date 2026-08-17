@@ -17,6 +17,7 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import { ToastProvider } from '@/components/Toast'
 import { MomentsProvider } from '@/components/moments/MomentsProvider'
 import { FuelProvider } from '@/components/fuel/FuelProvider'
+import { MissionProvider } from '@/lib/mission/MissionProvider'
 import { useAuth } from '@/lib/useAuth'
 import { checkSubscriptionStatus } from '@/lib/auth'
 import { useSessionKeepalive } from '@/lib/hooks/useSessionKeepalive'
@@ -91,19 +92,24 @@ export default function DashboardLayout({
                   själv det enda globala fynd-kortet (z-100, under Toast). */}
               <MomentsProvider>
                 <FuelProvider>
-                  <div className="flex min-h-screen bg-[#F8FAFC]">
-                    <Sidebar businessName={business.business_name} businessId={business.business_id} onLogout={logout} />
-                    <main className="flex-1 md:ml-64">
-                      <ImpersonationBanner />
-                      <PresenterBar />
-                      <BillingStatusBanner />
-                      {children}
-                    </main>
-                    <Jobbkompisen />
-                    <WelcomeModal />
-                    <FeedbackWidget />
-                    <PWAInstallBanner />
-                  </div>
+                  {/* MissionProvider bredvid FuelProvider: samma delad-hämtning-
+                      mönster, både Jobbkompisens bubbelpillar och sidinnehållet
+                      (Uppdragsrad i JarvisHome) konsumerar useMission(). */}
+                  <MissionProvider>
+                    <div className="flex min-h-screen bg-[#F8FAFC]">
+                      <Sidebar businessName={business.business_name} businessId={business.business_id} onLogout={logout} />
+                      <main className="flex-1 md:ml-64">
+                        <ImpersonationBanner />
+                        <PresenterBar />
+                        <BillingStatusBanner />
+                        {children}
+                      </main>
+                      <Jobbkompisen />
+                      <WelcomeModal />
+                      <FeedbackWidget />
+                      <PWAInstallBanner />
+                    </div>
+                  </MissionProvider>
                 </FuelProvider>
               </MomentsProvider>
             </ToastProvider>
