@@ -298,6 +298,9 @@ const CURATED_TOOL_NAMES = [
   'get_person_schedule',
   // Command Center — read-only översiktsverktyg (Matte).
   'get_projects_overview', 'get_stale_quotes', 'get_invoiceable_work', 'get_customer_commitments',
+  // Etapp O — Evidence-to-Payment readiness (Matte-scopat, se personalities.ts:
+  // ingen specialist listar verktyget i sin allowedTools-array).
+  'get_project_commercial_readiness',
   // Goal-to-Plan V1 (Etapp B) — Matte-scopat (se isToolAllowedForAgent/
   // getAgentTools nedan; ingen specialist listar dem i personalities.ts).
   'propose_mission_plan', 'confirm_mission',

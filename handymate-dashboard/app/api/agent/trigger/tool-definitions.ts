@@ -615,6 +615,21 @@ export const toolDefinitions = [
       required: [],
     },
   },
+  // Etapp O (Evidence-to-Payment readiness, council-sanktionerat rank 3) —
+  // read-only verdikt över åtta underlagsdelar (offert, ÄTA, tid, material,
+  // egenkontroll, arbetsrapport, avslut, faktura). Blockerar ALDRIG något
+  // autonomt — bara ett svar till Matte att formulera för hantverkaren.
+  {
+    name: "get_project_commercial_readiness",
+    description: "Hämta faktureringsberedskapen för ETT projekt: är underlaget komplett nog för att fakturera? Kontrollerar åtta delar (accepterad offert, ÄTA-status, loggad tid, registrerat material, egenkontroll, arbetsrapport, projektavslut, befintlig fakturering) och ger en verdikt — 'ready' (redo), 'blocked' (något konkret saknas) eller 'needs_review' (något motsäger sig, kräver en snabb koll innan du fakturerar). Skapar och ändrar ALDRIG något — bara en läsande koll. Använd för frågor som 'är projekt X redo att fakturera?' eller 'vad saknas innan jag kan skicka fakturan?'. Svaret är rådata plus en färdig svensk sammanfattning (summary) — formulera gärna vidare men hitta aldrig på egna blockerare utöver de som listas.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        project_id: { type: "string", description: "Projekt-ID att kontrollera faktureringsberedskap för" },
+      },
+      required: ["project_id"],
+    },
+  },
 
   // Goal-to-Plan V1 (Etapp B, tasks/jaunty-pondering-hummingbird.md) — Matte
   // bygger en sanningsmärkt uppdragsplan ur möjlighetsportfölj-kontextblocket

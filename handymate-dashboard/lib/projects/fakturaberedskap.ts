@@ -54,6 +54,36 @@ export interface Fakturaberedskap {
   varsta_blocker: string | null
 }
 
+export interface EgenkontrollChecklistLike {
+  status: string
+  items?: Array<{ checked: boolean }>
+}
+
+export interface EgenkontrollProgress {
+  done: number
+  total: number
+  /** De checklistor som räknades in (pågående/klara, med minst en punkt). */
+  aktiva: EgenkontrollChecklistLike[]
+}
+
+/**
+ * Delad räkning: vilka checklistor räknas som "aktiva" för egenkontroll
+ * (pågående eller klara, med minst en punkt) och hur många punkter är
+ * avbockade. Delad mellan fakturaberedskap (denna fil) och
+ * ProjectCommercialReadiness (lib/projects/commercial-readiness.ts) —
+ * SAMMA matte, aldrig duplicerad.
+ */
+export function computeEgenkontrollProgress<T extends EgenkontrollChecklistLike>(
+  checklists: T[],
+): { done: number; total: number; aktiva: T[] } {
+  const aktiva = checklists.filter(
+    cl => (cl.status === 'in_progress' || cl.status === 'completed') && (cl.items?.length ?? 0) > 0,
+  )
+  const total = aktiva.reduce((s, cl) => s + (cl.items?.length ?? 0), 0)
+  const done = aktiva.reduce((s, cl) => s + (cl.items ?? []).filter(i => i.checked).length, 0)
+  return { done, total, aktiva }
+}
+
 function blockerText(del: FakturaberedskapDel): string {
   const kvar = del.total - del.done
   switch (del.key) {
@@ -89,15 +119,12 @@ export function beraknaFakturaberedskap(input: FakturaberedskapInput): Fakturabe
     })
   }
 
-  const aktiva = input.checklists.filter(
-    cl => (cl.status === 'in_progress' || cl.status === 'completed') && (cl.items?.length ?? 0) > 0,
-  )
-  const punkterTotal = aktiva.reduce((s, cl) => s + (cl.items?.length ?? 0), 0)
+  const { done: egenkontrollDone, total: punkterTotal } = computeEgenkontrollProgress(input.checklists)
   if (punkterTotal > 0) {
     delar.push({
       key: 'egenkontroll',
       label: 'Egenkontroll',
-      done: aktiva.reduce((s, cl) => s + (cl.items ?? []).filter(i => i.checked).length, 0),
+      done: egenkontrollDone,
       total: punkterTotal,
     })
   }

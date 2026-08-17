@@ -234,6 +234,9 @@ export async function executeTool(
         return await getInvoiceableWork(supabase, businessId)
       case 'get_customer_commitments':
         return await getCustomerCommitments(supabase, businessId)
+      // Etapp O (Evidence-to-Payment readiness) — Matte-scopat, se tool-definitions.ts.
+      case 'get_project_commercial_readiness':
+        return await getProjectCommercialReadinessTool(supabase, businessId, input)
       // Goal-to-Plan V1 (Etapp B) — Matte-scopat, se tool-definitions.ts.
       case 'propose_mission_plan':
         return await proposeMissionPlanTool(supabase, businessId, input)
@@ -2716,6 +2719,41 @@ async function getCustomerCommitments(
         promise_status: r.promise_status ?? null,
       })),
     },
+  }
+}
+
+// ── Etapp O — ProjectCommercialReadiness V1 (Evidence-to-Payment) ────────
+//
+// Read-only verdikt: är projektets underlag komplett nog för fakturering?
+// loadProjectCommercialReadiness gör bara select-anrop och degraderar varje
+// källfel till 'ej_bedombar' internt — men vi omsluter ändå med try/catch
+// här, samma fail-soft-disciplin som övriga Command Center-verktyg i den
+// här filen (chatten får ett begripligt fel, aldrig en krasch).
+async function getProjectCommercialReadinessTool(
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+): Promise<ToolResult> {
+  const projectId = params.project_id ? String(params.project_id) : ''
+  if (!projectId) {
+    return { success: false, error: 'project_id krävs.' }
+  }
+
+  try {
+    const { loadProjectCommercialReadiness, byggReadinessSummering } = await import(
+      '@/lib/projects/commercial-readiness'
+    )
+    const readiness = await loadProjectCommercialReadiness(supabase, businessId, projectId)
+    if (!readiness) {
+      return { success: false, error: 'Projektet hittades inte.' }
+    }
+    return {
+      success: true,
+      data: {
+        ...readiness,
+        summary: byggReadinessSummering(readiness),
+      },
+    }
+  } catch (err: any) {
+    return { success: false, error: `Kunde inte kontrollera faktureringsberedskapen: ${err.message}` }
   }
 }
 
