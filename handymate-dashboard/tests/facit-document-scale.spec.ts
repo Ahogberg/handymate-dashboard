@@ -43,3 +43,33 @@ test.describe('computeFitScale — A4-dokumentets nedskalning till containerbred
     expect(computeFitScale(800, 400)).toBe(1)
   })
 })
+
+test.describe('DocumentScaler.tsx — skalar på CONTAINERbredd, inte viewport-brytpunkt (fix 2026-08-17)', () => {
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'components', 'quotes', 'document', 'DocumentScaler.tsx'),
+    'utf8',
+  ) as string
+
+  test('useIsMobileViewport importeras/används inte längre — skalning gatas inte på viewport', () => {
+    // Andreas fynd: samma DocumentScaler monteras nu i Snabbofferts smala
+    // enkolumns-container (max-w-3xl) OCH gamla editorns breda tvåkolumns-
+    // layout (max-w-[1600px]). Ett viewport-brytpunktstest ("lg och uppåt
+    // = no-op") stängde av skalningen på en RIKTIG desktopskärm trots att
+    // containern var smalare än A4-bredden — dokumentet klipptes.
+    expect(src).not.toContain('useIsMobileViewport')
+    expect(src).not.toContain('if (!isMobile)')
+  })
+
+  test('useLayoutEffect mäter/skalar ovillkorligt (inget tidigt return på viewport)', () => {
+    const effectStart = src.indexOf('useLayoutEffect(() => {')
+    const effectEnd = src.indexOf('}, [])', effectStart)
+    expect(effectStart).toBeGreaterThan(-1)
+    expect(effectEnd).toBeGreaterThan(effectStart)
+    const body = src.slice(effectStart, effectEnd)
+    expect(body).not.toMatch(/if \(!isMobile\)\s*return/)
+  })
+
+  test('render-grenen har inget "return <>{children}</>"-genvägsfall kvar', () => {
+    expect(src).not.toContain('return <>{children}</>')
+  })
+})
