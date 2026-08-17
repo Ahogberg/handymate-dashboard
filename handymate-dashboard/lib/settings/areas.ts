@@ -175,7 +175,10 @@ export const SETTINGS_AREAS: SettingsArea[] = [
       {
         label: 'Ekonomi',
         entries: [
-          { id: 'economics', label: 'Marginalmål', desc: 'Vad ett jobb ska bära', icon: 'trending-up' },
+          // "Marginalmål" t.o.m. 2026-08-17 — men fliken bär OCKSÅ
+          // omsättningsmålet (backlog #11), och den som letade efter det
+          // hittade aldrig hit (Andreas fynd). Etiketten säger nu båda.
+          { id: 'economics', label: 'Mål och marginal', desc: 'Omsättningsmål och vad ett jobb ska bära', icon: 'trending-up' },
           { id: '_link_internal_costs', label: 'Intern timkostnad', desc: 'Vad en timme kostar dig', icon: 'calculator', href: '/dashboard/settings/internal-costs', ownerOnly: true },
         ],
       },

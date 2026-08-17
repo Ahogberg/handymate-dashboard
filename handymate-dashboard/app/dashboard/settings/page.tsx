@@ -496,7 +496,10 @@ export default function SettingsPage() {
     const areaParam = searchParams?.get('area')
     if (areaParam) setAktivtOmrade(areaParam)
 
-    if (tabParam && ['company','hours','phone','invoice','time','integrations','pipeline','ai','subscription'].includes(tabParam)) {
+    // 'economics' saknades här t.o.m. 2026-08-17 — MalNudges länk
+    // (?tab=economics) landade då tyst på standardfliken och målfältet
+    // gick inte att hitta via nudgen (Andreas fynd).
+    if (tabParam && ['company','hours','phone','invoice','time','integrations','pipeline','ai','subscription','economics'].includes(tabParam)) {
       setActiveTab(tabParam)
       // En gammal ?tab=-länk ska öppna sitt område, annars hamnar man på hubben
       // med en osynligt vald flik.
