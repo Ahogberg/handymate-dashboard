@@ -298,6 +298,24 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
     },
   ],
 
+  'Uppdrag (Goal-to-Plan V1)': [
+    {
+      route: 'mission/active',
+      requires: 'owner-admin',
+      why: 'Företagets pengamål, deadline och härledd progress (verifierat betalt per klass) — samma finansiella känslighet som value/ledger. Etapp D-härdning, 2026-08-17.',
+    },
+    {
+      route: 'mission/suggestions',
+      requires: 'owner-admin',
+      why: 'Chipsen komponeras ur förfallna belopp och marginalrisk — samma pengar-källa som dashboard/pengar, bara omformulerad till förslag. Etapp D-härdning, 2026-08-17.',
+    },
+    {
+      route: 'mission/[id]/resolve',
+      requires: 'owner-admin',
+      why: 'Avslutar (cancel/complete) företagets aktiva pengamål — en styrande handling, inte en läsning. Etapp D-härdning, 2026-08-17.',
+    },
+  ],
+
   'Integrationer': [
     {
       route: 'integrations/fortnox/disconnect',

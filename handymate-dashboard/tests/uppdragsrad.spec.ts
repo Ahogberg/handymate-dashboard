@@ -55,4 +55,12 @@ test.describe('Uppdragsrad.tsx — startsidans andra fråga', () => {
   test('den signal-lösa pillen erbjuder en öppen text, inte ett påhittat förslag', () => {
     expect(src).toContain('Skriv vad du vill uppnå')
   })
+
+  test('progressraden visar gapet till målet ("kr kvar till målet") — Etapp D', () => {
+    expect(src).toContain('kr kvar till målet')
+  })
+
+  test('progressraden visar "målet nått" när gap_kr är noll och något är verifierat betalt — Etapp D', () => {
+    expect(src).toContain('målet nått')
+  })
 })

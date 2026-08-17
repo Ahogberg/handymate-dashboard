@@ -37,6 +37,7 @@ const KR_CLASS_ORDER: TruthClass[] = ['indrivningsbart', 'faktureringsklart']
  */
 function progressParts(progress: MissionProgress): string[] {
   const parts: string[] = []
+  let verifieratBetaltKr = 0
   for (const cls of KR_CLASS_ORDER) {
     const entry = progress.per_class[cls]
     if (!entry) continue
@@ -46,6 +47,15 @@ function progressParts(progress: MissionProgress): string[] {
     if (entry.invoiced_kr > entry.verified_paid_kr) {
       parts.push(`${entry.invoiced_kr.toLocaleString('sv-SE')} kr fakturerat`)
     }
+    verifieratBetaltKr += entry.verified_paid_kr
+  }
+  // gap_kr (Etapp D) — DET enda facit för hur nära målet uppdraget är, se
+  // MissionProgress.gap_kr. En egen del, aldrig en addition med de andra
+  // delarna ovan.
+  if (progress.gap_kr > 0) {
+    parts.push(`${progress.gap_kr.toLocaleString('sv-SE')} kr kvar till målet`)
+  } else if (verifieratBetaltKr > 0) {
+    parts.push('målet nått')
   }
   parts.push(
     progress.decisions_outstanding > 0

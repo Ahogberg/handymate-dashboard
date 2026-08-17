@@ -77,6 +77,14 @@ interface ToolContext {
    * som pending_approvals — se shouldQueueForApproval.
    */
   triggerSource: 'user' | 'system'
+  /**
+   * Etapp D-härdning (tasks/jaunty-pondering-hummingbird.md): den inloggade
+   * business_users.id när anropet kommer från en levande dashboard-/mobil-
+   * chatt (matte/chat/route.ts). Odefinierad/null i alla andra vägar
+   * (autonoma subagenter, cron, agent-handoff) — confirm_mission skriver då
+   * created_by: null precis som förut.
+   */
+  businessUserId?: string | null
 }
 
 function generateId(prefix: string): string {
@@ -229,7 +237,7 @@ export async function executeTool(
       case 'propose_mission_plan':
         return await proposeMissionPlanTool(supabase, businessId, input)
       case 'confirm_mission':
-        return await confirmMissionTool(supabase, businessId, input)
+        return await confirmMissionTool(supabase, businessId, input, context)
       default:
         return { success: false, error: `Okänt verktyg: ${name}` }
     }
@@ -2766,6 +2774,12 @@ async function proposeMissionPlanTool(
   }
 }
 
+/** Agentens visningsnamn — samma karta som sendAgentMessageTool använder,
+    duplicerad hellre än att bryta ut en delad export för fyra rader. */
+const MISSION_AGENT_DISPLAY_NAMES: Record<string, string> = {
+  matte: 'Matte', karin: 'Karin', hanna: 'Hanna', daniel: 'Daniel', lars: 'Lars', lisa: 'Lisa',
+}
+
 /**
  * confirm_mission — skapar den RIKTIGA mission-raden när hantverkaren
  * bekräftat ett tidigare propose_mission_plan-förslag.
@@ -2782,12 +2796,67 @@ async function confirmMissionTool(
   supabase: SupabaseClient,
   businessId: string,
   params: Record<string, unknown>,
+  context: ToolContext,
 ): Promise<ToolResult> {
   const plan = parseMissionPlanInput(params)
   const portfolio = await loadOpportunityPortfolioForBusiness(supabase, businessId)
   const result = validateMissionPlan(plan, portfolio, new Date())
   if (!result.ok) {
     return { success: false, error: result.detail }
+  }
+
+  // ═══ ETAPP D: DEN UTGÅNGNA BLOCKERAREN ═══
+  //
+  // GET /api/mission/active skriver redan expired lättjefullt vid läsning —
+  // men en ägare som aldrig öppnar dashboarden (bara chattar med Matte)
+  // fastnar annars bakom en aktiv rad vars deadline redan passerat, för
+  // evigt (idx_mission_one_active tillåter bara EN aktiv rad). Samma
+  // datumjämförelse-idiom som app/api/mission/active/route.ts: ren
+  // datum-bara-jämförelse, ingen cron.
+  try {
+    const { data: aktivMission, error: aktivError } = await supabase
+      .from('mission')
+      .select('id, deadline')
+      .eq('business_id', businessId)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    if (aktivError) {
+      // 42P01 (tabellen saknas) hanteras redan av INSERT-felhanteringen
+      // nedan — fail-soft: gå vidare till försöket i stället för att
+      // avbryta kontrollen här.
+      if (aktivError.code !== '42P01') {
+        console.warn('[confirm_mission] kunde inte kontrollera befintligt aktivt uppdrag (fortsätter till insert):', aktivError.message)
+      }
+    } else if (aktivMission) {
+      const idag = new Date().toISOString().slice(0, 10)
+      const deadlineDate = typeof aktivMission.deadline === 'string' ? aktivMission.deadline.slice(0, 10) : ''
+
+      if (deadlineDate !== '' && deadlineDate < idag) {
+        const { error: expireError } = await supabase
+          .from('mission')
+          .update({ status: 'expired', resolved_at: new Date().toISOString() })
+          .eq('id', aktivMission.id)
+          .eq('business_id', businessId)
+          .eq('status', 'active')
+        if (expireError) {
+          console.warn('[confirm_mission] kunde inte auto-expirera det gamla uppdraget (fortsätter ändå mot insert):', expireError.message)
+        }
+        // Faller igenom till INSERT nedan — den gamla platsen är fri.
+      } else {
+        // Deadline idag eller i framtiden — det gamla uppdraget är
+        // fortfarande giltigt. Svara direkt utan att ens försöka INSERT:en
+        // (sparar constraint-krocken; 23505-fångsten nedan är kvar som
+        // backstop om två bekräftelser råkar race:a).
+        return {
+          success: false,
+          error: 'Det finns redan ett aktivt uppdrag. Avsluta det först — säg till mig så avslutar jag det.',
+        }
+      }
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.warn('[confirm_mission] oväntat fel vid kontroll av befintligt uppdrag (fortsätter till insert):', msg)
   }
 
   const id = generateId('mis')
@@ -2799,10 +2868,10 @@ async function confirmMissionTool(
     status: 'active',
     plan_snapshot: { steps: result.steps },
     portfolio_generated_at: portfolio.generated_at,
-    // Routerns ToolContext bär ingen inloggad business_user_id — bara
-    // agentidentiteten (context.agentId, t.ex. 'matte'). NULL tills den
-    // kopplingen finns (sql/v144_mission.sql tillåter NULL i created_by).
-    created_by: null,
+    // Etapp D-härdning: business_users.id när matte/chat/route.ts trädde
+    // igenom den (levande dashboard-/mobil-chatt) — annars NULL, precis som
+    // förut (autonoma vägar bär ingen inloggad identitet).
+    created_by: context.businessUserId ?? null,
   })
 
   if (error) {
@@ -2839,9 +2908,33 @@ async function confirmMissionTool(
     degraded_sources: portfolio.degraded_sources,
   }
 
+  // ═══ ETAPP D: KOORDINERINGSSTARTEN ═══
+  //
+  // Utan den här texten startade verkställigheten först i Matte's nästa
+  // chattur — hantverkaren fick ett "uppdraget är igång" utan att någon
+  // specialist faktiskt kallats in. next_instruction adresserar modellen
+  // direkt: lämna över planens första steg NU, och stämpla varje åtgärdskort
+  // för uppdraget med payload.mission_id + payload.truth_class (annars
+  // räknas kortet aldrig in i progressen, se mission-progress.ts
+  // approvalClass).
+  const forstaStegen = result.steps
+    .slice(0, 3)
+    .map(s => `${s.title} → ${MISSION_AGENT_DISPLAY_NAMES[s.agent_key] || s.agent_key}`)
+    .join('; ')
+  const nextInstruction =
+    `Uppdraget är bekräftat (mission_id: ${id}). Börja verkställa planen NU, i den här turen: ` +
+    `lämna över första steget/stegen till ansvarig specialist — ${forstaStegen}. ` +
+    `Varje åtgärdskort du eller en specialist skapar för det här uppdraget MÅSTE bära ` +
+    `payload.mission_id: '${id}' och payload.truth_class satt till stegets sanningsklass — ` +
+    `annars räknas åtgärden aldrig in i uppdragets progress när hantverkaren tittar på uppdragsraden.`
+
   return {
     success: true,
-    data: { mission_id: id, presentation },
+    data: {
+      mission_id: id,
+      presentation,
+      next_instruction: nextInstruction,
+    },
   }
 }
 

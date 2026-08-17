@@ -244,6 +244,80 @@ test.describe('byggMissionProgress — rörelse, beslut, utgång', () => {
   })
 })
 
+test.describe('byggMissionProgress — gap_kr (Etapp D, ett enda facit för målet)', () => {
+  test('tom progress → gap_kr är hela målet', () => {
+    const progress = byggMissionProgress({ mission: mission(), ...tomIndata() })
+    expect(progress.gap_kr).toBe(150000)
+  })
+
+  test('fakturerat men obetalt lämnar gapet oförändrat — bara VERIFIERAT BETALT minskar det', () => {
+    const progress = byggMissionProgress({
+      mission: mission(),
+      ...tomIndata(),
+      invoices: [{ invoice_id: 'inv_1', total: 42000, status: 'sent', paid_at: null }],
+    })
+    expect(progress.gap_kr).toBe(150000)
+  })
+
+  test('pipeline-rörelse och godkända återaktiverings-kort rör aldrig gapet', () => {
+    const progress = byggMissionProgress({
+      mission: mission(),
+      ...tomIndata(),
+      quotes: [{ quote_id: 'q_1', status: 'accepted' }],
+      missionApprovals: [{
+        id: 'app_1',
+        status: 'approved',
+        approval_type: 'customer_outreach',
+        payload: { mission_id: 'mis_abc123def456', truth_class: 'ateraktivering' },
+      }],
+    })
+    expect(progress.gap_kr).toBe(150000)
+  })
+
+  test('verifierat betalt minskar gapet med exakt fakturans belopp', () => {
+    const progress = byggMissionProgress({
+      mission: mission(),
+      ...tomIndata(),
+      invoices: [{ invoice_id: 'inv_1', total: 42000, status: 'paid', paid_at: '2026-08-10T09:00:00Z' }],
+    })
+    expect(progress.gap_kr).toBe(150000 - 42000)
+  })
+
+  test('verifierat betalt summeras över BÅDA kr-klasserna — samma epistemiska klass, inte den förbjudna klassblandningen', () => {
+    const progress = byggMissionProgress({
+      mission: mission({
+        plan_snapshot: {
+          steps: [
+            steg({}), // indrivningsbart → inv_1
+            steg({
+              item_id: 'pf_333333333333',
+              truth_class: 'faktureringsklart',
+              measure: { kind: 'kr', amountKr: 12500 },
+              evidence: { table: 'invoice', ref_id: 'inv_2' },
+              approval_type: 'missad_intakt',
+            }),
+          ],
+        },
+      }),
+      ...tomIndata(),
+      invoices: [
+        { invoice_id: 'inv_1', total: 42000, status: 'paid', paid_at: '2026-08-10T09:00:00Z' },
+        { invoice_id: 'inv_2', total: 13000, status: 'paid', paid_at: '2026-08-12T09:00:00Z' },
+      ],
+    })
+    expect(progress.gap_kr).toBe(150000 - 42000 - 13000)
+  })
+
+  test('gapet golvar på 0 när verifierat betalt överstiger målet', () => {
+    const progress = byggMissionProgress({
+      mission: mission({ goal_kr: 10000 }),
+      ...tomIndata(),
+      invoices: [{ invoice_id: 'inv_1', total: 42000, status: 'paid', paid_at: '2026-08-10T09:00:00Z' }],
+    })
+    expect(progress.gap_kr).toBe(0)
+  })
+})
+
 test.describe('inget klassöverskridande fält existerar', () => {
   test('progressen bär inget hopslaget kronfält under något känt namn', () => {
     const progress = byggMissionProgress({ mission: mission(), ...tomIndata() })

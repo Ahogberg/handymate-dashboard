@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { buildPengarSummary, type OverdueInvoice } from '@/lib/value/pengar-pa-bordet'
 import { getWeekCapacity, currentWeekMonday } from '@/lib/capacity/week-capacity'
 import { svDateStrPlusDays } from '@/lib/dates'
@@ -25,11 +26,21 @@ export const dynamic = 'force-dynamic'
  * Var källa är fail-soft VAR FÖR SIG: en trasig läsning ger `null` för just
  * den signalen (composeSuggestions hittar då inte på det chippet) — den
  * drar aldrig ner de andra två källorna med sig.
+ *
+ * Rollgrind som value/ledger (Etapp D-härdning): chipsen bygger på förfallna
+ * belopp och marginalrisk — samma finansiella känslighet — ägare/admin
+ * (tests/permission-contract.spec.ts). JarvisHome.tsx döljer hela
+ * Uppdragsrad på 403 (missionSurfaceAllowed), inte bara chipsen.
  */
 export async function GET(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const currentUser = await getCurrentUser(request, business.business_id)
+    if (!currentUser || !isOwnerOrAdmin(currentUser)) {
+      return NextResponse.json({ error: 'Endast ägare och administratör' }, { status: 403 })
+    }
 
     const supabase = getServerSupabase()
     const businessId = business.business_id

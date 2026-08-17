@@ -72,6 +72,15 @@ export interface MissionProgress {
   decisions_outstanding: number
   /** Deadline passerad medan status ännu är 'active' — härlett, ej lagrat. */
   is_expired: boolean
+  /**
+   * max(0, goal_kr − verifierat betalt över kr-klasserna). DETTA är inte
+   * den förbjudna klassblandningen: att summera VERIFIERAT BETALDA kronor
+   * över indrivningsbart och faktureringsklart är samma epistemiska klass
+   * (pengar på banken) oavsett vilken kr-klass fakturan kom ur — till
+   * skillnad från att blanda IHOP olika SLAGS sanning (betalt, fakturerat,
+   * pipeline, antal) till en gemensam siffra, vilket förblir förbjudet.
+   */
+  gap_kr: number
 }
 
 export interface MissionInvoiceInput {
@@ -215,10 +224,20 @@ export function byggMissionProgress(input: {
   const nowDate = new Date(input.nowMs).toISOString().slice(0, 10)
   const deadlineDate = typeof mission.deadline === 'string' ? mission.deadline.slice(0, 10) : ''
 
+  // ── gap_kr: DET enda facit för hur nära målet uppdraget är. ────────────
+  // Summerar verifieratBetaltKr över kr-klasserna — se kommentaren på
+  // MissionProgress.gap_kr för varför det INTE är klassblandningen.
+  let verifieratBetaltKr = 0
+  for (const cls of Array.from(KR_CLASSES)) {
+    verifieratBetaltKr += perClass[cls]?.verified_paid_kr ?? 0
+  }
+  const gapKr = Math.max(0, Math.round(Number(mission.goal_kr) || 0) - verifieratBetaltKr)
+
   return {
     per_class: perClass,
     decisions_outstanding: vantande,
     is_expired: mission.status === 'active' && deadlineDate !== '' && deadlineDate < nowDate,
+    gap_kr: gapKr,
   }
 }
 

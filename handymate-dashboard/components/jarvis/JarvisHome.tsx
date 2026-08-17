@@ -290,6 +290,11 @@ export default function JarvisHome({
   // Uppdragsrad kan visa en skelettrad i stället för att blinka tom→chips).
   // Samma tysta-utfall-mönster som reaktiveringssignalen ovan.
   const [missionSuggestions, setMissionSuggestions] = useState<MissionSuggestion[] | null>(null)
+  // Etapp D-härdning: /api/mission/suggestions (och /api/mission/active)
+  // grindades ägare/admin. En anställd som får 403 ska INTE se en evig
+  // skelettrad (missionSuggestions stannar null = "laddar" annars för
+  // alltid) — hela Uppdragsrad döljs i stället, se renderingen nedan.
+  const [missionSurfaceAllowed, setMissionSurfaceAllowed] = useState(true)
   // Cross-Agent Case (2026-08-14) — flera agenters signaler om samma
   // projekt, se app/api/project-cases/route.ts. Egen hämtning av samma
   // skäl som NBA ovan (huvudkön är kapad till 15 senaste).
@@ -402,6 +407,12 @@ export default function JarvisHome({
     ;(async () => {
       try {
         const res = await fetch('/api/mission/suggestions', { headers: await authHeaders() })
+        if (res.status === 403) {
+          // Anställd utan ägare/admin-behörighet (Etapp D-härdning) — dölj
+          // hela Uppdragsrad, aldrig en evig skelettrad.
+          if (active) setMissionSurfaceAllowed(false)
+          return
+        }
         if (res.ok) {
           const data = await res.json()
           if (active) setMissionSuggestions(data.suggestions || [])
@@ -1045,8 +1056,11 @@ export default function JarvisHome({
               tasks/jaunty-pondering-hummingbird.md). Syskon DIREKT under
               heron, inte inuti den: heron sammanfattar dagen, den här raden
               frågar "vad vill du att vi får gjort?" eller redovisar det
-              aktiva uppdraget. SkrivRad längst ner är oberörd. */}
-          <Uppdragsrad suggestions={missionSuggestions} />
+              aktiva uppdraget. SkrivRad längst ner är oberörd.
+              missionSurfaceAllowed (Etapp D-härdning): 403 på ägare/admin-
+              grindade uppdragsrutter döljer raden helt, aldrig en evig
+              skelettrad för anställda. */}
+          {missionSurfaceAllowed && <Uppdragsrad suggestions={missionSuggestions} />}
         </div>
 
         {/* ── Huvudspalten ─────────────────────────────────────────────── */}

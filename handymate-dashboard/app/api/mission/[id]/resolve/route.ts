@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +13,10 @@ export const dynamic = 'force-dynamic'
  * resolved_at på varje slutläge). Ett redan avslutat, någon annans eller
  * ett obefintligt uppdrag → 404. Saknas tabellen finns inget uppdrag att
  * avsluta — också 404, aldrig ett kastat fel.
+ *
+ * Rollgrind som value/ledger (Etapp D-härdning): att avsluta företagets
+ * pengamål är en styrande handling, inte en läsning — ägare/admin
+ * (tests/permission-contract.spec.ts).
  */
 export async function POST(
   request: NextRequest,
@@ -20,6 +25,11 @@ export async function POST(
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const currentUser = await getCurrentUser(request, business.business_id)
+    if (!currentUser || !isOwnerOrAdmin(currentUser)) {
+      return NextResponse.json({ error: 'Endast ägare och administratör' }, { status: 403 })
+    }
 
     const body = await request.json().catch(() => null)
     const action = body?.action

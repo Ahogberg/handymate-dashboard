@@ -236,6 +236,25 @@ test.describe('tool-router.ts — propose_mission_plan / confirm_mission', () =>
     const body = functionBody(routerSrc, 'confirmMissionTool')
     expect(body).toContain("'42P01'")
   })
+
+  // ── Etapp D — härdning (tasks/jaunty-pondering-hummingbird.md) ─────────
+
+  test('confirm_mission läser befintlig aktiv rad och jämför deadline datum-bara (slice(0,10)) innan INSERT', () => {
+    const body = functionBody(routerSrc, 'confirmMissionTool')
+    const insertIdx = body.indexOf(".from('mission').insert(")
+    expect(insertIdx, 'INSERT-anropet hittades inte').toBeGreaterThan(-1)
+    const before = body.slice(0, insertIdx)
+    expect(before).toContain(".eq('status', 'active')")
+    expect(before).toContain('.slice(0, 10)')
+    expect(before).toContain("status: 'expired'")
+    expect(before).toContain('resolved_at')
+  })
+
+  test('confirm_mission ger Matte en koordineringsstart (next_instruction) med mission_id + truth_class-stämpling', () => {
+    const body = functionBody(routerSrc, 'confirmMissionTool')
+    expect(body).toContain('next_instruction')
+    expect(body).toContain('truth_class')
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────

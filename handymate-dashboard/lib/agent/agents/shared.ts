@@ -52,6 +52,14 @@ export interface ToolContext {
    * matte/chat/route.ts (session-auth dashboard-chatt) sätter 'user'.
    */
   triggerSource: 'user' | 'system'
+  /**
+   * Etapp D-härdning (tasks/jaunty-pondering-hummingbird.md, Goal-to-Plan
+   * V1): den inloggade business_users.id, satt av matte/chat/route.ts så
+   * confirm_mission kan skriva ett riktigt created_by i stället för alltid
+   * NULL. Odefinierad i alla andra vägar (orchestrator.ts sätter aldrig
+   * detta — 'system'-triggade körningar har ingen levande användare).
+   */
+  businessUserId?: string | null
 }
 
 export interface GoogleConnection {

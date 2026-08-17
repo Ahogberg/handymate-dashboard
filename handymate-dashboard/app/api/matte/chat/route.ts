@@ -20,6 +20,7 @@ import {
 } from '@/lib/agent/thread-messages'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/permissions'
 import { executeTool as executeSharedTool } from '@/app/api/agent/trigger/tool-router'
 import { filterTools, fetchBusinessContext, type ToolContext } from '@/lib/agent/agents/shared'
 import {
@@ -950,11 +951,18 @@ export async function POST(request: NextRequest) {
     // TD-52: detta är en levande dashboard-/mobil-chatt (session-auth ovan
     // via getAuthenticatedBusiness) — triggerSource är alltid 'user'.
     const bizCtx = await fetchBusinessContext(supabase, businessId, 'user')
-    const toolContext: ToolContext = bizCtx?.toolContext ?? {
-      businessName,
-      contactEmail: '',
-      googleConnection: null,
-      triggerSource: 'user',
+    // Etapp D-härdning: business_users.id för den inloggade — trådas in i
+    // ToolContext så confirm_mission kan skriva ett riktigt created_by i
+    // stället för alltid NULL (se lib/agent/agents/shared.ts ToolContext).
+    const currentBusinessUser = await getCurrentUser(request, businessId)
+    const toolContext: ToolContext = {
+      ...(bizCtx?.toolContext ?? {
+        businessName,
+        contactEmail: '',
+        googleConnection: null,
+        triggerSource: 'user',
+      }),
+      businessUserId: currentBusinessUser?.id ?? null,
     }
 
     // ── Thread-state ────────────────────────────────────────────────────

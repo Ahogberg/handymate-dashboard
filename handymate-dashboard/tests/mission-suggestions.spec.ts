@@ -11,6 +11,8 @@
  * Körs: npx playwright test tests/mission-suggestions.spec.ts --no-deps
  */
 import { test, expect } from '@playwright/test'
+import fs from 'fs'
+import path from 'path'
 import { composeSuggestions, type MissionSuggestion } from '../lib/mission/suggestions'
 
 function noSignals() {
@@ -128,5 +130,25 @@ test.describe('composeSuggestions — alla fyra signaler: max 3, rätt prioritet
       reactivation: { job_type: 'kök', count: 6, quietMonths: 6 },
     })
     expect(res.map(s => s.signalKind)).toEqual(['tunn_vecka', 'reaktivering', 'marginalrisk'])
+  })
+})
+
+test.describe('JarvisHome.tsx — 403 på uppdragsytorna döljer Uppdragsrad helt (Etapp D, härdning)', () => {
+  // /api/mission/active och /api/mission/suggestions grindades ägare/admin
+  // i Etapp D. En permanent skelettrad (samma som "fortfarande laddar")
+  // hade varit fel för en anställd — Uppdragsrad ska renderas som INGENTING,
+  // inte som ett evigt laddningsläge. Källskanning, samma idiom som
+  // tests/bubble-state.spec.ts:s Jobbkompisen-skanning.
+  const src = fs.readFileSync(
+    path.join(__dirname, '..', 'components', 'jarvis', 'JarvisHome.tsx'),
+    'utf8',
+  )
+
+  test('förslags-effekten hanterar 403 explicit', () => {
+    expect(src).toContain('res.status === 403')
+  })
+
+  test('en egen missionSurfaceAllowed-flagga gatar renderingen av Uppdragsrad (skild från tomma förslag)', () => {
+    expect(src).toContain('missionSurfaceAllowed')
   })
 })

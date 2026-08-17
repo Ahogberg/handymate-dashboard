@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { getMissionProgress, type MissionRow } from '@/lib/mission/mission-progress'
 
 export const dynamic = 'force-dynamic'
@@ -19,11 +20,21 @@ export const dynamic = 'force-dynamic'
  * (ingen cron — Hobby-planens crongräns, och läsningen är sanningen).
  * Uppdateringen är best effort: felar den svarar vi ändå med det härledda
  * expired-läget.
+ *
+ * Rollgrind som value/ledger (Etapp D-härdning): pengamål + verifierat
+ * betalt är samma finansiella känslighet — ägare/admin
+ * (tests/permission-contract.spec.ts). Klienten degraderar tyst på 403
+ * (MissionProvider sätter mission: null, ingen retry).
  */
 export async function GET(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const currentUser = await getCurrentUser(request, business.business_id)
+    if (!currentUser || !isOwnerOrAdmin(currentUser)) {
+      return NextResponse.json({ error: 'Endast ägare och administratör' }, { status: 403 })
+    }
 
     const supabase = getServerSupabase()
 
