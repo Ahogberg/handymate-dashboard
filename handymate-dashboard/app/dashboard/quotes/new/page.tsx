@@ -2394,11 +2394,14 @@ export default function NewQuotePage() {
               />
             )}
 
-            {/* Vägen TILLBAKA till Snabbofferten. Syns bara för den som valt
-                bort den, och bara innan offerten fått innehåll — annars vore
-                det en knapp som slänger arbete. Utan den här raden vore
-                banderollens "du kan alltid ändra dig" ett tomt löfte. */}
-            {preferredStart !== 'quick' && quickMode === null && items.length === 0 && (
+            {/* Vägen TILLBAKA till Snabbofferten — för ALLA med tom offert,
+                inte bara den som sparat bort den (fix 2026-08-17, Andreas
+                fynd): med default-preferensen 'quick' fanns ingen väg
+                tillbaka alls efter att man lämnat intaget i samma session,
+                och inget i synfältet signalerade ens att det guidade läget
+                finns. Villkoret items.length === 0 består — aldrig en knapp
+                som slänger påbörjat arbete. */}
+            {quickMode === null && items.length === 0 && (
               <button
                 type="button"
                 onClick={() => {
