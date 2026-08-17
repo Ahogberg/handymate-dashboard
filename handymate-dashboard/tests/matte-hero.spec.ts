@@ -1,0 +1,81 @@
+/**
+ * FACIT — components/jarvis/home/MatteHero.tsx (Etapp E: Hero-integrationen,
+ * tasks/jaunty-pondering-hummingbird.md).
+ *
+ * Källkodsskanning, samma idiom som tests/uppdragsrad.spec.ts och
+ * tests/mission-truth-guard.spec.ts. Etapp E gör heron till EN Matte-yta med
+ * två lägen: utan aktivt uppdrag bär den dagsbeskedet + Uppdragsradens band;
+ * med ett aktivt uppdrag ÄR heron uppdraget — rubrik, statistik och
+ * progressdelar (aldrig en klassöverskridande summa).
+ *
+ * Körs: npx playwright test tests/matte-hero.spec.ts --no-deps
+ */
+import { test, expect } from '@playwright/test'
+import fs from 'fs'
+import path from 'path'
+
+const ROOT = path.resolve(__dirname, '..')
+const heroSrc = fs.readFileSync(path.join(ROOT, 'components', 'jarvis', 'home', 'MatteHero.tsx'), 'utf8')
+const homeSrc = fs.readFileSync(path.join(ROOT, 'components', 'jarvis', 'JarvisHome.tsx'), 'utf8')
+
+test.describe('MatteHero — aktivt uppdrag ersätter dagsbeskedet (Etapp E)', () => {
+  test('läser useMission() själv — delad context, inga extra props tråds genom JarvisHome', () => {
+    expect(heroSrc).toContain("import { useMission } from '@/lib/mission/MissionProvider'")
+    expect(heroSrc).toContain('useMission()')
+  })
+
+  test('rubriken blir "Uppdrag: " i mission-läget, byggd med samma facit som Uppdragsrad använde', () => {
+    expect(heroSrc).toContain('Uppdrag: ')
+    expect(heroSrc).toContain('buildMissionHeadline')
+  })
+
+  test('sub-raden importerar den delade progress-parts-facit-funktionen i stället för att bygga den lokalt', () => {
+    expect(heroSrc).toContain("from '@/lib/mission/progress-parts'")
+    expect(heroSrc).toContain('progressParts(')
+  })
+
+  test('progressdelarna radas upp punktseparerat (join med \' · \')', () => {
+    expect(heroSrc).toContain("' · '")
+  })
+
+  test('progress.per_class summeras aldrig lokalt i heron — bara progressParts() läser klassbeloppen', () => {
+    // MatteHero har sedan tidigare en legitim .reduce( för NBA-kandidaternas
+    // beloppssumma (summaKr, en ENDA sanningskälla — inte en mission-
+    // klassöverskridande summa) — den bannlysningen hör hemma i
+    // progress-parts.ts (facit: tests/progress-parts.spec.ts), inte här.
+    // Vaktposten här är smalare och exakt: ingen kod i filen adderar ihop
+    // per_class-fälten själv.
+    expect(heroSrc).not.toMatch(/per_class\[[^\]]*\]\s*\+/)
+    expect(heroSrc).not.toContain('verified_paid_kr +')
+  })
+
+  test('inga bannade hopslagna kronfält (samma exakta namn som mission-truth-guard.spec.ts)', () => {
+    for (const banned of ['totalKr', 'grandTotal', 'total_kr']) {
+      expect(heroSrc.includes(banned), `MatteHero.tsx innehåller "${banned}"`).toBe(false)
+    }
+  })
+
+  test('tar emot uppdragBand som slot-prop för Uppdragsradens band', () => {
+    expect(heroSrc).toContain('uppdragBand')
+  })
+
+  test('gap_kr visas som "kr kvar till målet" eller "målet nått" i statistikytan — Etapp D-facit återanvänt', () => {
+    expect(heroSrc).toContain('kr kvar till målet')
+    expect(heroSrc).toContain('målet nått')
+  })
+})
+
+test.describe('JarvisHome.tsx — Uppdragsrad flyttad in i heron som band (Etapp E)', () => {
+  test('MatteHero får uppdragBand-prop byggd av missionSurfaceAllowed + Uppdragsrad', () => {
+    expect(homeSrc).toContain('uppdragBand={missionSurfaceAllowed ? <Uppdragsrad suggestions={missionSuggestions} /> : null}')
+  })
+
+  test('den gamla syskon-raden under MatteHero finns inte längre', () => {
+    expect(homeSrc).not.toContain('{missionSurfaceAllowed && <Uppdragsrad suggestions={missionSuggestions} />}')
+  })
+
+  test('Uppdragsrad förekommer bara en gång i filen — som prop-värde, inte som eget syskon', () => {
+    const occurrences = homeSrc.match(/<Uppdragsrad/g) || []
+    expect(occurrences.length).toBe(1)
+  })
+})

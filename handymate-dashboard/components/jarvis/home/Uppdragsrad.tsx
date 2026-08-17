@@ -2,71 +2,32 @@
 
 import { useMission } from '@/lib/mission/MissionProvider'
 import { useJobbuddy } from '@/lib/JobbuddyContext'
-import { buildMissionHeadline } from '@/lib/mission/mission-summary'
 import type { MissionSuggestion } from '@/lib/mission/suggestions'
-import type { TruthClass } from '@/lib/mission/opportunity-portfolio'
-import type { MissionProgress } from '@/lib/mission/mission-progress'
 
 /**
- * Uppdragsrad — startsidans andra fråga (Goal-to-Plan V1, Etapp C,
- * tasks/jaunty-pondering-hummingbird.md). Syskon DIREKT UNDER MatteHero i
- * JarvisHome.tsx — heron sammanfattar dagen, den här raden frågar "vad vill
- * du att vi får gjort?" eller redovisar det aktiva uppdraget. SkrivRad
- * längst ner rörs inte (en merge är V2).
+ * Uppdragsrad — MatteHero:s uppdragsband (Goal-to-Plan V1, Etapp C; flyttad
+ * in i heron som ett band i Etapp E: Hero-integrationen, 2026-08-17,
+ * tasks/jaunty-pondering-hummingbird.md).
  *
- * ═══ FYRA LÄGEN, ALDRIG ETT BLINK TOM→INNEHÅLL ═══
+ * Fram till Etapp E var det här en egen rad, syskon UNDER MatteHero. Etapp E
+ * flyttade den in som ett band i herons nederkant ("heron frågar, bandet
+ * svarar") och lät heron SJÄLV ta över det aktiva uppdragets huvudbudskap
+ * (rubrik + statistik + progressdelar — se MatteHero.tsx, som läser
+ * lib/mission/progress-parts.ts). Den här filen äger bara bandets fyra
+ * lägen, restylade för den mörka bandkontexten (en ljus yta INUTI heron,
+ * inte längre en egen vit kortsyta på sidbakgrunden):
  *
  *  1. Uppdraget laddar ELLER förslagen laddar (suggestions === null) →
  *     skelettrad.
- *  2. Aktivt uppdrag → rubrik + progress PER KLASS, punktseparerad,
- *     ALDRIG en klassöverskridande figur (se progressParts nedan — ingen
- *     addition över klassernas belopp, bara en lista av delar).
+ *  2. Aktivt uppdrag → EN kompakt "Öppna →"-yta. Heron visar redan
+ *     rubrik+progress ovanför — bandet ska inte upprepa dem.
  *  3. Inget uppdrag, minst ett förslag → chip-rad, klick förifyller chatten.
  *  4. Inget uppdrag, inga förslag → en smal pill som öppnar chatten tom.
+ *
+ * SkrivRad längst ner i JarvisHome rörs inte (en merge är V2).
  */
-
-/** Bara de två kr-klasserna bär "verifierat betalt"/"fakturerat" — pipeline,
- *  återaktivering och marginalskydd mäter rörelse/antal, inte den här
- *  radens penningspråk. */
-const KR_CLASS_ORDER: TruthClass[] = ['indrivningsbart', 'faktureringsklart']
-
-/**
- * Progressradens delar — EN sträng per klass-fakta, aldrig en klass-
- * överskridande siffra. Delarna radas sedan upp med ' · ', de läggs
- * aldrig ihop.
- */
-function progressParts(progress: MissionProgress): string[] {
-  const parts: string[] = []
-  let verifieratBetaltKr = 0
-  for (const cls of KR_CLASS_ORDER) {
-    const entry = progress.per_class[cls]
-    if (!entry) continue
-    if (entry.verified_paid_kr > 0) {
-      parts.push(`${entry.verified_paid_kr.toLocaleString('sv-SE')} kr verifierat betalt`)
-    }
-    if (entry.invoiced_kr > entry.verified_paid_kr) {
-      parts.push(`${entry.invoiced_kr.toLocaleString('sv-SE')} kr fakturerat`)
-    }
-    verifieratBetaltKr += entry.verified_paid_kr
-  }
-  // gap_kr (Etapp D) — DET enda facit för hur nära målet uppdraget är, se
-  // MissionProgress.gap_kr. En egen del, aldrig en addition med de andra
-  // delarna ovan.
-  if (progress.gap_kr > 0) {
-    parts.push(`${progress.gap_kr.toLocaleString('sv-SE')} kr kvar till målet`)
-  } else if (verifieratBetaltKr > 0) {
-    parts.push('målet nått')
-  }
-  parts.push(
-    progress.decisions_outstanding > 0
-      ? `${progress.decisions_outstanding} beslut återstår`
-      : 'inget väntar på dig just nu',
-  )
-  return parts
-}
-
 export function Uppdragsrad({ suggestions }: { suggestions: MissionSuggestion[] | null }) {
-  const { mission, progress, loading: missionLoading } = useMission()
+  const { mission, loading: missionLoading } = useMission()
   const { setPendingPrompt, setActiveTab, setIsOpen } = useJobbuddy()
 
   const oppnaMatte = (prefill?: string) => {
@@ -77,24 +38,19 @@ export function Uppdragsrad({ suggestions }: { suggestions: MissionSuggestion[] 
 
   // ── Läge 1: laddar ──────────────────────────────────────────────────────
   if (missionLoading || suggestions === null) {
-    return <div className="mt-2.5 h-14 rounded-2xl bg-white/60 animate-pulse" aria-hidden />
+    return <div className="h-10 rounded-xl bg-white/10 animate-pulse" aria-hidden />
   }
 
-  // ── Läge 2: aktivt uppdrag ───────────────────────────────────────────────
+  // ── Läge 2: aktivt uppdrag — heron visar redan rubrik+progress ovanför ──
   if (mission && mission.status === 'active') {
-    const headline = buildMissionHeadline(mission.goal_kr, mission.deadline.slice(0, 10))
-    const parts = progress ? progressParts(progress) : []
     return (
       <button
         type="button"
         onClick={() => oppnaMatte()}
-        className="mt-2.5 w-full text-left bg-white rounded-2xl border border-slate-200 px-4 py-3 hover:border-primary-300 transition-colors"
+        className="min-h-[40px] w-full flex items-center justify-between px-3.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-sm text-white/70"
       >
-        <p className="m-0 text-sm font-semibold text-slate-900">Uppdrag: {headline}</p>
-        <p className="m-0 mt-0.5 text-xs text-slate-600 tabular-nums">
-          {parts.join(' · ')}
-          <span className="ml-1.5 text-primary-700 font-medium">Öppna →</span>
-        </p>
+        <span>Uppdraget pågår</span>
+        <span className="text-primary-300 font-medium">Öppna →</span>
       </button>
     )
   }
@@ -102,8 +58,8 @@ export function Uppdragsrad({ suggestions }: { suggestions: MissionSuggestion[] 
   // ── Läge 3: förslagschips ────────────────────────────────────────────────
   if (suggestions.length > 0) {
     return (
-      <div className="mt-2.5">
-        <h2 className="m-0 mb-2 font-heading text-[15px] font-semibold text-slate-900">
+      <div>
+        <h2 className="m-0 mb-2 font-heading text-[13px] font-semibold text-white/80">
           Vad vill du att vi får gjort?
         </h2>
         <div className="flex flex-wrap gap-2">
@@ -112,7 +68,7 @@ export function Uppdragsrad({ suggestions }: { suggestions: MissionSuggestion[] 
               key={s.id}
               type="button"
               onClick={() => oppnaMatte(s.prefillText)}
-              className="min-h-[40px] px-4 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 active:bg-primary-50"
+              className="min-h-[40px] px-4 rounded-xl border border-white/15 bg-white/10 text-sm font-medium text-white active:bg-white/20"
             >
               {s.label}
             </button>
@@ -124,14 +80,14 @@ export function Uppdragsrad({ suggestions }: { suggestions: MissionSuggestion[] 
 
   // ── Läge 4: inga signaler — öppen inbjudan, ingen förifylld text ────────
   return (
-    <div className="mt-2.5">
-      <h2 className="m-0 mb-2 font-heading text-[15px] font-semibold text-slate-900">
+    <div>
+      <h2 className="m-0 mb-2 font-heading text-[13px] font-semibold text-white/80">
         Vad vill du att vi får gjort?
       </h2>
       <button
         type="button"
         onClick={() => oppnaMatte()}
-        className="min-h-[40px] px-4 rounded-xl border border-dashed border-slate-300 text-sm text-slate-500"
+        className="min-h-[40px] px-4 rounded-xl border border-dashed border-white/25 text-sm text-white/60"
       >
         Skriv vad du vill uppnå …
       </button>

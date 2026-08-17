@@ -1,12 +1,18 @@
 /**
- * FACIT — components/jarvis/home/Uppdragsrad.tsx (Goal-to-Plan V1, Etapp C,
+ * FACIT — components/jarvis/home/Uppdragsrad.tsx (Goal-to-Plan V1, Etapp C;
+ * omgjord till MatteHero:s uppdragsband i Etapp E: Hero-integrationen,
  * tasks/jaunty-pondering-hummingbird.md).
  *
  * Källkodsskanning, samma idiom som tests/reaktiverings-insikt.spec.ts:
  * raden handoffar in i Matte-chatten (setPendingPrompt), har aldrig en
  * egen godkänn/avvisa-mekanism, och lägger ALDRIG ihop klassernas belopp
- * till en gemensam siffra (ingen reduce( över klassbelopp — se
- * progressParts, som bygger en LISTA av delar, punktseparerad).
+ * till en gemensam siffra (ingen reduce( i filen).
+ *
+ * Etapp E flyttade det aktiva uppdragets rubrik+progressdelar in i
+ * MatteHero.tsx (se tests/matte-hero.spec.ts och tests/progress-parts.spec.ts
+ * för de facit som flyttade dit tillsammans med koden) — den här filen äger
+ * numera bara bandets fyra lägen: laddar, aktivt uppdrag (kompakt "Öppna →"),
+ * förslagschips, och den signal-lösa pillen.
  *
  * Körs: npx playwright test tests/uppdragsrad.spec.ts --no-deps
  */
@@ -43,24 +49,14 @@ test.describe('Uppdragsrad.tsx — startsidans andra fråga', () => {
     expect(src).not.toContain('reduce(')
   })
 
-  test('progressdelarna radas upp punktseparerat (join med \' · \'), inte hopslagna', () => {
-    expect(src).toContain("' · '")
-  })
-
-  test('aktivt-uppdrag-raden visar rubriken "Uppdrag:" och en öppna-länk', () => {
-    expect(src).toContain('Uppdrag:')
+  test('aktivt-uppdrag-läget är en kompakt öppna-yta — heron visar redan rubrik+progress ovanför (Etapp E)', () => {
     expect(src).toContain('Öppna')
+    // Rubriken "Uppdrag: {headline}" och progressdelarna flyttade till
+    // MatteHero.tsx i Etapp E — bandet ska inte upprepa dem.
+    expect(src).not.toContain('Uppdrag:')
   })
 
   test('den signal-lösa pillen erbjuder en öppen text, inte ett påhittat förslag', () => {
     expect(src).toContain('Skriv vad du vill uppnå')
-  })
-
-  test('progressraden visar gapet till målet ("kr kvar till målet") — Etapp D', () => {
-    expect(src).toContain('kr kvar till målet')
-  })
-
-  test('progressraden visar "målet nått" när gap_kr är noll och något är verifierat betalt — Etapp D', () => {
-    expect(src).toContain('målet nått')
   })
 })

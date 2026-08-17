@@ -1051,16 +1051,15 @@ export default function JarvisHome({
             nbaKandidater={synligaNba}
             bevis={bevis}
             autoCount={dygnsRader.filter(r => r.auto).length}
+            // Uppdragsradens band (Goal-to-Plan V1, Etapp C → Etapp E:
+            // Hero-integrationen, tasks/jaunty-pondering-hummingbird.md).
+            // Etapp E flyttade Uppdragsrad IN i heron som ett band i dess
+            // nederkant i stället för ett eget syskon under den — heron
+            // frågar, bandet svarar. missionSurfaceAllowed (Etapp D-
+            // härdning): 403 på ägare/admin-grindade uppdragsrutter döljer
+            // bandet helt, aldrig en evig skelettrad för anställda.
+            uppdragBand={missionSurfaceAllowed ? <Uppdragsrad suggestions={missionSuggestions} /> : null}
           />
-          {/* Uppdragsrad — startsidans andra fråga (Goal-to-Plan V1, Etapp C,
-              tasks/jaunty-pondering-hummingbird.md). Syskon DIREKT under
-              heron, inte inuti den: heron sammanfattar dagen, den här raden
-              frågar "vad vill du att vi får gjort?" eller redovisar det
-              aktiva uppdraget. SkrivRad längst ner är oberörd.
-              missionSurfaceAllowed (Etapp D-härdning): 403 på ägare/admin-
-              grindade uppdragsrutter döljer raden helt, aldrig en evig
-              skelettrad för anställda. */}
-          {missionSurfaceAllowed && <Uppdragsrad suggestions={missionSuggestions} />}
         </div>
 
         {/* ── Huvudspalten ─────────────────────────────────────────────── */}
