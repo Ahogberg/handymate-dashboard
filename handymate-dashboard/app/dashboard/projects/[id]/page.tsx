@@ -98,6 +98,9 @@ import { ProjectQuoteSpec } from '@/components/projects/ProjectQuoteSpec'
 import { ProjectQuoteDocumentCard } from '@/components/projects/ProjectQuoteDocumentCard'
 import { ProjectStatusCard, getStageBucket } from '@/components/projects/ProjectStatusCard'
 import ProjectTodoBlock, { type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
+import { TwinStrip } from '@/components/projects/TwinStrip'
+import { RedoAttFakturera } from '@/components/projects/RedoAttFakturera'
+import { beraknaFakturaberedskap } from '@/lib/projects/fakturaberedskap'
 import { formatSEK } from '@/lib/format-price'
 import type { ProjectEconomics } from '@/lib/projects/compute-economics'
 import type { LonsamhetsVarning } from '@/lib/projects/margin-guardian'
@@ -655,6 +658,10 @@ export default function ProjectDetailPage() {
   // live-bedömning — en kanonisk källa, inget separat anrop.
   const [guardianVarning, setGuardianVarning] = useState<LonsamhetsVarning | null>(null)
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
+  // Etapp D1 (2026-08-17): godkännandekortens antal, rapporterat upp från
+  // ProjectTodoBlock (samma räkning som dess badge) så twin-stripens
+  // "Nästa steg"-kort kan visa "X förslag väntar" utan egen hämtning.
+  const [projectApprovalsCount, setProjectApprovalsCount] = useState(0)
 
   // Work orders
   const [workOrders, setWorkOrders] = useState<any[]>([])
@@ -1962,6 +1969,17 @@ export default function ProjectDetailPage() {
     })
   }
 
+  // Fakturaberedskap (Etapp D1b, 2026-08-17) — EN beräkning per render,
+  // delad mellan twin-stripens kort och "Redo att fakturera?"-panelen.
+  // Ren funktion över redan hämtad data (se lib/projects/fakturaberedskap.ts
+  // för viktningsreglerna); kr-underlaget skickas bara med see_financials.
+  const fakturaberedskap = beraknaFakturaberedskap({
+    tidrapportGap: yesterdayTimeGap,
+    milestones,
+    checklists,
+    uninvoicedKr: canSeeFinancials && summary ? summary.uninvoiced_revenue : null,
+  })
+
   // Accordion/flikrad-subrader (Del 3a, copy.accordion_subs) — bara med
   // verklig data, annars null (gruppen visas då utan subrad).
   function groupSubrow(key: GroupKey): string | null {
@@ -2234,6 +2252,22 @@ export default function ProjectDetailPage() {
           />
         )}
 
+        {/* Twin-strip (Etapp D1) — mockupens fem svarskort direkt under
+            titeln, ovanför tvåkolumnsgriden. Allt props ur redan hämtad
+            data — noll nya anrop. */}
+        <TwinStrip
+          startDate={project.start_date}
+          endDate={project.end_date}
+          stageBucket={stageBucket}
+          isOverBudget={isOverBudget}
+          canSeeFinancials={canSeeFinancials}
+          economics={statusEconomics}
+          economicsLoading={statusEconomicsLoading}
+          beredskap={fakturaberedskap}
+          todoMode={todoMode}
+          approvalsCount={projectApprovalsCount}
+        />
+
         {/* Body — Del 3a: desktop tvåkolumn 400px|1fr, mobil enkolumn
             (statuskort → Att göra → nav). Vänsterkolumnen ÄR mobilvyns
             översta block, i samma ordning på båda. */}
@@ -2257,6 +2291,14 @@ export default function ProjectDetailPage() {
               onPrimaryClick={todoPrimaryOnClick}
               overBudgetAlert={overBudgetAlert}
               actionRows={todoActionRows}
+              onApprovalsCount={setProjectApprovalsCount}
+            />
+            {/* "Redo att fakturera?" (Etapp D2) — samma beräknade aggregat
+                som twin-stripen; vänsterkolumnen är vår layouts motsvarighet
+                till mockupens högerrail. */}
+            <RedoAttFakturera
+              beredskap={fakturaberedskap}
+              uninvoicedKr={canSeeFinancials && summary ? summary.uninvoiced_revenue : null}
             />
           </div>
 

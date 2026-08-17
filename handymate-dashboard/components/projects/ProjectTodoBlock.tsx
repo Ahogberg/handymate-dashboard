@@ -47,6 +47,10 @@ interface ProjectTodoBlockProps {
   onPrimaryClick?: () => void
   overBudgetAlert?: OverBudgetAlert | null
   actionRows: TodoRow[]
+  /** Etapp D1: vidarebefordrar godkännandekortens antal till sidan så
+      twin-stripens "Nästa steg" kan visa "X förslag väntar" — samma
+      räkning som badgen här, aldrig en egen hämtning. */
+  onApprovalsCount?: (count: number) => void
 }
 
 export default function ProjectTodoBlock({
@@ -56,6 +60,7 @@ export default function ProjectTodoBlock({
   onPrimaryClick,
   overBudgetAlert,
   actionRows,
+  onApprovalsCount,
 }: ProjectTodoBlockProps) {
   const [approvalsCount, setApprovalsCount] = useState(0)
   const [approvalsReady, setApprovalsReady] = useState(false)
@@ -113,6 +118,7 @@ export default function ProjectTodoBlock({
         onCountChange={count => {
           setApprovalsCount(count)
           setApprovalsReady(true)
+          onApprovalsCount?.(count)
         }}
       />
 

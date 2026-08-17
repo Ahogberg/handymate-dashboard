@@ -80,21 +80,61 @@ export function GuardianOrsaker({ varning, variant = 'rows', projectId }: Props)
   }
 
   // variant='full' — egen kort-chrome för projektsidan, ingen omslutande
-  // approval-kort att luta sig mot.
+  // approval-kort att luta sig mot. Etapp D3 (reskin, 2026-08-17):
+  // mockupens "Vad riskerar att gå fel"-ram — vitt kort med rubrik, varje
+  // orsak som en tonad radruta med punkt + text + belopp. Röd vid
+  // överskriden budget, amber vid risk — samma data, samma placering,
+  // KÄNT/UPPSKATTAT-märkningen (kursiv grå) består.
+  const radTon =
+    status === 'over_budget'
+      ? { ruta: 'bg-red-50 border-red-200', punkt: 'bg-red-500' }
+      : { ruta: 'bg-amber-50 border-amber-200', punkt: 'bg-amber-500' }
   return (
-    <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-      <div className="flex items-center gap-2 mb-2.5">
+    <div className="bg-white rounded-card p-4 sm:p-5 border border-slate-200">
+      <div className="flex items-center gap-2 mb-3">
         <AgentAvatar agentKey="karin" size="sm" />
-        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-        <span className="text-sm font-semibold text-amber-900">
+        <h3 className="m-0 font-heading text-[15px] font-semibold text-slate-900 flex-1 min-w-0">
+          Vad riskerar att gå fel
+        </h3>
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 whitespace-nowrap">
+          <AlertTriangle className="w-3 h-3 shrink-0" />
           {status === 'over_budget' ? 'Budget överskriden' : 'Lönsamhetsvarning'}
         </span>
       </div>
-      {rader}
+      {orsaker.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {orsaker.map((o, i) => (
+            <div key={i} className={`flex items-start gap-2.5 px-3 py-2.5 rounded-lg border ${radTon.ruta}`}>
+              <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${radTon.punkt}`} />
+              <div
+                className={`flex-1 min-w-0 flex items-baseline gap-3 text-[13px] ${
+                  o.kind === 'UPPSKATTAT' ? 'text-gray-400 italic' : 'text-slate-700'
+                }`}
+              >
+                {o.approval_id ? (
+                  <Link
+                    href={`/dashboard/approvals#approval-${o.approval_id}`}
+                    className="flex-1 min-w-0 underline decoration-dotted hover:text-primary-700"
+                  >
+                    {o.text}
+                  </Link>
+                ) : (
+                  <span className="flex-1 min-w-0">{o.text}</span>
+                )}
+                {typeof o.amount_kr === 'number' && o.amount_kr > 0 && (
+                  <span className="font-heading font-semibold tabular-nums text-right shrink-0 whitespace-nowrap">
+                    {o.amount_kr.toLocaleString('sv-SE')} kr
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {lank && (
         <Link
           href={lank.href}
-          className="inline-flex items-center gap-1 mt-2.5 text-xs text-primary-700 hover:text-primary-800 font-medium"
+          className="inline-flex items-center gap-1 mt-3 text-xs text-primary-700 hover:text-primary-800 font-medium"
         >
           {lank.label} <ExternalLink className="w-3 h-3" />
         </Link>

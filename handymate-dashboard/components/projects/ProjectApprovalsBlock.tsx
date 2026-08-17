@@ -186,7 +186,7 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
 
   if (!loaded) {
     return (
-      <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 flex items-center justify-center min-h-[72px]">
+      <div className="bg-white border border-[#E2E8F0] rounded-card p-4 flex items-center justify-center min-h-[72px]">
         <Loader2 className="w-4 h-4 text-gray-300 animate-spin" />
       </div>
     )
@@ -211,7 +211,11 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
         const busy = busyId === approval.id
 
         return (
-          <div key={approval.id} className="rounded-xl border border-[#E2E8F0] bg-gradient-to-br from-primary-50/60 to-white p-4">
+          // Etapp D3 (reskin, 2026-08-17): mockupens Godkänn-kort-chrome —
+          // grad-tint-bakgrund + teal-tonad ram + rounded-card, samma
+          // formspråk som Etapp C:s GorDettaForst. Beteendet (approve/
+          // reject/edit, realtime) är orört.
+          <div key={approval.id} className="rounded-card border border-primary-600/30 bg-grad-tint p-4">
             <div className="flex items-center gap-2.5 mb-2">
               {/* SPÅR D2 (2026-08-06): kortet var identiskt med IdagCore:s
                   godkännandekort så när som på två oavsiktliga skillnader —
@@ -227,7 +231,7 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
               </span>
             </div>
 
-            <h3 className="text-[15px] font-semibold text-gray-900 leading-snug mb-1">
+            <h3 className="font-heading text-[15px] font-semibold text-gray-900 leading-snug mb-1">
               {approval.title}
               <span className="ml-2 align-middle text-[10px] font-semibold uppercase tracking-wider text-gray-400">
                 {label}
@@ -238,7 +242,7 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
             )}
 
             {preview && !editing && (
-              <div className="text-[13px] text-gray-600 italic bg-gray-50 border border-gray-100 rounded-lg px-3 py-2.5 mb-3">
+              <div className="text-[13px] text-gray-600 italic bg-white border border-slate-200 rounded-lg px-3 py-2.5 mb-3">
                 &quot;{preview}&quot;
               </div>
             )}

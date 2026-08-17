@@ -62,7 +62,10 @@ interface ProjectStatusCardProps {
   onStageClick: () => void
 }
 
-function weekChip(start: string | null | undefined, end: string | null | undefined): string | null {
+/** "Vecka X av Y" ur projektets start/slutdatum. Exporterad (Etapp D1) så
+    TwinStrips "Planerat klart"-kort visar exakt samma text som chipen här —
+    en beräkning, två ytor. */
+export function weekChip(start: string | null | undefined, end: string | null | undefined): string | null {
   if (!start || !end) return null
   const s = new Date(start).getTime()
   const e = new Date(end).getTime()
@@ -92,7 +95,7 @@ export function ProjectStatusCard({
   const chip = weekChip(startDate, endDate) || (quoteTitle ? 'Skapad från offert' : null)
 
   return (
-    <div className={`bg-white border rounded-xl p-4 sm:p-5 ${overBudget ? 'border-red-200' : 'border-[#E2E8F0]'}`}>
+    <div className={`bg-white border rounded-card p-4 sm:p-5 ${overBudget ? 'border-red-200' : 'border-[#E2E8F0]'}`}>
       {/* Rubrikrad */}
       <div className="flex items-center justify-between gap-2 mb-4">
         <h2 className="text-[15px] font-semibold text-slate-900">Hur ligger vi till?</h2>
@@ -294,14 +297,16 @@ function Ebar({
 }) {
   return (
     <div>
+      {/* Etapp D3 (reskin): mockupens formspråk — font-heading + tabular-nums
+          på beloppet, helt rundade staplar. Samma data, samma procentmatte. */}
       <div className="flex items-baseline justify-between mb-1">
         <span className="text-xs font-medium text-slate-500">{label}</span>
-        <span className={`text-sm font-bold tabular-nums ${valueClass || 'text-slate-900'}`}>
+        <span className={`font-heading text-sm font-bold tabular-nums text-right ${valueClass || 'text-slate-900'}`}>
           {value == null ? '—' : formatSEK(value)}
         </span>
       </div>
-      <div className="h-2 bg-slate-100 rounded overflow-hidden">
-        <div className={`h-full rounded transition-all ${barClass}`} style={{ width: `${Math.max(0, Math.min(pct, 100))}%` }} />
+      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${barClass}`} style={{ width: `${Math.max(0, Math.min(pct, 100))}%` }} />
       </div>
       {sub && <p className="text-[11px] text-slate-400 mt-1">{sub}</p>}
     </div>
