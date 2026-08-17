@@ -12,7 +12,7 @@ import { test, expect } from '@playwright/test'
 import { assembleOpportunityPortfolio } from '../lib/mission/opportunity-portfolio'
 import { validateMissionPlan, type MissionPlanInput } from '../lib/mission/plan-validation'
 import { isMissionPlanPresentation, type MissionPlanPresentation } from '../lib/mission/mission-presentation'
-import { CAPACITY_GOAL_HOURS_MAX } from '../lib/mission/goal-type'
+import { CAPACITY_GOAL_HOURS_MAX, CONTACT_GOAL_COUNT_MAX } from '../lib/mission/goal-type'
 
 const NOW = new Date('2026-08-17T12:00:00Z')
 
@@ -227,6 +227,74 @@ test.describe('validateMissionPlan — Etapp F (kapacitetsmål)', () => {
   })
 })
 
+test.describe('validateMissionPlan — Etapp I (kontaktmål)', () => {
+  function kontaktPlan(p = portfolio(), overrides: Partial<MissionPlanInput> = {}): MissionPlanInput {
+    return {
+      goal_type: 'contact',
+      goal_count: 5,
+      deadline: '2026-09-30',
+      steps: [
+        { item_id: p.by_class.ateraktivering[0].id, motivation: 'Nå de tysta badrum-kunderna' },
+      ],
+      ...overrides,
+    }
+  }
+
+  test('kontaktplan utan goal_count avvisas (bad_goal)', () => {
+    const plan = kontaktPlan()
+    delete (plan as any).goal_count
+    const res = validateMissionPlan(plan, portfolio(), NOW)
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.reason).toBe('bad_goal')
+  })
+
+  test('kontaktplan med goal_count 0, negativt, NaN, decimal eller över taket avvisas', () => {
+    for (const count of [0, -3, NaN, Infinity, 2.5, CONTACT_GOAL_COUNT_MAX + 1]) {
+      const plan = kontaktPlan(portfolio(), { goal_count: count })
+      const res = validateMissionPlan(plan, portfolio(), NOW)
+      expect(res.ok, `goal_count ${count} skulle avvisas`).toBe(false)
+      if (!res.ok) expect(res.reason).toBe('bad_goal')
+    }
+  })
+
+  test('goal_count exakt på taket accepteras', () => {
+    const plan = kontaktPlan(portfolio(), { goal_count: CONTACT_GOAL_COUNT_MAX })
+    expect(validateMissionPlan(plan, portfolio(), NOW).ok).toBe(true)
+  })
+
+  test('giltig kontaktplan accepteras och ignorerar en insmugglad goal_kr/goal_hours helt', () => {
+    const p = portfolio()
+    const plan = kontaktPlan(p, { goal_kr: 999999, goal_hours: 999 } as any)
+    const res = validateMissionPlan(plan, p, NOW)
+    expect(res.ok).toBe(true)
+  })
+
+  test('pengaplan utan goal_type (default money) fungerar oförändrat även efter Etapp I', () => {
+    const res = validateMissionPlan(giltigPlan(), portfolio(), NOW)
+    expect(res.ok).toBe(true)
+  })
+
+  test('en goal_count smugglad in på en pengaplan (goal_type money/saknat) ignoreras — goal_kr avgör ensam', () => {
+    const plan = giltigPlan()
+    ;(plan as any).goal_count = 999
+    const res = validateMissionPlan(plan, portfolio(), NOW)
+    expect(res.ok).toBe(true)
+  })
+
+  test('pengaplan (explicit goal_type money) utan goal_kr avvisas (bad_goal) — goal_count räddar inte den', () => {
+    const p = portfolio()
+    const plan: MissionPlanInput = {
+      goal_type: 'money',
+      goal_count: 5,
+      deadline: '2026-09-30',
+      steps: [{ item_id: p.by_class.indrivningsbart[0].id, motivation: 'x' }],
+    }
+    const res = validateMissionPlan(plan, p, NOW)
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.reason).toBe('bad_goal')
+  })
+})
+
 test.describe('isMissionPlanPresentation — metadata-kontraktets vakt', () => {
   function giltigPresentation(): MissionPlanPresentation {
     const p = portfolio()
@@ -289,5 +357,16 @@ test.describe('isMissionPlanPresentation — metadata-kontraktets vakt', () => {
     delete aldre.goal_type
     delete aldre.goal_hours
     expect(isMissionPlanPresentation(aldre)).toBe(true)
+  })
+
+  test('Etapp I: en kontaktpresentation med goal_kr null och goal_count satt accepteras (additiv schemaändring)', () => {
+    const kontakt: MissionPlanPresentation = {
+      ...giltigPresentation(),
+      goal_type: 'contact',
+      goal_kr: null,
+      goal_count: 5,
+      headline: 'Kontakta 5 kunder före 2026-09-30',
+    }
+    expect(isMissionPlanPresentation(kontakt)).toBe(true)
   })
 })

@@ -20,6 +20,7 @@ const MISSION_FILES = [
   'plan-validation.ts',
   'mission-presentation.ts',
   'mission-progress.ts',
+  'contact-outcomes.ts',
 ]
 
 // De hopslagna kronfältens kända namn. (Skrivs bara HÄR — implementations-
@@ -49,8 +50,13 @@ test.describe('Etapp F (kapacitetsmål) — timmar och kronor konverteras aldrig
   // lib/mission/* har någon börjat räkna om ett kapacitetsmål till pengar
   // eller vice versa — exakt den klassblandning Etapp F:s design uttryckligen
   // förbjuder (Design-avsnittet i tasks/jaunty-pondering-hummingbird.md:
-  // "Money and hours are NEVER mixed in one figure").
-  const CONVERSION_IDENTIFIERS = ['hourly_rate', 'hourlyrate', 'timpris', 'kr_per_timme', 'kronorPerTimme']
+  // "Money and hours are NEVER mixed in one figure"). Etapp I (kontaktmål)
+  // utökar samma förbud till antal↔kronor/timmar — ett kontaktmål mäter
+  // ENDAST distinkta kunder, aldrig ett uppskattat värde per kontakt.
+  const CONVERSION_IDENTIFIERS = [
+    'hourly_rate', 'hourlyrate', 'timpris', 'kr_per_timme', 'kronorPerTimme',
+    'kr_per_kontakt', 'kronor_per_kontakt', 'kontaktvarde', 'value_per_contact', 'per_contact_kr',
+  ]
 
   for (const file of files) {
     test(`${file} innehåller ingen kr↔timmar-omvandling`, () => {

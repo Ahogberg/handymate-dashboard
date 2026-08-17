@@ -169,6 +169,34 @@ function capacityMission(): { mission: MissionRow; progress: ReturnType<typeof b
   return { mission, progress }
 }
 
+function contactMission(): { mission: MissionRow; progress: ReturnType<typeof byggMissionProgress> } {
+  const mission: MissionRow = {
+    id: 'mis_con123456789',
+    business_id: 'biz_1',
+    goal_kr: null,
+    deadline: '2026-08-24',
+    status: 'active',
+    plan_snapshot: { steps: [] },
+    portfolio_generated_at: NOW.toISOString(),
+    created_at: NOW.toISOString(),
+    resolved_at: null,
+    goal_type: 'contact',
+    goal_count: 5,
+  }
+  const progress = byggMissionProgress({
+    mission,
+    invoices: [],
+    missionApprovals: [],
+    quotes: [],
+    nowMs: NOW.getTime(),
+    contactOutcomes: [
+      { customer_id: 'c1', executed_at: '2026-08-01T00:00:00Z', replied_within_window: true },
+      { customer_id: 'c2', executed_at: '2026-08-01T00:00:00Z', replied_within_window: false },
+    ],
+  })
+  return { mission, progress }
+}
+
 test.describe('MissionPanelView — rendering', () => {
   test('två kr-klasser (40 000 + 32 000) visar båda beloppen, aldrig en hopslagen "72 000"', () => {
     const { mission, progress } = moneyMissionWithTwoKrClasses()
@@ -207,6 +235,28 @@ test.describe('MissionPanelView — rendering', () => {
     }))
     expect(markup).not.toContain('kr kvar till målet')
     expect(markup).toContain('timmar kvar att boka')
+  })
+
+  test('Etapp I: kontaktuppdrag renderar aldrig "kr kvar till målet" eller "timmar" — visar "N av M kontaktade"', () => {
+    const { mission, progress } = contactMission()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      mission,
+      progress,
+      decisions: [],
+      confirmAction: null,
+      resolving: false,
+      onClose: NOOP,
+      onFragaMatte: NOOP,
+      onRequestConfirm: NOOP,
+      onCancelConfirm: NOOP,
+      onConfirmResolve: NOOP,
+      renderAgentChip: NOOP_CHIP,
+    }))
+    expect(markup).not.toContain('kr kvar till målet')
+    expect(markup).not.toContain('timmar kvar att boka')
+    expect(markup).toContain('2 av 5 kontaktade')
+    expect(markup).toContain('1 svar inom 7 dagar')
+    expect(markup).toContain('Kontakta 5 kunder')
   })
 
   test('beslut renderas som länkar till /dashboard/approvals med titeln synlig', () => {
@@ -259,6 +309,7 @@ function missionFacit(overrides: Partial<MissionFacit> = {}): MissionFacit {
     resolved_at: '2026-06-20T00:00:00Z',
     slutgap_kr: 0,
     slutgap_hours: null,
+    slutgap_count: null,
     verifierat_betalt_kr: 80000,
     learning_eligible: true,
     learning_blockers: [],
@@ -356,6 +407,19 @@ test.describe('MissionPanelView — historik, Etapp H', () => {
       history,
     }))
     expect(markup).toContain('2 timmar kvar')
+    expect(markup).not.toContain('kr kvar')
+  })
+
+  test('kontaktuppdrag i historiken (Etapp I) visar "N kontakter kvar"/"målet nått", aldrig "kr kvar"', () => {
+    const { mission, progress } = contactMission()
+    const history: MissionFacit[] = [
+      missionFacit({ mission_id: 'con', goal_type: 'contact', headline: 'Kontakta 5 kunder före 2026-07-01', slutgap_kr: null, slutgap_count: 2, verifierat_betalt_kr: 0 }),
+    ]
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      history,
+    }))
+    expect(markup).toContain('2 kontakter kvar')
     expect(markup).not.toContain('kr kvar')
   })
 

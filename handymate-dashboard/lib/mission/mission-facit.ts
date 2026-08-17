@@ -49,6 +49,7 @@ import {
   loadMissionProgressInputs,
   type MissionApprovalInput,
   type MissionCapacityWeekInput,
+  type MissionContactOutcomeInput,
   type MissionInvoiceInput,
   type MissionQuoteInput,
   type MissionRow,
@@ -74,10 +75,13 @@ export interface MissionFacit {
   headline: string
   deadline: string
   resolved_at: string | null
-  /** Slutgap för pengamål. null för kapacitetsmål — se slutgap_hours. */
+  /** Slutgap för pengamål. null för kapacitets-/kontaktmål. */
   slutgap_kr: number | null
-  /** Slutgap för kapacitetsmål. null för pengamål. */
+  /** Slutgap för kapacitetsmål. null för penga-/kontaktmål. */
   slutgap_hours: number | null
+  /** Etapp I. Slutgap för kontaktmål (goal_count − kontaktade). null för
+      penga-/kapacitetsmål. */
+  slutgap_count: number | null
   /** Bara kr-klasserna, fakturadedupat inom uppdraget (se filhuvudet). */
   verifierat_betalt_kr: number
   learning_eligible: boolean
@@ -110,6 +114,8 @@ export function byggMissionFacit(input: {
   quotes: MissionQuoteInput[]
   nowMs: number
   capacityWeek?: MissionCapacityWeekInput | null
+  /** Etapp I — pre-derived kontaktutfall, se lib/mission/mission-progress.ts. */
+  contactOutcomes?: MissionContactOutcomeInput[]
 }): MissionFacit {
   const { mission, missionApprovals } = input
   const goalType = resolveGoalType(mission.goal_type)
@@ -124,7 +130,11 @@ export function byggMissionFacit(input: {
   const headline = buildMissionHeadline(
     mission.goal_kr ?? 0,
     mission.deadline.slice(0, 10),
-    goalType === 'capacity' ? { goalType, goalHours: mission.goal_hours ?? undefined } : undefined,
+    goalType === 'capacity'
+      ? { goalType, goalHours: mission.goal_hours ?? undefined }
+      : goalType === 'contact'
+        ? { goalType, goalCount: mission.goal_count ?? undefined }
+        : undefined,
   )
 
   // ── Lärande-grinden — se filhuvudet. Varje icke-completed status har sin
@@ -139,6 +149,10 @@ export function byggMissionFacit(input: {
   } else {
     if (steps.length === 0) blockers.push('ingen plan sattes')
     if (goalType === 'capacity' && progress.capacity_unconfigured) blockers.push('kapacitet ej konfigurerad')
+    // Kontaktmål har ingen egen "okonfigurerad"-degradering (till skillnad
+    // från kapacitet finns ingen extern inställning som kan saknas) — ett
+    // completed kontaktuppdrag med minst ett plansteg är alltså eligible
+    // som vilket annat completed uppdrag som helst.
   }
   const learningEligible = mission.status === 'completed' && blockers.length === 0
 
@@ -170,6 +184,7 @@ export function byggMissionFacit(input: {
     resolved_at: mission.resolved_at,
     slutgap_kr: progress.gap_kr,
     slutgap_hours: progress.gap_hours,
+    slutgap_count: progress.gap_count,
     verifierat_betalt_kr: verifieratBetaltKr,
     learning_eligible: learningEligible,
     learning_blockers: blockers,
@@ -183,6 +198,7 @@ function normaliseraRad(raw: MissionRow): MissionRow {
     goal_kr: raw.goal_kr == null ? null : Number(raw.goal_kr),
     goal_type: resolveGoalType(raw.goal_type),
     goal_hours: raw.goal_hours == null ? null : Number(raw.goal_hours),
+    goal_count: raw.goal_count == null ? null : Number(raw.goal_count),
   }
 }
 
@@ -217,12 +233,12 @@ export async function listMissionFacit(
     for (const raw of rows) {
       const mission = normaliseraRad(raw)
       try {
-        const { invoices, missionApprovals, quotes, capacityWeek } = await loadMissionProgressInputs(supabase, mission, nowMs)
-        facit.push(byggMissionFacit({ mission, invoices, missionApprovals, quotes, nowMs, capacityWeek }))
+        const { invoices, missionApprovals, quotes, capacityWeek, contactOutcomes } = await loadMissionProgressInputs(supabase, mission, nowMs)
+        facit.push(byggMissionFacit({ mission, invoices, missionApprovals, quotes, nowMs, capacityWeek, contactOutcomes }))
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         console.warn('[mission-facit] indata för ett uppdrag kunde inte läsas (nollfacit):', msg)
-        facit.push(byggMissionFacit({ mission, invoices: [], missionApprovals: [], quotes: [], nowMs, capacityWeek: null }))
+        facit.push(byggMissionFacit({ mission, invoices: [], missionApprovals: [], quotes: [], nowMs, capacityWeek: null, contactOutcomes: [] }))
       }
     }
     return facit

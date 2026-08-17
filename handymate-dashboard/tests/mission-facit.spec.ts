@@ -293,6 +293,34 @@ test.describe('byggMissionFacit — slutgap', () => {
     })
     expect(facit.headline).toContain('Boka')
   })
+
+  test('kontaktuppdrag (Etapp I): slutgap_count satt, slutgap_kr/slutgap_hours null', () => {
+    const facit = byggMissionFacit({
+      mission: mission({ goal_type: 'contact', goal_kr: null, goal_count: 5 }),
+      ...tomIndata(),
+      contactOutcomes: [{ customer_id: 'c1', executed_at: '2026-05-05T00:00:00Z', replied_within_window: true }],
+    })
+    expect(facit.slutgap_count).toBe(4)
+    expect(facit.slutgap_kr).toBeNull()
+    expect(facit.slutgap_hours).toBeNull()
+  })
+
+  test('headline speglar buildMissionHeadline (kontaktmål ger "Kontakta …")', () => {
+    const facit = byggMissionFacit({
+      mission: mission({ goal_type: 'contact', goal_kr: null, goal_count: 5, deadline: '2026-06-08' }),
+      ...tomIndata(),
+    })
+    expect(facit.headline).toContain('Kontakta')
+  })
+
+  test('completed kontaktuppdrag med plan → eligible (ingen egen okonfigurerad-degradering som kapacitet har)', () => {
+    const facit = byggMissionFacit({
+      mission: mission({ status: 'completed', goal_type: 'contact', goal_kr: null, goal_count: 5 }),
+      ...tomIndata(),
+    })
+    expect(facit.learning_eligible).toBe(true)
+    expect(facit.learning_blockers).toEqual([])
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────

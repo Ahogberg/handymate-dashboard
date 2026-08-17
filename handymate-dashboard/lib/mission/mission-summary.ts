@@ -98,17 +98,23 @@ function isoWeekNumber(dateStr: string): number {
  * kapacitetsformuleringen ("Boka N timmar till vecka V") i stället för
  * pengaformuleringen — goalKr ignoreras HELT i det läget (anropare som inte
  * har ett meningsfullt kr-tal för en kapacitetsplan skickar bara in 0, det
- * syns aldrig i resultatet). Utan opts (eller goalType 'money') är
+ * syns aldrig i resultatet). Etapp I (kontaktmål): opts.goalType ===
+ * 'contact' väljer kontaktformuleringen ("Kontakta N kunder före DATUM"),
+ * goalKr/goalHours ignoreras helt. Utan opts (eller goalType 'money') är
  * beteendet exakt det förra — bakåtkompatibel positionell 2-args-signatur.
  */
 export function buildMissionHeadline(
   goalKr: number,
   deadline: string,
-  opts?: { goalType?: MissionGoalType; goalHours?: number | null },
+  opts?: { goalType?: MissionGoalType; goalHours?: number | null; goalCount?: number | null },
 ): string {
   if (opts?.goalType === 'capacity') {
     const hours = Math.round(Number(opts.goalHours) || 0)
     return `Boka ${hours} timmar till vecka ${isoWeekNumber(deadline)}`
+  }
+  if (opts?.goalType === 'contact') {
+    const count = Math.round(Number(opts.goalCount) || 0)
+    return `Kontakta ${count} kunder före ${deadline}`
   }
   return `Frigöra ${Math.round(goalKr).toLocaleString('sv-SE')} kr före ${deadline}`
 }

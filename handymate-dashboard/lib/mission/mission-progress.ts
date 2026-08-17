@@ -66,6 +66,7 @@ import type { ValidatedMissionStep } from './plan-validation'
 import { resolveGoalType, type MissionGoalType } from './goal-type'
 import { getWeekCapacity, mondayOfWeek } from '@/lib/capacity/week-capacity'
 import { svDateStrPlusDays } from '@/lib/dates'
+import { loadContactOutcomes, type ContactApprovalInput } from './contact-outcomes'
 
 export interface MissionRow {
   id: string
@@ -87,6 +88,12 @@ export interface MissionRow {
   goal_type?: MissionGoalType
   /** null för pengauppdrag; optional av samma fail-soft-skäl som goal_type. */
   goal_hours?: number | null
+  /**
+   * Etapp I (kontaktmål, sql/v146_mission_contact_goal.sql). Optional av
+   * samma fail-soft-skäl som goal_type/goal_hours — miljöer där v146 inte
+   * körts saknar kolumnen helt. null för penga-/kapacitetsuppdrag.
+   */
+  goal_count?: number | null
 }
 
 export interface ClassProgress {
@@ -134,6 +141,39 @@ export interface MissionProgress {
    * ett påhittat gap.
    */
   capacity_unconfigured: boolean
+  /**
+   * Etapp I (kontaktmål). max(0, goal_count − contacted_count). null för
+   * penga-/kapacitetsuppdrag — samma ömsesidiga uteslutning som gap_kr/
+   * gap_hours, nu utökad till tre målstyper (se mutual-exclusivity-facit i
+   * tests/mission-progress.spec.ts).
+   */
+  gap_count: number | null
+  /**
+   * Etapp I. Distinkta kunder nådda av uppdragsstämplat, FAKTISKT
+   * EXEKVERAT utskick (lib/mission/contact-outcomes.ts). null för penga-/
+   * kapacitetsuppdrag.
+   */
+  contacted_count: number | null
+  /**
+   * Etapp I. Delmängd av contacted_count — kunder med minst en inkommande
+   * kommunikation inom 7 dagar efter sitt eget utskick (lib/mission/
+   * contact-outcomes.ts). Räknad fakta, aldrig ett svarsfrekvens-/
+   * konverteringspåstående. null för penga-/kapacitetsuppdrag.
+   */
+  replied_within_7d: number | null
+}
+
+/** Etapp I — mission-progress.ts:s egen, lokala spegling av
+    lib/mission/contact-outcomes.ts:s ContactOutcome (samma mönster som
+    MissionCapacityWeekInput ovan: den rena kärnan (byggMissionProgress)
+    definierar sin egen indataform i stället för att bero på I/O-modulens
+    typ, så pure-kärnan förblir självbärande). executed_at är nullbar här
+    (strängare i ContactOutcome) — den rena kärnan litar aldrig blint på
+    anroparen och filtrerar bort rader utan exekveringstid själv. */
+export interface MissionContactOutcomeInput {
+  customer_id: string
+  executed_at: string | null
+  replied_within_window: boolean
 }
 
 /** Bokade timmar + proveniens för uppdragets målvecka — I/O-lagrets
@@ -174,6 +214,12 @@ export interface MissionApprovalInput {
   status: string
   approval_type: string
   payload: Record<string, unknown>
+  /** Etapp I — satt ATOMISKT när statusen flippar till approved/rejected
+      (se lib/approvals/execution-outcome.ts filhuvud); används som
+      kontakttillfälle av lib/mission/contact-outcomes.ts. Optional så
+      alla befintliga fixturer/tester (Etapp A–H) som konstruerar en
+      approval utan fältet fortsätter kompilera oförändrat. */
+  resolved_at?: string | null
 }
 
 export interface MissionQuoteInput {
@@ -227,6 +273,10 @@ export function byggMissionProgress(input: {
   /** Etapp F — bara relevant för kapacitetsuppdrag; null/utelämnat för
       pengauppdrag ELLER när I/O-lagret inte kunde läsa kapaciteten. */
   capacityWeek?: MissionCapacityWeekInput | null
+  /** Etapp I — bara relevant för kontaktuppdrag; pre-derived av I/O-lagret
+      (lib/mission/contact-outcomes.ts:s loadContactOutcomes). Den rena
+      kärnan gör bara räkning här, ingen egen dedup/kommunikationslogik. */
+  contactOutcomes?: MissionContactOutcomeInput[]
 }): MissionProgress {
   const { mission } = input
   const steps = Array.isArray(mission.plan_snapshot?.steps) ? mission.plan_snapshot.steps : []
@@ -306,16 +356,21 @@ export function byggMissionProgress(input: {
   const nowDate = new Date(input.nowMs).toISOString().slice(0, 10)
   const deadlineDate = typeof mission.deadline === 'string' ? mission.deadline.slice(0, 10) : ''
 
-  // ── Målgapet: ETT enda facit, grenat på goal_type — aldrig båda. ───────
-  // Pengamål (Etapp D): summerar verifieratBetaltKr över kr-klasserna, se
-  // kommentaren på MissionProgress.gap_kr för varför det INTE är
-  // klassblandningen. Kapacitetsmål (Etapp F): timmar mot uppdragets
-  // MÅLVECKA (capacityWeek, uträknad av I/O-lagret) — bara när veckan har
-  // en verklig kapacitetsinställning, annars capacity_unconfigured.
+  // ── Målgapet: ETT enda facit, grenat på goal_type — aldrig fler än ett
+  // satt samtidigt. Pengamål (Etapp D): summerar verifieratBetaltKr över
+  // kr-klasserna, se kommentaren på MissionProgress.gap_kr för varför det
+  // INTE är klassblandningen. Kapacitetsmål (Etapp F): timmar mot
+  // uppdragets MÅLVECKA (capacityWeek, uträknad av I/O-lagret) — bara när
+  // veckan har en verklig kapacitetsinställning, annars
+  // capacity_unconfigured. Kontaktmål (Etapp I): distinkta kontaktade
+  // kunder (contactOutcomes, pre-derived av I/O-lagret) mot goal_count.
   const goalType = resolveGoalType(mission.goal_type)
   let gapKr: number | null = null
   let gapHours: number | null = null
   let capacityUnconfigured = false
+  let gapCount: number | null = null
+  let contactedCount: number | null = null
+  let repliedWithin7d: number | null = null
 
   if (goalType === 'money') {
     let verifieratBetaltKr = 0
@@ -323,7 +378,7 @@ export function byggMissionProgress(input: {
       verifieratBetaltKr += perClass[cls]?.verified_paid_kr ?? 0
     }
     gapKr = Math.max(0, Math.round(Number(mission.goal_kr) || 0) - verifieratBetaltKr)
-  } else {
+  } else if (goalType === 'capacity') {
     const cw = input.capacityWeek ?? null
     if (cw && cw.configured) {
       const bokat = round1(cw.bookedHours)
@@ -332,6 +387,16 @@ export function byggMissionProgress(input: {
     } else {
       capacityUnconfigured = true
     }
+  } else {
+    // Kontaktmål: contactOutcomes är redan deduplicerad per kund av
+    // deriveContactOutcomes (lib/mission/contact-outcomes.ts) — här räknas
+    // bara. Rader utan exekveringstid filtreras defensivt bort (se
+    // MissionContactOutcomeInput-kommentaren), även om det normala fallet
+    // är att I/O-lagret redan garanterat det.
+    const outcomes = (input.contactOutcomes ?? []).filter(o => o.executed_at != null)
+    contactedCount = outcomes.length
+    repliedWithin7d = outcomes.filter(o => o.replied_within_window).length
+    gapCount = Math.max(0, Math.round(Number(mission.goal_count) || 0) - contactedCount)
   }
 
   return {
@@ -341,6 +406,9 @@ export function byggMissionProgress(input: {
     gap_kr: gapKr,
     gap_hours: gapHours,
     capacity_unconfigured: capacityUnconfigured,
+    gap_count: gapCount,
+    contacted_count: contactedCount,
+    replied_within_7d: repliedWithin7d,
   }
 }
 
@@ -378,10 +446,14 @@ export async function loadMissionProgressInputs(
   missionApprovals: MissionApprovalRow[]
   quotes: MissionQuoteInput[]
   capacityWeek: MissionCapacityWeekInput | null
+  contactOutcomes: MissionContactOutcomeInput[]
 }> {
+  // resolved_at (Etapp I): kontakttillfället för deriveContactOutcomes —
+  // lästes inte tidigare (Etapp A–H behövde den inte), tillägget är
+  // additivt och rör ingen befintlig kolumn.
   const { data: approvalRows, error: approvalError } = await supabase
     .from('pending_approvals')
-    .select('id, status, approval_type, payload, title')
+    .select('id, status, approval_type, payload, title, resolved_at')
     .eq('business_id', mission.business_id)
     .contains('payload', { mission_id: mission.id })
   if (approvalError) throw new Error(`pending_approvals-uppslag misslyckades: ${approvalError.message}`)
@@ -444,7 +516,30 @@ export async function loadMissionProgressInputs(
     }
   }
 
-  return { invoices, missionApprovals, quotes, capacityWeek }
+  // ── Etapp I: kontaktuppdragets kontaktade kunder + svar inom 7 dagar. ──
+  // Egen try/catch: ett fel här ska degradera till [] (contacted_count/
+  // replied_within_7d blir 0), aldrig fälla hela progress-läsningen —
+  // samma fail-soft-linje som kapacitetsuppslaget ovan.
+  let contactOutcomes: MissionContactOutcomeInput[] = []
+  if (resolveGoalType(mission.goal_type) === 'contact') {
+    try {
+      const contactApprovals: ContactApprovalInput[] = missionApprovals.map(a => {
+        const execution = a.payload?.execution_result
+        const outcome = execution && typeof execution === 'object'
+          ? ((execution as Record<string, unknown>).outcome as string | undefined) ?? null
+          : null
+        const customerId = typeof a.payload?.customer_id === 'string' ? a.payload.customer_id : null
+        return { customer_id: customerId, resolved_at: a.resolved_at ?? null, outcome }
+      })
+      contactOutcomes = await loadContactOutcomes(supabase, mission.business_id, contactApprovals, 7, nowMs)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn('[mission-progress] kontaktutfall kunde inte läsas (contacted_count blir 0):', msg)
+      contactOutcomes = []
+    }
+  }
+
+  return { invoices, missionApprovals, quotes, capacityWeek, contactOutcomes }
 }
 
 /**
@@ -458,12 +553,12 @@ export async function getMissionProgress(
 ): Promise<MissionProgress> {
   const nowMs = Date.now()
   try {
-    const { invoices, missionApprovals, quotes, capacityWeek } = await loadMissionProgressInputs(supabase, mission, nowMs)
-    return byggMissionProgress({ mission, invoices, missionApprovals, quotes, nowMs, capacityWeek })
+    const { invoices, missionApprovals, quotes, capacityWeek, contactOutcomes } = await loadMissionProgressInputs(supabase, mission, nowMs)
+    return byggMissionProgress({ mission, invoices, missionApprovals, quotes, nowMs, capacityWeek, contactOutcomes })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     console.warn('[mission-progress] kunde inte härleda progress (nollprogress):', msg)
-    return byggMissionProgress({ mission, invoices: [], missionApprovals: [], quotes: [], nowMs, capacityWeek: null })
+    return byggMissionProgress({ mission, invoices: [], missionApprovals: [], quotes: [], nowMs, capacityWeek: null, contactOutcomes: [] })
   }
 }
 
@@ -490,8 +585,8 @@ export async function getMissionProgressWithDecisions(
 ): Promise<{ progress: MissionProgress; decisions: MissionDecision[] }> {
   const nowMs = Date.now()
   try {
-    const { invoices, missionApprovals, quotes, capacityWeek } = await loadMissionProgressInputs(supabase, mission, nowMs)
-    const progress = byggMissionProgress({ mission, invoices, missionApprovals, quotes, nowMs, capacityWeek })
+    const { invoices, missionApprovals, quotes, capacityWeek, contactOutcomes } = await loadMissionProgressInputs(supabase, mission, nowMs)
+    const progress = byggMissionProgress({ mission, invoices, missionApprovals, quotes, nowMs, capacityWeek, contactOutcomes })
     const decisions: MissionDecision[] = missionApprovals
       .filter(a => a.status === 'pending')
       .map(a => ({
@@ -505,7 +600,7 @@ export async function getMissionProgressWithDecisions(
     const msg = err instanceof Error ? err.message : String(err)
     console.warn('[mission-progress] kunde inte härleda progress (nollprogress):', msg)
     return {
-      progress: byggMissionProgress({ mission, invoices: [], missionApprovals: [], quotes: [], nowMs, capacityWeek: null }),
+      progress: byggMissionProgress({ mission, invoices: [], missionApprovals: [], quotes: [], nowMs, capacityWeek: null, contactOutcomes: [] }),
       decisions: [],
     }
   }

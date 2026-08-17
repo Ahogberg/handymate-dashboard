@@ -99,11 +99,17 @@ const HISTORY_STATUS_BADGE: Record<MissionFacit['status'], { text: string; class
 
 /** Etapp H — historikradens slutgap, per uppdragets EGEN goal_type. Läser
     bara MissionFacit-fälten (aldrig progressParts/gap_kr direkt) — historik-
-    raden har inget MissionProgress-objekt, bara det frusna facitet. */
+    raden har inget MissionProgress-objekt, bara det frusna facitet.
+    Etapp I lägger till kontaktmål-grenen (slutgap_count, "N kontakter
+    kvar" — aldrig kr/timmar). */
 function formatSlutgap(f: MissionFacit): string {
   if (f.goal_type === 'capacity') {
     if (f.slutgap_hours == null) return 'kapacitet ej konfigurerad'
     return f.slutgap_hours === 0 ? 'målet nått' : `${f.slutgap_hours.toLocaleString('sv-SE')} timmar kvar`
+  }
+  if (f.goal_type === 'contact') {
+    if (f.slutgap_count == null) return '—'
+    return f.slutgap_count === 0 ? 'målet nått' : `${f.slutgap_count.toLocaleString('sv-SE')} kontakter kvar`
   }
   if (f.slutgap_kr == null) return '—'
   return f.slutgap_kr === 0 ? 'målet nått' : `${f.slutgap_kr.toLocaleString('sv-SE')} kr kvar`
@@ -167,7 +173,11 @@ export function MissionPanelView({
   const headline = buildMissionHeadline(
     mission.goal_kr ?? 0,
     mission.deadline.slice(0, 10),
-    goalType === 'capacity' ? { goalType, goalHours: mission.goal_hours ?? undefined } : undefined,
+    goalType === 'capacity'
+      ? { goalType, goalHours: mission.goal_hours ?? undefined }
+      : goalType === 'contact'
+        ? { goalType, goalCount: mission.goal_count ?? undefined }
+        : undefined,
   )
   const deadlineLabel = new Date(mission.deadline).toLocaleDateString('sv-SE', {
     day: 'numeric',
@@ -176,9 +186,13 @@ export function MissionPanelView({
   })
   const steps = Array.isArray(mission.plan_snapshot?.steps) ? mission.plan_snapshot.steps : []
   const sections = groupStepsByClass(steps)
-  // Etapp D-facit: gap_kr/gap_hours är ömsesidigt uteslutande — "klart" är
-  // ETT av de två, aldrig en gissning från det andra fältet.
-  const gapClosed = goalType === 'capacity' ? progress.gap_hours === 0 : progress.gap_kr === 0
+  // Etapp D/F/I-facit: gap_kr/gap_hours/gap_count är ömsesidigt uteslutande
+  // — "klart" är ETT av de tre, aldrig en gissning från de andra fälten.
+  const gapClosed = goalType === 'capacity'
+    ? progress.gap_hours === 0
+    : goalType === 'contact'
+      ? progress.gap_count === 0
+      : progress.gap_kr === 0
 
   return (
     <div

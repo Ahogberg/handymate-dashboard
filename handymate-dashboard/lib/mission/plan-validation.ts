@@ -16,7 +16,7 @@
  */
 
 import type { OpportunityPortfolio, PortfolioItem, PortfolioMeasure, TruthClass } from './opportunity-portfolio'
-import { resolveGoalType, CAPACITY_GOAL_HOURS_MAX, type MissionGoalType } from './goal-type'
+import { resolveGoalType, CAPACITY_GOAL_HOURS_MAX, CONTACT_GOAL_COUNT_MAX, type MissionGoalType } from './goal-type'
 
 export const MAX_MISSION_STEPS = 5
 
@@ -36,6 +36,10 @@ export interface MissionPlanInput {
   /** Krävs (0 < n ≤ CAPACITY_GOAL_HOURS_MAX) för kapacitetsmål. Ignoreras
       helt för pengamål — timmar och kronor blandas aldrig. */
   goal_hours?: number
+  /** Krävs (heltal, 0 < n ≤ CONTACT_GOAL_COUNT_MAX) för kontaktmål (Etapp I).
+      Ignoreras helt för penga-/kapacitetsmål — antal kunder blandas aldrig
+      med kronor eller timmar. */
+  goal_count?: number
   deadline: string
   steps: MissionPlanStepInput[]
 }
@@ -68,10 +72,12 @@ const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
  * Regler: 1–5 steg; varje item_id måste finnas i portföljen (vilken klass
  * som helst); inga dubbletter; deadline ett datum STRIKT efter idag (ren
  * datumjämförelse — svensk arbetsdagssemantik krävs inte i V1). Målet
- * grenar på goal_type (Etapp F): pengamål kräver goal_kr ändligt och > 0
- * (goal_hours ignoreras helt); kapacitetsmål kräver goal_hours ändligt,
- * > 0 och ≤ CAPACITY_GOAL_HOURS_MAX (goal_kr ignoreras helt) — pengar och
- * timmar kan aldrig bli samma målsiffra.
+ * grenar på goal_type (Etapp F, Etapp I): pengamål kräver goal_kr ändligt
+ * och > 0 (goal_hours/goal_count ignoreras helt); kapacitetsmål kräver
+ * goal_hours ändligt, > 0 och ≤ CAPACITY_GOAL_HOURS_MAX (goal_kr/goal_count
+ * ignoreras helt); kontaktmål kräver goal_count ett HELTAL, > 0 och ≤
+ * CONTACT_GOAL_COUNT_MAX (goal_kr/goal_hours ignoreras helt) — pengar,
+ * timmar och antal kan aldrig bli samma målsiffra.
  */
 export function validateMissionPlan(
   plan: MissionPlanInput,
@@ -84,7 +90,7 @@ export function validateMissionPlan(
     if (!(typeof plan.goal_kr === 'number' && Number.isFinite(plan.goal_kr) && plan.goal_kr > 0)) {
       return { ok: false, reason: 'bad_goal', detail: 'Målet måste vara ett belopp större än noll.' }
     }
-  } else {
+  } else if (goalType === 'capacity') {
     if (!(
       typeof plan.goal_hours === 'number'
       && Number.isFinite(plan.goal_hours)
@@ -95,6 +101,20 @@ export function validateMissionPlan(
         ok: false,
         reason: 'bad_goal',
         detail: `Kapacitetsmålet måste vara fler än 0 och högst ${CAPACITY_GOAL_HOURS_MAX} timmar.`,
+      }
+    }
+  } else {
+    if (!(
+      typeof plan.goal_count === 'number'
+      && Number.isFinite(plan.goal_count)
+      && Number.isInteger(plan.goal_count)
+      && plan.goal_count > 0
+      && plan.goal_count <= CONTACT_GOAL_COUNT_MAX
+    )) {
+      return {
+        ok: false,
+        reason: 'bad_goal',
+        detail: `Kontaktmålet måste vara ett heltal större än 0 och högst ${CONTACT_GOAL_COUNT_MAX} kunder.`,
       }
     }
   }

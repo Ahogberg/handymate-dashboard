@@ -131,6 +131,13 @@ test.describe('buildMissionHeadline', () => {
     expect(buildMissionHeadline(72000, '2026-09-30', { goalType: 'money' }))
       .toBe(`Frigöra ${(72000).toLocaleString('sv-SE')} kr före 2026-09-30`)
   })
+
+  test('Etapp I: goalType contact bygger "Kontakta N kunder före DATUM", ignorerar goalKr/goalHours helt', () => {
+    const headline = buildMissionHeadline(999999, '2026-09-30', { goalType: 'contact', goalCount: 10 })
+    expect(headline).toBe('Kontakta 10 kunder före 2026-09-30')
+    expect(headline).not.toContain('999999')
+    expect(headline).not.toContain('kr')
+  })
 })
 
 test.describe('källskanning — lib/mission/mission-summary.ts summerar aldrig klassbelopp', () => {
@@ -219,6 +226,18 @@ test.describe('tool-definitions.ts — propose_mission_plan / confirm_mission', 
       expect(block).toContain('required: ["deadline", "steps"]')
     }
   })
+
+  test('Etapp I: båda verktygen har ett valfritt goal_count-fält och "contact" i goal_type-enumet', () => {
+    for (const [start, end] of [
+      ['name: "propose_mission_plan"', 'name: "confirm_mission"'],
+      ['name: "confirm_mission"', 'name: "send_agent_message"'],
+    ] as const) {
+      const block = sliceBetween(defsSrc, start, end, start)
+      expect(block).toContain('goal_count')
+      expect(block).toContain('"contact"')
+      expect(block).toContain('required: ["deadline", "steps"]')
+    }
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -300,6 +319,19 @@ test.describe('tool-router.ts — propose_mission_plan / confirm_mission', () =>
     expect(body.toLowerCase()).toContain('v145')
   })
 
+  // ── Etapp I — kontaktmål (tasks/jaunty-pondering-hummingbird.md) ───────
+
+  test('confirm_mission grenar INSERT:en på goalType "contact": goal_type/goal_count/goal_kr:null', () => {
+    const body = functionBody(routerSrc, 'confirmMissionTool')
+    expect(body).toContain("insertPayload.goal_type = 'contact'")
+    expect(body).toContain('insertPayload.goal_count = plan.goal_count')
+  })
+
+  test('confirm_mission hanterar saknade kontaktkolumner (v146 ej körd) vänligt, utan att fälla pengavägen', () => {
+    const body = functionBody(routerSrc, 'confirmMissionTool')
+    expect(body.toLowerCase()).toContain('v146')
+  })
+
   test('propose_mission_plan och confirm_mission bygger presentationen via resolveGoalType (samma fail-soft-default som läsvägarna)', () => {
     const propose = functionBody(routerSrc, 'proposeMissionPlanTool')
     const confirm = functionBody(routerSrc, 'confirmMissionTool')
@@ -376,5 +408,10 @@ test.describe('matte/chat/route.ts — möjlighetsportfölj-kontextblock', () =>
 
   test('Etapp F: mission-selecten är select(\'*\') — inte en explicit kolumnlista som fallerar pre-v145', () => {
     expect(chatSrc).toContain(".from('mission')\n            .select('*')")
+  })
+
+  test('Etapp I: kontextblocket instruerar Matte om kontaktmål (goal_type contact + goal_count)', () => {
+    expect(chatSrc).toContain('goal_type "contact"')
+    expect(chatSrc).toContain('goal_count')
   })
 })

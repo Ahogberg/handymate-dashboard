@@ -422,6 +422,127 @@ test.describe('byggMissionProgress — Etapp F (kapacitetsmål)', () => {
   })
 })
 
+test.describe('byggMissionProgress — Etapp I (kontaktmål)', () => {
+  function kontaktMission(overrides: Partial<MissionRow> = {}): MissionRow {
+    return mission({
+      goal_type: 'contact',
+      goal_kr: null,
+      goal_count: 5,
+      plan_snapshot: {
+        steps: [steg({
+          truth_class: 'ateraktivering',
+          measure: { kind: 'count', count: 7 },
+          evidence: { table: 'customer_group', ref_id: 'badrum' },
+          approval_type: null,
+        })],
+      },
+      ...overrides,
+    })
+  }
+
+  test('inga kontaktutfall → gap_count är hela målet, contacted_count/replied_within_7d noll', () => {
+    const progress = byggMissionProgress({ mission: kontaktMission(), ...tomIndata() })
+    expect(progress.gap_count).toBe(5)
+    expect(progress.contacted_count).toBe(0)
+    expect(progress.replied_within_7d).toBe(0)
+    expect(progress.gap_kr).toBeNull()
+    expect(progress.gap_hours).toBeNull()
+  })
+
+  test('3 kontaktade av mål 5 → gap_count 2', () => {
+    const progress = byggMissionProgress({
+      mission: kontaktMission(),
+      ...tomIndata(),
+      contactOutcomes: [
+        { customer_id: 'c1', executed_at: '2026-08-01T00:00:00Z', replied_within_window: true },
+        { customer_id: 'c2', executed_at: '2026-08-01T00:00:00Z', replied_within_window: false },
+        { customer_id: 'c3', executed_at: '2026-08-01T00:00:00Z', replied_within_window: true },
+      ],
+    })
+    expect(progress.contacted_count).toBe(3)
+    expect(progress.replied_within_7d).toBe(2)
+    expect(progress.gap_count).toBe(2)
+  })
+
+  test('gapet golvar på 0 när kontaktade överstiger målet ("överuppfyllt")', () => {
+    const progress = byggMissionProgress({
+      mission: kontaktMission({ goal_count: 2 }),
+      ...tomIndata(),
+      contactOutcomes: [
+        { customer_id: 'c1', executed_at: '2026-08-01T00:00:00Z', replied_within_window: false },
+        { customer_id: 'c2', executed_at: '2026-08-01T00:00:00Z', replied_within_window: false },
+        { customer_id: 'c3', executed_at: '2026-08-01T00:00:00Z', replied_within_window: false },
+      ],
+    })
+    expect(progress.contacted_count).toBe(3)
+    expect(progress.gap_count).toBe(0)
+  })
+
+  test('rad utan exekveringstid (executed_at null) filtreras bort defensivt, räknas inte som kontaktad', () => {
+    const progress = byggMissionProgress({
+      mission: kontaktMission(),
+      ...tomIndata(),
+      contactOutcomes: [
+        { customer_id: 'c1', executed_at: null, replied_within_window: false },
+      ],
+    })
+    expect(progress.contacted_count).toBe(0)
+  })
+
+  test('penga-/kapacitetsuppdrag → gap_count/contacted_count/replied_within_7d ALLTID null', () => {
+    const pengar = byggMissionProgress({ mission: mission(), ...tomIndata() })
+    expect(pengar.gap_count).toBeNull()
+    expect(pengar.contacted_count).toBeNull()
+    expect(pengar.replied_within_7d).toBeNull()
+
+    const kapacitet = byggMissionProgress({
+      mission: mission({ goal_type: 'capacity', goal_kr: null, goal_hours: 12 }),
+      ...tomIndata(),
+      capacityWeek: { bookedHours: 5, configured: true },
+    })
+    expect(kapacitet.gap_count).toBeNull()
+    expect(kapacitet.contacted_count).toBeNull()
+    expect(kapacitet.replied_within_7d).toBeNull()
+  })
+
+  test('verifierat betalt via en fakturareferens ackumuleras normalt i per_class ÄVEN för kontaktuppdrag, men rör aldrig gap_count', () => {
+    const progress = byggMissionProgress({
+      mission: kontaktMission({
+        plan_snapshot: { steps: [steg({ truth_class: 'indrivningsbart' })] },
+      }),
+      invoices: [{ invoice_id: 'inv_1', total: 42000, status: 'paid', paid_at: '2026-08-10T09:00:00Z' }],
+      missionApprovals: [],
+      quotes: [],
+      nowMs: NOW_MS,
+      contactOutcomes: [{ customer_id: 'c1', executed_at: '2026-08-01T00:00:00Z', replied_within_window: false }],
+    })
+    expect(progress.per_class.indrivningsbart?.verified_paid_kr).toBe(42000)
+    expect(progress.contacted_count).toBe(1)
+    expect(progress.gap_count).toBe(4)
+    expect(progress.gap_kr).toBeNull()
+  })
+
+  test('mutual exclusivity (utökad till TRE målstyper): gap_kr/gap_hours/gap_count — högst ETT satt åt gången', () => {
+    const pengar = byggMissionProgress({ mission: mission(), ...tomIndata() })
+    expect([pengar.gap_kr, pengar.gap_hours, pengar.gap_count].filter(v => v !== null)).toHaveLength(1)
+
+    const kapacitet = byggMissionProgress({
+      mission: mission({ goal_type: 'capacity', goal_kr: null, goal_hours: 12 }),
+      ...tomIndata(),
+      capacityWeek: { bookedHours: 5, configured: true },
+    })
+    expect([kapacitet.gap_kr, kapacitet.gap_hours, kapacitet.gap_count].filter(v => v !== null)).toHaveLength(1)
+
+    const kontakt = byggMissionProgress({
+      mission: kontaktMission(),
+      ...tomIndata(),
+      contactOutcomes: [{ customer_id: 'c1', executed_at: '2026-08-01T00:00:00Z', replied_within_window: false }],
+    })
+    expect([kontakt.gap_kr, kontakt.gap_hours, kontakt.gap_count].filter(v => v !== null)).toHaveLength(1)
+    expect(kontakt.gap_count).not.toBeNull()
+  })
+})
+
 test.describe('inget klassöverskridande fält existerar', () => {
   test('progressen bär inget hopslaget kronfält under något känt namn', () => {
     const progress = byggMissionProgress({ mission: mission(), ...tomIndata() })

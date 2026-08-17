@@ -114,6 +114,14 @@ export function byggLearningRows(facit: MissionFacit[]): {
     rows.push({ text: `${natt} av ${kapacitetsmal.length} kapacitetsmål nådde sin målveckas timmar`, grund })
   }
 
+  const kontaktmal = perTyp.get('contact') ?? []
+  if (kontaktmal.length >= MIN_ELIGIBLE_PER_GOAL_TYPE) {
+    godkanda.push(...kontaktmal)
+    const grund = `${kontaktmal.length} avslutade uppdrag`
+    const natt = kontaktmal.filter(f => f.slutgap_count === 0).length
+    rows.push({ text: `${natt} av ${kontaktmal.length} kontaktmål nådde målet`, grund })
+  }
+
   if (godkanda.length > 0) {
     const bast = bestUtfordAgent(godkanda)
     if (bast) {

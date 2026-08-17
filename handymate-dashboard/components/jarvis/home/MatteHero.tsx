@@ -96,16 +96,20 @@ export function MatteHero({
     .toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })
     .toUpperCase()
 
-  // Etapp F (kapacitetsmål): rubriken och stat-ytan grenar på uppdragets
-  // goal_type. resolveGoalType defaultar fail-soft till 'money' — se
-  // lib/mission/goal-type.ts.
+  // Etapp F (kapacitetsmål), Etapp I (kontaktmål): rubriken och stat-ytan
+  // grenar på uppdragets goal_type. resolveGoalType defaultar fail-soft
+  // till 'money' — se lib/mission/goal-type.ts.
   const missionGoalType = missionActive ? resolveGoalType(mission!.goal_type) : 'money'
 
   const headline = missionActive
     ? `Uppdrag: ${buildMissionHeadline(
         mission!.goal_kr ?? 0,
         mission!.deadline.slice(0, 10),
-        missionGoalType === 'capacity' ? { goalType: missionGoalType, goalHours: mission!.goal_hours ?? undefined } : undefined,
+        missionGoalType === 'capacity'
+          ? { goalType: missionGoalType, goalHours: mission!.goal_hours ?? undefined }
+          : missionGoalType === 'contact'
+            ? { goalType: missionGoalType, goalCount: mission!.goal_count ?? undefined }
+            : undefined,
       )}`
     : beslut === 0
       ? 'Inget behöver dig just nu. Allt är hanterat.'
@@ -176,9 +180,13 @@ export function MatteHero({
                     : progress.gap_hours != null && progress.gap_hours > 0
                       ? progress.gap_hours.toLocaleString('sv-SE')
                       : '✓'
-                  : progress.gap_kr != null && progress.gap_kr > 0
-                    ? progress.gap_kr.toLocaleString('sv-SE')
-                    : '✓'}
+                  : missionGoalType === 'contact'
+                    ? progress.gap_count != null && progress.gap_count > 0
+                      ? progress.gap_count.toLocaleString('sv-SE')
+                      : '✓'
+                    : progress.gap_kr != null && progress.gap_kr > 0
+                      ? progress.gap_kr.toLocaleString('sv-SE')
+                      : '✓'}
               </div>
               <div className="text-xs text-white/55 mt-1">
                 {missionGoalType === 'capacity'
@@ -187,9 +195,13 @@ export function MatteHero({
                     : progress.gap_hours != null && progress.gap_hours > 0
                       ? 'timmar kvar att boka'
                       : 'veckan fylld'
-                  : progress.gap_kr != null && progress.gap_kr > 0
-                    ? 'kr kvar till målet'
-                    : 'målet nått'}
+                  : missionGoalType === 'contact'
+                    ? progress.gap_count != null && progress.gap_count > 0
+                      ? 'kunder kvar till målet'
+                      : 'målet nått'
+                    : progress.gap_kr != null && progress.gap_kr > 0
+                      ? 'kr kvar till målet'
+                      : 'målet nått'}
               </div>
             </div>
             <div>

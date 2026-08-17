@@ -63,6 +63,11 @@ test.describe('MatteHero — aktivt uppdrag ersätter dagsbeskedet (Etapp E)', (
     expect(heroSrc).toContain('kr kvar till målet')
     expect(heroSrc).toContain('målet nått')
   })
+
+  test('Etapp I: kontaktmål visas som "kunder kvar till målet" i statistikytan, aldrig kr/timmar', () => {
+    expect(heroSrc).toContain('kunder kvar till målet')
+    expect(heroSrc).toContain("missionGoalType === 'contact'")
+  })
 })
 
 test.describe('JarvisHome.tsx — Uppdragsrad flyttad in i heron som band (Etapp E)', () => {

@@ -39,12 +39,14 @@ export function progressParts(progress: MissionProgress): string[] {
     }
     verifieratBetaltKr += entry.verified_paid_kr
   }
-  // Målgapet — ETT av tre ömsesidigt uteslutande utfall (Etapp D för
-  // pengamål, Etapp F för kapacitetsmål): gap_hours satt → kapacitetsmål,
-  // timmar (ALDRIG en kr-del här); annars capacity_unconfigured → ärlig
-  // "—"-text i stället för ett gissat gap; annars gap_kr (Etapp D-facit,
-  // DET enda facit för hur nära ett pengamål är). En egen del, aldrig en
-  // addition med de andra delarna ovan.
+  // Målgapet — ömsesidigt uteslutande utfall per målstyp (Etapp D pengamål,
+  // Etapp F kapacitetsmål, Etapp I kontaktmål): gap_hours satt →
+  // kapacitetsmål, timmar (ALDRIG en kr-del här); annars
+  // capacity_unconfigured → ärlig "—"-text i stället för ett gissat gap;
+  // annars contacted_count satt → kontaktmål, "N av M kontaktade" + ev.
+  // svarsraden + gap-delen, ALDRIG kr/timmar; annars gap_kr (Etapp D-facit,
+  // DET enda facit för hur nära ett pengamål är). Varje del är en egen
+  // sträng, aldrig en addition med de andra delarna ovan.
   if (progress.gap_hours != null) {
     parts.push(
       progress.gap_hours > 0
@@ -53,6 +55,24 @@ export function progressParts(progress: MissionProgress): string[] {
     )
   } else if (progress.capacity_unconfigured) {
     parts.push('kapacitet ej konfigurerad')
+  } else if (progress.contacted_count != null) {
+    // Etapp I (kontaktmål). "mål" härleds ur contacted_count + gap_count —
+    // exakt utom i det ovanliga "överuppfyllt"-fallet (kontaktade > målet),
+    // där gap_count golvar på 0 och summan då visar "N av N" (100 %) i
+    // stället för det ursprungliga, redan passerade målet — aldrig en lögn,
+    // bara ett konservativt sätt att undvika ett fjärde MissionProgress-fält.
+    const mal = progress.contacted_count + (progress.gap_count ?? 0)
+    parts.push(`${progress.contacted_count.toLocaleString('sv-SE')} av ${mal.toLocaleString('sv-SE')} kontaktade`)
+    if (progress.contacted_count > 0) {
+      parts.push(`${(progress.replied_within_7d ?? 0).toLocaleString('sv-SE')} svar inom 7 dagar`)
+    }
+    if (progress.gap_count != null) {
+      parts.push(
+        progress.gap_count > 0
+          ? `${progress.gap_count.toLocaleString('sv-SE')} kontakter kvar till målet`
+          : 'målet nått',
+      )
+    }
   } else if (progress.gap_kr != null) {
     if (progress.gap_kr > 0) {
       parts.push(`${progress.gap_kr.toLocaleString('sv-SE')} kr kvar till målet`)

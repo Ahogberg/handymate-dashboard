@@ -38,6 +38,9 @@ export interface MissionPlanPresentation {
   /** Etapp F — null för pengauppdrag OCH för presentationer skapade innan
       Etapp F (valfritt av samma additiv-skäl som goal_type). */
   goal_hours?: number | null
+  /** Etapp I (kontaktmål) — null för penga-/kapacitetsuppdrag OCH för
+      presentationer skapade innan Etapp I (valfritt, samma additiv-skäl). */
+  goal_count?: number | null
   deadline: string
   /** T.ex. 'Frigöra 150 000 kr före 30 september' eller (kapacitetsmål)
       'Boka 12 timmar till vecka 39'. */

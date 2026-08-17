@@ -32,6 +32,7 @@ function facit(overrides: Partial<MissionFacit> = {}): MissionFacit {
     resolved_at: '2026-05-20T00:00:00Z',
     slutgap_kr: 0,
     slutgap_hours: null,
+    slutgap_count: null,
     verifierat_betalt_kr: 40000,
     learning_eligible: true,
     learning_blockers: [],
@@ -117,6 +118,26 @@ test.describe('byggLearningRows — räknade fakta, inte kausalitet', () => {
     const res = byggLearningRows(rows)
     const rad = res.rows.find(r => r.text.includes('kapacitetsmål'))
     expect(rad?.text).toBe('2 av 3 kapacitetsmål nådde sin målveckas timmar')
+  })
+
+  test('kontaktmål (Etapp I): "N av M kontaktmål nådde målet"', () => {
+    const rows = [
+      facit({ mission_id: 'a', goal_type: 'contact', slutgap_kr: null, slutgap_count: 0 }),
+      facit({ mission_id: 'b', goal_type: 'contact', slutgap_kr: null, slutgap_count: 0 }),
+      facit({ mission_id: 'c', goal_type: 'contact', slutgap_kr: null, slutgap_count: 2 }),
+    ]
+    const res = byggLearningRows(rows)
+    const rad = res.rows.find(r => r.text.includes('kontaktmål'))
+    expect(rad?.text).toBe('2 av 3 kontaktmål nådde målet')
+  })
+
+  test('färre än 3 eligible kontaktmål → ingen kontaktmåls-rad', () => {
+    const rows = [
+      facit({ mission_id: 'a', goal_type: 'contact', slutgap_kr: null, slutgap_count: 0 }),
+      facit({ mission_id: 'b', goal_type: 'contact', slutgap_kr: null, slutgap_count: 0 }),
+    ]
+    const res = byggLearningRows(rows)
+    expect(res.rows.some(r => r.text.includes('kontaktmål'))).toBe(false)
   })
 
   test('varje rad bär sin grund som "N avslutade uppdrag"', () => {

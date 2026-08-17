@@ -24,6 +24,9 @@ function progress(overrides: Partial<MissionProgress> = {}): MissionProgress {
     gap_kr: 0,
     gap_hours: null,
     capacity_unconfigured: false,
+    gap_count: null,
+    contacted_count: null,
+    replied_within_7d: null,
     ...overrides,
   }
 }
@@ -115,6 +118,46 @@ test.describe('progressParts — Etapp F (kapacitetsmål): timmar, aldrig kr, f�
     // en kr-gap-rad när gap_hours är satt.
     const parts = progressParts(progress({ gap_hours: 3, gap_kr: 500 }))
     expect(parts).toContain(`${(3).toLocaleString('sv-SE')} timmar kvar att boka`)
+    expect(parts.join(' · ')).not.toContain('kr kvar till målet')
+  })
+})
+
+test.describe('progressParts — Etapp I (kontaktmål): kontaktade/svar/gap, aldrig kr eller timmar', () => {
+  test('contacted_count satt → "N av M kontaktade"-raden, mål härlett ur contacted_count + gap_count', () => {
+    const parts = progressParts(progress({ contacted_count: 3, gap_count: 2, gap_kr: null }))
+    expect(parts).toContain('3 av 5 kontaktade')
+  })
+
+  test('contacted_count > 0 → svarsraden "N svar inom 7 dagar"', () => {
+    const parts = progressParts(progress({ contacted_count: 3, replied_within_7d: 2, gap_count: 2, gap_kr: null }))
+    expect(parts).toContain('2 svar inom 7 dagar')
+  })
+
+  test('contacted_count === 0 → ingen svarsrad (inget att rapportera ännu)', () => {
+    const parts = progressParts(progress({ contacted_count: 0, replied_within_7d: 0, gap_count: 5, gap_kr: null }))
+    expect(parts.some(p => p.includes('svar inom 7 dagar'))).toBe(false)
+  })
+
+  test('gap_count > 0 → "N kontakter kvar till målet"', () => {
+    const parts = progressParts(progress({ contacted_count: 3, gap_count: 2, gap_kr: null }))
+    expect(parts).toContain('2 kontakter kvar till målet')
+  })
+
+  test('gap_count === 0 → "målet nått"', () => {
+    const parts = progressParts(progress({ contacted_count: 5, gap_count: 0, gap_kr: null }))
+    expect(parts).toContain('målet nått')
+  })
+
+  test('kontaktmålets delar innehåller ALDRIG kr eller timmar', () => {
+    const parts = progressParts(progress({ contacted_count: 3, replied_within_7d: 1, gap_count: 2, gap_kr: null }))
+    const joined = parts.join(' · ')
+    expect(joined).not.toContain('kr kvar till målet')
+    expect(joined).not.toContain('timmar')
+  })
+
+  test('contacted_count satt tar företräde framför gap_kr — gap_kr-delen förekommer aldrig samtidigt', () => {
+    const parts = progressParts(progress({ contacted_count: 1, gap_count: 4, gap_kr: 500 }))
+    expect(parts).toContain('1 av 5 kontaktade')
     expect(parts.join(' · ')).not.toContain('kr kvar till målet')
   })
 })

@@ -236,6 +236,8 @@ function buildPortfolioContextSection(portfolio: OpportunityPortfolio): string {
   lines.push('[MÖJLIGHETSPORTFÖLJ — underlag för uppdrag. Referera ENDAST dessa item_id:n i propose_mission_plan/confirm_mission. Belopp är serverns — hitta aldrig på egna.]')
   // Etapp F (kapacitetsmål) — en rad, källskannad av tests/mission-tools.spec.ts.
   lines.push('[Kapacitetsmål: om hantverkaren vill fylla NÄSTA veckas luckor (tunn vecka), föreslå en plan med goal_type "capacity" och goal_hours (INTE goal_kr) i propose_mission_plan/confirm_mission — kräver konfigurerad kapacitet (Inställningar); saknas den, säg det ärligt i stället för att gissa ett tal.]')
+  // Etapp I (kontaktmål) — en rad, källskannad av tests/mission-tools.spec.ts.
+  lines.push('[Kontaktmål: om hantverkaren vill nå ett antal kunder (t.ex. en tyst kundgrupp) före en deadline, föreslå en plan med goal_type "contact" och goal_count (INTE goal_kr/goal_hours) i propose_mission_plan/confirm_mission — segmentet (vilka kunder) bestäms av valda plansteg ur portföljen, både SMS och mejl räknas som kontakt.]')
   for (const cls of TRUTH_CLASSES) {
     const items = portfolio.by_class[cls]
     if (items.length === 0) continue
@@ -254,13 +256,18 @@ function buildActiveMissionContextSection(mission: {
   deadline: string
   goal_type?: string | null
   goal_hours?: number | null
+  goal_count?: number | null
 }): string {
   const deadline = String(mission.deadline).slice(0, 10)
   const goalType = resolveGoalType(mission.goal_type)
   const headline = buildMissionHeadline(
     Number(mission.goal_kr) || 0,
     deadline,
-    goalType === 'capacity' ? { goalType, goalHours: mission.goal_hours ?? undefined } : undefined,
+    goalType === 'capacity'
+      ? { goalType, goalHours: mission.goal_hours ?? undefined }
+      : goalType === 'contact'
+        ? { goalType, goalCount: mission.goal_count ?? undefined }
+        : undefined,
   )
   return `[AKTIVT UPPDRAG: ${headline}, deadline ${deadline}, mission_id ${mission.id}. Nya åtgärdskort för uppdraget ska bära payload.mission_id och payload.truth_class. Bara ETT uppdrag kan vara aktivt åt gången — föreslå aldrig ett nytt förrän det här är avslutat.]`
 }

@@ -629,11 +629,12 @@ export const toolDefinitions = [
       properties: {
         goal_type: {
           type: "string",
-          enum: ["money", "capacity"],
-          description: "'money' (standard, pengamål) eller 'capacity' (kapacitetsmål: timmar att boka för NÄSTA vecka, kräver konfigurerad kapacitet i Inställningar). Ange bara ETT av goal_kr/goal_hours beroende på detta val.",
+          enum: ["money", "capacity", "contact"],
+          description: "'money' (standard, pengamål), 'capacity' (kapacitetsmål: timmar att boka för NÄSTA vecka, kräver konfigurerad kapacitet i Inställningar) eller 'contact' (kontaktmål: nå N distinkta kunder före deadline — segmentet/vilka kunder bestäms av valda plansteg ur möjlighetsportföljen, både SMS och mejl räknas som kontakt). Ange bara ETT av goal_kr/goal_hours/goal_count beroende på detta val.",
         },
-        goal_kr: { type: "number", description: "Pengamålet i kronor, t.ex. 150000. Bara för goal_type 'money' — ignoreras för kapacitetsmål." },
-        goal_hours: { type: "number", description: "Kapacitetsmålet i timmar för NÄSTA vecka, t.ex. 12 (max 200). Bara för goal_type 'capacity' — ignoreras för pengamål." },
+        goal_kr: { type: "number", description: "Pengamålet i kronor, t.ex. 150000. Bara för goal_type 'money' — ignoreras för övriga målstyper." },
+        goal_hours: { type: "number", description: "Kapacitetsmålet i timmar för NÄSTA vecka, t.ex. 12 (max 200). Bara för goal_type 'capacity' — ignoreras för övriga målstyper." },
+        goal_count: { type: "number", description: "Kontaktmålet: antal distinkta kunder att nå, t.ex. 10 (max 200, heltal). Bara för goal_type 'contact' — ignoreras för övriga målstyper. Segmentet (vilka kunder) kommer ur portföljens item_ids i planstegen, inte ur det här talet." },
         deadline: { type: "string", description: "Deadline, format ÅÅÅÅ-MM-DD — måste vara ett datum efter idag" },
         steps: {
           type: "array",
@@ -659,11 +660,12 @@ export const toolDefinitions = [
       properties: {
         goal_type: {
           type: "string",
-          enum: ["money", "capacity"],
-          description: "'money' (standard, pengamål) eller 'capacity' (kapacitetsmål: timmar att boka för NÄSTA vecka, kräver konfigurerad kapacitet i Inställningar). Ange bara ETT av goal_kr/goal_hours beroende på detta val.",
+          enum: ["money", "capacity", "contact"],
+          description: "'money' (standard, pengamål), 'capacity' (kapacitetsmål: timmar att boka för NÄSTA vecka, kräver konfigurerad kapacitet i Inställningar) eller 'contact' (kontaktmål: nå N distinkta kunder före deadline — segmentet/vilka kunder bestäms av valda plansteg ur möjlighetsportföljen, både SMS och mejl räknas som kontakt). Ange bara ETT av goal_kr/goal_hours/goal_count beroende på detta val.",
         },
-        goal_kr: { type: "number", description: "Pengamålet i kronor, t.ex. 150000. Bara för goal_type 'money' — ignoreras för kapacitetsmål." },
-        goal_hours: { type: "number", description: "Kapacitetsmålet i timmar för NÄSTA vecka, t.ex. 12 (max 200). Bara för goal_type 'capacity' — ignoreras för pengamål." },
+        goal_kr: { type: "number", description: "Pengamålet i kronor, t.ex. 150000. Bara för goal_type 'money' — ignoreras för övriga målstyper." },
+        goal_hours: { type: "number", description: "Kapacitetsmålet i timmar för NÄSTA vecka, t.ex. 12 (max 200). Bara för goal_type 'capacity' — ignoreras för övriga målstyper." },
+        goal_count: { type: "number", description: "Kontaktmålet: antal distinkta kunder att nå, t.ex. 10 (max 200, heltal). Bara för goal_type 'contact' — ignoreras för övriga målstyper. Segmentet (vilka kunder) kommer ur portföljens item_ids i planstegen, inte ur det här talet." },
         deadline: { type: "string", description: "Deadline, format ÅÅÅÅ-MM-DD — måste vara ett datum efter idag" },
         steps: {
           type: "array",
