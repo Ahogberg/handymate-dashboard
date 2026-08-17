@@ -1,5 +1,33 @@
 # Playbook Kickoff Copilot V1 — 2026-08-17 (04:00)
 
+## Resultat (klart, pushat 2026-08-17, commit 23c4598b)
+
+Byggt av en Sonnet 5-subagent enligt det korrigerade designet, oberoende
+verifierat (tsc/236 riktade facit/build) innan commit.
+
+- Veckovis cron (torsdag 05:25 — två dagar efter playbook-pattern-cronen
+  tisdag 05:20, så mönster hinner bekräftas innan sveptningen letar efter
+  dem) sveper projekt skapade senaste 14 dagarna, matchar job_type mot
+  aktiva bekräftade mönster.
+- Ett `playbook_kickoff_suggestion`-kort per matchat projekt (livstids-
+  dedup, aldrig återförslaget), Lars-attribuerat, `project_team`-routat,
+  citerar riktiga källprojekt-namn (upplösta via project_lesson → project,
+  degraderar tyst om ett källprojekt inte längre går att slå upp).
+- Godkännande skriver EN `project_checklist`-rad, samma tabellform som
+  `checklist_forslag`.
+- Bekräftade under granskning: kortet dyker redan upp korrekt på
+  projektsidan (inte bara globala kön) via den BEFINTLIGA
+  `payload.project_id`-konventionen i `ProjectApprovalsBlock.tsx` (finns
+  sedan 2026-07-31) — ingen ny UI-arkitektur behövdes, bara en saknad
+  `TYPE_LABEL`-rad tillagd.
+- Helt fail-safe kring v141 (samma mönster som resten av Playbook-bygget).
+
+**Kvar för Andreas**: samma som Playbook Pattern — kör `sql/
+v141_business_knowledge_pattern.sql` för att aktivera hela kedjan
+(mönster → offert-sektion → Settings-yta → kickoff-förslag).
+
+---
+
 ## Mål
 
 Codex förslag: låt Playbook-mönster (byggt inatt) påverka INTE bara
