@@ -63,6 +63,10 @@ import type { RevenueRecoveryCase } from '@/lib/value/revenue-recovery-case'
 import { MalNudge } from '@/components/jarvis/MalNudge'
 import { FuelWarningCard } from '@/components/jarvis/FuelWarningCard'
 import { useFuel } from '@/components/fuel/FuelProvider'
+import { MatteHero } from '@/components/jarvis/home/MatteHero'
+import { SkottUtanDig } from '@/components/jarvis/home/SkottUtanDig'
+import { FirmanJustNu } from '@/components/jarvis/home/FirmanJustNu'
+import { ProjektPulsRad } from '@/components/jarvis/home/ProjektPulsRad'
 
 /**
  * JarvisHome — teamets rapportbord (2026-08-07).
@@ -87,11 +91,15 @@ import { useFuel } from '@/components/fuel/FuelProvider'
  *
  * ═══ SKELETTET — FYRA FRÅGOR, INTE EN WIDGETSTAPEL (designkontrakt 2026-08-12) ═══
  *
+ *   0. Mattes dagsbesked (home/MatteHero, Etapp C 2026-08-17) — mörka
+ *      heron med hälsningen, beslut-räknaren och dygnets auto-count.
+ *      Ingen egen fråga — den SAMMANFATTAR fråga 1 och 3.
  *   1. Det här behöver dig idag — beslutskorten, agenten leder varje kort.
  *   2. Pengar just nu           — PengarBand, tyst utelämnad utan ägarsvar.
- *   3. Det här sköter teamet    — TeamBevakning (✓-lista) + dygnsdigesten
- *                                 hopfälld under samma rubrik.
- *   4. Värdekvittoraden         — sist, som tidigare.
+ *   3. Det här sköter teamet    — dygnsdigestens auto-rader synliga
+ *                                 (home/SkottUtanDig) + TeamBevakning
+ *                                 (✓-lista) under samma rubrik.
+ *   4. Värdekvittoraden         — sist, som tidigare (grad-tint-teasern).
  *
  * "Värt att veta" (agentobservationerna) är inte en av de fyra — den är kvar
  * som ett eget litet flöde mellan 3 och 4, oförändrad sedan innan.
@@ -241,7 +249,6 @@ export default function JarvisHome({
   const [observations, setObservations] = useState<Observation[]>([])
   const [reschedules, setReschedules] = useState<RescheduleSuggestion[]>([])
   const [doneRows, setDoneRows] = useState<DoneRow[]>([])
-  const [doneOpen, setDoneOpen] = useState(false)
   const [lastResolvedAt, setLastResolvedAt] = useState<string | null>(null)
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
@@ -261,9 +268,10 @@ export default function JarvisHome({
   // Next Best Action Engine (2026-08-13) — dagens rangordnade rekommendation,
   // egen hämtning (se app/api/next-best-action/route.ts för varför: den
   // vanliga kön är begränsad till 15 senaste, toppvalet kan vara äldre).
-  // heroHidden är en LOKAL, optimistisk döljning — både vid godkänn (kortet
-  // är hanterat) och vid "Inte nu" (bara ytan döljs, ärendet lever kvar och
-  // återgår till att vara en vanlig rad i kön nedanför).
+  // nbaHiddenIds är en LOKAL, optimistisk döljning per kandidat: "Inte nu"
+  // döljer BARA den rankade ytan — ärendet lever kvar och återgår till att
+  // vara en vanlig rad i kön nedanför. Ett godkännande går via queueAction
+  // (hiddenIds) precis som varje annat kort.
   const [nba, setNba] = useState<NextBestActionRecommendation | null>(null)
   // Veckomötets beslutskort (2026-08-14) — SAMMA dagens rangordning, bara
   // fler av dem (upp till tre). Ingen egen hämtning: kommer ur samma svar
@@ -277,7 +285,7 @@ export default function JarvisHome({
   const [revenueRecoveryCases, setRevenueRecoveryCases] = useState<RevenueRecoveryCase[]>([])
   const [closeoutCandidates, setCloseoutCandidates] = useState<CloseoutCandidate[]>([])
   const [revenueRecoveryError, setRevenueRecoveryError] = useState(false)
-  const [heroHidden, setHeroHidden] = useState(false)
+  const [nbaHiddenIds, setNbaHiddenIds] = useState<Set<string>>(new Set())
   const [snack, setSnack] = useState<{ approvalId: string; text: string } | null>(null)
   const [feedback, setFeedback] = useState<{ text: string; isError: boolean } | null>(null)
   const [proof, setProof] = useState<string | null>(null)
@@ -845,18 +853,24 @@ export default function JarvisHome({
     }
   }
 
-  // Next Best Action-hero'n ovanför äger sin kandidat helt — utesluter den
-  // HÄR, innan gruppering, i stället för att försöka dölja den efteråt.
-  // Ett försök att dölja den EFTER gruppering missade fallet där kandidaten
+  // Den rankade kön (GorDettaForst) äger sina kandidater helt — utesluter
+  // dem HÄR, innan gruppering, i stället för att försöka dölja dem efteråt.
+  // Ett försök att dölja EFTER gruppering missade fallet där en kandidat
   // hamnar i en hopslagen grupp (samma agent+typ+dygn som ett annat kort):
   // gruppen döljs aldrig i sig (rätt — syskonkort ska synas), men den
   // hopslagna kortets EGEN radvisning visar ändå kandidatens titel som
   // källrad, vilket dubblerade den bredvid hero'n (hittat live 2026-08-14).
-  // Att plocka bort kandidaten INNAN groupApprovals ser den löser båda
+  // Att plocka bort kandidaterna INNAN groupApprovals ser dem löser båda
   // fallen enhetligt: en ensam kandidat försvinner helt från kön, en
   // kandidat som annars hade slagits ihop med syskon lämnar bara syskonen
-  // kvar som en egen, orörd grupp.
-  const synliga = approvals.filter(a => !hiddenIds.has(a.id) && !(nba && !heroHidden && a.id === nba.approval.id))
+  // kvar som en egen, orörd grupp. En "Inte nu"-dold kandidat (nbaHiddenIds)
+  // är INTE synlig i rankningen och återgår därför till kön nedanför.
+  const nbaKandidater = nbaList.length > 0 ? nbaList : nba ? [nba] : []
+  const synligaNba = nbaKandidater.filter(
+    r => !nbaHiddenIds.has(r.approval.id) && !hiddenIds.has(r.approval.id),
+  )
+  const synligaNbaIds = new Set(synligaNba.map(r => r.approval.id))
+  const synliga = approvals.filter(a => !hiddenIds.has(a.id) && !synligaNbaIds.has(a.id))
 
   // Dygnsdigesten: 24 h rullande fönster + grindar (lib/jarvis/dygnsdigest.ts).
   // Färska rader från executeSend (doneRows) står alltid först — de är det
@@ -873,9 +887,12 @@ export default function JarvisHome({
   ]
   // Räknaren visar BESLUT, inte databasrader. Två förfallna fakturor från
   // samma agent samma dygn är ett beslut — "4" när tre av korten är samma
-  // ärende läser som att man ligger efter mer än man gör.
+  // ärende läser som att man ligger efter mer än man gör. De rankade
+  // NBA-kandidaterna räknas MED (Etapp C, 2026-08-17): de är beslut som
+  // väntar, bara visade i en annan yta — utan dem sa räknaren, hälsningens
+  // bevisrad och heron "inget behöver dig" fast tre kort stod ovanför.
   const grupper = groupApprovals(synliga)
-  const beslut = grupper.length + reschedules.length + (fuelCritical ? 1 : 0) + (closeoutCandidates.length > 0 ? 1 : 0)
+  const beslut = grupper.length + reschedules.length + (fuelCritical ? 1 : 0) + (closeoutCandidates.length > 0 ? 1 : 0) + synligaNba.length
   const koTom = queueLoaded && beslut === 0
 
   // Cross-Agent Case — filtrera bort hanterade signaler (samma !hiddenIds-
@@ -963,22 +980,22 @@ export default function JarvisHome({
   return (
     <div className="max-w-[1180px] mx-auto px-4 sm:px-8 pt-6 sm:pt-7 pb-9">
       <div className="grid lg:grid-cols-[1fr_320px] gap-6 lg:gap-7">
-        {/* ── Hälsningen — egen fullbreddsrad (2026-08-10) ─────────────────
-             Högerspalten började tidigare i höjd med rubriken, så "Dagens
-             plan" hamnade ovanför beslutssektionens kant. Nu spänner
-             hälsningen över båda kolumnerna och railen börjar i linje med
-             "Det här behöver dig idag" — symmetrin Andreas efterfrågade. */}
+        {/* ── Mattes dagsbesked — egen fullbreddsrad (Etapp C1, 2026-08-17).
+             Ersätter hälsningsradens visuella roll; hälsningen bor kvar
+             INUTI heron. Spänner över båda kolumnerna som förut, så railen
+             börjar i linje med "Det här behöver dig idag" — symmetrin
+             Andreas efterfrågade 2026-08-10 består.
+             Tidsfönstret för bevisraden är ett RULLANDE dygn (team-activity,
+             HOURS_BACK=24) — halsningsBevis säger det den mäter. */}
         <div className="min-w-0 lg:col-span-2">
-          <h1 className="font-heading text-[22px] sm:text-[26px] font-bold tracking-[-0.02em] text-slate-900 m-0">
-            {greetingName ? `God morgon, ${greetingName}` : 'God morgon'}
-          </h1>
-          <p className="mt-1.5 text-sm text-slate-500 leading-normal m-0">
-            {new Date().toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
-            {/* Tidsfönstret är ett RULLANDE dygn (team-activity, HOURS_BACK=24).
-                halsningsBevis säger det den mäter — "Sedan igår" vore osant —
-                och är ärlig om huruvida något behövde ägaren. */}
-            {bevis && <> · <span className="text-slate-600">{bevis}</span></>}
-          </p>
+          <MatteHero
+            greetingName={greetingName}
+            queueLoaded={queueLoaded}
+            beslut={beslut}
+            nbaKandidater={synligaNba}
+            bevis={bevis}
+            autoCount={dygnsRader.filter(r => r.auto).length}
+          />
         </div>
 
         {/* ── Huvudspalten ─────────────────────────────────────────────── */}
@@ -999,9 +1016,9 @@ export default function JarvisHome({
               data-tour-target: Hemturens första stopp (components/tour/HemTur.tsx). ── */}
           <div data-tour-target="hemtur-attn" className="mb-2.5">
             <div className="flex items-baseline gap-2">
-              <h2 className="m-0 text-[15px] font-semibold text-slate-900">Det här behöver dig idag</h2>
+              <h2 className="m-0 font-heading text-[15px] font-semibold text-slate-900">Det här behöver dig idag</h2>
               {beslut > 0 && (
-                <span className="font-heading text-xs font-bold bg-primary-700 text-white rounded-full min-w-[21px] h-[21px] px-1.5 inline-flex items-center justify-center">
+                <span className="font-heading tabular-nums text-xs font-bold bg-primary-700 text-white rounded-full min-w-[21px] h-[21px] px-1.5 inline-flex items-center justify-center">
                   {beslut}
                 </span>
               )}
@@ -1068,21 +1085,25 @@ export default function JarvisHome({
             </div>
           )}
 
-          {nba && !heroHidden && !hiddenIds.has(nba.approval.id) && (
+          {synligaNba.length > 0 && (
             <GorDettaForst
-              recommendation={nba}
-              approveLabelText={approveLabel(nba.approval.approval_type, nba.approval.payload)}
-              onApprove={() => {
-                setHeroHidden(true)
+              recommendations={synligaNba}
+              onApprove={rec => {
                 // GorDettaForst deklarerar en minimal Approval-form (samma
                 // konvention som varje annan konsument i kodbasen — se
                 // ProjectApprovalsBlock/IdagCore/approvals/page.tsx, alla
                 // har sin egen lokala Approval-interface). Den faktiska
                 // raden bär alla fält (API:t gör select('*') mot
                 // pending_approvals), så dubbel-cast här är säker.
-                queueAction(nba.approval as unknown as Approval, 'approve')
+                // queueAction lägger id:t i hiddenIds → kortet försvinner
+                // ur rankningen OCH kön i samma rörelse.
+                queueAction(rec.approval as unknown as Approval, 'approve')
               }}
-              onDismiss={() => setHeroHidden(true)}
+              onDismiss={rec => {
+                // "Inte nu" döljer BARA den rankade ytan — ärendet lever
+                // kvar och blir en vanlig rad i kön nedanför.
+                setNbaHiddenIds(prev => new Set(prev).add(rec.approval.id))
+              }}
             />
           )}
 
@@ -1217,7 +1238,7 @@ export default function JarvisHome({
             // automatiskt om sektionen inte renderas (ingen pengarData).
             <div data-tour-target="hemtur-pengar">
               <div className="flex items-baseline gap-2 mt-6 mb-2.5">
-                <h2 className="m-0 text-[15px] font-semibold text-slate-900">Pengar just nu</h2>
+                <h2 className="m-0 font-heading text-[15px] font-semibold text-slate-900">Pengar just nu</h2>
               </div>
               {pengarData && <PengarBand summary={pengarData} />}
               {revenueRecoveryCases.map(recoveryCase => (
@@ -1235,60 +1256,16 @@ export default function JarvisHome({
               bevakningen (TeamBevakning) och dygnsdigesten under SAMMA
               rubrik, inte två sektioner. ── */}
           <div className="flex items-baseline gap-2 mt-6 mb-2.5">
-            <h2 className="m-0 text-[15px] font-semibold text-slate-900">Det här sköter teamet</h2>
+            <h2 className="m-0 font-heading text-[15px] font-semibold text-slate-900">Det här sköter teamet</h2>
             <span className="text-xs text-slate-400">Ingen åtgärd behövs — bara läget</span>
           </div>
 
-          {/* Senaste dygnet — 24 h rullande fönster, grindarna i
-              lib/jarvis/dygnsdigest.ts. Kollapsbar, default hopfälld — den
-              är kvitto, inte kö. */}
-          {dygnsRader.length > 0 && (
-            <div className="mb-2.5 bg-white border border-slate-200 rounded-xl overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setDoneOpen(o => !o)}
-                className="w-full flex items-center gap-2 px-4 py-3 min-h-[44px] text-left"
-              >
-                <Check className="w-4 h-4 text-primary-700 shrink-0" />
-                <span className="text-sm font-semibold text-slate-700">
-                  Senaste dygnet · {dygnsRader.length} händelse{dygnsRader.length > 1 ? 'r' : ''}
-                </span>
-                <span className="text-xs text-slate-400">
-                  {dygnsRader.filter(r => r.auto).length} automatiskt · {dygnsRader.filter(r => !r.auto).length} godkända av dig
-                </span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 ml-auto shrink-0 transition-transform ${doneOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {doneOpen && (
-                <ul className="border-t border-slate-100 divide-y divide-slate-50">
-                  {dygnsRader.map(r => (
-                    <li key={r.key} className={`flex items-center gap-2.5 px-4 py-2.5 ${r.fresh ? 'bg-primary-50/50' : ''}`}>
-                      <span className="font-mono text-[11px] text-slate-400 w-10 shrink-0">{r.time}</span>
-                      {/* Agentfärgad prick — persona-färgen är den enda
-                          tillåtna icke-teal-accenten, och pricken pekar ut
-                          VEM utan att en avatarkolumn tar plats i listan. */}
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: AGENT_INFO[r.agent]?.dot || '#94a3b8' }}
-                        aria-hidden
-                      />
-                      <span className="flex-1 min-w-0 text-[13px] text-slate-600 truncate">{r.text}</span>
-                      {/* Bocken är reserverad för mänskliga beslut. Maskinens
-                          eget arbete får ett eget, neutralt märke. */}
-                      {r.auto ? (
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 bg-slate-100 rounded px-1.5 py-0.5 shrink-0">
-                          Automatiskt
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary-700 bg-primary-50 rounded-full px-2 py-0.5 shrink-0">
-                          <Check className="w-3 h-3" /> Godkänt av dig
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
+          {/* Dygnsdigesten — 24 h rullande fönster, grindarna i
+              lib/jarvis/dygnsdigest.ts. Lyft ur sin hopfällda undanskymdhet
+              till home/SkottUtanDig (Etapp C3): auto-raderna som synlig
+              checklista, hela listan bakom "Visa alla". Samma dygnsRader
+              som förut — EN sanning, ingen andra hämtning. */}
+          <SkottUtanDig rader={dygnsRader} />
 
           {/* data-tour-target: Hemturens tredje stopp. */}
           <div data-tour-target="hemtur-team">
@@ -1299,7 +1276,7 @@ export default function JarvisHome({
           {vardAttVetaRader.length > 0 && (
             <>
               <div className="flex items-baseline gap-2 mt-6 mb-2">
-                <h2 className="m-0 text-[15px] font-semibold text-slate-900">Värt att veta</h2>
+                <h2 className="m-0 font-heading text-[15px] font-semibold text-slate-900">Värt att veta</h2>
                 <span className="text-xs text-slate-400">Inget att godkänna — bara läget</span>
               </div>
               <div>
@@ -1349,26 +1326,37 @@ export default function JarvisHome({
             </>
           )}
 
-          {/* ── Värdekvittot — en RAMLÖS rad, aldrig ett beslutskort (etapp 7).
-              Bekräftat ur attributionskärnan (månadens kvitto), vilande ur
-              samma pengar-data som Att hämta bär — ingen andra sanning om
-              samma kronor. Renderas bara för den som får se ekonomi (kvittot
-              är ägargrindat) och bara när det finns något att säga. */}
-          {kvitto && (kvitto.confirmed_kr > 0 || (pengarData?.totalKr ?? 0) > 0) && (
-            <p className="mt-5 px-1 text-[13px] text-slate-500 m-0">
-              Värdekvitto {new Date().toLocaleDateString('sv-SE', { month: 'long' })}:{' '}
-              <b className="font-semibold text-slate-700">{formatKr(kvitto.confirmed_kr)} bekräftat</b>
-              {ledger ? (
-                <>
-                  {' '}·{' '}
-                  <Link href="/dashboard/pengar" className="text-primary-700 hover:underline">
-                    {formatKr(ledger.identifierat.kr)} identifierat → {formatKr(ledger.betalt.kr)} bekräftat betalt
-                  </Link>
-                </>
-              ) : pengarData && pengarData.totalKr > 0 ? (
-                <> · {formatKr(pengarData.totalKr)} vilande på <Link href="/dashboard/pengar" className="text-primary-700 hover:underline">Pengar på bordet</Link></>
-              ) : null}
-            </p>
+          {/* ── Värdekvittot — grad-tint-teasern (Etapp C6, ersätter den
+              ramlösa textraden). Fortfarande ALDRIG ett beslutskort: inga
+              knappar, bara månadens bekräftade kronor och länken till
+              Value Ledger. Renderas bara för den som får se ekonomi
+              (kvittot är ägargrindat, 403 lämnar `kvitto` null) och bara
+              när det finns bekräftade kronor att visa — de vilande kronorna
+              berättas redan av Pengar just nu och Firman just nu, ingen
+              andra sanning om samma pengar här. */}
+          {kvitto && kvitto.confirmed_kr > 0 && (
+            <div className="mt-6 bg-grad-tint border border-primary-600/30 rounded-card p-5">
+              <div className="text-[11px] tracking-[0.14em] uppercase text-primary-600 font-semibold">
+                Värdekvitto · Handymate i {new Date().toLocaleDateString('sv-SE', { month: 'long' })}
+              </div>
+              <div className="mt-1.5 font-heading tabular-nums text-[26px] font-bold tracking-[-0.02em] text-primary-700">
+                {formatKr(kvitto.confirmed_kr)}
+              </div>
+              <p className="m-0 mt-1 text-[13px] text-slate-600 leading-relaxed">
+                bekräftat den här månaden
+                {ledger ? (
+                  <> — av {formatKr(ledger.identifierat.kr)} identifierat är {formatKr(ledger.betalt.kr)} verifierat betalt.</>
+                ) : (
+                  <> — varje krona spårbar till kortet som startade den.</>
+                )}
+              </p>
+              <Link
+                href="/dashboard/pengar"
+                className="inline-block mt-2.5 text-[13px] font-semibold text-primary-700 hover:text-primary-800"
+              >
+                Se varje krona →
+              </Link>
+            </div>
           )}
 
           {/* Retentionraden — en gång per månad, de första 3 dagarna. */}
@@ -1393,7 +1381,7 @@ export default function JarvisHome({
               <div className="flex flex-col gap-2.5">
                 {bookings.slice(0, 3).map(b => (
                   <Link key={b.booking_id} href={`/dashboard/bookings/${b.booking_id}`} className="flex items-center gap-2.5 min-h-[44px] -my-1">
-                    <span className="font-heading text-[13px] text-primary-700 w-11 shrink-0">{formatClock(b.scheduled_start)}</span>
+                    <span className="font-heading tabular-nums text-[13px] text-primary-700 w-11 shrink-0">{formatClock(b.scheduled_start)}</span>
                     <span className="w-[3px] h-8 rounded-sm bg-primary-500 shrink-0" />
                     <span className="min-w-0">
                       <span className="block text-sm font-medium text-slate-900 truncate">{b.customer?.name || 'Kund'}</span>
@@ -1405,10 +1393,16 @@ export default function JarvisHome({
             )}
           </RailCard>
 
+          {/* Firman just nu (Etapp C4): kassaradarn (see_financials-grindad,
+              rad döljs tyst vid 403), beläggningen (nya tunna
+              /api/dashboard/belaggning) och Pengar på bordet-totalen ur
+              redan hämtad pengarData. Inga rader → inget kort. */}
+          <FirmanJustNu pengarTotalKr={pengarData ? pengarData.totalKr : null} />
+
           <RailCard title="Verksamheten" href="/dashboard/pipeline">
             {pipelineStats ? (
               <>
-                <span className="block font-heading text-2xl font-bold text-slate-900">{formatKr(pipelineStats.totalValue)}</span>
+                <span className="block font-heading tabular-nums text-2xl font-bold text-slate-900">{formatKr(pipelineStats.totalValue)}</span>
                 {/* "0 nya idag" är en nolla, inte ett besked. Mönstret finns
                     redan två kort ned ("Inga obetalda — Karin bevakar"):
                     tomt ska sägas som lugn, inte som frånvaro. */}
@@ -1423,6 +1417,12 @@ export default function JarvisHome({
               <div className="h-10 bg-slate-50 rounded-lg animate-pulse" />
             )}
           </RailCard>
+
+          {/* Projektpulsen (Etapp C5, tunn version): en rad per aktivt
+              projekt ur EN listhämtning — bara signaler svaret bär
+              (försenad/klart·ofakturerat/livscykelns etikett), aldrig N+1
+              mot profitability. */}
+          <ProjektPulsRad />
 
           {/* Karins bolagskalender. Renderar ingenting för anställda, och
               inget när profilen saknar uppgifter — en widget som säger
@@ -1695,7 +1695,7 @@ function ApprovalCard({
                   <span className="flex-1 min-w-0 truncate">{cardContext(m.payload) || m.title}</span>
                   <span className="text-xs text-slate-400 shrink-0">{timeAgo(m.created_at)}</span>
                   {typeof belopp === 'number' && belopp > 0 && (
-                    <span className="font-heading font-semibold w-[76px] text-right shrink-0">
+                    <span className="font-heading tabular-nums font-semibold w-[76px] text-right shrink-0">
                       {formatKr(belopp)}
                     </span>
                   )}
@@ -1722,7 +1722,7 @@ function ApprovalCard({
                 <div key={i} className="flex items-center gap-3 py-2 text-[13px] text-slate-600">
                   <span className="flex-1 min-w-0 truncate">{rad.description || rad.name || 'Rad'}</span>
                   {typeof belopp === 'number' && belopp > 0 && (
-                    <span className="font-heading font-semibold shrink-0">{formatKr(belopp)}</span>
+                    <span className="font-heading tabular-nums font-semibold shrink-0">{formatKr(belopp)}</span>
                   )}
                 </div>
               )
@@ -1737,24 +1737,24 @@ function ApprovalCard({
               {typeof pl.preview.subtotal === 'number' && (
                 <div className="flex justify-between text-[13px] text-slate-600 py-0.5">
                   <span>Delsumma</span>
-                  <span className="font-heading font-semibold">{formatKr(pl.preview.subtotal)}</span>
+                  <span className="font-heading tabular-nums font-semibold">{formatKr(pl.preview.subtotal)}</span>
                 </div>
               )}
               {typeof pl.preview.vat_amount === 'number' && (
                 <div className="flex justify-between text-[13px] text-slate-600 py-0.5">
                   <span>Moms</span>
-                  <span className="font-heading font-semibold">{formatKr(pl.preview.vat_amount)}</span>
+                  <span className="font-heading tabular-nums font-semibold">{formatKr(pl.preview.vat_amount)}</span>
                 </div>
               )}
               {typeof pl.preview.rot_rut_deduction === 'number' && pl.preview.rot_rut_deduction > 0 && (
                 <div className="flex justify-between text-[13px] text-slate-600 py-0.5">
                   <span>ROT-avdrag</span>
-                  <span className="font-heading font-semibold text-primary-700">−{formatKr(pl.preview.rot_rut_deduction)}</span>
+                  <span className="font-heading tabular-nums font-semibold text-primary-700">−{formatKr(pl.preview.rot_rut_deduction)}</span>
                 </div>
               )}
               <div className="flex items-baseline justify-between border-t border-slate-200 mt-1 pt-2">
                 <span className="text-[13px] font-semibold text-slate-900">Kunden betalar</span>
-                <span className="font-heading text-[17px] font-bold text-slate-900">
+                <span className="font-heading tabular-nums text-[17px] font-bold text-slate-900">
                   {formatKr(pl.preview.customer_pays)}
                 </span>
               </div>
@@ -1762,7 +1762,7 @@ function ApprovalCard({
           ) : typeof pl.preview.total_before_vat === 'number' && pl.preview.total_before_vat > 0 ? (
             <div className="flex items-baseline justify-between border-t border-slate-200 mt-1.5 pt-2">
               <span className="text-[13px] font-semibold text-slate-700">Att fakturera</span>
-              <span className="font-heading text-[17px] font-bold text-slate-900">
+              <span className="font-heading tabular-nums text-[17px] font-bold text-slate-900">
                 {formatKr(pl.preview.total_before_vat)}
               </span>
             </div>
@@ -1790,14 +1790,14 @@ function ApprovalCard({
           {summary.rows.map(r => (
             <div key={r.label} className="flex justify-between text-[13px] text-slate-600 py-0.5">
               <span>{r.label}</span>
-              <span className={`font-heading font-semibold ${r.deduction ? 'text-primary-700' : ''}`}>
+              <span className={`font-heading tabular-nums font-semibold ${r.deduction ? 'text-primary-700' : ''}`}>
                 {r.deduction ? '−' : ''}{formatKr(r.amount)}
               </span>
             </div>
           ))}
           <div className="flex justify-between items-baseline border-t border-slate-200 mt-1.5 pt-2">
             <span className="text-[13px] font-semibold text-slate-900">Kunden betalar</span>
-            <span className="font-heading text-lg font-bold text-slate-900">{formatKr(summary.customerPays)}</span>
+            <span className="font-heading tabular-nums text-lg font-bold text-slate-900">{formatKr(summary.customerPays)}</span>
           </div>
         </CardFactBox>
       )}

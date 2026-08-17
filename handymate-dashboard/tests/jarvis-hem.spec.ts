@@ -180,9 +180,10 @@ test.describe('designkontraktet — fyra frågor, i ordning (Matte Command Cente
 
   test('Pengar just nu renderas bara vid ett ok-svar från /api/dashboard/pengar', () => {
     // 403 (anställd) eller fel sätter aldrig pengarData (se useEffect-fetchen)
-    // — sektionen är därför villkorad på samma state, aldrig ovillkorlig.
-    expect(home).toContain('{pengarData && (')
-    expect(home).toContain('<PengarBand summary={pengarData} />')
+    // — bandet är därför villkorat på samma state, aldrig ovillkorligt.
+    // (Sektionsrubriken kan numera även bäras av Revenue Recovery-casen,
+    // 2026-08-16 — men PengarBand själv kräver fortfarande pengarData.)
+    expect(home).toContain('{pengarData && <PengarBand summary={pengarData} />}')
   })
 
   test('AttHamtaRailCard är borta ur JarvisHome — ersatt av pengabandet', () => {

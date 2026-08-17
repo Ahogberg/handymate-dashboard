@@ -111,17 +111,32 @@ test.describe('hälsningens bevis', () => {
 })
 
 test.describe('ytan', () => {
+  // Etapp C3 (2026-08-17): digestens JSX flyttade från JarvisHome till
+  // components/jarvis/home/SkottUtanDig.tsx — auto-raderna lyfta till en
+  // synlig checklista, hela listan bakom "Visa alla". Datat (dygnsRader)
+  // byggs kvar i JarvisHome och skickas som prop — EN sanning.
   const home = fs.readFileSync(path.join(ROOT, 'components/jarvis/JarvisHome.tsx'), 'utf8')
+  const skott = fs.readFileSync(path.join(ROOT, 'components/jarvis/home/SkottUtanDig.tsx'), 'utf8')
 
-  test('digesten ligger under besluten, före bevakningen — och heter vad den mäter', () => {
-    expect(home).toContain('Senaste dygnet · {dygnsRader.length}')
-    const digestPos = home.indexOf('Senaste dygnet · {dygnsRader.length}')
+  test('digesten ligger under besluten, före bevakningen — monterad som SkottUtanDig', () => {
+    expect(home).toContain('<SkottUtanDig rader={dygnsRader} />')
+    const digestPos = home.indexOf('<SkottUtanDig rader={dygnsRader} />')
     const bevakningPos = home.indexOf('<TeamBevakning')
     const nyheterPos = home.indexOf('── Värt att veta ──')
     expect(digestPos).toBeLessThan(bevakningPos)
     expect(bevakningPos).toBeLessThan(nyheterPos)
     // Midnattsfiltret är borta ur ytan — fönstret bor i lib:en.
     expect(home).not.toContain('midnatt')
+  })
+
+  test('sektionen heter vad den mäter och skiljer automatiskt från godkänt', () => {
+    expect(skott).toContain('Skött utan dig sedan i går')
+    // Bara auto-raderna i checklistan; de användargodkända bor i den
+    // utfällda listan — aldrig en andra kopia.
+    expect(skott).toContain('rader.filter(r => r.auto)')
+    expect(skott).toContain('Visa alla {rader.length}')
+    expect(skott).toContain('Automatiskt')
+    expect(skott).toContain('Godkänt av dig')
   })
 
   test('hälsningen använder bevisraden och färska beslut prependas orörda', () => {
@@ -132,7 +147,7 @@ test.describe('ytan', () => {
   })
 
   test('agentfärgad prick per rad — färgen ur personakartan', () => {
-    expect(home).toContain('AGENT_INFO[r.agent]?.dot')
+    expect(skott).toContain('AGENT_INFO[r.agent]?.dot')
   })
 
   test('närvarobandets lib är städad', () => {

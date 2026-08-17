@@ -140,14 +140,20 @@ test.describe('rutten och ytan', () => {
     expect(s).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(/)
   })
 
-  test('raden på hemskärmen är ramlös information — aldrig ett beslutskort', () => {
+  test('kvittot på hemskärmen är information — aldrig ett beslutskort', () => {
+    // Etapp C6 (2026-08-17): den ramlösa textraden blev grad-tint-teasern.
+    // Garantierna består: renderas bara när bekräftade kronor finns, inga
+    // beslutsknappar, och de vilande kronorna sägs INTE här en gång till
+    // (de bor i Pengar just nu/Firman just nu — ingen andra sanning).
     const s = read('components/jarvis/JarvisHome.tsx')
-    const i = s.indexOf('Värdekvitto {')
-    expect(i, 'kvittoraden saknas på hemskärmen').toBeGreaterThan(-1)
-    const block = s.slice(i - 800, i + 800)
+    const i = s.indexOf('Värdekvitto · Handymate i {')
+    expect(i, 'kvittoteaser saknas på hemskärmen').toBeGreaterThan(-1)
+    const block = s.slice(i - 800, i + 1200)
+    expect(block).toContain('kvitto.confirmed_kr > 0')
+    expect(block).toContain('bg-grad-tint')
+    expect(block).toContain('Se varje krona')
     expect(block).not.toContain('AgentDecisionCard')
     expect(block).not.toContain('Godkänn')
-    // Vilande kommer ur SAMMA pengar-data som Att hämta — ingen andra sanning.
-    expect(block).toContain('pengarData')
+    expect(block).not.toContain('pengarData')
   })
 })
