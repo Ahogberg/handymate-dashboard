@@ -314,6 +314,11 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       requires: 'owner-admin',
       why: 'Avslutar (cancel/complete) företagets aktiva pengamål — en styrande handling, inte en läsning. Etapp D-härdning, 2026-08-17.',
     },
+    {
+      route: 'mission/history',
+      requires: 'owner-admin',
+      why: 'Uppdragshistorik + verifierat betalt per uppdrag + Mission Learning-rader — samma finansiella känslighet som mission/active. Etapp H, 2026-08-17.',
+    },
   ],
 
   'Integrationer': [

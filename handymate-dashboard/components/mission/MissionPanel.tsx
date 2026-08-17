@@ -17,6 +17,8 @@ import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import type { MissionRow, MissionProgress, MissionDecision } from '@/lib/mission/mission-progress'
 import type { TruthClass, PortfolioMeasure } from '@/lib/mission/opportunity-portfolio'
+import type { MissionFacit, AgentUtfall } from '@/lib/mission/mission-facit'
+import type { LearningRow } from '@/lib/mission/mission-learning'
 
 /**
  * MissionPanel — expansionspanelen (Goal-to-Plan V2, Etapp G,
@@ -47,6 +49,20 @@ import type { TruthClass, PortfolioMeasure } from '@/lib/mission/opportunity-por
  * sub-rad). "Vad som inte kunde bedömas" visar bara capacity_unconfigured
  * — degraded_sources lagras aldrig på mission-raden, så den ärligast
  * möjliga texten här är kapacitetsnoten, inte en källista vi inte har.
+ *
+ * ═══ ETAPP H: TEAM + HISTORIK + LÄRDOMAR ═══
+ *
+ * Tre nya read-only-sektioner, alla ur EN lazy fetch mot
+ * /api/mission/history när panelen öppnas (MissionPanel nedan) — samma svar
+ * ger både det aktiva uppdragets per-agent-facit (agentUtfall) och de
+ * tidigare uppdragens rader (history) plus lärandesektionen (learning).
+ * Panelen förblir annars gated på ett AKTIVT uppdrag (oförändrat från Etapp
+ * G) — historik utan ett pågående uppdrag är V3, inte byggt här.
+ *
+ * agentUtfall-raderna läser UTESLUTANDE AgentUtfall-fälten (ansvarar_steg/
+ * utforda/vantar/kunde_inte_verifieras) — aldrig plan_snapshot-stegen direkt.
+ * De två källorna (plan vs. utfört) delas aldrig ihop här, exakt som i
+ * lib/mission/mission-facit.ts.
  */
 
 const CLASS_LABEL: Record<TruthClass, string> = {
@@ -69,6 +85,28 @@ function formatMeasure(measure: PortfolioMeasure): string {
   return measure.kind === 'kr'
     ? `${measure.amountKr.toLocaleString('sv-SE')} kr`
     : `${measure.count} st`
+}
+
+/** Etapp H — historikradens statuschip. 'active' ingår för typfullständighet
+    men förekommer aldrig i praktiken (MissionPanel filtrerar bort det
+    aktiva uppdraget ur historiklistan innan den skickas hit). */
+const HISTORY_STATUS_BADGE: Record<MissionFacit['status'], { text: string; className: string }> = {
+  completed: { text: 'Slutfört', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  cancelled: { text: 'Avbrutet', className: 'bg-slate-50 text-slate-600 border-slate-200' },
+  expired: { text: 'Utgånget', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+  active: { text: 'Pågår', className: 'bg-primary-50 text-primary-700 border-primary-200' },
+}
+
+/** Etapp H — historikradens slutgap, per uppdragets EGEN goal_type. Läser
+    bara MissionFacit-fälten (aldrig progressParts/gap_kr direkt) — historik-
+    raden har inget MissionProgress-objekt, bara det frusna facitet. */
+function formatSlutgap(f: MissionFacit): string {
+  if (f.goal_type === 'capacity') {
+    if (f.slutgap_hours == null) return 'kapacitet ej konfigurerad'
+    return f.slutgap_hours === 0 ? 'målet nått' : `${f.slutgap_hours.toLocaleString('sv-SE')} timmar kvar`
+  }
+  if (f.slutgap_kr == null) return '—'
+  return f.slutgap_kr === 0 ? 'målet nått' : `${f.slutgap_kr.toLocaleString('sv-SE')} kr kvar`
 }
 
 export type MissionResolveAction = 'cancel' | 'complete'
@@ -99,6 +137,9 @@ export function MissionPanelView({
   onCancelConfirm,
   onConfirmResolve,
   renderAgentChip = defaultAgentChip,
+  agentUtfall = [],
+  history = [],
+  learning = null,
 }: {
   mission: MissionRow
   progress: MissionProgress
@@ -113,6 +154,14 @@ export function MissionPanelView({
   onConfirmResolve: () => void
   /** Testkrok — se defaultAgentChip. */
   renderAgentChip?: (agentKey: string) => ReactNode
+  /** Etapp H — det AKTIVA uppdragets per-agent-facit (lib/mission/mission-facit.ts).
+      Tom lista tills /api/mission/history hunnit svara — sektionen döljs då tyst. */
+  agentUtfall?: AgentUtfall[]
+  /** Etapp H — tidigare uppdrag (aktiva uppdraget är redan uteslutet av anroparen). */
+  history?: MissionFacit[]
+  /** Etapp H — null när /api/mission/history inte hunnit svara ELLER felade;
+      lärdomssektionen renderas då aldrig (se filhuvudet). */
+  learning?: { rows: LearningRow[]; forTidigt: boolean; antalEligible: number } | null
 }) {
   const goalType = resolveGoalType(mission.goal_type)
   const headline = buildMissionHeadline(
@@ -217,6 +266,75 @@ export function MissionPanelView({
           )}
         </div>
 
+        {/* Etapp H — teamet på DET AKTIVA uppdraget. Läser bara agentUtfall
+            (AgentUtfall-fälten) — aldrig plan_snapshot-stegen igen, se
+            filhuvudet. Döljs helt tills /api/mission/history svarat. */}
+        {agentUtfall.length > 0 && (
+          <div>
+            <h3 className="m-0 mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Teamet</h3>
+            <ul className="m-0 p-0 list-none space-y-2">
+              {agentUtfall.map(a => (
+                <li key={a.agent_key} className="flex items-center gap-2.5">
+                  {renderAgentChip(a.agent_key)}
+                  <span className="text-sm text-slate-700 tabular-nums">
+                    {`ansvarar ${a.ansvarar_steg} steg · ${a.utforda} utförda · ${a.vantar} väntar`}
+                    {a.kunde_inte_verifieras > 0 && ` · ${a.kunde_inte_verifieras} kunde inte verifieras`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Etapp H — tidigare uppdrag. Aktiva uppdraget är redan uteslutet
+            av anroparen (MissionPanel nedan). */}
+        {history.length > 0 && (
+          <div>
+            <h3 className="m-0 mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Tidigare uppdrag</h3>
+            <ul className="m-0 p-0 list-none space-y-2">
+              {history.map(f => {
+                const badge = HISTORY_STATUS_BADGE[f.status]
+                return (
+                  <li key={f.mission_id} className="border border-slate-200 rounded-xl p-2.5">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`px-1.5 py-0.5 rounded-full border text-[10px] font-bold ${badge.className}`}>
+                        {badge.text}
+                      </span>
+                      <span className="text-sm text-slate-900 truncate">{f.headline}</span>
+                    </div>
+                    <p className="m-0 text-xs text-slate-500 tabular-nums">
+                      {`${formatSlutgap(f)} · ${f.verifierat_betalt_kr.toLocaleString('sv-SE')} kr verifierat betalt`}
+                    </p>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+
+        {/* Etapp H — Mission Learning-läslagret. Renderas ALDRIG när
+            /api/mission/history-anropet felat (learning === null) — se
+            filhuvudet och lib/mission/mission-learning.ts. */}
+        {learning && (
+          <div>
+            <h3 className="m-0 mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Lärdomar</h3>
+            {learning.forTidigt ? (
+              <p className="m-0 text-sm text-slate-400">
+                {`För tidigt att se mönster — ${learning.antalEligible} genomförda uppdrag hittills.`}
+              </p>
+            ) : (
+              <ul className="m-0 p-0 list-none space-y-2">
+                {learning.rows.map((r, i) => (
+                  <li key={i}>
+                    <p className="m-0 text-sm text-slate-700">{r.text}</p>
+                    <p className="m-0 text-xs text-slate-400">{r.grund}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         {/* Vad som inte kunde bedömas — degraded_sources lagras inte på
             mission-raden (bara på portföljen vid planbygget), så den enda
             ärliga degraderingsnoten här är kapacitetsuppdragets. */}
@@ -296,6 +414,12 @@ export function MissionPanel() {
   const { setActiveTab, setIsOpen } = useJobbuddy()
   const [confirmAction, setConfirmAction] = useState<MissionResolveAction | null>(null)
   const [resolving, setResolving] = useState(false)
+  // Etapp H — team/historik/lärdomar. null tills /api/mission/history svarat
+  // (eller vid fel — se filhuvudets learning===null-regel).
+  const [history, setHistory] = useState<{
+    facit: MissionFacit[]
+    learning: { rows: LearningRow[]; forTidigt: boolean; antalEligible: number }
+  } | null>(null)
 
   // Escape stänger + scroll-lås medan panelen är öppen — samma idiom som
   // AddRowSheet/RowEditSheet (components/quotes/document/AddRowSheet.tsx).
@@ -319,8 +443,42 @@ export function MissionPanel() {
     if (!panelOpen) setConfirmAction(null)
   }, [panelOpen])
 
+  // Etapp H — EN lazy fetch mot /api/mission/history varje gång panelen
+  // öppnas (inte per render): samma svar ger både det aktiva uppdragets
+  // per-agent-facit och historik-/lärdomsraderna, se filhuvudet. Ett
+  // nätverksfel eller ett icke-ok-svar lämnar history som null — de tre
+  // sektionerna döljer sig då tyst i MissionPanelView.
+  useEffect(() => {
+    if (!panelOpen) return
+    let aktiv = true
+    fetch('/api/mission/history')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!aktiv) return
+        if (d && Array.isArray(d.facit) && d.learning) {
+          setHistory({ facit: d.facit, learning: d.learning })
+        } else {
+          setHistory(null)
+        }
+      })
+      .catch(() => {
+        if (aktiv) setHistory(null)
+      })
+    return () => {
+      aktiv = false
+    }
+  }, [panelOpen])
+
   if (!panelOpen) return null
   if (!mission || mission.status !== 'active' || !progress) return null
+
+  // Etapp H: det aktiva uppdragets egen rad ur samma /api/mission/history-
+  // svar (normalt facit[0] eftersom bara ETT uppdrag kan vara aktivt åt
+  // gången, men letas upp på mission_id i stället för att anta index) ger
+  // per-agent-facitet; resten av raderna är historiken.
+  const aktivFacit = history?.facit.find(f => f.mission_id === mission.id) ?? null
+  const agentUtfall = aktivFacit?.per_agent ?? []
+  const tidigareUppdrag = (history?.facit ?? []).filter(f => f.mission_id !== mission.id)
 
   function fragaMatte() {
     setPanelOpen(false)
@@ -363,6 +521,9 @@ export function MissionPanel() {
         onRequestConfirm={setConfirmAction}
         onCancelConfirm={() => setConfirmAction(null)}
         onConfirmResolve={confirmResolve}
+        agentUtfall={agentUtfall}
+        history={tidigareUppdrag}
+        learning={history?.learning ?? null}
       />
     </div>
   )

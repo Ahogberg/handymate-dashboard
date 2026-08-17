@@ -363,8 +363,13 @@ type MissionApprovalRow = MissionApprovalInput & { title?: string | null }
  * referenser, plus (Etapp F) kapacitetsuppdragets bokade timmar. Delad av
  * getMissionProgress OCH getMissionProgressWithDecisions (Etapp G) — samma
  * approvals-rader ska inte läsas två gånger för samma sida.
+ *
+ * Etapp H: exporterad (minimal ändring, byggMissionProgress orörd) så
+ * lib/mission/mission-facit.ts:s listMissionFacit kan återanvända EXAKT
+ * samma inläsning per uppdrag i historiken — ingen egen kopia av invoice-/
+ * quotes-/kapacitetsuppslagen.
  */
-async function loadMissionProgressInputs(
+export async function loadMissionProgressInputs(
   supabase: SupabaseClient,
   mission: MissionRow,
   nowMs: number,

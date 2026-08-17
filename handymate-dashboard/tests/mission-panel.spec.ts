@@ -24,6 +24,7 @@ import { MissionPanelView } from '../components/mission/MissionPanel'
 import { byggMissionProgress, type MissionRow } from '../lib/mission/mission-progress'
 import { assembleOpportunityPortfolio } from '../lib/mission/opportunity-portfolio'
 import { validateMissionPlan, type MissionPlanInput } from '../lib/mission/plan-validation'
+import type { MissionFacit, AgentUtfall } from '../lib/mission/mission-facit'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
@@ -225,6 +226,177 @@ test.describe('MissionPanelView — rendering', () => {
     }))
     expect(markup).toContain('Skicka påminnelse till Andersson')
     expect(markup).toContain('/dashboard/approvals')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────
+// Etapp H — team (per-agent), historik, lärdomar
+// ─────────────────────────────────────────────────────────────────────────
+
+function baseViewProps(mission: MissionRow, progress: ReturnType<typeof byggMissionProgress>) {
+  return {
+    mission,
+    progress,
+    decisions: [],
+    confirmAction: null,
+    resolving: false,
+    onClose: NOOP,
+    onFragaMatte: NOOP,
+    onRequestConfirm: NOOP,
+    onCancelConfirm: NOOP,
+    onConfirmResolve: NOOP,
+    renderAgentChip: NOOP_CHIP,
+  }
+}
+
+function missionFacit(overrides: Partial<MissionFacit> = {}): MissionFacit {
+  return {
+    mission_id: 'mis_prev_1',
+    goal_type: 'money',
+    status: 'completed',
+    headline: 'Frigöra 80 000 kr före 2026-07-01',
+    deadline: '2026-07-01',
+    resolved_at: '2026-06-20T00:00:00Z',
+    slutgap_kr: 0,
+    slutgap_hours: null,
+    verifierat_betalt_kr: 80000,
+    learning_eligible: true,
+    learning_blockers: [],
+    per_agent: [],
+    ...overrides,
+  }
+}
+
+test.describe('MissionPanel.tsx — källskanning (Etapp H)', () => {
+  test('importerar MissionFacit/AgentUtfall och LearningRow-typerna från lib/mission', () => {
+    expect(panelSrc).toContain("from '@/lib/mission/mission-facit'")
+    expect(panelSrc).toContain("from '@/lib/mission/mission-learning'")
+  })
+
+  test('innehåller sektionsrubrikerna "Teamet", "Tidigare uppdrag" och "Lärdomar"', () => {
+    expect(panelSrc).toContain('Teamet')
+    expect(panelSrc).toContain('Tidigare uppdrag')
+    expect(panelSrc).toContain('Lärdomar')
+  })
+
+  test('fortfarande inget klassöverskridande summeringsord efter Etapp H:s tillägg', () => {
+    const banned = [/\btotalt\b/i, /\bsammanlagt\b/i, /\bsumma\b/i, /reduce\(/]
+    for (const pattern of banned) {
+      expect(pattern.test(panelSrc), `MissionPanel.tsx innehåller "${pattern}"`).toBe(false)
+    }
+  })
+})
+
+test.describe('MissionPanelView — team (per-agent), Etapp H', () => {
+  test('läser UTESLUTANDE AgentUtfall-fälten — ansvarar_steg kommer ALDRIG från plan_snapshot-stegen', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    // Planen (plan_snapshot) har 2 steg, men agentUtfall-facit påstår ett
+    // ANNAT tal (5) — om renderingen läste plan_snapshot i stället för
+    // agentUtfall-propen skulle "ansvarar 5 steg" aldrig synas.
+    const agentUtfall: AgentUtfall[] = [
+      { agent_key: 'karin', ansvarar_steg: 5, utforda: 3, vantar: 1, kunde_inte_verifieras: 2 },
+    ]
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      agentUtfall,
+    }))
+    expect(markup).toContain('ansvarar 5 steg')
+    expect(markup).toContain('3 utförda')
+    expect(markup).toContain('1 väntar')
+    expect(markup).toContain('2 kunde inte verifieras')
+  })
+
+  test('kunde_inte_verifieras utelämnas ur texten när den är 0', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const agentUtfall: AgentUtfall[] = [
+      { agent_key: 'karin', ansvarar_steg: 1, utforda: 1, vantar: 0, kunde_inte_verifieras: 0 },
+    ]
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      agentUtfall,
+    }))
+    expect(markup).not.toContain('kunde inte verifieras')
+  })
+
+  test('tom agentUtfall-lista → Teamet-sektionen renderas inte alls', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, baseViewProps(mission, progress)))
+    expect(markup).not.toContain('Teamet')
+  })
+})
+
+test.describe('MissionPanelView — historik, Etapp H', () => {
+  test('statuschip Slutfört/Avbrutet/Utgånget renderas per rad, med rubrik och verifierat betalt', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const history: MissionFacit[] = [
+      missionFacit({ mission_id: 'a', status: 'completed', headline: 'Frigöra 50 000 kr före 2026-05-01', slutgap_kr: 0, verifierat_betalt_kr: 50000 }),
+      missionFacit({ mission_id: 'b', status: 'cancelled', headline: 'Frigöra 20 000 kr före 2026-04-01', slutgap_kr: 5000, verifierat_betalt_kr: 0, learning_eligible: false, learning_blockers: ['avbrutet uppdrag'] }),
+      missionFacit({ mission_id: 'c', status: 'expired', headline: 'Frigöra 10 000 kr före 2026-03-01', slutgap_kr: 10000, verifierat_betalt_kr: 0, learning_eligible: false, learning_blockers: ['utgånget uppdrag'] }),
+    ]
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      history,
+    }))
+    expect(markup).toContain('Slutfört')
+    expect(markup).toContain('Avbrutet')
+    expect(markup).toContain('Utgånget')
+    expect(markup).toContain('Frigöra 50 000 kr före 2026-05-01')
+    expect(markup).toContain('målet nått')
+    expect(markup).toContain(`${(50000).toLocaleString('sv-SE')} kr verifierat betalt`)
+    expect(markup).toContain(`${(5000).toLocaleString('sv-SE')} kr kvar`)
+  })
+
+  test('kapacitetsuppdrag i historiken visar aldrig pengaformuleringen "kr kvar" (aktivt uppdrag är också ett kapacitetsmål, så ingen sida av markupen kan läcka en penningsiffra)', () => {
+    const { mission, progress } = capacityMission()
+    const history: MissionFacit[] = [
+      missionFacit({ mission_id: 'cap', goal_type: 'capacity', headline: 'Boka 8 timmar till vecka 30', slutgap_kr: null, slutgap_hours: 2, verifierat_betalt_kr: 0 }),
+    ]
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      history,
+    }))
+    expect(markup).toContain('2 timmar kvar')
+    expect(markup).not.toContain('kr kvar')
+  })
+
+  test('tom historik-lista → "Tidigare uppdrag"-sektionen renderas inte', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, baseViewProps(mission, progress)))
+    expect(markup).not.toContain('Tidigare uppdrag')
+  })
+})
+
+test.describe('MissionPanelView — lärdomar, Etapp H', () => {
+  test('forTidigt renderar "För tidigt att se mönster" med antalEligible', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      learning: { rows: [], forTidigt: true, antalEligible: 2 },
+    }))
+    expect(markup).toContain('För tidigt att se mönster — 2 genomförda uppdrag hittills.')
+  })
+
+  test('lärdomsrader renderar text OCH sin grund', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      learning: {
+        rows: [{ text: '3 av 3 pengamål nådde målet före deadline', grund: '3 avslutade uppdrag' }],
+        forTidigt: false,
+        antalEligible: 3,
+      },
+    }))
+    expect(markup).toContain('3 av 3 pengamål nådde målet före deadline')
+    expect(markup).toContain('3 avslutade uppdrag')
+  })
+
+  test('learning === null (API:t har inte svarat/felade) → Lärdomar-sektionen renderas ALDRIG', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      learning: null,
+    }))
+    expect(markup).not.toContain('Lärdomar')
   })
 })
 
