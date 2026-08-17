@@ -64,6 +64,7 @@ import { QuickBuilding } from './components/quick/QuickBuilding'
 import { QuickReviewBar } from './components/quick/QuickReviewBar'
 import { PaymentPlanSheet } from './components/quick/PaymentPlanSheet'
 import { QuickReceipt } from './components/quick/QuickReceipt'
+import { QuoteNewMoreAboutProject } from './components/quick/QuoteNewMoreAboutProject'
 import {
   sectionHandlers,
   sectionSummary,
@@ -2212,6 +2213,17 @@ export default function NewQuotePage() {
               >
                 Spara utkast
               </button>
+              {/* Del 3 (jaunty-pondering-hummingbird.md): referens/adressfält
+                  som inte renderas i dokumentet någonstans, och därför inte
+                  kan knytas till en sektion. Stängd som default. */}
+              <QuoteNewMoreAboutProject
+                referencePerson={referencePerson}
+                setReferencePerson={setReferencePerson}
+                customerReference={customerReference}
+                setCustomerReference={setCustomerReference}
+                projectAddress={projectAddress}
+                setProjectAddress={setProjectAddress}
+              />
             </div>
           </div>
 
@@ -2271,6 +2283,20 @@ export default function NewQuotePage() {
               }}
               onOpenFullEditor={() => setQuickMode(null)}
               sending={saving}
+              attachments={attachments}
+              setAttachments={setAttachments}
+              uploadingFile={uploadingFile}
+              onFileUpload={handleFileUpload}
+              templateStyle={templateStyle}
+              setTemplateStyle={setTemplateStyle}
+              businessDefaultStyle={businessDefaultStyle}
+              accentColor={businessConfig?.accent_color}
+              detailLevel={detailLevel}
+              setDetailLevel={setDetailLevel}
+              showUnitPrices={showUnitPrices}
+              setShowUnitPrices={setShowUnitPrices}
+              showQuantities={showQuantities}
+              setShowQuantities={setShowQuantities}
             />
           )}
 
@@ -2374,6 +2400,20 @@ export default function NewQuotePage() {
                 }}
                 onOpenFullEditor={() => setQuickMode(null)}
                 sending={saving}
+                attachments={attachments}
+                setAttachments={setAttachments}
+                uploadingFile={uploadingFile}
+                onFileUpload={handleFileUpload}
+                templateStyle={templateStyle}
+                setTemplateStyle={setTemplateStyle}
+                businessDefaultStyle={businessDefaultStyle}
+                accentColor={businessConfig?.accent_color}
+                detailLevel={detailLevel}
+                setDetailLevel={setDetailLevel}
+                showUnitPrices={showUnitPrices}
+                setShowUnitPrices={setShowUnitPrices}
+                showQuantities={showQuantities}
+                setShowQuantities={setShowQuantities}
               />
             )}
 
