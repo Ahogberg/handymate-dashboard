@@ -62,6 +62,7 @@ import { RevenueRecoveryCaseKort } from '@/components/jarvis/RevenueRecoveryCase
 import type { RevenueRecoveryCase } from '@/lib/value/revenue-recovery-case'
 import { MalNudge } from '@/components/jarvis/MalNudge'
 import { FuelWarningCard } from '@/components/jarvis/FuelWarningCard'
+import { ReaktiveringsInsikt, type ReaktiveringsSignal } from '@/components/jarvis/ReaktiveringsInsikt'
 import { useFuel } from '@/components/fuel/FuelProvider'
 import { MatteHero } from '@/components/jarvis/home/MatteHero'
 import { SkottUtanDig } from '@/components/jarvis/home/SkottUtanDig'
@@ -277,6 +278,11 @@ export default function JarvisHome({
   // fler av dem (upp till tre). Ingen egen hämtning: kommer ur samma svar
   // som `nba` ovan, se fetch-effekten nedan.
   const [nbaList, setNbaList] = useState<NextBestActionRecommendation[]>([])
+  // "Låt Matte väga in det" (tasks/jaunty-pondering-hummingbird.md) — Hannas
+  // agenttips om en tyst kundgrupp, se app/api/jarvis/reactivation-signal
+  // och components/jarvis/ReaktiveringsInsikt.tsx. Egen hämtning, samma
+  // mönster som NBA-hämtningen nedan.
+  const [reactivationSignal, setReactivationSignal] = useState<ReaktiveringsSignal | null>(null)
   // Cross-Agent Case (2026-08-14) — flera agenters signaler om samma
   // projekt, se app/api/project-cases/route.ts. Egen hämtning av samma
   // skäl som NBA ovan (huvudkön är kapad till 15 senaste).
@@ -362,6 +368,20 @@ export default function JarvisHome({
           }
         }
       } catch { /* ingen rankning idag är ett giltigt, tyst utfall */ }
+    })()
+    return () => { active = false }
+  }, [authHeaders])
+
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const res = await fetch('/api/jarvis/reactivation-signal', { headers: await authHeaders() })
+        if (res.ok) {
+          const data = await res.json()
+          if (active) setReactivationSignal(data.signal || null)
+        }
+      } catch { /* ingen signal idag är ett giltigt, tyst utfall */ }
     })()
     return () => { active = false }
   }, [authHeaders])
@@ -1084,6 +1104,8 @@ export default function JarvisHome({
               <FuelWarningCard />
             </div>
           )}
+
+          <ReaktiveringsInsikt signal={reactivationSignal} />
 
           {synligaNba.length > 0 && (
             <GorDettaForst
