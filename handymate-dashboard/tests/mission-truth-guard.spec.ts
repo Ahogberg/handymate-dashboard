@@ -41,6 +41,27 @@ test.describe('källskanning — lib/mission/* innehåller inga hopslagna kronf�
   }
 })
 
+test.describe('Etapp F (kapacitetsmål) — timmar och kronor konverteras aldrig till varandra', () => {
+  const missionDir = path.join(__dirname, '..', 'lib', 'mission')
+  const files = fs.readdirSync(missionDir).filter(f => f.endsWith('.ts'))
+
+  // Om en kr↔timmar-omvandling (t.ex. ett timpris) någonsin smyger sig in i
+  // lib/mission/* har någon börjat räkna om ett kapacitetsmål till pengar
+  // eller vice versa — exakt den klassblandning Etapp F:s design uttryckligen
+  // förbjuder (Design-avsnittet i tasks/jaunty-pondering-hummingbird.md:
+  // "Money and hours are NEVER mixed in one figure").
+  const CONVERSION_IDENTIFIERS = ['hourly_rate', 'hourlyrate', 'timpris', 'kr_per_timme', 'kronorPerTimme']
+
+  for (const file of files) {
+    test(`${file} innehåller ingen kr↔timmar-omvandling`, () => {
+      const src = fs.readFileSync(path.join(missionDir, file), 'utf8').toLowerCase()
+      for (const banned of CONVERSION_IDENTIFIERS) {
+        expect(src.includes(banned.toLowerCase()), `${file} innehåller "${banned}"`).toBe(false)
+      }
+    })
+  }
+})
+
 test.describe('typnivå — kontrakten exponerar inget hopslaget fält', () => {
   test('OpportunityPortfolio saknar total-fält (kompilatorbevis + runtime)', () => {
     const portfolio: OpportunityPortfolio = assembleOpportunityPortfolio({

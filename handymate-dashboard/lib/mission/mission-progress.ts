@@ -36,23 +36,57 @@
  * Ren kärna (byggMissionProgress, facit i tests/mission-progress.spec.ts)
  * + fail-soft I/O (getMissionProgress): tabellfel → nollprogress med
  * loggad varning, aldrig ett kastat fel upp till användaren.
+ *
+ * ═══ ETAPP F: KAPACITETSMÅL (Goal-to-Plan V2) ═══
+ *
+ * En kapacitetsmission (goal_type 'capacity') mäter INGA kronor — målet är
+ * TIMMAR att boka i en enda målvecka, mot lib/capacity/week-capacity.ts:s
+ * redan levande kapacitetstal (ÅTERANVÄNT, aldrig omimplementerat). Samma
+ * per-klass-attribution (verified_paid_kr osv.) körs oförändrat även för
+ * kapacitetsmissioner om ett plansteg råkar referera en faktura — det är
+ * fortfarande "pengar på banken" som fakta, det är bara det att uppdragets
+ * GAP (gap_hours) aldrig läser den summan. gap_kr och gap_hours är därför
+ * ömsesidigt uteslutande på toppnivå (se MissionProgress-kommentarerna),
+ * även om per_class kan innehålla kr-fakta i båda fallen.
+ *
+ * MÅLVECKANS REGEL (byggMissionProgress tar emot den redan uträknad — se
+ * capacityTargetWeekMonday + getMissionProgress för I/O:t): veckan som
+ * innehåller uppdragets deadline, MEN aldrig längre bort än nästa vecka.
+ * En kapacitetsplan är per definition "fyll NÄSTA veckas luckor" (se
+ * Design-avsnittet i tasks/jaunty-pondering-hummingbird.md); en avlägsen
+ * deadline ska inte få oss att mäta mot en ännu obestämd framtida vecka —
+ * då faller vi tillbaka på nästa vecka. En snäv deadline i INNEVARANDE
+ * vecka ("boka innan fredag") mäts mot den veckan, inte nästa.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { WON_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 import { TRUTH_CLASSES, type TruthClass } from './opportunity-portfolio'
 import type { ValidatedMissionStep } from './plan-validation'
+import { resolveGoalType, type MissionGoalType } from './goal-type'
+import { getWeekCapacity, mondayOfWeek } from '@/lib/capacity/week-capacity'
+import { svDateStrPlusDays } from '@/lib/dates'
 
 export interface MissionRow {
   id: string
   business_id: string
-  goal_kr: number
+  /** null för kapacitetsuppdrag (goal_type 'capacity'). */
+  goal_kr: number | null
   deadline: string
   status: 'active' | 'completed' | 'cancelled' | 'expired'
   plan_snapshot: { steps: ValidatedMissionStep[] }
   portfolio_generated_at: string
   created_at: string
   resolved_at: string | null
+  /**
+   * Etapp F. Optional — miljöer där sql/v145 inte körts saknar kolumnen
+   * helt; varje läsning defaultar via resolveGoalType() (lib/mission/
+   * goal-type.ts) till 'money', ALDRIG en krasch eller en gissad
+   * kapacitetsplan.
+   */
+  goal_type?: MissionGoalType
+  /** null för pengauppdrag; optional av samma fail-soft-skäl som goal_type. */
+  goal_hours?: number | null
 }
 
 export interface ClassProgress {
@@ -79,8 +113,53 @@ export interface MissionProgress {
    * (pengar på banken) oavsett vilken kr-klass fakturan kom ur — till
    * skillnad från att blanda IHOP olika SLAGS sanning (betalt, fakturerat,
    * pipeline, antal) till en gemensam siffra, vilket förblir förbjudet.
+   *
+   * Etapp F: null för kapacitetsuppdrag — se gap_hours. Ett uppdrag har
+   * ALDRIG både gap_kr och gap_hours satta.
    */
-  gap_kr: number
+  gap_kr: number | null
+  /**
+   * Etapp F (kapacitetsmål). max(0, goal_hours − bokade timmar i
+   * uppdragets MÅLVECKA) — "bokade timmar" kommer från
+   * lib/capacity/week-capacity.ts (återanvänt, se filhuvudet för
+   * målveckans regel). null för pengauppdrag OCH när målveckans kapacitet
+   * saknar en verklig inställning (se capacity_unconfigured) — ett gap
+   * räknas ALDRIG fram ur en gissning.
+   */
+  gap_hours: number | null
+  /**
+   * True bara när uppdraget är ett kapacitetsmål och målveckans kapacitet
+   * INTE kommer från en verklig inställning (week-capacity source !==
+   * 'settings'). Alltid false för pengauppdrag. Ytan visar då "—", aldrig
+   * ett påhittat gap.
+   */
+  capacity_unconfigured: boolean
+}
+
+/** Bokade timmar + proveniens för uppdragets målvecka — I/O-lagrets
+    (getMissionProgress) redan uträknade indata till den rena kärnan. */
+export interface MissionCapacityWeekInput {
+  bookedHours: number
+  /** true bara när talet kommer från en verklig inställning — week-
+      capacity-regeln (source==='settings'), aldrig fallback-gissningen. */
+  configured: boolean
+}
+
+/**
+ * Kapacitetsuppdragets målvecka (måndag, YYYY-MM-DD) — se filhuvudets
+ * "MÅLVECKANS REGEL" för motiveringen. Exporterad ren funktion så regeln
+ * kan facit-testas isolerat.
+ */
+export function capacityTargetWeekMonday(deadline: string, now: Date): string {
+  const nextWeekMonday = mondayOfWeek(svDateStrPlusDays(7, now))
+  const deadlineDateOnly = typeof deadline === 'string' ? deadline.slice(0, 10) : ''
+  if (!deadlineDateOnly) return nextWeekMonday
+  const deadlineWeekMonday = mondayOfWeek(deadlineDateOnly)
+  return deadlineWeekMonday > nextWeekMonday ? nextWeekMonday : deadlineWeekMonday
+}
+
+function round1(n: number): number {
+  return Math.round(n * 10) / 10
 }
 
 export interface MissionInvoiceInput {
@@ -145,6 +224,9 @@ export function byggMissionProgress(input: {
   missionApprovals: MissionApprovalInput[]
   quotes: MissionQuoteInput[]
   nowMs: number
+  /** Etapp F — bara relevant för kapacitetsuppdrag; null/utelämnat för
+      pengauppdrag ELLER när I/O-lagret inte kunde läsa kapaciteten. */
+  capacityWeek?: MissionCapacityWeekInput | null
 }): MissionProgress {
   const { mission } = input
   const steps = Array.isArray(mission.plan_snapshot?.steps) ? mission.plan_snapshot.steps : []
@@ -224,20 +306,41 @@ export function byggMissionProgress(input: {
   const nowDate = new Date(input.nowMs).toISOString().slice(0, 10)
   const deadlineDate = typeof mission.deadline === 'string' ? mission.deadline.slice(0, 10) : ''
 
-  // ── gap_kr: DET enda facit för hur nära målet uppdraget är. ────────────
-  // Summerar verifieratBetaltKr över kr-klasserna — se kommentaren på
-  // MissionProgress.gap_kr för varför det INTE är klassblandningen.
-  let verifieratBetaltKr = 0
-  for (const cls of Array.from(KR_CLASSES)) {
-    verifieratBetaltKr += perClass[cls]?.verified_paid_kr ?? 0
+  // ── Målgapet: ETT enda facit, grenat på goal_type — aldrig båda. ───────
+  // Pengamål (Etapp D): summerar verifieratBetaltKr över kr-klasserna, se
+  // kommentaren på MissionProgress.gap_kr för varför det INTE är
+  // klassblandningen. Kapacitetsmål (Etapp F): timmar mot uppdragets
+  // MÅLVECKA (capacityWeek, uträknad av I/O-lagret) — bara när veckan har
+  // en verklig kapacitetsinställning, annars capacity_unconfigured.
+  const goalType = resolveGoalType(mission.goal_type)
+  let gapKr: number | null = null
+  let gapHours: number | null = null
+  let capacityUnconfigured = false
+
+  if (goalType === 'money') {
+    let verifieratBetaltKr = 0
+    for (const cls of Array.from(KR_CLASSES)) {
+      verifieratBetaltKr += perClass[cls]?.verified_paid_kr ?? 0
+    }
+    gapKr = Math.max(0, Math.round(Number(mission.goal_kr) || 0) - verifieratBetaltKr)
+  } else {
+    const cw = input.capacityWeek ?? null
+    if (cw && cw.configured) {
+      const bokat = round1(cw.bookedHours)
+      const mal = round1(Number(mission.goal_hours) || 0)
+      gapHours = Math.max(0, round1(mal - bokat))
+    } else {
+      capacityUnconfigured = true
+    }
   }
-  const gapKr = Math.max(0, Math.round(Number(mission.goal_kr) || 0) - verifieratBetaltKr)
 
   return {
     per_class: perClass,
     decisions_outstanding: vantande,
     is_expired: mission.status === 'active' && deadlineDate !== '' && deadlineDate < nowDate,
     gap_kr: gapKr,
+    gap_hours: gapHours,
+    capacity_unconfigured: capacityUnconfigured,
   }
 }
 
@@ -305,10 +408,28 @@ export async function getMissionProgress(
       quotes = asRows<MissionQuoteInput>(data)
     }
 
-    return byggMissionProgress({ mission, invoices, missionApprovals, quotes, nowMs })
+    // ── Etapp F: kapacitetsuppdragets bokade timmar i målveckan. ──────────
+    // Egen try/catch: ett kapacitetsfel ska degradera till
+    // capacity_unconfigured, aldrig fälla hela progress-läsningen (samma
+    // fail-soft-linje som invoice-/quotes-uppslagen ovan hör till den
+    // gemensamma try:n, men det här är en extra, separat I/O-källa).
+    let capacityWeek: MissionCapacityWeekInput | null = null
+    if (resolveGoalType(mission.goal_type) === 'capacity') {
+      try {
+        const targetWeek = capacityTargetWeekMonday(mission.deadline, new Date(nowMs))
+        const wc = await getWeekCapacity(supabase, mission.business_id, targetWeek)
+        capacityWeek = { bookedHours: wc.booked_hours, configured: wc.configured }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn('[mission-progress] kapacitet kunde inte läsas (gap_hours blir okonfigurerat):', msg)
+        capacityWeek = null
+      }
+    }
+
+    return byggMissionProgress({ mission, invoices, missionApprovals, quotes, nowMs, capacityWeek })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     console.warn('[mission-progress] kunde inte härleda progress (nollprogress):', msg)
-    return byggMissionProgress({ mission, invoices: [], missionApprovals: [], quotes: [], nowMs })
+    return byggMissionProgress({ mission, invoices: [], missionApprovals: [], quotes: [], nowMs, capacityWeek: null })
   }
 }

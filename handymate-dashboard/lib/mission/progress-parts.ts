@@ -9,6 +9,12 @@
  * radar upp delarna med ' · ' — den här filen lägger dem ALDRIG ihop till en
  * gemensam siffra (klassbeloppen summeras aldrig till ett tal).
  *
+ * Etapp F (kapacitetsmål): gap_kr och gap_hours är ömsesidigt uteslutande
+ * (se MissionProgress-kommentaren i mission-progress.ts) — den här filen
+ * väljer gap-delen på VILKET av de två fälten som är satt, aldrig på
+ * uppdragets goal_type direkt, så en framtida tredje målstyp inte kräver en
+ * ny gren här.
+ *
  * Facit: tests/progress-parts.spec.ts
  */
 import type { MissionProgress } from './mission-progress'
@@ -33,13 +39,26 @@ export function progressParts(progress: MissionProgress): string[] {
     }
     verifieratBetaltKr += entry.verified_paid_kr
   }
-  // gap_kr (Etapp D) — DET enda facit för hur nära målet uppdraget är, se
-  // MissionProgress.gap_kr. En egen del, aldrig en addition med de andra
-  // delarna ovan.
-  if (progress.gap_kr > 0) {
-    parts.push(`${progress.gap_kr.toLocaleString('sv-SE')} kr kvar till målet`)
-  } else if (verifieratBetaltKr > 0) {
-    parts.push('målet nått')
+  // Målgapet — ETT av tre ömsesidigt uteslutande utfall (Etapp D för
+  // pengamål, Etapp F för kapacitetsmål): gap_hours satt → kapacitetsmål,
+  // timmar (ALDRIG en kr-del här); annars capacity_unconfigured → ärlig
+  // "—"-text i stället för ett gissat gap; annars gap_kr (Etapp D-facit,
+  // DET enda facit för hur nära ett pengamål är). En egen del, aldrig en
+  // addition med de andra delarna ovan.
+  if (progress.gap_hours != null) {
+    parts.push(
+      progress.gap_hours > 0
+        ? `${progress.gap_hours.toLocaleString('sv-SE')} timmar kvar att boka`
+        : 'veckan fylld',
+    )
+  } else if (progress.capacity_unconfigured) {
+    parts.push('kapacitet ej konfigurerad')
+  } else if (progress.gap_kr != null) {
+    if (progress.gap_kr > 0) {
+      parts.push(`${progress.gap_kr.toLocaleString('sv-SE')} kr kvar till målet`)
+    } else if (verifieratBetaltKr > 0) {
+      parts.push('målet nått')
+    }
   }
   parts.push(
     progress.decisions_outstanding > 0

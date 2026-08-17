@@ -125,9 +125,9 @@ function presentationWithTwoKrClasses(state: 'proposal' | 'confirmed' = 'proposa
     version: 1,
     state,
     mission_id: state === 'confirmed' ? 'mis_abc123def456' : null,
-    goal_kr: plan.goal_kr,
+    goal_kr: plan.goal_kr!,
     deadline: plan.deadline,
-    headline: buildMissionHeadline(plan.goal_kr, plan.deadline),
+    headline: buildMissionHeadline(plan.goal_kr!, plan.deadline),
     steps: res.steps,
     degraded_sources: [],
   }

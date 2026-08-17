@@ -61,6 +61,7 @@ import {
   type MissionPlanPresentation,
 } from '@/lib/mission/mission-presentation'
 import { buildMissionHeadline } from '@/lib/mission/mission-summary'
+import { resolveGoalType } from '@/lib/mission/goal-type'
 
 const MAX_IMAGES_PER_MESSAGE = 4
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -233,6 +234,8 @@ function portfolioHasItems(portfolio: OpportunityPortfolio): boolean {
 function buildPortfolioContextSection(portfolio: OpportunityPortfolio): string {
   const lines: string[] = []
   lines.push('[MÖJLIGHETSPORTFÖLJ — underlag för uppdrag. Referera ENDAST dessa item_id:n i propose_mission_plan/confirm_mission. Belopp är serverns — hitta aldrig på egna.]')
+  // Etapp F (kapacitetsmål) — en rad, källskannad av tests/mission-tools.spec.ts.
+  lines.push('[Kapacitetsmål: om hantverkaren vill fylla NÄSTA veckas luckor (tunn vecka), föreslå en plan med goal_type "capacity" och goal_hours (INTE goal_kr) i propose_mission_plan/confirm_mission — kräver konfigurerad kapacitet (Inställningar); saknas den, säg det ärligt i stället för att gissa ett tal.]')
   for (const cls of TRUTH_CLASSES) {
     const items = portfolio.by_class[cls]
     if (items.length === 0) continue
@@ -245,9 +248,20 @@ function buildPortfolioContextSection(portfolio: OpportunityPortfolio): string {
   return lines.join('\n')
 }
 
-function buildActiveMissionContextSection(mission: { id: string; goal_kr: number; deadline: string }): string {
+function buildActiveMissionContextSection(mission: {
+  id: string
+  goal_kr: number | null
+  deadline: string
+  goal_type?: string | null
+  goal_hours?: number | null
+}): string {
   const deadline = String(mission.deadline).slice(0, 10)
-  const headline = buildMissionHeadline(Number(mission.goal_kr), deadline)
+  const goalType = resolveGoalType(mission.goal_type)
+  const headline = buildMissionHeadline(
+    Number(mission.goal_kr) || 0,
+    deadline,
+    goalType === 'capacity' ? { goalType, goalHours: mission.goal_hours ?? undefined } : undefined,
+  )
   return `[AKTIVT UPPDRAG: ${headline}, deadline ${deadline}, mission_id ${mission.id}. Nya åtgärdskort för uppdraget ska bära payload.mission_id och payload.truth_class. Bara ETT uppdrag kan vara aktivt åt gången — föreslå aldrig ett nytt förrän det här är avslutat.]`
 }
 
@@ -1178,9 +1192,16 @@ export async function POST(request: NextRequest) {
       if (currentAgent === 'matte') {
         try {
           const portfolio = await loadOpportunityPortfolioForBusiness(supabase, businessId)
+          // select('*') — INTE en explicit kolumnlista: goal_type/goal_hours
+          // (sql/v145_mission_capacity_goal.sql) kan saknas som kolumner i
+          // vissa miljöer, och en explicit lista med dem hade gjort HELA
+          // frågan fela (42703) där, vilket i sin tur hade dolt ett
+          // legitimt aktivt PENGAuppdrag bakom missionErr-fail-softet nedan
+          // — en regression för Etapp A/B. '*' returnerar bara de kolumner
+          // som faktiskt finns; resolveGoalType() defaultar resten.
           const { data: activeMissionRow, error: missionErr } = await supabase
             .from('mission')
-            .select('id, goal_kr, deadline')
+            .select('*')
             .eq('business_id', businessId)
             .eq('status', 'active')
             .maybeSingle()

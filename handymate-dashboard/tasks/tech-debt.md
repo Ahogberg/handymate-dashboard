@@ -2564,3 +2564,5 @@ en kontext-nyckel plumbas in i ToolContext (v3-regelmotorns autonomi opåverkad)
 **Trigger:** När Karin/prisjustering prioriteras för skarpt bruk, eller om en pilot rapporterar att godkända prisjusteringar inte syns någonstans.
 
 **Relaterat:** Samma mönster som TD-22 (tyst no-op i stället för ett synligt fel), fast i approval-exekveraren i stället för en portal-route.
+
+- TD-84: PresenterBar (demo-presentatörsläget) tvingar horisontell overflow vid 390px — knappraden radbryts inte, hela dashboarden klipps i högerkant PÅ DEMOKONTOT (riktiga kunder ser aldrig balken). Upptäckt 2026-08-17 vid Etapp E:s mobilverifiering. Fix: flex-wrap/min-w-0 i aside[data-demo-presenter].

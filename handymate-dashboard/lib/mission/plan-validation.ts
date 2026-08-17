@@ -16,6 +16,7 @@
  */
 
 import type { OpportunityPortfolio, PortfolioItem, PortfolioMeasure, TruthClass } from './opportunity-portfolio'
+import { resolveGoalType, CAPACITY_GOAL_HOURS_MAX, type MissionGoalType } from './goal-type'
 
 export const MAX_MISSION_STEPS = 5
 
@@ -25,7 +26,16 @@ export interface MissionPlanStepInput {
 }
 
 export interface MissionPlanInput {
-  goal_kr: number
+  /** 'money' som standard när fältet saknas (resolveGoalType, se
+      lib/mission/goal-type.ts) — samma fail-soft-default som lästa
+      DB-rader använder. */
+  goal_type?: MissionGoalType
+  /** Krävs (ändligt, > 0) för pengamål. Ignoreras helt för kapacitetsmål —
+      ett värde här bygger ALDRIG in sig i en kapacitetsplan. */
+  goal_kr?: number
+  /** Krävs (0 < n ≤ CAPACITY_GOAL_HOURS_MAX) för kapacitetsmål. Ignoreras
+      helt för pengamål — timmar och kronor blandas aldrig. */
+  goal_hours?: number
   deadline: string
   steps: MissionPlanStepInput[]
 }
@@ -56,17 +66,37 @@ const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
  * Validerar en föreslagen plan mot en (färsk) portfölj.
  *
  * Regler: 1–5 steg; varje item_id måste finnas i portföljen (vilken klass
- * som helst); inga dubbletter; goal_kr ändligt och > 0; deadline ett datum
- * STRIKT efter idag (ren datumjämförelse — svensk arbetsdagssemantik krävs
- * inte i V1).
+ * som helst); inga dubbletter; deadline ett datum STRIKT efter idag (ren
+ * datumjämförelse — svensk arbetsdagssemantik krävs inte i V1). Målet
+ * grenar på goal_type (Etapp F): pengamål kräver goal_kr ändligt och > 0
+ * (goal_hours ignoreras helt); kapacitetsmål kräver goal_hours ändligt,
+ * > 0 och ≤ CAPACITY_GOAL_HOURS_MAX (goal_kr ignoreras helt) — pengar och
+ * timmar kan aldrig bli samma målsiffra.
  */
 export function validateMissionPlan(
   plan: MissionPlanInput,
   portfolio: OpportunityPortfolio,
   now: Date,
 ): PlanValidationResult {
-  if (!(typeof plan.goal_kr === 'number' && Number.isFinite(plan.goal_kr) && plan.goal_kr > 0)) {
-    return { ok: false, reason: 'bad_goal', detail: 'Målet måste vara ett belopp större än noll.' }
+  const goalType = resolveGoalType(plan.goal_type)
+
+  if (goalType === 'money') {
+    if (!(typeof plan.goal_kr === 'number' && Number.isFinite(plan.goal_kr) && plan.goal_kr > 0)) {
+      return { ok: false, reason: 'bad_goal', detail: 'Målet måste vara ett belopp större än noll.' }
+    }
+  } else {
+    if (!(
+      typeof plan.goal_hours === 'number'
+      && Number.isFinite(plan.goal_hours)
+      && plan.goal_hours > 0
+      && plan.goal_hours <= CAPACITY_GOAL_HOURS_MAX
+    )) {
+      return {
+        ok: false,
+        reason: 'bad_goal',
+        detail: `Kapacitetsmålet måste vara fler än 0 och högst ${CAPACITY_GOAL_HOURS_MAX} timmar.`,
+      }
+    }
   }
 
   const deadline = typeof plan.deadline === 'string' ? plan.deadline.trim().slice(0, 10) : ''

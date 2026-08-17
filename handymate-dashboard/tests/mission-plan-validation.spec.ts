@@ -12,6 +12,7 @@ import { test, expect } from '@playwright/test'
 import { assembleOpportunityPortfolio } from '../lib/mission/opportunity-portfolio'
 import { validateMissionPlan, type MissionPlanInput } from '../lib/mission/plan-validation'
 import { isMissionPlanPresentation, type MissionPlanPresentation } from '../lib/mission/mission-presentation'
+import { CAPACITY_GOAL_HOURS_MAX } from '../lib/mission/goal-type'
 
 const NOW = new Date('2026-08-17T12:00:00Z')
 
@@ -155,6 +156,77 @@ test.describe('validateMissionPlan — berikning ur portföljen', () => {
   })
 })
 
+test.describe('validateMissionPlan — Etapp F (kapacitetsmål)', () => {
+  function kapacitetsPlan(p = portfolio(), overrides: Partial<MissionPlanInput> = {}): MissionPlanInput {
+    return {
+      goal_type: 'capacity',
+      goal_hours: 12,
+      deadline: '2026-09-30',
+      steps: [
+        { item_id: p.by_class.ateraktivering[0].id, motivation: 'Väck badrumskunderna för att fylla veckan' },
+      ],
+      ...overrides,
+    }
+  }
+
+  test('kapacitetsplan utan goal_hours avvisas (bad_goal)', () => {
+    const plan = kapacitetsPlan()
+    delete (plan as any).goal_hours
+    const res = validateMissionPlan(plan, portfolio(), NOW)
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.reason).toBe('bad_goal')
+  })
+
+  test('kapacitetsplan med goal_hours 0, negativt, NaN eller över taket avvisas', () => {
+    for (const hours of [0, -3, NaN, Infinity, CAPACITY_GOAL_HOURS_MAX + 1]) {
+      const plan = kapacitetsPlan(portfolio(), { goal_hours: hours })
+      const res = validateMissionPlan(plan, portfolio(), NOW)
+      expect(res.ok, `goal_hours ${hours} skulle avvisas`).toBe(false)
+      if (!res.ok) expect(res.reason).toBe('bad_goal')
+    }
+  })
+
+  test('goal_hours exakt på taket accepteras', () => {
+    const plan = kapacitetsPlan(portfolio(), { goal_hours: CAPACITY_GOAL_HOURS_MAX })
+    expect(validateMissionPlan(plan, portfolio(), NOW).ok).toBe(true)
+  })
+
+  test('giltig kapacitetsplan accepteras och ignorerar en insmugglad goal_kr helt', () => {
+    const p = portfolio()
+    const plan = kapacitetsPlan(p, { goal_kr: 999999 } as any)
+    const res = validateMissionPlan(plan, p, NOW)
+    expect(res.ok).toBe(true)
+  })
+
+  test('pengaplan utan goal_type (default money) fungerar oförändrat — dagens vägar rörs inte', () => {
+    // Samma facit som giltigPlan()-testerna ovan, men uttryckligen utan
+    // goal_type — bekräftar att fail-soft-defaulten (resolveGoalType) inte
+    // ändrar beteendet för V1:s redan levande pengaplaner.
+    const res = validateMissionPlan(giltigPlan(), portfolio(), NOW)
+    expect(res.ok).toBe(true)
+  })
+
+  test('en goal_hours smugglad in på en pengaplan (goal_type money/saknat) ignoreras — goal_kr avgör ensam', () => {
+    const plan = giltigPlan()
+    ;(plan as any).goal_hours = 999
+    const res = validateMissionPlan(plan, portfolio(), NOW)
+    expect(res.ok).toBe(true)
+  })
+
+  test('pengaplan (explicit goal_type money) utan goal_kr avvisas (bad_goal) — goal_hours räddar inte den', () => {
+    const p = portfolio()
+    const plan: MissionPlanInput = {
+      goal_type: 'money',
+      goal_hours: 12,
+      deadline: '2026-09-30',
+      steps: [{ item_id: p.by_class.indrivningsbart[0].id, motivation: 'x' }],
+    }
+    const res = validateMissionPlan(plan, p, NOW)
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.reason).toBe('bad_goal')
+  })
+})
+
 test.describe('isMissionPlanPresentation — metadata-kontraktets vakt', () => {
   function giltigPresentation(): MissionPlanPresentation {
     const p = portfolio()
@@ -199,5 +271,23 @@ test.describe('isMissionPlanPresentation — metadata-kontraktets vakt', () => {
     expect(isMissionPlanPresentation(null)).toBe(false)
     expect(isMissionPlanPresentation('mission_plan')).toBe(false)
     expect(isMissionPlanPresentation(42)).toBe(false)
+  })
+
+  test('Etapp F: en kapacitetspresentation med goal_kr null accepteras (additiv schemaändring)', () => {
+    const kapacitet: MissionPlanPresentation = {
+      ...giltigPresentation(),
+      goal_type: 'capacity',
+      goal_kr: null,
+      goal_hours: 12,
+      headline: 'Boka 12 timmar till vecka 39',
+    }
+    expect(isMissionPlanPresentation(kapacitet)).toBe(true)
+  })
+
+  test('Etapp F: en äldre lagrad presentation UTAN goal_type/goal_hours accepteras fortfarande (bakåtkompatibel)', () => {
+    const aldre: any = giltigPresentation()
+    delete aldre.goal_type
+    delete aldre.goal_hours
+    expect(isMissionPlanPresentation(aldre)).toBe(true)
   })
 })

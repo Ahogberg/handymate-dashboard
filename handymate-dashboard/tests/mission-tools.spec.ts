@@ -73,9 +73,9 @@ function presentationWithTwoKrClassesAndACountClass(): MissionPlanPresentation {
     version: 1,
     state: 'proposal',
     mission_id: null,
-    goal_kr: plan.goal_kr,
+    goal_kr: plan.goal_kr!,
     deadline: plan.deadline,
-    headline: buildMissionHeadline(plan.goal_kr, plan.deadline),
+    headline: buildMissionHeadline(plan.goal_kr!, plan.deadline),
     steps: res.steps,
     degraded_sources: [],
   }
@@ -117,6 +117,19 @@ test.describe('buildMissionHeadline', () => {
   test('formaterar belopp i sv-SE och returnerar deadline ordagrant', () => {
     expect(buildMissionHeadline(150000, '2026-09-30'))
       .toBe(`Frigöra ${(150000).toLocaleString('sv-SE')} kr före 2026-09-30`)
+  })
+
+  test('Etapp F: goalType capacity bygger "Boka N timmar till vecka V", ignorerar goalKr helt', () => {
+    // 2026-09-30 ligger i ISO-vecka 40.
+    const headline = buildMissionHeadline(999999, '2026-09-30', { goalType: 'capacity', goalHours: 12 })
+    expect(headline).toBe('Boka 12 timmar till vecka 40')
+    expect(headline).not.toContain('999999')
+    expect(headline).not.toContain('kr')
+  })
+
+  test('Etapp F: utan opts (eller goalType money) är beteendet bakåtkompatibelt oförändrat', () => {
+    expect(buildMissionHeadline(72000, '2026-09-30', { goalType: 'money' }))
+      .toBe(`Frigöra ${(72000).toLocaleString('sv-SE')} kr före 2026-09-30`)
   })
 })
 
@@ -191,6 +204,21 @@ test.describe('tool-definitions.ts — propose_mission_plan / confirm_mission', 
     expect(lower).toMatch(/aldrig.*(belopp|hitta)|hitta.*aldrig/)
     expect(block).toMatch(/5/)
   })
+
+  test('Etapp F: båda verktygen har valfria goal_type/goal_hours-fält, och goal_kr är INTE längre obligatoriskt', () => {
+    for (const [start, end] of [
+      ['name: "propose_mission_plan"', 'name: "confirm_mission"'],
+      ['name: "confirm_mission"', 'name: "send_agent_message"'],
+    ] as const) {
+      const block = sliceBetween(defsSrc, start, end, start)
+      expect(block).toContain('goal_type')
+      expect(block).toContain('goal_hours')
+      expect(block.toLowerCase()).toContain('capacity')
+      // goal_kr krävs bara villkorat (pengamål) — required-listan på
+      // toppnivå ska INTE tvinga fram goal_kr längre.
+      expect(block).toContain('required: ["deadline", "steps"]')
+    }
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -255,6 +283,29 @@ test.describe('tool-router.ts — propose_mission_plan / confirm_mission', () =>
     expect(body).toContain('next_instruction')
     expect(body).toContain('truth_class')
   })
+
+  // ── Etapp F — kapacitetsmål (tasks/jaunty-pondering-hummingbird.md) ────
+
+  test('confirm_mission grenar INSERT:en på goalType: kapacitetsvägen skriver goal_type/goal_hours/goal_kr:null, pengavägen lämnar dem orörda', () => {
+    const body = functionBody(routerSrc, 'confirmMissionTool')
+    expect(body).toContain("insertPayload.goal_type = 'capacity'")
+    expect(body).toContain('insertPayload.goal_hours = plan.goal_hours')
+    expect(body).toContain('insertPayload.goal_kr = null')
+    expect(body).toContain('insertPayload.goal_kr = plan.goal_kr')
+  })
+
+  test('confirm_mission hanterar saknade kapacitetskolumner (v145 ej körd) vänligt, utan att fälla pengavägen', () => {
+    const body = functionBody(routerSrc, 'confirmMissionTool')
+    expect(body).toContain("'42703'")
+    expect(body.toLowerCase()).toContain('v145')
+  })
+
+  test('propose_mission_plan och confirm_mission bygger presentationen via resolveGoalType (samma fail-soft-default som läsvägarna)', () => {
+    const propose = functionBody(routerSrc, 'proposeMissionPlanTool')
+    const confirm = functionBody(routerSrc, 'confirmMissionTool')
+    expect(propose).toContain('resolveGoalType(')
+    expect(confirm).toContain('resolveGoalType(')
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -315,5 +366,15 @@ test.describe('matte/chat/route.ts — möjlighetsportfölj-kontextblock', () =>
 
   test('känd kostnadspunkt är kommenterad (portföljen kör flera queries per Matte-tur)', () => {
     expect(chatSrc.toLowerCase()).toContain('känd kostnadspunkt')
+  })
+
+  test('Etapp F: kontextblocket instruerar Matte om kapacitetsmål (goal_type capacity + goal_hours)', () => {
+    expect(chatSrc).toContain('goal_type "capacity"')
+    expect(chatSrc).toContain('goal_hours')
+    expect(chatSrc.toLowerCase()).toContain('nästa veckas luckor')
+  })
+
+  test('Etapp F: mission-selecten är select(\'*\') — inte en explicit kolumnlista som fallerar pre-v145', () => {
+    expect(chatSrc).toContain(".from('mission')\n            .select('*')")
   })
 })

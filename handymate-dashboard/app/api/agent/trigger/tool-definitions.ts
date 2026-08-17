@@ -623,11 +623,17 @@ export const toolDefinitions = [
   // lib/agents/personalities.ts (ingen specialist listar dem).
   {
     name: "propose_mission_plan",
-    description: "Föreslå en uppdragsplan för hantverkarens pengamål — visas som ett plankort i chatten, INTE skapat än (hantverkaren måste bekräfta, se confirm_mission). item_id MÅSTE komma ordagrant från möjlighetsportfölj-kontextblocket i systempromptet — hitta ALDRIG på ett eget id. Hitta ALDRIG på belopp: alla belopp kopieras alltid från portföljen server-side, oavsett vad du anger. Högst 5 steg.",
+    description: "Föreslå en uppdragsplan för hantverkarens mål — visas som ett plankort i chatten, INTE skapat än (hantverkaren måste bekräfta, se confirm_mission). item_id MÅSTE komma ordagrant från möjlighetsportfölj-kontextblocket i systempromptet — hitta ALDRIG på ett eget id. Hitta ALDRIG på belopp: alla belopp kopieras alltid från portföljen server-side, oavsett vad du anger. Högst 5 steg.",
     input_schema: {
       type: "object" as const,
       properties: {
-        goal_kr: { type: "number", description: "Pengamålet i kronor, t.ex. 150000" },
+        goal_type: {
+          type: "string",
+          enum: ["money", "capacity"],
+          description: "'money' (standard, pengamål) eller 'capacity' (kapacitetsmål: timmar att boka för NÄSTA vecka, kräver konfigurerad kapacitet i Inställningar). Ange bara ETT av goal_kr/goal_hours beroende på detta val.",
+        },
+        goal_kr: { type: "number", description: "Pengamålet i kronor, t.ex. 150000. Bara för goal_type 'money' — ignoreras för kapacitetsmål." },
+        goal_hours: { type: "number", description: "Kapacitetsmålet i timmar för NÄSTA vecka, t.ex. 12 (max 200). Bara för goal_type 'capacity' — ignoreras för pengamål." },
         deadline: { type: "string", description: "Deadline, format ÅÅÅÅ-MM-DD — måste vara ett datum efter idag" },
         steps: {
           type: "array",
@@ -642,7 +648,7 @@ export const toolDefinitions = [
           },
         },
       },
-      required: ["goal_kr", "deadline", "steps"],
+      required: ["deadline", "steps"],
     },
   },
   {
@@ -651,7 +657,13 @@ export const toolDefinitions = [
     input_schema: {
       type: "object" as const,
       properties: {
-        goal_kr: { type: "number", description: "Pengamålet i kronor, t.ex. 150000" },
+        goal_type: {
+          type: "string",
+          enum: ["money", "capacity"],
+          description: "'money' (standard, pengamål) eller 'capacity' (kapacitetsmål: timmar att boka för NÄSTA vecka, kräver konfigurerad kapacitet i Inställningar). Ange bara ETT av goal_kr/goal_hours beroende på detta val.",
+        },
+        goal_kr: { type: "number", description: "Pengamålet i kronor, t.ex. 150000. Bara för goal_type 'money' — ignoreras för kapacitetsmål." },
+        goal_hours: { type: "number", description: "Kapacitetsmålet i timmar för NÄSTA vecka, t.ex. 12 (max 200). Bara för goal_type 'capacity' — ignoreras för pengamål." },
         deadline: { type: "string", description: "Deadline, format ÅÅÅÅ-MM-DD — måste vara ett datum efter idag" },
         steps: {
           type: "array",
@@ -666,7 +678,7 @@ export const toolDefinitions = [
           },
         },
       },
-      required: ["goal_kr", "deadline", "steps"],
+      required: ["deadline", "steps"],
     },
   },
 

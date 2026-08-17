@@ -38,6 +38,7 @@ import { loadOpportunityPortfolioForBusiness } from '@/lib/mission/opportunity-p
 import { validateMissionPlan, type MissionPlanInput } from '@/lib/mission/plan-validation'
 import type { MissionPlanPresentation } from '@/lib/mission/mission-presentation'
 import { buildMissionSummaryText, buildMissionHeadline } from '@/lib/mission/mission-summary'
+import { resolveGoalType } from '@/lib/mission/goal-type'
 
 interface ToolResult {
   success: boolean
@@ -2718,7 +2719,12 @@ async function getCustomerCommitments(
 function parseMissionPlanInput(params: Record<string, unknown>): MissionPlanInput {
   const rawSteps = Array.isArray(params.steps) ? params.steps : []
   return {
+    // Etapp F: 'money'/'capacity' skickas rakt igenom oparsat om det avviker
+    // — validateMissionPlan() defaultar (via resolveGoalType) allt annat till
+    // 'money', så vi behöver ingen egen defaultering här.
+    goal_type: params.goal_type === 'capacity' || params.goal_type === 'money' ? params.goal_type : undefined,
     goal_kr: typeof params.goal_kr === 'number' ? params.goal_kr : Number(params.goal_kr),
+    goal_hours: typeof params.goal_hours === 'number' ? params.goal_hours : Number(params.goal_hours),
     deadline: typeof params.deadline === 'string' ? params.deadline : '',
     steps: rawSteps.map((raw) => {
       const step = (raw ?? {}) as Record<string, unknown>
@@ -2753,14 +2759,23 @@ async function proposeMissionPlanTool(
     return { success: false, error: result.detail }
   }
 
+  // Etapp F: pengar och timmar blandas ALDRIG i en siffra — presentationen
+  // bär bara DET ena målfältet, det andra sätts uttryckligen till null.
+  const goalType = resolveGoalType(plan.goal_type)
   const presentation: MissionPlanPresentation = {
     kind: 'mission_plan',
     version: 1,
     state: 'proposal',
     mission_id: null,
-    goal_kr: plan.goal_kr,
+    goal_type: goalType,
+    goal_kr: goalType === 'money' ? plan.goal_kr! : null,
+    goal_hours: goalType === 'capacity' ? plan.goal_hours! : null,
     deadline: plan.deadline,
-    headline: buildMissionHeadline(plan.goal_kr, plan.deadline),
+    headline: buildMissionHeadline(
+      plan.goal_kr ?? 0,
+      plan.deadline,
+      goalType === 'capacity' ? { goalType, goalHours: plan.goal_hours } : undefined,
+    ),
     steps: result.steps,
     degraded_sources: portfolio.degraded_sources,
   }
@@ -2860,10 +2875,19 @@ async function confirmMissionTool(
   }
 
   const id = generateId('mis')
-  const { error } = await supabase.from('mission').insert({
+  const goalType = resolveGoalType(plan.goal_type)
+
+  // Etapp F: INSERT-formen grenar medvetet på goalType i stället för att
+  // alltid skicka med goal_type/goal_hours. sql/v145_mission_capacity_goal.sql
+  // (kolumnerna) körs manuellt av Andreas och kan alltså saknas i vissa
+  // miljöer — pengavägen (den gamla, redan levande vägen) skickar EXAKT
+  // samma insert-form som innan Etapp F, så pengauppdrag aldrig regresserar
+  // i en omigrerad miljö. Bara kapacitetsvägen bär de nya kolumnerna, och
+  // dess egen felgren nedan (42703/schema cache) fångar en omigrerad miljö
+  // vänligt.
+  const insertPayload: Record<string, unknown> = {
     id,
     business_id: businessId,
-    goal_kr: plan.goal_kr,
     deadline: plan.deadline,
     status: 'active',
     plan_snapshot: { steps: result.steps },
@@ -2872,7 +2896,19 @@ async function confirmMissionTool(
     // igenom den (levande dashboard-/mobil-chatt) — annars NULL, precis som
     // förut (autonoma vägar bär ingen inloggad identitet).
     created_by: context.businessUserId ?? null,
-  })
+  }
+  if (goalType === 'capacity') {
+    insertPayload.goal_type = 'capacity'
+    insertPayload.goal_hours = plan.goal_hours
+    insertPayload.goal_kr = null
+  } else {
+    insertPayload.goal_kr = plan.goal_kr
+    // goal_type/goal_hours utelämnas MEDVETET på pengavägen: kolumnerna kan
+    // saknas helt pre-v145, och när v145 väl är körd täcker DEFAULT 'money'
+    // exakt samma sak.
+  }
+
+  const { error } = await supabase.from('mission').insert(insertPayload)
 
   if (error) {
     // Max ETT aktivt uppdrag per företag (partiellt unikt index,
@@ -2893,6 +2929,17 @@ async function confirmMissionTool(
         error: 'Uppdragsfunktionen är inte påkopplad ännu i den här miljön — be din admin köra den senaste databasmigrationen.',
       }
     }
+    // Etapp F: kapacitetskolumnerna (sql/v145_mission_capacity_goal.sql) kan
+    // saknas i en miljö där v145 inte körts än — samma fail-soft-idiom som
+    // 42P01 ovan, men för enskilda kolumner i stället för hela tabellen
+    // (PostgREST svarar 42703/undefined_column eller ett
+    // "schema cache"-felmeddelande).
+    if (goalType === 'capacity' && (error.code === '42703' || /schema cache|does not exist/i.test(error.message || ''))) {
+      return {
+        success: false,
+        error: 'Kapacitetsmål är inte påkopplat ännu i den här miljön — be din admin köra den senaste databasmigrationen (v145).',
+      }
+    }
     return { success: false, error: error.message }
   }
 
@@ -2901,9 +2948,15 @@ async function confirmMissionTool(
     version: 1,
     state: 'confirmed',
     mission_id: id,
-    goal_kr: plan.goal_kr,
+    goal_type: goalType,
+    goal_kr: goalType === 'money' ? plan.goal_kr! : null,
+    goal_hours: goalType === 'capacity' ? plan.goal_hours! : null,
     deadline: plan.deadline,
-    headline: buildMissionHeadline(plan.goal_kr, plan.deadline),
+    headline: buildMissionHeadline(
+      plan.goal_kr ?? 0,
+      plan.deadline,
+      goalType === 'capacity' ? { goalType, goalHours: plan.goal_hours } : undefined,
+    ),
     steps: result.steps,
     degraded_sources: portfolio.degraded_sources,
   }

@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { getMissionProgress, type MissionRow } from '@/lib/mission/mission-progress'
+import { resolveGoalType } from '@/lib/mission/goal-type'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,9 +41,16 @@ export async function GET(request: NextRequest) {
 
     let row: MissionRow | null = null
     try {
+      // select('*') — INTE en explicit kolumnlista: goal_type/goal_hours
+      // (sql/v145_mission_capacity_goal.sql) kan saknas som kolumner i
+      // miljöer där v145 inte körts, och en explicit lista med dem hade
+      // gjort HELA frågan fela (42703) där — vilket hade dolt ett legitimt
+      // aktivt PENGAuppdrag bakom fail-softet nedan (regression för Etapp
+      // A). '*' returnerar bara de kolumner som faktiskt finns;
+      // normaliseringen nedan defaultar resten via resolveGoalType().
       const { data, error } = await supabase
         .from('mission')
-        .select('id, business_id, goal_kr, deadline, status, plan_snapshot, portfolio_generated_at, created_at, resolved_at')
+        .select('*')
         .eq('business_id', business.business_id)
         .eq('status', 'active')
         .maybeSingle()
@@ -59,7 +67,15 @@ export async function GET(request: NextRequest) {
 
     if (!row) return NextResponse.json({ mission: null })
 
-    const mission: MissionRow = { ...row, goal_kr: Number(row.goal_kr) }
+    const mission: MissionRow = {
+      ...row,
+      goal_kr: row.goal_kr == null ? null : Number(row.goal_kr),
+      // Etapp F: fail-soft-normalisering vid läsning — se lib/mission/
+      // goal-type.ts. Gäller lika mycket i miljöer där v145 inte körts
+      // (kolumnerna saknas helt i raden) som i migrerade miljöer.
+      goal_type: resolveGoalType(row.goal_type),
+      goal_hours: row.goal_hours == null ? null : Number(row.goal_hours),
+    }
 
     // Lättjefull utgång: deadline passerad → märk som expired (best effort).
     const idag = new Date().toISOString().slice(0, 10)

@@ -5,6 +5,7 @@ import type { NextBestActionRecommendation } from '@/components/jarvis/GorDettaF
 import { useMission } from '@/lib/mission/MissionProvider'
 import { buildMissionHeadline } from '@/lib/mission/mission-summary'
 import { progressParts } from '@/lib/mission/progress-parts'
+import { resolveGoalType } from '@/lib/mission/goal-type'
 
 /**
  * MatteHero — Command Centers mörka dagsbesked (Etapp C1, 2026-08-17;
@@ -52,6 +53,11 @@ import { progressParts } from '@/lib/mission/progress-parts'
  *   skelettrad, aldrig ett "Inget behöver dig" som sekunden senare byts ut
  *   mot "Uppdrag: …" (samma blink-regel som fällde "Klart idag", nu
  *   utvidgad till mission-laddningen).
+ * - Etapp F (kapacitetsmål): statistikytans FÖRSTA ruta grenar på
+ *   uppdragets goal_type — gap_hours/"timmar kvar att boka" för
+ *   kapacitetsmål, gap_kr/"kr kvar till målet" för pengamål, ALDRIG båda.
+ *   capacity_unconfigured (kapaciteten saknar en verklig inställning) visar
+ *   "—", aldrig ett gissat gap.
  */
 export function MatteHero({
   greetingName,
@@ -90,8 +96,17 @@ export function MatteHero({
     .toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })
     .toUpperCase()
 
+  // Etapp F (kapacitetsmål): rubriken och stat-ytan grenar på uppdragets
+  // goal_type. resolveGoalType defaultar fail-soft till 'money' — se
+  // lib/mission/goal-type.ts.
+  const missionGoalType = missionActive ? resolveGoalType(mission!.goal_type) : 'money'
+
   const headline = missionActive
-    ? `Uppdrag: ${buildMissionHeadline(mission!.goal_kr, mission!.deadline.slice(0, 10))}`
+    ? `Uppdrag: ${buildMissionHeadline(
+        mission!.goal_kr ?? 0,
+        mission!.deadline.slice(0, 10),
+        missionGoalType === 'capacity' ? { goalType: missionGoalType, goalHours: mission!.goal_hours ?? undefined } : undefined,
+      )}`
     : beslut === 0
       ? 'Inget behöver dig just nu. Allt är hanterat.'
       : `${beslut} ${beslut === 1 ? 'sak' : 'saker'} behöver dig i dag. Resten är hanterat.`
@@ -155,10 +170,26 @@ export function MatteHero({
           <div className="flex gap-5 sm:gap-7 shrink-0 border-t lg:border-t-0 lg:border-l border-white/10 pt-3.5 lg:pt-0 lg:pl-7">
             <div>
               <div className="font-heading tabular-nums text-[26px] sm:text-3xl font-bold leading-none text-primary-300">
-                {progress.gap_kr > 0 ? progress.gap_kr.toLocaleString('sv-SE') : '✓'}
+                {missionGoalType === 'capacity'
+                  ? progress.capacity_unconfigured
+                    ? '—'
+                    : progress.gap_hours != null && progress.gap_hours > 0
+                      ? progress.gap_hours.toLocaleString('sv-SE')
+                      : '✓'
+                  : progress.gap_kr != null && progress.gap_kr > 0
+                    ? progress.gap_kr.toLocaleString('sv-SE')
+                    : '✓'}
               </div>
               <div className="text-xs text-white/55 mt-1">
-                {progress.gap_kr > 0 ? 'kr kvar till målet' : 'målet nått'}
+                {missionGoalType === 'capacity'
+                  ? progress.capacity_unconfigured
+                    ? 'kapacitet ej konfigurerad'
+                    : progress.gap_hours != null && progress.gap_hours > 0
+                      ? 'timmar kvar att boka'
+                      : 'veckan fylld'
+                  : progress.gap_kr != null && progress.gap_kr > 0
+                    ? 'kr kvar till målet'
+                    : 'målet nått'}
               </div>
             </div>
             <div>

@@ -318,6 +318,110 @@ test.describe('byggMissionProgress — gap_kr (Etapp D, ett enda facit för mål
   })
 })
 
+test.describe('byggMissionProgress — Etapp F (kapacitetsmål)', () => {
+  function kapacitetsMission(overrides: Partial<MissionRow> = {}): MissionRow {
+    return mission({
+      goal_type: 'capacity',
+      goal_kr: null,
+      goal_hours: 12,
+      plan_snapshot: {
+        steps: [steg({
+          truth_class: 'ateraktivering',
+          measure: { kind: 'count', count: 7 },
+          evidence: { table: 'customer_group', ref_id: 'badrum' },
+          approval_type: null,
+        })],
+      },
+      ...overrides,
+    })
+  }
+
+  test('konfigurerad vecka, bokat < mål → gap_hours = mål − bokat, gap_kr null', () => {
+    const progress = byggMissionProgress({
+      mission: kapacitetsMission(),
+      ...tomIndata(),
+      capacityWeek: { bookedHours: 5, configured: true },
+    })
+    expect(progress.gap_hours).toBe(7)
+    expect(progress.gap_kr).toBeNull()
+    expect(progress.capacity_unconfigured).toBe(false)
+  })
+
+  test('konfigurerad vecka, bokat >= mål → gap_hours golvar på 0 ("veckan fylld")', () => {
+    const progress = byggMissionProgress({
+      mission: kapacitetsMission(),
+      ...tomIndata(),
+      capacityWeek: { bookedHours: 20, configured: true },
+    })
+    expect(progress.gap_hours).toBe(0)
+  })
+
+  test('okonfigurerad vecka (source !== settings) → gap_hours null, capacity_unconfigured true — ALDRIG ett gissat gap', () => {
+    const progress = byggMissionProgress({
+      mission: kapacitetsMission(),
+      ...tomIndata(),
+      capacityWeek: { bookedHours: 5, configured: false },
+    })
+    expect(progress.gap_hours).toBeNull()
+    expect(progress.capacity_unconfigured).toBe(true)
+    expect(progress.gap_kr).toBeNull()
+  })
+
+  test('capacityWeek utelämnat helt (I/O kunde inte läsa) → samma ärliga okonfigurerad-degradering', () => {
+    const progress = byggMissionProgress({ mission: kapacitetsMission(), ...tomIndata() })
+    expect(progress.gap_hours).toBeNull()
+    expect(progress.capacity_unconfigured).toBe(true)
+  })
+
+  test('pengauppdrag (default/explicit money) → gap_hours ALLTID null, capacity_unconfigured ALLTID false', () => {
+    const utanGoalType = byggMissionProgress({ mission: mission(), ...tomIndata() })
+    expect(utanGoalType.gap_hours).toBeNull()
+    expect(utanGoalType.capacity_unconfigured).toBe(false)
+
+    const explicitMoney = byggMissionProgress({
+      mission: mission({ goal_type: 'money' }),
+      ...tomIndata(),
+      capacityWeek: { bookedHours: 5, configured: true }, // ska ignoreras helt
+    })
+    expect(explicitMoney.gap_hours).toBeNull()
+    expect(explicitMoney.gap_kr).toBe(150000)
+  })
+
+  test('verifierat betalt via en fakturareferens ackumuleras normalt i per_class ÄVEN för kapacitetsuppdrag, men rör aldrig gap_hours', () => {
+    const progress = byggMissionProgress({
+      mission: kapacitetsMission({
+        plan_snapshot: {
+          steps: [
+            steg({ truth_class: 'indrivningsbart' }), // pf_000000000000 → inv_1
+          ],
+        },
+      }),
+      invoices: [{ invoice_id: 'inv_1', total: 42000, status: 'paid', paid_at: '2026-08-10T09:00:00Z' }],
+      missionApprovals: [],
+      quotes: [],
+      nowMs: NOW_MS,
+      capacityWeek: { bookedHours: 5, configured: true },
+    })
+    expect(progress.per_class.indrivningsbart?.verified_paid_kr).toBe(42000)
+    expect(progress.gap_hours).toBe(7) // 12 − 5, orört av de 42 000 kr
+    expect(progress.gap_kr).toBeNull()
+  })
+
+  test('mutual exclusivity: gap_kr och gap_hours är aldrig båda satta, för vare sig penga- eller kapacitetsuppdrag', () => {
+    const pengar = byggMissionProgress({ mission: mission(), ...tomIndata() })
+    expect(pengar.gap_kr === null || pengar.gap_hours === null).toBe(true)
+    expect(pengar.gap_hours).toBeNull()
+
+    const kapacitet = byggMissionProgress({
+      mission: kapacitetsMission(),
+      ...tomIndata(),
+      capacityWeek: { bookedHours: 5, configured: true },
+    })
+    expect(kapacitet.gap_kr === null || kapacitet.gap_hours === null).toBe(true)
+    expect(kapacitet.gap_kr).toBeNull()
+  })
+})
+
 test.describe('inget klassöverskridande fält existerar', () => {
   test('progressen bär inget hopslaget kronfält under något känt namn', () => {
     const progress = byggMissionProgress({ mission: mission(), ...tomIndata() })

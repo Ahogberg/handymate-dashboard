@@ -22,6 +22,8 @@ function progress(overrides: Partial<MissionProgress> = {}): MissionProgress {
     decisions_outstanding: 0,
     is_expired: false,
     gap_kr: 0,
+    gap_hours: null,
+    capacity_unconfigured: false,
     ...overrides,
   }
 }
@@ -84,6 +86,36 @@ test.describe('progressParts — en sträng per klass-fakta', () => {
 
   test('decisions_outstanding === 0 → "inget väntar på dig just nu"', () => {
     expect(progressParts(progress({ decisions_outstanding: 0 }))).toContain('inget väntar på dig just nu')
+  })
+})
+
+test.describe('progressParts — Etapp F (kapacitetsmål): timmar, aldrig kr, för gap-delen', () => {
+  test('gap_hours > 0 → "N timmar kvar att boka", ingen kr-gap-del', () => {
+    const parts = progressParts(progress({ gap_hours: 7, gap_kr: null }))
+    expect(parts).toContain(`${(7).toLocaleString('sv-SE')} timmar kvar att boka`)
+    expect(parts.some(p => p.includes('kvar till målet'))).toBe(false)
+    expect(parts.some(p => p === 'målet nått')).toBe(false)
+  })
+
+  test('gap_hours === 0 → "veckan fylld"', () => {
+    const parts = progressParts(progress({ gap_hours: 0, gap_kr: null }))
+    expect(parts).toContain('veckan fylld')
+  })
+
+  test('capacity_unconfigured (gap_hours null) → "kapacitet ej konfigurerad", inget gissat gap', () => {
+    const parts = progressParts(progress({ gap_hours: null, gap_kr: null, capacity_unconfigured: true }))
+    expect(parts).toContain('kapacitet ej konfigurerad')
+    expect(parts.some(p => p.includes('timmar'))).toBe(false)
+    expect(parts.some(p => p.includes('kr'))).toBe(false)
+  })
+
+  test('gap_hours satt tar företräde framför gap_kr — gap_kr-delen förekommer aldrig samtidigt', () => {
+    // Typiskt inte en riktig kombination (mutual exclusivity garanteras av
+    // mission-progress.spec.ts), men den här delen ska ändå ALDRIG rendera
+    // en kr-gap-rad när gap_hours är satt.
+    const parts = progressParts(progress({ gap_hours: 3, gap_kr: 500 }))
+    expect(parts).toContain(`${(3).toLocaleString('sv-SE')} timmar kvar att boka`)
+    expect(parts.join(' · ')).not.toContain('kr kvar till målet')
   })
 })
 
