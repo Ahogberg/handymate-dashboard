@@ -46,10 +46,16 @@ const REASON_TEXT: Record<string, string> = {
  *                   vitlistas redan nu så en framtida fix inte missar
  *                   den här listan.
  *   campaign_id   — seasonal_campaign
- *   checklist_id  — checklist_forslag / egenkontroll_foto
+ *   checklist_id  — checklist_forslag / egenkontroll_foto /
+ *                   playbook_kickoff_suggestion
  *   time_entry_id — time_attestation / tidrapport_forslag
  *   project_id    — checklist_forslag, four_eyes_project_close,
- *                   create_ata_draft, tidrapport_forslag
+ *                   create_ata_draft, tidrapport_forslag,
+ *                   playbook_kickoff_suggestion
+ *   knowledge_id  — playbook_pattern_confirmation (den skapade
+ *                   business_knowledge-raden — hittades saknas 2026-08-17
+ *                   vid Playbook → Project-slutförandet; utan den föll
+ *                   bekräftade mönster tyst ur Value Ledger-spåret)
  *   sms_id        — send_sms/quote_nudge/review_request-familjen
  *   message_id    — send_email (Resend-referensen — INTE "email_id", det
  *                   är det fältnamn caset faktiskt returnerar)
@@ -74,6 +80,7 @@ export const ARTIFACT_ID_KEYS = [
   'sms_id',
   'message_id',
   'total',
+  'knowledge_id',
 ] as const
 
 /**

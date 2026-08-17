@@ -149,4 +149,18 @@ test.describe('extractExecutionArtifacts — Value Ledger-grunden (kort → skap
     const r = extractExecutionArtifacts({ action: 'send_email', ok: true, message_id: 'msg_1' })
     expect(r).toEqual({ message_id: 'msg_1' })
   })
+
+  test('playbook_pattern_confirmation: knowledge_id plockas ut (Playbook → Project-slutförande, 2026-08-17)', () => {
+    const r = extractExecutionArtifacts({
+      action: 'playbook_pattern_confirmation', ok: true, knowledge_id: 'know_1',
+    })
+    expect(r).toEqual({ knowledge_id: 'know_1' })
+  })
+
+  test('playbook_kickoff_suggestion: checklist_id + project_id plockas ut', () => {
+    const r = extractExecutionArtifacts({
+      action: 'playbook_kickoff_suggestion', ok: true, checklist_id: 'cl_1', project_id: 'proj_1',
+    })
+    expect(r).toEqual({ checklist_id: 'cl_1', project_id: 'proj_1' })
+  })
 })
