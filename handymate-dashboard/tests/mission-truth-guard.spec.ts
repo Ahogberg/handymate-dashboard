@@ -21,6 +21,7 @@ const MISSION_FILES = [
   'mission-presentation.ts',
   'mission-progress.ts',
   'contact-outcomes.ts',
+  'mission-outreach.ts',
 ]
 
 // De hopslagna kronfältens kända namn. (Skrivs bara HÄR — implementations-
