@@ -66,7 +66,6 @@ import {
   countRows,
   DEMO_BUSINESS_ID,
   DEMO_OWNER_EMAIL,
-  E2E_TEST_PHONE,
   E2E_TEST_EMAIL,
   requireDemoOwnerPassword,
 } from './fixtures/db'
@@ -366,7 +365,12 @@ test.describe.serial('Flywheel — lärdomsloopen sluts på riktigt', () => {
           customer_id: genId('cust'),
           business_id: DEMO_BUSINESS_ID,
           name: KUND_NAMN,
-          phone_number: E2E_TEST_PHONE,
+          // KÖRUNIK telefon — INTE E2E_TEST_PHONE: den delade test-telefonen
+          // finns redan på en kund i demokontot (unique_phone_per_business
+          // föll första skarpa körningen, 2026-08-17). Ingen SMS går ut i
+          // den här loopen, så numret behöver aldrig kunna ta emot något —
+          // det behöver bara vara giltigt till formen och unikt per körning.
+          phone_number: `+4670${String(RUN_TS).slice(-7)}`,
           email: E2E_TEST_EMAIL,
           customer_type: 'private',
           customer_number: customerNumber,
