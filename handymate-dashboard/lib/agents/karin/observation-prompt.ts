@@ -37,6 +37,7 @@ import {
   computeProjectEconomics,
   type ProjectEconomics,
 } from '@/lib/projects/compute-economics'
+import { getExplicitMarginTarget } from '@/lib/profitability'
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
@@ -481,7 +482,24 @@ async function buildAggregate(
 // SCHEMA_BLOCK importerad från lib/agents/shared/schema-block.ts
 // ─────────────────────────────────────────────────────────────────
 
-function buildSystemPrompt(businessName: string, maturity: 'early_stage' | 'full_analysis'): string {
+/**
+ * Etapp T — marginalmålet injiceras med SAMMA set_at-disciplin som
+ * Guardian (lib/profitability.ts getExplicitMarginTarget): ett osatt mål
+ * (schema-defaulten 50 utan bekräftelse) får ALDRIG framstå som ett
+ * företagsmål. Saknas det används "20%+ över estimat"-tumregeln nedan —
+ * men uttryckligen märkt som Karins EGEN heuristik, inte ägarens mål.
+ */
+function buildMarginTargetLine(marginTargetPercent: number | null): string {
+  return marginTargetPercent !== null
+    ? `**Ägarens marginalmål: ${marginTargetPercent}%** — bekräftat av ägaren. Använd det som primär referens när du bedömer lönsamhet, inte en gissad tröskel.`
+    : 'Inget marginalmål är satt av ägaren. "20%+ över estimat" i punkt 2 nedan är DIN EGEN tumregel för att flagga möjliga ÄTA-kandidater — presentera den ALDRIG som ett företagsmål, bara som din observation.'
+}
+
+function buildSystemPrompt(
+  businessName: string,
+  maturity: 'early_stage' | 'full_analysis',
+  marginTargetPercent: number | null = null,
+): string {
   if (maturity === 'early_stage') {
     return `Du är Karin, ekonomi-ansvarig hos ${businessName}. Du är ny på företaget och har precis fått tillgång till siffrorna.
 
@@ -521,6 +539,8 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
   }
 
   return `Du är Karin, ekonomi-ansvarig hos ${businessName}. Analysera datan med dessa konkreta hypoteser om svenska hantverkar-verksamheter:
+
+**Marginalmål:** ${buildMarginTargetLine(marginTargetPercent)}
 
 1. **Betalningsmönster per kund-typ:**
    - Betalar BRF-kunder senare än privatkunder? Hur många dagar i snitt?
@@ -616,8 +636,9 @@ async function callKarinWithThinking(
   businessName: string,
   aggregate: KarinAggregate,
   maturity: 'early_stage' | 'full_analysis',
+  marginTargetPercent: number | null,
 ) {
-  const systemPrompt = buildSystemPrompt(businessName, maturity)
+  const systemPrompt = buildSystemPrompt(businessName, maturity, marginTargetPercent)
   const userMessage = `Här är ${businessName}s siffror senaste 90 dagarna:
 
 ${JSON.stringify(aggregate, null, 2)}
@@ -665,10 +686,15 @@ export async function runKarinObservation(
   const maturity: 'early_stage' | 'full_analysis' =
     invoiceCount < 10 ? 'early_stage' : 'full_analysis'
 
+  // Etapp T — samma set_at-disciplin som Guardian: null om ägaren aldrig
+  // uttryckligen sparat ett marginalmål (schema-defaulten 50 räknas inte).
+  const marginTargetPercent = await getExplicitMarginTarget(supabase, businessId)
+
   const { observations, thinkingPreview, debug } = await callKarinWithThinking(
     businessName,
     aggregate,
     maturity,
+    marginTargetPercent,
   )
 
   if (observations.length === 0) {

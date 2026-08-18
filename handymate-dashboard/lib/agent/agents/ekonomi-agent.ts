@@ -6,6 +6,7 @@
  */
 
 import { BusinessContext, escalateToolDefinition, filterTools } from './shared'
+import { hourlyRateField, vatRateField, formatHourlyRateForPrompt } from '@/lib/company/company-model'
 
 export const EKONOMI_MODEL = 'claude-haiku-4-5-20251001'
 export const EKONOMI_MAX_STEPS = 6
@@ -40,8 +41,15 @@ export function buildEkonomiPrompt(
   const settings = ctx.v3Settings
   const prefs = ctx.learnedPreferences
 
-  const hourlyRate = biz.pricing_settings?.hourly_rate || 695
-  const vatRate = biz.pricing_settings?.vat_rate || 25
+  // Etapp T — KVITTOPRINCIPEN: inget fallback-tal för timpris. Ett saknat
+  // timpris instruerar agenten att prissätta arbetsrader 0 kr och märka
+  // dem "PRIS SAKNAS", exakt samma disciplin materialrader redan har.
+  const hourlyRate = hourlyRateField(biz.pricing_settings)
+  const hourlyRateLine = formatHourlyRateForPrompt(hourlyRate)
+  const hourlyRateInstruction = hourlyRate.value !== null
+    ? `använd ALLTID timpris ${hourlyRate.value} kr/tim`
+    : 'timpris är INTE angivet av ägaren — sätt arbetsrader till 0 kr och kommentera "PRIS SAKNAS — fyll i manuellt". Gissa ALDRIG ett timpris.'
+  const vatRate = vatRateField(biz.pricing_settings).value ?? 25
 
   const pricingTendency = prefs?.pricing_tendency
     ? `Prissättningstendans: ${prefs.pricing_tendency}.`
@@ -96,7 +104,7 @@ Hantera ekonomi-relaterad uppgift (${triggerType}).`
   } else {
     priceListBlock = `## Prislista
 Hantverkaren har INGEN prislista inlagd.
-- Arbete: använd timpris ${hourlyRate} kr/tim
+- Arbete: ${hourlyRateInstruction}
 - Material: sätt alla materialpriser till 0 kr
 - Lägg till "PRIS SAKNAS — fyll i manuellt" som kommentar på varje materialrad`
   }
@@ -105,14 +113,14 @@ Hantverkaren har INGEN prislista inlagd.
 Du hanterar ENBART offerter, fakturor, betalningar och ROT/RUT-beräkningar.
 
 ## Prissättning
-- Timpris: ${hourlyRate} kr/tim (exkl. moms)
+- ${hourlyRateLine}
 - Moms: ${vatRate}%
 ${pricingTendency}
 
 ${priceListBlock}
 
 ## REGLER FÖR OFFERTPRISER
-1. Arbete: använd ALLTID timpris ${hourlyRate} kr/tim
+1. Arbete: ${hourlyRateInstruction}
 2. Material: ${priceList.length > 0
     ? 'Använd ENBART priser från prislistan ovan'
     : 'Sätt alla materialpriser till 0 kr (prislista saknas)'}

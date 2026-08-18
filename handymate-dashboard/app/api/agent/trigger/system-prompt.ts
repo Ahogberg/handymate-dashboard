@@ -3,6 +3,13 @@
 
 import { formatKnowledgeForPrompt } from '@/lib/widget-activation'
 import { AGENT_CAPABILITIES, isValidAgentId } from '@/lib/agent/capabilities'
+import {
+  hourlyRateField,
+  vatRateField,
+  formatHourlyRateForPrompt,
+  byggCompanyModelPromptBlock,
+  type CompanyModel,
+} from '@/lib/company/company-model'
 
 /** +46761234567 → 076-123 45 67 */
 function formatAgentPhoneHint(phone: string): string {
@@ -86,6 +93,11 @@ interface BusinessContext {
     pipeline_stage_key: string
     pipeline_stage_label: string
   } | null
+  // Etapp T (Company Model Read Contract V1) — källmärkt "hur jobbar den
+  // här firman"-block. Valfri: saknas den (äldre anropare, fel vid
+  // laddning) faller prompten tillbaka på pricing_settings direkt för
+  // timpris/moms, fortfarande utan att hitta på en siffra.
+  companyModel?: CompanyModel | null
 }
 
 const BRANCH_NAMES: Record<string, string> = {
@@ -105,8 +117,13 @@ export function buildSystemPrompt(
   triggerData?: Record<string, unknown>
 ): string {
   const branchLabel = BRANCH_NAMES[business.branch] || business.branch || 'Hantverkare'
-  const hourlyRate = business.pricing_settings?.hourly_rate || 695
-  const vatRate = business.pricing_settings?.vat_rate || 25
+  // Etapp T — KVITTOPRINCIPEN: kontraktet har INGEN fallback-siffra för
+  // timpris. Ett saknat timpris skrivs ut som en explicit instruktion att
+  // fråga ägaren, aldrig som ett gissat 695. Moms behåller sin generella
+  // 25%-standard (svensk moms på hantverkararbete) — inte del av
+  // saneringen, se tasks/jaunty-pondering-hummingbird.md Etapp T.
+  const hourlyRateLine = formatHourlyRateForPrompt(hourlyRateField(business.pricing_settings))
+  const vatRate = vatRateField(business.pricing_settings).value ?? 25
 
   // Använd den delade formatteraren från lib/widget-activation.ts så Lisa,
   // widget-chat och andra surfaces alla bygger knowledge-blocket från samma
@@ -180,6 +197,12 @@ export function buildSystemPrompt(
 
   const contextBlock = buildAgentContextBlock(business.agentContext)
   const learnedPrefsBlock = buildLearnedPreferencesBlock(business.learnedPreferences)
+  // Etapp T — kompakt källmärkt "hur jobbar den här firman"-block (mål,
+  // marginalmål, betalningsvillkor, bekräftade regler). Saknas modellen
+  // (äldre anropare/laddningsfel) → tom sträng, ingen krasch.
+  const companyModelBlock = business.companyModel
+    ? `\n${byggCompanyModelPromptBlock(business.companyModel)}\n`
+    : ''
 
   const prefsBlock = business.preferences && Object.keys(business.preferences).length > 0
     ? '\n\n## Inlärda preferenser\n' +
@@ -197,14 +220,14 @@ Du är en professionell affärsassistent som hjälper ${business.contact_name ||
 - **Företag:** ${business.business_name}
 - **Bransch:** ${branchLabel}
 - **Område:** ${business.service_area || 'Ej angivet'}
-- **Timpris:** ${hourlyRate} kr/tim (exkl. moms)
+- **${hourlyRateLine}**
 - **Moms:** ${vatRate}%
 
 ${servicesSection}
 
 ## Arbetstider
 ${hoursBlock}
-${contextBlock}
+${companyModelBlock}${contextBlock}
 ## Affärsregler
 ${buildAutomationBlock(business.automationSettings)}
 ### ROT-avdrag

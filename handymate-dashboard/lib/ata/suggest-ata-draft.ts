@@ -73,6 +73,8 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
+import { hourlyRateField } from '@/lib/company/company-model'
+import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 
 // ─────────────────────────────────────────────────────────────────
 // shouldSuggestAtaDraft — ren, facit-testbar gate
@@ -248,7 +250,13 @@ export async function suggestAtaDraft(
         default_hourly_rate?: number | null
       }
 
-      const { generateQuoteFromInput } = await import('@/lib/ai-quote-generator')
+      // Etapp T — KVITTOPRINCIPEN: aldrig ett hårdkodat 650. Riktiga
+      // källor ENDAST (pricing_settings.hourly_rate, sedan onboardingens
+      // default_hourly_rate) — saknas båda hoppar vi över AI-genereringen
+      // (samma fail-soft-gren som en misslyckad generering: kortet skapas
+      // ändå, utan preview och utan påstått belopp — se filhuvudet).
+      const hourlyRate = hourlyRateField(biz.pricing_settings).value ?? biz.default_hourly_rate ?? null
+
       // ÄTA:n gäller ett PÅGÅENDE projekt — projektnamnet ger modellen
       // sammanhanget som annars saknas i en lös mening om extraarbete.
       // Hoistad så beslutsposten kan hasha exakt det underlag modellen fick.
@@ -258,18 +266,30 @@ export async function suggestAtaDraft(
         params.customerContext ? `Kundens egna ord: "${params.customerContext}"` : null,
       ].filter(Boolean).join(' ')
 
-      const generated = await generateQuoteFromInput({
-        businessId: params.businessId,
-        branch: biz.industry || 'Bygg',
-        hourlyRate: biz.pricing_settings?.hourly_rate || biz.default_hourly_rate || 650,
-        textDescription: ataUnderlag,
-        priceList: (priceListResult.data || []).map((p: any) => ({
-          id: p.id, name: p.name, unit: p.unit, unit_price: p.sales_price, category: p.category,
-        })),
-        templates: templatesResult.data || [],
-        customerId: project?.customer_id || undefined,
-        jobType: project?.job_type || undefined,
-      })
+      let generated: Awaited<ReturnType<typeof import('@/lib/ai-quote-generator').generateQuoteFromInput>> | null = null
+      if (!hourlyRate) {
+        await rapporteraTystFel(
+          supabase,
+          params.businessId,
+          'ata/suggest-ata-draft:missing_hourly_rate',
+          'Timpris saknas — ÄTA-kortet skapas utan AI-genererad prisad förhandsvisning för att inte citera ett gissat timpris.',
+          { project_id: params.projectId },
+        )
+      } else {
+        const { generateQuoteFromInput } = await import('@/lib/ai-quote-generator')
+        generated = await generateQuoteFromInput({
+          businessId: params.businessId,
+          branch: biz.industry || 'Bygg',
+          hourlyRate,
+          textDescription: ataUnderlag,
+          priceList: (priceListResult.data || []).map((p: any) => ({
+            id: p.id, name: p.name, unit: p.unit, unit_price: p.sales_price, category: p.category,
+          })),
+          templates: templatesResult.data || [],
+          customerId: project?.customer_id || undefined,
+          jobType: project?.job_type || undefined,
+        })
+      }
 
       if (generated?.items?.length) {
         preview = {

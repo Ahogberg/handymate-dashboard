@@ -25,6 +25,16 @@ import {
   type AgentDebugInfo,
 } from '@/lib/agents/shared/thinking-call'
 import { saveAndPush } from '@/lib/agents/shared/save-and-push'
+import { QUIET_MONTH_DAYS } from '@/lib/customers/quiet-customer'
+
+/**
+ * Etapp T — Hannas reaktiveringströskel var en fristående "60"-siffra,
+ * oberoende av lib/customers/quiet-customer.ts's delade primitiv (som
+ * Hanna-outbound-cronen och capacity-fill använder: 90/180 dagar).
+ * 60 dagar = 2 × QUIET_MONTH_DAYS (30) — samma tal som förut, men nu
+ * härlett ur den delade primitiven så det inte kan glida isär tyst.
+ */
+export const HANNA_REACTIVATION_QUIET_DAYS = 2 * QUIET_MONTH_DAYS
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
@@ -234,14 +244,15 @@ async function buildHannaAggregate(
 
   const totalLtvAll = customers.reduce((s, c) => s + (lifetimeValueByCustomer[c.customer_id] || 0), 0)
 
-  // ── Reaktiverings-kandidater (60+ dagar sedan kontakt + LTV >= 5000) ──
-  const sixtyDaysAgoMs = now - 60 * 86400000
+  // ── Reaktiverings-kandidater (HANNA_REACTIVATION_QUIET_DAYS+ dagar
+  // sedan kontakt + LTV >= 5000) ──
+  const reactivationCutoffMs = now - HANNA_REACTIVATION_QUIET_DAYS * 86400000
   const reactivationCandidates = customers
     .filter(c => {
       const lastTs = lastContactByCustomer[c.customer_id]
       if (!lastTs) return false
       const ltv = lifetimeValueByCustomer[c.customer_id] || 0
-      return lastTs < sixtyDaysAgoMs && ltv >= 5000
+      return lastTs < reactivationCutoffMs && ltv >= 5000
     })
     .map(c => {
       const declaredType = c.customer_type
@@ -380,7 +391,7 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
   return `Du är Hanna, marknadsansvarig hos ${businessName}. Du har ögon för retention och säsongsmönster — du spårar kund-flödet över tid och spottar var marknadsföringen läcker. Du analyserar senaste 180 dagarnas kunder, leads och fakturor med dessa konkreta hypoteser:
 
 1. **Reaktiverings-möjligheter (inaktiva högt-värde-kunder):**
-   - Vilka kunder med tidigare högt LTV har inte hörts på 60+ dagar?
+   - Vilka kunder med tidigare högt LTV har inte hörts på ${HANNA_REACTIVATION_QUIET_DAYS}+ dagar?
    - Är det rätt tid för ett "vi tänkte på dig"-utskick?
    - Vilken kund-typ är mest värd att jaga aktivt?
 

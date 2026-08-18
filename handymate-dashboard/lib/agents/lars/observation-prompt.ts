@@ -27,6 +27,7 @@ import {
   computeProjectEconomics,
   type ProjectEconomics,
 } from '@/lib/projects/compute-economics'
+import { getExplicitMarginTarget } from '@/lib/profitability'
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
@@ -545,9 +546,19 @@ async function buildLarsAggregate(
 // Hypotes-driven prompt
 // ─────────────────────────────────────────────────────────────────
 
+/** Etapp T — samma set_at-disciplin som Guardian/Karin: ett osatt
+    marginalmål (schema-defaulten 50 utan bekräftelse) får ALDRIG
+    framstå som ett företagsmål. */
+function buildMarginTargetLine(marginTargetPercent: number | null): string {
+  return marginTargetPercent !== null
+    ? `**Ägarens marginalmål: ${marginTargetPercent}%** — bekräftat av ägaren. Jämför \`marginal_pct\` mot detta i stället för en egen gissad tröskel när du bedömer om ett projekt går bra.`
+    : 'Inget marginalmål är satt av ägaren. Bedöm \`marginal_pct\` på om den är positiv/negativ eller ovanligt låg jämfört med andra projekt — hitta ALDRIG på ett procentmål och presentera det som ägarens.'
+}
+
 function buildLarsSystemPrompt(
   businessName: string,
   maturity: 'early_stage' | 'full_analysis',
+  marginTargetPercent: number | null = null,
 ): string {
   if (maturity === 'early_stage') {
     return `Du är Lars, projektledare hos ${businessName}. Du är ny på företaget och har precis fått tillgång till projekt-flödet.
@@ -588,6 +599,8 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
   }
 
   return `Du är Lars, projektledare hos ${businessName}. Du håller koll på operativ effektivitet — scope, tid, material, ÄTA-flöde. Du analyserar senaste 90 dagarnas projekt-data med dessa konkreta hypoteser:
+
+**Marginalmål:** ${buildMarginTargetLine(marginTargetPercent)}
 
 1. **Scope-creep per projekt-typ:**
    - Vilka projekt har gått 20%+ över budget-timmar?
@@ -681,8 +694,9 @@ async function callLarsWithThinking(
   businessName: string,
   aggregate: LarsAggregate,
   maturity: 'early_stage' | 'full_analysis',
+  marginTargetPercent: number | null,
 ) {
-  const systemPrompt = buildLarsSystemPrompt(businessName, maturity)
+  const systemPrompt = buildLarsSystemPrompt(businessName, maturity, marginTargetPercent)
   const userMessage = `Här är ${businessName}s projekt-data senaste 90 dagarna:
 
 ${JSON.stringify(aggregate, null, 2)}
@@ -727,10 +741,14 @@ export async function runLarsObservation(
   const maturity: 'early_stage' | 'full_analysis' =
     projectCount < 10 ? 'early_stage' : 'full_analysis'
 
+  // Etapp T — samma set_at-disciplin som Guardian/Karin.
+  const marginTargetPercent = await getExplicitMarginTarget(supabase, businessId)
+
   const { observations, thinkingPreview, debug } = await callLarsWithThinking(
     businessName,
     aggregate,
     maturity,
+    marginTargetPercent,
   )
 
   if (observations.length === 0) {

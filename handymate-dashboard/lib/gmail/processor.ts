@@ -7,6 +7,8 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import type { GmailMessage } from '@/lib/gmail'
 import { getNextCustomerNumber } from '@/lib/numbering'
+import { hourlyRateField } from '@/lib/company/company-model'
+import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 
 interface BusinessConfig {
   business_id: string
@@ -373,6 +375,24 @@ export async function processInboundEmail(
         .eq('business_id', businessId)
         .single()
 
+      // Etapp T — KVITTOPRINCIPEN: aldrig ett hårdkodat 650. Riktiga
+      // källor ENDAST (pricing_settings.hourly_rate, sedan onboardingens
+      // default_hourly_rate). intent-agent.ts kräver ett riktigt tal
+      // (interpolerar det direkt i sin prompt som "Timpris: X kr/h") —
+      // saknas båda källorna hoppar vi över hela Matte Gmail
+      // Intelligence-passet för det här mejlet istället för att låta
+      // agenten citera ett gissat pris till kunden.
+      const hourlyRate = hourlyRateField(config?.pricing_settings as any).value ?? config?.default_hourly_rate ?? null
+      if (!hourlyRate) {
+        await rapporteraTystFel(
+          supabase,
+          businessId,
+          'gmail/processor:missing_hourly_rate',
+          'Timpris saknas — Matte Gmail Intelligence hoppas över för detta mejl för att inte citera ett gissat timpris.',
+        )
+        return
+      }
+
       const [entity, availableSlots] = await Promise.all([
         resolveEntity(fromEmail, businessId),
         getAvailableSlots(businessId, 2).catch(() => [] as import('@/lib/matte/calendar-slots').TimeSlot[]),
@@ -388,7 +408,7 @@ export async function processInboundEmail(
 
       const businessConf = {
         businessName: config?.display_name || config?.business_name || 'Handymate',
-        hourlyRate: (config?.pricing_settings as any)?.hourly_rate || config?.default_hourly_rate || 650,
+        hourlyRate,
         rotEnabled: config?.rot_enabled || false,
         workStart: '07:00',
         workEnd: '17:00',

@@ -6,6 +6,7 @@ import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { createInvoice } from '@/lib/invoices/create-invoice'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
+import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 
 export const dynamic = 'force-dynamic'
 
@@ -78,23 +79,46 @@ export async function GET(request: NextRequest) {
     .eq('business_id', business.business_id)
     .single()
 
-  // Formatera tidposter till fakturarader
+  // Formatera tidposter till fakturarader. Etapp T — KVITTOPRINCIPEN:
+  // aldrig ett hårdkodat 895. Saknas BÅDE tidpostens eget timpris OCH
+  // företagets default_hourly_rate skrivs raden prislös (samma "Sätt
+  // pris"-konvention som produktbanken, lib/products/pricing-state.ts:
+  // unit_price 0 betyder "ej prissatt", aldrig en gissning) och flaggas
+  // i warnings så gränssnittet kan uppmärksamma hantverkaren INNAN
+  // fakturan skapas — en gissad krona på en faktura är värst av alla.
+  const warnings: string[] = []
   const laborLines = (timeEntries || []).map((te: any) => {
     const hours = (te.duration_minutes || 0) / 60
-    const rate = te.hourly_rate || config?.default_hourly_rate || 895
+    const rate = te.hourly_rate || config?.default_hourly_rate || null
+    if (!rate) {
+      warnings.push(
+        `Timpris saknas för "${te.description || `Arbete ${te.work_date}`}" — sätt pris manuellt innan fakturan skickas.`,
+      )
+    }
     return {
       source: 'time_entry' as const,
       source_id: te.time_entry_id,
       description: te.description || `Arbete ${te.work_date}`,
       quantity: Math.round(hours * 100) / 100,
       unit: 'tim',
-      unit_price: rate,
-      total: Math.round(hours * rate),
+      unit_price: rate || 0,
+      total: rate ? Math.round(hours * rate) : 0,
       is_rot_eligible: true,
       is_rut_eligible: false,
       date: te.work_date,
+      price_missing: !rate,
     }
   })
+
+  if (warnings.length > 0) {
+    await rapporteraTystFel(
+      supabase,
+      business.business_id,
+      'invoices/from-project:missing_hourly_rate',
+      `${warnings.length} tidpost(er) saknar timpris för projekt ${projectId} — fakturaunderlaget visar dem prislösa.`,
+      { project_id: projectId, count: warnings.length },
+    )
+  }
 
   // Formatera material till fakturarader
   const materialLines = (materials || []).map((m: any) => ({
@@ -120,8 +144,9 @@ export async function GET(request: NextRequest) {
     },
     labor: { lines: laborLines, total: laborTotal },
     materials: { lines: materialLines, total: materialTotal },
+    ...(warnings.length > 0 ? { warnings } : {}),
     config: {
-      default_hourly_rate: config?.default_hourly_rate || 895,
+      default_hourly_rate: config?.default_hourly_rate ?? null,
       default_payment_days: config?.default_payment_days || 30,
       invoice_prefix: config?.invoice_prefix || 'FV',
       next_invoice_number: config?.next_invoice_number || 1,

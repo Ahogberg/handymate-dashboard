@@ -75,6 +75,8 @@ import { getServerSupabase } from '@/lib/supabase'
 import { checkCostGuards, type CostGuardBusiness } from '@/lib/agents/shared/cost-guard'
 import { generateQuoteFromInput, type PriceListItem, type QuoteTemplate } from '@/lib/ai-quote-generator'
 import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
+import { hourlyRateField } from '@/lib/company/company-model'
+import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 
 // ─────────────────────────────────────────────────────────────────
 // Trösklar
@@ -278,7 +280,21 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
       default_hourly_rate?: number | null
     }
     const branch = bizConfig.industry || 'Bygg'
-    const hourlyRate = bizConfig.pricing_settings?.hourly_rate || bizConfig.default_hourly_rate || 650
+    // Etapp T — KVITTOPRINCIPEN: aldrig ett hårdkodat 650. Riktiga källor
+    // ENDAST (pricing_settings.hourly_rate, sedan onboardingens
+    // default_hourly_rate) — saknas båda hoppar vi över AI-genereringen
+    // helt istället för att citera ett påhittat timpris i utkastet.
+    const hourlyRate = hourlyRateField(bizConfig.pricing_settings).value ?? bizConfig.default_hourly_rate ?? null
+    if (!hourlyRate) {
+      await rapporteraTystFel(
+        supabase,
+        businessId,
+        'quotes/suggest-quote-draft:missing_hourly_rate',
+        'Timpris saknas (varken pricing_settings.hourly_rate eller default_hourly_rate satt) — hoppar över AI-offertutkast för att inte citera ett gissat pris.',
+        { lead_id: leadId },
+      )
+      return
+    }
 
     // Rå lead-text — ÄTALLTID vad som skickas vidare till exekveraren
     // (payload.description), aldrig den AI-skrivna kundvända varianten.

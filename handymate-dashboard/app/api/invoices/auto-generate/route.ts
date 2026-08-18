@@ -3,6 +3,7 @@ import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { createInvoice } from '@/lib/invoices/create-invoice'
+import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 
 /**
  * POST - Auto-generera fakturor från ofakturerade tidrapporter.
@@ -150,21 +151,58 @@ async function generateInvoicesForBusiness(params: {
       const customer = customerMap[customerId]
       const customerName = customer?.name || 'Okänd kund'
 
-      // Build invoice items from time entries
-      const items = entries.map((entry: any) => {
-        const hours = (entry.duration_minutes || 0) / 60
-        const rate = entry.hourly_rate || business.default_hourly_rate || 500
-        const total = Math.round(hours * rate * 100) / 100
+      // Build invoice items from time entries. Etapp T — KVITTOPRINCIPEN:
+      // aldrig ett hårdkodat 500 på en RIKTIG faktura — det är den värsta
+      // lögnen i systemet. Tidposter utan vare sig eget timpris eller
+      // företagets default_hourly_rate exkluderas ur fakturan (stannar
+      // ofakturerade, försöks igen nästa körning) i stället för att gissa.
+      const priceLessEntries: any[] = []
+      const pricedEntries: any[] = []
+      const items = entries
+        .filter((entry: any) => {
+          const rate = entry.hourly_rate || business.default_hourly_rate
+          if (!rate) {
+            priceLessEntries.push(entry)
+            return false
+          }
+          pricedEntries.push(entry)
+          return true
+        })
+        .map((entry: any) => {
+          const hours = (entry.duration_minutes || 0) / 60
+          const rate = entry.hourly_rate || business.default_hourly_rate
+          const total = Math.round(hours * rate * 100) / 100
 
-        return {
-          description: entry.description || `Arbete ${new Date(entry.work_date).toLocaleDateString('sv-SE')}`,
-          quantity: Math.round(hours * 100) / 100,
-          unit: 'timmar',
-          unit_price: rate,
-          total,
-          type: 'labor',
-        }
-      })
+          return {
+            description: entry.description || `Arbete ${new Date(entry.work_date).toLocaleDateString('sv-SE')}`,
+            quantity: Math.round(hours * 100) / 100,
+            unit: 'timmar',
+            unit_price: rate,
+            total,
+            type: 'labor',
+          }
+        })
+
+      if (priceLessEntries.length > 0) {
+        await rapporteraTystFel(
+          supabase,
+          params.businessId,
+          'invoices/auto-generate:missing_hourly_rate',
+          `${priceLessEntries.length} tidpost(er) för ${customerName} saknar timpris — uteslutna ur auto-fakturan, inget pris gissades.`,
+          { customer_id: customerId, count: priceLessEntries.length },
+        )
+        result.errors.push(
+          `${customerName}: ${priceLessEntries.length} tidrapport(er) saknar timpris och fakturerades inte — sätt timpris manuellt.`,
+        )
+      }
+
+      if (items.length === 0) {
+        result.skipped.push({
+          customer_name: customerName,
+          reason: 'Alla ofakturerade tidrapporter saknar timpris — inget kunde faktureras utan att gissa ett pris.',
+        })
+        continue
+      }
 
       const subtotal = items.reduce((sum: number, item: any) => sum + item.total, 0)
       const vatRate = 25
@@ -218,7 +256,9 @@ async function generateInvoicesForBusiness(params: {
       dueDate.setDate(dueDate.getDate() + dueDays)
 
       // Källorna markeras atomiskt via den delade vägen (P0-4).
-      const entryIds = entries.map((e: any) => e.time_entry_id)
+      // Bara de PRISADE entries — priceLessEntries (Etapp T ovan) ska
+      // förbli ofakturerade så de kan plockas upp igen när timpris satts.
+      const entryIds = pricedEntries.map((e: any) => e.time_entry_id)
       const markering = await markInvoiceSources(supabase, {
         businessId: params.businessId,
         invoiceId: invoice.invoice_id,
@@ -235,7 +275,7 @@ async function generateInvoicesForBusiness(params: {
         business_id: params.businessId,
         activity_type: 'invoice_created',
         title: `Faktura #${invoiceNumber} skapad`,
-        description: `Auto-genererad faktura på ${total} kr från ${entries.length} tidrapporter`,
+        description: `Auto-genererad faktura på ${total} kr från ${pricedEntries.length} tidrapporter`,
         created_by: 'system',
       })
 

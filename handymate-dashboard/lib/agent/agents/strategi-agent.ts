@@ -8,6 +8,7 @@
 
 import { toolDefinitions } from '@/app/api/agent/trigger/tool-definitions'
 import { BusinessContext } from './shared'
+import { hourlyRateField, formatHourlyRateForPrompt } from '@/lib/company/company-model'
 
 export const STRATEGI_MODEL = 'claude-sonnet-4-6'
 export const STRATEGI_MAX_STEPS = 10
@@ -33,7 +34,9 @@ export function buildStrategiPrompt(
     cleaning: 'Städföretag', other: 'Hantverkare',
   }
   const branch = branchMap[biz.branch] || biz.branch || 'Hantverkare'
-  const hourlyRate = biz.pricing_settings?.hourly_rate || 695
+  // Etapp T — KVITTOPRINCIPEN: inget fallback-tal. Saknat timpris skrivs
+  // ut som en explicit instruktion att fråga ägaren.
+  const hourlyRateLine = formatHourlyRateForPrompt(hourlyRateField(biz.pricing_settings))
 
   // Preferences block
   let prefsBlock = ''
@@ -94,7 +97,7 @@ Du kallas ENBART för komplexa beslut som kräver eftertanke.
 ## Företag
 - ${biz.business_name} (${branch})
 - Område: ${biz.service_area || 'Sverige'}
-- Timpris: ${hourlyRate} kr/tim (exkl. moms)
+- ${hourlyRateLine}
 
 ## Automationsinställningar
 ${settings ? `- Arbetstider: ${settings.work_start}–${settings.work_end}
