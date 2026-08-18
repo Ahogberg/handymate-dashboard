@@ -389,6 +389,10 @@ async function createCustomer(
     address_line: params.address_line || null,
     customer_number: customerNumber,
     created_at: new Date().toISOString(),
+    // v152 (kontaktproveniens): agenten agerar på hantverkarens uppdrag —
+    // samma proveniens som om han skapat kunden själv.
+    contact_source: 'manual',
+    contact_source_at: new Date().toISOString(),
   })
 
   if (error) return { success: false, error: error.message }

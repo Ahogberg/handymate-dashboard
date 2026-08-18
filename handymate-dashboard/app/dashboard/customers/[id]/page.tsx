@@ -75,6 +75,9 @@ interface Customer {
   sms_opt_out?: boolean
   sms_opt_out_at?: string | null
   sms_opt_out_source?: string | null
+  email_opt_out?: boolean
+  email_opt_out_at?: string | null
+  email_opt_out_source?: string | null
 }
 
 interface CustomerFact {
@@ -558,6 +561,7 @@ export default function CustomerDetailPage() {
       reference: customer.reference || '',
       apartment_count: customer.apartment_count ? String(customer.apartment_count) : '',
       sms_opt_out: !!customer.sms_opt_out,
+      email_opt_out: !!customer.email_opt_out,
     })
     setIsEditing(true)
   }
@@ -798,6 +802,14 @@ export default function CustomerDetailPage() {
                   title="Kunden får inga agent-SMS förrän flaggan tas bort"
                 >
                   Har avböjt SMS
+                </span>
+              )}
+              {customer.email_opt_out && (
+                <span
+                  className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 border border-red-200 rounded-md"
+                  title="Kunden får inga marknadsföringsmail förrän flaggan tas bort"
+                >
+                  Har avböjt e-postutskick
                 </span>
               )}
             </div>
@@ -1864,6 +1876,16 @@ export default function CustomerDetailPage() {
                   className="w-4 h-4 rounded border-gray-300 text-primary-700 focus:ring-primary-600"
                 />
                 <span className="text-sm text-gray-700">Kunden har avböjt SMS (inga agent-SMS skickas)</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer min-h-[44px] p-3 bg-gray-50 rounded-xl">
+                <input
+                  type="checkbox"
+                  checked={!!editForm.email_opt_out}
+                  onChange={(e) => setEditForm({ ...editForm, email_opt_out: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300 text-primary-700 focus:ring-primary-600"
+                />
+                <span className="text-sm text-gray-700">Kunden har avböjt e-postutskick (inga marknadsföringsmail skickas)</span>
               </label>
             </div>
 

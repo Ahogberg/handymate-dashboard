@@ -23,6 +23,7 @@ import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { getStageBySlug } from '@/lib/pipeline'
 import { normalizeSwedishPhone } from '@/lib/phone-normalize'
 import { findCustomerDuplicates } from '@/lib/customer-dedupe'
+import { contactSourceFromLead, isMissingContactSourceColumnError } from '@/lib/customers/contact-source'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -169,17 +170,39 @@ export async function createLeadAndDeal(
     }
   } else {
     const newId = 'cust_' + Math.random().toString(36).substr(2, 9)
-    const { data: newCustomer } = await supabase
+    const newCustomerRow = {
+      customer_id: newId,
+      business_id: businessId,
+      name,
+      phone_number: leadPhone || null,
+      email: email || null,
+      // v152 (kontaktproveniens): Golden Path är den EN platsen som skapar
+      // en customer-rad ur ett lead — se lib/customers/contact-source.ts
+      // för mappningen mellan leads.source och contact_source.
+      contact_source: contactSourceFromLead(source),
+      contact_source_at: new Date().toISOString(),
+    }
+    let { data: newCustomer, error: newCustomerError } = await supabase
       .from('customer')
-      .insert({
-        customer_id: newId,
-        business_id: businessId,
-        name,
-        phone_number: leadPhone || null,
-        email: email || null,
-      })
+      .insert(newCustomerRow)
       .select('customer_id')
       .single()
+
+    if (newCustomerError && isMissingContactSourceColumnError(newCustomerError.message)) {
+      // sql/v152 ej körd ännu — Golden Path är den mest centrala kundvägen
+      // i hela appen (röst, widget, portal, referral, e-postforward, ...)
+      // och FÅR ALDRIG fällas av ett proveniensfält, samma toleransmönster
+      // som v86.
+      console.warn('[golden-path] contact_source-kolumner saknas (sql/v152 ej körd) — sparar utan dem:', newCustomerError.message)
+      const { contact_source, contact_source_at, ...rest } = newCustomerRow
+      const retry = await supabase.from('customer').insert(rest).select('customer_id').single()
+      newCustomer = retry.data
+      newCustomerError = retry.error
+    }
+
+    if (newCustomerError) {
+      console.error('[golden-path] customer insert error:', newCustomerError.message)
+    }
     customerId = newCustomer?.customer_id || newId
   }
 

@@ -349,6 +349,9 @@ async function findOrCreateCustomer(
       business_id: businessId,
       name,
       created_at: new Date().toISOString(),
+      // v152 (kontaktproveniens): kunden nämndes i ett röstagent-samtal.
+      contact_source: 'phone_call',
+      contact_source_at: new Date().toISOString(),
     })
     .select('customer_id')
     .single()

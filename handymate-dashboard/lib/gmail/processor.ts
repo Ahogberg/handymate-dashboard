@@ -136,6 +136,9 @@ async function autoCreateCustomer(
       email,
       phone_number: phone,
       ...(customerNumber ? { customer_number: customerNumber } : {}),
+      // v152 (kontaktproveniens): auto-skapad ur en obesvarad Gmail-tråd.
+      contact_source: 'gmail_import',
+      contact_source_at: new Date().toISOString(),
     })
     if (error) {
       console.error('[gmail-processor] Auto-create customer error:', error.message)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { isMissingContactSourceColumnError } from '@/lib/customers/contact-source'
 
 /**
  * POST /api/customers/bulk
@@ -66,6 +67,10 @@ export async function POST(request: NextRequest) {
         email: email || null,
         customer_type: 'private',
         created_at: new Date().toISOString(),
+        // v152 (kontaktproveniens): denna route används för CSV-massimport
+        // (onboarding-flödet).
+        contact_source: 'csv_import',
+        contact_source_at: new Date().toISOString(),
       })
     }
 
@@ -77,7 +82,15 @@ export async function POST(request: NextRequest) {
     let created = 0
     for (let i = 0; i < toInsert.length; i += 100) {
       const batch = toInsert.slice(i, i + 100)
-      const { error } = await supabase.from('customer').insert(batch)
+      let { error } = await supabase.from('customer').insert(batch)
+      if (error && isMissingContactSourceColumnError(error.message)) {
+        // sql/v152 ej körd ännu — hela onboarding-importen får aldrig
+        // fällas av ett proveniensfält, samma toleransmönster som v86.
+        console.warn('[customers/bulk] contact_source-kolumner saknas (sql/v152 ej körd) — sparar utan dem:', error.message)
+        const strippedBatch = batch.map(({ contact_source, contact_source_at, ...rest }) => rest)
+        const retry = await supabase.from('customer').insert(strippedBatch)
+        error = retry.error
+      }
       if (error) {
         console.error('[customers/bulk] Insert batch failed:', error)
         errors.push(`Batch ${Math.floor(i / 100) + 1} misslyckades`)

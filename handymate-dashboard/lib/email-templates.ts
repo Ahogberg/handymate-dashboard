@@ -314,7 +314,19 @@ export function nurtureStepEmail(params: {
   message: string
   ctaText?: string
   ctaUrl?: string
+  /** v151: signerad avregistreringslänk (lib/email/unsubscribe-link.ts).
+      Proaktiv marknadsföringsmail (nurture-sekvenser) MÅSTE bära en
+      avregistreringslänk — marknadsföringslagen-krav. Renderas som en liten
+      rad i mail-footern (footerExtra), separat från den vanliga kontakt-
+      raden så den inte kan förväxlas med hantverkarens egen info. */
+  unsubscribeUrl?: string
 }): { subject: string; html: string } {
+  const footerExtra = params.unsubscribeUrl
+    ? `<p style="margin:0 0 8px;font-size:12px;color:#94a3b8;">
+        Vill du inte längre få mail som detta? <a href="${params.unsubscribeUrl}" style="color:#0F766E;">Avregistrera dig här</a>.
+      </p>`
+    : undefined
+
   const html = emailLayout(params.branding, `
     <div style="color:#475569;font-size:15px;line-height:1.6;">
       ${params.message.replace(/\n/g, '<br/>')}
@@ -324,7 +336,7 @@ export function nurtureStepEmail(params: {
       ${ctaButton(params.ctaText, params.ctaUrl)}
     </p>
     ` : ''}
-  `)
+  `, footerExtra)
   return { subject: params.subject, html }
 }
 

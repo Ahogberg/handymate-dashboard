@@ -5,6 +5,7 @@ import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { findCustomerDuplicates } from '@/lib/customer-dedupe'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { isMissingContactSourceColumnError } from '@/lib/customers/contact-source'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -126,6 +127,10 @@ export async function POST(request: NextRequest) {
           email: email || null,
           address_line: address_line || null,
           created_at: new Date().toISOString(),
+          // v152 (kontaktproveniens): hantverkaren skapar kunden manuellt
+          // från dashboarden — ingen annan källa är rimlig här.
+          contact_source: 'manual',
+          contact_source_at: new Date().toISOString(),
         }
 
         // Optional fields - only include if they have values
@@ -148,7 +153,19 @@ export async function POST(request: NextRequest) {
           .from('customer')
           .insert(insertData)
 
-        if (error) throw error
+        if (error) {
+          // v152 (kontaktproveniens) ej körd ännu — tolerera precis som
+          // sms_opt_out nedan i update_customer, annars blockeras "Skapa
+          // kund"-knappen helt tills migrationen körts.
+          if (isMissingContactSourceColumnError(error.message)) {
+            console.warn('[actions/create_customer] contact_source-kolumner saknas (sql/v152 ej körd) — sparar utan dem:', error.message)
+            const { contact_source, contact_source_at, ...rest } = insertData
+            const { error: retryError } = await supabase.from('customer').insert(rest)
+            if (retryError) throw retryError
+            return NextResponse.json({ success: true, customerId, contact_source_saved: false })
+          }
+          throw error
+        }
         return NextResponse.json({ success: true, customerId })
       }
 
@@ -193,6 +210,16 @@ export async function POST(request: NextRequest) {
           updateData.sms_opt_out_at = optOut ? new Date().toISOString() : null
           updateData.sms_opt_out_source = optOut ? 'manual' : null
         }
+        // v151 (marknadsföringslagen-gap): samma manuella opt-out-toggle-
+        // mönster som sms_opt_out ovan, för e-postutskick i stället för SMS.
+        // sql/v151_email_optout.sql lägger kolumnerna men körs manuellt av
+        // Andreas — samma fail-soft-retry-behov, se hanteringen nedan.
+        if (data.email_opt_out !== undefined) {
+          const optOut = !!data.email_opt_out
+          updateData.email_opt_out = optOut
+          updateData.email_opt_out_at = optOut ? new Date().toISOString() : null
+          updateData.email_opt_out_source = optOut ? 'manual' : null
+        }
 
         const { error } = await supabase
           .from('customer')
@@ -202,18 +229,24 @@ export async function POST(request: NextRequest) {
         if (error) {
           const missingOptOutColumn =
             'sms_opt_out' in updateData && /column .*sms_opt_out.* does not exist/i.test(error.message || '')
-          if (missingOptOutColumn) {
+          const missingEmailOptOutColumn =
+            'email_opt_out' in updateData && /column .*email_opt_out.* does not exist/i.test(error.message || '')
+          if (missingOptOutColumn || missingEmailOptOutColumn) {
             console.warn(
-              '[actions/update_customer] sms_opt_out-kolumner saknas (sql/v86 ej körd) — sparar övriga fält utan dem:',
+              '[actions/update_customer] opt-out-kolumner saknas (sql/v86 eller sql/v151 ej körd) — sparar övriga fält utan dem:',
               error.message,
             )
-            const { sms_opt_out, sms_opt_out_at, sms_opt_out_source, ...rest } = updateData
+            const { sms_opt_out, sms_opt_out_at, sms_opt_out_source, email_opt_out, email_opt_out_at, email_opt_out_source, ...rest } = updateData
             const { error: retryError } = await supabase
               .from('customer')
               .update(rest)
               .eq('customer_id', customerId)
             if (retryError) throw retryError
-            return NextResponse.json({ success: true, sms_opt_out_saved: false })
+            return NextResponse.json({
+              success: true,
+              sms_opt_out_saved: !missingOptOutColumn,
+              email_opt_out_saved: !missingEmailOptOutColumn,
+            })
           }
           throw error
         }

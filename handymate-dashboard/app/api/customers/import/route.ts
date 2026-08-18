@@ -87,6 +87,9 @@ export async function POST(request: NextRequest) {
             email: email || null,
             address_line: address || null,
             customer_number: customerNumber,
+            // v152 (kontaktproveniens): CSV-import.
+            contact_source: 'csv_import',
+            contact_source_at: new Date().toISOString(),
           })
 
         if (error) {

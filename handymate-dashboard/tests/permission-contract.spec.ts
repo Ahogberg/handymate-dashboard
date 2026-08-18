@@ -352,6 +352,8 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
 const UNPROTECTED_BY_DESIGN: Record<string, string> = {
   'projects':
     'Grindar inte utan DEGRADERAR svaret (canSeeAllProjects/canSeeFinancials filtrerar fälten). Fail-open på !currentUser är medvetet för superadmin-impersonation.',
+  'email/unsubscribe':
+    'v151: publik avregistreringslänk i botten av nurture-mail. Ingen inloggad session finns att slå upp — auth är i stället en signerad, fail-closed HMAC-token (lib/email/unsubscribe-link.ts) som binder business_id+customer_id, samma mönster som referral-lead och admin/partners/[id]/approve.',
 }
 
 /**

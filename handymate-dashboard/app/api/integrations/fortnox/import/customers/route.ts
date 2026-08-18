@@ -92,7 +92,12 @@ export async function POST(request: NextRequest) {
             phone_number: fc.Phone1 || null,
             address_line: addressLine || null,
             fortnox_customer_number: fc.CustomerNumber,
-            fortnox_synced_at: new Date().toISOString()
+            fortnox_synced_at: new Date().toISOString(),
+            // v152 (kontaktproveniens): kunden fanns redan i Fortnox
+            // bokföring — inte en ny "kontakt" i egentlig mening, men en
+            // egen källa så granskningen kan skilja den från riktiga leads.
+            contact_source: 'fortnox_sync',
+            contact_source_at: new Date().toISOString(),
           })
 
         if (insertError) {

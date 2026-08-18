@@ -415,16 +415,47 @@ export async function processEnrollmentStep(enrollmentId: string): Promise<{
       customerId: enrollment.customer_id,
     })
   } else if (step.channel === 'email') {
-    sendResult = await sendNurtureEmail({
-      to: customer.email,
-      subject: subject || `Meddelande från ${business.business_name}`,
-      message,
-      businessName: business.business_name || 'Handymate',
-      contactEmail: business.contact_email,
-      orgNumber: business.org_number,
-      businessId: enrollment.business_id,
-      customerId: enrollment.customer_id,
-    })
+    // v151 (marknadsföringslagen-gap): email_opt_out är kundens spärr mot
+    // proaktivt marknadsföringsmail — samma princip som sms_opt_out
+    // (v86) men kollad HÄR i stället för i en gemensam strypunkt, då
+    // nurture.ts är den enda proaktiva e-postavsändaren (campaigns/send
+    // är SMS-bara, se app/api/campaigns/send/route.ts). Fail-soft mot en
+    // ännu ej körd sql/v151: kolumnen saknas ⇒ optedOutOfEmail blir false
+    // (skickar som förut) i stället för att fälla hela nurture-processet.
+    let optedOutOfEmail = false
+    try {
+      const { data: optOutRow, error: optOutError } = await supabase
+        .from('customer')
+        .select('email_opt_out')
+        .eq('customer_id', enrollment.customer_id)
+        .maybeSingle()
+      if (optOutError) {
+        console.warn('[nurture] email_opt_out kunde inte läsas (sql/v151 ej körd?) — skickar som vanligt:', optOutError.message)
+      } else {
+        optedOutOfEmail = optOutRow?.email_opt_out === true
+      }
+    } catch (err: any) {
+      console.warn('[nurture] email_opt_out-uppslag kastade — skickar som vanligt:', err?.message || err)
+    }
+
+    if (optedOutOfEmail) {
+      // Samma idiom som ett vanligt sändningsfel: loggas, fäller inte
+      // enrollmentet — nästa steg (om något) processas som vanligt.
+      sendResult = { success: false, error: 'Kunden har avregistrerat sig från e-postutskick (email_opt_out)' }
+    } else {
+      const { buildUnsubscribeUrl } = await import('@/lib/email/unsubscribe-link')
+      sendResult = await sendNurtureEmail({
+        to: customer.email,
+        subject: subject || `Meddelande från ${business.business_name}`,
+        message,
+        businessName: business.business_name || 'Handymate',
+        contactEmail: business.contact_email,
+        orgNumber: business.org_number,
+        businessId: enrollment.business_id,
+        customerId: enrollment.customer_id,
+        unsubscribeUrl: buildUnsubscribeUrl({ businessId: enrollment.business_id, customerId: enrollment.customer_id }),
+      })
+    }
   }
 
   if (!sendResult.success) {
@@ -761,6 +792,8 @@ async function sendNurtureEmail(params: {
   orgNumber?: string
   businessId: string
   customerId: string
+  /** v151: signerad avregistreringslänk, renderas i mail-footern. */
+  unsubscribeUrl?: string
 }): Promise<{ success: boolean; error?: string }> {
   if (!params.to) return { success: false, error: 'Ingen e-postadress' }
 
@@ -776,6 +809,7 @@ async function sendNurtureEmail(params: {
       },
       subject: params.subject,
       message: params.message,
+      unsubscribeUrl: params.unsubscribeUrl,
     })
 
     const result = await sendEmail({

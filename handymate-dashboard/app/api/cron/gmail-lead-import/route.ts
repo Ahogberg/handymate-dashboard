@@ -223,6 +223,9 @@ export async function GET(request: NextRequest) {
                 address_line: leadData.address || null,
                 job_status: 'lead',
                 customer_number: customerNumber,
+                // v152 (kontaktproveniens): kund skapad ur en Gmail-lead.
+                contact_source: 'gmail_import',
+                contact_source_at: new Date().toISOString(),
               })
               .select('customer_id')
               .single()

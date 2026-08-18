@@ -65,6 +65,10 @@ async function createBooking(supabase: SupabaseClient, suggestion: any, actionDa
             phone_number: phoneNumberForCustomer,
             email: emailForCustomer,
             address_line: actionData.address || null,
+            // v152 (kontaktproveniens): AI-förslag härlett ur ett
+            // telefonsamtal (call_recording).
+            contact_source: 'phone_call',
+            contact_source_at: new Date().toISOString(),
           })
           .select('customer_id')
           .single()
@@ -197,6 +201,9 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
           name: actionData.customer_name || 'Ny kund',
           phone_number: actionData.phone_number || suggestion.call_recording?.phone_number,
           address_line: actionData.address || null,
+          // v152 (kontaktproveniens): se motivering i createBooking ovan.
+          contact_source: 'phone_call',
+          contact_source_at: new Date().toISOString(),
         })
         .select('customer_id')
         .single()
@@ -479,6 +486,10 @@ async function createCustomer(supabase: SupabaseClient, suggestion: any, actionD
         phone_number: phone || null,
         email: actionData.email || null,
         address_line: actionData.address || null,
+        // v152 (kontaktproveniens): "create_customer"-förslaget kommer
+        // liksom de andra AI-förslagen ovan från ett telefonsamtal.
+        contact_source: 'phone_call',
+        contact_source_at: new Date().toISOString(),
       })
       .select('customer_id')
       .single()

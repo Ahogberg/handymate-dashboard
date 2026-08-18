@@ -99,6 +99,10 @@ export async function POST(request: NextRequest) {
           phone_number: cleanPhone,
           email: cleanEmail,
           lead_source: 'website',
+          // v152 (kontaktproveniens): kontaktformuläret på hantverkarens
+          // egen Handymate-genererade hemsida.
+          contact_source: 'lead_form',
+          contact_source_at: new Date().toISOString(),
         })
         .select('customer_id')
         .single()

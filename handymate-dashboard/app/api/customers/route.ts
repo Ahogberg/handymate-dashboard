@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getNextCustomerNumber } from '@/lib/numbering'
+import { isMissingContactSourceColumnError } from '@/lib/customers/contact-source'
 
 /**
  * GET - Lista alla kunder för ett företag
@@ -72,6 +73,9 @@ export async function POST(request: NextRequest) {
       address_line: address_line || null,
       customer_number: customerNumber,
       created_at: new Date().toISOString(),
+      // v152 (kontaktproveniens): manuell skapelse via API:et/dashboarden.
+      contact_source: 'manual',
+      contact_source_at: new Date().toISOString(),
     }
 
     if (body.personal_number) insertData.personal_number = body.personal_number
@@ -84,11 +88,21 @@ export async function POST(request: NextRequest) {
     if (body.reference) insertData.reference = body.reference
     if (body.apartment_count) insertData.apartment_count = parseInt(body.apartment_count)
 
-    const { data: customer, error } = await supabase
+    let { data: customer, error } = await supabase
       .from('customer')
       .insert(insertData)
       .select()
       .single()
+
+    if (error && isMissingContactSourceColumnError(error.message)) {
+      // sql/v152 ej körd ännu — samma toleransmönster som sms_opt_out (v86):
+      // proveniensfälten får aldrig blockera kundskapande.
+      console.warn('[customers] contact_source-kolumner saknas (sql/v152 ej körd) — sparar utan dem:', error.message)
+      const { contact_source, contact_source_at, ...rest } = insertData
+      const retry = await supabase.from('customer').insert(rest).select().single()
+      customer = retry.data
+      error = retry.error
+    }
 
     if (error) throw error
 
