@@ -18,9 +18,10 @@
  */
 
 import { useEffect, useState } from 'react'
-import { ListChecks, Rocket, Target, Crown, TrendingUp } from 'lucide-react'
+import { ListChecks, Rocket, Target, Crown, TrendingUp, Compass } from 'lucide-react'
 import { TEAM, getAgentById } from '@/lib/agents/team'
 import { TourTarget, SpotlightOverlay, type TourStepBase } from '@/components/tour/TourPrimitives'
+import { buildFirstMissionPrompt, writeFirstMissionPrompt } from '@/lib/onboarding/first-mission-handoff'
 import type { OnboardingFormData } from '../types-redesign'
 
 interface Step6Props {
@@ -57,7 +58,7 @@ interface InstantValue {
  * fortsättning, inte en repris.
  */
 interface TourStep extends TourStepBase {
-  id: 'team' | 'matte' | 'approve' | 'setup'
+  id: 'team' | 'matte' | 'approve' | 'uppdragsband' | 'setup'
 }
 
 const TOUR_STEPS: TourStep[] = [
@@ -77,6 +78,16 @@ const TOUR_STEPS: TourStep[] = [
     id: 'approve',
     title: 'Det här behöver dig idag',
     body: 'Allt teamet vill göra hamnar här. Inget går ut utan ditt ja.',
+    placement: 'top',
+  },
+  // Goal-to-Plan (tasks/jaunty-pondering-hummingbird.md, Etapp R) — kedjornas
+  // ingång. Peker mot components/jarvis/home/Uppdragsrad.tsx (märkt
+  // data-tour="uppdragsband" på riktiga dashboarden) — mockad här precis som
+  // de andra tre stoppen ovan, se MockDashboard nedan.
+  {
+    id: 'uppdragsband',
+    title: 'Skriv ett mål här',
+    body: "”Frigör 50 000 kr före fredag” — så bygger teamet en plan ur dina egna siffror och kör den i din godkännandekö.",
     placement: 'top',
   },
   {
@@ -218,7 +229,16 @@ export default function Step6LiveTour({ onFinish, data }: Step6Props) {
         </button>
       )}
 
-      {/* Final CTA */}
+      {/* Final CTA — Första-uppdraget-beat (Etapp R). Konkret handling i
+          stället för bara "Kör igång": ett mål från Step3 (om satt) blir en
+          förifylld fråga till Matte via sessionStorage-bryggan (se
+          lib/onboarding/first-mission-handoff.ts — JobbuddyProvider finns
+          inte i onboardingens layout, så handoffen konsumeras av
+          components/jarvis/FirstMissionHandoff.tsx efter navigeringen).
+          ALDRIG auto-send — hantverkaren ser och kan redigera frågan innan
+          den går iväg. Skippbar: "Utforska själv" kör exakt samma finish()
+          som förut, utan förifylld prompt — onboardingen får aldrig fånga
+          någon. */}
       {finished && (
         <div
           style={{
@@ -235,15 +255,32 @@ export default function Step6LiveTour({ onFinish, data }: Step6Props) {
             style={{
               textAlign: 'center',
               fontSize: 13,
-              fontWeight: 600,
+              fontWeight: 500,
               color: 'var(--ob-muted)',
+              lineHeight: 1.5,
               marginBottom: 10,
             }}
           >
-            Nu visar vi dig runt på riktigt.
+            Teamet tittar redan på det som finns i {data.companyName || 'din firma'} —{' '}
+            ju mer data som kommer in, desto vassare förslag.
           </p>
-          <button type="button" className="ob-cta" onClick={onFinish}>
-            Kör igång <Rocket size={18} />
+          <button
+            type="button"
+            className="ob-cta"
+            onClick={() => {
+              writeFirstMissionPrompt(buildFirstMissionPrompt(data.revenueTargetAnnual))
+              onFinish()
+            }}
+          >
+            Ge teamet ditt första uppdrag <Rocket size={18} />
+          </button>
+          <button
+            type="button"
+            className="ob-cta ghost"
+            onClick={onFinish}
+            style={{ marginTop: 8 }}
+          >
+            Utforska själv
           </button>
         </div>
       )}
@@ -558,7 +595,44 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
           </TourTarget>
         </div>
 
-        {/* Setup checklist — TOUR TARGET 4 */}
+        {/* Uppdragsband — TOUR TARGET 4 (Goal-to-Plan V1). Mockar den riktiga
+            Uppdragsraden (components/jarvis/home/Uppdragsrad.tsx) som ligger
+            i botten av MatteHero på riktiga dashboarden — samma rubrik och
+            tomt-läge-pill, ingen DOM-koppling hit (Step6 är en helt egen,
+            fast mockad förhandsvisning). */}
+        <div style={{ marginTop: 12 }}>
+          <TourTarget id="uppdragsband" highlight={lit('uppdragsband')} dim={dim}>
+            <div
+              style={{
+                padding: 14,
+                borderRadius: 'var(--ob-r-lg)',
+                background: 'linear-gradient(135deg, #0F766E 0%, #0D9488 100%)',
+                boxShadow: '0 10px 28px rgba(13,148,136,0.25)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ color: '#fff' }}>
+                  <Compass size={16} />
+                </span>
+                <strong style={{ fontSize: 13, color: '#fff' }}>Vad vill du att vi får gjort?</strong>
+              </div>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  padding: '9px 14px',
+                  borderRadius: 'var(--ob-r-pill)',
+                  border: '1px dashed rgba(255,255,255,0.4)',
+                  color: 'rgba(255,255,255,0.8)',
+                  fontSize: 12.5,
+                }}
+              >
+                Skriv vad du vill uppnå …
+              </div>
+            </div>
+          </TourTarget>
+        </div>
+
+        {/* Setup checklist — TOUR TARGET 5 */}
         <div style={{ marginTop: 12, marginBottom: 8 }}>
           <TourTarget id="setup" highlight={lit('setup')} dim={dim}>
             <div

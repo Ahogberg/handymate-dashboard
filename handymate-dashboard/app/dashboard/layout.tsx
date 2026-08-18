@@ -26,6 +26,7 @@ import { BusinessContext } from '@/lib/BusinessContext'
 import { CurrentUserProvider } from '@/lib/CurrentUserContext'
 import { JobbuddyProvider } from '@/lib/JobbuddyContext'
 import PresenterBar from '@/components/demo/PresenterBar'
+import FirstMissionHandoff from '@/components/jarvis/FirstMissionHandoff'
 
 export default function DashboardLayout({
   children,
@@ -106,6 +107,10 @@ export default function DashboardLayout({
                         {children}
                       </main>
                       <Jobbkompisen />
+                      {/* Onboardingens Första-uppdraget-beat (Etapp R) — konsumerar
+                          en väntande handoff från Step6LiveTour, se
+                          components/jarvis/FirstMissionHandoff.tsx. Renderar inget. */}
+                      <FirstMissionHandoff />
                       {/* Expansionspanelen (Etapp G, Goal-to-Plan V2): mission-
                           bandets "Öppna →" och bubblans "Uppdrag pågår"-pill
                           öppnar den här i stället för chatten. Läser

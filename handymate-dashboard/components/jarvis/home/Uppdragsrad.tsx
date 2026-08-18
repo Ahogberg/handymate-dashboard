@@ -38,9 +38,17 @@ export function Uppdragsrad({ suggestions }: { suggestions: MissionSuggestion[] 
     setIsOpen(true)
   }
 
+  // Stabil ankarpunkt för framtida DOM-baserade turer (t.ex. HemTur,
+  // components/tour/HemTur.tsx, som spotlightar via data-tour-target) —
+  // bandet hade ingen förut. Onboardingens Step6LiveTour speglar däremot
+  // Uppdragsrad i en helt egen mockad förhandsvisning (ingen DOM-koppling
+  // hit), se app/onboarding/components/Step6LiveTour.tsx. Satt på alla fyra
+  // lägens rotelement så attributet alltid finns oavsett tillstånd.
+  const TOUR_ANCHOR = 'uppdragsband'
+
   // ── Läge 1: laddar ──────────────────────────────────────────────────────
   if (missionLoading || suggestions === null) {
-    return <div className="h-10 rounded-xl bg-white/10 animate-pulse" aria-hidden />
+    return <div data-tour={TOUR_ANCHOR} className="h-10 rounded-xl bg-white/10 animate-pulse" aria-hidden />
   }
 
   // ── Läge 2: aktivt uppdrag — heron visar redan rubrik+progress ovanför ──
@@ -50,6 +58,7 @@ export function Uppdragsrad({ suggestions }: { suggestions: MissionSuggestion[] 
     return (
       <button
         type="button"
+        data-tour={TOUR_ANCHOR}
         onClick={() => setPanelOpen(true)}
         className="min-h-[40px] w-full flex items-center justify-between px-3.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-sm text-white/70"
       >
@@ -62,7 +71,7 @@ export function Uppdragsrad({ suggestions }: { suggestions: MissionSuggestion[] 
   // ── Läge 3: förslagschips ────────────────────────────────────────────────
   if (suggestions.length > 0) {
     return (
-      <div>
+      <div data-tour={TOUR_ANCHOR}>
         <h2 className="m-0 mb-2 font-heading text-[13px] font-semibold text-white/80">
           Vad vill du att vi får gjort?
         </h2>
@@ -84,7 +93,7 @@ export function Uppdragsrad({ suggestions }: { suggestions: MissionSuggestion[] 
 
   // ── Läge 4: inga signaler — öppen inbjudan, ingen förifylld text ────────
   return (
-    <div>
+    <div data-tour={TOUR_ANCHOR}>
       <h2 className="m-0 mb-2 font-heading text-[13px] font-semibold text-white/80">
         Vad vill du att vi får gjort?
       </h2>
