@@ -10,6 +10,14 @@ const VOICE_PROCESS_MODEL = 'claude-haiku-4-5-20251001'
 /**
  * POST /api/voice/process
  * Tar emot ljudfil → transkriberar med Whisper → analyserar med Claude → returnerar actions.
+ *
+ * DIKTATVÄGEN (etapp 1b, "en väg in"): detta är hantverkarens EGET röst-
+ * kommando-flöde — han pratar in "boka Anna på tisdag" och godkänner själv
+ * förslaget i UI:t. Ingen agent triggas, inget ai_suggestion-kort skapas —
+ * det är INTE en inbound-kanal och ska aldrig bli en. Blanda inte ihop med
+ * telefonivägen (46elks → voice/recording → voice/transcribe →
+ * lib/voice/analyze-call.ts), där ett INKOMMANDE samtal går genom Lisa
+ * (agentmotorn) och analysmotorn.
  */
 export async function POST(request: NextRequest) {
   const business = await getAuthenticatedBusiness(request)

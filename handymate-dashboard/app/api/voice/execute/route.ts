@@ -8,6 +8,12 @@ import { createQuote } from '@/lib/quotes/create-quote'
 /**
  * POST /api/voice/execute
  * Tar emot en godkänd action → skapar posten i databasen.
+ *
+ * DIKTATVÄGEN (etapp 1b, "en väg in"): exekverar det hantverkaren själv
+ * godkände från voice/process ovan — hans EGET röstkommando, inte ett
+ * inkommande kundsamtal. Inget agenttriggande, inga ai_suggestion-kort,
+ * ingen koppling till telefonivägen (46elks → voice/recording →
+ * voice/transcribe → lib/voice/analyze-call.ts + Lisa). Håll det så.
  */
 export async function POST(request: NextRequest) {
   const business = await getAuthenticatedBusiness(request)

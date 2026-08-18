@@ -233,3 +233,126 @@ test.describe('7. e-postvägen behåller full exekvering', () => {
     expect(call, 'e-postvägen har fått dryRun:true — den ska köra fullt').not.toContain('dryRun')
   })
 })
+
+/**
+ * ═══ ETAPP 1b: VOICE-HALVAN AV "EN VÄG IN" (2026-08-18) ═══
+ *
+ * SMS-halvan ovan konsoliderade till en hjärna (Lisa via
+ * triggerAgentFireAndForget) och en atomisk claim. Röstvägen hade sitt eget
+ * separata problem: UI:t (inkorgen) startade en ANDRA, oberoende analys
+ * ovanpå den som transkriberingskedjan redan kör automatiskt — och
+ * analysmotorns enda dubbelkörningsspärr (already_analyzed mot
+ * ai_suggestion) skyddade aldrig mötesgrenen, som skriver pending_approvals.
+ * Två samtidiga analyser av samma nya möte kunde båda passera. Analysmotorn
+ * respekterade inte heller agents_globally_paused (kill switchen Lisas
+ * agentmotor redan lyder under), och kedjan transcribe→analyze gick via ett
+ * onödigt HTTP-självanrop.
+ *
+ * Fixat: ett atomiskt anspråk (sql/v155, claimCallAnalysis i
+ * lib/voice/analyze-call.ts) som ersätter den ofullständiga spärren för
+ * BÅDA grenarna, en kill switch-kontroll före modellanropet, och ett
+ * direkt in-process-anrop istället för fetch mot sig själv.
+ */
+const TRANSCRIBE_ROUTE = 'app/api/voice/transcribe/route.ts'
+const ANALYZE_CALL = 'lib/voice/analyze-call.ts'
+const INBOX_PAGE = 'app/dashboard/inbox/page.tsx'
+const RECORDINGS_PAGE = 'app/dashboard/recordings/page.tsx'
+const VOICE_PROCESS = 'app/api/voice/process/route.ts'
+const VOICE_EXECUTE = 'app/api/voice/execute/route.ts'
+
+test.describe('8. röstvägen analyseras en gång', () => {
+  test('transkriberingskedjan anropar analyseraSamtal direkt — inget HTTP-självanrop mot sig själv', () => {
+    const s = kod(TRANSCRIBE_ROUTE)
+    expect(s, 'analyseraSamtal anropas inte').toContain('analyseraSamtal(')
+    expect(s, 'ett HTTP-självanrop mot /api/voice/analyze är kvar').not.toContain('/api/voice/analyze')
+  })
+
+  test('inkorgen startar aldrig en egen analys — transkriberingskedjan gör redan det', () => {
+    const s = kod(INBOX_PAGE)
+    expect(s, 'inkorgen anropar fortfarande /api/voice/analyze själv — dubblettkort').not.toContain('/api/voice/analyze')
+  })
+
+  test('inspelningssidans knapp analyserar bara om (force) — den kan inte längre av misstag agera förstagångsanalys som kolliderar med kedjan', () => {
+    const s = kod(RECORDINGS_PAGE)
+    const i = s.indexOf("fetch('/api/voice/analyze'")
+    expect(i, 'analyze-anropet hittas inte i inspelningssidan').toBeGreaterThan(-1)
+    const call = s.slice(i, s.indexOf('})', i) + 2)
+    expect(call, 'force: true saknas — knappen skulle nekas av anspråket och tro att inget hände').toContain('force: true')
+  })
+})
+
+test.describe('9. anspråket (v155) tas före modellen och före båda köerna', () => {
+  const s = kod(ANALYZE_CALL)
+  const fnStart = s.indexOf('export async function analyseraSamtal')
+
+  test('analyseraSamtal hittas', () => {
+    expect(fnStart, 'analyseraSamtal hittas inte i lib/voice/analyze-call.ts').toBeGreaterThan(-1)
+  })
+
+  test('anspråket tas före modellanropet, före ai_suggestion-kön och före pending_approvals-kön', () => {
+    const fn = s.slice(fnStart)
+    const claim = fn.indexOf('await claimCallAnalysis(')
+    const modell = fn.indexOf('anthropic.messages.create(')
+    const aiSuggestion = fn.indexOf(".from('ai_suggestion')")
+    const pendingApprovals = fn.indexOf(".from('pending_approvals')")
+    expect(claim, 'anspråket tas inte').toBeGreaterThan(-1)
+    expect(modell, 'modellanropet hittas inte').toBeGreaterThan(-1)
+    expect(aiSuggestion, 'ai_suggestion-kön hittas inte').toBeGreaterThan(-1)
+    expect(pendingApprovals, 'pending_approvals-kön hittas inte').toBeGreaterThan(-1)
+    expect(claim, 'anspråket tas efter modellanropet — kostnaden är redan tagen innan spärren').toBeLessThan(modell)
+    expect(claim, 'anspråket tas efter ai_suggestion-kön').toBeLessThan(aiSuggestion)
+    expect(claim, 'anspråket tas efter pending_approvals-kön — mötesgrenen är då oskyddad igen').toBeLessThan(pendingApprovals)
+  })
+
+  test('force rensar ett befintligt anspråk (och analyzed_at) innan det tas om', () => {
+    const i = s.indexOf('if (force)')
+    expect(i, 'force-grenen hittas inte').toBeGreaterThan(-1)
+    const block = s.slice(i, i + 400)
+    expect(block, 'analysis_claimed_at rensas inte').toContain('analysis_claimed_at: null')
+    expect(block, 'analyzed_at rensas inte — ett gammalt "klar"-märke skulle bli kvar').toContain('analyzed_at: null')
+  })
+
+  test('ett kraschat anspråk släpps i catch-blocket — annars blockerar en transient krasch all framtida analys', () => {
+    const catchIdx = s.indexOf('} catch (error: any) {')
+    expect(catchIdx, 'catch-blocket hittas inte').toBeGreaterThan(-1)
+    const catchBlock = s.slice(catchIdx)
+    expect(catchBlock, 'anspråket släpps inte vid fel').toContain('analysis_claimed_at: null')
+  })
+
+  test('saknas v155 (kolumnen finns inte) faller anspråket tillbaka, inte kraschar', () => {
+    expect(s, 'isMissingColumnError används inte — ett schemafel skulle krascha analysen').toContain('isMissingColumnError')
+  })
+})
+
+test.describe('10. kill switch gäller analysen (inte bara Lisas agentmotor)', () => {
+  test('agents_globally_paused läses och kontrolleras före modellanropet', () => {
+    const s = kod(ANALYZE_CALL)
+    const fnStart = s.indexOf('export async function analyseraSamtal')
+    expect(fnStart).toBeGreaterThan(-1)
+    const fn = s.slice(fnStart)
+    const killSwitch = fn.indexOf('agents_globally_paused')
+    const modell = fn.indexOf('anthropic.messages.create(')
+    expect(killSwitch, 'agents_globally_paused läses inte i analysfunktionen').toBeGreaterThan(-1)
+    expect(modell, 'modellanropet hittas inte').toBeGreaterThan(-1)
+    expect(killSwitch, 'kill switch kontrolleras efter modellanropet — kostnaden är redan tagen').toBeLessThan(modell)
+  })
+})
+
+test.describe('11. diktatvägen förblir diktatväg', () => {
+  for (const [namn, fil] of [
+    ['voice/process', VOICE_PROCESS],
+    ['voice/execute', VOICE_EXECUTE],
+  ] as const) {
+    test(`${namn} har ingen koppling till inbound-agentvägen`, () => {
+      const s = kod(fil)
+      for (const ref of ['triggerAgentFireAndForget', 'ai_suggestion', '/api/agent/trigger']) {
+        expect(s, `${ref} läcker in i diktatvägen (${namn}) — det är hantverkarens EGET röstkommando, inte ett inkommande kundsamtal`).not.toContain(ref)
+      }
+    })
+
+    test(`${namn} har en header som säger att det är diktatvägen, inte inbound`, () => {
+      const s = read(fil)
+      expect(s, `${namn} saknar en förklarande diktatvägs-header`).toMatch(/DIKTATVÄGEN/)
+    })
+  }
+})

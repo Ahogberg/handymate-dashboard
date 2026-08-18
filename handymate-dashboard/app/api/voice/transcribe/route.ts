@@ -4,6 +4,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { triggerAgentFireAndForget, makeIdempotencyKey } from '@/lib/agent-trigger'
 import { recordCost } from '@/lib/costs/record'
 import { whisperCostOre } from '@/lib/costs/meter'
+import { analyseraSamtal } from '@/lib/voice/analyze-call'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 const ELKS_API_USER = process.env.ELKS_API_USER
@@ -185,15 +186,15 @@ export async function POST(request: NextRequest) {
       console.error('[Transcribe] Agent trigger failed:', agentErr)
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-    fetch(`${appUrl}/api/voice/analyze`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-internal-secret': process.env.CRON_SECRET || '',
-      },
-      body: JSON.stringify({ recording_id })
-    }).catch(err => console.error('Failed to trigger analysis:', err))
+    // Etapp 1b (en väg in): ett HTTP-självanrop mot den egna appen
+    // (fetch mot /api/voice/analyze) var en onödig felkälla — extra
+    // nätverksrunda, extra DNS/TLS, extra sätt att timeouta — utan någon
+    // vinst, eftersom vi redan kör i samma process med samma supabase-klient.
+    // analyseraSamtal anropas därför direkt. Fortfarande fire-and-forget:
+    // samtalet är redan avslutat, ingen väntar på svaret.
+    analyseraSamtal({ supabase, recordingId: recording_id }).catch(err =>
+      console.error('[Transcribe] Analys misslyckades:', err)
+    )
 
     return NextResponse.json({
       success: true,

@@ -255,7 +255,10 @@ test.describe('taket är detsamma i båda vägarna', () => {
  * analysmotorns lista mot Lisas allowedTools: glider de isär faller provet.
  */
 test.describe('rollfördelningen är kod, inte prompttillit', () => {
-  const ANALYZE = 'app/api/voice/analyze/route.ts'
+  // Etapp 1b (en väg in): analysmotorns kropp flyttade ut ur route.ts till
+  // lib/voice/analyze-call.ts (analyseraSamtal) — route.ts är numera en tunn
+  // HTTP-adapter. Konstanten pekar om, invarianterna nedan är oförändrade.
+  const ANALYZE = 'lib/voice/analyze-call.ts'
   const TRANSCRIBE = 'app/api/voice/transcribe/route.ts'
 
   /** Lisas allowedTools, lästa ur personalities.ts — inte kopierade hit. */
@@ -299,33 +302,41 @@ test.describe('rollfördelningen är kod, inte prompttillit', () => {
   })
 
   test('analysen är ett avsiktligt steg, inte en catch-gren', () => {
+    // Etapp 1b: fetch mot /api/voice/analyze (ett HTTP-självanrop) ersattes
+    // av ett direkt in-process-anrop till analyseraSamtal — samma ordning
+    // mäts fortfarande: EFTER Lisa-triggerns catch-block, i huvudflödet.
     const s = kod(TRANSCRIBE)
     const catchIdx = s.indexOf('catch (agentErr)')
-    const analyzeIdx = s.indexOf('/api/voice/analyze')
-    expect(analyzeIdx, 'analyze anropas inte alls').toBeGreaterThan(-1)
+    const analyzeIdx = s.indexOf('analyseraSamtal(')
+    expect(analyzeIdx, 'analyseraSamtal anropas inte alls').toBeGreaterThan(-1)
     expect(catchIdx).toBeGreaterThan(-1)
     // Anropet ska ligga EFTER catch-blockets slut — i huvudflödet.
     const catchSlut = s.indexOf('}', s.indexOf('console.error', catchIdx))
-    expect(analyzeIdx, 'analyze bor fortfarande i catch-grenen').toBeGreaterThan(catchSlut)
+    expect(analyzeIdx, 'analyseraSamtal bor fortfarande i catch-grenen').toBeGreaterThan(catchSlut)
   })
 
   test('samma samtal analyseras en gång — knappen ger inga dubbletter', () => {
+    // Etapp 1b: den primära spärren är numera det atomiska anspråket
+    // (v155, se en-vag-in.spec.ts) — already_analyzed lever kvar som
+    // reservväg för miljöer där migrationen inte körts än (missing-column-
+    // fallback i claimCallAnalysis).
     const s = kod(ANALYZE)
     expect(s).toContain('already_analyzed')
     // Mötesassistenten V2 (map-reduce för långa transkript) lade till egna
-    // anthropic.messages.create-anrop i hjälpfunktioner OVANFÖR POST-handlern
-    // (extraheraFyndFranChunk, slaIhopFynd) — de körs bara om POST själv
-    // anropar dem, EFTER dubbelkörningsspärren. Ett indexOf över hela filen
-    // hittar då fel anrop (det första textmässigt, inte det som faktiskt
-    // körs). Avgränsa till POST-handlerns egen kropp där spärren verkligen
-    // sitter, så jämförelsen inte förskjuts av kod ovanför den.
-    const postStart = s.indexOf('export async function POST')
-    expect(postStart, 'POST-handlern hittades inte').toBeGreaterThan(-1)
-    const post = s.slice(postStart)
-    const sparr = post.indexOf('already_analyzed')
-    const modellanrop = post.indexOf('anthropic.messages.create')
-    expect(sparr, 'spärren saknas i POST-handlern').toBeGreaterThan(-1)
-    expect(modellanrop, 'modellanropet saknas i POST-handlern').toBeGreaterThan(-1)
+    // anthropic.messages.create-anrop i hjälpfunktioner OVANFÖR
+    // analyseraSamtal (extraheraFyndFranChunk, slaIhopFynd) — de körs bara
+    // om analyseraSamtal själv anropar dem, EFTER dubbelkörningsspärren. Ett
+    // indexOf över hela filen hittar då fel anrop (det första textmässigt,
+    // inte det som faktiskt körs). Avgränsa till analyseraSamtals egen
+    // kropp där spärren verkligen sitter, så jämförelsen inte förskjuts av
+    // kod ovanför den.
+    const fnStart = s.indexOf('export async function analyseraSamtal')
+    expect(fnStart, 'analyseraSamtal hittades inte').toBeGreaterThan(-1)
+    const fn = s.slice(fnStart)
+    const sparr = fn.indexOf('already_analyzed')
+    const modellanrop = fn.indexOf('anthropic.messages.create')
+    expect(sparr, 'spärren saknas i analyseraSamtal').toBeGreaterThan(-1)
+    expect(modellanrop, 'modellanropet saknas i analyseraSamtal').toBeGreaterThan(-1)
     expect(sparr, 'spärren ligger efter modellanropet — kostnaden är redan tagen').toBeLessThan(modellanrop)
   })
 

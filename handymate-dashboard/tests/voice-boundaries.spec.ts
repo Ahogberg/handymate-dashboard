@@ -85,12 +85,25 @@ test.describe('2. voice/transcribe — inte längre en öppen dörr till Lisa', 
 })
 
 test.describe('3. voice/analyze — inloggad någonstans ≠ rätt till raden', () => {
-  test('inspelningens företag jämförs med den inloggades före skrivningar', () => {
+  // Etapp 1b (en väg in): analysens kropp (och därmed skrivningarna mot
+  // ai_suggestion/tryAutoApprove) flyttade till lib/voice/analyze-call.ts
+  // (analyseraSamtal) — route.ts är numera en tunn adapter som bara sköter
+  // auth, tenantmatchning och svarsform. Samma invariant mäts fortfarande:
+  // matchningen sker FÖRE varje skrivning — nu uttryckt som "före anropet
+  // till analysfunktionen", eftersom ALLA skrivningar sker där inne.
+  test('inspelningens företag jämförs med den inloggades före anropet till analysfunktionen', () => {
     const s = kod('app/api/voice/analyze/route.ts')
     const i = s.indexOf('recording.business_id !== authed')
     expect(i, 'ingen tenantmatchning').toBeGreaterThan(-1)
+    const anrop = s.indexOf('analyseraSamtal(')
+    expect(anrop, 'analysfunktionen anropas inte').toBeGreaterThan(-1)
+    expect(anrop, 'analysfunktionen anropas före tenantmatchningen — matchningen skyddar då ingenting').toBeGreaterThan(i)
+  })
+
+  test('skrivningarna (ai_suggestion, tryAutoApprove) sker i analysfunktionen', () => {
+    const s = kod('lib/voice/analyze-call.ts')
     for (const skrivning of ['ai_suggestion', 'tryAutoApprove']) {
-      expect(s.indexOf(skrivning), `${skrivning} sker före matchningen`).toBeGreaterThan(i)
+      expect(s, `${skrivning} saknas i analysfunktionen`).toContain(skrivning)
     }
   })
 })

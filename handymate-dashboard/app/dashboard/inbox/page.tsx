@@ -342,15 +342,18 @@ export default function InboxPage() {
 
       showToast('Transkribering startad', 'success')
 
-      // Analyze after transcription
-      await fetch('/api/voice/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recording_id: recordingId })
-      })
-
       fetchRecordings()
       fetchSuggestions()
+
+      // Sidan startar ALDRIG en egen analys (etapp 1b, "en väg in") —
+      // transkriberingskedjan (app/api/voice/transcribe → analyseraSamtal)
+      // analyserar redan samtalet i bakgrunden. Ett andra anrop härifrån
+      // körde tidigare parallellt med det första och gav dubbla
+      // förslagskort innan det atomiska anspråket (v155) fanns. Vi väntar
+      // bara in resultatet med en fördröjd omhämtning.
+      setTimeout(() => {
+        fetchSuggestions()
+      }, 3000)
     } catch (error: any) {
       showToast(error.message || 'Något gick fel', 'error')
     } finally {

@@ -32,6 +32,7 @@ interface Recording {
   transcript: string | null
   transcript_summary: string | null
   transcribed_at: string | null
+  analyzed_at: string | null
   phone_number: string | null
   direction: 'inbound' | 'outbound'
   created_at: string
@@ -215,10 +216,14 @@ export default function RecordingsPage() {
   const handleAnalyze = async (recordingId: string) => {
     setAnalyzing(recordingId)
     try {
+      // force: true — knappen är ett explicit "analysera om" (etapp 1b,
+      // "en väg in"). Utan force stoppar det atomiska anspråket (v155) en
+      // andra analys av samma samtal, vilket är rätt för den automatiska
+      // kedjan men fel för en hantverkare som medvetet vill köra om.
       const response = await fetch('/api/voice/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recording_id: recordingId })
+        body: JSON.stringify({ recording_id: recordingId, force: true })
       })
 
       const result = await response.json()
@@ -227,7 +232,11 @@ export default function RecordingsPage() {
         throw new Error(result.error || 'Analysis failed')
       }
 
-      showToast(`Analys klar! ${result.suggestions_created} förslag skapade.`, 'success')
+      if (result.skipped) {
+        showToast(result.message || 'Agenterna är pausade — ingen analys gjordes.', 'error')
+      } else {
+        showToast(`Analys klar! ${result.suggestions_created ?? 0} förslag skapade.`, 'success')
+      }
       fetchRecordings()
       fetchSuggestions(recordingId)
 
@@ -530,7 +539,7 @@ export default function RecordingsPage() {
                               ) : (
                                 <RefreshCw className="w-3 h-3" />
                               )}
-                              {suggestions.length > 0 ? 'Analysera igen' : 'Analysera'}
+                              {suggestions.length > 0 || recording.analyzed_at ? 'Analysera igen' : 'Analysera'}
                             </button>
                           </div>
 
