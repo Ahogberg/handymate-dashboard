@@ -13,6 +13,7 @@ import {
   Search,
   Loader2
 } from 'lucide-react'
+// Strukturlyft (Etapp L2b2, 2026-08-18, docs/HANDYMATE_DESIGN_SYSTEM.md).
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 
@@ -168,14 +169,13 @@ export default function OrdersPage() {
     return matchesFilter && matchesSearch
   })
 
-  // Beräkna statistik
-  const stats = {
-    total: orders.length,
-    draft: orders.filter(o => o.status === 'draft').length,
-    ordered: orders.filter(o => o.status === 'ordered').length,
-    delivered: orders.filter(o => o.status === 'delivered').length,
-    totalValue: orders.reduce((sum, o) => sum + (o.total || 0), 0)
-  }
+  // Läget — besked i stället för fyra fåfänga statplattor (2026-08-18,
+  // samma mönster som app/dashboard/projects/page.tsx rad ~367-394): de
+  // gamla plattorna (Totalt/Beställda/Levererade/kr totalt) räknade samma
+  // data flera gånger. Nu: bara det som faktiskt väntar på dig, härlett ur
+  // samma `orders`-lista som redan är hämtad — ingen ny fetch.
+  const pendingDeliveries = orders.filter(o => o.status === 'ordered')
+  const pendingValue = pendingDeliveries.reduce((sum, o) => sum + (o.total || 0), 0)
 
   if (loading) {
     return (
@@ -203,72 +203,55 @@ export default function OrdersPage() {
       )}
 
       <div className="relative">
-        {/* Header */}
+        {/* Header — ljust idiom (docs/HANDYMATE_DESIGN_SYSTEM.md), samma
+            uppbyggnad som Godkännanden/Bokningar/Fakturor: ikon-platta +
+            font-heading-titel. */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Materialbeställningar</h1>
-            <p className="text-sm text-gray-500">Beställ material från dina grossister</p>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center shrink-0">
+              <Package className="w-5 h-5 text-primary-700" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-heading text-2xl sm:text-3xl font-bold text-slate-900">Materialbeställningar</h1>
+              <p className="text-sm text-slate-500 mt-0.5">Beställ material från dina grossister</p>
+            </div>
           </div>
           <Link
             href="/dashboard/orders/new"
-            className="flex items-center justify-center px-4 py-2 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90"
+            className="flex items-center justify-center px-4 py-2 min-h-[44px] bg-primary-700 rounded-card font-medium text-white hover:bg-primary-600 transition-all"
           >
             <Plus className="w-4 h-4 mr-2" />
             Ny beställning
           </Link>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
-                <Package className="w-5 h-5 text-primary-700" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-gray-900">{stats.total}</p>
-                <p className="text-xs text-gray-400">Totalt</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
-                <Send className="w-5 h-5 text-primary-600" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-gray-900">{stats.ordered}</p>
-                <p className="text-xs text-gray-400">Beställda</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-                <Truck className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-gray-900">{stats.delivered}</p>
-                <p className="text-xs text-gray-400">Levererade</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-                <Package className="w-5 h-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-gray-900">{stats.totalValue.toLocaleString('sv-SE')}</p>
-                <p className="text-xs text-gray-400">kr totalt</p>
-              </div>
-            </div>
-          </div>
+        {/* Läget — besked i stället för fyra fåfänga statplattor (samma
+            mönster som Projekt-sidans chip-rad, se filhuvudet ovanför
+            pendingDeliveries): kontexten som text/chips, bara när den bär
+            något. */}
+        <div className="flex flex-wrap items-center gap-2.5 mb-6">
+          {pendingDeliveries.length > 0 ? (
+            <>
+              <span className="inline-flex items-center gap-2 px-3.5 min-h-[36px] bg-white border border-slate-200 rounded-full text-sm font-medium text-gray-700">
+                <Truck className="w-4 h-4 text-primary-600" />
+                {pendingDeliveries.length} väntar leverans
+              </span>
+              <span className="inline-flex items-center gap-2 px-3.5 min-h-[36px] bg-primary-50 border border-primary-100 rounded-full text-sm font-semibold text-primary-700 tabular-nums">
+                <Package className="w-4 h-4" />
+                {pendingValue.toLocaleString('sv-SE')} kr på väg
+              </span>
+            </>
+          ) : (
+            <span className="text-sm text-gray-400">Inget beställt just nu</span>
+          )}
         </div>
 
-        {/* Filters */}
+        {/* Filters — segmenterad kontroll, samma idiom som Godkännanden/
+            Bokningar/Fakturor (bg-slate-100 rack + vit "pill" på aktivt
+            läge). Fixar även den gamla no-op-hover-buggen på de inaktiva
+            flikarna (osynlig text på vit botten). */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="flex bg-white border border-[#E2E8F0] rounded-xl p-1 overflow-x-auto">
+          <div className="flex gap-1 p-1 bg-slate-100 rounded-xl overflow-x-auto">
             {[
               { id: 'all', label: 'Alla' },
               { id: 'draft', label: 'Utkast' },
@@ -278,8 +261,8 @@ export default function OrdersPage() {
               <button
                 key={f.id}
                 onClick={() => setFilter(f.id as typeof filter)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                  filter === f.id ? 'bg-primary-700 text-white' : 'text-gray-500 hover:text-white'
+                className={`px-4 py-2 min-h-[44px] rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
+                  filter === f.id ? 'bg-white text-primary-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
                 {f.label}
@@ -294,20 +277,23 @@ export default function OrdersPage() {
               placeholder="Sök beställning..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
+              className="w-full pl-10 pr-4 py-2 min-h-[44px] bg-white border border-slate-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
             />
           </div>
         </div>
 
         {/* Orders List */}
-        <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
+        <div className="bg-white rounded-card border border-slate-200 overflow-hidden">
           {filteredOrders.length === 0 ? (
             <div className="p-12 text-center">
-              <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 mb-2">Inga beställningar hittades</p>
+              <div className="w-16 h-16 bg-primary-50 rounded-card flex items-center justify-center mx-auto mb-4">
+                <Package className="w-8 h-8 text-primary-700" />
+              </div>
+              <p className="font-heading text-slate-900 font-semibold text-lg mb-1">Inga beställningar än</p>
+              <p className="text-slate-500 text-sm mb-2">När du beställer material hamnar det här.</p>
               <Link
                 href="/dashboard/orders/new"
-                className="text-primary-700 hover:text-primary-700 text-sm"
+                className="text-primary-700 hover:text-primary-800 text-sm font-medium"
               >
                 Skapa din första beställning →
               </Link>
@@ -323,7 +309,7 @@ export default function OrdersPage() {
                       </div>
                       <div>
                         <div className="flex items-center gap-3">
-                          <p className="font-medium text-gray-900">
+                          <p className="font-heading font-semibold text-slate-900">
                             {order.supplier?.name || 'Ingen leverantör'}
                           </p>
                           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs rounded-full border ${getStatusStyle(order.status)}`}>
@@ -331,7 +317,7 @@ export default function OrdersPage() {
                             {getStatusText(order.status)}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-400 mt-1">
+                        <p className="text-sm text-gray-500 mt-1 tabular-nums">
                           {order.items?.length || 0} produkter • {order.total?.toLocaleString('sv-SE')} kr
                         </p>
                         {order.quote && (
@@ -355,7 +341,7 @@ export default function OrdersPage() {
                           <button
                             onClick={() => handleSend(order.order_id)}
                             disabled={sendingId === order.order_id || !order.supplier?.contact_email}
-                            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-700 rounded-lg text-white hover:opacity-90 disabled:opacity-50"
+                            className="flex items-center gap-2 px-3 py-1.5 min-h-[44px] text-sm bg-primary-700 rounded-lg text-white hover:bg-primary-600 disabled:opacity-50 transition-all"
                             title={order.supplier?.contact_email ? 'Skicka till leverantör' : 'Leverantören saknar email'}
                           >
                             {sendingId === order.order_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -363,7 +349,7 @@ export default function OrdersPage() {
                           </button>
                           <button
                             onClick={() => handleDelete(order.order_id)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -373,7 +359,7 @@ export default function OrdersPage() {
                       {order.status === 'ordered' && (
                         <button
                           onClick={() => handleMarkDelivered(order.order_id)}
-                          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-emerald-100 border border-emerald-200 rounded-lg text-emerald-600 hover:bg-emerald-500/30"
+                          className="flex items-center gap-2 px-3 py-1.5 min-h-[44px] text-sm bg-emerald-100 border border-emerald-200 rounded-lg text-emerald-600 hover:bg-emerald-100 transition-all"
                         >
                           <Truck className="w-4 h-4" />
                           Levererad

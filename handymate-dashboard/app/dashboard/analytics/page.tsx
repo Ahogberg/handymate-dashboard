@@ -152,21 +152,24 @@ export default function AnalyticsPage() {
   }))
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#F8FAFC]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <BarChart3 className="w-6 h-6 text-primary-700" />
-              Analys &amp; Ekonomi
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">Försäljningsinsikter och ekonomiöversikt</p>
+        {/* Header — ljust idiom (docs/HANDYMATE_DESIGN_SYSTEM.md), samma
+            uppbyggnad som Godkännanden: ikon-platta + font-heading-titel. */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center shrink-0">
+              <BarChart3 className="w-5 h-5 text-primary-700" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-heading text-xl sm:text-2xl font-bold text-slate-900">Analys &amp; Ekonomi</h1>
+              <p className="text-sm text-slate-500 mt-0.5">Försäljningsinsikter och ekonomiöversikt</p>
+            </div>
           </div>
           <select
             value={period}
             onChange={e => setPeriod(e.target.value)}
-            className="px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-700 focus:outline-none focus:border-primary-500"
+            className="px-3 py-2 min-h-[44px] bg-white border border-slate-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-primary-500"
           >
             <option value="30d">Senaste 30 dagar</option>
             <option value="90d">Senaste 90 dagar</option>
@@ -184,22 +187,22 @@ export default function AnalyticsPage() {
             {econ && (
               <>
                 <div className="flex items-center gap-3">
-                  <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Ekonomi</h2>
+                  <h2 className="font-heading text-sm font-bold text-slate-700 uppercase tracking-wide">Ekonomi</h2>
                   <div className="flex-1 h-px bg-gray-200" />
                 </div>
 
                 {/* Topprad: 3 metrikkort */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
-                    <span className="text-xs text-gray-400 uppercase tracking-wider">Fakturerat denna månad</span>
+                  <div className="bg-white rounded-card border border-slate-200 p-4">
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Fakturerat denna månad</span>
                     <p className="text-2xl font-bold text-gray-900 mt-1">~{econ.invoiced.toLocaleString('sv-SE')} kr</p>
                   </div>
-                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
-                    <span className="text-xs text-gray-400 uppercase tracking-wider">Uppskattad vinst</span>
+                  <div className="bg-white rounded-card border border-slate-200 p-4">
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Uppskattad vinst</span>
                     <p className="text-2xl font-bold text-gray-900 mt-1">~{Math.max(0, econ.invoiced - econ.materialCost - econ.laborCost - econ.overhead).toLocaleString('sv-SE')} kr</p>
                   </div>
-                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
-                    <span className="text-xs text-gray-400 uppercase tracking-wider">Uppskattad marginal</span>
+                  <div className="bg-white rounded-card border border-slate-200 p-4">
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Uppskattad marginal</span>
                     <p className={`text-2xl font-bold mt-1 ${(econ.estimatedMargin ?? 0) >= 50 ? 'text-emerald-600' : (econ.estimatedMargin ?? 0) >= 30 ? 'text-amber-600' : 'text-red-600'}`}>
                       {econ.estimatedMargin !== null ? `~${econ.estimatedMargin}%` : '—'}
                     </p>
@@ -208,8 +211,8 @@ export default function AnalyticsPage() {
 
                 {/* Kostnadsfördelning */}
                 {econ.invoiced > 0 && (
-                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Kostnadsfördelning</h3>
+                  <div className="bg-white rounded-card border border-slate-200 p-4">
+                    <h3 className="font-heading text-sm font-bold text-slate-900 mb-3">Kostnadsfördelning</h3>
                     <div className="space-y-2.5">
                       {[
                         { label: 'Din vinst (est.)', value: Math.max(0, econ.invoiced - econ.materialCost - econ.laborCost - econ.overhead), color: 'bg-emerald-500' },
@@ -225,19 +228,19 @@ export default function AnalyticsPage() {
                               <div className={`h-full rounded-full ${row.color}`} style={{ width: `${pct}%` }} />
                             </div>
                             <span className="text-xs text-gray-500 w-10 text-right">{pct}%</span>
-                            <span className="text-xs text-gray-400 w-16 text-right">~{(row.value / 1000).toFixed(0)}k kr</span>
+                            <span className="text-xs text-gray-600 w-16 text-right">~{(row.value / 1000).toFixed(0)}k kr</span>
                           </div>
                         )
                       })}
                     </div>
-                    <p className="text-[10px] text-gray-300 mt-3">Estimat baserat på dina kostnadsinställningar</p>
+                    <p className="text-[10px] text-gray-500 mt-3">Estimat baserat på dina kostnadsinställningar</p>
                   </div>
                 )}
 
                 {/* Månadsöversikt */}
                 {econ.monthlyTrend.length > 1 && (
-                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Fakturerat per månad</h3>
+                  <div className="bg-white rounded-card border border-slate-200 p-4">
+                    <h3 className="font-heading text-sm font-bold text-slate-900 mb-3">Fakturerat per månad</h3>
                     <div className="h-48">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={econ.monthlyTrend}>
@@ -253,7 +256,7 @@ export default function AnalyticsPage() {
                 )}
 
                 {!econ.overheadSet && (
-                  <a href="/dashboard/settings" className="block text-xs text-gray-400 hover:text-primary-700 transition-colors">
+                  <a href="/dashboard/settings" className="block text-xs text-gray-500 hover:text-primary-700 transition-colors">
                     Justera kostnadsinställningar för bättre estimat →
                   </a>
                 )}
@@ -262,43 +265,43 @@ export default function AnalyticsPage() {
 
             {/* ═══ Försäljningsinsikter ═══ */}
             <div className="flex items-center gap-3 pt-2">
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Försäljningsinsikter</h2>
+              <h2 className="font-heading text-sm font-bold text-slate-700 uppercase tracking-wide">Försäljningsinsikter</h2>
               <div className="flex-1 h-px bg-gray-200" />
             </div>
 
             {/* Overview KPIs */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
+              <div className="bg-white rounded-card border border-slate-200 p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 rounded-lg bg-green-100"><Trophy className="w-4 h-4 text-green-600" /></div>
-                  <span className="text-xs text-gray-400 uppercase tracking-wider">Win-rate</span>
+                  <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Win-rate</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{winLossData?.win_rate || 0}%</p>
-                <p className="text-xs text-gray-400 mt-1">{winLossData?.won || 0} vunna / {(winLossData?.won || 0) + (winLossData?.lost || 0)} avslutade</p>
+                <p className="text-xs text-gray-500 mt-1">{winLossData?.won || 0} vunna / {(winLossData?.won || 0) + (winLossData?.lost || 0)} avslutade</p>
               </div>
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
+              <div className="bg-white rounded-card border border-slate-200 p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 rounded-lg bg-primary-100"><TrendingUp className="w-4 h-4 text-primary-700" /></div>
-                  <span className="text-xs text-gray-400 uppercase tracking-wider">Vunnet totalt</span>
+                  <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Vunnet totalt</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{formatValue(winLossData?.won_value || 0)}</p>
-                <p className="text-xs text-gray-400 mt-1">Snitt: {formatValue(winLossData?.avg_deal_size_won || 0)}/deal</p>
+                <p className="text-xs text-gray-500 mt-1">Snitt: {formatValue(winLossData?.avg_deal_size_won || 0)}/deal</p>
               </div>
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
+              <div className="bg-white rounded-card border border-slate-200 p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 rounded-lg bg-amber-100"><Clock className="w-4 h-4 text-amber-600" /></div>
-                  <span className="text-xs text-gray-400 uppercase tracking-wider">Tid till vinst</span>
+                  <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Tid till vinst</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{winLossData?.avg_days_to_win || 0} dagar</p>
-                <p className="text-xs text-gray-400 mt-1">Snitt från lead till avslut</p>
+                <p className="text-xs text-gray-500 mt-1">Snitt från lead till avslut</p>
               </div>
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
+              <div className="bg-white rounded-card border border-slate-200 p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1.5 rounded-lg bg-purple-100"><Zap className="w-4 h-4 text-purple-600" /></div>
-                  <span className="text-xs text-gray-400 uppercase tracking-wider">Svarstid</span>
+                  <div className="p-1.5 rounded-lg bg-blue-100"><Zap className="w-4 h-4 text-blue-600" /></div>
+                  <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Svarstid</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{speedData ? formatResponseTime(speedData.avg_response_seconds) : '-'}</p>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                   {speedData && speedData.avg_response_seconds > 0
                     ? `${Math.round(speedData.industry_avg_seconds / speedData.avg_response_seconds)}x snabbare`
                     : 'Ingen data'
@@ -309,8 +312,8 @@ export default function AnalyticsPage() {
 
             {/* AI Insights */}
             {insights.length > 0 && (
-              <div className="bg-gradient-to-r from-primary-50 to-primary-50 rounded-xl border border-[#E2E8F0] p-5">
-                <h3 className="text-sm font-semibold text-primary-900 flex items-center gap-2 mb-3">
+              <div className="bg-gradient-to-r from-primary-50 to-primary-50 rounded-card border border-slate-200 p-5">
+                <h3 className="font-heading text-sm font-bold text-primary-900 flex items-center gap-2 mb-3">
                   <Lightbulb className="w-4 h-4 text-primary-700" />
                   AI-insikter
                 </h3>
@@ -329,9 +332,9 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
               {/* Speed-to-Lead */}
-              <div className="bg-white rounded-xl border border-[#E2E8F0]">
+              <div className="bg-white rounded-card border border-slate-200">
                 <div className="p-5 border-b border-gray-100">
-                  <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <h3 className="font-heading text-base font-bold text-slate-900 flex items-center gap-2">
                     <Zap className="w-4 h-4 text-amber-500" />
                     Svarstid
                   </h3>
@@ -339,7 +342,7 @@ export default function AnalyticsPage() {
                 <div className="p-5 space-y-6">
                   {/* Distribution */}
                   <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-3">Fördelning</p>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Fördelning</p>
                     <div className="space-y-2">
                       {SPEED_BUCKETS.map(bucket => {
                         const count = speedData?.response_distribution[bucket.key] || 0
@@ -352,7 +355,7 @@ export default function AnalyticsPage() {
                               <div className="h-3 rounded-full bg-primary-700 transition-all" style={{ width: `${Math.max(pct, 1)}%` }} />
                             </div>
                             <span className="w-8 text-gray-600 text-xs text-right font-medium">{count}</span>
-                            <span className="w-12 text-gray-400 text-xs text-right">({Math.round(pct)}%)</span>
+                            <span className="w-12 text-gray-600 text-xs text-right">({Math.round(pct)}%)</span>
                           </div>
                         )
                       })}
@@ -361,7 +364,7 @@ export default function AnalyticsPage() {
 
                   {/* Win-rate by speed */}
                   <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-3">Win-rate per svarstid</p>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Win-rate per svarstid</p>
                     {speedChartData.some(d => d.winRate > 0) ? (
                       <ResponsiveContainer width="100%" height={180}>
                         <BarChart data={speedChartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
@@ -373,14 +376,14 @@ export default function AnalyticsPage() {
                         </BarChart>
                       </ResponsiveContainer>
                     ) : (
-                      <p className="text-sm text-gray-400 text-center py-8">Inte tillräckligt med data</p>
+                      <p className="text-sm text-gray-500 text-center py-8">Inte tillräckligt med data</p>
                     )}
                   </div>
 
                   {/* Trend */}
                   {trendData.length > 1 && (
                     <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-3">Svarstid-trend (veckosnitt)</p>
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Svarstid-trend (veckosnitt)</p>
                       <ResponsiveContainer width="100%" height={160}>
                         <LineChart data={trendData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -397,9 +400,9 @@ export default function AnalyticsPage() {
               </div>
 
               {/* Win/Loss Analysis */}
-              <div className="bg-white rounded-xl border border-[#E2E8F0]">
+              <div className="bg-white rounded-card border border-slate-200">
                 <div className="p-5 border-b border-gray-100">
-                  <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <h3 className="font-heading text-base font-bold text-slate-900 flex items-center gap-2">
                     <Target className="w-4 h-4 text-primary-700" />
                     Win/Loss-analys
                   </h3>
@@ -407,7 +410,7 @@ export default function AnalyticsPage() {
                 <div className="p-5 space-y-6">
                   {/* Loss reasons */}
                   <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-3">Förlustorsaker</p>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Förlustorsaker</p>
                     {lossData.length > 0 ? (
                       <div className="space-y-2">
                         {lossData.slice(0, 6).map(r => {
@@ -419,24 +422,24 @@ export default function AnalyticsPage() {
                                 <div className="h-3 rounded-full bg-red-400 transition-all" style={{ width: `${(r.count / maxCount) * 100}%` }} />
                               </div>
                               <span className="w-6 text-gray-600 text-xs text-right font-medium">{r.count}</span>
-                              <span className="w-16 text-gray-400 text-xs text-right">{formatValue(r.value)}</span>
+                              <span className="w-16 text-gray-600 text-xs text-right">{formatValue(r.value)}</span>
                             </div>
                           )
                         })}
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-400 text-center py-4">Inga förlorade deals ännu</p>
+                      <p className="text-sm text-gray-500 text-center py-4">Inga förlorade deals ännu</p>
                     )}
                   </div>
 
                   {/* Win-rate by source */}
                   <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-3">Win-rate per källa</p>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Win-rate per källa</p>
                     {(winLossData?.win_rate_by_source || []).length > 0 ? (
                       <div className="rounded-lg border border-[#E2E8F0] overflow-hidden">
                         <table className="w-full text-xs">
                           <thead>
-                            <tr className="bg-gray-50 text-gray-400">
+                            <tr className="bg-gray-50 text-gray-600">
                               <th className="text-left px-3 py-2 font-medium">Källa</th>
                               <th className="text-right px-3 py-2 font-medium">Leads</th>
                               <th className="text-right px-3 py-2 font-medium">Vunna</th>
@@ -458,14 +461,14 @@ export default function AnalyticsPage() {
                         </table>
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-400 text-center py-4">Ingen data</p>
+                      <p className="text-sm text-gray-500 text-center py-4">Ingen data</p>
                     )}
                   </div>
 
                   {/* Monthly trend */}
                   {(winLossData?.monthly_trend || []).length > 1 && (
                     <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-3">Månadsvis trend</p>
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Månadsvis trend</p>
                       <ResponsiveContainer width="100%" height={180}>
                         <BarChart data={winLossData?.monthly_trend || []} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -484,14 +487,14 @@ export default function AnalyticsPage() {
 
             {/* Jobbtyp-uppdelning */}
             {jobTypeStats && jobTypeStats.rows.length > 0 && (
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 mt-6">
+              <div className="bg-white rounded-card border border-slate-200 p-5 mt-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900">Intäkter per jobbtyp</h3>
+                    <h3 className="font-heading text-sm font-bold text-slate-900">Intäkter per jobbtyp</h3>
                     <p className="text-xs text-gray-500">Senaste 12 månaderna — baserat på accepterade offerter</p>
                   </div>
                   <p className="text-right">
-                    <span className="text-xs text-gray-400 uppercase tracking-wider">Totalt</span>
+                    <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Totalt</span>
                     <span className="block text-sm font-bold text-gray-900">
                       {jobTypeStats.total_value.toLocaleString('sv-SE')} kr
                     </span>
@@ -505,11 +508,11 @@ export default function AnalyticsPage() {
                         <div className="flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: row.color }} />
                           <span className="font-medium text-gray-900">{row.name}</span>
-                          <span className="text-gray-400">· {row.deal_count} deals · {row.quote_accepted_count} accepterade offerter</span>
+                          <span className="text-gray-500">· {row.deal_count} deals · {row.quote_accepted_count} accepterade offerter</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-gray-700 font-medium">{row.accepted_value.toLocaleString('sv-SE')} kr</span>
-                          <span className="text-gray-400 w-10 text-right">{row.share_pct}%</span>
+                          <span className="text-gray-500 w-10 text-right">{row.share_pct}%</span>
                         </div>
                       </div>
                       <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -526,7 +529,7 @@ export default function AnalyticsPage() {
                 </div>
 
                 {jobTypeStats.rows.every(r => r.accepted_value === 0 && r.deal_count === 0) && (
-                  <p className="text-center text-sm text-gray-400 py-6">
+                  <p className="text-center text-sm text-gray-500 py-6">
                     Inga jobb kopplade till jobbtyper än. Börja tagga deals i pipelinen!
                   </p>
                 )}
