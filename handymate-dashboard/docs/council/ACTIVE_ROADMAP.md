@@ -76,12 +76,32 @@ kräver eget publicerat facit före inträde. Skapande/ändrande åtgärder
 (fakturor, ÄTA, priser, nya mottagare, pengar) står strukturellt utanför
 trappan tills vidare.
 
+**Etapp Y (samma dag): grindregeln är nu mekanisk, inte magkänsla.**
+`lib/mandates/type-maturity.ts:bedomTypMognad` bedömer varje åtgärdstyp mot
+FEM namngivna konstanter (`MATURITY_MIN_EXECUTED=25`, `MATURITY_MAX_STOPP=0`,
+`MATURITY_MAX_DELIVERY_FAILURE_PCT=2`, `MATURITY_MAX_SAFETY_REVOCATIONS=0`,
+`MATURITY_MIN_HISTORY_DAYS=30` — Andreas justerar siffrorna vid granskning,
+koden ändras aldrig i smyg). `mogen` är sant bara när ALLA fem är uppfyllda,
+aldrig delbetyg. `GET /api/admin/mandate-maturity` (isAdmin-gated, samma
+ask-coverage-idiom som Etapp L, plattformsövergripande — inte tenant-scoped
+och därför medvetet utanför permission-contract-kartan) aggregerar
+`lib/mandates/platform-maturity.ts` — mandat-stämplade kort ÖVER ALLA
+FÖRETAG, återanvänder `byggMandateFacit` per mandat i stället för att
+duplicera räkningen — och publicerar `bedomTypMognad`-resultatet per typ med
+kriterielista ("12/25 · 0 STOPP · 0% av 12 · 0 återkallelser · 18/30 dagar").
+Grindregeln (raden ovan) pekar nu på dessa konstanter: **att öppna en typ
+kräver TRE lås tillsammans — `mogen=true`, Andreas uttryckliga godkännande,
+och en migration som vidgar `mission_mandate.allowed_action_types`
+CHECK-begränsningen.** `mogen=true` är beviset, aldrig beslutet i sig.
+
 **Verifiering:** `npx tsc --noEmit` och produktionsbuilden gröna. Facit för
 `lib/mandates/*` (mission-mandate/mandate-facit/resolve/create/
-load-mandate-facit), callerintegrationen (send-reminders/quote-follow-up/
-review-requests/automation-engine), routen och panelen/kortet — samtliga
-gröna. `mission-proof.spec.ts` utökad med en mandatstation mot riktig
-databas (skip-with-fix-instruktion om `sql/v150` inte är körd i miljön).
+load-mandate-facit/type-maturity/platform-maturity), callerintegrationen
+(send-reminders/quote-follow-up/review-requests/automation-engine), rutten
+och panelen/kortet, samt Etapp Y:s kvantifierade grind
+(`type-maturity`/`mandate-maturity`-faciten) — samtliga gröna.
+`mission-proof.spec.ts` utökad med en mandatstation mot riktig databas
+(skip-with-fix-instruktion om `sql/v150` inte är körd i miljön).
 
 ---
 
