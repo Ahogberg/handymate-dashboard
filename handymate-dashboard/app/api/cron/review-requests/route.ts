@@ -4,6 +4,8 @@ import { getServerSupabase } from '@/lib/supabase'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { normalizeSwedishPhone } from '@/lib/phone-normalize'
 import { buildReferralUrl } from '@/lib/referral/link'
+import { registerMandateDeliveryFailure } from '@/lib/mandates/mission-mandate'
+import { loadMandateResolutionCache, resolveMandateForAction } from '@/lib/mandates/resolve'
 
 export const dynamic = 'force-dynamic'
 
@@ -143,6 +145,11 @@ export async function GET(request: NextRequest) {
     // dess projekt i loopen nedan.
     const referralAskEnabled = await isReferralAskEnabled(supabase, biz.business_id)
 
+    // Etapp W (Mission Mandates V1): en mandat-cache per business (som ovan)
+    // — inte en läsning per projekt i loopen nedan (se lib/mandates/
+    // resolve.ts filhuvud).
+    const reviewMandateCache = await loadMandateResolutionCache(supabase, biz.business_id)
+
     for (const project of projects || []) {
       projectsScanned++
 
@@ -276,11 +283,21 @@ export async function GET(request: NextRequest) {
         message: smsText,
       }
 
-      // Förtjänad autonomi: skicka direkt (samma sendSmsViaElks-väg som
-      // approve-exekveringen) istället för att skapa godkännande. Vid
+      // Etapp W (Mission Mandates V1): mandatkontrollen körs FÖRE förtjänad
+      // autonomi — ett mandat är uppdrags-scopat uttryckligt samtycke, mer
+      // specifikt än global streak-baserad autonomi. review_request har
+      // inget kr-belopp (samma skäl som ovan: ingen beloppsgräns).
+      const mandateResolution = await resolveMandateForAction(supabase, biz.business_id, reviewMandateCache, {
+        actionKey: 'review_request', targetRef: project.project_id, amountKr: null, nowIso: now.toISOString(),
+      })
+
+      // Förtjänad autonomi ELLER mandat: skicka direkt (samma sendSmsViaElks-
+      // väg som approve-exekveringen) istället för att skapa godkännande. Vid
       // misslyckat utskick faller vi IGENOM till approval-inserten nedan
-      // så ett hanterbart kort skapas — kunden tappas aldrig tyst.
-      if (reviewAutonomous) {
+      // så ett hanterbart kort skapas — kunden tappas aldrig tyst. När inget
+      // mandat täcker reducerar villkoret till exakt det gamla
+      // `if (reviewAutonomous)`.
+      if (reviewAutonomous || mandateResolution.covered) {
         const { sendSmsViaElks } = await import('@/lib/sms-send')
         const smsResult = await sendSmsViaElks({
           supabase,
@@ -303,7 +320,8 @@ export async function GET(request: NextRequest) {
           action_type: 'send_sms',
           status: smsResult.success ? 'success' : 'failed',
           context: {
-            earned_autonomy: true,
+            earned_autonomy: reviewAutonomous,
+            mandate_id: mandateResolution.covered ? mandateResolution.mandate.id : null,
             customer_id: customer.customer_id,
             project_id: project.project_id,
             referral_link_attached: !!referralUrl,
@@ -311,6 +329,38 @@ export async function GET(request: NextRequest) {
           result: smsResult.success ? {} : { error: smsResult.error || 'okänt fel' },
         })
         if (logError) console.warn('[review-requests] autonom logg-insert misslyckades:', logError.message)
+
+        // Etapp W: mandat-täckta sändningar stämplas med ett eget
+        // auto_approved-kort — mandatets mätinstrument (mandate-facit.ts)
+        // härleder användning ur payload.mandate_id-stämplade kort. Den
+        // förtjänade-autonomi-vägen skrev aldrig ett kort här, oförändrat.
+        // Ingen truth_class stämplas: varken "en bokning påmindes om" eller
+        // "en recension efterfrågades" beskrivs ärligt av någon av mission-
+        // progress.ts:s fem klasser (se lib/mandates/resolve.ts filhuvud).
+        if (mandateResolution.covered) {
+          const mandate = mandateResolution.mandate
+          const cardId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+          const { error: cardErr } = await supabase.from('pending_approvals').insert({
+            id: cardId,
+            business_id: biz.business_id,
+            approval_type: 'review_request',
+            title: `Be ${firstName || 'kunden'} om recension`,
+            description: `Projektet "${projectName}" — recensions-SMS skickat automatiskt inom mandatet.`,
+            payload: {
+              ...reviewPayload,
+              mandate_id: mandate.id,
+              mission_id: mandate.mission_id,
+              execution_result: {
+                outcome: smsResult.success ? 'success' : 'failed',
+                error_text: smsResult.success ? null : (smsResult.error || null),
+              },
+            },
+            status: 'auto_approved',
+            risk_level: 'low',
+            expires_at: expiresAt.toISOString(),
+          })
+          if (cardErr) console.error('[review-requests] mandat-kort insert failed:', project.project_id, cardErr)
+        }
 
         if (smsResult.success) {
           // Spegla approve-vägen: markera kunden så 180d-spärren (checken
@@ -329,9 +379,16 @@ export async function GET(request: NextRequest) {
           continue
         }
 
-        // Misslyckat autonomt utskick — räknas mot nedgraderings-tröskeln
-        // (2 fel/14 dagar). Fail-safe internt, kastar aldrig.
-        await recordAutonomyFailure(supabase, biz.business_id, 'review_request')
+        // Misslyckat utskick — mandat och förtjänad autonomi registreras mot
+        // sina EGNA, separata trösklar (aldrig samma räkning).
+        if (mandateResolution.covered) {
+          await registerMandateDeliveryFailure(supabase, { mandateId: mandateResolution.mandate.id, businessId: biz.business_id })
+        }
+        if (reviewAutonomous) {
+          // Misslyckat autonomt utskick — räknas mot nedgraderings-tröskeln
+          // (2 fel/14 dagar). Fail-safe internt, kastar aldrig.
+          await recordAutonomyFailure(supabase, biz.business_id, 'review_request')
+        }
 
         // Notifiera ägaren (samma push-mönster som automation-motorns
         // autonomi-fail) och fall igenom till approval-inserten nedan —

@@ -13,6 +13,8 @@ import { deriveAutonomyKey, isAutonomous as isAutonomyGranted, recordAutonomyFai
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 import { arTestId, arTestNamn } from '@/lib/testdata'
 import { extractFirstName } from '@/lib/customers/namn'
+import { registerMandateDeliveryFailure } from '@/lib/mandates/mission-mandate'
+import { loadMandateResolutionCache, resolveMandateForAction, type MandateResolutionCache } from '@/lib/mandates/resolve'
 
 // ── Types ───────────────────────────────────────────────
 
@@ -797,7 +799,18 @@ export async function runApprovedAutomationAction(
 export async function executeRule(
   supabase: SupabaseClient,
   ruleId: string,
-  context: ExecutionContext = {}
+  context: ExecutionContext = {},
+  /**
+   * Etapp W (Mission Mandates V1, tasks/jaunty-pondering-hummingbird.md):
+   * en delad mandat-cache för HELA business-körningen (se
+   * evaluateThresholds, som skapar den EN gång och skickar in den till
+   * varje kandidat i sin loop — inte en läsning per kandidat). Utelämnad
+   * (fireEvent/executeCronRules/direkta anrop) ⇒ lazy fallback nedan, men
+   * det spelar ingen roll i praktiken: mandat-blocket nedan är bara
+   * nåbart för trigger_type 'threshold' (deriveAutonomyKey), och det är
+   * bara evaluateThresholds som kör såna regler.
+   */
+  mandateCache?: MandateResolutionCache
 ): Promise<{ status: LogStatus; data?: Record<string, unknown>; error?: string }> {
   // 1. Fetch rule
   const { data: rule, error: ruleErr } = await supabase
@@ -868,10 +881,54 @@ export async function executeRule(
   // fall igenom till exekvering (steg 7). Markera i context för logg/digest.
   const autonomyKey = deriveAutonomyKey(typedRule)
   let autonomousBypass = false
+  // Etapp W (Mission Mandates V1): mandatkontrollen körs FÖRE isAutonomous —
+  // ett mandat är uppdrags-scopat uttryckligt samtycke, mer specifikt än
+  // global förtjänad autonomi. Träff ⇒ SAMMA exekverings-/loggningsväg som
+  // autonomousBypass redan tar (steg 7/8 nedan, orörda) plus ett eget
+  // stämplat auto_approved-kort (se strax efter steg 7). Miss/orsak (inget
+  // mandat, fel typ, mål utanför, tak nått, plan ändrad, ...) ⇒ dagens
+  // isAutonomous-beteende, exakt oförändrat (reduktionen syns nedan: när
+  // mandatBypass förblir false körs precis den gamla try/catch-satsen).
+  let mandateStamp: { mandate_id: string; mission_id: string } | null = null
   if (needsApproval && autonomyKey) {
-    try {
-      autonomousBypass = await isAutonomyGranted(supabase, typedRule.business_id, autonomyKey)
-    } catch { autonomousBypass = false }
+    // Etapp W:s uttryckliga scope för den här callern är booking_reminder
+    // (tasks/jaunty-pondering-hummingbird.md, Etapp W punkt 1).
+    // deriveAutonomyKey mappar ÄVEN threshold-signaturerna
+    // invoice/days_overdue och quote/days_since_sent till invoice_reminder/
+    // quote_followup_sms (V3-regelmotorns egen väg dit, parallell med
+    // cron-callerna) — de typerna HAR ett default-belopptak
+    // (DEFAULT_AUTONOMY_CAPS), så ett `amountKr: null` härifrån (context bär
+    // inget vitlistat beloppsfält på den här grenen) skulle fail-closed:a
+    // till 'belopp_okant' varje gång, dvs. tyst göra mandat overksamma för
+    // just de typerna på just den här vägen. Snävare att hålla sig till
+    // exakt det planen ber om än att gissa ett belopp — isAutonomous-
+    // kontrollen nedan körs OFÖRÄNDRAT för de typerna, precis som innan.
+    if (autonomyKey === 'booking_reminder') {
+      const entityId = (context.entity_id as string) || (context.id as string)
+      if (entityId) {
+        try {
+          const cache = mandateCache ?? await loadMandateResolutionCache(supabase, typedRule.business_id)
+          const resolution = await resolveMandateForAction(supabase, typedRule.business_id, cache, {
+            actionKey: autonomyKey,
+            targetRef: entityId,
+            // booking_reminder saknar ett kr-belopp i den här kontexten (och
+            // saknar default-tak i DEFAULT_AUTONOMY_CAPS) — null är ärligt,
+            // inte en gissning.
+            amountKr: null,
+            nowIso: new Date().toISOString(),
+          })
+          if (resolution.covered) {
+            autonomousBypass = true
+            mandateStamp = { mandate_id: resolution.mandate.id, mission_id: resolution.mandate.mission_id }
+          }
+        } catch { /* fail-soft: ingen täckning, faller igenom till isAutonomous nedan */ }
+      }
+    }
+    if (!autonomousBypass) {
+      try {
+        autonomousBypass = await isAutonomyGranted(supabase, typedRule.business_id, autonomyKey)
+      } catch { autonomousBypass = false }
+    }
   }
   // Muta ALDRIG caller-ägda context (fireEvent delar payload-objektet över
   // regler i loopen) — härled en lokal kopia för den autonoma vägen.
@@ -923,12 +980,58 @@ export async function executeRule(
 
   const status: LogStatus = result.success ? 'success' : 'failed'
 
+  // Etapp W (Mission Mandates V1): mandat-täckta körningar stämplas med ett
+  // eget auto_approved-kort — mandatets mätinstrument (mandate-facit.ts,
+  // Etapp V) härleder daglig/total användning ur payload.mandate_id-
+  // stämplade pending_approvals-rader (deriveMandateUsage), och den vanliga
+  // v3_automation_logs-raden (steg 8 nedan) bär inget mandate_id. Det här är
+  // en TILLÄGGSSKRIVNING vid sidan av steg 8, inte en ersättning för den.
+  if (mandateStamp) {
+    try {
+      const cardId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+      const { error: cardErr } = await supabase.from('pending_approvals').insert({
+        id: cardId,
+        business_id: typedRule.business_id,
+        approval_type: 'automation',
+        title: typedRule.name,
+        description: `${typedRule.description || ''} — utfört automatiskt inom mandatet.`.trim(),
+        payload: {
+          ...execContext,
+          rule_action_type: typedRule.action_type,
+          autonomy_key: autonomyKey,
+          mandate_id: mandateStamp.mandate_id,
+          mission_id: mandateStamp.mission_id,
+          execution_result: {
+            outcome: status === 'success' ? 'success' : 'failed',
+            error_text: status === 'success' ? null : (result.error || null),
+          },
+        },
+        status: 'auto_approved',
+        risk_level: 'medium',
+        expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+      })
+      if (cardErr) console.error('[automation-engine] mandat-kort insert failed:', typedRule.id, cardErr)
+      if (status === 'failed') {
+        await registerMandateDeliveryFailure(supabase, {
+          mandateId: mandateStamp.mandate_id,
+          businessId: typedRule.business_id,
+        })
+      }
+    } catch (err) {
+      console.error('[automation-engine] mandat-kortskrivning kastade oväntat (fail-safe, ignorerat):', err)
+    }
+  }
+
   // Förtjänad autonomi: ett autonomt utskick som failar får inte svälta tyst —
   // hantverkaren har delegerat och måste få veta när delegationen fallerar.
   if (status === 'failed' && autonomousBypass) {
     // Räknas mot nedgraderings-tröskeln (2 fel/14 dagar). autonomyKey är satt
     // (annars hade autonomousBypass aldrig blivit true). Fail-safe internt.
-    if (autonomyKey) {
+    // INTE när felet kom via ett mandat (mandateStamp satt) — det är
+    // registerMandateDeliveryFailure ovan som äger den räkningen, en
+    // mandat-driven misslyckad körning ska aldrig straffa den separata
+    // förtjänad-autonomi-streaken.
+    if (autonomyKey && !mandateStamp) {
       await recordAutonomyFailure(supabase, typedRule.business_id, autonomyKey)
     }
     try {
@@ -987,6 +1090,12 @@ export async function evaluateThresholds(
 
   if (!rules || rules.length === 0) return { evaluated, triggered, errors }
 
+  // Etapp W (Mission Mandates V1): EN mandat-cache för hela den här
+  // business-körningen, delad av varje kandidat i loopen nedan via
+  // executeRule:s valfria 4:e argument — inte en läsning per kandidat (se
+  // lib/mandates/resolve.ts filhuvud).
+  const mandateCache = await loadMandateResolutionCache(supabase, businessId)
+
   for (const rule of rules as AutomationRule[]) {
     evaluated++
     const config = rule.trigger_config
@@ -1039,7 +1148,7 @@ export async function evaluateThresholds(
           entity_id: entityId,
           dedup_key: dedupKey,
           ...entityItem,
-        })
+        }, mandateCache)
 
         if (result.status === 'success' || result.status === 'pending_approval') {
           triggered++

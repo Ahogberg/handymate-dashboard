@@ -427,7 +427,7 @@ test.describe('Mission Control är ägar-/admin-låst i chatten (Andreas fynd 20
   })
 
   test('portföljblocket (bär fakturabelopp) byggs bara för behöriga', () => {
-    expect(routeSrc).toContain(currentAgent === 'matte' && missionBehorig)
+    expect(routeSrc).toContain("currentAgent === 'matte' && missionBehorig")
   })
 
   test('dubbelgrind: verktygslistan filtreras OCH exekveringen vägrar', () => {

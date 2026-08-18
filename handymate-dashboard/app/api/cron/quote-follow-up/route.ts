@@ -9,6 +9,8 @@ import { getBusinessPlanFromConfig } from '@/lib/auth'
 import { checkSmsAllowance } from '@/lib/sms-usage'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 import { arTestId, arTestNamn } from '@/lib/testdata'
+import { registerMandateDeliveryFailure } from '@/lib/mandates/mission-mandate'
+import { loadMandateResolutionCache, resolveMandateForAction, MANDATE_TRUTH_CLASS, type MandateResolutionCache } from '@/lib/mandates/resolve'
 
 /**
  * GET /api/cron/quote-follow-up - Automatisk uppföljning av offerter via AI agent.
@@ -66,6 +68,9 @@ export async function GET(request: NextRequest) {
       // Beloppsgräns per företag (bara relevant om autonomt) — kollas per
       // offert nedan, cap:et självt är samma oavsett belopp.
       const nudgeCapMap = new Map<string, number | null>()
+      // Etapp W (Mission Mandates V1): en mandat-cache per företag, laddad EN
+      // gång här (inte per offert nedan) — se lib/mandates/resolve.ts filhuvud.
+      const nudgeMandateCacheMap = new Map<string, MandateResolutionCache>()
 
       if (nudgeBizIds.length > 0) {
         const { data: v3NudgeRules } = await supabase
@@ -128,6 +133,10 @@ export async function GET(request: NextRequest) {
               nudgeCapMap.set(bizId, null)
             }
           }
+          // Mandat-cachen laddas oavsett förtjänad autonomi — ett mandat kan
+          // täcka en offert även för ett företag som inte förtjänat streak-
+          // autonomi ännu (uppdrags-scopat samtycke, inte streak-baserat).
+          nudgeMandateCacheMap.set(bizId, await loadMandateResolutionCache(supabase, bizId))
         }
       }
 
@@ -161,11 +170,24 @@ export async function GET(request: NextRequest) {
         // aldrig i kundtext.
         const message = `Hej${firstName ? ' ' + firstName : ''}! Din offert på ${amount} kr går ut om 3 dagar. Hör av dig om du har frågor eller vill gå vidare!\n${suffix}`
 
+        // Etapp W (Mission Mandates V1): mandatkontrollen körs FÖRE förtjänad
+        // autonomi — ett mandat är uppdrags-scopat uttryckligt samtycke, mer
+        // specifikt än global streak-baserad autonomi.
+        const mandateCache = nudgeMandateCacheMap.get(q.business_id)
+          ?? { mandates: [], missionStepsById: new Map(), usageByMandateId: new Map() }
+        const mandateResolution = await resolveMandateForAction(supabase, q.business_id, mandateCache, {
+          actionKey: 'quote_followup_sms', targetRef: q.quote_id, amountKr: amountRaw, nowIso: now.toISOString(),
+        })
+
         // Beloppsgräns: ett belopp över gränsen tar godkännande-vägen även om
         // företaget annars fått autonomi — hög risk trumpar streak.
         const bizAutonomous = nudgeAutonomousMap.get(q.business_id) === true
         const capExceeded = bizAutonomous && !underAutonomyCap(nudgeCapMap.get(q.business_id) ?? null, amountRaw)
-        const treatAsAutonomous = bizAutonomous && !capExceeded
+        // Ett mandat vinner oavsett cap/streak (mandateCovers har redan
+        // validerat beloppet mot mandatets EGNA tak) — när inget mandat
+        // täcker reducerar uttrycket till exakt den gamla
+        // `bizAutonomous && !capExceeded`.
+        const treatAsAutonomous = mandateResolution.covered || (bizAutonomous && !capExceeded)
 
         // ── Grind: icke-V3-företag gatas genom förtjänad autonomi ──
         if (!treatAsAutonomous) {
@@ -253,9 +275,52 @@ export async function GET(request: NextRequest) {
               expiryNudgesSent++
             } else {
               console.error('[quote-follow-up] expiry-nudge SMS send failed (non-blocking):', q.business_id, q.quote_id, smsResult.error)
-              // Autonomt utskick nådde ingen kund — räknas mot nedgraderings-
-              // tröskeln (2 fel/14 dagar). Fail-safe internt, kastar aldrig.
-              await recordAutonomyFailure(supabase, q.business_id, 'quote_followup_sms')
+              if (mandateResolution.covered) {
+                // Mandat-driven leverans misslyckades — registreras mot
+                // mandatets EGNA auto-paus-tröskel, aldrig mot earned-
+                // autonomy-streaken.
+                await registerMandateDeliveryFailure(supabase, { mandateId: mandateResolution.mandate.id, businessId: q.business_id })
+              } else {
+                // Autonomt utskick nådde ingen kund — räknas mot nedgraderings-
+                // tröskeln (2 fel/14 dagar). Fail-safe internt, kastar aldrig.
+                await recordAutonomyFailure(supabase, q.business_id, 'quote_followup_sms')
+              }
+            }
+
+            // Etapp W: mandat-täckta sändningar stämplas med ett eget
+            // auto_approved-kort — mandatets mätinstrument (mandate-facit.ts)
+            // härleder användning ur payload.mandate_id-stämplade kort. Den
+            // förtjänade-autonomi-vägen skrev aldrig ett kort här, oförändrat.
+            if (mandateResolution.covered) {
+              const mandate = mandateResolution.mandate
+              const cardId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+              const { error: cardErr } = await supabase.from('pending_approvals').insert({
+                id: cardId,
+                business_id: q.business_id,
+                approval_type: 'send_sms',
+                title: 'Följ upp offert innan den går ut',
+                description: `Offerten "${q.title || ''}" på ${amount} kr — skickad automatiskt inom mandatet.`,
+                payload: {
+                  to: customer.phone_number,
+                  message,
+                  customer_id: q.customer_id,
+                  related_id: q.quote_id,
+                  autonomy_key: 'quote_followup_sms',
+                  agent_id: 'daniel',
+                  amount_kr: amountRaw,
+                  mandate_id: mandate.id,
+                  mission_id: mandate.mission_id,
+                  truth_class: MANDATE_TRUTH_CLASS.quote_followup_sms,
+                  execution_result: {
+                    outcome: smsResult.success ? 'success' : 'failed',
+                    error_text: smsResult.success ? null : (smsResult.error || null),
+                  },
+                },
+                status: 'auto_approved',
+                risk_level: 'medium',
+                expires_at: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+              })
+              if (cardErr) console.error('[quote-follow-up] mandat-kort insert failed:', q.quote_id, cardErr)
             }
 
             // VP2 (gap 4): nudge-vägen loggade tidigare INGENTING till

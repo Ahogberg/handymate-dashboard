@@ -8,6 +8,8 @@ import { isAutonomous, getAutonomyCap, underAutonomyCap, recordAutonomyFailure }
 import { deliverInvoiceReminder } from '@/lib/invoice-reminder-send'
 import { svDateStr } from '@/lib/dates'
 import { arTestId, arTestNamn } from '@/lib/testdata'
+import { registerMandateDeliveryFailure } from '@/lib/mandates/mission-mandate'
+import { loadMandateResolutionCache, resolveMandateForAction, MANDATE_TRUTH_CLASS, type MandateResolutionCache } from '@/lib/mandates/resolve'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -276,6 +278,11 @@ async function sendAutoReminders() {
     let approvalsCreated = 0
     const results: Array<{ invoice_id: string; invoice_number: string; level: string; success: boolean; fee_added?: number; interest_added?: number; approval_created?: boolean }> = []
 
+    // Etapp W (Mission Mandates V1): en mandat-cache per företag, laddad
+    // första gången det företaget förekommer i loopen nedan — INTE en
+    // läsning per faktura (se lib/mandates/resolve.ts filhuvud).
+    const mandateCacheByBusiness = new Map<string, MandateResolutionCache>()
+
     for (const inv of overdueInvoices as any[]) {
       const cfg = configMap[inv.business_id]
       if (!cfg) continue
@@ -363,19 +370,40 @@ async function sendAutoReminders() {
         daysOverdue,
       }
 
+      // ── Etapp W (Mission Mandates V1): mandatkontrollen körs FÖRE
+      // förtjänad autonomi — ett mandat är uppdrags-scopat uttryckligt
+      // samtycke, mer specifikt än global streak-baserad autonomi. Träff ⇒
+      // `autonomous` sätts direkt (SAMMA direktsändningsväg nedan, oförändrad
+      // kod), och kortet nedan stämplas med mandate_id/mission_id.
+      // Miss/orsak ⇒ mandateResolution.covered är false, och allt nedan
+      // reducerar exakt till dagens beteende.
+      if (!mandateCacheByBusiness.has(inv.business_id)) {
+        mandateCacheByBusiness.set(inv.business_id, await loadMandateResolutionCache(supabase, inv.business_id))
+      }
+      const mandateResolution = await resolveMandateForAction(
+        supabase, inv.business_id, mandateCacheByBusiness.get(inv.business_id)!,
+        { actionKey: 'invoice_reminder', targetRef: inv.invoice_id, amountKr: amountToPay ?? null, nowIso: today.toISOString() },
+      )
+
       // ── Grind: företag UTAN V3-regel gatas genom förtjänad autonomi ──
       // Autonom → skicka direkt (avgift/ränta muteras BARA vid faktisk leverans
       // inne i deliverInvoiceReminder). Ej autonom → skapa godkännande, ingen
       // utskick + INGEN avgiftsmutation förrän hantverkaren godkänner.
-      let autonomous = false
-      try {
-        autonomous = await isAutonomous(supabase, inv.business_id, 'invoice_reminder')
-      } catch { autonomous = false }
+      let autonomous = mandateResolution.covered
+      if (!autonomous) {
+        try {
+          autonomous = await isAutonomous(supabase, inv.business_id, 'invoice_reminder')
+        } catch { autonomous = false }
+      }
 
       // Beloppsgräns: ett belopp över gränsen tar godkännande-vägen även för
       // ett företag som annars fått autonomi — hög risk trumpar streak.
+      // Gäller INTE mandatvägen: mandateCovers() har redan validerat beloppet
+      // mot mandatets eget tak (eller default-taket som fallback) — att
+      // applicera earned-autonomy-taket en gång till vore dubbelarbete som
+      // kan felaktigt underkänna ett giltigt mandat-täckt utskick.
       let capExceeded = false
-      if (autonomous) {
+      if (autonomous && !mandateResolution.covered) {
         let cap: number | null = null
         try { cap = await getAutonomyCap(supabase, inv.business_id, 'invoice_reminder') } catch { cap = null }
         if (!underAutonomyCap(cap, amountToPay)) {
@@ -402,9 +430,52 @@ async function sendAutoReminders() {
           })
         } else {
           results.push({ invoice_id: inv.invoice_id, invoice_number: inv.invoice_number, level, success: false })
-          // Autonomt utskick nådde ingen kund — räknas mot nedgraderings-
-          // tröskeln (2 fel/14 dagar). Fail-safe internt, kastar aldrig.
-          await recordAutonomyFailure(supabase, inv.business_id, 'invoice_reminder')
+          if (mandateResolution.covered) {
+            // Mandat-driven leverans misslyckades — registreras mot mandatets
+            // EGNA auto-paus-tröskel, aldrig mot earned-autonomy-streaken.
+            await registerMandateDeliveryFailure(supabase, { mandateId: mandateResolution.mandate.id, businessId: inv.business_id })
+          } else {
+            // Autonomt utskick nådde ingen kund — räknas mot nedgraderings-
+            // tröskeln (2 fel/14 dagar). Fail-safe internt, kastar aldrig.
+            await recordAutonomyFailure(supabase, inv.business_id, 'invoice_reminder')
+          }
+        }
+
+        // Etapp W: mandat-täckta utskick stämplas med ett eget auto_approved
+        // kort — mandatets mätinstrument (mandate-facit.ts) härleder
+        // användning ur payload.mandate_id-stämplade kort. Den förtjänade-
+        // autonomi-vägen skrev aldrig ett kort här, det är oförändrat.
+        if (mandateResolution.covered) {
+          const mandate = mandateResolution.mandate
+          const cardId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+          const amountLabelMandate = amountToPay?.toLocaleString('sv-SE') ?? '0'
+          const { error: cardErr } = await supabase.from('pending_approvals').insert({
+            id: cardId,
+            business_id: inv.business_id,
+            approval_type: 'invoice_reminder',
+            title: `Skicka påminnelse för faktura ${inv.invoice_number}`,
+            description: `Faktura ${inv.invoice_number} på ${amountLabelMandate} kr — påminnelse ${nextCount} skickad automatiskt inom mandatet.`,
+            payload: {
+              invoice_id: inv.invoice_id,
+              autonomy_key: 'invoice_reminder',
+              amount_kr: amountToPay ?? null,
+              customer_name: customer?.name ?? null,
+              invoice_number: inv.invoice_number,
+              days_overdue: daysOverdue,
+              delivery: deliveryInput,
+              mandate_id: mandate.id,
+              mission_id: mandate.mission_id,
+              truth_class: MANDATE_TRUTH_CLASS.invoice_reminder,
+              execution_result: {
+                outcome: delivery.skipped ? 'failed' : 'success',
+                error_text: delivery.skipped ? (delivery.orsak ?? null) : null,
+              },
+            },
+            status: 'auto_approved',
+            risk_level: 'medium',
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          })
+          if (cardErr) console.error('[send-reminders] mandat-kort insert failed:', inv.invoice_id, cardErr)
         }
         continue
       }
