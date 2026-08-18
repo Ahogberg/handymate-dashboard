@@ -11,6 +11,7 @@ import { executeTool } from '@/app/api/agent/trigger/tool-router'
 import { toolDefinitions } from '@/app/api/agent/trigger/tool-definitions'
 import { ensureValidToken } from '@/lib/google-calendar'
 import { getBusinessPreferences } from '@/lib/business-preferences'
+import { isToolAllowedForActor, type ActorType } from '@/lib/agent/external-actor'
 
 // ── Types ──
 
@@ -60,6 +61,18 @@ export interface ToolContext {
    * detta — 'system'-triggade körningar har ingen levande användare).
    */
   businessUserId?: string | null
+  /**
+   * Etapp S (tasks/lisa-voice-plan.md, korrigering 1 — Lisa Voice steg 1b):
+   * vem/vad som faktiskt sitter på andra sidan av det här verktygsanropet.
+   * Odefinierad = 'internal_user' = dagens beteende, HELT oförändrat (ingen
+   * befintlig anropsväg sätter detta fältet). 'external_customer' = en
+   * OIDENTIFIERAD extern uppringare/chattare — ett telefonnummer kopplat
+   * till företaget bevisar inte vem som ringer. Styr filterTools() nedan
+   * och executeTool-vakten i tool-router.ts (se lib/agent/external-actor.ts
+   * för den fullständiga vitlistan/motiveringen). V1: ingen runtime-väg
+   * sätter 'external_customer' än — groundwork för Lisa Voice V2.
+   */
+  actorType?: ActorType
 }
 
 export interface GoogleConnection {
@@ -103,10 +116,19 @@ export const escalateToolDefinition = {
 
 // ── Tool filtering ──
 
+/**
+ * Filtrerar den delade verktygslistan till det agenten (allowedNames) OCH
+ * aktören (actorType) tillsammans får se — modellen erbjuds aldrig ett
+ * verktyg utanför någotdera gränsen. actorType odefinierad = intern aktör,
+ * dagens beteende (bara allowedNames avgör), helt oförändrat.
+ */
 export function filterTools(
-  allowedNames: string[]
+  allowedNames: string[],
+  actorType?: ActorType
 ): typeof toolDefinitions {
-  return toolDefinitions.filter(t => allowedNames.includes(t.name)) as unknown as typeof toolDefinitions
+  return toolDefinitions.filter(
+    t => allowedNames.includes(t.name) && isToolAllowedForActor(t.name, actorType)
+  ) as unknown as typeof toolDefinitions
 }
 
 // ── Business context fetcher ──

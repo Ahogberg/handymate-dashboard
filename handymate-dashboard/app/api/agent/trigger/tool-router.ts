@@ -39,6 +39,7 @@ import { validateMissionPlan, type MissionPlanInput } from '@/lib/mission/plan-v
 import type { MissionPlanPresentation } from '@/lib/mission/mission-presentation'
 import { buildMissionSummaryText, buildMissionHeadline } from '@/lib/mission/mission-summary'
 import { resolveGoalType } from '@/lib/mission/goal-type'
+import { isToolAllowedForActor, EXTERNAL_TOOL_DENIED_MESSAGE, type ActorType } from '@/lib/agent/external-actor'
 
 interface ToolResult {
   success: boolean
@@ -86,6 +87,14 @@ interface ToolContext {
    * created_by: null precis som förut.
    */
   businessUserId?: string | null
+  /**
+   * Etapp S (tasks/lisa-voice-plan.md, korrigering 1 — Lisa Voice steg 1b):
+   * se samma fält på lib/agent/agents/shared.ts ToolContext för den
+   * fullständiga förklaringen. Odefinierad = intern aktör = dagens
+   * beteende, oförändrat. 'external_customer' = oidentifierad extern part
+   * — kontrolleras av vakten längst upp i executeTool() nedan.
+   */
+  actorType?: ActorType
 }
 
 function generateId(prefix: string): string {
@@ -104,6 +113,17 @@ export async function executeTool(
   businessId: string,
   context: ToolContext
 ): Promise<ToolResult> {
+  // ═══ ETAPP S — DUBBELGRINDENS ANDRA HALVA (Lisa Voice steg 1b) ═══
+  // filterTools() i lib/agent/agents/shared.ts hindrar redan modellen från
+  // att SE ett icke-vitlistat verktyg när aktören är en oidentifierad
+  // extern part — men listan till modellen är UX, inte gränsen (samma
+  // disciplin som isToolAllowedForAgent i app/api/matte/chat/route.ts,
+  // P0.2). Den riktiga gränsen sitter här, FÖRE switchen: ett hallucinerat
+  // eller injicerat verktygsnamn förbi filtreringen exekverar aldrig sitt
+  // case. Neutral text — avslöjar aldrig vilka verktyg som finns.
+  if (!isToolAllowedForActor(name, context.actorType)) {
+    return { success: false, error: EXTERNAL_TOOL_DENIED_MESSAGE }
+  }
   try {
     switch (name) {
       case 'get_customer':
