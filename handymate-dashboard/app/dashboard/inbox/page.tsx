@@ -432,48 +432,53 @@ export default function InboxPage() {
       )}
 
       <div className="relative max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center mb-6">
-          <div className="p-3 rounded-xl bg-primary-700 mr-4">
-            <Inbox className="w-6 h-6 text-gray-900" />
+        {/* Header — ljust idiom, ingen mörk platta (docs/HANDYMATE_DESIGN_SYSTEM.md,
+            samma uppbyggnad som Godkännanden). "Inbox" var enda engelska
+            sidnamnet i huset — bytt till "Inkorg" (Sidebar.tsx säger redan
+            "Inkorg" för samma nav-post). */}
+        <div className="flex items-center gap-3 mb-6 min-w-0">
+          <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center shrink-0">
+            <Inbox className="w-5 h-5 text-primary-700" />
           </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Inbox</h1>
-            <p className="text-gray-500">AI-förslag och samtalsinspelningar</p>
+          <div className="min-w-0">
+            <h1 className="font-heading text-2xl sm:text-3xl font-bold text-slate-900">Inkorg</h1>
+            <p className="text-gray-600">AI-förslag och samtalsinspelningar</p>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6">
+        {/* Tabbar — segmenterad kontroll (approvals-idiomet). */}
+        <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-6">
           <button
             onClick={() => setActiveTab('suggestions')}
-            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all min-h-[44px] flex-1 sm:flex-none ${
+            className={`flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-all flex-1 ${
               activeTab === 'suggestions'
-                ? 'bg-primary-700 text-white'
-                : 'bg-white border border-[#E2E8F0] text-gray-500 hover:text-white'
+                ? 'bg-white text-primary-700 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             <Sparkles className="w-4 h-4" />
             <span className="hidden sm:inline">AI-förslag</span>
             <span className="sm:hidden">Förslag</span>
             {stats.pending > 0 && (
-              <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-white/20">
+              <span className={`ml-1 px-2 py-0.5 text-xs rounded-full font-semibold ${
+                activeTab === 'suggestions' ? 'bg-primary-100 text-primary-700' : 'bg-slate-200 text-slate-600'
+              }`}>
                 {stats.pending}
               </span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('recordings')}
-            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all min-h-[44px] flex-1 sm:flex-none ${
+            className={`flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-all flex-1 ${
               activeTab === 'recordings'
-                ? 'bg-primary-700 text-white'
-                : 'bg-white border border-[#E2E8F0] text-gray-500 hover:text-white'
+                ? 'bg-white text-primary-700 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             <Mic className="w-4 h-4" />
             Inspelningar
             {pendingRecordings > 0 && (
-              <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-amber-500/30 text-amber-600">
+              <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 font-semibold">
                 {pendingRecordings}
               </span>
             )}
@@ -483,57 +488,60 @@ export default function InboxPage() {
         {/* AI Suggestions Tab */}
         {activeTab === 'suggestions' && (
           <>
-            {/* Stats */}
+            {/* Stat-tiles — ärliga siffror ur redan hämtad `stats`-state
+                (fetchSuggestions), samma font-heading/tabular-nums/rounded-card
+                idiom som Godkännanden. Dubblar som filterknappar precis som
+                innan — bara presentationen är ny. */}
             <div className="grid grid-cols-3 gap-3 mb-6">
               <button
                 onClick={() => setStatusFilter('pending')}
-                className={`p-4 rounded-xl border transition-all ${
+                className={`text-left p-4 min-h-[44px] rounded-card border transition-all ${
                   statusFilter === 'pending'
-                    ? 'bg-amber-100 border-amber-200'
-                    : 'bg-white border-gray-200 hover:border-gray-300'
+                    ? 'bg-amber-50 border-amber-200'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <AlertTriangle className={`w-5 h-5 ${statusFilter === 'pending' ? 'text-amber-600' : 'text-gray-400'}`} />
-                  <span className={`text-2xl font-bold ${statusFilter === 'pending' ? 'text-amber-600' : 'text-gray-900'}`}>
+                  <AlertTriangle className={`w-5 h-5 ${statusFilter === 'pending' ? 'text-amber-600' : 'text-slate-400'}`} />
+                  <span className={`font-heading tabular-nums text-2xl font-bold ${statusFilter === 'pending' ? 'text-amber-600' : 'text-slate-900'}`}>
                     {stats.pending}
                   </span>
                 </div>
-                <p className="text-sm text-gray-400 mt-2">Väntar</p>
+                <p className="text-sm text-slate-500 mt-2">Väntar</p>
               </button>
 
               <button
                 onClick={() => setStatusFilter('completed')}
-                className={`p-4 rounded-xl border transition-all ${
+                className={`text-left p-4 min-h-[44px] rounded-card border transition-all ${
                   statusFilter === 'completed'
-                    ? 'bg-emerald-100 border-emerald-200'
-                    : 'bg-white border-gray-200 hover:border-gray-300'
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <CheckCircle className={`w-5 h-5 ${statusFilter === 'completed' ? 'text-emerald-600' : 'text-gray-400'}`} />
-                  <span className={`text-2xl font-bold ${statusFilter === 'completed' ? 'text-emerald-600' : 'text-gray-900'}`}>
+                  <CheckCircle className={`w-5 h-5 ${statusFilter === 'completed' ? 'text-green-600' : 'text-slate-400'}`} />
+                  <span className={`font-heading tabular-nums text-2xl font-bold ${statusFilter === 'completed' ? 'text-green-600' : 'text-slate-900'}`}>
                     {stats.approved}
                   </span>
                 </div>
-                <p className="text-sm text-gray-400 mt-2">Hanterade</p>
+                <p className="text-sm text-slate-500 mt-2">Hanterade</p>
               </button>
 
               <button
                 onClick={() => setStatusFilter('all')}
-                className={`p-4 rounded-xl border transition-all ${
+                className={`text-left p-4 min-h-[44px] rounded-card border transition-all ${
                   statusFilter === 'all'
-                    ? 'bg-primary-100 border-primary-300'
-                    : 'bg-white border-gray-200 hover:border-gray-300'
+                    ? 'bg-primary-50 border-primary-300'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <Sparkles className={`w-5 h-5 ${statusFilter === 'all' ? 'text-primary-700' : 'text-gray-400'}`} />
-                  <span className={`text-2xl font-bold ${statusFilter === 'all' ? 'text-primary-700' : 'text-gray-900'}`}>
+                  <Sparkles className={`w-5 h-5 ${statusFilter === 'all' ? 'text-primary-700' : 'text-slate-400'}`} />
+                  <span className={`font-heading tabular-nums text-2xl font-bold ${statusFilter === 'all' ? 'text-primary-700' : 'text-slate-900'}`}>
                     {stats.pending + stats.approved + stats.rejected}
                   </span>
                 </div>
-                <p className="text-sm text-gray-400 mt-2">Alla</p>
+                <p className="text-sm text-slate-500 mt-2">Alla</p>
               </button>
             </div>
 
@@ -541,12 +549,14 @@ export default function InboxPage() {
             {suggestionsLoading ? (
               <div className="text-center py-12 text-gray-500">Laddar...</div>
             ) : groups.length === 0 ? (
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
-                <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">
+              <div className="bg-white rounded-card border border-[#E2E8F0] p-12 text-center">
+                <div className="w-16 h-16 bg-primary-50 rounded-card flex items-center justify-center mx-auto mb-4">
+                  <Sparkles className="w-8 h-8 text-primary-700" />
+                </div>
+                <p className="font-heading text-slate-900 font-semibold text-lg mb-1">
                   {statusFilter === 'pending' ? 'Inga väntande förslag' : 'Inga förslag att visa'}
                 </p>
-                <p className="text-gray-400 text-sm mt-2">
+                <p className="text-gray-600 text-sm mt-2">
                   AI-förslag skapas automatiskt när samtal transkriberas
                 </p>
               </div>
@@ -560,7 +570,7 @@ export default function InboxPage() {
                   return (
                     <div
                       key={groupId}
-                      className={`bg-white rounded-xl border transition-all ${
+                      className={`bg-white rounded-card border transition-all ${
                         hasPending ? 'border-amber-200' : 'border-gray-200'
                       }`}
                     >
@@ -584,7 +594,7 @@ export default function InboxPage() {
                                 }`}
                               >
                                 {playingId === group.recording.recording_id ? (
-                                  <Pause className="w-5 h-5 text-gray-900" />
+                                  <Pause className="w-5 h-5 text-white" />
                                 ) : (
                                   <Play className="w-5 h-5 text-gray-500" />
                                 )}
@@ -593,7 +603,7 @@ export default function InboxPage() {
 
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <h3 className="font-semibold text-gray-900 text-lg">
+                                <h3 className="font-heading font-semibold text-gray-900 text-lg">
                                   {group.extractedInfo.customerName || group.extractedInfo.phoneNumber || 'Okänd kund'}
                                 </h3>
                                 {hasPending && (
@@ -603,7 +613,7 @@ export default function InboxPage() {
                                 )}
                               </div>
 
-                              <div className="flex items-center gap-4 text-sm text-gray-400 flex-wrap">
+                              <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
                                 {group.extractedInfo.phoneNumber && (
                                   <span className="flex items-center gap-1">
                                     <Phone className="w-3 h-3" />
@@ -691,7 +701,7 @@ export default function InboxPage() {
                           )}
 
                           <div className="space-y-3">
-                            <p className="text-sm text-gray-400">AI-förslag ({group.suggestions.length})</p>
+                            <p className="text-sm text-gray-500">AI-förslag ({group.suggestions.length})</p>
 
                             {group.suggestions.map((suggestion) => {
                               const Icon = getSuggestionIcon(suggestion.suggestion_type)
@@ -847,11 +857,13 @@ export default function InboxPage() {
             {recordingsLoading ? (
               <div className="text-center py-12 text-gray-500">Laddar...</div>
             ) : recordings.length === 0 ? (
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
-                <Mic className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">Inga inspelningar ännu</p>
-                <p className="text-gray-400 text-sm mt-2">
-                  Inspelningar skapas automatiskt från inkommande samtal
+              <div className="bg-white rounded-card border border-[#E2E8F0] p-12 text-center">
+                <div className="w-16 h-16 bg-primary-50 rounded-card flex items-center justify-center mx-auto mb-4">
+                  <Mic className="w-8 h-8 text-primary-700" />
+                </div>
+                <p className="font-heading text-slate-900 font-semibold text-lg mb-1">Inga inspelningar ännu</p>
+                <p className="text-gray-600 text-sm mt-2">
+                  Inspelningar skapas automatiskt från inkommande samtal.
                 </p>
               </div>
             ) : (
@@ -859,7 +871,7 @@ export default function InboxPage() {
                 {recordings.map((recording) => (
                   <div
                     key={recording.recording_id}
-                    className={`bg-white rounded-xl border p-4 ${
+                    className={`bg-white rounded-card border p-4 ${
                       !recording.transcript ? 'border-amber-200' : 'border-gray-200'
                     }`}
                   >
@@ -877,7 +889,7 @@ export default function InboxPage() {
                           }`}
                         >
                           {playingId === recording.recording_id ? (
-                            <Pause className="w-5 h-5 text-gray-900" />
+                            <Pause className="w-5 h-5 text-white" />
                           ) : (
                             <Play className="w-5 h-5 text-gray-500" />
                           )}
@@ -885,7 +897,7 @@ export default function InboxPage() {
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-medium text-gray-900">
+                            <h3 className="font-heading font-medium text-gray-900">
                               {recording.customer?.name || recording.phone_number || 'Okänt nummer'}
                             </h3>
                             {!recording.transcript && (
@@ -894,7 +906,7 @@ export default function InboxPage() {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 text-sm text-gray-400 mt-1">
+                          <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
                             <span className="flex items-center gap-1">
                               {recording.direction === 'inbound' ? 'Inkommande' : 'Utgående'}
                             </span>

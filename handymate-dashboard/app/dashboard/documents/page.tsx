@@ -690,40 +690,47 @@ export default function DocumentsPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 md:ml-64">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
 
-        {/* Header */}
+        {/* Header — ljust idiom (docs/HANDYMATE_DESIGN_SYSTEM.md), samma
+            uppbyggnad som Godkännanden: ikon-platta + font-heading-titel. */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Dokument</h1>
-            <p className="text-gray-500 text-sm mt-1">Mallar, protokoll och intyg</p>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5 text-primary-700" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-heading text-2xl sm:text-3xl font-bold text-slate-900">Dokument</h1>
+              <p className="text-gray-600 text-sm mt-1">Mallar, protokoll och intyg</p>
+            </div>
           </div>
           <button
             onClick={startCreate}
-            className="flex items-center gap-2 px-5 py-2.5 bg-primary-800 rounded-xl font-medium text-sm transition-all shadow-lg shadow-primary-600/10"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 min-h-[44px] bg-primary-700 text-white rounded-card font-medium text-sm hover:bg-primary-600 transition-all shadow-lg shadow-primary-600/10"
           >
             <Plus className="w-4 h-4" /> Nytt dokument
           </button>
         </div>
 
-        {/* Tabs + Search */}
+        {/* Tabbar — segmenterad kontroll (approvals-idiomet: bg-slate-100 rack
+            + vit "pill" på aktivt läge). */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="flex bg-white rounded-xl p-1 border border-[#E2E8F0]">
+          <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
             <button
               onClick={() => { setView('documents'); setSelectedCategory(null) }}
-              className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'documents' ? 'bg-primary-800 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+              className={`px-4 py-2 min-h-[44px] text-sm font-semibold rounded-lg transition-all ${view === 'documents' ? 'bg-white text-primary-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
               Mina dokument ({documents.length})
             </button>
             <button
               onClick={() => { setView('uploads'); setSelectedCategory(null) }}
-              className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'uploads' ? 'bg-primary-800 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+              className={`px-4 py-2 min-h-[44px] text-sm font-semibold rounded-lg transition-all ${view === 'uploads' ? 'bg-white text-primary-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
               Uppladdade filer ({uploadedFiles.length})
             </button>
             <button
               onClick={() => { setView('templates'); setSelectedCategory(null) }}
-              className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'templates' ? 'bg-primary-800 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+              className={`px-4 py-2 min-h-[44px] text-sm font-semibold rounded-lg transition-all ${view === 'templates' ? 'bg-white text-primary-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
               Mallar ({templates.length})
             </button>
@@ -789,8 +796,8 @@ export default function DocumentsPage() {
             <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
               <button
                 onClick={() => setSelectedCategory(null)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs transition-all ${
-                  !selectedCategory ? 'bg-primary-800 text-gray-900' : 'bg-gray-100 text-gray-500'
+                className={`flex-shrink-0 px-3 py-1.5 min-h-[32px] rounded-full text-xs font-semibold transition-all border ${
+                  !selectedCategory ? 'bg-primary-50 border-primary-700 text-primary-700' : 'bg-gray-100 border-transparent text-gray-500'
                 }`}
               >
                 Alla
@@ -799,8 +806,8 @@ export default function DocumentsPage() {
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs transition-all ${
-                    selectedCategory === cat.id ? 'bg-primary-800 text-gray-900' : 'bg-gray-100 text-gray-500'
+                  className={`flex-shrink-0 px-3 py-1.5 min-h-[32px] rounded-full text-xs font-semibold transition-all border ${
+                    selectedCategory === cat.id ? 'bg-primary-50 border-primary-700 text-primary-700' : 'bg-gray-100 border-transparent text-gray-500'
                   }`}
                 >
                   {cat.name}
@@ -815,12 +822,14 @@ export default function DocumentsPage() {
               /* Documents list */
               filteredDocuments.length === 0 ? (
                 <div className="text-center py-16">
-                  <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500 text-lg mb-2">Inga dokument ännu</p>
-                  <p className="text-gray-400 text-sm mb-6">Skapa ditt första dokument från en mall</p>
+                  <div className="w-16 h-16 bg-primary-50 rounded-card flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-8 h-8 text-primary-700" />
+                  </div>
+                  <p className="font-heading text-slate-900 font-semibold text-lg mb-1">Inga dokument ännu</p>
+                  <p className="text-gray-600 text-sm mb-6">Skapa ditt första dokument från en mall — protokoll, intyg eller egen mall.</p>
                   <button
                     onClick={startCreate}
-                    className="px-5 py-2.5 bg-primary-800 rounded-xl text-sm font-medium"
+                    className="px-5 py-2.5 min-h-[44px] bg-primary-700 text-white rounded-card text-sm font-medium hover:bg-primary-600 transition-all"
                   >
                     <Plus className="w-4 h-4 inline mr-2" /> Nytt dokument
                   </button>
@@ -830,7 +839,7 @@ export default function DocumentsPage() {
                   {filteredDocuments.map(doc => (
                     <div
                       key={doc.id}
-                      className="bg-white border border-[#E2E8F0] rounded-xl p-4 hover:border-gray-300 transition-all group cursor-pointer"
+                      className="bg-white border border-[#E2E8F0] rounded-card p-4 hover:border-gray-300 transition-all group cursor-pointer"
                       onClick={() => viewDocument(doc)}
                     >
                       <div className="flex items-start gap-4">
@@ -839,10 +848,10 @@ export default function DocumentsPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-1">
-                            <h3 className="text-sm font-medium text-gray-900 truncate">{doc.title}</h3>
+                            <h3 className="font-heading text-sm font-semibold text-gray-900 truncate">{doc.title}</h3>
                             {getStatusBadge(doc.status)}
                           </div>
-                          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
                             {doc.template && (
                               <span className="flex items-center gap-1">
                                 <FileText className="w-3 h-3" /> {doc.template.name}
@@ -866,7 +875,7 @@ export default function DocumentsPage() {
                         <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                           <button
                             onClick={() => viewDocument(doc)}
-                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+                            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
                             title="Förhandsgranska"
                           >
                             <Eye className="w-4 h-4" />
@@ -874,7 +883,7 @@ export default function DocumentsPage() {
                           {doc.status === 'draft' && (
                             <button
                               onClick={() => openEdit(doc)}
-                              className="p-2 text-gray-500 hover:text-primary-700 hover:bg-gray-100 rounded-lg transition-all"
+                              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-500 hover:text-primary-700 hover:bg-gray-100 rounded-lg transition-all"
                               title="Redigera"
                             >
                               <PenTool className="w-4 h-4" />
@@ -883,7 +892,7 @@ export default function DocumentsPage() {
                           {(doc.status === 'draft' || doc.status === 'completed') && (
                             <button
                               onClick={() => openSign(doc)}
-                              className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-gray-100 rounded-lg transition-all"
+                              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-500 hover:text-emerald-600 hover:bg-gray-100 rounded-lg transition-all"
                               title="Signera"
                             >
                               <Check className="w-4 h-4" />
@@ -894,7 +903,7 @@ export default function DocumentsPage() {
                               e.stopPropagation()
                               setContextMenu({ docId: doc.id, x: e.clientX, y: e.clientY })
                             }}
-                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+                            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
                           >
                             <MoreVertical className="w-4 h-4" />
                           </button>
@@ -908,16 +917,18 @@ export default function DocumentsPage() {
               /* Uploaded files list */
               filteredUploads.length === 0 ? (
                 <div className="text-center py-16">
-                  <Upload className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500 text-lg mb-2">Inga uppladdade filer</p>
-                  <p className="text-gray-400 text-sm">Filer som laddas upp i projekt, deals och kundprofiler visas här</p>
+                  <div className="w-16 h-16 bg-primary-50 rounded-card flex items-center justify-center mx-auto mb-4">
+                    <Upload className="w-8 h-8 text-primary-700" />
+                  </div>
+                  <p className="font-heading text-slate-900 font-semibold text-lg mb-1">Inga uppladdade filer</p>
+                  <p className="text-gray-600 text-sm">Filer som laddas upp i projekt, deals och kundprofiler visas här.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {filteredUploads.map(file => (
                     <div
                       key={`${file.source}-${file.id}`}
-                      className="bg-white border border-[#E2E8F0] rounded-xl p-4 hover:border-gray-300 transition-all group cursor-pointer"
+                      className="bg-white border border-[#E2E8F0] rounded-card p-4 hover:border-gray-300 transition-all group cursor-pointer"
                       onClick={() => openUploadedFile(file)}
                     >
                       <div className="flex items-start gap-4">
@@ -925,8 +936,8 @@ export default function DocumentsPage() {
                           {getFileIcon(file.file_type, 'w-5 h-5 text-amber-600')}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-medium text-gray-900 truncate mb-1">{file.file_name}</h3>
-                          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
+                          <h3 className="font-heading text-sm font-semibold text-gray-900 truncate mb-1">{file.file_name}</h3>
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
                             <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
                               file.source === 'customer' ? 'bg-primary-50 text-primary-700' : 'bg-primary-50 text-primary-700'
                             }`}>
@@ -955,14 +966,14 @@ export default function DocumentsPage() {
                           <button
                             type="button"
                             onClick={() => openUploadedFile(file)}
-                            className="p-2 text-gray-500 hover:text-primary-700 hover:bg-gray-100 rounded-lg transition-all"
+                            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-500 hover:text-primary-700 hover:bg-gray-100 rounded-lg transition-all"
                             title="Öppna fil"
                           >
                             <ExternalLink className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => deleteUploadedFile(file)}
-                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-lg transition-all"
+                            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-lg transition-all"
                             title="Ta bort"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -977,15 +988,17 @@ export default function DocumentsPage() {
               /* Templates grid */
               filteredTemplates.length === 0 ? (
                 <div className="text-center py-16">
-                  <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">Inga mallar hittades</p>
+                  <div className="w-16 h-16 bg-primary-50 rounded-card flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-8 h-8 text-primary-700" />
+                  </div>
+                  <p className="font-heading text-slate-900 font-semibold">Inga mallar hittades</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   {filteredTemplates.map(tpl => (
                     <div
                       key={tpl.id}
-                      className="bg-white border border-[#E2E8F0] rounded-xl p-5 hover:border-primary-300 transition-all group cursor-pointer"
+                      className="bg-white border border-[#E2E8F0] rounded-card p-5 hover:border-primary-300 transition-all group cursor-pointer"
                       onClick={() => { selectTemplate(tpl); setShowCreate(true) }}
                     >
                       <div className="flex items-start gap-3 mb-3">
@@ -993,8 +1006,8 @@ export default function DocumentsPage() {
                           {tpl.category ? getCategoryIcon(tpl.category.icon, 'w-5 h-5 text-primary-700') : <FileText className="w-5 h-5 text-primary-700" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-medium text-gray-900 mb-0.5">{tpl.name}</h3>
-                          <p className="text-xs text-gray-400">{tpl.category?.name}</p>
+                          <h3 className="font-heading text-sm font-semibold text-gray-900 mb-0.5">{tpl.name}</h3>
+                          <p className="text-xs text-gray-500">{tpl.category?.name}</p>
                         </div>
                         {tpl.is_system ? (
                           <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">System</span>
@@ -1004,11 +1017,11 @@ export default function DocumentsPage() {
                       </div>
                       <p className="text-xs text-gray-500 mb-3 line-clamp-2">{tpl.description}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-400">{(tpl.variables || []).filter((v: any) => v.source === 'input').length} fält att fylla i</span>
+                        <span className="text-xs text-gray-500">{(tpl.variables || []).filter((v: any) => v.source === 'input').length} fält att fylla i</span>
                         <div className="flex gap-1">
                           <button
                             onClick={(e) => { e.stopPropagation(); duplicateTemplate(tpl) }}
-                            className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                            className="p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                             title="Kopiera mall"
                           >
                             <Copy className="w-3.5 h-3.5" />
@@ -1044,7 +1057,7 @@ export default function DocumentsPage() {
             {/* Wizard header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div>
-                <h2 className="text-lg font-semibold">
+                <h2 className="font-heading text-lg font-semibold text-slate-900">
                   {wizardStep === 1 ? 'Välj mall' : wizardStep === 2 ? 'Välj kund & projekt' : 'Fyll i uppgifter'}
                 </h2>
                 <div className="flex items-center gap-2 mt-2">
@@ -1080,7 +1093,7 @@ export default function DocumentsPage() {
                               {getCategoryIcon(cat.icon, 'w-5 h-5 text-primary-700')}
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-900">{tpl.name}</p>
-                                <p className="text-xs text-gray-400 truncate">{tpl.description}</p>
+                                <p className="text-xs text-gray-600 truncate">{tpl.description}</p>
                               </div>
                               {tpl.branch && <span className="text-xs text-gray-400 px-2 py-0.5 bg-white rounded-full">{
                                 tpl.branch === 'electrician' ? 'El' :
@@ -1145,7 +1158,7 @@ export default function DocumentsPage() {
                     </button>
                     <button
                       onClick={() => setWizardStep(3)}
-                      className="flex-1 px-4 py-2.5 bg-primary-800 rounded-xl text-sm font-medium transition-all"
+                      className="flex-1 px-4 py-2.5 min-h-[44px] bg-primary-700 text-white rounded-xl text-sm font-medium hover:bg-primary-600 transition-all"
                     >
                       Nästa <ChevronRight className="w-4 h-4 inline ml-1" />
                     </button>
@@ -1211,7 +1224,7 @@ export default function DocumentsPage() {
                     <button
                       onClick={createDocument}
                       disabled={creating}
-                      className="flex-1 px-4 py-2.5 bg-primary-800 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                      className="flex-1 px-4 py-2.5 min-h-[44px] bg-primary-700 text-white rounded-xl text-sm font-medium hover:bg-primary-600 transition-all disabled:opacity-50"
                     >
                       {creating ? <Loader2 className="w-4 h-4 inline animate-spin mr-2" /> : <Plus className="w-4 h-4 inline mr-2" />}
                       Skapa dokument
@@ -1231,7 +1244,7 @@ export default function DocumentsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold">{viewDoc.title}</h2>
+              <h2 className="font-heading text-lg font-semibold text-slate-900">{viewDoc.title}</h2>
               <div className="flex items-center gap-2">
                 {getStatusBadge(viewDoc.status)}
                 <button onClick={() => setViewDoc(null)} className="p-2 text-gray-500 hover:text-gray-900 rounded-lg">
@@ -1258,7 +1271,7 @@ export default function DocumentsPage() {
               {viewDoc.status === 'draft' && (
                 <button
                   onClick={() => { setViewDoc(null); openEdit(viewDoc) }}
-                  className="px-4 py-2 bg-primary-800 hover:bg-primary-700 rounded-xl text-sm font-medium transition-all"
+                  className="px-4 py-2 min-h-[44px] bg-primary-700 text-white rounded-xl text-sm font-medium hover:bg-primary-600 transition-all"
                 >
                   <PenTool className="w-4 h-4 inline mr-2" /> Redigera
                 </button>
@@ -1266,7 +1279,7 @@ export default function DocumentsPage() {
               {(viewDoc.status === 'draft' || viewDoc.status === 'completed') && (
                 <button
                   onClick={() => { setViewDoc(null); openSign(viewDoc) }}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-sm font-medium transition-all"
+                  className="px-4 py-2 min-h-[44px] bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-500 transition-all"
                 >
                   <Check className="w-4 h-4 inline mr-2" /> Signera
                 </button>
@@ -1296,7 +1309,7 @@ export default function DocumentsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold">Redigera: {editDoc.title}</h2>
+              <h2 className="font-heading text-lg font-semibold text-slate-900">Redigera: {editDoc.title}</h2>
               <button onClick={() => setEditDoc(null)} className="p-2 text-gray-500 hover:text-gray-900 rounded-lg">
                 <X className="w-5 h-5" />
               </button>
@@ -1358,7 +1371,7 @@ export default function DocumentsPage() {
               <button
                 onClick={saveDocument}
                 disabled={saving}
-                className="flex-1 px-4 py-2.5 bg-primary-800 hover:bg-primary-700 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 min-h-[44px] bg-primary-700 text-white rounded-xl text-sm font-medium hover:bg-primary-600 transition-all disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-4 h-4 inline animate-spin mr-2" /> : null}
                 Spara utkast
@@ -1366,7 +1379,7 @@ export default function DocumentsPage() {
               <button
                 onClick={markComplete}
                 disabled={saving}
-                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                className="px-4 py-2.5 min-h-[44px] bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-500 transition-all disabled:opacity-50"
               >
                 <CheckCircle2 className="w-4 h-4 inline mr-2" /> Markera klar
               </button>
@@ -1382,7 +1395,7 @@ export default function DocumentsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-lg">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold">Signera dokument</h2>
+              <h2 className="font-heading text-lg font-semibold text-slate-900">Signera dokument</h2>
               <button onClick={() => setSignDoc(null)} className="p-2 text-gray-500 hover:text-gray-900 rounded-lg">
                 <X className="w-5 h-5" />
               </button>
@@ -1432,7 +1445,7 @@ export default function DocumentsPage() {
               <button
                 onClick={submitSignature}
                 disabled={!signName || signing}
-                className="flex-1 px-4 py-2.5 bg-primary-800 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 min-h-[44px] bg-primary-700 text-white rounded-xl text-sm font-medium hover:bg-primary-600 transition-all disabled:opacity-50"
               >
                 {signing ? <Loader2 className="w-4 h-4 inline animate-spin mr-2" /> : <PenTool className="w-4 h-4 inline mr-2" />}
                 Signera

@@ -5,6 +5,22 @@ import { Calendar, Plus, Clock, User, X, Loader2, Trash2, Edit } from 'lucide-re
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 
+// Reskin (Etapp L2b1, docs/HANDYMATE_DESIGN_SYSTEM.md): dag-rubriken för
+// kortlistan som ersätter den råa HTML-tabellen. `filteredBookings` kommer
+// redan sorterad `scheduled_start ascending` från fetchData() — samma
+// ordning som innan, den här funktionen lägger bara in en rubrik-rad
+// mellan dagar, den sorterar aldrig om. Se dayLabel-mönstret i
+// app/dashboard/approvals/page.tsx.
+function bookingDayLabel(dateStr: string): string {
+  const date = new Date(dateStr)
+  const now = new Date()
+  if (date.toDateString() === now.toDateString()) return 'I dag'
+  const tomorrow = new Date(now)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  if (date.toDateString() === tomorrow.toDateString()) return 'I morgon'
+  return date.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
 interface Booking {
   booking_id: string
   customer_id: string
@@ -215,8 +231,8 @@ export default function BookingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 w-full max-w-md mx-4">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">{editingBooking ? 'Redigera bokning' : 'Ny bokning'}</h3>
-              <button onClick={() => setModalOpen(false)} className="text-gray-400 hover:text-gray-900"><X className="w-5 h-5" /></button>
+              <h3 className="font-heading text-lg font-semibold text-gray-900">{editingBooking ? 'Redigera bokning' : 'Ny bokning'}</h3>
+              <button onClick={() => setModalOpen(false)} className="text-gray-400 hover:text-gray-900 min-h-[44px] min-w-[44px] flex items-center justify-center"><X className="w-5 h-5" /></button>
             </div>
 
             <div className="space-y-4">
@@ -293,11 +309,11 @@ export default function BookingsPage() {
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">
-              <button onClick={() => setModalOpen(false)} className="px-4 py-2 text-gray-500 hover:text-gray-900">Avbryt</button>
+              <button onClick={() => setModalOpen(false)} className="px-4 py-2 min-h-[44px] text-gray-500 hover:text-gray-900">Avbryt</button>
               <button
                 onClick={handleSubmit}
                 disabled={actionLoading || customers.length === 0}
-                className="flex items-center px-4 py-2 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="flex items-center px-4 py-2 min-h-[44px] bg-primary-700 rounded-xl font-medium text-white hover:bg-primary-600 disabled:opacity-50 transition-all"
               >
                 {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 {editingBooking ? 'Spara' : 'Skapa'}
@@ -308,103 +324,119 @@ export default function BookingsPage() {
       )}
 
       <div className="relative">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Bokningar</h1>
-            <p className="text-gray-500">{filteredBookings.length} bokningar</p>
+        {/* Header — ljust idiom (docs/HANDYMATE_DESIGN_SYSTEM.md), samma
+            uppbyggnad som Godkännanden: ikon-platta + font-heading-titel. */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center shrink-0">
+              <Calendar className="w-5 h-5 text-primary-700" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-heading text-2xl sm:text-3xl font-bold text-slate-900">Bokningar</h1>
+              <p className="text-gray-600 text-sm mt-0.5">{filteredBookings.length} bokningar</p>
+            </div>
           </div>
-          <div className="flex space-x-4">
-            <div className="flex bg-white border border-[#E2E8F0] rounded-xl p-1">
+          <div className="flex gap-3">
+            <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
               {(['all', 'today', 'upcoming'] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    filter === f ? 'bg-primary-700 text-white' : 'text-gray-500 hover:text-white'
+                  className={`px-4 py-2 min-h-[44px] rounded-lg text-sm font-semibold transition-all ${
+                    filter === f ? 'bg-white text-primary-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   {f === 'all' ? 'Alla' : f === 'today' ? 'Idag' : 'Kommande'}
                 </button>
               ))}
             </div>
-            <button onClick={openCreateModal} className="flex items-center px-4 py-2 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90">
-              <Plus className="w-4 h-4 mr-2" />
+            <button onClick={openCreateModal} className="flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] bg-primary-700 rounded-card font-medium text-white hover:bg-primary-600 transition-all">
+              <Plus className="w-4 h-4" />
               Ny bokning
             </button>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
-          {filteredBookings.length === 0 ? (
-            <div className="text-center py-12">
-              <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-400">{filter === 'today' ? 'Inga bokningar idag' : 'Inga bokningar ännu'}</p>
-              {customers.length > 0 ? (
-                <button onClick={openCreateModal} className="mt-4 text-primary-700 hover:text-primary-700">
-                  Skapa din första bokning →
-                </button>
-              ) : (
-                <a href="/dashboard/customers" className="mt-4 text-primary-700 hover:text-primary-700 block">
-                  Skapa en kund först →
-                </a>
-              )}
+        {filteredBookings.length === 0 ? (
+          <div className="bg-white rounded-card border border-[#E2E8F0] text-center py-16">
+            <div className="w-16 h-16 bg-primary-50 rounded-card flex items-center justify-center mx-auto mb-4">
+              <Calendar className="w-8 h-8 text-primary-700" />
             </div>
-          ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Kund</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Tjänst</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Datum & Tid</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Åtgärd</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredBookings.map((booking) => (
-                  <tr key={booking.booking_id} className="hover:bg-gray-100/30 transition-all">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 bg-[#F0FDFA] rounded-xl flex items-center justify-center border border-[#E2E8F0]">
-                          <User className="w-5 h-5 text-primary-700" />
-                        </div>
-                        <div className="ml-4">
-                          <p className="font-medium text-gray-900">{booking.customer?.name || 'Okänd'}</p>
-                          <p className="text-sm text-gray-400">{booking.customer?.phone_number || '-'}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-900">{getServiceFromNotes(booking.notes)}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <Clock className="w-4 h-4 text-gray-400 mr-2" />
-                        <div>
-                          <p className="text-gray-900">{formatDate(booking.scheduled_start)}</p>
-                          <p className="text-sm text-gray-400">{formatTime(booking.scheduled_start)} - {formatTime(booking.scheduled_end)}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex px-3 py-1 text-xs rounded-full border ${getStatusStyle(booking.status)}`}>
+            <p className="font-heading text-slate-900 font-semibold text-lg mb-1">
+              {filter === 'today' ? 'Inga bokningar idag' : 'Inga bokningar ännu'}
+            </p>
+            {customers.length > 0 ? (
+              <button onClick={openCreateModal} className="mt-2 text-primary-700 hover:text-primary-800 text-sm font-medium min-h-[44px] px-2">
+                Skapa din första bokning →
+              </button>
+            ) : (
+              <a href="/dashboard/customers" className="mt-2 text-primary-700 hover:text-primary-800 text-sm font-medium block">
+                Skapa en kund först →
+              </a>
+            )}
+          </div>
+        ) : (
+          // Kortlista med dag-gruppering — bokningar är tidsdata, samma
+          // idiom som Godkännanden. Listan kommer redan sorterad
+          // scheduled_start ascending (fetchData ovan), så headern
+          // sorterar aldrig om — bara en rubrik-rad läggs in mellan dagar.
+          <div className="space-y-3">
+            {filteredBookings.map((booking, idx) => {
+              const day = bookingDayLabel(booking.scheduled_start)
+              const prevDay = idx > 0 ? bookingDayLabel(filteredBookings[idx - 1].scheduled_start) : null
+              const dayHeader = day !== prevDay ? (
+                <div key={`day-${booking.booking_id}`} className="flex items-center gap-2 px-1 pt-1 first:pt-0">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 whitespace-nowrap">{day}</span>
+                  <span className="flex-1 h-px bg-slate-200" aria-hidden />
+                </div>
+              ) : null
+
+              const card = (
+                <div
+                  key={booking.booking_id}
+                  className="flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-card hover:border-slate-300 transition-all"
+                >
+                  <div className="w-10 h-10 bg-[#F0FDFA] rounded-xl flex items-center justify-center border border-[#E2E8F0] shrink-0">
+                    <User className="w-5 h-5 text-primary-700" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-heading text-[15px] font-semibold text-slate-900">{booking.customer?.name || 'Okänd'}</p>
+                      <span className={`inline-flex px-2.5 py-0.5 text-xs font-semibold rounded-full border ${getStatusStyle(booking.status)}`}>
                         {getStatusText(booking.status)}
                       </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex space-x-2">
-                        <button onClick={() => openEditModal(booking)} className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleDelete(booking.booking_id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                    </div>
+                    <p className="text-sm text-slate-500 mt-0.5">{getServiceFromNotes(booking.notes)}</p>
+                    <div className="flex items-center gap-3 text-sm text-slate-500 mt-1 flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        {formatDate(booking.scheduled_start)} · {formatTime(booking.scheduled_start)}–{formatTime(booking.scheduled_end)}
+                      </span>
+                      {booking.customer?.phone_number && (
+                        <span className="text-slate-400">{booking.customer.phone_number}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => openEditModal(booking)}
+                      className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(booking.booking_id)}
+                      className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )
+              return dayHeader ? [dayHeader, card] : card
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
