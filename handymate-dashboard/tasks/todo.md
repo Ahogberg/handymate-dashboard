@@ -1,3 +1,31 @@
+# Godkännanden-sidan — visuell reskin till Command Center-språket (2026-08-18)
+
+Ren visuell reskin av app/dashboard/approvals/page.tsx mot GorDettaForst/
+MatteHero/MissionPanel-idiomet (docs/HANDYMATE_DESIGN_SYSTEM.md). Ingen
+ApprovalCard delas med JarvisHome (den har sin egen lokala, mycket
+rikare komponent) — så det här är en page-local restyling, inget forkat
+delat kort.
+
+- [ ] Header: ljust block (inte en andra mörk hero), boss-frame-undertitel,
+      2 ärliga stat-tiles (väntar nu / äldsta väntande ålder) ur samma
+      redan hämtade lista. "Avklarade idag" utelämnas — datan finns bara
+      när "Hanterade"-fliken är aktiv, ingen ny fetch.
+- [ ] Tabbar → segmented control (samma idiom som QuotePreviewPanels
+      Live/Slutdesign-toggle).
+- [ ] Standardkortet: byt lokal getAgentFromApproval mot
+      agentForApproval (lib/jarvis/approval-view) + <AgentAvatar>,
+      typ-pill kvar, belopp inline när payloaden bär ett känt fält (och
+      typen inte redan har en egen detaljruta), knapprad med
+      min-h-[44px].
+- [ ] Dag-gruppering (rubrik när dagen byter i den redan sorterade
+      listan — ingen omsortering).
+- [ ] Varmare tomt-state-text.
+- [ ] Ny facit: tests/approvals-page-design.spec.ts.
+- [ ] Verifiera: tsc, build, alla approval-specs + jarvis-hem.spec.ts,
+      läs hela diffen.
+
+---
+
 # Playbook Kickoff Copilot V1 — 2026-08-17 (04:00)
 
 ## Resultat (klart, pushat 2026-08-17, commit 23c4598b)

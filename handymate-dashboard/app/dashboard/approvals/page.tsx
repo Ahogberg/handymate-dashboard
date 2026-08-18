@@ -36,33 +36,21 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
-import { ringUppmaning } from '@/lib/jarvis/approval-view'
+import { AgentAvatar } from '@/components/agents/AgentAvatar'
+import { agentForApproval, ringUppmaning } from '@/lib/jarvis/approval-view'
 import { MandagskortCard } from '@/components/jarvis/MandagskortCard'
 import { GuardianOrsaker } from '@/components/projects/GuardianOrsaker'
 import { DispatchReasoning } from '@/components/dispatch/DispatchReasoning'
 import { buildValueReceipt } from '@/lib/approvals/value-receipt'
 import ProjectCloseoutModal from '@/components/projects/ProjectCloseoutModal'
 
-// SPÅR D1 (2026-08-06): kartan låg inlinead här och var en av fyra kopior av
-// teamet som hunnit gå isär. Härleds nu ur den enda källan (lib/agents/team.ts).
-const AVATAR_BASE = 'https://pktaqedooyzgvzwipslu.supabase.co/storage/v1/object/sign/team-avatars'
-
-function getAgentFromApproval(approval: Approval): { name: string; role: string; color: string; initials: string } | null {
-  // Explicit routing via payload (cron-skapade approvals sätter detta)
-  const routedAgent = (approval.payload?.routed_agent as string) || null
-  if (routedAgent && AGENT_INFO[routedAgent]) return AGENT_INFO[routedAgent]
-  const agentId = (approval.payload?.agent_id as string) || null
-  if (agentId && AGENT_INFO[agentId]) return AGENT_INFO[agentId]
-
-  // Infer from approval_type
-  const type = approval.approval_type
-  if (type.includes('invoice') || type.includes('payment') || type === 'profitability_warning') return AGENT_INFO.karin
-  if (type.includes('campaign') || type.includes('neighbour') || type.includes('reactivat') || type.includes('review')) return AGENT_INFO.hanna
-  if (type.includes('quote') || type.includes('lead') || type.includes('pipeline')) return AGENT_INFO.daniel
-  if (type.includes('booking') || type.includes('project') || type.includes('dispatch') || type.includes('job_report') || type.includes('warranty')) return AGENT_INFO.lars
-  if (type.includes('call') || type.includes('sms')) return AGENT_INFO.lisa
-  return null
-}
+// Reskin 2026-08-18 (Command Center-språket, docs/HANDYMATE_DESIGN_SYSTEM.md):
+// den lokala agent-kartan (SPÅR D1:s fjärde kopia, nämnd i
+// agentPersonas.ts:s filhuvud) är borttagen — agenten härleds nu genom
+// samma agentForApproval() som hemskärmen/GorDettaForst redan använder,
+// och ritas med <AgentAvatar>. Ren visuell konsolidering, ingen ändrad
+// routing (samma explicit-payload-först-regel, bara med 'matte' som
+// ärligt fallback i stället för att tyst falla tillbaka på typ-ikonen).
 
 interface Approval {
   id: string
@@ -161,6 +149,36 @@ function formatTime(dateStr: string): string {
   return `${date.getDate()}/${date.getMonth() + 1} ${hours}:${mins}`
 }
 
+// Reskin 2026-08-18: dag-rubriken för den nya grupperingen. Listan kommer
+// redan sorterad `created_at desc` från /api/approvals (samma ordning som
+// innan — se app/api/approvals/route.ts) så samma-dags-rader ligger redan
+// intill varandra. Rubriken ändrar alltså aldrig ORDNINGEN, bara lägger en
+// synlig rad mellan dagarna.
+function dayLabel(dateStr: string): string {
+  const date = new Date(dateStr)
+  const now = new Date()
+  if (date.toDateString() === now.toDateString()) return 'Idag'
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (date.toDateString() === yesterday.toDateString()) return 'Igår'
+  return date.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long' })
+}
+
+// Reskin 2026-08-18: åldern på den äldsta väntande raden — headerns andra
+// stat-tile. Ren klientberäkning ur samma `approvals`-lista som redan är
+// hämtad (ingen ny endpoint, inget gissat tal).
+function oldestPendingAgeLabel(pending: { created_at: string }[]): string | null {
+  if (pending.length === 0) return null
+  const oldest = pending.reduce((min, a) =>
+    new Date(a.created_at).getTime() < new Date(min.created_at).getTime() ? a : min,
+  pending[0])
+  const diffMs = Date.now() - new Date(oldest.created_at).getTime()
+  const hours = Math.floor(diffMs / 3600000)
+  if (hours < 1) return `${Math.max(1, Math.floor(diffMs / 60000))} min`
+  if (hours < 24) return `${hours} tim`
+  return `${Math.floor(hours / 24)} dygn`
+}
+
 function timeUntilExpiry(expiresAt: string): string {
   const diff = new Date(expiresAt).getTime() - Date.now()
   if (diff <= 0) return 'Utgången'
@@ -191,6 +209,35 @@ function getQuoteId(approval: Approval): string | null {
   if (p?.quote_id) return p.quote_id as string
   if ((p?.context as any)?.quote_id) return (p.context as any).quote_id as string
   if (approval.package_data?.quote_id) return approval.package_data.quote_id
+  return null
+}
+
+// Reskin 2026-08-18 (Kvittoprincipen — belopp inline, aldrig bakom en
+// toggle): typer som redan bygger en egen detaljruta med sitt eget belopp
+// (GuardianOrsaker, DispatchReasoning, tidrapportens grid osv.) ska inte
+// FÅ en andra, konkurrerande summa på kortets header-rad.
+const AMOUNT_HANDLED_TYPES = new Set([
+  'time_attestation', 'dispatch_suggestion', 'profitability_warning',
+  'monday_brief', 'lead_review', 'publish_microsite', 'seasonal_campaign',
+  'autopilot_package',
+])
+
+/** Kortets header-belopp — bara kända, strukturerade payloadfält. Aldrig en
+    gissning: samma fältnamn som approveLabel()/exekveraren redan litar på. */
+function getPrimaryAmount(approval: Approval): number | null {
+  if (AMOUNT_HANDLED_TYPES.has(approval.approval_type)) return null
+  const p = (approval.payload || {}) as Record<string, any>
+  const candidates = [
+    p.amount_kr,
+    p.preview?.customer_pays,
+    p.estimated_value,
+    p.amount_estimate,
+    p.suggested_price,
+    p.total,
+  ]
+  for (const v of candidates) {
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) return v
+  }
   return null
 }
 
@@ -593,70 +640,101 @@ export default function ApprovalsPage() {
   }
 
   const pendingCount = approvals.filter(a => a.status === 'pending').length
+  // Reskin 2026-08-18 — headerns andra stat-tile. Samma `approvals`-lista
+  // som pendingCount ovan (ingen ny fetch); se dayLabel/oldestPendingAgeLabel
+  // filhuvud för varför den bara är sann på "Väntande"-fliken.
+  const oldestPendingAge = oldestPendingAgeLabel(approvals.filter(a => a.status === 'pending'))
 
   return (
     <div className="bg-[#F8FAFC] min-h-screen">
-      {/* Header */}
+      {/* Header — ljust block (JarvisHome äger den enda mörka heron, se
+          docs/HANDYMATE_DESIGN_SYSTEM.md §4.0), boss-frame-undertitel +
+          ärliga stat-tiles ur samma redan hämtade lista. */}
       <div className="px-4 sm:px-8 pt-6 pb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center shrink-0">
               <Bot className="w-5 h-5 text-primary-700" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">Godkännanden</h1>
-              <p className="text-sm text-gray-500">AI-agentens förslag som kräver din bekräftelse</p>
+            <div className="min-w-0">
+              <h1 className="font-heading text-xl font-bold text-slate-900">Godkännanden</h1>
+              <p className="text-sm text-slate-500">Inget når en kund utan ditt OK — här är allt som väntar.</p>
             </div>
           </div>
-          {feedbackMsg && (
-            <div className="px-4 py-2 bg-primary-50 border border-[#E2E8F0] rounded-lg text-sm text-primary-700 font-medium flex items-center gap-2">
-              <span>✓ {feedbackMsg}</span>
-              {feedbackLink && (
-                <Link href={feedbackLink} className="underline hover:text-primary-900">
-                  {feedbackLinkLabel}
-                </Link>
-              )}
-            </div>
-          )}
-          {failedFeedback && (
-            <div className="px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-medium flex items-center gap-3">
-              <span>{failedFeedback.text}</span>
-              <button
-                onClick={() => handleRetry(failedFeedback.id)}
-                disabled={retryLoading === failedFeedback.id}
-                className="px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 whitespace-nowrap"
-              >
-                {retryLoading === failedFeedback.id ? 'Försöker...' : 'Försök igen'}
-              </button>
-              <button
-                onClick={() => setFailedFeedback(null)}
-                className="text-red-400 hover:text-red-700"
-                aria-label="Stäng"
-              >
-                ✕
-              </button>
-            </div>
-          )}
           <button
             onClick={fetchApprovals}
-            className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all"
+            className="p-2.5 min-h-[44px] min-w-[44px] rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all shrink-0"
+            aria-label="Uppdatera"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
+
+        {(feedbackMsg || failedFeedback) && (
+          <div className="mt-3">
+            {feedbackMsg && (
+              <div className="px-4 py-2 bg-primary-50 border border-primary-100 rounded-input text-sm text-primary-700 font-medium flex items-center gap-2">
+                <span>✓ {feedbackMsg}</span>
+                {feedbackLink && (
+                  <Link href={feedbackLink} className="underline hover:text-primary-900">
+                    {feedbackLinkLabel}
+                  </Link>
+                )}
+              </div>
+            )}
+            {failedFeedback && (
+              <div className="px-4 py-2 bg-red-50 border border-red-200 rounded-input text-sm text-red-700 font-medium flex items-center gap-3">
+                <span>{failedFeedback.text}</span>
+                <button
+                  onClick={() => handleRetry(failedFeedback.id)}
+                  disabled={retryLoading === failedFeedback.id}
+                  className="px-3 py-1 min-h-[32px] rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {retryLoading === failedFeedback.id ? 'Försöker...' : 'Försök igen'}
+                </button>
+                <button
+                  onClick={() => setFailedFeedback(null)}
+                  className="text-red-400 hover:text-red-700"
+                  aria-label="Stäng"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Stat-tiles — bara "väntar nu" + "äldsta väntande ålder", båda
+            ur samma lista som redan är hämtad. "Avklarade idag" utelämnas
+            medvetet: den datan finns bara när "Hanterade"-fliken varit
+            aktiv, och kravet är att aldrig fetcha mer för en siffra. */}
+        <div className="mt-4 flex gap-3">
+          <div className="bg-white border border-slate-200 rounded-card px-4 py-3 flex-1 sm:flex-none sm:min-w-[140px]">
+            <div className="font-heading tabular-nums text-2xl font-bold text-slate-900">{pendingCount}</div>
+            <div className="text-xs text-slate-500 mt-0.5">väntar nu</div>
+          </div>
+          {oldestPendingAge && (
+            <div className="bg-white border border-slate-200 rounded-card px-4 py-3 flex-1 sm:flex-none sm:min-w-[140px]">
+              <div className="font-heading tabular-nums text-2xl font-bold text-slate-900">{oldestPendingAge}</div>
+              <div className="text-xs text-slate-500 mt-0.5">äldsta väntande</div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabbar — segmenterad kontroll, samma idiom som QuotePreviewPanels
+          Live/Slutdesign-toggle (bg-slate-100 rack + vit "pill" på aktivt
+          läge i stället för den gamla ramade primary-50-varianten). */}
       <div className="px-4 sm:px-8 pb-4">
-        <div className="flex gap-1 p-1 bg-white rounded-xl border border-[#E2E8F0]">
+        <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
           {(['pending', 'resolved'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+              className={`flex-1 py-2.5 px-4 min-h-[44px] rounded-lg text-sm font-semibold transition-all ${
                 activeTab === tab
-                  ? 'bg-primary-50 text-primary-700 border border-[#E2E8F0]'
-                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                  ? 'bg-white text-primary-700 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               {tab === 'pending' ? (
@@ -706,7 +784,7 @@ export default function ApprovalsPage() {
                     <button
                       onClick={() => handleRetry(item.id)}
                       disabled={retryLoading === item.id}
-                      className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 whitespace-nowrap"
+                      className="px-3 py-1.5 min-h-[44px] rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 whitespace-nowrap"
                     >
                       {retryLoading === item.id ? 'Försöker...' : 'Försök igen'}
                     </button>
@@ -726,21 +804,32 @@ export default function ApprovalsPage() {
           </div>
         ) : approvals.length === 0 ? (
           <div className="text-center py-20">
-            <div className="w-16 h-16 bg-primary-50 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-primary-50 rounded-card flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-primary-700" />
             </div>
-            <p className="text-gray-900 font-medium text-lg mb-1">
-              {activeTab === 'pending' ? 'Inget att godkänna' : 'Inga hanterade ännu'}
+            <p className="font-heading text-slate-900 font-semibold text-lg mb-1">
+              {activeTab === 'pending' ? 'Kön är tom' : 'Inget hanterat än'}
             </p>
-            <p className="text-gray-500 text-sm">
+            <p className="text-slate-500 text-sm max-w-xs mx-auto">
               {activeTab === 'pending'
-                ? 'AI-agenten har inga förslag som väntar på din bekräftelse just nu.'
-                : 'Hanterade godkännanden visas här.'}
+                ? 'Kön är tom — teamet jobbar vidare och säger till när något behöver dig.'
+                : 'Här samlas allt du har tagit beslut om, så fort något är klart.'}
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {approvals.map(approval => {
+            {approvals.map((approval, idx) => {
+              const day = dayLabel(approval.created_at)
+              const prevDay = idx > 0 ? dayLabel(approvals[idx - 1].created_at) : null
+              // Dag-rubrik — bara en visuell markör mellan redan-intilliggande
+              // dagar (listan kommer sorterad created_at desc), aldrig en
+              // omsortering. Se dayLabel-filhuvudet ovanför formatTime.
+              const dayHeader = day !== prevDay ? (
+                <div key={`day-${approval.id}`} className="flex items-center gap-2 px-1 pt-1 first:pt-0">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 whitespace-nowrap">{day}</span>
+                  <span className="flex-1 h-px bg-slate-200" aria-hidden />
+                </div>
+              ) : null
               // Autopilot-paket — specialvy
               if (approval.approval_type === 'autopilot_package' && approval.package_data?.actions) {
                 const pkgActions = approval.package_data.actions
@@ -749,9 +838,9 @@ export default function ApprovalsPage() {
                 const pendingActions = pkgActions.filter(a => a.type !== 'project_info')
                 const activeCount = pendingActions.filter(a => !rejectedSet.has(a.id)).length
 
-                return (
-                  <div key={approval.id} id={`approval-${approval.id}`} className={`border-2 rounded-xl transition-all ${
-                    approval.status === 'pending' ? 'border-primary-200 bg-primary-50/30' : 'border-gray-100 opacity-75'
+                const card = (
+                  <div key={approval.id} id={`approval-${approval.id}`} className={`border rounded-card transition-all ${
+                    approval.status === 'pending' ? 'border-primary-200 bg-primary-50/30' : 'border-slate-100 opacity-75'
                   }`}>
                     <div className="p-5">
                       <div className="flex items-start justify-between mb-3">
@@ -809,13 +898,13 @@ export default function ApprovalsPage() {
                           <button
                             onClick={() => handleAutopilotApprove(approval, Array.from(rejectedSet))}
                             disabled={actionLoading !== null || activeCount === 0}
-                            className="flex-1 bg-primary-700 text-white py-3 rounded-xl font-semibold text-sm hover:bg-primary-800 disabled:opacity-50 transition-all"
+                            className="flex-1 bg-primary-700 text-white py-3 min-h-[44px] rounded-xl font-semibold text-sm hover:bg-primary-800 disabled:opacity-50 transition-all"
                           >
                             {actionLoading === approval.id + 'approve' ? 'Godkänner...' : `✅ Godkänn allt (${activeCount})`}
                           </button>
                           <button
                             onClick={() => setExpandedPackage(isExpanded ? null : approval.id)}
-                            className="px-4 py-3 border border-[#E2E8F0] rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-all flex items-center gap-1"
+                            className="px-4 py-3 min-h-[44px] border border-slate-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-all flex items-center gap-1"
                           >
                             {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                             Granska
@@ -823,7 +912,7 @@ export default function ApprovalsPage() {
                           <button
                             onClick={() => handleAction(approval.id, 'reject')}
                             disabled={actionLoading !== null}
-                            className="px-4 py-3 border border-[#E2E8F0] rounded-xl text-sm text-gray-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all"
+                            className="px-4 py-3 min-h-[44px] border border-slate-200 rounded-xl text-sm text-gray-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all"
                           >
                             Avvisa
                           </button>
@@ -882,12 +971,14 @@ export default function ApprovalsPage() {
                     </div>
                   </div>
                 )
+                return dayHeader ? [dayHeader, card] : card
               }
 
               // Standard approval card
               const config = TYPE_CONFIG[approval.approval_type] || TYPE_CONFIG.other
-              const Icon = config.icon
-              const agent = getAgentFromApproval(approval)
+              const agentKey = agentForApproval(approval)
+              const agent = AGENT_INFO[agentKey]
+              const primaryAmount = getPrimaryAmount(approval)
               const isExpiringSoon =
                 approval.status === 'pending' &&
                 new Date(approval.expires_at).getTime() - Date.now() < 3600000
@@ -895,31 +986,23 @@ export default function ApprovalsPage() {
               const messagePreview = getMessagePreview(approval.payload)
               const isEditing = editingId === approval.id
 
-              return (
+              const card = (
                 <div
                   key={approval.id}
                   id={`approval-${approval.id}`}
-                  className={`bg-white border rounded-xl transition-all ${
+                  className={`bg-white border rounded-card transition-all ${
                     approval.status === 'pending'
-                      ? 'border-gray-200'
-                      : 'border-gray-100 opacity-75'
+                      ? 'border-slate-200'
+                      : 'border-slate-100 opacity-75'
                   }`}
                 >
                   <div className="p-4">
                     <div className="flex items-start gap-3">
-                      {agent ? (
-                        <div className={`w-9 h-9 rounded-full ${agent.color} flex items-center justify-center flex-shrink-0 text-white text-xs font-bold`}>
-                          {agent.initials}
-                        </div>
-                      ) : (
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bgColor}`}>
-                          <Icon className={`w-4 h-4 ${config.textColor}`} />
-                        </div>
-                      )}
+                      <AgentAvatar agentKey={agentKey} size="md" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           {agent && (
-                            <span className="text-xs text-gray-400">{agent.name} · {agent.role}</span>
+                            <span className="text-xs text-slate-500">{agent.name} · {agent.role}</span>
                           )}
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${config.bgColor} ${config.textColor}`}>
                             {config.label}
@@ -946,14 +1029,19 @@ export default function ApprovalsPage() {
                                'Utgången'}
                             </span>
                           )}
-                          <span className="text-xs text-gray-400 ml-auto">{formatTime(approval.created_at)}</span>
+                          {primaryAmount != null && (
+                            <span className="font-heading tabular-nums font-semibold text-slate-700 ml-auto shrink-0">
+                              {primaryAmount.toLocaleString('sv-SE')} kr
+                            </span>
+                          )}
+                          <span className={`text-xs text-slate-400 whitespace-nowrap ${primaryAmount != null ? '' : 'ml-auto'}`}>{formatTime(approval.created_at)}</span>
                         </div>
-                        <p className="text-gray-900 font-medium mt-1.5">{approval.title}</p>
+                        <p className="font-heading text-[15px] font-semibold text-slate-900 mt-1.5">{approval.title}</p>
                         {recipient && (
-                          <p className="text-sm text-gray-500 mt-0.5">Till: {recipient}</p>
+                          <p className="text-sm text-slate-500 mt-0.5">Till: {recipient}</p>
                         )}
                         {approval.description && (
-                          <p className="text-sm text-gray-500 mt-1">{approval.description}</p>
+                          <p className="text-sm text-slate-500 mt-1">{approval.description}</p>
                         )}
                         {/* Visa offert-länk för quote-relaterade approvals */}
                         {QUOTE_RELATED_TYPES.includes(approval.approval_type) && (() => {
@@ -1197,20 +1285,20 @@ export default function ApprovalsPage() {
                   </div>
 
                   {approval.status === 'pending' && (
-                    <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-100">
+                    <div className="flex items-center gap-2 px-4 py-3 border-t border-slate-100 flex-wrap">
                       {isEditing ? (
                         <>
                           <button
                             onClick={() => submitEdit(approval)}
                             disabled={actionLoading !== null}
-                            className="flex items-center gap-2 px-4 py-2 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
+                            className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
                           >
                             <CheckCircle className="w-4 h-4" />
                             Godkänn med ändringar
                           </button>
                           <button
                             onClick={() => setEditingId(null)}
-                            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 transition-all"
+                            className="px-3 py-2 min-h-[44px] text-sm text-slate-500 hover:text-slate-700 transition-all"
                           >
                             Avbryt
                           </button>
@@ -1224,7 +1312,7 @@ export default function ApprovalsPage() {
                           <button
                             onClick={() => openDebriefModal(approval)}
                             disabled={actionLoading !== null}
-                            className="flex items-center gap-2 px-4 py-2 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
+                            className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
                           >
                             <Lightbulb className="w-4 h-4" />
                             Svara
@@ -1232,12 +1320,12 @@ export default function ApprovalsPage() {
                           <button
                             onClick={() => handleAction(approval.id, 'reject')}
                             disabled={actionLoading !== null}
-                            className="flex items-center gap-2 px-3 py-2 border border-[#E2E8F0] hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-gray-700 text-sm font-medium rounded-lg transition-all"
+                            className="flex items-center gap-2 px-3 py-2 min-h-[44px] border border-slate-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-slate-700 text-sm font-medium rounded-lg transition-all"
                           >
                             <XCircle className="w-3.5 h-3.5" />
                             {actionLoading === approval.id + 'reject' ? 'Avvisar...' : 'Hoppa över'}
                           </button>
-                          <span className="ml-auto flex items-center gap-1 text-xs text-gray-400">
+                          <span className="ml-auto flex items-center gap-1 text-xs text-slate-400">
                             <Clock className="w-3 h-3" />
                             {timeUntilExpiry(approval.expires_at)}
                           </span>
@@ -1247,7 +1335,7 @@ export default function ApprovalsPage() {
                           <button
                             onClick={() => requestApprove(approval)}
                             disabled={actionLoading !== null}
-                            className="flex items-center gap-2 px-4 py-2 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
+                            className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
                           >
                             {approval.approval_type === 'quote_nudge' ? (
                               <>
@@ -1264,7 +1352,7 @@ export default function ApprovalsPage() {
                           {messagePreview && (
                             <button
                               onClick={() => startEdit(approval)}
-                              className="flex items-center gap-2 px-3 py-2 border border-[#E2E8F0] hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-all"
+                              className="flex items-center gap-2 px-3 py-2 min-h-[44px] border border-slate-200 hover:bg-gray-50 text-slate-700 text-sm font-medium rounded-lg transition-all"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                               Redigera
@@ -1273,12 +1361,12 @@ export default function ApprovalsPage() {
                           <button
                             onClick={() => handleAction(approval.id, 'reject')}
                             disabled={actionLoading !== null}
-                            className="flex items-center gap-2 px-3 py-2 border border-[#E2E8F0] hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-gray-700 text-sm font-medium rounded-lg transition-all"
+                            className="flex items-center gap-2 px-3 py-2 min-h-[44px] border border-slate-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-slate-700 text-sm font-medium rounded-lg transition-all"
                           >
                             <XCircle className="w-3.5 h-3.5" />
                             {actionLoading === approval.id + 'reject' ? 'Avvisar...' : 'Avvisa'}
                           </button>
-                          <span className="ml-auto flex items-center gap-1 text-xs text-gray-400">
+                          <span className="ml-auto flex items-center gap-1 text-xs text-slate-400">
                             <Clock className="w-3 h-3" />
                             {timeUntilExpiry(approval.expires_at)}
                           </span>
@@ -1288,6 +1376,7 @@ export default function ApprovalsPage() {
                   )}
                 </div>
               )
+              return dayHeader ? [dayHeader, card] : card
             })}
           </div>
         )}
