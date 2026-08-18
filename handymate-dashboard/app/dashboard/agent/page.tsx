@@ -259,6 +259,14 @@ function humanizeResponse(text: string, cronLabel?: string | null): string {
     return cronLabel ? `${cronLabel} — allt ser bra ut` : 'Klar'
   }
 
+  // En cron-körnings KORTA svar utan en enda siffra är aldrig information —
+  // modellen småpratar ibland ("Hej!", "Hallå!") på en tom kontroll, och det
+  // ska inte se ut som teamaktivitet (Andreas fynd 2026-08-18). Kollapsas
+  // till samma ärliga standardrad som övriga tomma kontroller.
+  if (cronLabel && trimmed.length < 30 && !/\d/.test(trimmed)) {
+    return `${cronLabel} — allt ser bra ut, inga åtgärder behövs`
+  }
+
   // ── Step 1: Try to extract a clean one-line summary ────────────────
   // Many cron responses follow the pattern: "Status: Lugnt läge ✅" or similar
   const statusMatch = text.match(/Status:\s*(.+?)(?:\n|$)/i)

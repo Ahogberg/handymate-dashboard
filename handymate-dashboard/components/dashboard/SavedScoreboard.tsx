@@ -125,7 +125,10 @@ export default function SavedScoreboard() {
                     <div className="text-sm font-semibold text-gray-900 leading-tight">
                       {a.name} <span className="text-gray-400 font-normal">· {a.role}</span>
                     </div>
-                    <div className="text-base font-bold text-gray-900 mt-0.5">~{fmtHours(a.minutes)}</div>
+                    {/* Vilande agent: "—" i stället för "~0 h" — ärligt utan
+                        att se ut som ett mätvärde (Andreas 2026-08-18: alla
+                        sex ska synas, API:t döljer inte längre inaktiva). */}
+                    <div className="text-base font-bold text-gray-900 mt-0.5">{a.minutes > 0 ? `~${fmtHours(a.minutes)}` : '—'}</div>
                     <div className="text-xs text-gray-500">{a.detail}</div>
                   </div>
                 </div>

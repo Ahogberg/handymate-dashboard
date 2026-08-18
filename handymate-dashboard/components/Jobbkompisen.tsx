@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useRef, useEffect } from 'react'
 import {
@@ -861,7 +861,7 @@ function ChatTab({
         {/* Smart suggestions */}
         {suggestions.length > 0 && (
           <div className="space-y-2 mb-3">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Smarta f\örslag</p>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Smarta förslag</p>
             {suggestions.map(s => (
               <div key={s.id} className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl">
                 <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -925,7 +925,7 @@ function ChatTab({
           <div className="flex justify-start">
             <div className="bg-gray-100 text-gray-500 px-3.5 py-2.5 rounded-2xl text-sm border border-gray-200">
               <Loader2 className="w-4 h-4 animate-spin inline mr-1.5" />
-              T\änker...
+              Tänker...
             </div>
           </div>
         )}
@@ -1070,14 +1070,14 @@ function VoiceTab({
       <div className="flex-1 overflow-y-auto p-4">
         {/* What AI understood */}
         <div className="mb-4 p-3 bg-primary-50 border border-primary-200 rounded-xl">
-          <p className="text-xs font-medium text-primary-700 mb-1">F\örstod:</p>
+          <p className="text-xs font-medium text-primary-700 mb-1">Förstod:</p>
           <p className="text-sm text-gray-900">{result.understood}</p>
         </div>
 
         {/* Actions */}
         {result.actions.length > 0 && (
           <div className="space-y-2 mb-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Åtg\ärder</p>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Åtgärder</p>
             {result.actions.map(action => (
               <button
                 key={action.id}
@@ -1117,7 +1117,7 @@ function VoiceTab({
             onClick={() => onExecuteAll(result.actions)}
             className="w-full py-3 bg-primary-700 text-white rounded-xl font-medium text-sm hover:opacity-90 transition-opacity mb-3"
           >
-            Utf\ör alla ({pendingActions.length} \åtg\ärder)
+            Utför alla ({pendingActions.length} åtgärder)
           </button>
         )}
 
@@ -1145,7 +1145,7 @@ function VoiceTab({
       <div className="flex-1 flex flex-col items-center justify-center p-6">
         <Loader2 className="w-10 h-10 text-primary-700 animate-spin mb-3" />
         <p className="text-gray-900 font-medium">Analyserar...</p>
-        <p className="text-xs text-gray-400 mt-1">Transkriberar och f\örst\år dina instruktioner</p>
+        <p className="text-xs text-gray-400 mt-1">Transkriberar och förstår dina instruktioner</p>
       </div>
     )
   }
@@ -1184,8 +1184,8 @@ function VoiceTab({
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6">
       <p className="text-sm text-gray-500 mb-6 text-center max-w-[260px]">
-        Ber\ätta vad du gjort, vad som beh\övs eller s\äg ett kommando.
-        AI:n f\örst\år och utf\ör.
+        Berätta vad du gjort, vad som behövs eller säg ett kommando.
+        AI:n förstår och utför.
       </p>
 
       <button
@@ -1209,7 +1209,7 @@ function VoiceTab({
       {isRecording ? (
         <p className="mt-4 text-lg font-mono text-gray-900 tabular-nums">{formatTime(duration)}</p>
       ) : (
-        <p className="mt-4 text-xs text-gray-400">Tryck f\ör att b\örja</p>
+        <p className="mt-4 text-xs text-gray-400">Tryck för att börja</p>
       )}
 
       {/* Quick examples */}
@@ -1217,9 +1217,9 @@ function VoiceTab({
         <div className="mt-6 space-y-1.5 w-full px-2">
           <p className="text-xs text-gray-400 text-center mb-2">Exempel:</p>
           {[
-            'Jag \är klar hos kunden, bytte tv\å uttag',
-            'Skapa offert f\ör badrumsrenovering',
-            'Skicka p\åminnelse till senaste kunden',
+            'Jag är klar hos kunden, bytte två uttag',
+            'Skapa offert för badrumsrenovering',
+            'Skicka påminnelse till senaste kunden',
           ].map((example, i) => (
             <p key={i} className="text-xs text-gray-400 text-center italic">
               "{example}"

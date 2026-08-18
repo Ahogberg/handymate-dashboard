@@ -95,12 +95,17 @@ export async function GET(request: NextRequest) {
 
   const reminders = logs.filter(l => l.action_type === 'send_reminder' || l.action_type === 'send_invoice_reminder').length
 
-  // Bygg per-agent-rader (bara agenter med åtgärder), sorterat efter tid.
+  // Bygg per-agent-rader för HELA teamet (Andreas 2026-08-18: agenter utan
+  // åtgärder doldes tidigare, vilket fick teamet att se mindre ut än det
+  // är — nu visas alla sex, aktiva först, med en ärlig vilotext i stället
+  // för en påhittad siffra). Tiden förblir 0 för vilande agenter.
   const perAgent = TEAM
     .map(agent => {
       const actions = actionsByAgent[agent.id] || 0
       const minutes = actions * MIN_PER_ACTION
-      let detail = `${actions} åtgärd${actions === 1 ? '' : 'er'}`
+      let detail = actions > 0
+        ? `${actions} åtgärd${actions === 1 ? '' : 'er'}`
+        : 'Redo — inget loggat den här månaden'
       if (agent.id === 'lisa' && (lisaCalls > 0 || lisaSms > 0)) {
         detail = `${lisaCalls} samtal, ${lisaSms} SMS`
       } else if (agent.id === 'karin' && reminders > 0) {
@@ -108,7 +113,6 @@ export async function GET(request: NextRequest) {
       }
       return { id: agent.id, name: agent.name, role: agent.role, actions, minutes, detail }
     })
-    .filter(a => a.actions > 0)
     .sort((a, b) => b.minutes - a.minutes)
 
   const totalActions = runs.length + logs.filter(l => l.agent_id).length
