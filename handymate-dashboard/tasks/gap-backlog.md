@@ -110,8 +110,14 @@ fix/b2-mobile-auth-forwarding.
 - [ ] **Serviceavtal/återkommande jobb** — avtalskoncept ovanpå warranties +
       proactive-care (årlig service → automatisk bokning + faktura).
       Förutsägbar intäkt för hantverkaren, churn-skydd för oss.
-- [ ] **BankID-signering av offerter** (Criipto el. likn.) — svensk trust-signal,
-      juridiskt starkare accept. Är SPEC i kapabilitets-inventeringen.
+- [ ] **BankID i kundportalen** (Criipto el. likn.) — signering av offerter
+      OCH inloggning/identifiering i portalen (offertaccept, ÄTA-godkännande,
+      fältrapport-signering, jobbpasset): svensk trust-signal, juridiskt
+      starkare accept, och ett säkerhetslager ovanpå dagens token-länkar.
+      Är SPEC i kapabilitets-inventeringen. GRIND (Andreas 2026-08-18):
+      kräver att bolaget är AB — BankID-avtal (via Criipto/motsv.) tecknas
+      först när AB-registreringen är klar. Byggs INTE före dess; ligger
+      medvetet efter launch freeze oavsett.
 - [ ] **Kvitto/utläggsfångst** — foto → tolkning → kostnad på projekt → Fortnox.
       Saknas helt; mobilens kamera-infra (QuoteCamera) återanvänds. Stärker
       efterkalkylen.
