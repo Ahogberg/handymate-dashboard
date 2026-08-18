@@ -2570,4 +2570,20 @@ en kontext-nyckel plumbas in i ToolContext (v3-regelmotorns autonomi opåverkad)
 - TD-85: Löftesuppfyllelse-hooken (Etapp N, promise_fact_id → fulfilled) sitter bara i approve/edit-exekveringsvägen — INTE i retry-vägen. Ett kort som felar först och lyckas via retry uppfyller inte löftet. Litet isolerat tillägg i app/api/approvals/[id]/route.ts retry-grenen.
 
 - TD-86: auto-invoice-on-complete:171 anropar /api/invoices/send som ger KÄND 401 (egen kommentar rad 161-167) — autofakturan stannar som utkast med SMS-varning istället för att skickas. Riktig sändbugg, separat från manifestarbetet.
+  **LÖST 2026-08-18 (Etapp Q).** Sändkärnan (email/SMS/PDF/manifest/status/
+  post-send-automationer) extraherad ur `app/api/invoices/send/route.ts` till
+  ny `lib/invoices/send-invoice.ts` — husmönstret från `lib/invoice-reminder-
+  send.ts` (delas av flera anropare). Rutten är nu tunn (auth+validering+
+  anrop till kärnan); `lib/projects/auto-invoice-on-complete.ts` anropar
+  `sendInvoice()` DIREKT med servicerollens supabase-klient — inget
+  nätverksanrop mot sig själv, ingen session behövs, ingen 401 möjlig
+  längre. Samtidigt konsoliderades leverans-strypunkten (Etapp P-manifestet)
+  ytterligare: två av tre sent-skrivare går nu genom samma kärna. Facit:
+  `tests/send-invoice-core.spec.ts` (ny) + uppdaterade `tests/invoice-
+  delivery-truth.spec.ts`/`tests/invoice-evidence-manifest.spec.ts`. Sido-
+  fix: `app/api/projects/route.ts`, `app/api/booking/complete-job/route.ts`
+  och `app/api/approvals/[id]/route.ts` fick `runtime='nodejs'` +
+  `maxDuration=30` eftersom sändningen (Chromium-PDF) nu kan köras inline
+  i de rutterna — annars hade fixen bara bytt ett garanterat fel (401) mot
+  ett sannolikt (timeout).
 - TD-87: credit/route.ts:128 skapar kreditnotor med status 'sent' vid INSERT utan att någon leverans skett — semantiskt fel som förorenar 'sent'-betydelsen (exkluderas ur manifest-triggning, men bör rättas).

@@ -62,20 +62,33 @@ test.describe('skapandet påstår ingen leverans', () => {
   })
 })
 
-test.describe('sändningen läses', () => {
+test.describe('sändningen läses (Etapp Q, TD-86, 2026-08-18)', () => {
+  // TIDIGARE: ett `await fetch('${appUrl}/api/invoices/send')` — ett internt
+  // HTTP-anrop mot en rutt som kräver getAuthenticatedBusiness. Ett server-
+  // anrop utan session gav KÄND 401, varje gång. NU: den delade sändkärnan
+  // (lib/invoices/send-invoice.ts, samma kod som den manuella sändningen)
+  // anropas DIREKT — inget nätverksanrop, ingen session, ingen 401 möjlig.
+  test('sändkärnan anropas direkt — inget internt fetch mot /api/invoices/send', () => {
+    // Filen gör fortfarande ETT legitimt fetch (till /api/sms/send, för att
+    // varna hantverkaren) — det är oförändrat och inte del av TD-86. Bara
+    // fetchen mot fakturasändningen är förbjuden att komma tillbaka.
+    expect(KOD, 'sändningen ska inte gå via ett internt HTTP-anrop längre')
+      .not.toMatch(/fetch\(`\$\{appUrl\}\/api\/invoices\/send`/)
+    expect(KOD).toContain("import { sendInvoice } from '@/lib/invoices/send-invoice'")
+    expect(KOD).toMatch(/const sendResult = await sendInvoice\(supabase/)
+  })
+
   test('svaret plockas upp i stället för att kastas bort', () => {
-    expect(KOD).toMatch(/const res = await fetch\(`\$\{appUrl\}\/api\/invoices\/send`/)
-    expect(KOD).toContain('levererad = res.ok')
+    expect(KOD).toContain('levererad = Boolean(sendResult.email || sendResult.sms)')
   })
 
   test('det verkningslösa auth-fältet är borta', () => {
-    // Rutten konsumerar det inte. Att skicka med det gav ett falskt intryck av
-    // att server-till-server-anropet var löst.
+    // Fanns i den gamla fetch-body:n. Direktanropet skickar inga sådana fält.
     expect(KOD).not.toContain('_internal_business_id')
   })
 
   test('ingen tom catch sväljer felet', () => {
-    const start = KOD.indexOf('/api/invoices/send')
+    const start = KOD.indexOf('await sendInvoice(supabase')
     const slut = KOD.indexOf('config?.personal_phone')
     expect(start, 'sändanropet hittades inte').toBeGreaterThan(-1)
     expect(slut, 'SMS-blocket hittades inte').toBeGreaterThan(start)
@@ -121,28 +134,32 @@ test.describe('pengarna hamnar inte i limbo', () => {
   })
 })
 
-test.describe('sändrutten läser Resends svar (fynd av Codex 2026-08-08)', () => {
+test.describe('sändkärnan läser Resends svar (fynd av Codex 2026-08-08)', () => {
   // Resend-SDK:n kastar INTE vid HTTP-fel — den returnerar { data, error }.
   // Rutten kastade bort svaret och satte results.email = true villkorslöst:
   // en avvisad sändning blev "skickad" och fakturan fick status sent utan
   // att något nått kunden. Samma felklass som auto-fakturans 401, fast i
   // den manuella sändvägen.
-  const RUTT = fs.readFileSync(path.join(ROOT, 'app/api/invoices/send/route.ts'), 'utf8')
+  //
+  // Etapp Q (TD-86, 2026-08-18): den här logiken flyttade ur
+  // app/api/invoices/send/route.ts till den delade sändkärnan
+  // lib/invoices/send-invoice.ts — skanningen pekar nu ärligt dit den bor.
+  const KARNA = fs.readFileSync(path.join(ROOT, 'lib/invoices/send-invoice.ts'), 'utf8')
 
   test('returvärdet fångas och felet grenas', () => {
-    expect(RUTT).toContain('const emailRes = await resend.emails.send')
-    expect(RUTT).toContain('if (emailRes.error)')
+    expect(KARNA).toContain('const emailRes = await resend.emails.send')
+    expect(KARNA).toContain('if (emailRes.error)')
   })
 
   test('email markeras bara skickad när Resend inte avvisat', () => {
     // results.email = true får bara finnas i else-grenen efter felkontrollen.
-    const i = RUTT.indexOf('if (emailRes.error)')
-    const j = RUTT.indexOf('results.email = true')
+    const i = KARNA.indexOf('if (emailRes.error)')
+    const j = KARNA.indexOf('results.email = true')
     expect(i).toBeGreaterThan(-1)
     expect(j, 'results.email sätts före felkontrollen').toBeGreaterThan(i)
   })
 
   test('status sent grindas på faktiskt utfall', () => {
-    expect(RUTT).toContain('if (results.email || results.sms)')
+    expect(KARNA).toContain('if (results.email || results.sms)')
   })
 })

@@ -1,29 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { Resend } from 'resend'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { checkSmsRateLimitDb, checkEmailRateLimitDb } from '@/lib/rate-limit-db'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
-import { generateOCR } from '@/lib/ocr'
-import { generateInvoicePDF } from '@/lib/pdf-generator'
-import { generateSwishQR } from '@/lib/swish-qr'
-import { buildInvoicePdfBuffer } from '@/lib/invoices/build-invoice-pdf'
-import { randomUUID } from 'crypto'
-import { prepareInvoiceManifest, markInvoiceDelivered } from '@/lib/invoices/evidence-manifest'
-import { rapporteraTystFel } from '@/lib/observability/driftlarm'
+import { sendInvoice } from '@/lib/invoices/send-invoice'
 
-// Chromium-rendering (buildInvoicePdfBuffer → renderHtmlToPdf) kräver
-// Node-runtime och en generösare timeout än default — samma mönster som
-// quotes/pdf och invoices/pdf (ETAPP 6b, offert-masterplan.md).
+// Chromium-rendering (buildInvoicePdfBuffer → renderHtmlToPdf, i sändkärnan
+// lib/invoices/send-invoice.ts) kräver Node-runtime och en generösare
+// timeout än default — samma mönster som quotes/pdf och invoices/pdf
+// (ETAPP 6b, offert-masterplan.md).
 export const runtime = 'nodejs'
 export const maxDuration = 30
 
-function getResend() {
-  return new Resend(process.env.RESEND_API_KEY)
-}
-
 /**
  * POST - Skicka faktura via SMS och/eller email
+ *
+ * Tunn rutt (Etapp Q, TD-86, 2026-08-18): auth, behörighet, validering och
+ * rate limiting stannar här — själva sändningen (email/SMS/PDF/manifest/
+ * status/post-send-automationer) bor i den delade kärnan
+ * lib/invoices/send-invoice.ts, som även autoInvoiceOnComplete anropar
+ * direkt (server-till-server, ingen session).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -40,7 +36,6 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
-    const resend = getResend()
     const body = await request.json()
     const { invoice_id, send_sms = false, send_email = true } = body
 
@@ -62,363 +57,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Hämta faktura med kundinfo och verifiera ägarskap. ETAPP 6b: samma
-    // kundfält som invoices/pdf redan hämtar (address_line/personal_number/
-    // property_designation) — mall-motorn (buildInvoiceTemplateData) läser
-    // dem för PDF-bilagan, precis som den redan gör för nedladdningen.
-    const { data: invoice, error: invoiceError } = await supabase
-      .from('invoice')
-      .select(`
-        *,
-        customer:customer_id (
-          name,
-          phone_number,
-          email,
-          address_line,
-          personal_number,
-          property_designation,
-          customer_number
-        )
-      `)
-      .eq('invoice_id', invoice_id)
-      .eq('business_id', business.business_id)
-      .single()
+    const sendResult = await sendInvoice(supabase, {
+      businessId: business.business_id,
+      invoiceId: invoice_id,
+      sendEmail: send_email,
+      sendSms: send_sms,
+    })
 
-    if (invoiceError || !invoice) {
+    if (!sendResult.found) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }
 
-    // Etapp P (sql/v148): fryser fakturaunderlaget INNAN fysisk sändning
-    // påbörjas. Best-effort — ett prepare-fel får ALDRIG blockera eller
-    // fördröja utskicket, returvärdet ignoreras medvetet.
-    await prepareInvoiceManifest(supabase, {
-      businessId: business.business_id,
-      invoiceId: invoice_id,
-      projectId: invoice.project_id || null,
-    })
-
-    // Hämta företagsconfig för PDF-generering
-    const { data: businessConfig } = await supabase
-      .from('business_config')
-      .select('*')
-      .eq('business_id', business.business_id)
-      .single()
-
-    const results: { sms?: boolean; email?: boolean; errors: string[] } = { errors: [] }
-
-    // Säkerställ kundportal aktiverad
-    const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-    let portalUrl = ''
-    if (invoice.customer_id) {
-      const { data: cust } = await supabase
-        .from('customer')
-        .select('portal_token, portal_enabled')
-        .eq('customer_id', invoice.customer_id)
-        .single()
-
-      if (cust?.portal_token && cust?.portal_enabled) {
-        portalUrl = `${APP_URL}/portal/${cust.portal_token}?tab=invoices`
-      } else {
-        // Auto-skapa kundportal
-        const newToken = randomUUID()
-        await supabase
-          .from('customer')
-          .update({
-            portal_token: newToken,
-            portal_token_created_at: new Date().toISOString(),
-            portal_enabled: true,
-          })
-          .eq('customer_id', invoice.customer_id)
-        portalUrl = `${APP_URL}/portal/${newToken}?tab=invoices`
-      }
-    }
-
-    // Skicka email
-    if (send_email && invoice.customer?.email) {
-      try {
-        const pdfUrl = `${APP_URL}/api/invoices/pdf?invoiceId=${invoice_id}`
-        const amountToPay = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
-
-        // ── Generera PDF-bilaga ────────────────────────────────────────
-        // ETAPP 6b (offert-masterplan.md, faktura-sprinten): samma mall-
-        // HTML→Chromium-väg som invoices/pdf (buildInvoicePdfBuffer, EN
-        // källa) — tidigare byggde denna route en EGEN, avkortad jsPDF-data
-        // (saknade OCR/personnummer/fastighetsbeteckning/referenser) så
-        // mejlbilagan skiljde sig från nedladdningen. Fallbacken nedan
-        // används bara om Chromium-rendering misslyckas.
-        let pdfBuffer: Buffer
-        try {
-          const pdfFromHtml = await buildInvoicePdfBuffer(invoice, businessConfig, {
-            logTag: 'invoices/send',
-          })
-          if (!pdfFromHtml) throw new Error('renderHtmlToPdf returnerade null')
-          pdfBuffer = pdfFromHtml
-        } catch (htmlPdfErr) {
-          console.error('[invoices/send] HTML→PDF-vägen misslyckades — faller tillbaka till jsPDF:', htmlPdfErr)
-          console.error('[invoices/send] FALLBACK-JSPDF AKTIV — Chromium-rendering misslyckades, mejlbilagan skickas med den äldre jsPDF-renderaren')
-          const swishQR = await generateSwishQR(
-            businessConfig?.swish_number,
-            amountToPay || invoice.total,
-            invoice.invoice_number,
-          )
-          pdfBuffer = generateInvoicePDF(
-            {
-              invoice_number: invoice.invoice_number,
-              invoice_date: invoice.invoice_date,
-              due_date: invoice.due_date,
-              status: invoice.status,
-              items: invoice.items || [],
-              subtotal: invoice.subtotal,
-              vat_rate: invoice.vat_rate,
-              vat_amount: invoice.vat_amount,
-              total: invoice.total,
-              rot_rut_type: invoice.rot_rut_type,
-              rot_rut_deduction: invoice.rot_rut_deduction,
-              customer_pays: invoice.customer_pays,
-              is_credit_note: invoice.is_credit_note,
-              credit_reason: invoice.credit_reason,
-              original_invoice_id: invoice.original_invoice_id,
-              personnummer: invoice.personnummer,
-              fastighetsbeteckning: invoice.fastighetsbeteckning,
-              customer: invoice.customer,
-              ocr_number: invoice.ocr_number || generateOCR(invoice.invoice_number || ''),
-              our_reference: invoice.our_reference,
-              your_reference: invoice.your_reference,
-              invoice_type: invoice.invoice_type || 'standard',
-            },
-            {
-              business_name: businessConfig?.business_name || business?.business_name,
-              org_number: businessConfig?.org_number,
-              contact_email: businessConfig?.contact_email,
-              contact_phone: businessConfig?.contact_phone,
-              address: businessConfig?.address,
-              bankgiro: businessConfig?.bankgiro,
-              plusgiro: businessConfig?.plusgiro,
-              swish_number: businessConfig?.swish_number,
-              swish_qr: swishQR || undefined,
-              f_skatt_registered: businessConfig?.f_skatt_registered,
-            }
-          )
-        }
-
-        // ═══ RETURVÄRDET MÅSTE LÄSAS (N3-felklassen, fynd av Codex 2026-08-08) ═══
-        //
-        // Resend-SDK:n kastar INTE vid HTTP-fel — den returnerar
-        // { data: null, error } (node_modules/resend/dist/index.mjs).
-        // Tidigare kastades svaret bort och results.email sattes till true
-        // villkorslöst: en avvisad sändning blev alltså "skickad", och
-        // fakturan fick status sent utan att någonting nått kunden. Exakt
-        // samma mönster som auto-fakturans 401 — påstådd leverans utan
-        // verifierad.
-        const emailRes = await resend.emails.send({
-          from: `${business?.business_name || 'Handymate'} <faktura@${process.env.RESEND_DOMAIN || 'handymate.se'}>`,
-          to: invoice.customer.email,
-          subject: `Faktura ${invoice.invoice_number} från ${business?.business_name || 'oss'}`,
-          html: buildInvoiceEmailHtml({
-            customerName: invoice.customer?.name || '',
-            businessName: business?.business_name || '',
-            invoiceNumber: invoice.invoice_number,
-            dueDate: invoice.due_date,
-            subtotal: invoice.subtotal,
-            vatRate: invoice.vat_rate,
-            vatAmount: invoice.vat_amount,
-            amountToPay: amountToPay || 0,
-            rotRutType: invoice.rot_rut_type,
-            rotRutDeduction: invoice.rot_rut_deduction,
-            bankgiro: business?.bankgiro,
-            ocrNumber: invoice.ocr_number || generateOCR(invoice.invoice_number || ''),
-            swishNumber: businessConfig?.swish_number,
-            orgNumber: business?.org_number,
-            contactEmail: business?.contact_email,
-            contactPhone: business?.contact_phone,
-            portalUrl: portalUrl || pdfUrl,
-            pdfUrl,
-          }),
-          attachments: [
-            {
-              filename: `faktura-${invoice.invoice_number}.pdf`,
-              content: pdfBuffer,
-            }
-          ]
-        })
-
-        if (emailRes.error) {
-          console.error('Email send rejected by Resend:', emailRes.error)
-          results.errors.push(`Email: ${emailRes.error.message || 'avvisad av e-posttjänsten'}`)
-        } else {
-          results.email = true
-        }
-      } catch (emailError: any) {
-        console.error('Email send error:', emailError)
-        results.errors.push(`Email: ${emailError.message}`)
-      }
-    }
-
-    // Skicka SMS
-    if (send_sms && invoice.customer?.phone_number) {
-      try {
-        const amountToPay = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
-        const smsLink = portalUrl || `${APP_URL}/api/invoices/pdf?invoiceId=${invoice_id}`
-
-        // Genom strypunkten (etapp 0 batch 1) — ger opt-out-spärr, sms_log,
-        // kostnadsmätning och typografitvätt. Utan den kunde en kund som
-        // svarat STOPP få fakturan via SMS ändå.
-        const { sendSmsViaElks } = await import('@/lib/sms-send')
-        const smsResult = await sendSmsViaElks({
-          supabase,
-          businessId: business.business_id,
-          businessName: business?.business_name,
-          to: invoice.customer.phone_number,
-          message: `Faktura ${invoice.invoice_number} från ${business?.business_name || 'oss'}.\n\nAtt betala: ${amountToPay?.toLocaleString('sv-SE')} kr\nFörfaller: ${new Date(invoice.due_date).toLocaleDateString('sv-SE')}\n\nSe faktura: ${smsLink}`,
-          customerId: invoice.customer_id || null,
-          relatedId: invoice_id,
-          messageType: 'invoice',
-          recipient: 'customer',
-          purpose: 'transactional',
-        })
-
-        if (smsResult.success) {
-          results.sms = true
-        } else {
-          results.errors.push(`SMS: ${smsResult.error || 'kunde inte skickas'}`)
-        }
-      } catch (smsError: any) {
-        console.error('SMS send error:', smsError)
-        results.errors.push(`SMS: ${smsError.message}`)
-      }
-    }
-
-    // Uppdatera fakturastatus
-    if (results.email || results.sms) {
-      // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): sent_at/
-      // sent_method sattes ALDRIG här — InvoiceStatusTimeline.tsx läser
-      // BÅDA (rad 48-52) för att visa "Skickad via {metod}"-steget som
-      // klart; utan sent_at visas steget som "upcoming" trots att fakturan
-      // faktiskt är skickad. Samma buggklass som project.status-fyndet
-      // tidigare i samma körning — en statusflip utan sina stödjande fält.
-      const sentMethod = results.email && results.sms ? 'both' : results.email ? 'email' : 'sms'
-      const { error: statusErr } = await supabase
-        .from('invoice')
-        .update({ status: 'sent', sent_at: new Date().toISOString(), sent_method: sentMethod })
-        .eq('invoice_id', invoice_id)
-
-      if (statusErr) {
-        console.error('[invoices/send] Status update failed after send:', statusErr)
-        results.errors.push(`Status: ${statusErr.message}`)
-        // Etapp P-härdning: felet svaldes tidigare (bara loggat till
-        // console) trots att kunden FAKTISKT redan fått fakturan (email/sms
-        // gick iväg innan detta steget). Gör det högt utan att ändra
-        // svarssemantiken ovan — driftlarmet (automation_activity) fångar
-        // det nu istället för att det försvinner i Vercel-loggarna.
-        await rapporteraTystFel(
-          supabase,
-          business.business_id,
-          'invoice-manifest:status-write-failed-after-delivery',
-          statusErr.message,
-          { invoiceId: invoice_id },
-        )
-      }
-
-      // Manifestet markeras levererat OAVSETT om statusskrivningen ovan
-      // lyckades — leveransen (email/sms) skedde, och det är den sanningen
-      // manifestet fryser. Best-effort, blockerar aldrig svaret.
-      await markInvoiceDelivered(supabase, {
-        businessId: business.business_id,
-        invoiceId: invoice_id,
-        method: sentMethod,
-      })
-
-      // Logga aktivitet (customer_activity — gamla namnet activity fanns inte)
-      // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): activity_id och
-      // title är NOT NULL utan default på customer_activity — insertet
-      // saknade båda och floppade TYST vid VARJE fakturautskick (ingen
-      // .error-koll här, samma tysta-fel-mönster som redan dokumenterat i
-      // auto-invoice-on-complete.ts). Fältformen kopierad från den
-      // fungerande app/api/quotes/send/route.ts.
-      const { error: activityErr } = await supabase
-        .from('customer_activity')
-        .insert({
-          activity_id: 'act_' + Math.random().toString(36).substr(2, 9),
-          business_id: invoice.business_id,
-          customer_id: invoice.customer_id,
-          activity_type: 'invoice_sent',
-          title: `Faktura ${invoice.invoice_number} skickad`,
-          description: `Faktura ${invoice.invoice_number} skickad${results.email ? ' via email' : ''}${results.sms ? ' via SMS' : ''}`,
-          metadata: { invoice_id, ...results },
-          created_by: 'user',
-        })
-      if (activityErr) {
-        console.error('[invoices/send] customer_activity insert failed:', activityErr)
-      }
-
-      // Pipeline: move deal to invoiced
-      try {
-        const { findDealByInvoice, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')
-        const settings = await getAutomationSettings(business.business_id)
-        if (settings?.auto_move_on_payment) {
-          const deal = await findDealByInvoice(business.business_id, invoice_id)
-          if (deal) {
-            await moveDeal({
-              dealId: deal.id,
-              businessId: business.business_id,
-              // V80: Ingen 'invoiced'-stage finns längre ('quote_accepted' är
-              // borttaget, sql/v80_merge_accepted_into_won.sql) — flytta direkt
-              // till 'won'. Betalstatus är fakturamodulens ansvar (invoice.status/
-              // paid_at), inte pipeline-stegets — "Vunnen" betyder numera signerad/
-              // vunnen affär, inte nödvändigtvis betald. De flesta dealsen är redan
-              // i 'won' via Golden Path vid signering — moveDeal() no-opar då.
-              toStageSlug: 'won',
-              triggeredBy: 'system',
-            })
-          }
-        }
-      } catch (pipelineErr) {
-        console.error('Pipeline trigger error (non-blocking):', pipelineErr)
-      }
-
-      // Project workflow stage: 'Faktura skickad' (non-blocking)
-      try {
-        const { advanceProjectStage, SYSTEM_STAGES, findProjectForEntity } = await import('@/lib/project-stages/automation-engine')
-        const project = await findProjectForEntity({
-          businessId: business.business_id,
-          invoiceId: invoice_id,
-        })
-        if (project) {
-          const flytt = await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_SENT, business.business_id)
-          if (!flytt.moved) console.error('[invoices/send] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: project.project_id })
-        }
-      } catch (err) {
-        console.error('[invoices/send] advanceProjectStage failed:', err)
-      }
-
-      // Smart communication: trigger invoice_sent event
-      try {
-        const { triggerEventCommunication } = await import('@/lib/smart-communication')
-        await triggerEventCommunication({
-          businessId: business.business_id,
-          event: 'invoice_sent',
-          customerId: invoice.customer_id,
-          context: { invoiceId: invoice_id },
-        })
-      } catch (commErr) {
-        console.error('Communication trigger error (non-blocking):', commErr)
-      }
-
-      // Portal-notifikation
-      try {
-        const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
-        await sendPortalNotification(business.business_id, invoice.customer_id, 'invoice_sent', {
-          context: {
-            amount: invoice.total_amount || invoice.total || invoice.amount,
-            due_date: invoice.due_date || null,
-            invoice_number: invoice.invoice_number,
-          },
-        })
-      } catch (notifErr) {
-        console.error('Portal notification invoice_sent error (non-blocking):', notifErr)
-      }
-    }
-
+    const { found, ...results } = sendResult
     return NextResponse.json({
       success: results.email || results.sms,
       ...results
@@ -428,140 +78,4 @@ export async function POST(request: NextRequest) {
     console.error('Send invoice error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
-}
-
-// ── Faktura-mailmall (teal, matchar offertmall) ─────────────────────
-
-function buildInvoiceEmailHtml(opts: {
-  customerName: string
-  businessName: string
-  invoiceNumber: string
-  dueDate: string
-  subtotal: number
-  vatRate: number
-  vatAmount: number
-  amountToPay: number
-  rotRutType?: string | null
-  rotRutDeduction?: number | null
-  bankgiro?: string | null
-  ocrNumber: string
-  swishNumber?: string | null
-  orgNumber?: string | null
-  contactEmail?: string | null
-  contactPhone?: string | null
-  portalUrl: string
-  pdfUrl: string
-}): string {
-  const firstName = opts.customerName.split(' ')[0] || 'Kund'
-
-  const rotSection = opts.rotRutType ? `
-    <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 16px; margin: 20px 0;">
-      <p style="margin: 0 0 4px; font-weight: 600; color: #166534;">🏠 ${opts.rotRutType.toUpperCase()}-avdrag tillämpas</p>
-      <p style="margin: 0; color: #374151; font-size: 14px;">
-        Avdraget på <strong>${opts.rotRutDeduction?.toLocaleString('sv-SE')} kr</strong> dras automatiskt via Skatteverket.
-      </p>
-    </div>` : ''
-
-  const rotRow = opts.rotRutType ? `
-    <tr>
-      <td style="padding: 12px 16px; color: #374151; font-size: 14px;">${opts.rotRutType.toUpperCase()}-avdrag</td>
-      <td style="padding: 12px 16px; text-align: right; color: #059669; font-size: 14px; font-weight: 600;">-${opts.rotRutDeduction?.toLocaleString('sv-SE')} kr</td>
-    </tr>` : ''
-
-  const swishSection = opts.swishNumber ? (() => {
-    const swishData = JSON.stringify({
-      version: 1,
-      payee: { value: (opts.swishNumber as string).replace(/\D/g, '') },
-      amount: { value: Math.round(opts.amountToPay) },
-      message: { value: opts.invoiceNumber },
-    })
-    const swishLink = 'swish://payment?data=' + encodeURIComponent(swishData)
-    return `
-    <div style="text-align: center; margin: 24px 0; padding: 20px; background: #F0FDFA; border: 1px solid #99F6E4; border-radius: 8px;">
-      <p style="font-size: 13px; color: #6B7280; margin: 0 0 12px;">Betala enkelt med Swish</p>
-      <a href="${swishLink}"
-         style="display: inline-block; background: #0F766E; color: #ffffff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 600;">
-        Betala ${opts.amountToPay.toLocaleString('sv-SE')} kr med Swish
-      </a>
-      <p style="font-size: 13px; color: #374151; margin: 12px 0 0;">
-        Swish-nummer: <strong>${opts.swishNumber}</strong>
-      </p>
-      <p style="font-size: 12px; color: #9CA3AF; margin: 4px 0 0;">
-        Märk betalningen: <strong>${opts.invoiceNumber}</strong>
-      </p>
-    </div>`
-  })() : ''
-
-  const paymentInfo = [
-    opts.bankgiro ? `Bankgiro: <strong>${opts.bankgiro}</strong>` : '',
-    `OCR-nummer: <strong>${opts.ocrNumber}</strong>`,
-  ].filter(Boolean).join('<br>')
-
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: #f8fafc; color: #1F2937;">
-  <div style="max-width: 600px; margin: 0 auto;">
-
-    <div style="background: #0F766E; padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-      <h1 style="color: white; margin: 0; font-size: 20px; font-weight: 700;">${opts.businessName}</h1>
-      <p style="color: rgba(255,255,255,0.8); margin: 4px 0 0; font-size: 14px;">Faktura ${opts.invoiceNumber}</p>
-    </div>
-
-    <div style="background: white; padding: 28px; border: 1px solid #E5E7EB; border-top: none; border-radius: 0 0 12px 12px;">
-
-      <h2 style="color: #111827; font-size: 18px; margin: 0 0 8px;">Hej ${firstName}!</h2>
-      <p style="color: #374151; line-height: 1.6; margin: 0 0 20px;">
-        Här kommer din faktura. Nedan hittar du en sammanfattning — du kan se alla detaljer i din kundportal eller i bifogad PDF.
-      </p>
-
-      ${rotSection}
-
-      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; margin-bottom: 20px;">
-        <tr style="background: #F9FAFB;">
-          <td style="padding: 12px 16px; color: #6B7280; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Beskrivning</td>
-          <td style="padding: 12px 16px; text-align: right; color: #6B7280; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Belopp</td>
-        </tr>
-        <tr>
-          <td style="padding: 12px 16px; color: #374151; font-size: 14px; border-top: 1px solid #E5E7EB;">Delsumma</td>
-          <td style="padding: 12px 16px; text-align: right; color: #374151; font-size: 14px; border-top: 1px solid #E5E7EB;">${opts.subtotal?.toLocaleString('sv-SE')} kr</td>
-        </tr>
-        <tr>
-          <td style="padding: 12px 16px; color: #374151; font-size: 14px; border-top: 1px solid #F3F4F6;">Moms (${opts.vatRate}%)</td>
-          <td style="padding: 12px 16px; text-align: right; color: #374151; font-size: 14px; border-top: 1px solid #F3F4F6;">${opts.vatAmount?.toLocaleString('sv-SE')} kr</td>
-        </tr>
-        ${rotRow}
-        <tr style="background: #F0FDFA;">
-          <td style="padding: 14px 16px; color: #0F766E; font-size: 16px; font-weight: 700; border-top: 2px solid #0F766E;">Att betala</td>
-          <td style="padding: 14px 16px; text-align: right; color: #0F766E; font-size: 16px; font-weight: 700; border-top: 2px solid #0F766E;">${opts.amountToPay.toLocaleString('sv-SE')} kr</td>
-        </tr>
-      </table>
-
-      <div style="background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-        <p style="margin: 0 0 4px; font-weight: 600; color: #111827; font-size: 14px;">Betalningsinformation</p>
-        <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.6;">${paymentInfo}</p>
-        <p style="margin: 8px 0 0; color: #6B7280; font-size: 13px;">Förfallodatum: <strong>${new Date(opts.dueDate).toLocaleDateString('sv-SE')}</strong></p>
-      </div>
-
-      ${swishSection}
-
-      <div style="text-align: center; margin: 24px 0 8px;">
-        <a href="${opts.portalUrl}" style="display: inline-block; background: #0F766E; color: white; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">
-          Visa i kundportalen
-        </a>
-        <p style="margin: 12px 0 0; font-size: 13px;">
-          <a href="${opts.pdfUrl}" style="color: #0F766E; text-decoration: underline;">Ladda ner som PDF</a>
-        </p>
-      </div>
-
-      <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 24px 0;" />
-
-      <p style="color: #6B7280; font-size: 13px; text-align: center; margin: 0; line-height: 1.5;">
-        ${opts.businessName}${opts.orgNumber ? ` · Org.nr: ${opts.orgNumber}` : ''}<br>
-        ${[opts.contactEmail, opts.contactPhone].filter(Boolean).join(' · ')}
-      </p>
-    </div>
-  </div>
-</body>
-</html>`
 }

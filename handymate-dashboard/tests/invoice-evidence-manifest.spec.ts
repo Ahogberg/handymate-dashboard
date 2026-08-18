@@ -707,8 +707,14 @@ test.describe('källskanning — READINESS_RULES_VERSION', () => {
 })
 
 test.describe('källskanning — de tre sändvägarna anropar prepare+mark', () => {
+  // Etapp Q (TD-86, 2026-08-18): den manuella sändningens hookar flyttade
+  // ur app/api/invoices/send/route.ts till den delade sändkärnan
+  // lib/invoices/send-invoice.ts (som rutten OCH autoInvoiceOnComplete nu
+  // båda anropar direkt) — skanningen pekar ärligt dit hookarna faktiskt
+  // bor. De andra två vägarna (Fortnox, auto-generate) har egna hookar,
+  // orörda av Etapp Q.
   const VAGAR = [
-    'app/api/invoices/send/route.ts',
+    'lib/invoices/send-invoice.ts',
     'app/api/invoices/[id]/send-via-fortnox/route.ts',
     'app/api/invoices/auto-generate/route.ts',
   ]
@@ -758,16 +764,20 @@ test.describe('källskanning — evidence-manifest.ts läser aldrig blob-innehå
   })
 })
 
-test.describe('källskanning — statusskrivningsfelet i invoices/send blir högt (Etapp P-härdning)', () => {
+test.describe('källskanning — statusskrivningsfelet i sändkärnan blir högt (Etapp P-härdning)', () => {
+  // Etapp Q (TD-86, 2026-08-18): status-skrivningen (och dess felhantering)
+  // flyttade ur route.ts till lib/invoices/send-invoice.ts.
   test('ett misslyckat status-write efter lyckad leverans rapporteras till driftlarmet', () => {
-    const src = read('app/api/invoices/send/route.ts')
+    const src = read('lib/invoices/send-invoice.ts')
     const idx = src.indexOf('Status update failed after send')
     expect(idx).toBeGreaterThan(-1)
     const after = src.slice(idx, idx + 600)
     expect(after).toContain('rapporteraTystFel')
   })
 
-  test('svarssemantiken är oförändrad — success grenar fortfarande bara på email/sms', () => {
+  test('svarssemantiken är oförändrad — rutten grenar fortfarande success bara på email/sms', () => {
+    // Kärnan returnerar { email?, sms?, errors } — rutten (route.ts) bygger
+    // fortfarande det slutgiltiga svaret med exakt samma villkor som förut.
     const src = read('app/api/invoices/send/route.ts')
     expect(src).toContain('success: results.email || results.sms')
   })

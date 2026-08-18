@@ -4,6 +4,13 @@ import { getServerSupabase } from '@/lib/supabase'
 import { computeBookingDayProgress, fetchProjectBookings } from '@/lib/bookings/day-progress'
 import { completeProject, type CompleteProjectResult } from '@/lib/projects/complete-project'
 
+// completeProject → autoInvoiceOnComplete kan nu (Etapp Q, TD-86) skicka
+// fakturan på riktigt inline (sendInvoice, Chromium-PDF via
+// buildInvoicePdfBuffer) på sista dagens booking — samma anledning som
+// invoices/send/route.ts behöver 30s.
+export const runtime = 'nodejs'
+export const maxDuration = 30
+
 /**
  * POST /api/booking/complete-job
  *

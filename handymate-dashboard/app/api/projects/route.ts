@@ -9,6 +9,13 @@ import { verifyOwnership } from '@/lib/auth/verify-ownership'
 import { completeProject, type CompleteProjectResult } from '@/lib/projects/complete-project'
 import { deriveProjectLifecycle } from '@/lib/projects/derive-lifecycle'
 
+// completeProject → autoInvoiceOnComplete kan nu (Etapp Q, TD-86) skicka
+// fakturan på riktigt inline (sendInvoice, Chromium-PDF via
+// buildInvoicePdfBuffer) när projektet stängs med auto_invoice_on_complete
+// påslaget — samma anledning som invoices/send/route.ts behöver 30s.
+export const runtime = 'nodejs'
+export const maxDuration = 30
+
 /**
  * GET - Lista projekt för ett företag
  */

@@ -12,6 +12,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { createInvoice } from '@/lib/invoices/create-invoice'
 import { byggProjektFakturaUnderlag } from '@/lib/invoices/project-invoice-draft'
+import { sendInvoice } from '@/lib/invoices/send-invoice'
 
 interface AutoInvoiceResult {
   success: boolean
@@ -152,34 +153,34 @@ export async function autoInvoiceOnComplete(
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
     const dueDateStr = dueDate.toLocaleDateString('sv-SE')
 
-    // 10. Om auto-send: försök skicka till kund via /api/invoices/send.
+    // 10. Om auto-send: skicka direkt via den delade sändkärnan (Etapp Q,
+    // TD-86, 2026-08-18).
     //
-    // Svaret LÄSES nu. Tidigare stod här ett `await fetch(...)` vars resultat
-    // kastades bort och en tom catch — vilket är hur ett alltid misslyckande
-    // anrop kunde se ut som en lyckad sändning i månader.
+    // TIDIGARE BUGG: här stod ett `await fetch('${appUrl}/api/invoices/send')`
+    // — ett internt HTTP-anrop mot en rutt som kräver getAuthenticatedBusiness.
+    // Ett serveranrop utan session svarade 401 VARJE gång, resultatet kastades
+    // dessutom bort i en tom catch, så en alltid misslyckande sändning såg ut
+    // som en lyckad i månader. `_internal_business_id` som skickades med
+    // konsumerades aldrig av rutten — en verkningslös lösning på problemet.
     //
-    // KÄND BEGRÄNSNING: rutten kräver getAuthenticatedBusiness och det här är ett
-    // serveranrop utan session, så den svarar 401. `_internal_business_id`
-    // konsumeras inte av rutten — fältet var en verkningslös lösning på just det
-    // problemet. Anropet ligger kvar för att intentionen ska vara synlig och för
-    // att det börjar fungera den dag rutten får en server-till-server-väg. Men
-    // det får inte längre PÅSTÅ något: misslyckas det förblir fakturan ett utkast
-    // och hantverkaren får veta det.
+    // Fixen: sändkärnan (lib/invoices/send-invoice.ts, samma kod som den
+    // manuella sändningen använder) flyttades ut ur rutten och anropas här
+    // DIREKT med servicerollens supabase-klient som redan finns i scope.
+    // Inget nätverksanrop, ingen session behövs — och resultatet LÄSES:
+    // misslyckas sändningen förblir fakturan ett utkast och hantverkaren
+    // får veta det, precis som innan.
     let levererad = false
     if (autoSend && customer?.email) {
       try {
-        const res = await fetch(`${appUrl}/api/invoices/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            invoice_id: invoice.invoice_id,
-            send_email: true,
-            send_sms: !!customer.phone_number,
-          }),
+        const sendResult = await sendInvoice(supabase, {
+          businessId,
+          invoiceId: invoice.invoice_id,
+          sendEmail: true,
+          sendSms: !!customer.phone_number,
         })
-        levererad = res.ok
-        if (!res.ok) {
-          console.error('[auto-invoice] sändningen nekades:', res.status, {
+        levererad = Boolean(sendResult.email || sendResult.sms)
+        if (!levererad) {
+          console.error('[auto-invoice] sändningen nekades:', sendResult.errors, {
             invoice_id: invoice.invoice_id,
             project_id: projectId,
           })

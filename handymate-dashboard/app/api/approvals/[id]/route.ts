@@ -21,6 +21,13 @@ import { normalizeDueDateIso } from '@/lib/customer-facts/build-card'
 
 export const dynamic = 'force-dynamic'
 
+// completeProject → autoInvoiceOnComplete kan nu (Etapp Q, TD-86) skicka
+// fakturan på riktigt inline (sendInvoice, Chromium-PDF via
+// buildInvoicePdfBuffer) via four_eyes_project_close-godkännandet — samma
+// anledning som invoices/send/route.ts behöver 30s.
+export const runtime = 'nodejs'
+export const maxDuration = 30
+
 /**
  * POST /api/approvals/[id]
  * Body: { action: 'approve' | 'reject' }
