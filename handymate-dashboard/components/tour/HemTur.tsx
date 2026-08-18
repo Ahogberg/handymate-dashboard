@@ -48,15 +48,18 @@ const BASE_STEPS: HemTurStep[] = [
     placement: 'bottom',
   },
   {
-    id: 'hemtur-pengar',
-    title: 'Pengar just nu',
-    body: 'Här ser du läget på pengarna som väntar in — Karin bevakar dem åt dig.',
-    placement: 'bottom',
-  },
-  {
     id: 'hemtur-team',
     title: 'Det här sköter teamet',
     body: 'Medan du jobbar håller de ögonen på fakturor, offerter och projekt.',
+    placement: 'top',
+  },
+  // Pengar-stoppet ligger EFTER teamet sedan 2026-08-18 — sektionen
+  // flyttades ned i JarvisHome (den knuffade agentlistan utanför
+  // no-scroll) och turen följer sidans verkliga ordning.
+  {
+    id: 'hemtur-pengar',
+    title: 'Pengar just nu',
+    body: 'Här ser du läget på pengarna som väntar in — Karin bevakar dem åt dig.',
     placement: 'top',
   },
   {

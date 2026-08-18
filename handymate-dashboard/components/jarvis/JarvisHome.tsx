@@ -1300,12 +1300,34 @@ export default function JarvisHome({
             </div>
           )}
 
-          {/* ── Pengar just nu (designkontraktet, fråga 2) — NYTT band.
+          {/* ── Det här sköter teamet (designkontraktet, fråga 3) —
+              bevakningen (TeamBevakning) och dygnsdigesten under SAMMA
+              rubrik, inte två sektioner. ── */}
+          <div className="flex items-baseline gap-2 mt-6 mb-2.5">
+            <h2 className="m-0 font-heading text-[15px] font-semibold text-slate-900">Det här sköter teamet</h2>
+            <span className="text-xs text-slate-400">Ingen åtgärd behövs — bara läget</span>
+          </div>
+
+          {/* Dygnsdigesten — 24 h rullande fönster, grindarna i
+              lib/jarvis/dygnsdigest.ts. Lyft ur sin hopfällda undanskymdhet
+              till home/SkottUtanDig (Etapp C3): auto-raderna som synlig
+              checklista, hela listan bakom "Visa alla". Samma dygnsRader
+              som förut — EN sanning, ingen andra hämtning. */}
+          <SkottUtanDig rader={dygnsRader} />
+
+          {/* data-tour-target: Hemturens andra stopp. */}
+          <div data-tour-target="hemtur-team">
+            <TeamBevakning rader={bevakning} kompakt={beslut >= 2} fynd={fynd} />
+          </div>
+
+          {/* ── Pengar just nu — flyttad NED under teamet (Andreas
+              2026-08-18: bandet knuffade agentlistan utanför no-scroll;
+              heron bär redan kronsumman och /dashboard/pengar detaljerna).
               /api/dashboard/pengar är ägargrindad (403 för anställda); ett
               uteblivet svar utelämnar sektionen helt och tyst, samma regel
               som kalenderwidgeten. ── */}
           {(pengarData || revenueRecoveryCases.length > 0 || revenueRecoveryError) && (
-            // data-tour-target: Hemturens andra stopp — hoppas över
+            // data-tour-target: Hemturens tredje stopp — hoppas över
             // automatiskt om sektionen inte renderas (ingen pengarData).
             <div data-tour-target="hemtur-pengar">
               <div className="flex items-baseline gap-2 mt-6 mb-2.5">
@@ -1322,26 +1344,6 @@ export default function JarvisHome({
               )}
             </div>
           )}
-
-          {/* ── Det här sköter teamet (designkontraktet, fråga 3) —
-              bevakningen (TeamBevakning) och dygnsdigesten under SAMMA
-              rubrik, inte två sektioner. ── */}
-          <div className="flex items-baseline gap-2 mt-6 mb-2.5">
-            <h2 className="m-0 font-heading text-[15px] font-semibold text-slate-900">Det här sköter teamet</h2>
-            <span className="text-xs text-slate-400">Ingen åtgärd behövs — bara läget</span>
-          </div>
-
-          {/* Dygnsdigesten — 24 h rullande fönster, grindarna i
-              lib/jarvis/dygnsdigest.ts. Lyft ur sin hopfällda undanskymdhet
-              till home/SkottUtanDig (Etapp C3): auto-raderna som synlig
-              checklista, hela listan bakom "Visa alla". Samma dygnsRader
-              som förut — EN sanning, ingen andra hämtning. */}
-          <SkottUtanDig rader={dygnsRader} />
-
-          {/* data-tour-target: Hemturens tredje stopp. */}
-          <div data-tour-target="hemtur-team">
-            <TeamBevakning rader={bevakning} kompakt={beslut >= 2} fynd={fynd} />
-          </div>
 
           {/* ── Värt att veta ── */}
           {vardAttVetaRader.length > 0 && (

@@ -165,7 +165,10 @@ test.describe('profilbilderna når fram', () => {
 test.describe('designkontraktet — fyra frågor, i ordning (Matte Command Center, 2026-08-12)', () => {
   const home = fs.readFileSync(path.join(ROOT, 'components/jarvis/JarvisHome.tsx'), 'utf8')
 
-  test('rubrikerna står i exakt denna ordning: beslut, pengar, team, kvitto', () => {
+  test('rubrikerna står i exakt denna ordning: beslut, team, pengar, kvitto', () => {
+    // Reviderad ordning 2026-08-18 (Andreas): Pengar just nu flyttad NED
+    // under teamet — bandet knuffade agentlistan utanför no-scroll, och
+    // heron bär redan kronsumman.
     const beslut = home.indexOf('Det här behöver dig idag')
     const pengar = home.indexOf('Pengar just nu')
     const team = home.indexOf('Det här sköter teamet')
@@ -173,9 +176,9 @@ test.describe('designkontraktet — fyra frågor, i ordning (Matte Command Cente
     for (const [namn, pos] of [['beslut', beslut], ['pengar', pengar], ['team', team], ['kvitto', kvitto]] as const) {
       expect(pos, `${namn}-rubriken saknas`).toBeGreaterThan(-1)
     }
-    expect(beslut).toBeLessThan(pengar)
-    expect(pengar).toBeLessThan(team)
-    expect(team).toBeLessThan(kvitto)
+    expect(beslut).toBeLessThan(team)
+    expect(team).toBeLessThan(pengar)
+    expect(pengar).toBeLessThan(kvitto)
   })
 
   test('Pengar just nu renderas bara vid ett ok-svar från /api/dashboard/pengar', () => {

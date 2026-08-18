@@ -72,8 +72,10 @@ test.describe('fem stopp, tre möjliga att auto-hoppa', () => {
     const arr = s.slice(arrStart, arrEnd)
     const ids = arr.match(/id: '([a-z-]+)'/g) || []
     expect(ids).toHaveLength(5)
+    // Ordning reviderad 2026-08-18: pengar-stoppet EFTER team-stoppet —
+    // turen följer sidans verkliga ordning (sektionen flyttades ned).
     expect(ids.map(m => m.replace(/id: '|'/g, ''))).toEqual([
-      'hemtur-attn', 'hemtur-pengar', 'hemtur-team', 'hemtur-mote', 'hemtur-skriv',
+      'hemtur-attn', 'hemtur-team', 'hemtur-pengar', 'hemtur-mote', 'hemtur-skriv',
     ])
   })
 
@@ -109,7 +111,7 @@ test.describe('fem stopp, tre möjliga att auto-hoppa', () => {
     expect(s).toContain('json?.headline?.text')
     // Fallback-kroppen i BASE_STEPS ska inte vara tom — annars visas
     // ingenting om ägargrinden (403) slår till.
-    const base = s.slice(s.indexOf("id: 'hemtur-pengar'"), s.indexOf("id: 'hemtur-team'"))
+    const base = s.slice(s.indexOf("id: 'hemtur-pengar'"), s.indexOf("id: 'hemtur-mote'"))
     expect(base).toMatch(/body: '.+'/)
   })
 })
