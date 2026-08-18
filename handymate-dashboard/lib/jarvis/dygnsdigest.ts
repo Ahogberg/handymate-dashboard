@@ -54,8 +54,15 @@ export function byggDygnsdigest(input: {
   /** Aggregat ur team-activity: samtal senaste dygnet + hur många som blev bokade besök. */
   samtal?: { antal: number; bokade: number } | null
   nu: Date
+  /**
+   * Owner Absence V1 (Etapp Å, lib/absence/franvarorapport.ts) — valfri
+   * explicit fönsterstart som ERSÄTTER DIGEST_TIMMAR-bakåträkningen. Utan
+   * detta fält (alla befintliga anrop) är beteendet exakt oförändrat:
+   * "senaste dygnet" räknat bakåt från `nu`.
+   */
+  from?: Date
 }): DigestRad[] {
-  const sedan = input.nu.getTime() - DIGEST_TIMMAR * 3_600_000
+  const sedan = input.from ? input.from.getTime() : input.nu.getTime() - DIGEST_TIMMAR * 3_600_000
 
   const rader: DigestRad[] = input.aktiviteter
     .filter(a => {

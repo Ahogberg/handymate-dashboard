@@ -65,6 +65,7 @@ import { FuelWarningCard } from '@/components/jarvis/FuelWarningCard'
 import { ReaktiveringsInsikt, type ReaktiveringsSignal } from '@/components/jarvis/ReaktiveringsInsikt'
 import { useFuel } from '@/components/fuel/FuelProvider'
 import { MatteHero } from '@/components/jarvis/home/MatteHero'
+import { AbsenceBand } from '@/components/jarvis/home/AbsenceBand'
 import { Uppdragsrad } from '@/components/jarvis/home/Uppdragsrad'
 import type { MissionSuggestion } from '@/lib/mission/suggestions'
 import { SkottUtanDig } from '@/components/jarvis/home/SkottUtanDig'
@@ -1059,6 +1060,10 @@ export default function JarvisHome({
             // härdning): 403 på ägare/admin-grindade uppdragsrutter döljer
             // bandet helt, aldrig en evig skelettrad för anställda.
             uppdragBand={missionSurfaceAllowed ? <Uppdragsrad suggestions={missionSuggestions} /> : null}
+            // Owner Absence V1 (Etapp Å) — AbsenceBand sköter sin egen
+            // hämtning/403-degradering (samma tålighetsmönster som
+            // Uppdragsrad), så den monteras ovillkorligt här.
+            absenceBand={<AbsenceBand />}
           />
         </div>
 

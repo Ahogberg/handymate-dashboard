@@ -3,6 +3,9 @@ import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { sendEmail } from '@/lib/email'
 import { resolveCostCapUsd } from '@/lib/agents/shared/cost-guard'
+import { getAbsenceWindow, isAbsenceActive } from '@/lib/absence/absence-window'
+import { classifyAbsenceEvent } from '@/lib/absence/escalation'
+import { sendApprovalPush } from '@/lib/notifications/approval-push'
 
 /**
  * GET/POST /api/cron/driftlarm
@@ -134,6 +137,7 @@ async function runDriftlarm() {
 
   // 3. billing_event
   let billing: SweepOutcome = EMPTY
+  let billingRows: Array<{ business_id: string; data: any; created_at: string }> = []
   try {
     let q = supabase
       .from('billing_event')
@@ -144,6 +148,7 @@ async function runDriftlarm() {
     const { data, error } = await q
     if (error) throw error
     const list = data || []
+    billingRows = list
     billing = {
       ok: true,
       count: list.length,
@@ -160,6 +165,7 @@ async function runDriftlarm() {
 
   // 4. automation_activity
   let automation: SweepOutcome = EMPTY
+  let automationRows: Array<{ business_id: string; automation_type: string; action: string; description: string | null; created_at: string }> = []
   try {
     let q = supabase
       .from('automation_activity')
@@ -170,6 +176,7 @@ async function runDriftlarm() {
     const { data, error } = await q
     if (error) throw error
     const list = data || []
+    automationRows = list
     automation = {
       ok: true,
       count: list.length,
@@ -182,6 +189,69 @@ async function runDriftlarm() {
   } catch (err) {
     console.error('[driftlarm] automation_activity-svepet kraschade:', err)
     brokenSweeps.push('Automationer')
+  }
+
+  // 6. Owner Absence V1 (Etapp Å) — driftlarmet mejlar historiskt BARA ops.
+  // Under ett AKTIVT frånvarofönster (lib/absence/absence-window.ts) ska
+  // eskaleringsklassade fel även pusha ägaren, via BEFINTLIGA push-vägen
+  // (sendApprovalPush → /api/push/send) — ingen ny kanal. Ops-mejlet ovan
+  // fortsätter helt oförändrat. Utanför ett aktivt fönster (normalfallet)
+  // görs INGA extra anrop här — beteendet är byte-för-byte som innan detta
+  // steg lades till. Klassningen (classifyAbsenceEvent) är samma auktoritet
+  // push-strypunkten själv använder — driftlarmet gissar inte, det taggar
+  // bara resultatet av samma klassare i det syntetiska kortets payload
+  // (sendApprovalPush verifierar taggen mot samma slutna lista igen).
+  try {
+    const checkedBusinessIds = new Map<string, boolean>()
+    const absenceActiveFor = async (businessId: string): Promise<boolean> => {
+      if (checkedBusinessIds.has(businessId)) return checkedBusinessIds.get(businessId)!
+      let active = false
+      try {
+        const window = await getAbsenceWindow(businessId)
+        active = isAbsenceActive(window, new Date())
+      } catch (err) {
+        console.error('[driftlarm] frånvarokontroll kraschade för', businessId, '(fail-closed, ingen extra push):', err)
+      }
+      checkedBusinessIds.set(businessId, active)
+      return active
+    }
+
+    for (const row of billingRows) {
+      if (!(await absenceActiveFor(row.business_id))) continue
+      const cls = classifyAbsenceEvent({ kind: 'billing_event', eventType: 'payment_failed' })
+      if (cls === 'samlas') continue
+      const amountDue = row.data?.amount_due
+      void sendApprovalPush({
+        business_id: row.business_id,
+        approval_type: 'payment_failed_signal',
+        risk_level: 'high',
+        payload: {
+          escalation_class: cls,
+          amount_due: typeof amountDue === 'number' ? amountDue : null,
+        },
+      })
+    }
+
+    for (const row of automationRows) {
+      if (!(await absenceActiveFor(row.business_id))) continue
+      const cls = classifyAbsenceEvent({ kind: 'automation_activity', status: 'failed' })
+      if (cls === 'samlas') continue
+      void sendApprovalPush({
+        business_id: row.business_id,
+        approval_type: 'external_delivery_failure_signal',
+        risk_level: 'high',
+        payload: {
+          escalation_class: cls,
+          automation_type: row.automation_type,
+          action: row.action,
+          description: row.description,
+        },
+      })
+    }
+  } catch (err) {
+    // Fail-safe: ägar-pushen under frånvaro är ett TILLÄGG — en trasig
+    // väg här får aldrig hindra ops-mejlet nedan från att skickas.
+    console.error('[driftlarm] frånvaro-ägarpush-steget kraschade (fail-safe, ops-mejlet skickas ändå):', err)
   }
 
   // 5. Användningssignal — INTE ett fel-svep (se filhuvudet). Summerar

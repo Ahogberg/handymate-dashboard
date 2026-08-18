@@ -15,11 +15,20 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { getAbsenceWindow, isAbsenceActive } from '@/lib/absence/absence-window'
+import { classifyAbsenceEvent } from '@/lib/absence/escalation'
 
 interface ApprovalLike {
   business_id: string
   approval_type: string
   payload?: Record<string, unknown> | null
+  /**
+   * Owner Absence V1 (Etapp Å) — samma fält pending_approvals-raden redan
+   * bär. Saknas den (äldre call-sites som bygger ett syntetiskt objekt utan
+   * risk_level) tolkas som "ingen känd risknivå", ALDRIG som 'high' —
+   * fail-closed mot att INTE eskalera, aldrig mot att pusha för mycket.
+   */
+  risk_level?: string | null
   /**
    * Etapp 4 (multi-employee-parity-plan.md) — business_users.id (INTE en
    * auth-uuid) för vem pushen ska riktas mot specifikt, om caller vet det
@@ -168,6 +177,30 @@ function buildPushTemplate(
       }
     }
 
+    case 'payment_failed_signal': {
+      // Owner Absence V1 (Etapp Å) — driftlarmets syntetiska ägar-push
+      // under ett aktivt frånvarofönster (app/api/cron/driftlarm/route.ts).
+      // Skapar ALDRIG en pending_approvals-rad; ops-mejlet är sanningen,
+      // det här är bara en extra notis medan ägaren är borta.
+      const amountDue = payload.amount_due
+      const amountText = typeof amountDue === 'number' ? ` (${(amountDue / 100).toLocaleString('sv-SE')} kr)` : ''
+      return {
+        title: `Betalning misslyckades${amountText}`,
+        body: 'En kunds betalning gick inte igenom — det här kan inte vänta till du är tillbaka.',
+        url: '/dashboard',
+      }
+    }
+
+    case 'external_delivery_failure_signal': {
+      // Owner Absence V1 (Etapp Å) — se payment_failed_signal ovan.
+      const beskrivning = truncate(payload.description || `${payload.automation_type || ''}/${payload.action || ''}`, 90)
+      return {
+        title: 'Något gick inte fram medan du var borta',
+        body: beskrivning || 'En automatisk åtgärd misslyckades',
+        url: '/dashboard',
+      }
+    }
+
     case 'monday_brief': {
       // Måndagsmötet (2026-08-13) — url pekar på startsidan, inte
       // godkännande-listan: JarvisHomes egen auto-öppningsgrind
@@ -221,6 +254,18 @@ export async function resolveTargetUserId(businessUserId?: string | null): Promi
  * Kan också anropas direkt med ett "syntetiskt" approval-objekt för
  * events som INTE skapar pending_approval-rad (t.ex. quote_signed —
  * kunden behöver veta men inte agera).
+ *
+ * ═══ OWNER ABSENCE V1 (Etapp Å) — DEN ENDA STRYPPUNKTEN ═══
+ *
+ * sendApprovalPush är den EN chokepoint alla pushar redan går igenom (varje
+ * call-site i huset anropar den här, aldrig /api/push/send direkt för en
+ * approval). Under ett aktivt frånvarofönster (lib/absence/absence-window.ts)
+ * släpps ENDAST eskaleringsklassade händelser igenom (lib/absence/
+ * escalation.ts classifyAbsenceEvent) — övriga pushar undertrycks HÄR.
+ * Approval-raden/köandet är redan gjort av anroparen INNAN detta anrop och
+ * rörs inte — bara själva push-notisen hålls tillbaka. Utan ett aktivt
+ * fönster (den överväldigande majoriteten av anrop) är beteendet exakt
+ * oförändrat: en extra, snabb (fail-open) läsning, sedan samma väg som idag.
  */
 export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
   const payload = (approval.payload || {}) as Record<string, any>
@@ -229,6 +274,29 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
   if (!template) {
     console.warn('[approval-push] no template for approval_type:', approval.approval_type)
     return
+  }
+
+  try {
+    const window = await getAbsenceWindow(approval.business_id)
+    if (isAbsenceActive(window, new Date())) {
+      const cls = classifyAbsenceEvent({
+        kind: 'pending_approval',
+        approvalType: approval.approval_type,
+        riskLevel: approval.risk_level ?? null,
+        payload,
+      })
+      if (cls === 'samlas') {
+        // Undertryckt, inte tappad — kortet ligger kvar precis som vanligt
+        // i pending_approvals/kön. Bara pushen hålls tillbaka.
+        return
+      }
+    }
+  } catch (err) {
+    // Fail-open mot AVSAKNAD av frånvarofönster (dvs. dagens beteende) —
+    // en trasig frånvaro-läsning får aldrig blockera en push som annars
+    // skulle gått iväg. (Motsatsen — fail-closed mot ATT ge mer behörighet
+    // — gäller inte här: push är inte en exekveringsväg.)
+    console.error('[approval-push] frånvarokontrollen kastade (fail-open, pushar som vanligt):', err)
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'

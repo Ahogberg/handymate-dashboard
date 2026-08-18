@@ -522,6 +522,14 @@ async function sendAutoReminders() {
           invoice_number: inv.invoice_number,
           days_overdue: daysOverdue,
           delivery: deliveryInput,
+          // Owner Absence V1 (Etapp Å) — taggar ENDAST kort som annars hade
+          // skickats autonomt men stoppades av beloppstaket (inte "aldrig
+          // förtjänat autonomi"). lib/absence/escalation.ts klassar detta
+          // som autonomy_cap_refusal: en riktig policyavvikelse som ska
+          // synas i återkomstrapportens "behöver beslut" (lib/absence/
+          // franvarorapport.ts), och gate:a en framtida push för typen om
+          // en sådan någonsin kopplas in. Ingen ny rad, ingen ny tabell.
+          ...(capExceeded ? { cap_exceeded: true } : {}),
         },
         status: 'pending',
         risk_level: 'medium',

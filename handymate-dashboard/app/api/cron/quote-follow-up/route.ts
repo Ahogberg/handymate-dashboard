@@ -223,6 +223,12 @@ export async function GET(request: NextRequest) {
               autonomy_key: 'quote_followup_sms',
               agent_id: 'daniel',
               amount_kr: amountRaw,
+              // Owner Absence V1 (Etapp Å) — se motsvarande kommentar i
+              // app/api/cron/send-reminders/route.ts: taggar ENDAST kort
+              // som stoppades av beloppstaket, inte "aldrig förtjänat
+              // autonomi". Feeder lib/absence/escalation.ts
+              // autonomy_cap_refusal-klassen.
+              ...(capExceeded ? { cap_exceeded: true } : {}),
             },
             status: 'pending',
             risk_level: 'medium',

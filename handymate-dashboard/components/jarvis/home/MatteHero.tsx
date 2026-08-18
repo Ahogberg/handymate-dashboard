@@ -67,6 +67,7 @@ export function MatteHero({
   bevis,
   autoCount,
   uppdragBand,
+  absenceBand,
 }: {
   greetingName: string
   queueLoaded: boolean
@@ -85,6 +86,13 @@ export function MatteHero({
    * false i JarvisHome för anställda utan ägare/admin-behörighet).
    */
   uppdragBand?: React.ReactNode
+  /**
+   * Owner Absence V1 (Etapp Å) — samma slot-mönster som uppdragBand: en
+   * snabbknapp/statusrad för frånvaroläget. Komponenten (AbsenceBand) sköter
+   * sin egen hämtning/behörighetsdegradering, heron vet bara att rendera
+   * det den får. `null`/`undefined` döljer bandet helt.
+   */
+  absenceBand?: React.ReactNode
 }) {
   const { mission, progress, loading: missionLoading } = useMission()
   const missionActive = mission != null && mission.status === 'active'
@@ -242,6 +250,12 @@ export function MatteHero({
       {uppdragBand && (
         <div className="border-t border-white/10 pt-4">
           {uppdragBand}
+        </div>
+      )}
+
+      {absenceBand && (
+        <div className="border-t border-white/10 pt-4">
+          {absenceBand}
         </div>
       )}
     </section>

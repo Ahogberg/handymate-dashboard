@@ -41,6 +41,9 @@ export interface AutomationSettings {
   // Auto-approve
   auto_approve_enabled: boolean
   auto_approve_config: Record<string, any>
+  // Owner Absence V1 (Etapp Å, sql/v153_owner_absence.sql) — se
+  // lib/absence/absence-window.ts. NULL = aldrig satt / migration ej körd.
+  owner_absence: { from: string; to: string; set_by: string | null; set_at: string } | null
 }
 
 const DEFAULT_SETTINGS: Omit<AutomationSettings, 'id' | 'business_id'> = {
@@ -79,6 +82,7 @@ const DEFAULT_SETTINGS: Omit<AutomationSettings, 'id' | 'business_id'> = {
     quote:           { enabled: false, min_confidence: 100, daily_limit: 0, risk: 'high' },
     other:           { enabled: false, min_confidence: 100, daily_limit: 0, risk: 'high' },
   },
+  owner_absence: null,
 }
 
 export async function getAutomationSettings(businessId: string): Promise<AutomationSettings> {

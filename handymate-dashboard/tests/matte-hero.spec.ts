@@ -84,3 +84,18 @@ test.describe('JarvisHome.tsx — Uppdragsrad flyttad in i heron som band (Etapp
     expect(occurrences.length).toBe(1)
   })
 })
+
+test.describe('MatteHero — absenceBand-slot (Owner Absence V1, Etapp Å)', () => {
+  test('tar emot absenceBand som slot-prop, samma mönster som uppdragBand', () => {
+    expect(heroSrc).toContain('absenceBand')
+    const uppdragBlock = heroSrc.slice(heroSrc.indexOf('{uppdragBand &&'), heroSrc.indexOf('{uppdragBand &&') + 200)
+    const absenceBlock = heroSrc.slice(heroSrc.indexOf('{absenceBand &&'), heroSrc.indexOf('{absenceBand &&') + 200)
+    expect(uppdragBlock).toContain("border-t border-white/10 pt-4")
+    expect(absenceBlock).toContain("border-t border-white/10 pt-4")
+  })
+
+  test('JarvisHome monterar AbsenceBand ovillkorligt (komponenten sköter sin egen 401/403-degradering)', () => {
+    expect(homeSrc).toContain("import { AbsenceBand } from '@/components/jarvis/home/AbsenceBand'")
+    expect(homeSrc).toContain('absenceBand={<AbsenceBand />}')
+  })
+})

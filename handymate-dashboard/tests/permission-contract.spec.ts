@@ -336,6 +336,19 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
     },
   ],
 
+  'Frånvaroläge (Etapp Å)': [
+    {
+      route: 'absence',
+      requires: 'owner-admin',
+      why: 'Sätter/avslutar frånvarofönstret som styr vilka pushar hela teamet undertrycker — en styrande policy för företaget, aldrig något en anställd ska kunna sätta åt ägaren. Etapp Å, 2026-08-18.',
+    },
+    {
+      route: 'absence/report',
+      requires: 'owner-admin',
+      why: 'Återkomstrapporten läser kön och aktivitetsloggen brett (vad teamet gjort/misslyckats med under hela frånvaron) — samma känslighet som mission/history. Etapp Å, 2026-08-18.',
+    },
+  ],
+
   'Integrationer': [
     {
       route: 'integrations/fortnox/disconnect',
