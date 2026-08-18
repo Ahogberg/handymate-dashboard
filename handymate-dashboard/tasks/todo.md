@@ -93,6 +93,54 @@ service-samtycke. Inget nytt utskick — bara data + en publik länk.
 
 ## Approvals-UI
 - [x] app/dashboard/approvals/page.tsx — TYPE_CONFIG-post + särskild gren för
+
+---
+
+# Etapp L1 — Paketeringens sanningsbuggar (2026-08-18)
+
+Bugfixar/konsolidering under launch freeze, inga nya funktioner, inga nya
+priser/copy-beslut. 10 verifierade fynd, alla åtgärdade.
+
+- [x] app/dashboard/settings/billing/page.tsx — läste billing.plan.status/
+      trialEndsAt/currentPeriodEnd som aldrig fanns i /api/billing-svaret
+      (plan/subscription/trial). BillingData-interfacet skrivet om mot
+      faktiskt API-svar; lokal PLANS-priskonstant ersatt med
+      getPlanPrice/getPlanLabel.
+- [x] app/dashboard/settings/page.tsx:~4347 — `currentPlan === 'Professional'`
+      matchade aldrig lowercase-DB-värdet → visade alltid 2 495 kr. Bytt till
+      useBusinessPlan().plan + getPlanPrice/getPlanLabel. (Sido-notering: den
+      lokala SMSUsageWidget-komponenten i samma fil, rad ~241/243, har samma
+      casing-bugg mot egna hårdkodade SMS-siffror som redan avviker från
+      SMS_QUOTAS — INTE fixad, utanför de 10 fynden, flaggad separat.)
+- [x] components/UpgradeModal.tsx + app/dashboard/agent/page.tsx:~1457 —
+      hårdkodat "Professional — 5 995 kr/mån" ersatt med
+      getPlanLabel('professional')/getPlanPrice('professional').
+- [x] app/dashboard/marketing/leads/page.tsx — villkorlig return före
+      useEffect (Rules of Hooks-brott) flyttad till efter alla hooks,
+      tillsammans med addon-gaten.
+- [x] lib/feature-gates.ts hasFeature() — fail-closed på okänd nyckel
+      (var fail-open). Alla callsites grep-verifierade mot FEATURE_GATES,
+      se tests/feature-gates-fail-closed.spec.ts för facit-listan.
+- [x] app/api/agent/trigger/route.ts — TEAM_AGENTS_ALLOWED upprätthålls nu
+      server-side (isAgentAllowed) för externt (cookie-)autentiserade anrop.
+      internalSecret-anrop (webhooks/crons/agent_handoff) undantagna
+      medvetet — Lisa svarar på inkommande samtal/SMS på alla planer.
+- [x] app/onboarding/components/StepPayment.tsx — död komponent (ingen
+      importerar den, verifierat), raderad.
+- [x] lib/feature-gates.ts — gate-tabellens team_members/users-limit (var
+      3/25/∞) alignad till USER_LIMITS (3/5/∞), kommentar om att USER_LIMITS
+      är kanonisk.
+- [x] app/api/team/invite/route.ts:~54 — defaultplan vid saknad DB-rad
+      ändrad 'professional' → 'starter', konsekvent med lib/auth.ts,
+      lib/get-plan.ts, lib/useBusinessPlan.ts.
+- [x] Prishårdkodningar konsoliderade till getPlanPrice:
+      app/onboarding/components/Step5Activate.tsx (Firman/Storfirman-kort),
+      app/api/admin/metrics/route.ts (PLAN_PRICES-fallback).
+
+Verifiering: nya tester tests/feature-gates-fail-closed.spec.ts +
+tests/team-agent-gate.spec.ts (grönt, 108/108 tillsammans med befintliga
+td52-gating/agent-team-spec), `npx tsc --noEmit` 0 fel, `npx next build` 0.
+
       'jobbpass_proposal' (länk till ägar-ytan i st f rakt godkänn, samma
       mönster som project_debrief), "Hoppa över" avvisar
 

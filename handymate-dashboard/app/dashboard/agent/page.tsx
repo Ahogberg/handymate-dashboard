@@ -38,7 +38,7 @@ import ReactMarkdown from 'react-markdown'
 import SavedScoreboard from '@/components/dashboard/SavedScoreboard'
 import EarnedAutonomyPanel from '@/components/dashboard/EarnedAutonomyPanel'
 import { useBusiness } from '@/lib/BusinessContext'
-import { isAgentAllowed, type PlanType } from '@/lib/feature-gates'
+import { isAgentAllowed, getPlanLabel, getPlanPrice, type PlanType } from '@/lib/feature-gates'
 import MatteChatModal from '@/components/MatteChatModal'
 import AgentMemoriesModal from '@/components/AgentMemoriesModal'
 import { TEAM, type TeamAgent } from '@/lib/agents/team'
@@ -1449,12 +1449,12 @@ export default function AgentDashboardPage() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowTeamUpgrade(false)}>
           <div className="bg-white rounded-xl max-w-sm w-full p-6 text-center" onClick={e => e.stopPropagation()}>
             <div className="text-4xl mb-4">⚡</div>
-            <h2 className="text-xl font-semibold mb-2">Uppgradera till Professional</h2>
+            <h2 className="text-xl font-semibold mb-2">Uppgradera till {getPlanLabel('professional')}</h2>
             <p className="text-gray-500 mb-6">
-              Karin, Hanna, Daniel och Lars ingår i Professional-planen. Uppgradera för att låsa upp hela backoffice-teamet.
+              Karin, Hanna, Daniel och Lars ingår i {getPlanLabel('professional')}-planen. Uppgradera för att låsa upp hela backoffice-teamet.
             </p>
             <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-              <div className="font-medium">Professional — 5 995 kr/mån</div>
+              <div className="font-medium">{getPlanLabel('professional')} — {getPlanPrice('professional').toLocaleString('sv-SE')} kr/mån</div>
               <ul className="text-sm text-gray-500 mt-2 space-y-1">
                 <li>✓ Hela teamet (5 AI-medarbetare)</li>
                 <li>✓ 300 SMS/mån</li>

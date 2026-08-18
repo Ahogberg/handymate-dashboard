@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react'
 import Link from 'next/link'
+import { getPlanLabel, getPlanPrice } from '@/lib/feature-gates'
 
 interface UpgradeModalProps {
   feature: string
@@ -9,6 +10,8 @@ interface UpgradeModalProps {
 }
 
 export function UpgradeModal({ feature, onClose }: UpgradeModalProps) {
+  const upgradeLabel = getPlanLabel('professional')
+  const upgradePrice = getPlanPrice('professional').toLocaleString('sv-SE')
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -25,14 +28,14 @@ export function UpgradeModal({ feature, onClose }: UpgradeModalProps) {
 
           <div className="text-4xl mb-4">⚡</div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            Uppgradera till Professional
+            Uppgradera till {upgradeLabel}
           </h2>
           <p className="text-gray-500 mb-6">
-            {feature} ingår obegränsat i Professional-planen.
+            {feature} ingår obegränsat i {upgradeLabel}-planen.
           </p>
 
           <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
-            <div className="font-semibold text-gray-900">Professional — 5 995 kr/mån</div>
+            <div className="font-semibold text-gray-900">{upgradeLabel} — {upgradePrice} kr/mån</div>
             <ul className="text-sm text-gray-500 mt-3 space-y-1.5">
               <li>✓ Obegränsade offertmallar</li>
               <li>✓ Obegränsade lead-källor</li>

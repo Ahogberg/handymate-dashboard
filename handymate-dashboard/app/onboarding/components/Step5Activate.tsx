@@ -5,6 +5,7 @@ import { ArrowRight, Check, Info, Loader2, Shield } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import InfoSheet from './InfoSheet'
 import { TEAM } from '@/lib/agents/team'
+import { getPlanPrice } from '@/lib/feature-gates'
 import type { OnboardingFormData } from '../types-redesign'
 
 /**
@@ -28,7 +29,7 @@ const PLANS = [
   {
     id: 'professional',
     name: 'Firman',
-    price: 5995,
+    price: getPlanPrice('professional'),
     popular: true,
     agents: ['lisa', 'karin', 'daniel', 'hanna', 'lars', 'matte'],
     // Utfall, inte funktioner (Andreas-beslut 2026-08-09): varje rad svarar
@@ -53,7 +54,7 @@ const PLANS = [
   {
     id: 'business',
     name: 'Storfirman',
-    price: 11995,
+    price: getPlanPrice('business'),
     popular: false,
     agents: ['lisa', 'karin', 'daniel', 'hanna', 'lars', 'matte'],
     features: ['Allt i Firman', 'Obegränsade användare', 'Större utrymme för SMS & utskick', 'Egen hemsida med SEO', 'Dedikerad support'],

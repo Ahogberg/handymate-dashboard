@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdmin, getAdminSupabase } from '@/lib/admin-auth'
+import { getPlanPrice } from '@/lib/feature-gates'
 
+// Fallback om billing_plan-tabellen saknar en rad för plan_id — konsoliderat
+// till getPlanPrice (L1, 2026-08-18) så priset aldrig kan gå isär från
+// lib/feature-gates.ts, den kanoniska källan.
 const PLAN_PRICES: Record<string, number> = {
-  starter: 2495,
-  professional: 5995,
-  business: 11995,
+  starter: getPlanPrice('starter'),
+  professional: getPlanPrice('professional'),
+  business: getPlanPrice('business'),
 }
 
 /**

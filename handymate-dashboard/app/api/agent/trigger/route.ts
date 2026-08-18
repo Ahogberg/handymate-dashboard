@@ -22,6 +22,7 @@ import {
   type ToolOutcome,
 } from '@/lib/agent/orchestration'
 import { isValidAgentId, type AgentId } from '@/lib/agent/capabilities'
+import { isAgentAllowed, type PlanType } from '@/lib/feature-gates'
 
 // Central AI agent endpoint — handles ALL inbound triggers:
 // - Manual (dashboard), phone_call (46elks/Vapi), incoming_sms, cron
@@ -344,6 +345,27 @@ export async function POST(request: NextRequest) {
 
     // Route to specialist agent
     const agentId = body.agent_id || routeToAgent(trigger_type, trigger_data?.cron_type || trigger_data?.event_name)
+
+    // Team-agent-gate (L1, 2026-08-18): app/dashboard/agent/page.tsx grindar
+    // vilka medarbetare en kund kan öppna via isAgentAllowed(plan, agent.id)
+    // — men den grinden var bara klient-sidan. En starter-kund som når den
+    // här rutten direkt med sin egen cookie-session (förbi UI:t) kunde
+    // tidigare köra t.ex. Karin eller Hanna trots att planen bara ger Matte.
+    //
+    // internalSecret-anrop (46elks-webhooks, crons, agent_handoff mellan
+    // våra egna körningar) undantas medvetet: Lisa svarar redan på inkommande
+    // samtal/SMS åt ALLA planer (AI-telefonassistenten ingår överallt) och
+    // interna handoffs är vår egen orkestrering, inte en kundstyrd genväg
+    // runt planlåset.
+    if (!internalSecret) {
+      const plan = (guardConfig?.subscription_plan || 'starter') as PlanType
+      if (!isAgentAllowed(plan, agentId)) {
+        return NextResponse.json(
+          { error: 'Den här medarbetaren ingår inte i din plan. Uppgradera för att låsa upp hela teamet.' },
+          { status: 403 }
+        )
+      }
+    }
 
     // Etapp T — källmärkt "hur jobbar den här firman"-kontrakt. Fail-soft:
     // ett laddningsfel får aldrig fälla agent-turen, bara utebli ur prompten.

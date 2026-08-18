@@ -20,6 +20,7 @@ import {
   Receipt
 } from 'lucide-react'
 import { FuelBillingCard } from '@/components/fuel/FuelBillingCard'
+import { getPlanPrice, getPlanLabel, type PlanType } from '@/lib/feature-gates'
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 }).format(amount)
@@ -34,19 +35,38 @@ const formatShortDate = (dateStr: string) => {
   return d.toLocaleDateString('sv-SE', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
+// Matchar den faktiska formen från GET /api/billing (app/api/billing/route.ts).
+// Komponenten läste tidigare billing.plan.status/price/trialEndsAt/
+// currentPeriodEnd — fält som aldrig fanns i svaret. Statusen visade därför
+// alltid fallback-värdet "Aktiv", trial/förnyelsedatum renderades aldrig, och
+// priset föll alltid tillbaka på den lokala PLANS-konstanten.
 interface BillingData {
   plan: {
     /** plan_id från billing_plan (starter/professional/business) — stabil
         nyckel för matchning; name är visningsnamn och kan bytas fritt. */
     id?: string
     name: string
-    status: 'active' | 'trialing' | 'past_due' | 'cancelled'
-    trialEndsAt: string | null
-    currentPeriodStart: string
-    currentPeriodEnd: string
-    price: number
+    price_sek: number
+    features?: unknown
+    limits?: unknown
   }
-  history: Array<{
+  subscription: {
+    status: 'active' | 'trialing' | 'past_due' | 'cancelled' | string
+    stripe_customer_id: string | null
+    stripe_subscription_id: string | null
+    period_start: string | null
+    period_end: string | null
+  }
+  trial: {
+    is_trialing: boolean
+    ends_at: string | null
+    days_left: number
+  }
+  // OBS: API:et returnerar inget history-fält idag — fältet är kvar här så
+  // att UI:t har ett säkert fallback-läge ("Ingen betalningshistorik ännu")
+  // istället för att krascha, men listan blir alltid tom tills en riktig
+  // källa kopplas på. Utanför den här etappens scope.
+  history?: Array<{
     id: string
     date: string
     type: string
@@ -58,8 +78,8 @@ interface BillingData {
 const PLANS = [
   {
     id: 'starter',
-    name: 'Bas',
-    price: 2495,
+    name: getPlanLabel('starter'),
+    price: getPlanPrice('starter'),
     features: [
       '50 SMS/mån (0,89 kr/extra)',
       '100 samtal/mån',
@@ -77,8 +97,8 @@ const PLANS = [
   },
   {
     id: 'professional',
-    name: 'Firman',
-    price: 5995,
+    name: getPlanLabel('professional'),
+    price: getPlanPrice('professional'),
     features: [
       '300 SMS/mån (0,79 kr/extra)',
       '400 samtal/mån',
@@ -96,8 +116,8 @@ const PLANS = [
   },
   {
     id: 'business',
-    name: 'Storfirman',
-    price: 11995,
+    name: getPlanLabel('business'),
+    price: getPlanPrice('business'),
     features: [
       '1 000 SMS/mån (0,69 kr/extra)',
       'Obegränsade samtal',
@@ -231,13 +251,13 @@ export default function BillingPage() {
 
   // Matcha på plan_id (stabil nyckel) — inte på visningsnamnet, som numera
   // kan skilja mellan DB (billing_plan.name) och koden under namnbyten.
-  const currentPlanId = billing?.plan?.id || 'starter'
+  const currentPlanId = (billing?.plan?.id || 'starter') as PlanType
   const currentPlan = PLANS.find((p) => p.id === currentPlanId)
-  const trialDaysLeft =
-    billing?.plan?.status === 'trialing' && billing.plan.trialEndsAt
-      ? Math.max(0, Math.ceil((new Date(billing.plan.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-      : null
-  const status = getStatusLabel(billing?.plan?.status || 'active')
+  // Läses ur API:ets faktiska svarsform (subscription/trial) — inte
+  // billing.plan, som aldrig bar dessa fält.
+  const trialDaysLeft = billing?.trial?.is_trialing ? billing.trial.days_left : null
+  const status = getStatusLabel(billing?.subscription?.status || 'active')
+  const planPrice = billing?.plan?.price_sek ?? getPlanPrice(currentPlanId)
 
   return (
     <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
@@ -269,7 +289,7 @@ export default function BillingPage() {
             {/* ===== CURRENT PLAN CARD ===== */}
             <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
               {/* Past due warning banner */}
-              {billing?.plan?.status === 'past_due' && (
+              {billing?.subscription?.status === 'past_due' && (
                 <div className="bg-red-50 border-b border-red-200 px-6 py-4 flex items-center gap-3">
                   <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
                   <div>
@@ -289,28 +309,28 @@ export default function BillingPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-3 flex-wrap">
-                        <h2 className="text-xl font-bold text-gray-900">{currentPlan?.name || billing?.plan?.name || 'Bas'}</h2>
+                        <h2 className="text-xl font-bold text-gray-900">{currentPlan?.name || billing?.plan?.name || getPlanLabel('starter')}</h2>
                         <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${status.className}`}>
                           {status.text}
                         </span>
                       </div>
-                      {billing?.plan?.status === 'trialing' && trialDaysLeft !== null && (
+                      {billing?.subscription?.status === 'trialing' && trialDaysLeft !== null && (
                         <div className="flex items-center gap-2 mt-2">
                           <Clock className="w-4 h-4 text-amber-500" />
                           <p className="text-amber-600 text-sm font-medium">
                             Provperioden avslutas om {trialDaysLeft} {trialDaysLeft === 1 ? 'dag' : 'dagar'}
-                            {billing.plan.trialEndsAt && (
-                              <span className="text-gray-400 font-normal"> ({formatDate(billing.plan.trialEndsAt)})</span>
+                            {billing?.trial?.ends_at && (
+                              <span className="text-gray-400 font-normal"> ({formatDate(billing.trial.ends_at)})</span>
                             )}
                           </p>
                         </div>
                       )}
-                      {billing?.plan?.status === 'active' && billing.plan.currentPeriodEnd && (
+                      {billing?.subscription?.status === 'active' && billing.subscription.period_end && (
                         <p className="text-gray-500 text-sm mt-1">
-                          Fornyelse: {formatDate(billing.plan.currentPeriodEnd)}
+                          Fornyelse: {formatDate(billing.subscription.period_end)}
                         </p>
                       )}
-                      {billing?.plan?.status === 'cancelled' && (
+                      {billing?.subscription?.status === 'cancelled' && (
                         <p className="text-gray-500 text-sm mt-1">
                           Prenumerationen ar avslutad
                         </p>
@@ -320,7 +340,7 @@ export default function BillingPage() {
 
                   <div className="flex items-center gap-3">
                     <div className="text-right mr-2">
-                      <p className="text-2xl font-bold text-gray-900">{formatCurrency(billing?.plan?.price || currentPlan?.price || 2495)}</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatCurrency(planPrice)}</p>
                       <p className="text-xs text-gray-400">per manad</p>
                     </div>
                     <button
@@ -347,10 +367,10 @@ export default function BillingPage() {
                   <BarChart3 className="w-5 h-5 text-gray-700" />
                   <h2 className="text-lg font-semibold text-gray-900">Anvandning</h2>
                 </div>
-                {billing?.plan?.currentPeriodStart && billing?.plan?.currentPeriodEnd && (
+                {billing?.subscription?.period_start && billing?.subscription?.period_end && (
                   <p className="text-xs text-gray-400">
-                    Aktuell period: {formatShortDate(billing.plan.currentPeriodStart)} &ndash;{' '}
-                    {formatShortDate(billing.plan.currentPeriodEnd)}
+                    Aktuell period: {formatShortDate(billing.subscription.period_start)} &ndash;{' '}
+                    {formatShortDate(billing.subscription.period_end)}
                   </p>
                 )}
               </div>

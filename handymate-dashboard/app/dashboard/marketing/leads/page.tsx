@@ -39,11 +39,6 @@ export default function LeadsOutboundPage() {
   const [hasLogo, setHasLogo] = useState(true)
   const [hasAddon, setHasAddon] = useState(false)
 
-  // Feature gate
-  if (!hasFeature('leads_outbound')) {
-    return <UpgradePrompt featureKey="leads_outbound" />
-  }
-
   useEffect(() => {
     checkAddon()
     fetchLeads()
@@ -149,6 +144,13 @@ export default function LeadsOutboundPage() {
   }
 
   useEffect(() => { fetchLeads() }, [statusFilter])
+
+  // Feature gate — måste komma EFTER alla hooks ovan (Rules of Hooks). Ett
+  // villkorligt return före useEffect kraschade komponenten vid planbyte,
+  // eftersom hooks då kallades i olika ordning mellan renderingar.
+  if (!hasFeature('leads_outbound')) {
+    return <UpgradePrompt featureKey="leads_outbound" />
+  }
 
   // Addon gate — visa upgrade-sida
   if (!hasAddon && !loading) {

@@ -150,17 +150,22 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     plans: ['starter', 'professional', 'business'],
     limit: { starter: 10, professional: 50, business: null },
   },
+  // team_members/users limit-fälten här var 3/25/∞ — i strid med USER_LIMITS
+  // (3/5/∞) ovan, som är den siffra app/api/team/invite/route.ts faktiskt
+  // upprätthåller. USER_LIMITS är kanonisk; dessa två gate-poster är bara
+  // beskrivande metadata (t.ex. för getFeatureLimit-callsites) och hålls
+  // synkade med den hädanefter — ändra USER_LIMITS, inte här.
   team_members: {
     key: 'team_members',
     name: 'Teammedlemmar',
     plans: ['starter', 'professional', 'business'],
-    limit: { starter: 3, professional: 25, business: null },
+    limit: { starter: 3, professional: 5, business: null },
   },
   users: {
     key: 'users',
     name: 'Användare',
     plans: ['starter', 'professional', 'business'],
-    limit: { starter: 3, professional: 25, business: null },
+    limit: { starter: 3, professional: 5, business: null },
   },
   call_volume: {
     key: 'call_volume',
@@ -342,7 +347,11 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
 
 export function hasFeature(plan: PlanType, featureKey: string): boolean {
   const gate = FEATURE_GATES[featureKey]
-  if (!gate) return true
+  // Fail-closed (L1, 2026-08): en okänd/felstavad nyckel nekade tidigare
+  // ALDRIG åtkomst (fail-open) — en bortglömd gate-post öppnade tyst en
+  // betalfunktion för alla planer. Varje callsite är grep-verifierad mot
+  // FEATURE_GATES (se tasks/todo.md, L1) innan detta byttes.
+  if (!gate) return false
   return gate.plans.includes(plan)
 }
 

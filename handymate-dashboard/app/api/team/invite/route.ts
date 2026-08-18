@@ -45,13 +45,16 @@ export async function POST(request: NextRequest) {
      * Beskedet säger vägen framåt i stället för bara nej.
      */
     // Planen finns inte på auth-objektet — slå upp den. Saknad/okänd plan
-    // faller till professional (5), aldrig till obegränsat.
+    // faller till starter (3) — samma konservativa fallback som lib/auth.ts,
+    // lib/get-plan.ts och lib/useBusinessPlan.ts. Fallet till 'professional'
+    // (5) var inkonsekvent med resten av kodbasen och gav ett osant tak om
+    // uppslaget misslyckades, aldrig till obegränsat.
     const { data: planRad } = await supabase
       .from('business_config')
       .select('subscription_plan')
       .eq('business_id', business.business_id)
       .single()
-    const anvandartak = getUserLimit((planRad?.subscription_plan as PlanType) || 'professional')
+    const anvandartak = getUserLimit((planRad?.subscription_plan as PlanType) || 'starter')
     if (anvandartak !== null) {
       const { count: aktiva } = await supabase
         .from('business_users')

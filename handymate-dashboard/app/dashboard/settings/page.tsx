@@ -46,6 +46,7 @@ import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useBusinessPlan } from '@/lib/useBusinessPlan'
+import { getPlanPrice, getPlanLabel } from '@/lib/feature-gates'
 import { isLaunchHidden, launchGateForPath } from '@/lib/launch-visibility'
 import { visibleAreas, allEntries } from '@/lib/settings/areas'
 import { SettingsHub, SettingsAreaView } from '@/components/settings/SettingsHub'
@@ -344,7 +345,7 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
 export default function SettingsPage() {
   const business = useBusiness()
   const { isOwnerOrAdmin } = useCurrentUser()
-  const { hasFeature: canAccess } = useBusinessPlan()
+  const { hasFeature: canAccess, plan: businessPlan } = useBusinessPlan()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -1501,7 +1502,11 @@ export default function SettingsPage() {
     router.replace('/dashboard/settings', { scroll: false })
   }
 
-  const currentPlan = config.subscription_plan || 'Starter'
+  // businessPlan (från useBusinessPlan) är alltid gemener ('starter'/
+  // 'professional'/'business') — currentPlan jämfördes tidigare mot
+  // kapitaliserade strängar ('Professional'/'Business') som aldrig matchade,
+  // så priset visade alltid Bas-priset oavsett faktisk plan.
+  const currentPlanLabel = getPlanLabel(businessPlan)
 
   return (
     <PermissionGate permission="manage_settings">
@@ -4334,7 +4339,7 @@ export default function SettingsPage() {
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gradient-to-r from-primary-700/10 to-primary-600/10 border border-[#E2E8F0] rounded-xl mb-4 gap-4">
                 <div>
-                  <p className="text-gray-900 font-semibold text-lg">{currentPlan}</p>
+                  <p className="text-gray-900 font-semibold text-lg">{currentPlanLabel}</p>
                   <p className="text-gray-500 text-sm">
                     {config.subscription_status === 'trial' && trialDaysLeft !== null
                       ? `Provperiod - ${trialDaysLeft} dagar kvar`
@@ -4344,7 +4349,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="sm:text-right">
                   <p className="text-2xl font-bold text-gray-900">
-                    {currentPlan === 'Professional' ? '5 995' : currentPlan === 'Business' ? '11 995' : '2 495'}
+                    {getPlanPrice(businessPlan).toLocaleString('sv-SE')}
                   </p>
                   <p className="text-gray-400 text-sm">kr/mån</p>
                 </div>
@@ -4379,7 +4384,7 @@ export default function SettingsPage() {
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">SMS-användning denna månad</h2>
 
-              <SMSUsageWidget businessId={business.business_id} plan={currentPlan} />
+              <SMSUsageWidget businessId={business.business_id} plan={businessPlan} />
             </div>
 
             {/* Referral */}
