@@ -52,98 +52,36 @@
 
 import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import {
-  AUTONOMY_META,
-  DEFAULT_AUTONOMY_CAPS,
-  type AutonomyKey,
-} from '@/lib/autonomy/earned-autonomy'
+import { DEFAULT_AUTONOMY_CAPS } from '@/lib/autonomy/earned-autonomy'
 import type { ValidatedMissionStep } from '@/lib/mission/plan-validation'
 import { svDateStr } from '@/lib/dates'
 import { arSchemaSaknas } from '@/lib/observability/driftlarm'
+import {
+  MANDATE_ALLOWED_TYPES,
+  isMandateActionType,
+  mandateAllowlistMatchesAutonomyAllowlist,
+  MANDATE_TARGET_LIST_KEY as TARGET_LIST_KEY,
+  type MandateActionType,
+  type MandateTargets,
+  type MandateStatus,
+  type MandateRow,
+} from './types'
 
 // ─────────────────────────────────────────────────────────────────
-// ALLOWLIST-speglingen — den ENDA utbyggnadspunkten (se filhuvudets
-// "Vägen till fullständighet" i planen). MandateActionType ÄR AutonomyKey,
-// ingen egen parallell union — så indexering mot DEFAULT_AUTONOMY_CAPS/
-// autonomyKeyFromApproval/isAllowlistedKey kräver aldrig en cast.
+// ALLOWLIST-speglingen + rad-/målformerna lever i ./types.ts (INGEN
+// node:crypto-import där — se filhuvudet på types.ts) och re-exporteras
+// härifrån oförändrat, så varje befintlig `from './mission-mandate'`/
+// `from '../lib/mandates/mission-mandate'`-import fortsätter fungera exakt
+// som förut.
 // ─────────────────────────────────────────────────────────────────
 
-export const MANDATE_ALLOWED_TYPES = [
-  'invoice_reminder', 'booking_reminder', 'quote_followup_sms', 'review_request',
-] as const
-
-export type MandateActionType = AutonomyKey
-
-// Kompilatorbevis: om MANDATE_ALLOWED_TYPES och AutonomyKey någonsin driver
-// isär (ny typ läggs till i den ena men inte den andra) slutar filen
-// kompilera — INNAN någon körning når skillnaden. Facit-testet i
-// tests/mission-mandate.spec.ts lägger en runtime-låsning ovanpå detta.
-type _MandateTypesSubsetOfAllowlist = (typeof MANDATE_ALLOWED_TYPES)[number] extends AutonomyKey ? true : never
-type _AllowlistSubsetOfMandateTypes = AutonomyKey extends (typeof MANDATE_ALLOWED_TYPES)[number] ? true : never
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _mandateAllowlistLock: [_MandateTypesSubsetOfAllowlist, _AllowlistSubsetOfMandateTypes] = [true, true]
-
-function isMandateActionType(v: unknown): v is MandateActionType {
-  return typeof v === 'string' && (MANDATE_ALLOWED_TYPES as readonly string[]).includes(v)
-}
-
-/** Exporterad för facit-testet: körtids-mängdlikhet mot AUTONOMY_META (vars
-    nycklar TypeScript redan tvingar att exakt vara AutonomyKey-domänen). */
-export function mandateAllowlistMatchesAutonomyAllowlist(): boolean {
-  const a = [...MANDATE_ALLOWED_TYPES].sort()
-  const b = Object.keys(AUTONOMY_META).sort()
-  return a.length === b.length && a.every((v, i) => v === b[i])
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Målens namngivna listor. Tre av de fyra typerna har en direkt motsvarande
-// entitet (faktura/offert/bokning); review_request-kort skapas mot ett
-// AVSLUTAT PROJEKT (se app/api/cron/review-requests/route.ts — customer_id
-// löses ur project_id), därför project_ids för den typen. Detta är den
-// här modulens EGNA designval för TS-lagret ovanpå den generiska JSONB-
-// kolumnen i sql/v150 — Etapp X:s skapande-UI och Etapp W:s callers ska
-// följa exakt denna mappning.
-// ─────────────────────────────────────────────────────────────────
-
-export interface MandateTargets {
-  invoice_ids?: string[]
-  quote_ids?: string[]
-  booking_ids?: string[]
-  project_ids?: string[]
-}
-
-const TARGET_LIST_KEY: Record<MandateActionType, keyof MandateTargets> = {
-  invoice_reminder: 'invoice_ids',
-  quote_followup_sms: 'quote_ids',
-  booking_reminder: 'booking_ids',
-  review_request: 'project_ids',
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Rad-typen — mirrorar sql/v150_mission_mandate.sql kolumn för kolumn.
-// ─────────────────────────────────────────────────────────────────
-
-export type MandateStatus = 'active' | 'paused' | 'revoked' | 'expired' | 'completed'
-
-export interface MandateRow {
-  id: string
-  business_id: string
-  mission_id: string
-  plan_hash: string
-  allowed_action_types: MandateActionType[]
-  targets: MandateTargets
-  daily_cap: number
-  total_cap: number
-  amount_cap_kr: number | null
-  /** DATE-kolumn — 'YYYY-MM-DD' (kan komma som fullt ISO-datum från vissa
-      klienter; all jämförelse här sker via .slice(0, 10)). */
-  expires_at: string
-  status: MandateStatus
-  pause_reason: string | null
-  created_by: string | null
-  created_at: string
-  revoked_at: string | null
-  paused_at: string | null
+export {
+  MANDATE_ALLOWED_TYPES,
+  mandateAllowlistMatchesAutonomyAllowlist,
+  type MandateActionType,
+  type MandateTargets,
+  type MandateStatus,
+  type MandateRow,
 }
 
 // ─────────────────────────────────────────────────────────────────

@@ -33,8 +33,10 @@
  * meningslös summa.
  */
 
-import type { MandateActionType, MandateRow } from './mission-mandate'
-import { MANDATE_ALLOWED_TYPES } from './mission-mandate'
+// Värde-importen (MANDATE_ALLOWED_TYPES) hämtas ur ./types, inte
+// ./mission-mandate (som drar in node:crypto) — samma skäl som lib/mandates/
+// create.ts, se lib/mandates/types.ts:s filhuvud.
+import { MANDATE_ALLOWED_TYPES, type MandateActionType, type MandateRow } from './types'
 import { autonomyKeyFromApproval } from '@/lib/autonomy/earned-autonomy'
 
 const STOPP_WINDOW_MS = 7 * 24 * 3600_000

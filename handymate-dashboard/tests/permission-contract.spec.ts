@@ -329,6 +329,11 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       requires: 'owner-admin',
       why: 'Uppdragshistorik + verifierat betalt per uppdrag + Mission Learning-rader — samma finansiella känslighet som mission/active. Etapp H, 2026-08-17.',
     },
+    {
+      route: 'mission/[id]/mandate',
+      requires: 'owner-admin',
+      why: 'Ger teamet rätt att agera autonomt inom kronor/antal-gränser utan ett kort per handling — en styrande delegeringshandling (POST/PATCH), inte en läsning. Får aldrig kunna skapas eller återkallas av en anställd. Etapp X, 2026-08-18.',
+    },
   ],
 
   'Integrationer': [

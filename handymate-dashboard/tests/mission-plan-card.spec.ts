@@ -162,6 +162,36 @@ test.describe('MissionPlanCard — rendering', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────
+// 4. Etapp X — Mission Mandates V1: länken till mandatdialogen
+// ─────────────────────────────────────────────────────────────────────────
+
+test.describe('MissionPlanCard — onOpenPanel (Etapp X)', () => {
+  test('confirmed-läget, onOpenPanel given → visar EN länkrad som öppnar uppdragspanelen', () => {
+    const markup = renderToStaticMarkup(
+      createElement(MissionPlanCard, { presentation: presentationWithTwoKrClasses('confirmed'), onOpenPanel: () => {} }),
+    )
+    expect(markup).toContain('uppdragspanelen')
+  })
+
+  test('confirmed-läget, ingen onOpenPanel given → ingen länk renderas (ingen krasch)', () => {
+    const markup = renderToStaticMarkup(createElement(MissionPlanCard, { presentation: presentationWithTwoKrClasses('confirmed') }))
+    expect(markup).not.toContain('uppdragspanelen')
+  })
+
+  test('proposal-läget renderar aldrig länken, även med onOpenPanel given (mandat gäller bara ett STARTAT uppdrag)', () => {
+    const markup = renderToStaticMarkup(
+      createElement(MissionPlanCard, { presentation: presentationWithTwoKrClasses('proposal'), onOpenPanel: () => {} }),
+    )
+    expect(markup).not.toContain('uppdragspanelen')
+  })
+
+  test('källskanning: mandat skapas ALDRIG i chatt-kortet — ingen fetch/nätverksanrop i den här filen alls', () => {
+    const src = read('components/agents/MissionPlanCard.tsx')
+    expect(src).not.toContain('fetch(')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────
 // 3. Källskanning — inga klassöverskridande summeringsoperationer
 // ─────────────────────────────────────────────────────────────────────────
 

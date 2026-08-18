@@ -86,6 +86,10 @@ import { byggMissionFacit, listMissionFacit, type MissionFacit } from '@/lib/mis
 import { byggLearningRows } from '@/lib/mission/mission-learning'
 import { getNextCustomerNumber } from '@/lib/numbering'
 import { svDateStr, svDateStrPlusDays } from '@/lib/dates'
+// Mission Mandates V1 (Etapp X) — RIKTIGA funktionerna, mot sql/v150.
+import { computePlanHash, mandateCovers, deriveMandateUsage, type MandateRow } from '@/lib/mandates/mission-mandate'
+import { loadMandateResolutionCache, resolveMandateForAction } from '@/lib/mandates/resolve'
+import { loadMandateFacit } from '@/lib/mandates/load-mandate-facit'
 
 // ── Rapport — egen fil, samma jsonl-append-mönster som flywheel.spec.ts,
 // egen katalog så ingen annan harness-rapport skrivs över. ─────────────────
@@ -130,12 +134,16 @@ const ids: {
   missionId: string | null
   approvalId: string | null
   failedApprovalId: string | null
+  mandateId: string | null
+  mandateApprovalId: string | null
 } = {
   customerId: null,
   invoiceId: null,
   missionId: null,
   approvalId: null,
   failedApprovalId: null,
+  mandateId: null,
+  mandateApprovalId: null,
 }
 
 /** Samma stations-wrapper som flywheel.spec.ts — bokför + kastar vidare,
@@ -175,6 +183,8 @@ test.describe.serial('Mission-beviset — Mission Control-lyckovägen mot riktig
     }
 
     try {
+      if (ids.mandateApprovalId) await del('pending_approvals', 'id', ids.mandateApprovalId)
+      if (ids.mandateId) await del('mission_mandate', 'id', ids.mandateId)
       if (ids.approvalId) await del('pending_approvals', 'id', ids.approvalId)
       if (ids.failedApprovalId) await del('pending_approvals', 'id', ids.failedApprovalId)
       if (ids.missionId) await del('mission', 'id', ids.missionId)
@@ -182,14 +192,23 @@ test.describe.serial('Mission-beviset — Mission Control-lyckovägen mot riktig
       if (ids.customerId) await del('customer', 'customer_id', ids.customerId)
 
       // ── Verifiering: NOLL rader kvar med körningens markörer. ──────────
-      if (ids.approvalId || ids.failedApprovalId) {
-        const trackedApprovalIds = [ids.approvalId, ids.failedApprovalId].filter((v): v is string => !!v)
+      if (ids.approvalId || ids.failedApprovalId || ids.mandateApprovalId) {
+        const trackedApprovalIds = [ids.approvalId, ids.failedApprovalId, ids.mandateApprovalId].filter((v): v is string => !!v)
         const { data: cardsLeft, error: cardsErr } = await supabase
           .from('pending_approvals')
           .select('id')
           .in('id', trackedApprovalIds)
         if (cardsErr) leftover.push(`pending_approvals-räkningen: ${cardsErr.message}`)
         if ((cardsLeft || []).length > 0) leftover.push(`${(cardsLeft || []).length} pending_approvals-rader kvar`)
+      }
+      if (ids.mandateId) {
+        const { data: mandateLeft, error: mandateErr } = await supabase
+          .from('mission_mandate')
+          .select('id')
+          .eq('id', ids.mandateId)
+        // 42P01 (v150 aldrig körd — stationen skippades då) är INTE ett städningsfel.
+        if (mandateErr && mandateErr.code !== '42P01') leftover.push(`mission_mandate-räkningen: ${mandateErr.message}`)
+        if ((mandateLeft || []).length > 0) leftover.push(`mission_mandate-raden ${ids.mandateId} kvar`)
       }
       if (ids.missionId) {
         const { data: missionLeft, error: missionErr } = await supabase
@@ -602,5 +621,186 @@ test.describe.serial('Mission-beviset — Mission Control-lyckovägen mot riktig
 
       return `misslyckat kort ${ids.failedApprovalId}: karin.kunde_inte_verifieras=${karin.kunde_inte_verifieras}, slutgap_kr oförändrat (${facit.slutgap_kr})`
     })
+  })
+
+  test('Station 8 — Mandatstationen (Mission Mandates V1, Etapp X, kräver sql/v150)', async () => {
+    // ── Station-0-idiomet, men med SKIP i stället för FAIL: v150 är EN NY,
+    // manuellt körd migration (till skillnad från v144/145/146 som Station 0
+    // gatar hårt) — dess frånvaro är ett väntat, ofarligt läge i miljöer som
+    // inte hunnit köra den, inte ett produktionsfel. Se planens explicita
+    // instruktion: "skip-with-clear-message on 42P01".
+    const supabase = getSupabaseAdmin()
+    const probe = await supabase.from('mission_mandate').select('id').limit(0)
+    if (probe.error?.code === '42P01') {
+      pushResult({
+        station: '8',
+        steg: 'mission_mandate-grinden (sql/v150)',
+        bevis: '',
+        verdict: 'SKIP',
+        detalj:
+          'mission_mandate-tabellen SAKNAS — sql/v150_mission_mandate.sql är inte körd i den här miljön. ' +
+          'FIX: kör sql/v150_mission_mandate.sql i Supabase SQL Editor och kör om testet för att bevisa mandatstationen.',
+      })
+      return
+    }
+
+    // Mandatet gäller det uppdrag Station 3 skapade — kräver att det uppdraget
+    // fortfarande finns (körs allra sist, efter mission redan avslutats i
+    // Station 6; det påverkar inte mandatlogiken, se stationens kommentar).
+    if (!ids.missionId || !ids.invoiceId) {
+      throw new Error('Station 8 kräver ids.missionId/ids.invoiceId från Station 1-3 — kunde inte köras isolerat')
+    }
+
+    const mission = await assertRow<MissionRow>('mission', { id: ids.missionId }, 'uppdraget (för plan_hash)')
+    const steps = mission.plan_snapshot?.steps ?? []
+    const planHash = computePlanHash(steps)
+    ids.mandateId = `mnd_mp_${RUN_TS}`
+
+    await station('8a', 'Mandatrad skapas direkt (service client), giltig för fakturans invoice_reminder-steg', async () => {
+      const nowIso = new Date().toISOString()
+      const { error } = await supabase.from('mission_mandate').insert({
+        id: ids.mandateId,
+        business_id: DEMO_BUSINESS_ID,
+        mission_id: ids.missionId,
+        plan_hash: planHash,
+        allowed_action_types: ['invoice_reminder'],
+        targets: { invoice_ids: [ids.invoiceId] },
+        daily_cap: 5,
+        total_cap: 20,
+        amount_cap_kr: null,
+        expires_at: svDateStrPlusDays(30),
+        status: 'active',
+        created_at: nowIso,
+      })
+      if (error) throw new Error(`Kunde inte skapa mandatraden: ${error.message}`)
+      const row = await assertRow<MandateRow>('mission_mandate', { id: ids.mandateId }, 'den nya mandatraden')
+      if (row.status !== 'active') throw new Error(`Mandatet skapades men status är "${row.status}", väntade "active"`)
+      return `mandat ${ids.mandateId} skapat, plan_hash=${planHash.slice(0, 16)}…, mål=[${ids.invoiceId}]`
+    })
+
+    await station(
+      '8b',
+      'resolveMandateForAction (RIKTIGA caller-integrationen) täcker det namngivna målet',
+      async () => {
+        const cache = await loadMandateResolutionCache(supabase, DEMO_BUSINESS_ID)
+        if (!cache.mandates.some(m => m.id === ids.mandateId)) {
+          throw new Error(`loadMandateResolutionCache hittade inte det nyss skapade mandatet ${ids.mandateId}`)
+        }
+        const result = await resolveMandateForAction(supabase, DEMO_BUSINESS_ID, cache, {
+          actionKey: 'invoice_reminder',
+          targetRef: ids.invoiceId!,
+          amountKr: 5000,
+          nowIso: new Date().toISOString(),
+        })
+        if (!result.covered) throw new Error(`Väntade covered:true för det namngivna målet, fick: ${JSON.stringify(result)}`)
+        if (result.mandate.id !== ids.mandateId) throw new Error(`Fel mandat matchade: ${result.mandate.id}`)
+        return `resolveMandateForAction → covered:true, mandate.id=${result.mandate.id}`
+      },
+    )
+
+    await station('8c', 'mandateCovers avvisar ett FRÄMMANDE mål med orsaken mal_utanfor', async () => {
+      const mandateRow = await assertRow<MandateRow>('mission_mandate', { id: ids.mandateId }, 'mandatet')
+      const result = mandateCovers(mandateRow, {
+        actionKey: 'invoice_reminder',
+        targetRef: `mp_frammande_faktura_${RUN_TS}`,
+        amountKr: 5000,
+        nowIso: new Date().toISOString(),
+        dailyUsed: 0,
+        totalUsed: 0,
+      })
+      if (result.covered || result.reason !== 'mal_utanfor') {
+        throw new Error(`Väntade { covered:false, reason:'mal_utanfor' }, fick: ${JSON.stringify(result)}`)
+      }
+      return `mandateCovers(främmande mål) → covered:false, reason=${result.reason}`
+    })
+
+    await station('8d', 'over-cap-simulering: deriveMandateUsage → totalUsed når total_cap → mandateCovers avvisar (totaltak)', async () => {
+      const mandateRow = await assertRow<MandateRow>('mission_mandate', { id: ids.mandateId }, 'mandatet')
+      const nowIso = new Date().toISOString()
+      // 20 syntetiska godkända mandat-kort, utspridda över flera dagar så
+      // dailyUsed hålls under daily_cap (5) medan totalUsed når total_cap (20)
+      // — renodlad in-memory-simulering, precis som planen ber om
+      // ("over-cap simulation via deriveMandateUsage inputs").
+      const syntheticCards = Array.from({ length: 20 }, (_, i) => ({
+        created_at: svDateStrPlusDays(-(i + 1)) + 'T08:00:00.000Z',
+        payload: { mandate_id: mandateRow.id },
+        status: 'auto_approved',
+      }))
+      const usage = deriveMandateUsage(syntheticCards, nowIso)
+      if (usage.totalUsed !== 20) throw new Error(`deriveMandateUsage gav totalUsed=${usage.totalUsed}, väntade 20`)
+      const result = mandateCovers(mandateRow, {
+        actionKey: 'invoice_reminder',
+        targetRef: ids.invoiceId!,
+        amountKr: 5000,
+        nowIso,
+        dailyUsed: usage.dailyUsed,
+        totalUsed: usage.totalUsed,
+      })
+      if (result.covered || result.reason !== 'totaltak') {
+        throw new Error(`Väntade { covered:false, reason:'totaltak' } vid totalUsed=20/total_cap=20, fick: ${JSON.stringify(result)}`)
+      }
+      return `deriveMandateUsage(20 syntetiska kort) → totalUsed=20, dailyUsed=${usage.dailyUsed}; mandateCovers → reason=totaltak`
+    })
+
+    await station('8e', 'återkallelse (riktig DB-skrivning) → mandateCovers avvisar med aterkallat', async () => {
+      const { error } = await supabase
+        .from('mission_mandate')
+        .update({ status: 'revoked', revoked_at: new Date().toISOString() })
+        .eq('id', ids.mandateId)
+        .eq('business_id', DEMO_BUSINESS_ID)
+      if (error) throw new Error(`Kunde inte återkalla mandatet: ${error.message}`)
+      const revoked = await assertRow<MandateRow>('mission_mandate', { id: ids.mandateId }, 'det återkallade mandatet')
+      if (revoked.status !== 'revoked') throw new Error(`Väntade status='revoked' efter uppdateringen, fick '${revoked.status}'`)
+      const result = mandateCovers(revoked, {
+        actionKey: 'invoice_reminder',
+        targetRef: ids.invoiceId!,
+        amountKr: 5000,
+        nowIso: new Date().toISOString(),
+        dailyUsed: 0,
+        totalUsed: 0,
+      })
+      if (result.covered || result.reason !== 'aterkallat') {
+        throw new Error(`Väntade { covered:false, reason:'aterkallat' } efter återkallelse, fick: ${JSON.stringify(result)}`)
+      }
+      return `mission_mandate.status='revoked' verifierat via SELECT; mandateCovers → reason=${result.reason}`
+    })
+
+    await station(
+      '8f',
+      'ett stämplat mandat-kort + loadMandateFacit (RIKTIGA I/O-vägen) → 1 utförd',
+      async () => {
+        ids.mandateApprovalId = genId('mpmandate')
+        const { error: insertErr } = await supabase.from('pending_approvals').insert({
+          id: ids.mandateApprovalId,
+          business_id: DEMO_BUSINESS_ID,
+          approval_type: 'invoice_reminder',
+          title: `${MARKER} — mandatstämplad påminnelse`,
+          description: `Mandatstationens exekveringsbevis, körning ${RUN_TS}.`,
+          status: 'auto_approved',
+          risk_level: 'medium',
+          resolved_at: new Date().toISOString(),
+          payload: {
+            mandate_id: ids.mandateId,
+            mission_id: ids.missionId,
+            autonomy_key: 'invoice_reminder',
+            invoice_id: ids.invoiceId,
+            customer_id: ids.customerId,
+            truth_class: 'indrivningsbart',
+            execution_result: { outcome: 'success', artifacts: { invoice_id: ids.invoiceId } },
+          },
+        })
+        if (insertErr) throw new Error(`Kunde inte skapa det mandatstämplade kortet: ${insertErr.message}`)
+
+        const revokedMandate = await assertRow<MandateRow>('mission_mandate', { id: ids.mandateId }, 'mandatet (nu återkallat, facit ska ändå räkna det stämplade kortet)')
+        const facit = await loadMandateFacit(supabase, DEMO_BUSINESS_ID, revokedMandate)
+        if (!facit) throw new Error('loadMandateFacit svarade null — förväntade en riktig facit-rad')
+        const invoiceRow = facit.per_type.find(r => r.action_type === 'invoice_reminder')
+        if (!invoiceRow) throw new Error(`per_type saknar invoice_reminder helt: ${JSON.stringify(facit.per_type)}`)
+        if (invoiceRow.utforda !== 1) throw new Error(`Väntade utforda=1, fick ${invoiceRow.utforda}`)
+        if (!facit.agaraterkallelse) throw new Error('facit.agaraterkallelse ska vara true (mandatet återkallades i 8e)')
+
+        return `pending_approvals ${ids.mandateApprovalId} stämplat mandate_id=${ids.mandateId} → loadMandateFacit: utforda=${invoiceRow.utforda}, leveransfel=${invoiceRow.leveransfel}, agaraterkallelse=${facit.agaraterkallelse}`
+      },
+    )
   })
 })

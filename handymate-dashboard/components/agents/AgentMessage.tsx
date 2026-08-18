@@ -42,6 +42,7 @@ export function AgentMessage({
   children,
   onSendChat,
   onPrefill,
+  onOpenPanel,
 }: {
   message: ChatMessageLike
   index?: number
@@ -53,6 +54,8 @@ export function AgentMessage({
   onSendChat?: (text: string) => void
   /** Vidarebefordras till MissionPlanCard — "Justera"-knappen. */
   onPrefill?: (text: string) => void
+  /** Vidarebefordras till MissionPlanCard — öppnar uppdragspanelen (Etapp X). */
+  onOpenPanel?: () => void
 }) {
   const isUser = message.role === 'user'
 
@@ -102,7 +105,7 @@ export function AgentMessage({
           <BusinessScenarioCard scenario={interaction.presentation.scenario} />
         )}
         {interaction.presentation?.kind === 'mission_plan' && (
-          <MissionPlanCard presentation={interaction.presentation} onSendChat={onSendChat} onPrefill={onPrefill} />
+          <MissionPlanCard presentation={interaction.presentation} onSendChat={onSendChat} onPrefill={onPrefill} onOpenPanel={onOpenPanel} />
         )}
         {children}
         {timestamp && <Tidsstämpel iso={timestamp} />}

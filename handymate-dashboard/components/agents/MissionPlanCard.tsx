@@ -50,12 +50,18 @@ export function MissionPlanCard({
   presentation,
   onSendChat,
   onPrefill,
+  onOpenPanel,
 }: {
   presentation: MissionPlanPresentation
   /** Skickar chattmeddelandet "Starta uppdraget som föreslaget." */
   onSendChat?: (text: string) => void
   /** Förifyller chattinputen, skickar inget. */
   onPrefill?: (text: string) => void
+  /** Etapp X (Mission Mandates V1): öppnar uppdragspanelen (components/mission/
+      MissionPanel.tsx), där mandatdialogen faktiskt bor. Kortet SKAPAR aldrig
+      ett mandat självt — Matte/chatten är inte en mandatskapande yta, se
+      lib/mandates/mission-mandate.ts:s filhuvud. */
+  onOpenPanel?: () => void
 }) {
   const sections = groupStepsByClass(presentation.steps)
 
@@ -117,9 +123,20 @@ export function MissionPlanCard({
           </button>
         </div>
       ) : (
-        <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
-          ✓ Uppdraget startat — jag säger till när något behöver dig.
-        </span>
+        <div className="space-y-1.5">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
+            ✓ Uppdraget startat — jag säger till när något behöver dig.
+          </span>
+          {onOpenPanel && (
+            <button
+              type="button"
+              onClick={onOpenPanel}
+              className="block text-xs text-primary-700 hover:text-primary-800 font-medium underline underline-offset-2"
+            >
+              Vill du låta teamet genomföra inom gränser? Öppna uppdragspanelen.
+            </button>
+          )}
+        </div>
       )}
     </div>
   )

@@ -4,6 +4,8 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { getMissionProgressWithDecisions, type MissionRow } from '@/lib/mission/mission-progress'
 import { resolveGoalType } from '@/lib/mission/goal-type'
+import { loadActiveMandateForMission } from '@/lib/mandates/mission-mandate'
+import { loadMandateFacit } from '@/lib/mandates/load-mandate-facit'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,7 +106,18 @@ export async function GET(request: NextRequest) {
     // Etapp G (expansionspanelen): samma läsning som förut, bara med
     // uppdragets öppna beslut med i svaret — panelen slipper en andra fråga.
     const { progress, decisions } = await getMissionProgressWithDecisions(supabase, mission)
-    return NextResponse.json({ mission, progress, decisions })
+
+    // Etapp X (Mission Mandates V1, ägarens upplevelse): mandatet kopplat
+    // till uppdraget — OAVSETT status (panelen behöver visa pausade/
+    // återkallade mandat med rätt orsak, inte bara aktiva) — plus dess
+    // mätning (bara beräknad när ett mandat finns). Samma en-fetch-delas-
+    // princip som decisions ovan fick i Etapp G; ingen ny lazy-rutt (till
+    // skillnad från Etapp H:s historik/lärande, som INTE är knutna till
+    // just det aktiva uppdraget på samma sätt).
+    const mandate = await loadActiveMandateForMission(supabase, business.business_id, mission.id)
+    const mandateFacit = mandate ? await loadMandateFacit(supabase, business.business_id, mandate) : null
+
+    return NextResponse.json({ mission, progress, decisions, mandate, mandateFacit })
   } catch (error: any) {
     console.error('GET /api/mission/active error:', error)
     return NextResponse.json({ mission: null })

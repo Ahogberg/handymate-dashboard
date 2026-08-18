@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { MissionRow, MissionProgress, MissionDecision } from './mission-progress'
+import type { MandateRow } from '@/lib/mandates/mission-mandate'
+import type { MandateFacitResult } from '@/lib/mandates/mandate-facit'
 
 /**
  * Den globala kanalen för det aktiva uppdraget — Goal-to-Plan V1 (Etapp C,
@@ -26,12 +28,19 @@ import type { MissionRow, MissionProgress, MissionDecision } from './mission-pro
  * panelens (components/mission/MissionPanel.tsx) egna öppna/stängd-state —
  * samma delade-context-mönster som Jobbkompisens isOpen, fast för panelen
  * i stället för chattbubblan.
+ *
+ * Etapp X (Mission Mandates V1, ägarens upplevelse): `mandate`/`mandateFacit`
+ * kommer likaså ur SAMMA svar (nollor bara flyttades ut till ett eget fält
+ * i stället för att läggas till en tredje fetch) — `refresh()` uppdaterar
+ * alltså redan mandatets läge tillsammans med mission/progress/decisions.
  */
 
 interface MissionState {
   mission: MissionRow | null
   progress: MissionProgress | null
   decisions: MissionDecision[]
+  mandate: MandateRow | null
+  mandateFacit: MandateFacitResult | null
   loading: boolean
   refresh: () => void
   panelOpen: boolean
@@ -42,6 +51,8 @@ const MissionContext = createContext<MissionState>({
   mission: null,
   progress: null,
   decisions: [],
+  mandate: null,
+  mandateFacit: null,
   loading: true,
   refresh: () => {},
   panelOpen: false,
@@ -56,6 +67,8 @@ export function MissionProvider({ children }: { children: React.ReactNode }) {
   const [mission, setMission] = useState<MissionRow | null>(null)
   const [progress, setProgress] = useState<MissionProgress | null>(null)
   const [decisions, setDecisions] = useState<MissionDecision[]>([])
+  const [mandate, setMandate] = useState<MandateRow | null>(null)
+  const [mandateFacit, setMandateFacit] = useState<MandateFacitResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [tick, setTick] = useState(0)
   const [panelOpen, setPanelOpen] = useState(false)
@@ -70,6 +83,8 @@ export function MissionProvider({ children }: { children: React.ReactNode }) {
         setMission(d?.mission ?? null)
         setProgress(d?.progress ?? null)
         setDecisions(Array.isArray(d?.decisions) ? d.decisions : [])
+        setMandate(d?.mandate ?? null)
+        setMandateFacit(d?.mandateFacit ?? null)
       })
       .catch(err => console.error('[mission] kunde inte hämtas:', err))
       .finally(() => {
@@ -90,7 +105,10 @@ export function MissionProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <MissionContext.Provider
-      value={{ mission, progress, decisions, loading, refresh: () => setTick(t => t + 1), panelOpen, setPanelOpen }}
+      value={{
+        mission, progress, decisions, mandate, mandateFacit, loading,
+        refresh: () => setTick(t => t + 1), panelOpen, setPanelOpen,
+      }}
     >
       {children}
     </MissionContext.Provider>

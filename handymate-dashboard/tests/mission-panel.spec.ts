@@ -25,6 +25,9 @@ import { byggMissionProgress, type MissionRow } from '../lib/mission/mission-pro
 import { assembleOpportunityPortfolio } from '../lib/mission/opportunity-portfolio'
 import { validateMissionPlan, type MissionPlanInput } from '../lib/mission/plan-validation'
 import type { MissionFacit, AgentUtfall } from '../lib/mission/mission-facit'
+import type { MandateRow } from '../lib/mandates/mission-mandate'
+import type { MandateFacitResult } from '../lib/mandates/mandate-facit'
+import type { MandateDraft } from '../components/mission/MissionPanel'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
@@ -479,5 +482,254 @@ test.describe('Integrationspunkter', () => {
     const src = read('lib/mission/MissionProvider.tsx')
     expect(src).toContain('panelOpen')
     expect(src).toContain('setPanelOpen')
+  })
+
+  test('MissionProvider exponerar mandate/mandateFacit (Etapp X)', () => {
+    const src = read('lib/mission/MissionProvider.tsx')
+    expect(src).toContain('mandate')
+    expect(src).toContain('mandateFacit')
+  })
+
+  test('GET /api/mission/active svarar med mandate + mandateFacit i samma svar (ingen ny lazy-rutt)', () => {
+    const src = read('app/api/mission/active/route.ts')
+    expect(src).toContain('loadActiveMandateForMission')
+    expect(src).toContain('loadMandateFacit')
+    expect(src).toContain('mandate, mandateFacit')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────
+// Etapp X — Mission Mandates V1, ägarens upplevelse
+// ─────────────────────────────────────────────────────────────────────────
+
+function missionWithoutMandateEligibleSteps(): { mission: MissionRow; progress: ReturnType<typeof byggMissionProgress> } {
+  const mission: MissionRow = {
+    id: 'mis_nomandate',
+    business_id: 'biz_1',
+    goal_kr: 30000,
+    deadline: '2026-09-30',
+    status: 'active',
+    plan_snapshot: {
+      steps: [
+        {
+          item_id: 'pf_x',
+          truth_class: 'faktureringsklart',
+          title: 'Material ej fakturerat — Kök',
+          measure: { kind: 'kr', amountKr: 30000 },
+          evidence: { table: 'project', ref_id: 'proj_1' },
+          agent_key: 'karin',
+          approval_type: 'missad_intakt',
+          motivation: '',
+        },
+      ],
+    },
+    portfolio_generated_at: NOW.toISOString(),
+    created_at: NOW.toISOString(),
+    resolved_at: null,
+  }
+  const progress = byggMissionProgress({ mission, invoices: [], missionApprovals: [], quotes: [], nowMs: NOW.getTime() })
+  return { mission, progress }
+}
+
+function mandateRow(over: Partial<MandateRow> = {}): MandateRow {
+  return {
+    id: 'mnd_mis_abc123def456',
+    business_id: 'biz_1',
+    mission_id: 'mis_abc123def456',
+    plan_hash: 'mndh_v1_abc',
+    allowed_action_types: ['invoice_reminder'],
+    targets: { invoice_ids: ['inv_1'] },
+    daily_cap: 5,
+    total_cap: 20,
+    amount_cap_kr: null,
+    expires_at: '2026-09-15',
+    status: 'active',
+    pause_reason: null,
+    created_by: 'bu_1',
+    created_at: '2026-08-01T00:00:00.000Z',
+    revoked_at: null,
+    paused_at: null,
+    ...over,
+  }
+}
+
+function mandateFacitResult(over: Partial<MandateFacitResult> = {}): MandateFacitResult {
+  return {
+    mandate_id: 'mnd_mis_abc123def456',
+    per_type: [{ action_type: 'invoice_reminder', utforda: 4, leveransfel: 0, stopp_inom_7d: 0, ej_bedombart: 0 }],
+    agaraterkallelse: false,
+    pausorsaker: [],
+    ...over,
+  }
+}
+
+function mandateDraft(over: Partial<MandateDraft> = {}): MandateDraft {
+  return {
+    selectedTypes: ['invoice_reminder'],
+    daily_cap: 2,
+    total_cap: 2,
+    amount_cap_kr: '',
+    expires_at: '2026-09-30',
+    ...over,
+  }
+}
+
+test.describe('MissionPanel.tsx — källskanning (Etapp X)', () => {
+  test('innehåller rubriken "Mandat" och knappen "Låt teamet genomföra inom mina gränser"', () => {
+    expect(panelSrc).toContain('Mandat')
+    expect(panelSrc).toContain('Låt teamet genomföra inom mina gränser')
+  })
+
+  test('den ALLTID-SYNLIGA "kräver alltid separat godkännande"-listan finns i källan', () => {
+    expect(panelSrc).toContain('Kräver alltid separat godkännande')
+    for (const item of ['Fakturaskapande', 'Prisändringar', 'ÄTA', 'Nya mottagare', 'Pengaförflyttningar']) {
+      expect(panelSrc).toContain(item)
+    }
+  })
+
+  test('"Återkalla mandatet" finns och är alltid nåbar (ingen villkorad bortgömning bakom en flagga i källan)', () => {
+    expect(panelSrc).toContain('Återkalla mandatet')
+  })
+
+  test('kandidaterna härleds via den delade deriveMandateCandidates, byggs inte om lokalt', () => {
+    expect(panelSrc).toContain("from '@/lib/mandates/create'")
+    expect(panelSrc).toContain('deriveMandateCandidates(')
+  })
+
+  test('läser Swenska etiketter ur AUTONOMY_META, hårdkodar inte typ-namnen på nytt', () => {
+    expect(panelSrc).toContain("from '@/lib/autonomy/earned-autonomy'")
+    expect(panelSrc).toContain('AUTONOMY_META')
+  })
+
+  test('varken "Godkänn" eller "Avvisa" — mandatformuläret återanvänder inte approval-vokabulären', () => {
+    expect(panelSrc).not.toContain('Godkänn')
+    expect(panelSrc).not.toContain('Avvisa')
+  })
+
+  test('fortfarande inget klassöverskridande summeringsord efter Etapp X:s tillägg', () => {
+    const banned = [/\btotalt\b/i, /\bsammanlagt\b/i, /\bsumma\b/i, /reduce\(/]
+    for (const pattern of banned) {
+      expect(pattern.test(panelSrc), `MissionPanel.tsx innehåller "${pattern}"`).toBe(false)
+    }
+  })
+})
+
+test.describe('MissionPanelView — Mandat, Etapp X', () => {
+  test('planen har inga mandat-bara typer i planen → Mandat-sektionen renderas inte alls', () => {
+    const { mission, progress } = missionWithoutMandateEligibleSteps()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, baseViewProps(mission, progress)))
+    expect(markup).not.toContain('Mandat')
+  })
+
+  test('kandidater finns, inget mandat, formuläret stängt → knappen "Låt teamet genomföra inom mina gränser" visas, inte formuläret', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, baseViewProps(mission, progress)))
+    expect(markup).toContain('Låt teamet genomföra inom mina gränser')
+    expect(markup).not.toContain('Kräver alltid separat godkännande')
+    expect(markup).not.toContain('Ge mandatet')
+  })
+
+  test('formuläret öppet → kryssrutor per kandidat-typ med planens egna mål-titlar, tak-fält och alltid-separat-listan', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      mandateFormOpen: true,
+      mandateDraft: mandateDraft(),
+    }))
+    expect(markup).toContain('Andersson') // fakturans/steget titel (den namngivna målet, inte fritext)
+    expect(markup).toContain('Kräver alltid separat godkännande')
+    expect(markup).toContain('Ge mandatet')
+  })
+
+  test('aktivt mandat → gränssammanfattning + mätningen (utförda/leveransfel/STOPP) + Återkalla-knapp', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      mandate: mandateRow(),
+      mandateFacit: mandateFacitResult(),
+    }))
+    expect(markup).toContain('4 utförda')
+    expect(markup).toContain('0 leveransfel')
+    expect(markup).toContain('0 STOPP inom 7 dagar')
+    expect(markup).toContain('Återkalla mandatet')
+    expect(markup).not.toContain('Låt teamet genomföra inom mina gränser')
+  })
+
+  test('beloppstak null → "standardtak gäller" (aldrig taklöst påstått)', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      mandate: mandateRow({ amount_cap_kr: null }),
+      mandateFacit: mandateFacitResult(),
+    }))
+    expect(markup).toContain('standardtak gäller')
+  })
+
+  test('explicit beloppstak → beloppet visas, inte "standardtak gäller"', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      mandate: mandateRow({ amount_cap_kr: 15000 }),
+      mandateFacit: mandateFacitResult(),
+    }))
+    expect(markup).toContain(`${(15000).toLocaleString('sv-SE')} kr`)
+    expect(markup).not.toContain('standardtak gäller')
+  })
+
+  test('återkalla-bekräftelsen visar "Säker?" och Ja/Avbryt, samma idiom som avsluta-uppdraget-flödet', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      mandate: mandateRow(),
+      mandateFacit: mandateFacitResult(),
+      mandateConfirmRevoke: true,
+    }))
+    expect(markup).toContain('Säker?')
+    expect(markup).toContain('Ja, återkalla')
+    expect(markup).toContain('Avbryt')
+  })
+
+  test('pausat (leveransfel) → amber-banner på svenska + "Starta om mandatet"', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      mandate: mandateRow({ status: 'paused', pause_reason: 'delivery_failures' }),
+      mandateFacit: mandateFacitResult(),
+    }))
+    expect(markup).toContain('leveransfel')
+    expect(markup).toContain('Starta om mandatet')
+  })
+
+  test('pausat (plan_changed) → INGEN "Starta om"-knapp, texten pekar mot ett nytt mandat', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      mandate: mandateRow({ status: 'paused', pause_reason: 'plan_changed' }),
+      mandateFacit: mandateFacitResult(),
+    }))
+    expect(markup).not.toContain('Starta om mandatet')
+    expect(markup).toContain('nytt mandat')
+  })
+
+  test('återkallat mandat → notis + möjlighet att ge ett nytt mandat, mätningen finns kvar', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      mandate: mandateRow({ status: 'revoked', revoked_at: '2026-08-18T00:00:00.000Z' }),
+      mandateFacit: mandateFacitResult({ agaraterkallelse: true }),
+    }))
+    expect(markup).toContain('4 utförda')
+    expect(markup).not.toContain('Återkalla mandatet')
+  })
+
+  test('mandateError sätter en synlig felrad', () => {
+    const { mission, progress } = moneyMissionWithTwoKrClasses()
+    const markup = renderToStaticMarkup(createElement(MissionPanelView, {
+      ...baseViewProps(mission, progress),
+      mandateFormOpen: true,
+      mandateDraft: mandateDraft(),
+      mandateError: 'Sista giltighetsdag kan inte vara efter uppdragets deadline.',
+    }))
+    expect(markup).toContain('Sista giltighetsdag kan inte vara efter uppdragets deadline.')
   })
 })

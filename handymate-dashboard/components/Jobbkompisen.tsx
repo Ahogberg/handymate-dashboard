@@ -665,6 +665,7 @@ export default function Jobbkompisen() {
             onInputChange={setChatInput}
             onSend={() => sendChat()}
             onSendChat={startMissionFromCard}
+            onOpenPanel={() => setPanelOpen(true)}
             onExecuteAction={executeAction}
             onClearSuggestion={clearSuggestion}
             onConfirmPending={confirmPendingAction}
@@ -725,6 +726,7 @@ function ChatTab({
   onInputChange,
   onSend,
   onSendChat,
+  onOpenPanel,
   onExecuteAction,
   onClearSuggestion,
   onConfirmPending,
@@ -744,6 +746,8 @@ function ChatTab({
   onSend: () => void
   /** MissionPlanCards "Starta uppdraget" — se Jobbkompisen.startMissionFromCard. */
   onSendChat: (text: string) => void
+  /** MissionPlanCards "Öppna uppdragspanelen" (Etapp X) — se useMission().setPanelOpen. */
+  onOpenPanel: () => void
   onExecuteAction: (action: AIAction) => void
   onClearSuggestion: (id: string) => void
   onConfirmPending: () => void
@@ -841,7 +845,7 @@ function ChatTab({
             med Mattes formspråk runt; nu ÄR porträttet avsändaren, och
             överlämningar och statusar ser likadana ut på båda ytorna. */}
         {messages.map((message, i) => (
-          <AgentMessage key={i} message={message} index={i} onSendChat={onSendChat} onPrefill={onInputChange}>
+          <AgentMessage key={i} message={message} index={i} onSendChat={onSendChat} onPrefill={onInputChange} onOpenPanel={onOpenPanel}>
             {/* Actions from AI */}
             {message.actions && message.actions.length > 0 && (
               <div className="mt-2 ml-1 space-y-1.5">

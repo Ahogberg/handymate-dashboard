@@ -17,6 +17,74 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-18 — Mission Mandates V1 byggd (hybrid: mandat som mätinstrument)
+
+Andreas medvetna rådsbeslut: bygg avgränsad delegation — ägaren godkänner ETT
+uppdrags genomförande inom exakta gränser i stället för varje kort — men i
+**hybridform**, begränsad till de fyra redan förtjänta-autonomi-typerna
+(`invoice_reminder`, `booking_reminder`, `quote_followup_sms`,
+`review_request`, `lib/autonomy/earned-autonomy.ts`), med inbyggd per-typ-
+utfallsmätning så mandaten själva genererar det säkerhetsbevis autonomigrinden
+längre ner i den här filen (N1/rad "Autonomy Marketplace") efterlyste.
+
+**Det som nu är sant:**
+
+- Ett mandat (`mission_mandate`, `sql/v150`, körs manuellt) är ägarens
+  uttryckliga, avgränsade delegation för ETT uppdrag: namngivna mål
+  (`invoice_ids`/`quote_ids`/`booking_ids`/`project_ids` — aldrig fritext,
+  aldrig en ny mottagare), dag-/totaltak, valfritt beloppstak, sista
+  giltighetsdag ≤ uppdragets deadline. `mandateCovers`
+  (`lib/mandates/mission-mandate.ts`) är fail-closed på ALLT: fel typ, mål
+  utanför listan, tak nått, okänt belopp när ett tak gäller, utgånget,
+  pausat, återkallat — minsta avvikelse faller alltid tillbaka till ett
+  vanligt godkännandekort.
+- Mandatkontrollen sitter BREDVID `isAutonomous()` i callers
+  (send-reminders, quote-follow-up, review-requests, automation-engine),
+  aldrig via tool-routerns exekverings-spegel — alla nedströms-vakter
+  (STOPP/sms-gate, SMS-kvot, fyra-ögon, frekvens) ärvs oförändrat.
+- **Mandatet ÄR mätinstrumentet.** `lib/mandates/mandate-facit.ts` räknar,
+  per mandat och per typ: utförda utskick, leveransfel, STOPP-registreringar
+  inom 7 dagar efter kontakt, ägaråterkallelse, pausorsak — räknade fakta,
+  aldrig ett kausalitetspåstående (samma disciplin som checkpoint-outcomes).
+  Publiceras i uppdragspanelen ("4 utförda · 0 leveransfel · 0 STOPP inom 7
+  dagar") med Återkalla-knappen alltid nåbar.
+- Mandatskapande är UTESLUTANDE en ägar-UI-handling
+  (`POST/PATCH /api/mission/[id]/mandate`, owner/admin-grindad,
+  `created_by` alltid från serverkontexten) — Matte kan aldrig skapa ett
+  mandat, ingen tool-definition eller router-case finns för det
+  (källskanningslåst). Dialogen visar EXAKT planens omfattade steg, tillåtna
+  typer, namngivna mål och en ALLTID-SYNLIG "kräver alltid separat
+  godkännande"-lista (fakturaskapande, prisändringar, ÄTA, nya mottagare,
+  pengaförflyttningar) — strukturellt sant eftersom bara de fyra sändtyperna
+  ens KAN mandateras.
+- Ärlig begränsning, dokumenterad överallt i koden: kontaktmålens utskick
+  (`proactive_care`, Hannas mission-outreach) ingår INTE i V1 — förblir
+  godkännandebaserat tills det förtjänar sin plats på trappan nedan.
+
+**Autonomy Marketplace-grinden omformuleras** (se raden i NOT NOW-tabellen
+längre ner): öppnandet är inte längre "vänta på bevisad autonomi i
+allmänhet", utan **öppnar per åtgärdstyp när mandatens publicerade per-typ-
+facit visar ett bevisat säkert utfall för just den typen.** Mandaten
+genererar nu själva det löpande beviset — grinden väntar inte på ett separat
+mätprojekt.
+
+**Vägen till fullständighet** (designad in från start, ALLOWLIST är den enda
+utbyggnadspunkten): V1 = de fyra typerna. Nästa kandidat = `proactive_care`
+(starkast vaktstack av alla), släpps in när mandate-facit visar bevisat säkert
+per-typ-facit för de fyra. Därefter datastyrt per typ — varje ny kandidat
+kräver eget publicerat facit före inträde. Skapande/ändrande åtgärder
+(fakturor, ÄTA, priser, nya mottagare, pengar) står strukturellt utanför
+trappan tills vidare.
+
+**Verifiering:** `npx tsc --noEmit` och produktionsbuilden gröna. Facit för
+`lib/mandates/*` (mission-mandate/mandate-facit/resolve/create/
+load-mandate-facit), callerintegrationen (send-reminders/quote-follow-up/
+review-requests/automation-engine), routen och panelen/kortet — samtliga
+gröna. `mission-proof.spec.ts` utökad med en mandatstation mot riktig
+databas (skip-with-fix-instruktion om `sql/v150` inte är körd i miljön).
+
+---
+
 # Läge 2026-08-16 — Project Closeout Copilot V1 byggd
 
 Projektagenten Lars hittar nu projekt som med strukturerade, verifierbara
@@ -1042,7 +1110,7 @@ ingen baslinje finns — påhittad numerisk precision är värre än ingen.
 | Universell Policy Engine | N5 löser problemet med klassning och allowlists | Autonomi per åtgärd över fler domäner än godkännandekön |
 | Company Model-tjänst/tabell | `business_config` är delad profillagring och räcker | En andra oberoende domän behöver stabila faktanamn, färskhet, källa och konfliktlösning |
 | Generisk Evidence Store | Bevis är stabila referenser till befintliga rader | Löftes- eller tvisteflöden behöver gemensam bevisretention |
-| Autonomy Marketplace | Ingen autonomi är ännu bevisat säker | Flera bevisat säkra åtgärdstyper i drift |
+| Autonomy Marketplace | Reformulerad 2026-08-18 (Mission Mandates V1): grinden är inte längre generell — den öppnar PER ÅTGÄRDSTYP när den typens mandate-facit (`lib/mandates/mandate-facit.ts`, publicerat i uppdragspanelen) visar ett bevisat säkert utfall | En första typs mandate-facit visar bevisat säkert i drift över tid — datastyrt, en typ i taget, aldrig en samlad marknad på en gång |
 | Margin Insurance | Kräver pålitlig marginal, vilket X2 först måste bevisa | X2 klar + försäkringsbar riskmodell |
 | Homeowner Twin | Ingen efterfrågan visad | Upprepad kundefterfrågan i pilot |
 | Supplier Intelligence | Leverantörsfakturor är manuella | Licensierat AP-flöde |
