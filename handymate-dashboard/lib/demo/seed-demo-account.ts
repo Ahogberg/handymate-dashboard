@@ -12,6 +12,7 @@ import { freezeProjectOutcome } from '@/lib/efterkalkyl/freeze-outcome'
 import { getProjectOutcome } from '@/lib/efterkalkyl/get-project-outcome'
 import { skapaDebriefKort } from '@/lib/debrief/create-debrief-card'
 import { halsning } from '@/lib/customers/namn'
+import { getOrCreateDraftJobbpass } from '@/lib/jobbpass/jobbpass'
 
 /**
  * lib/demo/seed-demo-account.ts (2026-07)
@@ -35,11 +36,13 @@ import { halsning } from '@/lib/customers/namn'
  *   schedule_entry, time_entry, project_change, project_material
  *
  * Sedan 2026-08-12 seedas även: project_outcome (via freezeProjectOutcome),
- * project_lesson, customer_fact och (städas, seedas dock av det separata
- * Meeting Intelligence-demot) call_recording. V99-RPC:n (sql/v99_demo_
- * reset_transaction.sql) känner ÄNNU INTE till dessa fyra — se steg 0b
- * nedan för TS-nivå-städningen som kompletterar tills Andreas uppdaterar
- * RPC:ns DELETE-manifest manuellt.
+ * project_lesson, customer_fact och (seedas dock av det separata Meeting
+ * Intelligence-demot) call_recording. Radering av dessa fyra ÄGS numera av
+ * RPC:n (sql/v155_demo_reset_v2.sql, som ersätter v99:s manifest) — den
+ * tidigare TS-nivå-städningen (steg 0b, körd före RPC-anropet) togs bort
+ * 2026-08-18 eftersom den gjorde raderingen icke-atomisk (en separat,
+ * ej transaktionssäker DELETE innan den riktiga transaktionen). Se v155:s
+ * filhuvud för varför call_recording måste raderas före customer i manifestet.
  *
  * Fas 0.2 (planen vad-kan-vi-kopiera-snug-phoenix.md, R2-DoD
  * tasks/resurs-masterplan.md): booking + schedule_entry seedas nu också —
@@ -124,32 +127,7 @@ export async function resetDemoAccount(
   const businessName = (biz.business_name as string) || 'Företaget'
   const contactName = (biz.contact_name as string) || ''
 
-  // ── 0b. Städa nyare tabeller SOM V99 ÄNNU INTE KÄNNER TILL ──
-  // (kompletterar sql/v99_demo_reset_transaction.sql tills RPC:ns
-  // explicita DELETE-manifest uppdateras manuellt av Andreas — se
-  // filhuvudets kommentar om varför V99 medvetet är en statisk lista).
-  //
-  // call_recording MÅSTE städas HÄR, FÖRE V99-anropet: tabellen har en
-  // NO ACTION-foreignkey mot customer.customer_id (call_recording_
-  // customer_id_fkey) och seedas separat av app/api/admin/demo-seed-
-  // meeting/route.ts (Meeting Intelligence-demot). Om en sådan rad
-  // någonsin pekar på en av demokontots kunder skulle V99:s
-  // "DELETE FROM public.customer" annars misslyckas med en FK-
-  // violation och hela resetten rulla tillbaka.
-  //
-  // project_outcome/project_lesson/customer_fact har ingen sådan FK-
-  // risk (fristående TEXT-kolumner, ingen REFERENCES mot project/
-  // customer) men städas här ändå — de skrivs av stegen längre ned
-  // (freezeProjectOutcome, lärdomsraderna, kundfakta) och måste rensas
-  // mellan varje reset precis som resten av demovärlden.
-  for (const staleTable of ['call_recording', 'project_outcome', 'project_lesson', 'customer_fact']) {
-    const { error: cleanupErr } = await supabase.from(staleTable).delete().eq('business_id', businessId)
-    if (cleanupErr) {
-      return { error: `Kunde inte städa gamla ${staleTable}-rader innan återställning: ${cleanupErr.message}` }
-    }
-  }
-
-  // ── 1. Atomisk radering via V99 ───────────────────────────
+  // ── 1. Atomisk radering via V155 (utökar v99:s manifest) ──
   // RPC:n anropas med den verkliga användarens JWT så auth.uid() i
   // SECURITY DEFINER-funktionen blir auditens actor och DB:n kan upprepa
   // owner/admin-grinden. Service-role används fortsatt enbart för seedningen.
@@ -178,7 +156,7 @@ export async function resetDemoAccount(
       finished_at: new Date().toISOString(),
       ok: false,
       error_text: 'delete_transaction_failed',
-      reset_version: 'v99',
+      reset_version: 'v155',
     })
     if (auditInsertError) {
       console.error('[demo-reset] kunde inte auditlogga rollback:', auditInsertError.message)
@@ -368,7 +346,11 @@ export async function resetDemoAccount(
       priority: 'medium',
       source: 'website',
       job_type: 'altan',
-      created_at: isoAt(-6, 14, 0),
+      // -9 dagar (inte -6): lib/mission/opportunity-portfolio.ts:
+      // STALE_QUOTE_DAYS=7 kräver sent_at strikt äldre än 7 dagar för att
+      // räknas som "pipeline"-signal i uppdragsportföljen — -6 missade
+      // tröskeln med en dags marginal (verifierat 2026-08-18).
+      created_at: isoAt(-9, 14, 0),
     },
     {
       key: 'anna_badrum',
@@ -491,9 +473,11 @@ export async function resetDemoAccount(
       title: 'Altanbygge – Furuvägen 8',
       status: 'sent',
       items: mikaelItems,
-      sentAt: isoAt(-6, 14, 20),
+      // -9 dagar (matchar dealSeeds.mikael_altan.created_at ovan) — se
+      // kommentaren där om STALE_QUOTE_DAYS-tröskeln (7 dagar).
+      sentAt: isoAt(-9, 14, 20),
       acceptedAt: null,
-      createdAt: isoAt(-6, 14, 5),
+      createdAt: isoAt(-9, 14, 5),
       validUntilOffset: 24,
       projectAddress: 'Furuvägen 8, 141 45 Huddinge',
     },
@@ -682,6 +666,35 @@ export async function resetDemoAccount(
     .select('project_id')
     .single()
   if (kristinaProjErr || !kristinaProject) return failReset(`Kunde inte skapa projekt (Kristina): ${kristinaProjErr?.message}`, 'project_insert_failed')
+
+  // ══════════════════════════════════════════════════════════
+  // 6a2. OFAKTURERAT MATERIAL (Kristinas kranbyte) — D2 punkt 5 (Mission-
+  //      portföljen): 'material_ej_fakturerat'-godkännandekortet nedan (8)
+  //      påstod redan "Blandare och packningar registrerade men aldrig
+  //      fakturerade" — men INGEN project_material-rad fanns för att göra
+  //      det sant. Utan den här raden hittar lib/value/missed-revenue.ts
+  //      (findUninvoicedMaterial, som lib/mission/opportunity-portfolio.ts
+  //      läser via listMissedRevenue) INGET för Kristinas projekt, och
+  //      "faktureringsklart"-sanningsklassen i uppdragsportföljen blir tom
+  //      trots det seedade kortet. Beloppet (2400 kr) matchar kortets
+  //      amount_kr exakt. project_type='fixed' + redan kopplad faktura
+  //      (kristinaInvoice.project_id sätts nedan i steg 7c) ⇒ NEEDS_REVIEW
+  //      (antal, aldrig kronor) — ärligt: samma osäkerhet kortet redan
+  //      beskriver ("kontrollera om tillägget ingår").
+  // ══════════════════════════════════════════════════════════
+  const { error: kristinaMaterialErr } = await supabase.from('project_material').insert({
+    project_id: kristinaProject.project_id,
+    business_id: businessId,
+    name: 'Blandare och packningar',
+    quantity: 1,
+    unit: 'st',
+    purchase_price: 1400,
+    sell_price: 2400,
+    total_purchase: 1400,
+    total_sell: 2400,
+    invoiced: false,
+  })
+  if (kristinaMaterialErr) return failReset(`Kunde inte registrera material (Kristina): ${kristinaMaterialErr.message}`, 'project_material_insert_failed')
 
   // ══════════════════════════════════════════════════════════
   // 6b. EGENKONTROLL-CHECKLISTA (1 st, aktiv) — Anna-badrummet, tema
@@ -1219,6 +1232,82 @@ export async function resetDemoAccount(
       created_at: isoAt(0, 7, 10),
       expires_at: isoAt(14),
     },
+    // ═══ Värdekvitton (D2 punkt 3) — REDAN LÖSTA kort som attribuerar
+    // REDAN SEEDADE verifierade händelser (Annas accepterade offert nedan,
+    // Fastighets och Johans betalda fakturor nedan). lib/value/recovered-
+    // revenue.ts (getRecoveredRevenue) kräver status IN ('approved',
+    // 'auto_approved') + resolved_at satt FÖRE händelsen, inom
+    // ATTRIBUTION_WINDOW_DAYS (14 dagar för både quote_accepted och
+    // invoice_paid). Payload-formen kopierar EXAKT de befintliga daniel/
+    // lisa-korten ovan (agent_id, to, message, customer_name) plus
+    // customer_id — mapApprovalRowToCard läser payload.customer_id för
+    // kundmatchningen och den TOPPNIVÅ-kolumnen `routed_agent` (INTE
+    // payload.agent) för attributionens agentnamn. Inget nytt påhittat
+    // fält: bara redan existerande belopp (quotes.anna_quote.total,
+    // fakturornas total, satta längre ned) som Attribution-kärnan slår
+    // upp på egen hand vid läsning — den här raden lagrar inget belopp.
+    {
+      id: genId('appr'),
+      business_id: businessId,
+      approval_type: 'quote_nudge',
+      routed_agent: 'daniel',
+      title: `Nudge — ${customers.anna.name}`,
+      description: 'Påminde om badrumsoffertens status innan hon svarade',
+      status: 'approved',
+      risk_level: 'medium',
+      payload: {
+        agent_id: 'daniel',
+        quote_id: quotes.anna_quote.quote_id,
+        customer_id: customers.anna.customer_id,
+        to: ownerPhone,
+        message: `${halsning(customers.anna.name)} Hörde av mig för att höra hur ni tänkte kring offerten — säg gärna till om något är oklart! //${contactName}`,
+        customer_name: customers.anna.name,
+        view_count: 2,
+      },
+      created_at: isoAt(-11, 9, 0),
+      resolved_at: isoAt(-11, 10, 0),
+      expires_at: isoAt(-4),
+    },
+    {
+      id: genId('appr'),
+      business_id: businessId,
+      approval_type: 'send_sms',
+      routed_agent: 'lisa',
+      title: `Uppföljning — ${customers.fastighets.name}`,
+      description: 'Bekräftade fakturaunderlaget innan betalning',
+      status: 'approved',
+      risk_level: 'low',
+      payload: {
+        agent_id: 'lisa',
+        to: ownerPhone,
+        message: 'Hej! Bekräftar bara att fakturan för elinstallationen är på väg — hör av dig om något är oklart.',
+        customer_id: customers.fastighets.customer_id,
+        customer_name: customers.fastighets.name,
+      },
+      created_at: isoAt(-17, 8, 30),
+      resolved_at: isoAt(-17, 9, 0),
+      expires_at: isoAt(-10),
+    },
+    {
+      id: genId('appr'),
+      business_id: businessId,
+      approval_type: 'send_sms',
+      routed_agent: 'lisa',
+      title: `Uppföljning — ${customers.johan.name}`,
+      description: 'Bekräftade fakturaunderlaget för gästtoaletten innan betalning',
+      status: 'approved',
+      risk_level: 'low',
+      payload: {
+        agent_id: 'lisa',
+        to: ownerPhone,
+        message: 'Hej! Bekräftar fakturan för gästtoaletten — hör av dig om något är oklart.',
+        customer_id: customers.johan.customer_id,
+        customer_name: customers.johan.name,
+      },
+      created_at: isoAt(-12, 8, 0),
+      resolved_at: isoAt(-12, 8, 30),
+      expires_at: isoAt(-5),
+    },
   ]
 
   const { error: approvalsErr } = await supabase.from('pending_approvals').insert(approvalSeeds)
@@ -1532,12 +1621,60 @@ export async function resetDemoAccount(
   if (lessonErr) return failReset(`Kunde inte skapa lärdomar (gästtoalett): ${lessonErr.message}`, 'project_lesson_insert_failed')
 
   // ══════════════════════════════════════════════════════════
+  // 9g. JOBBPASS-FÖRSLAG (D2 punkt 2) — Johans avslutade gästtoalett har
+  //     redan hela efterkalkyl-kedjan (freezeProjectOutcome + skapaDebrief
+  //     Kort ovan) — samma projekt proposeJobbpass (lib/projects/complete-
+  //     project.ts, effekt 7b) skulle föreslå ett jobbpass för i produktion.
+  //     Draftraden skapas via SAMMA riktiga helper
+  //     (getOrCreateDraftJobbpass, lib/jobbpass/jobbpass.ts — idempotent,
+  //     tom foturval/samtycke) så demot verifierar den faktiska koden.
+  //     Godkännandekortets payload-form kopieras EXAKT från proposeJobbpass
+  //     (project_id/project_name/customer_id/target_route/agent_id — se
+  //     lib/projects/complete-project.ts rad ~753-770) eftersom den privata
+  //     funktionen inte går att importera direkt utan att köra hela
+  //     closeout-effektkedjan (som redan kördes en gång ovan). Presentatören
+  //     kan därmed visa hela closeout→jobbpass→publicera→kundvy-kedjan live.
+  // ══════════════════════════════════════════════════════════
+  const johanJobbpassDraft = await getOrCreateDraftJobbpass(supabase, businessId, johanProject.project_id)
+  if (!johanJobbpassDraft.ok) {
+    return failReset(`Kunde inte skapa jobbpass-utkast (gästtoalett): ${johanJobbpassDraft.error}`, 'jobbpass_draft_failed')
+  }
+  const { error: jobbpassApprovalErr } = await supabase.from('pending_approvals').insert({
+    business_id: businessId,
+    approval_type: 'jobbpass_proposal',
+    title: 'Jobbpass — Gästtoalett – renovering, Sjövägen 19',
+    description: 'Skapa ett digitalt jobbpass åt kunden för "Gästtoalett – renovering, Sjövägen 19": vad som gjordes, valda foton och garantivillkor.',
+    risk_level: 'low',
+    status: 'pending',
+    expires_at: isoAt(14),
+    payload: {
+      project_id: johanProject.project_id,
+      project_name: 'Gästtoalett – renovering, Sjövägen 19',
+      customer_id: customers.johan.customer_id,
+      target_route: `/dashboard/projects/${johanProject.project_id}/jobbpass`,
+      agent_id: 'lars',
+    },
+  })
+  if (jobbpassApprovalErr) return failReset(`Kunde inte skapa jobbpass-förslaget: ${jobbpassApprovalErr.message}`, 'jobbpass_proposal_insert_failed')
+
+  // ══════════════════════════════════════════════════════════
   // 9f. KUNDFAKTA (customer_fact) — bekräftade fynd på Anna (huvudkunden
   //     för badrumsprojektet). "Föds bekräftade" i demot precis som
   //     lärdomsraderna ovan — i produktion skapas de via ett godkänt
   //     customer_fact-kort (app/api/voice/analyze/route.ts, arMote-
   //     grenen), men demot behöver inte simulera hela mötesanalysen för
   //     att kundkortet/"Att tänka på" ska ha innehåll.
+  //
+  //     D2 punkt 1 (Kundlöften under bevakning): två av raderna nedan bär
+  //     promise_status='open' + due_at (sql/v147_promise_dates.sql) —
+  //     Annas materialpris-löfte (redan skrivet ovan, kompletterat med
+  //     due_at inom 48h så lib/promises/deadline-sweep.ts:s
+  //     hittaLoftenSomBehoverKort räknar den till fasen 'paminnelse'), och
+  //     ett nytt löfte till Mikael med due_at längre bort (ingen fas —
+  //     bara ett bevakat, ännu inte påmint löfte). "Föds bekräftade" precis
+  //     som övriga rader — v147:s regel att promise_status ENDAST sätts av
+  //     ett ägar-godkänt kort gäller runtime-koden (app/api/approvals),
+  //     inte demoseeden, som redan skriver bekräftade rader rakt av.
   // ══════════════════════════════════════════════════════════
   const { error: factsErr } = await supabase.from('customer_fact').insert([
     {
@@ -1572,6 +1709,11 @@ export async function resetDemoAccount(
       confidence: 0.95,
       created_at: isoAt(-2, 13, 0),
       confirmed_at: isoAt(-2, 13, 5),
+      // Påminnelse-läget: due_at inom 48h (PROMISE_REMINDER_WINDOW_MS,
+      // lib/promises/deadline-sweep.ts) — svepet ska kunna visa denna som
+      // "snart förfallet löfte" direkt efter en demo-reset.
+      due_at: isoAt(1, 16, 0),
+      promise_status: 'open',
     },
     {
       business_id: businessId,
@@ -1583,6 +1725,22 @@ export async function resetDemoAccount(
       confidence: 0.8,
       created_at: isoAt(-6, 10, 4),
       confirmed_at: isoAt(-6, 10, 5),
+    },
+    // Mikael — daterat löfte längre bort (utanför 48h-fönstret): ett
+    // bevakat men ännu inte påmint åtagande, så listan över öppna löften
+    // visar båda faserna (nära förfall / längre bort) direkt efter reset.
+    {
+      business_id: businessId,
+      customer_id: customers.mikael.customer_id,
+      fact_type: 'commitment',
+      content: 'Lovat skicka en uppdaterad ritning på altanen innan grundläggningen bokas',
+      source_type: 'meeting',
+      evidence_quote: 'Jag skickar en uppdaterad ritning på altanen innan vi bokar in grundläggningen.',
+      confidence: 0.85,
+      created_at: isoAt(-1, 11, 0),
+      confirmed_at: isoAt(-1, 11, 5),
+      due_at: isoAt(6, 12, 0),
+      promise_status: 'open',
     },
   ])
   if (factsErr) return failReset(`Kunde inte skapa kundfakta: ${factsErr.message}`, 'customer_fact_insert_failed')
