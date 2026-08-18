@@ -96,3 +96,51 @@ test.describe('Jobbkompisen.tsx — bubbelpillarna (källskanning, EN pill-slot)
     expect(block).toContain('setIsOpen(true)')
   })
 })
+
+// Uppdragsfoten (Andreas 2026-08-18): den ÖPPNA panelens stående redovisning
+// av det aktiva uppdraget — en rad i panelens nederkant som öppnar
+// expansionspanelen. Bubbelpillarna ovan gäller bara stängd bubbla; utan
+// foten försvann uppdraget ur synfältet så fort chatten öppnades.
+test.describe('Jobbkompisen.tsx — uppdragsfoten i öppna panelen', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'components', 'Jobbkompisen.tsx'), 'utf8')
+
+  test('fottexten förekommer exakt en gång — v144 garanterar max ett aktivt uppdrag, siffran är en ärlig etta', () => {
+    const matches = src.match(/1 pågående uppdrag/g) || []
+    expect(matches.length).toBe(1)
+  })
+
+  test('foten renderas bara vid aktivt uppdrag', () => {
+    const idx = src.indexOf('1 pågående uppdrag')
+    expect(idx).toBeGreaterThan(-1)
+    const guard = src.slice(Math.max(0, idx - 1600), idx)
+    expect(guard).toContain("mission.status === 'active'")
+  })
+
+  test('foten öppnar expansionspanelen, inte chatten', () => {
+    const idx = src.indexOf('1 pågående uppdrag')
+    const block = src.slice(Math.max(0, idx - 900), idx + 900)
+    expect(block).toContain('setPanelOpen(true)')
+    expect(block).not.toContain('setIsOpen(true)')
+  })
+
+  test('beslut har företräde framför gapet — samma precedens som bubbelpillarna', () => {
+    const idx = src.indexOf('1 pågående uppdrag')
+    const block = src.slice(Math.max(0, idx - 900), idx + 900)
+    expect(block).toContain('decisions_outstanding')
+    expect(block).toContain('beslut väntar')
+  })
+
+  test('gaptexten är måltypens egen storhet — alla tre gapfälten läses, aldrig adderade', () => {
+    const idx = src.indexOf('1 pågående uppdrag')
+    const block = src.slice(Math.max(0, idx - 900), idx + 900)
+    expect(block).toContain('gap_kr')
+    expect(block).toContain('gap_hours')
+    expect(block).toContain('gap_count')
+    // Ingen aritmetik mellan gapfälten — de är ömsesidigt uteslutande
+    // (tests/mission-progress.spec.ts äger den regeln; här bara att ytan
+    // inte hittar på en blandad summa).
+    expect(block).not.toMatch(/gap_kr\s*\+/)
+    expect(block).not.toMatch(/gap_hours\s*\+/)
+    expect(block).not.toMatch(/gap_count\s*\+/)
+  })
+})

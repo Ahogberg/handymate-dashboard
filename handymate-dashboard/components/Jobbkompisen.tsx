@@ -700,6 +700,42 @@ export default function Jobbkompisen() {
             kameraknappen i chatt-inputen → analyzePhotoIntoChat. */}
       </div>
 
+      {/* Uppdragsfoten (Andreas 2026-08-18): panelens stående redovisning av
+          det aktiva uppdraget — bubbelpillarna syns bara när bubblan är
+          stängd, så utan foten försvann uppdraget ur synfältet så fort
+          chatten öppnades. v144 garanterar max ETT aktivt uppdrag per
+          företag, därför en ärlig etta och aldrig en räknare. Beslut har
+          företräde framför gapet (samma precedens som deriveBubbleState);
+          gaptexten är måltypens EGEN storhet — kr, timmar eller kontakter,
+          aldrig en blandning (mission-progress äger uteslutningen). Öppnar
+          expansionspanelen, samma väg som MissionPlanCards panelknapp. */}
+      {mission && mission.status === 'active' && (() => {
+        const beslut = progress?.decisions_outstanding ?? 0
+        const gapText =
+          progress?.gap_kr != null ? `${formatKr(progress.gap_kr)} kvar till målet`
+          : progress?.gap_hours != null ? `${progress.gap_hours} h kvar till målet`
+          : progress?.gap_count != null ? `${progress.gap_count} kontakter kvar till målet`
+          : null
+        return (
+          <button
+            type="button"
+            onClick={() => setPanelOpen(true)}
+            className="flex-shrink-0 w-full flex items-center justify-between gap-2 px-4 py-2.5 border-t border-gray-200 bg-primary-50/60 hover:bg-primary-50 transition-colors text-left"
+          >
+            <span className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-primary-600 animate-pulse flex-shrink-0" />
+              <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">1 pågående uppdrag</span>
+              {beslut > 0 ? (
+                <span className="text-xs font-medium text-amber-700 truncate">{beslut} beslut väntar dig</span>
+              ) : gapText ? (
+                <span className="text-xs text-gray-500 truncate">{gapText}</span>
+              ) : null}
+            </span>
+            <span className="text-xs font-medium text-primary-700 whitespace-nowrap flex-shrink-0">Öppna →</span>
+          </button>
+        )
+      })()}
+
       {/* Dolda file-inputs för kameraknappen i chatten */}
       <input
         ref={cameraInputRef}
