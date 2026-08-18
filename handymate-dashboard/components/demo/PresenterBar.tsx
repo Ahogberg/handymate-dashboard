@@ -7,6 +7,7 @@ import {
   ChevronRight,
   ExternalLink,
   Loader2,
+  PlayCircle,
   RefreshCcw,
 } from 'lucide-react'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
@@ -63,6 +64,7 @@ export function PresenterBar() {
   const [quoteAmount, setQuoteAmount] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [replaying, setReplaying] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const story = useMemo(() => manifest ? buildDemoStory(manifest) : null, [manifest])
@@ -137,6 +139,21 @@ export function PresenterBar() {
     router.push(nextStep.targetRoute)
   }
 
+  // Delas av resetDemo och showOnboarding — samma story/moment-state ska
+  // bort oavsett vilken av de två knapparna som körs, annars kan
+  // presentatörsbaren visa ett steg-index eller en recap som hör till en
+  // demo-runda som inte längre finns.
+  function clearDemoStoryState() {
+    try {
+      for (let index = sessionStorage.length - 1; index >= 0; index--) {
+        const key = sessionStorage.key(index)
+        if (key?.startsWith('hm_demo_story')) sessionStorage.removeItem(key)
+      }
+      localStorage.removeItem('hm_moments_seen')
+      sessionStorage.removeItem('matte-chat-auto-opened')
+    } catch { /* full reload/navigation återställer ändå komponentstate */ }
+  }
+
   async function resetDemo() {
     setResetting(true)
     setError(null)
@@ -154,19 +171,36 @@ export function PresenterBar() {
         throw new Error(result?.error || 'Reset misslyckades')
       }
 
-      try {
-        for (let index = sessionStorage.length - 1; index >= 0; index--) {
-          const key = sessionStorage.key(index)
-          if (key?.startsWith('hm_demo_story')) sessionStorage.removeItem(key)
-        }
-        localStorage.removeItem('hm_moments_seen')
-        sessionStorage.removeItem('matte-chat-auto-opened')
-      } catch { /* full reload återställer ändå komponentstate */ }
-
+      clearDemoStoryState()
       window.location.assign('/dashboard')
     } catch {
       setError('Demon kunde inte återställas. Försök igen från demosidan.')
       setResetting(false)
+    }
+  }
+
+  async function showOnboarding() {
+    setReplaying(true)
+    setError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch('/api/admin/demo-onboarding-replay', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+      })
+      const result = await response.json().catch(() => null)
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.error || 'Kunde inte visa onboardingen')
+      }
+
+      clearDemoStoryState()
+      window.location.assign('/onboarding')
+    } catch {
+      setError('Onboardingen kunde inte visas. Försök igen från demosidan.')
+      setReplaying(false)
     }
   }
 
@@ -218,6 +252,16 @@ export function PresenterBar() {
         >
           Nästa
           <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+
+        <button
+          type="button"
+          onClick={showOnboarding}
+          disabled={replaying}
+          className="inline-flex h-8 items-center gap-1 rounded-lg border border-white/15 px-2 text-xs font-semibold hover:bg-white/10 disabled:opacity-60"
+        >
+          {replaying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlayCircle className="h-3.5 w-3.5" />}
+          Visa onboardingen
         </button>
 
         <button

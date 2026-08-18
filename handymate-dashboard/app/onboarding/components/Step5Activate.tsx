@@ -6,6 +6,7 @@ import OnboardingHeader from './OnboardingHeader'
 import InfoSheet from './InfoSheet'
 import { TEAM } from '@/lib/agents/team'
 import { getPlanPrice } from '@/lib/feature-gates'
+import { isDemoBusinessId } from '@/lib/demo/is-demo-client'
 import type { OnboardingFormData } from '../types-redesign'
 
 /**
@@ -84,6 +85,11 @@ interface Step5Props {
  * kunden debiterades aldrig). Routes finns kvar orörda men anropas inte längre.
  */
 export default function Step5Activate({ onNext, onBack, data, setData }: Step5Props) {
+  // Demokontot: hoppa Stripe-checkouten helt (INGA Stripe-anrop) — knappen
+  // går direkt vidare. Garantitexten/plan-vyn visas som vanligt (det ÄR
+  // demon av steget). Icke-demo-vägen (handleSubmit nedan) är oförändrad.
+  const isDemo = isDemoBusinessId(data.businessId)
+
   const plan = data.plan || 'professional'
   const setPlan = (id: string) => setData(d => ({ ...d, plan: id }))
 
@@ -301,24 +307,36 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
       </div>
 
       <div className="ob-footer">
-        <button
-          type="button"
-          className="ob-cta"
-          disabled={redirecting}
-          onClick={handleSubmit}
-        >
-          {redirecting ? (
-            <>
-              <Loader2 size={18} className="animate-spin" /> Öppnar säker betalning…
-            </>
-          ) : (
-            <>
-              Aktivera Handymate <ArrowRight size={18} />
-            </>
-          )}
-        </button>
+        {isDemo ? (
+          <button
+            type="button"
+            className="ob-cta"
+            onClick={onNext}
+          >
+            Fortsätt (simulerat i demoläget) <ArrowRight size={18} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="ob-cta"
+            disabled={redirecting}
+            onClick={handleSubmit}
+          >
+            {redirecting ? (
+              <>
+                <Loader2 size={18} className="animate-spin" /> Öppnar säker betalning…
+              </>
+            ) : (
+              <>
+                Aktivera Handymate <ArrowRight size={18} />
+              </>
+            )}
+          </button>
+        )}
         <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--ob-muted)' }}>
-          {selectedPlan.price.toLocaleString('sv-SE')} kr/mån · Säker betalning via Stripe
+          {isDemo
+            ? 'Ingen betalning sker i demoläget.'
+            : `${selectedPlan.price.toLocaleString('sv-SE')} kr/mån · Säker betalning via Stripe`}
         </p>
       </div>
 

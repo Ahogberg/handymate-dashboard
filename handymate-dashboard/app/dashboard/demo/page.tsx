@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { RefreshCcw, Loader2, CheckCircle2, AlertTriangle, ShieldAlert, Mic } from 'lucide-react'
+import { RefreshCcw, Loader2, CheckCircle2, AlertTriangle, ShieldAlert, Mic, PlayCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 /**
@@ -17,6 +17,9 @@ export default function DemoPage() {
 
   const [meetingLoading, setMeetingLoading] = useState(false)
   const [meetingResult, setMeetingResult] = useState<{ ok: boolean; text: string; isForbidden?: boolean } | null>(null)
+
+  const [onboardingLoading, setOnboardingLoading] = useState(false)
+  const [onboardingResult, setOnboardingResult] = useState<{ ok: boolean; text: string; isForbidden?: boolean } | null>(null)
 
   useEffect(() => {
     try {
@@ -82,6 +85,55 @@ export default function DemoPage() {
       setResult({ ok: false, text: 'Kunde inte återställa demon — försök igen.' })
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleShowOnboarding() {
+    setOnboardingLoading(true)
+    setOnboardingResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin/demo-onboarding-replay', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+      })
+      const json = await res.json().catch(() => null)
+
+      if (res.status === 403) {
+        setOnboardingResult({ ok: false, isForbidden: true, text: json?.error || 'Det här är inte demokontot.' })
+        return
+      }
+      if (!res.ok || !json?.ok) {
+        setOnboardingResult({ ok: false, text: json?.error || 'Kunde inte visa onboardingen — försök igen.' })
+        return
+      }
+
+      // Samma story/moment-state som "Återställ demon" rensar — annars kan
+      // presentatörsbaren visa ett steg-index som hör till en demo-runda
+      // som inte längre finns när touren körs om.
+      try {
+        localStorage.removeItem('hm_moments_seen')
+        for (let index = localStorage.length - 1; index >= 0; index--) {
+          const key = localStorage.key(index)
+          if (key?.startsWith('hm_demo_story')) localStorage.removeItem(key)
+        }
+        for (let index = sessionStorage.length - 1; index >= 0; index--) {
+          const key = sessionStorage.key(index)
+          if (key?.startsWith('hm_demo_story')) sessionStorage.removeItem(key)
+        }
+        sessionStorage.removeItem('matte-chat-auto-opened')
+      } catch {
+        // Navigationen nedan återställer ändå komponentstate.
+      }
+
+      window.location.assign('/onboarding')
+    } catch {
+      setOnboardingResult({ ok: false, text: 'Kunde inte visa onboardingen — försök igen.' })
+    } finally {
+      setOnboardingLoading(false)
     }
   }
 
@@ -157,6 +209,48 @@ export default function DemoPage() {
             <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           )}
           <span>{result.text}</span>
+        </div>
+      )}
+
+      <h2 className="text-lg font-bold text-gray-900 mt-10 mb-2">Onboardingen</h2>
+      <p className="text-sm text-gray-500 leading-relaxed mb-6">
+        Kör om onboarding-flödet från registreringssteget, med simulerade
+        wow-ögonblick (telefonnummer, betalning, Fortnox-import) i stället för
+        riktiga externa anrop. Rör inte kund-/fakturadata — kör "Återställ
+        demon" också om du vill se onboardingen mot en helt orörd demo.
+      </p>
+
+      <button
+        onClick={handleShowOnboarding}
+        disabled={onboardingLoading}
+        className="w-full inline-flex items-center justify-center gap-2 h-12 px-5 bg-primary-700 hover:bg-primary-800 disabled:opacity-60 text-white text-[15px] font-semibold rounded-xl transition-colors"
+      >
+        {onboardingLoading ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <PlayCircle className="w-4 h-4" />
+        )}
+        {onboardingLoading ? 'Förbereder onboardingen…' : 'Visa onboardingen'}
+      </button>
+
+      {onboardingResult && (
+        <div
+          className={`mt-4 flex items-start gap-2.5 px-4 py-3 rounded-xl border text-sm font-medium ${
+            onboardingResult.ok
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              : onboardingResult.isForbidden
+                ? 'bg-amber-50 border-amber-300 text-amber-800'
+                : 'bg-red-50 border-red-200 text-red-700'
+          }`}
+        >
+          {onboardingResult.ok ? (
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          ) : onboardingResult.isForbidden ? (
+            <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          )}
+          <span>{onboardingResult.text}</span>
         </div>
       )}
 

@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import { TEAM } from '@/lib/agents/team'
+import { isDemoBusinessId } from '@/lib/demo/is-demo-client'
 import type { OnboardingFormData } from '../types-redesign'
 
 interface Props {
@@ -46,6 +47,11 @@ type View = 'choose' | 'fortnox-loading' | 'fortnox-done' | 'csv' | 'csv-done'
 const avatarFor = (id: string) => TEAM.find(a => a.id === id)?.avatar
 
 export default function StepImportData({ onNext, onBack, data, setData }: Props) {
+  // Demokontot: "Koppla Fortnox" anropar en simulering i stället för den
+  // riktiga OAuth-länken (INGA Fortnox-anrop). Se runDemoFortnoxSim nedan —
+  // connectFortnox() och hela den riktiga import-logiken är oförändrade.
+  const isDemo = isDemoBusinessId(data.businessId)
+
   const [view, setView] = useState<View>('choose')
   const [error, setError] = useState<string | null>(null)
   const [fortnoxResult, setFortnoxResult] = useState<FortnoxResult | null>(null)
@@ -130,6 +136,43 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
     window.location.href = '/api/integrations/fortnox/connect?return=onboarding'
   }
 
+  /**
+   * Demoläge: kör Fortnox-simuleringen (POST /api/admin/demo-fortnox-sim)
+   * i stället för att redirecta till en riktig OAuth-inloggning. Svaret har
+   * exakt samma form som de två riktiga import-anropen kombinerade
+   * ({customers:{imported,...}, invoices:{imported,total_outstanding_kr,...}}),
+   * så samma fortnox-done-vy (SuccessView) kan återanvändas oförändrad.
+   */
+  const runDemoFortnoxSim = useCallback(async () => {
+    setView('fortnox-loading')
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/demo-fortnox-sim', { method: 'POST' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error ?? 'Kunde inte simulera Fortnox-importen')
+
+      const result: FortnoxResult = {
+        customers: Number(json?.customers?.imported ?? 0),
+        invoices: Number(json?.invoices?.imported ?? 0),
+        outstandingKr: Number(json?.invoices?.total_outstanding_kr ?? 0),
+      }
+      setFortnoxResult(result)
+      setData(d => ({ ...d, importedCustomers: result.customers, importedInvoices: result.invoices }))
+      // Samma mjuka tomt-läge som runFortnoxImport: redan simulerat i en
+      // tidigare "Visa onboardingen"-runda utan mellanliggande "Återställ
+      // demon" → allt redan importerat, inget nytt att visa upp.
+      if (result.customers === 0 && result.invoices === 0) {
+        setError('Fortnox-simuleringen har redan körts — kör "Återställ demon" för en ny genomgång.')
+        setView('choose')
+        return
+      }
+      setView('fortnox-done')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Något gick fel vid simuleringen')
+      setView('choose')
+    }
+  }, [setData])
+
   async function handleCsvFile(file: File) {
     setCsvBusy(true)
     setError(null)
@@ -175,7 +218,7 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
             {error && <FallbackNote text={error} />}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 18 }}>
-              <button className="obi-choice rec" onClick={connectFortnox}>
+              <button className="obi-choice rec" onClick={isDemo ? runDemoFortnoxSim : connectFortnox}>
                 <span className="obi-badge">Rekommenderat</span>
                 <span className="obi-choice-ic teal"><Link2 size={24} strokeWidth={2.2} /></span>
                 <span style={{ flex: 1, minWidth: 0 }}>

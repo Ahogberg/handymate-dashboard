@@ -5,6 +5,7 @@ import { ArrowRight, ChevronDown, Info } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import InfoSheet from './InfoSheet'
 import { TEAM } from '@/lib/agents/team'
+import { isDemoBusinessId } from '@/lib/demo/is-demo-client'
 import type { OnboardingFormData } from '../types-redesign'
 
 interface Step4Props {
@@ -284,6 +285,12 @@ function TestLisaCard() {
 }
 
 export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step4Props) {
+  // Demokontot: hoppa den riktiga nummer-reservationen (INGA 46elks-anrop)
+  // — demokontot har redan ett riktigt tilldelat assigned_phone_number från
+  // sin ursprungliga uppsättning, se D3-specen. Icke-demo-vägen nedan är
+  // helt oförändrad.
+  const isDemo = isDemoBusinessId(data.businessId)
+
   // Persisterad platshållare från äldre sessioner räknas som "inget nummer".
   const initialNumber = data.lisaNumber && data.lisaNumber !== LEGACY_PLACEHOLDER ? data.lisaNumber : ''
   // 'pending' = köpet gav inget nummer ännu — ärligt väntande-läge, aldrig låtsasnummer.
@@ -304,8 +311,42 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
   const update = (updates: Partial<OnboardingFormData>) =>
     setData(d => ({ ...d, ...updates }))
 
+  // Demoläge: hämta det redan tilldelade numret direkt ur business_config
+  // i stället för att reservera ett nytt (GET /api/onboarding är samma
+  // endpoint page.tsx redan använder för att återuppta onboardingen — ingen
+  // ny rutt behövs). Kör bara EN gång; vid en senare replay ligger numret
+  // redan i onboarding_data (sparat av `next()` förra varvet) och
+  // `initialNumber` ovan sätter fasen till 'done' direkt utan nätverksanrop.
   useEffect(() => {
-    if (number) return
+    if (!isDemo || number) return
+    let cancelled = false
+    async function loadDemoNumber() {
+      try {
+        const res = await fetch('/api/onboarding')
+        if (!res.ok) throw new Error('kunde inte läsa demokontot')
+        const json = await res.json()
+        const assigned = (json?.assigned_phone_number as string | undefined) || ''
+        if (cancelled) return
+        if (assigned) {
+          setNumber(assigned)
+          update({ lisaNumber: assigned })
+          setPhase('done')
+        } else {
+          // Osannolikt (demokontot ska alltid ha ett tilldelat nummer) —
+          // 'pending' låser aldrig flödet, "Fortsätt" fungerar ändå.
+          setPhase('pending')
+        }
+      } catch {
+        if (!cancelled) setPhase('pending')
+      }
+    }
+    loadDemoNumber()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDemo])
+
+  useEffect(() => {
+    if (isDemo || number) return
 
     let cancelled = false
     const timers: ReturnType<typeof setTimeout>[] = []
@@ -465,6 +506,11 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
                 {number}
               </div>
               <p style={{ fontSize: 13, color: 'var(--ob-muted)' }}>Lisa fångar samtalen — dygnet runt</p>
+              {isDemo && (
+                <p style={{ marginTop: 8, fontSize: 11, color: 'var(--ob-muted)' }}>
+                  Simulerat i demoläget — inget nytt nummer köps.
+                </p>
+              )}
             </div>
           )}
         </div>
