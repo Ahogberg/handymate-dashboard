@@ -608,8 +608,12 @@ export async function POST(request: NextRequest) {
       meta: { agent_id: agentId, trigger_type, model: MODEL },
     })
 
-    // Extract and save memory (fire-and-forget)
-    extractAndSaveMemory(businessId, agentId, finalResponse, trigger_type, trigger_data || {}).catch((err) =>
+    // Extract and save memory (fire-and-forget) — källspårat till denna
+    // körning (Etapp U, sql/v149_agent_memory_hardening.sql).
+    extractAndSaveMemory(businessId, agentId, finalResponse, trigger_type, trigger_data || {}, {
+      type: 'agent_run',
+      id: runId,
+    }).catch((err) =>
       console.error('[AgentTrigger] extractAndSaveMemory failed (non-blocking):', businessId, agentId, err)
     )
 

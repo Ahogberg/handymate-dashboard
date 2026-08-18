@@ -1,30 +1,458 @@
 /**
  * V21 DEL 2 — Agent Memory Pipeline
  *
+ * Härdad i Etapp U (2026-08-18, sql/v149_agent_memory_hardening.sql):
+ * agent_memories var append-only rå modelloutput utan bekräftelse, utan
+ * ersättningskedja, utan färskhet och utan källspår — allt customer_fact
+ * (v122) redan gör rätt. v149 lägger till fyra kolumner (superseded_by,
+ * confirmed_at, source_type, source_id) på EXISTERANDE tabell. Filen är
+ * fail-soft genomgående: körs v149 inte än (PostgREST 42703 — kolumnen
+ * finns inte) faller varje skriv-/läsväg tillbaka till gårdagens form,
+ * BYTE-IDENTISKT beteende, tills Andreas kör migrationen.
+ *
  * Efter varje agent-körning:
- * 1. Extrahera lärdom via Claude Haiku
- * 2. Generera embedding (mock om API saknas)
- * 3. Spara i agent_memories
+ * 1. Extrahera lärdom via Claude Haiku (extractAndSaveMemory)
+ * 2. Maska PII (scrubPII, samma helper som thread-messages.ts)
+ * 3. Klassificera + dedupe/supersede + spara (saveExtractedMemory)
+ *    — observation/fact auto-bekräftas (de påstår bara vad EN körning
+ *      såg); pattern/preference (firmanivå-påståenden) skrivs UNBEKRÄFTADE
+ *      och kräver ett pending_approvals-kort (case
+ *      'agent_memory_confirmation', app/api/approvals/[id]/route.ts) innan
+ *      de räknas som sanning — rå modelloutput blir aldrig sanning utan
+ *      en människa.
  *
  * Före varje körning:
- * 1. Hämta top-5 relevanta minnen via cosine similarity
+ * 1. Hämta relevanta minnen (fetchRelevantMemories/getRelevantMemories) —
+ *    bara BEKRÄFTADE, icke-ersatta rader, rankade på färskhetsviktad
+ *    poäng (recency-decay, halveringstid 90 dagar — se decayFactor).
  * 2. Injicera i systemprompt
+ *
+ * Dödad död kod (Etapp U): generateEmbedding returnerade alltid null,
+ * embedding-kolumnen var alltid NULL, och context-argumentet till
+ * getRelevantMemories ignorerades helt (ingen anropare skickade det ens).
+ * V1-beslutet är ärlighet före ambition: bort, inte en låtsad
+ * vektorsökning. Kolumnen finns kvar i databasen (ingen destruktiv
+ * migration) — bara oanvänd.
+ *
+ * Facit: tests/agent-memory.spec.ts.
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
+import { scrubPII } from '@/lib/agent/thread-messages'
 
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001'
 
-// ── Extract memory from agent run ──
+export const AGENT_MEMORY_CONFIRMATION_TYPE = 'agent_memory_confirmation'
 
+/** Firmanivå-kort som skapas av agent_memory_confirmation-flödet. */
+const MEMORY_CARD_EXPIRES_DAYS = 14
+
+export const AGENT_DISPLAY_NAMES: Record<string, string> = {
+  matte: 'Matte (chef)',
+  karin: 'Karin (ekonom)',
+  hanna: 'Hanna (marknad)',
+  daniel: 'Daniel (sälj)',
+  lars: 'Lars (projekt)',
+  lisa: 'Lisa (kundservice)',
+}
+
+/** Varifrån ett minne kom — källspår (v149). id kan vara null om
+ *  anroparen inte hade en referens i scope; type sätts ändå. */
+export interface MemorySource {
+  type: string
+  id: string | null
+}
+
+// ── Källspår-detektion (fail-soft) ──
+
+/** Är detta ett PostgREST "kolumnen finns inte"-fel (pre-migration)? Samma
+ *  mönster som customer_fact-caset och deadline-sweep.ts. */
+export function isMissingColumnError(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false
+  return error.code === '42703' || /column .* does not exist|schema cache/i.test(error.message || '')
+}
+
+// ── Klassificering + viktning (LÅST beteende — characterization tests) ──
+
+export type MemoryType = 'observation' | 'pattern' | 'preference' | 'fact'
+
+export function classifyMemoryType(content: string, triggerType: string): MemoryType {
+  const lower = content.toLowerCase()
+  if (lower.includes('föredrar') || lower.includes('vill ha') || lower.includes('gillar')) return 'preference'
+  if (lower.includes('brukar') || lower.includes('tenderar') || lower.includes('mönster')) return 'pattern'
+  if (lower.includes('har ') || lower.includes('är ') || lower.includes('finns')) return 'fact'
+  return 'observation'
+}
+
+export function calculateImportance(triggerType: string, content: string): number {
+  let score = 0.5
+  if (triggerType === 'phone_call') score += 0.2 // Phone calls are high-signal
+  if (triggerType === 'manual') score += 0.1
+  if (content.toLowerCase().includes('viktigt') || content.toLowerCase().includes('kritisk')) score += 0.15
+  if (content.length > 100) score += 0.05
+  return Math.min(1.0, score)
+}
+
+/** Åtkomst-bumpen vid en exakt dubblett — samma formel som innan v149,
+ *  bara flyttad till en egen funktion så den kan lås-testas. */
+export function bumpedImportance(accessCount: number): number {
+  return Math.min(1.0, 0.5 + (accessCount || 0) * 0.1)
+}
+
+/** Firmanivå-påståenden (pattern/preference) kräver ett mänskligt
+ *  godkännande innan de räknas som sanning. Körningsobservationer
+ *  (observation/fact) auto-bekräftas — de påstår bara vad EN körning såg. */
+export function requiresConfirmation(memoryType: string): boolean {
+  return memoryType === 'pattern' || memoryType === 'preference'
+}
+
+// ── Färskhet (recency-decay vid LÄSNING — ingen write-back behövs) ──
+
+/** Halveringstid för ett minnes vikt — ~ett kvartal. Gammal information
+ *  tonar bort (ett mönster observerat i våras väger mindre idag) men
+ *  försvinner inte över en natt (ett minne från förra veckan är fortfarande
+ *  ~95% av sin ursprungsvikt). Vald för att matcha den tidshorisont
+ *  övriga "färskhets"-koncept i kodbasen redan resonerar i (kvartalsvisa
+ *  mönster, inte dagsfärskt och inte för evigt). */
+export const MEMORY_HALF_LIFE_DAYS = 90
+
+export function decayFactor(ageMs: number): number {
+  const ageDays = Math.max(0, ageMs) / (1000 * 60 * 60 * 24)
+  return Math.pow(0.5, ageDays / MEMORY_HALF_LIFE_DAYS)
+}
+
+/** effective_score = importance * decay(age). Lästidsberäknad — ingen
+ *  kolumn skrivs om, "nu" är alltid "nu". */
+export function effectiveImportance(importanceScore: number, createdAtIso: string, now: Date = new Date()): number {
+  const created = new Date(createdAtIso).getTime()
+  if (Number.isNaN(created)) return importanceScore
+  return importanceScore * decayFactor(now.getTime() - created)
+}
+
+export function rankByEffectiveScore<T extends { importance_score: number; created_at: string }>(
+  memories: T[],
+  now: Date = new Date(),
+): T[] {
+  return [...memories].sort(
+    (a, b) => effectiveImportance(b.importance_score, b.created_at, now) - effectiveImportance(a.importance_score, a.created_at, now),
+  )
+}
+
+// ── Dedupe/supersede — deterministisk, ALDRIG LLM-dömd ──
+
+/**
+ * Normaliserar text till jämförbara tokens: gemener, diakritik bortstädad,
+ * skiljetecken bort, mellanslag-delad.
+ */
+export function normalizeForOverlap(text: string): string[] {
+  return (text || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+}
+
+export function normalizedText(text: string): string {
+  return normalizeForOverlap(text).join(' ')
+}
+
+/** Jaccard-överlapp mellan två tokenmängder — |A∩B| / |A∪B|. */
+export function jaccardOverlap(a: string[], b: string[]): number {
+  if (a.length === 0 && b.length === 0) return 1
+  const setA = new Set(a)
+  const setB = new Set(b)
+  let intersection = 0
+  Array.from(setA).forEach((t) => {
+    if (setB.has(t)) intersection++
+  })
+  const union = new Set(Array.from(setA).concat(Array.from(setB))).size
+  return union === 0 ? 0 : intersection / union
+}
+
+/** Tröskeln för "samma sak, sagt igen med andra ord" — hög avsiktligt:
+ *  hellre två sanna minnen som borde slagits ihop än en felaktig
+ *  sammanslagning av två olika fakta. */
+export const SUPERSEDE_OVERLAP_THRESHOLD = 0.6
+
+export interface DedupeCandidate {
+  id: string
+  content: string
+  memory_type: string
+}
+
+export type DedupeDecision =
+  | { action: 'skip'; matchId: string }
+  | { action: 'supersede'; matchId: string }
+  | { action: 'insert' }
+
+/**
+ * Ersätter substring-hacket (.ilike('%first-50-chars%')) med två regler,
+ * i tur och ordning:
+ *   1. Exakt normaliserad matchning (samma innehåll, andra skiljetecken/
+ *      versaler) → skip, bumpa den befintliga.
+ *   2. Samma memory_type + hög tokenöverlapp (Jaccard ≥ 0.6) → den nya
+ *      raden ERSÄTTER den gamla (supersede), inte en tyst bump.
+ *   3. Annars → ny rad.
+ *
+ * KÄND BEGRÄNSNING (V2, ärligt dokumenterad): en riktig MOTSÄGELSE ("kunden
+ * vill ha ek" vs "kunden vill ha ek, ändrade sig — vill ha halkfritt golv")
+ * har LÅG tokenöverlapp och slinker igenom som två separata, samexisterande
+ * minnen. Att avgöra äkta motsägelse kräver semantisk förståelse — den här
+ * funktionen är medvetet inte LLM-dömd (deterministisk, testbar, aldrig en
+ * gissning), så den gränsen accepteras hellre än att bygga en AI-domare.
+ */
+export function decideDedupeAction(newContent: string, newType: string, candidates: DedupeCandidate[]): DedupeDecision {
+  const newNorm = normalizedText(newContent)
+  if (newNorm.length > 0) {
+    for (const c of candidates) {
+      if (normalizedText(c.content) === newNorm) {
+        return { action: 'skip', matchId: c.id }
+      }
+    }
+  }
+
+  const newTokens = normalizeForOverlap(newContent)
+  let best: { id: string; overlap: number } | null = null
+  for (const c of candidates) {
+    if (c.memory_type !== newType) continue
+    const overlap = jaccardOverlap(newTokens, normalizeForOverlap(c.content))
+    if (overlap >= SUPERSEDE_OVERLAP_THRESHOLD && (!best || overlap > best.overlap)) {
+      best = { id: c.id, overlap }
+    }
+  }
+  if (best) return { action: 'supersede', matchId: best.id }
+  return { action: 'insert' }
+}
+
+// ── Spara (I/O, testbar via injicerad klient — samma mönster som
+//    lib/promises/deadline-sweep.ts findOpenPromiseDeadlines) ──
+
+export interface SaveExtractedMemoryInput {
+  businessId: string
+  agentId: string
+  rawContent: string
+  triggerType: string
+  source?: MemorySource
+}
+
+export type SaveExtractedMemoryResult =
+  | { action: 'discarded' }
+  | { action: 'error'; error: string }
+  | { action: 'bumped'; memoryId: string }
+  | { action: 'inserted'; memoryId: string; legacy: boolean; confirmationPending: boolean }
+  | { action: 'superseded'; memoryId: string; supersededId: string; confirmationPending: boolean }
+
+/**
+ * Klassificerar, maskar PII, deduperar/supersedar och sparar EN extraherad
+ * mening. Ren I/O-orkestrering runt de rena funktionerna ovan — ingen
+ * nätverkstrafik här (Haiku-anropet ligger i extractAndSaveMemory).
+ */
+export async function saveExtractedMemory(
+  supabase: SupabaseClient,
+  input: SaveExtractedMemoryInput,
+): Promise<SaveExtractedMemoryResult> {
+  const { businessId, agentId, triggerType, source } = input
+  const trimmed = (input.rawContent || '').trim()
+  if (!trimmed || trimmed === 'INGEN' || trimmed.length < 10) {
+    return { action: 'discarded' }
+  }
+
+  // PII-skydd (samma helper som thread-messages.ts): maska personnummer/
+  // bankgiro/långa siffersekvenser (bl.a. svenska mobilnummer, 10 siffror)
+  // INNAN något sparas.
+  const content = scrubPII(trimmed)
+  const memoryType = classifyMemoryType(content, triggerType)
+  const importance = calculateImportance(triggerType, content)
+
+  const { data: candidates, error: candErr } = await supabase
+    .from('agent_memories')
+    .select('id, content, memory_type, access_count')
+    .eq('business_id', businessId)
+    .eq('agent_id', agentId)
+    .is('superseded_by', null)
+    .limit(50)
+
+  if (candErr) {
+    if (!isMissingColumnError(candErr)) {
+      console.error('[agent-memory] dedupe-läsning misslyckades:', candErr.message)
+      return { action: 'error', error: candErr.message }
+    }
+    // Pre-migration (42703 på superseded_by) — kör gårdagens exakta
+    // väg: substring-dedupe, ingen bekräftelsegrind, ingen ny kolumn.
+    return saveExtractedMemoryLegacy(supabase, businessId, agentId, content, memoryType, importance)
+  }
+
+  const decision = decideDedupeAction(content, memoryType, candidates || [])
+
+  if (decision.action === 'skip') {
+    const match = (candidates || []).find((c) => c.id === decision.matchId)
+    const { error: bumpErr } = await supabase
+      .from('agent_memories')
+      .update({
+        access_count: (match?.access_count || 0) + 1,
+        last_accessed_at: new Date().toISOString(),
+        importance_score: bumpedImportance(match?.access_count || 0),
+      })
+      .eq('id', decision.matchId)
+    if (bumpErr) {
+      console.error('[agent-memory] bump misslyckades:', bumpErr.message)
+      return { action: 'error', error: bumpErr.message }
+    }
+    return { action: 'bumped', memoryId: decision.matchId }
+  }
+
+  const needsConfirmation = requiresConfirmation(memoryType)
+  const { data: inserted, error: insertErr } = await supabase
+    .from('agent_memories')
+    .insert({
+      business_id: businessId,
+      agent_id: agentId,
+      memory_type: memoryType,
+      content,
+      importance_score: importance,
+      confirmed_at: needsConfirmation ? null : new Date().toISOString(),
+      source_type: source?.type ?? null,
+      source_id: source?.id ?? null,
+    })
+    .select('id')
+    .single()
+
+  if (insertErr || !inserted) {
+    console.error('[agent-memory] insert misslyckades:', insertErr?.message)
+    return { action: 'error', error: insertErr?.message || 'insert failed' }
+  }
+
+  if (decision.action === 'supersede') {
+    const { error: supersedeErr } = await supabase
+      .from('agent_memories')
+      .update({ superseded_by: inserted.id })
+      .eq('id', decision.matchId)
+      .eq('business_id', businessId)
+    if (supersedeErr) {
+      // Icke-blockerande: den nya sanningen är redan sparad, en misslyckad
+      // markering av den gamla får aldrig fälla hela sparandet.
+      console.error('[agent-memory] supersede-markering misslyckades (icke-blockerande):', supersedeErr.message)
+    }
+  }
+
+  if (needsConfirmation) {
+    await createMemoryConfirmationCard(supabase, businessId, agentId, memoryType, content, inserted.id)
+  }
+
+  return decision.action === 'supersede'
+    ? { action: 'superseded', memoryId: inserted.id, supersededId: decision.matchId, confirmationPending: needsConfirmation }
+    : { action: 'inserted', memoryId: inserted.id, legacy: false, confirmationPending: needsConfirmation }
+}
+
+/** Exakt gårdagens beteende — substring-dedupe, ingen v149-kolumn rörd. */
+async function saveExtractedMemoryLegacy(
+  supabase: SupabaseClient,
+  businessId: string,
+  agentId: string,
+  content: string,
+  memoryType: MemoryType,
+  importance: number,
+): Promise<SaveExtractedMemoryResult> {
+  const { data: existing } = await supabase
+    .from('agent_memories')
+    .select('id, content, access_count')
+    .eq('business_id', businessId)
+    .eq('agent_id', agentId)
+    .ilike('content', `%${content.slice(0, 50)}%`)
+    .limit(1)
+
+  if (existing && existing.length > 0) {
+    await supabase
+      .from('agent_memories')
+      .update({
+        access_count: (existing[0].access_count || 0) + 1,
+        last_accessed_at: new Date().toISOString(),
+        importance_score: bumpedImportance(existing[0].access_count || 0),
+      })
+      .eq('id', existing[0].id)
+    return { action: 'bumped', memoryId: existing[0].id }
+  }
+
+  const { data: inserted, error: insertErr } = await supabase
+    .from('agent_memories')
+    .insert({
+      business_id: businessId,
+      agent_id: agentId,
+      memory_type: memoryType,
+      content,
+      importance_score: importance,
+    })
+    .select('id')
+    .single()
+
+  if (insertErr || !inserted) {
+    console.error('[agent-memory] legacy insert misslyckades:', insertErr?.message)
+    return { action: 'error', error: insertErr?.message || 'insert failed' }
+  }
+  return { action: 'inserted', memoryId: inserted.id, legacy: true, confirmationPending: false }
+}
+
+/**
+ * Bekräftelsegrinden: skapar ett pending_approvals-kort
+ * (approval_type='agent_memory_confirmation'). Godkännande sätter
+ * confirmed_at på DENNA redan sparade rad — se app/api/approvals/[id]/
+ * route.ts, case 'agent_memory_confirmation'. Icke-blockerande: en
+ * misslyckad kortskapelse får aldrig fälla ett redan sparat minne (det
+ * ligger kvar unbekräftat och plockas inte upp av getRelevantMemories
+ * förrän någon bekräftar det — säkert fail-läge, inte en läcka).
+ */
+async function createMemoryConfirmationCard(
+  supabase: SupabaseClient,
+  businessId: string,
+  agentId: string,
+  memoryType: MemoryType,
+  content: string,
+  memoryId: string,
+): Promise<void> {
+  try {
+    const agentLabel = AGENT_DISPLAY_NAMES[agentId] || agentId
+    const typLabel = memoryType === 'preference' ? 'en preferens' : 'ett mönster'
+    const { error } = await supabase.from('pending_approvals').insert({
+      id: `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      business_id: businessId,
+      status: 'pending',
+      expires_at: new Date(Date.now() + MEMORY_CARD_EXPIRES_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+      approval_type: AGENT_MEMORY_CONFIRMATION_TYPE,
+      routing_role: 'owner_admin',
+      title: `${agentLabel} har lagt märke till ${typLabel}`,
+      description: content,
+      risk_level: 'low',
+      payload: {
+        memory_id: memoryId,
+        agent_id: agentId,
+        memory_type: memoryType,
+        content,
+      },
+    })
+    if (error) {
+      console.error('[agent-memory] kunde inte skapa bekräftelsekort (icke-blockerande):', error.message)
+    }
+  } catch (err: any) {
+    console.error('[agent-memory] bekräftelsekort kastade (icke-blockerande):', err?.message || err)
+  }
+}
+
+/**
+ * Anropas fire-and-forget efter varje agent-körning (app/api/agent/trigger/
+ * route.ts) och varje Matte-chattur (app/api/matte/chat/route.ts). Blockerar
+ * aldrig — sväljer alla fel, precis som innan Etapp U.
+ */
 export async function extractAndSaveMemory(
   businessId: string,
   agentId: string,
   finalResponse: string,
   triggerType: string,
-  triggerData: Record<string, unknown>
+  triggerData: Record<string, unknown>,
+  source?: MemorySource,
 ): Promise<void> {
   if (!finalResponse || finalResponse.length < 30) return
   if (!process.env.ANTHROPIC_API_KEY) return
@@ -72,83 +500,109 @@ Agentens svar: ${finalResponse.slice(0, 500)}`
       })
     }
 
-    const memoryContent = extraction.content?.[0]?.text?.trim()
-
-    if (!memoryContent || memoryContent === 'INGEN' || memoryContent.length < 10) return
-
-    // 2. Determine memory type
-    const memoryType = classifyMemoryType(memoryContent, triggerType)
-
-    // 3. Generate embedding (mock for now — Anthropic doesn't have embeddings API yet)
-    const embedding = await generateEmbedding(memoryContent)
-
-    // 4. Save to agent_memories
+    const rawContent = extraction.content?.[0]?.text?.trim() || ''
     const supabase = getServerSupabase()
-
-    // Check for duplicate/similar memories
-    const { data: existing } = await supabase
-      .from('agent_memories')
-      .select('id, content, access_count')
-      .eq('business_id', businessId)
-      .eq('agent_id', agentId)
-      .ilike('content', `%${memoryContent.slice(0, 50)}%`)
-      .limit(1)
-
-    if (existing && existing.length > 0) {
-      // Update access count instead of duplicating
-      await supabase
-        .from('agent_memories')
-        .update({
-          access_count: (existing[0].access_count || 0) + 1,
-          last_accessed_at: new Date().toISOString(),
-          importance_score: Math.min(1.0, 0.5 + (existing[0].access_count || 0) * 0.1),
-        })
-        .eq('id', existing[0].id)
-      return
-    }
-
-    await supabase.from('agent_memories').insert({
-      business_id: businessId,
-      agent_id: agentId,
-      memory_type: memoryType,
-      content: memoryContent,
-      embedding: embedding,
-      importance_score: calculateImportance(triggerType, memoryContent),
-    })
+    await saveExtractedMemory(supabase, { businessId, agentId, rawContent, triggerType, source })
   } catch (err) {
     console.error('[agent-memory] Failed to extract/save memory:', err)
   }
 }
 
-// ── Retrieve relevant memories ──
+// ── Läsa (I/O, testbar via injicerad klient) ──
 
-export async function getRelevantMemories(
+export interface RelevantMemoryRow {
+  id: string
+  content: string
+  importance_score: number
+  memory_type: string
+  created_at: string
+  access_count?: number
+}
+
+const RELEVANT_MEMORIES_FETCH_LIMIT = 200
+const RELEVANT_MEMORIES_TOP_N = 5
+
+/**
+ * Hämtar minnen för en agent (+ Mattes delade minnen), bekräftade och
+ * icke-ersatta (fail-soft: 42703 → gårdagens ofiltrerade fråga), rankade
+ * på färskhetsviktad poäng (rankByEffectiveScore) — ALDRIG bara rå
+ * importance_score längre, ett minne från i höstas ska inte slå ett från
+ * i morse för evigt.
+ *
+ * OBS: "relevans" här betyder "topp-N per bekräftad poäng med
+ * färskhetsdecay" — INTE semantisk sökning. Den tidigare kommentarens
+ * antydan om vektor-likhet var död kod (embedding var alltid NULL); den
+ * här funktionen döps och dokumenteras som vad den faktiskt är.
+ */
+export async function fetchRelevantMemories(
+  supabase: SupabaseClient,
   businessId: string,
   agentId: string,
-  context?: string
-): Promise<string[]> {
-  const supabase = getServerSupabase()
+  opts: { now?: Date } = {},
+): Promise<RelevantMemoryRow[]> {
+  const now = opts.now ?? new Date()
 
-  // Simple approach: get most recent + highest importance memories for this agent
-  // Full vector search requires embedding the query — use importance-based for now
-  const { data: memories } = await supabase
+  const { data, error } = await supabase
     .from('agent_memories')
-    .select('id, content, importance_score, memory_type, access_count')
+    .select('id, content, importance_score, memory_type, created_at, access_count')
     .eq('business_id', businessId)
-    .or(`agent_id.eq.${agentId},agent_id.eq.matte`) // Include Matte's shared knowledge
-    .order('importance_score', { ascending: false })
-    .limit(5)
+    .or(`agent_id.eq.${agentId},agent_id.eq.matte`)
+    .is('superseded_by', null)
+    .not('confirmed_at', 'is', null)
+    .limit(RELEVANT_MEMORIES_FETCH_LIMIT)
 
-  if (!memories || memories.length === 0) return []
+  let rows = data as RelevantMemoryRow[] | null
+  let readErr = error
 
-  // Update last_accessed_at
-  const ids = memories.map((m: any) => m.id)
-  await supabase
-    .from('agent_memories')
-    .update({ last_accessed_at: new Date().toISOString() })
-    .in('id', ids)
+  if (readErr && isMissingColumnError(readErr)) {
+    // Pre-migration — gårdagens exakta fråga: ofiltrerad, DB-sorterad på
+    // rå importance_score, topp-5 direkt (ingen decay-sortering behövs
+    // här utöver vad rankByEffectiveScore gör lokalt nedan, som fortfarande
+    // fungerar eftersom created_at alltid funnits, sedan v21).
+    const legacy = await supabase
+      .from('agent_memories')
+      .select('id, content, importance_score, memory_type, created_at, access_count')
+      .eq('business_id', businessId)
+      .or(`agent_id.eq.${agentId},agent_id.eq.matte`)
+      .order('importance_score', { ascending: false })
+      .limit(RELEVANT_MEMORIES_TOP_N)
+    rows = legacy.data as RelevantMemoryRow[] | null
+    readErr = legacy.error
+  }
 
-  return memories.map((m: any) => m.content)
+  if (readErr) {
+    console.error('[agent-memory] läsning misslyckades:', readErr.message)
+    return []
+  }
+  if (!rows || rows.length === 0) return []
+
+  const top = rankByEffectiveScore(rows, now).slice(0, RELEVANT_MEMORIES_TOP_N)
+
+  const ids = top.map((m) => m.id)
+  if (ids.length > 0) {
+    await supabase
+      .from('agent_memories')
+      .update({ last_accessed_at: now.toISOString() })
+      .in('id', ids)
+  }
+
+  return top
+}
+
+/**
+ * Hämtar top-5 relevanta minnen via cosine similarity — NEJ: se
+ * fetchRelevantMemories filhuvud, det är top-N per bekräftad relevanspoäng
+ * med färskhetsdecay, ingen vektorsökning. Behåller signaturen
+ * (businessId, agentId) — ingen anropare har någonsin skickat ett
+ * context-argument (verifierat i app/api/agent/trigger/route.ts och
+ * app/api/matte/chat/route.ts), så det tredje argumentet är borttaget
+ * helt (Etapp U, ärlighet före ambition) i stället för att låtsas
+ * användas.
+ */
+export async function getRelevantMemories(businessId: string, agentId: string): Promise<string[]> {
+  const supabase = getServerSupabase()
+  const rows = await fetchRelevantMemories(supabase, businessId, agentId)
+  return rows.map((r) => r.content)
 }
 
 /**
@@ -222,17 +676,8 @@ export function buildMessagesPrompt(
 ): string {
   if (messages.length === 0) return ''
 
-  const agentNames: Record<string, string> = {
-    matte: 'Matte (chef)',
-    karin: 'Karin (ekonom)',
-    hanna: 'Hanna (marknad)',
-    daniel: 'Daniel (sälj)',
-    lars: 'Lars (projekt)',
-    lisa: 'Lisa (kundservice)',
-  }
-
   const formatted = messages.map(m => {
-    const name = agentNames[m.from_agent] || m.from_agent
+    const name = AGENT_DISPLAY_NAMES[m.from_agent] || m.from_agent
     const typeLabel = m.message_type === 'handoff' ? ' [HANDOFF]' : ''
     const lines = [`${name}${typeLabel}: ${m.content}`]
     if (m.metadata?.reason) lines.push(`  Anledning: ${m.metadata.reason}`)
@@ -246,30 +691,4 @@ export function buildMessagesPrompt(
 ${formatted.join('\n\n')}
 === Slut på meddelanden ===
 Agera på relevanta meddelanden — vid HANDOFF, ta över ärendet direkt. Du kan skicka svar via send_agent_message.`
-}
-
-// ── Helpers ──
-
-function classifyMemoryType(content: string, triggerType: string): string {
-  const lower = content.toLowerCase()
-  if (lower.includes('föredrar') || lower.includes('vill ha') || lower.includes('gillar')) return 'preference'
-  if (lower.includes('brukar') || lower.includes('tenderar') || lower.includes('mönster')) return 'pattern'
-  if (lower.includes('har ') || lower.includes('är ') || lower.includes('finns')) return 'fact'
-  return 'observation'
-}
-
-function calculateImportance(triggerType: string, content: string): number {
-  let score = 0.5
-  if (triggerType === 'phone_call') score += 0.2 // Phone calls are high-signal
-  if (triggerType === 'manual') score += 0.1
-  if (content.toLowerCase().includes('viktigt') || content.toLowerCase().includes('kritisk')) score += 0.15
-  if (content.length > 100) score += 0.05
-  return Math.min(1.0, score)
-}
-
-async function generateEmbedding(text: string): Promise<number[] | null> {
-  // Anthropic doesn't have an embeddings API — use null for now
-  // When available, replace with real embedding call
-  // For vector search, could use OpenAI ada-002 or similar
-  return null
 }

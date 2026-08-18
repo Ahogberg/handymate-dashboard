@@ -1536,6 +1536,12 @@ export async function POST(request: NextRequest) {
       customerId,
       projectId,
       userMessage: newUserText,
+    }, {
+      // Källspår (Etapp U, sql/v149_agent_memory_hardening.sql): tråden
+      // detta minne extraherades ur, om chatten hade en (kan saknas för
+      // en helt ny tråd som inte hann skapas).
+      type: 'chat_thread',
+      id: thread?.id ?? null,
     }).catch((err) => console.error('[matte/chat] extractAndSaveMemory failed (non-blocking):', err))
 
     await bokforMatteUsage(`matte_${thread?.id || businessId}_${Date.now()}`)

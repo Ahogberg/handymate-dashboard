@@ -1394,6 +1394,34 @@ async function executeApprovalPayload(
         return { action: 'customer_fact', ok: true, fact_id: fact.id }
       }
 
+      case 'agent_memory_confirmation': {
+        // Agentminnets härdning (Etapp U, 2026-08-18, sql/v149_agent_
+        // memory_hardening.sql): kortet representerar EN redan sparad
+        // agent_memories-rad (skriven unbekräftad vid extraktion, se
+        // lib/agents/memory.ts saveExtractedMemory). Godkännande sätter
+        // BARA confirmed_at på den raden — ingen ny rad, ingen gissning.
+        // Samma fältlokala, tenant-scopade mönster som case 'customer_fact'
+        // ovan.
+        const pl = payload as any
+        if (!pl.memory_id) {
+          return { action: 'agent_memory_confirmation', ok: false, error: 'Kortet saknar minnes-id.' }
+        }
+        const supabaseAM = await getSupabase()
+        const { data: mem, error: memErr } = await supabaseAM
+          .from('agent_memories')
+          .update({ confirmed_at: new Date().toISOString() })
+          .eq('id', pl.memory_id)
+          .eq('business_id', businessId)
+          .select('id')
+          .single()
+
+        if (memErr || !mem) {
+          console.error('[approvals/agent_memory_confirmation] kunde inte bekräfta minnet:', memErr?.message)
+          return { action: 'agent_memory_confirmation', ok: false, error: 'Kunde inte bekräfta — försök igen om en stund' }
+        }
+        return { action: 'agent_memory_confirmation', ok: true, memory_id: mem.id }
+      }
+
       case 'proactive_care': {
         const pl = payload as any
         if (!pl.customer_phone || !pl.suggested_sms) {

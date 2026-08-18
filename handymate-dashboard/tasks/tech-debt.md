@@ -2587,3 +2587,5 @@ en kontext-nyckel plumbas in i ToolContext (v3-regelmotorns autonomi opåverkad)
   i de rutterna — annars hade fixen bara bytt ett garanterat fel (401) mot
   ett sannolikt (timeout).
 - TD-87: credit/route.ts:128 skapar kreditnotor med status 'sent' vid INSERT utan att någon leverans skett — semantiskt fel som förorenar 'sent'-betydelsen (exkluderas ur manifest-triggning, men bör rättas).
+
+- TD-88: tests/stegkedjan.spec.ts har 2 fallerande test (fire-and-forget-init + flytt-resultatläsning, båda kring app/api/booking/complete-job) — pre-existerande före Q/T/U (rapporterat oberoende 2026-08-17 innan fakturaarbetet), sannolikt från tidigare stegkedje-ändring. Behöver rotorsaksanalys.

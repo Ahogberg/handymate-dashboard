@@ -179,6 +179,18 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // meeting_followup ovan. Se sql/v122_customer_fact.sql.
   customer_fact: 'EXECUTABLE_ACTION',
 
+  // Agentminnets härdning (Etapp U, 2026-08-18, sql/v149_agent_memory_
+  // hardening.sql): firmanivå-minnen (pattern/preference-klass ur
+  // lib/agents/memory.ts) skrivs UNBEKRÄFTADE vid extraktion — rå
+  // Haiku-output blir aldrig sanning utan en människa. Godkännande sätter
+  // confirmed_at på den REDAN sparade agent_memories-raden (payload bär
+  // memory_id) — en riktig skrivning, samma klass som customer_fact ovan,
+  // därför EXECUTABLE_ACTION och inte INFORMATIONAL (en informationsklass
+  // skulle aldrig nå caset — nonExecutableResult utför ingenting, och
+  // hela poängen med kortet ÄR att utföra bekräftelsen). Se
+  // app/api/approvals/[id]/route.ts, case 'agent_memory_confirmation'.
+  agent_memory_confirmation: 'EXECUTABLE_ACTION',
+
   // Förtjänad autonomi — nedgradering (lib/autonomy/earned-autonomy.ts
   // recordAutonomyFailure): "nyckeln togs bort" är ett konstaterande, inte
   // ett förslag. Godkänn = jag har läst den, ingenting att utföra.
