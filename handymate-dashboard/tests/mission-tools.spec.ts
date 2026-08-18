@@ -415,3 +415,24 @@ test.describe('matte/chat/route.ts — möjlighetsportfölj-kontextblock', () =>
     expect(chatSrc).toContain('goal_count')
   })
 })
+
+test.describe('Mission Control är ägar-/admin-låst i chatten (Andreas fynd 2026-08-18)', () => {
+  const fs = require('fs')
+  const path = require('path')
+  const routeSrc = fs.readFileSync(path.join(__dirname, '..', 'app', 'api', 'matte', 'chat', 'route.ts'), 'utf8') as string
+
+  test('rollgrinden finns — isOwnerOrAdmin importeras och missionBehorig beräknas', () => {
+    expect(routeSrc).toContain('isOwnerOrAdmin')
+    expect(routeSrc).toContain('missionBehorig')
+  })
+
+  test('portföljblocket (bär fakturabelopp) byggs bara för behöriga', () => {
+    expect(routeSrc).toContain(currentAgent === 'matte' && missionBehorig)
+  })
+
+  test('dubbelgrind: verktygslistan filtreras OCH exekveringen vägrar', () => {
+    expect(routeSrc).toContain('MISSION_TOOL_NAMES')
+    expect(routeSrc).toContain('missionToolsAllowed || !MISSION_TOOL_NAMES.has')
+    expect(routeSrc).toContain('Endast ägare och administratör kan skapa eller bekräfta uppdrag.')
+  })
+})

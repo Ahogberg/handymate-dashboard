@@ -20,7 +20,7 @@ import {
 } from '@/lib/agent/thread-messages'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { getCurrentUser } from '@/lib/permissions'
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { executeTool as executeSharedTool } from '@/app/api/agent/trigger/tool-router'
 import { filterTools, fetchBusinessContext, type ToolContext } from '@/lib/agent/agents/shared'
 import {
@@ -685,11 +685,18 @@ async function runAgentTurn(opts: {
   supabase: ReturnType<typeof getServerSupabase>
   toolContext: ToolContext
   requireConfirmExternal: boolean
+  /** Ägar-/admin-grinden för Mission Control (Andreas fynd 2026-08-18):
+      false ⇒ mission-verktygen tas bort ur listan (modellen ser dem aldrig)
+      OCH exekveringen vägrar (djupförsvar nedan). */
+  missionToolsAllowed: boolean
 }): Promise<AgentTurnResult> {
   const MAX_TOOL_ITERATIONS = 5
+  const MISSION_TOOL_NAMES = new Set(['propose_mission_plan', 'confirm_mission'])
   // Agentens allowlist låses för hela turen — byts agenten sker det via en
   // NY runAgentTurn efter handoff, med den nya agentens lista.
-  const agentTools = toolsForAgent(opts.agent)
+  const agentTools = toolsForAgent(opts.agent).filter(
+    t => opts.missionToolsAllowed || !MISSION_TOOL_NAMES.has(t.name),
+  )
   let response = await callClaude({
     apiKey: opts.apiKey,
     system: opts.systemArray,
@@ -791,6 +798,18 @@ async function runAgentTurn(opts: {
             type: 'tool_result',
             tool_use_id: block.id,
             content: `Fel: ${block.name} ligger utanför ${opts.agent}s område. Lämna över till rätt specialist i stället.`,
+          }
+        }
+        // Mission Control-grindens andra halva (Andreas fynd 2026-08-18):
+        // även om ett mission-verktyg hallucineras nekas det här för roller
+        // utan ägar-/admin-behörighet — listan till modellen är UX, det här
+        // är gränsen (samma tvåhalvsmönster som agent-allowlisten ovan).
+        if (!opts.missionToolsAllowed && MISSION_TOOL_NAMES.has(block.name)) {
+          toolOutcomes.push({ tool: block.name, ok: false, error: 'mission-verktyg kräver ägare/administratör' })
+          return {
+            type: 'tool_result',
+            tool_use_id: block.id,
+            content: 'Endast ägare och administratör kan skapa eller bekräfta uppdrag.',
           }
         }
         const r: any = await executeSharedTool(block.name, block.input || {}, opts.supabase, opts.businessId, opts.toolContext as any)
@@ -994,6 +1013,12 @@ export async function POST(request: NextRequest) {
     // ToolContext så confirm_mission kan skriva ett riktigt created_by i
     // stället för alltid NULL (se lib/agent/agents/shared.ts ToolContext).
     const currentBusinessUser = await getCurrentUser(request, businessId)
+    // Mission Control är ägar-/admin-låst (Andreas fynd 2026-08-18): samma
+    // grind som mission-rutterna (Etapp D). Utan behörighet: inget
+    // portföljblock (det bär fakturabelopp) och inga mission-verktyg —
+    // chatten i övrigt orörd. Dubbelgrind: verktygslistan filtreras OCH
+    // exekveringen vägrar (djupförsvar, samma filosofi som external-actor).
+    const missionBehorig = currentBusinessUser != null && isOwnerOrAdmin(currentBusinessUser)
     const toolContext: ToolContext = {
       ...(bizCtx?.toolContext ?? {
         businessName,
@@ -1226,7 +1251,7 @@ export async function POST(request: NextRequest) {
       // flera (billiga, indexerade) frågor per Matte-tur — ingen cache
       // mellan requests i V1, se lib/mission/opportunity-portfolio.ts.
       let missionContextBlock = ''
-      if (currentAgent === 'matte') {
+      if (currentAgent === 'matte' && missionBehorig) {
         try {
           const portfolio = await loadOpportunityPortfolioForBusiness(supabase, businessId)
           // select('*') — INTE en explicit kolumnlista: goal_type/goal_hours
@@ -1305,6 +1330,7 @@ export async function POST(request: NextRequest) {
         supabase,
         toolContext,
         requireConfirmExternal,
+        missionToolsAllowed: missionBehorig,
       })
 
       requestUsage.input_tokens = (requestUsage.input_tokens || 0) + (turn.usage.input_tokens || 0)
