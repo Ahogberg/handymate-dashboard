@@ -127,6 +127,9 @@ test.describe('vägvalet är förstklassigt — inte en hjälte och två fotnote
   })
 
   test('den inaktiverade knappen förklarar sig', () => {
-    expect(intake).toContain('Beskriv jobbet först')
+    // Texten bytte lydelse i dbe859ae (2026-08-17, Bygg själv-knappen) —
+    // regeln är oförändrad: den inaktiverade primärknappen ska förklara
+    // sig, inte stå stum.
+    expect(intake).toContain('Beskriv jobbet — eller bygg själv')
   })
 })
