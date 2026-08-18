@@ -32,6 +32,7 @@ import {
   Lightbulb,
   Users,
   ListChecks,
+  Camera,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -133,6 +134,8 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   team_intro: { label: 'Ditt team', icon: Users, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   // Måndagskortet (Måndagsmötet etapp 1, 2026-08-13) — se lib/jarvis/monday-brief.ts.
   monday_brief: { label: 'Måndagskortet', icon: ListChecks, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
+  // Jobbpass (Etapp Ä, Closeout-to-Lifetime, 2026-08-18) — se lib/jobbpass/jobbpass.ts.
+  jobbpass_proposal: { label: 'Jobbpass', icon: Camera, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 
@@ -1301,6 +1304,28 @@ export default function ApprovalsPage() {
                             className="px-3 py-2 min-h-[44px] text-sm text-slate-500 hover:text-slate-700 transition-all"
                           >
                             Avbryt
+                          </button>
+                        </>
+                      ) : approval.approval_type === 'jobbpass_proposal' ? (
+                        // Får INTE godkännas rakt av — det finns inget att
+                        // "godkänna", ägaren väljer foton/samtycke och
+                        // publicerar i sin egen yta. "Hoppa över" avvisar
+                        // (kunden får inget jobbpass för det här projektet).
+                        <>
+                          <Link
+                            href={(approval.payload?.target_route as string) || `/dashboard/projects/${approval.payload?.project_id}/jobbpass`}
+                            className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-primary-700 hover:bg-primary-800 text-white text-sm font-medium rounded-lg transition-all"
+                          >
+                            <Camera className="w-4 h-4" />
+                            Välj foton & publicera
+                          </Link>
+                          <button
+                            onClick={() => handleAction(approval.id, 'reject')}
+                            disabled={actionLoading !== null}
+                            className="flex items-center gap-2 px-3 py-2 min-h-[44px] border border-slate-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-slate-700 text-sm font-medium rounded-lg transition-all"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            {actionLoading === approval.id + 'reject' ? 'Avvisar...' : 'Hoppa över'}
                           </button>
                         </>
                       ) : approval.approval_type === 'project_debrief' ? (

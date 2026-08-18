@@ -349,6 +349,19 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
     },
   ],
 
+  'Jobbpass (Etapp Ä)': [
+    {
+      route: 'projects/[id]/jobbpass',
+      requires: 'owner-admin',
+      why: 'Ägarens urval av vilka projektfoton som får följa med kunden plus samtyckesflaggan för framtida service — en styrande redigeringsyta, inte en läsning en anställd ska kunna göra åt ägaren. Etapp Ä, 2026-08-18.',
+    },
+    {
+      route: 'projects/[id]/jobbpass/publish',
+      requires: 'owner-admin',
+      why: 'Publicerar en publik kundlänk med projektdata — samma känslighet som quotes/sign-link. Får aldrig kunna triggas av en anställd. Etapp Ä, 2026-08-18.',
+    },
+  ],
+
   'Integrationer': [
     {
       route: 'integrations/fortnox/disconnect',

@@ -28,6 +28,7 @@ export type CloseoutEffectName =
   | 'project_debrief'
   | 'agent_trigger'
   | 'review_request'
+  | 'jobbpass_proposal'
   | 'deal_stage'
   | 'completion_batch'
 
@@ -535,6 +536,12 @@ async function runCompletionEffects(params: {
   // nu med felfacit och projekt-dedupe.
   effects.push(await createReviewRequest(supabase, businessId, project))
 
+  // 7b. Jobbpass (Etapp Ä, sql/v154_jobbpass.sql): Lars föreslår ett
+  // digitalt jobbpass åt kunden. Skapar bara FÖRSLAGSKORTET + en tom
+  // draft-rad att fylla i — inget publiceras här, ägaren väljer foton och
+  // publicerar själv i egen yta. Dedupe på samma sätt som recensionskortet.
+  effects.push(await proposeJobbpass(supabase, businessId, project))
+
   // 8. Flytta kopplad deal till vunnen; saknad deal är ett legitimt skip.
   try {
     if (!project.quote_id && !project.lead_id) {
@@ -579,7 +586,7 @@ async function runCompletionEffects(params: {
       .select('id, payload')
       .eq('business_id', businessId)
       .eq('status', 'pending')
-      .in('approval_type', ['review_auto_invoice', 'project_debrief', 'scheduled_review_request'])
+      .in('approval_type', ['review_auto_invoice', 'project_debrief', 'scheduled_review_request', 'jobbpass_proposal'])
     if (batchReadError) throw batchReadError
 
     let stamped = 0
@@ -704,6 +711,72 @@ async function createReviewRequest(
   }
 }
 
+/**
+ * Jobbpass-förslaget (Etapp Ä). Skapar en TOM draft-rad (getOrCreateDraftJobbpass
+ * — idempotent, inga foton/samtycke valda ännu) och ett förslagskort ägaren
+ * kan öppna för att välja foton och publicera. Dedupe mot en existerande
+ * pending_approval för samma projekt, samma mönster som createReviewRequest.
+ */
+async function proposeJobbpass(
+  supabase: SupabaseClient,
+  businessId: string,
+  project: CompletedProjectRow,
+): Promise<CloseoutEffectResult> {
+  try {
+    if (!project.customer_id) {
+      return { effect: 'jobbpass_proposal', status: 'skipped', message: 'Ingen kund kopplad' }
+    }
+
+    const existingResult = await supabase
+      .from('pending_approvals')
+      .select('id')
+      .eq('business_id', businessId)
+      .eq('approval_type', 'jobbpass_proposal')
+      .contains('payload', { project_id: project.project_id })
+      .limit(1)
+    if (existingResult.error) throw existingResult.error
+    if (existingResult.data && existingResult.data.length > 0) {
+      return {
+        effect: 'jobbpass_proposal',
+        status: 'skipped',
+        message: 'Jobbpass redan föreslaget',
+        artifact_id: existingResult.data[0].id,
+      }
+    }
+
+    const { getOrCreateDraftJobbpass } = await import('@/lib/jobbpass/jobbpass')
+    const draft = await getOrCreateDraftJobbpass(supabase, businessId, project.project_id)
+    if (!draft.ok) {
+      return { effect: 'jobbpass_proposal', status: 'failed', message: draft.error }
+    }
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('pending_approvals')
+      .insert({
+        business_id: businessId,
+        approval_type: 'jobbpass_proposal',
+        title: `Jobbpass — ${project.name}`,
+        description: `Skapa ett digitalt jobbpass åt kunden för "${project.name}": vad som gjordes, valda foton och garantivillkor.`,
+        risk_level: 'low',
+        status: 'pending',
+        expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        payload: {
+          project_id: project.project_id,
+          project_name: project.name,
+          customer_id: project.customer_id,
+          target_route: `/dashboard/projects/${project.project_id}/jobbpass`,
+          agent_id: 'lars',
+        },
+      })
+      .select('id')
+      .single()
+    if (insertError) throw insertError
+    return { effect: 'jobbpass_proposal', status: 'succeeded', artifact_id: inserted.id }
+  } catch (error) {
+    return effectFailure('jobbpass_proposal', error)
+  }
+}
+
 function effectFailure(effect: CloseoutEffectName, error: unknown): CloseoutEffectResult {
   return {
     effect,
@@ -726,6 +799,7 @@ function userWarningForEffect(effect: CloseoutEffectName): string {
     project_debrief: 'Lärandefrågorna kunde inte skapas.',
     agent_trigger: 'Lars kunde inte starta sin projektuppföljning.',
     review_request: 'Recensionsförfrågan kunde inte förberedas.',
+    jobbpass_proposal: 'Jobbpasset kunde inte föreslås.',
     deal_stage: 'Säljstatusen kunde inte uppdateras.',
     completion_batch: 'Efterarbetets kort kunde inte grupperas.',
   }

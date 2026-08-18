@@ -42,3 +42,74 @@ eskaleringsklasser pushar igenom, ingen ny behörighet någonsin, deterministisk
 - [x] npx tsc --noEmit
 - [x] npx next build
 - [x] git status, commit specifika filer, ingen push
+
+---
+
+# Etapp Ä — Jobbpass V1 (Closeout-to-Lifetime)
+
+Digitalt jobbpass som Lars föreslår vid projektavslut: accepterad omfattning,
+godkända ÄTA, utfört arbete (signerad fältrapport), UTVALDA foton (ägaren
+väljer), egenkontroll, fakturareferens, standardgaranti, valfri
+service-samtycke. Inget nytt utskick — bara data + en publik länk.
+
+## Migration
+- [x] sql/v154_jobbpass.sql — ny tabell `jobbpass` (id jp_-prefix, business_id,
+      project_id UNIQUE, selected_photo_ids JSONB, service_consent boolean,
+      status draft/published, token, published_at). RLS: service_role only
+      (samma mönster som v148). EJ körd — Andreas kör manuellt.
+
+## Lib (facit först — rött innan bygge)
+- [x] lib/jobbpass/jobbpass.ts
+      - JOBBPASS_ALLOWED_FIELDS (exporterad allowlist-konstant)
+      - deriveJobbpassView() — REN funktion, bygger kundvyn genom EXPLICIT
+        fältplock (aldrig spread av råa DB-rader) → strukturellt omöjligt
+        att läcka ett fält som inte står i allowlisten
+      - loadJobbpassSourceData() — I/O, smala .select()-listor, fail-soft
+      - loadSelectedJobbpassPhotos() — .in('id', selectedIds) — bara valda
+      - getOrCreateDraftJobbpass / setJobbpassSelection / publishJobbpass /
+        getPublishedJobbpassByToken / getJobbpassServiceConsent (I/O)
+      - Kommentarer beskriver förbjudna fält i PROSA, aldrig kolumnnamnen
+        ordagrant (självreferens-fällan mot källskanningsfacit)
+- [x] tests/jobbpass.spec.ts — facit (a)-(f) + källskanning + fake-supabase
+      derivationstest för foturvalet (52 tester, gröna)
+
+## Closeout-hook
+- [x] lib/projects/complete-project.ts — nytt effect-steg 'jobbpass_proposal'
+      i runCompletionEffects (samma dedupe/idempotens-idiom som
+      scheduled_review_request/project_debrief), tillagt i completion_batch
+      .in()-listan, CloseoutEffectName + userWarningForEffect uppdaterade
+
+## Ägar-ytan
+- [x] app/api/projects/[id]/jobbpass/route.ts — GET (kandidatfoton signerade
+      + nuvarande urval) / PATCH (foturval + samtycke), owner-admin
+- [x] app/api/projects/[id]/jobbpass/publish/route.ts — POST publicera
+      (genererar token), owner-admin
+- [x] app/dashboard/projects/[id]/jobbpass/page.tsx — fotoval, förhandsgranskning,
+      samtyckesbock, publicera-knapp, kopiera länk
+
+## Publik portalvy
+- [x] app/api/jobbpass/public/[token]/route.ts — GET, publik, 404 om ej published
+- [x] app/jobbpass/[token]/page.tsx — svensk, ljus/teal, mobiloptimerad
+
+## Approvals-UI
+- [x] app/dashboard/approvals/page.tsx — TYPE_CONFIG-post + särskild gren för
+      'jobbpass_proposal' (länk till ägar-ytan i st f rakt godkänn, samma
+      mönster som project_debrief), "Hoppa över" avvisar
+
+## Hanna-kopplingen
+- [x] getJobbpassServiceConsent(projectId) — läsfunktion, dokumenterad var den
+      SKA läsas (befintlig recensions-/rekommendationsflöde), inte kopplad
+      till någon cron nu
+
+## Behörighetskontrakt
+- [x] tests/permission-contract.spec.ts — registrerade
+      projects/[id]/jobbpass + projects/[id]/jobbpass/publish (owner-admin)
+
+## Verifiering
+- [x] npx playwright test tests/jobbpass.spec.ts --no-deps (rött → grönt, 52 st)
+- [x] npx playwright test tests/permission-contract.spec.ts --no-deps (26 st)
+- [x] npx playwright test tests/canonical-project-completion.spec.ts
+      tests/project-closeout-copilot.spec.ts --no-deps (26 st, oberörda)
+- [x] npx tsc --noEmit (0 fel)
+- [x] npx next build (ren build)
+- [x] git status + ett commit med specifika filer, ingen push
