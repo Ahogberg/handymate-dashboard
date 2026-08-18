@@ -177,6 +177,9 @@ export async function autoInvoiceOnComplete(
           invoiceId: invoice.invoice_id,
           sendEmail: true,
           sendSms: !!customer.phone_number,
+          // Attributionsregeln (Codex Q-granskning): systemets utskick
+          // loggas som automation — aldrig som en mänsklig användare.
+          source: 'automation',
         })
         levererad = Boolean(sendResult.email || sendResult.sms)
         if (!levererad) {

@@ -363,3 +363,19 @@ test.describe('sendInvoice — hela vägen, utan att röra Resend/46elks/Chromiu
     expect(db._state.invoice[0].status).toBe('draft')
   })
 })
+
+test.describe('attributionsregeln — automationens utskick loggas aldrig som människa (Codex Q-granskning 2026-08-18)', () => {
+  const fs = require('fs')
+  const path = require('path')
+  const coreSrc = fs.readFileSync(path.join(__dirname, '..', 'lib', 'invoices', 'send-invoice.ts'), 'utf8') as string
+  const autoSrc = fs.readFileSync(path.join(__dirname, '..', 'lib', 'projects', 'auto-invoice-on-complete.ts'), 'utf8') as string
+
+  test('kärnan hårdkodar inte created_by — den läser source-parametern', () => {
+    expect(coreSrc).not.toContain("created_by: 'user'")
+    expect(coreSrc).toContain('created_by: source')
+  })
+
+  test('autofakturan skickar source automation', () => {
+    expect(autoSrc).toContain("source: 'automation'")
+  })
+})

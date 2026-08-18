@@ -52,6 +52,14 @@ export interface SendInvoiceParams {
   sendEmail: boolean
   /** Skicka via SMS — anroparen avgör. */
   sendSms: boolean
+  /**
+   * Vem som initierade utskicket — attributionsregeln (Codex Q-granskning
+   * 2026-08-18): autofakturan får ALDRIG loggas som en mänsklig användare.
+   * 'user' = en inloggad människa tryckte skicka (rutten, default).
+   * 'automation' = systemflöde (auto-invoice-on-complete).
+   * Skrivs till customer_activity.created_by.
+   */
+  source?: 'user' | 'automation'
 }
 
 export interface SendInvoiceResult {
@@ -331,6 +339,7 @@ export async function sendInvoice(
     invoiceId,
     invoice,
     results,
+    source: params.source ?? 'user',
   })
 
   // Best-effort-sidoautomationer (pipeline/projektsteg/kommunikation/portal)
@@ -355,6 +364,8 @@ export interface InvoiceDeliveryOutcomeParams {
    */
   invoice: any
   results: { email?: boolean; sms?: boolean; errors: string[] }
+  /** Attributionsregeln — se SendInvoiceParams.source. Default 'user'. */
+  source?: 'user' | 'automation'
 }
 
 export interface InvoiceDeliveryOutcomeResult {
@@ -380,7 +391,7 @@ export async function applyInvoiceDeliveryOutcome(
   supabase: SupabaseClient,
   params: InvoiceDeliveryOutcomeParams,
 ): Promise<InvoiceDeliveryOutcomeResult> {
-  const { businessId, invoiceId, invoice, results } = params
+  const { businessId, invoiceId, invoice, results, source = 'user' } = params
 
   if (results.email || results.sms) {
     // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): sent_at/
@@ -438,7 +449,9 @@ export async function applyInvoiceDeliveryOutcome(
         title: `Faktura ${invoice.invoice_number} skickad`,
         description: `Faktura ${invoice.invoice_number} skickad${results.email ? ' via email' : ''}${results.sms ? ' via SMS' : ''}`,
         metadata: { invoice_id: invoiceId, ...results },
-        created_by: 'user',
+        // Attributionsregeln: automationens utskick får aldrig se ut som en
+        // människas klick — 'automation' när auto-invoice-on-complete skickade.
+        created_by: source,
       })
     if (activityErr) {
       console.error('[invoices/send] customer_activity insert failed:', activityErr)
