@@ -85,17 +85,55 @@ test.describe('JarvisHome.tsx — Uppdragsrad flyttad in i heron som band (Etapp
   })
 })
 
-test.describe('MatteHero — absenceBand-slot (Owner Absence V1, Etapp Å)', () => {
-  test('tar emot absenceBand som slot-prop, samma mönster som uppdragBand', () => {
+test.describe('MatteHero — absenceBand-slot (Owner Absence V1, Etapp Å; diskret-flytt 2026-08-18)', () => {
+  const absenceBandSrc = fs.readFileSync(
+    path.join(ROOT, 'components', 'jarvis', 'home', 'AbsenceBand.tsx'), 'utf8',
+  )
+  const jobbkompisenSrc = fs.readFileSync(
+    path.join(ROOT, 'components', 'Jobbkompisen.tsx'), 'utf8',
+  )
+
+  test('tar emot absenceBand som slot-prop, men renderar den BAR — ingen wrapper-ram i heron', () => {
     expect(heroSrc).toContain('absenceBand')
+    // Andreas 2026-08-18: vilo-knappen förlängde heron. Bandet renderar null
+    // i vardagen och äger sin EGEN avdelarram — en wrapper i heron hade
+    // lämnat en tom ramrad kvar. uppdragBand behåller sin wrapper (den
+    // renderar alltid innehåll).
+    expect(heroSrc).not.toContain('{absenceBand &&')
     const uppdragBlock = heroSrc.slice(heroSrc.indexOf('{uppdragBand &&'), heroSrc.indexOf('{uppdragBand &&') + 200)
-    const absenceBlock = heroSrc.slice(heroSrc.indexOf('{absenceBand &&'), heroSrc.indexOf('{absenceBand &&') + 200)
     expect(uppdragBlock).toContain("border-t border-white/10 pt-4")
-    expect(absenceBlock).toContain("border-t border-white/10 pt-4")
   })
 
   test('JarvisHome monterar AbsenceBand ovillkorligt (komponenten sköter sin egen 401/403-degradering)', () => {
     expect(homeSrc).toContain("import { AbsenceBand } from '@/components/jarvis/home/AbsenceBand'")
     expect(homeSrc).toContain('absenceBand={<AbsenceBand />}')
+  })
+
+  test('vilo-läget renderar ingenting i heron — bandet finns bara som aktiv status eller återkomstrapport', () => {
+    // Bandets ternary slutar i null, aldrig i en vilo-knapp. Texten
+    // "Jag är borta en period" får inte förekomma som bandinnehåll —
+    // den lever vidare enbart som aria-label/title på utlösarikonen.
+    const bandStart = absenceBandSrc.indexOf('export function AbsenceBand()')
+    const bandEnd = absenceBandSrc.indexOf('export function AbsenceTrigger()')
+    const bandBody = absenceBandSrc.slice(bandStart, bandEnd)
+    expect(bandBody).toContain(': null}')
+    expect(bandBody).not.toContain('Jag är borta en period')
+  })
+
+  test('bandets synliga lägen äger sin egen avdelarram (border-t) — flyttad från heron', () => {
+    const bandStart = absenceBandSrc.indexOf('export function AbsenceBand()')
+    const bandEnd = absenceBandSrc.indexOf('export function AbsenceTrigger()')
+    const bandBody = absenceBandSrc.slice(bandStart, bandEnd)
+    expect(bandBody).toContain('border-t border-white/10 pt-4')
+  })
+
+  test('utlösaren är en diskret ikon i Mattes panelhuvud, ägar-grindad via samma 401/403-degradering', () => {
+    expect(absenceBandSrc).toContain('export function AbsenceTrigger()')
+    expect(jobbkompisenSrc).toContain("import { AbsenceTrigger } from '@/components/jarvis/home/AbsenceBand'")
+    expect(jobbkompisenSrc).toContain('<AbsenceTrigger />')
+    // Triggern öppnar inställningsmodalen, aldrig chatten eller panelen.
+    const triggerBody = absenceBandSrc.slice(absenceBandSrc.indexOf('export function AbsenceTrigger()'))
+    expect(triggerBody).toContain('setShowSettings(true)')
+    expect(triggerBody).toContain('AbsenceSettingsModal')
   })
 })

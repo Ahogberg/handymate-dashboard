@@ -253,11 +253,10 @@ export function MatteHero({
         </div>
       )}
 
-      {absenceBand && (
-        <div className="border-t border-white/10 pt-4">
-          {absenceBand}
-        </div>
-      )}
+      {/* Frånvarobandet äger sin egen avdelarram och renderar null i
+          vardagen (Andreas 2026-08-18: vilo-knappen förlängde heron) — en
+          wrapper här hade lämnat en tom ramrad kvar i null-läget. */}
+      {absenceBand}
     </section>
   )
 }

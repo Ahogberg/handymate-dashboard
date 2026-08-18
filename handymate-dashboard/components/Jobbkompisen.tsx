@@ -34,6 +34,7 @@ import type { InteractionStatus } from '@/lib/agents/interaction'
 import type { BusinessScenarioPresentation } from '@/lib/business-twin/scenario-contract'
 import type { MissionPlanPresentation } from '@/lib/mission/mission-presentation'
 import { useMission } from '@/lib/mission/MissionProvider'
+import { AbsenceTrigger } from '@/components/jarvis/home/AbsenceBand'
 import { deriveBubbleState } from '@/lib/mission/bubble-state'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -609,9 +610,14 @@ export default function Jobbkompisen() {
             </span>
           )}
         </div>
-        <button onClick={() => setIsOpen(false)} className="hover:bg-white/20 p-1 rounded-lg transition-colors">
-          <X className="w-5 h-5 text-gray-900" />
-        </button>
+        <div className="flex items-center gap-1">
+          {/* Frånvaroläget (Andreas 2026-08-18): diskret månikon i stället
+              för vilo-bandet i heron — ägar-grindad, döljer sig själv. */}
+          <AbsenceTrigger />
+          <button onClick={() => setIsOpen(false)} className="hover:bg-white/20 p-1 rounded-lg transition-colors">
+            <X className="w-5 h-5 text-gray-900" />
+          </button>
+        </div>
       </div>
 
       {/* Värdebandet — vad Handymate hittat senaste månaden, i de tre

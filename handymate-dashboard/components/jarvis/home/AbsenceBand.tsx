@@ -11,14 +11,19 @@
  * primär informationskälla.
  *
  * Tre lägen:
- *  1. Inget aktivt fönster, ingen ovisad rapport → en tyst länkknapp
- *     "Jag är borta en period" som öppnar inställningsmodalen.
+ *  1. Inget aktivt fönster, ingen ovisad rapport → INGENTING renderas
+ *     (Andreas 2026-08-18: vilo-knappen förlängde heron — utlösaren bor nu
+ *     i stället som diskret månikon i Mattes panelhuvud, se AbsenceTrigger
+ *     nedan + Jobbkompisen.tsx; heron har exakt sin gamla storlek i vardagen).
  *  2. Aktivt fönster → statusraden "Frånvaroläge till {datum} — X händelser
  *     samlade, Y eskaleringar" (X/Y HÄRLETT server-side, aldrig gissat här)
  *     + "Avsluta frånvaro nu".
  *  3. Fönstret har passerat och rapporten inte visats än (localStorage,
  *     samma mönster som mandagsmoteSeenKey) → "Välkommen tillbaka →" som
  *     öppnar rapportmodalen. Avfärdas med en gång den öppnats.
+ *
+ * Bandet äger sin EGEN avdelarram (border-t) i lägena 2-3 — MatteHero
+ * renderar sloten bar, så ett null-läge lämnar ingen tom ramrad efter sig.
  *
  * INGEN chatt-parsning, inget mission-verktyg — bara ett rent UI-lager ovanpå
  * lib/absence/*. Den här filen skriver aldrig till pending_approvals.
@@ -132,7 +137,7 @@ export function AbsenceBand() {
   return (
     <>
       {state.active && state.window ? (
-        <div className="flex flex-wrap items-center gap-2.5 text-sm">
+        <div className="border-t border-white/10 pt-4 flex flex-wrap items-center gap-2.5 text-sm">
           <Moon className="w-4 h-4 text-primary-300 shrink-0" />
           <span className="text-white/80">
             Frånvaroläge till {formatDatum(state.window.to)}
@@ -151,24 +156,17 @@ export function AbsenceBand() {
           </button>
         </div>
       ) : rapportChecked && rapport ? (
-        <button
-          type="button"
-          onClick={() => setShowReport(true)}
-          className="flex items-center gap-2 text-sm font-medium text-primary-300 hover:text-primary-200"
-        >
-          <PartyPopper className="w-4 h-4 shrink-0" />
-          Välkommen tillbaka — se vad som hände medan du var borta →
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setShowSettings(true)}
-          className="flex items-center gap-2 text-xs font-medium text-white/50 hover:text-white/80"
-        >
-          <Moon className="w-3.5 h-3.5 shrink-0" />
-          Jag är borta en period
-        </button>
-      )}
+        <div className="border-t border-white/10 pt-4">
+          <button
+            type="button"
+            onClick={() => setShowReport(true)}
+            className="flex items-center gap-2 text-sm font-medium text-primary-300 hover:text-primary-200"
+          >
+            <PartyPopper className="w-4 h-4 shrink-0" />
+            Välkommen tillbaka — se vad som hände medan du var borta →
+          </button>
+        </div>
+      ) : null}
 
       {showSettings && (
         <AbsenceSettingsModal
@@ -182,6 +180,83 @@ export function AbsenceBand() {
 
       {showReport && rapport && (
         <FranvarorapportModal rapport={rapport} onClose={dismissReport} />
+      )}
+    </>
+  )
+}
+
+/**
+ * AbsenceTrigger — den diskreta utlösaren för frånvaroläget (Andreas
+ * 2026-08-18: flyttad hit från herons vilo-band som förlängde ytan).
+ * En liten månikon i Mattes panelhuvud (Jobbkompisen.tsx): tänd
+ * (primary-300) när ett fönster är aktivt, dämpad annars. Öppnar samma
+ * inställningsmodal som bandet. Egen lätt hämtning vid montering (panelen
+ * monteras först när den öppnas) och samma tysta 401/403-degradering —
+ * anställda ser aldrig knappen.
+ */
+export function AbsenceTrigger() {
+  const [state, setState] = useState<AbsenceState | null>(null)
+  const [allowed, setAllowed] = useState(true)
+  const [showSettings, setShowSettings] = useState(false)
+
+  const authHeaders = useCallback(async (): Promise<Record<string, string>> => {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
+  }, [])
+
+  const fetchState = useCallback(async () => {
+    try {
+      const res = await fetch('/api/absence', { headers: await authHeaders() })
+      if (res.status === 401 || res.status === 403) { setAllowed(false); return }
+      if (!res.ok) return
+      const data = await res.json()
+      setState({ window: data.window, active: data.active, status: data.status })
+    } catch { /* tyst — bekvämlighetsyta */ }
+  }, [authHeaders])
+
+  useEffect(() => { void fetchState() }, [fetchState])
+
+  async function saveWindow(from: string, to: string) {
+    const res = await fetch('/api/absence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+      body: JSON.stringify({ from, to }),
+    })
+    if (res.ok) {
+      setShowSettings(false)
+      void fetchState()
+    }
+    return res.ok
+  }
+
+  async function endWindow() {
+    await fetch('/api/absence', { method: 'DELETE', headers: await authHeaders() })
+    setShowSettings(false)
+    void fetchState()
+  }
+
+  if (!allowed || !state) return null
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setShowSettings(true)}
+        aria-label={state.active ? 'Frånvaroläge aktivt — hantera' : 'Jag är borta en period'}
+        title={state.active ? 'Frånvaroläge aktivt' : 'Jag är borta en period'}
+        className={`p-1 rounded-lg transition-colors ${state.active ? 'text-primary-200 bg-white/20' : 'text-gray-900/50 hover:bg-white/20 hover:text-gray-900'}`}
+      >
+        <Moon className="w-4 h-4" />
+      </button>
+
+      {showSettings && (
+        <AbsenceSettingsModal
+          window={state.window}
+          active={state.active}
+          onClose={() => setShowSettings(false)}
+          onSave={saveWindow}
+          onEnd={endWindow}
+        />
       )}
     </>
   )
