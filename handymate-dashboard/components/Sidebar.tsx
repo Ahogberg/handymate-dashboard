@@ -399,12 +399,16 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   async function fetchApprovalCount() {
     if (!businessId) return
     try {
-      const { count } = await supabase
-        .from('pending_approvals')
-        .select('*', { count: 'exact', head: true })
-        .eq('business_id', businessId)
-        .eq('status', 'pending')
-      setApprovalCount(count || 0)
+      // Andreas fynd 2026-08-18: rå DB-räkning inkluderade rader som SIDAN
+      // gömmer (testdata-filtret + routing-behörigheten i /api/approvals) —
+      // en kvarliggande test-markerad rad gav en evig "1"-badge mot en tom
+      // kö. Badgen räknar nu via SAMMA API som sidan visar — samma filter,
+      // per konstruktion samma siffra, för alltid.
+      const res = await fetch('/api/approvals?status=pending')
+      if (res.ok) {
+        const data = await res.json()
+        setApprovalCount((data.approvals || []).length)
+      }
     } catch { /* silent */ }
 
     // Check for failed automation rules in last 24h

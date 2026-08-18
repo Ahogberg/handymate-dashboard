@@ -266,3 +266,15 @@ test.describe('momenten i Värt att veta (2026-08-12)', () => {
     expect(home).toContain('link={{ label: m.action.label, href: m.action.href, icon: NYHETS_IKON.pengar }}')
   })
 })
+
+test.describe('Sidebar-badgen räknar via samma API som sidan visar (Andreas fynd 2026-08-18)', () => {
+  const fs = require('fs')
+  const path = require('path')
+  const src = fs.readFileSync(path.join(__dirname, '..', 'components', 'Sidebar.tsx'), 'utf8') as string
+
+  test('fetchApprovalCount går via /api/approvals — aldrig rå DB-räkning', () => {
+    const slice = src.slice(src.indexOf('async function fetchApprovalCount'), src.indexOf('async function fetchApprovalCount') + 1200)
+    expect(slice).toContain('/api/approvals?status=pending')
+    expect(slice).not.toContain(".from('pending_approvals')")
+  })
+})
