@@ -661,7 +661,7 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
                 <p className="text-sm font-mono font-semibold text-gray-900 mt-0.5">{formatCost(run.estimated_cost)}</p>
               </div>
               <div className="bg-gray-50 rounded-lg p-3 border border-[#E2E8F0]">
-                <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wider">Run ID</p>
+                <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wider">Körnings-ID</p>
                 <p className="text-xs font-mono text-gray-500 mt-0.5 truncate">{run.run_id}</p>
               </div>
             </div>

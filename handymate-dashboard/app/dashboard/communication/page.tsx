@@ -438,8 +438,8 @@ export default function CommunicationPage() {
                 <div key={log.id} className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <div className={`p-1.5 rounded-lg ${log.channel === 'sms' ? 'bg-primary-50' : 'bg-purple-50'}`}>
-                        <ChannelIcon className={`w-3.5 h-3.5 ${log.channel === 'sms' ? 'text-primary-700' : 'text-purple-600'}`} />
+                      <div className={`p-1.5 rounded-lg ${log.channel === 'sms' ? 'bg-primary-50' : 'bg-blue-50'}`}>
+                        <ChannelIcon className={`w-3.5 h-3.5 ${log.channel === 'sms' ? 'text-primary-700' : 'text-blue-600'}`} />
                       </div>
                       <span className="text-sm font-medium text-gray-900">
                         Till: {log.customer_name}

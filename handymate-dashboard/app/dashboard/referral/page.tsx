@@ -93,8 +93,8 @@ export default function ReferralPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-900">Bjud in en vän</h1>
-        <p className="text-zinc-500 mt-1">
+        <h1 className="text-2xl font-bold text-slate-900">Bjud in en vän</h1>
+        <p className="text-slate-500 mt-1">
           Dela din länk och få 50% rabatt på nästa månads faktura när din vän aktiverar sitt konto.
         </p>
       </div>
@@ -112,11 +112,11 @@ export default function ReferralPage() {
 
       {/* Referrallänk */}
       {data && (
-        <div className="bg-white border border-zinc-200 rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-zinc-900">Din unika länk</h2>
+        <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+          <h2 className="font-semibold text-slate-900">Din unika länk</h2>
 
           <div className="flex items-center gap-2">
-            <div className="flex-1 bg-zinc-50 border border-zinc-200 rounded-lg px-4 py-3 font-mono text-sm text-zinc-700 truncate">
+            <div className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 font-mono text-sm text-slate-700 truncate">
               {data.referral_url}
             </div>
             <button
@@ -130,11 +130,11 @@ export default function ReferralPage() {
 
           {/* Förifyllt SMS */}
           <div>
-            <h3 className="text-sm font-medium text-zinc-700 mb-2 flex items-center gap-1.5">
+            <h3 className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-1.5">
               <MessageSquare className="h-4 w-4" />
               Förifyllt SMS
             </h3>
-            <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 text-sm text-zinc-600">
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-600">
               {smsMessage}
             </div>
             <button
@@ -150,31 +150,31 @@ export default function ReferralPage() {
 
       {/* Statistik */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white border border-zinc-200 rounded-xl p-4 text-center">
-          <div className="text-3xl font-bold text-zinc-900">{referrals.length}</div>
-          <div className="text-sm text-zinc-500 mt-1">Hänvisade kollegor</div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <div className="text-3xl font-bold text-slate-900">{referrals.length}</div>
+          <div className="text-sm text-slate-500 mt-1">Hänvisade kollegor</div>
         </div>
-        <div className="bg-white border border-zinc-200 rounded-xl p-4 text-center">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
           <div className="text-3xl font-bold text-primary-700">{activeCount}</div>
-          <div className="text-sm text-zinc-500 mt-1">Har aktiverat</div>
+          <div className="text-sm text-slate-500 mt-1">Har aktiverat</div>
         </div>
       </div>
 
       {/* Referral-lista */}
       {referrals.length > 0 && (
-        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-zinc-200 flex items-center gap-2">
-            <Users className="h-4 w-4 text-zinc-400" />
-            <h2 className="font-semibold text-zinc-900 text-sm">Dina hänvisningar</h2>
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 flex items-center gap-2">
+            <Users className="h-4 w-4 text-slate-400" />
+            <h2 className="font-semibold text-slate-900 text-sm">Dina hänvisningar</h2>
           </div>
-          <div className="divide-y divide-zinc-100">
+          <div className="divide-y divide-slate-100">
             {referrals.map(ref => (
               <div key={ref.id} className="px-4 py-3 flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-medium text-zinc-900">
+                  <div className="text-sm font-medium text-slate-900">
                     {ref.referred_email || 'Okänd e-post'}
                   </div>
-                  <div className="text-xs text-zinc-400">
+                  <div className="text-xs text-slate-400">
                     {new Date(ref.created_at).toLocaleDateString('sv-SE')}
                   </div>
                 </div>
@@ -192,8 +192,8 @@ export default function ReferralPage() {
       )}
 
       {/* Hur det fungerar */}
-      <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-6">
-        <h2 className="font-semibold text-zinc-900 mb-4">Så fungerar det</h2>
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
+        <h2 className="font-semibold text-slate-900 mb-4">Så fungerar det</h2>
         <div className="space-y-3">
           {[
             'Dela din unika länk med en vän',
@@ -204,7 +204,7 @@ export default function ReferralPage() {
               <div className="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-xs font-bold">
                 {i + 1}
               </div>
-              <p className="text-sm text-zinc-600 pt-0.5">{step}</p>
+              <p className="text-sm text-slate-600 pt-0.5">{step}</p>
             </div>
           ))}
         </div>

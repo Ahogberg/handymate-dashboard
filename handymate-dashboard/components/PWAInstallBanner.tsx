@@ -112,14 +112,14 @@ export default function PWAInstallBanner() {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-80">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-4 shadow-2xl shadow-black/50">
+      <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-lg">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 bg-primary-700/20 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Smartphone className="w-5 h-5 text-primary-500" />
+          <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Smartphone className="w-5 h-5 text-primary-700" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white font-semibold text-sm">Installera Handymate</p>
-            <p className="text-zinc-400 text-xs mt-0.5">
+            <p className="text-gray-900 font-semibold text-sm">Installera Handymate</p>
+            <p className="text-gray-500 text-xs mt-0.5">
               Lägg till som app på din telefon och få push-notiser om nya godkännanden.
             </p>
             <div className="flex gap-2 mt-3">
@@ -132,13 +132,13 @@ export default function PWAInstallBanner() {
               </button>
               <button
                 onClick={handleDismiss}
-                className="px-3 py-1.5 text-zinc-400 hover:text-white text-xs rounded-lg transition-all"
+                className="px-3 py-1.5 text-gray-500 hover:text-gray-900 text-xs rounded-lg transition-all"
               >
                 Inte nu
               </button>
             </div>
           </div>
-          <button onClick={handleDismiss} className="text-zinc-500 hover:text-zinc-300 flex-shrink-0">
+          <button onClick={handleDismiss} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
             <X className="w-4 h-4" />
           </button>
         </div>

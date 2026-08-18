@@ -728,7 +728,7 @@ export default function PricelistPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Email</label>
+                  <label className="block text-sm text-gray-500 mb-1">E-post</label>
                   <input
                     type="email"
                     value={supplierForm.contact_email}

@@ -3964,7 +3964,7 @@ export default function SettingsPage() {
                       offerta: 'bg-orange-100 text-orange-700',
                       servicefinder: 'bg-primary-100 text-primary-700',
                       byggahus: 'bg-yellow-100 text-yellow-700',
-                      website: 'bg-purple-100 text-purple-700',
+                      website: 'bg-blue-100 text-blue-700',
                       email: 'bg-gray-100 text-gray-700',
                       manual: 'bg-gray-100 text-gray-700',
                     }
@@ -4042,9 +4042,9 @@ export default function SettingsPage() {
                           </div>
                         )}
                         {source.platform === 'website' && (
-                          <div className="mt-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
-                            <p className="text-xs font-medium text-purple-800 mb-1">Hemsida-integration:</p>
-                            <p className="text-xs text-purple-700">Konfigurera ditt kontaktformulär att skicka till e-postadressen ovan, eller lägg till en webhook mot <code className="bg-purple-100 px-1 rounded">/api/lead-sources/webhook</code></p>
+                          <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                            <p className="text-xs font-medium text-blue-800 mb-1">Hemsida-integration:</p>
+                            <p className="text-xs text-blue-700">Konfigurera ditt kontaktformulär att skicka till e-postadressen ovan, eller lägg till en webhook mot <code className="bg-blue-100 px-1 rounded">/api/lead-sources/webhook</code></p>
                           </div>
                         )}
                       </div>

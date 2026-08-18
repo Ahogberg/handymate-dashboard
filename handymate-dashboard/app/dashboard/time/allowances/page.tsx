@@ -241,7 +241,7 @@ export default function AllowancesPage() {
                       <div className={`mt-0.5 p-2 rounded-lg flex-shrink-0 ${
                         report.allowance_type?.type === 'mileage' ? 'bg-blue-50 text-blue-600' :
                         report.allowance_type?.type === 'daily' ? 'bg-amber-50 text-amber-600' :
-                        report.allowance_type?.type === 'hourly' ? 'bg-purple-50 text-purple-600' :
+                        report.allowance_type?.type === 'hourly' ? 'bg-emerald-50 text-emerald-600' :
                         'bg-gray-50 text-gray-600'
                       }`}>
                         {getTypeIcon(report.allowance_type?.type || 'fixed')}

@@ -503,7 +503,7 @@ export function DealModal() {
                             {selectedDeal.customer.customer_type && (
                               <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
                                 selectedDeal.customer.customer_type === 'company' ? 'bg-primary-50 text-primary-700 border-primary-200' :
-                                selectedDeal.customer.customer_type === 'brf' ? 'bg-purple-50 text-purple-600 border-purple-200' :
+                                selectedDeal.customer.customer_type === 'brf' ? 'bg-blue-50 text-blue-600 border-blue-200' :
                                 'bg-gray-100 text-gray-500 border-gray-200'
                               }`}>
                                 {selectedDeal.customer.customer_type === 'company' ? 'Företag' : selectedDeal.customer.customer_type === 'brf' ? 'BRF' : 'Privat'}
@@ -579,7 +579,7 @@ export function DealModal() {
                           <FileText className="w-4 h-4" /> {selectedDeal.quote_id ? 'Visa offert' : 'Skapa offert'}
                         </Link>
                         <button onClick={() => { setShowSiteVisit(true); setSiteVisitForm({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true, invitedTeam: [], externalUe: '' }) }}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-violet-200 bg-violet-50 text-sm text-violet-700 hover:bg-violet-100 transition-colors">
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-700 hover:bg-blue-100 transition-colors">
                           <Calendar className="w-4 h-4" /> Platsbesök
                         </button>
                         {selectedDeal.customer_id && <PortalLankKnapp customerId={selectedDeal.customer_id} variant="chip" />}
@@ -977,7 +977,7 @@ export function DealModal() {
                                             <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${
                                               act.action === 'created' ? 'bg-primary-700' :
                                               act.action === 'completed' ? 'bg-green-500' :
-                                              act.action === 'assigned' ? 'bg-purple-500' :
+                                              act.action === 'assigned' ? 'bg-blue-500' :
                                               act.action === 'deleted' ? 'bg-red-500' :
                                               'bg-gray-400'
                                             }`} />
@@ -1154,12 +1154,12 @@ export function DealModal() {
                     {(dealEmailThreads.length > 0 || dealEmailLoading) && (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <Mail className="w-4 h-4 text-purple-500" />
+                          <Mail className="w-4 h-4 text-blue-500" />
                           <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">E-post</span>
                           {dealEmailLoading && <Loader2 className="w-3 h-3 animate-spin text-gray-400" />}
                         </div>
                         {dealEmailThreads.map(thread => (
-                          <div key={thread.threadId} className="rounded-lg border border-purple-100 bg-purple-50/30 p-4">
+                          <div key={thread.threadId} className="rounded-lg border border-blue-100 bg-blue-50/30 p-4">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-gray-900 truncate">{thread.subject}</p>
@@ -1179,7 +1179,7 @@ export function DealModal() {
                             <p className="text-xs text-gray-500 mt-1 line-clamp-2">{thread.snippet}</p>
                             <button
                               onClick={() => fetchDealThreadMessages(thread.threadId)}
-                              className="mt-2 text-xs text-purple-600 hover:text-purple-500 flex items-center gap-1"
+                              className="mt-2 text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1"
                             >
                               {dealThreadLoading && dealExpandedThread === thread.threadId ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />

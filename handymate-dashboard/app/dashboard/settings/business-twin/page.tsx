@@ -164,7 +164,7 @@ export default function BusinessTwinDataSettingsPage() {
 
           <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
             <div className="flex items-start gap-3">
-              <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-violet-600" />
+              <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary-600" />
               <div>
                 <h2 className="font-semibold text-slate-900">Branschunderlaget är inte öppet ännu</h2>
                 <p className="mt-1 text-sm text-slate-600">

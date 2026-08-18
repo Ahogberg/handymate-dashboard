@@ -1057,7 +1057,7 @@ export default function SchedulePage() {
               >
                 <div
                   className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${
-                    today ? 'bg-primary-700 text-gray-900' : 'text-gray-500'
+                    today ? 'bg-primary-700 text-white' : 'text-gray-500'
                   }`}
                 >
                   {format(day, 'd')}
@@ -1384,7 +1384,7 @@ export default function SchedulePage() {
                   type="text"
                   value={entryForm.title}
                   onChange={(e) => setEntryForm({ ...entryForm, title: e.target.value })}
-                  placeholder="Vad ska goras?"
+                  placeholder="Vad ska göras?"
                   className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
@@ -1757,7 +1757,7 @@ export default function SchedulePage() {
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 mode === 'calendar'
                   ? 'bg-primary-700 text-white'
-                  : 'text-gray-500 hover:text-white'
+                  : 'text-gray-500 hover:text-primary-700'
               }`}
             >
               <CalendarDays className="w-4 h-4" />
@@ -1768,7 +1768,7 @@ export default function SchedulePage() {
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 mode === 'utilization'
                   ? 'bg-primary-700 text-white'
-                  : 'text-gray-500 hover:text-white'
+                  : 'text-gray-500 hover:text-primary-700'
               }`}
             >
               <BarChart3 className="w-4 h-4" />

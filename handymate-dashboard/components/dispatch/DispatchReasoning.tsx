@@ -37,7 +37,7 @@ export function DispatchReasoning({ reasons, alternatives, week_utilization_pct,
       {reasons && reasons.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {reasons.map((r, i) => (
-            <span key={i} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">{r}</span>
+            <span key={i} className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">{r}</span>
           ))}
         </div>
       )}

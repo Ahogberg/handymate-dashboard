@@ -49,7 +49,7 @@ export function CustomersFilterBar({
             onClick={() => setSelectedTagFilter('')}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
               !selectedTagFilter
-                ? 'bg-slate-900 text-white'
+                ? 'bg-primary-700 text-white'
                 : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
             }`}
           >

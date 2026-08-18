@@ -225,7 +225,7 @@ export default function TravelSection({ currentWeek }: TravelSectionProps) {
             <button
               onClick={() => setForm({ ...form, has_overnight: !form.has_overnight, allowance_amount: !form.has_overnight ? '290' : '0' })}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
-                form.has_overnight ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-gray-50 border-gray-200 text-gray-500'
+                form.has_overnight ? 'bg-primary-50 border-primary-300 text-primary-700' : 'bg-gray-50 border-gray-200 text-gray-500'
               }`}
             >
               <Moon className="w-4 h-4" />
@@ -240,7 +240,7 @@ export default function TravelSection({ currentWeek }: TravelSectionProps) {
                       onClick={() => setForm({ ...form, allowance_amount: opt.val })}
                       className={`px-3 py-1 rounded-lg border text-xs ${
                         form.allowance_amount === opt.val
-                          ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                          ? 'bg-primary-50 border-primary-300 text-primary-700'
                           : 'bg-gray-50 border-gray-200 text-gray-500'
                       }`}
                     >
@@ -292,7 +292,7 @@ export default function TravelSection({ currentWeek }: TravelSectionProps) {
                   <span className="text-sm font-medium text-gray-900">{entry.distance_km} km</span>
                   <span className="text-xs text-gray-500">{Math.round(entry.total_amount).toLocaleString('sv-SE')} kr</span>
                   {entry.has_overnight && (
-                    <span className="px-1.5 py-0.5 text-xs rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200">
+                    <span className="px-1.5 py-0.5 text-xs rounded-full bg-primary-50 text-primary-600 border border-primary-200">
                       Traktamente {Math.round(entry.allowance_amount).toLocaleString('sv-SE')} kr
                     </span>
                   )}

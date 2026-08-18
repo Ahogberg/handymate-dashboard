@@ -268,7 +268,7 @@ export default function HelpPage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Header */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-primary-700 shadow-lg shadow-primary-600/25 mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-primary-700 shadow-sm mb-4">
             <HelpCircle className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
@@ -404,7 +404,7 @@ export default function HelpPage() {
           </h2>
           <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-              <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-primary-700 flex items-center justify-center text-white shadow-lg shadow-primary-600/20">
+              <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-primary-700 flex items-center justify-center text-white shadow-sm">
                 <Mail className="w-7 h-7" />
               </div>
               <div className="flex-1">

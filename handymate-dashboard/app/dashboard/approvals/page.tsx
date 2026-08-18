@@ -1119,9 +1119,9 @@ export default function ApprovalsPage() {
                         {approval.approval_type === 'dispatch_suggestion' && approval.payload && (() => {
                           const pl = approval.payload as any
                           return (
-                            <div className="mt-2 bg-violet-50 rounded-lg p-3 space-y-2">
+                            <div className="mt-2 bg-primary-50 rounded-lg p-3 space-y-2">
                               <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-violet-100 rounded-full flex items-center justify-center text-xs font-semibold text-violet-700">
+                                <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-xs font-semibold text-primary-700">
                                   {(pl.member_name || '??').slice(0, 2).toUpperCase()}
                                 </div>
                                 <div>

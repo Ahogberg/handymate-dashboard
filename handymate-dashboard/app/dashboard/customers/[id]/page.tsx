@@ -1045,7 +1045,7 @@ export default function CustomerDetailPage() {
                 <button
                   type="button"
                   onClick={() => setShowSiteVisitModal(true)}
-                  className="flex-1 min-w-[60px] flex flex-col items-center justify-center gap-1.5 min-h-[64px] p-2 rounded-xl border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition-all"
+                  className="flex-1 min-w-[60px] flex flex-col items-center justify-center gap-1.5 min-h-[64px] p-2 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all"
                 >
                   <CalendarClock className="w-5 h-5" />
                   <span className="text-xs font-medium">Platsbesök</span>

@@ -34,7 +34,7 @@ export const ITEM_TYPE_STYLES: Record<QuoteItem['item_type'], string> = {
 // särskilda radtyper (rubrik, fritext, delsumma, rabatt) som påverkar layouten i offerten.
 export const ITEM_TYPE_BADGE: Record<QuoteItem['item_type'], { label: string; cls: string } | null> = {
   item: null,
-  heading: { label: 'Rubrik', cls: 'bg-indigo-50 text-indigo-700 border border-indigo-100' },
+  heading: { label: 'Rubrik', cls: 'bg-blue-50 text-blue-700 border border-blue-100' },
   text: { label: 'Fritext', cls: 'bg-slate-100 text-slate-700 border border-slate-200' },
   subtotal: { label: 'Delsumma', cls: 'bg-slate-200 text-slate-700 border border-slate-300' },
   discount: { label: 'Rabatt', cls: 'bg-red-50 text-red-700 border border-red-100' },

@@ -38,10 +38,10 @@ export function PermissionGate({ permission, children, fallback }: PermissionGat
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center px-4">
         <div className="text-6xl mb-4">🔒</div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">
           Åtkomst nekad
         </h2>
-        <p className="text-gray-500 dark:text-gray-400 max-w-md">
+        <p className="text-gray-500 max-w-md">
           Du har inte behörighet att se den här sidan.
           Kontakta din administratör om du behöver åtkomst.
         </p>
@@ -76,10 +76,10 @@ export function RequireRole({ roles, children, fallback }: {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center px-4">
         <div className="text-6xl mb-4">🔒</div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">
           Åtkomst nekad
         </h2>
-        <p className="text-gray-500 dark:text-gray-400 max-w-md">
+        <p className="text-gray-500 max-w-md">
           Du har inte behörighet att se den här sidan.
           Kontakta din administratör om du behöver åtkomst.
         </p>

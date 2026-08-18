@@ -66,7 +66,7 @@ export function DealCard({ deal, isDragging }: DealCardProps) {
               deal.lead_source_platform
             }</span>}
             {!deal.lead_source_platform && deal.source && !['manual', 'ai', 'call', 'website_form', 'vapi_call', 'inbound_sms'].includes(deal.source) && (
-              <span className="px-1.5 py-0.5 text-[9px] font-medium rounded-full flex-shrink-0 bg-violet-100 text-violet-700">
+              <span className="px-1.5 py-0.5 text-[9px] font-medium rounded-full flex-shrink-0 bg-gray-100 text-gray-600">
                 via {deal.source}
               </span>
             )}
@@ -143,7 +143,7 @@ export function DealCard({ deal, isDragging }: DealCardProps) {
             <span className="text-[10px]">{deal.quote_id ? 'Offert' : 'Ny offert'}</span>
           </Link>
         )}
-        <button onClick={() => handleOpenTasks(deal)} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-purple-600 transition-colors" title="Uppgifter">
+        <button onClick={() => handleOpenTasks(deal)} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-primary-700 transition-colors" title="Uppgifter">
           <CheckSquare className="w-3.5 h-3.5" />
           <span className="text-[10px]">Uppgifter</span>
         </button>

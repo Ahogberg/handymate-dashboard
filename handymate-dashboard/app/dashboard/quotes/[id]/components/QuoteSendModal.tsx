@@ -224,7 +224,7 @@ export function QuoteSendModal({
                 <div className="flex items-center gap-2">
                   <Mail className="w-3.5 h-3.5 text-gray-400" />
                   <span className="text-sm text-gray-700">
-                    {quote.customer?.email || <span className="text-red-500">Email saknas</span>}
+                    {quote.customer?.email || <span className="text-red-500">E-post saknas</span>}
                   </span>
                 </div>
               )}

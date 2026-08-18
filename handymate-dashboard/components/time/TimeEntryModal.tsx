@@ -237,8 +237,8 @@ export default function TimeEntryModal({
                 onClick={() => handleQuickButton(qb.hours, qb.label)}
                 className={`px-[14px] py-[5px] text-[12px] border-thin rounded-full cursor-pointer ${
                   activeQuick === qb.label
-                    ? 'bg-[#0F766E] text-white border-[#0F766E]'
-                    : 'bg-transparent text-[#64748B] border-[#E2E8F0] hover:border-[#0F766E] hover:text-[#0F766E]'
+                    ? 'bg-primary-700 text-white border-primary-700'
+                    : 'bg-transparent text-[#64748B] border-[#E2E8F0] hover:border-primary-700 hover:text-primary-700'
                 }`}
               >
                 {qb.label}
@@ -248,8 +248,8 @@ export default function TimeEntryModal({
               onClick={handleHeldag}
               className={`px-[14px] py-[5px] text-[12px] border-thin rounded-full cursor-pointer ${
                 activeQuick === 'Heldag'
-                  ? 'bg-[#0F766E] text-white border-[#0F766E]'
-                  : 'bg-transparent text-[#64748B] border-[#E2E8F0] hover:border-[#0F766E] hover:text-[#0F766E]'
+                  ? 'bg-primary-700 text-white border-primary-700'
+                  : 'bg-transparent text-[#64748B] border-[#E2E8F0] hover:border-primary-700 hover:text-primary-700'
               }`}
             >
               Heldag
@@ -438,7 +438,7 @@ export default function TimeEntryModal({
           <button
             onClick={onSave}
             disabled={saving || locked}
-            className="flex-1 py-[11px] bg-[#0F766E] text-white border-none rounded-lg text-[14px] font-medium cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 py-[11px] bg-primary-700 text-white border-none rounded-lg text-[14px] font-medium cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             Spara

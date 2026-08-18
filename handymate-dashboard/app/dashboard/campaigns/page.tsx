@@ -205,7 +205,7 @@ export default function CampaignsPage() {
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                 filter === f.id
                   ? 'bg-primary-700 text-white'
-                  : 'bg-white text-gray-500 hover:text-white border border-[#E2E8F0]'
+                  : 'bg-white text-gray-500 hover:text-primary-700 border border-[#E2E8F0]'
               }`}
             >
               {f.label}

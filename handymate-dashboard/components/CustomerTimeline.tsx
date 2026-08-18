@@ -148,7 +148,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
     if (type === 'booking_completed') return <CheckCircle className="w-4 h-4 text-emerald-600" />
     if (type.startsWith('lead_')) return <Target className="w-4 h-4 text-orange-500" />
     if (type === 'agent_action') return <Bot className="w-4 h-4 text-primary-700" />
-    if (type === 'time_entry') return <Timer className="w-4 h-4 text-indigo-500" />
+    if (type === 'time_entry') return <Timer className="w-4 h-4 text-primary-600" />
     if (type === 'note_added') return <FileText className="w-4 h-4 text-gray-500" />
     if (type === 'rating_received') return <Star className="w-4 h-4 text-yellow-400" />
     if (type === 'job_completed') return <CheckCircle className="w-4 h-4 text-emerald-600" />
@@ -165,7 +165,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
     if (type.startsWith('booking_')) return 'bg-amber-50'
     if (type.startsWith('lead_')) return 'bg-orange-50'
     if (type === 'agent_action') return 'bg-primary-50'
-    if (type === 'time_entry') return 'bg-indigo-50'
+    if (type === 'time_entry') return 'bg-primary-50'
     return 'bg-gray-100'
   }
 
@@ -264,8 +264,8 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
                   <div key={item.id} className="p-4 hover:bg-gray-50/50 transition-all">
                     <div className="flex gap-3">
                       <div className="flex-shrink-0 relative">
-                        <div className="w-8 h-8 bg-purple-50 rounded-full flex items-center justify-center">
-                          <Mail className="w-4 h-4 text-purple-500" />
+                        <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">
+                          <Mail className="w-4 h-4 text-blue-500" />
                         </div>
                         {/* Timeline line */}
                         <div className="absolute top-8 left-1/2 -translate-x-1/2 w-px h-[calc(100%-2rem)] bg-gray-100" />
@@ -287,7 +287,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
                         <p className="text-sm text-gray-500 mt-1 line-clamp-2">{thread.snippet}</p>
                         <button
                           onClick={() => fetchThreadMsgs(thread.threadId)}
-                          className="mt-2 text-xs text-purple-600 hover:text-purple-500 flex items-center gap-1"
+                          className="mt-2 text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1"
                         >
                           {threadLoading && expandedThreadId === thread.threadId
                             ? <Loader2 className="w-3 h-3 animate-spin" />

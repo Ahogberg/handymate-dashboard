@@ -139,7 +139,7 @@ export function PipelineHeader({ stats, mobileStageIndex, setMobileStageIndex }:
             </button>
             {/* Stage settings removed — stages are locked */}
             <button onClick={() => { setShowNewDeal(true); fetchCustomers(); fetchJobTypes(); fetchLeadSources(); fetchJobTypeOptions() }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-700 text-white text-sm font-medium transition-all shadow-lg shadow-primary-600/10">
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-700 text-white text-sm font-medium transition-all shadow-sm">
               <Plus className="w-4 h-4" /><span className="hidden sm:inline">Ny deal</span>
             </button>
           </div>

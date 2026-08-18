@@ -91,3 +91,48 @@ test.describe('Godkännanden — Command Center-reskin', () => {
     expect(source).not.toMatch(/\[\s*\.\.\.approvals\s*\]\s*\.sort/)
   })
 })
+
+/**
+ * En-mörk-hero-facit, repo-brett (Etapp L2a, 2026-08-18).
+ *
+ * Ovanstående describe-block låser bara att approvals/page.tsx (den sida
+ * facit-headern refererar till) aldrig lägger till en andra mörk hero.
+ * Den regeln är svagare än designsystemets §4.0-regel — "MAX EN mörk hero
+ * i HELA huset" — som tidigare inte källskannades någonstans. LedgerHero
+ * (components/value/LedgerHero.tsx) var en tyst andra kopia tills den
+ * gjordes om till en ljus variant i detta etapp. Detta facit källskannar
+ * app/ + components/ och låser att bg-grad-dark-hero bara förekommer i
+ * MatteHero.tsx — nästa gång någon kopierar mönstret slår testet rött
+ * innan det hinner bli en tredje mörk yta.
+ */
+test.describe('En mörk hero i hela huset (§4.0) — repo-brett facit', () => {
+  function findSourceFiles(dir: string): string[] {
+    const entries = fs.readdirSync(dir, { withFileTypes: true })
+    let files: string[] = []
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (entry.name === 'node_modules' || entry.name === '.next') continue
+        files = files.concat(findSourceFiles(full))
+      } else if (/\.(tsx|ts)$/.test(entry.name)) {
+        files.push(full)
+      }
+    }
+    return files
+  }
+
+  test('bg-grad-dark-hero förekommer bara i MatteHero.tsx', () => {
+    const roots = [path.join(ROOT, 'app'), path.join(ROOT, 'components')]
+    const hits: string[] = []
+    for (const root of roots) {
+      if (!fs.existsSync(root)) continue
+      for (const file of findSourceFiles(root)) {
+        const contents = fs.readFileSync(file, 'utf8')
+        if (contents.includes('bg-grad-dark-hero')) {
+          hits.push(path.relative(ROOT, file).replace(/\\/g, '/'))
+        }
+      }
+    }
+    expect(hits).toEqual(['components/jarvis/home/MatteHero.tsx'])
+  })
+})

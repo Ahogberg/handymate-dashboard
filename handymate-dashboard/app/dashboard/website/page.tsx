@@ -439,7 +439,7 @@ export default function WebsitePage() {
           <button
             onClick={handleGenerate}
             disabled={generating}
-            className="inline-flex items-center px-8 py-4 bg-primary-700 rounded-xl font-semibold text-white text-lg hover:opacity-90 disabled:opacity-50 transition-all shadow-lg shadow-primary-600/25"
+            className="inline-flex items-center px-8 py-4 bg-primary-700 rounded-xl font-semibold text-white text-lg hover:bg-primary-600 disabled:opacity-50 transition-all shadow-md"
           >
             {generating ? (
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />

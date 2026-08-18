@@ -434,7 +434,7 @@ export default function ProjectsPage() {
               onClick={() => setJobTypeFilter('')}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
                 !jobTypeFilter
-                  ? 'bg-slate-900 text-white'
+                  ? 'bg-primary-700 text-white'
                   : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
               }`}
             >
@@ -728,7 +728,7 @@ export default function ProjectsPage() {
                       onClick={() => setNewProject({ ...newProject, job_type: '' })}
                       className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
                         !newProject.job_type
-                          ? 'bg-slate-900 text-white border-slate-900'
+                          ? 'bg-primary-700 text-white border-primary-700'
                           : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
                       }`}
                     >

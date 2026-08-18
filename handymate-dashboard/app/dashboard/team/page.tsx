@@ -107,7 +107,7 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:border-[#0F766E] focus:ring-offset-2 focus:ring-offset-zinc-900 ${
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:border-[#0F766E] ${
         checked ? 'bg-primary-700' : 'bg-gray-200'
       } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
@@ -1075,7 +1075,7 @@ export default function TeamPage() {
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                     filter === tab.key
                       ? 'bg-primary-700 text-white'
-                      : 'bg-white text-gray-500 hover:text-white border border-[#E2E8F0]'
+                      : 'bg-white text-gray-500 hover:text-primary-700 border border-[#E2E8F0]'
                   }`}
                 >
                   {tab.label}

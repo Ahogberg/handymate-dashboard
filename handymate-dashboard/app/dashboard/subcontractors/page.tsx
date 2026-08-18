@@ -235,12 +235,12 @@ export default function SubcontractorsPage() {
               placeholder="Sök namn, företag eller specialisering..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/50 min-h-[44px]"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/50 min-h-[44px]"
             />
           </div>
           <button
             onClick={openCreateModal}
-            className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]"
+            className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-primary-700 rounded-xl font-medium text-white hover:bg-primary-600 min-h-[44px]"
           >
             <Plus className="w-4 h-4 mr-2" />
             Ny underleverantör
@@ -349,7 +349,7 @@ export default function SubcontractorsPage() {
                     type="text"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   />
                 </div>
                 <div>
@@ -358,7 +358,7 @@ export default function SubcontractorsPage() {
                     type="text"
                     value={form.company_name}
                     onChange={(e) => setForm({ ...form, company_name: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   />
                 </div>
               </div>
@@ -369,7 +369,7 @@ export default function SubcontractorsPage() {
                     type="tel"
                     value={form.phone_number}
                     onChange={(e) => setForm({ ...form, phone_number: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   />
                 </div>
                 <div>
@@ -378,7 +378,7 @@ export default function SubcontractorsPage() {
                     type="email"
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   />
                 </div>
               </div>
@@ -389,7 +389,7 @@ export default function SubcontractorsPage() {
                     type="text"
                     value={form.org_number}
                     onChange={(e) => setForm({ ...form, org_number: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   />
                 </div>
                 <div>
@@ -398,7 +398,7 @@ export default function SubcontractorsPage() {
                     type="number"
                     value={form.hourly_rate}
                     onChange={(e) => setForm({ ...form, hourly_rate: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                   />
                 </div>
               </div>
@@ -407,7 +407,7 @@ export default function SubcontractorsPage() {
                 <select
                   value={form.specialization}
                   onChange={(e) => setForm({ ...form, specialization: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
                 >
                   <option value="">Välj...</option>
                   {SPECIALIZATIONS.map(s => (
@@ -421,7 +421,7 @@ export default function SubcontractorsPage() {
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
                   rows={2}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500/50 resize-none"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none"
                 />
               </div>
             </div>
@@ -432,7 +432,7 @@ export default function SubcontractorsPage() {
               <button
                 onClick={handleSubmit}
                 disabled={actionLoading}
-                className="flex items-center px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="flex items-center px-4 py-2 bg-primary-700 rounded-xl font-medium text-white hover:bg-primary-600 disabled:opacity-50"
               >
                 {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 {editingSub ? 'Spara' : 'Skapa'}

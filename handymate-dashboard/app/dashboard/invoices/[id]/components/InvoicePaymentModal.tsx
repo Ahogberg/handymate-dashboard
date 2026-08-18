@@ -110,7 +110,7 @@ export function InvoicePaymentModal({
           <button
             onClick={onConfirm}
             disabled={updatingStatus}
-            className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-green-500 rounded-xl text-gray-900 font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 py-3 bg-primary-700 rounded-xl text-white font-medium hover:bg-primary-600 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {updatingStatus ? (
               <Loader2 className="w-4 h-4 animate-spin" />

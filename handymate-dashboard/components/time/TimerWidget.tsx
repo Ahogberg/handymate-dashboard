@@ -160,7 +160,7 @@ export default function TimerWidget({ onCheckInOut }: TimerWidgetProps) {
         className={`px-5 py-2 border-none rounded-lg text-[13px] font-medium cursor-pointer disabled:opacity-50 ${
           active
             ? 'bg-red-500 text-white hover:bg-red-600'
-            : 'bg-[#0F766E] text-white hover:bg-[#0F766E]/90'
+            : 'bg-primary-700 text-white hover:bg-primary-700/90'
         }`}
       >
         {actionLoading ? (

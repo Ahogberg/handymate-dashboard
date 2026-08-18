@@ -118,7 +118,7 @@ export default function EmailInboxPage() {
       case 'email':
         return <span className="px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded-full">Matchad via e-post</span>
       case 'name':
-        return <span className="px-2 py-0.5 text-xs bg-purple-50 text-purple-600 rounded-full">Matchad via namn</span>
+        return <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">Matchad via namn</span>
       case 'unmatched':
         return <span className="px-2 py-0.5 text-xs bg-amber-50 text-amber-600 rounded-full">Okänd avsändare</span>
       default:
@@ -157,7 +157,7 @@ export default function EmailInboxPage() {
               {f.label}
               {statusCounts[f.key] > 0 && (
                 <span className={`ml-1.5 px-1.5 py-0.5 text-xs rounded-full ${
-                  filter === f.key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+                  filter === f.key ? 'bg-white text-primary-700' : 'bg-gray-100 text-gray-500'
                 }`}>
                   {statusCounts[f.key]}
                 </span>

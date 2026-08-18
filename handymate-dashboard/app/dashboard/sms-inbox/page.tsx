@@ -173,8 +173,8 @@ export default function SmsInboxPage() {
         <div className="px-5 py-4 border-b border-[#E2E8F0]">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-[#0F766E]" />
-              <h1 className="text-[17px] font-semibold text-[#0F172A]">SMS</h1>
+              <MessageSquare className="w-5 h-5 text-primary-700" />
+              <h1 className="text-[17px] font-semibold text-slate-900">SMS</h1>
               {totalUnread > 0 && (
                 <span className="bg-[#0F766E] text-white text-[11px] font-medium px-2 py-0.5 rounded-full">
                   {totalUnread}
