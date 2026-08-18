@@ -204,6 +204,10 @@ test.describe('V155 RPC — utökat manifest, samma grindar', () => {
     'deal',
     'customer',
     'business_preferences',
+    // D3-skarven: Fortnox-simlägets loggtabeller (se simläges-facitet
+    // nedan) — sist eftersom de saknar FK-beroenden mot resten.
+    'fortnox_api_log',
+    'fortnox_sync',
   ]
 
   test('v155 är en CREATE OR REPLACE på samma signatur, med samma grindar', () => {
@@ -276,6 +280,19 @@ test.describe('V155 RPC — utökat manifest, samma grindar', () => {
     expect(idxOf('DELETE FROM public.project_document')).toBeLessThan(idxOf('DELETE FROM public.project WHERE'))
     // business_twin_forecast måste bort FÖRE project_outcome (CHECK-constraint-fällan, se filhuvudet)
     expect(idxOf('DELETE FROM public.business_twin_forecast')).toBeLessThan(idxOf('DELETE FROM public.project_outcome'))
+  })
+
+  test('Fortnox-simläget nollas av resetten — loggtabeller töms och de fem statuskolumnerna släcks', () => {
+    // D3-skarven (2026-08-18): utan denna städning lämnar "Återställ demon"
+    // kontot som "Fortnox ansluten" med synkstatistik mot raderade rader.
+    expect(v155Source).toContain('DELETE FROM public.fortnox_api_log')
+    expect(v155Source).toContain('DELETE FROM public.fortnox_sync')
+    expect(v155Source).toContain('fortnox_connected = FALSE')
+    expect(v155Source).toContain('fortnox_token_expires_at = NULL')
+    // business_config-uppdateringen är dubbelgrindat demo-låst även lokalt.
+    const updIdx = v155Source.indexOf('UPDATE public.business_config')
+    expect(updIdx).toBeGreaterThan(-1)
+    expect(v155Source.slice(updIdx, updIdx + 400)).toContain('is_demo_tenant IS TRUE')
   })
 
   test('call_recording/project_outcome/project_lesson/customer_fact städas INTE längre i TypeScript', () => {

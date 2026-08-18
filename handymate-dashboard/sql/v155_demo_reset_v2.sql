@@ -276,6 +276,24 @@ BEGIN
   WHERE business_id = p_business_id
     AND key = 'demo_manifest';
 
+  -- Fortnox-SIMLÄGET (D3, app/api/admin/demo-fortnox-sim): utan denna
+  -- städning skulle "Återställ demon" radera de simulerade fakturorna/
+  -- kunderna ovan men lämna kontot som "Fortnox ansluten" med
+  -- synkstatistik som pekar på raderade rader. Loggtabellerna töms och de
+  -- fem statuskolumnerna nollas — det ENDA business_config-ingreppet i
+  -- hela funktionen, avsiktligt begränsat till simulationens egna fält
+  -- (grinden ovan garanterar redan is_demo_tenant).
+  DELETE FROM public.fortnox_api_log WHERE business_id = p_business_id;
+  DELETE FROM public.fortnox_sync WHERE business_id = p_business_id;
+  UPDATE public.business_config
+  SET fortnox_connected = FALSE,
+      fortnox_company_name = NULL,
+      fortnox_connected_at = NULL,
+      fortnox_last_synced_at = NULL,
+      fortnox_token_expires_at = NULL
+  WHERE business_id = p_business_id
+    AND is_demo_tenant IS TRUE;
+
   RETURN v_audit_id;
 END;
 $$;
