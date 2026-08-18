@@ -67,6 +67,18 @@ type LogStatus = 'success' | 'pending_approval' | 'rejected' | 'skipped' | 'fail
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 const CRON_SECRET = process.env.CRON_SECRET || ''
 
+// En väg in (etapp 1, "en väg in"-konsolideringen, 2026-08-18): inbound-
+// kanalerna har exakt EN hjärna. app/api/sms/incoming/route.ts dispatchar
+// redan Lisa (gate:ad — killswitch, billing, ACTION_CONTRACT, nattkö,
+// opt-out) för varje inkommande SMS; app/api/voice/*-vägarna gör motsvarande
+// för samtal. En tenant-skapad v3-regel med action_type='run_agent' på ett
+// av dessa event skulle lägga ÄNNU en muterande, ogated agentkörning ovanpå
+// den redan dispatchade — precis den dubbelkörning som konsolideringen tar
+// bort ur sms/incoming. Ingen sådan regel finns i produktion idag (verifierat
+// vid skrivandet) — vägras här i kod istället för att förlita sig på att
+// ingen någonsin skapar en.
+const INBOUND_SINGLE_BRAIN_EVENTS = new Set(['sms_received', 'call_completed', 'phone_call'])
+
 // ── Helpers ─────────────────────────────────────────────
 
 function getSwedenTime(): { hour: number; minute: number; dayName: string } {
@@ -815,6 +827,32 @@ export async function executeRule(
   // 2. Check if active
   if (!typedRule.is_active) {
     return { status: 'skipped', data: { reason: 'Regeln är inaktiv' } }
+  }
+
+  // 2b. En väg in: run_agent vägras för inbound-event (sms_received,
+  // call_completed, phone_call) — se INBOUND_SINGLE_BRAIN_EVENTS ovan.
+  // Inbound-kanaler har exakt en hjärna; ingen automationsregel får lägga
+  // en till.
+  if (
+    typedRule.action_type === 'run_agent' &&
+    typedRule.trigger_type === 'event' &&
+    INBOUND_SINGLE_BRAIN_EVENTS.has(String(typedRule.trigger_config?.event_name || ''))
+  ) {
+    const skäl = `run_agent vägras: "${typedRule.trigger_config?.event_name}" är en inbound-kanalhändelse som redan har en dispatchad agentkörning (en-väg-in). Ingen ytterligare agentkörning tillåts här.`
+    console.warn(`[automation-engine] ${skäl} (regel: ${typedRule.name})`)
+    await logExecution(supabase, {
+      businessId: typedRule.business_id,
+      ruleId: typedRule.id,
+      ruleName: typedRule.name,
+      triggerType: typedRule.trigger_type,
+      actionType: typedRule.action_type,
+      agentId: typedRule.agent_id ?? null,
+      status: 'skipped',
+      context,
+      result: { reason: skäl },
+    })
+    await updateRuleStats(supabase, typedRule.id, 'skipped')
+    return { status: 'skipped', data: { reason: skäl } }
   }
 
   // 3. Get settings

@@ -137,8 +137,14 @@ export async function orchestrate(params: OrchestrateParams): Promise<Orchestrat
   const supabase = getServerSupabase()
   const startTime = Date.now()
 
+  // Deklarerade utanför try:n så catch-blocket (nedan) kan släppa ett
+  // claimat-men-kraschat lås — samma mönster som app/api/agent/trigger/route.ts.
+  let claimRunId = ''
+  let claimed = false
+
   try {
-    // 1. Idempotency check
+    // 1. Idempotency check (snabb väg — den riktiga låsningen är claim-
+    // inserten i steg 1b, se dess kommentar).
     if (idempotencyKey) {
       const { data: existing } = await supabase
         .from('agent_runs')
@@ -158,6 +164,49 @@ export async function orchestrate(params: OrchestrateParams): Promise<Orchestrat
           durationMs: existing.duration_ms || 0,
           escalated: false,
         }
+      }
+    }
+
+    // 1b. Claim-before-run (idempotenshårdningen, etapp 1 "en väg in") —
+    // samma insert-som-lås-mönster som app/api/agent/trigger/route.ts:
+    // en UNIK partiell index på idempotency_key (sql/agent_idempotency.sql)
+    // gör en samtidig andra claim till en 23505-konflikt, INNAN sub-agenten
+    // (dyr, långsam) körs — inte bara en läsning som hinner missas.
+    if (idempotencyKey) {
+      claimRunId = generateRunId()
+      const { error: claimError } = await supabase
+        .from('agent_runs')
+        .insert({
+          run_id: claimRunId,
+          business_id: businessId,
+          trigger_type: triggerType,
+          trigger_data: triggerData || {},
+          status: 'running',
+          idempotency_key: idempotencyKey,
+          created_at: new Date().toISOString(),
+        })
+
+      if (!claimError) {
+        claimed = true
+      } else if (claimError.code === '23505') {
+        const { data: existing } = await supabase
+          .from('agent_runs')
+          .select('run_id, status, final_response, tool_calls, duration_ms, agent_type')
+          .eq('idempotency_key', idempotencyKey)
+          .maybeSingle()
+        return {
+          success: true,
+          runId: existing?.run_id || '',
+          agentType: (existing?.agent_type as AgentType) || 'lead',
+          finalResponse: existing?.final_response || '',
+          steps: 0,
+          toolCalls: existing?.tool_calls || 0,
+          tokensUsed: 0,
+          durationMs: existing?.duration_ms || 0,
+          escalated: false,
+        }
+      } else {
+        console.error('[Orchestrator] claim-insert misslyckades, kör olåst:', claimError.message)
       }
     }
 
@@ -204,7 +253,11 @@ export async function orchestrate(params: OrchestrateParams): Promise<Orchestrat
 
     // 6. Handle escalation
     if (result.escalation) {
-      // Log the Haiku run first
+      // Log the Haiku run first — egen sekundär rad med '-haiku'-suffixad
+      // nyckel, INTE den claimade raden (den bär originalnyckeln, se nedan).
+      // En konkurrerande orchestrate()-anrop med samma idempotencyKey blev
+      // redan avvisad av claim-inserten i steg 1b, så den här inserten är
+      // aldrig i kapplöpning med sig själv.
       const haikuRunId = generateRunId()
       await logAgentRun(supabase, {
         runId: haikuRunId,
@@ -225,11 +278,12 @@ export async function orchestrate(params: OrchestrateParams): Promise<Orchestrat
         result.escalation
       )
 
-      // Log the Strategi run
+      // Log the Strategi run — UPPDATERAR den claimade raden om vi vann
+      // låset, annars en vanlig insert (ingen idempotencyKey angiven alls).
       agentType = 'strategi'
       escalated = true
 
-      const strRunId = generateRunId()
+      const strRunId = claimed ? claimRunId : generateRunId()
       await logAgentRun(supabase, {
         runId: strRunId,
         businessId,
@@ -238,6 +292,7 @@ export async function orchestrate(params: OrchestrateParams): Promise<Orchestrat
         agentType: 'strategi',
         result: strResult,
         idempotencyKey: idempotencyKey || undefined,
+        claimed,
       })
 
       return {
@@ -253,8 +308,8 @@ export async function orchestrate(params: OrchestrateParams): Promise<Orchestrat
       }
     }
 
-    // 7. Log to agent_runs (no escalation)
-    const runId = generateRunId()
+    // 7. Log to agent_runs (no escalation) — samma claimad-eller-ny-princip.
+    const runId = claimed ? claimRunId : generateRunId()
     await logAgentRun(supabase, {
       runId,
       businessId,
@@ -263,6 +318,7 @@ export async function orchestrate(params: OrchestrateParams): Promise<Orchestrat
       agentType,
       result,
       idempotencyKey: idempotencyKey || undefined,
+      claimed,
     })
 
     return {
@@ -278,6 +334,20 @@ export async function orchestrate(params: OrchestrateParams): Promise<Orchestrat
     }
   } catch (err: any) {
     console.error('[Orchestrator] Error:', err)
+    // Släpp ett claimat lås som kraschade innan slutskrivningen — annars
+    // blockerar den 'running'-raden en legitim retry med samma
+    // idempotencyKey tills underhållssvepet (cron/maintenance) städar den.
+    if (claimed && claimRunId) {
+      try {
+        await supabase
+          .from('agent_runs')
+          .update({ status: 'failed', error_message: String(err?.message || err).slice(0, 500) })
+          .eq('run_id', claimRunId)
+          .eq('status', 'running')
+      } catch (releaseErr) {
+        console.error('[Orchestrator] kunde inte släppa claimat lås:', releaseErr)
+      }
+    }
     return {
       success: false,
       runId: '',
@@ -377,30 +447,52 @@ async function logAgentRun(
     agentType: AgentType
     result: AgentRunResult
     idempotencyKey?: string
+    /** true = runId pekar på en rad redan claimad (INSERT status:'running')
+     *  av claim-inserten i orchestrate() steg 1b — UPPDATERA den istället
+     *  för att försöka en ny INSERT (som den unika idempotency_key-indexen
+     *  då hade avvisat). */
+    claimed?: boolean
   }
 ): Promise<void> {
-  const { runId, businessId, triggerType, triggerData, agentType, result, idempotencyKey } = params
+  const { runId, businessId, triggerType, triggerData, agentType, result, idempotencyKey, claimed } = params
   const estimatedCost = +(result.tokensUsed * 0.000009).toFixed(4)
 
   try {
-    await supabase
-      .from('agent_runs')
-      .insert({
-        run_id: runId,
-        business_id: businessId,
-        trigger_type: triggerType,
-        trigger_data: triggerData || {},
-        steps: result.steps,
-        tool_calls: result.toolCallCount,
-        final_response: result.finalResponse,
-        tokens_used: result.tokensUsed,
-        estimated_cost: estimatedCost,
-        duration_ms: result.durationMs,
-        status: 'completed',
-        agent_type: agentType,
-        idempotency_key: idempotencyKey || null,
-        created_at: new Date().toISOString(),
-      })
+    if (claimed) {
+      await supabase
+        .from('agent_runs')
+        .update({
+          trigger_data: triggerData || {},
+          steps: result.steps,
+          tool_calls: result.toolCallCount,
+          final_response: result.finalResponse,
+          tokens_used: result.tokensUsed,
+          estimated_cost: estimatedCost,
+          duration_ms: result.durationMs,
+          status: 'completed',
+          agent_type: agentType,
+        })
+        .eq('run_id', runId)
+    } else {
+      await supabase
+        .from('agent_runs')
+        .insert({
+          run_id: runId,
+          business_id: businessId,
+          trigger_type: triggerType,
+          trigger_data: triggerData || {},
+          steps: result.steps,
+          tool_calls: result.toolCallCount,
+          final_response: result.finalResponse,
+          tokens_used: result.tokensUsed,
+          estimated_cost: estimatedCost,
+          duration_ms: result.durationMs,
+          status: 'completed',
+          agent_type: agentType,
+          idempotency_key: idempotencyKey || null,
+          created_at: new Date().toISOString(),
+        })
+    }
   } catch (err: any) {
     console.error('[Orchestrator] Failed to log agent_run:', err?.message || err)
   }

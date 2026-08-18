@@ -15,8 +15,23 @@ export async function executeMatteActions(
   signal: IncomingSignal,
   businessId: string,
   supabase: SupabaseClient,
-  availableSlots?: TimeSlot[]
+  availableSlots?: TimeSlot[],
+  options?: { dryRun?: boolean }
 ): Promise<void> {
+  // Etapp 1 ("en väg in", 2026-08-18) — skuggläge: Mattes SMS-mutationer
+  // pensioneras till förmån för en enskild agentkörning (Lisa), men vi vill
+  // jämföra vad Matte SKULLE ha gjort mot vad Lisa faktiskt gjorde i en
+  // vecka innan vägen stängs helt. dryRun:true loggar bara beslutet och
+  // MUTERAR INGENTING — varken ÄTA-förslaget, actions-loopen eller
+  // kundsvaret. Vakten ligger FÖRST i funktionskroppen, före varje skrivning
+  // (suggestAtaDraft, executeDirectAction, createApproval, sendCustomerReply
+  // skriver alla till Supabase). lib/gmail/processor.ts (e-postkanalen)
+  // anropar aldrig med dryRun:true — den behåller full exekvering.
+  if (options?.dryRun) {
+    await logMatteShadow(decision, entity, signal, businessId, supabase, availableSlots)
+    return
+  }
+
   // Våg 2b (tasks/value-chain-plan.md) — ÄTA-kedjan: en tilläggsbeställning
   // (intent 'quote_addition') på ett REDAN identifierat projekt är en ÄTA,
   // inte en vanlig ny offert. Körs FÖRE actions-loopen och skapar kortet via
@@ -271,5 +286,54 @@ async function logMatteAction(
     })
   } catch (err) {
     console.error('[Matte] Log error:', err)
+  }
+}
+
+/**
+ * Skuggläge (etapp 1, "en väg in") — samma logg-tabell som logMatteAction,
+ * men rule_name 'matte_sms_shadow' markerar raden som ETT BESLUT SOM ALDRIG
+ * EXEKVERADES. result.would_execute_actions är exakt de actions Matte hade
+ * kört (typ, autonom/godkännande, params) om skuggläget inte funnits — det
+ * jämförelseunderlaget en människa (eller ett facit) kan ställa mot Lisas
+ * faktiska agent_runs för samma inkommande SMS.
+ */
+async function logMatteShadow(
+  decision: MatteDecision,
+  entity: ResolvedEntity,
+  signal: IncomingSignal,
+  businessId: string,
+  supabase: SupabaseClient,
+  availableSlots?: TimeSlot[]
+): Promise<void> {
+  try {
+    await supabase.from('v3_automation_logs').insert({
+      business_id: businessId,
+      rule_name: 'matte_sms_shadow',
+      trigger_type: `${signal.channel}_received`,
+      action_type: decision.intent,
+      status: 'success',
+      context: {
+        intent: decision.intent,
+        confidence: decision.confidence,
+        customer: entity.customerName,
+        reasoning: decision.reasoning,
+        channel: signal.channel,
+        shadow_mode: true,
+      },
+      result: {
+        would_execute_actions: decision.actions.map(a => ({
+          type: a.type,
+          autonomous: a.autonomous,
+          params: a.params,
+          description: a.description,
+        })),
+        would_send_reply: decision.customerReply?.send ?? false,
+        would_reply_message: decision.customerReply?.message ?? null,
+        suggested_agent: decision.suggestedAgent,
+        available_slots_count: availableSlots?.length ?? 0,
+      },
+    })
+  } catch (err) {
+    console.error('[Matte] Shadow log error:', err)
   }
 }

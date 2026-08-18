@@ -244,5 +244,38 @@ export async function GET(request: NextRequest) {
     results.job_started_error = err.message
   }
 
+  // ── 5. Släpp fastnade agent_runs-claims (idempotenshårdningen, etapp 1) ──
+  //
+  // app/api/agent/trigger/route.ts och lib/agent/orchestrator.ts INSERT:ar
+  // numera en agent_runs-rad med status='running' INNAN modellen kallas — ett
+  // lås, inte en kvittens (se claim-before-run-kommentaren i route.ts). Om
+  // processen kraschar mellan claim och slutskrivning (Vercel-timeout,
+  // deploy-omstart) försöker båda ställena redan släppa raden i sitt eget
+  // catch-block, men det är best effort — en riktig krasch (OOM, kill -9)
+  // hinner aldrig dit. En sådan rad blockerar annars en legitim retry med
+  // samma idempotency_key för alltid. 90 sekunder är gott om marginal över
+  // routens egen maxDuration (60s).
+  try {
+    const stale = new Date(Date.now() - 90 * 1000).toISOString()
+    const { data, error } = await supabase
+      .from('agent_runs')
+      .update({
+        status: 'failed',
+        error_message: 'Claimet fastnade (>90s) — städat av underhållssvepet, kan köras igen.',
+      })
+      .eq('status', 'running')
+      .lt('created_at', stale)
+      .select('run_id')
+
+    if (error) throw error
+    results.stale_agent_claims_released = data?.length || 0
+    if (results.stale_agent_claims_released > 0) {
+      console.log(`[maintenance] Släppte ${results.stale_agent_claims_released} fastnade agent_runs-claims`)
+    }
+  } catch (err: any) {
+    console.error('[maintenance] stale-agent-claims error:', err.message)
+    results.stale_agent_claims_error = err.message
+  }
+
   return NextResponse.json({ ok: true, ...results })
 }

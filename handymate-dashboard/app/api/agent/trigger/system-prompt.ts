@@ -245,7 +245,8 @@ ${buildAutomationBlock(business.automationSettings)}
 ${triggerInstructions}
 
 ## Lead Pipeline
-- Vid inkommande samtal/SMS: kvalificera ALLTID som lead först med qualify_lead
+- Vid inkommande samtal: kvalificera ALLTID som lead först med qualify_lead
+- Vid inkommande SMS: lead-fångst för okända avsändare sker redan deterministiskt i webhooken innan du kopplas in (se "Inkommande SMS" nedan för vad som redan är gjort) — kvalificera INTE igen, agera direkt på ärendet
 - Heta leads (urgency high/emergency) kräver omedelbar åtgärd
 - Vid lead_nurture: referera till kundens SPECIFIKA förfrågan
 - Vid hot lead: betona brådskan, inkludera jobbtyp och kontaktinfo
@@ -326,6 +327,71 @@ function agentNamn(id: unknown): string {
   return isValidAgentId(id) ? AGENT_CAPABILITIES[id].name : 'en kollega'
 }
 
+/**
+ * Etapp 1 ("en väg in", 2026-08-18) — inkommande SMS.
+ *
+ * app/api/sms/incoming/route.ts kan dispatcha den här triggern på två sätt:
+ *
+ *   - Pilotläget (business_config.inbound_single_brain=PÅ): trigger_data bär
+ *     en FÖRBEREDD, deterministisk kontext (entity_type/customer_id/lead_id/
+ *     customer_name/available_slots) — kund-/lead-uppslaget och kalender-
+ *     kontrollen är redan gjorda i koden, inte något du ska gissa dig till.
+ *     Lead-fångst för okända avsändare är REDAN GJORD innan du kopplas in.
+ *   - Legacyläget (flaggan AV): trigger_data bär bara telefon/meddelande/
+ *     historik, som förut — ingen förberedd kontext.
+ *
+ * Renderas villkorat: den förberedda kontexten och de verifierade tiderna
+ * visas BARA när de faktiskt skickats med (entityType/slots kan saknas).
+ */
+function buildIncomingSmsInstructions(triggerData?: Record<string, unknown>): string {
+  const entityType = triggerData?.entity_type as string | undefined
+  const customerName = triggerData?.customer_name as string | undefined
+  const customerId = triggerData?.customer_id as string | undefined
+  const leadId = triggerData?.lead_id as string | undefined
+  const slots = Array.isArray(triggerData?.available_slots)
+    ? (triggerData!.available_slots as Array<{ label?: string; start?: string; end?: string }>)
+    : null
+
+  const entityLines: string[] = []
+  if (entityType) {
+    entityLines.push(
+      entityType === 'unknown'
+        ? 'Avsändarstatus: OKÄND avsändare — ingen tidigare kund/lead på detta nummer (en ny lead har redan skapats åt dig om det behövdes).'
+        : `Avsändarstatus: ${entityType === 'known_customer' ? 'BEFINTLIG KUND' : 'BEFINTLIG LEAD'}${customerName ? ` — ${customerName}` : ''}.`
+    )
+    if (customerId) entityLines.push(`Kund-id: ${customerId}`)
+    if (leadId) entityLines.push(`Lead-id: ${leadId}`)
+  }
+
+  const slotsBlock = slots && slots.length > 0
+    ? `\nVERIFIERADE LEDIGA TIDER (kontrollerade mot kalendern):\n${slots
+        .map((s, i) => `  ${i + 1}. ${s.label || `${s.start ?? '?'}–${s.end ?? '?'}`}`)
+        .join('\n')}\nHård regel: föreslå ALDRIG en tid som inte finns i listan över lediga tider.`
+    : ''
+
+  return `### Inkommande SMS
+Sök kund, förstå behov, vidta åtgärd.
+Från: ${triggerData?.phone_number || 'Okänt'}
+Meddelande: ${triggerData?.message || '(Tomt)'}
+Historik: ${triggerData?.conversation_history || '(Ingen)'}
+${entityLines.length > 0 ? '\n' + entityLines.join('\n') : ''}${slotsBlock}
+
+### När ett godkännandekort krävs (portat från Mattes tidigare bedömningsregler)
+Agera DIREKT (utan kort) bara för:
+- Svara på informationsfrågor om status
+- Uppdatera anteckningar/materialval på ett pågående projekt
+- Tacka för betalning
+- Skicka en kort bekräftelse eller ett välkomstmeddelande till en ny kontakt
+
+Skapa i stället ETT GODKÄNNANDEKORT (create_approval_request) — agera ALDRIG direkt — för:
+- Att boka eller omboka en tid
+- Att skicka offert eller prisuppgift
+- Allt som innebär ett löfte om pengar eller ett datum
+- Ett PÅSTÅENDE om betalning (kunden SÄGER att de redan betalat) — bekräfta via kort, mutera ALDRIG fakturastatus bara utifrån ett SMS
+- Tilläggsarbete (ÄTA) på ett pågående projekt
+- Att markera en affär/deal som förlorad`
+}
+
 function getTriggerInstructions(
   triggerType: string,
   triggerData?: Record<string, unknown>
@@ -340,12 +406,7 @@ Telefon: ${triggerData?.phone_number || 'Okänt'}
 Längd: ${triggerData?.duration_seconds || '?'} sek`
 
     case 'incoming_sms':
-      return `### Inkommande SMS
-1. Kvalificera som lead med qualify_lead
-2. Sök kund, förstå behov, vidta åtgärd
-Från: ${triggerData?.phone_number || 'Okänt'}
-Meddelande: ${triggerData?.message || '(Tomt)'}
-Historik: ${triggerData?.conversation_history || '(Ingen)'}`
+      return buildIncomingSmsInstructions(triggerData)
 
     case 'cron':
       return `### Schemalagt jobb (${triggerData?.cron_type || 'daily_check'})`

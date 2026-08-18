@@ -42,6 +42,10 @@ const MODEL_LIVE = 'claude-sonnet-4-6'
 const MODEL_BACKGROUND = 'claude-haiku-4-5-20251001'
 
 export async function POST(request: NextRequest) {
+  // Deklarerade utanför try:n så catch-blocket (nedan) kan släppa ett
+  // claimat-men-kraschat lås utan att gissa på om vi hann dit.
+  let runId = ''
+  let claimed = false
   try {
     const supabase = getServerSupabase()
     const body = await request.json()
@@ -479,6 +483,60 @@ export async function POST(request: NextRequest) {
     // Används för att trimma tool-historiken utan att tappa initial context.
     const initialMessageCount = messages.length
 
+    // ── Claim-before-run (idempotenshårdningen, etapp 1 "en väg in") ──
+    //
+    // Den gamla idempotensen (ovan, "Idempotency check") var en LÄSNING följd
+    // av en insert som skrevs FÖRST EFTER hela körningen — alltså en kvittens,
+    // inte ett lås. Två samtidiga retries (46elks webhook-retry + Supabase-
+    // spegling, eller bara ett dubbelt klick) kunde båda passera den läsningen
+    // innan någon av dem hunnit skriva, och båda köra klart — två SMS till
+    // samma kund för samma händelse.
+    //
+    // INSERT:en nedan är i stället själva låset: idx_agent_runs_idempotency
+    // (sql/agent_idempotency.sql) är ett unikt PARTIELLT index på
+    // idempotency_key, så en samtidig andra insert med samma nyckel avvisas
+    // av Postgres (23505) — inte av vår egen (racy) SELECT. Modellanropen
+    // (dyra, långsamma) körs bara av den som faktiskt vann klaimet.
+    runId = 'run_' + Math.random().toString(36).substring(2, 14)
+    if (idempotency_key) {
+      const { error: claimError } = await supabase
+        .from('agent_runs')
+        .insert({
+          run_id: runId,
+          business_id: businessId,
+          trigger_type,
+          trigger_data: trigger_data || {},
+          status: 'running',
+          idempotency_key,
+          agent_id: agentId,
+          created_at: new Date().toISOString(),
+        })
+
+      if (!claimError) {
+        claimed = true
+      } else if (claimError.code === '23505') {
+        // En annan process vann kapplöpningen om samma idempotency_key —
+        // samma dubblett-svarsform som den gamla förkontrollen gav.
+        const { data: existingClaim } = await supabase
+          .from('agent_runs')
+          .select('run_id, status, final_response, tool_calls, duration_ms')
+          .eq('idempotency_key', idempotency_key)
+          .maybeSingle()
+        return NextResponse.json({
+          run_id: existingClaim?.run_id,
+          duplicate: true,
+          status: existingClaim?.status,
+          final_response: existingClaim?.final_response,
+          tool_calls: existingClaim?.tool_calls,
+          duration_ms: existingClaim?.duration_ms,
+        })
+      } else {
+        // Ett annat DB-fel (inte konflikt) får aldrig stoppa en pågående,
+        // användarinitierad kundkontakt — logga och kör olåst, som förut.
+        console.error('[AgentTrigger] claim-insert misslyckades, kör olåst:', claimError.message)
+      }
+    }
+
     for (let step = 0; step < MAX_STEPS; step++) {
       // Trimma message-historiken: behåll initial + senaste 4 (2 par tool_use+tool_result)
       // Reducerar token-volym på iterationer 3+ utan att förlora aktuell context.
@@ -567,30 +625,49 @@ export async function POST(request: NextRequest) {
     const estimatedCostRaw = llmCostUsd(cumulativeUsage, MODEL)
     const estimatedCost = Math.round(estimatedCostRaw * 10000) / 10000
 
-    // Log to agent_runs
-    const runId =
-      'run_' + Math.random().toString(36).substring(2, 14)
+    // Skriv resultatet till agent_runs. Var vi claimade raden ovan (låset
+    // vann) UPPDATERAS den istället för att skrivas som en ny rad — annars
+    // hade den unika idempotency_key-indexen avvisat den här inserten och
+    // resultatet gått förlorat. Ingen claim (ingen idempotency_key gavs) →
+    // samma insert som förut.
     try {
-      await supabase
-        .from('agent_runs')
-        .insert({
-          run_id: runId,
-          business_id: businessId,
-          trigger_type,
-          trigger_data: trigger_data || {},
-          steps,
-          tool_calls: toolCallCount,
-          final_response: finalResponse,
-          tokens_used: totalTokens,
-          estimated_cost: estimatedCost,
-          duration_ms: durationMs,
-          status: 'completed',
-          idempotency_key: idempotency_key || null,
-          agent_id: agentId,
-          created_at: new Date().toISOString(),
-        })
+      if (claimed) {
+        await supabase
+          .from('agent_runs')
+          .update({
+            trigger_data: trigger_data || {},
+            steps,
+            tool_calls: toolCallCount,
+            final_response: finalResponse,
+            tokens_used: totalTokens,
+            estimated_cost: estimatedCost,
+            duration_ms: durationMs,
+            status: 'completed',
+            agent_id: agentId,
+          })
+          .eq('run_id', runId)
+      } else {
+        await supabase
+          .from('agent_runs')
+          .insert({
+            run_id: runId,
+            business_id: businessId,
+            trigger_type,
+            trigger_data: trigger_data || {},
+            steps,
+            tool_calls: toolCallCount,
+            final_response: finalResponse,
+            tokens_used: totalTokens,
+            estimated_cost: estimatedCost,
+            duration_ms: durationMs,
+            status: 'completed',
+            idempotency_key: idempotency_key || null,
+            agent_id: agentId,
+            created_at: new Date().toISOString(),
+          })
+      }
     } catch (insertErr: any) {
-      console.error('[agent] Failed to insert agent_run:', insertErr?.message || insertErr)
+      console.error('[agent] Failed to save agent_run:', insertErr?.message || insertErr)
     }
 
     // COGS-boken (cost_event) — samma princip som observation-cronarnas
@@ -635,6 +712,22 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('[AgentTrigger] Error:', error)
+    // Släpp ett claimat lås som kraschade innan slutskrivningen — annars
+    // låg raden kvar som 'running' och blockerade en legitim retry med
+    // samma idempotency_key tills nattens underhållssvep (cron/maintenance)
+    // städar bort den. Best effort: misslyckas även DEN här skrivningen får
+    // svepet ta det, aldrig fälla felsvaret vi redan ska returnera.
+    if (claimed && runId) {
+      try {
+        await getServerSupabase()
+          .from('agent_runs')
+          .update({ status: 'failed', error_message: String(error?.message || error).slice(0, 500) })
+          .eq('run_id', runId)
+          .eq('status', 'running')
+      } catch (releaseErr) {
+        console.error('[AgentTrigger] kunde inte släppa claimat lås:', releaseErr)
+      }
+    }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

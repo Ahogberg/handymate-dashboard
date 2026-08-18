@@ -67,11 +67,16 @@ test('alla cron-rutter utanför Claudes Karin-fillås använder helpern', () => 
   // Confirmation V1, tasks/todo.md) och använder helpern korrekt.
   // 40 (2026-08-17): playbook-kickoff tillkom (Playbook Kickoff Copilot
   // V1, tasks/todo.md) och använder helpern korrekt.
-  expect(files).toHaveLength(40)
+  // 41 (facit-drift upptäckt 2026-08-18, "en väg in"-etappen): talet var
+  // redan stelt fel innan denna ändring — agent-observations/test och
+  // patterns/test-rutterna fanns redan i repot och använder helpern
+  // korrekt (verifierat nedan av samma loop), bara siffran var föråldrad.
+  // Ingen ny cron-rutt tillkom i denna ändring.
+  expect(files).toHaveLength(41)
 
   const karinRoute = path.join(CRON_DIR, 'karin-deadlines', 'route.ts')
   const ownedRoutes = files.filter(file => file !== karinRoute)
-  expect(ownedRoutes).toHaveLength(39)
+  expect(ownedRoutes).toHaveLength(40)
 
   const missing = ownedRoutes
     .filter(file => {
