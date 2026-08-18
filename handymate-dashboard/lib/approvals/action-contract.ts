@@ -223,6 +223,15 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // brutet, en människa avgör. Se lib/promises/deadline-sweep.ts. Samma
   // klass som expectation_drift_signal ovan.
   promise_deadline_signal: 'INFORMATIONAL',
+
+  // Mission Mandates V1 (Etapp V, tasks/jaunty-pondering-hummingbird.md,
+  // sql/v150_mission_mandate.sql, 2026-08-18): ett uppdragsmandat pausar sig
+  // SJÄLVT (kod, aldrig en människa som klickar) vid planändring eller
+  // upprepade leveransfel — se lib/mandates/mission-mandate.ts
+  // pauseMandateForPlanChange/registerMandateDeliveryFailure. Kortet
+  // konstaterar att pausningen redan skett; godkänn = jag har läst det,
+  // precis som autonomy_revoked ovan. Ingenting exekveras av ett klick.
+  mandate_paused_signal: 'INFORMATIONAL',
 }
 
 /** Vad är det här kortet? `null` = okänt, och okänt godkänns inte. */
