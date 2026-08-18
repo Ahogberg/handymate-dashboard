@@ -1063,9 +1063,20 @@ export function DealModal() {
                                 <span>{new Date(doc.uploaded_at).toLocaleDateString('sv-SE')}</span>
                               </div>
                             </div>
-                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-gray-400 hover:text-primary-700 rounded-lg hover:bg-primary-50 transition-colors" title="Öppna">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // customer-documents är privat sedan v151 — doc.file_url är bara
+                                // en path, inte en klickbar URL. Samma signerad-proxy-mönster som
+                                // kundkortets openDocument().
+                                const cid = selectedDeal.customer_id || selectedDeal.id
+                                window.open(`/api/customers/${cid}/documents/${doc.id}?view=inline`, '_blank', 'noopener,noreferrer')
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-primary-700 rounded-lg hover:bg-primary-50 transition-colors"
+                              title="Öppna"
+                            >
                               <Download className="w-4 h-4" />
-                            </a>
+                            </button>
                           </div>
                         ))}
                       </div>

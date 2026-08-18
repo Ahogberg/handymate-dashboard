@@ -309,13 +309,8 @@ export async function approveJobReport(
       return { success: false, error: 'Kunde inte ladda upp PDF' }
     }
 
-    const { data: urlData } = supabase.storage
-      .from('customer-documents')
-      .getPublicUrl(storagePath)
-
-    const pdfUrl = urlData?.publicUrl || ''
-
-    // Save to generated_document
+    // v151: bucketen är privat — pdf_url lagrar PATH (aldrig en publik/
+    // signerad URL). Signering sker vid läsning.
     await supabase.from('generated_document').insert({
       id: `jrep_${Math.random().toString(36).slice(2, 11)}`,
       business_id: businessId,
@@ -325,8 +320,17 @@ export async function approveJobReport(
       content: [{ type: 'job_report', data: reportData }],
       variables_data: reportData,
       status: 'completed',
-      pdf_url: pdfUrl,
+      pdf_url: storagePath,
     })
+
+    // Mejlet länkar (bifogar inte bytes) — kunden kan öppna det dagar
+    // senare, så en 1h-TTL räcker inte. 7 dygn är den dokumenterade
+    // avvägningen för länkad-i-mejl (Etapp Z-instruktionen): länge nog för
+    // att rimligen hinna öppnas, men aldrig permanent. Denna signerade URL
+    // returneras till approval-anroparen (transient API-svar) men skrivs
+    // ALDRIG till databasen — se pdf_url ovan.
+    const { signStorageUrl } = await import('@/lib/storage-signing')
+    const pdfUrl = (await signStorageUrl(supabase, 'customer-documents', storagePath, 7 * 24 * 3600)) || ''
 
     // Send email if customer has email
     if (reportData.customerEmail) {

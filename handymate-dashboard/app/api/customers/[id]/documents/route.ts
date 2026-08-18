@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { extractStoragePath, signStorageUrl } from '@/lib/storage-signing'
+
+const BUCKET = 'customer-documents'
 
 /**
  * GET - Lista dokument för en kund
+ *
+ * v151: file_url lagrar en storage-PATH (bucketen är privat). Listan
+ * signerar varje dokuments file_url vid läsning (1h TTL) — de flesta
+ * konsumenter (t.ex. kundkortets dokumentflik) bygger sin egen proxy-URL
+ * från doc.id och struntar i file_url, men quotes/new-sidan förifyller
+ * offertens bilagor direkt från detta svar och behöver en klickbar länk.
+ * `path` följer med bredvid så anropande kod kan spara path tillbaka utan
+ * att råka persistera den signerade länken.
  */
 export async function GET(
   request: NextRequest,
@@ -26,7 +37,16 @@ export async function GET(
       .order('uploaded_at', { ascending: false })
 
     if (error) throw error
-    return NextResponse.json({ documents: documents || [] })
+
+    const signedDocuments = await Promise.all(
+      (documents || []).map(async (doc: any) => {
+        const path = extractStoragePath(doc.file_url, BUCKET)
+        const signedUrl = path ? await signStorageUrl(supabase, BUCKET, path, 3600) : null
+        return { ...doc, path, file_url: signedUrl || doc.file_url }
+      }),
+    )
+
+    return NextResponse.json({ documents: signedDocuments })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

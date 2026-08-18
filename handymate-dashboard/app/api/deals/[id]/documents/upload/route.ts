@@ -24,7 +24,8 @@ export async function POST(
     const supabase = getServerSupabase()
 
     // Bucket-config best-effort, kastar aldrig — uploaden funkar via service_role.
-    await ensureBucket(supabase, BUCKET, { public: true })
+    // v151: privat — public:true hade tyst synkat bucketen tillbaka till publik.
+    await ensureBucket(supabase, BUCKET, { public: false })
 
     let formData: FormData
     try {
@@ -100,10 +101,8 @@ export async function POST(
       )
     }
 
-    // Get public URL — används som fallback i UI:t (signerad URL skapas
-    // via /api/customers/[id]/documents/[docId] vid klick).
-    const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
-
+    // v151: bucketen är privat — file_url lagrar PATH. Signerad URL skapas
+    // via /api/customers/[id]/documents/[docId] vid klick.
     const docId = 'doc_' + Math.random().toString(36).substr(2, 9)
     const { data, error: insertError } = await supabase
       .from('customer_document')
@@ -112,7 +111,7 @@ export async function POST(
         customer_id: deal?.customer_id || dealId,
         business_id: business.business_id,
         file_name: file.name,
-        file_url: urlData.publicUrl,
+        file_url: filePath,
         file_type: file.type || null,
         file_size: file.size || null,
         category,

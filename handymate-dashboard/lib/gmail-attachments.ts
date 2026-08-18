@@ -134,12 +134,9 @@ export async function downloadAndSaveAttachments(
         continue
       }
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('customer-documents')
-        .getPublicUrl(storagePath)
-
-      const fileUrl = urlData?.publicUrl || ''
+      // v151: bucketen är privat — file_url lagrar PATH (samma värde som
+      // storage_path), signering sker vid läsning.
+      const fileUrl = storagePath
 
       // Insert customer_document record
       const { error: dbError } = await supabase

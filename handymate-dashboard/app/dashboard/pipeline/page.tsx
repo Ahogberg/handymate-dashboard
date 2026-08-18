@@ -1015,30 +1015,19 @@ export default function PipelinePage() {
       const createdDeal = dealData.deal
 
       // Upload attached documents if customer is linked
+      // v151: customer-documents är privat — uppladdningen går via
+      // server-rutten (upload+storage+DB-insert i ett), samma väg som
+      // DealModal-fliken redan använder för befintliga deals.
       if (newDealFiles.length > 0 && createdDeal.customer_id) {
         let uploadFails = 0
         for (const file of newDealFiles) {
           try {
-            const filePath = `${business.business_id}/${createdDeal.customer_id}/${Date.now()}_${file.name}`
-            const { error: uploadError } = await supabase.storage
-              .from('customer-documents')
-              .upload(filePath, file)
-            if (uploadError) { uploadFails++; continue }
-
-            const { data: urlData } = supabase.storage
-              .from('customer-documents')
-              .getPublicUrl(filePath)
-
-            const docRes = await fetch(`/api/customers/${createdDeal.customer_id}/documents`, {
+            const formData = new FormData()
+            formData.append('file', file)
+            formData.append('category', 'other')
+            const docRes = await fetch(`/api/customers/${createdDeal.customer_id}/documents/upload`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                file_name: file.name,
-                file_url: urlData.publicUrl,
-                file_type: file.type,
-                file_size: file.size,
-                category: 'other',
-              })
+              body: formData,
             })
             if (!docRes.ok) uploadFails++
           } catch {

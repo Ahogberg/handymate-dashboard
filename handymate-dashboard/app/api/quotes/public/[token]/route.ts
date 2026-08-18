@@ -10,6 +10,7 @@ import { sanitizeTemplateDataForPublic } from '@/lib/quotes/public-document'
 import { buildPublicQuoteDto } from '@/lib/quotes/public-dto'
 import { stripPrintBar } from '@/lib/document-html'
 import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/business/quote-surface-select'
+import { signAttachmentList } from '@/lib/storage-signing'
 
 // ETAPP 5 (offert-masterplan.md): dokument-HTML-rendering (Premium/Friendly)
 // kräver Node-runtime (react-dom/server via lib/quote-templates, samma som
@@ -191,6 +192,18 @@ export async function GET(
     // kolumner VISUELLT i mallen — de råa värdena får inte läcka i nätverks-
     // svaret som denna funktion serialiserar till klienten.
     ;(quote as any).quote_items = rawItems
+
+    // v151: quote.attachments[].url lagrar en storage-path (customer-
+    // documents är privat) — signera vid VARJE anrop innan den skickas till
+    // kunden/portalen. 1h TTL räcker för en enskild visning. Aldrig
+    // persisterat — bara mutation av det redan hämtade quote-objektet.
+    ;(quote as any).attachments = await signAttachmentList(
+      supabase,
+      'customer-documents',
+      Array.isArray((quote as any).attachments) ? (quote as any).attachments : [],
+      3600,
+    )
+
     const creator = await fetchQuoteCreator(supabase, quote.created_by)
     const templateStyle = (quote.template_style || business?.quote_template_style || 'modern') as
       | 'modern' | 'premium' | 'friendly'

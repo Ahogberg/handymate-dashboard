@@ -7,7 +7,10 @@ import { applyAnnualCap } from '@/lib/quotes/apply-annual-cap'
 import { resolveReferencePerson } from '@/lib/quotes/resolve-reference-person'
 import { lockedChanges, lockedChangeMessage } from '@/lib/quotes/lifecycle'
 import { createQuote, resolveItemSplit } from '@/lib/quotes/create-quote'
+import { signAttachmentList } from '@/lib/storage-signing'
 import type { QuoteItem } from '@/lib/types/quote'
+
+const ATTACHMENTS_BUCKET = 'customer-documents'
 
 /**
  * Produktbank (v67): invariant-backstopp för arbete/material-spliten.
@@ -105,9 +108,20 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: true })
         .limit(50)
 
+      // v151: quote.attachments[].url lagrar en storage-path (bucketen är
+      // privat) — signera vid läsning, aldrig persistera den signerade
+      // länken. `path` följer med så klienten kan spara path oförändrat.
+      const signedAttachments = await signAttachmentList(
+        supabase,
+        ATTACHMENTS_BUCKET,
+        Array.isArray(quote.attachments) ? quote.attachments : [],
+        3600,
+      )
+
       return NextResponse.json({
         quote: {
           ...quote,
+          attachments: signedAttachments,
           quote_items: quoteItems || [],
           customer,
         },

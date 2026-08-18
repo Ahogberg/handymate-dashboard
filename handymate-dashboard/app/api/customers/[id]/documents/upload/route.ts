@@ -20,7 +20,10 @@ export async function POST(
 
     const { id: customerId } = await params
     const supabase = getServerSupabase()
-    await ensureBucket(supabase, 'customer-documents', { public: true })
+    // v151: bucketen är privat sedan 2026-08-18 — public:true hade tyst
+    // synkat den tillbaka till publik (se lib/storage.ts "Bucket finns —
+    // synka public-flaggan om den driftat").
+    await ensureBucket(supabase, 'customer-documents', { public: false })
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -54,12 +57,8 @@ export async function POST(
       return NextResponse.json({ error: 'Kunde inte ladda upp filen: ' + uploadError.message }, { status: 500 })
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('customer-documents')
-      .getPublicUrl(filePath)
-
-    // Save metadata
+    // v151: bucketen är privat — file_url lagrar PATH (inte en publik URL,
+    // som ändå skulle 403:a). Läsning signerar via /documents/[docId].
     const docId = 'doc_' + Math.random().toString(36).substr(2, 9)
     const { data, error } = await supabase
       .from('customer_document')
@@ -68,7 +67,7 @@ export async function POST(
         customer_id: customerId,
         business_id: business.business_id,
         file_name: file.name,
-        file_url: urlData.publicUrl,
+        file_url: filePath,
         file_type: file.type || null,
         file_size: file.size || null,
         category,

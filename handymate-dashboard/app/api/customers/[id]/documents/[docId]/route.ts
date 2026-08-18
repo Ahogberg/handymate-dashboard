@@ -2,31 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { streamInline } from '@/lib/storage/stream-inline'
+import { extractStoragePath } from '@/lib/storage-signing'
 
 const BUCKET = 'customer-documents'
-
-/**
- * Extraherar storage-path från en publik Supabase storage-URL.
- *
- * Format: https://<proj>.supabase.co/storage/v1/object/public/customer-documents/<path>
- * Returnerar: <path>
- */
-function extractPathFromUrl(fileUrl: string | null | undefined): string | null {
-  if (!fileUrl) return null
-  // Matcha allt efter bucket-namnet (med både public/ och utan)
-  const match = fileUrl.match(/customer-documents\/(.+?)(?:\?|$)/)
-  return match ? decodeURIComponent(match[1]) : null
-}
 
 /**
  * GET /api/customers/[id]/documents/[docId]
  * Returnerar signerad URL (1h expiry) för att öppna dokumentet.
  *
- * Anledning till denna endpoint: kund-dokumenten lagrar `file_url` som
- * publik URL från getPublicUrl(). Om bucket:en är privat (eller saknar
- * RLS-policy för storage.objects) 403:ar den URL:en. Genom att alltid
- * generera signerad URL server-side undviker vi det helt — fungerar
- * oavsett bucket-konfiguration.
+ * Anledning till denna endpoint: kund-dokumenten lagrar `file_url` som en
+ * storage-path (tidigare en publik URL, från innan v151 gjorde bucketen
+ * privat). En path/publik-URL fungerar aldrig direkt i en <a href> mot en
+ * privat bucket. Genom att alltid generera signerad URL server-side
+ * undviker vi det helt — fungerar oavsett bucket-konfiguration.
  *
  * Detta speglar projektets mönster (/api/projects/[id]/documents/[docId]).
  */
@@ -60,7 +48,7 @@ export async function GET(
       return NextResponse.json({ error: 'Dokument hittades inte' }, { status: 404 })
     }
 
-    const path = extractPathFromUrl(doc.file_url)
+    const path = extractStoragePath(doc.file_url, BUCKET)
     if (!path) {
       // Fallback — om URL saknar canonical path, returnera den lagrade URL:en
       // (kan vara extern länk eller legacy-data)
@@ -126,7 +114,7 @@ export async function DELETE(
     }
 
     // Försök ta bort från storage (inte fatal om det misslyckas)
-    const path = extractPathFromUrl(doc.file_url)
+    const path = extractStoragePath(doc.file_url, BUCKET)
     if (path) {
       await supabase.storage.from(BUCKET).remove([path])
     }

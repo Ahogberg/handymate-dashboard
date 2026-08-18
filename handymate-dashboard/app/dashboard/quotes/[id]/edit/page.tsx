@@ -18,6 +18,7 @@ import { ReservationReviewSheet } from '../../_shared/ReservationReviewSheet'
 import { QuoteMarginCard } from '../../_shared/QuoteMarginCard'
 import { QuoteNewAttachmentsCard } from '../../new/components/QuoteNewAttachmentsCard'
 import { supabase } from '@/lib/supabase'
+import { extractStoragePath } from '@/lib/storage-signing'
 import {
   calculatePaymentPlan,
   generateItemId,
@@ -330,7 +331,9 @@ export default function EditQuotePage() {
   // här — dokument uppladdade vid skapandet syntes inte i redigeraren och
   // kunde varken tas bort eller kompletteras. Samma kort och samma
   // uppladdningsväg som new-sidan.
-  const [attachments, setAttachments] = useState<{ name: string; url: string; size?: number }[]>([])
+  // `url` är en kortlivad signerad länk (server signerar vid varje GET);
+  // `path` är storage-pathen som faktiskt ska sparas — se lib/storage-signing.ts.
+  const [attachments, setAttachments] = useState<{ name: string; url: string; size?: number; path?: string }[]>([])
   const [uploadingFile, setUploadingFile] = useState(false)
 
   // Produktbank: NY rad (add-row-combo/snabbval) resp. förfyllnad av
@@ -918,7 +921,13 @@ export default function EditQuotePage() {
         template_style: templateStyle,
         // Skickas alltid (API:t uppdaterar bara när fältet finns i bodyn) —
         // en tömd lista ska också sparas, annars går bilagor inte att ta bort.
-        attachments,
+        // Path lagras, ALDRIG den kortlivade signerade visnings-URL:en
+        // (a.url) — se lib/storage-signing.ts.
+        attachments: attachments.map(a => ({
+          name: a.name,
+          url: a.path || extractStoragePath(a.url, 'customer-documents') || a.url,
+          size: a.size,
+        })),
       }
     },
     [
@@ -962,7 +971,7 @@ export default function EditQuotePage() {
     templateStyle, attachments,
   ])
 
-  // Samma uppladdningsväg som new-sidan (customer-documents-bucketen).
+  // Server-side uppladdning (customer-documents är privat sedan v151).
   // Autosparen plockar upp liständringen och skriver quotes.attachments.
   async function handleAttachmentUpload(file: File) {
     if (file.size > 10 * 1024 * 1024) {
@@ -971,18 +980,15 @@ export default function EditQuotePage() {
     }
     setUploadingFile(true)
     try {
-      const timestamp = Date.now()
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-      const filePath = `${business.business_id}/quotes/${quoteId}/${timestamp}_${safeName}`
-      const arrayBuffer = await file.arrayBuffer()
-      const { error: uploadError } = await supabase.storage
-        .from('customer-documents')
-        .upload(filePath, arrayBuffer, { contentType: file.type, upsert: false })
-      if (uploadError) throw uploadError
-      const { data: urlData } = supabase.storage.from('customer-documents').getPublicUrl(filePath)
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('quoteId', quoteId)
+      const res = await fetch('/api/quotes/attachments/upload', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Uppladdning misslyckades')
       setAttachments(prev => [
         ...prev,
-        { name: file.name, url: urlData.publicUrl, size: file.size },
+        { name: data.name, url: data.url, size: data.size, path: data.path },
       ])
     } catch (err) {
       console.error('Upload failed:', err)

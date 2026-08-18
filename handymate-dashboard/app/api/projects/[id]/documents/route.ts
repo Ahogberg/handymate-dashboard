@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { ensureBucket } from '@/lib/storage'
+import { signStorageUrl } from '@/lib/storage-signing'
 import { analyzeProjectPhoto } from '@/lib/egenkontroll/analyze-and-queue'
 
 const BUCKET = 'project-files'
@@ -67,8 +68,9 @@ export async function POST(
     const projectId = params.id
 
     // Bucket-config är best-effort (kastar aldrig — se lib/storage.ts).
-    // Uploaden funkar ändå via service_role om bucket finns.
-    await ensureBucket(supabase, BUCKET, { public: true })
+    // Uploaden funkar ändå via service_role om bucket finns. v151: privat —
+    // public:true hade tyst synkat bucketen tillbaka till publik.
+    await ensureBucket(supabase, BUCKET, { public: false })
 
     // Parse multipart-body
     let formData: FormData
@@ -175,16 +177,23 @@ export async function POST(
     // fastna på en AI-analys som kan ta flera sekunder. analyzeProjectPhoto
     // är själv fail-safe (kastar aldrig), .catch() är bara ett extra skyddsnät.
     if (document && (file.type || '').startsWith('image/')) {
-      const { data: publicUrlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
-      analyzeProjectPhoto({
-        businessId: business.business_id,
-        projectId,
-        photoRef: document.id,
-        imageSource: { type: 'url', url: publicUrlData.publicUrl },
-        uploadedBy: business.user_id || null,
-      }).catch(err => {
-        console.error('[projects/documents] egenkontroll-analys misslyckades (fire-and-forget):', err)
-      })
+      // v151: bucketen är privat — AI-analysen behöver en HÄMTNINGSBAR URL,
+      // inte den (nu obrukbara) publika strängen. Signerad 1h räcker gott
+      // för en analys som körs direkt (fire-and-forget, inte fördröjd).
+      const signedForAnalysis = await signStorageUrl(supabase, BUCKET, filePath, 3600)
+      if (signedForAnalysis) {
+        analyzeProjectPhoto({
+          businessId: business.business_id,
+          projectId,
+          photoRef: document.id,
+          imageSource: { type: 'url', url: signedForAnalysis },
+          uploadedBy: business.user_id || null,
+        }).catch(err => {
+          console.error('[projects/documents] egenkontroll-analys misslyckades (fire-and-forget):', err)
+        })
+      } else {
+        console.error('[projects/documents] kunde inte signera URL för egenkontroll-analys, hoppar över')
+      }
     }
 
     return NextResponse.json({ document })

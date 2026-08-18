@@ -17,6 +17,7 @@ import {
   getItemRotRutType, resolveLegacyItemFields, applyGlobalDeductionType,
 } from '@/lib/quote-calculations'
 import { compressImageFile } from '@/lib/images/compress-photo'
+import { extractStoragePath } from '@/lib/storage-signing'
 import { getAllCategories, type CustomCategory } from '@/lib/constants/categories'
 import {
   type DetailLevel,
@@ -376,8 +377,10 @@ export default function NewQuotePage() {
   const [showNewCategoryInput, setShowNewCategoryInput] = useState<string | null>(null)
   const [newCategoryLabel, setNewCategoryLabel] = useState('')
 
-  // Attachments
-  const [attachments, setAttachments] = useState<{ name: string; url: string; size?: number }[]>([])
+  // Attachments — `url` är en KORTLIVAD signerad länk bara för visning i det
+  // här passet; `path` är storage-pathen som faktiskt ska sparas
+  // (se toAttachmentPath nedan och lib/storage-signing.ts).
+  const [attachments, setAttachments] = useState<{ name: string; url: string; size?: number; path?: string }[]>([])
   const [priceWarnings, setPriceWarnings] = useState<Array<{ product_name: string; quote_price: number; normal_price: number; supplier_name: string; difference_pct: number }>>([])
   const [priceAlts, setPriceAlts] = useState<Array<{ product_name: string; cheaper_supplier: string; cheaper_price: number; savings_pct: number }>>([])
   // Motor 1 (Lärande prissättning): efterkalkyl-insikt för vald mall/jobbtyp.
@@ -1081,6 +1084,7 @@ export default function NewQuotePage() {
         name: d.file_name,
         url: d.file_url,
         size: d.file_size || 0,
+        path: d.path,
       }))
       if (docs.length > 0) setAttachments(docs)
     } catch {
@@ -1089,6 +1093,8 @@ export default function NewQuotePage() {
   }
 
   // ─── Attachment upload ───────────────────────────────────────────
+  // Server-side uppladdning (customer-documents är privat sedan v151 —
+  // webbläsaren kan inte längre skriva direkt mot bucketen).
   async function handleFileUpload(file: File) {
     if (file.size > 10 * 1024 * 1024) {
       toast.error('Filen är för stor (max 10 MB)')
@@ -1096,18 +1102,14 @@ export default function NewQuotePage() {
     }
     setUploadingFile(true)
     try {
-      const timestamp = Date.now()
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-      const filePath = `${business.business_id}/quotes/drafts/${timestamp}_${safeName}`
-      const arrayBuffer = await file.arrayBuffer()
-      const { error: uploadError } = await supabase.storage
-        .from('customer-documents')
-        .upload(filePath, arrayBuffer, { contentType: file.type, upsert: false })
-      if (uploadError) throw uploadError
-      const { data: urlData } = supabase.storage.from('customer-documents').getPublicUrl(filePath)
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/quotes/attachments/upload', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Uppladdning misslyckades')
       setAttachments(prev => [
         ...prev,
-        { name: file.name, url: urlData.publicUrl, size: file.size },
+        { name: data.name, url: data.url, size: data.size, path: data.path },
       ])
     } catch (err) {
       console.error('Upload failed:', err)
@@ -1365,17 +1367,16 @@ export default function NewQuotePage() {
   async function uploadPhotoAsAttachment(
     dataUrl: string,
     index: number,
-  ): Promise<{ name: string; url: string; size: number } | null> {
+  ): Promise<{ name: string; url: string; size: number; path?: string } | null> {
     try {
-      const arrayBuffer = await (await fetch(dataUrl)).arrayBuffer()
-      const timestamp = Date.now()
-      const filePath = `${business.business_id}/quotes/drafts/${timestamp}_foto_${index + 1}.jpg`
-      const { error: uploadError } = await supabase.storage
-        .from('customer-documents')
-        .upload(filePath, arrayBuffer, { contentType: 'image/jpeg', upsert: false })
-      if (uploadError) throw uploadError
-      const { data: urlData } = supabase.storage.from('customer-documents').getPublicUrl(filePath)
-      return { name: `Foto ${index + 1}.jpg`, url: urlData.publicUrl, size: arrayBuffer.byteLength }
+      const blob = await (await fetch(dataUrl)).blob()
+      const photoFile = new File([blob], `foto_${index + 1}.jpg`, { type: 'image/jpeg' })
+      const formData = new FormData()
+      formData.append('file', photoFile)
+      const res = await fetch('/api/quotes/attachments/upload', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Uppladdning misslyckades')
+      return { name: `Foto ${index + 1}.jpg`, url: data.url, size: data.size, path: data.path }
     } catch (err) {
       console.error('Kunde inte spara foto som bilaga:', err)
       return null
@@ -1939,7 +1940,17 @@ export default function NewQuotePage() {
           template_id: templateId || null,
           job_type: quoteJobType,
           template_style: templateStyle,
-          attachments: attachments.length > 0 ? attachments : [],
+          // Spara path, ALDRIG den kortlivade signerade visnings-URL:en
+          // (a.url) — se lib/storage-signing.ts. a.path finns för nytt
+          // uppladdade/förifyllda bilagor; extractStoragePath läker även en
+          // eventuell legacy publik URL tillbaka till path.
+          attachments: attachments.length > 0
+            ? attachments.map(a => ({
+                name: a.name,
+                url: a.path || extractStoragePath(a.url, 'customer-documents') || a.url,
+                size: a.size,
+              }))
+            : [],
           deal_id: dealIdFromQuery,
           lead_id: leadIdFromQuery,
         }),

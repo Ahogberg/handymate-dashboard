@@ -1,3 +1,96 @@
+# Etapp Z — privata storage-buckets, kodsidan (2026-08-18)
+
+sql/v151_private_buckets.sql (huvudsessionen) gör customer-documents och
+project-files privata. Detta är kodsidan: inga getPublicUrl-länkar och
+inga webbläsar-direktuppladdningar mot de två buckets får finnas kvar.
+business-assets (logotyper) och meeting-audio rörs INTE.
+
+Ny delad helper: `lib/storage-signing.ts`
+(`extractStoragePath` + `signStorageUrl` + `signAttachmentList`).
+
+## Kartan (väg → lösning)
+
+- [x] `app/api/customers/[id]/documents/upload/route.ts` — ensureBucket
+      public:false, lagrar path (inte getPublicUrl) i `file_url`.
+- [x] `app/api/projects/[id]/documents/route.ts` — ensureBucket
+      public:false; egenkontroll-fotoanalysen signerar en 1h-URL EFTER
+      DB-insert i stället för getPublicUrl (aldrig persisterad).
+- [x] `app/api/deals/[id]/documents/upload/route.ts` — samma som customers/upload.
+- [x] `app/api/quotes/attachments/upload/route.ts` (NY) — server-side
+      uppladdning för offertbilagor utan garanterad customer_id
+      (utkast). Returnerar `{name, path, size, url}` — path ska sparas,
+      url är bara en 1h-visningslänk.
+- [x] `app/api/customers/[id]/documents/[docId]/route.ts` — dedupe:
+      egen `extractPathFromUrl` ersatt med delade `extractStoragePath`.
+- [x] `app/api/customers/[id]/documents/route.ts` (list-GET) — signerar
+      varje dokuments `file_url` vid läsning (1h), lägger till `path`.
+      Behövs av quotes/new-sidans bilage-förifyllning.
+- [x] `app/api/quotes/route.ts` — enskild offert-GET signerar
+      `attachments[].url` via `signAttachmentList` innan svaret skickas.
+- [x] `app/api/quotes/public/[token]/route.ts` — samma signering innan
+      `buildPublicQuoteDto` — täcker BÅDE den publika offertsidan och
+      portalens signeringsmodal (samma endpoint).
+- [x] `lib/gmail-attachments.ts` + `lib/email/postmark-attachments.ts` —
+      inkommande mejlbilagor: `file_url` sätts till storage-pathen
+      direkt (redan känd lokalt), ingen getPublicUrl.
+- [x] `lib/job-report.ts` — `generated_document.pdf_url` lagrar path;
+      jobbrapport-mejlet (länkat, inte bifogat som bytes — se avvägning
+      nedan) får en 7 dygns signerad länk genererad separat, aldrig
+      persisterad.
+- [x] `app/api/debug/storage/route.ts` — defensiv fix: hårdkodad
+      `createBucket(..., {public:true})` för customer-documents → false.
+- [x] Webbläsaruppladdningar borttagna (ersatta med fetch mot server-
+      rutter): `quotes/new/page.tsx` (2 ställen), `quotes/[id]/edit/page.tsx`,
+      `pipeline/page.tsx` (nytt-deal-flödet återanvänder
+      `/api/customers/[id]/documents/upload` i stället för egen kod).
+- [x] `pipeline/components/DealModal.tsx` — dokumentfliken öppnade
+      `doc.file_url` direkt i en `<a href>` (dödar länk mot en privat
+      bucket) — bytt till samma signerad-proxy-klick som kundkortet.
+- [x] Klientsidans attachments-state bär nu `path` (storage-path) vid
+      sidan av `url` (kortlivad visnings-länk) — sparfunktionerna i
+      quotes/new och quotes/edit skriver alltid `path` (eller
+      `extractStoragePath(url)` som fallback) till DB, aldrig `url`.
+
+## Medvetet ORÖRDA (dokumenterat skäl)
+
+- `app/api/business/logo/route.ts` (business-assets) — avsiktligt
+  fortsatt publik, se sql/v151_private_buckets.sql.
+- `app/api/matte/upload-image/route.ts` + `app/api/quotes/upload-image/route.ts`
+  — bucketen `quote-images`, inte migrerad av v151, orörd.
+- `lib/quotes/reference-photos.ts` — fail-closed (returnerar alltid
+  null), ingen levande dataväg att åtgärda.
+- Portalens dokumentflik (`PortalDocumentsList.tsx`) — kund/projekt-
+  dokument är avstängt där sedan tidigare ("hidden tills
+  customer_documents-tabell finns"), ingen renderingskod att fixa.
+- `app/dashboard/documents/page.tsx` — redan korrekt (signerad-proxy
+  via `openUploadedFile`), rörde den inte.
+
+## Facit
+
+`tests/storage-signing.spec.ts` — 44 tester: enhetstester för
+`extractStoragePath`, källskanning (getPublicUrl per fil+bucket, inte
+globalt förbud — sanity-testad mot business-assets/quote-images),
+regressionslås på uppladdningsvägarna + ensureBucket-flaggan +
+webbläsarsidornas `.storage.`-frånvaro + att signeringshelpern bara
+förekommer i läsvägar.
+
+## Verifiering
+
+- `npx playwright test tests/storage-signing.spec.ts --no-deps` — 44/44 gröna.
+- `npx playwright test tests/permission-contract.spec.ts --no-deps` — 48/48 gröna (ingen regression).
+- Riktad svit (quote-attachments, quote-duplicate-contract, quote-document-width,
+  quotes-mer-i-flodet, invoice-evidence-manifest) — 144/144 gröna.
+- Hela svep-facit-sviten (`npx playwright test --no-deps --project=chromium`,
+  276 filer) — 4477 gröna, 4 fel — samtliga OBEROENDE av denna etapp
+  (cron-auth.spec.ts: stale hårdkodat routeantal 40→41; quick-preferences.spec.ts
+  + stegkedjan.spec.ts x2: orelaterade UI/projektskapande-facit). Ingen
+  jest finns i repot — instruktionens "npx jest" var fel premiss, körde
+  Playwright-idiomet som resten av testsviten faktiskt använder.
+- `npx tsc --noEmit` — 0 fel.
+- `npx next build` — exit 0, `/api/quotes/attachments/upload` med i manifestet.
+
+---
+
 # Godkännanden-sidan — visuell reskin till Command Center-språket (2026-08-18)
 
 Ren visuell reskin av app/dashboard/approvals/page.tsx mot GorDettaForst/

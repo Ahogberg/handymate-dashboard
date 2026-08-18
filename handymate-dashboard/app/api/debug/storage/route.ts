@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
     // Skapa bucket om den saknas
     const { error: ensureErr } = await supabase.storage.getBucket('customer-documents')
     if (ensureErr) {
-      const { error: createErr } = await supabase.storage.createBucket('customer-documents', { public: true })
+      // v151: bucketen är privat — debug-endpointen ska aldrig skapa den publik.
+      const { error: createErr } = await supabase.storage.createBucket('customer-documents', { public: false })
       results.bucket_created = createErr ? { error: createErr.message } : { success: true }
     }
 
