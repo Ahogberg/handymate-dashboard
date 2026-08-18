@@ -9,6 +9,8 @@ import { generateInvoicePDF } from '@/lib/pdf-generator'
 import { generateSwishQR } from '@/lib/swish-qr'
 import { buildInvoicePdfBuffer } from '@/lib/invoices/build-invoice-pdf'
 import { randomUUID } from 'crypto'
+import { prepareInvoiceManifest, markInvoiceDelivered } from '@/lib/invoices/evidence-manifest'
+import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 
 // Chromium-rendering (buildInvoicePdfBuffer → renderHtmlToPdf) kräver
 // Node-runtime och en generösare timeout än default — samma mönster som
@@ -85,6 +87,15 @@ export async function POST(request: NextRequest) {
     if (invoiceError || !invoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }
+
+    // Etapp P (sql/v148): fryser fakturaunderlaget INNAN fysisk sändning
+    // påbörjas. Best-effort — ett prepare-fel får ALDRIG blockera eller
+    // fördröja utskicket, returvärdet ignoreras medvetet.
+    await prepareInvoiceManifest(supabase, {
+      businessId: business.business_id,
+      invoiceId: invoice_id,
+      projectId: invoice.project_id || null,
+    })
 
     // Hämta företagsconfig för PDF-generering
     const { data: businessConfig } = await supabase
@@ -294,7 +305,28 @@ export async function POST(request: NextRequest) {
       if (statusErr) {
         console.error('[invoices/send] Status update failed after send:', statusErr)
         results.errors.push(`Status: ${statusErr.message}`)
+        // Etapp P-härdning: felet svaldes tidigare (bara loggat till
+        // console) trots att kunden FAKTISKT redan fått fakturan (email/sms
+        // gick iväg innan detta steget). Gör det högt utan att ändra
+        // svarssemantiken ovan — driftlarmet (automation_activity) fångar
+        // det nu istället för att det försvinner i Vercel-loggarna.
+        await rapporteraTystFel(
+          supabase,
+          business.business_id,
+          'invoice-manifest:status-write-failed-after-delivery',
+          statusErr.message,
+          { invoiceId: invoice_id },
+        )
       }
+
+      // Manifestet markeras levererat OAVSETT om statusskrivningen ovan
+      // lyckades — leveransen (email/sms) skedde, och det är den sanningen
+      // manifestet fryser. Best-effort, blockerar aldrig svaret.
+      await markInvoiceDelivered(supabase, {
+        businessId: business.business_id,
+        invoiceId: invoice_id,
+        method: sentMethod,
+      })
 
       // Logga aktivitet (customer_activity — gamla namnet activity fanns inte)
       // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): activity_id och

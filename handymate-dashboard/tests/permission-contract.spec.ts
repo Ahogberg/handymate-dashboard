@@ -167,6 +167,16 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       why: 'Räknar om företagets historiska projektutfall som kan bli lärdata för prissättning och agentinsikter.',
     },
     {
+      route: 'admin/invoice-manifests/reconcile',
+      requires: 'owner-admin',
+      why: 'Etapp P: läker frusna fakturaunderlags-manifest mot extern leveransevidens — samma isOwnerOrAdmin-idiom och domän som project-outcomes/reconcile, inte det ogrindade isAdmin-mönstret (jfr admin/ask-coverage, Etapp L).',
+    },
+    {
+      route: 'invoices/[id]/evidence-manifest',
+      requires: 'owner-admin',
+      why: 'Etapp P: det frusna fakturaunderlaget (readiness-verdikt vid leveranstillfället) — samma ledger-idiom och känslighet som value/ledger.',
+    },
+    {
       route: 'observations',
       requires: 'owner-admin',
       why: 'Karins observationer om marginaler, obetalda fakturor och förfallna kundfordringar — plus bolagskalenderns moms, preliminärskatt och bokslut. Låg öppen för alla anställda fram till 2026-08-07.',

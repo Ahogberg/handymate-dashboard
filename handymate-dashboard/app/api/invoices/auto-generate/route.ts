@@ -250,6 +250,19 @@ async function generateInvoicesForBusiness(params: {
       // Auto-send if enabled
       if (params.autoSend && customer?.email) {
         try {
+          // Etapp P (sql/v148): fryser fakturaunderlaget INNAN fysisk
+          // sändning påbörjas. Best-effort, returvärdet ignoreras medvetet
+          // — får aldrig blockera auto-faktureringen. Auto-genererade
+          // fakturor har inget kopplat projekt (grupperas per kund, inte
+          // per projekt) → projectId alltid null, hederligt flaggat i
+          // manifestet.
+          const { prepareInvoiceManifest, markInvoiceDelivered } = await import('@/lib/invoices/evidence-manifest')
+          await prepareInvoiceManifest(supabase, {
+            businessId: params.businessId,
+            invoiceId: invoice.invoice_id,
+            projectId: null,
+          })
+
           const { sendEmail } = await import('@/lib/email')
           const { invoiceEmail } = await import('@/lib/email-templates')
 
@@ -278,6 +291,14 @@ async function generateInvoicesForBusiness(params: {
               .from('invoice')
               .update({ status: 'sent', sent_at: new Date().toISOString() })
               .eq('invoice_id', invoice.invoice_id)
+
+            // Etapp P: manifestet markeras levererat direkt efter den
+            // lyckade status-skrivningen ovan.
+            await markInvoiceDelivered(supabase, {
+              businessId: params.businessId,
+              invoiceId: invoice.invoice_id,
+              method: 'email',
+            })
 
             // Log email
             const { logEmail } = await import('@/lib/email')

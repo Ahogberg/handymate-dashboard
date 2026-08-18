@@ -2568,3 +2568,6 @@ en kontext-nyckel plumbas in i ToolContext (v3-regelmotorns autonomi opåverkad)
 - TD-84: PresenterBar (demo-presentatörsläget) tvingar horisontell overflow vid 390px — knappraden radbryts inte, hela dashboarden klipps i högerkant PÅ DEMOKONTOT (riktiga kunder ser aldrig balken). Upptäckt 2026-08-17 vid Etapp E:s mobilverifiering. Fix: flex-wrap/min-w-0 i aside[data-demo-presenter].
 
 - TD-85: Löftesuppfyllelse-hooken (Etapp N, promise_fact_id → fulfilled) sitter bara i approve/edit-exekveringsvägen — INTE i retry-vägen. Ett kort som felar först och lyckas via retry uppfyller inte löftet. Litet isolerat tillägg i app/api/approvals/[id]/route.ts retry-grenen.
+
+- TD-86: auto-invoice-on-complete:171 anropar /api/invoices/send som ger KÄND 401 (egen kommentar rad 161-167) — autofakturan stannar som utkast med SMS-varning istället för att skickas. Riktig sändbugg, separat från manifestarbetet.
+- TD-87: credit/route.ts:128 skapar kreditnotor med status 'sent' vid INSERT utan att någon leverans skett — semantiskt fel som förorenar 'sent'-betydelsen (exkluderas ur manifest-triggning, men bör rättas).

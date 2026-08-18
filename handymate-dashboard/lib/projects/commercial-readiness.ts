@@ -42,6 +42,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeEgenkontrollProgress, type EgenkontrollChecklistLike } from './fakturaberedskap'
 
+/**
+ * Versionsmärkning av SLOT-REGLERNA i deriveProjectCommercialReadiness —
+ * inte av datat den läser. Etapp P (sql/v148_invoice_evidence_manifest.sql,
+ * lib/invoices/evidence-manifest.ts) fryser den här versionen tillsammans
+ * med varje faktura-manifest, så att en senare regeländring aldrig tyst
+ * tolkar om ett redan fruset verdikt. Samma bump-disciplin som
+ * OUTCOME_CALCULATION_VERSION i lib/efterkalkyl/freeze-outcome.ts: höj vid
+ * VARJE ändring som kan ändra en tidigare beräknad verdict/slot-status för
+ * samma indata (ny slot, ändrad tröskel, ändrad statuslogik) — inte vid
+ * rena formuleringsändringar i detail-texten.
+ */
+export const READINESS_RULES_VERSION = 1
+
 // ─────────────────────────────────────────────────────────────────
 // Public types
 // ─────────────────────────────────────────────────────────────────

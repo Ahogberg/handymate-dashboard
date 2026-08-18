@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { fortnoxRequest, isFortnoxConnected, syncCustomerToFortnox } from '@/lib/fortnox'
+import { prepareInvoiceManifest, markInvoiceDelivered } from '@/lib/invoices/evidence-manifest'
 
 /**
  * Hur länge en pending sync räknas som "in-flight" innan vi antar att den
@@ -228,6 +229,15 @@ export async function POST(
       }
     }
 
+    // Etapp P (sql/v148): fryser fakturaunderlaget INNAN fysisk sändning
+    // (Fortnox-anropet) påbörjas. Best-effort — ett prepare-fel får ALDRIG
+    // blockera eller fördröja synken, returvärdet ignoreras medvetet.
+    await prepareInvoiceManifest(supabase, {
+      businessId: business.business_id,
+      invoiceId,
+      projectId: invoice.project_id || null,
+    })
+
     // Markera sync som in-flight FÖRE Fortnox-anropet. Skydd mot
     // parallella requests (samtidiga tryck på "Skicka") och in-flight-
     // detection vid retry.
@@ -305,6 +315,18 @@ export async function POST(
       .update(updateData)
       .eq('invoice_id', invoiceId)
       .eq('business_id', business.business_id)
+
+    // Etapp P: manifestet markeras levererat direkt efter den lyckade
+    // synken — samma ställe som status='sent' sätts ovan. delivery_method
+    // 'fortnox' betyder att BOKFÖRINGEN skapades, inte att kunden bevisat
+    // mottagit fakturan — men det ÄR produktens egna definition av
+    // "skickad" här (samma semantik som status='sent' ovan), så manifestet
+    // följer den, medvetet.
+    await markInvoiceDelivered(supabase, {
+      businessId: business.business_id,
+      invoiceId,
+      method: 'fortnox',
+    })
 
     // Post-send automationer triggas BARA vid lyckad sync — pipeline-flytt
     // och project-stage ska inte starta för fakturor som faktiskt inte
