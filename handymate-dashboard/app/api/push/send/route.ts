@@ -16,9 +16,15 @@ export const dynamic = 'force-dynamic'
  * lagrar (satt i app/api/push/subscribe/route.ts). När den skickas med
  * riktas web-pushen mot bara den personens prenumerationer istället för
  * att blasta till hela businessen. Utelämnad = oförändrat beteende
- * (blast, som idag). Gäller ENDAST web-push (push_subscriptions) — Expo/
- * mobile-push (push_tokens, lib/notifications/expo-push.ts) har ingen
- * per-user-kolumn och blastar fortfarande till hela businessen oavsett.
+ * (blast, som idag).
+ *
+ * Bugg fixad 2026-08-19: Expo/mobile-push (push_tokens,
+ * lib/notifications/expo-push.ts) blastade tidigare ALLTID till hela
+ * businessen oavsett target_user_id — push_tokens hade ingen per-user-
+ * kolumn. push_tokens.user_id (sql/v159_push_tokens_user_id.sql) +
+ * selectExpoTargets() gör nu Expo-leveransen target_user_id-medveten på
+ * samma sätt som web-push, med fail-safe-blast (och en loggrad) när
+ * target_user_id finns men ingen push_tokens-rad matchar den.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -112,7 +118,7 @@ export async function POST(request: NextRequest) {
       url: url || '/dashboard',
       tag: tag || 'handymate',
     }
-    sendExpoPushNotification(business_id, title, body || '', expoData)
+    sendExpoPushNotification(business_id, title, body || '', expoData, target_user_id)
       .catch((err: unknown) => {
         console.error('[push/send] Expo push error:', {
           business_id,

@@ -9,38 +9,131 @@ interface ExpoPushMessage {
 }
 
 /**
- * Hämta alla Expo push-tokens för ett business.
+ * En push_tokens-rad, så mycket expo-push.ts behöver för att filtrera.
+ * user_id är nullable (sql/v159_push_tokens_user_id.sql, additiv) —
+ * äldre rader/enheter som inte registrerat om sig saknar den.
  */
-async function getExpoPushTokens(businessId: string): Promise<string[]> {
+export interface ExpoTokenRow {
+  token: string
+  user_id?: string | null
+}
+
+export interface SelectExpoTargetsResult {
+  tokens: string[]
+  /** true = filtrerades faktiskt till targetUserId. false = blast (antingen för att
+   *  targetUserId saknades, eller som fail-safe när ingen rad matchade den). */
+  usedTargetFilter: boolean
+}
+
+/**
+ * Ren filtreringsfunktion — bugg fixad 2026-08-19: Expo-leveransen blastade
+ * alltid till HELA businessens push_tokens oavsett vem ett beslut gällde
+ * (pending_approvals.routed_business_user_id slogs upp och skickades som
+ * target_user_id, men mobilpushen hade ingen kolumn att filtrera på).
+ *
+ *  (a) targetUserId finns + minst en rad matchar → BARA de raderna
+ *  (b) targetUserId finns men INGEN rad matchar (gammal rad utan user_id,
+ *      eller användaren har bara webb-inloggning) → fail-safe: blast till
+ *      alla (usedTargetFilter=false så callern kan logga gapet, inte tyst)
+ *  (c) targetUserId saknas (null/undefined/tomsträng) → oförändrat blast
+ */
+export function selectExpoTargets(
+  rows: ExpoTokenRow[],
+  targetUserId?: string | null,
+): SelectExpoTargetsResult {
+  if (!targetUserId) {
+    return { tokens: rows.map((r) => r.token), usedTargetFilter: false }
+  }
+
+  const matched = rows.filter((r) => r.user_id === targetUserId)
+  if (matched.length > 0) {
+    return { tokens: matched.map((r) => r.token), usedTargetFilter: true }
+  }
+
+  return { tokens: rows.map((r) => r.token), usedTargetFilter: false }
+}
+
+/**
+ * Postgres "undefined_column" (42703) — detekteras för att överbrygga
+ * gapet mellan kod-deploy (auto, git push till main) och den manuella
+ * körningen av sql/v159_push_tokens_user_id.sql. Utan den här kollen
+ * skulle EN SELECT mot en kolumn som ännu inte finns slå ut ALL
+ * push-leverans (inte bara riktningen) tills Andreas kör migrationen.
+ */
+export function isUndefinedColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  if (error.code === '42703') return true
+  return typeof error.message === 'string' && /user_id.*does not exist/i.test(error.message)
+}
+
+/**
+ * Hämta alla Expo push-token-rader (token + user_id) för ett business.
+ * Faller tillbaka till en select utan user_id om kolumnen inte finns än
+ * (migration ej körd) — push-leverans ska aldrig stanna helt av det.
+ */
+async function getExpoPushTokenRows(businessId: string): Promise<ExpoTokenRow[]> {
   const supabase = getServerSupabase()
 
   const { data, error } = await supabase
     .from('push_tokens')
-    .select('token')
+    .select('token, user_id')
     .eq('business_id', businessId)
 
-  if (error) {
-    console.error('Kunde inte hämta push-tokens:', error)
-    return []
+  if (!error) {
+    return data || []
   }
 
-  return (data || []).map((row: { token: string }) => row.token)
+  if (isUndefinedColumnError(error)) {
+    console.warn('[expo-push] push_tokens.user_id saknas ännu (sql/v159 ej körd) — faller tillbaka till oriktad hämtning')
+    const fallback = await supabase.from('push_tokens').select('token').eq('business_id', businessId)
+    if (fallback.error) {
+      console.error('Kunde inte hämta push-tokens (fallback):', fallback.error)
+      return []
+    }
+    return (fallback.data || []).map((r: { token: string }) => ({ token: r.token, user_id: null }))
+  }
+
+  console.error('Kunde inte hämta push-tokens:', error)
+  return []
 }
 
 /**
- * Skicka push-notis till alla registrerade enheter för ett business.
+ * Skicka push-notis till registrerade enheter för ett business.
  * Använder Expo Push API direkt (ingen SDK-dependency behövs).
+ *
+ * targetUserId (auth-uuid, Etapp 4 multi-employee-parity-plan.md) — om
+ * satt riktas leveransen mot bara den personens enheter (selectExpoTargets).
+ * Utelämnad = oförändrat blast, som tidigare.
  */
 export async function sendExpoPushNotification(
   businessId: string,
   title: string,
   body: string,
-  data?: Record<string, unknown>
+  data?: Record<string, unknown>,
+  targetUserId?: string | null,
 ) {
-  const tokens = await getExpoPushTokens(businessId)
+  const rows = await getExpoPushTokenRows(businessId)
+
+  if (rows.length === 0) {
+    console.log(`Inga push-tokens för business ${businessId}`)
+    return
+  }
+
+  const { tokens, usedTargetFilter } = selectExpoTargets(rows, targetUserId)
+
+  if (targetUserId && !usedTargetFilter) {
+    // Fail-safe-blast: hellre en push för mycket till en anställd än att
+    // ägaren missar ett beslut helt — men INTE tyst, se lager 2 i
+    // uppdraget. Loggas så gapet (rader utan user_id, eller mål utan
+    // registrerad mobilenhet) syns i loggarna och kan åtgärdas.
+    console.warn('[expo-push] target_user_id satt men ingen matchande push_tokens-rad — fail-safe blast till alla enheter för business', {
+      businessId,
+      targetUserId,
+      totalTokens: rows.length,
+    })
+  }
 
   if (tokens.length === 0) {
-    console.log(`Inga push-tokens för business ${businessId}`)
     return
   }
 
