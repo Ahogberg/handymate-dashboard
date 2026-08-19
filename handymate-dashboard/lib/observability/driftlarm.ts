@@ -83,8 +83,19 @@ export async function rapporteraTystFel(
  * att koden deployats — 42P01/42703 i det fönstret är FÖRVÄNTAT, inte en
  * driftstörning värd att larma om. Riktiga fel (annan felkod, eller inget
  * kod alls — t.ex. ett nätverksfel) ska fortfarande rapporteras.
+ *
+ * PGRST205 (2026-08-19, OperatingExperiment Etapp 2-utredningen): PostgREST
+ * fångar en okänd tabell i sin EGEN schema-cache innan frågan ens når
+ * Postgres, och svarar då PGRST205 ("Could not find the table ... in the
+ * schema cache") — INTE 42P01. Verifierat empiriskt mot den riktiga demo-
+ * databasen (operating_experiment, v157 ej körd): felkoden var PGRST205,
+ * inte 42P01. Samma gotcha var redan handplockad lokalt i tre andra filer
+ * (lib/business-twin/watch-forecast.ts:isMissingForecastTable m.fl.) innan
+ * den fixades här EN gång — alla anropare av arSchemaSaknas (measure.ts,
+ * kickoff-candidates.ts, propose-pattern.ts, med flera) får rättelsen utan
+ * att röras.
  */
 export function arSchemaSaknas(err: unknown): boolean {
   const code = (err as { code?: string } | null | undefined)?.code
-  return code === '42P01' || code === '42703'
+  return code === '42P01' || code === '42703' || code === 'PGRST205'
 }

@@ -106,6 +106,19 @@ export const EXPERIMENT_MIN_COMPARABLE_DEFAULT = 3
     experiment_enrolled_within_cap). Ändras båda ställena tillsammans. */
 export const EXPERIMENT_MAX_PROJECTS_CAP = 5
 
+/** Etapp 2 (2026-08-19, förslagslagret): standardmåtten för ett
+    kickoff_checkpoint-försök — de tre av de sex (se ovan) som är mest
+    relevanta för en kontrollpunkt kopplad till ett bekräftat playbook-
+    mönster. Inget tekniskt tak (alla sex går att begära explicit), bara
+    ett rimligt förval lib/experiment/propose.ts skriver till
+    pending_approvals-kortet. Ärvs oförändrat av continue_testing-grenen
+    (app/api/approvals/[id]/route.ts, case 'operating_experiment_readout'). */
+export const EXPERIMENT_DEFAULT_MEASURES: readonly ExperimentMeasureKey[] = [
+  'sena_andringar',
+  'extra_timmar',
+  'marginal',
+] as const
+
 // ─────────────────────────────────────────────────────────────────
 // planned_change — typad, INTE fritext. V1 har exakt EN variant
 // (kickoff-checkpoints, den beslutade första Lars-piloten). Ny variant

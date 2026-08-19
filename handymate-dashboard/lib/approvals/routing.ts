@@ -45,6 +45,12 @@ const ROUTING_TABLE: Partial<Record<string, RoutingRole>> = {
   // framtida offerter av jobbtypen — samma företagsomfattande blast radius
   // som four_eyes_project_close/dispatch_suggestion ovan.
   playbook_pattern_confirmation: 'owner_admin',
+  // OperatingExperiment Etapp 2 (2026-08-19) — samma blast radius som
+  // playbook_pattern_confirmation ovan: ett bekräftat försök (och senare,
+  // dess redovisning/slutbeslut) formar hela jobbtypens hantering, inte ett
+  // enskilt projekt.
+  operating_experiment_proposal: 'owner_admin',
+  operating_experiment_readout: 'owner_admin',
 
   // can_approve_time
   time_attestation: 'can_approve_time',

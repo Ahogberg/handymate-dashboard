@@ -123,6 +123,25 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // Se lib/playbook/propose-kickoff.ts.
   playbook_kickoff_suggestion: 'EXECUTABLE_ACTION',
 
+  // OperatingExperiment Etapp 2 (2026-08-19): ett bekräftat playbook-mönster
+  // kan föreslås som ett avgränsat, tidsbegränsat försök. Godkännande skriver
+  // EN rad i operating_experiment (status='active') — fältlokal skrivning,
+  // samma klass som playbook_pattern_confirmation. Se lib/experiment/propose.ts.
+  operating_experiment_proposal: 'EXECUTABLE_ACTION',
+
+  // OperatingExperiment Etapp 2 — redovisningskortet. Presenteras som ett
+  // informationskort (räknade fakta, aldrig en slutsats — se lib/experiment/
+  // report.ts filhuvud) men ägarens beslut skriver på riktigt: en ny
+  // förslagsrad (continue_testing), owner_decision (rejected), eller en
+  // business_knowledge-rad (made_standard) — därför EXECUTABLE_ACTION, inte
+  // INFORMATIONAL (som aldrig skulle nå caset). Tre val ryms inte i kön
+  // (godkänn/avvisa) — kortet routar till en egen beslutssida
+  // (app/dashboard/experiments/[approvalId]/page.tsx, husets target_route-
+  // idiom, se jobbpass_proposal) som skickar det faktiska beslutet via
+  // edited_payload.decision. Ett rakt klick på "Avvisa" i kön täcks separat
+  // (reject-side-effect, samma mönster som four_eyes_quote/lead_review).
+  operating_experiment_readout: 'EXECUTABLE_ACTION',
+
   // ── Kräver mänsklig granskning, aldrig ett klick ────────────────────
   //
   // `missad_intakt` är hela grinden för intäktsåtervinningen: ett fynd är ett

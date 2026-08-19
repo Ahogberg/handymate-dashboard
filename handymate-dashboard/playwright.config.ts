@@ -123,6 +123,20 @@ export default defineConfig({
       use: { storageState: { cookies: [], origins: [] } },
     },
 
+    // ── OperatingExperiment-beviset (tests/e2e-golden-path/experiment-
+    // proof.spec.ts) — Etapp 2, 2026-08-19. Egen projektgrupp, samma skäl
+    // som mission-proof ovan (isolerat, ingen dependencies-kedja, ingen
+    // UI-inloggning — service-role + direkta funktionsanrop). SKIPPAR
+    // ärligt (test.skip i Station 0) om sql/v157_operating_experiment.sql
+    // inte är körd i miljön, faller aldrig rött på det.
+    {
+      name: 'experiment-proof',
+      testDir: './tests/e2e-golden-path',
+      testMatch: /experiment-proof\.spec\.ts/,
+      testIgnore: [],
+      use: { storageState: { cookies: [], origins: [] } },
+    },
+
     // ── Margin Guardian — fristående "fungerar i praktiken"-test ─────────
     // Egen fil/eget projekt (inte en Golden Path-station): en lönsamhets-
     // varning är en villkorad gren, inte del av kundresans huvudspår.

@@ -14,7 +14,7 @@ import { checkSmsAllowance } from '@/lib/sms-usage'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { classify, nonExecutableResult } from '@/lib/approvals/action-contract'
 import { extractAgentId } from '@/lib/patterns/utils/extract-agent-id'
-import { rapporteraTystFel } from '@/lib/observability/driftlarm'
+import { rapporteraTystFel, arSchemaSaknas } from '@/lib/observability/driftlarm'
 import { halsning } from '@/lib/customers/namn'
 import { completeProject } from '@/lib/projects/complete-project'
 import { normalizeDueDateIso } from '@/lib/customer-facts/build-card'
@@ -27,6 +27,44 @@ export const dynamic = 'force-dynamic'
 // anledning som invoices/send/route.ts behöver 30s.
 export const runtime = 'nodejs'
 export const maxDuration = 30
+
+/**
+ * GET /api/approvals/[id]
+ *
+ * Hämtar ETT kort, business-scoped. Tillkom för OperatingExperiment Etapp 2
+ * (2026-08-19): beslutssidan för 'operating_experiment_readout'
+ * (app/dashboard/experiments/[approvalId]/page.tsx) behöver kortets fulla
+ * payload (measurement, verdict, hypothesis) för att rendera de tre valen —
+ * husets bulk-lista (GET /api/approvals) räcker inte för en djuplänkad sida.
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const supabase = getServerSupabase()
+    const { data, error } = await supabase
+      .from('pending_approvals')
+      .select('*')
+      .eq('id', params.id)
+      .eq('business_id', business.business_id)
+      .single()
+
+    if (error || !data) {
+      return NextResponse.json({ error: 'Approval not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ approval: data })
+  } catch (error: any) {
+    console.error('GET /api/approvals/[id] error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
 
 /**
  * POST /api/approvals/[id]
@@ -340,6 +378,26 @@ export async function POST(
           .eq('business_id', business.business_id)
         if (leadErr) {
           console.error('[approvals/lead_review] Failed to mark lead lost:', leadErr.message)
+        }
+      }
+    }
+
+    // OperatingExperiment Etapp 2 (2026-08-19) — ett rakt "Avvisa"-klick i
+    // kön (utan att besöka beslutssidan) är ett giltigt tredje val:
+    // owner_decision='rejected'. Fail-soft mot v157 saknas (arSchemaSaknas —
+    // täcker BÅDE 42P01 och PostgREST:s PGRST205, se driftlarm.ts) —
+    // experimentet kan ju inte existera om tabellen inte gör det, och det
+    // ska aldrig fälla den vanliga avvisnings-flippen ovan.
+    if (action === 'reject' && approval.approval_type === 'operating_experiment_readout') {
+      const experimentId = (approval.payload as Record<string, unknown>)?.experiment_id as string | undefined
+      if (experimentId) {
+        const { error: expRejectErr } = await supabase
+          .from('operating_experiment')
+          .update({ owner_decision: 'rejected', decided_at: new Date().toISOString() })
+          .eq('id', experimentId)
+          .eq('business_id', business.business_id)
+        if (expRejectErr && !arSchemaSaknas(expRejectErr)) {
+          console.error('[approvals/operating_experiment_readout] kunde inte avvisa försöket:', expRejectErr.message)
         }
       }
     }
@@ -2622,6 +2680,22 @@ async function executeApprovalPayload(
           return { action: 'playbook_pattern_confirmation', ok: false, error: 'Kunde inte spara — försök igen om en stund' }
         }
 
+        // OperatingExperiment Etapp 2 (2026-08-19): SAMMA flöde, fire-and-
+        // forget — minsta ärliga ingrepp (se lib/experiment/propose.ts
+        // filhuvud för varför inte cronen). Fail-soft i sig (kastar aldrig),
+        // outer try/catch är bara ett extra säkerhetsbälte: ett förlorat
+        // experimentförslag får ALDRIG fälla en lyckad mönsterbekräftelse.
+        try {
+          const { proposeExperiment } = await import('@/lib/experiment/propose')
+          await proposeExperiment(supabasePP, businessId, {
+            jobType: pl.job_type,
+            hypothesis: pl.pattern_text,
+            sourcePatternId: knowledge.id,
+          })
+        } catch (proposeErr) {
+          console.error('[approvals/playbook_pattern_confirmation] experimentförslag misslyckades (fail-safe):', proposeErr)
+        }
+
         return { action: 'playbook_pattern_confirmation', ok: true, knowledge_id: knowledge.id }
       }
 
@@ -2663,7 +2737,166 @@ async function executeApprovalPayload(
           return { action: 'playbook_kickoff_suggestion', ok: false, error: insertKoErr.message }
         }
 
+        // OperatingExperiment Etapp 2 (2026-08-19): skriver in projektet i ett
+        // matchande AKTIVT försök om plats/fönster tillåter — se
+        // lib/experiment/enroll.ts filhuvud. Aldrig blockerande: kontroll-
+        // punkten ovan är redan skapad oavsett vad som händer här.
+        try {
+          const { maybeEnrollProject } = await import('@/lib/experiment/enroll')
+          await maybeEnrollProject(supabaseKo, businessId, projectIdKo, plKo.job_type || '')
+        } catch (enrollErr) {
+          console.error('[approvals/playbook_kickoff_suggestion] experiment-inskrivning misslyckades (fail-safe):', enrollErr)
+        }
+
         return { action: 'playbook_kickoff_suggestion', ok: true, checklist_id: checklistIdKo, project_id: projectIdKo }
+      }
+
+      case 'operating_experiment_proposal': {
+        // OperatingExperiment Etapp 2 (2026-08-19): godkännande INSERTar EN
+        // rad i operating_experiment (status='active') med kortets
+        // föreslagna värden — samma form propose.ts skrev till payload.
+        // Avvisning kräver ingen skrivning här — dedup-logiken i
+        // lib/experiment/propose.ts (hasPendingOrPastProposal) läser direkt
+        // ur pending_approvals-historiken, ingen egen tabell för det.
+        const plExp = payload as any
+        if (!plExp.job_type || !plExp.hypothesis || !plExp.guard_rails || !plExp.planned_change || !Array.isArray(plExp.measures)) {
+          return { action: 'operating_experiment_proposal', ok: false, error: 'Kortet saknar underlag för att starta försöket.' }
+        }
+
+        const supabaseExp = await getSupabase()
+        const experimentId = `exp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+        const nowIsoExp = new Date().toISOString()
+
+        const { error: expInsertErr } = await supabaseExp.from('operating_experiment').insert({
+          id: experimentId,
+          business_id: businessId,
+          hypothesis: plExp.hypothesis,
+          agent_key: plExp.agent_id || 'lars',
+          job_type: plExp.job_type,
+          source_pattern_id: plExp.source_pattern_id ?? null,
+          source_project_ids: [],
+          planned_change: plExp.planned_change,
+          guard_rails: plExp.guard_rails,
+          measures: plExp.measures,
+          min_comparable_projects: plExp.min_comparable_projects ?? 3,
+          enrolled_project_ids: [],
+          status: 'active',
+          confirmed_at: nowIsoExp,
+        })
+
+        if (expInsertErr) {
+          if (arSchemaSaknas(expInsertErr)) {
+            return { action: 'operating_experiment_proposal', ok: false, error: 'Försöket kan inte startas ännu.' }
+          }
+          console.error('[approvals/operating_experiment_proposal] kunde inte starta försöket:', expInsertErr.message)
+          return { action: 'operating_experiment_proposal', ok: false, error: 'Kunde inte starta försöket — försök igen om en stund' }
+        }
+
+        return { action: 'operating_experiment_proposal', ok: true, experiment_id: experimentId }
+      }
+
+      case 'operating_experiment_readout': {
+        // OperatingExperiment Etapp 2 (2026-08-19): redovisningskortet.
+        // Beslutet kommer via edited_payload.decision (klienten skickar
+        // action:'edit' från beslutssidan, app/dashboard/experiments/
+        // [approvalId]/page.tsx — samma idiom som project_debrief:s
+        // edited_payload.answers). Ett rakt "Avvisa" i kön (action:'reject')
+        // täcks av reject-side-effect-blocket ovan, INTE här (switchen körs
+        // aldrig för action==='reject').
+        const plRo = payload as any
+        const experimentIdRo = plRo.experiment_id as string | undefined
+        const decisionRo = plRo.decision as string | undefined
+
+        if (!experimentIdRo) {
+          return { action: 'operating_experiment_readout', ok: false, error: 'Kortet saknar koppling till försöket.' }
+        }
+        if (decisionRo !== 'continue_testing' && decisionRo !== 'made_standard') {
+          return { action: 'operating_experiment_readout', ok: false, error: 'Välj ett av alternativen — fortsätt testa eller gör till standard.' }
+        }
+
+        const supabaseRo = await getSupabase()
+        const nowIsoRo = new Date().toISOString()
+
+        if (decisionRo === 'made_standard') {
+          // Samma form som case 'playbook_pattern_confirmation' ovan — en
+          // bekräftad regel formar Daniels offertmotor.
+          const { data: knowledgeRo, error: knowledgeErrRo } = await supabaseRo
+            .from('business_knowledge')
+            .insert({
+              business_id: businessId,
+              agent_id: 'lars',
+              knowledge_type: 'pattern',
+              job_type: plRo.job_type,
+              title: `Mönster (bekräftat via försök): ${plRo.job_type}`,
+              observation: plRo.hypothesis,
+              confidence: null,
+              data_basis: {
+                source_experiment_id: experimentIdRo,
+                source_pattern_id: plRo.source_pattern_id ?? null,
+              },
+              status: 'active',
+              related_approval_id: approvalId,
+            })
+            .select('id')
+            .single()
+
+          if (knowledgeErrRo || !knowledgeRo) {
+            console.error('[approvals/operating_experiment_readout] kunde inte spara regeln:', knowledgeErrRo?.message)
+            return { action: 'operating_experiment_readout', ok: false, error: 'Kunde inte spara — försök igen om en stund' }
+          }
+
+          const { error: expUpdateErrRo } = await supabaseRo
+            .from('operating_experiment')
+            .update({ owner_decision: 'made_standard', decided_at: nowIsoRo, resulting_rule_id: knowledgeRo.id })
+            .eq('id', experimentIdRo)
+            .eq('business_id', businessId)
+
+          if (expUpdateErrRo) {
+            if (arSchemaSaknas(expUpdateErrRo)) {
+              return { action: 'operating_experiment_readout', ok: false, error: 'Försöket kan inte startas ännu.' }
+            }
+            console.error('[approvals/operating_experiment_readout] regeln sparades men försöket kunde inte uppdateras:', expUpdateErrRo.message)
+          }
+
+          return { action: 'operating_experiment_readout', ok: true, decision: decisionRo, resulting_rule_id: knowledgeRo.id }
+        }
+
+        // continue_testing — ärver hypotes/jobbtyp/källmönster/mått, ett
+        // helt nytt förslagskort (samma dedupe-funktion, men medvetet
+        // förbikopplad — se lib/experiment/propose.ts opts.allowDuplicate).
+        const { error: expUpdateContRo } = await supabaseRo
+          .from('operating_experiment')
+          .update({ owner_decision: 'continue_testing', decided_at: nowIsoRo })
+          .eq('id', experimentIdRo)
+          .eq('business_id', businessId)
+
+        if (expUpdateContRo) {
+          if (arSchemaSaknas(expUpdateContRo)) {
+            return { action: 'operating_experiment_readout', ok: false, error: 'Försöket kan inte startas ännu.' }
+          }
+          return { action: 'operating_experiment_readout', ok: false, error: 'Kunde inte spara beslutet — försök igen om en stund' }
+        }
+
+        try {
+          const { proposeExperiment } = await import('@/lib/experiment/propose')
+          const inheritedMeasures = Array.isArray(plRo.measurement?.measures)
+            ? (plRo.measurement.measures as Array<{ measure: string }>).map(m => m.measure as any)
+            : undefined
+          await proposeExperiment(
+            supabaseRo, businessId,
+            {
+              jobType: plRo.job_type,
+              hypothesis: plRo.hypothesis,
+              sourcePatternId: plRo.source_pattern_id ?? null,
+              measures: inheritedMeasures,
+            },
+            { allowDuplicate: true },
+          )
+        } catch (continueErr) {
+          console.error('[approvals/operating_experiment_readout] nytt förslag misslyckades (fail-safe):', continueErr)
+        }
+
+        return { action: 'operating_experiment_readout', ok: true, decision: decisionRo }
       }
 
       default: {

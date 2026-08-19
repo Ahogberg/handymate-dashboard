@@ -244,5 +244,36 @@ export async function GET(request: NextRequest) {
     results.job_started_error = err.message
   }
 
+  // ── 5. OperatingExperiment-redovisning (Etapp 2, 2026-08-19) ───────
+  //
+  // Rider på den här BEFINTLIGA dagliga cronen — ingen ny vercel.json-rad
+  // (den kända fallgropen, se CLAUDE.md). Fail-soft mot v157 (42P01, ej
+  // körd ännu): sweepExperimentReadouts degraderar internt till en no-op,
+  // ingen särskild grind behövs här. Pausade agenter hoppas över, samma
+  // spärr som playbook-cronen.
+  try {
+    const { sweepExperimentReadouts } = await import('@/lib/experiment/report')
+    const { data: expBizRows, error: expBizErr } = await supabase
+      .from('business_config')
+      .select('business_id, agents_globally_paused')
+    if (expBizErr) throw expBizErr
+
+    let readoutsCreated = 0
+    for (const biz of expBizRows || []) {
+      if (biz.agents_globally_paused) continue
+      try {
+        const r = await sweepExperimentReadouts(supabase, biz.business_id as string)
+        readoutsCreated += r.created
+      } catch (err: any) {
+        console.error(`[maintenance] experiment-redovisning ${biz.business_id}:`, err?.message || err)
+      }
+    }
+    results.experiment_readouts_created = readoutsCreated
+    if (readoutsCreated > 0) console.log(`[maintenance] Försöksredovisningar: ${readoutsCreated} skapade`)
+  } catch (err: any) {
+    console.error('[maintenance] experiment-redovisningssvepet failade:', err.message)
+    results.experiment_readouts_error = err.message
+  }
+
   return NextResponse.json({ ok: true, ...results })
 }

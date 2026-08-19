@@ -29,6 +29,7 @@ import {
   isExperimentMeasureKey,
   EXPERIMENT_MIN_COMPARABLE_DEFAULT,
   EXPERIMENT_MAX_PROJECTS_CAP,
+  EXPERIMENT_DEFAULT_MEASURES,
   type ExperimentTruthLevel,
   type ExperimentMeasureKey,
 } from '../lib/experiment/types'
@@ -40,7 +41,11 @@ import {
   type ExperimentOutcomeInput,
   type MeasurableExperiment,
   type ExperimentVerdict,
+  type ExperimentMeasurement,
 } from '../lib/experiment/measure'
+import { proposeExperiment } from '../lib/experiment/propose'
+import { maybeEnrollProject } from '../lib/experiment/enroll'
+import { buildReadoutBody, buildReadoutCardCopy, maybeCreateReadout, sweepExperimentReadouts, type ActiveExperimentRow } from '../lib/experiment/report'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
@@ -54,7 +59,7 @@ type FakeResponse = { data: unknown; error: { message: string; code?: string } |
 
 function fakeChain(response: FakeResponse) {
   const promise = Promise.resolve(response) as any
-  const methods = ['select', 'eq', 'neq', 'not', 'gte', 'order', 'limit', 'in', 'contains', 'is', 'insert']
+  const methods = ['select', 'eq', 'neq', 'not', 'gte', 'order', 'limit', 'in', 'contains', 'is', 'insert', 'update']
   for (const m of methods) promise[m] = () => promise
   return promise
 }
@@ -684,5 +689,500 @@ test.describe('källskanning — sql/v157_operating_experiment.sql', () => {
   test('resultat lagras aldrig — inget "results"-fält, bara frozen_summary skrivet en gång', () => {
     expect(sql).not.toMatch(/\bresults\b/)
     expect(sql).toContain('frozen_summary')
+  })
+})
+
+/**
+ * ═══════════════════════════════════════════════════════════════════
+ * Etapp 2 — förslags-/inskrivnings-/redovisnings-/beslutslagret
+ * (docs/council/ACTIVE_ROADMAP.md "Läge 2026-08-19")
+ * ═══════════════════════════════════════════════════════════════════
+ */
+
+// ─────────────────────────────────────────────────────────────────
+// lib/experiment/propose.ts — proposeExperiment
+// ─────────────────────────────────────────────────────────────────
+
+test.describe('propose.ts — proposeExperiment', () => {
+  const input = { jobType: 'badrum', hypothesis: 'Räkna med en extra dag för rivning', sourcePatternId: 'bk_1' }
+
+  test('saknad jobType/hypothesis → skipped_invalid_input, inga frågor körs', async () => {
+    const { supabase, callCount } = fakeSupabase([])
+    const result = await proposeExperiment(supabase as any, 'biz_test', { jobType: '', hypothesis: '', sourcePatternId: null })
+    expect(result).toBe('skipped_invalid_input')
+    expect(callCount()).toBe(0)
+  })
+
+  test('dedupe a) — befintligt förslagskort (oavsett status) blockerar, b) frågas aldrig', async () => {
+    const { supabase, callCount } = fakeSupabase([ok([{ id: 'appr_existing' }])])
+    const result = await proposeExperiment(supabase as any, 'biz_test', input)
+    expect(result).toBe('skipped_already_proposed')
+    expect(callCount()).toBe(1)
+  })
+
+  test('dedupe b) — befintlig operating_experiment-rad blockerar', async () => {
+    const { supabase } = fakeSupabase([ok([]), ok([{ id: 'exp_existing' }])])
+    const result = await proposeExperiment(supabase as any, 'biz_test', input)
+    expect(result).toBe('skipped_already_proposed')
+  })
+
+  test('dedupe b) 42P01 (v157 ej körd) tolkas som "inga träffar", INTE blockerande', async () => {
+    const { supabase } = fakeSupabase([
+      ok([]),
+      { data: null, error: { message: 'relation does not exist', code: '42P01' } },
+      ok(null), // insert lyckas
+    ])
+    const result = await proposeExperiment(supabase as any, 'biz_test', input)
+    expect(result).toBe('created')
+  })
+
+  test('dedupe b) PGRST205 (PostgREST:s schema-cache-miss, samma verkliga läge som 42P01) tolkas OCKSÅ som "inga träffar"', () => {
+    // Empiriskt fynd (2026-08-19, mot demo-databasen): en riktigt ej körd
+    // migration ger PGRST205, INTE 42P01 — fixat en gång i den delade
+    // arSchemaSaknas-helpern (lib/observability/driftlarm.ts) som propose.ts
+    // nu använder i stället för en egen hårdkodad '42P01'-jämförelse.
+    const src = read('lib/experiment/propose.ts')
+    expect(src).toContain('arSchemaSaknas(error)')
+    expect(src).not.toContain("error.code === '42P01'")
+  })
+
+  test('sourcePatternId=null hoppar över BÅDA dedupe-läsningarna, går rakt till insert', async () => {
+    const { supabase, callCount } = fakeSupabase([ok(null)])
+    const result = await proposeExperiment(supabase as any, 'biz_test', { ...input, sourcePatternId: null })
+    expect(result).toBe('created')
+    expect(callCount()).toBe(1)
+  })
+
+  test('opts.allowDuplicate=true hoppar över dedupen även med sourcePatternId satt', async () => {
+    const { supabase, callCount } = fakeSupabase([ok(null)])
+    const result = await proposeExperiment(supabase as any, 'biz_test', input, { allowDuplicate: true })
+    expect(result).toBe('created')
+    expect(callCount()).toBe(1)
+  })
+
+  test('insert-fel ger skipped_error, kastar aldrig', async () => {
+    const { supabase } = fakeSupabase([
+      ok([]), ok([]),
+      { data: null, error: { message: 'boom' } },
+      ok(null), // automation_activity-insert via rapporteraTystFel
+    ])
+    const result = await proposeExperiment(supabase as any, 'biz_test', input)
+    expect(result).toBe('skipped_error')
+  })
+
+  test('hypotesen kopieras ORDAGRANT till payload.hypothesis OCH planned_change.checkpoint_text', () => {
+    const src = read('lib/experiment/propose.ts')
+    expect(src).toContain('hypothesis: input.hypothesis')
+    expect(src).toContain('checkpoint_text: input.hypothesis')
+  })
+
+  test('payload-formen: guard_rails/measures/min_comparable_projects/planned_change/approval_type/routing_role', () => {
+    const src = read('lib/experiment/propose.ts')
+    const insertIdx = src.indexOf(".from('pending_approvals').insert(")
+    expect(insertIdx).toBeGreaterThan(-1)
+    const gren = src.slice(insertIdx, insertIdx + 1600)
+    expect(gren).toContain("approval_type: 'operating_experiment_proposal'")
+    expect(gren).toContain("routing_role: 'owner_admin'")
+    expect(gren).toContain('job_type: input.jobType')
+    expect(gren).toContain('source_pattern_id: input.sourcePatternId')
+    expect(gren).toContain('guard_rails: guardRails')
+    expect(gren).toContain('measures,')
+    expect(gren).toContain('min_comparable_projects: EXPERIMENT_MIN_COMPARABLE_DEFAULT')
+    expect(gren).toContain('planned_change: plannedChange')
+  })
+
+  test('förvalda måtten kommer från EXPERIMENT_DEFAULT_MEASURES när inget anges', () => {
+    expect(EXPERIMENT_DEFAULT_MEASURES).toEqual(['sena_andringar', 'extra_timmar', 'marginal'])
+    const src = read('lib/experiment/propose.ts')
+    expect(src).toContain('EXPERIMENT_DEFAULT_MEASURES')
+  })
+
+  test('guard_rails.max_projects använder EXPERIMENT_MAX_PROJECTS_CAP, no_autonomous_customer_send alltid true', () => {
+    const src = read('lib/experiment/propose.ts')
+    expect(src).toContain('max_projects: EXPERIMENT_MAX_PROJECTS_CAP')
+    expect(src).toContain('no_autonomous_customer_send: true')
+  })
+
+  test('funktionen kastar aldrig (try/catch runt hela kroppen)', () => {
+    const src = read('lib/experiment/propose.ts')
+    expect(src).toContain('export async function proposeExperiment')
+    expect(src).toContain('try {')
+    expect(src).toContain('catch (err')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────
+// lib/experiment/enroll.ts — maybeEnrollProject
+// ─────────────────────────────────────────────────────────────────
+
+test.describe('enroll.ts — maybeEnrollProject', () => {
+  const activeExperiment = {
+    id: 'exp_1',
+    enrolled_project_ids: ['proj_existing'],
+    guard_rails: { start_date: '2026-01-01', end_date: '2027-01-01', max_projects: 5, no_autonomous_customer_send: true },
+  }
+
+  test('inget aktivt experiment för jobbtypen → skipped_no_active_experiment', async () => {
+    const { supabase, callCount } = fakeSupabase([ok([])])
+    const result = await maybeEnrollProject(supabase as any, 'biz_test', 'proj_1', 'badrum')
+    expect(result).toBe('skipped_no_active_experiment')
+    expect(callCount()).toBe(1)
+  })
+
+  test('projektet redan inskrivet → skipped_already_enrolled, ingen skrivning', async () => {
+    const { supabase, callCount } = fakeSupabase([ok([activeExperiment])])
+    const result = await maybeEnrollProject(supabase as any, 'biz_test', 'proj_existing', 'badrum')
+    expect(result).toBe('skipped_already_enrolled')
+    expect(callCount()).toBe(1)
+  })
+
+  test('fönstret ännu inte öppnat/redan stängt → skipped_window_closed', async () => {
+    const framtid = { ...activeExperiment, guard_rails: { ...activeExperiment.guard_rails, start_date: '2099-01-01', end_date: '2099-06-01' } }
+    const { supabase } = fakeSupabase([ok([framtid])])
+    const result = await maybeEnrollProject(supabase as any, 'biz_test', 'proj_ny', 'badrum')
+    expect(result).toBe('skipped_window_closed')
+  })
+
+  test('full kapacitet (enrolled.length >= max_projects) → skipped_full', async () => {
+    const full = { ...activeExperiment, enrolled_project_ids: ['p1', 'p2', 'p3', 'p4', 'p5'] }
+    const { supabase } = fakeSupabase([ok([full])])
+    const result = await maybeEnrollProject(supabase as any, 'biz_test', 'proj_ny', 'badrum')
+    expect(result).toBe('skipped_full')
+  })
+
+  test('lyckad inskrivning lägger till projektets id och skriver bara det', async () => {
+    const { supabase } = fakeSupabase([ok([activeExperiment]), ok(null)])
+    const result = await maybeEnrollProject(supabase as any, 'biz_test', 'proj_ny', 'badrum')
+    expect(result).toBe('enrolled')
+  })
+
+  test('malformade guard_rails (saknar start/end) → skipped_error, skriver aldrig blint', async () => {
+    const trasig = { ...activeExperiment, guard_rails: { max_projects: 5, no_autonomous_customer_send: true } }
+    const { supabase, callCount } = fakeSupabase([ok([trasig])])
+    const result = await maybeEnrollProject(supabase as any, 'biz_test', 'proj_ny', 'badrum')
+    expect(result).toBe('skipped_error')
+    expect(callCount()).toBe(1)
+  })
+
+  test('42P01 (v157 ej körd) → skipped_error, kastar aldrig', async () => {
+    const { supabase } = fakeSupabase([{ data: null, error: { message: 'relation does not exist', code: '42P01' } }])
+    const result = await maybeEnrollProject(supabase as any, 'biz_test', 'proj_1', 'badrum')
+    expect(result).toBe('skipped_error')
+  })
+
+  test('funktionen kastar aldrig (try/catch runt hela kroppen), använder arSchemaSaknas', () => {
+    const src = read('lib/experiment/enroll.ts')
+    expect(src).toContain('export async function maybeEnrollProject')
+    expect(src).toContain('try {')
+    expect(src).toContain('catch (err')
+    expect(src).toContain('arSchemaSaknas')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────
+// lib/experiment/report.ts — buildReadoutBody/buildReadoutCardCopy (rena)
+// ─────────────────────────────────────────────────────────────────
+
+function measurement(over: Partial<ExperimentMeasurement> = {}): ExperimentMeasurement {
+  return {
+    experiment_id: 'exp_1',
+    projects_enrolled: 5,
+    projects_completed: 5,
+    projects_with_sufficient_data: 3,
+    measures: [
+      { measure: 'sena_andringar', values: [{ project_id: 'p1', value: 0 }, { project_id: 'p2', value: 2 }, { project_id: 'p3', value: 0 }], ej_bedombar: [] },
+    ],
+    verdict: 'underlag_finns',
+    ...over,
+  }
+}
+
+test.describe('report.ts — buildReadoutBody (ren, räknade fakta)', () => {
+  test('räknar inskrivna projekt, sena_andringar=0-fall, och underlagslösa', () => {
+    const body = buildReadoutBody(measurement())
+    expect(body).toContain('Kontrollen användes på 5 projekt.')
+    expect(body).toContain('2 hade inga sena ändringar.')
+    expect(body).toContain('2 saknar tillräckligt underlag.') // 5 enrolled - 3 sufficient
+  })
+
+  test('sena_andringar-raden utelämnas när måttet inte ingår i försöket', () => {
+    const body = buildReadoutBody(measurement({ measures: [{ measure: 'marginal', values: [], ej_bedombar: [] }] }))
+    expect(body).not.toContain('sena ändringar')
+  })
+})
+
+test.describe('report.ts — buildReadoutCardCopy', () => {
+  test('rubriken innehåller ordagrant "Försöket är klart att redovisas"', () => {
+    const { title } = buildReadoutCardCopy('badrum', measurement())
+    expect(title).toContain('Försöket är klart att redovisas')
+  })
+
+  test("verdict for_tidigt: texten säger ordagrant 'för tidigt' och erbjuder fortsättning", () => {
+    const { description } = buildReadoutCardCopy('badrum', measurement({ verdict: 'for_tidigt', projects_with_sufficient_data: 1 }))
+    expect(description.toLowerCase()).toContain('för tidigt')
+    expect(description).toContain('fortsätta testa')
+  })
+
+  test('verdict underlag_finns: ingen "för tidigt"-text', () => {
+    const { description } = buildReadoutCardCopy('badrum', measurement({ verdict: 'underlag_finns' }))
+    expect(description.toLowerCase()).not.toContain('för tidigt')
+  })
+
+  // Rendertest — samma FORBJUDNA_ORD-idé som källskanningen nedan, men körd
+  // mot det FAKTISKA GENERERADE textinnehållet, inte källkoden. En textbyggare
+  // kan i princip klara en källkodsskanning men ändå råka producera ett
+  // värdeord i en sträng som byggs dynamiskt — det här stänger den luckan.
+  test('genererad text (båda verdict-grenarna, flera måttkombinationer) innehåller aldrig ett värdeord', () => {
+    const VARDEORD = [
+      'battre', 'bättre', 'samre', 'sämre', 'fungerar', 'lyckad', 'lyckat', 'misslyckad', 'misslyckat',
+      'orsakade', 'orsakar', 'gav bättre', 'berodde på', 'beror på', 'ledde till', 'fick kunden',
+      'fungerar bäst', 'förbättrar', 'tack vare', 'success',
+    ]
+    const scenarios: ExperimentMeasurement[] = [
+      measurement(),
+      measurement({ verdict: 'for_tidigt', projects_with_sufficient_data: 0 }),
+      measurement({ measures: [{ measure: 'marginal', values: [{ project_id: 'p1', value: 12.4 }], ej_bedombar: [{ project_id: 'p2', reasons: ['financial_learning_ineligible'] }] }] }),
+      measurement({ projects_enrolled: 0, projects_completed: 0, projects_with_sufficient_data: 0, measures: [], verdict: 'for_tidigt' }),
+    ]
+    for (const scen of scenarios) {
+      const { title, description } = buildReadoutCardCopy('badrum', scen)
+      const text = (title + ' ' + description).toLowerCase()
+      for (const ord of VARDEORD) {
+        expect(text, `"${ord}" hittades i genererad text: ${text}`).not.toContain(ord)
+      }
+    }
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────
+// lib/experiment/report.ts — maybeCreateReadout/sweepExperimentReadouts (I/O)
+// ─────────────────────────────────────────────────────────────────
+
+function activeExperimentRow(over: Partial<ActiveExperimentRow> = {}): ActiveExperimentRow {
+  return {
+    id: 'exp_1',
+    business_id: 'biz_test',
+    job_type: 'badrum',
+    hypothesis: 'Räkna med en extra dag för rivning',
+    source_pattern_id: 'bk_1',
+    enrolled_project_ids: [],
+    measures: ['sena_andringar'],
+    min_comparable_projects: 3,
+    guard_rails: { start_date: '2026-01-01', end_date: '2026-01-10', max_projects: 5, no_autonomous_customer_send: true },
+    planned_change: { type: 'kickoff_checkpoint', checkpoint_text: 'Räkna med en extra dag för rivning' },
+    ...over,
+  }
+}
+
+test.describe('report.ts — maybeCreateReadout', () => {
+  test('varken end_date nått eller alla frusna → skipped_not_ready, ingen skrivning', async () => {
+    const framtid = activeExperimentRow({ guard_rails: { start_date: '2026-01-01', end_date: '2099-01-01', max_projects: 5, no_autonomous_customer_send: true } })
+    const { supabase, callCount } = fakeSupabase([])
+    const result = await maybeCreateReadout(supabase as any, 'biz_test', framtid, new Date('2026-06-01'))
+    expect(result).toBe('skipped_not_ready')
+    expect(callCount()).toBe(0) // enrolled=[] → measureExperiment gör noll frågor
+  })
+
+  test('end_date passerad → skapar kortet och avslutar försöket (frozen_summary + status=concluded)', async () => {
+    const exp = activeExperimentRow()
+    const { supabase, tables } = fakeSupabase([
+      ok([]), // hasExistingReadoutCard: inget befintligt kort
+      ok(null), // pending_approvals-insert
+      ok(null), // operating_experiment-update (concludeExperiment)
+    ])
+    const result = await maybeCreateReadout(supabase as any, 'biz_test', exp, new Date('2026-06-01'))
+    expect(result).toBe('created')
+    expect(tables).toEqual(['pending_approvals', 'pending_approvals', 'operating_experiment'])
+  })
+
+  test('redan ett kort (tidigare svep hann skapa men inte avsluta) → skipped_already_exists, försöker ändå avsluta', async () => {
+    const exp = activeExperimentRow()
+    const { supabase, tables } = fakeSupabase([
+      ok([{ id: 'appr_existing' }]), // hasExistingReadoutCard: träff
+      ok(null), // operating_experiment-update (concludeExperiment körs ändå)
+    ])
+    const result = await maybeCreateReadout(supabase as any, 'biz_test', exp, new Date('2026-06-01'))
+    expect(result).toBe('skipped_already_exists')
+    expect(tables).toEqual(['pending_approvals', 'operating_experiment'])
+  })
+
+  test('insert-fel ger skipped_error, kastar aldrig, försöket avslutas INTE', async () => {
+    const exp = activeExperimentRow()
+    const { supabase, tables } = fakeSupabase([
+      ok([]),
+      { data: null, error: { message: 'boom' } },
+      ok(null), // automation_activity via rapporteraTystFel
+    ])
+    const result = await maybeCreateReadout(supabase as any, 'biz_test', exp, new Date('2026-06-01'))
+    expect(result).toBe('skipped_error')
+    expect(tables).not.toContain('operating_experiment')
+  })
+
+  test('kortets payload bär experiment_id/job_type/hypothesis/source_pattern_id/verdict/measurement/target_route', () => {
+    const src = read('lib/experiment/report.ts')
+    const insertIdx = src.indexOf(".from('pending_approvals').insert(")
+    expect(insertIdx).toBeGreaterThan(-1)
+    const gren = src.slice(insertIdx, insertIdx + 1200)
+    expect(gren).toContain("approval_type: 'operating_experiment_readout'")
+    expect(gren).toContain("routing_role: 'owner_admin'")
+    expect(gren).toContain('experiment_id: experiment.id')
+    expect(gren).toContain('job_type: experiment.job_type')
+    expect(gren).toContain('hypothesis: experiment.hypothesis')
+    expect(gren).toContain('source_pattern_id: experiment.source_pattern_id')
+    expect(gren).toContain('verdict: measurement.verdict')
+    expect(gren).toContain('measurement,')
+    expect(gren).toContain('target_route: `/dashboard/experiments/${approvalId}`')
+  })
+
+  test('funktionerna kastar aldrig (try/catch)', () => {
+    const src = read('lib/experiment/report.ts')
+    expect(src).toContain('export async function maybeCreateReadout')
+    expect(src).toContain('export async function sweepExperimentReadouts')
+    expect((src.match(/try \{/g) || []).length).toBeGreaterThanOrEqual(4)
+  })
+})
+
+test.describe('report.ts — sweepExperimentReadouts', () => {
+  test('42P01 (v157 ej körd) → { considered: 0, created: 0 }, kastar aldrig', async () => {
+    const { supabase } = fakeSupabase([{ data: null, error: { message: 'relation does not exist', code: '42P01' } }])
+    const result = await sweepExperimentReadouts(supabase as any, 'biz_test')
+    expect(result).toEqual({ considered: 0, created: 0 })
+  })
+
+  test('inga aktiva försök → { considered: 0, created: 0 }', async () => {
+    const { supabase } = fakeSupabase([ok([])])
+    const result = await sweepExperimentReadouts(supabase as any, 'biz_test')
+    expect(result).toEqual({ considered: 0, created: 0 })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────
+// frozen_summary — skrivs EXAKT en gång, ENDAST i report.ts (Etapp 2)
+// ─────────────────────────────────────────────────────────────────
+
+test.describe('källskanning — frozen_summary skrivs EXAKT en gång, ENDAST i report.ts', () => {
+  test('lib/experiment/*.ts: bara report.ts skriver frozen_summary till en rad', () => {
+    const dir = path.join(ROOT, 'lib', 'experiment')
+    // types.ts undantaget avsiktligt — den bär bara TYPKONTRAKTET
+    // (OperatingExperimentRow.frozen_summary), ingen I/O, ingen skrivning
+    // (samma disciplin Etapp 1 redan låste: "Ingen skrivväg finns i Etapp 1").
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.ts') && f !== 'types.ts')
+    const writers = files.filter(f => {
+      const src = read(path.join('lib/experiment', f))
+      return /frozen_summary\s*:/.test(src)
+    })
+    expect(writers).toEqual(['report.ts'])
+  })
+
+  test('report.ts skriver frozen_summary EXAKT en gång (en enda `frozen_summary:`-förekomst)', () => {
+    const src = read('lib/experiment/report.ts')
+    const matches = src.match(/frozen_summary\s*:/g) || []
+    expect(matches.length).toBe(1)
+  })
+
+  test('app/api/approvals/[id]/route.ts skriver ALDRIG frozen_summary — bara concludeExperiment (report.ts) gör det', () => {
+    const src = read('app/api/approvals/[id]/route.ts')
+    expect(src).not.toContain('frozen_summary')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────
+// enrollment blockerar aldrig kickoff-flödet (källskanning)
+// ─────────────────────────────────────────────────────────────────
+
+test.describe('källskanning — experiment-inskrivning blockerar aldrig kickoff-kortets egen skrivning', () => {
+  test("maybeEnrollProject-anropet i case 'playbook_kickoff_suggestion' är omslutet av try/catch, EFTER checklist-inserten", () => {
+    const src = read('app/api/approvals/[id]/route.ts')
+    const caseStart = src.indexOf("case 'playbook_kickoff_suggestion':")
+    expect(caseStart).toBeGreaterThan(-1)
+    const checklistInsertIdx = src.indexOf(".from('project_checklist').insert(", caseStart)
+    const enrollIdx = src.indexOf('maybeEnrollProject(', caseStart)
+    expect(checklistInsertIdx).toBeGreaterThan(-1)
+    expect(enrollIdx).toBeGreaterThan(checklistInsertIdx)
+
+    const tryIdx = src.lastIndexOf('try {', enrollIdx)
+    const catchIdx = src.indexOf('catch (enrollErr', enrollIdx)
+    expect(tryIdx).toBeGreaterThan(checklistInsertIdx)
+    expect(catchIdx).toBeGreaterThan(enrollIdx)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────
+// approvals-casen fail-softar utan v157 (svensk feltext)
+// ─────────────────────────────────────────────────────────────────
+
+test.describe('approvals-rutten — operating_experiment_proposal/readout fail-softar utan v157', () => {
+  const src = read('app/api/approvals/[id]/route.ts')
+
+  test("case 'operating_experiment_proposal' har en egen hanterare och skriver operating_experiment", () => {
+    expect(src).toContain("case 'operating_experiment_proposal':")
+    const i = src.indexOf("case 'operating_experiment_proposal':")
+    const gren = src.slice(i, i + 2200)
+    expect(gren).toContain(".from('operating_experiment')")
+    expect(gren).toContain(".insert(")
+    expect(gren).toContain("status: 'active'")
+  })
+
+  test("case 'operating_experiment_readout' har en egen hanterare, kräver decision, avvisning hanteras via reject-side-effect", () => {
+    expect(src).toContain("case 'operating_experiment_readout':")
+    expect(src).toContain("action === 'reject' && approval.approval_type === 'operating_experiment_readout'")
+  })
+
+  test('svensk feltext "Försöket kan inte startas ännu." finns för v157-frånvaro i BÅDA nya cases', () => {
+    const occurrences = (src.match(/Försöket kan inte startas ännu\./g) || []).length
+    expect(occurrences).toBeGreaterThanOrEqual(2)
+  })
+
+  test('schema-saknas kollas explicit runt operating_experiment-skrivningarna, via arSchemaSaknas (täcker BÅDE 42P01 och PostgREST:s PGRST205)', () => {
+    const proposalStart = src.indexOf("case 'operating_experiment_proposal':")
+    const readoutStart = src.indexOf("case 'operating_experiment_readout':")
+    const defaultStart = src.indexOf('default: {')
+    expect(src.slice(proposalStart, readoutStart)).toContain('arSchemaSaknas(')
+    expect(src.slice(readoutStart, defaultStart)).toContain('arSchemaSaknas(')
+    expect(src).toContain("import { rapporteraTystFel, arSchemaSaknas } from '@/lib/observability/driftlarm'")
+  })
+
+  test('arSchemaSaknas (den delade helpern) känner igen PostgREST:s PGRST205, inte bara Postgres 42P01 — empiriskt verifierat mot en riktig ej-migrerad tabell', () => {
+    const driftlarmSrc = read('lib/observability/driftlarm.ts')
+    expect(driftlarmSrc).toContain("code === 'PGRST205'")
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────
+// action-contract + routing — nya typerna
+// ─────────────────────────────────────────────────────────────────
+
+test.describe('action-contract/routing — operating_experiment_proposal + readout', () => {
+  test('registrerade som EXECUTABLE_ACTION, owner_admin', () => {
+    const src = read('lib/approvals/action-contract.ts')
+    expect(src).toContain("operating_experiment_proposal: 'EXECUTABLE_ACTION'")
+    expect(src).toContain("operating_experiment_readout: 'EXECUTABLE_ACTION'")
+    const routingSrc = read('lib/approvals/routing.ts')
+    expect(routingSrc).toContain("operating_experiment_proposal: 'owner_admin'")
+    expect(routingSrc).toContain("operating_experiment_readout: 'owner_admin'")
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────
+// Kausalitetsbanet + PROSA — Etapp 2-filerna omfattas redan av
+// "källskanning — kausalitetsbanet gäller hela lib/experiment/" ovan
+// (den itererar fs.readdirSync(lib/experiment/) och fångar propose.ts/
+// enroll.ts/report.ts automatiskt). Detta test bevisar bara att de tre
+// filerna faktiskt FINNS och skannas, så den täckningen inte tyst tappas
+// bort om katalogen någonsin bara innehåller Etapp 1-filerna i en annan
+// körningskontext.
+// ─────────────────────────────────────────────────────────────────
+
+test.describe('kausalitetsbanet täcker Etapp 2-filerna', () => {
+  test('propose.ts, enroll.ts, report.ts finns i lib/experiment/ och skannas av källskanningen ovan', () => {
+    const dir = path.join(ROOT, 'lib', 'experiment')
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.ts'))
+    for (const f of ['propose.ts', 'enroll.ts', 'report.ts']) {
+      expect(files).toContain(f)
+    }
+  })
+
+  test('filhuvudena dokumenterar kausalitetsdisciplinen (propose.ts nämner det via types.ts-referensen, enroll.ts/report.ts uttryckligen)', () => {
+    expect(read('lib/experiment/report.ts').toLowerCase()).toContain('kausalitet')
   })
 })

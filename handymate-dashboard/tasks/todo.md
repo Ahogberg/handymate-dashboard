@@ -161,3 +161,59 @@ td52-gating/agent-team-spec), `npx tsc --noEmit` 0 fel, `npx next build` 0.
 - [x] npx tsc --noEmit (0 fel)
 - [x] npx next build (ren build)
 - [x] git status + ett commit med specifika filer, ingen push
+
+---
+
+# OperatingExperiment Etapp 2 — förslag/beslutslager (2026-08-19)
+
+Bygger på Etapp 1 (e2644c1e): sql/v157 (EJ körd), lib/experiment/types.ts,
+lib/experiment/measure.ts (läs-only). Etapp 2 = förslag → bekräftelse →
+inskrivning → redovisning → ägarbeslut. INGEN LLM. Allt fail-soft mot
+saknad v157 (42P01).
+
+## Lib
+- [x] lib/experiment/types.ts — + EXPERIMENT_DEFAULT_MEASURES (sena_andringar,
+      extra_timmar, marginal)
+- [x] lib/experiment/propose.ts — proposeExperiment(), dedupe (livstid,
+      pending_approvals + operating_experiment, per source_pattern_id),
+      opts.allowDuplicate för continue_testing-grenen
+- [x] lib/experiment/enroll.ts — maybeEnrollProject(), tids-/kapacitetscheck,
+      aldrig blockerande
+- [x] lib/experiment/report.ts — buildReadoutBody/buildReadoutCardCopy (rena),
+      sweepExperimentReadouts (I/O, concluded+frozen_summary EN gång)
+
+## Approvals-flödet
+- [x] app/api/approvals/[id]/route.ts
+      - GET (hämta ett kort, business-scoped) — decision-sidan behöver den
+      - case 'playbook_pattern_confirmation' — fire-and-forget proposeExperiment
+        efter lyckad business_knowledge-insert
+      - case 'playbook_kickoff_suggestion' — fire-and-forget maybeEnrollProject
+        efter lyckad checklist-insert
+      - case 'operating_experiment_proposal' — godkänn: INSERT operating_experiment
+        (status active). Avvisa: ingen skrivning. Fail-soft 42P01.
+      - case 'operating_experiment_readout' — decision via edited_payload.decision
+        (continue_testing|made_standard), reject-side-effect (rejected)
+- [x] lib/approvals/action-contract.ts — båda nya typer EXECUTABLE_ACTION
+- [x] lib/approvals/routing.ts — båda owner_admin
+
+## UI
+- [x] app/dashboard/approvals/page.tsx — TYPE_CONFIG + särskild gren för
+      'operating_experiment_readout' (Link till beslutssida, husets
+      target_route-idiom som jobbpass_proposal — INGA nya fetch(`/api/approvals)-anrop)
+- [x] app/dashboard/experiments/[approvalId]/page.tsx — beslutssidan, tre knappar
+
+## Cron
+- [x] app/api/cron/maintenance/route.ts — steg 5, sweepExperimentReadouts per
+      företag (rider på befintlig daglig cron, ingen ny vercel.json-rad)
+
+## Facit
+- [x] tests/operating-experiment.spec.ts — utökad (Etapp 2-delarna)
+- [x] tests/e2e-golden-path/experiment-proof.spec.ts — eget playwright-projekt,
+      SKIP ärligt om v157 saknas
+- [x] playwright.config.ts — --project=experiment-proof
+
+## Verifiering
+- [x] Riktade playwright-körningar (rött→grönt)
+- [x] npx tsc --noEmit (0 fel)
+- [x] npx next build > buildlog.txt 2>&1 (0)
+- [x] git status, ETT commit specifika filer, ingen push
