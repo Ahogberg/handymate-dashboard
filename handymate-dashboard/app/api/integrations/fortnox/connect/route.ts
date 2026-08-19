@@ -19,7 +19,13 @@ const FORTNOX_AUTH_BASE = 'https://apps.fortnox.se/oauth-v1'
 // scope-utvidgning + re-OAuth innan användning: bookFortnoxInvoice
 // (bookkeeping), registerFortnoxPayment (payment), syncQuoteToFortnox
 // (offer).
-const FORTNOX_SCOPES = 'invoice customer companyinformation'
+//
+// 2026-08-19: utökad med "supplierinvoice" för leverantörsfaktura-pull-synk
+// (se docs/superpowers/specs/2026-08-19-leverantorsfakturor-design.md).
+// REDAN ANSLUTNA konton saknar detta scope på sin nuvarande token och
+// måste ÅTERANSLUTA (göra om OAuth) för att importen av leverantörs-
+// fakturor ska fungera.
+const FORTNOX_SCOPES = 'invoice customer companyinformation supplierinvoice'
 
 function getRedirectUri(): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
