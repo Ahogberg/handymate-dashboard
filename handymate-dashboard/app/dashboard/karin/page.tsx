@@ -45,6 +45,29 @@ interface CalendarResponse {
   suggestions: EventSuggestion[]
 }
 
+/** En rad i leverantörsfaktura-matchningskön (Etapp 3, sql/supplier_invoices). */
+interface SupplierInvoiceQueueItem {
+  id: string
+  supplier_name: string | null
+  invoice_number: string | null
+  invoice_date: string | null
+  due_date: string | null
+  total_amount: number | null
+  fortnox_supplier_invoice_number: string | null
+  created_at: string
+}
+
+interface ProjectOption {
+  project_id: string
+  name: string
+  status: string
+}
+
+interface SubcontractorOption {
+  subcontractor_id: string
+  name: string
+}
+
 const KATEGORI_ETIKETT: Record<string, string> = {
   moms: 'Moms',
   arbetsgivare: 'Arbetsgivare',
@@ -84,6 +107,56 @@ export default function KarinKalenderPage() {
   const [fel, setFel] = useState<string | null>(null)
   const [kvittenser, setKvittenser] = useState<Map<string, Kvittens>>(new Map())
   const [visaLaggTill, setVisaLaggTill] = useState(false)
+
+  // ── Leverantörsfaktura-matchningskön (Etapp 3) ──
+  // Egen hämtning, eget fel-läge — kön är en tillagd yta på sidan, inte en
+  // del av kalenderns laddning. Faller den ovan syns kön ändå.
+  const [queue, setQueue] = useState<SupplierInvoiceQueueItem[]>([])
+  const [projects, setProjects] = useState<ProjectOption[]>([])
+  const [subcontractors, setSubcontractors] = useState<SubcontractorOption[]>([])
+
+  useEffect(() => {
+    fetch('/api/karin/supplier-invoices')
+      .then(r => (r.ok ? r.json() : { queue: [] }))
+      .then(d => setQueue(d.queue || []))
+      .catch(() => setQueue([]))
+
+    fetch('/api/projects?status=active')
+      .then(r => (r.ok ? r.json() : { projects: [] }))
+      .then(d => setProjects(d.projects || []))
+      .catch(() => setProjects([]))
+
+    // Fail-soft: rutten nedan är feature-gated ('subcontractors'-
+    // planfunktionen, se app/dashboard/projects/[id]/page.tsx) — ett konto
+    // utan den ska bara se fritext-fältet, aldrig ett fel.
+    fetch('/api/subcontractors?status=active')
+      .then(r => (r.ok ? r.json() : { subcontractors: [] }))
+      .then(d => setSubcontractors(d.subcontractors || []))
+      .catch(() => setSubcontractors([]))
+  }, [])
+
+  /** Matchar en kö-rad mot ett projekt. Raden lämnar kön lokalt utan omladdning. */
+  async function kopplaFaktura(id: string, projectId: string, subcontractorId: string, supplierName: string) {
+    try {
+      const res = await fetch('/api/karin/supplier-invoices', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          project_id: projectId,
+          subcontractor_id: subcontractorId || null,
+          supplier_name: supplierName || undefined,
+        }),
+      })
+      if (!res.ok) throw new Error(String(res.status))
+      setQueue(prev => prev.filter(q => q.id !== id))
+      toast.success('Kopplad till projektet')
+      return true
+    } catch {
+      toast.error('Kunde inte koppla — försök igen')
+      return false
+    }
+  }
 
   // Lager två av rollskyddet. API:et är lager tre — en sida som bara döljer
   // sig är ingen spärr.
@@ -227,6 +300,17 @@ export default function KarinKalenderPage() {
             Lägg till
           </button>
         </div>
+
+        {/* ── Leverantörsfaktura-matchningskön (Etapp 3) ──
+             Egen hämtning, oberoende av kalenderns laddningsläge. Tom kö
+             renderar ingenting — samma "tystnad om det inte finns något att
+             göra"-princip som resten av sidan (se "TRE LÖFTEN" ovan). */}
+        <LeverantorsfakturaKo
+          queue={queue}
+          projects={projects}
+          subcontractors={subcontractors}
+          onKoppla={kopplaFaktura}
+        />
 
         {laddar ? (
           <div className="mt-6 bg-white border border-slate-200 rounded-2xl p-6 flex items-center justify-center min-h-[120px]">
@@ -686,6 +770,132 @@ function LaggTillModal({ suggestions, onClose, onSave }: {
             {sparar ? 'Sparar …' : 'Spara'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Matchningskön för leverantörsfakturor utan projekt (Etapp 3).
+ *
+ * Fakturor som kommit in via Fortnox-synken (eller skapats manuellt) utan
+ * projektkoppling hamnar här. Ägaren väljer projekt + leverantör per rad;
+ * en kopplad rad lämnar kön direkt (lokal filtrering, ingen omladdning) och
+ * syns sedan i projektets befintliga "Leverantörer"-flik.
+ *
+ * Tom kö renderar ingenting — samma princip som resten av sidan: tystnad
+ * betyder "inget att göra", inte en tom ruta som ser trasig ut.
+ */
+function LeverantorsfakturaKo({ queue, projects, subcontractors, onKoppla }: {
+  queue: SupplierInvoiceQueueItem[]
+  projects: ProjectOption[]
+  subcontractors: SubcontractorOption[]
+  onKoppla: (id: string, projectId: string, subcontractorId: string, supplierName: string) => Promise<boolean>
+}) {
+  if (queue.length === 0) return null
+
+  return (
+    <>
+      <div className="flex items-baseline gap-2 mt-6 mb-2.5">
+        <h2 className="m-0 text-[15px] font-semibold text-slate-900">Leverantörsfakturor att matcha</h2>
+        <span className="font-heading text-xs font-bold bg-primary-700 text-white rounded-full min-w-[21px] h-[21px] px-1.5 inline-flex items-center justify-center">
+          {queue.length}
+        </span>
+      </div>
+      <div className="space-y-2.5">
+        {queue.map(item => (
+          <LeverantorsfakturaRad key={item.id} item={item} projects={projects} subcontractors={subcontractors} onKoppla={onKoppla} />
+        ))}
+      </div>
+    </>
+  )
+}
+
+function LeverantorsfakturaRad({ item, projects, subcontractors, onKoppla }: {
+  item: SupplierInvoiceQueueItem
+  projects: ProjectOption[]
+  subcontractors: SubcontractorOption[]
+  onKoppla: (id: string, projectId: string, subcontractorId: string, supplierName: string) => Promise<boolean>
+}) {
+  const [projectId, setProjectId] = useState('')
+  const [subcontractorId, setSubcontractorId] = useState('')
+  const [annanLeverantor, setAnnanLeverantor] = useState(false)
+  const [leverantorNamn, setLeverantorNamn] = useState(item.supplier_name || '')
+  const [sparar, setSparar] = useState(false)
+
+  async function handleKoppla() {
+    if (!projectId) return
+    setSparar(true)
+    await onKoppla(item.id, projectId, annanLeverantor ? '' : subcontractorId, annanLeverantor ? leverantorNamn : '')
+    setSparar(false)
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-4">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[15px] font-semibold text-slate-900 leading-snug mb-0.5 truncate">
+            {item.supplier_name || 'Okänd leverantör'}
+          </h3>
+          <p className="text-[13px] text-slate-500 m-0 truncate">
+            {item.invoice_date ? visaDatum(item.invoice_date) : 'Datum saknas'}
+            {item.invoice_number && ` · Fakturanr ${item.invoice_number}`}
+          </p>
+        </div>
+        <span className="font-heading text-sm font-bold text-slate-900 whitespace-nowrap shrink-0">
+          {(item.total_amount ?? 0).toLocaleString('sv-SE')} kr
+        </span>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <select
+          value={projectId}
+          onChange={e => setProjectId(e.target.value)}
+          className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 min-h-[44px]"
+        >
+          <option value="">Välj projekt…</option>
+          {projects.map(p => (
+            <option key={p.project_id} value={p.project_id}>{p.name}</option>
+          ))}
+        </select>
+
+        {!annanLeverantor ? (
+          <select
+            value={subcontractorId}
+            onChange={e => {
+              if (e.target.value === '__annan__') {
+                setAnnanLeverantor(true)
+                setSubcontractorId('')
+                return
+              }
+              setSubcontractorId(e.target.value)
+            }}
+            className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 min-h-[44px]"
+          >
+            <option value="">Ingen underentreprenör</option>
+            {subcontractors.map(s => (
+              <option key={s.subcontractor_id} value={s.subcontractor_id}>{s.name}</option>
+            ))}
+            <option value="__annan__">Annan leverantör…</option>
+          </select>
+        ) : (
+          <input
+            type="text"
+            value={leverantorNamn}
+            onChange={e => setLeverantorNamn(e.target.value)}
+            placeholder="Leverantörsnamn"
+            className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 min-h-[44px]"
+          />
+        )}
+
+        <button
+          type="button"
+          onClick={handleKoppla}
+          disabled={!projectId || sparar}
+          className="inline-flex items-center justify-center gap-1.5 h-[44px] px-4 bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 shrink-0"
+        >
+          {sparar ? 'Kopplar …' : 'Koppla'}
+        </button>
       </div>
     </div>
   )

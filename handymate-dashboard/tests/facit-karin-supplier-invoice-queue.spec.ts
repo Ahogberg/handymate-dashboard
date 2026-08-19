@@ -39,3 +39,33 @@ test.describe('GET/PATCH /api/karin/supplier-invoices', () => {
     expect(getBlock).not.toMatch(/marginal|budget_amount/)
   })
 })
+
+test.describe('Karin-sidan renderar leverantorsfaktura-kon', () => {
+  const PAGE = fs.readFileSync(
+    path.join(__dirname, '..', 'app/dashboard/karin/page.tsx'),
+    'utf8',
+  )
+
+  test('sidan hamtar /api/karin/supplier-invoices', () => {
+    expect(PAGE).toContain('/api/karin/supplier-invoices')
+  })
+
+  test('varje ko-rad har bade projekt- och leverantorsval', () => {
+    expect(PAGE).toMatch(/project_id/)
+    expect(PAGE).toMatch(/subcontractor_id/)
+  })
+
+  test('subcontractors-hamtningen ar fail-soft (feature-gated rutt)', () => {
+    const idx = PAGE.indexOf('/api/subcontractors')
+    expect(idx).toBeGreaterThan(-1)
+    const around = PAGE.slice(idx, idx + 300)
+    expect(around).toMatch(/catch/)
+  })
+
+  test('en matchad rad forsvinner ur kon (omhamtning eller lokal filtrering efter PATCH)', () => {
+    const idx = PAGE.indexOf("method: 'PATCH'")
+    expect(idx).toBeGreaterThan(-1)
+    const around = PAGE.slice(Math.max(0, idx - 100), idx + 500)
+    expect(around).toMatch(/laddaKalender|setQueue|filter\(/)
+  })
+})
