@@ -433,7 +433,7 @@ export default function BillingPage() {
                     Lanseringserbjudande — Grundarkunderna
                   </strong>
                   <p className="text-sm text-gray-600 leading-relaxed">
-                    Du blir en av de första 20: priset låses för alltid — det höjs aldrig för dig — och du får en direktlinje till grundaren under hela första året.
+                    Just nu finns grundarkundsplatser kvar: ditt pris låses för alltid — det höjs aldrig för dig — och du får en direktlinje till grundaren under hela första året.
                   </p>
                 </div>
               )}

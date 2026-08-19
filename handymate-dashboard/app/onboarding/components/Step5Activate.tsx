@@ -162,7 +162,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
               Lanseringserbjudande — Grundarkunderna
             </strong>
             <p style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.45 }}>
-              Du blir en av de första 20: priset låses för alltid — det höjs aldrig för dig — och du får en direktlinje till grundaren under hela första året.
+              Just nu finns grundarkundsplatser kvar: ditt pris låses för alltid — det höjs aldrig för dig — och du får en direktlinje till grundaren under hela första året.
             </p>
           </div>
         )}
