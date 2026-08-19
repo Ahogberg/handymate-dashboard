@@ -141,4 +141,27 @@ test.describe('create-debrief-card.ts — livstids-dedupen', () => {
     expect(kalla).toContain('try {')
     expect(kalla).toContain('catch (err)')
   })
+
+  // OperatingExperiment-fångstskydd (2026-08-19): kortet hade tidigare bara
+  // 7 dagar innan det gick ut, och livstids-dedupen ovan gör ett utgånget
+  // kort permanent — lärdomen var borta för alltid för varje hantverkare som
+  // inte svarade i tid. Förlängt till 90 dagar (INTE null — se kommentaren
+  // i källan för varför: `new Date(null)` i approvals/page.tsx:s
+  // timeUntilExpiry() ger epoch 1970 → kortet visar permanent "Utgången" i
+  // UI:t trots att det fortfarande går att svara på).
+  test('debrief-kortets expires_at är 90 dagar, inte 7', () => {
+    expect(kalla).toContain('Date.now() + 90 * 24 * 60 * 60 * 1000')
+    expect(kalla).not.toContain('Date.now() + 7 * 24 * 60 * 60 * 1000')
+  })
+
+  test('expires_at sätts aldrig till null för debrief-kortet (dokumenterat medvetet val)', () => {
+    const insertBlockStart = kalla.indexOf("approval_type: 'project_debrief'")
+    expect(insertBlockStart).toBeGreaterThan(-1)
+    expect(kalla).not.toMatch(/expires_at:\s*null/)
+  })
+
+  test('konsument-antagandet håller: maintenance-svepet expirar bara via .lt(expires_at, now) (NULL matchar aldrig)', () => {
+    const maintenance = fs.readFileSync(path.join(ROOT, 'app/api/cron/maintenance/route.ts'), 'utf8')
+    expect(maintenance).toContain(".lt('expires_at', new Date().toISOString())")
+  })
 })

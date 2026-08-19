@@ -20,6 +20,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
+import { SYSTEM_STAGES } from '@/lib/project-stages/automation-engine'
 
 interface MaybeCreateResult {
   created: boolean
@@ -90,6 +91,13 @@ export async function maybeCreateProjectFromBooking(
       .maybeSingle()
 
     const projectName = serviceType || (cust?.name ? `Jobb – ${cust.name}` : 'Nytt projekt')
+    // Stegkedjan startar VID FÖDSELN (OperatingExperiment-fångstskydd,
+    // 2026-08-19 — samma princip som create-from-quote.ts). Inline i
+    // insert:en, INTE via advanceProjectStage: den här grenen är just
+    // "offert-lös" (se filhuvudet) — inget kontrakt är signerat, bara en
+    // bokning gjord — så ps-01:s default-automation (SMS "Vi har mottagit
+    // er signerade offert...") skulle vara felaktig att trigga här.
+    const nuIso = new Date().toISOString()
     const { data: project, error } = await supabase
       .from('project')
       .insert({
@@ -99,6 +107,11 @@ export async function maybeCreateProjectFromBooking(
         project_type: 'hourly',
         status: 'active',
         address: cust?.address || null,
+        current_workflow_stage_id: SYSTEM_STAGES.CONTRACT_SIGNED,
+        workflow_stage_entered_at: nuIso,
+        workflow_stage_history: [
+          { stage_id: SYSTEM_STAGES.CONTRACT_SIGNED, entered_at: nuIso, previous_stage_id: null },
+        ],
         source_lead_data: {
           created_from: 'booking',
           booking_id: bookingId,

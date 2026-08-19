@@ -161,13 +161,36 @@ test.describe('Reconciliation och manuell migration', () => {
   test('legacy-rader räknas om och märks aldrig V2 med UPDATE', () => {
     const reconciliation = read('lib/efterkalkyl/reconcile-outcomes.ts')
     const migration = read('sql/v138_outcome_quality_gate.sql')
-    expect(reconciliation).toContain('versionByProject.get(projectId) !== OUTCOME_CALCULATION_VERSION')
+    expect(reconciliation).toContain('outcome.calculation_version !== OUTCOME_CALCULATION_VERSION')
     expect(reconciliation).toContain('reconciliation: true')
     expect(migration).toContain('ADD COLUMN IF NOT EXISTS calculation_version')
     expect(migration).toContain('financial_learning_eligible BOOLEAN NOT NULL DEFAULT false')
     expect(migration).toContain('invoice_net_amount_complete')
     expect(migration.match(/calculation_version IS NOT NULL AND calculation_version >= 2/g)).toHaveLength(2)
     expect(migration).not.toMatch(/^\s*UPDATE\s+project_outcome\b/im)
+  })
+
+  // Läcka 2 (OperatingExperiment-fångstskydd, 2026-08-19): en V2-rad frusen
+  // med labor_cost_configured=false läkte tidigare ALDRIG, ens efter att
+  // business_config.default_internal_hourly_cost sattes i efterhand —
+  // versionskriteriet ovan såg raden som redan "klar". Detta facit läser
+  // KÄLLKODENS FORM (ingen DB här) och låser att det utökade kriteriet finns
+  // kvar, pekar på rätt kolumn, och att refrysning fortfarande går genom
+  // samma freezeProjectOutcome (aldrig en UPDATE som fuskar in V2).
+  test('labor_cost-fallet: en V2-rad med labor_cost_configured=false refryses när timkostnaden nu är satt', () => {
+    const reconciliation = read('lib/efterkalkyl/reconcile-outcomes.ts')
+    // Läser flaggan från project_outcome...
+    expect(reconciliation).toContain("select('project_id, calculation_version, labor_cost_configured')")
+    // ...och den aktuella business-konfigurationen (inte en cachad/gammal
+    // uppfattning om timkostnaden).
+    expect(reconciliation).toContain(".from('business_config')")
+    expect(reconciliation).toContain("select('default_internal_hourly_cost')")
+    // Kandidat-kriteriet måste inkludera BÅDE version-avvikelsen (oförändrat)
+    // OCH det nya labor-cost-fallet — aldrig bara det ena.
+    expect(reconciliation).toContain('hourlyCostNowConfigured && outcome.labor_cost_configured === false')
+    // Ingen genväg — en rad markeras aldrig V2/komplett genom en UPDATE, bara
+    // genom att faktiskt köra freezeProjectOutcome om igen.
+    expect(reconciliation).not.toMatch(/\.update\(\s*\{\s*calculation_version/i)
   })
 
   test('reconciliation-routen är tenantbunden och owner/admin-grindad', () => {

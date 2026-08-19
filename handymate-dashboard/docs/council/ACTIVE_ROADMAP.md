@@ -17,6 +17,79 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-19 — Adaptive Business Twin / OperatingExperiment (FÖRSTA post-launch-programmet)
+
+Tre datafångst-läckor täpptes samma dag i det som blir underlaget för detta
+program (debrief-kortets 7-dagarsfönster, den läkande labor-cost-refrysningen
+i `reconcile-outcomes.ts`, saknat startsteg i två projekt-skapelsevägar) —
+inte programmet självt, men grunden det ska stå på. **OperatingExperiment är
+det FÖRSTA programmet i post-launch-fasen**, och skiljer sig från allt ovan i
+den här filen: allt tidigare är byggt och skarpt; det här är en **namngiven
+kommande riktning med en kvantifierad grind**, inte kod som finns idag.
+
+**Vad det är:** en loop som räknar på VERKLIGA projektutfall
+(`project_outcome`, `financial_learning_eligible=true`) över tid, per
+företag och jobbtyp, och gradvis låter systemet forma starkare påståenden om
+vad som faktiskt fungerar — bortom enskilda lärdomar (`project_lesson`, V1)
+och bekräftade mönster (`business_knowledge` pattern-rader, Playbook Pattern
+Confirmation V1) till experiment som medvetet varierar EN sak och mäter
+utfallet.
+
+**Grinden — öppnas när:**
+```
+≥3 riktiga betalande kunder
+har ≥5 avslutade projekt vardera
+med kompletta utfall (financial_learning_eligible = true)
+```
+Riktiga = inte demo/testdata (`lib/testdata.ts`-filtret). Kompletta utfall =
+`calculation_version = OUTCOME_CALCULATION_VERSION` OCH
+`financial_learning_eligible = true` — samma sanningskontrakt som Outcome
+Quality Gate V1 (`sql/v138_outcome_quality_gate.sql`) redan håller. Under
+grinden: programmet förblir ett dokument, ingen kod byggs mot det.
+
+**De fyra sanningsnivåerna** (varje påstående programmet någonsin gör måste
+bära sin nivå synligt, aldrig blandas ihop):
+1. **Observation** — en enskild registrerad datapunkt. Ett `project_lesson`-
+   svar, en `project_outcome`-rad. Sann för EN instans, påstår inget om
+   mönster.
+2. **Hypotes** — flera observationer pekar åt samma håll men är obekräftade.
+   Motsvarar en oconfirmed `business_knowledge`-kandidat innan ägaren
+   godkänt den (Playbook Pattern Confirmation V1-kortet, väntande).
+3. **Avgränsat försök** — en medvetet skopad, tidsbegränsad variation
+   (t.ex. "testa högre timpris för badrumsjobb hos detta företag i N
+   projekt") med ett förutbestämt mätvillkor. Fortfarande INTE en generell
+   sanning — gäller bara det avgränsade försöket tills det utvärderats.
+4. **Bekräftad regel** — ägaren har uttryckligen godkänt att mönstret ska
+   forma FRAMTIDA offerter/beslut generellt (samma disciplin som redan
+   gäller för `business_knowledge`-rader idag: ingen AI-inferens blir en
+   regel utan en människas godkännande-klick).
+
+Ett påstående får aldrig hoppa nivå utan den nivåns beviskrav — en hypotes
+som presenteras som en bekräftad regel är den typ av fabricering Matte redan
+bevisat VÄGRAR göra i planflödet (Mission Control V1, 2026-08-17).
+
+**Kausalitetsbanet gäller ovillkorligt:** programmet räknar och korrelerar,
+men skriver ALDRIG "X orsakar Y" — bara "X observerades tillsammans med Y, N
+gånger, under Z villkor". Samma disciplin som `mandate-facit.ts` redan
+tillämpar på autonomifacit ("räknade fakta, aldrig ett kausalitetspåstående").
+Ett handverk med 5 projekt är inte ett kontrollerat experiment — programmets
+egna avgränsade försök (nivå 3) är den enda platsen kausalspråk ens
+NÄRMAR sig, och bara inom det uttryckligt skopade villkoret.
+
+**Beslutad första pilot (när grinden öppnas):** Lars + kickoff-checkpoints
+(`lib/playbook/kickoff-candidates.ts`, Playbook Kickoff Copilot V1) — redan
+byggd infrastruktur för att citera källprojekt och visa bevis vid ett
+projekts start. OperatingExperiment bygger vidare på samma "visa beläggen,
+aldrig bara påståendet"-princip, men med kvantifierat, nivåsatt bevis i
+stället för en fri textformulering.
+
+**Status:** dokumenterad riktning, ingen kod. Nästa steg är INTE att börja
+bygga — det är att övervaka grindvillkoret (kontrollfrågorna i
+`sql/kontroll_utfallsfangst_2026-08-19.sql`, fråga 4b, visar hur snabbt
+`financial_learning_eligible`-raderna växer nu när läckorna är täppta).
+
+---
+
 # Läge 2026-08-18 — Mission Mandates V1 byggd (hybrid: mandat som mätinstrument)
 
 Andreas medvetna rådsbeslut: bygg avgränsad delegation — ägaren godkänner ETT

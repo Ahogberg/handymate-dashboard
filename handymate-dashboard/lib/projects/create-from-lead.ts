@@ -6,6 +6,7 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 import { halsning } from '@/lib/customers/namn'
+import { SYSTEM_STAGES } from '@/lib/project-stages/automation-engine'
 
 interface CreateResult {
   success: boolean
@@ -83,6 +84,19 @@ export async function createProjectFromLead(
     // 5. Skapa projekt
     const projectName = quote?.title || lead.title || lead.description || 'Nytt projekt'
 
+    // Stegkedjan startar VID FÖDSELN (OperatingExperiment-fångstskydd,
+    // 2026-08-19 — samma princip som create-from-quote.ts/project-ai-engine.ts).
+    // Sätts HÄR, INLINE i insert:en — inte via advanceProjectStage. Skälet:
+    // quote?.status ovan tillåter 'sent' (bara SKICKAD, inte signerad), och
+    // ps-01 (CONTRACT_SIGNED) triggar en automation som SMS:ar kunden "Vi har
+    // mottagit er signerade offert..." (automation-engine.ts
+    // runDefaultAutomations). Att anropa advanceProjectStage ovillkorat här
+    // skulle alltså kunna skicka ett FELAKTIGT sms till en kund som inte
+    // signerat något. Samma inline-fältform som advanceProjectStage skriver,
+    // bara utan att trigga automationer — projektet får sin startpunkt i
+    // workflow_stage_history utan sidoeffekter.
+    const nuIso = new Date().toISOString()
+
     const { data: project, error: insertError } = await supabase
       .from('project')
       .insert({
@@ -96,6 +110,11 @@ export async function createProjectFromLead(
         budget_amount: budgetAmount || lead.estimated_value || null,
         address: lead.address || null,
         status: 'active',
+        current_workflow_stage_id: SYSTEM_STAGES.CONTRACT_SIGNED,
+        workflow_stage_entered_at: nuIso,
+        workflow_stage_history: [
+          { stage_id: SYSTEM_STAGES.CONTRACT_SIGNED, entered_at: nuIso, previous_stage_id: null },
+        ],
         source_lead_data: {
           lead_title: lead.title,
           lead_value: lead.estimated_value,

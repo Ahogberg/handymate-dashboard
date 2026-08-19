@@ -72,7 +72,27 @@ export async function skapaDebriefKort(
       id: `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       business_id: businessId,
       status: 'pending',
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      // 90 dagar, INTE 7 (OperatingExperiment-fångstskydd, 2026-08-19):
+      // debriefen är reflektion, inte en tidskänslig åtgärd — ett svar tre
+      // veckor efter stängning är fortfarande en giltig lärdom, och kortet
+      // har LIVSTIDS-dedupe (se filhuvudet) så ett utgånget kort återskapas
+      // ALDRIG. Ett fönster på bara 7 dagar tystade lärdomen permanent för
+      // varje hantverkare som inte hann svara i tid.
+      //
+      // Övervägde expires_at=null ("ska aldrig gå ut" — kortet är ju alltid
+      // svarbart). Verifierat mot alla konsumenter av fältet:
+      //   - app/api/cron/maintenance/route.ts .lt('expires_at', now): NULL
+      //     matchar aldrig `<` i Postgres → skulle aldrig expiras. Säkert.
+      //   - app/dashboard/approvals/page.tsx timeUntilExpiry(): `new
+      //     Date(null)` blir epoch 1970 (JS coercar null→0), så
+      //     `diff <= 0` → kortet visar permanent "Utgången" i UI:t (rad
+      //     ~1355, project_debrief-grenen anropar den ovillkorat) — OSÄKERT.
+      //     Ingen krasch, men aktivt vilseledande för en åtgärd som
+      //     fortfarande går att svara på.
+      // Därför 90 dagar i stället: gott om tid för hantverkaren, ändå ett
+      // ändligt värde som varken cron-svepet eller UI:t behöver särskild
+      // null-hantering för.
+      expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
       approval_type: 'project_debrief',
       title: `Hur gick ${projektnamn}?`,
       description: '30 sekunder — det du säger nu gör nästa offert på liknande jobb bättre.',

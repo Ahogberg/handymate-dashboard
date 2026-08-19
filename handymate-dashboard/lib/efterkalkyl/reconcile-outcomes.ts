@@ -45,19 +45,58 @@ export async function reconcileProjectOutcomes(
 
   const { data: outcomes, error: outcomeError } = await supabase
     .from('project_outcome')
-    .select('project_id, calculation_version')
+    .select('project_id, calculation_version, labor_cost_configured')
     .eq('business_id', businessId)
     .in('project_id', projectIds)
   if (outcomeError) throw new Error(`project_outcome-reconciliation misslyckades: ${outcomeError.message}`)
 
-  const versionByProject = new Map<string, number | null>(
-    (outcomes || []).map(row => [String(row.project_id), row.calculation_version == null
-      ? null
-      : Number(row.calculation_version)]),
+  interface OutcomeVersionRow {
+    calculation_version: number | null
+    labor_cost_configured: boolean | null
+  }
+  const outcomeByProject = new Map<string, OutcomeVersionRow>(
+    (outcomes || []).map(row => [String(row.project_id), {
+      calculation_version: row.calculation_version == null ? null : Number(row.calculation_version),
+      labor_cost_configured: row.labor_cost_configured ?? null,
+    }]),
   )
-  const candidates = projectIds.filter(projectId => (
-    versionByProject.get(projectId) !== OUTCOME_CALCULATION_VERSION
-  ))
+
+  // Läcka 2-täppning (2026-08-19, OperatingExperiment-fångstskydd): en V2-rad
+  // kan vara "klar" i versionsmening men ändå frusen med
+  // labor_cost_configured=false (learning_blockers innehåller
+  // 'labor_cost_incomplete') om business_config.default_internal_hourly_cost
+  // saknades vid stängningen — se lib/efterkalkyl/freeze-outcome.ts. Utan
+  // detta extra kriterium läker den raden ALDRIG: versionskriteriet nedan ser
+  // den redan som klar (calculation_version === OUTCOME_CALCULATION_VERSION)
+  // och rör den aldrig igen, även efter att timkostnaden satts.
+  //
+  // Säkerhetsresonemang för att refrysa: freezeProjectOutcome läser HELA sin
+  // källdata på nytt vid varje anrop (tidrapporter, fakturor, ÄTA, business_
+  // config — se compute-economics.ts) — inget cachat delta. Projektet är
+  // redan stängt, så tidrapporter/fakturor/ÄTA-rader ändras inte retroaktivt
+  // av refrysningen, bara arbetskostnaden (som nu KAN beräknas) läggs på.
+  // Upsert (onConflict: project_id) skriver hela raden på nytt, aldrig ett
+  // delta ovanpå gamla värden — ingen dubbelräkning möjlig. Frysprincipen är
+  // att utfallet ska spegla verkligheten, och verkligheten är nu att
+  // kostnaden är känd, så en refrysning här är hederlig, inte en smygrevidering
+  // av ett medvetet fruset fält.
+  let hourlyCostNowConfigured = false
+  {
+    const { data: configRow, error: configError } = await supabase
+      .from('business_config')
+      .select('default_internal_hourly_cost')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (configError) throw new Error(`business_config-uppslag misslyckades: ${configError.message}`)
+    hourlyCostNowConfigured = Number(configRow?.default_internal_hourly_cost ?? 0) > 0
+  }
+
+  const candidates = projectIds.filter(projectId => {
+    const outcome = outcomeByProject.get(projectId)
+    if (!outcome || outcome.calculation_version !== OUTCOME_CALCULATION_VERSION) return true
+    if (hourlyCostNowConfigured && outcome.labor_cost_configured === false) return true
+    return false
+  })
   const selected = candidates.slice(0, reconcileLimit)
   const failures: OutcomeReconciliationResult['failures'] = []
   let reconciled = 0
