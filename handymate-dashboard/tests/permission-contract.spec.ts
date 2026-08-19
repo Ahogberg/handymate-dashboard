@@ -373,6 +373,11 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       requires: 'owner-admin',
       why: 'DELETE tar bort en egen kalenderpost — filtrerad på karin_custom_event och business_id, men samma rollgrind som skapandet ska gälla symmetriskt.',
     },
+    {
+      route: 'karin/supplier-invoices',
+      requires: 'owner-admin',
+      why: 'Matchningskön för leverantörsfakturor utan projekt — samma ägare/admin-grind som resten av Karins yta. GET/PATCH rör inköpspriser och kan koppla en faktura mot vilket projekt som helst; en anställd ska inte kunna göra det obevakat.',
+    },
   ],
 
   'Integrationer': [
