@@ -19,12 +19,14 @@ const SEED_PATH = path.join(ROOT, 'lib/demo/seed-demo-account.ts')
 const PAGE_PATH = path.join(ROOT, 'app/dashboard/demo/page.tsx')
 const MIGRATION_PATH = path.join(ROOT, 'sql/v99_demo_reset_transaction.sql')
 const V155_PATH = path.join(ROOT, 'sql/v155_demo_reset_v2.sql')
+const V158_PATH = path.join(ROOT, 'sql/v158_demo_reset_v3.sql')
 
 const routeSource = fs.readFileSync(ROUTE_PATH, 'utf8')
 const seedSource = fs.readFileSync(SEED_PATH, 'utf8')
 const pageSource = fs.readFileSync(PAGE_PATH, 'utf8')
 const migrationSource = fs.readFileSync(MIGRATION_PATH, 'utf8')
 const v155Source = fs.readFileSync(V155_PATH, 'utf8')
+const v158Source = fs.readFileSync(V158_PATH, 'utf8')
 
 test.describe('demo-reset route — tre oberoende grindar', () => {
   test('saknad DEMO_BUSINESS_ID och annan tenant stoppas med 403', () => {
@@ -303,6 +305,130 @@ test.describe('V155 RPC — utökat manifest, samma grindar', () => {
   })
 })
 
+test.describe('V158 RPC — utökat manifest (+OperatingExperiment), samma grindar', () => {
+  // Löv-till-rot, exakt den ordning sql/v158_demo_reset_v3.sql skriver dem i
+  // — V155:s lista med 'operating_experiment' inskjutet bland de fristående
+  // Etapp-tabellerna (se KLASSIFICERINGSREGELN i V155-blocket ovan, samma
+  // anda gäller här: operating_experiment bär business_id-skopad demodata
+  // sedan D4, sql/v157_operating_experiment.sql).
+  const expectedV158Manifest = [
+    'next_best_action',
+    'lead_activities',
+    'automation_queue',
+    'call_recording',
+    'customer_activity',
+    'thread_message',
+    'agent_handoffs',
+    'agent_threads',
+    'agent_messages',
+    'agent_memories',
+    'business_knowledge',
+    'notification',
+    'pending_approvals',
+    'agent_runs',
+    'pipeline_activity',
+    'mission_mandate',
+    'mission',
+    'cost_event',
+    'fuel_ledger',
+    'operating_experiment',
+    'meeting_segment',
+    'meeting_job',
+    'sms_log',
+    'sms_conversation',
+    'sms_queue',
+    'communication_log',
+    'automation_activity',
+    'inbox_item',
+    'nurture_enrollment',
+    'leads',
+    'travel_entry',
+    'customer_document',
+    'email_conversations',
+    'time_checkins',
+    'quote_tracking_events',
+    'invoice_reminders',
+    'invoice_evidence_manifest',
+    'project_events',
+    'project_document',
+    'project_milestone',
+    'work_orders',
+    'business_twin_forecast',
+    'jobbpass',
+    'project_outcome',
+    'project_lesson',
+    'customer_fact',
+    'project_log',
+    'project_photos',
+    'project_checklist',
+    'time_entry',
+    'project_material',
+    'project_change',
+    'schedule_entry',
+    'booking',
+    'quote_items',
+    'invoice',
+    'project',
+    'quotes',
+    'deal',
+    'customer',
+    'business_preferences',
+    'fortnox_api_log',
+    'fortnox_sync',
+  ]
+
+  test('v158 är en CREATE OR REPLACE på samma signatur, med samma grindar', () => {
+    expect(v158Source).toMatch(/CREATE OR REPLACE FUNCTION public\.reset_demo_tenant\s*\(\s*p_business_id TEXT\s*\)/)
+    expect(v158Source).toContain('SECURITY DEFINER')
+    expect(v158Source).toContain('SET search_path = public, pg_temp')
+    expect(v158Source).toContain('user_id = auth.uid()::TEXT')
+    expect(v158Source).toContain("MESSAGE = 'Demo reset denied: tenant is not explicitly demo-flagged'")
+    expect(v158Source).toContain("MESSAGE = 'Demo reset denied: owner or admin required'")
+  })
+
+  test('is_demo_tenant valideras före första DELETE i v158 också', () => {
+    const functionStart = v158Source.indexOf('CREATE OR REPLACE FUNCTION public.reset_demo_tenant')
+    const functionBody = v158Source.slice(functionStart)
+    const demoGuard = functionBody.indexOf('is_demo_tenant IS TRUE')
+    const firstDelete = functionBody.indexOf('DELETE FROM')
+    expect(demoGuard).toBeGreaterThan(-1)
+    expect(firstDelete).toBeGreaterThan(demoGuard)
+  })
+
+  test('reset_version-strängen är uppdaterad till v158', () => {
+    expect(v158Source).toContain("'v158'")
+  })
+
+  test('v158-manifestet är komplett, i löv-till-rot-ordning, inga dynamiska tabellnamn', () => {
+    const actual = Array.from(v158Source.matchAll(/DELETE FROM\s+public\.([a-z0-9_]+)/gi))
+      .map(match => match[1].toLowerCase())
+    expect(actual).toEqual(expectedV158Manifest)
+    expect(v158Source).not.toMatch(/EXECUTE\s+format|EXECUTE\s+['"]/i)
+  })
+
+  test('varje ny tabell i v158-manifestet finns i repots schemafacit', () => {
+    const facit = new Set(['business_config', 'customer', 'booking', 'quotes', 'invoice', 'price_list'])
+    const sqlDir = path.join(ROOT, 'sql')
+    for (const file of fs.readdirSync(sqlDir).filter(file => file.endsWith('.sql'))) {
+      const sql = fs.readFileSync(path.join(sqlDir, file), 'utf8')
+      for (const match of Array.from(sql.matchAll(
+        /CREATE TABLE (?:IF NOT EXISTS )?(?:public\.)?"?([a-z0-9_]+)"?/gi,
+      ))) {
+        facit.add(match[1].toLowerCase())
+      }
+    }
+    facit.add('customer_activity')
+
+    const unknown = expectedV158Manifest.filter(table => !facit.has(table))
+    expect(unknown, `Okända tabeller i v158 DELETE-manifest: ${unknown.join(', ')}`).toEqual([])
+  })
+
+  test('operating_experiment kräver v157 explicit i guard-blocket', () => {
+    expect(v158Source).toContain("v158 kräver sql/v157_operating_experiment.sql (public.operating_experiment saknas)")
+    expect(v158Source).toContain("to_regclass('public.operating_experiment')")
+  })
+})
+
 test.describe('entity-manifestet', () => {
   const uuid = '4a7cda5c-d2ae-4aed-a349-272dd06d8cf2'
   const manifest = buildDemoManifest({
@@ -314,6 +440,7 @@ test.describe('entity-manifestet', () => {
     materialMissedApprovalId: 'appr_mat123456',
     profitabilityWarningApprovalId: 'appr_profit123',
     invoiceReminderApprovalId: 'appr_invoice12',
+    experimentReadoutApprovalId: 'appr_expreadout1',
   })
 
   test('har sex storynycklar och samtliga stödnycklar', () => {
@@ -329,6 +456,7 @@ test.describe('entity-manifestet', () => {
     expect(seedSource).toContain('marginProjectId: annaProject.project_id')
     expect(seedSource).toContain('overdueInvoiceId: kristinaInvoice.invoice_id')
     expect(seedSource).toContain('ataMissedApprovalId,')
+    expect(seedSource).toContain('experimentReadoutApprovalId,')
     expect(seedSource).toContain("key: 'demo_manifest'")
     expect(seedSource).toContain("source: 'user'")
   })
@@ -339,10 +467,22 @@ test.describe('entity-manifestet', () => {
     for (const table of [
       'customer', 'deal', 'pipeline_activity', 'quotes', 'quote_items',
       'project', 'project_checklist', 'booking', 'schedule_entry', 'invoice',
-      'pending_approvals', 'business_knowledge', 'agent_runs',
+      'pending_approvals', 'business_knowledge', 'agent_runs', 'operating_experiment',
     ]) {
       expect(seedSource).toContain(`from('${table}')`)
     }
+  })
+
+  test('OperatingExperiment D4: två lägen seedas via RIKTIGA lib/experiment-funktioner', () => {
+    expect(seedSource).toContain("import { maybeCreateReadout } from '@/lib/experiment/report'")
+    expect(seedSource).toContain("from('operating_experiment').insert({")
+    expect(seedSource).toContain("status: 'active',")
+    expect(seedSource).toContain('await maybeCreateReadout(supabase, businessId, {')
+    // AKTIVT försöket enrollar båda de befintliga badrum-projekten direkt.
+    expect(seedSource).toContain('enrolled_project_ids: [annaProject.project_id, johanProject.project_id]')
+    // REDOVISNINGSKLARA försöket bygger på Johans gästtoalett — den enda
+    // seedade projektet med en fryst efterkalkyl (freezeProjectOutcome).
+    expect(seedSource).toContain('enrolled_project_ids: [johanProject.project_id]')
   })
 })
 

@@ -19,6 +19,11 @@ export const DEMO_SUPPORTING_ENTITY_KEYS = [
   'material_missed',
   'profitability_warning',
   'invoice_reminder',
+  // D4 (2026-08-19): OperatingExperiment Etapp 2 — pekar på
+  // pending_approvals-raden för det redovisningsklara försökets
+  // 'operating_experiment_readout'-kort, så presentatören kan navigera
+  // direkt till beslutssidan (app/dashboard/experiments/[approvalId]).
+  'experiment_readout',
 ] as const
 
 export type DemoStoryEntityKey = typeof DEMO_STORY_ENTITY_KEYS[number]
@@ -36,6 +41,7 @@ export interface DemoManifestInput {
   materialMissedApprovalId: string
   profitabilityWarningApprovalId: string
   invoiceReminderApprovalId: string
+  experimentReadoutApprovalId: string
 }
 
 export function buildDemoManifest(input: DemoManifestInput): DemoManifest {
@@ -50,6 +56,7 @@ export function buildDemoManifest(input: DemoManifestInput): DemoManifest {
     material_missed: input.materialMissedApprovalId,
     profitability_warning: input.profitabilityWarningApprovalId,
     invoice_reminder: input.invoiceReminderApprovalId,
+    experiment_readout: input.experimentReadoutApprovalId,
   }
 }
 

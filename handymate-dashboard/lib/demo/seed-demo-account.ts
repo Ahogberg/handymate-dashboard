@@ -13,6 +13,9 @@ import { getProjectOutcome } from '@/lib/efterkalkyl/get-project-outcome'
 import { skapaDebriefKort } from '@/lib/debrief/create-debrief-card'
 import { halsning } from '@/lib/customers/namn'
 import { getOrCreateDraftJobbpass } from '@/lib/jobbpass/jobbpass'
+import { arSchemaSaknas } from '@/lib/observability/driftlarm'
+import { maybeCreateReadout } from '@/lib/experiment/report'
+import type { ExperimentMeasureKey } from '@/lib/experiment/types'
 
 /**
  * lib/demo/seed-demo-account.ts (2026-07)
@@ -156,7 +159,7 @@ export async function resetDemoAccount(
       finished_at: new Date().toISOString(),
       ok: false,
       error_text: 'delete_transaction_failed',
-      reset_version: 'v155',
+      reset_version: 'v158',
     })
     if (auditInsertError) {
       console.error('[demo-reset] kunde inte auditlogga rollback:', auditInsertError.message)
@@ -1745,6 +1748,184 @@ export async function resetDemoAccount(
   ])
   if (factsErr) return failReset(`Kunde inte skapa kundfakta: ${factsErr.message}`, 'customer_fact_insert_failed')
 
+  // ══════════════════════════════════════════════════════════
+  // 9h. OPERATING EXPERIMENT (Etapp 2, 2026-08-19) — Demo-etapp D4.
+  //     Två lägen samtidigt på badrum-projekten (de enda två seedade
+  //     projekten som delar jobbtyp): (a) ETT AKTIVT försök — Annas
+  //     pågående badrum + Johans avslutade gästtoalett inskrivna, och
+  //     (b) ETT REDOVISNINGSKLART försök — avslutat via RIKTIGA
+  //     maybeCreateReadout/measureExperiment (lib/experiment/report.ts,
+  //     samma väg som app/api/cron/maintenance/route.ts och
+  //     tests/e2e-golden-path/experiment-proof.spec.ts Station 5–6),
+  //     eftersom Johans gästtoalett är det ENDA seedade projektet med
+  //     en fryst efterkalkyl (steg 9e) — utan den finns inget att mäta
+  //     på riktigt.
+  //
+  //     AVVIKELSE från "olika jobbtyper": båda lägena har job_type=
+  //     'badrum' — det är den enda jobbtypen med två BEFINTLIGA seedade
+  //     projekt (Kristinas 'vvs'-kranbyte är ensamt och saknar dessutom
+  //     fryst efterkalkyl, så det duger inte för (b)). Ingen funktionell
+  //     krock: maybeEnrollProject/dedupen i lib/experiment/enroll.ts
+  //     matchar bara AKTIVA rader per jobbtyp, och (b)-raden blir
+  //     'concluded' innan seedningen är klar.
+  //
+  //     source_pattern_id kräver business_knowledge.job_type (sql/
+  //     v141_business_knowledge_pattern.sql, inte bekräftat kört i alla
+  //     miljöer) — fail-softar med en tydlig logg om kolumnen saknas
+  //     (mönstret sparas ändå, bara utan jobbtypskoppling). Allt annat
+  //     i det här steget hård-failar som resten av filen.
+  // ══════════════════════════════════════════════════════════
+  const seedConfirmedPattern = async (
+    hypothesis: string,
+    jobType: string,
+    title: string,
+  ): Promise<string | DemoResetError> => {
+    const basePayload = {
+      business_id: businessId,
+      agent_id: 'lars',
+      knowledge_type: 'pattern',
+      title,
+      observation: hypothesis,
+      confidence: 0.8,
+      data_basis: { evidence_lesson_ids: [], sample_count: 2 },
+      status: 'active',
+    }
+    const { data, error } = await supabase
+      .from('business_knowledge')
+      .insert({ ...basePayload, job_type: jobType })
+      .select('id')
+      .single()
+    if (!error && data) return data.id as string
+
+    // PGRST204 (kolumn saknas i PostgREST:s schema-cache vid INSERT) är
+    // INTE en av koderna arSchemaSaknas täcker (den är byggd för
+    // SELECT-fallet, 42P01/42703/PGRST205) — samma distinktion som
+    // lib/efterkalkyl/freeze-outcome.ts isMissingQualitySchemaError gör
+    // lokalt. Båda kollas här.
+    if (error && (arSchemaSaknas(error) || error.code === 'PGRST204')) {
+      console.warn(
+        `[demo-reset] business_knowledge.job_type saknas (sql/v141_business_knowledge_pattern.sql ej körd) — seedar "${title}" utan jobbtypskoppling: ${error.message}`,
+      )
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('business_knowledge')
+        .insert(basePayload)
+        .select('id')
+        .single()
+      if (fallbackError || !fallbackData) {
+        return failReset(`Kunde inte seeda mönstret "${title}" (utan job_type heller): ${fallbackError?.message}`, 'business_knowledge_insert_failed')
+      }
+      return fallbackData.id as string
+    }
+
+    return failReset(`Kunde inte seeda mönstret "${title}": ${error?.message}`, 'business_knowledge_insert_failed')
+  }
+
+  // ── (a) AKTIVT försök ──
+  const activeExperimentHypothesis = 'Projekt med materialkontroll före byggstart har haft färre sena ändringar'
+  const activePatternResult = await seedConfirmedPattern(
+    activeExperimentHypothesis,
+    'badrum',
+    'Materialkontroll före byggstart — badrum',
+  )
+  if (typeof activePatternResult !== 'string') return activePatternResult
+  const activePatternId = activePatternResult
+
+  const activeExperimentId = genId('exp')
+  const activeGuardRails: { max_projects: number; start_date: string; end_date: string; no_autonomous_customer_send: true } = {
+    max_projects: 5,
+    start_date: dateOnly(-10),
+    end_date: dateOnly(50),
+    no_autonomous_customer_send: true,
+  }
+  const { error: activeExpErr } = await supabase.from('operating_experiment').insert({
+    id: activeExperimentId,
+    business_id: businessId,
+    hypothesis: activeExperimentHypothesis,
+    agent_key: 'lars',
+    job_type: 'badrum',
+    source_pattern_id: activePatternId,
+    source_project_ids: [],
+    planned_change: { type: 'kickoff_checkpoint', checkpoint_text: activeExperimentHypothesis },
+    guard_rails: activeGuardRails,
+    measures: ['sena_andringar', 'extra_timmar', 'marginal'],
+    min_comparable_projects: 3,
+    enrolled_project_ids: [annaProject.project_id, johanProject.project_id],
+    status: 'active',
+    confirmed_at: isoAt(-10, 8, 0),
+  })
+  if (activeExpErr) return failReset(`Kunde inte skapa aktivt försök (badrum): ${activeExpErr.message}`, 'operating_experiment_insert_failed')
+
+  // ── (b) REDOVISNINGSKLART försök ──
+  const concludedExperimentHypothesis = 'Badrumsprojekt med förbesiktning av befintligt kakel innan rivning har haft färre timavvikelser mot offert'
+  const concludedPatternResult = await seedConfirmedPattern(
+    concludedExperimentHypothesis,
+    'badrum',
+    'Förbesiktning innan rivning — badrum',
+  )
+  if (typeof concludedPatternResult !== 'string') return concludedPatternResult
+  const concludedPatternId = concludedPatternResult
+
+  const concludedExperimentId = genId('exp')
+  const concludedGuardRails: { max_projects: number; start_date: string; end_date: string; no_autonomous_customer_send: true } = {
+    max_projects: 5,
+    start_date: dateOnly(-70),
+    end_date: dateOnly(-5),
+    no_autonomous_customer_send: true,
+  }
+  const concludedMeasures: ExperimentMeasureKey[] = ['sena_andringar', 'extra_timmar', 'marginal']
+  const { error: concludedExpErr } = await supabase.from('operating_experiment').insert({
+    id: concludedExperimentId,
+    business_id: businessId,
+    hypothesis: concludedExperimentHypothesis,
+    agent_key: 'lars',
+    job_type: 'badrum',
+    source_pattern_id: concludedPatternId,
+    source_project_ids: [],
+    planned_change: { type: 'kickoff_checkpoint', checkpoint_text: concludedExperimentHypothesis },
+    guard_rails: concludedGuardRails,
+    measures: concludedMeasures,
+    min_comparable_projects: 1,
+    enrolled_project_ids: [johanProject.project_id],
+    status: 'active',
+    confirmed_at: isoAt(-70, 8, 0),
+  })
+  if (concludedExpErr) return failReset(`Kunde inte skapa redovisningsklart försök (gästtoalett): ${concludedExpErr.message}`, 'operating_experiment_insert_failed')
+
+  // RIKTIGA maybeCreateReadout/measureExperiment — inget handbyggt
+  // frozen_summary. Johans gästtoalett har redan en fryst project_outcome
+  // (steg 9e) så measurement.projects_completed === enrolled.length direkt
+  // (allFrozen) — ingen bakdatering av end_date krävs för att göra
+  // försöket redovisningsbart, till skillnad från experiment-proof.spec.ts
+  // Station 6 (som saknar en fryst outcome och därför MÅSTE bakdatera).
+  const readoutResult = await maybeCreateReadout(supabase, businessId, {
+    id: concludedExperimentId,
+    business_id: businessId,
+    job_type: 'badrum',
+    hypothesis: concludedExperimentHypothesis,
+    source_pattern_id: concludedPatternId,
+    enrolled_project_ids: [johanProject.project_id],
+    measures: concludedMeasures,
+    min_comparable_projects: 1,
+    guard_rails: concludedGuardRails,
+    planned_change: { type: 'kickoff_checkpoint', checkpoint_text: concludedExperimentHypothesis },
+  })
+  if (readoutResult !== 'created') {
+    return failReset(`Kunde inte avsluta det redovisningsklara försöket (resultat: ${readoutResult})`, 'operating_experiment_readout_failed')
+  }
+
+  const { data: readoutCardRow, error: readoutCardErr } = await supabase
+    .from('pending_approvals')
+    .select('id')
+    .eq('business_id', businessId)
+    .eq('approval_type', 'operating_experiment_readout')
+    .contains('payload', { experiment_id: concludedExperimentId })
+    .limit(1)
+    .single()
+  if (readoutCardErr || !readoutCardRow) {
+    return failReset(`Kunde inte hitta redovisningskortet efter skapande: ${readoutCardErr?.message}`, 'operating_experiment_readout_lookup_failed')
+  }
+  const experimentReadoutApprovalId = readoutCardRow.id as string
+
   // ── 10. Stabilt entity-manifest för Epic 5 ────────────────
   // Alla värden kommer från de inserts som precis lyckades. Inga belopp eller
   // seedantaganden lagras här — bara pekare till riktiga produktionsobjekt.
@@ -1757,6 +1938,7 @@ export async function resetDemoAccount(
     materialMissedApprovalId,
     profitabilityWarningApprovalId,
     invoiceReminderApprovalId,
+    experimentReadoutApprovalId,
   })
   const { error: manifestError } = await supabase.from('business_preferences').upsert(
     {

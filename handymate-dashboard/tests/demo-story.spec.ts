@@ -36,6 +36,7 @@ const manifest: DemoManifest = {
   material_missed: 'appr_material123',
   profitability_warning: 'appr_profit123',
   invoice_reminder: 'appr_reminder123',
+  experiment_readout: 'appr_expreadout123',
 }
 
 function targetHasProductionPage(targetRoute: string): boolean {
