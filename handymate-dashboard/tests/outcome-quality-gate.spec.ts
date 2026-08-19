@@ -72,6 +72,8 @@ function input(overrides: Partial<BuildOutcomeRowInput> = {}): BuildOutcomeRowIn
         supplier_invoice_count: 1,
         project_material_count: 0,
         extra_cost_count: 0,
+        unlinked_supplier_invoice_count: 1,
+        unlinked_project_material_count: 0,
       },
     },
     ...overrides,

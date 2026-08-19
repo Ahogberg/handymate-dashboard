@@ -73,6 +73,8 @@ function eko(overrides: {
       realized_invoice_count: 0,
       invoice_net_amount_complete: true,
       extra_cost_count: 0,
+      unlinked_supplier_invoice_count: 0,
+      unlinked_project_material_count: 0,
     },
     quote_rot_rut: null,
   }
