@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
-import { syncFortnoxPaymentsForBusiness } from '@/lib/fortnox/sync-payments'
+import { syncFortnoxPaymentsForBusiness, syncSupplierInvoicePayments } from '@/lib/fortnox/sync-payments'
 
 export const maxDuration = 300
 // Cron-route: får ALDRIG prerendras vid build (utan denna försöker Next
@@ -16,6 +16,11 @@ export const dynamic = 'force-dynamic'
  * cron varje 2 timmar. När en faktura ändrar status från 'sent' till 'paid'
  * eller 'overdue' triggas automation-pipelinen via
  * lib/fortnox/sync-payments.runPostPaymentAutomations.
+ *
+ * Friskar även upp betalstatus för LEVERANTÖRSfakturor (supplier_invoices)
+ * via syncSupplierInvoicePayments — samma per-business-loop, men utan
+ * sidoeffekter (ingen notis, inget automation-event; se funktionens
+ * docstring i lib/fortnox/sync-payments.ts).
  *
  * Säkerhet: Vercel sätter authorization header Bearer CRON_SECRET.
  * Andra anrop utan secret refuseras (men endpoint är ändå idempotent).
@@ -38,9 +43,12 @@ export async function GET(request: Request) {
   }
 
   const results = []
+  const supplierResults = []
   let totalChecked = 0
   let totalMarkedPaid = 0
   let totalMarkedOverdue = 0
+  let totalSupplierChecked = 0
+  let totalSupplierMarkedPaid = 0
   const errors: string[] = []
 
   for (const biz of businesses || []) {
@@ -59,6 +67,19 @@ export async function GET(request: Request) {
       console.error('[cron/fortnox-sync] syncFortnoxPaymentsForBusiness failed:', biz.business_id, err)
       errors.push(`${biz.business_id}: ${err?.message || 'sync failed'}`)
     }
+
+    try {
+      const supplierResult = await syncSupplierInvoicePayments(biz.business_id)
+      supplierResults.push(supplierResult)
+      totalSupplierChecked += supplierResult.checked
+      totalSupplierMarkedPaid += supplierResult.marked_paid
+      if (supplierResult.errors.length > 0) {
+        errors.push(`${biz.business_id} (supplier_invoices): ${supplierResult.errors.join('; ')}`)
+      }
+    } catch (err: any) {
+      console.error('[cron/fortnox-sync] syncSupplierInvoicePayments failed:', biz.business_id, err)
+      errors.push(`${biz.business_id} (supplier_invoices): ${err?.message || 'sync failed'}`)
+    }
   }
 
   return NextResponse.json({
@@ -67,7 +88,10 @@ export async function GET(request: Request) {
     total_checked: totalChecked,
     total_marked_paid: totalMarkedPaid,
     total_marked_overdue: totalMarkedOverdue,
+    total_supplier_invoices_checked: totalSupplierChecked,
+    total_supplier_invoices_marked_paid: totalSupplierMarkedPaid,
     errors,
     results,
+    supplier_results: supplierResults,
   })
 }

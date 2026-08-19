@@ -27,6 +27,18 @@ interface FortnoxInvoiceListItem {
   FullyPaid?: boolean
 }
 
+export interface SupplierInvoiceSyncResult {
+  business_id: string
+  checked: number
+  marked_paid: number
+  errors: string[]
+}
+
+interface FortnoxSupplierInvoiceDetail {
+  GivenNumber: string
+  Balance: number
+}
+
 /**
  * Synka betal-status för alla Fortnox-kopplade fakturor i en business.
  *
@@ -132,6 +144,79 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string): Promis
     .from('business_config')
     .update({ fortnox_last_synced_at: new Date().toISOString() })
     .eq('business_id', businessId)
+
+  return result
+}
+
+/**
+ * Synka betal-status för Fortnox-kopplade LEVERANTÖRSfakturor i en business.
+ * Speglar syncFortnoxPaymentsForBusiness ovan, men mot supplier_invoices —
+ * OBS: INGA sidoeffekter utöver statusuppdateringen (ingen portal-notis,
+ * inget automation-event) — till skillnad från kundfakturors motsvarande
+ * synk. supplier_invoices status-kolumnen har inget 'overdue'-värde (se
+ * sql/v11_supplier_invoices.sql: 'unpaid' | 'paid' | 'invoiced'), så denna
+ * funktion rör ALDRIG förfallenhet — bara betald-status.
+ *
+ * Logik:
+ *   - Hämta supplier_invoices-rader med fortnox_supplier_invoice_number satt
+ *     och status != 'paid'
+ *   - För varje: läs Fortnox-fakturan via GET /supplierinvoices/{GivenNumber}
+ *   - Om Balance <= 0 → markera som betald lokalt
+ */
+export async function syncSupplierInvoicePayments(businessId: string): Promise<SupplierInvoiceSyncResult> {
+  const result: SupplierInvoiceSyncResult = {
+    business_id: businessId,
+    checked: 0,
+    marked_paid: 0,
+    errors: [],
+  }
+
+  const connected = await isFortnoxConnected(businessId)
+  if (!connected) {
+    result.errors.push('not_connected')
+    return result
+  }
+
+  const supabase = getSupabase()
+
+  const { data: invoices, error } = await supabase
+    .from('supplier_invoices')
+    .select('id, fortnox_supplier_invoice_number, status')
+    .eq('business_id', businessId)
+    .not('fortnox_supplier_invoice_number', 'is', null)
+    .neq('status', 'paid')
+
+  if (error) {
+    result.errors.push(`fetch: ${error.message}`)
+    return result
+  }
+
+  for (const inv of invoices || []) {
+    result.checked++
+    try {
+      const docNum = inv.fortnox_supplier_invoice_number
+      const fnRes = await fortnoxRequest<{ SupplierInvoice: FortnoxSupplierInvoiceDetail }>(
+        businessId,
+        'GET',
+        `/supplierinvoices/${docNum}`
+      )
+      const fnInv = fnRes?.SupplierInvoice
+      if (!fnInv) continue
+
+      const isPaid = typeof fnInv.Balance === 'number' && fnInv.Balance <= 0
+
+      if (isPaid && inv.status !== 'paid') {
+        await supabase
+          .from('supplier_invoices')
+          .update({ status: 'paid', paid_at: new Date().toISOString() })
+          .eq('id', inv.id)
+          .eq('business_id', businessId)
+        result.marked_paid++
+      }
+    } catch (err: any) {
+      result.errors.push(`${inv.id}: ${err?.message || 'sync error'}`)
+    }
+  }
 
   return result
 }
