@@ -5,7 +5,7 @@ import { ArrowRight, Check, Info, Loader2, Shield } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import InfoSheet from './InfoSheet'
 import { TEAM } from '@/lib/agents/team'
-import { getPlanPrice } from '@/lib/feature-gates'
+import { getPlanPrice, getPlanYearlyPrice, YEARLY_MONTHS_FREE } from '@/lib/feature-gates'
 import { isDemoBusinessId } from '@/lib/demo/is-demo-client'
 import type { OnboardingFormData } from '../types-redesign'
 
@@ -31,6 +31,7 @@ const PLANS = [
     id: 'professional',
     name: 'Firman',
     price: getPlanPrice('professional'),
+    yearlyPrice: getPlanYearlyPrice('professional'),
     popular: true,
     agents: ['lisa', 'karin', 'daniel', 'hanna', 'lars', 'matte'],
     // Utfall, inte funktioner (Andreas-beslut 2026-08-09): varje rad svarar
@@ -56,6 +57,7 @@ const PLANS = [
     id: 'business',
     name: 'Storfirman',
     price: getPlanPrice('business'),
+    yearlyPrice: getPlanYearlyPrice('business'),
     popular: false,
     agents: ['lisa', 'karin', 'daniel', 'hanna', 'lars', 'matte'],
     features: ['Allt i Firman', 'Obegränsade användare', 'Större utrymme för SMS & utskick', 'Egen hemsida med SEO', 'Dedikerad support'],
@@ -93,6 +95,9 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
   const plan = data.plan || 'professional'
   const setPlan = (id: string) => setData(d => ({ ...d, plan: id }))
 
+  // Årsavtal (Andreas-beslut 2026-08-19): default Månadsvis — kunden väljer
+  // aktivt bort den lägre totalkostnaden, inte tvärtom.
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
   const [redirecting, setRedirecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [infoPlanId, setInfoPlanId] = useState<string | null>(null)
@@ -106,7 +111,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
       const res = await fetch('/api/billing/onboarding-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId: plan }),
+        body: JSON.stringify({ planId: plan, interval: billingInterval }),
       })
       const d = await res.json().catch(() => ({}))
 
@@ -185,7 +190,80 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
               du av någon anledning inte nöjd — får du{' '}
               <strong>pengarna tillbaka</strong>. Inga frågor.
             </p>
+            {billingInterval === 'yearly' && (
+              <p style={{ fontSize: 12, color: 'var(--ob-primary-700)', fontWeight: 600, marginTop: 6 }}>
+                Gäller även årsavtal.
+              </p>
+            )}
           </div>
+        </div>
+
+        {/* Månadsvis/Årsvis (Andreas-beslut 2026-08-19) — ovanför plankorten,
+            default Månadsvis. */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 4,
+            padding: 4,
+            background: 'var(--ob-surface)',
+            border: '1px solid var(--ob-border)',
+            borderRadius: 'var(--ob-r-pill)',
+            marginBottom: 14,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setBillingInterval('monthly')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: 'var(--ob-r-pill)',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              background: billingInterval === 'monthly' ? 'var(--ob-primary-700)' : 'transparent',
+              color: billingInterval === 'monthly' ? '#fff' : 'var(--ob-ink-2)',
+            }}
+          >
+            Månadsvis
+          </button>
+          <button
+            type="button"
+            onClick={() => setBillingInterval('yearly')}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              padding: '8px 12px',
+              borderRadius: 'var(--ob-r-pill)',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              background: billingInterval === 'yearly' ? 'var(--ob-primary-700)' : 'transparent',
+              color: billingInterval === 'yearly' ? '#fff' : 'var(--ob-ink-2)',
+            }}
+          >
+            Årsvis
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.02em',
+                padding: '2px 6px',
+                borderRadius: 'var(--ob-r-pill)',
+                background: billingInterval === 'yearly' ? 'rgba(255,255,255,0.25)' : 'var(--ob-primary-50)',
+                color: billingInterval === 'yearly' ? '#fff' : 'var(--ob-primary-700)',
+              }}
+            >
+              {YEARLY_MONTHS_FREE} månader på köpet
+            </span>
+          </button>
         </div>
 
         {/* Plan picker */}
@@ -197,6 +275,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
             <PlanCard
               key={p.id}
               plan={p}
+              interval={billingInterval}
               active={plan === p.id}
               onSelect={() => setPlan(p.id)}
               onInfo={() => setInfoPlanId(p.id)}
@@ -336,7 +415,9 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
         <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--ob-muted)' }}>
           {isDemo
             ? 'Ingen betalning sker i demoläget.'
-            : `${selectedPlan.price.toLocaleString('sv-SE')} kr/mån · Säker betalning via Stripe`}
+            : billingInterval === 'yearly' && selectedPlan.yearlyPrice != null
+              ? `${selectedPlan.yearlyPrice.toLocaleString('sv-SE')} kr/år · Säker betalning via Stripe`
+              : `${selectedPlan.price.toLocaleString('sv-SE')} kr/mån · Säker betalning via Stripe`}
         </p>
       </div>
 
@@ -456,18 +537,25 @@ interface PlanCardProps {
     id: string
     name: string
     price: number
+    yearlyPrice: number | null
     popular: boolean
     agents: string[]
     features: string[]
     valueBullets: string[]
     upgradeHint: string
   }
+  interval: 'monthly' | 'yearly'
   active: boolean
   onSelect: () => void
   onInfo: () => void
 }
 
-function PlanCard({ plan, active, onSelect, onInfo }: PlanCardProps) {
+function PlanCard({ plan, interval, active, onSelect, onInfo }: PlanCardProps) {
+  // Årsvis: kortpriset visar årsbeloppet + en underrad med
+  // månadsekvivalenten, allt räknat ur plan.price/plan.yearlyPrice
+  // (feature-gates.getPlanPrice/getPlanYearlyPrice) — aldrig hårdkodat.
+  const showYearly = interval === 'yearly' && plan.yearlyPrice != null
+  const monthlyEquivalent = showYearly ? Math.round((plan.yearlyPrice as number) / 12) : null
   return (
     <div
       role="button"
@@ -518,11 +606,20 @@ function PlanCard({ plan, active, onSelect, onInfo }: PlanCardProps) {
         <strong style={{ fontSize: 17, color: 'var(--ob-ink)', letterSpacing: '-0.01em' }}>
           {plan.name}
         </strong>
-        <div>
-          <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--ob-ink)' }}>
-            {plan.price.toLocaleString('sv-SE')}
-          </span>
-          <span style={{ fontSize: 12, color: 'var(--ob-muted)', marginLeft: 2 }}>kr/mån</span>
+        <div style={{ textAlign: 'right' }}>
+          <div>
+            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--ob-ink)' }}>
+              {(showYearly ? (plan.yearlyPrice as number) : plan.price).toLocaleString('sv-SE')}
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--ob-muted)', marginLeft: 2 }}>
+              {showYearly ? 'kr/år' : 'kr/mån'}
+            </span>
+          </div>
+          {monthlyEquivalent !== null && (
+            <div style={{ fontSize: 11, color: 'var(--ob-muted)', marginTop: 2 }}>
+              motsvarar ~{monthlyEquivalent.toLocaleString('sv-SE')} kr/mån — {YEARLY_MONTHS_FREE} månader på köpet
+            </div>
+          )}
         </div>
       </div>
 

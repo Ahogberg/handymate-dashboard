@@ -382,6 +382,31 @@ export function getPlanPrice(plan: PlanType): number {
   return prices[plan]
 }
 
+// ---------------------------------------------------------------------------
+// Årsavtal — permanent årsplan (Andreas-beslut 2026-08-19)
+//
+// "Betala för 10 månader, få 12" — 2 månader på köpet vid årsbetalning.
+// Gäller ENDAST professional (Firman) och business (Storfirman) — starter
+// (Bas) säljs inte publikt och får inget årspris (null).
+//
+// Beloppen är egna sanningskällor (INTE getPlanPrice(plan) * 10 räknat i
+// runtime) — de råkar idag stämma exakt med månadspris×10 (5995×10=59950,
+// 11995×10=119950) eftersom det ÄR precis vad "betala för 10, få 12"
+// betyder, men hårdkodas ändå separat så att en framtida ändring av
+// månadspriset (getPlanPrice) aldrig tyst rubbar det redan kommunicerade
+// årspriset — ett nytt årspris kräver ett eget Andreas-beslut.
+// ---------------------------------------------------------------------------
+
+export const YEARLY_MONTHS_FREE = 2
+
+export function getPlanYearlyPrice(plan: PlanType): number | null {
+  const prices: Partial<Record<PlanType, number>> = {
+    professional: 59950,
+    business: 119950,
+  }
+  return prices[plan] ?? null
+}
+
 export function getPlanLabel(plan: PlanType): string {
   // Svenska visningsnamn (Andreas-beslut 2026-07-31): interna nycklar
   // (starter/professional/business) och Stripe-objekt byts ALDRIG — endast

@@ -20,7 +20,7 @@ import {
   Receipt
 } from 'lucide-react'
 import { FuelBillingCard } from '@/components/fuel/FuelBillingCard'
-import { getPlanPrice, getPlanLabel, type PlanType } from '@/lib/feature-gates'
+import { getPlanPrice, getPlanLabel, getPlanYearlyPrice, YEARLY_MONTHS_FREE, type PlanType } from '@/lib/feature-gates'
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 }).format(amount)
@@ -80,6 +80,7 @@ const PLANS = [
     id: 'starter',
     name: getPlanLabel('starter'),
     price: getPlanPrice('starter'),
+    yearlyPrice: getPlanYearlyPrice('starter'),
     features: [
       '50 SMS/mån (0,89 kr/extra)',
       '100 samtal/mån',
@@ -99,6 +100,7 @@ const PLANS = [
     id: 'professional',
     name: getPlanLabel('professional'),
     price: getPlanPrice('professional'),
+    yearlyPrice: getPlanYearlyPrice('professional'),
     features: [
       '300 SMS/mån (0,79 kr/extra)',
       '400 samtal/mån',
@@ -118,6 +120,7 @@ const PLANS = [
     id: 'business',
     name: getPlanLabel('business'),
     price: getPlanPrice('business'),
+    yearlyPrice: getPlanYearlyPrice('business'),
     features: [
       '1 000 SMS/mån (0,69 kr/extra)',
       'Obegränsade samtal',
@@ -178,6 +181,8 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true)
   const [portalLoading, setPortalLoading] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
+  // Årsavtal (Andreas-beslut 2026-08-19): default Månadsvis vid plan-byte.
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
 
   useEffect(() => {
     if (!business?.business_id) return
@@ -234,7 +239,7 @@ export default function BillingPage() {
       const res = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ planId, interval: billingInterval }),
       })
       if (res.ok) {
         const data = await res.json()
@@ -414,9 +419,43 @@ export default function BillingPage() {
                 <h2 className="text-lg font-semibold text-gray-900">Valj plan</h2>
               </div>
 
+              {/* Månadsvis/Årsvis (Andreas-beslut 2026-08-19) */}
+              <div className="inline-flex items-center gap-1 p-1 mb-2 bg-gray-100 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setBillingInterval('monthly')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    billingInterval === 'monthly' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                  }`}
+                >
+                  Månadsvis
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingInterval('yearly')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    billingInterval === 'yearly' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                  }`}
+                >
+                  Årsvis
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary-100 text-primary-700">
+                    {YEARLY_MONTHS_FREE} månader på köpet
+                  </span>
+                </button>
+              </div>
+
+              {billingInterval === 'yearly' && (
+                <p className="text-xs text-primary-700 font-medium mb-4">
+                  30 dagars pengarna-tillbaka-garanti. Inga frågor. Gäller även årsavtal.
+                </p>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {SELECTABLE_PLANS.map((plan) => {
                   const isCurrent = plan.id === currentPlanId
+                  const showYearly = billingInterval === 'yearly' && plan.yearlyPrice != null
+                  const displayPrice = showYearly ? (plan.yearlyPrice as number) : plan.price
+                  const monthlyEquivalent = showYearly ? Math.round((plan.yearlyPrice as number) / 12) : null
                   // currentIndex blir -1 för Bas-kunder (starter finns inte i
                   // SELECTABLE_PLANS) — då räknas båda kvarvarande planerna korrekt
                   // som uppgraderingar, vilket stämmer (Bas är alltid lägst).
@@ -445,9 +484,14 @@ export default function BillingPage() {
                       <div className="mb-4">
                         <h3 className="text-lg font-bold text-gray-900">{plan.name}</h3>
                         <div className="flex items-baseline gap-1 mt-2">
-                          <span className="text-3xl font-bold text-gray-900">{formatCurrency(plan.price)}</span>
-                          <span className="text-sm text-gray-400">/man</span>
+                          <span className="text-3xl font-bold text-gray-900">{formatCurrency(displayPrice)}</span>
+                          <span className="text-sm text-gray-400">{showYearly ? '/år' : '/man'}</span>
                         </div>
+                        {monthlyEquivalent !== null && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            motsvarar ~{monthlyEquivalent.toLocaleString('sv-SE')} kr/mån — {YEARLY_MONTHS_FREE} månader på köpet
+                          </p>
+                        )}
                       </div>
 
                       <ul className="space-y-2 mb-6">
