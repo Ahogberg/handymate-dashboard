@@ -31,3 +31,16 @@ test.describe('compute-economics — ingen dubbelräkning av lankade fakturor', 
     expect(block).toMatch(/linkedInvoiceIds|new Set\(/)
   })
 })
+
+test.describe('freeze-outcome — overlap-flaggan respekterar lankning', () => {
+  const FILE = fs.readFileSync(
+    path.join(__dirname, '..', 'lib/efterkalkyl/freeze-outcome.ts'),
+    'utf8',
+  )
+
+  test('overlap-regeln läser olänkade rader, inte bara totala antal', () => {
+    const idx = FILE.indexOf('materialSourceOverlapFree')
+    const block = FILE.slice(idx, idx + 400)
+    expect(block).toMatch(/unlinked/i)
+  })
+})

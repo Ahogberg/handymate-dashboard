@@ -208,11 +208,15 @@ export function buildProjectOutcomeRow(input: BuildOutcomeRowInput): ProjectOutc
   const costRowsPresent =
     sourceCounts.time_entry + sourceCounts.supplier_invoice +
       sourceCounts.project_material + sourceCounts.project_cost > 0
-  // Supplierfakturor och manuella materialrader kan i dagens modell avse
-  // samma inköp. Tills X2d äger dedupliceringen får sådana projekt visas,
-  // men de får inte bli finansiell lärdata.
+  // Etapp 1 leverantörsfakturor (2026-08-19): en supplier_invoices-rad och
+  // en project_material-rad kan avse samma inköp — men bara om INGEN av dem
+  // är länkad (project_material.supplier_invoice_id). Länkade par har
+  // dubbelräkningen bevisat undanröjd i compute-economics.ts (fakturan
+  // räknas via materialraden, aldrig separat), så bara KVARSTÅENDE olänkad
+  // överlappning blockerar lärdata.
   const materialSourceOverlapFree = !(
-    sourceCounts.supplier_invoice > 0 && sourceCounts.project_material > 0
+    input.economics.meta.unlinked_supplier_invoice_count > 0 &&
+    input.economics.meta.unlinked_project_material_count > 0
   )
   const quoteSourceType = input.budget?.source ?? 'none'
   const completenessFlags: OutcomeCompletenessFlags = {

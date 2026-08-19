@@ -106,11 +106,20 @@ test.describe('Outcome V2 — ren kvalitetskärna', () => {
   })
 
   test('överlappande materialkällor visas men får inte träna ekonomin före X2d', () => {
+    // Etapp 1 leverantörsfakturor (2026-08-19): overlap blockerar bara när
+    // BÅDA sidorna har olänkade rader kvar — här simuleras 2 fristående
+    // (olänkade) project_material-rader ovanpå den redan olänkade
+    // supplier_invoice-raden från input(), dvs en genuin kvarstående
+    // dubbelräkningsrisk, inte bara två råa antal som råkar vara > 0.
     const base = input()
     const row = buildProjectOutcomeRow(input({
       economics: {
         ...base.economics,
-        meta: { ...base.economics.meta, project_material_count: 2 },
+        meta: {
+          ...base.economics.meta,
+          project_material_count: 2,
+          unlinked_project_material_count: 2,
+        },
       },
     }))
     expect(row.completeness_flags.material_source_overlap_free).toBe(false)
