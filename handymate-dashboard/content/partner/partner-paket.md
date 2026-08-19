@@ -1,8 +1,9 @@
 # Partner-paketet — allt en ny partner behöver
 
-_Version 1.0, 2026-07-28. Ges till partnern efter signerat avtal.
+_Version 1.1, 2026-08-19. Ges till partnern efter signerat avtal.
 Internt: håll detta synkat med tasks/capability-inventory.md — materialet
-nedan är granskat mot den, partnern får ALDRIG improvisera bortom det._
+nedan är granskat mot den, partnern får ALDRIG improvisera bortom det.
+Hela paketets innehållsförteckning och läsordning: `README.md` i denna mapp._
 
 ## Välkommen som Handymate-partner
 
@@ -29,13 +30,21 @@ Du får en personlig P-kod (t.ex. `P-XXXXXX`) och en länk:
 | Pitch-deck | [länk delas separat — mobilanpassad presentation] | Kundmötet: svep igenom, 8 min + demo |
 | Demo-manus | Delas som PDF vid onboarding | 15-minutersdemo, två varianter (jaktfirma / etablerad firma) |
 | Demokonto | Uppgifter delas separat | Din demo-miljö — se punkt 3 |
+| "Vad är Handymate?" | `01-vad-ar-handymate.md` | Lekmannaförklaringen — läs själv, dela gärna med prospekt |
+| Funktionsguiden | `02-funktionsguide.md` | Uppslagsverk: "kan det…?"-frågor |
+| Motorerna förklarade | `03-motorerna-enkelt-forklarat.md` | När prospektet vill förstå "AI-delen" |
+| Säljmanuset | `04-saljmanus.md` | Kalla samtalet → mötet → avslut → uppföljning |
+| Pitchpunkterna | `05-pitchpunkter.md` | De starkaste argumenten + hisspitch, memoreras |
+| Invändningar & FAQ | `06-invandningar-och-faq.md` | Efter varje demo; innan svåra möten |
 | Jämförelsesida | handymate.se/jamfor | Skicka till prospekt som jämför med Bygglet/Easoft |
 | Agentsidorna | handymate.se/ai-team | Skicka som "läs mer om teamet" |
 | ROT-kalkylatorn | handymate.se/rot-kalkylator | Isbrytare/nytta i kalla samtal |
 
-**Priser (får kommuniceras):** Bas 2 495 kr/mån · Pro 5 995 kr/mån ·
-Business 11 995 kr/mån. Ingen bindningstid, pengarna-tillbaka-garanti.
-Priset nämns EFTER värdet, aldrig före.
+**Priser (får kommuniceras):** Firman 5 995 kr/mån · Storfirman
+11 995 kr/mån · årsbetalning "betala för 10 månader, få 12" · fler än 10
+anställda/flera bolag: anpassat, hänvisa till Handymate. Ingen bindnings-
+tid, pengarna-tillbaka-garanti. (Bas säljs inte längre publikt — nämn den
+inte.) Priset nämns EFTER värdet, aldrig före.
 
 ## 3. Demokontot — din viktigaste tillgång
 
