@@ -34,3 +34,22 @@ test.describe('SupplierInvoiceModal — underentreprenor-koppling', () => {
     expect(body).toMatch(/subcontractor_id:\s*subcontractorId/)
   })
 })
+
+test.describe('API — supplier_invoices skriver subcontractor_id', () => {
+  const ROUTE = fs.readFileSync(
+    path.join(__dirname, '..', 'app/api/supplier-invoices/route.ts'),
+    'utf8',
+  )
+
+  test('POST-insert bär subcontractor_id', () => {
+    const postStart = ROUTE.indexOf('export async function POST')
+    const postBody = ROUTE.slice(postStart, ROUTE.indexOf('export async function PATCH'))
+    expect(postBody).toContain('subcontractor_id')
+  })
+
+  test('PATCH allowed-listan tillåter subcontractor_id', () => {
+    const patchStart = ROUTE.indexOf('export async function PATCH')
+    const patchBody = ROUTE.slice(patchStart, ROUTE.indexOf('export async function DELETE'))
+    expect(patchBody).toMatch(/allowed\s*=\s*\[[\s\S]*?'subcontractor_id'[\s\S]*?\]/)
+  })
+})
