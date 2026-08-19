@@ -149,6 +149,7 @@ export async function PUT(
     if (body.purchase_price !== undefined) updates.purchase_price = body.purchase_price
     if (body.notes !== undefined) updates.notes = body.notes
     if (body.name !== undefined) updates.name = body.name
+    if (body.supplier_invoice_id !== undefined) updates.supplier_invoice_id = body.supplier_invoice_id
 
     // Omberäkna priser
     const quantity = updates.quantity ?? existing.quantity
