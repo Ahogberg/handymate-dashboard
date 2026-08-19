@@ -17,6 +17,64 @@ står i N1. Inga andra strategiska frågor är öppnade.
 
 ---
 
+# Läge 2026-08-19 — Teamet i fickan / AgentNotification (ANDRA post-launch-programmet)
+
+Codex förslag (via Andreas): ett gemensamt presentations- och
+prioriteringslager för mobilpush — tre notisklasser (kräver beslut / något
+viktigt hänt / teamuppdatering), aldrig tomma engagemangsnotiser, agent-
+identitet på varje notis, exakt deep link till rätt kort, mottagare efter
+ansvar snarare än hela företaget, dedupe, tyst tid, prioritet, diskret
+låsskärmstext.
+
+**Verifiering 2026-08-19 (två parallella granskningar, backend + mobil)
+motsäger Codex huvudpåstående** — "ni har redan mycket av infrastrukturen...
+det som saknas är ett presentationslager, inte ett nytt notissystem" stämmer
+INTE. Verifierat läge:
+
+- **En riktig bugg hittades och fixades samma dag, oberoende av det här
+  programmet** (se `tests/push-target-user.spec.ts` / commit-loggen): mobil-
+  push (Expo, `push_tokens`) blastade till HELA företaget oavsett vem ett
+  beslut gällde, eftersom `routed_business_user_id` i praktiken aldrig
+  sattes. Web-push honorerade redan riktning korrekt — bara mobilsidan
+  läckte. Detta var inte del av notissystem-bygget, det var en fristående
+  rätt-person-får-rätt-info-fix.
+- **Inget deep-link-schema finns** i mobilappen (`handymate-mobile`) — inget
+  `handymate://`, ingen `Linking.parse`. Mobilens tap-listener routar bara
+  2 av ~11 pushtyper (ÄTA) till en specifik vy; allt annat öppnar hemskärmen.
+- **Ingen dedupe på själva pushsändningen** — bara på agent-observationers
+  SKAPANDE (48–168h-fönster). Offert/ÄTA/bokning/review kan dubbelpushas.
+- **Ingen tyst tid för push** — SMS har ett riktigt klockslags-baserat
+  mönster (`smart-communication.ts`), push importerar det aldrig. Push har
+  bara det binära frånvarofönstret (helt på/av).
+- **Ingen prioritet, inget TTL** skickas till Expo/APNs alls idag.
+- **"Agent moments"** (`MomentsProvider`) är en ren webb-badge med
+  `localStorage`-state — noll koppling till push, inte återanvändbar som
+  Codex antog.
+- **Nollpush-täckning idag** för tre av Codex sex V1-händelser: Mission
+  Control-progress/blockerare, projektöverlämning/jobbpass, betald faktura.
+  `mandate_paused_signal` finns i `ACTION_CONTRACT` men saknar helt en
+  pushmall.
+- **Det som FAKTISKT redan finns gratis**: agentidentiteten. Mobilappens
+  `theme/tokens.ts` har exakt samma sex agenter (id/namn/roll/porträtt) som
+  dashboardens, med `AIAvatar.tsx` färdig för ringstil per agent.
+
+**Beslut (Andreas, samma dag):** mottagarbuggen fixas omgående (fristående,
+liten, avgränsad — samma kategori som Mission Control-behörighetsfyndet
+2026-08-18). Själva notissystemet — de tre klasserna, nya pushmallar för
+uppdrag/jobbpass/betalning, deep-link-schema, dedupe-på-sändning, tyst tid,
+prioritet — blir **ANDRA post-launch-programmet**, med samma disciplin som
+OperatingExperiment ovan: produkten fryses ren fram till lansering, bygget
+tar vid direkt efteråt. Codex strategiska ram (tre klasser, aldrig tomma
+notiser, agent-identitet, exakt deep link, ansvarsbaserad mottagare) är
+korrekt och blir grunden för etappspecen — bara omfattningsuppskattningen
+("presentationslager") var fel; det är riktig bakänds-/klientkoppling i flera
+lager, inte en tunn presentationsyta.
+
+**Status:** roadmap-post skriven 2026-08-19. Mottagarbuggen fixas samma dag
+(fristående commit). Inget av notissystemets övriga skikt är påbörjat.
+
+---
+
 # Läge 2026-08-19 — Adaptive Business Twin / OperatingExperiment (FÖRSTA post-launch-programmet)
 
 Tre datafångst-läckor täpptes samma dag i det som blir underlaget för detta
@@ -105,15 +163,17 @@ projekts start. OperatingExperiment bygger vidare på samma "visa beläggen,
 aldrig bara påståendet"-princip, men med kvantifierat, nivåsatt bevis i
 stället för en fri textformulering.
 
-**Status:** Etapp 1 (datalager + läs-only mätmotor) byggd, testad och TOM
-2026-08-19 — `sql/v157_operating_experiment.sql` (ej körd av Andreas ännu),
-`lib/experiment/types.ts`, `lib/experiment/measure.ts`,
-`tests/operating-experiment.spec.ts`. Nästa steg är fortfarande INTE att
-presentera en slutsats för en ägare — det är att (a) övervaka grindvillkoret
-för Etapp 2 (kontrollfrågorna i `sql/kontroll_utfallsfangst_2026-08-19.sql`,
-fråga 4b, visar hur snabbt `financial_learning_eligible`-raderna växer nu när
-läckorna är täppta) och (b) bygga förslagslagret (Etapp 2: kortet som skapar
-en `operating_experiment`-rad) när den grinden öppnas.
+**Status (uppdaterad samma dag):** Etapp 1 OCH Etapp 2 är BÅDA byggda, testade
+och pushade 2026-08-19 (`e2644c1e`, `79ed5f1f`, kontraktsfixen `cf1265fc`) —
+`sql/v157_operating_experiment.sql` KÖRD av Andreas, skarpbevisat 9/9
+stationer mot prod (`tests/e2e-golden-path/experiment-proof.spec.ts
+--project=experiment-proof`, kört två gånger, städning select-verifierad).
+Förslagslagret, inskrivningen, redovisningen och ägarens tre beslut
+(fortsätt/avvisa/gör till standard) finns i `lib/experiment/`. Demokontot
+visar motorn i två lägen sedan `sql/v158_demo_reset_v3.sql` (D4, `9c860661`).
+Motorn är **vilande, inte bara byggd** — den väntar på att en riktig kund
+bekräftar sitt första playbook-mönster, vilket är den enda återstående
+grinden (ingen kod-grind kvar).
 
 ---
 
