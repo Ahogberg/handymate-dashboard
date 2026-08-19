@@ -3,9 +3,11 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
 import { materializeObligations, missingProfileFields } from '@/lib/karin/obligations'
-import { obligationToEvent, sortByUrgency, needsAttention, groupByMonth } from '@/lib/karin/calendar'
+import { obligationToEvent, customEventToEvent, sortByUrgency, needsAttention, groupByMonth, type CalendarEvent } from '@/lib/karin/calendar'
 import type { CompanyProfile } from '@/lib/karin/obligation-rules'
 import { HANDLED_KEY, parseEntries, applyKvittens, serializeEntries, suppresses, type Kvittens, type KvittensAndring } from '@/lib/karin/handled-store'
+import { suggestEvents } from '@/lib/karin/event-suggestions'
+import { dateStr } from '@/lib/karin/business-days'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,18 +92,46 @@ export async function GET(request: NextRequest) {
 
     const perId = new Map(kvittenser.map(k => [k.id, k]))
 
+    // Egna poster (sql/v160) — samma händelseform som de härledda, källmärkta
+    // 'egen'. Kvitterar/ångrar med EXAKT samma business_preferences-mekanism
+    // som härledda poster, eftersom den aldrig frågade vad källan var. Ett
+    // fel här får aldrig fälla kalendern: då visas bara de härledda posterna,
+    // vilket är det säkra hållet (samma princip som kvittensläsningen ovan).
+    let egnaEvents: CalendarEvent[] = []
+    try {
+      const { data: egna, error: egnaError } = await supabase
+        .from('karin_custom_event')
+        .select('id, title, event_date, note')
+        .eq('business_id', business.business_id)
+        .gte('event_date', dateStr(idag))
+        .lte('event_date', dateStr(till))
+      if (egnaError) throw egnaError
+      egnaEvents = (egna || []).map(customEventToEvent)
+    } catch (e) {
+      console.warn('[karin/calendar] kunde inte läsa egna poster:', e)
+    }
+
     // `kvittens` bär vad ägaren gjorde, av vem och när — så vyn kan visa det och
     // erbjuda ångra. `handled` är enbart "tystas den just nu?", och är avsiktligt
     // INTE samma sak: en kvitterad post som gått in i sista anflygningen har en
     // kvittens men tystas inte längre.
-    const events = materializeObligations(profile, idag, till)
-      .map(obligationToEvent)
+    const events = [...materializeObligations(profile, idag, till).map(obligationToEvent), ...egnaEvents]
       .map(e => {
         const k = perId.get(e.id)
         if (!k) return e
         return { ...e, kvittens: k, handled: suppresses(k, idag) }
       })
     const sorterade = sortByUrgency(events, idag)
+
+    // Förslagen till "Lägg till"-modalen — deterministiska, filtrerade på
+    // profilen, årstiden och vad som redan finns (se lib/karin/event-suggestions.ts).
+    const suggestions = suggestEvents({
+      companyForm: profile.company_form ?? null,
+      employeeCount: (rad.employee_count as number) ?? null,
+      fiscalYearEndMonth: profile.fiscal_year_end_month ?? null,
+      existingTitles: events.map(e => e.title),
+      today: idag,
+    })
 
     return NextResponse.json({
       profile,
@@ -111,6 +141,7 @@ export async function GET(request: NextRequest) {
       months: groupByMonth(events),
       total: events.length,
       window_days: dagar,
+      suggestions,
     })
   } catch (err: any) {
     console.error('[karin/calendar] oväntat fel:', err)

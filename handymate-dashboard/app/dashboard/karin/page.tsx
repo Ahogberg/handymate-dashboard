@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, ArrowRight, Calendar, Check, ExternalLink, Loader2 } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Calendar, Check, ExternalLink, Loader2, Plus, Trash2, X } from 'lucide-react'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useToast } from '@/components/Toast'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import type { CalendarEvent, MonthGroup } from '@/lib/karin/calendar'
 import type { Kvittens } from '@/lib/karin/handled-store'
+import type { EventSuggestion } from '@/lib/karin/event-suggestions'
 
 /**
  * Karins bolagskalender (2026-08-07).
@@ -41,6 +42,7 @@ interface CalendarResponse {
   months: MonthGroup[]
   total: number
   window_days: number
+  suggestions: EventSuggestion[]
 }
 
 const KATEGORI_ETIKETT: Record<string, string> = {
@@ -81,6 +83,7 @@ export default function KarinKalenderPage() {
   const [laddar, setLaddar] = useState(true)
   const [fel, setFel] = useState<string | null>(null)
   const [kvittenser, setKvittenser] = useState<Map<string, Kvittens>>(new Map())
+  const [visaLaggTill, setVisaLaggTill] = useState(false)
 
   // Lager två av rollskyddet. API:et är lager tre — en sida som bara döljer
   // sig är ingen spärr.
@@ -88,26 +91,73 @@ export default function KarinKalenderPage() {
     if (!userLoading && !isOwnerOrAdmin) router.replace('/dashboard')
   }, [userLoading, isOwnerOrAdmin, router])
 
+  async function laddaKalender() {
+    try {
+      const r = await fetch('/api/karin/calendar?days=90')
+      if (!r.ok) throw new Error(String(r.status))
+      const d: CalendarResponse = await r.json()
+      setData(d)
+      // Serverns kvittenser är sanningen; lokal state är bara ekot.
+      const fransServer: Array<[string, Kvittens]> = [
+        ...(d.months || []).flatMap((m: { events: CalendarEvent[] }) => m.events),
+        ...(d.attention || []),
+      ]
+        .filter((e: any) => e?.kvittens)
+        .map((e: any) => [e.id, e.kvittens as Kvittens])
+      setKvittenser(new Map(fransServer))
+      setFel(null)
+    } catch {
+      setFel('Kunde inte hämta kalendern just nu.')
+    } finally {
+      setLaddar(false)
+    }
+  }
+
   useEffect(() => {
-    let aktiv = true
-    fetch('/api/karin/calendar?days=90')
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then(d => {
-        if (!aktiv) return
-        setData(d)
-        // Serverns kvittenser är sanningen; lokal state är bara ekot.
-        const fransServer: Array<[string, Kvittens]> = [
-          ...(d.months || []).flatMap((m: { events: CalendarEvent[] }) => m.events),
-          ...(d.attention || []),
-        ]
-          .filter((e: any) => e?.kvittens)
-          .map((e: any) => [e.id, e.kvittens as Kvittens])
-        if (fransServer.length > 0) setKvittenser(new Map(fransServer))
-      })
-      .catch(() => { if (aktiv) setFel('Kunde inte hämta kalendern just nu.') })
-      .finally(() => { if (aktiv) setLaddar(false) })
-    return () => { aktiv = false }
+    void laddaKalender()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /** Lägger till en egen post och laddar om kalendern så den dyker upp i rätt månad direkt. */
+  async function laggTillEgen(title: string, eventDate: string, note: string): Promise<boolean> {
+    try {
+      const res = await fetch('/api/karin/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, event_date: eventDate, note: note || undefined }),
+      })
+      if (!res.ok) throw new Error(String(res.status))
+      await laddaKalender()
+      setVisaLaggTill(false)
+      toast.success('Tillagd i kalendern')
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** Tar bort en egen post. Kan aldrig träffa en härledd — API:et frågar bara karin_custom_event. */
+  async function taBortEgen(id: string) {
+    const innan = data
+    // Optimistiskt: posten försvinner direkt, återställs vid fel.
+    if (data) {
+      setData({
+        ...data,
+        attention: data.attention.filter(e => e.id !== id),
+        months: data.months
+          .map(m => ({ ...m, events: m.events.filter(e => e.id !== id) }))
+          .filter(m => m.events.length > 0),
+        total: data.total - 1,
+      })
+    }
+    try {
+      const res = await fetch(`/api/karin/events/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(String(res.status))
+    } catch {
+      setData(innan)
+      toast.error('Kunde inte ta bort — försök igen')
+    }
+  }
 
   if (userLoading || !isOwnerOrAdmin) {
     return (
@@ -160,7 +210,7 @@ export default function KarinKalenderPage() {
         {/* ── Hero ── */}
         <div className="flex items-center gap-3 mb-1">
           <AgentAvatar agentKey="karin" size="lg" />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="font-heading text-[22px] sm:text-[26px] font-bold tracking-[-0.02em] text-slate-900 m-0">
               Bolagskalendern
             </h1>
@@ -168,6 +218,14 @@ export default function KarinKalenderPage() {
               Karin håller koll på myndighetsdatumen åt dig
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => setVisaLaggTill(true)}
+            className="inline-flex items-center gap-1.5 h-[44px] px-4 bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold rounded-xl transition-colors shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            Lägg till
+          </button>
         </div>
 
         {laddar ? (
@@ -223,6 +281,7 @@ export default function KarinKalenderPage() {
                       event={e}
                       onHandled={() => { void sattKvittens(e.id, 'acknowledge') }}
                       onSnooze={() => { void sattKvittens(e.id, 'snooze', snoozeDatum(e.due_date)) }}
+                      onDelete={e.source === 'egen' ? () => { void taBortEgen(e.id) } : undefined}
                     />
                   ))}
                 </div>
@@ -263,6 +322,7 @@ export default function KarinKalenderPage() {
                           event={e}
                           kvittens={kvittenser.get(e.id)}
                           onUndo={() => { void sattKvittens(e.id, 'undo') }}
+                          onDelete={e.source === 'egen' ? () => { void taBortEgen(e.id) } : undefined}
                         />
                       ))}
                     </div>
@@ -282,6 +342,14 @@ export default function KarinKalenderPage() {
           </>
         )}
       </div>
+
+      {visaLaggTill && (
+        <LaggTillModal
+          suggestions={data?.suggestions || []}
+          onClose={() => setVisaLaggTill(false)}
+          onSave={laggTillEgen}
+        />
+      )}
     </div>
   )
 }
@@ -303,7 +371,13 @@ function snoozeDatum(forfall: string): string {
   return d.toISOString().slice(0, 10)
 }
 
-function EventCard({ event, onHandled, onSnooze }: { event: CalendarEvent; onHandled: () => void; onSnooze: () => void }) {
+function EventCard({ event, onHandled, onSnooze, onDelete }: {
+  event: CalendarEvent
+  onHandled: () => void
+  onSnooze: () => void
+  /** Bara satt för egna poster (source 'egen') — aldrig för härledda. */
+  onDelete?: () => void
+}) {
   const forfallen = dagarKvar(event.due_date) < 0
 
   return (
@@ -325,10 +399,13 @@ function EventCard({ event, onHandled, onSnooze }: { event: CalendarEvent; onHan
         {event.title} — {visaDatum(event.due_date)}
       </h3>
       <p className="text-[13px] text-slate-500 leading-relaxed mb-2.5">
-        Avser {event.period_label}. {event.why}
+        {event.period_label && `Avser ${event.period_label}. `}{event.why}
       </p>
 
-      {/* Där säkerheten är låg hänvisar Karin vidare i stället för att gissa. */}
+      {/* Där säkerheten är låg hänvisar Karin vidare i stället för att gissa.
+          Egna poster har alltid confidence 'hog' — de är aldrig en gissning,
+          se lib/karin/calendar.ts:customEventToEvent — så den här visas aldrig
+          på en post ägaren själv skrivit in. */}
       {event.confidence !== 'hog' && (
         <div className="bg-slate-50 border border-slate-100 rounded-xl px-3.5 py-2.5 mb-3">
           <p className="text-[13px] text-slate-600 m-0 leading-relaxed">
@@ -361,15 +438,18 @@ function EventCard({ event, onHandled, onSnooze }: { event: CalendarEvent; onHan
         >
           Påminn senare
         </button>
-        <a
-          href={event.source_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 h-[38px] px-4 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
-        >
-          Läs hos {event.authority}
-          <ExternalLink className="w-3.5 h-3.5" />
-        </a>
+        {event.source_url && (
+          <a
+            href={event.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 h-[38px] px-4 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
+          >
+            Läs hos {event.authority}
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        )}
+        {onDelete && <TaBortKnapp onConfirm={onDelete} className="ml-auto" />}
       </div>
     </div>
   )
@@ -382,21 +462,34 @@ function EventCard({ event, onHandled, onSnooze }: { event: CalendarEvent; onHan
  * kön men blir kvar här med sin etikett, så beslutet alltid går att ta tillbaka.
  * Etiketterna säger vad ägaren gjort ("Kvitterad", "Påminner igen"), aldrig att
  * skyldigheten är uppfylld.
+ *
+ * Egna poster (source 'egen') får en diskret "Egen"-badge och en ta bort-knapp
+ * i stället för myndighet/period — de har ingen av delarna.
  */
-function MonthRow({ event, kvittens, onUndo }: {
+function MonthRow({ event, kvittens, onUndo, onDelete }: {
   event: CalendarEvent
   kvittens?: Kvittens
   onUndo: () => void
+  /** Bara satt för egna poster — aldrig för härledda. */
+  onDelete?: () => void
 }) {
   const dag = new Date(event.due_date + 'T12:00:00').getDate()
+  const egen = event.source === 'egen'
 
   return (
     <div className={`flex items-center gap-3 px-4 py-3 ${kvittens ? 'opacity-60' : ''}`}>
       <span className="font-heading text-[13px] font-semibold text-primary-700 w-6 shrink-0 tabular-nums">{dag}</span>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium text-slate-900 truncate">{event.title}</span>
+        <span className="flex items-center gap-1.5 min-w-0">
+          <span className="block text-sm font-medium text-slate-900 truncate">{event.title}</span>
+          {egen && (
+            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500">
+              Egen
+            </span>
+          )}
+        </span>
         <span className="block text-xs text-slate-400 truncate">
-          {event.authority} · {event.period_label}
+          {egen ? 'Egen anteckning' : `${event.authority} · ${event.period_label}`}
           {kvittens?.actor && ` · av ${kvittens.actor}`}
         </span>
       </span>
@@ -414,9 +507,186 @@ function MonthRow({ event, kvittens, onUndo }: {
             Ångra
           </button>
         </span>
+      ) : onDelete ? (
+        <span className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-slate-400 whitespace-nowrap">{nedrakning(event.due_date)}</span>
+          <TaBortKnapp onConfirm={onDelete} />
+        </span>
       ) : (
         <span className="text-xs text-slate-400 shrink-0 whitespace-nowrap">{nedrakning(event.due_date)}</span>
       )}
+    </div>
+  )
+}
+
+/**
+ * Ta bort-knappen — två steg, ingen webbläsarens inbyggda bekräftelsedialog.
+ *
+ * Första trycket väpnar knappen ("Säkert?" + "Avbryt"). Andra trycket
+ * utför borttagningen. Väpningen glömmer sig själv efter fyra sekunder så en
+ * rad aldrig blir kvar i ett förvirrande halvöppet läge om ägaren klickar
+ * bort sig.
+ */
+function TaBortKnapp({ onConfirm, className = '' }: { onConfirm: () => void; className?: string }) {
+  const [vapnad, setVapnad] = useState(false)
+
+  useEffect(() => {
+    if (!vapnad) return
+    const t = setTimeout(() => setVapnad(false), 4000)
+    return () => clearTimeout(t)
+  }, [vapnad])
+
+  if (vapnad) {
+    return (
+      <span className={`inline-flex items-center gap-2 shrink-0 ${className}`}>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="text-xs font-semibold text-red-600 hover:text-red-700 underline underline-offset-2"
+        >
+          Säkert?
+        </button>
+        <button
+          type="button"
+          onClick={() => setVapnad(false)}
+          className="text-xs text-slate-400 hover:text-slate-600"
+        >
+          Avbryt
+        </button>
+      </span>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setVapnad(true)}
+      aria-label="Ta bort"
+      title="Ta bort"
+      className={`shrink-0 min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-red-600 transition-colors ${className}`}
+    >
+      <Trash2 className="w-3.5 h-3.5" />
+    </button>
+  )
+}
+
+/**
+ * "Lägg till"-modalen — titel, datum, valfri anteckning, plus max tre
+ * kontextuella förslag som TAP-förifyller formuläret (aldrig lägger till av
+ * sig självt). Samma modal-idiom som AbsenceSettingsModal
+ * (components/jarvis/home/AbsenceBand.tsx).
+ */
+function LaggTillModal({ suggestions, onClose, onSave }: {
+  suggestions: EventSuggestion[]
+  onClose: () => void
+  onSave: (title: string, date: string, note: string) => Promise<boolean>
+}) {
+  const [title, setTitle] = useState('')
+  const [date, setDate] = useState('')
+  const [note, setNote] = useState('')
+  const [sparar, setSparar] = useState(false)
+  const [fel, setFel] = useState<string | null>(null)
+
+  function anvandForslag(s: EventSuggestion) {
+    setTitle(s.title)
+    setDate(s.date)
+    setNote(s.note)
+  }
+
+  async function handleSpara() {
+    setFel(null)
+    if (!title.trim()) { setFel('Ange en titel'); return }
+    if (!date) { setFel('Ange ett datum'); return }
+    setSparar(true)
+    const ok = await onSave(title.trim(), date, note)
+    setSparar(false)
+    if (!ok) setFel('Kunde inte spara — försök igen')
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/55">
+      <div className="w-full max-w-[420px] bg-white rounded-2xl border border-slate-200 shadow-lg p-5 flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="m-0 text-[15px] font-bold text-slate-900">Lägg till i kalendern</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Stäng"
+            className="text-slate-400 hover:text-slate-600 min-h-[44px] min-w-[44px] -mt-2 -mr-2 flex items-center justify-center"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {suggestions.length > 0 && (
+          <div>
+            <p className="m-0 mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Förslag</p>
+            <div className="flex flex-wrap gap-1.5">
+              {suggestions.map(s => (
+                <button
+                  key={s.code}
+                  type="button"
+                  onClick={() => anvandForslag(s)}
+                  className="text-xs font-medium px-3 py-1.5 rounded-full border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+                >
+                  {s.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+          Titel
+          <input
+            type="text"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="T.ex. Semesterplanering"
+            className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 min-h-[44px]"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+          Datum
+          <input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 min-h-[44px]"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+          Anteckning (valfritt)
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            rows={2}
+            className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 resize-none"
+          />
+        </label>
+
+        {fel && <p className="m-0 text-xs text-red-600">{fel}</p>}
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 min-h-[44px]"
+          >
+            Avbryt
+          </button>
+          <button
+            type="button"
+            onClick={handleSpara}
+            disabled={sparar}
+            className="flex-1 px-4 py-2.5 rounded-xl bg-primary-700 text-white text-sm font-semibold hover:bg-primary-800 disabled:opacity-50 min-h-[44px]"
+          >
+            {sparar ? 'Sparar …' : 'Spara'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

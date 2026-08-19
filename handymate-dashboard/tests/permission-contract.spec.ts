@@ -362,6 +362,19 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
     },
   ],
 
+  'Bolagskalendern (egna poster)': [
+    {
+      route: 'karin/events',
+      requires: 'owner-admin',
+      why: 'Skapar en egen post i bolagskalendern — samma ägare/admin-grind som GET/POST /api/karin/calendar. En anställd ska inte kunna lägga poster i den yta som visar moms, skatt och bokslut åt ägaren.',
+    },
+    {
+      route: 'karin/events/[id]',
+      requires: 'owner-admin',
+      why: 'DELETE tar bort en egen kalenderpost — filtrerad på karin_custom_event och business_id, men samma rollgrind som skapandet ska gälla symmetriskt.',
+    },
+  ],
+
   'Integrationer': [
     {
       route: 'integrations/fortnox/disconnect',

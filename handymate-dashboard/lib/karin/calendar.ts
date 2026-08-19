@@ -75,6 +75,48 @@ export function obligationToEvent(o: Obligation): CalendarEvent {
   }
 }
 
+/** En rad ur karin_custom_event (sql/v160). */
+export interface CustomEventRow {
+  id: string
+  title: string
+  /** YYYY-MM-DD. */
+  event_date: string
+  note: string | null
+}
+
+/**
+ * Omvandlar en egen post till samma händelseform som de härledda —
+ * `source`/`category`/`egen` fanns redan förberett i CalendarEvent (se
+ * filhuvudet). `id` lämnas OFÖRÄNDRAT: det är radens riktiga primärnyckel i
+ * karin_custom_event, så DELETE /api/karin/events/[id] kan träffa exakt utan
+ * att tolka om en sammansatt sträng.
+ *
+ * `confidence` är alltid `'hog'` — inte för att datumet är säkrare än en
+ * myndighetsdeadline, utan för att det INTE är en gissning: ägaren skrev det
+ * själv. Effekten är att kalenderns "kan variera"-varning (reserverad för
+ * regler med lägre säkerhet) aldrig visas på en egen post.
+ */
+export function customEventToEvent(row: CustomEventRow): CalendarEvent {
+  return {
+    id: row.id,
+    source: 'egen',
+    rule_code: null,
+    title: row.title,
+    authority: '',
+    category: 'egen',
+    due_date: row.event_date,
+    prepare_from: row.event_date,
+    period_label: '',
+    why: row.note && row.note.trim() ? row.note.trim() : 'Något du själv lagt till i kalendern.',
+    legal_basis: '',
+    source_url: '',
+    rule_version: null,
+    confidence: 'hog',
+    amount: null,
+    handled: false,
+  }
+}
+
 export type Urgency = 'forfallen' | 'bradskande' | 'snart' | 'senare'
 
 /**
