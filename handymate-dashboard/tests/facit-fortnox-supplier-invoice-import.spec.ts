@@ -51,3 +51,17 @@ test.describe('POST /api/integrations/fortnox/import/supplier-invoices', () => {
     expect(src).toMatch(/results\.errors\.push/)
   })
 })
+
+test.describe('Installningar - Hamta historik inkluderar leverantorsfakturor', () => {
+  const PAGE = fs.readFileSync(
+    path.join(__dirname, '..', 'app/dashboard/settings/integrations/page.tsx'),
+    'utf8',
+  )
+
+  test('handleFortnoxImportHistory anropar import/supplier-invoices', () => {
+    const start = PAGE.indexOf('async function handleFortnoxImportHistory')
+    const end = PAGE.indexOf('async function handleFortnoxDisconnect')
+    const block = PAGE.slice(start, end === -1 ? start + 3000 : end)
+    expect(block).toContain('/api/integrations/fortnox/import/supplier-invoices')
+  })
+})

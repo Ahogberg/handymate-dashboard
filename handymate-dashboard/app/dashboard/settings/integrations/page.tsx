@@ -146,9 +146,22 @@ export default function IntegrationsPage() {
       await fetch('/api/integrations/fortnox/import/customers', { method: 'POST' })
       const res = await fetch('/api/integrations/fortnox/import/invoices', { method: 'POST' })
       const data = await res.json()
+
+      let supplierMessage = ''
+      try {
+        const supplierRes = await fetch('/api/integrations/fortnox/import/supplier-invoices', { method: 'POST' })
+        const supplierData = await supplierRes.json()
+        if (supplierRes.ok && supplierData.imported > 0) {
+          supplierMessage = ` + ${supplierData.imported} leverantörsfakturor`
+        }
+      } catch {
+        // Nätverksfel på det tredje anropet ska inte förstöra toasten för
+        // de två som redan lyckades.
+      }
+
       if (res.ok) {
         setFortnoxToast(
-          `Historik hämtad: ${data.imported} fakturor importerade${data.skipped ? `, ${data.skipped} redan kända` : ''}`
+          `Historik hämtad: ${data.imported} fakturor importerade${data.skipped ? `, ${data.skipped} redan kända` : ''}${supplierMessage}`
         )
       } else {
         setFortnoxToast(`Historik-hämtning misslyckades: ${data.error || 'okänt fel'}`)
