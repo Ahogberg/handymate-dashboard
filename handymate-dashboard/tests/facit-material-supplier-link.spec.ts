@@ -24,3 +24,21 @@ test.describe('PUT /api/projects/[id]/materials — supplier_invoice_id', () => 
     expect(line).toContain('!== undefined')
   })
 })
+
+test.describe('Material-tabens UI — länk mot leverantörsfaktura', () => {
+  const PAGE = fs.readFileSync(
+    path.join(__dirname, '..', 'app/dashboard/projects/[id]/page.tsx'),
+    'utf8',
+  )
+
+  test('materialradens rendering läser mat.supplier_invoice_id', () => {
+    const matRowStart = PAGE.indexOf('{materials.map(mat =>')
+    const matRowEnd = PAGE.indexOf('{/* Product search modal */}')
+    const block = PAGE.slice(matRowStart, matRowEnd)
+    expect(block).toContain('mat.supplier_invoice_id')
+  })
+
+  test('länkningen anropar PUT /api/projects/[id]/materials med supplier_invoice_id i body', () => {
+    expect(PAGE).toMatch(/supplier_invoice_id:\s*\w/)
+  })
+})

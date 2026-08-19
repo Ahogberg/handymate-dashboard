@@ -352,6 +352,7 @@ interface ProjectMaterial {
   total_sell: number | null
   invoiced: boolean
   invoice_id: string | null
+  supplier_invoice_id: string | null
   notes: string | null
   created_at: string
 }
@@ -3311,7 +3312,18 @@ export default function ProjectDetailPage() {
                       <p className="text-sm font-medium text-gray-900 truncate">{mat.name}</p>
                       {mat.sku && <p className="text-xs text-gray-400">Art: {mat.sku}</p>}
                     </div>
-                    <div className="col-span-2 text-sm text-gray-500 truncate">{mat.supplier_name || '-'}</div>
+                    <div className="col-span-2 text-sm text-gray-500 truncate">
+                      {mat.supplier_name && <p className="m-0 truncate">{mat.supplier_name}</p>}
+                      {supplierInvoices.length === 0 ? null : (
+                        <MaterialInvoiceLink
+                          materialId={mat.material_id}
+                          projectId={project?.project_id || ''}
+                          currentInvoiceId={mat.supplier_invoice_id ?? null}
+                          invoices={supplierInvoices}
+                          onLinked={fetchProjectData}
+                        />
+                      )}
+                    </div>
                     {editingMaterial === mat.material_id ? (
                       <>
                         <div className="col-span-1">
@@ -5753,6 +5765,87 @@ function WorkOrderModal({ projectId, editing, projectData, onClose, onSaved, onS
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * Länk-/avlänkningsaffordans mellan en project_material-rad och den
+ * supplier_invoices-rad kostnaden faktiskt hör till (Etapp 1 leverantörs-
+ * fakturor). Egen lokal state — rör INTE editingMaterial/editValues, som
+ * äger kvantitet/påslag-redigeringen.
+ */
+function MaterialInvoiceLink({
+  materialId,
+  projectId,
+  currentInvoiceId,
+  invoices,
+  onLinked,
+}: {
+  materialId: string
+  projectId: string
+  currentInvoiceId: string | null
+  invoices: any[]
+  onLinked: () => void
+}) {
+  const [picking, setPicking] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const linked = invoices.find(inv => inv.id === currentInvoiceId)
+
+  const save = async (invoiceId: string | null) => {
+    setSaving(true)
+    try {
+      await fetch(`/api/projects/${projectId}/materials`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ material_id: materialId, supplier_invoice_id: invoiceId }),
+      })
+      onLinked()
+    } finally {
+      setSaving(false)
+      setPicking(false)
+    }
+  }
+
+  if (linked) {
+    return (
+      <button
+        onClick={() => save(null)}
+        disabled={saving}
+        className="text-xs text-primary-700 hover:text-primary-800 underline underline-offset-2 disabled:opacity-50"
+        title="Klicka för att avlänka"
+      >
+        {linked.supplier_name} · {linked.invoice_number || 'utan nr'}
+      </button>
+    )
+  }
+
+  if (picking) {
+    return (
+      <select
+        autoFocus
+        disabled={saving}
+        onChange={e => { if (e.target.value) save(e.target.value) }}
+        onBlur={() => setPicking(false)}
+        className="text-xs bg-gray-50 border border-[#E2E8F0] rounded px-1 py-0.5"
+      >
+        <option value="">Välj faktura…</option>
+        {invoices.map(inv => (
+          <option key={inv.id} value={inv.id}>
+            {inv.supplier_name} · {inv.invoice_number || 'utan nr'} · {inv.total_amount} kr
+          </option>
+        ))}
+      </select>
+    )
+  }
+
+  return (
+    <button
+      onClick={() => setPicking(true)}
+      className="text-xs text-gray-400 hover:text-primary-700 underline underline-offset-2"
+    >
+      Koppla faktura
+    </button>
   )
 }
 
