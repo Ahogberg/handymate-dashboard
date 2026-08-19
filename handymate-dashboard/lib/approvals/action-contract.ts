@@ -149,6 +149,11 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // är ett reparationskort — det ska öppna projektet, inte utföra något.
   missad_intakt: 'REVIEW_REQUIRED',
   manual_project_create: 'REVIEW_REQUIRED',
+  // Jobbpass (Etapp Ä 2026-08-18): kortet är ett förslag som ROUTAR till
+  // granskningssidan (target_route — ägaren väljer foton och publicerar DÄR,
+  // aldrig via ett kö-klick). "Hoppa över" = vanlig avvisning. Ett godkänn-
+  // klick ska aldrig publicera något åt kunden.
+  jobbpass_proposal: 'REVIEW_REQUIRED',
   review_auto_invoice: 'REVIEW_REQUIRED',
   four_eyes_quote: 'REVIEW_REQUIRED',
   four_eyes_project_close: 'REVIEW_REQUIRED',
@@ -251,6 +256,13 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // konstaterar att pausningen redan skett; godkänn = jag har läst det,
   // precis som autonomy_revoked ovan. Ingenting exekveras av ett klick.
   mandate_paused_signal: 'INFORMATIONAL',
+  // Owner Absence V1 (Etapp Å 2026-08-18): driftlarmets SYNTETISKA ägar-
+  // pushar under ett aktivt frånvarofönster. De skapar ALDRIG en
+  // pending_approvals-rad (bara en push via sendApprovalPush) — klassas
+  // ändå, eftersom kontraktets producentskanning ser typsträngarna och en
+  // framtida rad-skapande väg aldrig får hamna i default-grenen.
+  external_delivery_failure_signal: 'INFORMATIONAL',
+  payment_failed_signal: 'INFORMATIONAL',
 }
 
 /** Vad är det här kortet? `null` = okänt, och okänt godkänns inte. */
