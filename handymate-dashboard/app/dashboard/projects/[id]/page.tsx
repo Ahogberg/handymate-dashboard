@@ -352,6 +352,7 @@ interface ProjectMaterial {
   total_sell: number | null
   invoiced: boolean
   invoice_id: string | null
+  supplier_invoice_id: string | null
   notes: string | null
   created_at: string
 }
@@ -3311,7 +3312,18 @@ export default function ProjectDetailPage() {
                       <p className="text-sm font-medium text-gray-900 truncate">{mat.name}</p>
                       {mat.sku && <p className="text-xs text-gray-400">Art: {mat.sku}</p>}
                     </div>
-                    <div className="col-span-2 text-sm text-gray-500 truncate">{mat.supplier_name || '-'}</div>
+                    <div className="col-span-2 text-sm text-gray-500 truncate">
+                      {mat.supplier_name && <p className="m-0 truncate">{mat.supplier_name}</p>}
+                      {supplierInvoices.length === 0 ? null : (
+                        <MaterialInvoiceLink
+                          materialId={mat.material_id}
+                          projectId={project?.project_id || ''}
+                          currentInvoiceId={mat.supplier_invoice_id ?? null}
+                          invoices={supplierInvoices}
+                          onLinked={fetchProjectData}
+                        />
+                      )}
+                    </div>
                     {editingMaterial === mat.material_id ? (
                       <>
                         <div className="col-span-1">
@@ -5756,6 +5768,87 @@ function WorkOrderModal({ projectId, editing, projectData, onClose, onSaved, onS
   )
 }
 
+/**
+ * Länk-/avlänkningsaffordans mellan en project_material-rad och den
+ * supplier_invoices-rad kostnaden faktiskt hör till (Etapp 1 leverantörs-
+ * fakturor). Egen lokal state — rör INTE editingMaterial/editValues, som
+ * äger kvantitet/påslag-redigeringen.
+ */
+function MaterialInvoiceLink({
+  materialId,
+  projectId,
+  currentInvoiceId,
+  invoices,
+  onLinked,
+}: {
+  materialId: string
+  projectId: string
+  currentInvoiceId: string | null
+  invoices: any[]
+  onLinked: () => void
+}) {
+  const [picking, setPicking] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const linked = invoices.find(inv => inv.id === currentInvoiceId)
+
+  const save = async (invoiceId: string | null) => {
+    setSaving(true)
+    try {
+      await fetch(`/api/projects/${projectId}/materials`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ material_id: materialId, supplier_invoice_id: invoiceId }),
+      })
+      onLinked()
+    } finally {
+      setSaving(false)
+      setPicking(false)
+    }
+  }
+
+  if (linked) {
+    return (
+      <button
+        onClick={() => save(null)}
+        disabled={saving}
+        className="text-xs text-primary-700 hover:text-primary-800 underline underline-offset-2 disabled:opacity-50"
+        title="Klicka för att avlänka"
+      >
+        {linked.supplier_name} · {linked.invoice_number || 'utan nr'}
+      </button>
+    )
+  }
+
+  if (picking) {
+    return (
+      <select
+        autoFocus
+        disabled={saving}
+        onChange={e => { if (e.target.value) save(e.target.value) }}
+        onBlur={() => setPicking(false)}
+        className="text-xs bg-gray-50 border border-[#E2E8F0] rounded px-1 py-0.5"
+      >
+        <option value="">Välj faktura…</option>
+        {invoices.map(inv => (
+          <option key={inv.id} value={inv.id}>
+            {inv.supplier_name} · {inv.invoice_number || 'utan nr'} · {inv.total_amount} kr
+          </option>
+        ))}
+      </select>
+    )
+  }
+
+  return (
+    <button
+      onClick={() => setPicking(true)}
+      className="text-xs text-gray-400 hover:text-primary-700 underline underline-offset-2"
+    >
+      Koppla faktura
+    </button>
+  )
+}
+
 // --- Supplier Invoice Modal ---
 
 function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
@@ -5775,6 +5868,18 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
   const [showToCustomer, setShowToCustomer] = useState(editing?.show_to_customer ?? false)
   const [notes, setNotes] = useState(editing?.notes || '')
   const [saving, setSaving] = useState(false)
+  const [subcontractorId, setSubcontractorId] = useState<string>(editing?.subcontractor_id || '')
+  const [subcontractors, setSubcontractors] = useState<any[]>([])
+
+  useEffect(() => {
+    // Fail-soft: /api/subcontractors är feature-gated ('subcontractors'-
+    // planfunktionen) — ett konto utan den ska bara se fritext-fältet,
+    // aldrig ett fel. 403/nätverksfel lämnar bara listan tom.
+    fetch('/api/subcontractors?status=active')
+      .then(r => (r.ok ? r.json() : { subcontractors: [] }))
+      .then(d => setSubcontractors(d.subcontractors || []))
+      .catch(() => setSubcontractors([]))
+  }, [])
 
   const exclVat = parseFloat(amountExclVat) || 0
   const vat = parseFloat(vatAmount) || 0
@@ -5801,6 +5906,7 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
         billable_to_customer: billable,
         show_to_customer: showToCustomer,
         notes: notes.trim() || null,
+        subcontractor_id: subcontractorId || null,
       }
 
       if (editing) {
@@ -5835,6 +5941,26 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
             <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Leverantör *</label>
             <input type="text" value={supplierName} onChange={e => setSupplierName(e.target.value)} placeholder="T.ex. Byggmaterial AB" className={inputCls} />
           </div>
+
+          {subcontractors.length > 0 && (
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Underentreprenör (valfritt)</label>
+              <select
+                value={subcontractorId}
+                onChange={e => {
+                  setSubcontractorId(e.target.value)
+                  const chosen = subcontractors.find(s => s.subcontractor_id === e.target.value)
+                  if (chosen) setSupplierName(chosen.name)
+                }}
+                className={inputCls}
+              >
+                <option value="">Ingen — fritext ovan</option>
+                {subcontractors.map(s => (
+                  <option key={s.subcontractor_id} value={s.subcontractor_id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Fakturanr */}
           <div>

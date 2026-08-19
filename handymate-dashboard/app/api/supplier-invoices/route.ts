@@ -92,6 +92,7 @@ export async function POST(request: NextRequest) {
         id,
         business_id: business.business_id,
         project_id: body.project_id || null,
+        subcontractor_id: body.subcontractor_id || null,
         supplier_name: body.supplier_name.trim(),
         invoice_number: body.invoice_number?.trim() || null,
         invoice_date: body.invoice_date || null,
@@ -143,11 +144,24 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'ID krävs' }, { status: 400 })
     }
 
+    if (rest.project_id) {
+      const ownership = await verifyOwnership(supabase, business.business_id, [
+        { table: 'project', idColumn: 'project_id', idValue: rest.project_id, label: 'projekt' },
+      ])
+      if (!ownership.ok) {
+        return NextResponse.json(
+          { error: `Du har inte tillgång till: ${ownership.missing.join(', ')}` },
+          { status: 403 },
+        )
+      }
+    }
+
     const allowed = [
       'supplier_name', 'invoice_number', 'invoice_date', 'due_date',
       'amount_excl_vat', 'vat_amount', 'total_amount',
       'markup_percent', 'billable_to_customer', 'show_to_customer',
-      'status', 'paid_at', 'receipt_url', 'notes',
+      'status', 'paid_at', 'receipt_url', 'notes', 'subcontractor_id',
+      'project_id',
     ]
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }

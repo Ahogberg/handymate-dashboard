@@ -68,6 +68,8 @@ interface ProjectEconomics {
     realized_invoice_count: number
     invoice_net_amount_complete: boolean
     extra_cost_count: number
+    unlinked_supplier_invoice_count: number
+    unlinked_project_material_count: number
   }
   // Lokal duplicat av lib/projects/compute-economics.ts ProjectEconomics
   // (se kommentar där) — hålls i synk manuellt eftersom denna komponent

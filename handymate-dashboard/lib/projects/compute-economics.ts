@@ -107,6 +107,8 @@ export interface ProjectEconomics {
     realized_invoice_count: number
     invoice_net_amount_complete: boolean
     extra_cost_count: number  // antal project_cost-rader
+    unlinked_supplier_invoice_count: number
+    unlinked_project_material_count: number
   }
 
   /**
@@ -171,6 +173,7 @@ interface TimeEntryRow {
 }
 
 interface SupplierInvoiceRow {
+  id: string
   total_amount: number | null
   billable_to_customer: boolean | null
 }
@@ -384,31 +387,53 @@ export async function computeProjectEconomics(
   // ── 5. Supplier invoices (material-inköp) ────────────────────
   const { data: supplierData, error: supplierError } = await supabase
     .from('supplier_invoices')
-    .select('total_amount, billable_to_customer')
+    .select('id, total_amount, billable_to_customer')
     .eq('business_id', businessId)
     .eq('project_id', projectId)
 
   assertSourceRead('supplier_invoices', supplierError)
 
   const supplierInvoices = (supplierData || []) as SupplierInvoiceRow[]
+
+  // Material registrerat via materials-UI (project_material). En rad kan
+  // vara LÄNKAD till en supplier_invoices-rad (supplier_invoice_id satt) —
+  // då representerar den fakturans faktiska kostnadsrader, och fakturans
+  // total_amount ska INTE också räknas separat (dubbelräkning). En rad utan
+  // länk är fristående inköp utanför fakturaflödet (Etapp 1,
+  // docs/superpowers/specs/2026-08-19-leverantorsfakturor-design.md).
+  const { data: projectMaterials, error: projectMaterialsError } = await supabase
+    .from('project_material')
+    .select('total_purchase, total_sell, supplier_invoice_id')
+    .eq('business_id', businessId)
+    .eq('project_id', projectId)
+  assertSourceRead('project_material', projectMaterialsError)
+
+  const materialRows = (projectMaterials || []) as Array<{
+    total_purchase: number | null
+    total_sell: number | null
+    supplier_invoice_id: string | null
+  }>
+
+  const linkedInvoiceIds = new Set(
+    materialRows.map(m => m.supplier_invoice_id).filter((id): id is string => !!id),
+  )
+  const unlinkedSupplierInvoiceCount = supplierInvoices.filter(s => !linkedInvoiceIds.has(s.id)).length
+  const unlinkedProjectMaterialCount = materialRows.filter(m => !m.supplier_invoice_id).length
+
   let materialInkop = 0
   let materialBillable = 0
+
+  // Fakturor UTAN någon länkad materialrad räknas som fristående kostnad.
+  // Länkade fakturor hoppas över här — deras belopp kommer in via
+  // materialraderna nedan i stället, så det räknas exakt en gång.
   for (const s of supplierInvoices) {
+    if (linkedInvoiceIds.has(s.id)) continue
     const v = Number(s.total_amount || 0)
     materialInkop += v
     if (s.billable_to_customer) materialBillable += v
   }
 
-  // Material registrerat via materials-UI (project_material) — saknades helt i
-  // marginalberäkningen förut (bara supplier_invoices räknades) → material_inkop
-  // blev 0 och marginalen uppblåst. Inköp = total_purchase, fakturerbart = total_sell.
-  const { data: projectMaterials, error: projectMaterialsError } = await supabase
-    .from('project_material')
-    .select('total_purchase, total_sell')
-    .eq('business_id', businessId)
-    .eq('project_id', projectId)
-  assertSourceRead('project_material', projectMaterialsError)
-  for (const m of (projectMaterials || []) as Array<{ total_purchase: number | null; total_sell: number | null }>) {
+  for (const m of materialRows) {
     materialInkop += Number(m.total_purchase || 0)
     materialBillable += Number(m.total_sell || 0)
   }
@@ -519,6 +544,8 @@ export async function computeProjectEconomics(
       realized_invoice_count: realizedInvoiceCount,
       invoice_net_amount_complete: invoiceNetAmountComplete,
       extra_cost_count: extraCosts.length,
+      unlinked_supplier_invoice_count: unlinkedSupplierInvoiceCount,
+      unlinked_project_material_count: unlinkedProjectMaterialCount,
     },
     // Sätts av routen (se fältets docstring ovan) — helpern har ingen
     // quotes-koppling.
