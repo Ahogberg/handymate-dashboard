@@ -1,4 +1,4 @@
--- v161: Leverantörsfakturor — Fortnox pull-synk
+-- v162: Leverantörsfakturor — Fortnox pull-synk
 --
 -- KÖRS MANUELLT i Supabase SQL Editor.
 --
@@ -12,6 +12,9 @@
 -- "invoice customer companyinformation"). Import-rutten känner igen och
 -- svarar tydligt på scope-fel — se app/api/integrations/fortnox/import/
 -- supplier-invoices/route.ts.
+--
+-- NUMRERING: döpt om från v161 till v162 vid mergen mot main — Etapp 1
+-- (länkningen) hade redan tagit v161 i sin egen parallella worktree.
 
 BEGIN;
 
