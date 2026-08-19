@@ -5868,6 +5868,18 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
   const [showToCustomer, setShowToCustomer] = useState(editing?.show_to_customer ?? false)
   const [notes, setNotes] = useState(editing?.notes || '')
   const [saving, setSaving] = useState(false)
+  const [subcontractorId, setSubcontractorId] = useState<string>(editing?.subcontractor_id || '')
+  const [subcontractors, setSubcontractors] = useState<any[]>([])
+
+  useEffect(() => {
+    // Fail-soft: /api/subcontractors är feature-gated ('subcontractors'-
+    // planfunktionen) — ett konto utan den ska bara se fritext-fältet,
+    // aldrig ett fel. 403/nätverksfel lämnar bara listan tom.
+    fetch('/api/subcontractors?status=active')
+      .then(r => (r.ok ? r.json() : { subcontractors: [] }))
+      .then(d => setSubcontractors(d.subcontractors || []))
+      .catch(() => setSubcontractors([]))
+  }, [])
 
   const exclVat = parseFloat(amountExclVat) || 0
   const vat = parseFloat(vatAmount) || 0
@@ -5894,6 +5906,7 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
         billable_to_customer: billable,
         show_to_customer: showToCustomer,
         notes: notes.trim() || null,
+        subcontractor_id: subcontractorId || null,
       }
 
       if (editing) {
@@ -5928,6 +5941,26 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
             <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Leverantör *</label>
             <input type="text" value={supplierName} onChange={e => setSupplierName(e.target.value)} placeholder="T.ex. Byggmaterial AB" className={inputCls} />
           </div>
+
+          {subcontractors.length > 0 && (
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Underentreprenör (valfritt)</label>
+              <select
+                value={subcontractorId}
+                onChange={e => {
+                  setSubcontractorId(e.target.value)
+                  const chosen = subcontractors.find(s => s.subcontractor_id === e.target.value)
+                  if (chosen) setSupplierName(chosen.name)
+                }}
+                className={inputCls}
+              >
+                <option value="">Ingen — fritext ovan</option>
+                {subcontractors.map(s => (
+                  <option key={s.subcontractor_id} value={s.subcontractor_id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Fakturanr */}
           <div>
