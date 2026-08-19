@@ -18,6 +18,12 @@ något där måste det speglas här. Partnern improviserar aldrig bortom paketet
 | 6 | `06-invandningar-och-faq.md` | Utökad invändningshantering + vanliga frågor med svar | Efter varje demo; innan svåra möten |
 | — | `partneravtal-utkast.md` | Avtalet (internt utkast — jurist-granskas innan användning) | Signeras före aktivering |
 
+**Word-versioner:** varje dokument finns även som `.docx` i `word/`-mappen
+(färdiga att skicka/skriva ut). De genereras från markdown-filerna med
+`node scripts/partner-paket-till-word.js` — kör om skriptet efter varje
+ändring i denna mapp så versionerna hålls i synk. Markdown är alltid
+originalet; redigera aldrig direkt i Word-filerna.
+
 **Utanför denna mapp men del av paketet:**
 
 - Pitch-decken — delas separat (mobilanpassad, 8 min + demo)
