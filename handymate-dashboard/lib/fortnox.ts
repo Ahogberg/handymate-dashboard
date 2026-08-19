@@ -652,6 +652,25 @@ export interface FortnoxInvoiceListItem {
   Booked?: boolean
 }
 
+export interface FortnoxSupplierInvoiceListItem {
+  GivenNumber?: string
+  InvoiceNumber?: string
+  SupplierNumber?: string
+  SupplierName?: string
+  InvoiceDate?: string
+  DueDate?: string
+  Total?: number
+  Balance?: number
+  Currency?: string
+  Cancelled?: boolean
+  Booked?: boolean
+}
+
+interface FortnoxSupplierInvoicesListResponse {
+  SupplierInvoices?: FortnoxSupplierInvoiceListItem[]
+  MetaInformation?: { '@TotalPages'?: number; '@CurrentPage'?: number }
+}
+
 interface FortnoxInvoicesListResponse {
   Invoices?: FortnoxInvoiceListItem[]
   MetaInformation?: {
@@ -683,6 +702,66 @@ async function fetchFortnoxInvoicePages(
     )
 
     const rows = response.Invoices ?? []
+    all.push(...rows)
+
+    const totalPages = response.MetaInformation?.['@TotalPages'] ?? 1
+    const currentPage = response.MetaInformation?.['@CurrentPage'] ?? page
+    if (rows.length === 0 || currentPage >= totalPages) break
+  }
+  return all
+}
+
+/**
+ * Hämtar leverantörsfakturor från Fortnox — samma två-pull-strategi som
+ * getFortnoxInvoices (obetalda utan tidsgräns + senaste 12 månaderna),
+ * pull-only (Fortnox förblir bokföringens källa, se
+ * docs/superpowers/specs/2026-08-19-leverantorsfakturor-design.md).
+ */
+export async function getFortnoxSupplierInvoices(
+  businessId: string
+): Promise<FortnoxSupplierInvoiceListItem[]> {
+  const twelveMonthsAgo = new Date()
+  twelveMonthsAgo.setUTCMonth(twelveMonthsAgo.getUTCMonth() - 12)
+  const fromDate = twelveMonthsAgo.toISOString().slice(0, 10)
+
+  try {
+    const [unpaid, recent] = await Promise.all([
+      fetchFortnoxSupplierInvoicePages(businessId, 'filter=unpaid'),
+      fetchFortnoxSupplierInvoicePages(businessId, `fromdate=${fromDate}`),
+    ])
+    const seen = new Set<string>()
+    const merged: FortnoxSupplierInvoiceListItem[] = []
+    for (const inv of [...unpaid, ...recent]) {
+      const key = inv.GivenNumber ?? inv.InvoiceNumber
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      merged.push(inv)
+    }
+    return merged.filter(inv => !inv.Cancelled)
+  } catch (error) {
+    console.error('Get Fortnox supplier invoices error:', error)
+    throw error
+  }
+}
+
+/**
+ * Paginerad hämtning mot Fortnox /supplierinvoices med givna query-
+ * parametrar. Speglar fetchFortnoxInvoicePages ovan. Återanvänder
+ * fortnoxRequest → token-refresh + audit-logg sköts där.
+ */
+async function fetchFortnoxSupplierInvoicePages(
+  businessId: string,
+  queryParams: string,
+): Promise<FortnoxSupplierInvoiceListItem[]> {
+  const all: FortnoxSupplierInvoiceListItem[] = []
+  for (let page = 1; page <= INVOICE_PULL_MAX_PAGES; page++) {
+    const response = await fortnoxRequest<FortnoxSupplierInvoicesListResponse>(
+      businessId,
+      'GET',
+      `/supplierinvoices?${queryParams}&page=${page}`
+    )
+
+    const rows = response.SupplierInvoices ?? []
     all.push(...rows)
 
     const totalPages = response.MetaInformation?.['@TotalPages'] ?? 1
