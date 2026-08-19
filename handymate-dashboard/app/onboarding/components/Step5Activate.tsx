@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { ArrowRight, Check, Info, Loader2, Shield } from 'lucide-react'
@@ -162,7 +162,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
               Lanseringserbjudande — Grundarkunderna
             </strong>
             <p style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.45 }}>
-              Du blir en av de första 20: priset låses för alltid, 90 dagars pengarna-tillbaka-garanti i stället för 30, och direktlinje till grundaren första året.
+              Du blir en av de första 20: priset låses för alltid — det höjs aldrig för dig — och du får en direktlinje till grundaren under hela första året.
             </p>
           </div>
         )}

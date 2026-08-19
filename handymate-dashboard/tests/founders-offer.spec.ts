@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Lanseringserbjudandet "Grundarkunderna" (Andreas-beslut 2026-08-19): de
  * första 20 RIKTIGA betalande företagen låser sitt pris för alltid, får 90
  * dagars pengarna-tillbaka-garanti i stället för 30, och direktlinje till
@@ -25,7 +25,7 @@ const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
 const HELPER = 'lib/billing/founders-offer.ts'
 const BANNER_TITLE = 'Lanseringserbjudande — Grundarkunderna'
 const BANNER_BODY =
-  'Du blir en av de första 20: priset låses för alltid, 90 dagars pengarna-tillbaka-garanti i stället för 30, och direktlinje till grundaren första året.'
+  'Du blir en av de första 20: priset låses för alltid — det höjs aldrig för dig — och du får en direktlinje till grundaren under hela första året.'
 
 test.describe('isFoundersOfferAvailable — frågan mot riktiga prenumerationsfält', () => {
   test('räknar på stripe_subscription_id + subscription_status = active', () => {
