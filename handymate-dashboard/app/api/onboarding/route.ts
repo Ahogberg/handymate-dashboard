@@ -4,6 +4,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { seedAllDefaults } from '@/lib/seed-defaults'
 import { isOnboardingPaymentBlocked } from '@/lib/onboarding/payment-gate'
 import { skapaStartkort } from '@/lib/onboarding/starter-cards'
+import { isFoundersOfferAvailable } from '@/lib/billing/founders-offer'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,10 +58,17 @@ export async function GET(request: NextRequest) {
       gmailEnabled = calConn.gmail_sync_enabled || false
     }
 
+    // Lanseringserbjudandet "Grundarkunderna" (Andreas-beslut 2026-08-19):
+    // Step5Activate visar en banner om färre än 20 riktiga betalande konton
+    // finns. Server-härlett — se lib/billing/founders-offer.ts. Återanvänder
+    // den redan-anropade GET /api/onboarding istället för en ny fetch.
+    const foundersAvailable = await isFoundersOfferAvailable(supabase)
+
     return NextResponse.json({
       ...data,
       google_connected: googleConnected,
       gmail_enabled: gmailEnabled,
+      founders_available: foundersAvailable,
     })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Okänt fel'

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/permissions'
+import { isFoundersOfferAvailable } from '@/lib/billing/founders-offer'
 
 /**
  * GET /api/billing - Hämta aktuell faktureringsstatus
@@ -75,6 +76,12 @@ export async function GET(request: NextRequest) {
       trialDaysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
     }
 
+    // Lanseringserbjudandet "Grundarkunderna" (Andreas-beslut 2026-08-19):
+    // billing-sidan har ingen egen naturlig källa för detta — återanvänder
+    // GET /api/billing (redan anropad av sidan vid load) i stället för en
+    // ny fetch. Server-härlett, se lib/billing/founders-offer.ts.
+    const foundersAvailable = await isFoundersOfferAvailable(supabase)
+
     return NextResponse.json({
       plan: {
         id: plan.plan_id,
@@ -83,6 +90,7 @@ export async function GET(request: NextRequest) {
         features: plan.features,
         limits: plan.limits
       },
+      founders_available: foundersAvailable,
       subscription: {
         status: billingData?.subscription_status || 'trialing',
         stripe_customer_id: billingData?.stripe_customer_id || null,

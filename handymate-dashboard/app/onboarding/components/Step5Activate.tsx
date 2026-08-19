@@ -136,6 +136,37 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
     <div className="ob-screen">
       <OnboardingHeader step={3} total={6} onBack={onBack} />
       <div className="ob-body">
+        {/* Lanseringserbjudandet "Grundarkunderna" (Andreas-beslut 2026-08-19)
+            — server-härlett via data.foundersAvailable (GET /api/onboarding,
+            lib/billing/founders-offer.ts). Ingen banner alls när flaggan är
+            false/undefined — ingen "platserna är slut"-text i V1. */}
+        {data.foundersAvailable && (
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #FFFBEB 0%, var(--ob-primary-50) 100%)',
+              border: '1.5px solid #FDE68A',
+              borderRadius: 'var(--ob-r-2xl)',
+              padding: '18px 18px',
+              marginBottom: 14,
+            }}
+          >
+            <strong
+              style={{
+                display: 'block',
+                fontSize: 15,
+                color: 'var(--ob-primary-700)',
+                letterSpacing: '-0.01em',
+                marginBottom: 4,
+              }}
+            >
+              Lanseringserbjudande — Grundarkunderna
+            </strong>
+            <p style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.45 }}>
+              Du blir en av de första 20: priset låses för alltid, 90 dagars pengarna-tillbaka-garanti i stället för 30, och direktlinje till grundaren första året.
+            </p>
+          </div>
+        )}
+
         {/* Guarantee banner — DOMINERANDE, inte fotnot */}
         <div
           style={{

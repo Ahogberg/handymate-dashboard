@@ -106,6 +106,10 @@ export default function OnboardingPage() {
           phone: d.phone_number,
           fSkatt: true,
           ...(d.onboarding_data || {}),
+          // Server-härlett (aldrig från onboarding_data — se GET /api/onboarding).
+          // Placerad EFTER spreadet så den aldrig kan skuggas av ett gammalt
+          // cachat värde i onboarding_data.
+          foundersAvailable: Boolean(d.founders_available),
         }
 
         setData(restored)

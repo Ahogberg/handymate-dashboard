@@ -41,6 +41,10 @@ const formatShortDate = (dateStr: string) => {
 // alltid fallback-värdet "Aktiv", trial/förnyelsedatum renderades aldrig, och
 // priset föll alltid tillbaka på den lokala PLANS-konstanten.
 interface BillingData {
+  // Lanseringserbjudandet "Grundarkunderna" (Andreas-beslut 2026-08-19) —
+  // server-härlett, se lib/billing/founders-offer.ts. undefined/false =
+  // ingen banner.
+  founders_available?: boolean
   plan: {
     /** plan_id från billing_plan (starter/professional/business) — stabil
         nyckel för matchning; name är visningsnamn och kan bytas fritt. */
@@ -418,6 +422,21 @@ export default function BillingPage() {
                 <Zap className="w-5 h-5 text-gray-700" />
                 <h2 className="text-lg font-semibold text-gray-900">Valj plan</h2>
               </div>
+
+              {/* Lanseringserbjudandet "Grundarkunderna" (Andreas-beslut
+                  2026-08-19) — server-härlett via billing.founders_available
+                  (GET /api/billing, lib/billing/founders-offer.ts). Ingen
+                  banner alls när flaggan är false/undefined. */}
+              {billing?.founders_available && (
+                <div className="bg-gradient-to-br from-amber-50 to-primary-50 border border-amber-200 rounded-xl p-4 mb-4">
+                  <strong className="block text-sm text-primary-700 mb-1">
+                    Lanseringserbjudande — Grundarkunderna
+                  </strong>
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    Du blir en av de första 20: priset låses för alltid, 90 dagars pengarna-tillbaka-garanti i stället för 30, och direktlinje till grundaren första året.
+                  </p>
+                </div>
+              )}
 
               {/* Månadsvis/Årsvis (Andreas-beslut 2026-08-19) */}
               <div className="inline-flex items-center gap-1 p-1 mb-2 bg-gray-100 rounded-xl">

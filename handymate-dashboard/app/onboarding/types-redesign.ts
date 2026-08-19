@@ -84,6 +84,12 @@ export interface OnboardingFormData {
 
   // ── Step 5: Aktivera ─────────────────────────────────────
   plan?: string  // 'starter' | 'professional' | 'business'
+  /**
+   * Lanseringserbjudandet "Grundarkunderna" (Andreas-beslut 2026-08-19) —
+   * server-härlett i GET /api/onboarding (lib/billing/founders-offer.ts),
+   * ALDRIG en klientsidan-gissning. undefined/false = ingen banner.
+   */
+  foundersAvailable?: boolean
 
   // ── Steg 6: Hämta in verksamhet (import) ─────────────────
   // Antal importerade rader — LiveTour kan visa dem som payoff (state E).
