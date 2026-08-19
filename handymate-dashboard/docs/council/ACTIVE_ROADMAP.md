@@ -35,17 +35,39 @@ och bekräftade mönster (`business_knowledge` pattern-rader, Playbook Pattern
 Confirmation V1) till experiment som medvetet varierar EN sak och mäter
 utfallet.
 
-**Grinden — öppnas när:**
-```
-≥3 riktiga betalande kunder
-har ≥5 avslutade projekt vardera
-med kompletta utfall (financial_learning_eligible = true)
-```
-Riktiga = inte demo/testdata (`lib/testdata.ts`-filtret). Kompletta utfall =
-`calculation_version = OUTCOME_CALCULATION_VERSION` OCH
-`financial_learning_eligible = true` — samma sanningskontrakt som Outcome
-Quality Gate V1 (`sql/v138_outcome_quality_gate.sql`) redan håller. Under
-grinden: programmet förblir ett dokument, ingen kod byggs mot det.
+**Grinden omformulerad 2026-08-19 — MOTORN BYGGD I FÖRVÄG (Etapp 1: datalager
++ läs-only mätmotor), OCH STÅR TOM. AKTIVERAS AV DATA.**
+
+`sql/v157_operating_experiment.sql` (körs manuellt av Andreas),
+`lib/experiment/types.ts` och `lib/experiment/measure.ts` finns i repot,
+färdigtestade (`tests/operating-experiment.spec.ts`) — men tabellen har noll
+rader tills en riktig `operating_experiment`-rad skapas, och ingen kod i
+Etapp 1 skriver dit. Grinden är alltså INTE längre "börja bygga när N kunder
+finns" — den flyttas till två senare, tydligare avgränsade punkter:
+
+1. **Förslagslagret (Etapp 2)** — kortet som föreslår ett avgränsat försök åt
+   ägaren (skapar den faktiska `operating_experiment`-raden) byggs när
+   ```
+   ≥3 riktiga betalande kunder
+   har ≥5 avslutade projekt vardera
+   med kompletta utfall (financial_learning_eligible = true)
+   ```
+   Riktiga = inte demo/testdata (`lib/testdata.ts`-filtret). Kompletta utfall
+   = `calculation_version = OUTCOME_CALCULATION_VERSION` OCH
+   `financial_learning_eligible = true` — samma sanningskontrakt som Outcome
+   Quality Gate V1 (`sql/v138_outcome_quality_gate.sql`) redan håller,
+   oförändrat av att Etapp 1 nu finns.
+2. **Presentationsgrinden** — de namngivna trösklarna i
+   `lib/experiment/types.ts` (`EXPERIMENT_MIN_COMPARABLE_DEFAULT = 3`,
+   `EXPERIMENT_MAX_PROJECTS_CAP = 5`) är uttryckligen dokumenterade som
+   förhandsgissningar ("förhandsgissning 2026-08-19, kalibreras mot verkliga
+   utfall före första presenterade slutsats") — de kalibreras mot faktiska
+   mätresultat INNAN någon slutsats någonsin visas för en ägare som mer än
+   räknade fakta. Ett `underlag_finns`-facit betyder bara "tillräckligt
+   många projekt att räkna på", ALDRIG ett kvalitetsomdöme —
+   `deriveExperimentVerdict` (`lib/experiment/measure.ts`) kan strukturellt
+   inte returnera ett värdeord, källskanningen i
+   `tests/operating-experiment.spec.ts` låser det.
 
 **De fyra sanningsnivåerna** (varje påstående programmet någonsin gör måste
 bära sin nivå synligt, aldrig blandas ihop):
@@ -83,10 +105,15 @@ projekts start. OperatingExperiment bygger vidare på samma "visa beläggen,
 aldrig bara påståendet"-princip, men med kvantifierat, nivåsatt bevis i
 stället för en fri textformulering.
 
-**Status:** dokumenterad riktning, ingen kod. Nästa steg är INTE att börja
-bygga — det är att övervaka grindvillkoret (kontrollfrågorna i
-`sql/kontroll_utfallsfangst_2026-08-19.sql`, fråga 4b, visar hur snabbt
-`financial_learning_eligible`-raderna växer nu när läckorna är täppta).
+**Status:** Etapp 1 (datalager + läs-only mätmotor) byggd, testad och TOM
+2026-08-19 — `sql/v157_operating_experiment.sql` (ej körd av Andreas ännu),
+`lib/experiment/types.ts`, `lib/experiment/measure.ts`,
+`tests/operating-experiment.spec.ts`. Nästa steg är fortfarande INTE att
+presentera en slutsats för en ägare — det är att (a) övervaka grindvillkoret
+för Etapp 2 (kontrollfrågorna i `sql/kontroll_utfallsfangst_2026-08-19.sql`,
+fråga 4b, visar hur snabbt `financial_learning_eligible`-raderna växer nu när
+läckorna är täppta) och (b) bygga förslagslagret (Etapp 2: kortet som skapar
+en `operating_experiment`-rad) när den grinden öppnas.
 
 ---
 
