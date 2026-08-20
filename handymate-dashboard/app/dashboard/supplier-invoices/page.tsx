@@ -50,8 +50,8 @@ const STATUS_LABEL: Record<DisplayStatus, string> = {
 
 const STATUS_BADGE_CLASS: Record<DisplayStatus, string> = {
   unpaid: 'bg-slate-100 text-slate-600',
-  overdue: 'bg-red-50 text-red-700',
-  paid: 'bg-green-50 text-green-700',
+  overdue: 'bg-red-50 text-red-600',
+  paid: 'bg-green-50 text-green-600',
 }
 
 function SupplierInvoicesPageContent() {
@@ -105,7 +105,7 @@ function SupplierInvoicesPageContent() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
-      <h1 className="text-xl font-semibold text-slate-900 mb-4">Leverantörsfakturor</h1>
+      <h1 className="font-heading text-xl font-semibold text-slate-900 mb-4">Leverantörsfakturor</h1>
 
       <div className="flex flex-col sm:flex-row gap-2 mb-4">
         <div className="relative flex-1">
@@ -146,7 +146,7 @@ function SupplierInvoicesPageContent() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="text-[15px] font-semibold text-slate-900 truncate m-0">{inv.supplier_name}</h3>
-                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE_CLASS[status]}`}>
+                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_BADGE_CLASS[status]}`}>
                       {STATUS_LABEL[status]}
                     </span>
                   </div>
@@ -165,7 +165,7 @@ function SupplierInvoicesPageContent() {
                     </Link>
                   )}
                 </div>
-                <span className="font-heading text-sm font-bold text-slate-900 whitespace-nowrap shrink-0">
+                <span className="font-heading text-sm font-bold tabular-nums text-slate-900 whitespace-nowrap shrink-0">
                   {inv.total_amount.toLocaleString('sv-SE')} kr
                 </span>
               </div>

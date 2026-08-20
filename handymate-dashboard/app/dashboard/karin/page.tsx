@@ -849,7 +849,7 @@ function LeverantorsfakturaRad({ item, projects, subcontractors, onKoppla }: {
             {item.invoice_number && ` · Fakturanr ${item.invoice_number}`}
           </p>
         </div>
-        <span className="font-heading text-sm font-bold text-slate-900 whitespace-nowrap shrink-0">
+        <span className="font-heading text-sm font-bold tabular-nums text-slate-900 whitespace-nowrap shrink-0">
           {(item.total_amount ?? 0).toLocaleString('sv-SE')} kr
         </span>
       </div>
