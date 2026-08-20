@@ -69,3 +69,31 @@ test.describe('Karin-sidan renderar leverantorsfaktura-kon', () => {
     expect(around).toMatch(/laddaKalender|setQueue|filter\(/)
   })
 })
+
+test.describe('GET /api/karin/supplier-invoices — matchningsforslag', () => {
+  const ROUTE = fs.readFileSync(
+    path.join(__dirname, '..', 'app/api/karin/supplier-invoices/route.ts'),
+    'utf8',
+  )
+
+  test('GET importerar och anvander suggestMatch', () => {
+    expect(ROUTE).toContain("from '@/lib/karin/supplier-invoice-match'")
+    expect(ROUTE).toContain('suggestMatch(')
+  })
+
+  test('historikfragan filtrerar pa project_id IS NOT NULL', () => {
+    const getBlock = ROUTE.slice(ROUTE.indexOf('export async function GET'), ROUTE.indexOf('export async function PATCH'))
+    expect(getBlock).toMatch(/\.not\(['"]project_id['"],\s*['"]is['"],\s*null\)/)
+  })
+
+  test('svaret bar suggested_project_id och suggested_subcontractor_id', () => {
+    const getBlock = ROUTE.slice(ROUTE.indexOf('export async function GET'), ROUTE.indexOf('export async function PATCH'))
+    expect(getBlock).toContain('suggested_project_id')
+    expect(getBlock).toContain('suggested_subcontractor_id')
+  })
+
+  test('tom ko hoppar over historikfragan (ingen anledning att fraga i onodan)', () => {
+    const getBlock = ROUTE.slice(ROUTE.indexOf('export async function GET'), ROUTE.indexOf('export async function PATCH'))
+    expect(getBlock).toMatch(/queue\.length > 0/)
+  })
+})
