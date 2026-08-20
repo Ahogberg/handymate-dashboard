@@ -63,3 +63,26 @@ test.describe('send-via-fortnox/route.ts ar en tunn wrapper', () => {
     expect(ROUTE).toContain("status: 'sent'")
   })
 })
+
+test.describe('Fortnox-dubbelskydd — markera som skickad (verifierat mot fortnox-openapi.json)', () => {
+  test('gor ett PUT-anrop mot externalprint-endpointen for att markera fakturan som skickad', () => {
+    const idx = FILE.indexOf('fortnoxDocumentNumber = response')
+    const block = FILE.slice(idx, idx + 2000)
+    expect(block).toMatch(/fortnoxRequest[\s\S]*?'PUT'[\s\S]*?externalprint/)
+  })
+
+  test('ett misslyckat markera-som-skickad-anrop blockerar INTE flodet', () => {
+    // Hitta try/catch-blocket för externalprint-anropet specifikt (inte det
+    // första POST /invoices-blocket längre upp i filen) och verifiera att
+    // catch-grenen bara loggar — ingen `return { success: false` eller
+    // omkastning av felet, så bokföringen (redan klar vid det här laget)
+    // aldrig rapporteras som misslyckad bara för att markera-som-skickad
+    // strular.
+    const idx = FILE.indexOf('externalprint')
+    expect(idx).toBeGreaterThan(-1)
+    const catchIdx = FILE.indexOf('catch (markSentErr', idx)
+    expect(catchIdx).toBeGreaterThan(idx)
+    const catchBlock = FILE.slice(catchIdx, catchIdx + 300)
+    expect(catchBlock).not.toMatch(/return \{ success: false/)
+  })
+})

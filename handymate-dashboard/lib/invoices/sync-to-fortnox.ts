@@ -202,6 +202,28 @@ export async function syncInvoiceToFortnox(
     console.error('[sync-to-fortnox] Fortnox API failed:', fortnoxError)
   }
 
+  // Dubbelskydd (2026-08-20, verifierat mot Fortnox egen OpenAPI-spec —
+  // se lib/invoices/sync-to-fortnox.ts's grannefil-historik för research):
+  // PUT /invoices/{DocumentNumber}/externalprint markerar fakturan som
+  // Sent=true i Fortnox UTAN att generera/skicka något själv ("Use this
+  // endpoint to set invoice as sent, without generating an invoice").
+  // Gör att Fortnox egen "Skicka"-knapp/e-postutskick i deras gränssnitt
+  // visar fakturan som redan skickad, så en människa där inte råkar
+  // dubbelmejla kunden. Best-effort — bokföringen (huvudsyftet) är redan
+  // klar vid det här laget oavsett vad detta anrop gör.
+  if (fortnoxDocumentNumber) {
+    try {
+      await fortnoxRequest(
+        businessId,
+        'PUT',
+        `/invoices/${fortnoxDocumentNumber}/externalprint`,
+        { Invoice: { CustomerNumber: customerNumber } },
+      )
+    } catch (markSentErr: any) {
+      console.error('[sync-to-fortnox] externalprint (markera som skickad) misslyckades — bokföringen kvarstår korrekt:', markSentErr?.message || markSentErr)
+    }
+  }
+
   if (fortnoxError || !fortnoxInvoiceNumber) {
     await supabase
       .from('invoice')
