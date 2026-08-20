@@ -55,6 +55,13 @@ interface SupplierInvoiceQueueItem {
   total_amount: number | null
   fortnox_supplier_invoice_number: string | null
   created_at: string
+  // Matchningsförslag (2026-08-20) — se lib/karin/supplier-invoice-match.ts
+  suggested_project_id: string | null
+  suggested_project_name: string | null
+  suggested_project_match_count: number
+  suggested_subcontractor_id: string | null
+  suggested_subcontractor_name: string | null
+  suggested_subcontractor_match_count: number
 }
 
 interface ProjectOption {
@@ -817,8 +824,8 @@ function LeverantorsfakturaRad({ item, projects, subcontractors, onKoppla }: {
   subcontractors: SubcontractorOption[]
   onKoppla: (id: string, projectId: string, subcontractorId: string, supplierName: string) => Promise<boolean>
 }) {
-  const [projectId, setProjectId] = useState('')
-  const [subcontractorId, setSubcontractorId] = useState('')
+  const [projectId, setProjectId] = useState(item.suggested_project_id || '')
+  const [subcontractorId, setSubcontractorId] = useState(item.suggested_subcontractor_id || '')
   const [annanLeverantor, setAnnanLeverantor] = useState(false)
   const [leverantorNamn, setLeverantorNamn] = useState(item.supplier_name || '')
   const [sparar, setSparar] = useState(false)
@@ -897,6 +904,16 @@ function LeverantorsfakturaRad({ item, projects, subcontractors, onKoppla }: {
           {sparar ? 'Kopplar …' : 'Koppla'}
         </button>
       </div>
+      {item.suggested_project_match_count > 0 && (
+        <p className="text-[12px] text-slate-400 mt-2 mb-0">
+          Föreslaget projekt — kopplad hit {item.suggested_project_match_count} gånger förut
+        </p>
+      )}
+      {item.suggested_subcontractor_match_count > 0 && (
+        <p className="text-[12px] text-slate-400 mt-0.5 mb-0">
+          Föreslagen underentreprenör — kopplad hit {item.suggested_subcontractor_match_count} gånger förut
+        </p>
+      )}
     </div>
   )
 }

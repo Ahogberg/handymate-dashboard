@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { verifyOwnership } from '@/lib/auth/verify-ownership'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
+import { suggestMatch, type MatchedInvoice } from '@/lib/karin/supplier-invoice-match'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +40,64 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    return NextResponse.json({ queue: data || [] })
+    const queue = data || []
+
+    // Matchningsförslag (2026-08-20, docs/superpowers/specs/
+    // 2026-08-20-leverantorsfaktura-matchningsforslag-design.md): beräknat
+    // från leverantörens egen historik. Tom kö → hoppa över historik-
+    // frågan helt, ingen anledning att fråga i onödan.
+    let queueWithSuggestions = queue.map(item => ({
+      ...item,
+      suggested_project_id: null as string | null,
+      suggested_project_name: null as string | null,
+      suggested_project_match_count: 0,
+      suggested_subcontractor_id: null as string | null,
+      suggested_subcontractor_name: null as string | null,
+      suggested_subcontractor_match_count: 0,
+    }))
+
+    if (queue.length > 0) {
+      const { data: matchedData, error: matchedError } = await supabase
+        .from('supplier_invoices')
+        .select('supplier_name, project_id, subcontractor_id')
+        .eq('business_id', business.business_id)
+        .not('project_id', 'is', null)
+
+      if (matchedError) throw matchedError
+
+      const matchedInvoices: MatchedInvoice[] = matchedData || []
+      const suggestions = queue.map(item => suggestMatch(item.supplier_name || '', matchedInvoices))
+
+      const projectIds = Array.from(new Set(suggestions.map(s => s.project_id).filter((id): id is string => !!id)))
+      const subcontractorIds = Array.from(new Set(suggestions.map(s => s.subcontractor_id).filter((id): id is string => !!id)))
+
+      const [projectNamesResult, subcontractorNamesResult] = await Promise.all([
+        projectIds.length > 0
+          ? supabase.from('project').select('project_id, name').in('project_id', projectIds)
+          : Promise.resolve({ data: [] as { project_id: string; name: string }[] }),
+        subcontractorIds.length > 0
+          ? supabase.from('subcontractor').select('subcontractor_id, name').in('subcontractor_id', subcontractorIds)
+          : Promise.resolve({ data: [] as { subcontractor_id: string; name: string }[] }),
+      ])
+
+      const projectNameById = new Map((projectNamesResult.data || []).map(p => [p.project_id, p.name]))
+      const subcontractorNameById = new Map((subcontractorNamesResult.data || []).map(s => [s.subcontractor_id, s.name]))
+
+      queueWithSuggestions = queue.map((item, i) => {
+        const s = suggestions[i]
+        return {
+          ...item,
+          suggested_project_id: s.project_id,
+          suggested_project_name: s.project_id ? (projectNameById.get(s.project_id) ?? null) : null,
+          suggested_project_match_count: s.project_match_count,
+          suggested_subcontractor_id: s.subcontractor_id,
+          suggested_subcontractor_name: s.subcontractor_id ? (subcontractorNameById.get(s.subcontractor_id) ?? null) : null,
+          suggested_subcontractor_match_count: s.subcontractor_match_count,
+        }
+      })
+    }
+
+    return NextResponse.json({ queue: queueWithSuggestions })
   } catch (error: any) {
     console.error('Get karin supplier-invoice queue error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
