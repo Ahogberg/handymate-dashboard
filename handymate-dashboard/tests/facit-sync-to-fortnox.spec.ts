@@ -43,3 +43,23 @@ test.describe('lib/invoices/sync-to-fortnox.ts', () => {
     expect(FILE).toMatch(/skipped:\s*true/)
   })
 })
+
+test.describe('send-via-fortnox/route.ts ar en tunn wrapper', () => {
+  const ROUTE = fs.readFileSync(
+    path.join(__dirname, '..', 'app/api/invoices/[id]/send-via-fortnox/route.ts'),
+    'utf8',
+  )
+
+  test('anvander syncInvoiceToFortnox istallet for egen Fortnox-logik', () => {
+    expect(ROUTE).toContain("from '@/lib/invoices/sync-to-fortnox'")
+    expect(ROUTE).toContain('syncInvoiceToFortnox(')
+  })
+
+  test('POST-anropet mot Fortnox finns bara i sync-to-fortnox.ts, inte har langre', () => {
+    expect(ROUTE).not.toMatch(/fortnoxRequest\(/)
+  })
+
+  test('satter fortfarande status=sent for bakatkompatibilitet med den fristaende knappen', () => {
+    expect(ROUTE).toContain("status: 'sent'")
+  })
+})
