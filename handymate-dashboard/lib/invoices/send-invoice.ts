@@ -567,19 +567,14 @@ export async function triggerPostSendAutomations(params: PostSendAutomationsPara
     console.error('Communication trigger error (non-blocking):', commErr)
   }
 
-  // Portal-notifikation
-  try {
-    const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
-    await sendPortalNotification(businessId, invoice.customer_id, 'invoice_sent', {
-      context: {
-        amount: invoice.total_amount || invoice.total || invoice.amount,
-        due_date: invoice.due_date || null,
-        invoice_number: invoice.invoice_number,
-      },
-    })
-  } catch (notifErr) {
-    console.error('Portal notification invoice_sent error (non-blocking):', notifErr)
-  }
+  // Portal-notifikation borttagen (2026-08-20): sendInvoice() skickar redan
+  // ett komplett mejl (PDF-bilaga + länk "Visa i kundportalen") och/eller
+  // SMS (samma portal-länk) högre upp i samma anrop. Ett separat,
+  // ovillkorligt "Ny faktura — visa i din portal"-mejl härifrån ovanpå det
+  // var alltid överflödigt — kunden fick två mejl om samma faktura inom
+  // loppet av sekunder. Övriga portal-notis-event (invoice_paid,
+  // invoice_overdue, project_update, ...) är oförändrade — bara denna
+  // specifika ovillkorliga trigger vid utskick är borttagen.
 }
 
 // ── Faktura-mailmall (teal, matchar offertmall) ─────────────────────

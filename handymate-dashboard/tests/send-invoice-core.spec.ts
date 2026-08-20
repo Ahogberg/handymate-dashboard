@@ -407,3 +407,25 @@ test.describe('attributionsregeln — automationens utskick loggas aldrig som m�
     expect(autoSrc).toContain("source: 'automation'")
   })
 })
+
+test.describe('inget dubbelmejl vid fakturautskick (2026-08-20)', () => {
+  const fs = require('fs')
+  const path = require('path')
+  const coreSrc = fs.readFileSync(path.join(__dirname, '..', 'lib', 'invoices', 'send-invoice.ts'), 'utf8') as string
+
+  // sendInvoice() skickar redan ett fullständigt mejl (PDF-bilaga + länk
+  // "Visa i kundportalen") och/eller SMS (med samma portal-länk) i samma
+  // anrop som triggerPostSendAutomations(). Ett separat, ovillkorligt
+  // "Ny faktura — visa i din portal"-mejl via sendPortalNotification
+  // ovanpå det är alltså alltid överflödigt — kunden får två mejl om
+  // samma faktura inom loppet av sekunder. Andra event
+  // (invoice_paid/invoice_overdue/project_update/...) berörs inte,
+  // portal-notissystemet i sig tas inte bort — bara denna specifika
+  // ovillkorliga trigger vid utskick.
+  test('triggerPostSendAutomations anropar inte sendPortalNotification med invoice_sent', () => {
+    const idx = coreSrc.indexOf('export async function triggerPostSendAutomations')
+    expect(idx).toBeGreaterThan(-1)
+    const block = coreSrc.slice(idx)
+    expect(block).not.toMatch(/sendPortalNotification\([^)]*'invoice_sent'/)
+  })
+})
