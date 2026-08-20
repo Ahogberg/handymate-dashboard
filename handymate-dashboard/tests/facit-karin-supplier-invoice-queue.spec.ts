@@ -97,3 +97,35 @@ test.describe('GET /api/karin/supplier-invoices — matchningsforslag', () => {
     expect(getBlock).toMatch(/queue\.length > 0/)
   })
 })
+
+test.describe('LeverantorsfakturaRad — forifyllda forslag', () => {
+  const PAGE = fs.readFileSync(
+    path.join(__dirname, '..', 'app/dashboard/karin/page.tsx'),
+    'utf8',
+  )
+
+  test('SupplierInvoiceQueueItem-interfacet har de sex nya faltet', () => {
+    const ifaceStart = PAGE.indexOf('interface SupplierInvoiceQueueItem')
+    const ifaceEnd = PAGE.indexOf('\n}', ifaceStart)
+    const block = PAGE.slice(ifaceStart, ifaceEnd)
+    for (const field of [
+      'suggested_project_id', 'suggested_project_name', 'suggested_project_match_count',
+      'suggested_subcontractor_id', 'suggested_subcontractor_name', 'suggested_subcontractor_match_count',
+    ]) {
+      expect(block).toContain(field)
+    }
+  })
+
+  test('projectId-state initieras fran item.suggested_project_id', () => {
+    expect(PAGE).toContain("useState(item.suggested_project_id || '')")
+  })
+
+  test('subcontractorId-state initieras fran item.suggested_subcontractor_id', () => {
+    expect(PAGE).toContain("useState(item.suggested_subcontractor_id || '')")
+  })
+
+  test('motiveringstext renderas villkorligt pa match_count', () => {
+    expect(PAGE).toContain('suggested_project_match_count')
+    expect(PAGE).toContain('Föreslaget')
+  })
+})
