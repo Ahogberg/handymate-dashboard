@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { syncInvoiceToFortnox } from '@/lib/fortnox'
+import { getServerSupabase } from '@/lib/supabase'
+import { syncInvoiceToFortnox } from '@/lib/invoices/sync-to-fortnox'
 import { logFortnoxOperation } from '@/lib/fortnox/api-log'
 
 /**
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'invoiceId required' }, { status: 400 })
     }
 
-    const result = await syncInvoiceToFortnox(businessId, invoiceId)
+    const result = await syncInvoiceToFortnox(getServerSupabase(), { businessId, invoiceId })
 
     await logFortnoxOperation(businessId, 'sync_invoice', {
       invoice_id: invoiceId,

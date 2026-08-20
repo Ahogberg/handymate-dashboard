@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { isFortnoxConnected, syncInvoiceToFortnox } from '@/lib/fortnox'
+import { isFortnoxConnected } from '@/lib/fortnox'
+import { syncInvoiceToFortnox } from '@/lib/invoices/sync-to-fortnox'
 import { logFortnoxOperation } from '@/lib/fortnox/api-log'
 
 /**
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     for (const invoice of invoices || []) {
-      const result = await syncInvoiceToFortnox(businessId, invoice.invoice_id)
+      const result = await syncInvoiceToFortnox(supabase, { businessId, invoiceId: invoice.invoice_id })
       if (result.success) {
         results.synced++
       } else {

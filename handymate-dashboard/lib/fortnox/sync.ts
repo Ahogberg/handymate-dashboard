@@ -8,11 +8,11 @@
 import { createClient } from '@supabase/supabase-js'
 import {
   syncCustomerToFortnox,
-  syncInvoiceToFortnox,
   syncQuoteToFortnox,
   registerFortnoxPayment,
   isFortnoxConnected,
 } from '@/lib/fortnox'
+import { syncInvoiceToFortnox } from '@/lib/invoices/sync-to-fortnox'
 
 function getSupabase() {
   return createClient(
@@ -104,7 +104,7 @@ export async function syncInvoiceWithTracking(
   businessId: string,
   invoiceId: string
 ): Promise<{ success: boolean; skipped?: boolean; fortnoxId?: string; error?: string }> {
-  const result = await syncInvoiceToFortnox(businessId, invoiceId)
+  const result = await syncInvoiceToFortnox(getSupabase(), { businessId, invoiceId })
 
   if (result.skipped) {
     return { success: false, skipped: true, error: result.error }

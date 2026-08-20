@@ -597,21 +597,10 @@ export interface FortnoxInvoiceResponse {
   Invoice: FortnoxInvoice
 }
 
-/**
- * Create an invoice in Fortnox
- */
-export async function createFortnoxInvoice(
-  businessId: string,
-  invoice: Omit<FortnoxInvoice, 'DocumentNumber' | 'InvoiceNumber' | 'Balance' | 'FullyPaid' | 'Booked' | 'Cancelled'>
-): Promise<FortnoxInvoice> {
-  const response = await fortnoxRequest<FortnoxInvoiceResponse>(
-    businessId,
-    'POST',
-    '/invoices',
-    { Invoice: invoice }
-  )
-  return response.Invoice
-}
+// createFortnoxInvoice borttagen 2026-08-20 (konsolidering) — var bara
+// använd av den nedan borttagna syncInvoiceToFortnox. Ersatt av
+// lib/invoices/sync-to-fortnox.ts, som alla fyra tidigare separata
+// fakturasynk-vägar nu pekar mot.
 
 /**
  * Get invoice from Fortnox by document number
@@ -843,131 +832,14 @@ export async function getFortnoxInvoices(
   }
 }
 
-/**
- * Sync a single Handymate invoice to Fortnox
- */
-export async function syncInvoiceToFortnox(
-  businessId: string,
-  invoiceId: string
-): Promise<{ success: boolean; skipped?: boolean; fortnoxInvoiceNumber?: string; fortnoxDocumentNumber?: string; error?: string }> {
-  const supabase = getSupabase()
-
-  try {
-    const connected = await isFortnoxConnected(businessId)
-    if (!connected) {
-      return { success: false, skipped: true, error: 'fortnox_not_connected' }
-    }
-
-    // Get invoice — invoice saknar FK till customer i prod, en embed
-    // (`customer(...)`) avvisar HELA queryn (PGRST200). Hämta kund separat.
-    const { data: invoice, error: fetchError } = await supabase
-      .from('invoice')
-      .select('*')
-      .eq('invoice_id', invoiceId)
-      .eq('business_id', businessId)
-      .single()
-
-    if (fetchError || !invoice) {
-      return { success: false, error: 'Invoice not found' }
-    }
-
-    // Already synced?
-    if (invoice.fortnox_invoice_number) {
-      return { success: true, fortnoxInvoiceNumber: invoice.fortnox_invoice_number, fortnoxDocumentNumber: invoice.fortnox_document_number }
-    }
-
-    // Kunden är KRÄVD för Fortnox-synk — degradera inte tyst till null.
-    if (invoice.customer_id) {
-      const { data: customerData, error: customerErr } = await supabase
-        .from('customer')
-        .select('customer_id, name, email, phone_number, address_line, fortnox_customer_number')
-        .eq('customer_id', invoice.customer_id)
-        .maybeSingle()
-      if (customerErr) {
-        return { success: false, error: `Could not fetch customer: ${customerErr.message}` }
-      }
-      invoice.customer = customerData
-    } else {
-      invoice.customer = null
-    }
-
-    // Ensure customer exists in Fortnox
-    let customerNumber = invoice.customer?.fortnox_customer_number
-    if (!customerNumber && invoice.customer) {
-      const syncResult = await syncCustomerToFortnox(businessId, invoice.customer.customer_id)
-      if (!syncResult.success) {
-        return { success: false, error: `Could not sync customer: ${syncResult.error}` }
-      }
-      customerNumber = syncResult.customerNumber
-    }
-
-    if (!customerNumber) {
-      return { success: false, error: 'No customer linked to invoice' }
-    }
-
-    // Get business info for OurReference
-    const { data: config } = await supabase
-      .from('business_config')
-      .select('business_name, contact_name')
-      .eq('business_id', businessId)
-      .single()
-
-    // Build invoice rows
-    const items = invoice.items || []
-    const invoiceRows: FortnoxInvoiceRow[] = items.map((item: { description: string; quantity: number; unit?: string; unit_price: number }) => ({
-      Description: item.description,
-      DeliveredQuantity: item.quantity,
-      Price: item.unit_price,
-      Unit: item.unit === 'timmar' ? 'h' : item.unit === 'st' ? 'st' : undefined
-    }))
-
-    // Create in Fortnox
-    const fortnoxInvoice = await createFortnoxInvoice(businessId, {
-      CustomerNumber: customerNumber,
-      InvoiceDate: invoice.invoice_date?.split('T')[0] || new Date().toISOString().split('T')[0],
-      DueDate: invoice.due_date?.split('T')[0] || '',
-      YourReference: invoice.customer?.name || undefined,
-      OurReference: config?.contact_name || config?.business_name || undefined,
-      InvoiceRows: invoiceRows
-    })
-
-    // Fortnox Invoice-resursen har inget InvoiceNumber-fält — bara
-    // DocumentNumber (bekräftat 2026-08-20 mot Fortnox riktiga OpenAPI-
-    // spec). InvoiceNumber.InvoiceNumber var alltid undefined, vilket
-    // gjorde att fortnox_invoice_number aldrig blev truthy — och därmed
-    // att "redan synkad?"-kollen ovan (rad ~875) aldrig triggade. Varje
-    // klick skapade alltså ännu en riktig faktura i Fortnox bokföring.
-    const { error: updateError } = await supabase
-      .from('invoice')
-      .update({
-        fortnox_invoice_number: fortnoxInvoice.DocumentNumber,
-        fortnox_document_number: fortnoxInvoice.DocumentNumber,
-        fortnox_synced_at: new Date().toISOString(),
-        fortnox_sync_error: null
-      })
-      .eq('invoice_id', invoiceId)
-
-    if (updateError) {
-      console.error('Failed to update invoice after Fortnox sync:', updateError)
-    }
-
-    return {
-      success: true,
-      fortnoxInvoiceNumber: fortnoxInvoice.DocumentNumber,
-      fortnoxDocumentNumber: fortnoxInvoice.DocumentNumber
-    }
-
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Sync failed'
-
-    await supabase
-      .from('invoice')
-      .update({ fortnox_sync_error: errorMessage })
-      .eq('invoice_id', invoiceId)
-
-    return { success: false, error: errorMessage }
-  }
-}
+// syncInvoiceToFortnox (kundfaktura-versionen) borttagen 2026-08-20
+// (konsolidering). Fanns tidigare här som en egen, oberoende
+// implementation av samma sak som lib/invoices/sync-to-fortnox.ts gör —
+// två separata implementationer råkade ha samma InvoiceNumber-bugg
+// (se git-historik för fulla detaljer). Alla fyra anropsställen som
+// använde denna (fakturalistans synk-knapp, Inställningars bulk-synk,
+// agent-verktyget och automationsmotorn via lib/fortnox/sync.ts) pekar
+// nu mot lib/invoices/sync-to-fortnox.ts istället — en källa, inte två.
 
 // ============================================
 // INVOICE ACTIONS (book, mark paid)
