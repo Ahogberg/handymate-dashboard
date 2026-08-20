@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fortnoxRequest, isFortnoxConnected, syncCustomerToFortnox } from '@/lib/fortnox'
 import { prepareInvoiceManifest, markInvoiceDelivered } from '@/lib/invoices/evidence-manifest'
+import { generateOCR } from '@/lib/ocr'
 
 /**
  * Fortnox-bokföringssteget för en kundfaktura. Bruten ut ur
@@ -39,6 +40,14 @@ export interface SyncToFortnoxResult {
   idempotent?: boolean
   fortnoxInvoiceNumber?: string
   fortnoxDocumentNumber?: string
+  /**
+   * Satt bara vid en FÄRSK lyckad synk (inte på idempotent-vägen) —
+   * det nya invoice_number/ocr_number som just skrevs till DB. Anroparen
+   * (sendInvoice) har redan hämtat fakturan INNAN detta anrop gjordes,
+   * så dess in-memory-kopia är annars stale efter denna uppdatering.
+   */
+  newInvoiceNumber?: string
+  newOcrNumber?: string
   error?: string
 }
 
@@ -242,13 +251,34 @@ export async function syncInvoiceToFortnox(
     return { success: false, error: fortnoxError || 'No invoice number returned' }
   }
 
+  // fortnoxDocumentNumber sätts alltid tillsammans med fortnoxInvoiceNumber
+  // från samma Fortnox-svar (rad ~206-207) — kan i praktiken inte vara null
+  // här, men TS narrowar inte det via kollen ovan (skild variabel). Egen
+  // koll för typsäkerheten.
+  if (!fortnoxDocumentNumber) {
+    return { success: false, error: 'No document number returned' }
+  }
+
   const now = new Date().toISOString()
+  // Nummer-unifiering (2026-08-20): skriv över Handymates eget
+  // invoice_number/ocr_number med Fortnox-härledda värden, så kunden
+  // ALDRIG kan se två olika nummer för samma faktura (t.ex. om Fortnox
+  // någon gång kontaktar kunden direkt, som en egen betalningspåminnelse).
+  // Säkert utrett innan bygget: ingen annan kod tolkar invoice_number-
+  // formatet, ingen intern betalningsavstämning slår upp fakturor via
+  // ocr_number, och kreditfakturor kopplas via ett stabilt ID
+  // (original_invoice_id) — inte via nummersträngen. Sker INNAN kunden
+  // någonsin ser fakturan (Fortnox-först-ordningen garanterar det), så
+  // det är aldrig ett nummer kunden hunnit se bytas ut.
+  const newOcrNumber = generateOCR(fortnoxDocumentNumber)
   const updateData: Record<string, unknown> = {
     fortnox_invoice_number: fortnoxInvoiceNumber,
     fortnox_document_number: fortnoxDocumentNumber,
     fortnox_synced_at: now,
     fortnox_sync_status: 'synced',
     fortnox_sync_error: null,
+    invoice_number: fortnoxDocumentNumber,
+    ocr_number: newOcrNumber,
   }
   if (isRot) {
     updateData.rot_application_status = 'submitted'
@@ -262,7 +292,13 @@ export async function syncInvoiceToFortnox(
 
   await markInvoiceDelivered(supabase, { businessId, invoiceId, method: 'fortnox' })
 
-  return { success: true, fortnoxInvoiceNumber, fortnoxDocumentNumber: fortnoxDocumentNumber ?? undefined }
+  return {
+    success: true,
+    fortnoxInvoiceNumber,
+    fortnoxDocumentNumber: fortnoxDocumentNumber ?? undefined,
+    newInvoiceNumber: fortnoxDocumentNumber,
+    newOcrNumber,
+  }
 }
 
 function mapUnit(u: string | undefined): string | undefined {

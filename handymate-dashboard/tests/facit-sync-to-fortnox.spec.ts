@@ -111,3 +111,44 @@ test.describe('Fortnox-dubbelskydd — markera som skickad (verifierat mot fortn
     expect(catchBlock).not.toMatch(/return \{ success: false/)
   })
 })
+
+test.describe('Nummer-unifiering (2026-08-20) — kunden ser samma nummer overallt', () => {
+  // Utrett innan bygget: ingen annan kod tolkar invoice_number-formatet,
+  // ingen intern betalningsavstamning slar upp fakturor via ocr_number,
+  // OCR-funktionen fungerar pa vilken sifferstrang som helst, och
+  // kreditfakturor kopplas via ett stabilt ID (original_invoice_id), inte
+  // via nummersträngen. Sakert att skriva over invoice_number/ocr_number
+  // med Fortnox nummer nar synken lyckas, INNAN kunden nagonsin ser
+  // fakturan (Fortnox-forst-ordningen garanterar det).
+
+  test('importerar generateOCR for att rakna om OCR-numret', () => {
+    expect(FILE).toContain("from '@/lib/ocr'")
+  })
+
+  test('lyckad synk skriver over bade invoice_number och ocr_number med Fortnox-harledda varden', () => {
+    // generateOCR(fortnoxDocumentNumber) beräknas en gång i en variabel
+    // (återanvänd för både updateData och returvärdet) — sök brett
+    // efter anropet snarare än att anta det inline i updateData-objektet.
+    expect(FILE).toMatch(/generateOCR\(fortnoxDocumentNumber\)/)
+    const idx = FILE.indexOf('const updateData: Record<string, unknown> = {')
+    expect(idx).toBeGreaterThan(-1)
+    const block = FILE.slice(idx, idx + 400)
+    expect(block).toMatch(/invoice_number:\s*fortnoxDocumentNumber/)
+    expect(block).toMatch(/ocr_number:\s*\w+/)
+  })
+
+  test('foretag utan Fortnox paverkas inte — skipped-vagen andrar aldrig invoice_number', () => {
+    const idx = FILE.indexOf('return { success: true, skipped: true }')
+    expect(idx).toBeGreaterThan(-1)
+    const before = FILE.slice(Math.max(0, idx - 50), idx)
+    expect(before).not.toContain('invoice_number')
+  })
+
+  test('returnerar de nya vardena sa sendInvoice kan uppdatera sin redan hamtade in-memory-faktura', () => {
+    const idx = FILE.lastIndexOf('return {')
+    expect(idx).toBeGreaterThan(-1)
+    const block = FILE.slice(idx, idx + 300)
+    expect(block).toMatch(/newInvoiceNumber/)
+    expect(block).toMatch(/newOcrNumber/)
+  })
+})

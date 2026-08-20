@@ -33,4 +33,18 @@ test.describe('sendInvoice — Fortnox fore kund', () => {
   test('delivery_status satts till delivered vid lyckad leverans', () => {
     expect(FILE).toContain("delivery_status: 'delivered'")
   })
+
+  test('nummer-unifiering: patchar den redan hamtade in-memory-fakturan med Fortnox nya nummer INNAN PDF/mejl/SMS byggs', () => {
+    const fortnoxIdx = FILE.indexOf('syncInvoiceToFortnox(')
+    const patchIdx = FILE.indexOf('invoice.invoice_number = fortnoxResult.newInvoiceNumber', fortnoxIdx)
+    const pdfBuildIdx = FILE.indexOf('buildInvoicePdfBuffer', fortnoxIdx)
+    expect(patchIdx).toBeGreaterThan(fortnoxIdx)
+    expect(patchIdx).toBeLessThan(pdfBuildIdx)
+  })
+
+  test('patchen ar villkorad pa newInvoiceNumber — paverkar inte foretag utan Fortnox', () => {
+    const idx = FILE.indexOf('invoice.invoice_number = fortnoxResult.newInvoiceNumber')
+    const before = FILE.slice(Math.max(0, idx - 100), idx)
+    expect(before).toMatch(/if\s*\(fortnoxResult\.newInvoiceNumber\)/)
+  })
 })

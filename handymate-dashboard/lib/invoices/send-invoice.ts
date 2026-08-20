@@ -124,6 +124,17 @@ export async function sendInvoice(
     return { found: true, errors: [`Fortnox: ${fortnoxResult.error}`] }
   }
 
+  // Nummer-unifiering (2026-08-20): `invoice` hämtades OVAN, innan
+  // Fortnox-synken kördes — om synken precis skrev över invoice_number/
+  // ocr_number i DB (fortnoxResult.newInvoiceNumber satt), är denna
+  // in-memory-kopia stale. Patcha den INNAN PDF/mejl/SMS byggs nedan, så
+  // kunden ser Fortnox nummer redan i sitt första möte med fakturan —
+  // aldrig Handymates interna utkastnummer.
+  if (fortnoxResult.newInvoiceNumber) {
+    invoice.invoice_number = fortnoxResult.newInvoiceNumber
+    invoice.ocr_number = fortnoxResult.newOcrNumber
+  }
+
   // Etapp P (sql/v148): fryser fakturaunderlaget INNAN fysisk sändning
   // påbörjas. Best-effort — ett prepare-fel får ALDRIG blockera eller
   // fördröja utskicket, returvärdet ignoreras medvetet.
