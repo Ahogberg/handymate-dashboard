@@ -71,6 +71,8 @@ export interface Invoice {
   fortnox_sync_attempted_at?: string | null
   fortnox_sync_error?: string | null
   rot_application_status?: string | null
+  /** sql/v163 — kundleveransens tillstånd, skilt från fortnox_sync_status. */
+  delivery_status?: 'pending' | 'delivered' | 'delivery_failed' | null
   customer?: {
     customer_id: string
     name: string

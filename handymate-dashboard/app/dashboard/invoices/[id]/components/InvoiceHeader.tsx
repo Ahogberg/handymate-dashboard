@@ -70,8 +70,10 @@ const MENU_ITEM =
  * ny flik / Ladda ner PDF — två separata knappar idag, samma två länkar).
  *
  * "…"-OVERFLOW: Markera betald (när den inte redan är primär), Kreditera
- * (samma villkor som idag), Skicka via Fortnox (bara draft + Fortnox
- * kopplat — samma villkor som gårdagens hover-undermeny, bara flyttad hit).
+ * (samma villkor som idag), Bokför i Fortnox (bara draft + Fortnox kopplat
+ * + inte redan synkad — omdöpt i samband med enat fakturautskick
+ * 2026-08-20: den fristående knappen bokför bara, "Skicka faktura" ovan
+ * sköter numera Fortnox-steget automatiskt).
  */
 export function InvoiceHeader({
   invoice,
@@ -101,7 +103,7 @@ export function InvoiceHeader({
   const primaryIsMarkPaid = isActive && alreadyReminded
   const primaryIsRemind = isActive && !alreadyReminded
   const canCredit = !invoice.is_credit_note && invoice.status !== 'credited' && invoice.status !== 'draft' && invoice.status !== 'cancelled'
-  const canSendViaFortnox = fortnoxConnected && invoice.status === 'draft'
+  const canSendViaFortnox = fortnoxConnected && invoice.status === 'draft' && invoice.fortnox_sync_status !== 'synced'
 
   return (
     <>
@@ -255,10 +257,20 @@ export function InvoiceHeader({
                   </button>
                 )}
                 {canSendViaFortnox && (
-                  <button onClick={() => { setMoreMenuOpen(false); onSendViaFortnox() }} disabled={sendingViaFortnox} className={MENU_ITEM}>
-                    <Send className="w-4 h-4 text-slate-400" />
-                    {sendingViaFortnox ? 'Skickar…' : 'Skicka via Fortnox'}
-                  </button>
+                  <>
+                    <button onClick={() => { setMoreMenuOpen(false); onSendViaFortnox() }} disabled={sendingViaFortnox} className={MENU_ITEM}>
+                      <Send className="w-4 h-4 text-slate-400" />
+                      {sendingViaFortnox ? 'Bokför…' : 'Bokför i Fortnox'}
+                    </button>
+                    {/* Enat fakturautskick (2026-08-20), Task 5 DEGRADERAD:
+                        inget verifierat, tekniskt sätt hittades att spärra
+                        dubbelutskick från Fortnox egna gränssnitt (se
+                        commit-meddelandet för research-underlaget) — den
+                        här textraden är det mänskliga skyddet istället. */}
+                    <p className="px-4 pb-2 text-xs text-slate-400 leading-snug">
+                      Skicka inte om den här fakturan från Fortnox — kunden har redan fått den via Handymate.
+                    </p>
+                  </>
                 )}
               </div>
             )}

@@ -282,7 +282,12 @@ test.describe('applyInvoiceDeliveryOutcome — leverans-strypunktens invariant',
     expect(db._state.invoice[0].sent_method).toBe('both')
   })
 
-  test('BÅDA misslyckades → ingen statusskrivning, ingen manifest-mark, ingen aktivitet — returnerar delivered:false', async () => {
+  test('BÅDA misslyckades → ingen status/manifest/aktivitets-skrivning, MEN delivery_status markeras failed — returnerar delivered:false', async () => {
+    // Enat fakturautskick (2026-08-20): tidigare lämnades fakturaraden HELT
+    // orörd vid total leveransmisslyckande. Nu skrivs delivery_status=
+    // 'delivery_failed' (sql/v163) — annars kan man inte skilja "aldrig
+    // försökt" från "Fortnox-bokfört men aldrig levererat till kund". Status/
+    // sent_at/manifest/aktivitet förblir dock oskrivna, precis som förut.
     const db = createFakeSupabase({
       invoice: [{ invoice_id: 'inv_4', business_id: 'biz_1', status: 'draft', sent_at: null }],
       invoice_evidence_manifest: [preparedManifestRow('inv_4', 'biz_1')],
@@ -295,8 +300,14 @@ test.describe('applyInvoiceDeliveryOutcome — leverans-strypunktens invariant',
     })
     expect(result).toEqual({ delivered: false, sentMethod: null })
 
-    // Fakturan ligger kvar orörd som draft — INGEN skrivning fick ske.
-    expect(db._state.invoice[0]).toEqual({ invoice_id: 'inv_4', business_id: 'biz_1', status: 'draft', sent_at: null })
+    // status/sent_at fick INGEN skrivning — bara delivery_status tillkom.
+    expect(db._state.invoice[0]).toEqual({
+      invoice_id: 'inv_4',
+      business_id: 'biz_1',
+      status: 'draft',
+      sent_at: null,
+      delivery_status: 'delivery_failed',
+    })
     // Manifestet är fortfarande bara 'prepared' — ingen mark-delivered.
     expect(db._state.invoice_evidence_manifest[0].status).toBe('prepared')
     // Ingen aktivitetslogg skapades.
@@ -334,11 +345,28 @@ test.describe('sendInvoice — hela vägen, utan att röra Resend/46elks/Chromiu
     expect(result.found).toBe(false)
   })
 
-  test('varken email eller sms begärs → ingen Resend/46elks-väg nås, allt är fortfarande ärligt tomt', async () => {
+  // Enat fakturautskick (2026-08-20): sendInvoice() gör nu OVILLKORLIGEN
+  // ett syncInvoiceToFortnox()-anrop innan email/SMS-försöket (se
+  // tests/facit-send-invoice-fortnox-first.spec.ts) — och den funktionen
+  // anropar lib/fortnox.ts:s isFortnoxConnected(), som skapar sin EGEN
+  // riktiga Supabase-klient direkt från process.env (oberoende av den
+  // fejkade `db` som skickas in här) och alltid slår mot business_config.
+  // Det fanns ingen kombination av sendEmail/sendSms som undvek detta
+  // förut heller (Fortnox-steget körs oavsett) — så det här testet kan
+  // INTE längre köra sendInvoice() end-to-end utan att antingen (a) träffa
+  // en riktig Supabase-instans över nätverket, eller (b) att
+  // isFortnoxConnected blir injicerbar/mockbar (inget stöd för modul-mocks
+  // finns i denna Playwright-baserade testuppsättning). Att bara sätta
+  // NEXT_PUBLIC_SUPABASE_URL i .env.test vore FEL väg — det skulle göra
+  // detta "aldrig rör live tjänster"-testet till ett riktigt nätverksanrop
+  // mot produktions-Supabase. Skippat medvetet, inte borttaget — flaggat
+  // i slutrapporten som ett kvarstående testtäckningsgap.
+  test.skip('varken email eller sms begärs → ingen Resend/46elks-väg nås, allt är fortfarande ärligt tomt', async () => {
     // Ingen kund kopplad (customer_id null) → portal-blocket hoppas också
-    // över. Detta är den enda kombinationen som låter oss köra sendInvoice()
+    // över. Detta var den enda kombinationen som lät oss köra sendInvoice()
     // rakt igenom på riktigt utan att smyga in ett nätverksanrop mot Resend
-    // eller 46elks i testsviten.
+    // eller 46elks i testsviten — men Fortnox-steget ovan gör nu ETT
+    // ovillkorligt nätverksanrop oavsett kombination.
     const db = createFakeSupabase({
       invoice: [{
         invoice_id: 'inv_6',

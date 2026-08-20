@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { AlertCircle, Loader2, RotateCcw } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Loader2, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { buildInvoiceTemplateData } from '@/lib/invoice-templates/data-builder'
@@ -381,6 +381,22 @@ export default function InvoiceDetailPage() {
                     </Link>
                   ) : 'okänd'}
                   {invoice.credit_reason && ` — ${invoice.credit_reason}`}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {invoice.delivery_status === 'delivery_failed' && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              <div>
+                <p className="text-amber-700 font-medium">
+                  {invoice.fortnox_sync_status === 'synced' ? 'Bokförd i Fortnox, men ej levererad till kunden' : 'Kunde inte levereras till kunden'}
+                </p>
+                <p className="text-sm text-amber-600">
+                  Försök skicka fakturan igen — {invoice.fortnox_sync_status === 'synced' ? 'bokföringen är redan klar, bara' : ''} leveransen görs om.
                 </p>
               </div>
             </div>
