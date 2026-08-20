@@ -113,6 +113,14 @@ const NAV: NavItem[] = [
       { label: 'Offerter', href: '/dashboard/quotes' },
       { label: 'Projekt', href: '/dashboard/projects' },
       { label: 'Fakturor', href: '/dashboard/invoices' },
+      // Leverantörsfakturor (2026-08-20): tidigare bara synliga per projekt
+      // eller i Karins matchningskö (bara de okopplade) — ingen samlad vy
+      // fanns. see_financials-skyddad data, samma döljregel som Fakturor.
+      { label: 'Leverantörsfakturor', href: '/dashboard/supplier-invoices' },
+      // Underentreprenörer (2026-08-20): sidan (app/dashboard/subcontractors)
+      // fanns redan sedan tidigare men var helt orphanad — ingen länk till
+      // den existerade någonstans i appen.
+      { label: 'Underentreprenörer', href: '/dashboard/subcontractors', featureGate: 'subcontractors' },
       { label: 'ROT/RUT till Skatteverket', href: '/dashboard/invoices/rot-payment' },
       { label: 'Dokument', href: '/dashboard/documents' },
     ],
@@ -580,7 +588,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   // egen route (/dashboard/team) med sidebar-länk i Schema-gruppen — samma
   // döljregel för anställda gäller den nya länken (löner/behörigheter är
   // owner/admin-data, oförändrat sedan innan).
-  const HIDDEN_CHILDREN_FOR_EMPLOYEE = new Set(['/dashboard/invoices', '/dashboard/invoices/rot-payment', '/dashboard/settings', '/dashboard/settings/my-prices', '/dashboard/settings/products', '/dashboard/settings/pricelist', '/dashboard/billing', '/dashboard/team', '/dashboard/automations', '/dashboard/settings/quote-templates', '/dashboard/settings/quote-texts', '/dashboard/orders', '/dashboard/campaigns', '/dashboard/website', '/dashboard/analytics'])
+  const HIDDEN_CHILDREN_FOR_EMPLOYEE = new Set(['/dashboard/invoices', '/dashboard/supplier-invoices', '/dashboard/invoices/rot-payment', '/dashboard/settings', '/dashboard/settings/my-prices', '/dashboard/settings/products', '/dashboard/settings/pricelist', '/dashboard/billing', '/dashboard/team', '/dashboard/automations', '/dashboard/settings/quote-templates', '/dashboard/settings/quote-texts', '/dashboard/orders', '/dashboard/campaigns', '/dashboard/website', '/dashboard/analytics'])
 
   /**
    * Rutter som kräver ÄGARE eller ADMIN, inte bara "inte anställd".
