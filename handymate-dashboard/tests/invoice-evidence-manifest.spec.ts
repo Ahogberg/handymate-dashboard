@@ -713,9 +713,15 @@ test.describe('källskanning — de tre sändvägarna anropar prepare+mark', () 
   // båda anropar direkt) — skanningen pekar ärligt dit hookarna faktiskt
   // bor. De andra två vägarna (Fortnox, auto-generate) har egna hookar,
   // orörda av Etapp Q.
+  //
+  // Enat fakturautskick (2026-08-20): Fortnox-vägens hookar flyttade i sin
+  // tur ur app/api/invoices/[id]/send-via-fortnox/route.ts till
+  // lib/invoices/sync-to-fortnox.ts (som BÅDE den fristående rutten OCH
+  // sendInvoice() nu anropar) — samma mönster som Etapp Q, skanningen
+  // uppdaterad att peka dit hookarna faktiskt bor nu.
   const VAGAR = [
     'lib/invoices/send-invoice.ts',
-    'app/api/invoices/[id]/send-via-fortnox/route.ts',
+    'lib/invoices/sync-to-fortnox.ts',
     'app/api/invoices/auto-generate/route.ts',
   ]
 
@@ -728,8 +734,13 @@ test.describe('källskanning — de tre sändvägarna anropar prepare+mark', () 
     })
   }
 
-  test('send-via-fortnox markerar delivery_method som fortnox', () => {
+  test('den fristående send-via-fortnox-rutten delegerar till sync-to-fortnox.ts (som gör mark-anropet)', () => {
     const src = read('app/api/invoices/[id]/send-via-fortnox/route.ts')
+    expect(src).toContain("from '@/lib/invoices/sync-to-fortnox'")
+  })
+
+  test('sync-to-fortnox.ts markerar delivery_method som fortnox', () => {
+    const src = read('lib/invoices/sync-to-fortnox.ts')
     expect(src).toMatch(/method:\s*'fortnox'/)
   })
 

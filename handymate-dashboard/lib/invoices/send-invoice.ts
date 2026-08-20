@@ -40,6 +40,7 @@ import { buildInvoicePdfBuffer } from '@/lib/invoices/build-invoice-pdf'
 import { randomUUID } from 'crypto'
 import { prepareInvoiceManifest, markInvoiceDelivered } from '@/lib/invoices/evidence-manifest'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
+import { syncInvoiceToFortnox } from '@/lib/invoices/sync-to-fortnox'
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
@@ -111,6 +112,16 @@ export async function sendInvoice(
 
   if (invoiceError || !invoice) {
     return { found: false, errors: [] }
+  }
+
+  // Enat fakturautskick (2026-08-20): Fortnox-bokföring FÖRE
+  // kundleverans. Fortnox-fel blockerar HELA leveransen — ingen email/
+  // SMS skickas om bokföringen misslyckades. syncInvoiceToFortnox() är
+  // idempotent (redan 'synced' → no-op) så en omkörning efter ett
+  // tidigare Fortnox-fel gör inte om det som redan lyckades.
+  const fortnoxResult = await syncInvoiceToFortnox(supabase, { businessId, invoiceId })
+  if (!fortnoxResult.success) {
+    return { found: true, errors: [`Fortnox: ${fortnoxResult.error}`] }
   }
 
   // Etapp P (sql/v148): fryser fakturaunderlaget INNAN fysisk sändning
@@ -403,7 +414,7 @@ export async function applyInvoiceDeliveryOutcome(
     const sentMethod = results.email && results.sms ? 'both' : results.email ? 'email' : 'sms'
     const { error: statusErr } = await supabase
       .from('invoice')
-      .update({ status: 'sent', sent_at: new Date().toISOString(), sent_method: sentMethod })
+      .update({ status: 'sent', sent_at: new Date().toISOString(), sent_method: sentMethod, delivery_status: 'delivered' })
       .eq('invoice_id', invoiceId)
 
     if (statusErr) {
@@ -458,6 +469,21 @@ export async function applyInvoiceDeliveryOutcome(
     }
 
     return { delivered: true, sentMethod }
+  }
+
+  // Enat fakturautskick (2026-08-20): Fortnox-steget (om aktuellt) körs
+  // nu FÖRE detta, i sendInvoice(). Om vi hamnar här har bokföringen
+  // alltså redan lyckats — det som misslyckades är bara kundleveransen.
+  // delivery_status='delivery_failed' fångar exakt det tillståndet
+  // (sql/v163) så en retry vet att bara göra om leveransen, aldrig
+  // Fortnox-anropet.
+  const { error: deliveryStatusErr } = await supabase
+    .from('invoice')
+    .update({ delivery_status: 'delivery_failed' })
+    .eq('invoice_id', invoiceId)
+    .eq('business_id', businessId)
+  if (deliveryStatusErr) {
+    console.error('[invoices/send] delivery_status write failed:', deliveryStatusErr)
   }
 
   return { delivered: false, sentMethod: null }
