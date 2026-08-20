@@ -64,6 +64,31 @@ test.describe('send-via-fortnox/route.ts ar en tunn wrapper', () => {
   })
 })
 
+test.describe('Fortnox Invoice-resursen har inget InvoiceNumber-falt (verifierat mot fortnox-openapi.json)', () => {
+  // fortnox_Kf_InvoiceSingleItem (kundfaktura-resursen) har BARA
+  // DocumentNumber som identifierande nummerfalt — InvoiceNumber finns
+  // bara pa helt andra resurser (betalningsuppfoljning, SupplierInvoice).
+  // Att lasa response.Invoice.InvoiceNumber ger alltid undefined, vilket
+  // fick VARJE lyckad Fortnox-bokning att tolkas som ett misslyckande —
+  // ingen kund kunde nagonsin fa sin faktura for foretag med Fortnox
+  // kopplat, och varje omforsok skapade annu en riktig faktura i
+  // bokforingen. Fixat 2026-08-20.
+  test('lasnyckeln for POST /invoices-svaret ar DocumentNumber, inte InvoiceNumber', () => {
+    const idx = FILE.indexOf("const response = await fortnoxRequest")
+    expect(idx).toBeGreaterThan(-1)
+    const block = FILE.slice(idx, idx + 500)
+    expect(block).not.toMatch(/response\?\.Invoice\?\.InvoiceNumber/)
+    expect(block).toMatch(/response\?\.Invoice\?\.DocumentNumber/)
+  })
+
+  test('fortnoxInvoiceNumber-variabeln fylls fran DocumentNumber, inte ett icke-existerande falt', () => {
+    const idx = FILE.indexOf('fortnoxInvoiceNumber = response')
+    expect(idx).toBeGreaterThan(-1)
+    const line = FILE.slice(idx, idx + 80)
+    expect(line).toContain('DocumentNumber')
+  })
+})
+
 test.describe('Fortnox-dubbelskydd — markera som skickad (verifierat mot fortnox-openapi.json)', () => {
   test('gor ett PUT-anrop mot externalprint-endpointen for att markera fakturan som skickad', () => {
     const idx = FILE.indexOf('fortnoxDocumentNumber = response')

@@ -189,13 +189,21 @@ export async function syncInvoiceToFortnox(
   let fortnoxError: string | null = null
 
   try {
-    const response = await fortnoxRequest<{ Invoice: { InvoiceNumber: string; DocumentNumber: string } }>(
+    // Fortnox Invoice-resursen (kundfaktura) har INGET InvoiceNumber-fält —
+    // bekräftat 2026-08-20 mot Fortnox riktiga OpenAPI-spec
+    // (fortnox_Kf_InvoiceSingleItem). Det enda identifierande numret är
+    // DocumentNumber. InvoiceNumber finns bara på andra resurser
+    // (betalningsuppföljning, SupplierInvoice — dit det hörde i den
+    // ursprungliga koden, förväxlat med kundfaktura-resursen). Att läsa
+    // InvoiceNumber här gav alltid undefined, vilket fick varje lyckad
+    // bokning att tolkas som ett misslyckande.
+    const response = await fortnoxRequest<{ Invoice: { DocumentNumber: string } }>(
       businessId,
       'POST',
       '/invoices',
       { Invoice: invoicePayload },
     )
-    fortnoxInvoiceNumber = response?.Invoice?.InvoiceNumber ?? null
+    fortnoxInvoiceNumber = response?.Invoice?.DocumentNumber ?? null
     fortnoxDocumentNumber = response?.Invoice?.DocumentNumber ?? null
   } catch (err: any) {
     fortnoxError = err?.message || 'Fortnox-fel'

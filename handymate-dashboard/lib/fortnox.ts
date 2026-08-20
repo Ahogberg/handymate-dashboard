@@ -931,11 +931,16 @@ export async function syncInvoiceToFortnox(
       InvoiceRows: invoiceRows
     })
 
-    // Update invoice in DB
+    // Fortnox Invoice-resursen har inget InvoiceNumber-fält — bara
+    // DocumentNumber (bekräftat 2026-08-20 mot Fortnox riktiga OpenAPI-
+    // spec). InvoiceNumber.InvoiceNumber var alltid undefined, vilket
+    // gjorde att fortnox_invoice_number aldrig blev truthy — och därmed
+    // att "redan synkad?"-kollen ovan (rad ~875) aldrig triggade. Varje
+    // klick skapade alltså ännu en riktig faktura i Fortnox bokföring.
     const { error: updateError } = await supabase
       .from('invoice')
       .update({
-        fortnox_invoice_number: fortnoxInvoice.InvoiceNumber,
+        fortnox_invoice_number: fortnoxInvoice.DocumentNumber,
         fortnox_document_number: fortnoxInvoice.DocumentNumber,
         fortnox_synced_at: new Date().toISOString(),
         fortnox_sync_error: null
@@ -948,7 +953,7 @@ export async function syncInvoiceToFortnox(
 
     return {
       success: true,
-      fortnoxInvoiceNumber: fortnoxInvoice.InvoiceNumber,
+      fortnoxInvoiceNumber: fortnoxInvoice.DocumentNumber,
       fortnoxDocumentNumber: fortnoxInvoice.DocumentNumber
     }
 
