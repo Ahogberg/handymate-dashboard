@@ -25,6 +25,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import PartnerCommissionModal from './components/PartnerCommissionModal'
+import SupportQueueTab from './components/SupportQueueTab'
 
 interface Customer {
   business_id: string
@@ -126,7 +127,7 @@ export default function AdminDashboardPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [customerSearch, setCustomerSearch] = useState('')
   const [planFilter, setPlanFilter] = useState<string>('all')
-  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'partners'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'partners' | 'support'>('overview')
   const [updatingPlan, setUpdatingPlan] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [partners, setPartners] = useState<Partner[]>([])
@@ -412,12 +413,12 @@ export default function AdminDashboardPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
-          {(['overview', 'customers', 'partners'] as const).map(tab => (
+          {(['overview', 'customers', 'partners', 'support'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                 activeTab === tab ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
               }`}>
-              {tab === 'overview' ? 'Översikt' : tab === 'customers' ? `Kunder (${customers.length})` : `Partners (${partners.length})`}
+              {tab === 'overview' ? 'Översikt' : tab === 'customers' ? `Kunder (${customers.length})` : tab === 'partners' ? `Partners (${partners.length})` : 'Support'}
             </button>
           ))}
         </div>
@@ -851,6 +852,9 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         )}
+
+        {/* SUPPORT TAB */}
+        {activeTab === 'support' && <SupportQueueTab />}
 
         {/* Partner-provisionsmodal */}
         {commissionPartnerId && (
