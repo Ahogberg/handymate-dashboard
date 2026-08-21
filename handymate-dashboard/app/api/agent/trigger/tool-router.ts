@@ -95,6 +95,16 @@ interface ToolContext {
    * — kontrolleras av vakten längst upp i executeTool() nedan.
    */
   actorType?: ActorType
+  /**
+   * Support-agenten (escalate_to_handymate_team, se docs/superpowers/specs/
+   * 2026-08-21-handymate-support-agent-design.md): den agent_threads.id som
+   * konversationen tillhör, satt av app/api/matte/chat/route.ts efter att
+   * tråden skapats/hämtats. support_ticket.thread_id är NOT NULL — utan
+   * detta fältet kan verktyget inte koppla ärendet till konversationen.
+   * Odefinierad i alla andra vägar (orchestrator.ts/cron sätter aldrig
+   * detta — de har ingen levande chattråd).
+   */
+  threadId?: string | null
 }
 
 function generateId(prefix: string): string {
@@ -186,6 +196,46 @@ export async function executeTool(
             status: data.subscription_status,
             trial_ends_at: data.trial_ends_at,
           },
+        }
+      }
+      case 'escalate_to_handymate_team': {
+        const { category, summary } = input
+        if (!category || !summary) {
+          return { success: false, error: 'category och summary krävs' }
+        }
+        const threadId = context.threadId
+        if (!threadId) {
+          return { success: false, error: 'Ingen aktiv konversationstråd att koppla ärendet till' }
+        }
+        const { data: biz } = await supabase
+          .from('business_config')
+          .select('business_name')
+          .eq('business_id', businessId)
+          .single()
+
+        const ticketId = 'stkt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8)
+        const { error } = await supabase.from('support_ticket').insert({
+          id: ticketId,
+          business_id: businessId,
+          thread_id: threadId,
+          category: String(category),
+          status: 'escalated',
+        })
+        if (error) {
+          console.error('[escalate_to_handymate_team] insert error:', error)
+          return { success: false, error: 'Kunde inte skapa supportärendet' }
+        }
+
+        const { notifyHandymateSupportTeam } = await import('@/lib/notifications/handymate-team-alert')
+        await notifyHandymateSupportTeam({
+          businessName: biz?.business_name || 'Okänt företag',
+          category: String(category),
+          ticketId,
+        })
+
+        return {
+          success: true,
+          data: { message: 'Ärendet är skapat och Handymates team är notifierat — de återkommer till dig här i chatten.' },
         }
       }
       case 'check_pending_approvals':

@@ -490,6 +490,25 @@ export const toolDefinitions = [
     },
   },
   {
+    name: "escalate_to_handymate_team",
+    description: "Eskalera ett ärende till Handymates eget team för mänsklig hantering (uppsägning, refund, GDPR-klagomål, bugg med pengapåverkan, eller när hantverkaren uttryckligen ber om en människa). Endast för Support-agenten. Beslutar ALDRIG själv — skapar bara ärendet och larmar teamet.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        category: {
+          type: "string",
+          enum: ["cancellation", "refund", "gdpr", "bug_financial", "human_requested", "other"],
+          description: "Vilken typ av ärende",
+        },
+        summary: {
+          type: "string",
+          description: "Kort sammanfattning av vad hantverkaren vill, för teamet att se direkt i kön",
+        },
+      },
+      required: ["category", "summary"],
+    },
+  },
+  {
     name: "trigger_fortnox_sync",
     description: "Synka en specifik entitet (kund, faktura eller offert) till Fortnox. Kräver att Fortnox är anslutet.",
     input_schema: {

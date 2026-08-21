@@ -1043,6 +1043,11 @@ export async function POST(request: NextRequest) {
       console.error('[matte/chat] thread fetch/create failed (non-blocking):', err)
     }
     let currentAgent: AgentId = (thread?.current_agent_id as AgentId) || 'matte'
+    // Support-agenten (escalate_to_handymate_team): tråden finns först nu,
+    // efter getOrCreateThread ovan — samma ställe som businessUserId sätts
+    // hade inte tråden ännu. support_ticket.thread_id är NOT NULL, så
+    // verktyget vägrar utan detta om trådskapandet skulle misslyckas.
+    toolContext.threadId = thread?.id ?? null
 
     // ── Auto-routing: bilder + Matte → Daniel ───────────────────────────
     // Om användaren bifogar bild(er) och vi är hos Matte (default agent)

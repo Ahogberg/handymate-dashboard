@@ -73,6 +73,16 @@ export interface ToolContext {
    * sätter 'external_customer' än — groundwork för Lisa Voice V2.
    */
   actorType?: ActorType
+  /**
+   * Support-agenten (escalate_to_handymate_team, se docs/superpowers/specs/
+   * 2026-08-21-handymate-support-agent-design.md): den agent_threads.id som
+   * konversationen tillhör. Satt av matte/chat/route.ts från redan hämtad/
+   * skapad `thread` (samma ställe som businessUserId sätts) efter att
+   * getOrCreateThread körts. Odefinierad i alla andra vägar (orchestrator.ts
+   * har ingen levande chattråd) — support_ticket.thread_id är NOT NULL, så
+   * verktyget vägrar utan detta fältet.
+   */
+  threadId?: string | null
 }
 
 export interface GoogleConnection {
