@@ -372,8 +372,8 @@ const TOOLS: any[] = [
       properties: {
         target_agent: {
           type: 'string',
-          description: 'Vilken agent som ska ta över: matte | lars | karin | daniel | hanna | lisa',
-          enum: ['matte', 'lars', 'karin', 'daniel', 'hanna', 'lisa'],
+          description: 'Vilken agent som ska ta över: matte | lars | karin | daniel | hanna | lisa | support',
+          enum: ['matte', 'lars', 'karin', 'daniel', 'hanna', 'lisa', 'support'],
         },
         reason: {
           type: 'string',

@@ -35,3 +35,14 @@ test.describe('Support som sjunde agent (lib/agent/capabilities.ts)', () => {
     expect(block).toMatch(/Handymate-konto/)
   })
 })
+
+test.describe('handoff_to_agent-verktygets enum inkluderar support', () => {
+  const ROUTE = fs.readFileSync(
+    path.join(__dirname, '..', 'app/api/matte/chat/route.ts'),
+    'utf8',
+  )
+  test('target_agent-enum listar support', () => {
+    const idx = ROUTE.indexOf("enum: ['matte', 'lars', 'karin', 'daniel', 'hanna', 'lisa', 'support']")
+    expect(idx).toBeGreaterThan(-1)
+  })
+})
