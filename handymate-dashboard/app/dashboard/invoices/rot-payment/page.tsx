@@ -25,6 +25,7 @@ interface EligibleRow {
   property_designation: string | null
   brf_org_number: string | null
   apartment_number: string | null
+  likely_reported_by_fortnox: boolean
 }
 
 interface Edit {
@@ -202,6 +203,12 @@ function Section({ type, rows, edits, setEdits, selected, setSelected, orgNumber
                         ? <span className="inline-flex items-center gap-1 text-xs text-emerald-600"><Check className="w-3 h-3" /> Klar</span>
                         : <span className="inline-flex items-center gap-1 text-xs text-amber-600"><AlertTriangle className="w-3 h-3" /> {validation.errors.length} att åtgärda</span>}
                     </div>
+                    {row.likely_reported_by_fortnox && (
+                      <div className="mt-1 flex items-start gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
+                        <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <span>Redan bokförd i Fortnox med skattereduktion — kontrollera i Fortnox om den redan skickats till Skatteverket innan du väljer den här, så du inte begär utbetalning dubbelt.</span>
+                      </div>
+                    )}
                     <div className="text-xs text-gray-500 mt-0.5">Arbetskostnad {row.work_cost.toLocaleString('sv-SE')} kr · Begärt avdrag <strong>{row.deduction.toLocaleString('sv-SE')} kr</strong></div>
 
                     {/* Luckfält */}

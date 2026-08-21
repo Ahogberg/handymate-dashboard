@@ -9,9 +9,16 @@ export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/rot-payment/eligible
- * Listar betalda ROT/RUT-fakturor som ännu inte rapporterats till Skatteverket,
+ * Listar betalda ROT/RUT-fakturor som ännu inte rapporterats via denna fil-väg,
  * med per-faktura-valideringsstatus så UI kan visa vad som saknas innan export.
- * Exkluderar redan 'submitted' (ingen dubbelrapportering) + Fortnox-rapporterade.
+ * Exkluderar redan skickade via vår egen XML-fil (rot_payment_request_id satt).
+ *
+ * Fakturor som Fortnox bokfört med skattereduktion (rot_application_status=
+ * 'submitted' men rot_payment_request_id fortfarande null) INKLUDERAS numera,
+ * men flaggas med likely_reported_by_fortnox — vi kan inte från kod verifiera
+ * att Fortnox faktiskt har den automatiska Skatteverket-anslutningen aktiverad
+ * för det specifika kontot, så en tyst uteslutning riskerade att låta ROT/RUT-
+ * ansökan aldrig nå Skatteverket alls om den inte var. Beslut 2026-08-21.
  */
 export async function GET(request: NextRequest) {
   const business = await getAuthenticatedBusiness(request)
@@ -47,8 +54,6 @@ export async function GET(request: NextRequest) {
   const defaultCategory = config?.default_rot_work_category || defaultCategoryForIndustry(config?.industry)
 
   const rows = (invoices || [])
-    // Exkludera redan inskickade (Fortnox eller tidigare fil) — extra säkerhet utöver rot_payment_request_id.
-    .filter((inv: any) => inv.rot_application_status !== 'submitted')
     .map((inv: any) => {
       const customer = inv.customer || {}
       // Förvald kategori om ingen satt på fakturan (override sker i UI/generate).
@@ -79,6 +84,11 @@ export async function GET(request: NextRequest) {
         property_designation: inv.rot_property_designation || customer.property_designation || null,
         brf_org_number: inv.rot_brf_org_number || null,
         apartment_number: inv.rot_apartment_number || null,
+        // rot_application_status='submitted' här betyder Fortnox har bokfört
+        // fakturan med skattereduktion (rot_payment_request_id är null, annars
+        // hade queryn ovan redan uteslutit raden) — inte att vi vet den nått
+        // Skatteverket. Flaggas i UI, utesluts inte tyst.
+        likely_reported_by_fortnox: inv.rot_application_status === 'submitted',
         valid: validation.valid,
         errors: validation.errors,
         warnings: validation.warnings,
