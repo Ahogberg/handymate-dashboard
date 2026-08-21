@@ -66,10 +66,13 @@ Research innan design visade att mycket redan finns:
    Handymate-räkning, "vad kostar min plan") försöker Support lösa
    själv INNAN den eskalerar vidare till en människa.
 3. **Support har full läsåtkomst till kontots Handymate-prenumeration/
-   fakturering, noll skrivrätt.** Refund och uppsägning går alltid via
-   samma `create_approval_request`-verktyg som redan finns (skapar en
-   `pending_approvals`-rad) — bara att mottagaren nu är Handymates eget
-   team, inte businessens egen ägare.
+   fakturering, noll skrivrätt.** Refund och uppsägning går ALDRIG via
+   det befintliga `create_approval_request`/`pending_approvals` —
+   den kön läses redan av hantverkarens EGEN business-facing sida
+   (`app/dashboard/approvals/page.tsx`), och en rad om att godkänna sin
+   egen refund där vore bakvänd (det är Handymate som ska granska, inte
+   hantverkaren). Refund/uppsägning går via SAMMA nya `support_ticket`-
+   spårning och notis som alla andra eskaleringar — se punkt 5.
 4. **Support bryter medvetet mot "alltid Mattes ansikte"-regeln.**
    Idag visas Mattes porträtt på alla svar oavsett vilken specialist
    som egentligen svarade (`components/MatteChatModal.tsx:401`,
@@ -99,7 +102,6 @@ CREATE TABLE support_ticket (
   category TEXT NOT NULL,                 -- 'cancellation'|'refund'|'gdpr'|'bug_financial'|'human_requested'|'other'
   status TEXT NOT NULL DEFAULT 'escalated'
     CHECK (status IN ('escalated', 'in_progress', 'resolved')),
-  linked_approval_id TEXT REFERENCES pending_approvals(id),  -- satt vid refund/uppsägning
   escalated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   resolved_at TIMESTAMPTZ,
   satisfaction TEXT CHECK (satisfaction IN ('positive', 'negative')),
@@ -151,10 +153,13 @@ gör jobbet — ingen ny klassificeringskod.
 `'all'`):
 
 - `get_account_billing_status` (**nytt verktyg** — se nedan)
-- `create_approval_request` (befintligt — används för refund/uppsägning)
-- `escalate_to_handymate_team` (**nytt verktyg** — se nedan, för
-  icke-finansiella eskaleringar: GDPR-klagomål, allvarlig bugg)
+- `escalate_to_handymate_team` (**nytt verktyg** — se nedan, ENDA vägen
+  för alla eskaleringar: refund, uppsägning, GDPR-klagomål, allvarlig
+  bugg)
 - `handoff_to_agent` (koordinationsverktyg, redan tillgängligt alla agenter)
+
+`create_approval_request` ingår MEDVETET INTE i Supports verktygslista
+— den kön är hantverkarens egen (se Beslut punkt 3).
 
 **4. Nytt verktyg `get_account_billing_status`** — läggs till i
 `lib/tool-definitions.ts` + `lib/tool-router.ts` (samma
@@ -166,16 +171,14 @@ Live Stripe-uppslag (faktiska debiteringar, kommande förnyelse) är
 explicit UTANFÖR v1 — se Utanför scope. **Rent läsande** — inga
 skrivvägar.
 
-**5. Nytt verktyg `escalate_to_handymate_team`** — skapar en
-`support_ticket`-rad (`status='escalated'`, kategori från verktygets
-input) och anropar en ny notifieringshjälpare (punkt 6). Körs för
-`gdpr`/`bug_financial`/`human_requested`-kategorierna. För
-`refund`/`cancellation` skapar Support istället en `pending_approvals`-
-rad via det BEFINTLIGA `create_approval_request`, och SAMMA nya
-notifieringshjälpare anropas därifrån också (så alla eskaleringsvägar,
-finansiella som icke-finansiella, går genom en enda notis-punkt) —
-`support_ticket.linked_approval_id` sätts till den skapade
-godkännande-raden.
+**5. Nytt verktyg `escalate_to_handymate_team`** — DEN ENDA vägen för
+varje eskalering, oavsett kategori (`refund`, `cancellation`, `gdpr`,
+`bug_financial`, `human_requested`). Skapar en `support_ticket`-rad
+(`status='escalated'`, kategori från verktygets input, `thread_id`
+från konversationen) och anropar notifieringshjälparen (punkt 6). Ingen
+gren mot `pending_approvals` — refund/uppsägning granskas och utförs
+manuellt av er i admin-kön (nästa avsnitt), inte via ett
+godkännande-klick i ett system byggt för hantverkarens egna beslut.
 
 **6. Ny notifieringshjälpare** — `notifyHandymateSupportTeam()` i
 `lib/notifications/`, återanvänder samma push-infrastruktur som
@@ -203,8 +206,9 @@ själv kommer redan gratis från `buildHandoffAnnouncement()` (ingen
 **Ny flik i `/admin`** (`app/admin/page.tsx`, samma
 `isAdmin()`-inloggningsgrind som redan gäller resten av sidan — inget
 nytt auth-system). Visar `support_ticket`-rader där `status !=
-'resolved'`, sorterat äldst-eskalerad-först, med kategori-badge och
-länkad `pending_approvals`-status om `linked_approval_id` är satt.
+'resolved'`, sorterat äldst-eskalerad-först, med kategori-badge (så
+`refund`/`cancellation`-ärenden syns tydligt som kräver en faktisk
+åtgärd från er, inte bara ett svar).
 
 **Ärendevy:** klick på en rad öppnar tråden — samma `thread_message`-
 historik som redan renderas i Matte-chatten, återanvänd read-only, plus
@@ -241,10 +245,12 @@ nytt).
 - Facit: `get_account_billing_status` är rent läsande — grep efter att
   ingen `.update()`/`.insert()` finns i verktygets implementation.
 - Facit: `escalate_to_handymate_team` skapar `support_ticket` med
-  korrekt `category`, och anropar `notifyHandymateSupportTeam()` — mockat
+  korrekt `category` (alla fem: refund/cancellation/gdpr/bug_financial/
+  human_requested), och anropar `notifyHandymateSupportTeam()` — mockat
   push-anrop verifieras.
-- Facit: refund/uppsägnings-vägen skapar BÅDE en `pending_approvals`-rad
-  OCH en `support_ticket` med `linked_approval_id` satt till samma id.
+- Facit: Support-agentens verktygslista (`getAgentTools('support')`)
+  innehåller INTE `create_approval_request` — regressionsskydd mot att
+  någon av misstag lägger tillbaka den kopplingen.
 - UI-facit: `MatteChatModal` renderar Support-header när
   `message.agent === 'support'`, Mattes porträtt annars (regressionsskydd
   mot att undantaget läcker till andra agenter).
@@ -264,9 +270,10 @@ nytt).
   hantverkare kommer tillbaka med samma problem) — ny `support_ticket`-
   rad varje eskalering, inte en återöppning av den gamla; historiken i
   `thread_message` är ändå sammanhängande.
-- `pending_approvals`-raden för en refund avslås — `support_ticket`
-  förblir `escalated`/`in_progress` tills ni explicit markerar den
-  löst (avslag är också ett svar, bara inte det hantverkaren ville ha).
+- En refund-begäran avslås efter granskning — `support_ticket`
+  markeras ändå `resolved` av er (avslag är också ett svar, bara inte
+  det hantverkaren ville ha); nöjdhetsfrågan går ut som vanligt och kan
+  helt rimligt besvaras negativt.
 - Företag utan aktiv Handymate-prenumeration (t.ex. redan uppsagt) som
   ändå skriver i chatten — `get_account_billing_status` returnerar det
   faktiska läget ärligt, ingen särskild felhantering behövs.
