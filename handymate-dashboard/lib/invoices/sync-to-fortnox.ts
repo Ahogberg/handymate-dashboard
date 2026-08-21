@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { fortnoxRequest, isFortnoxConnected, syncCustomerToFortnox } from '@/lib/fortnox'
+import { fortnoxRequest, isFortnoxConnected, syncCustomerToFortnox, updateFortnoxCustomer } from '@/lib/fortnox'
 import { prepareInvoiceManifest, markInvoiceDelivered } from '@/lib/invoices/evidence-manifest'
 import { generateOCR } from '@/lib/ocr'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
@@ -49,6 +49,14 @@ export interface SyncToFortnoxResult {
    */
   newInvoiceNumber?: string
   newOcrNumber?: string
+  /**
+   * true = fakturan skickades som e-faktura via Fortnox (kunden har ett
+   * gln_number) istället för Handymates egen PDF/email/SMS. sendInvoice()
+   * hoppar då över sin egen kundleverans helt. false/undefined = ingen
+   * GLN, eller e-fakturaförsöket misslyckades — sendInvoice() faller
+   * tillbaka till PDF/email/SMS som vanligt (2026-08-21).
+   */
+  eInvoiceSent?: boolean
   error?: string
 }
 
@@ -101,6 +109,7 @@ export async function syncInvoiceToFortnox(
       idempotent: true,
       fortnoxInvoiceNumber: invoice.fortnox_invoice_number,
       fortnoxDocumentNumber: invoice.fortnox_document_number,
+      eInvoiceSent: !!invoice.fortnox_einvoice_sent_at,
     }
   }
   if (syncStatus === 'pending' && lastAttempt) {
@@ -124,6 +133,26 @@ export async function syncInvoiceToFortnox(
 
   if (!customerNumber) {
     return { success: false, error: 'Ingen kund kopplad till fakturan' }
+  }
+
+  // E-faktura (2026-08-21): om kunden har ett gln_number, håll Fortnox-
+  // kundens Type/OrganisationNumber/GLN uppdaterade INNAN fakturan bokförs
+  // — annars vet inte /einvoice-anropet nedan vart den ska routas. Körs på
+  // varje synk (inte bara vid kundens FÖRSTA Fortnox-synk högre upp), så en
+  // GLN som läggs till i efterhand på en redan synkad kund ändå når fram.
+  // Best-effort: misslyckas den, faller e-fakturaförsöket nedan tillbaka
+  // till Handymates egen PDF/email/SMS-leverans ändå.
+  if (invoice.customer?.gln_number) {
+    try {
+      await updateFortnoxCustomer(businessId, customerNumber, {
+        Type: 'COMPANY',
+        OrganisationNumber: invoice.customer.org_number || undefined,
+        GLN: invoice.customer.gln_number,
+        GLNDelivery: invoice.customer.gln_number,
+      })
+    } catch (glnErr: any) {
+      console.error('[sync-to-fortnox] Kunde inte uppdatera GLN på Fortnox-kunden:', glnErr?.message || glnErr)
+    }
   }
 
   const items: InvoiceItem[] = Array.isArray(invoice.items) ? invoice.items : []
@@ -242,6 +271,22 @@ export async function syncInvoiceToFortnox(
     }
   }
 
+  // E-faktura (2026-08-21): kunden har ett gln_number → försök skicka som
+  // e-faktura via Fortnox e-fakturaoperatör istället för Handymates egen
+  // PDF/email/SMS. Best-effort: misslyckas anropet (t.ex. mottagaren inte
+  // Peppol-registrerad) faller sendInvoice() tillbaka till sin egen
+  // leverans — se eInvoiceSent i returvärdet. Bokföringen ovan är redan
+  // klar oavsett utfall här.
+  let eInvoiceSent = false
+  if (fortnoxDocumentNumber && invoice.customer?.gln_number) {
+    try {
+      await fortnoxRequest(businessId, 'GET', `/invoices/${fortnoxDocumentNumber}/einvoice`)
+      eInvoiceSent = true
+    } catch (eInvoiceErr: any) {
+      console.error('[sync-to-fortnox] E-fakturaförsök misslyckades, faller tillbaka till egen leverans:', eInvoiceErr?.message || eInvoiceErr)
+    }
+  }
+
   if (fortnoxError || !fortnoxInvoiceNumber) {
     await supabase
       .from('invoice')
@@ -284,6 +329,9 @@ export async function syncInvoiceToFortnox(
   if (isRot) {
     updateData.rot_application_status = 'submitted'
   }
+  if (eInvoiceSent) {
+    updateData.fortnox_einvoice_sent_at = now
+  }
 
   const { error: finalUpdateError } = await supabase
     .from('invoice')
@@ -318,6 +366,7 @@ export async function syncInvoiceToFortnox(
     fortnoxDocumentNumber: fortnoxDocumentNumber ?? undefined,
     newInvoiceNumber: fortnoxDocumentNumber,
     newOcrNumber,
+    eInvoiceSent,
   }
 }
 

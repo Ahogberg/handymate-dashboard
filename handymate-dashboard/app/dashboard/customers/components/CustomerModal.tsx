@@ -149,6 +149,20 @@ export function CustomerModal({
                   className={INPUT_CLS}
                 />
               </div>
+              <div>
+                <label className={LABEL_CLS}>GLN-nummer (för e-faktura)</label>
+                <input
+                  type="text"
+                  value={form.gln_number}
+                  onChange={e => setForm({ ...form, gln_number: e.target.value })}
+                  placeholder="13 siffror, valfritt"
+                  maxLength={13}
+                  className={INPUT_CLS}
+                />
+                <p className="mt-1 text-xs text-slate-400">
+                  Fyll i om kunden vill ha fakturan som e-faktura direkt in i sitt bokföringsprogram istället för PDF/e-post.
+                </p>
+              </div>
             </>
           )}
 

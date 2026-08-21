@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
       case 'create_customer': {
         const { name, phone_number, email, address_line, personal_number, property_designation,
-                customer_type, org_number, contact_person, invoice_address, visit_address, reference, apartment_count,
+                customer_type, org_number, gln_number, contact_person, invoice_address, visit_address, reference, apartment_count,
                 segment_id, contract_type_id, price_list_id } = data
 
         // Pre-check dubbletter på telefon/e-post/namn+adress för att förhindra
@@ -133,6 +133,7 @@ export async function POST(request: NextRequest) {
         if (property_designation) insertData.property_designation = property_designation
         if (customer_type) insertData.customer_type = customer_type
         if (org_number) insertData.org_number = org_number
+        if (gln_number) insertData.gln_number = gln_number
         if (contact_person) insertData.contact_person = contact_person
         if (invoice_address) insertData.invoice_address = invoice_address
         if (visit_address) insertData.visit_address = visit_address
@@ -154,7 +155,7 @@ export async function POST(request: NextRequest) {
 
       case 'update_customer': {
         const { customerId, name, phone_number, email, address_line, personal_number, property_designation,
-                customer_type, org_number, contact_person, invoice_address, visit_address, reference, apartment_count,
+                customer_type, org_number, gln_number, contact_person, invoice_address, visit_address, reference, apartment_count,
                 segment_id, contract_type_id, price_list_id } = data
 
         const updateData: Record<string, any> = {
@@ -169,6 +170,7 @@ export async function POST(request: NextRequest) {
         if (property_designation !== undefined) updateData.property_designation = property_designation || null
         if (customer_type !== undefined) updateData.customer_type = customer_type || 'private'
         if (org_number !== undefined) updateData.org_number = org_number || null
+        if (gln_number !== undefined) updateData.gln_number = gln_number || null
         if (contact_person !== undefined) updateData.contact_person = contact_person || null
         if (invoice_address !== undefined) updateData.invoice_address = invoice_address || null
         if (visit_address !== undefined) updateData.visit_address = visit_address || null

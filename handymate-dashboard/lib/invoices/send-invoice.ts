@@ -70,6 +70,8 @@ export interface SendInvoiceResult {
   email?: boolean
   /** true bara om SMS faktiskt gick ut (godkänt av strypunkten). */
   sms?: boolean
+  /** true om fakturan gick som e-faktura via Fortnox istället (2026-08-21). */
+  einvoice?: boolean
   errors: string[]
 }
 
@@ -155,7 +157,17 @@ export async function sendInvoice(
     .eq('business_id', businessId)
     .single()
 
-  const results: { sms?: boolean; email?: boolean; errors: string[] } = { errors: [] }
+  const results: { sms?: boolean; email?: boolean; einvoice?: boolean; errors: string[] } = { errors: [] }
+
+  // E-faktura (2026-08-21): Fortnox skickade redan fakturan direkt till
+  // kundens bokföringsprogram (kunden har ett gln_number). Handymates egen
+  // PDF/email/SMS-leverans hoppas då över helt — annars får en företagskund
+  // som specifikt bett om e-faktura ändå ett dubblettmejl med PDF-bilaga,
+  // precis det de ville slippa. Om e-fakturaförsöket misslyckades
+  // (eInvoiceSent falsy) fortsätter email/SMS nedan som vanligt.
+  if (fortnoxResult.eInvoiceSent) {
+    results.einvoice = true
+  }
 
   // Säkerställ kundportal aktiverad
   const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
@@ -185,7 +197,7 @@ export async function sendInvoice(
   }
 
   // Skicka email
-  if (send_email && invoice.customer?.email) {
+  if (send_email && invoice.customer?.email && !results.einvoice) {
     try {
       const pdfUrl = `${APP_URL}/api/invoices/pdf?invoiceId=${invoiceId}`
       const amountToPay = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
@@ -315,7 +327,7 @@ export async function sendInvoice(
   }
 
   // Skicka SMS
-  if (send_sms && invoice.customer?.phone_number) {
+  if (send_sms && invoice.customer?.phone_number && !results.einvoice) {
     try {
       const amountToPay = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
       const smsLink = portalUrl || `${APP_URL}/api/invoices/pdf?invoiceId=${invoiceId}`
@@ -373,7 +385,7 @@ export async function sendInvoice(
     await triggerPostSendAutomations({ businessId, invoiceId, invoice })
   }
 
-  return { found: true, email: results.email, sms: results.sms, errors: results.errors }
+  return { found: true, email: results.email, sms: results.sms, einvoice: results.einvoice, errors: results.errors }
 }
 
 export interface InvoiceDeliveryOutcomeParams {
@@ -385,15 +397,15 @@ export interface InvoiceDeliveryOutcomeParams {
    * loggningen läser fält som business_id/customer_id/invoice_number).
    */
   invoice: any
-  results: { email?: boolean; sms?: boolean; errors: string[] }
+  results: { email?: boolean; sms?: boolean; einvoice?: boolean; errors: string[] }
   /** Attributionsregeln — se SendInvoiceParams.source. Default 'user'. */
   source?: 'user' | 'automation'
 }
 
 export interface InvoiceDeliveryOutcomeResult {
-  /** true om email||sms lyckades — samma villkor som svarets success-fält. */
+  /** true om email||sms||einvoice lyckades — samma villkor som svarets success-fält. */
   delivered: boolean
-  sentMethod: 'email' | 'sms' | 'both' | null
+  sentMethod: 'email' | 'sms' | 'both' | 'einvoice' | null
 }
 
 /**
@@ -415,14 +427,16 @@ export async function applyInvoiceDeliveryOutcome(
 ): Promise<InvoiceDeliveryOutcomeResult> {
   const { businessId, invoiceId, invoice, results, source = 'user' } = params
 
-  if (results.email || results.sms) {
+  if (results.email || results.sms || results.einvoice) {
     // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): sent_at/
     // sent_method sattes ALDRIG här — InvoiceStatusTimeline.tsx läser
     // BÅDA (rad 48-52) för att visa "Skickad via {metod}"-steget som
     // klart; utan sent_at visas steget som "upcoming" trots att fakturan
     // faktiskt är skickad. Samma buggklass som project.status-fyndet
     // tidigare i samma körning — en statusflip utan sina stödjande fält.
-    const sentMethod = results.email && results.sms ? 'both' : results.email ? 'email' : 'sms'
+    // einvoice är alltid ensam (send-invoice.ts hoppar över email/sms-
+    // blocken när den är satt) — behöver inget eget both-läge.
+    const sentMethod = results.einvoice ? 'einvoice' : results.email && results.sms ? 'both' : results.email ? 'email' : 'sms'
     const { error: statusErr } = await supabase
       .from('invoice')
       .update({ status: 'sent', sent_at: new Date().toISOString(), sent_method: sentMethod, delivery_status: 'delivered' })
@@ -469,7 +483,7 @@ export async function applyInvoiceDeliveryOutcome(
         customer_id: invoice.customer_id,
         activity_type: 'invoice_sent',
         title: `Faktura ${invoice.invoice_number} skickad`,
-        description: `Faktura ${invoice.invoice_number} skickad${results.email ? ' via email' : ''}${results.sms ? ' via SMS' : ''}`,
+        description: `Faktura ${invoice.invoice_number} skickad${results.einvoice ? ' via e-faktura (Fortnox)' : ''}${results.email ? ' via email' : ''}${results.sms ? ' via SMS' : ''}`,
         metadata: { invoice_id: invoiceId, ...results },
         // Attributionsregeln: automationens utskick får aldrig se ut som en
         // människas klick — 'automation' när auto-invoice-on-complete skickade.

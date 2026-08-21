@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
     if (body.property_designation) insertData.property_designation = body.property_designation
     if (body.customer_type) insertData.customer_type = body.customer_type
     if (body.org_number) insertData.org_number = body.org_number
+    if (body.gln_number) insertData.gln_number = body.gln_number
     if (body.contact_person) insertData.contact_person = body.contact_person
     if (body.invoice_address) insertData.invoice_address = body.invoice_address
     if (body.visit_address) insertData.visit_address = body.visit_address
@@ -127,6 +128,7 @@ export async function PUT(request: NextRequest) {
     if (body.property_designation !== undefined) updateData.property_designation = body.property_designation || null
     if (body.customer_type !== undefined) updateData.customer_type = body.customer_type || 'private'
     if (body.org_number !== undefined) updateData.org_number = body.org_number || null
+    if (body.gln_number !== undefined) updateData.gln_number = body.gln_number || null
     if (body.contact_person !== undefined) updateData.contact_person = body.contact_person || null
     if (body.invoice_address !== undefined) updateData.invoice_address = body.invoice_address || null
     if (body.visit_address !== undefined) updateData.visit_address = body.visit_address || null

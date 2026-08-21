@@ -397,6 +397,11 @@ export interface FortnoxCustomer {
   Address1?: string
   ZipCode?: string
   City?: string
+  Type?: 'PRIVATE' | 'COMPANY'
+  OrganisationNumber?: string
+  /** 13-siffrigt GLN — adressen Fortnox e-fakturaoperatoren routar mot. */
+  GLN?: string
+  GLNDelivery?: string
 }
 
 export interface FortnoxCustomerResponse {
@@ -527,14 +532,21 @@ export async function syncCustomerToFortnox(
       }
     }
 
-    // Create in Fortnox
+    // Create in Fortnox. Type/OrganisationNumber/GLN skickas med redan vid
+    // skapandet om ifyllda (E-faktura, 2026-08-21) — sync-to-fortnox.ts gör
+    // dessutom en egen uppdatering vid varje fakturasynk, så en GLN som
+    // läggs till EFTER att kunden redan synkats når Fortnox ändå.
     const fortnoxCustomer = await createFortnoxCustomer(businessId, {
       Name: customer.name,
       Email: customer.email || undefined,
       Phone1: customer.phone_number || undefined,
       Address1: address1 || undefined,
       ZipCode: zipCode || undefined,
-      City: city || undefined
+      City: city || undefined,
+      Type: customer.customer_type === 'company' || customer.customer_type === 'brf' ? 'COMPANY' : 'PRIVATE',
+      OrganisationNumber: customer.org_number || undefined,
+      GLN: customer.gln_number || undefined,
+      GLNDelivery: customer.gln_number || undefined,
     })
 
     // Update customer in DB

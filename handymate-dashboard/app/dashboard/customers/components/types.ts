@@ -10,6 +10,7 @@ export interface Customer {
   created_at: string
   customer_type?: 'private' | 'company' | 'brf'
   org_number?: string | null
+  gln_number?: string | null
   contact_person?: string | null
   invoice_address?: string | null
   visit_address?: string | null
@@ -63,6 +64,7 @@ export interface CustomerForm {
   property_designation: string
   customer_type: 'private' | 'company' | 'brf'
   org_number: string
+  gln_number: string
   contact_person: string
   invoice_address: string
   visit_address: string
