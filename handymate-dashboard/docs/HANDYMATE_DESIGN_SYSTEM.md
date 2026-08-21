@@ -508,6 +508,7 @@ härleder `AGENT_INFO` ur den. **Skriv aldrig en egen agentkarta.**
 | Daniel | Säljare | `#d97706` |
 | Lars | Projektledare | `#059669` |
 | Lisa | Kundservice & Telefonist | `#0ea5e9` |
+| Support | Kundtjänst | `#4f46e5` |
 
 ### Undantaget från "max 2 accentfärger"
 
