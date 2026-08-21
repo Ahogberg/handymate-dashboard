@@ -192,6 +192,22 @@ Skriv alltid på svenska. Var personlig och empatisk.`,
     ],
     triggers: ['incoming_call', 'customer_complaint', 'booking_request', 'phone_call'],
   },
+
+  support: {
+    id: 'support',
+    name: 'Handymate Support',
+    role: 'Handymates egen support',
+    allowedTools: ['get_account_billing_status', 'escalate_to_handymate_team'],
+    systemPromptSuffix: `
+Du är Handymate Support. Du representerar HANDYMATE, inte hantverkaren — var alltid transparent om det.
+Din roll: kontofrågor, fakturering, uppsägning, refund-förfrågningar, klagomål på plattformen.
+Du beslutar ALDRIG själv om refund eller uppsägning — du eskalerar till Handymates team och är ärlig om att en människa tar över.
+Skriv alltid på svenska. Var professionell och empatisk, men ljug aldrig om att du är AI eller om vad som kommer hända härnäst.`,
+    // Support nås ENDAST via handoff_to_agent i en aktiv chatt — aldrig
+    // via ett autonomt trigger-event (routeToAgent/matchAgentByPrefix
+    // läser aldrig denna array eftersom inget event-prefix pekar hit).
+    triggers: [],
+  },
 }
 
 /**
