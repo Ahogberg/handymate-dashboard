@@ -520,9 +520,11 @@ tar över:
 > avatarcirkeln och prickar i en händelselogg. Aldrig som kortram,
 > bakgrund, rubrikfärg eller knapp.
 
-Med den regeln blir sex agenter i följd sex små ansikten i ett lugnt flöde —
-inte sex färgade kort. Hannas lila finns i persondata och bryter inte mot
-"aldrig lila", eftersom den aldrig når en temayta.
+Med den regeln blir sju agenter i följd sju små ansikten i ett lugnt flöde —
+inte sju färgade kort. Hannas lila finns i persondata och bryter inte mot
+"aldrig lila", eftersom den aldrig når en temayta. Samma undantag gäller
+Supports indigo (`bg-indigo-600` / `#4f46e5`) mot Förbjudet-listans "aldrig
+indigo" — den bor bara i avataren, aldrig på en temayta.
 
 Använd `<AgentAvatar agentKey={...} size="sm|md|lg" />`
 ([components/agents/AgentAvatar.tsx](../components/agents/AgentAvatar.tsx)) —
