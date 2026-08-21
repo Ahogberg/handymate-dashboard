@@ -20,7 +20,7 @@ test.describe('Nöjdhetsfråga + recension vid löst supportärende', () => {
     expect(route).toContain('HANDYMATE_GOOGLE_REVIEW_URL')
   })
 
-  test('anvander getAuthenticatedBusiness, inte isAdmin — kraven ar hantverkarens egen session', () => {
+  test('använder getAuthenticatedBusiness, inte administratörsvägen — kravet är hantverkarens egen session', () => {
     const route = fs.readFileSync(
       path.join(__dirname, '..', 'app/api/admin/support-tickets/[id]/satisfaction/route.ts'),
       'utf8',
