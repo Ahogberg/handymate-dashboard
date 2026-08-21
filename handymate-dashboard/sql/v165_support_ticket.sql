@@ -9,7 +9,10 @@ BEGIN;
 CREATE TABLE public.support_ticket (
   id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL REFERENCES public.business_config(business_id) ON DELETE CASCADE,
-  thread_id TEXT NOT NULL REFERENCES public.agent_threads(id) ON DELETE CASCADE,
+  -- agent_threads.id ar UUID (undantag fran denna kodbasens vanliga
+  -- TEXT-id-konvention, se sql/v48_agent_handoff.sql) — thread_id maste
+  -- matcha typen for att FK-constrainten ska ga att skapa.
+  thread_id UUID NOT NULL REFERENCES public.agent_threads(id) ON DELETE CASCADE,
   category TEXT NOT NULL
     CHECK (category IN ('cancellation', 'refund', 'gdpr', 'bug_financial', 'human_requested', 'other')),
   summary TEXT,
