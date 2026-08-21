@@ -23,7 +23,7 @@ test.describe('Support har en egen identitet i teamregistret', () => {
     expect(block).toMatch(/Handymate Support/)
   })
 
-  test('support finns i SHORT_VERB-kartan (annars faller bylinen tillbaka pa Teamet/noterade)', () => {
+  test('support finns i SHORT_VERB-kartan (annars faller bylinen tillbaka på Teamet/noterade)', () => {
     const idx = INTERACTION_FILE.indexOf('const SHORT_VERB')
     expect(idx).toBeGreaterThan(-1)
     const block = INTERACTION_FILE.slice(idx, idx + 300)
