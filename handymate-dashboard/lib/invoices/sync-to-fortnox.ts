@@ -51,10 +51,11 @@ export interface SyncToFortnoxResult {
   newOcrNumber?: string
   /**
    * true = fakturan skickades som e-faktura via Fortnox (kunden har ett
-   * gln_number) istället för Handymates egen PDF/email/SMS. sendInvoice()
-   * hoppar då över sin egen kundleverans helt. false/undefined = ingen
-   * GLN, eller e-fakturaförsöket misslyckades — sendInvoice() faller
-   * tillbaka till PDF/email/SMS som vanligt (2026-08-21).
+   * org_number — företag/BRF) istället för Handymates egen PDF/email/SMS.
+   * sendInvoice() hoppar då över sin egen kundleverans helt. false/
+   * undefined = ingen org_number, eller e-fakturaförsöket misslyckades
+   * (t.ex. ingen aktiv e-fakturaanslutning hos mottagaren) — sendInvoice()
+   * faller tillbaka till PDF/email/SMS som vanligt (2026-08-21).
    */
   eInvoiceSent?: boolean
   error?: string
@@ -135,23 +136,30 @@ export async function syncInvoiceToFortnox(
     return { success: false, error: 'Ingen kund kopplad till fakturan' }
   }
 
-  // E-faktura (2026-08-21): om kunden har ett gln_number, håll Fortnox-
-  // kundens Type/OrganisationNumber/GLN uppdaterade INNAN fakturan bokförs
-  // — annars vet inte /einvoice-anropet nedan vart den ska routas. Körs på
-  // varje synk (inte bara vid kundens FÖRSTA Fortnox-synk högre upp), så en
-  // GLN som läggs till i efterhand på en redan synkad kund ändå når fram.
-  // Best-effort: misslyckas den, faller e-fakturaförsöket nedan tillbaka
-  // till Handymates egen PDF/email/SMS-leverans ändå.
-  if (invoice.customer?.gln_number) {
+  // E-faktura (2026-08-21, korrigerad 2026-08-21): Fortnox e-fakturaadress
+  // ÄR organisationsnumret — GLN krävs INTE i Sverige (verifierat mot
+  // Fortnox egen support: "Your e-invoice address in Fortnox is your
+  // organisation number. GLN-numbers are not a requirement within
+  // Sweden"). Så triggern är org_number (redan ett fält varje företags-/
+  // BRF-kund har), inte ett separat GLN-fält ingen kund i praktiken har.
+  // GLN skickas med som ett VALFRITT override om det ändå är ifyllt.
+  // Håller Fortnox-kundens Type/OrganisationNumber/GLN uppdaterade INNAN
+  // fakturan bokförs — annars vet inte /einvoice-anropet nedan vart den
+  // ska routas. Körs på varje synk (inte bara vid kundens FÖRSTA Fortnox-
+  // synk högre upp), så ett org-nummer som läggs till i efterhand på en
+  // redan synkad kund ändå når fram. Best-effort: misslyckas den, faller
+  // e-fakturaförsöket nedan tillbaka till Handymates egen PDF/email/SMS-
+  // leverans ändå.
+  if (invoice.customer?.org_number) {
     try {
       await updateFortnoxCustomer(businessId, customerNumber, {
         Type: 'COMPANY',
-        OrganisationNumber: invoice.customer.org_number || undefined,
-        GLN: invoice.customer.gln_number,
-        GLNDelivery: invoice.customer.gln_number,
+        OrganisationNumber: invoice.customer.org_number,
+        GLN: invoice.customer.gln_number || undefined,
+        GLNDelivery: invoice.customer.gln_number || undefined,
       })
     } catch (glnErr: any) {
-      console.error('[sync-to-fortnox] Kunde inte uppdatera GLN på Fortnox-kunden:', glnErr?.message || glnErr)
+      console.error('[sync-to-fortnox] Kunde inte uppdatera Fortnox-kundens e-fakturaadress:', glnErr?.message || glnErr)
     }
   }
 
@@ -271,14 +279,16 @@ export async function syncInvoiceToFortnox(
     }
   }
 
-  // E-faktura (2026-08-21): kunden har ett gln_number → försök skicka som
-  // e-faktura via Fortnox e-fakturaoperatör istället för Handymates egen
-  // PDF/email/SMS. Best-effort: misslyckas anropet (t.ex. mottagaren inte
-  // Peppol-registrerad) faller sendInvoice() tillbaka till sin egen
-  // leverans — se eInvoiceSent i returvärdet. Bokföringen ovan är redan
-  // klar oavsett utfall här.
+  // E-faktura (2026-08-21, korrigerad 2026-08-21): kunden har ett
+  // org_number (företag/BRF) → försök skicka som e-faktura via Fortnox
+  // e-fakturaoperatör istället för Handymates egen PDF/email/SMS. Fortnox
+  // routar via organisationsnumret (GLN krävs inte i Sverige) och avgör
+  // själv om mottagaren faktiskt har en aktiv e-fakturaanslutning — best-
+  // effort: misslyckas anropet (ingen sådan anslutning) faller
+  // sendInvoice() tillbaka till sin egen leverans — se eInvoiceSent i
+  // returvärdet. Bokföringen ovan är redan klar oavsett utfall här.
   let eInvoiceSent = false
-  if (fortnoxDocumentNumber && invoice.customer?.gln_number) {
+  if (fortnoxDocumentNumber && invoice.customer?.org_number) {
     try {
       await fortnoxRequest(businessId, 'GET', `/invoices/${fortnoxDocumentNumber}/einvoice`)
       eInvoiceSent = true
