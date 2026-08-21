@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 
-test.describe('Admin supportko', () => {
+test.describe('Admin supportkö', () => {
   test('SupportQueueTab-komponenten finns', () => {
     const p = path.join(__dirname, '..', 'app/admin/components/SupportQueueTab.tsx')
     expect(fs.existsSync(p)).toBe(true)
