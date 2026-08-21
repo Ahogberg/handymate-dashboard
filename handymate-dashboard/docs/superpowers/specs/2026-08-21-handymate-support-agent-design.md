@@ -73,15 +73,22 @@ Research innan design visade att mycket redan finns:
    egen refund där vore bakvänd (det är Handymate som ska granska, inte
    hantverkaren). Refund/uppsägning går via SAMMA nya `support_ticket`-
    spårning och notis som alla andra eskaleringar — se punkt 5.
-4. **Support bryter medvetet mot "alltid Mattes ansikte"-regeln.**
-   Idag visas Mattes porträtt på alla svar oavsett vilken specialist
-   som egentligen svarade (`components/MatteChatModal.tsx:401`,
-   uttryckligen avsiktligt). Support är det EN deliberata undantaget:
-   eget avatar/namn + en tydlig skiljelinje i tråden när den kopplas
-   in. Anledningen är specifik för just den här agenten — alla andra
-   specialister är otvetydigt "ditt team"; Support representerar
-   Handymate självt, och den skillnaden måste synas, inte gömmas i en
-   fotnot.
+4. **Support får en egen identitet i det redan per-agent-baserade
+   avatarsystemet — ingen specialbehandling behövs.** Research
+   avslöjade att antagandet i tidigare utkast var föråldrat: en
+   kodkommentar (`components/MatteChatModal.tsx:401`) beskrev ett
+   ÄLDRE läge ("Mattes porträtt på alla svar") som redan ersatts av
+   Epic 3 (`components/agents/AgentMessage.tsx`) — varje agent får
+   IDAG sitt eget avatar OCH en byline i tredje person ("Karin ·
+   Ekonom förberedde") på VARJE meddelande, inte bara vid en
+   engångs-handoff. Support behöver alltså bara registreras i samma
+   källa alla andra agenter redan kommer ifrån (`lib/agents/team.ts`
+   `TEAM`-arrayen + `lib/agents/interaction.ts` `SHORT_VERB`-kartan) —
+   då får den automatiskt sitt eget avatar (initialer, ingen
+   porträttbild behövs för v1) och en byline ("Handymate Support
+   svarade") på varje enskilt meddelande, konsekvent genom hela
+   ärendet — starkare kontinuerlig tydlighet än en engångsdivider hade
+   gett.
 5. **Eskalering pushar direkt till er, alltid.** Ni är två personer —
    ingen SLA-motor, bara en omedelbar push/SMS när något landar i kön.
 6. **Ni svarar i `/admin`, svaret landar i samma chattråd.** Sluten
@@ -191,15 +198,22 @@ mejl-digest). En generell "slå upp alla @handymate.se-mejl"-lösning är
 uttryckligen UTANFÖR scope — två hårdkodade mottagare räcker för ett
 team på två.
 
-**7. UI-avatar-undantaget** (`components/MatteChatModal.tsx`) — där
-komponenten idag alltid renderar Mattes porträtt (rad ~401), läggs ett
-villkor till: `agent === 'support'` renderar istället en egen
-Support-ikon/namn-header ("🎧 Handymate Support") ovanpå bubblan. Kräver
-en ny avatarbild eller — för v1 — en enkel ikon (lucide-react
-`Headset`), inget nytt bilduppladdningsflöde. Skiljelinjen i tråden
-själv kommer redan gratis från `buildHandoffAnnouncement()` (ingen
-ändring där — texten "Det där är inget jag hanterar bäst — jag lämnar
-över till Handymate Support" fungerar oförändrad).
+**7. Registrera Support i teamregistret** (`lib/agents/team.ts`) — lägg
+till en post i `TEAM`-arrayen (id `'support'`, namn "Handymate
+Support", roll t.ex. "Support", initialer, en egen accentfärg, ingen
+`avatar`-bild i v1 — `AgentAvatar` faller redan tillbaka på initialer i
+en färgad cirkel om `avatar` saknas, samma säkra fallback som
+"okänd agent" använder, bara med RÄTT namn/färg istället för en
+gissning). Lägg till samma `id` i `lib/agents/interaction.ts`s
+`SHORT_VERB`-karta (t.ex. `support: 'svarade'`). Allt annat —
+`AgentAvatar`, `AGENT_INFO` (`components/dashboard/agentPersonas.ts`,
+härledd från `TEAM`), bylinen, morgonbriefen — plockar upp den nya
+agenten automatiskt, ingen ändring i `MatteChatModal.tsx` eller
+`AgentMessage.tsx` behövs. Skiljelinjen i tråden själv kommer redan
+gratis från `buildHandoffAnnouncement()` (ingen ändring där — texten
+"Det där är inget jag hanterar bäst — jag lämnar över till Handymate
+Support" fungerar oförändrad, och renderas dämpad med pil/vänsterkant
+precis som alla andra handoffs, `AgentMessage.tsx`s `ärÖverlämning`-läge).
 
 ## Admin — supportkön
 
