@@ -12,7 +12,7 @@
  * `handoff_targets` får agenten inte initiera den.
  */
 
-export type AgentId = 'matte' | 'lars' | 'karin' | 'daniel' | 'hanna' | 'lisa'
+export type AgentId = 'matte' | 'lars' | 'karin' | 'daniel' | 'hanna' | 'lisa' | 'support'
 
 export interface AgentCapability {
   id: AgentId
@@ -47,6 +47,7 @@ export const AGENT_CAPABILITIES: Record<AgentId, AgentCapability> = {
       'Offert-utformning och prisförhandling — Daniel äger',
       'Projektledning och bokningsdetaljer — Lars äger',
       'Recensioner och kampanjer — Hanna äger',
+      'Frågor om ditt Handymate-konto, fakturering, uppsägning eller klagomål på plattformen — Support äger',
     ],
     handoff_targets: '*',
   },
@@ -66,7 +67,7 @@ export const AGENT_CAPABILITIES: Record<AgentId, AgentCapability> = {
       'Offert-detaljer eller ÄTA-tillägg — Daniel äger',
       'Recensioner efter avslut — Hanna äger',
     ],
-    handoff_targets: ['matte', 'karin', 'daniel', 'hanna'],
+    handoff_targets: ['matte', 'karin', 'daniel', 'hanna', 'support'],
   },
 
   karin: {
@@ -85,7 +86,7 @@ export const AGENT_CAPABILITIES: Record<AgentId, AgentCapability> = {
       'Nya offerter eller försäljning — Daniel äger',
       'Kundens upplevelse efter avslut — Hanna äger',
     ],
-    handoff_targets: ['matte', 'lars', 'daniel'],
+    handoff_targets: ['matte', 'lars', 'daniel', 'support'],
   },
 
   daniel: {
@@ -104,7 +105,7 @@ export const AGENT_CAPABILITIES: Record<AgentId, AgentCapability> = {
       'Pågående projekt och bokningar — Lars äger',
       'Recensions-uppföljning — Hanna äger',
     ],
-    handoff_targets: ['matte', 'karin', 'lars'],
+    handoff_targets: ['matte', 'karin', 'lars', 'support'],
   },
 
   hanna: {
@@ -122,7 +123,7 @@ export const AGENT_CAPABILITIES: Record<AgentId, AgentCapability> = {
       'Pågående projekt — Lars äger',
       'Aktiv offertförhandling — Daniel äger',
     ],
-    handoff_targets: ['matte', 'karin', 'daniel', 'lars'],
+    handoff_targets: ['matte', 'karin', 'daniel', 'lars', 'support'],
   },
 
   lisa: {
@@ -141,7 +142,23 @@ export const AGENT_CAPABILITIES: Record<AgentId, AgentCapability> = {
       'Projektstatus — Lars äger',
       'Kampanjer och recensioner — Hanna äger',
     ],
-    handoff_targets: ['matte', 'karin', 'daniel', 'lars', 'hanna'],
+    handoff_targets: ['matte', 'karin', 'daniel', 'lars', 'hanna', 'support'],
+  },
+
+  support: {
+    id: 'support',
+    name: 'Handymate Support',
+    domain: 'Handymates egen support — konto, fakturering, uppsägning, klagomål på plattformen.',
+    expertise: [
+      'Frågor om din Handymate-prenumeration och fakturering',
+      'Uppsägning eller nedgradering',
+      'Refund-förfrågningar (skapar en begäran, beslutar aldrig själv)',
+      'Klagomål och buggar som påverkat dig ekonomiskt',
+    ],
+    out_of_scope: [
+      'Allt som rör DINA kunder/offerter/fakturor — Matte och teamet äger det',
+    ],
+    handoff_targets: ['matte'],
   },
 }
 
