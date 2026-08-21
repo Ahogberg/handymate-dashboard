@@ -8,7 +8,7 @@ test.describe('Admin supportko', () => {
     expect(fs.existsSync(p)).toBe(true)
   })
 
-  test('GET /api/admin/support-tickets kraver isAdmin', () => {
+  test('GET /api/admin/support-tickets kräver isAdmin', () => {
     const route = fs.readFileSync(
       path.join(__dirname, '..', 'app/api/admin/support-tickets/route.ts'),
       'utf8',
@@ -22,7 +22,7 @@ test.describe('Admin supportko', () => {
     expect(page).toContain('SupportQueueTab')
   })
 
-  test('kategori-etiketten for refund ar pa svenska, inte engelska', () => {
+  test('kategori-etiketten för refund är på svenska, inte engelska', () => {
     const component = fs.readFileSync(
       path.join(__dirname, '..', 'app/admin/components/SupportQueueTab.tsx'),
       'utf8',
