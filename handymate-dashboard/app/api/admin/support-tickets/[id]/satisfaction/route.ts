@@ -46,10 +46,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     .select('id')
     .single()
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-  if (!updated) {
+  if (error || !updated) {
     return NextResponse.json({ error: 'Ärendet hittades inte' }, { status: 404 })
   }
 
