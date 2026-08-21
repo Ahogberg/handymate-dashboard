@@ -83,6 +83,7 @@ const SHORT_VERB: Record<string, string> = {
   lars: 'kontrollerade',
   hanna: 'föreslog',
   lisa: 'tog emot',
+  support: 'svarade',
 }
 
 export function agentIdentity(agentKey: string | null | undefined): AgentIdentity {
