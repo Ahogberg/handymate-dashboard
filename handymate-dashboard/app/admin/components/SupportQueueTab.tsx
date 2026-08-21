@@ -69,7 +69,6 @@ export default function SupportQueueTab() {
             {t.summary && <div className="text-xs text-gray-500 mt-1">{t.summary}</div>}
             <div className="text-xs text-gray-400 mt-1">Eskalerad {new Date(t.escalated_at).toLocaleString('sv-SE')}</div>
           </div>
-          {/* /admin/support/[id] byggs i en senare task i denna serie — 404 här är väntat, inte en bugg. */}
           <a href={`/admin/support/${t.id}`} className="text-sm text-primary-700 font-medium hover:underline">Öppna →</a>
         </div>
       ))}

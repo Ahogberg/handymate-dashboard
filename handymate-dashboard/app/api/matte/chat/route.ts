@@ -333,16 +333,28 @@ const CURATED_TOOL_NAMES = [
 // per agent, OCH varje exekvering verifieras igen — en hallucinerad
 // tool_use förbi listan nekas server-side. Prompten är aldrig gränsen.
 
-/** Koordinationsverktyg alla agenter behöver oavsett domän. */
-const COORDINATION_TOOLS = new Set([
+/** Rena koordinationsverktyg — inget skrivrisk, alla agenter får dem. */
+const UNIVERSAL_COORDINATION_TOOLS = new Set([
   'navigate',
   'handoff_to_agent',
+])
+
+/**
+ * Godkännandeköns verktyg — alla agenter FÖRUTOM support, vars hela design
+ * bygger på att ALDRIG skriva till pending_approvals (den kön är
+ * hantverkarens egen, se app/dashboard/approvals/page.tsx). Utan detta
+ * undantag skulle support få tillgång till create_approval_request/
+ * check_pending_approvals via den här koordinationsvägen trots att
+ * personalities.ts medvetet utelämnar dem ur support.allowedTools.
+ */
+const APPROVAL_COORDINATION_TOOLS = new Set([
   'create_approval_request',
   'check_pending_approvals',
 ])
 
 function isToolAllowedForAgent(agent: AgentId, toolName: string): boolean {
-  if (COORDINATION_TOOLS.has(toolName)) return true
+  if (UNIVERSAL_COORDINATION_TOOLS.has(toolName)) return true
+  if (APPROVAL_COORDINATION_TOOLS.has(toolName) && agent !== 'support') return true
   const allowed = getAgentTools(agent)
   if (allowed === 'all') return true
   return allowed.includes(toolName)
