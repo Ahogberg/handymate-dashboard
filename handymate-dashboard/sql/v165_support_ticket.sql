@@ -12,6 +12,7 @@ CREATE TABLE public.support_ticket (
   thread_id TEXT NOT NULL REFERENCES public.agent_threads(id) ON DELETE CASCADE,
   category TEXT NOT NULL
     CHECK (category IN ('cancellation', 'refund', 'gdpr', 'bug_financial', 'human_requested', 'other')),
+  summary TEXT,
   status TEXT NOT NULL DEFAULT 'escalated'
     CHECK (status IN ('escalated', 'in_progress', 'resolved')),
   escalated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

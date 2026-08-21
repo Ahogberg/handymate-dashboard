@@ -18,7 +18,14 @@ export interface SupportTicketAlert {
   businessName: string
   category: string
   ticketId: string
+  /** Ärendets sammanfattning (från escalate_to_handymate_team-verktyget).
+   *  Valfri — trunkeras till SMS_SUMMARY_MAX_LEN tecken i meddelandet
+   *  nedan så larmet inte drar iväg i segment (kostnad per SMS-del). */
+  summary?: string
 }
+
+/** Max antal tecken av summary som tas med i SMS:et — se SupportTicketAlert.summary. */
+const SMS_SUMMARY_MAX_LEN = 100
 
 /**
  * Fire-and-forget SMS-larm till Handymates eget team vid en support-
@@ -37,7 +44,11 @@ export async function notifyHandymateSupportTeam(alert: SupportTicketAlert): Pro
     return
   }
 
-  const message = `Support-arende (${alert.category}) fran ${alert.businessName}. Se /admin. #${alert.ticketId}`
+  const trimmedSummary = alert.summary?.trim()
+  const summarySuffix = trimmedSummary
+    ? `: ${trimmedSummary.length > SMS_SUMMARY_MAX_LEN ? `${trimmedSummary.slice(0, SMS_SUMMARY_MAX_LEN)}…` : trimmedSummary}`
+    : ''
+  const message = `Support-arende (${alert.category}) fran ${alert.businessName}${summarySuffix}. Se /admin. #${alert.ticketId}`
 
   await Promise.all(
     ALERT_PHONES.map(async (phone) => {

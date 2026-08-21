@@ -207,18 +207,14 @@ export async function executeTool(
         if (!threadId) {
           return { success: false, error: 'Ingen aktiv konversationstråd att koppla ärendet till' }
         }
-        const { data: biz } = await supabase
-          .from('business_config')
-          .select('business_name')
-          .eq('business_id', businessId)
-          .single()
 
-        const ticketId = 'stkt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8)
+        const ticketId = generateId('stkt')
         const { error } = await supabase.from('support_ticket').insert({
           id: ticketId,
           business_id: businessId,
           thread_id: threadId,
           category: String(category),
+          summary: String(summary),
           status: 'escalated',
         })
         if (error) {
@@ -228,9 +224,10 @@ export async function executeTool(
 
         const { notifyHandymateSupportTeam } = await import('@/lib/notifications/handymate-team-alert')
         await notifyHandymateSupportTeam({
-          businessName: biz?.business_name || 'Okänt företag',
+          businessName: context.businessName || 'Okänt företag',
           category: String(category),
           ticketId,
+          summary: String(summary),
         })
 
         return {
