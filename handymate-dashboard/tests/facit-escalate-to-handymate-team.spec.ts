@@ -12,7 +12,7 @@ const ROUTER = fs.readFileSync(
 )
 
 test.describe('escalate_to_handymate_team', () => {
-  test('verktygsschema finns med category-enum for alla fem kategorier', () => {
+  test('verktygsschema finns med category-enum för alla fem kategorier', () => {
     expect(DEFS).toContain('name: "escalate_to_handymate_team"')
     const idx = DEFS.indexOf('name: "escalate_to_handymate_team"')
     const block = DEFS.slice(idx, idx + 700)
@@ -33,7 +33,7 @@ test.describe('escalate_to_handymate_team', () => {
     expect(ROUTER).toContain('notifyHandymateSupportTeam')
   })
 
-  test('skapar INGEN pending_approvals-rad (se spec — fel ko for detta)', () => {
+  test('skapar INGEN pending_approvals-rad (se spec — fel kö för detta)', () => {
     const idx = ROUTER.indexOf("case 'escalate_to_handymate_team'")
     const nextCaseIdx = ROUTER.indexOf("case '", idx + 10)
     const block = ROUTER.slice(idx, nextCaseIdx > -1 ? nextCaseIdx : idx + 1200)
