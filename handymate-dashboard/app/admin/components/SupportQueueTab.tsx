@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { AlertCircle } from 'lucide-react'
+import { CATEGORY_LABELS } from '@/lib/constants/support-categories'
 
 interface SupportTicket {
   id: string
@@ -12,15 +13,6 @@ interface SupportTicket {
   summary?: string | null
   escalated_at: string
   business_config?: { business_name?: string } | null
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  cancellation: 'Uppsägning',
-  refund: 'Återbetalning',
-  gdpr: 'GDPR/juridik',
-  bug_financial: 'Bugg (pengapåverkan)',
-  human_requested: 'Ville prata med människa',
-  other: 'Övrigt',
 }
 
 export default function SupportQueueTab() {

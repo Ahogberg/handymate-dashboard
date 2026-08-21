@@ -11,12 +11,20 @@ test.describe('Admin support-svar — sluten loop till samma chattråd', () => {
     expect(route).toContain('isAdmin')
   })
 
-  test('reply-rutten använder saveThreadMessage, ingen Claude-runda', () => {
+  test('reply-rutten sparar direkt i thread_message och kontrollerar felet (ingen tyst fire-and-forget), ingen Claude-runda', () => {
     const route = fs.readFileSync(
       path.join(__dirname, '..', 'app/api/admin/support-tickets/[id]/reply/route.ts'),
       'utf8',
     )
-    expect(route).toContain('saveThreadMessage')
+    // saveThreadMessage() sväljer DB-fel internt — fel för en "sluten loop"
+    // där bekräftad leverans är hela poängen. Rutten ska göra inserten
+    // direkt och faktiskt kontrollera felet istället. (En kommentar som
+    // FÖRKLARAR varför saveThreadMessage medvetet inte används är okej —
+    // det är importen som inte får finnas, dvs funktionen får inte anropas.)
+    expect(route).not.toMatch(/import\s*{[^}]*saveThreadMessage[^}]*}/)
+    expect(route).toContain("from('thread_message')")
+    expect(route).toMatch(/error:\s*msgErr/)
+    expect(route).toMatch(/if\s*\(\s*msgErr\s*\)/)
     expect(route).not.toMatch(/callClaude|anthropic\.com\/v1\/messages/)
   })
 

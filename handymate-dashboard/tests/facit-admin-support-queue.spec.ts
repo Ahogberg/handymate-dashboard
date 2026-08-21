@@ -23,11 +23,20 @@ test.describe('Admin supportkö', () => {
   })
 
   test('kategori-etiketten för refund är på svenska, inte engelska', () => {
+    // CATEGORY_LABELS konsoliderades till lib/constants/support-categories.ts
+    // (delas med ärendevyn i app/admin/support/[id]/page.tsx) — kontrollera
+    // källan till sanning där, och att komponenten faktiskt använder den.
+    const shared = fs.readFileSync(
+      path.join(__dirname, '..', 'lib/constants/support-categories.ts'),
+      'utf8',
+    )
+    expect(shared).not.toMatch(/refund:\s*'Refund'/)
+    expect(shared).toMatch(/refund:\s*'Återbetalning'/)
+
     const component = fs.readFileSync(
       path.join(__dirname, '..', 'app/admin/components/SupportQueueTab.tsx'),
       'utf8',
     )
-    expect(component).not.toMatch(/refund:\s*'Refund'/)
-    expect(component).toMatch(/refund:\s*'Återbetalning'/)
+    expect(component).toContain("from '@/lib/constants/support-categories'")
   })
 })

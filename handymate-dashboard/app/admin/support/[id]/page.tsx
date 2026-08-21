@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
+import { CATEGORY_LABELS } from '@/lib/constants/support-categories'
 
 interface ThreadMsg {
   id: string
@@ -18,15 +19,6 @@ interface TicketInfo {
   category: string
   summary?: string | null
   business_config?: { business_name?: string } | null
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  cancellation: 'Uppsägning',
-  refund: 'Återbetalning',
-  gdpr: 'GDPR/juridik',
-  bug_financial: 'Bugg (pengapåverkan)',
-  human_requested: 'Ville prata med människa',
-  other: 'Övrigt',
 }
 
 export default function SupportTicketPage() {
@@ -61,6 +53,7 @@ export default function SupportTicketPage() {
   }, [load])
 
   async function sendReply() {
+    if (sending) return
     if (!reply.trim()) return
     setSending(true)
     setSendError(null)

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAdminSupabase, isAdmin } from '@/lib/admin-auth'
+import { getAdminSupabase, isAdmin, logAdminAction } from '@/lib/admin-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   const supabase = getAdminSupabase()
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('support_ticket')
     .update({
       status: 'resolved',
@@ -22,10 +22,20 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       resolved_by: admin.email || 'unknown',
     })
     .eq('id', params.id)
+    .select('id, business_id')
+    .single()
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+  if (!updated) {
+    return NextResponse.json({ error: 'Ärendet hittades inte' }, { status: 404 })
+  }
+
+  await logAdminAction('support_ticket_resolve', admin.userId || 'unknown', updated.business_id, {
+    ticketId: updated.id,
+    adminEmail: admin.email,
+  })
 
   return NextResponse.json({ success: true })
 }
