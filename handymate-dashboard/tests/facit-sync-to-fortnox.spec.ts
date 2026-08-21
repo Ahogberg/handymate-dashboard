@@ -152,3 +152,25 @@ test.describe('Nummer-unifiering (2026-08-20) — kunden ser samma nummer overal
     expect(block).toMatch(/newOcrNumber/)
   })
 })
+
+test.describe('Sista DB-skrivningen (markera synced) — felet kollas, inte tyst svalt (2026-08-21)', () => {
+  // Om denna specifika skrivning misslyckas har Fortnox ANDA bokfort
+  // fakturan, men lokala raden blir kvar pa fortnox_sync_status='pending'
+  // — ett senare omforsok (efter 5-minuters-timeouten) skulle da forsoka
+  // POSTa ANNU en gang och skapa en dubblett i Fortnox, trots att den
+  // forsta bokforingen redan lyckades. Maste larmas synligt, inte bara
+  // console.error som forsvinner i Vercel-loggarna.
+  test('updateError fran den slutgiltiga synced-skrivningen kollas explicit', () => {
+    const idx = FILE.indexOf("fortnox_sync_status: 'synced',")
+    expect(idx).toBeGreaterThan(-1)
+    const block = FILE.slice(idx, idx + 900)
+    expect(block).toMatch(/error:\s*(finalUpdateError|updateError)/)
+  })
+
+  test('ett fel dar rapporteras via rapporteraTystFel, inte bara console.error', () => {
+    expect(FILE).toContain("from '@/lib/observability/driftlarm'")
+    const idx = FILE.indexOf("fortnox_sync_status: 'synced',")
+    const block = FILE.slice(idx, idx + 1200)
+    expect(block).toMatch(/rapporteraTystFel/)
+  })
+})

@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fortnoxRequest, isFortnoxConnected, syncCustomerToFortnox } from '@/lib/fortnox'
 import { prepareInvoiceManifest, markInvoiceDelivered } from '@/lib/invoices/evidence-manifest'
 import { generateOCR } from '@/lib/ocr'
+import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 
 /**
  * Fortnox-bokföringssteget för en kundfaktura. Bruten ut ur
@@ -284,11 +285,30 @@ export async function syncInvoiceToFortnox(
     updateData.rot_application_status = 'submitted'
   }
 
-  await supabase
+  const { error: finalUpdateError } = await supabase
     .from('invoice')
     .update(updateData)
     .eq('invoice_id', invoiceId)
     .eq('business_id', businessId)
+
+  if (finalUpdateError) {
+    // Fortnox HAR redan bokfört fakturan korrekt vid det här laget — det
+    // som misslyckades är bara vår egen lokala bokföring av att det
+    // lyckades. Kritiskt att larma synligt: utan detta blir raden kvar på
+    // fortnox_sync_status='pending', och ett omförsök efter timeouten
+    // (FORTNOX_PENDING_TIMEOUT_MS) skulle då POSTa ÄNNU en gång och skapa
+    // en riktig dubblett i Fortnox — trots att den första bokföringen
+    // redan var korrekt. console.error försvinner i Vercel-loggarna;
+    // rapporteraTystFel gör felet synligt i automation_activity.
+    console.error('[sync-to-fortnox] Kunde inte skriva synced-status efter lyckad Fortnox-bokning:', finalUpdateError.message)
+    await rapporteraTystFel(
+      supabase,
+      businessId,
+      'sync-to-fortnox:final-update-failed-after-fortnox-success',
+      finalUpdateError.message,
+      { invoiceId, fortnoxDocumentNumber },
+    )
+  }
 
   await markInvoiceDelivered(supabase, { businessId, invoiceId, method: 'fortnox' })
 
