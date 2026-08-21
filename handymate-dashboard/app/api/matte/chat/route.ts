@@ -318,6 +318,8 @@ const CURATED_TOOL_NAMES = [
   // Goal-to-Plan V1 (Etapp B) — Matte-scopat (se isToolAllowedForAgent/
   // getAgentTools nedan; ingen specialist listar dem i personalities.ts).
   'propose_mission_plan', 'confirm_mission',
+  // Support-agenten (2026-08-21) — se lib/agent/capabilities.ts 'support'.
+  'get_account_billing_status', 'escalate_to_handymate_team',
 ]
 
 // ═══ PER-AGENT ALLOWLIST (Codex audit P0.2, 2026-08-08) ═══

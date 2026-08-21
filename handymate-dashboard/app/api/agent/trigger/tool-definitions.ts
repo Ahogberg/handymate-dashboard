@@ -481,6 +481,15 @@ export const toolDefinitions = [
     },
   },
   {
+    name: "get_account_billing_status",
+    description: "Hämta hantverkarens EGEN Handymate-prenumeration (plan, status, ev. provperiod). Endast för Support-agenten — rör aldrig hantverkarens KUNDERS fakturor.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
     name: "trigger_fortnox_sync",
     description: "Synka en specifik entitet (kund, faktura eller offert) till Fortnox. Kräver att Fortnox är anslutet.",
     input_schema: {

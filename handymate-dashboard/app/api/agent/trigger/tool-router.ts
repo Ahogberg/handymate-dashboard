@@ -170,6 +170,24 @@ export async function executeTool(
         return await getDailyStats(supabase, businessId, input)
       case 'create_approval_request':
         return await createApprovalRequest(supabase, businessId, input)
+      case 'get_account_billing_status': {
+        const { data, error } = await supabase
+          .from('business_config')
+          .select('subscription_plan, subscription_status, trial_ends_at')
+          .eq('business_id', businessId)
+          .single()
+        if (error || !data) {
+          return { success: false, error: 'Kunde inte läsa kontostatus' }
+        }
+        return {
+          success: true,
+          data: {
+            plan: data.subscription_plan,
+            status: data.subscription_status,
+            trial_ends_at: data.trial_ends_at,
+          },
+        }
+      }
       case 'check_pending_approvals':
         return await checkPendingApprovals(supabase, businessId)
       case 'get_project_profitability': {
