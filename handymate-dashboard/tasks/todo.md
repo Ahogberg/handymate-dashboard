@@ -217,3 +217,40 @@ saknad v157 (42P01).
 - [x] npx tsc --noEmit (0 fel)
 - [x] npx next build > buildlog.txt 2>&1 (0)
 - [x] git status, ETT commit specifika filer, ingen push
+# Launch hardening — Codex lane (2026-08-22)
+
+Avgränsning: Claudes externa, DB-verifierade lanseringschecklista är ensam
+kanonisk. Denna arbetslista omfattar bara kod, facit och tekniska bevis och
+skapar ingen konkurrerande launch-checklista eller roadmap.
+
+- [x] Supporteskalering rapporterar sanningen om ticket respektive internt larm
+- [x] Google-recensionslänk villkoras inte av positiv nöjdhet (ingen review gating)
+- [x] Browserlösa facit täcker larmfel, dedupe/ägarskap och nöjdhetsflödet
+- [x] Kritiska publika/tokenbaserade rutter får ett smalt regressionsfacit
+- [x] Tvåtenant-harneset valideras lokalt och körs om disponibla env/testkonton finns
+- [x] `npx tsc --noEmit`, riktade tester och `npx next build` är gröna
+
+## Review
+
+- Supportticketen och 46elks-larmet är nu två separata sanningar. Saknad
+  konfiguration, noll mottagare och transportfel ger explicit icke-levererat
+  utfall; kundtexten påstår aldrig att teamet notifierats då.
+- Modellretry/dubbelklick återanvänder öppet supportärende inom samma tenant,
+  tråd och kategori. Ett löst ärende blockerar inte en senare eskalering.
+- Nöjdhet lagras internt, medan Google-länken är neutral för båda svaren.
+- Publik offert/ÄTA/portal har smal regressionsvakt för dynamiska svar,
+  allowlistade DTO:er, tenant-/kundbindning, dedupe och generiska serverfel.
+- CI-kontraktslistan + nya launchfacit: 108/108 gröna. Supportsviten: 37/37.
+  Det publika/tokenbaserade urvalet: 91/91. `npx tsc --noEmit`: 0 fel.
+  `npx next build`: exit 0.
+- Full standardsvit startades men innehåller skarpa anrop mot app.handymate.se;
+  i den nätverksbegränsade miljön stoppades den vid 907/5166 med EACCES-fel,
+  alltså inte ett produktfacit för denna diff.
+- Tvåtenant-harneset och dess säkerhetsspärr är validerade (4/4). Den riktiga
+  DB-körningen avbröt fail-closed före anslutning eftersom `.env.integration`
+  och två disponibla testkonton saknas. Ingen databas berördes.
+
+Resultaten rapporteras till Claude för den kanoniska lanseringsartefakten;
+denna sektion är endast utvecklingsbokföring.
+
+---

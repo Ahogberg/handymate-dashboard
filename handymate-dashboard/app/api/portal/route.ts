@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/portal - Kundportal: hämta kundens data via token
  * Query: token (portal_token från customer-tabellen)

@@ -96,6 +96,6 @@ export async function POST(
     return NextResponse.json({ ok: true })
   } catch (err: any) {
     console.error('[claim-paid] error:', err)
-    return NextResponse.json({ error: err?.message || 'Serverfel' }, { status: 500 })
+    return NextResponse.json({ error: 'Kunde inte registrera betalningsuppgiften' }, { status: 500 })
   }
 }

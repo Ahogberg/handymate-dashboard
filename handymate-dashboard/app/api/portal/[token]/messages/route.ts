@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getCustomerFromPortalToken } from '@/lib/portal-link'
 
+export const dynamic = 'force-dynamic'
+
 const MESSAGES_CUSTOMER_SELECT = 'customer_id, business_id, portal_enabled, name, phone_number'
 
 export async function GET(request: NextRequest, { params }: { params: { token: string } }) {

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/ata/sign/[token] — Hämta ÄTA via publik signeringslänk (ingen auth)
  */
@@ -68,7 +70,6 @@ export async function GET(
         status: ata.status,
         signed_at: ata.signed_at,
         signed_by_name: ata.signed_by_name,
-        notes: ata.notes,
         created_at: ata.created_at,
       },
       project: {
@@ -86,7 +87,7 @@ export async function GET(
     })
   } catch (error: any) {
     console.error('GET /api/ata/sign/[token] error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Kunde inte läsa ÄTA' }, { status: 500 })
   }
 }
 
@@ -250,6 +251,6 @@ export async function POST(
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('POST /api/ata/sign/[token] error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Kunde inte uppdatera ÄTA' }, { status: 500 })
   }
 }

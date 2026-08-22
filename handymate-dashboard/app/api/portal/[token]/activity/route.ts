@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getCustomerFromPortalToken } from '@/lib/portal-link'
 
+export const dynamic = 'force-dynamic'
+
 interface ActivityItem {
   id: string
   type: string

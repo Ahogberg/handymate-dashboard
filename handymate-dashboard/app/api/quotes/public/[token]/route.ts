@@ -16,6 +16,7 @@ import { signAttachmentList } from '@/lib/storage-signing'
 // kräver Node-runtime (react-dom/server via lib/quote-templates, samma som
 // PDF-routen) — Edge-runtimet saknar det.
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/quotes/public/[token] - Hämta offert via publik signeringslänk
@@ -41,7 +42,8 @@ export async function GET(
       .single()
 
     if (error || !quote) {
-      console.error('[quote/public] Fetch error:', error?.message, 'token:', token)
+      // Signeringstoken är en bearer-hemlighet och får aldrig hamna i loggar.
+      console.error('[quote/public] Fetch error:', error?.message)
       return NextResponse.json({ error: 'Offert hittades inte eller länken är ogiltig' }, { status: 404 })
     }
 

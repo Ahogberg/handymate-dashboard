@@ -6,6 +6,8 @@ import { sanitizeSenderId } from '@/lib/sms/sender-id'
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
   try {
     const supabase = getServerSupabase()

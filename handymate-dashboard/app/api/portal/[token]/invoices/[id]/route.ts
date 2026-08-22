@@ -9,6 +9,7 @@ import { stripPrintBar } from '@/lib/document-html'
 // markup) — men buildInvoiceTemplateData/selectInvoiceTemplate går via
 // react-dom/server (samma skäl som quotes/public/[token], ETAPP 5).
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/portal/[token]/invoices/[id] — ETAPP 6e (offert-masterplan.md,

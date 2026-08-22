@@ -3,6 +3,8 @@ import { getServerSupabase } from '@/lib/supabase'
 import { generateOCR } from '@/lib/ocr'
 import { getCustomerFromPortalToken } from '@/lib/portal-link'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
   try {
     const supabase = getServerSupabase()
