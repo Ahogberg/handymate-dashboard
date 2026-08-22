@@ -14,7 +14,7 @@
  * - Hanna var rosa i briefen men lila överallt annars.
  *
  * Kopiorna är sammanslagna. Den här filen är regressionstestet: den låser att
- * alla sex finns, att härledningen är fullständig, och att paletten är hel.
+ * alla sju finns, att härledningen är fullständig, och att paletten är hel.
  *
  * Körs utan browser/session:
  *   npx playwright test tests/agent-team.spec.ts --no-deps
@@ -23,13 +23,13 @@ import { test, expect } from '@playwright/test'
 import { TEAM, getAgentById } from '../lib/agents/team'
 import { AGENT_INFO } from '../components/dashboard/agentPersonas'
 
-/** De sex som faktiskt finns. Ändras listan ska någon behöva tänka efter. */
-const SEX = ['matte', 'karin', 'hanna', 'daniel', 'lars', 'lisa']
+/** De sju som faktiskt finns. Ändras listan ska någon behöva tänka efter. */
+const EXPECTED_AGENT_IDS = ['matte', 'karin', 'hanna', 'daniel', 'lars', 'lisa', 'support']
 
 test.describe('teamet är fullständigt', () => {
-  test('alla sex agenter finns — regressionstestet för Lisa-buggen', () => {
+  test('alla sju agenter finns — inklusive Lisa och Handymate Support', () => {
     const ids = TEAM.map(a => a.id).sort()
-    expect(ids, 'Någon agent saknas i teamet').toEqual([...SEX].sort())
+    expect(ids, 'Någon agent saknas i teamet').toEqual([...EXPECTED_AGENT_IDS].sort())
   })
 
   test('inga dubbletter på id', () => {

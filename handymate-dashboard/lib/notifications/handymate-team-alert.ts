@@ -2,17 +2,7 @@
 //
 // Internt driftlarm till Handymates eget team (INTE en business-scopad
 // push/SMS — se docs/superpowers/specs/2026-08-21-handymate-support-agent-design.md).
-// Fast, hardkodad mottagarlista for v1 — tva personer, ingen katalogsokning.
-
-const ELKS_API_USER = process.env.ELKS_API_USER
-const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
-
-// Kommaseparerad lista med E.164-nummer, t.ex. "+46701234567,+46707654321".
-// Satt via Vercel env vars — INGA telefonnummer hardkodas i kallkoden.
-const ALERT_PHONES = (process.env.HANDYMATE_SUPPORT_ALERT_PHONES || '')
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean)
+// Fast mottagarlista via env for v1 — tva personer, ingen katalogsokning.
 
 export interface SupportTicketAlert {
   businessName: string
@@ -27,21 +17,66 @@ export interface SupportTicketAlert {
 /** Max antal tecken av summary som tas med i SMS:et — se SupportTicketAlert.summary. */
 const SMS_SUMMARY_MAX_LEN = 100
 
+export type SupportAlertFailure =
+  | 'missing_credentials'
+  | 'missing_recipients'
+  | 'delivery_failed'
+
+export interface SupportAlertDelivery {
+  delivered: boolean
+  attempted: number
+  deliveredCount: number
+  failure?: SupportAlertFailure
+}
+
+interface SupportAlertDependencies {
+  /** Testbar env-källa. Produktion använder process.env. */
+  env?: Readonly<Record<string, string | undefined>>
+  /** Testbar transport. Produktion använder global fetch. */
+  fetchImpl?: typeof fetch
+}
+
 /**
- * Fire-and-forget SMS-larm till Handymates eget team vid en support-
+ * Kundtexten skiljer uttryckligen mellan två oberoende sanningar:
+ * ticketen är sparad i supportkön, medan internnotisen kan ha misslyckats.
+ */
+export function supportEscalationCustomerMessage(delivery: SupportAlertDelivery): string {
+  if (delivery.delivered) {
+    return 'Ärendet är skapat och Handymates team är notifierat — de återkommer till dig här i chatten.'
+  }
+
+  return 'Ärendet är skapat i supportkön. Internnotisen kunde inte levereras just nu, men ärendet finns sparat och väntar på vårt team.'
+}
+
+/**
+ * SMS-larm till Handymates eget team vid en support-
  * eskalering. Skiljer sig medvetet fran sendApprovalPush/sendSmsViaElks:
  * ingen kvotkoll, ingen opt-out, inget business_id att logga mot — det
  * ar INTE ett kundutskick, det ar ett internt driftlarm till era egna
- * tva nummer.
+ * tva nummer. Transportfel kastas inte (ticketen finns redan), men returneras
+ * explicit så anroparen aldrig behöver låtsas att larmet levererades.
  */
-export async function notifyHandymateSupportTeam(alert: SupportTicketAlert): Promise<void> {
-  if (!ELKS_API_USER || !ELKS_API_PASSWORD) {
+export async function notifyHandymateSupportTeam(
+  alert: SupportTicketAlert,
+  dependencies: SupportAlertDependencies = {},
+): Promise<SupportAlertDelivery> {
+  const env = dependencies.env ?? process.env
+  const fetchImpl = dependencies.fetchImpl ?? fetch
+  const apiUser = env.ELKS_API_USER
+  const apiPassword = env.ELKS_API_PASSWORD
+  // Kommaseparerad lista med E.164-nummer. Inga nummer hardkodas i källkoden.
+  const alertPhones = (env.HANDYMATE_SUPPORT_ALERT_PHONES || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+
+  if (!apiUser || !apiPassword) {
     console.error('[handymate-team-alert] 46elks credentials saknas — larm ej skickat')
-    return
+    return { delivered: false, attempted: 0, deliveredCount: 0, failure: 'missing_credentials' }
   }
-  if (ALERT_PHONES.length === 0) {
+  if (alertPhones.length === 0) {
     console.error('[handymate-team-alert] HANDYMATE_SUPPORT_ALERT_PHONES ej konfigurerad — larm ej skickat')
-    return
+    return { delivered: false, attempted: 0, deliveredCount: 0, failure: 'missing_recipients' }
   }
 
   const trimmedSummary = alert.summary?.trim()
@@ -50,13 +85,13 @@ export async function notifyHandymateSupportTeam(alert: SupportTicketAlert): Pro
     : ''
   const message = `Support-arende (${alert.category}) fran ${alert.businessName}${summarySuffix}. Se /admin. #${alert.ticketId}`
 
-  await Promise.all(
-    ALERT_PHONES.map(async (phone) => {
+  const results = await Promise.all(
+    alertPhones.map(async (phone) => {
       try {
-        const response = await fetch('https://api.46elks.com/a1/sms', {
+        const response = await fetchImpl('https://api.46elks.com/a1/sms', {
           method: 'POST',
           headers: {
-            Authorization: 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
+            Authorization: 'Basic ' + Buffer.from(`${apiUser}:${apiPassword}`).toString('base64'),
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
@@ -67,10 +102,21 @@ export async function notifyHandymateSupportTeam(alert: SupportTicketAlert): Pro
         })
         if (!response.ok) {
           console.error('[handymate-team-alert] 46elks svarade', response.status, 'for', phone)
+          return false
         }
+        return true
       } catch (err) {
         console.error('[handymate-team-alert] SMS-sandning misslyckades (non-blocking):', err)
+        return false
       }
     })
   )
+
+  const deliveredCount = results.filter(Boolean).length
+  return {
+    delivered: deliveredCount > 0,
+    attempted: alertPhones.length,
+    deliveredCount,
+    ...(deliveredCount > 0 ? {} : { failure: 'delivery_failed' as const }),
+  }
 }

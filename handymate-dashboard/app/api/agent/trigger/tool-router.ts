@@ -208,6 +208,35 @@ export async function executeTool(
           return { success: false, error: 'Ingen aktiv konversationstråd att koppla ärendet till' }
         }
 
+        // Modellretry/dubbelklick får inte skapa flera öppna kö-rader för
+        // samma ärende. Ett tidigare LÖST ärende hindrar däremot inte en ny
+        // eskalering i samma tråd.
+        const { data: existingTicket, error: existingTicketError } = await supabase
+          .from('support_ticket')
+          .select('id')
+          .eq('business_id', businessId)
+          .eq('thread_id', threadId)
+          .eq('category', String(category))
+          .in('status', ['escalated', 'in_progress'])
+          .order('escalated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (existingTicketError) {
+          console.error('[escalate_to_handymate_team] dedupe lookup error:', existingTicketError)
+          return { success: false, error: 'Kunde inte kontrollera befintligt supportärende' }
+        }
+        if (existingTicket) {
+          return {
+            success: true,
+            data: {
+              ticket_id: existingTicket.id,
+              deduplicated: true,
+              message: 'Du har redan ett öppet ärende i supportkön. Handymates team återkommer till dig här i chatten.',
+            },
+          }
+        }
+
         const ticketId = generateId('stkt')
         const { error } = await supabase.from('support_ticket').insert({
           id: ticketId,
@@ -222,8 +251,11 @@ export async function executeTool(
           return { success: false, error: 'Kunde inte skapa supportärendet' }
         }
 
-        const { notifyHandymateSupportTeam } = await import('@/lib/notifications/handymate-team-alert')
-        await notifyHandymateSupportTeam({
+        const {
+          notifyHandymateSupportTeam,
+          supportEscalationCustomerMessage,
+        } = await import('@/lib/notifications/handymate-team-alert')
+        const alertDelivery = await notifyHandymateSupportTeam({
           businessName: context.businessName || 'Okänt företag',
           category: String(category),
           ticketId,
@@ -232,7 +264,12 @@ export async function executeTool(
 
         return {
           success: true,
-          data: { message: 'Ärendet är skapat och Handymates team är notifierat — de återkommer till dig här i chatten.' },
+          data: {
+            ticket_id: ticketId,
+            deduplicated: false,
+            alert_delivered: alertDelivery.delivered,
+            message: supportEscalationCustomerMessage(alertDelivery),
+          },
         }
       }
       case 'check_pending_approvals':

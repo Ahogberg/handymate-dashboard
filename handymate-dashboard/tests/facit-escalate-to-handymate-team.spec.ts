@@ -24,13 +24,32 @@ test.describe('escalate_to_handymate_team', () => {
   test('routern skapar en support_ticket-rad', () => {
     const idx = ROUTER.indexOf("case 'escalate_to_handymate_team'")
     expect(idx).toBeGreaterThan(-1)
-    const block = ROUTER.slice(idx, idx + 1200)
+    const nextCaseIdx = ROUTER.indexOf("case '", idx + 10)
+    const block = ROUTER.slice(idx, nextCaseIdx > -1 ? nextCaseIdx : idx + 3000)
     expect(block).toMatch(/\.from\('support_ticket'\)/)
     expect(block).toMatch(/\.insert\(/)
   })
 
   test('routern anropar notifyHandymateSupportTeam', () => {
     expect(ROUTER).toContain('notifyHandymateSupportTeam')
+  })
+
+  test('routern skiljer ticket-sanning från internt larmutfall', () => {
+    const idx = ROUTER.indexOf("case 'escalate_to_handymate_team'")
+    const nextCaseIdx = ROUTER.indexOf("case '", idx + 10)
+    const block = ROUTER.slice(idx, nextCaseIdx > -1 ? nextCaseIdx : idx + 3000)
+    expect(block).toContain('alertDelivery.delivered')
+    expect(block).toContain('supportEscalationCustomerMessage(alertDelivery)')
+  })
+
+  test('ett redan öppet ärende i samma tråd och kategori återanvänds', () => {
+    const idx = ROUTER.indexOf("case 'escalate_to_handymate_team'")
+    const nextCaseIdx = ROUTER.indexOf("case '", idx + 10)
+    const block = ROUTER.slice(idx, nextCaseIdx > -1 ? nextCaseIdx : idx + 3000)
+    expect(block).toMatch(/\.eq\('thread_id',\s*threadId\)/)
+    expect(block).toMatch(/\.eq\('category',\s*String\(category\)\)/)
+    expect(block).toMatch(/\.in\('status',\s*\['escalated',\s*'in_progress'\]\)/)
+    expect(block).toContain('deduplicated: true')
   })
 
   test('skapar INGEN pending_approvals-rad (se spec — fel kö för detta)', () => {

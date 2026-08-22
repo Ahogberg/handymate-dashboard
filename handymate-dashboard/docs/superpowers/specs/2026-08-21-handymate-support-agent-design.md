@@ -89,12 +89,16 @@ Research innan design visade att mycket redan finns:
    svarade") på varje enskilt meddelande, konsekvent genom hela
    ärendet — starkare kontinuerlig tydlighet än en engångsdivider hade
    gett.
-5. **Eskalering pushar direkt till er, alltid.** Ni är två personer —
-   ingen SLA-motor, bara en omedelbar push/SMS när något landar i kön.
+5. **Eskalering försöker larma er direkt, men skiljer ticket från leverans.**
+   Ni är två personer — ingen SLA-motor, bara ett omedelbart SMS-försök när
+   något landar i kön. Ticketen är sparad sanning även om 46elks-larmet
+   misslyckas; kundsvaret får då aldrig påstå att teamet notifierats.
 6. **Ni svarar i `/admin`, svaret landar i samma chattråd.** Sluten
    loop, en historik.
-7. **Recension bara efter bekräftat nöjd.** En snabb tumme upp/ner vid
-   stängt ärende; bara positiv triggar recensionslänken.
+7. **Nöjdhet och recension är separata.** En snabb tumme upp/ner vid stängt
+   ärende används internt för kvalitetsuppföljning. Googles recensionslänk
+   får inte villkoras av ett positivt svar — selektiv värvning av positiva
+   recensioner är förbjuden review gating.
 
 ## Datamodell
 
@@ -182,7 +186,9 @@ skrivvägar.
 varje eskalering, oavsett kategori (`refund`, `cancellation`, `gdpr`,
 `bug_financial`, `human_requested`). Skapar en `support_ticket`-rad
 (`status='escalated'`, kategori från verktygets input, `thread_id`
-från konversationen) och anropar notifieringshjälparen (punkt 6). Ingen
+från konversationen) och anropar notifieringshjälparen (punkt 6). Ett redan
+öppet ärende för samma tråd och kategori återanvänds; ett löst ärende hindrar
+inte en senare, ny eskalering. Ingen
 gren mot `pending_approvals` — refund/uppsägning granskas och utförs
 manuellt av er i admin-kön (nästa avsnitt), inte via ett
 godkännande-klick i ett system byggt för hantverkarens egna beslut.
@@ -238,16 +244,13 @@ en svarsruta. Att skicka ett svar där:
 
 ## Nöjdhetsfråga + recension
 
-Vid `status='resolved'`: nästa gång hantverkaren är i chatten (eller
-direkt, om de fortfarande är i tråden) visas en enkel tumme upp/ner:
-"Löste vi det åt dig?". Positivt svar → samma
-`buildReviewRequestMessage()`-mönster som redan används för
-hantverkarnas egna kunder, men pekat mot en NY, hårdkodad Handymate-
-egen Google-recensionslänk (env-variabel `HANDYMATE_GOOGLE_REVIEW_URL`
-— inget nytt konfig-system, ingen `app_config`-tabell; ett enda
-konstantvärde motiverar inte det). Negativt svar → ingen recensionslänk,
-bara en tack-text; själva ärendet är redan `resolved` (öppnar inte ett
-nytt).
+Vid `status='resolved'`: nästa gång hantverkaren är i chatten (eller direkt,
+om de fortfarande är i tråden) visas en enkel tumme upp/ner: "Löste vi det
+åt dig?". Svaret lagras som intern kvalitetsdata. Den hårdkodade Handymate-
+egna Google-recensionslänken (env-variabel `HANDYMATE_GOOGLE_REVIEW_URL`)
+är neutral och densamma oavsett svar — inget sentimentfilter får styra vem
+som erbjuds länken. Ett enda konstantvärde motiverar inget nytt
+konfigurationssystem eller någon `app_config`-tabell.
 
 ## Testning
 
@@ -280,9 +283,9 @@ nytt).
   `'support'` i ALLA agenters `handoff_targets`-listor, inte bara
   Mattes, så eskalering fungerar oavsett vem hantverkaren råkar prata
   med).
-- Samma tråd eskalerar flera gånger (t.ex. löst, men samma
-  hantverkare kommer tillbaka med samma problem) — ny `support_ticket`-
-  rad varje eskalering, inte en återöppning av den gamla; historiken i
+- Samma tråd eskalerar flera gånger medan ärendet är öppet — återanvänd den
+  öppna `support_ticket`-raden så modellretry/dubbelklick inte fyller kön.
+  Om det tidigare ärendet är löst skapas en ny rad; historiken i
   `thread_message` är ändå sammanhängande.
 - En refund-begäran avslås efter granskning — `support_ticket`
   markeras ändå `resolved` av er (avslag är också ett svar, bara inte

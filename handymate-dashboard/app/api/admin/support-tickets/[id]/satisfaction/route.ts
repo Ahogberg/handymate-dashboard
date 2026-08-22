@@ -52,8 +52,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   return NextResponse.json({
     success: true,
-    review_url: satisfaction === 'positive' && HANDYMATE_GOOGLE_REVIEW_URL
-      ? HANDYMATE_GOOGLE_REVIEW_URL
-      : null,
+    // Google förbjuder selektiv värvning av positiva recensioner. Länken
+    // är därför neutral och identisk oavsett nöjdhetssvar; själva svaret
+    // används bara för Handymates interna kvalitetsuppföljning.
+    review_url: HANDYMATE_GOOGLE_REVIEW_URL || null,
   })
 }
