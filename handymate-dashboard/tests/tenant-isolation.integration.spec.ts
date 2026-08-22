@@ -7,7 +7,9 @@
  *
  * Testet använder service_role endast för fixtures och cleanup. Alla SELECT,
  * INSERT, UPDATE och DELETE som verifierar isoleringen görs med två riktiga
- * authenticated-sessioner från olika företag.
+ * authenticated-sessioner från olika företag. Direkt PostgreSQL-URL är
+ * valfri: utan den körs fortfarande hela RLS-provet, medan de två separata
+ * katalogkontrollerna för SECURITY DEFINER och grants markeras som hoppade.
  */
 import { test, expect } from '@playwright/test'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
@@ -55,7 +57,7 @@ function loadTestConfig() {
     supabaseUrl: required('TENANT_TEST_SUPABASE_URL'),
     anonKey: required('TENANT_TEST_SUPABASE_ANON_KEY'),
     serviceRoleKey: required('TENANT_TEST_SUPABASE_SERVICE_ROLE_KEY'),
-    databaseUrl: required('TENANT_TEST_DATABASE_URL'),
+    databaseUrl: process.env.TENANT_TEST_DATABASE_URL?.trim() || null,
     databaseSsl: process.env.TENANT_TEST_DATABASE_SSL || 'require',
     expectedProjectRef: required('TENANT_TEST_EXPECTED_PROJECT_REF'),
     destructiveConfirmation: required('TENANT_TEST_ALLOW_DESTRUCTIVE_RLS_PROBE'),
@@ -82,10 +84,12 @@ function loadTestConfig() {
   if (actualProjectRef !== config.expectedProjectRef) {
     throw new Error(`Supabase-ref ${actualProjectRef} matchar inte TENANT_TEST_EXPECTED_PROJECT_REF`)
   }
-  const databaseUrl = new URL(config.databaseUrl)
-  const databaseIdentity = `${databaseUrl.hostname} ${databaseUrl.username}`
-  if (!databaseIdentity.includes(config.expectedProjectRef)) {
-    throw new Error('TENANT_TEST_DATABASE_URL verkar inte peka på samma projekt som TENANT_TEST_SUPABASE_URL')
+  if (config.databaseUrl) {
+    const databaseUrl = new URL(config.databaseUrl)
+    const databaseIdentity = `${databaseUrl.hostname} ${databaseUrl.username}`
+    if (!databaseIdentity.includes(config.expectedProjectRef)) {
+      throw new Error('TENANT_TEST_DATABASE_URL verkar inte peka på samma projekt som TENANT_TEST_SUPABASE_URL')
+    }
   }
 
   return config
@@ -98,7 +102,7 @@ let service: SupabaseClient
 let clients: Record<Side, SupabaseClient>
 let fixtures: Record<Side, Record<Exclude<TableName, 'business_config'>, JsonRow>>
 let originalBusinessNames: Record<Side, string | null>
-let pool: Pool
+let pool: Pool | null = null
 
 function fixtureRows(side: Side): Record<Exclude<TableName, 'business_config'>, JsonRow> {
   const suffix = side.toLowerCase()
@@ -205,11 +209,13 @@ test.beforeAll(async () => {
     A: await authenticatedClient('A'),
     B: await authenticatedClient('B'),
   }
-  pool = new Pool({
-    connectionString: config.databaseUrl,
-    ssl: config.databaseSsl === 'disable' ? false : { rejectUnauthorized: false },
-    max: 1,
-  })
+  if (config.databaseUrl) {
+    pool = new Pool({
+      connectionString: config.databaseUrl,
+      ssl: config.databaseSsl === 'disable' ? false : { rejectUnauthorized: false },
+      max: 1,
+    })
+  }
 
   const { data: businesses, error: businessError } = await service
     .from('business_config')
@@ -243,6 +249,8 @@ test.afterAll(async () => {
 })
 
 test('is_business_member är faktiskt SECURITY DEFINER i testdatabasen', async () => {
+  test.skip(!pool, 'TENANT_TEST_DATABASE_URL saknas — katalogkontrollen körs separat av databasägaren')
+  if (!pool) return
   const result = await pool.query<{ security_definer: boolean }>(`
     SELECT p.prosecdef AS security_definer
     FROM pg_catalog.pg_proc AS p
@@ -255,6 +263,8 @@ test('is_business_member är faktiskt SECURITY DEFINER i testdatabasen', async (
 })
 
 test('authenticated har DML-grants på tenant-tabellerna men ingen SELECT-grant på credentials', async () => {
+  test.skip(!pool, 'TENANT_TEST_DATABASE_URL saknas — katalogkontrollen körs separat av databasägaren')
+  if (!pool) return
   const result = await pool.query<{
     table_name: TableName
     can_select: boolean

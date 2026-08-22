@@ -246,9 +246,14 @@ skapar ingen konkurrerande launch-checklista eller roadmap.
 - Full standardsvit startades men innehåller skarpa anrop mot app.handymate.se;
   i den nätverksbegränsade miljön stoppades den vid 907/5166 med EACCES-fel,
   alltså inte ett produktfacit för denna diff.
-- Tvåtenant-harneset och dess säkerhetsspärr är validerade (4/4). Den riktiga
-  DB-körningen avbröt fail-closed före anslutning eftersom `.env.integration`
-  och två disponibla testkonton saknas. Ingen databas berördes.
+- Tvåtenant-harneset och dess säkerhetsspärr är validerade. Skarpkörningen
+  2026-08-22 mot två autentiserade konton i olika disponibla företag gav
+  51/51 gröna API/RLS-kontroller: egenläsning fungerar; främmande SELECT,
+  INSERT, UPDATE och DELETE nekas för samtliga sex tabeller; credentials är
+  helt oläsbar. Två direkt-SQL-katalogkontroller hoppades ärligt över utan
+  delat databaslösenord och verifierades separat av databasägaren: funktionen
+  är SECURITY DEFINER och grants stämmer. Read-only cleanup-stickprov gav
+  noll kvarvarande `rls_it_*`-rader i alla fem fixturetabeller.
 
 Resultaten rapporteras till Claude för den kanoniska lanseringsartefakten;
 denna sektion är endast utvecklingsbokföring.

@@ -97,3 +97,10 @@ test('testbädden är märkt för disponibel miljö, inte produktion', () => {
   expect(sql).toContain('rls_test_biz_a')
   expect(sql).toContain('rls_test_biz_b')
 })
+
+test('RLS-provet kräver inte att databaslösenord delas för katalogkontrollerna', () => {
+  const spec = read(SPEC)
+  expect(spec).toContain("process.env.TENANT_TEST_DATABASE_URL?.trim() || null")
+  expect(spec).toContain("test.skip(!pool, 'TENANT_TEST_DATABASE_URL saknas")
+  expect(spec).not.toContain("databaseUrl: required('TENANT_TEST_DATABASE_URL')")
+})
