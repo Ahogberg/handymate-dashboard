@@ -3,6 +3,13 @@ import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getDueEnrollments, processEnrollmentStep } from '@/lib/nurture'
 import { getServerSupabase } from '@/lib/supabase'
 
+
+// force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
+// som läser request.headers direkt, inte cookies()/headers() från next/headers —
+// Next ser bara route-filens egen kod och cachar annars denna GET-rutt statiskt,
+// så samma frusna svar går till alla anropare oavsett vem som faktiskt frågar.
+export const dynamic = 'force-dynamic'
+
 /**
  * Cron job: bearbeta förfallna nurture-enrollments.
  * Använder processEnrollmentStep (interpolerar mall + skickar SMS/email +

@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkPhoneApiRateLimit } from '@/lib/auth'
 
+
+// force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
+// som läser request.headers direkt, inte cookies()/headers() från next/headers —
+// Next ser bara route-filens egen kod och cachar annars denna GET-rutt statiskt,
+// så samma frusna svar går till alla anropare oavsett vem som faktiskt frågar.
+export const dynamic = 'force-dynamic'
+
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'

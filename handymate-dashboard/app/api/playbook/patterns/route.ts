@@ -3,6 +3,13 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { arSchemaSaknas } from '@/lib/observability/driftlarm'
 
+
+// force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
+// som läser request.headers direkt, inte cookies()/headers() från next/headers —
+// Next ser bara route-filens egen kod och cachar annars denna GET-rutt statiskt,
+// så samma frusna svar går till alla anropare oavsett vem som faktiskt frågar.
+export const dynamic = 'force-dynamic'
+
 /**
  * Playbook Pattern Confirmation V1 — läs-halvan (Debrief → Playbook,
  * V2-lagret, 2026-08-16). Skrivsidan (app/api/approvals/[id]/route.ts,

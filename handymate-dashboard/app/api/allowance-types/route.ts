@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 
+
+// force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
+// som läser request.headers direkt, inte cookies()/headers() från next/headers —
+// Next ser bara route-filens egen kod och cachar annars denna GET-rutt statiskt,
+// så samma frusna svar går till alla anropare oavsett vem som faktiskt frågar.
+export const dynamic = 'force-dynamic'
+
 const SYSTEM_TYPES = [
   { name: 'Milersättning', type: 'mileage', rate: 25, unit: 'km', is_taxable: false, is_system: true },
   { name: 'Traktamente Sverige', type: 'daily', rate: 290, unit: 'dag', is_taxable: false, is_system: true },

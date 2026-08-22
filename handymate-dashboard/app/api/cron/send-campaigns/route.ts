@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 
+
+// force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
+// som läser request.headers direkt, inte cookies()/headers() från next/headers —
+// Next ser bara route-filens egen kod och cachar annars denna GET-rutt statiskt,
+// så samma frusna svar går till alla anropare oavsett vem som faktiskt frågar.
+export const dynamic = 'force-dynamic'
+
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
 /**

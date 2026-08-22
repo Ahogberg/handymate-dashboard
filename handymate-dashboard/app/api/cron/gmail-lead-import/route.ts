@@ -7,6 +7,13 @@ import { isLikelyLead, parseLeadFromEmail } from '@/lib/gmail-lead-detection'
 import { downloadAndSaveAttachments } from '@/lib/gmail-attachments'
 import { getNextCustomerNumber, getNextLeadNumber } from '@/lib/numbering'
 
+
+// force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
+// som läser request.headers direkt, inte cookies()/headers() från next/headers —
+// Next ser bara route-filens egen kod och cachar annars denna GET-rutt statiskt,
+// så samma frusna svar går till alla anropare oavsett vem som faktiskt frågar.
+export const dynamic = 'force-dynamic'
+
 /**
  * Cron: GET /api/cron/gmail-lead-import
  * Runs every 15 minutes (configured in vercel.json / cron service).

@@ -106,8 +106,7 @@ export function SettingsHub({
 }) {
   return (
     <div>
-      <h1 className="font-heading text-2xl sm:text-[28px] font-bold text-gray-900 tracking-tight">Inställningar</h1>
-      <p className="mt-1.5 text-sm text-gray-500">
+      <p className="text-sm text-gray-500">
         {businessName ? `${businessName} · ` : ''}Ändringar sparas direkt och gäller för hela teamet.
       </p>
 
