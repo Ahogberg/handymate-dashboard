@@ -6,6 +6,7 @@ import fs from 'node:fs/promises'
 const root = process.cwd()
 const source = path.join(root, 'docs', 'marketing', 'content-library-v1', 'render.html')
 const output = path.join(root, 'public', 'marketing', 'content-library-v1')
+const logoSource = pathToFileURL(path.join(root, 'public', 'logo.png')).href
 
 await fs.mkdir(output, { recursive: true })
 const browser = await chromium.launch({ headless: true })
@@ -29,7 +30,26 @@ const assets = await page.locator('[data-export]').evaluateAll(nodes => nodes.ma
 for (const asset of assets) {
   const directory = path.join(output, asset.campaign)
   await fs.mkdir(directory, { recursive: true })
-  await page.locator(`#${asset.id}`).screenshot({ path: path.join(directory, `${asset.id}.png`) })
+  const target = page.locator(`#${asset.id}`)
+  const transparent = await target.getAttribute('data-transparent') === 'true'
+  if (transparent) {
+    const transparentPage = await browser.newPage({ viewport: { width: 1080, height: 1080 }, deviceScaleFactor: 1 })
+    await transparentPage.setContent(`<!doctype html><style>
+      html,body{margin:0;width:1080px;height:1080px;background:transparent;overflow:hidden}
+      body{display:grid;place-items:center}
+      img{width:950px;height:950px;object-fit:contain}
+    </style><img src="${logoSource}" alt="Handymate">`)
+    await transparentPage.locator('img').evaluate(image => image.complete
+      ? Promise.resolve()
+      : new Promise(resolve => image.addEventListener('load', resolve, { once: true })))
+    await transparentPage.screenshot({
+      path: path.join(directory, `${asset.id}.png`),
+      omitBackground: true,
+    })
+    await transparentPage.close()
+    continue
+  }
+  await target.screenshot({ path: path.join(directory, `${asset.id}.png`) })
 }
 
 for (const campaign of [...new Set(assets.map(asset => asset.campaign))]) {

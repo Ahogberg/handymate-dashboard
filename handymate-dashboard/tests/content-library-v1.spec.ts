@@ -19,17 +19,20 @@ const expectedAssets = [
     path.join('reel', `reel-${name}.png`)),
   ...['market', '2006', 'not-system', 'works-for-you', 'team-reveal', 'matte', 'launch-soon', 'three-days', 'tomorrow', 'launch'].map((name, index) =>
     path.join('prelaunch', `prelaunch-${String(index + 1).padStart(2, '0')}-${name}.png`)),
+  ...['primary-dark', 'light', 'teal-white', 'transparent', 'safe-area-guide'].map((name, index) =>
+    path.join('profile', `profile-${String(index + 1).padStart(2, '0')}-${name}.png`)),
 ]
 
 test.describe('Handymate content library V1', () => {
-  test('levererar 39 publiceringsklara PNG-original', () => {
-    expect(expectedAssets).toHaveLength(39)
+  test('levererar 44 publiceringsklara PNG-original', () => {
+    expect(expectedAssets).toHaveLength(44)
     for (const relativePath of expectedAssets) {
       const file = path.join(assets, relativePath)
       expect(fs.existsSync(file), relativePath).toBe(true)
       const bytes = fs.readFileSync(file)
       expect(bytes.subarray(0, 8).toString('hex'), relativePath).toBe('89504e470d0a1a0a')
-      expect(bytes.length, relativePath).toBeGreaterThan(20_000)
+      const minimumBytes = relativePath.endsWith('profile-04-transparent.png') ? 5_000 : 20_000
+      expect(bytes.length, relativePath).toBeGreaterThan(minimumBytes)
     }
   })
 
@@ -104,5 +107,18 @@ test.describe('Handymate content library V1', () => {
     expect(guide).toContain('påhittade kundresultat eller testimonials')
     expect(guide).toContain('no identity blending')
     expect(guide).toContain('Ett realistiskt klipp är inte automatiskt ett sant klipp.')
+  })
+
+  test('profilpaketet är 1080 kvadratiskt och har en riktig transparent master', () => {
+    const primary = fs.readFileSync(path.join(assets, 'profile', 'profile-01-primary-dark.png'))
+    const transparent = fs.readFileSync(path.join(assets, 'profile', 'profile-04-transparent.png'))
+    expect(primary.readUInt32BE(16)).toBe(1080)
+    expect(primary.readUInt32BE(20)).toBe(1080)
+    expect(transparent.readUInt32BE(16)).toBe(1080)
+    expect(transparent.readUInt32BE(20)).toBe(1080)
+    expect(transparent[25]).toBe(6)
+    const guide = fs.readFileSync(path.join(docs, 'profile-assets.md'), 'utf8')
+    expect(guide).toContain('profile-01-primary-dark.png')
+    expect(guide).toContain('Safe-area-guiden får aldrig laddas upp offentligt')
   })
 })

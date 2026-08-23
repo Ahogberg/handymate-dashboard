@@ -46,6 +46,7 @@ Fyra fristående 4:5-inlägg och tre 9:16-omslag för Reels/Stories.
 - `publishing-calendar.md` — datum, kanal, exakt fil, ordning, copy och CTA
 - `video-production-pack.md` — fem filmer med manus, storyboard och shot list
 - `seedance-2.5-prompts.md` — verifierad hybridstrategi och färdiga videoprompter
+- `profile-assets.md` — primär profilbild, kanalvarianter och säker beskärning
 - `render.html` — deterministiska originalytor för samtliga bilder
 - `public/marketing/content-library-v1/` — färdiga PNG-filer
 - `public/marketing/handymate-content-library-v1.zip` — nedladdningspaket

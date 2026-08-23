@@ -17,6 +17,7 @@
     body { padding:40px; display:flex; flex-direction:column; align-items:center; gap:40px; }
     .asset { width:1080px; height:1350px; position:relative; overflow:hidden; background:var(--paper); color:var(--ink); font-family:DM, sans-serif; }
     .asset.story { height:1920px; }
+    .asset.profile { height:1080px; }
     .noise { position:absolute; inset:0; opacity:.055; pointer-events:none; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E"); }
     .pad { position:absolute; inset:0; padding:74px 78px; display:flex; flex-direction:column; }
     .brand { height:34px; width:auto; object-fit:contain; object-position:left center; }
@@ -94,6 +95,16 @@
     .outline-team img { width:132px; height:132px; border-radius:50%; object-fit:cover; object-position:top; border:5px solid rgba(255,255,255,.78); filter:saturate(.35); }
     .countdown { font:700 390px/.78 Space; letter-spacing:-.1em; color:#78d1c0; }
     .launch-chip { display:inline-flex; width:max-content; padding:14px 22px; border:1px solid rgba(255,255,255,.24); border-radius:999px; color:white; font:700 20px/1 Space; letter-spacing:.08em; text-transform:uppercase; }
+    .profile-canvas { position:absolute; inset:0; display:grid; place-items:center; }
+    .profile-canvas img { width:950px; height:950px; object-fit:contain; }
+    .profile-primary { background:linear-gradient(145deg,#052f2c,#073f3b); }
+    .profile-light { background:#f7f8f6; }
+    .profile-teal { background:#0f766e; }
+    .profile-teal img { filter:brightness(0) invert(1); }
+    .profile-transparent, .profile-transparent .profile-canvas { background:transparent; }
+    .profile-transparent .noise { display:none; }
+    .safe-circle { position:absolute; inset:82px; border:4px dashed rgba(255,255,255,.65); border-radius:50%; }
+    .safe-label { position:absolute; left:50%; top:85px; transform:translateX(-50%); padding:10px 18px; border-radius:999px; background:rgba(5,47,44,.78); color:white; font:700 20px/1 Space; letter-spacing:.08em; }
   </style>
 </head>
 <body>
@@ -223,6 +234,13 @@
       <div style="margin-top:390px"><div class="teaser-word">Framtiden</div><div class="teaser-rule"></div><h1 class="hero">Imorgon börjar den.</h1></div>${footer(true,'Det digitala teamet för hantverksföretag.')}</div>`,'story dark')
     add('prelaunch-10-launch','prelaunch',`<img class="photo-bg" src="${launchBase}worksite-morning-source.png" alt=""><div class="photo-shade"></div><div class="pad overlay">${logoRow(true,'NU LANSERAR VI')}
       <div class="standalone-copy" style="margin-top:230px"><div class="launch-chip">Handymate är här</div><h1 class="hero" style="margin-top:38px">Välkommen till framtidens hantverksföretag.</h1><p class="sub" style="margin-top:46px">Möt det digitala teamet som arbetar med dig.</p></div>${footer(true,'Det digitala teamet för hantverksföretag')}</div>`,'story dark')
+
+    add('profile-01-primary-dark','profile',`<div class="profile-canvas profile-primary"><img src="${logo}" alt="Handymate"></div>`,'profile')
+    add('profile-02-light','profile',`<div class="profile-canvas profile-light"><img src="${logo}" alt="Handymate"></div>`,'profile')
+    add('profile-03-teal-white','profile',`<div class="profile-canvas profile-teal"><img src="${logo}" alt="Handymate"></div>`,'profile')
+    add('profile-04-transparent','profile',`<div class="profile-canvas"><img src="${logo}" alt="Handymate"></div>`,'profile profile-transparent')
+    document.querySelector('#profile-04-transparent').setAttribute('data-transparent','true')
+    add('profile-05-safe-area-guide','profile',`<div class="profile-canvas profile-primary"><img src="${logo}" alt="Handymate"><div class="safe-circle"></div><div class="safe-label">SÄKER CIRKELBESKÄRNING</div></div>`,'profile')
   </script>
 </body>
 </html>

@@ -331,6 +331,27 @@ denna sektion är endast utvecklingsbokföring.
 
 ---
 
+# Profilbildspaket (2026-08-23)
+
+- [x] Skapa primär mörk teal profilbild med optiskt centrerad H-symbol
+- [x] Skapa ljus, inverterad teal och transparent 1080×1080-master
+- [x] Skapa intern safe-area-guide för rund och kvadratisk beskärning
+- [x] Dokumentera kanalval och vad som aldrig ska publiceras
+- [x] Uppdatera ZIP, facit och produktionsverifiering
+
+## Review
+
+- Fem 1080×1080-original levereras: primär mörk teal, ljus, inverterad,
+  transparent master och en intern safe-area-guide.
+- Den transparenta mastern är verifierad som riktig RGBA-PNG; den primära
+  mörka varianten är rekommenderad profilbild i sociala kanaler.
+- Innehållsbiblioteket omfattar nu 44 publiceringsklara bilder och sju
+  kontaktark. Safe-area-guiden är uttryckligen märkt som intern.
+- `tests/content-library-v1.spec.ts`: 20/20 gröna över desktop + mobil.
+  `npx tsc --noEmit`: 0 fel. `npx next build`: exit 0.
+
+---
+
 # Social Launch Kit — kampanj 01 (2026-08-23)
 
 - [x] Förankra tonalitet, färg och budskap i Handymates designsystem
