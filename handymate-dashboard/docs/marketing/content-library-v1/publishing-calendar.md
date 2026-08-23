@@ -62,6 +62,19 @@ Publicera aldrig kontaktarken. De är bara översikter.
 - **2006 → 2026:** `future-01` till `future-06`
 - **Så arbetar teamet åt dig:** `work-01` till `work-08`
 
+## Videoproduktion och publicering
+
+| Produktions-ID | Rekommenderad publicering | Film | Utförande |
+|---|---|---|---|
+| V4 | 29 aug eller 3 sep | 2006 → 2026 | Seedance-miljöer + verklig Handymate-UI |
+| V3 | 5 sep | Hälsa på ditt team | Agentporträtt + kontrollerad motion |
+| V1 | 12 sep | Grundarmanifestet | Verklig Andreas + AI-B-roll |
+| V2 | 14 sep | Handymate på 45 sekunder | Verklig produkt + verklig/AI-B-roll |
+| V5 | 18 sep | En verklig automation | Verklig produktkedja, inget syntetiskt resultat |
+
+Fullständiga manus och shot lists finns i `video-production-pack.md`.
+Seedance-arbetssätt och prompter finns i `seedance-2.5-prompts.md`.
+
 ## Kanalutförande
 
 ### LinkedIn

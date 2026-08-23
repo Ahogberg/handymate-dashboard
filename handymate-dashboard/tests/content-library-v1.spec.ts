@@ -86,4 +86,23 @@ test.describe('Handymate content library V1', () => {
     }
     expect(calendar).toContain('Publicera aldrig kontaktarken')
   })
+
+  test('videopaketet separerar verkligt produktbevis från syntetisk B-roll', () => {
+    const pack = fs.readFileSync(path.join(docs, 'video-production-pack.md'), 'utf8')
+    for (const id of ['V1 —', 'V2 —', 'V3 —', 'V4 —', 'V5 —']) {
+      expect(pack, id).toContain(id)
+    }
+    expect(pack).toContain('Andreas ansikte, röst eller repliker')
+    expect(pack).toContain('Alla produktbilder spelas in i verklig produkt eller demo-tenant')
+    expect(pack).toContain('Inga syntetiska testimonials eller påhittade resultat')
+  })
+
+  test('Seedance-guiden förbjuder fejkad UI, kundbevis och identitetsblandning', () => {
+    const guide = fs.readFileSync(path.join(docs, 'seedance-2.5-prompts.md'), 'utf8')
+    expect(guide).toContain('upp till 30 sekunder per generering')
+    expect(guide).toContain('fejkade produktgränssnitt')
+    expect(guide).toContain('påhittade kundresultat eller testimonials')
+    expect(guide).toContain('no identity blending')
+    expect(guide).toContain('Ett realistiskt klipp är inte automatiskt ett sant klipp.')
+  })
 })

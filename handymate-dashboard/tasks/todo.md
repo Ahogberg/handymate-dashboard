@@ -307,6 +307,30 @@ denna sektion är endast utvecklingsbokföring.
 
 ---
 
+# Video Production Pack + Seedance 2.5 (2026-08-23)
+
+- [x] Verifiera Seedance 2.5 mot ByteDances officiella källor
+- [x] Definiera hybridgränsen mellan verklig film, verklig UI och AI-B-roll
+- [x] Skapa fem videokoncept med manus, storyboard och shot list
+- [x] Skapa produktionsklara Seedance-prompter och kvalitetsgrind
+- [x] Lägg videorna i publiceringskalendern och nedladdningspaketet
+- [x] Kör dokumentfacit, tsc och produktionsbygge
+
+## Review
+
+- Seedance 2.5 verifierades mot ByteDances officiella lansering och modellsida:
+  30 sekunder per generering, förlängning och multimodala referenser; officiell
+  API-åtkomst beskrevs som kommande via BytePlus ModelArk.
+- Fem filmer är produktionssatta: grundarmanifest, 45-sekunders produktbevis,
+  team-reveal, 2006→2026 och en verklig automationskedja.
+- Hybridgränsen är explicit: Andreas och produkt-UI är verkliga; Seedance äger
+  B-roll, miljöer, kontrollerad porträttrörelse och konceptövergångar.
+- Sex färdiga Seedance-prompter, referenspaket och kvalitetsgrind ingår i ZIP.
+- `tests/content-library-v1.spec.ts`: 18/18 gröna över desktop + mobil.
+  `npx tsc --noEmit`: 0 fel. `npx next build`: exit 0.
+
+---
+
 # Social Launch Kit — kampanj 01 (2026-08-23)
 
 - [x] Förankra tonalitet, färg och budskap i Handymates designsystem

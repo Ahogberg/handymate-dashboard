@@ -44,6 +44,8 @@ Fyra fristående 4:5-inlägg och tre 9:16-omslag för Reels/Stories.
 - `campaign-copy.md` — captions, bildtexter, alt-texter och Reel-manus
 - `prelaunch-copy.md` — P1–P10 för de tre veckorna före lansering
 - `publishing-calendar.md` — datum, kanal, exakt fil, ordning, copy och CTA
+- `video-production-pack.md` — fem filmer med manus, storyboard och shot list
+- `seedance-2.5-prompts.md` — verifierad hybridstrategi och färdiga videoprompter
 - `render.html` — deterministiska originalytor för samtliga bilder
 - `public/marketing/content-library-v1/` — färdiga PNG-filer
 - `public/marketing/handymate-content-library-v1.zip` — nedladdningspaket
