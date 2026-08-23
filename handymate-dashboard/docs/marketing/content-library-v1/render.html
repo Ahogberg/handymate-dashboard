@@ -19,6 +19,7 @@
     .asset.story { height:1920px; }
     .asset.profile { height:1080px; }
     .asset.linkedin-banner { width:4200px; height:700px; align-self:flex-start; }
+    .asset.article-cover { width:1920px; height:1080px; align-self:flex-start; }
     .noise { position:absolute; inset:0; opacity:.055; pointer-events:none; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E"); }
     .pad { position:absolute; inset:0; padding:74px 78px; display:flex; flex-direction:column; }
     .brand { height:34px; width:auto; object-fit:contain; object-position:left center; }
@@ -115,6 +116,21 @@
     .linkedin-title { margin-top:30px; max-width:2500px; font:650 112px/.96 Space; letter-spacing:-.052em; }
     .linkedin-sub { margin-top:38px; color:#cfeae5; font:500 42px/1.2 DM; letter-spacing:-.01em; }
     .linkedin-mark { position:absolute; z-index:1; width:680px; height:680px; right:120px; top:8px; object-fit:contain; opacity:.13; filter:brightness(0) invert(1); }
+    .article-shell { position:absolute; inset:0; overflow:hidden; background:linear-gradient(135deg,#052f2c 0%,#073f3b 58%,#0f766e 100%); color:white; }
+    .article-shell::before { content:''; position:absolute; width:930px; height:930px; right:-330px; top:-300px; border-radius:50%; border:2px solid rgba(141,215,201,.22); box-shadow:0 0 0 110px rgba(141,215,201,.045),0 0 0 245px rgba(141,215,201,.026); }
+    .article-top { position:absolute; left:104px; right:104px; top:84px; z-index:3; display:flex; align-items:center; justify-content:space-between; }
+    .article-brand { font:700 25px/1 Space; letter-spacing:.17em; }
+    .article-series { color:#8dd7c9; font:700 22px/1 Space; letter-spacing:.12em; text-transform:uppercase; }
+    .article-copy { position:absolute; left:104px; top:268px; z-index:3; width:1390px; }
+    .article-kicker { color:#8dd7c9; font:700 25px/1 Space; letter-spacing:.13em; text-transform:uppercase; }
+    .article-title { margin-top:30px; font:650 104px/.98 Space; letter-spacing:-.052em; }
+    .article-rule { margin-top:52px; width:170px; height:8px; border-radius:9px; background:#78d1c0; }
+    .article-number { position:absolute; z-index:1; right:95px; bottom:-64px; color:rgba(255,255,255,.075); font:700 460px/.82 Space; letter-spacing:-.12em; }
+    .article-visual { position:absolute; z-index:2; right:105px; bottom:88px; display:flex; align-items:center; gap:18px; }
+    .article-visual img { width:116px; height:116px; object-fit:cover; object-position:top; border:5px solid rgba(255,255,255,.8); border-radius:50%; }
+    .article-flow { position:absolute; z-index:2; left:104px; bottom:90px; display:flex; gap:16px; align-items:center; color:#cfeae5; font:700 22px/1 Space; letter-spacing:.04em; }
+    .article-flow span { padding:13px 18px; border:1px solid rgba(255,255,255,.2); border-radius:999px; background:rgba(255,255,255,.07); }
+    .article-flow b { color:#78d1c0; font-size:28px; }
   </style>
 </head>
 <body>
@@ -259,6 +275,19 @@
       <p class="linkedin-sub">Hittar pengar. Skyddar marginalen. Minskar admin.</p></div>
       <img class="linkedin-mark" src="${logo}" alt="">
     </div>`,'linkedin-banner')
+
+    function articleCover(id, number, kicker, title, visual='') {
+      add(id,'article',`<div class="article-shell"><div class="article-top"><div class="article-brand">HANDYMATE</div><div class="article-series">Framtidens hantverksföretag · ${number}</div></div>
+        <div class="article-copy"><div class="article-kicker">${kicker}</div><h1 class="article-title">${title}</h1><div class="article-rule"></div></div>
+        <div class="article-number">${number}</div>${visual}</div>`,'article-cover')
+    }
+    articleCover('article-01-system-eller-team','01','Ett nytt arbetssätt','Affärssystemet visar. Ett AI-team hjälper dig agera.',`<div class="article-flow"><span>REGISTRERA</span><b>→</b><span>FÖRSTÅ</span><b>→</b><span>AGERA</span></div>`)
+    articleCover('article-02-vad-gor-ett-ai-team','02','Möt teamet','Vad gör ett AI-team för ett hantverksföretag — på riktigt?',`<div class="article-visual">${agents.map(a=>`<img src="${assetBase}${a.id}.png" alt="${a.name}">`).join('')}</div>`)
+    articleCover('article-03-fran-utfort-till-betalt','03','Pengar som väntar','Jobbet är utfört. Varför är pengarna inte på kontot?',`<div class="article-flow"><span>UTFÖRT</span><b>→</b><span>FAKTURERAT</span><b>→</b><span>BETALT</span></div>`)
+    articleCover('article-04-ai-som-kan-bevisa','04','Kontroll och förtroende','AI som får agera måste kunna bevisa vad den har gjort.',`<div class="article-flow"><span>FÖRSLAG</span><b>→</b><span>GODKÄNNANDE</span><b>→</b><span>BEVIS</span></div>`)
+    articleCover('article-05-nasta-affar-finns-redan','05','Tillväxt med relevans','Nästa affär kan redan finnas bland dina tidigare kunder.',`<div class="article-visual"><img style="width:190px;height:190px" src="${assetBase}hanna.png" alt="Hanna"></div>`)
+    articleCover('article-06-fem-onodiga-manuella-jobb','06','Mindre knappande','Fem saker hantverksföretag fortfarande gör manuellt helt i onödan.')
+    articleCover('article-07-affarssystem-eller-ai-team','07','Jämför arbetsdagen','Affärssystem eller digitalt AI-team — vad är skillnaden?',`<div class="article-flow"><span>ÖVERBLICK</span><b>ELLER</b><span>ARBETSKAPACITET</span></div>`)
   </script>
 </body>
 </html>

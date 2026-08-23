@@ -345,7 +345,7 @@ denna sektion är endast utvecklingsbokföring.
   transparent master och en intern safe-area-guide.
 - Den transparenta mastern är verifierad som riktig RGBA-PNG; den primära
   mörka varianten är rekommenderad profilbild i sociala kanaler.
-- Innehållsbiblioteket omfattar nu 45 publiceringsklara bilder och åtta
+- Innehållsbiblioteket omfattar nu 52 publiceringsklara bilder och nio
   kontaktark. Safe-area-guiden är uttryckligen märkt som intern.
 - `tests/content-library-v1.spec.ts`: 20/20 gröna över desktop + mobil.
   `npx tsc --noEmit`: 0 fel. `npx next build`: exit 0.
@@ -368,6 +368,31 @@ denna sektion är endast utvecklingsbokföring.
 - Renderaren isolerar nu varje original före export och skriver PNG-filer via
   buffert med retry, så ultrabreda format inte kan påverka övriga kampanjer.
 - `tests/content-library-v1.spec.ts`: 22/22 gröna över desktop + mobil.
+  `npx tsc --noEmit`: 0 fel. `npx next build`: exit 0.
+
+---
+
+# LinkedIn-artikelserie (2026-08-23)
+
+- [x] Förankra format och newsletter-upplägg i LinkedIns aktuella riktlinjer
+- [x] Skriva sju kompletta artiklar ur Handymates verifierade produktberättelse
+- [x] Förankra reaktiveringsartikeln i svensk lag och IMY:s vägledning
+- [x] Skapa sju egna 1920×1080-omslag och inlinebildplan
+- [x] Visuellt granska samtliga omslag och uppdatera nedladdningspaketet
+- [x] Kör artikel-, bild-, typ- och produktionsfacit
+
+## Review
+
+- Sju artiklar om 707–909 ord levereras i serien `Framtidens
+  hantverksföretag`, färdiga för publicering från Andreas profil.
+- Serien går varje torsdag 27 augusti–8 oktober och är införd i den auktoritativa
+  publiceringskalendern utan att skapa dubbla företagsinlägg samma dag.
+- Sju sammanhållna 1920×1080-omslag och exakta inlinebildplaceringar ingår.
+  Kontaktark och tre typografiskt svåraste original granskades visuellt.
+- Reaktiveringsartikeln håller GDPR:s laggrund separat från
+  marknadsföringslagens kanalregler och länkar Riksdagen, IMY och
+  Konsumentverket. Texten ger inte juridiska garantier.
+- `tests/content-library-v1.spec.ts`: 26/26 gröna över desktop + mobil.
   `npx tsc --noEmit`: 0 fel. `npx next build`: exit 0.
 
 ---

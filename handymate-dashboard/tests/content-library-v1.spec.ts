@@ -22,11 +22,13 @@ const expectedAssets = [
   ...['primary-dark', 'light', 'teal-white', 'transparent', 'safe-area-guide'].map((name, index) =>
     path.join('profile', `profile-${String(index + 1).padStart(2, '0')}-${name}.png`)),
   path.join('linkedin', 'linkedin-banner-company.png'),
+  ...['system-eller-team', 'vad-gor-ett-ai-team', 'fran-utfort-till-betalt', 'ai-som-kan-bevisa', 'nasta-affar-finns-redan', 'fem-onodiga-manuella-jobb', 'affarssystem-eller-ai-team'].map((name, index) =>
+    path.join('article', `article-${String(index + 1).padStart(2, '0')}-${name}.png`)),
 ]
 
 test.describe('Handymate content library V1', () => {
-  test('levererar 45 publiceringsklara PNG-original', () => {
-    expect(expectedAssets).toHaveLength(45)
+  test('levererar 52 publiceringsklara PNG-original', () => {
+    expect(expectedAssets).toHaveLength(52)
     for (const relativePath of expectedAssets) {
       const file = path.join(assets, relativePath)
       expect(fs.existsSync(file), relativePath).toBe(true)
@@ -131,5 +133,35 @@ test.describe('Handymate content library V1', () => {
     const source = fs.readFileSync(path.join(docs, 'render.html'), 'utf8')
     expect(source).toContain('Välkommen till framtidens hantverksföretag.')
     expect(source).toContain('Hittar pengar. Skyddar marginalen. Minskar admin.')
+  })
+
+  test('levererar sju kompletta LinkedIn-artiklar med egna omslag', () => {
+    const articleDir = path.join(docs, 'linkedin-articles')
+    const articleFiles = fs.readdirSync(articleDir).filter(file => /^\d{2}-.+\.md$/.test(file))
+    expect(articleFiles).toHaveLength(7)
+    for (const file of articleFiles) {
+      const article = fs.readFileSync(path.join(articleDir, file), 'utf8')
+      expect(article.split(/\s+/).length, file).toBeGreaterThan(650)
+      expect(article, file).toContain('**Omslag:**')
+      expect(article, file).toContain('**Inlinebild 1:**')
+      expect(article, file).toContain('**Delningsfråga:**')
+    }
+    for (let index = 1; index <= 7; index += 1) {
+      const prefix = `article-${String(index).padStart(2, '0')}-`
+      const file = expectedAssets.find(asset => asset.includes(prefix))
+      expect(file, prefix).toBeTruthy()
+      const cover = fs.readFileSync(path.join(assets, file!))
+      expect(cover.readUInt32BE(16), file).toBe(1920)
+      expect(cover.readUInt32BE(20), file).toBe(1080)
+      expect(cover.length, file).toBeLessThan(3_000_000)
+    }
+  })
+
+  test('reaktiveringsartikeln håller isär laggrund, kanalregel och relevans', () => {
+    const article = fs.readFileSync(path.join(docs, 'linkedin-articles', '05-nasta-affar-finns-redan.md'), 'utf8')
+    expect(article).toContain('Marknadsföringslag (2008:486), 19–20 §§')
+    expect(article).toContain('GDPR-frågan är dessutom separat')
+    expect(article).toContain('Om personen invänder mot direktmarknadsföring ska behandlingen upphöra')
+    expect(article).not.toMatch(/GDPR[- ]säker|garanterat laglig|alltid tillåtet/i)
   })
 })

@@ -50,8 +50,11 @@ if (campaignFilter && assets.length === 0) {
 for (const asset of assets) {
   const directory = path.join(output, asset.campaign)
   await fs.mkdir(directory, { recursive: true })
-  if (asset.campaign === 'linkedin') {
-    const widePage = await browser.newPage({ viewport: { width: 4300, height: 800 }, deviceScaleFactor: 1 })
+  if (asset.campaign === 'linkedin' || asset.campaign === 'article') {
+    const wideViewport = asset.campaign === 'linkedin'
+      ? { width: 4300, height: 800 }
+      : { width: 2020, height: 1180 }
+    const widePage = await browser.newPage({ viewport: wideViewport, deviceScaleFactor: 1 })
     await widePage.goto(pathToFileURL(source).href)
     await widePage.evaluate(async () => {
       await document.fonts.ready
@@ -62,6 +65,11 @@ for (const asset of assets) {
             image.addEventListener('error', resolve, { once: true })
           })))
     })
+    await widePage.evaluate(id => {
+      document.querySelectorAll('[data-export]').forEach(node => {
+        node.style.display = node.id === id ? 'block' : 'none'
+      })
+    }, asset.id)
     const bytes = await widePage.locator(`#${asset.id}`).screenshot()
     await writePng(path.join(directory, `${asset.id}.png`), bytes)
     await widePage.close()

@@ -43,6 +43,11 @@ Fyra fristående 4:5-inlägg och tre 9:16-omslag för Reels/Stories.
 Fem profilbildsoriginal samt ett 4200×700-omslag för Handymates LinkedIn-sida.
 Omslagets huvudbudskap ligger i en central säker zon för varierande skärmstorlek.
 
+### LinkedIn-artiklar
+
+Sju fullängdsartiklar i serien `Framtidens hantverksföretag`, med egna
+1920×1080-omslag, inlinebildplan, delningsfråga och publiceringsordning.
+
 ## Filer
 
 - `messaging-playbook.md` — budskapshierarki, ordval och innehållspelare
@@ -53,6 +58,7 @@ Omslagets huvudbudskap ligger i en central säker zon för varierande skärmstor
 - `seedance-2.5-prompts.md` — verifierad hybridstrategi och färdiga videoprompter
 - `profile-assets.md` — primär profilbild, kanalvarianter och säker beskärning
 - `linkedin-banner.md` — LinkedIn-omslag, uppladdning och beskärningsprincip
+- `linkedin-articles/` — publiceringsfärdig newsletter- och artikelserie
 - `render.html` — deterministiska originalytor för samtliga bilder
 - `public/marketing/content-library-v1/` — färdiga PNG-filer
 - `public/marketing/handymate-content-library-v1.zip` — nedladdningspaket

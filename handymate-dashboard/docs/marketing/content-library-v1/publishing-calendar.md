@@ -37,6 +37,27 @@ resonemang och diskussion.
 
 P1–P10 finns i `prelaunch-copy.md`.
 
+## LinkedIn newsletter — Framtidens hantverksföretag
+
+Publiceras torsdagar från Andreas personliga profil. Handymate-sidan delar med
+en egen kort kommentar samma dag. Serien ersätter kalenderns rena
+“community”-aktivitet när datumen sammanfaller; den läggs inte ovanpå som ett
+extra företagsinlägg.
+
+| Datum | Utgåva | Artikel | Omslag | Primär fråga |
+|---|---|---|---|---|
+| Tor 27 aug | 01 | `linkedin-articles/01-system-eller-team.md` | `article/article-01-system-eller-team.png` | Vilket nästa steg måste du själv minnas? |
+| Tor 3 sep | 02 | `linkedin-articles/02-vad-gor-ett-ai-team.md` | `article/article-02-vad-gor-ett-ai-team.png` | Vilken roll behövs mest? |
+| Tor 10 sep | 03 | `linkedin-articles/03-fran-utfort-till-betalt.md` | `article/article-03-fran-utfort-till-betalt.png` | Var fastnar vägen till betalning? |
+| Tor 17 sep | 04 | `linkedin-articles/04-ai-som-kan-bevisa.md` | `article/article-04-ai-som-kan-bevisa.png` | Vad krävs för att lita på AI? |
+| Tor 24 sep | 05 | `linkedin-articles/05-nasta-affar-finns-redan.md` | `article/article-05-nasta-affar-finns-redan.png` | Vilken jobbtyp är relevant igen? |
+| Tor 1 okt | 06 | `linkedin-articles/06-fem-onodiga-manuella-jobb.md` | `article/article-06-fem-onodiga-manuella-jobb.png` | Vilken uppgift tar mest tid? |
+| Tor 8 okt | 07 | `linkedin-articles/07-affarssystem-eller-ai-team.md` | `article/article-07-affarssystem-eller-ai-team.png` | Överblick eller hjälp att agera? |
+
+Varje utgåva återbrukas under veckan efter publicering som ett kort
+grundarinlägg, en karusell och två citatbilder. Publicera inte samtliga format
+samma dag.
+
 ## Publiceringsordning efter lansering
 
 | Datum | Kanal | Format | Exakt fil/ordning | Copykälla | Primär poäng |
