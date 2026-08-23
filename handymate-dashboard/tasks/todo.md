@@ -284,6 +284,29 @@ denna sektion är endast utvecklingsbokföring.
 
 ---
 
+# Förlanseringshype + samlad publiceringskalender (2026-08-23)
+
+- [x] Sätt en trestegsdramaturgi: utmana → avslöja → bevisa
+- [x] Skapa tio separata förlanseringsassets för T–21 till T0
+- [x] Skriv P1–P10 med CTA och gemensam alt-text
+- [x] Mappa varje publiceringsdag till kanal, format, exakt fil och copy
+- [x] Lås karusellordning och markera kontaktark som ej publicerbara
+- [x] Uppdatera ZIP-paket, renderare och regressionsfacit
+
+## Review
+
+- Arbetsdatum för lansering är 2026-09-14; kalendern är relativ och kan flyttas
+  utan att dramaturgin ändras.
+- Tio nya bilder tillkom: sju 4:5-teasers/reveals och tre 9:16-bilder för
+  T–3, T–1 och T0. Biblioteket innehåller nu 39 publiceringsklara PNG-filer.
+- Kalendern täcker 24 augusti–9 oktober med exakt filordning, kanal, format,
+  copy-ID, CTA och efterlanseringssekvens.
+- Visuell QA genomförd mot förlanseringens kontaktark och fullstora nyckelbilder.
+- `tests/content-library-v1.spec.ts`: 14/14 gröna över desktop + mobil.
+  `npx tsc --noEmit`: 0 fel. `npx next build`: exit 0.
+
+---
+
 # Social Launch Kit — kampanj 01 (2026-08-23)
 
 - [x] Förankra tonalitet, färg och budskap i Handymates designsystem

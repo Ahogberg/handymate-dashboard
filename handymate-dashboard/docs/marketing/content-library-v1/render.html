@@ -88,6 +88,12 @@
     .story .avatar-stack img { width:230px; height:230px; margin:0; border-width:8px; }
     .mini-logo { filter:brightness(0) invert(1); }
     .kicker { font:700 24px/1 Space; letter-spacing:.12em; text-transform:uppercase; color:#8dd7c9; margin-bottom:26px; }
+    .teaser-word { font:700 154px/.82 Space; letter-spacing:-.08em; color:rgba(255,255,255,.11); text-transform:uppercase; }
+    .teaser-rule { width:170px; height:8px; border-radius:8px; background:#78d1c0; margin:34px 0; }
+    .outline-team { display:flex; gap:24px; margin-top:90px; }
+    .outline-team img { width:132px; height:132px; border-radius:50%; object-fit:cover; object-position:top; border:5px solid rgba(255,255,255,.78); filter:saturate(.35); }
+    .countdown { font:700 390px/.78 Space; letter-spacing:-.1em; color:#78d1c0; }
+    .launch-chip { display:inline-flex; width:max-content; padding:14px 22px; border:1px solid rgba(255,255,255,.24); border-radius:999px; color:white; font:700 20px/1 Space; letter-spacing:.08em; text-transform:uppercase; }
   </style>
 </head>
 <body>
@@ -195,6 +201,28 @@
       <div class="avatar-stack">${agents.map(a=>`<img src="${assetBase}${a.id}.png" alt="${a.name}">`).join('')}</div></div>${footer(true)}</div>`,'story dark')
     add('reel-2006-2026','reel',`<div class="pad dark">${logoRow(true,'2006 → 2026')}<div style="margin-top:300px"><div class="year old">2006</div><div class="arrow-line"></div><div class="year new">2026</div><h1 class="hero small" style="margin-top:100px">Välkommen till framtiden.</h1></div>${footer(true)}</div>`,'story dark')
     add('reel-team-at-work','reel',`<img class="photo-bg" src="${launchBase}van-morning-source.png" alt=""><div class="photo-shade"></div><div class="pad overlay">${logoRow(true,'MEDAN DU JOBBAR')}<div class="standalone-copy" style="margin-top:320px"><h1 class="hero">Teamet arbetar vidare.</h1><p class="sub" style="margin-top:55px">Du godkänner. Handymate tar nästa steg.</p></div>${footer(true)}</div>`,'story dark')
+
+    add('prelaunch-01-market','prelaunch',`<div class="pad dark">${logoRow(true,'SNART')}
+      <div style="margin-top:165px"><div class="teaser-word">Marknaden</div><div class="teaser-rule"></div><h1 class="hero small">Snart förändras spelreglerna för hantverksföretag.</h1><p class="sub" style="margin-top:44px">Inte med ännu en meny. Med ett team.</p></div>${footer(true,'Handymate lanserar snart.')}</div>`,'dark')
+    add('prelaunch-02-2006','prelaunch',`<div class="pad dark">${logoRow(true,'2006 → 2026')}
+      <div style="margin-top:180px"><div class="year old">2006</div><div class="arrow-line"></div><div class="year new">2026</div><h1 class="hero small" style="margin-top:70px">Dags att lämna det gamla arbetssättet.</h1></div>${footer(true,'Handymate lanserar snart.')}</div>`,'dark')
+    add('prelaunch-03-not-system','prelaunch',`<div class="pad dark">${logoRow(true,'EN NY KATEGORI')}
+      <div style="margin-top:230px"><h1 class="hero">Det här är inte ännu ett affärssystem.</h1><div class="teaser-rule"></div><p class="sub">Snart berättar vi vad det är istället.</p></div>${footer(true,'Följ resan mot lansering.')}</div>`,'dark')
+    add('prelaunch-04-works-for-you','prelaunch',`<img class="photo-bg" src="${launchBase}van-morning-source.png" alt=""><div class="photo-shade"></div><div class="pad overlay">${logoRow(true,'ETT NYTT ARBETSSÄTT')}
+      <div class="standalone-copy" style="margin-top:180px"><h1 class="hero">Du ska inte arbeta för systemet.</h1><p class="sub" style="margin-top:44px">Systemet ska arbeta för dig.</p></div>${footer(true,'Handymate lanserar snart.')}</div>`,'dark')
+    add('prelaunch-05-team-reveal','prelaunch',`<div class="pad dark">${logoRow(true,'AVSLÖJANDE 01')}
+      <div style="margin-top:170px"><div class="launch-chip">Det digitala teamet</div><h1 class="hero small" style="margin-top:34px">Sex AI-kollegor. Byggda för hantverksföretag.</h1><div class="outline-team">${agents.map(a=>`<img src="${assetBase}${a.id}.png" alt="${a.name}">`).join('')}</div></div>${footer(true,'Snart får du hälsa på dem.')}</div>`,'dark')
+    add('prelaunch-06-matte','prelaunch',`<div class="pad" style="--agent:#0f766e">${logoRow(false,'AVSLÖJANDE 02')}
+      <div class="agent-mark"></div><div class="agent-copy" style="margin-top:135px"><div class="pill"><span class="dot"></span>Din chefsagent</div><h2 class="agent-name" style="margin-top:28px">Matte</h2><p class="agent-promise">Du berättar vad du vill uppnå. Matte samordnar teamet.</p></div>
+      <div class="example"><div class="example-label">Snart i Handymate</div><div class="example-text">En kontaktpunkt. Rätt specialist. Tydlig återkoppling.</div></div><img class="portrait portrait-large" src="${assetBase}matte.png" alt="Matte"></div>`)
+    add('prelaunch-07-launch-soon','prelaunch',`<div class="pad dark">${logoRow(true,'HANDYMATE')}
+      <div style="margin-top:280px"><div class="launch-chip">Lanserar snart</div><h1 class="hero" style="margin-top:38px">Välkommen till framtidens hantverksföretag.</h1></div>${footer(true,'Det digitala teamet är snart på plats.')}</div>`,'dark')
+    add('prelaunch-08-three-days','prelaunch',`<div class="pad dark">${logoRow(true,'NEDRÄKNING')}
+      <div style="margin-top:265px"><div class="countdown">3</div><h1 class="hero small" style="margin-top:65px">dagar kvar.</h1><p class="sub" style="margin-top:38px">Sedan börjar systemet arbeta för dig.</p></div>${footer(true,'Handymate lanserar snart.')}</div>`,'story dark')
+    add('prelaunch-09-tomorrow','prelaunch',`<div class="pad dark">${logoRow(true,'IMORGON')}
+      <div style="margin-top:390px"><div class="teaser-word">Framtiden</div><div class="teaser-rule"></div><h1 class="hero">Imorgon börjar den.</h1></div>${footer(true,'Det digitala teamet för hantverksföretag.')}</div>`,'story dark')
+    add('prelaunch-10-launch','prelaunch',`<img class="photo-bg" src="${launchBase}worksite-morning-source.png" alt=""><div class="photo-shade"></div><div class="pad overlay">${logoRow(true,'NU LANSERAR VI')}
+      <div class="standalone-copy" style="margin-top:230px"><div class="launch-chip">Handymate är här</div><h1 class="hero" style="margin-top:38px">Välkommen till framtidens hantverksföretag.</h1><p class="sub" style="margin-top:46px">Möt det digitala teamet som arbetar med dig.</p></div>${footer(true,'Det digitala teamet för hantverksföretag')}</div>`,'story dark')
   </script>
 </body>
 </html>

@@ -11,6 +11,12 @@ kundkontakten.
 
 ## Kampanjfamiljer
 
+### 00 — Förlansering
+
+Tio bilder för perioden T–21 till T0: sex modiga kategori- och
+teamavslöjanden, ett lanseringsbesked samt tre vertikala nedräkningsbilder.
+Publiceringsdatum och exakt ordning finns i `publishing-calendar.md`.
+
 ### 01 — Hälsa på ditt team
 
 Åtta 4:5-bilder: omslag, Matte, Karin, Daniel, Lars, Hanna, Lisa och avslutning.
@@ -36,6 +42,8 @@ Fyra fristående 4:5-inlägg och tre 9:16-omslag för Reels/Stories.
 
 - `messaging-playbook.md` — budskapshierarki, ordval och innehållspelare
 - `campaign-copy.md` — captions, bildtexter, alt-texter och Reel-manus
+- `prelaunch-copy.md` — P1–P10 för de tre veckorna före lansering
+- `publishing-calendar.md` — datum, kanal, exakt fil, ordning, copy och CTA
 - `render.html` — deterministiska originalytor för samtliga bilder
 - `public/marketing/content-library-v1/` — färdiga PNG-filer
 - `public/marketing/handymate-content-library-v1.zip` — nedladdningspaket

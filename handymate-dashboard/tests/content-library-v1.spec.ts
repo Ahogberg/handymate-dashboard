@@ -17,11 +17,13 @@ const expectedAssets = [
     path.join('standalone', `standalone-${name}.png`)),
   ...['meet-team', '2006-2026', 'team-at-work'].map(name =>
     path.join('reel', `reel-${name}.png`)),
+  ...['market', '2006', 'not-system', 'works-for-you', 'team-reveal', 'matte', 'launch-soon', 'three-days', 'tomorrow', 'launch'].map((name, index) =>
+    path.join('prelaunch', `prelaunch-${String(index + 1).padStart(2, '0')}-${name}.png`)),
 ]
 
 test.describe('Handymate content library V1', () => {
-  test('levererar 29 publiceringsklara PNG-original', () => {
-    expect(expectedAssets).toHaveLength(29)
+  test('levererar 39 publiceringsklara PNG-original', () => {
+    expect(expectedAssets).toHaveLength(39)
     for (const relativePath of expectedAssets) {
       const file = path.join(assets, relativePath)
       expect(fs.existsSync(file), relativePath).toBe(true)
@@ -68,5 +70,20 @@ test.describe('Handymate content library V1', () => {
     const archive = path.join(root, 'public', 'marketing', 'handymate-content-library-v1.zip')
     expect(fs.existsSync(archive)).toBe(true)
     expect(fs.statSync(archive).size).toBeGreaterThan(1_000_000)
+  })
+
+  test('kalendern kopplar förlansering och karuseller till exakta filer', () => {
+    const calendar = fs.readFileSync(path.join(docs, 'publishing-calendar.md'), 'utf8')
+    expect(calendar).toContain('Lanseringsdag: måndag 14 september 2026')
+    for (const asset of [
+      'prelaunch/prelaunch-01-market.png',
+      'prelaunch/prelaunch-10-launch.png',
+      'team/team-01-cover.png` → `team-08-cta.png',
+      'future/future-01-cover.png` → `future-06-welcome.png',
+      'work/work-01-cover.png` → `work-08-cta.png',
+    ]) {
+      expect(calendar, asset).toContain(asset)
+    }
+    expect(calendar).toContain('Publicera aldrig kontaktarken')
   })
 })
