@@ -7,6 +7,19 @@ const root = process.cwd()
 const source = path.join(root, 'docs', 'marketing', 'content-library-v1', 'render.html')
 const output = path.join(root, 'public', 'marketing', 'content-library-v1')
 const logoSource = pathToFileURL(path.join(root, 'public', 'logo.png')).href
+const campaignFilter = process.argv[2]
+
+async function writePng(file, bytes) {
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    try {
+      await fs.writeFile(file, bytes)
+      return
+    } catch (error) {
+      if (attempt === 5) throw error
+      await new Promise(resolve => setTimeout(resolve, attempt * 100))
+    }
+  }
+}
 
 await fs.mkdir(output, { recursive: true })
 const browser = await chromium.launch({ headless: true })
@@ -22,14 +35,43 @@ await page.evaluate(async () => {
       })))
 })
 
-const assets = await page.locator('[data-export]').evaluateAll(nodes => nodes.map(node => ({
+const allAssets = await page.locator('[data-export]').evaluateAll(nodes => nodes.map(node => ({
   id: node.id,
   campaign: node.getAttribute('data-campaign') || 'other',
 })))
+const assets = campaignFilter
+  ? allAssets.filter(asset => asset.campaign === campaignFilter)
+  : allAssets
+
+if (campaignFilter && assets.length === 0) {
+  throw new Error(`Unknown campaign: ${campaignFilter}`)
+}
 
 for (const asset of assets) {
   const directory = path.join(output, asset.campaign)
   await fs.mkdir(directory, { recursive: true })
+  if (asset.campaign === 'linkedin') {
+    const widePage = await browser.newPage({ viewport: { width: 4300, height: 800 }, deviceScaleFactor: 1 })
+    await widePage.goto(pathToFileURL(source).href)
+    await widePage.evaluate(async () => {
+      await document.fonts.ready
+      await Promise.all(Array.from(document.images).map(image => image.complete
+        ? Promise.resolve()
+        : new Promise(resolve => {
+            image.addEventListener('load', resolve, { once: true })
+            image.addEventListener('error', resolve, { once: true })
+          })))
+    })
+    const bytes = await widePage.locator(`#${asset.id}`).screenshot()
+    await writePng(path.join(directory, `${asset.id}.png`), bytes)
+    await widePage.close()
+    continue
+  }
+  await page.evaluate(id => {
+    document.querySelectorAll('[data-export]').forEach(node => {
+      node.style.display = node.id === id ? 'block' : 'none'
+    })
+  }, asset.id)
   const target = page.locator(`#${asset.id}`)
   const transparent = await target.getAttribute('data-transparent') === 'true'
   if (transparent) {
@@ -42,14 +84,13 @@ for (const asset of assets) {
     await transparentPage.locator('img').evaluate(image => image.complete
       ? Promise.resolve()
       : new Promise(resolve => image.addEventListener('load', resolve, { once: true })))
-    await transparentPage.screenshot({
-      path: path.join(directory, `${asset.id}.png`),
-      omitBackground: true,
-    })
+    const bytes = await transparentPage.screenshot({ omitBackground: true })
+    await writePng(path.join(directory, `${asset.id}.png`), bytes)
     await transparentPage.close()
     continue
   }
-  await target.screenshot({ path: path.join(directory, `${asset.id}.png`) })
+  const bytes = await target.screenshot()
+  await writePng(path.join(directory, `${asset.id}.png`), bytes)
 }
 
 for (const campaign of [...new Set(assets.map(asset => asset.campaign))]) {
@@ -64,7 +105,8 @@ for (const campaign of [...new Set(assets.map(asset => asset.campaign))]) {
       padding:20px !important; width:600px !important; }
     .asset { zoom:.25; }
   ` })
-  await page.screenshot({ path: path.join(output, `contact-sheet-${campaign}.png`), fullPage: true })
+  const bytes = await page.screenshot({ fullPage: true })
+  await writePng(path.join(output, `contact-sheet-${campaign}.png`), bytes)
   await page.reload()
   await page.evaluate(async () => { await document.fonts.ready })
 }

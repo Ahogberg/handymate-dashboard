@@ -18,6 +18,7 @@
     .asset { width:1080px; height:1350px; position:relative; overflow:hidden; background:var(--paper); color:var(--ink); font-family:DM, sans-serif; }
     .asset.story { height:1920px; }
     .asset.profile { height:1080px; }
+    .asset.linkedin-banner { width:4200px; height:700px; align-self:flex-start; }
     .noise { position:absolute; inset:0; opacity:.055; pointer-events:none; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E"); }
     .pad { position:absolute; inset:0; padding:74px 78px; display:flex; flex-direction:column; }
     .brand { height:34px; width:auto; object-fit:contain; object-position:left center; }
@@ -105,6 +106,15 @@
     .profile-transparent .noise { display:none; }
     .safe-circle { position:absolute; inset:82px; border:4px dashed rgba(255,255,255,.65); border-radius:50%; }
     .safe-label { position:absolute; left:50%; top:85px; transform:translateX(-50%); padding:10px 18px; border-radius:999px; background:rgba(5,47,44,.78); color:white; font:700 20px/1 Space; letter-spacing:.08em; }
+    .linkedin-shell { position:absolute; inset:0; overflow:hidden; background:linear-gradient(115deg,#052f2c 0%,#073f3b 48%,#0f766e 100%); color:white; }
+    .linkedin-shell::before { content:''; position:absolute; width:1150px; height:1150px; border:2px solid rgba(143,221,207,.16); border-radius:50%; left:-560px; top:-520px; box-shadow:0 0 0 135px rgba(143,221,207,.035),0 0 0 300px rgba(143,221,207,.025); }
+    .linkedin-shell::after { content:''; position:absolute; width:920px; height:920px; border-radius:50%; right:-110px; top:-320px; background:radial-gradient(circle,rgba(120,209,192,.22),rgba(120,209,192,0) 68%); }
+    .linkedin-wordmark { position:absolute; left:280px; top:284px; z-index:2; font:700 54px/1 Space; letter-spacing:.16em; }
+    .linkedin-copy { position:absolute; left:1120px; top:122px; z-index:2; width:2480px; }
+    .linkedin-kicker { color:#8dd7c9; font:700 30px/1 Space; letter-spacing:.13em; text-transform:uppercase; }
+    .linkedin-title { margin-top:30px; max-width:2500px; font:650 112px/.96 Space; letter-spacing:-.052em; }
+    .linkedin-sub { margin-top:38px; color:#cfeae5; font:500 42px/1.2 DM; letter-spacing:-.01em; }
+    .linkedin-mark { position:absolute; z-index:1; width:680px; height:680px; right:120px; top:8px; object-fit:contain; opacity:.13; filter:brightness(0) invert(1); }
   </style>
 </head>
 <body>
@@ -241,6 +251,14 @@
     add('profile-04-transparent','profile',`<div class="profile-canvas"><img src="${logo}" alt="Handymate"></div>`,'profile profile-transparent')
     document.querySelector('#profile-04-transparent').setAttribute('data-transparent','true')
     add('profile-05-safe-area-guide','profile',`<div class="profile-canvas profile-primary"><img src="${logo}" alt="Handymate"><div class="safe-circle"></div><div class="safe-label">SÄKER CIRKELBESKÄRNING</div></div>`,'profile')
+
+    add('linkedin-banner-company','linkedin',`<div class="linkedin-shell">
+      <div class="linkedin-wordmark">HANDYMATE</div>
+      <div class="linkedin-copy"><div class="linkedin-kicker">Det digitala AI-teamet</div>
+      <h1 class="linkedin-title">Välkommen till framtidens hantverksföretag.</h1>
+      <p class="linkedin-sub">Hittar pengar. Skyddar marginalen. Minskar admin.</p></div>
+      <img class="linkedin-mark" src="${logo}" alt="">
+    </div>`,'linkedin-banner')
   </script>
 </body>
 </html>

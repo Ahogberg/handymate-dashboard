@@ -21,11 +21,12 @@ const expectedAssets = [
     path.join('prelaunch', `prelaunch-${String(index + 1).padStart(2, '0')}-${name}.png`)),
   ...['primary-dark', 'light', 'teal-white', 'transparent', 'safe-area-guide'].map((name, index) =>
     path.join('profile', `profile-${String(index + 1).padStart(2, '0')}-${name}.png`)),
+  path.join('linkedin', 'linkedin-banner-company.png'),
 ]
 
 test.describe('Handymate content library V1', () => {
-  test('levererar 44 publiceringsklara PNG-original', () => {
-    expect(expectedAssets).toHaveLength(44)
+  test('levererar 45 publiceringsklara PNG-original', () => {
+    expect(expectedAssets).toHaveLength(45)
     for (const relativePath of expectedAssets) {
       const file = path.join(assets, relativePath)
       expect(fs.existsSync(file), relativePath).toBe(true)
@@ -120,5 +121,15 @@ test.describe('Handymate content library V1', () => {
     const guide = fs.readFileSync(path.join(docs, 'profile-assets.md'), 'utf8')
     expect(guide).toContain('profile-01-primary-dark.png')
     expect(guide).toContain('Safe-area-guiden får aldrig laddas upp offentligt')
+  })
+
+  test('LinkedIn-bannern följer företagssidans aktuella format och säkra budskap', () => {
+    const banner = fs.readFileSync(path.join(assets, 'linkedin', 'linkedin-banner-company.png'))
+    expect(banner.readUInt32BE(16)).toBe(4200)
+    expect(banner.readUInt32BE(20)).toBe(700)
+    expect(banner.length).toBeLessThan(3_000_000)
+    const source = fs.readFileSync(path.join(docs, 'render.html'), 'utf8')
+    expect(source).toContain('Välkommen till framtidens hantverksföretag.')
+    expect(source).toContain('Hittar pengar. Skyddar marginalen. Minskar admin.')
   })
 })

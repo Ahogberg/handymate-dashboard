@@ -38,6 +38,11 @@ projektblockerare, kundportal, reaktivering och kontrollgränsen före handling.
 
 Fyra fristående 4:5-inlägg och tre 9:16-omslag för Reels/Stories.
 
+### Profil och LinkedIn
+
+Fem profilbildsoriginal samt ett 4200×700-omslag för Handymates LinkedIn-sida.
+Omslagets huvudbudskap ligger i en central säker zon för varierande skärmstorlek.
+
 ## Filer
 
 - `messaging-playbook.md` — budskapshierarki, ordval och innehållspelare
@@ -47,6 +52,7 @@ Fyra fristående 4:5-inlägg och tre 9:16-omslag för Reels/Stories.
 - `video-production-pack.md` — fem filmer med manus, storyboard och shot list
 - `seedance-2.5-prompts.md` — verifierad hybridstrategi och färdiga videoprompter
 - `profile-assets.md` — primär profilbild, kanalvarianter och säker beskärning
+- `linkedin-banner.md` — LinkedIn-omslag, uppladdning och beskärningsprincip
 - `render.html` — deterministiska originalytor för samtliga bilder
 - `public/marketing/content-library-v1/` — färdiga PNG-filer
 - `public/marketing/handymate-content-library-v1.zip` — nedladdningspaket

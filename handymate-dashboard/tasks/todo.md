@@ -345,9 +345,29 @@ denna sektion är endast utvecklingsbokföring.
   transparent master och en intern safe-area-guide.
 - Den transparenta mastern är verifierad som riktig RGBA-PNG; den primära
   mörka varianten är rekommenderad profilbild i sociala kanaler.
-- Innehållsbiblioteket omfattar nu 44 publiceringsklara bilder och sju
+- Innehållsbiblioteket omfattar nu 45 publiceringsklara bilder och åtta
   kontaktark. Safe-area-guiden är uttryckligen märkt som intern.
 - `tests/content-library-v1.spec.ts`: 20/20 gröna över desktop + mobil.
+  `npx tsc --noEmit`: 0 fel. `npx next build`: exit 0.
+
+---
+
+# LinkedIn-banner (2026-08-23)
+
+- [x] Verifiera aktuell företagssidesstorlek mot LinkedIns officiella hjälp
+- [x] Skapa ett tidlöst, on-brand omslag i central säker zon
+- [x] Rendera, visuellt granska och lägga i nedladdningspaketet
+- [x] Kör facit, tsc och produktionsbygge
+
+## Review
+
+- LinkedIns aktuella rekommendation verifierades mot officiell hjälp:
+  4200×700 px, PNG/JPEG och högst 3 MB.
+- Slutfilen är 4200×700, 2,29 MB och visuellt granskad i originalformat.
+  Huvudbudskapet ligger centralt; dekorativa ytterelement tål beskärning.
+- Renderaren isolerar nu varje original före export och skriver PNG-filer via
+  buffert med retry, så ultrabreda format inte kan påverka övriga kampanjer.
+- `tests/content-library-v1.spec.ts`: 22/22 gröna över desktop + mobil.
   `npx tsc --noEmit`: 0 fel. `npx next build`: exit 0.
 
 ---
