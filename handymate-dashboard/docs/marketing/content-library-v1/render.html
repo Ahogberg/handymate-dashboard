@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <title>Handymate Content Library V1</title>
+  <style>
+    @font-face { font-family: Space; src: url('../../../public/marketing/social/launch-01/fonts/space-grotesk-latin.woff2'); }
+    @font-face { font-family: DM; src: url('../../../public/marketing/social/launch-01/fonts/dm-sans-latin.woff2'); }
+    :root {
+      --teal:#0f766e; --teal-dark:#073f3b; --teal-deep:#052f2c;
+      --mint:#dff4ef; --paper:#f7f8f6; --white:#fff; --ink:#0f172a;
+      --slate:#475569; --line:#dbe3e1; --blue:#2563eb; --amber:#d97706;
+      --green:#059669; --purple:#9333ea; --sky:#0ea5e9;
+    }
+    * { box-sizing:border-box; }
+    html, body { margin:0; background:#d6dcda; }
+    body { padding:40px; display:flex; flex-direction:column; align-items:center; gap:40px; }
+    .asset { width:1080px; height:1350px; position:relative; overflow:hidden; background:var(--paper); color:var(--ink); font-family:DM, sans-serif; }
+    .asset.story { height:1920px; }
+    .noise { position:absolute; inset:0; opacity:.055; pointer-events:none; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E"); }
+    .pad { position:absolute; inset:0; padding:74px 78px; display:flex; flex-direction:column; }
+    .brand { height:34px; width:auto; object-fit:contain; object-position:left center; }
+    .brand-row { display:flex; align-items:center; justify-content:space-between; min-height:40px; }
+    .series { font:700 22px/1 Space; letter-spacing:.09em; text-transform:uppercase; color:var(--teal); }
+    .dark .series { color:#94d8cc; }
+    h1,h2,h3,p { margin:0; }
+    h1,h2,h3 { font-family:Space, sans-serif; letter-spacing:-.045em; }
+    .hero { font-size:92px; line-height:.98; max-width:900px; }
+    .hero.small { font-size:76px; }
+    .sub { font-size:34px; line-height:1.28; color:var(--slate); max-width:820px; }
+    .dark { background:linear-gradient(145deg,var(--teal-deep),var(--teal-dark)); color:white; }
+    .dark .sub { color:#cfebe5; }
+    .overlay { color:white; }
+    .overlay .sub { color:#cfebe5; }
+    .footer { margin-top:auto; display:flex; align-items:center; justify-content:space-between; gap:20px; font-size:22px; color:#64748b; }
+    .dark .footer { color:#b8dad4; }
+    .overlay .footer { color:#d8eee9; }
+    .pill { display:inline-flex; width:max-content; align-items:center; gap:10px; padding:12px 20px; border-radius:999px; background:var(--mint); color:var(--teal); font-weight:700; font-size:22px; }
+    .dark .pill { background:rgba(255,255,255,.1); color:white; border:1px solid rgba(255,255,255,.18); }
+    .overlay .pill { background:rgba(255,255,255,.1); color:white; border:1px solid rgba(255,255,255,.18); }
+    .dot { width:10px; height:10px; border-radius:50%; background:currentColor; }
+    .portrait { object-fit:cover; object-position:center top; background:#eef3f2; }
+    .avatar-ring { border-radius:50%; border:7px solid var(--agent); box-shadow:0 20px 50px rgba(15,23,42,.16); }
+    .portrait-large { position:absolute; width:610px; height:610px; right:-70px; bottom:40px; border-radius:50%; border:10px solid white; box-shadow:0 36px 90px rgba(15,23,42,.18); }
+    .agent-copy { width:590px; margin-top:150px; position:relative; z-index:2; }
+    .agent-name { font-size:102px; line-height:.9; }
+    .agent-role { margin-top:18px; font:700 30px/1 Space; color:var(--agent); }
+    .agent-promise { margin-top:42px; font:500 38px/1.25 DM; max-width:575px; }
+    .example { position:absolute; left:78px; right:78px; bottom:82px; min-height:190px; border-radius:30px; background:white; border:1px solid var(--line); box-shadow:0 25px 65px rgba(15,23,42,.09); padding:32px 380px 32px 34px; display:flex; flex-direction:column; justify-content:center; }
+    .example-label { font:700 18px/1 Space; color:var(--agent); letter-spacing:.08em; text-transform:uppercase; margin-bottom:12px; }
+    .example-text { font-size:27px; line-height:1.34; color:#334155; }
+    .agent-mark { position:absolute; left:76px; top:260px; width:54px; height:7px; border-radius:9px; background:var(--agent); }
+    .avatar-stack { display:flex; margin-top:75px; }
+    .avatar-stack img { width:150px; height:150px; margin-left:-22px; object-fit:cover; object-position:top; border:6px solid white; border-radius:50%; box-shadow:0 14px 36px rgba(0,0,0,.18); }
+    .avatar-stack img:first-child { margin-left:0; }
+    .contrast-grid { margin-top:75px; display:grid; grid-template-columns:1fr 1fr; gap:25px; }
+    .contrast-card { min-height:430px; border-radius:34px; padding:42px; border:1px solid var(--line); background:white; }
+    .contrast-card.future { background:var(--mint); border-color:#a9ded2; }
+    .contrast-card h3 { font-size:42px; margin-bottom:28px; }
+    .contrast-card ul { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:20px; }
+    .contrast-card li { font-size:28px; line-height:1.25; display:flex; gap:14px; }
+    .contrast-card li::before { content:'•'; color:#94a3b8; font-weight:800; }
+    .contrast-card.future li::before { color:var(--teal); }
+    .year { font:700 180px/.85 Space; letter-spacing:-.09em; }
+    .year.old { color:#cbd5e1; }
+    .year.new { color:#78d1c0; }
+    .arrow-line { width:100%; height:12px; margin:58px 0; border-radius:12px; background:linear-gradient(90deg,#cbd5e1 0 42%,var(--teal) 58% 100%); }
+    .quote { font:600 70px/1.08 Space; max-width:900px; }
+    .quote em { color:#78d1c0; font-style:normal; }
+    .flow { margin-top:76px; display:flex; flex-direction:column; gap:22px; }
+    .flow-step { border-radius:26px; padding:28px 32px; background:white; border:1px solid var(--line); display:flex; align-items:center; gap:25px; font-size:29px; line-height:1.25; box-shadow:0 14px 35px rgba(15,23,42,.06); }
+    .flow-number { width:52px; height:52px; flex:0 0 52px; display:grid; place-items:center; border-radius:50%; background:var(--mint); color:var(--teal); font:700 23px/1 Space; }
+    .automation-head { display:grid; grid-template-columns:180px 1fr; align-items:center; gap:34px; margin-top:95px; }
+    .automation-head img { width:180px; height:180px; object-fit:cover; object-position:top; border:6px solid var(--agent); border-radius:50%; }
+    .automation-head h2 { font-size:72px; line-height:.98; }
+    .automation-head p { margin-top:10px; color:var(--agent); font:700 25px/1 Space; }
+    .automation-title { margin-top:58px; font:600 48px/1.14 Space; }
+    .control-band { margin-top:44px; padding:24px 28px; border-radius:22px; color:var(--teal); background:var(--mint); font-size:24px; font-weight:700; }
+    .photo-bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    .photo-shade { position:absolute; inset:0; background:linear-gradient(90deg,rgba(5,47,44,.97) 0%,rgba(5,47,44,.82) 50%,rgba(5,47,44,.16) 100%); }
+    .standalone-copy { position:relative; z-index:2; width:700px; margin-top:155px; }
+    .standalone-copy .hero { font-size:82px; }
+    .big-number { font:700 138px/.9 Space; color:var(--teal); }
+    .story .pad { padding:96px 82px; }
+    .story .hero { font-size:112px; }
+    .story .sub { font-size:40px; }
+    .story .avatar-stack { margin-top:110px; display:grid; grid-template-columns:repeat(3, 1fr); gap:28px; }
+    .story .avatar-stack img { width:230px; height:230px; margin:0; border-width:8px; }
+    .mini-logo { filter:brightness(0) invert(1); }
+    .kicker { font:700 24px/1 Space; letter-spacing:.12em; text-transform:uppercase; color:#8dd7c9; margin-bottom:26px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const assetBase = '../../../public/marketing/content-library-v1/avatars/'
+    const logo = '../../../public/logo.png'
+    const launchBase = '../../../public/marketing/social/launch-01/'
+    const agents = [
+      { id:'matte', name:'Matte', role:'Din chefsagent', color:'#0f766e', promise:'Berätta vad du vill uppnå. Matte samordnar rätt specialister och återkommer med läget.', example:'“Vilka projekt behöver mig?” → Matte samlar teamets bedömning och visar nästa steg.' },
+      { id:'karin', name:'Karin', role:'Din ekonom', color:'#2563eb', promise:'Håller koll på fakturor, betalningar och vad som kan tas vidare.', example:'En faktura är förfallen → Karin förbereder en vänlig påminnelse för ditt godkännande.' },
+      { id:'daniel', name:'Daniel', role:'Din säljare', color:'#d97706', promise:'Följer upp leads och offerter innan affären hinner kallna.', example:'En offert har stått utan svar → Daniel föreslår en relevant uppföljning.' },
+      { id:'lars', name:'Lars', role:'Din projektledare', color:'#059669', promise:'Ser bokningar, projektblockerare och sådant som behöver lösas.', example:'Ett projekt börjar dra över tid → Lars flaggar vad som behöver din uppmärksamhet.' },
+      { id:'hanna', name:'Hanna', role:'Din marknadschef', color:'#9333ea', promise:'Förbereder kampanjer och hjälper tidigare kunder hitta tillbaka.', example:'En tunn vecka närmar sig → Hanna föreslår en relevant kontakt med tidigare kunder.' },
+      { id:'lisa', name:'Lisa', role:'Din kundservice', color:'#0ea5e9', promise:'Fångar missade samtal och sparar nya kundförfrågningar.', example:'Du missar ett samtal → kunden får snabb återkoppling och förfrågan sparas för uppföljning.' },
+    ]
+    const agentMap = Object.fromEntries(agents.map(a => [a.id, a]))
+    const root = document.querySelector('#root')
+
+    function logoRow(dark=false, series='HANDYMATE') {
+      return `<div class="brand-row"><img class="brand ${dark ? 'mini-logo' : ''}" src="${logo}" alt="Handymate"><span class="series">${series}</span></div>`
+    }
+    function footer(dark=false, text='Det digitala teamet för hantverksföretag') {
+      return `<div class="footer"><span>${text}</span><span>handymate.se</span></div>${dark ? '' : ''}`
+    }
+    function add(id, campaign, html, classes='') {
+      root.insertAdjacentHTML('beforeend', `<section id="${id}" data-export data-campaign="${campaign}" class="asset ${classes}">${html}<div class="noise"></div></section>`)
+    }
+
+    add('team-01-cover','team',`
+      <img class="photo-bg" src="${launchBase}worksite-morning-source.png" alt="">
+      <div class="photo-shade"></div><div class="pad overlay">
+        ${logoRow(true,'HÄLSA PÅ DITT TEAM')}
+        <div style="margin-top:150px;position:relative;z-index:2">
+          <div class="pill"><span class="dot"></span>Sex AI-kollegor</div>
+          <h1 class="hero" style="margin-top:28px">Hälsa på<br>ditt team.</h1>
+          <p class="sub" style="margin-top:34px">Redo att börja jobba åt dig.</p>
+          <div class="avatar-stack">${agents.map(a=>`<img src="${assetBase}${a.id}.png" alt="${a.name}">`).join('')}</div>
+        </div>${footer(true)}
+      </div>`,'dark')
+
+    agents.forEach((a,index) => add(`team-${String(index+2).padStart(2,'0')}-${a.id}`,'team',`
+      <div class="pad" style="--agent:${a.color}">
+        ${logoRow(false,'DITT DIGITALA TEAM')}
+        <div class="agent-mark"></div>
+        <div class="agent-copy"><h2 class="agent-name">${a.name}</h2><div class="agent-role">${a.role}</div><p class="agent-promise">${a.promise}</p></div>
+        <div class="example"><div class="example-label">Ett exempel</div><div class="example-text">${a.example}</div></div>
+        <img class="portrait portrait-large" src="${assetBase}${a.id}.png" alt="${a.name}">
+      </div>`))
+
+    add('team-08-cta','team',`<div class="pad dark">${logoRow(true,'HANDYMATE')}
+      <div style="margin-top:190px"><div class="pill"><span class="dot"></span>Matte samordnar</div>
+      <h1 class="hero" style="margin-top:34px">Det här är inte ännu ett system.</h1>
+      <p class="sub" style="margin-top:48px">Det är ditt nya team.</p>
+      <div class="avatar-stack">${agents.map(a=>`<img src="${assetBase}${a.id}.png" alt="${a.name}">`).join('')}</div></div>
+      ${footer(true,'Du behåller kontrollen. Teamet tar nästa steg.')}</div>`,'dark')
+
+    add('future-01-cover','future',`<div class="pad dark">${logoRow(true,'2006 → 2026')}
+      <div style="margin-top:190px"><div class="year old">2006</div><div class="arrow-line"></div><div class="year new">2026</div>
+      <h1 class="hero small" style="margin-top:70px">Du ska inte behöva arbeta som förr.</h1></div>${footer(true,'Välkommen till framtidens hantverksföretag.')}</div>`,'dark')
+    add('future-02-old-system','future',`<div class="pad">${logoRow(false,'GÅRDAGENS ARBETSSÄTT')}
+      <h1 class="hero small" style="margin-top:105px">Systemet väntar på dig.</h1>
+      <div class="contrast-card" style="margin-top:70px"><h3>Du behöver själv</h3><ul><li>leta i menyer</li><li>mata in information</li><li>komma ihåg uppföljningen</li><li>samordna nästa steg</li><li>tolka rapporten i efterhand</li></ul></div>${footer()}</div>`)
+    add('future-03-digital-team','future',`<div class="pad">${logoRow(false,'HANDYMATE 2026')}
+      <h1 class="hero small" style="margin-top:105px">Teamet arbetar med dig.</h1>
+      <div class="contrast-card future" style="margin-top:70px"><h3>Du kan istället</h3><ul><li>berätta vad du vill uppnå</li><li>låta rätt specialist hitta nästa steg</li><li>godkänna viktiga handlingar</li><li>följa arbetet medan det sker</li><li>se vad som faktiskt blev gjort</li></ul></div>${footer()}</div>`)
+    add('future-04-category','future',`<div class="pad dark">${logoRow(true,'ETT NYTT ARBETSSÄTT')}
+      <div style="margin-top:225px"><p class="quote">Gamla system digitaliserade <em>pärmen.</em><br><br>Handymate digitaliserar <em>arbetet.</em></p></div>
+      ${footer(true)}</div>`,'dark')
+    add('future-05-control','future',`<div class="pad">${logoRow(false,'KONTROLL UTAN MER ADMIN')}
+      <h1 class="hero small" style="margin-top:110px">AI som gör jobbet — utan att ta kontrollen.</h1>
+      <div class="flow"><div class="flow-step"><div class="flow-number">1</div>Teamet upptäcker och förbereder</div><div class="flow-step"><div class="flow-number">2</div>Du godkänner det som ska lämna företaget</div><div class="flow-step"><div class="flow-number">3</div>Handymate redovisar vad som faktiskt hände</div></div>${footer()}</div>`)
+    add('future-06-welcome','future',`<div class="pad dark">${logoRow(true,'HANDYMATE')}
+      <div style="margin-top:230px"><div class="pill"><span class="dot"></span>Det digitala teamet</div><h1 class="hero" style="margin-top:34px">Välkommen till framtidens hantverksföretag.</h1>
+      <p class="sub" style="margin-top:50px">Du ska inte arbeta för systemet.<br>Systemet ska arbeta för dig.</p></div>${footer(true)}</div>`,'dark')
+
+    const automations = [
+      {id:'daniel', title:'Offerten håller på att kallna', steps:['En offert står utan svar','Daniel upptäcker den','En relevant uppföljning förbereds'], control:'Du godkänner innan något skickas.'},
+      {id:'karin', title:'Jobbet är gjort. Pengarna väntar.', steps:['Underlaget finns i projektet','Karin ser vad som behöver tas vidare','Faktura eller påminnelse förbereds'], control:'Potential kallas aldrig bekräftade pengar.'},
+      {id:'lars', title:'Något blockerar projektet', steps:['Projektets bevisplatser bedöms','Lars namnger det som saknas','Rätt specialist får nästa fråga'], control:'Ingen falsk “klart”-markering.'},
+      {id:'lisa', title:'Kunden behöver aldrig jaga dig', steps:['Status och dokument samlas','Kundportalen visar nästa steg','Frågor och förfrågningar fångas'], control:'Färre avbrott. En tryggare kundresa.'},
+      {id:'hanna', title:'Tidigare kunder kan bli nya affärer', steps:['En relevant kundgrupp identifieras','Hanna förbereder kontakten','Svar samlas som affärsmöjligheter'], control:'Behöriga mottagare och ditt godkännande före utskick.'},
+      {id:'matte', title:'Ett mål blir ett uppdrag', steps:['Du berättar vad du vill uppnå','Matte bygger en plan ur verkliga signaler','Specialisterna tar sina steg'], control:'Du ser ansvar, väntande beslut och verifierat resultat.'},
+    ]
+    add('work-01-cover','work',`<div class="pad dark">${logoRow(true,'TEAMET ARBETAR')}
+      <div style="margin-top:200px"><div class="pill"><span class="dot"></span>Medan du gör jobbet</div><h1 class="hero" style="margin-top:34px">Vad gör teamet åt dig?</h1><p class="sub" style="margin-top:42px">Upptäcker. Förbereder. Samordnar. Redovisar.</p>
+      <div class="avatar-stack">${agents.map(a=>`<img src="${assetBase}${a.id}.png" alt="${a.name}">`).join('')}</div></div>${footer(true)}</div>`,'dark')
+    automations.forEach((x,index)=>{const a=agentMap[x.id]; add(`work-${String(index+2).padStart(2,'0')}-${x.id}`,'work',`<div class="pad" style="--agent:${a.color}">${logoRow(false,'SÅ ARBETAR TEAMET')}
+      <div class="automation-head"><img src="${assetBase}${a.id}.png" alt="${a.name}"><div><h2>${a.name}</h2><p>${a.role}</p></div></div>
+      <h3 class="automation-title">${x.title}</h3><div class="flow">${x.steps.map((s,i)=>`<div class="flow-step"><div class="flow-number">${i+1}</div>${s}</div>`).join('')}</div>
+      <div class="control-band">${x.control}</div>${footer()}</div>`)} )
+    add('work-08-cta','work',`<div class="pad dark">${logoRow(true,'HANDYMATE')}
+      <div style="margin-top:220px"><h1 class="hero">Du bygger.<br>Teamet håller ihop företaget.</h1><p class="sub" style="margin-top:50px">Mindre knappande. Mer gjort.</p></div>${footer(true,'Det digitala teamet för hantverksföretag')}</div>`,'dark')
+
+    const standalone = [
+      {id:'standalone-digital-team', kicker:'EN NY KATEGORI', title:'Ett system visar information. Ett team hjälper dig agera.', sub:'Handymate är det digitala teamet för hantverksföretag.'},
+      {id:'standalone-customer-portal', kicker:'KUNDPORTALEN', title:'Kunden ska inte behöva jaga dig.', sub:'Status, dokument och nästa steg — samlat på en plats.'},
+      {id:'standalone-reactivation', kicker:'TILLVÄXT', title:'Nästa affär kan redan finnas bland tidigare kunder.', sub:'Relevant kontakt, förberedd av teamet och godkänd av dig.'},
+      {id:'standalone-money', kicker:'PENGAR SOM VÄNTAR', title:'Jobbet är gjort. Har det blivit betalt?', sub:'Handymate hjälper dig se nästa ekonomiska handling.'},
+    ]
+    standalone.forEach((x,i)=>add(x.id,'standalone',`<img class="photo-bg" src="${launchBase}${i%2===0?'worksite-morning-source.png':'van-morning-source.png'}" alt=""><div class="photo-shade"></div><div class="pad overlay">${logoRow(true,x.kicker)}
+      <div class="standalone-copy"><h1 class="hero">${x.title}</h1><p class="sub" style="margin-top:44px">${x.sub}</p></div>${footer(true)}</div>`,'dark'))
+
+    add('reel-meet-team','reel',`<div class="pad dark">${logoRow(true,'HÄLSA PÅ DITT TEAM')}<div style="margin-top:230px"><h1 class="hero">Du behöver inte ännu ett system.</h1><p class="sub" style="margin-top:44px">Du behöver ett team.</p>
+      <div class="avatar-stack">${agents.map(a=>`<img src="${assetBase}${a.id}.png" alt="${a.name}">`).join('')}</div></div>${footer(true)}</div>`,'story dark')
+    add('reel-2006-2026','reel',`<div class="pad dark">${logoRow(true,'2006 → 2026')}<div style="margin-top:300px"><div class="year old">2006</div><div class="arrow-line"></div><div class="year new">2026</div><h1 class="hero small" style="margin-top:100px">Välkommen till framtiden.</h1></div>${footer(true)}</div>`,'story dark')
+    add('reel-team-at-work','reel',`<img class="photo-bg" src="${launchBase}van-morning-source.png" alt=""><div class="photo-shade"></div><div class="pad overlay">${logoRow(true,'MEDAN DU JOBBAR')}<div class="standalone-copy" style="margin-top:320px"><h1 class="hero">Teamet arbetar vidare.</h1><p class="sub" style="margin-top:55px">Du godkänner. Handymate tar nästa steg.</p></div>${footer(true)}</div>`,'story dark')
+  </script>
+</body>
+</html>

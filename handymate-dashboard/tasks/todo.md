@@ -260,6 +260,30 @@ denna sektion är endast utvecklingsbokföring.
 
 ---
 
+# Nedladdningsbart innehållsbibliotek V1 (2026-08-23)
+
+- [x] Förankra publik namnhierarki: digitalt team, Matte som chefsagent och Uppdrag som en produktberättelse
+- [x] Skapa kampanjfamiljen “Hälsa på ditt team” med riktiga agentprofiler
+- [x] Skapa kampanjfamiljen “2006 → 2026” utan obelagda konkurrentpåståenden
+- [x] Skapa kampanjfamiljen “Så arbetar teamet åt dig” med konkreta automationskedjor
+- [x] Skapa fristående inlägg, Reel-omslag, captions, alt-texter och publiceringsguide
+- [x] Rendera, visuellt granska, testa och paketera allt som en nedladdningsbar ZIP
+
+## Review
+
+- 29 publiceringsklara bilder: tre karuseller, fyra fristående inlägg och tre
+  vertikala Reel/Story-omslag. Därtill fem kontaktark och sex lokala
+  agentporträtt.
+- Budskapsguide och kampanjcopy låser “det digitala teamet”, Matte som
+  chefsagent och Uppdrag som en av flera produktberättelser.
+- Visuell QA genomförd mot alla kontaktark samt fullstora agent-, framtids-,
+  automations- och reaktiveringsbilder.
+- Nedladdningspaket: `public/marketing/handymate-content-library-v1.zip`.
+- `tests/content-library-v1.spec.ts`: 12/12 gröna över desktop + mobil.
+  `npx tsc --noEmit`: 0 fel. `npx next build`: exit 0.
+
+---
+
 # Social Launch Kit — kampanj 01 (2026-08-23)
 
 - [x] Förankra tonalitet, färg och budskap i Handymates designsystem
