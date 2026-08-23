@@ -259,3 +259,26 @@ Resultaten rapporteras till Claude för den kanoniska lanseringsartefakten;
 denna sektion är endast utvecklingsbokföring.
 
 ---
+
+# Social Launch Kit — kampanj 01 (2026-08-23)
+
+- [x] Förankra tonalitet, färg och budskap i Handymates designsystem
+- [x] Skapa 30-dagars contentplan och kanalprinciper
+- [x] Skapa kampanjmanus: LinkedIn-karusell, Instagram och Reel
+- [x] Generera ImageGen-bakgrunder utan produktpåståenden eller fejkad UI
+- [x] Rendera publiceringsklara assets med riktig logotyp och exakt svensk text
+- [x] Visuell QA, filinventering och leveransnotering
+
+## Review
+
+- Två dokumentära, nordiska ImageGen-källbilder skapades utan text, UI,
+  logotyper, belopp eller testimonial-påståenden.
+- Åtta finalassets renderades deterministiskt: sex LinkedIn-slides,
+  Instagram 4:5 och Reel 9:16. Riktig Handymate-logotyp samt lokala
+  Space Grotesk/DM Sans används.
+- Kampanjmanus, captions, alt-texter, Reel-storyboard, 30-dagarsplan och
+  återanvändbara bildprompts ligger i `docs/marketing/social-launch-kit/`.
+- Visuell QA genomförd mot kontaktark och tre fullstora nyckelassets.
+- `tests/social-launch-kit.spec.ts`: 5/5 gröna. `npx tsc --noEmit`: 0 fel.
+
+---
