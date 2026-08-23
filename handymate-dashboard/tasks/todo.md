@@ -260,6 +260,29 @@ denna sektion är endast utvecklingsbokföring.
 
 ---
 
+# GTM-strategi + Operating Plan för Christoffer (2026-08-23)
+
+- [x] Stäm av juliplanerna mot dagens produkt-, pris- och lanseringsläge
+- [x] Uppdatera strategisk position, ICP, erbjudande och kanalordning
+- [x] Ersätt kalla mass-SMS som standard med peer selling och juridiskt grindad prospektering
+- [x] Skriv en konkret sexveckorsplan med roller, kvoter, demo och uppföljning
+- [x] Lås dokumenthierarkin så den tekniska lanseringschecklistan inte dubbleras
+- [x] Korsgranska dokumenten och verifiera interna hänvisningar
+
+## Review
+
+- Båda julidokumenten är ersatta med ett dagens-läge-kontrakt: strategin
+  håller position, ICP, erbjudande och kanalordning; Operating Plan håller
+  Christoffers sexveckorsutförande, demo, uppföljning och mätetavla.
+- Kalla mass-SMS till okända är borttaget som standardkanal. Manuell riktad
+  kontakt ligger bakom separat relevans-, laggrunds- och kanalbedömning.
+- Dokumenthierarkin hänvisar till den externa tekniska lanseringschecklistan
+  utan att duplicera den.
+- Firman och Storfirman, månads- och årsvis, verifierades skrivskyddat mot den
+  körande databasens `billing_plan`; samtliga fyra Stripe-priser är satta.
+
+---
+
 # Nedladdningsbart innehållsbibliotek V1 (2026-08-23)
 
 - [x] Förankra publik namnhierarki: digitalt team, Matte som chefsagent och Uppdrag som en produktberättelse

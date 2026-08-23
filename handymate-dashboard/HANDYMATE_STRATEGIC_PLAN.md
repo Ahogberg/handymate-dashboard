@@ -1,396 +1,343 @@
-# HANDYMATE — STRATEGISK PLAN
+# HANDYMATE — STRATEGISK GTM-PLAN
 
-_Version 2026-07-17. Del 1 är faktabaserad från kodbasen och databasen med
-samma ärlighetsdisciplin som `tasks/capability-inventory.md` (LIVE = prod-
-verifierat, BYGGT = i main/deployat men ej prod-verifierat, SPEC = ej byggt).
-Siffror märkta [UPPSKATTNING] är härledda, inte mätta. Frågor märkta
-[ANDREAS: ...] är medvetet öppna — de kräver ägarens svar, inte AI:ns._
+_Version 2026-08-23. Ersätter juliversionens marknads- och kanalantaganden.
+Det här dokumentet styr kommersiell riktning. `HANDYMATE_OPERATING_PLAN.md`
+styr veckans utförande. Det ersätter inte den tekniska lanseringschecklistan
+eller `docs/council/ACTIVE_ROADMAP.md`._
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## DEL 1 — PRODUKTSTATUS (från kodbasen)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## 1. Målet
 
-### 1.1 Vad som är byggt och deployat
+Handymate ska etablera en ny kategori för svenska hantverksföretag:
 
-**Kärnprodukten** (allt deployat på app.handymate.se): AI-team med 6 agenter
-(Matte chefsassistent/chatt, Lisa telefoni/SMS, Daniel sälj, Karin ekonomi,
-Lars projekt, Hanna marknad) ovanpå en delad verktygsmotor, med **godkännande-
-kön som central interaktionsyta** — sedan 2026-07-15 är 100 % av system-
-initierade agent-utskick gatade genom kön eller förtjänad autonomi
-(facit-låst beslutslogik). CRM, offerter (produktbank, tillval, ROT/RUT +
-grön teknik-avdrag, visningsnivåer, PDF, e-signering), fakturor (Fortnox-synk,
-påminnelser, ROT till Skatteverket), projekt (8-stegs workflow, ÄTA med
-kundsignering, ekonomi/marginal med ärlighetsgrindning), bokningar/schema
-(Google-synk), tidrapportering med attestering, kapacitetsmotor (v1),
-lärande (förtjänad autonomi, preferenser, mönster, veckovärde).
+> **Det digitala teamet för hantverksföretag.**
 
-**Cron-jobb/agentloopar** (27 st i vercel.json, dagliga om ej annat anges):
-nattlig företagsanalys (agent-context 05:00) · 5 agent-observationsloopar
-(06:00–06:20, Sonnet + thinking, skapar insikter + gatade förslag) ·
-fakturapåminnelser (07:00 + 10:00) · offert-uppföljning (08:00) ·
-Hanna-reaktivering (08:30) · recensionsförfrågningar (09:00) ·
-kapacitetsfyllnad (måndagar 07:00 — tunn vecka → kö-förslag) · nurture-steg ·
-Fortnox-synk (betalningar/kunder) · Gmail-lead-import · kampanjutskick ·
-mönster-extraktion · månadsrapport · kalendersynk · underhåll.
+Vägen till 300 kunder börjar inte med maximal räckvidd. Den börjar med tre
+bevis:
 
-**Frontend:** ~20 dashboardsidor (Idag-vyn med godkännandekö som primär yta,
-godkännanden, kunder, offerter, fakturor + ROT-inlämning, projekt, kalender,
-schema, tid, verksamhetsöversikt/pipeline, analys, kampanjer, leads, team,
-inställningar, AI-widget-konfiguration). **Mobilapp** (Expo): Idag-hemskärm
-med kö + "på väg"-SMS, godkännanden, projekt, offert-kamera, tid/attestering,
-Matte-chatt med röst-in, ÄTA. *(Mobilkoden är komplett och mergad — men
-inget EAS-bygge sedan maj: det som kör på telefoner är en gammal version.
-Bygget är en manuell knapp som återstår.)*
+1. att rätt typ av hantverksföretag förstår kategorin;
+2. att de upplever ett tydligt värde i en kort demo;
+3. att en repeterbar kanal kan skapa betalande kunder till hållbar kostnad.
 
-**Integrationer:**
-| Integration | Status | Kommentar |
+De första 10 betalande externa kunderna är därför en lärandefas. Kund 10–100
+är distributionsfasen. Kund 100–300 är nordisk kategorietablering.
+
+## 2. Den strategiska tesen
+
+Gamla affärssystem lagrar information och väntar på att användaren ska göra
+nästa sak. En chattbot ovanpå samma system förändrar inte arbetsfördelningen.
+Handymate är byggt runt motsatt modell:
+
+```text
+Företagaren anger mål eller godkänner ett förslag
+                         ↓
+Matte samordnar rätt specialist i teamet
+                         ↓
+Teamet förbereder eller utför arbetet bakom tydliga säkerhetsgränser
+                         ↓
+Handymate visar vad som hände och vad resultatet faktiskt bevisar
+```
+
+Kärnpositioneringen är:
+
+> **De ger dig ett verktyg. Vi ger dig ett team.**
+
+Utåt säger vi inte “Mission Control” som huvudproduktnamn. Funktionen heter
+**Uppdrag** i produktberättelsen och Matte introduceras som **din chefsagent**.
+“Mission Control” får användas internt när vi diskuterar arkitekturen.
+
+## 3. Varför vi kan vinna
+
+### 3.1 Produkten gör, inte bara svarar
+
+Handymate kan samordna offerter, projekt, kundkontakt, fakturering,
+uppföljning och tillväxt. Viktiga kund- och pengahandlingar går genom en
+godkännandegräns. Företagaren behåller kontrollen utan att själv behöva komma
+ihåg varje nästa steg.
+
+### 3.2 Svensk verksamhet är en del av motorn
+
+ROT/RUT och grön teknik, svenska offert- och fakturaflöden, Fortnox-koppling,
+ÄTA, projektekonomi och kundkommunikation är inte översatta eftertankar. De är
+delar av datamodellen. Det gör Handymate svårare att ersätta med en generell
+AI-assistent.
+
+### 3.3 Tre sammanhängande kedjor är byggda
+
+- **Mission Control / Uppdrag:** mål → sanningsmärkt plan → specialister →
+  godkännande → verifierat resultat → lärande.
+- **Promise-to-Proof:** daterat kundlöfte → bevakning → utförd handling med
+  bevis.
+- **Evidence-to-Payment:** utfört projekt → namngivna bevisluckor → korrekt
+  faktureringsberedskap → fakturaunderlag.
+
+Till detta kommer bland annat projektavslut, digitalt jobbpass, kundportal,
+reaktivering, supportagent med mänsklig eskalering och en gemensam
+fakturasändningsväg. Produktens bredd ska dock aldrig bli en funktionsparad i
+demon. Vi visar den kedja som löser prospektets största problem.
+
+### 3.4 Systemet får inte hitta på framgång
+
+Identifierad potential, utförd handling, fakturerat och bekräftat betalt hålls
+isär. Det är både en förtroendefördel och en produktmässig moat. Vårt bevis är
+inte “AI-insikter genererade” utan vad företaget faktiskt fick gjort.
+
+## 4. Marknadsrealitet och sanningsgräns
+
+Betalvägen är testad end-to-end. Den gyllene vägen är körd genom skarp kod,
+tvåtenant-isoleringen är bevisad mot riktig databas och produktens supportloop
+är byggd. Det ger en stark produktgrund inför lanseringen. Det faktiska
+go/no-go-beslutet ligger fortfarande i den separata tekniska
+lanseringschecklistan.
+
+Det betyder inte att allt är marknadsbevisat:
+
+- Organisk användningshistorik från många externa kunder saknas fortfarande.
+- Publicerbara kundcase med verifierade resultat ska skapas med de första
+  kunderna, inte simuleras.
+- Fortnox kräver rätt licens och ska bara utlovas med den brasklappen.
+- Full talande röstagent är efter lansering. Lisa fångar förfrågningar idag,
+  men ska inte beskrivas som en AI-röst som för samtal.
+- Interna namn som Mission Control, Value Ledger och Margin Guardian är inte
+  automatiskt publika produktnamn.
+
+Aktuella funktionspåståenden kontrolleras före publicering mot
+`tasks/capability-inventory.md` och den faktiska produkten. Kanoniskt
+säljspråk finns i `tasks/sales-arsenal.md`.
+
+## 5. Idealkunden
+
+### Primär beachhead
+
+Ett svenskt hantverksföretag med ungefär 3–15 personer där ägaren fortfarande
+är operativ och känner att administrationen följer med hem. Företaget har
+ofta:
+
+- ett befintligt kundregister och återkommande jobbtyper;
+- flera samtidiga offerter och projekt;
+- missade samtal eller långsam återkoppling under arbetsdagen;
+- fakturering och uppföljning som blir personberoende;
+- ett befintligt system som används ofullständigt, eller flera lösa verktyg;
+- en ägare som vill växa utan att omedelbart anställa mer kontorspersonal.
+
+### Starka köpsignaler
+
+- “Jag gör administrationen på kvällarna.”
+- “Vi har kunderna i systemet men gör inget med dem.”
+- “Offerter och fakturor blir liggande.”
+- “Jag vet inte alltid vad som är klart att fakturera.”
+- “Vi betalar redan för ett system som personalen inte använder.”
+- “Allt hänger på att jag själv kommer ihåg nästa steg.”
+
+### Lägre prioritet i första vågen
+
+- enmansföretag utan stabil omsättning eller tydlig administrativ smärta;
+- företag som bara söker billigaste faktureringsprogrammet;
+- stora bolag med lång upphandling, komplex koncernstruktur eller krav på
+  specialintegrationer före första värde;
+- prospekt som kräver den framtida röstagenten som villkor för köp.
+
+Planen **Firman** kan passa 1–5 användare, men den kommersiella beachheaden är
+snävare: företag där 5 995 kr/mån kan motiveras av ett konkret operativt och
+ekonomiskt problem.
+
+## 6. Erbjudande och prissättning
+
+Det publika standardutbudet är:
+
+| Plan | Pris exkl. moms | Passar | Princip |
+|---|---:|---|---|
+| **Firman** | 5 995 kr/mån | upp till 5 användare | hela agentteamet och kärnprodukten |
+| **Storfirman** | 11 995 kr/mån | större team | hela agentteamet, större volym och obegränsade användare |
+
+Årsbetalning innebär betala för 10 månader och få 12. Båda årsplanernas
+Stripe-priser verifierades i den körande databasen 2026-08-23. Bas/Starter
+finns av bakåtkompatibilitet men marknadsförs inte publikt.
+
+Lanseringserbjudandet **Grundarkunderna** gäller de första 20 riktiga
+betalande företagen: låst pris, direktlinje till grundaren under första året
+och den ordinarie 30-dagars pengarna-tillbaka-garantin. Vi visar aldrig en
+påhittad platsräknare.
+
+Priset presenteras efter att prospektets problem och relevant arbetskedja har
+visats. Handymate jämförs med kostnaden för kvarvarande administration,
+missade affärer och mer kontorskapacitet — inte med billigaste ERP-licensen.
+
+## 7. Produktberättelserna vi säljer
+
+Alla demos börjar i prospektets verklighet. Välj högst två berättelser:
+
+| Prospektets problem | Primär berättelse | Bevis i demon |
 |---|---|---|
-| 46elks (telefoni/SMS) | **LIVE** | Samtalsrouting, SMS, nummer auto-provisioneras vid köp |
-| Stripe (egen billing) | **BYGGT** | Checkout utan trial, webhook-idempotens — **B7-testköpet ej kört: betalvägen obevisad** |
-| Fortnox | **BYGGT, licens-blockerad** | Kod + onboarding-import klara; kräver kundens integrationslicens 149 kr/mån |
-| Google (kalender/Gmail) | **BYGGT** | OAuth + tokenrefresh + webhook-synk |
-| OpenAI Whisper | **BYGGT** | Röstmeddelanden + mobil röst-in på svenska |
-| Vapi/röstplattform | **SPEC** | Röst-Lisa har design-spec (tasks/rost-lisa-spec.md); RETELL-env-nyckel från tidigare experiment finns |
+| Ägaren är flaskhals | Matte + Uppdrag | mål, plan, specialistansvar och väntande beslut |
+| Pengar blir liggande | Från utfört till betalt | namngiven blockerare, fakturaunderlag, uppföljning |
+| Offerter kallnar | Daniel | uppföljning som förbereds och godkänns |
+| Kundregistret används inte | Hanna | segmenterad reaktivering mot befintliga relationer |
+| Kunden jagar status | Kundportalen | samma riktiga dokument, status och kommunikation |
+| Projekt tappar marginal eller bevis | Lars + projektavslut | bevisluckor, ÄTA, foton, jobbpass |
+| Missade förfrågningar | Lisa | fångad kontakt och snabb återkoppling, inte talande AI |
 
-**De tre portalerna:**
-1. **Kundportal** (`app/portal/[token]`) — **LIVE-klass**: fakturor (Swish-QR
-   + "Jag har betalat"-bekräftelse), offerter med signering, projekt,
-   meddelanden, rapporter, aktivitet. Mognast av de tre.
-2. **Partnerportal** (`app/partners` + `/api/partners/dashboard` +
-   admin-hantering + referral-belöning i billing-webhooken) — **BYGGT**:
-   partner kan följa hänvisningar; provisionflödet kopplat till betalning.
-   Ej prod-verifierad med riktig partner.
-3. **Lead-leverantörsportal** (`app/lead-portal/[code]`) — **BYGGT**:
-   leverantörsvy för lead-leverans/uppföljning med kategorier. Ej skarpt använd.
+Den starkaste generella demon är: **“Ge Matte ett mål.”** Den visar att
+Handymate är ett arbetande team utan att kräva en meny- eller funktionsrunda.
 
-### 1.2 Tekniska styrkor att lyfta i säljmöten
+## 8. Kanalstrategi — kund 1 till 10
 
-**Unikt och svårt att replikera** (konkurrensresearch juli 2026, källbelagd):
-- **Agentteam bakom EN godkännandekö med förtjänad autonomi.** Ingen aktör
-  globalt skeppar mönstret (ServiceTitan Max = agera-först-eskalera-sen,
-  enterprise; Jobber/HCP = singelfunktions-AI). Sedan TD-52-gatingen är
-  claimen kod-bevisbar — och EU AI Act art. 14 (aug 2026) gör
-  människa-godkänner-före-handling till compliance-fördel, inte bara UX.
-- **Svensk back-office-vertikal:** ROT/RUT/grön teknik-avdrag med årstak och
-  personnummer, produktbank med ROT-split på arbetsandel, Skatteverkets
-  XML-inlämning, Fortnox-loop. Detta är moaten — agenttekniken är commodity
-  (GoHighLevel talar svenska för $0.16/min), *domänmodellen* är det inte.
-- **Lärandet:** approve-streaks → autonomierbjudanden, nattlig preferens-
-  inlärning, offert-vinnaranalys, scope-creep-mönster — data som kompondar
-  per kund och gör byte dyrare för varje månad.
-- **Kapacitetsmotorn** (ServiceTitans viktigaste mekanik, förenklad för
-  1–5-mannalag): en siffra alla kanaler läser; driver redan Hannas
-  tunn-vecka-förslag, byggd för Röst-Lisas bokningar.
+Kanaler testas sekventiellt i tvåveckorsfönster. Vi skalar inget innan vi kan
+mäta kontakt → samtal → demo → köp.
 
-**Kan demonstreras live IDAG** (LIVE eller A-test-verifierat — inget BRANCH):
-missat samtal → SMS → bokning (kärnkilen) · Idag-vyn med kön · tillvalsflödet
-med kundsignering · produktbanken + visningsfilter (verifierad mot pilotens
-riktiga data) · Pengar in-radarn · Förtroendetrappan · onboarding-wow-kedjan
-(signup → Fortnox/CSV-import → payoff) · offert-vinnaranalysen · grön
-teknik-avdrag på offert. **Får EJ demoas som beprövat:** Stripe-betalning
-(B7), mobilens senaste version (EAS), röst-AI (finns ej).
+### Kanal A — Christoffers nätverk och peer selling
 
-### 1.3 Tekniska gap
+Förstavalet. Christoffer är hantverkaren som använder och visar produkten,
+inte en traditionell mjukvarusäljare. Personliga introduktioner, telefonsamtal
+och demos har högst förväntad trovärdighet och snabbast lärande.
 
-**Blockerar betald kund 1:**
-1. **B7 Stripe-testköpet** — betalvägen är aldrig bevisad end-to-end.
-   Rigg klar (preview-branch + automatisering); ~1 timme av Andreas tid.
-2. **EAS-mobilbygge** — säljlöftet "app i telefonen" kräver att bygget körs.
-3. *(mjukt)* Migrations-svepet v68–v71 bekräftat i prod-Supabase.
-Inget annat blockerar kund 1 — onboarding är self-serve hela vägen.
+### Kanal B — grundarlett innehåll och social proof
 
-**Blockerar kund 10:** cron-arkitekturen (se 1.4) börjar slå i tak;
-kostnadsattribution saknas för chatt-flöden (Anthropic-fakturan är en
-klumpsumma — TD-36); korrektivt datastäd per pilot måste bli noll.
+Andreas bygger kategorin publikt. Christoffer gör innehållet trovärdigt genom
+egna erfarenheter, kommentarer och verkliga kundsamtal. LinkedIn-serien
+**Framtidens hantverksföretag**, Instagram-materialet och videoplanen är
+produktionssatta i `docs/marketing/content-library-v1/`.
 
-**Blockerar kund 50–100:** multi-tenancy-isolationen (se 1.4) måste få
-DB-backstop; cron-fanout måste bli köbaserad; supportytan (idag: Andreas).
+Innehåll är inte en separat varumärkesövning. Varje kvalificerad reaktion ska
+kunna leda till ett samtal, en demo eller en introduktion.
 
-### 1.4 SKALNINGSANALYS
+### Kanal C — introduktioner och selektiva partners
 
-**Cron-kapacitet — första väggen, vid ca 10–20 kunder.**
-Observations- och uppföljningscronerna itererar ALLA businesses sekventiellt
-i en enda Vercel-invocation, en Sonnet-thinking-anrop per business i serie.
-Flera av de tunga (agent-observations, quote-follow-up) saknar maxDuration-
-konfiguration; taket är 60s (Pro-plan). Redan dokumenterat i tech-debt:
-communication-check brände 3,97M tokens på 16 entiteter. **Vid 50–100
-businesses timar looparna ut mitt i — senare kunder processas tyst aldrig.**
-Fixen är känd och avgränsad: batching/kö (fan-out till per-business-
-invocations) + dvala-filter för inaktiva konton. Uppskattad insats: dagar,
-inte veckor. Ska göras före kund 20. Kostnadssidan är däremot INTE väggen —
-cost-cap $5/dag/kund finns redan per business.
+Revisorer, redovisningsbyråer, leverantörer, branschprofiler,
+webb-/marknadsbyråer och rådgivare med förtroende hos hantverkare kan bli
+distributionspartners. Standardlinjen är 20 % på betald abonnemangsintäkt i
+12 månader. Kom igång-paket kan ge partnern 50 % när partnern faktiskt
+levererar arbetet. Kärnprodukt, fakturering och Handymates IP lämnas aldrig
+bort.
 
-**AI-inferenskostnad per kund/månad — MÄTT (30 dagar, riktig databas):**
-| Flöde | Mätvärde | Kommentar |
-|---|---|---|
-| Nattliga agentloopar (6 agenter, Sonnet+thinking) | **$0,11–1,56/kund** (1–16 kr) | Mest aktiva kontot (Bee, 93 runs): $1,56. Typiskt konto: $0,11 |
-| Matte-chatt/widget/offert-AI (Sonnet) | **EJ ATTRIBUERAT** (TD-36) | Loggas inte per kund idag — [UPPSKATTNING] 2–10× nattliga vid aktiv användning |
-| Skydd | Cost-cap $5/dag/kund | ≈ 550 kr/mån absolut värsta fall; praktiken ligger 50–500× under |
+Partners aktiveras först efter att de kan visa demon korrekt och har godkänt
+den uttryckliga “får inte säga”-listan.
 
-Konservativ totalbudget: **30–150 kr AI-kostnad/kund/månad** vid aktiv
-användning. Router-mönstret (Haiku för bakgrund ~10× billigare, Sonnet för
-kvalitet) är redan implementerat i trigger-routern; ~20 ställen har dock
-Sonnet hårdkodat där Haiku skulle räcka — känd optimering, inte akut.
+### Kanal D — hög köpintention
 
-**46elks per kund/månad [UPPSKATTNING — verifiera mot avtal]:**
-nummerhyra ~30–40 kr + SMS ~0,35–0,50 kr/st (pilotens volym: 4–35 SMS/mån
-= under 20 kr; budgetera 100 SMS = ~45 kr) + vidarekopplade samtalsminuter
-(största rörliga posten; 100 min ≈ 40–80 kr). **Totalt ~70–160 kr/kund/mån.**
+Jämförelse- och sökinnehåll för personer som redan söker alternativ till
+äldre affärssystem. Börja organiskt med jämförelsesida och artiklar. Testa
+Google Ads först när de första 8–10 demosamtalen har gett ett stabilt språk
+och en konverterande landningssida.
 
-**BRUTTOMARGINAL vid 5 995 kr/mån:**
-COGS per kund ≈ AI (30–150) + 46elks (70–160) + infra-andel (Vercel Pro +
-Supabase + Resend, fasta ~500–1000 kr/mån totalt → 5–100 kr/kund beroende på
-antal) = **~100–400 kr/kund/mån → bruttomarginal 93–98 %.**
-→ **Exit-matematiken i Del 4 hotas inte av COGS.** Det som avgör EBITDA är
-löner och CAC, inte molnkostnad. Röst-Lisa ändrar kalkylen (röstminuter är
-dyra — därav usage-komponent i dess prissättning, se spec).
+### Kanal E — riktad prospektering efter juridisk och kvalitativ grind
 
-**Multi-tenancy — ärlig bedömning: håller INTE obevakat till 100 kunder.**
-All isolation sker i applikationskod (`.eq('business_id')`) — servern kör
-service-role-nyckel som kringgår RLS, och kärntabellerna (customer, quotes,
-invoice, booking, business_config) saknar RLS helt. En enda glömd filter-rad
-= cross-tenant-läcka, utan databas-backstop; buggklassen har redan inträffat
-internt. Vid dagens 1 pilot är risken hanterbar; **före kund 50 krävs
-RLS-härdning på kärntabellerna + audit av alla queries.** Uppskattad insats:
-en fokuserad vecka. (Positivt: allt är redan business_id-scopat i datamodellen
-— det som saknas är skyddsnätet, inte arkitekturen.)
+Handymate ska inte börja med massutskick till okända personer. Särskilt kalla
+SMS är inte standardkanal. GDPR och marknadsföringslagen är två separata
+gränser, och företagsnummer kan ändå vara personuppgifter eller nå en enskild
+näringsidkare.
 
-**Manuellt arbete per ny kund — nästan noll (verifierat i kod):**
-Automatiskt vid signup→betalning: plan/status, **telefonnummer köps och
-konfigureras av webhooken** (voice/SMS-webhooks + inspelning), automations-
-defaults seedas, referral-belöning. Kundens egna steg (self-serve):
-vidarekoppling av sin telefon (guidad, självbekräftad), Fortnox-OAuth (kräver
-kundens egen licens), prislista/produktbank via import eller manuellt.
-**Andreas per-kund-arbete idag: korrektivt datastäd hos piloter (ska bli
-noll), inget provisioneringsarbete.** Dold kostnad per kund ≈ supporttid,
-inte provisionering. Vapi förekommer inte i onboarding (röst = SPEC).
+Tillåten V1 är manuell, relevant och dokumenterad kontakt där mottagare,
+laglig grund, kanalregel och enkel invändningsväg är bedömda. Köpta listor,
+scraping till mass-SMS och agentdriven autonom prospektering är parkerade till
+ett separat juridiskt granskat program efter lansering.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## DEL 2 — MARKNAD OCH POSITIONERING
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## 9. Säljmodellen
 
-**MÅLGRUPP (avatar):** Hantverkarföretag, 3–20 anställda, 5–50 MSEK
-omsättning. Ägaren ofta tidigare hantverkare, inte tekniker. Skeptisk mot
-IT-system, bränd av krångel. Använder idag Easoft/Bygglet eller Excel+pärm.
-_Produktkonsekvens (redan byggd in): svenska rakt igenom, inga tekniska
-termer, mobil-först för fältet, "teamet" som metafor istället för
-"systemet", payoff med kundens egna siffror inom minuter i onboardingen._
+Funneln är enkel:
 
-**POSITIONERING:** _"De ger dig ett verktyg. Vi ger dig ett team."_
-Konkurrenterna säljer ERP/projektverktyg med regelbaserad automatik —
-användaren gör jobbet i systemet. Handymate säljer medarbetare som gör
-jobbet och lär sig företaget, med ägaren som godkännare. Kategoriskillnad,
-inte featureskillnad. Kodbeviset finns: godkännandekön är produktens
-primära yta, inte en inställningssida.
+```text
+Kvalificerat företag
+  → 15 min problemintervju
+  → relevant 20 min demo
+  → tydligt nästa steg inom 24 timmar
+  → gemensam onboarding
+  → första verifierade värdet
+  → case / introduktion
+```
 
-**KONKURRENTLANDSKAP (research verifierad juli 2026, källor i
-tasks/gap-backlog.md + minnesanteckningar):**
-- **Bygglet** (SmartCraft): projektverktyg, ingen skeppad AI (verifierat —
-  hela SmartCraft-portföljen saknar AI-features). Omsättning ~153M
-  [ANDREAS: VERIFIERA SIFFRAN — ur din research, ej min].
-- **Easoft** (EG Group): ERP med regelautomatik, ingen AI-medhjälpare.
-- **BuddyPro** (NGM via ANTCO): städsektor-fokus. **WOOS:** skal.
-- **Det verkliga hotet är inte FSM-bolagen** utan horisontella svenska
-  AI-receptionister (Skaala 299 kr/mån med hantverkar-vertikal, Svaria m.fl.)
-  som commoditiserar rösten underifrån — de svarar i telefon men äger inte
-  back-officen. Globalt: ServiceTitan Max/Avoca bevisar betalviljan
-  ($1–3k/mån) men finns inte på nordiska språk och gate:ar inte som vi.
-- **Fönstret är öppet men stängs:** Simpro replatformade AI-first i maj
-  2026 med Amsterdam-kontor som beachhead.
+En demo utan överenskommet nästa steg räknas inte som en vunnen möjlighet.
+Ett registrerat konto räknas inte som en kund. En kund är en extern firma med
+aktiv betalning.
 
-**PRISSÄTTNING:** Pro 5 995 kr/mån — allt ingår (verifierat i billing_plan:
-Bas 2 495 / Pro 5 995 / Business 11 995, live-price-ids seedade).
-[ANDREAS: bekräfta nivåerna + vad som skiljer Bas/Pro/Business i pitch —
-koden har tre planer men positioneringen ovan nämner bara Pro/Enterprise.]
+Första kundernas onboarding är en del av försäljningen. Målet är inte bara att
+få kortuppgifter, utan att hjälpa kunden till sitt första meningsfulla
+Handymate-ögonblick och därefter mäta vad som faktiskt hände.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## DEL 2B — INCUMBENT-DISPLACEMENT: VINNA KUNDER FRÅN EASOFT/BYGGLET
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## 10. Mätning och beslut
 
-**Grundinsikt: slåss aldrig ERP mot ERP.** Ställs frågan som "vilket system
-ska du ha?" jämför kunden funktionslistor — och en incumbent med års försprång
-och inlåst data vinner. Vi byter frågan. Deras kategori = "programvara du
-sköter". Vår = "ett team som jobbar åt dig". Att byta ERP är ett stort jobbigt
-beslut; att anställa någon som svarar i telefonen och jagar pengarna är ett
-litet lockande. **Vi landar som ett tillägg, inte ett byte — och låter det
-gamla systemet dö av sig självt.**
+### Ledande mått varje vecka
 
-**Den trojanska hästen — samexistera först, ersätt sen.** Kräv aldrig att de
-river ut Bygglet dag ett (där dör affären: "men allt mitt ligger ju där").
-Importera deras data, låt Handymate ta över FRONT OFFICE (samtal, offerter,
-uppföljning, serviceavtal, recensioner) medan det gamla systemet tuffar på i
-bakgrunden. Efter ~2 månader lever kunden i Handymate och ERP:t är död vikt de
-betalar för → de churnar incumbenten, inte oss. Mekanismen som gör
-samexistensen till ett bevis snarare än en kompromiss: agenterna producerar
-värde ERP:t aldrig kunde (fångade samtal, jagade fakturor, avtalsintäkter).
+- nya kvalificerade företag;
+- personliga kontakter;
+- genomförda problemintervjuer;
+- bokade och genomförda demos;
+- erbjudanden och överenskomna nästa steg;
+- onboardingstarter.
 
-**Beachhead — den frustrerade, betalande firman.** Inte "alla hantverkare".
-Vinnbar kund = firman som REDAN betalar för ett ERP den använder till 10 % och
-är besviken. Bevisad betalningsvilja + kundbas som våra motorer behöver + mest
-mottaglig just för att de redan är missnöjda. "Sovande pengar"-pitchen är
-skräddarsydd för dem (befintlig bas = omedelbar ROI som betalar prenumerationen).
-Firma utan system alls: tekniskt lättast (ingen migrering) men svårare att
-sälja 5 995 kr till — andrahand.
+### Utfallsmått
 
-**Tre hävstänger mot bytesmotståndet:**
-1. **Migrering på 10 minuter** — det största hindret är "min data". Behöver
-   import specifikt från Bygglet/Easoft-exporter (kunder, projekt, offerter,
-   prislistor), ovanpå befintlig Fortnox/CSV-import. En "byt från Bygglet"-
-   flöde. **Detta är den konkreta byggsak som mest direkt tjänar strategin —
-   nästa-bygge-kandidat (se DEL 5).**
-2. **Anti-inlåsning som vapen** — incumbenter binder ofta 12 mån. Vi har redan
-   pengarna-tillbaka-garanti + ingen bindningstid. Budskap: _"De binder dig ett
-   år. Vi låter dig gå när du vill — för att du inte kommer vilja."_
-3. **Ändra jämförelsegruppen** — vi är dyrare än en ERP-plats, kan inte vinna
-   på pris. Sluta jämföra mot ERP: _"Bygglet är ett program du betalar för att
-   själv jobba i. Vi är ett team. Jämför oss inte mot Bygglet — jämför mot att
-   anställa en kontorsassistent för ~30 000 kr/mån."_ Då är 5 995 billigt.
+- nya betalande externa kunder;
+- konvertering kontakt → samtal → demo → köp;
+- tid från första kontakt till köp;
+- CAC per testad kanal;
+- 30-dagarsaktivering och första verifierade värde;
+- supportbehov och tecken på churn;
+- rekommendationer och introduktioner per kund.
 
-**Moaten gör OSS till den sträva parten.** Efter ~6 mån = att lämna Handymate
-är att lämna sin inlärda prissättning (Motor 1) och sin löpande avtalsintäkt
-(Motor 2). Incumbentens efterkalkyl är en statisk rapport; vår blir bättre per
-jobb. + benchmark-nätverkseffekten (omöjlig för Easoft att kopiera i efterhand
-— de samlar ingen utfallsdata) + svensk back-office-korrekthet (ROT/grön teknik
-rätt). "Team not tool" är produktarkitektur, inte en bolt-on-AI de kan klistra
-på ett passivt ERP.
+### Beslutsdisciplin
 
-**Kanal: bara jämlik bevisning flyttar en skeptisk hantverkare.** Christoffers
-genomkörning + case study ÄR strategin — allt annat är hypotes tills tre firmor
-faktiskt bytt. Peer-bevis via nätverket först, sedan kall SMS/Ads när caset bär.
+- Testa en huvudkanal i taget i minst två veckor eller till minsta
+  urvalsstorlek har nåtts.
+- Ändra inte målgrupp, budskap och kanal samtidigt; då lär vi oss ingenting.
+- Dubbla en kanal först när den producerat betalande kunder, inte bara leads.
+- Pausa en kanal som ger aktivitet men inga kvalificerade samtal.
+- Skriv invändningar ordagrant. Produktteamet ska se verkligheten, inte
+  säljarens sammanfattning av den.
 
-**Obekväm sanning:** ovaliderat av marknaden tills tre firmor bytt. De första
-tre casen är strategin. Enda faktapunkten att verifiera innan jämförelse-
-siffrorna spikas: [ANDREAS: exakt incumbent-prissättning per plats för
-Bygglet/Easoft — behövs för "jämför mot assistent"-argumentet].
+CAC på 10 000 kr är en tidig varningsgräns, inte ett bevisat optimum. Den
+omprövas när verklig retention och payback finns.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## DEL 3 — GO-TO-MARKET: VÄGEN TILL KUND 1–10
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## 11. Vägen till 300 kunder
 
-**UTGÅNGSLÄGE (ärligt):** Noll betalande kunder. Bee Service = pilot +
-co-founder-bolag, comp. Christoffer Thanger äger 50 % och går mot att lämna
-Bee för att sälja Handymate heltid. Databasen: 18 konton varav ~16 är
-testkonton — inget aktivt konto representerar extern betalande kund.
+### Fas 1 — 0 till 10: bevisa försäljningen
 
-**KANALHYPOTESER (otestade — rankade efter CAC-potential och tempo):**
-1. **Christoffer som referens/hantverkare-till-hantverkare** — starkaste
-   tillgången: en av dem som visar sitt eget företag live, inte en säljare.
-   Kostnad ≈ 0, trovärdighet max. Kräver: case study från genomkörningen.
-2. **Kalla SMS till hantverkare** — konkurrenterna gör det aldrig; vi har
-   dessutom kampanjmotorn själva (dogfooding som demo). Lead-scraping via
-   Google Maps/Hitta.se/Ratsit → CSV → kampanj. [Verktyg: OpenClaw SKILL.md]
-3. **Google Ads "Bygglet alternativ" / "Easoft alternativ"** — fångar aktiv
-   bytesintention; liten volym men het.
-4. **Facebook-grupper för hantverkare** — konkurrenterna frånvarande;
-   Christoffers röst passar formatet.
-5. **Leads-modulen som hook** — brevutskick finns BYGGT i produkten
-   (`lib/leads/api/brevutskick.ts`, Infoservice ~1,30 kr/adress → ~15 kr/brev);
-   ingen konkurrent har det. Gratis demo som dörröppnare.
-6. **Partnerportal** — byråer hänvisar mot provision (BYGGT, oanvänd).
+Founder-led och Christoffer-led. Personlig onboarding. Skapa tre starka,
+samtyckta case från olika företagstyper och hitta en kanal som kan upprepas.
 
-**Första jobbet är inte att sälja till 100 — det är att hitta EN kanal som
-ger kund 1–10 repeterbart med mätbar CAC.** Testa sekventiellt (2 veckor per
-kanal), mät svar/demo/köp, döda det som inte funkar.
-[ANDREAS: korrigera rankingen — vilken kanal tror du mest på?]
+### Fas 2 — 10 till 50: paketera det som fungerar
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## DEL 4 — MILSTOLPAR OCH EXIT-MATEMATIK
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Standardisera demo, onboarding, partnercertifiering och kundbevis. Börja köpa
+trafik endast på bevisade budskap. Följ skalningsgrindarna i den tekniska
+roadmapen.
 
-**EXIT-KALKYL** — och Del 1:s dom över den: **bruttomarginalen (93–98 %)
-bär kalkylen.** COGS per kund är 100–400 kr mot 5 995 kr i intäkt; AI-
-kostnaden är inte risken. Riskerna mot 55 % EBITDA är löner, CAC och churn
-— alla okända tills kanaltesterna körts.
+### Fas 3 — 50 till 100: bygg svensk kategori
 
-    100 kunder × 5 995 × 12   = 7,2M ARR
-    + Leads/brev/SMS-tillägg  ≈ 8M ARR
-    × ~55 % EBITDA            ≈ 4,4M resultat
-    × 8x ARR                  ≈ 60–70M värdering
-    → 100 kunder = självförsörjande + gamla exit-målet
+Öka partners, jämförelseinnehåll, webinarier och branschnärvaro. Publicera
+resultat med tydliga bevisnivåer. Gör Handymate till namnet på “ett team, inte
+ett verktyg”.
 
-    300 kunder ≈ 25M ARR ≈ 13M EBITDA
-    × 8x ARR / 15x EBITDA     ≈ 200M SEK
-    → 300 kunder = 200M-målet
+### Fas 4 — 100 till 300: Norden
 
-_Teknisk fotnot till kalkylen: vägen till 100 kunder kräver de två
-skalningsinsatserna i Del 1.4 (cron-kö före kund 20, RLS-härdning före
-kund 50) — båda är avgränsade veckoinsatser, inga ombyggen._
+Norge kommer först när svensk säljmodell, support och onboarding är
+repeterbara. Anpassa ekonomi, avdrag, integrationer, språk och juridik — inte
+bara översättning. Tyskland är ett separat inträdesprogram efter nordiskt
+bevis, med lokal domänmodell och lokala partners.
 
-**Milstolpar [ANDREAS: sätt datum]:**
-- Kund 1 (betald, ej comp): ______
-- Kund 10 (kanal bevisad, CAC känd): ______
-- Kund 50: ______
-- Kund 100: ______
-- Kund 300 / exit-förberedelse: ______
+## 12. Vad vi inte gör före marknadsbevis
 
-**EXIT-SCENARION:**
-1. **Industriell köpare:** SmartCraft (Bygglet), EG Group (Easoft), Visma,
-   Fortnox — köper marknadsandel + AI-kapabilitet de bevisligen saknar
-   (verifierat: noll skeppad AI i deras portföljer juli 2026).
-2. **Strategisk/PropTech:** nordisk eller internationell aktör som vill in
-   i svensk hantverkarmarknad (jfr Simpros Amsterdam-beachhead).
-3. [ANDREAS: finns ett tredje? T.ex. amerikansk field-service-konsolidering
-   (ServiceTitan/Avoca-sfären) som köper Norden-ingång + gating-IP:t?]
+- Ingen bred autonom outboundmotor mot okända mottagare.
+- Ingen ny prisnivå för varje feature; kärnteamet förblir begripligt.
+- Ingen generell gratisperiod som drar in lågintresserade konton.
+- Ingen funktionslista som huvudpitch.
+- Ingen aggressiv konkurrentclaim som inte kan beläggas.
+- Ingen geografisk expansion innan svensk försäljning går att upprepa.
+- Ingen utveckling styrd av enstaka prospekts önskelista utan bevisad
+  återkommande köpsignal.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## DEL 5 — NÄSTA 90 DAGAR (operativt)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## 13. Källor och dokumenthierarki
 
-[ANDREAS: fyll datum och namn — detta är delen där Byglo-planen har
-Damir/Emma/Mikael och Handymate har ingen. Det ÄR problemet 90 dagarna
-ska lösa.]
+| Fråga | Kanonisk källa |
+|---|---|
+| Kommersiell strategi | detta dokument |
+| Veckans säljutförande | `HANDYMATE_OPERATING_PLAN.md` |
+| Säljspråk och invändningar | `tasks/sales-arsenal.md` |
+| Demo | `HANDYMATE_OPERATING_PLAN.md` §8; `tasks/demo-manus.md` är stödmaterial som måste följa den nyare planen |
+| Publik positionering | `docs/marketing/content-library-v1/messaging-playbook.md` |
+| Publicering | `docs/marketing/content-library-v1/publishing-calendar.md` |
+| Partnergränser | `docs/council/PARTNER_ADDON_PACKAGING.md` + signerat avtal |
+| Produktpåståenden | `tasks/capability-inventory.md` + faktisk produktkontroll |
+| Produktutveckling | `docs/council/ACTIVE_ROADMAP.md` |
+| Teknisk lanseringsberedskap | den externa kanoniska lanseringschecklistan |
 
-**Vecka 1–2 — Gör piloten bevisad:**
-- [ ] Genomkörning med Christoffer: Golden Path lead→offert→projekt→faktura→
-      Vunnen (förvandlar sista BYGGT→LIVE, ger case study). _A-testet A1–A5 +
-      wow-kedjan är redan godkända 2026-07-15 — det som återstår är
-      betalsteget och en dokumenterad hel-kedja._
-- [ ] Stripe-testköp B7 (4242 mot preview) → betalvägen bevisad. Riggen står;
-      Claude automatiserar B3/B4/B6 när testnycklarna klistras.
-- [ ] EAS-mobilbygge → appen (med nya Idag-skärmen + korrekta kö-kort) på
-      riktiga telefoner. Allt kod-klart; kommandot finns i LAUNCH-GUIDE.md.
-- [ ] v68–v71 migrations-status verifierad i prod-Supabase (5 min SQL).
-→ **Utan dessa kan inget säljas: du kan inte demoa betalning, ta betalt,
-   eller visa mobilen.**
-
-**Vecka 3–6 — Kanaltest:**
-- [ ] Välj EN kanal från Del 3, kör 50–100 kontakter, mät svar → demo → köp.
-- [ ] Christoffer i sitt nätverk: 5–10 hantverkare han känner.
-- [ ] Pitch deck klar (underlag: detta dokument + capability-inventory +
-      "Får inte sägas i demo"-listan) + case study från genomkörningen.
-→ **Mål: kund 1–3 betalande.**
-
-**Vecka 7–12 — Repeterbarhet:**
-- [ ] Kanal 2 om kanal 1 inte gav CAC under [ANDREAS: tröskel, t.ex. 10 000 kr].
-- [ ] Self-serve onboarding verifierad med kund N (ingen handpåläggning).
-- [ ] Cron-kö-ombyggnaden (Del 1.4) senast när kund 15 närmar sig.
-- [ ] **"Byt från Bygglet/Easoft"-migreringsflöde** (import av kunder/projekt/
-      offerter/prislistor ur incumbent-export, ovanpå Fortnox/CSV-importen) —
-      avväpnar "min data ligger där"-invändningen, kärnan i DEL 2B. Bygg när
-      första avslaget beror på migreringsfriktion, inte tidigare (validera
-      behovet mot verkliga affärer först).
-→ **Mål: kund 5–10, känd CAC, känd churn.**
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## DEL 6 — FINANSIERING OCH ORGANISATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-[ANDREAS: fyll — detta saknas helt i underlaget och kan inte härledas
-ur kodbasen:]
-- Nuläge: bootstrappat? Byglo är parallellt projekt — hur fördelas din tid?
-- Christoffer: när lämnar han Bee? Vad lever han på tills Handymate betalar lön?
-- Kapital: Almi? Vinnova? Seed vid X kunder? Eller bootstrap till 100?
-- Break-even: vid hur många kunder betalar bolaget två löner?
-  _(Räknehjälp från Del 1: vid 93–98 % bruttomarginal är break-even för
-  2 × [ANDREAS: lönenivå] + fasta kostnader ≈ [2 × lön + ~15 tkr] / ~5 700 kr
-  ≈ grovt 15–25 kunder vid normala lönenivåer — verifiera med riktiga tal.)_
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## KÄLLOR OCH DISCIPLIN
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Del 1: kodbasen (git main 2026-07-17), riktig prod-databas (read-only-
-mätningar 30 dagar), tasks/capability-inventory.md, tasks/tech-debt.md,
-tasks/launch-verification.md. Konkurrensfakta: webbverifierad research
-2026-07-11/12 med källor (minnesanteckningar + tasks/gap-backlog.md).
-Allt omärkt är verifierat; [UPPSKATTNING] är härlett; [ANDREAS: ...] är öppet.
-Dokumentet uppdateras vid varje större statusskifte (nästa: efter B7 + EAS).
+Strategin revideras när en kanal har testats färdigt, när pris/erbjudande
+ändras eller när Sverige går från founder-led till repeterbar distribution.
