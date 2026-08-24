@@ -442,3 +442,45 @@ denna sektion är endast utvecklingsbokföring.
 - `tests/social-launch-kit.spec.ts`: 5/5 gröna. `npx tsc --noEmit`: 0 fel.
 
 ---
+
+# Handymate Launch Desk V1 (2026-08-24)
+
+- [x] Lås service-role-only datakontrakt för prospekt, kontaktutfall och spärrar
+- [x] Bygg rena domänregler för juridisk kanalgrind, fit-poäng och daglig prioritering
+- [x] Bygg superadmin-API för import, sökning, uppdatering, aktivitetslogg och spärr
+- [x] Bygg klickstyrd AI-brief som bara får använda källmärkta prospektfakta
+- [x] Bygg mobilvänlig intern arbetsyta under `/admin/launch`
+- [x] Lägg till CSV-mall/import och länk från befintlig adminpanel
+- [x] Facit-testa auth, ingen autosändning, källkrav, spärr och mättratt
+- [x] Kör riktade tester, `npx tsc --noEmit` och `npx next build`
+
+## Scopegränser
+
+- Launch Desk är Handymates interna säljstöd, aldrig kundernas `leads_outbound`.
+- V1 skickar inga SMS, mejl, brev eller LinkedIn-meddelanden. En människa
+  verkställer alltid kontakten utanför ytan och loggar utfallet.
+- AI får formulera brief och utkast från sparade fakta, men får inte göra
+  research, lägga till osourcade fakta eller välja bort spärrar.
+- Kalla SMS ingår inte. Oklassad bolagsform får bara manuell telefonbedömning
+  eller ingen kontakt; systemet gissar aldrig kanalbehörighet.
+
+## Review
+
+- Ny superadminyta under `/admin/launch`: källkontrollerad CSV-import,
+  deterministisk fit, daglig prioritering, kontaktkomplettering, klickstyrd
+  AI-brief, manuell utfallslogg, nästa steg och permanent spärr.
+- `gtm_account`, `gtm_activity` och `gtm_suppression` är service-role-only.
+  Kontaktutfall + pipeline-status och spärr + auditnotering sker atomiskt via
+  två snäva RPC:er. Migrationen ligger i `sql/v166_launch_desk.sql` och ska
+  köras manuellt före användning.
+- Kall kontakt till enskild/okänd/oklassad bolagsform är stängd i både kod
+  och RPC. SMS finns inte som kanal. Launch Desk importerar eller skriver
+  aldrig i kundernas `leads`/`leads_outbound`.
+- Varje rad bär ändamål, rättslig grund, källa, kontrolldatum och ett
+  granskningsdatum efter 180 dagar. AI-snapshoten utesluter e-post och telefon,
+  och varje e-postutkast får en obligatorisk stoppformulering.
+- `tests/launch-desk.spec.ts` + kolumn-, schema- och permissionsfacit:
+  128/128 gröna över desktop och mobil. `npx tsc --noEmit`: 0 fel.
+  `npx next build`: exit 0 (befintliga miljö-/dynamic-route-varningar kvar).
+
+---

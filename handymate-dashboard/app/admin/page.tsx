@@ -23,6 +23,7 @@ import {
   Shield,
   Zap,
   ChevronDown,
+  Target,
 } from 'lucide-react'
 import PartnerCommissionModal from './components/PartnerCommissionModal'
 import SupportQueueTab from './components/SupportQueueTab'
@@ -393,6 +394,13 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <a
+              href="/admin/launch"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-800 bg-primary-50 border border-primary-200 rounded-xl hover:bg-primary-100 transition-colors"
+            >
+              <Target className="w-4 h-4" />
+              Launch Desk
+            </a>
             <button
               onClick={handleRefresh}
               disabled={refreshing}

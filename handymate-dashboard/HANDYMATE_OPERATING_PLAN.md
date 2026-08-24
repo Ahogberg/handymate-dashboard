@@ -1,6 +1,6 @@
 # HANDYMATE — OPERATIV GTM-PLAN FÖR ANDREAS OCH CHRISTOFFER
 
-_Version 2026-08-23. Detta är den gemensamma kommersiella arbetsytan fram till
+_Version 2026-08-24. Detta är den gemensamma kommersiella arbetsytan fram till
 och efter lanseringen. Den ersätter juliplanens gamla produktgrindar och kalla
 SMS-spår. Den ersätter inte den tekniska lanseringschecklistan._
 
@@ -41,7 +41,7 @@ var i tratten det sker.
 - omvandlar återkommande säljlärdomar till produkt- eller budskapsbeslut;
 - ser till att inga publika claims går längre än beviset.
 
-### Handymate/Claude — material och analys
+### Handymate/AI — material och analys
 
 - håller demo-, pitch- och contentmaterial sammanhängande;
 - sammanställer veckans tratt och invändningar;
@@ -167,6 +167,44 @@ kunna:
 Christoffers riktiga företagskonto kan användas som ett extra trovärdighetsbevis
 när datan är lämplig att visa. Den återställbara demomiljön är standard eftersom
 den alltid ger samma säkra berättelse.
+
+### D. Arbeta ur Launch Desk — en gemensam säljsanning
+
+Den interna arbetsytan finns under **Admin → Launch Desk**. Den ersätter lösa
+kontaktlistor men är inte ett autonomt säljverktyg och skickar aldrig SMS,
+e-post, brev eller LinkedIn-meddelanden.
+
+Arbetsordningen varje säljdag är:
+
+1. Importera eller uppdatera källkontrollerade företagsrader via CSV-mallen.
+2. Öppna dagens högst prioriterade konto och kontrollera källa, bolagsform,
+   kontaktgrund och fit-skäl.
+3. Klicka **Förbered** för ett källbundet samtals-, e-post-, LinkedIn- och
+   videounderlag. Det är ett utkast; Christoffer avgör om och hur kontakt sker.
+4. Lägg kontot i arbetskön först när underlaget är rimligt och kontaktvägen är
+   relevant.
+5. Kontakta personen manuellt utanför Handymate och logga verkligt utfall,
+   ordagrann invändning och ett daterat nästa steg direkt efteråt.
+6. Vid “kontakta mig inte”, oklar juridisk grund eller fel person: spärra
+   kontot. Spärren följer med vid senare importer.
+
+Fit-poängen prioriterar bara arbetet. Den är aldrig ett påstående om köpvilja.
+AI-underlaget får bara omformulera sparade och källmärkta fakta; formuleringen
+“relevans” ska alltid läsas som en hypotes att pröva i samtalet.
+
+Skalstegen hålls separata från veckokvoten:
+
+| Lager | Kapacitetsmål | Vad som räknas |
+|---|---:|---|
+| Källkontrollerad bas | 500 företag | unik, relevant företagsrad med källa och kontrolldatum |
+| Mänskligt bearbetade | 300 företag | ett verkligt individuellt kontaktförsök loggat |
+| Kvalificerade samtal | 50 | personen har bekräftat ett relevant problem eller mål |
+| Demos | 30 | genomförd produktvisning, inte bara bokad tid |
+| Första kunder | 6–9 | betalning eller bindande årsavtal, aldrig “positiv dialog” |
+
+Detta är en kapacitetstratt för lanseringsmaskinen, inte en prognos eller ett
+löfte. De lägre veckokvoterna ovan styr fortfarande Christoffers kalender tills
+verklig konvertering visar att volymen bör höjas.
 
 ## 6. Kanal A — Christoffers nätverk
 
