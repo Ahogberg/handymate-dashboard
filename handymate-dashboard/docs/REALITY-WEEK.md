@@ -34,6 +34,17 @@ körningen. Duplicera inte stationsdetaljerna hit; körboken äger dem.
   visade sig vara korrekt konfigurerat) och Anthropic-kontots API-kredit
   slut (#11, Andreas fyllde på krediten). Enda kvarstående avvikelse:
   A9:s kända, icke-blockerande API-bevis-harnesskvirk (401 vs 403).
+- 2026-08-25 (Pass 2-uppstart, samma dag som feature freeze): körningen
+  hade legat still sedan 13 aug — demo-ägarens `.env.test`-lösenord var
+  förlegat (kontot återställdes 25 aug, oberoende av denna körning) och
+  blockerade Station 1 direkt. Efter återställning (Supabase Admin API,
+  Andreas-godkänd) hittades och fixades TRE ytterligare riktiga
+  produktionsbuggar under den fortsatta körningen — se Avvikelseloggen
+  #12-15. **ALLA 14 STATIONER + A9 (UI- OCH API-BEVIS) BEKRÄFTAT GRÖNA
+  IGEN på post-fix-koden**, 19/19 test passed. A9:s 401-vs-403 (#4,
+  tidigare avfärdad som en icke-blockerande harnesskvirk) visade sig vid
+  närmare granskning vara ett äkta test-validitetshål, inte bara en
+  kvirk — se #15.
 
 **Status-koder:** ☐ ej körd · ✅ PASS · 🔴 AVVIKELSE (länka fix-commit) ·
 🔧 FIXAD & omtestad · ⏭ hoppad (motivera)
@@ -81,13 +92,17 @@ körningen. Duplicera inte stationsdetaljerna hit; körboken äger dem.
 | A6 | Möte med saknat segment ('[— avsnitt saknas —]') | ☐ | |
 | A7 | Dubbel cron-körning (idempotens) | ☐ | |
 | A8 | Två användare agerar samtidigt (CAS på kortet) | ☐ | |
-| A9 | Anställd utan ekonomibehörighet (403 → ytor göms) | 🔴 | UI-bevis ✅: Ekonomi/ÄTA-priser och 7 menylänkar korrekt dolda för anställd-sessionen. API-bevis 🔴: `GET /api/analytics/economics` gav 401 istället för 403 via harnessets `page.request`-anrop, trots att UI-beviset redan bekräftar att behörigheten fungerar korrekt i praktiken — troligen en Playwright-specifik cookie-timing-kvirk i test-harnesset, inte en produktionsbugg. Se pass1-2026-08-13.md. |
+| A3 | ÄTA avvisas | ✅ (kontraktsnivå) | `tests/ata-livscykeln.spec.ts` — matrisens invarianter (fakturerad är ändstation, avvisad räknas aldrig som signerad/fakturerad) grönt 2026-08-25. Kod-/kontraktsbevis, inte en live browser-körning av just detta scenario. |
+| A4 | Godkännande REDIGERAS (payload.edited, streak bryts) | ✅ (kontraktsnivå) | `tests/autonomy-hardening.spec.ts` `computeStreakFromRows` — redigering bryter streaken precis som avvisning, grönt 2026-08-25. |
+| A5 | Autonomt utskick failar (2/14d → nyckeln lämnas tillbaka) | ✅ (kontraktsnivå) | `tests/autonomy-hardening.spec.ts` `trimRecentFailures`-fönstret grönt 2026-08-25. |
+| A7 | Dubbel cron-körning (idempotens) | ✅ (delvis, kontraktsnivå) | `tests/project-quote-idempotency.spec.ts` — offert→projekt-skapande idempotent, 23505-krock returnerar vinnaren i stället för 500, grönt 2026-08-25. Agent-trigger-idempotens (`idempotency_key`) och Guardian-dedup ej separat körda denna omgång. |
+| A9 | Anställd utan ekonomibehörighet (403 → ytor göms) | ✅ | **Omvärderad och fixad 2026-08-25** — se Avvikelseloggen #15: 401:an var INTE en harnesskvirk utan ett äkta test-validitetshål (anställd-sessionen var helt oautentiserad; UI-beviset passerade falskt mot inloggningssidan). Efter fix (lösenordsbaserad inloggning i stället för trasig magic link): UI-bevis ✅ OCH API-bevis ✅ — `GET /api/analytics/economics` ger nu korrekt 403 med en genuint autentiserad anställd-session (1 cookie sparad, verifierat). 19/19 test passed. |
 | A10 | Fortnox otillgängligt | ☐ | |
 | A11 | Google frånkopplad | ☐ | |
 | A12 | Kund utan e-post | ☐ | |
-| A13 | Superseded kundfaktum (nytt ersätter, gammalt göms) | ☐ | |
-| A14 | Projekt utan intern timkostnad (ärlig "ej konfigurerad") | ☐ | |
-| A15 | PWA på iOS Safari (install + push) | ☐ | |
+| A13 | Superseded kundfaktum (nytt ersätter, gammalt göms) | ✅ (kontraktsnivå) | `tests/customer-facts.spec.ts` — supersede-filtret (`superseded_by IS NULL`) i både offertgenerering och kundkort, grönt 2026-08-25. |
+| A14 | Projekt utan intern timkostnad (ärlig "ej konfigurerad") | ☐ | Golden Path Station 7 hoppade Guardian-kortet av samma skäl (F1 ej körd) — se Förberedelser. |
+| A15 | PWA på iOS Safari (install + push) | ☐ | Kräver fysisk iPhone — kan inte automatiseras, Pass 3-territorium. |
 
 ## Pass 3 — Integrationerna på riktigt (Andreas riktiga konto)
 
@@ -113,6 +128,10 @@ körningen. Duplicera inte stationsdetaljerna hit; körboken äger dem.
 | 9 | Pass 1, station 13 (Fas 2) | `/api/voice/analyze` kunde aldrig läsa en inspelning ens efter fynd #8 — "Recording not found" trots att raden fanns | Embedded PostgREST-query selectade `customer.address`, en kolumn som inte längre finns (uppdelad i address_line/postal_code/city vid en tidigare migration som aldrig synkades hit) | 7c44c02e | ✅ (query-nivå) — stationens EGEN helhetskörning ej omtestad än, se anteckning nedan |
 | 10 | Pass 1, station 4 (Fas 2) | `POST /api/quotes/send` svarade 500 ("Kunde inte skicka offerten") när testet skickade via SMS | EJ en kodbugg: 46elks-kontots förbetalda saldo var slut, troligen uttömt av sessionens egna ~50 riktiga SMS idag. Gmail är inte kopplat (ingen calendar_connection-rad) — men Resend (Email) VISADE SIG vara konfigurerat och fungerande. | 15bc877c (testet växlade leveransmetod till Email) | ✅ sidesteppad — 46elks-saldot kvarstår obetalt men blockerar inte längre |
 | 11 | Pass 1, station 13 (Fas 2) | `POST /api/admin/demo-seed-meeting` svarade 502 — analysen misslyckades trots att BÅDA de tidigare buggarna (#8, #9) var fixade och bekräftat förbikomna | EJ en kodbugg: produktionens Anthropic-konto svarade "Your credit balance is too low to access the Anthropic API" — kontots köpta API-kredit var slut. | — (Andreas fyllde på krediten hos Anthropic, inte en git-commit) | ✅ löst — full körning bekräftar Station 13 OCH 14 gröna |
+| 12 | Pass 2-uppstart, 2026-08-25 | Station 1 gav "Fel e-post eller lösenord" — reproducerat oberoende av Playwright med direkt curl mot `/api/auth` | EJ en kodbugg: `.env.test`s `DEMO_OWNER_PASSWORD` var förlegat (skrivet 14 aug, kontot återställdes senare, oberoende av harnesset) | — (lösenord återställt via Supabase Admin API, Andreas-godkänt, `.env.test` uppdaterad) | ✅ löst — verifierat live mot `/api/auth` före omkörning |
+| 13 | Pass 2-uppstart, station 4, 2026-08-25 | `POST /api/quotes` gav 500: `duplicate key value violates unique constraint "quotes_business_year_number_unique"` — permanent, samma kollision på varje försök | `nastaOffertnummer()` (`lib/quotes/create-quote.ts`, DEN kanoniska byggaren för ALLA vägar — UI/agent/chatt/röst) räknade `COUNT(*)+1` i stället för `MAX(nummer)+1`. En raderad offert (E2E-städning, admin-borttagning) gör att count permanent glider isär från högsta faktiskt utfärdade numret — 3-försöks-retryn räknar om exakt samma tal varje gång, ingen retry gör framsteg. Bekräftat i produktionsdata (offerter '#002'/'#003' fanns, count=2 → nästa='#003' → evig krock) och med curl-repro. | `40641434` | ✅ löst — nytt offertskapande verifierat live via curl, sedan Station 4 grönt |
+| 14 | Pass 2-uppstart, station 11, 2026-08-25 | Projektstängning skrev `status='completed'` korrekt men `current_workflow_stage_id` flyttade ALDRIG till ps-05 — ingen faktura, inget fruset utfall, inget debriefkort | PostgREST-fynd: `.eq()/.in()` ihop med `.or(...)` på en `update().select().maybeSingle()` får UPDATE:en att matcha och skriva raden korrekt, men representationen kommer tillbaka TOM (`[]`) — anroparen (`transitionProjectToCompleted` i `lib/projects/complete-project.ts`) tolkar det som "ingen rad matchade" och faller igenom till "redan stängd"-grenen. Verifierat direkt mot PostgREST via curl (samma filterform utan `or()` fungerar perfekt). Samma buggklass hittad och fixad i `lib/meetings/process-job.ts`s CAS-claim — där hade den varit ödesdiger: workern hade TYST claimat varje mötesjobb (skrivit `status='processing'`) men trott att den misslyckades, och ALDRIG kört transkriberingen. | `24af4b66` | ✅ löst — verifierat live via curl (`transitioned:true`, alla completion-effekter `succeeded`), sedan Station 11 grönt |
+| 15 | Pass 2, A9, 2026-08-25 | `GET /api/analytics/economics` gav 401 i stället för förväntade 403 — tidigare (pass1-2026-08-13.md) avfärdat som en icke-blockerande Playwright-cookie-timing-kvirk | Omvärdering visade att avfärdandet var fel: `demo-employee.setup.ts`s magic-link+`page.goto`+`waitForURL`-mönster sparade en TOM storageState (`{cookies:[],origins:[]}`) — sessionen studsade tyst tillbaka till `/login`, men `waitForURL`:s regex hade redan matchat en transient `/dashboard`-URL. Hela A9-testet körde därför med en helt oautentiserad session: "UI-bevis" (kollar att `Ekonomi & offert` INTE syns) blev ett FALSKT POSITIVT — inloggningssidan saknar också den texten — och 401:an var i själva verket en KORREKT respons på en genuint saknad session, inte en produktionsbugg men inte heller en harmlös kvirk: testet bevisade ingenting om verklig behörighetsenforcering. Riktig produktionsinbjudan använder aldrig magic link, bara lösenord. | `1560d3fe` | ✅ löst — lösenordsbaserad inloggning (samma mönster som riktig produktionsinbjudan), plus en ärlighetsvakt (noll cookies kastar nu fel i stället för att spara tyst). UI-bevis OCH API-bevis båda gröna med en genuint autentiserad session (1 cookie). |
 
 ---
 
