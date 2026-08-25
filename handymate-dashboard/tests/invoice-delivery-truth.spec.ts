@@ -79,7 +79,9 @@ test.describe('sändningen läses (Etapp Q, TD-86, 2026-08-18)', () => {
   })
 
   test('svaret plockas upp i stället för att kastas bort', () => {
-    expect(KOD).toContain('levererad = Boolean(sendResult.email || sendResult.sms)')
+    // 2026-08-25 (Codex-fynd 3): einvoice räknas som leverans — kärnan
+    // hoppar medvetet över mejl/SMS när Fortnox redan skickat e-fakturan.
+    expect(KOD).toContain('levererad = Boolean(sendResult.email || sendResult.sms || sendResult.einvoice)')
   })
 
   test('det verkningslösa auth-fältet är borta', () => {
@@ -160,6 +162,9 @@ test.describe('sändkärnan läser Resends svar (fynd av Codex 2026-08-08)', () 
   })
 
   test('status sent grindas på faktiskt utfall', () => {
-    expect(KARNA).toContain('if (results.email || results.sms)')
+    // Föråldrat facit uppdaterat 2026-08-25: kärnan grindar sedan
+    // e-faktura-stödet (2026-08-21) på email||sms||einvoice — det gamla
+    // facitet (utan einvoice) låg kvar rött och låste fel beteende.
+    expect(KARNA).toContain('if (results.email || results.sms || results.einvoice)')
   })
 })

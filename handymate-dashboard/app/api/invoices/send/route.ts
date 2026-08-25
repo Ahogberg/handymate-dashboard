@@ -70,7 +70,12 @@ export async function POST(request: NextRequest) {
 
     const { found, ...results } = sendResult
     return NextResponse.json({
-      success: results.email || results.sms,
+      // BUGFIX (2026-08-25, Codex-granskningens fynd 3, källverifierat):
+      // sändkärnan hoppar MEDVETET över mejl/SMS när e-fakturan gått via
+      // Fortnox (results.einvoice — se send-invoice.ts: annars får en
+      // e-fakturakund ett dubblettmejl). `email || sms` ensamt gjorde då en
+      // LYCKAD e-fakturaleverans till success:false mot UI/anropare.
+      success: Boolean(results.email || results.sms || results.einvoice),
       ...results
     })
 

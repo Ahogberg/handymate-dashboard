@@ -786,10 +786,11 @@ test.describe('källskanning — statusskrivningsfelet i sändkärnan blir högt
     expect(after).toContain('rapporteraTystFel')
   })
 
-  test('svarssemantiken är oförändrad — rutten grenar fortfarande success bara på email/sms', () => {
-    // Kärnan returnerar { email?, sms?, errors } — rutten (route.ts) bygger
-    // fortfarande det slutgiltiga svaret med exakt samma villkor som förut.
+  test('svarssemantiken räknar alla tre leveransvägarna — email, sms OCH einvoice', () => {
+    // 2026-08-25 (Codex-fynd 3): kärnan hoppar medvetet över mejl/SMS när
+    // e-fakturan gått via Fortnox (results.einvoice) — `email || sms`
+    // ensamt gjorde en LYCKAD e-fakturaleverans till success:false.
     const src = read('app/api/invoices/send/route.ts')
-    expect(src).toContain('success: results.email || results.sms')
+    expect(src).toContain('success: Boolean(results.email || results.sms || results.einvoice)')
   })
 })

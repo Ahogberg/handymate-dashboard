@@ -181,7 +181,11 @@ export async function autoInvoiceOnComplete(
           // loggas som automation — aldrig som en mänsklig användare.
           source: 'automation',
         })
-        levererad = Boolean(sendResult.email || sendResult.sms)
+        // einvoice räknas som leverans (2026-08-25, samma fynd som
+        // invoices/send-routens success-rad): kärnan hoppar medvetet över
+        // mejl/SMS när Fortnox redan skickat e-fakturan — utan einvoice här
+        // loggades en LYCKAD e-fakturaleverans som "sändningen nekades".
+        levererad = Boolean(sendResult.email || sendResult.sms || sendResult.einvoice)
         if (!levererad) {
           console.error('[auto-invoice] sändningen nekades:', sendResult.errors, {
             invoice_id: invoice.invoice_id,

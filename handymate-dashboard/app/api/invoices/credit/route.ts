@@ -80,17 +80,32 @@ export async function POST(request: NextRequest) {
     const vatAmount = subtotal * (vatRate / 100)
     const total = subtotal + vatAmount
 
-    // Generera kreditfakturanummer
+    // Generera kreditfakturanummer.
+    // BUGFIX (2026-08-25): räknade tidigare COUNT(*)+1 — exakt samma
+    // felklass som offertserien (lib/quotes/create-quote.ts, fixad samma
+    // dag, verkligt prod-repro där): en raderad kreditfaktura får count att
+    // permanent glida isär från högsta utfärdade numret → antingen
+    // dubblettnummer i bokföringen eller evig kollision. Facit: högsta
+    // FAKTISKA numret + 1.
     const year = new Date().getFullYear()
-    const { count } = await supabase
+    const { data: existingCredits } = await supabase
       .from('invoice')
-      .select('*', { count: 'exact', head: true })
+      .select('invoice_number')
       .eq('business_id', business_id)
       .eq('invoice_type', 'credit')
       .gte('created_at', `${year}-01-01`)
+      .not('invoice_number', 'is', null)
+    const hogstaKf = (existingCredits || []).reduce((max, row) => {
+      const m = String(row.invoice_number).match(/(\d+)\s*$/)
+      const n = m ? parseInt(m[1], 10) : NaN
+      return Number.isFinite(n) && n > max ? n : max
+    }, 0)
+    const nextKfNum = hogstaKf + 1
 
-    const creditNumber = `KF-${year}-${String((count || 0) + 1).padStart(3, '0')}`
-    const ocrNumber = generateOCR(creditNumber.replace(/\D/g, '') || String((count || 0) + 1))
+    const creditNumber = `KF-${year}-${String(nextKfNum).padStart(3, '0')}`
+    // OCR-underlaget är oförändrat från innan: alla siffror ur numret
+    // ("KF-2026-004" → "2026004") — bara räkningen av löpnumret är fixad.
+    const ocrNumber = generateOCR(creditNumber.replace(/\D/g, '') || String(nextKfNum))
     const invoiceDate = new Date()
 
     // ROT/RUT: negera avdrag proportionellt
@@ -125,7 +140,17 @@ export async function POST(request: NextRequest) {
       rotRutDeduction,
       customerPays,
       invoiceType: 'credit',
-      status: 'sent',
+      // BUGFIX (2026-08-25, Codex-granskningens fynd 2, källverifierat):
+      // skapades tidigare direkt med status 'sent' — men den här rutten
+      // levererar INGENTING (inget mejl, inget SMS, ingen e-faktura).
+      // Kreditfakturan bokfördes alltså som skickad utan att kunden
+      // någonsin fått den — brott mot sanningsprincipen (samma klass som
+      // auto-send-fyndet i PROJECT_SYSTEM_AUDIT §16). 'draft' är det
+      // sanna tillståndet; UI:t navigerar redan till kreditfakturans
+      // detaljsida efter skapandet, där den vanliga Skicka-vägen
+      // (sendInvoice-kärnan) levererar på riktigt och sätter 'sent' först
+      // efter faktisk leverans.
+      status: 'draft',
       dueDays: 0,
       invoiceDate,
       personnummer: original.personnummer,

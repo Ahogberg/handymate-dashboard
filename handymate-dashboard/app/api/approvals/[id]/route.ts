@@ -2080,22 +2080,51 @@ async function executeApprovalPayload(
       }
 
       case 'price_adjustment': {
-        // Uppdatera pris i prislista
+        // BUGFIX (2026-08-25, Codex-granskningens fynd 1, källverifierat):
+        // producenten (lib/agent/price-analysis.ts, nattliga agentkörningen)
+        // skickar `price_list_id` + `suggested_rate` och läser/föreslår mot
+        // price_lists_v2.hourly_rate_normal — men caset här krävde
+        // `item_id` + `suggested_price` och skrev till LEGACY-tabellen
+        // price_list (0 rader i prod). Varje godkännande av ett riktigt
+        // prisjusteringskort blev alltså ett tyst 'skipped' — användaren
+        // godkände "Ändra pris" och inget pris ändrades, någonsin.
         const pl = payload as any
-        // Utfalls-hårdning: saknades item_id/suggested_price gjorde caset
-        // ingenting men returnerade ändå ok:true — dolt no-op klassat som
-        // success. Returnera 'skipped' istället så det syns i utfallet.
-        if (!pl.item_id || !pl.suggested_price) {
-          return { action: 'price_adjustment', skipped: 'no item_id or suggested_price' }
-        }
         const supabasePa = (await import('@/lib/supabase')).getServerSupabase()
-        const { error: priceUpdateError } = await supabasePa.from('price_list').update({
-          unit_price: pl.suggested_price,
-        }).eq('id', pl.item_id).eq('business_id', businessId)
-        if (priceUpdateError) {
-          return { action: 'price_adjustment', ok: false, error: priceUpdateError.message }
+
+        // Producentens verkliga kontrakt: timpriset på prislistan (v2).
+        if (pl.price_list_id && pl.suggested_rate) {
+          const { data: updatedPl, error: rateUpdateError } = await supabasePa
+            .from('price_lists_v2')
+            .update({ hourly_rate_normal: pl.suggested_rate, updated_at: new Date().toISOString() })
+            .eq('id', pl.price_list_id)
+            .eq('business_id', businessId)
+            .select('id')
+          if (rateUpdateError) {
+            return { action: 'price_adjustment', ok: false, error: rateUpdateError.message }
+          }
+          if (!updatedPl || updatedPl.length === 0) {
+            // Prislistan kan ha raderats sedan kortet skapades — ärligt fel,
+            // inte tyst success.
+            return { action: 'price_adjustment', ok: false, error: 'Prislistan hittades inte (kan ha tagits bort sedan förslaget skapades)' }
+          }
+          return { action: 'price_adjustment', ok: true, price_list_id: pl.price_list_id, new_rate: pl.suggested_rate }
         }
-        return { action: 'price_adjustment', ok: true }
+
+        // Legacy-form (item_id + suggested_price mot price_list) — behållen
+        // för eventuella gamla pending-kort, men ingen nuvarande producent
+        // skapar den formen.
+        if (pl.item_id && pl.suggested_price) {
+          const { error: priceUpdateError } = await supabasePa.from('price_list').update({
+            unit_price: pl.suggested_price,
+          }).eq('id', pl.item_id).eq('business_id', businessId)
+          if (priceUpdateError) {
+            return { action: 'price_adjustment', ok: false, error: priceUpdateError.message }
+          }
+          return { action: 'price_adjustment', ok: true }
+        }
+
+        // Utfalls-hårdning: dolt no-op får aldrig klassas som success.
+        return { action: 'price_adjustment', skipped: 'payload saknar price_list_id/suggested_rate (och legacy item_id/suggested_price)' }
       }
 
       case 'profitability_warning': {
