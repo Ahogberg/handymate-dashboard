@@ -25,12 +25,32 @@
 -- lib/seed-defaults.ts vid onboarding-avslut) — service_role påverkas inte
 -- av dessa REVOKEs.
 --
--- Facit-verifiering (kör EFTER migrationen):
+-- VIKTIGT (upptäckt vid körningen 2026-08-25): rollspecifik REVOKE räcker
+-- INTE — Postgres ger EXECUTE till PUBLIC per default på alla funktioner,
+-- och anon/authenticated ärver den. Verifieringen visade can_exec=true
+-- efter första försöket. REVOKE FROM PUBLIC är det som faktiskt biter.
+-- De rollspecifika raderna behålls för tydlighet (no-ops efter PUBLIC).
+--
+-- Appens tre anropsplatser (lib/seed-defaults.ts, api/automation POST,
+-- api/leads POST) använder alla getServerSupabase() (service_role) bakom
+-- getAuthenticatedBusiness-grindade rutter — service_role behåller EXECUTE
+-- (den ärver inte från PUBLIC utan har superuser-liknande åtkomst), så
+-- inget riktigt flöde påverkas. handle_new_user är en triggerfunktion —
+-- triggers exekverar som tabellägaren, inte anroparen, så triggern
+-- fortsätter fungera.
+--
+-- Facit-verifiering (kör EFTER migrationen — GJORD 2026-08-25, alla false):
 --   SELECT p.proname, r.rolname, has_function_privilege(r.rolname, p.oid, 'EXECUTE') AS can_exec
 --   FROM pg_proc p CROSS JOIN pg_roles r
 --   WHERE p.proname IN ('seed_automation_rules','seed_lead_scoring_rules','handle_new_user','cleanup_expired_impersonation_tokens')
 --     AND r.rolname IN ('anon','authenticated');
 --   -- alla rader ska visa can_exec = false
+-- Dessutom live-verifierat: anon REST-anrop mot /rest/v1/rpc/seed_automation_rules → 401 (42501).
+
+REVOKE EXECUTE ON FUNCTION public.seed_automation_rules(text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.seed_lead_scoring_rules(text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.cleanup_expired_impersonation_tokens() FROM PUBLIC;
 
 REVOKE EXECUTE ON FUNCTION public.seed_automation_rules(text) FROM anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.seed_lead_scoring_rules(text) FROM anon, authenticated;
