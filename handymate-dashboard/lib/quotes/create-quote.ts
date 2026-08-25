@@ -126,14 +126,32 @@ export function resolveItemSplit(
 }
 
 /** Nästa lediga nummer i år — count+1, skyddat av v98:s unika index. */
+/**
+ * BUGFIX (2026-08-25, verklig repro mot produktion): räknade tidigare
+ * `count(*) + 1` — en offert som NÅGONSIN raderas för businessen i år (t.ex.
+ * E2E-städning, en admin/support-borttagning, eller ett framtida
+ * radera-offert-flöde) gör att count permanent glider isär från det högsta
+ * FAKTISKT utfärdade numret. Retry-loopen i createQuote() upptäcker
+ * kollisionen korrekt (arNummerkollision) men räknar om EXAKT samma
+ * count-baserade nummer varje försök — ingen av de tre retries gör
+ * framsteg, så skapandet failar permanent (kunden ser aldrig felet; det
+ * gäller ALLA vägar in, inte bara UI:t, se filhuvudets kanonisk-motivering).
+ * Reproducerat: quotes '#002'/'#003' fanns, count=2 → nästa='#003' → krock
+ * i evighet. Facit: högsta FAKTISKA numret + 1, inte antalet rader.
+ */
 async function nastaOffertnummer(supabase: SupabaseClient, businessId: string): Promise<string> {
   const year = new Date().getFullYear()
-  const { count } = await supabase
+  const { data } = await supabase
     .from('quotes')
-    .select('*', { count: 'exact', head: true })
+    .select('quote_number')
     .eq('business_id', businessId)
     .gte('created_at', `${year}-01-01`)
-  return `#${String((count || 0) + 1).padStart(3, '0')}`
+    .not('quote_number', 'is', null)
+  const hogsta = (data || []).reduce((max, row) => {
+    const n = parseInt(String(row.quote_number).replace(/\D/g, ''), 10)
+    return Number.isFinite(n) && n > max ? n : max
+  }, 0)
+  return `#${String(hogsta + 1).padStart(3, '0')}`
 }
 
 function arNummerkollision(error: { code?: string; message?: string } | null): boolean {

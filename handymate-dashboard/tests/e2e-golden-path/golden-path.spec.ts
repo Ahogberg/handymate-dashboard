@@ -422,9 +422,19 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
         // blockerar skapandet tills "Skapa ändå" klickas. Detta är en RIKTIG
         // produktbeteende, inte en bugg att kringgå tyst — men harnesset ska
         // vara motståndskraftigt mot sin egen ofullständiga städning.
+        //
+        // SKÄRPT (2026-08-25, verklig repro): 3000ms var för snålt — den
+        // riktiga dublettkollens API-rundtur kan ta längre än så under
+        // verklig nätverkslast. Effekten mättes: väntefönstret gav upp,
+        // koden fortsatte till waitForRow UTAN att klicka "Skapa ändå",
+        // och dialogen renderades någon sekund senare — kunden skapades
+        // ALDRIG, och en ORPHANAD rad blev kvar i produktionen i 11 dagar
+        // (cust_3f2s5m7u5, städad manuellt 2026-08-25) tills den i sin tur
+        // blockerade EN NY körnings dublettkoll — ett självförstärkande
+        // fel. 8000ms ger den riktiga rundturen gott om marginal.
         const skapaAnda = ownerPage.getByRole('button', { name: 'Skapa ändå' })
         const dupDialogAppeared = await skapaAnda
-          .waitFor({ state: 'visible', timeout: 3000 })
+          .waitFor({ state: 'visible', timeout: 8000 })
           .then(() => true)
           .catch(() => false)
         if (dupDialogAppeared) await skapaAnda.click()
