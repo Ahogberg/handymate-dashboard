@@ -79,6 +79,16 @@ export default defineConfig({
       testDir: './tests/e2e-golden-path',
       testMatch: /golden-path\.spec\.ts/,
       testIgnore: [],
+      // Stationerna är riktiga webbläsarresor mot produktion — inte
+      // enhetstester. Globala 30s var redan en nära-miss för Station 13
+      // (28s), och när Guardian-grenen i Station 7 aktiverades (F1-seedet
+      // kört 2026-08-25) passerade stationen 30s trots att varje enskilt
+      // steg lyckades: två extra riktiga POST /api/time-entry + väntan på
+      // Guardian-kortet + dedupe-beviset lade ~15s på en station som förut
+      // tog 17s. describe.serial gör dessutom varje timeout terminal för
+      // hela kedjan. 120s per station med bibehållna KORTA steg-timeouts
+      // (10-15s) inuti — det är stegen som ska larma, inte totalsumman.
+      timeout: 120_000,
       use: { storageState: { cookies: [], origins: [] } },
       dependencies: ['golden-path-setup'],
     },
