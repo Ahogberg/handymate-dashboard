@@ -89,7 +89,7 @@ körningen. Duplicera inte stationsdetaljerna hit; körboken äger dem.
 | A3 | ÄTA avvisas | ☐ | |
 | A4 | Godkännande REDIGERAS (payload.edited, streak bryts) | ☐ | |
 | A5 | Autonomt utskick failar (2/14d → nyckeln lämnas tillbaka) | ☐ | |
-| A6 | Möte med saknat segment ('[— avsnitt saknas —]') | ☐ | |
+| A6 | Möte med saknat segment ('[— avsnitt saknas —]') | ✅ (kontraktsnivå) | `tests/meeting-v2.spec.ts` — "misslyckat segment → explicit lucka, offset avancerar ändå" grönt, 41/41 hela filen. Samma fil bekräftar även tom/ej-transkriberad-segment-hantering. 2026-08-25. |
 | A7 | Dubbel cron-körning (idempotens) | ☐ | |
 | A8 | Två användare agerar samtidigt (CAS på kortet) | ✅ | Riktigt repro: två parallella `POST /api/approvals/[id] {action:'reject'}` mot samma kort — exakt en fick 200, den andra 409 "Approval already resolved". CAS-guarden (`.eq('status','pending')`, ren eq, inte or()) håller. 2026-08-25. |
 | A3 | ÄTA avvisas | ✅ (kontraktsnivå) | `tests/ata-livscykeln.spec.ts` — matrisens invarianter (fakturerad är ändstation, avvisad räknas aldrig som signerad/fakturerad) grönt 2026-08-25. Kod-/kontraktsbevis, inte en live browser-körning av just detta scenario. |
