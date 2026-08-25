@@ -82,14 +82,39 @@ export async function processMeetingJob(
   const staleThreshold = new Date(Date.now() - CLAIM_STALE_MINUTES * 60_000).toISOString()
   const nowIso = new Date().toISOString()
 
-  const { data: claimed, error: claimError } = await supabase
+  // BUGFIX (2026-08-25, verklig repro mot produktion — samma fynd som
+  // lib/projects/complete-project.ts): `.eq()/.in()` ihop med `.or(...)` på
+  // en update-representation ger PostgREST en TOM retur ([]) trots att
+  // UPDATE:en faktiskt matchar och skriver raden (bekräftat direkt mot
+  // PostgREST via curl på ett strukturellt identiskt filter). Effekten här
+  // hade varit ödesdiger: `!claimed` tolkas explicit som "inget fel, någon
+  // annan äger jobbet redan" (rad 98 nedan) — workern hade TYST claimat
+  // varje mötesjobb (status→'processing' skrivs i databasen) men trott att
+  // den misslyckades, och ALDRIG kört transkriberingen. Jobbet fastnar i
+  // 'processing' för evigt, ingen loggrad, inget fel att felsöka på. Fixen
+  // delar upp OR-fallen (unclaimed / stale claim) i två atomära försök,
+  // samma CAS-garanti (Postgres rad-lås) per försök, bara olika filterform.
+  let claimResult = await supabase
     .from('meeting_job')
     .update({ status: 'processing', claimed_at: nowIso, updated_at: nowIso })
     .eq('id', jobId)
     .in('status', ['finalized', 'processing'])
-    .or(`claimed_at.is.null,claimed_at.lt.${staleThreshold}`)
+    .is('claimed_at', null)
     .select('id, business_id, customer_id, booking_id, total_duration_seconds')
     .maybeSingle()
+
+  if (!claimResult.error && !claimResult.data) {
+    claimResult = await supabase
+      .from('meeting_job')
+      .update({ status: 'processing', claimed_at: nowIso, updated_at: nowIso })
+      .eq('id', jobId)
+      .in('status', ['finalized', 'processing'])
+      .lt('claimed_at', staleThreshold)
+      .select('id, business_id, customer_id, booking_id, total_duration_seconds')
+      .maybeSingle()
+  }
+
+  const { data: claimed, error: claimError } = claimResult
 
   if (claimError) {
     console.error('[meeting-worker] claim misslyckades:', jobId, claimError.message)

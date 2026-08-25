@@ -97,7 +97,19 @@ export async function transitionProjectToCompleted(
   projectId: string,
   completedAt = new Date().toISOString(),
 ): Promise<TransitionResult> {
-  const transition = await supabase
+  // BUGFIX (2026-08-25, verklig repro mot produktion): `.or('status.neq.
+  // completed,status.is.null')` ihop med `.eq()`-filtren gav PostgREST en
+  // TOM representation ([]) trots att UPDATE:en faktiskt matchade och
+  // skrev raden — verifierat både via curl direkt mot PostgREST och via
+  // supabase-js: samma filter men UTAN or() (bara `.neq('status',
+  // 'completed')`) returnerar representationen korrekt. Effekten: en
+  // RIKTIG stängning (status skrevs till 'completed' i databasen) tolkades
+  // av anroparen som "redan stängd" — workflow-stage flyttade aldrig till
+  // ps-05, ingen faktura, inget fruset utfall, inget debriefkort. Fixen
+  // delar upp i två atomära försök (vanligt fall + null-status-fallet) för
+  // att aldrig kombinera or() med eq() på en update-representation — samma
+  // CAS-garanti (Postgres rad-lås) per försök, bara olika filterform.
+  let transition = await supabase
     .from('project')
     .update({
       status: 'completed',
@@ -106,11 +118,26 @@ export async function transitionProjectToCompleted(
     })
     .eq('project_id', projectId)
     .eq('business_id', businessId)
-    // SQL:s NULL-semantik gör `neq completed` falskt även för NULL. Äldre
-    // rader utan status ska också kunna stängas, men bara en gång.
-    .or('status.neq.completed,status.is.null')
+    .neq('status', 'completed')
     .select(PROJECT_COLUMNS)
     .maybeSingle()
+
+  // Äldre rader utan status (NULL) matchar aldrig `neq.completed` (SQL:s
+  // NULL-semantik) — ett separat, likaledes atomärt försök för det fallet.
+  if (!transition.error && !transition.data) {
+    transition = await supabase
+      .from('project')
+      .update({
+        status: 'completed',
+        completed_at: completedAt,
+        updated_at: completedAt,
+      })
+      .eq('project_id', projectId)
+      .eq('business_id', businessId)
+      .is('status', null)
+      .select(PROJECT_COLUMNS)
+      .maybeSingle()
+  }
 
   if (transition.error) {
     return {
