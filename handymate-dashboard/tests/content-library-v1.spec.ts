@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 const root = process.cwd()
 const docs = path.join(root, 'docs', 'marketing', 'content-library-v1')
@@ -70,6 +71,27 @@ test.describe('Handymate content library V1', () => {
     expect(renderer).toContain('content-library-v1/avatars/')
     expect(renderer).toContain('data-export')
     expect(script).toContain("page.locator('[data-export]')")
+  })
+
+  test('håller agenternas exempel fria från porträtt och använder en ren varumärkestopp', async ({ page }) => {
+    await page.goto(pathToFileURL(path.join(docs, 'render.html')).href)
+    await page.evaluate(async () => { await document.fonts.ready })
+
+    await expect(page.locator('.series')).toHaveCount(0)
+    const brand = await page.locator('#team-02-matte .brand').boundingBox()
+    expect(brand?.height).toBeGreaterThanOrEqual(50)
+
+    for (const agent of ['matte', 'karin', 'daniel', 'lars', 'hanna', 'lisa']) {
+      const card = await page.locator(`[id$="-${agent}"][data-campaign="team"] .example`).boundingBox()
+      const portrait = await page.locator(`[id$="-${agent}"][data-campaign="team"] .portrait-large`).boundingBox()
+      expect(card, `${agent}: exempel`).not.toBeNull()
+      expect(portrait, `${agent}: porträtt`).not.toBeNull()
+      expect(portrait!.y + portrait!.height, `${agent}: porträttet överlappar textkortet`).toBeLessThanOrEqual(card!.y)
+    }
+
+    const source = fs.readFileSync(path.join(docs, 'render.html'), 'utf8')
+    expect(source).not.toMatch(/AVSLÖJANDE 0[12]/)
+    expect(source).not.toContain('padding:32px 380px')
   })
 
   test('levererar ett samlat nedladdningspaket', () => {
