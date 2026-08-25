@@ -144,3 +144,20 @@ körningen. Duplicera inte stationsdetaljerna hit; körboken äger dem.
 
 **Feature freeze: måndag 25 augusti 18:00.** Efter det: endast korrekthet,
 tillförlitlighet, UX-blockerare, säkerhet, prestanda, lanserings-GTM.
+
+---
+
+## Launch Truth Gate (Codex-granskningen 2026-08-25) — status
+
+| # | Punkt | Status |
+|---|---|---|
+| 1 | Prisjusteringskortet fixat | ✅ `b6cce3c4` (avvikelse #20) |
+| 2 | Kreditfakturans status sanningsenlig | ✅ `b6cce3c4` (avvikelse #21, + KF-nummerfix) |
+| 3 | E-faktura räknas som lyckad leverans | ✅ `b6cce3c4` (avvikelse #22, två anropare) |
+| 4 | Föråldrade facit + en auktoritativ grön CI-grind | ✅ 2026-08-25: facit-svepet (`0ca0eae4` — 16 röda granskade mot källkod, 2 riktiga produktluckor fixade, 3 ärliga röda lämnade som 46elks-kanariefågel) + CI-grinden återaktiverad (`326ac6d7`+`7478810e`, run 32865519407 GRÖN: tsc + hela kontraktssviten på varje push/PR, SMS-sändande debug-tester exkluderade medvetet). TEST_USER_PASSWORD-secreten satt (saknades — gamla workflown kunde aldrig autentisera). |
+| 5 | 46elks + skarp SMS/STOPP/fallback | ⏳ Andreas ikväll — SMS-debug-testerna i sviten blir gröna av sig själva vid påfyllning |
+| 6 | Senaste lyckade körning per produktions-cron | ⏳ kräver Vercel-inloggning |
+| 7 | PWA/push/högriskgodkännande på fysisk iPhone | ⏳ Andreas (= A15/I3) |
+| 8 | Stäng av obevisade synliga automationer | ⏳ Andreas-beslut, inventering kan tas fram |
+| — | Läckta-lösenordsskyddet i Supabase Auth | ⏳ Andreas, dashboard-inställning |
+| — | (Utöver Codex) v168 anon-RPC-revoke | ✅ körd + live-verifierad (avvikelse #17) |
