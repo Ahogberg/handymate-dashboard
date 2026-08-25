@@ -1,26 +1,40 @@
-# Playwright QA Tests pausade 2026-05-08.
-# Reason: testerna fungerar inte i prod-miljön, kostar bara CI-minuter och
-# auth-tokens utan att fånga riktiga regressions. Återaktivera när
-# testsuiten är reparerad och stabilt kan köras mot app.handymate.se.
-# Trigger: workflow_dispatch only (manuell via GitHub UI).
+# CI-grinden — återaktiverad 2026-08-25 (Codex Launch Truth Gate punkt 4).
+#
+# Historik: pausad 2026-05-08 ("testerna fungerar inte i prod-miljön") —
+# det stämde då. Sedan dess har sviten reparerats i omgångar (Reality Week
+# Pass 1+2, facit-svepet 2026-08-25) och är nu grön: 5205/5208 lokalt,
+# där de 3 sista är SMS-debug-tester som medvetet EXKLUDERAS här (de
+# skickar RIKTIGA SMS via 46elks — en grind som kostar pengar och pip i
+# telefonen på varje push vore fel verktyg; de körs lokalt/manuellt).
+#
+# Vad grinden kör: tsc (typfelen) + hela kontraktssviten (källskannings-
+# facit + unit + live-smoke mot app.handymate.se). MEDVETET INTE next
+# build — Vercel bygger redan varje push och är den riktiga deploy-
+# grinden; regeln "kolla att Vercel-deployen blev grön" (lessons 2026-08-04)
+# ägs av deploy-flödet, inte av denna CI.
+#
+# Rött här = pusha inget mer ovanpå förrän det är utrett (samma
+# STOP-THE-LINE-princip som docs/REALITY-WEEK.md).
 
-name: Playwright QA Tests
+name: CI-grind
 
 on:
-  # PAUSAT — pushar till main triggar inte längre testerna.
-  # push:
-  #   branches: [main]
-
-  # PAUSAT — nattlig schedule avstängd.
-  # schedule:
-  #   - cron: '0 3 * * *'  # Varje natt 03:00 UTC
-
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
+# En superseded körning avbryts när nästa push kommer — grinden gäller
+# alltid det senaste läget.
+concurrency:
+  group: ci-grind-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: handymate-dashboard
@@ -35,25 +49,31 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-audit --no-fund
+
+      - name: TypeScript — noll fel
+        run: npx tsc --noEmit
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Prepare auth state
-        run: |
-          mkdir -p playwright/.auth
-          echo '{"cookies":[],"origins":[]}' > playwright/.auth/user.json
+      - name: Prepare auth state dir
+        run: mkdir -p playwright/.auth
 
-      - name: Run Playwright tests
+      - name: Kontraktssviten (exkl. SMS-sändande debug-tester)
         env:
           BASE_URL: https://app.handymate.se
           TEST_USER_EMAIL: andreashogberg93@gmail.com
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
           TEST_BUSINESS_ID: biz_al7pjuu5smi
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        run: npx playwright test --project=setup --project=chromium --reporter=list
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        # --grep-invert träffar de tre SMS-debug-testtitlarna
+        # (tests/sms.spec.ts, tests/api.spec.ts, tests/comprehensive.spec.ts)
+        # — se filhuvudet för varför de inte hör hemma i en push-grind.
+        run: npx playwright test --project=setup --project=chromium --grep-invert "debug/sms|Debug SMS" --reporter=list
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
@@ -63,9 +83,3 @@ jobs:
           path: handymate-dashboard/playwright-report/
           retention-days: 14
           if-no-files-found: ignore
-
-      - name: Notify on failure
-        if: failure()
-        run: |
-          echo "Playwright-tester misslyckades!"
-          echo "Se rapport: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
