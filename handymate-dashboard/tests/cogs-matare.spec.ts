@@ -387,6 +387,14 @@ test.describe('spärrhaken — läckaget får bara krympa', () => {
     // Utvecklarverktyg — men det skickar RIKTIGA SMS som kostar riktiga
     // pengar. Nåbarhet i produktion behöver kontrolleras separat.
     'app/api/debug/sms/route.ts',
+    // Internt driftlarm till Handymates EGET team (launch desk, v165/v166,
+    // klassat 2026-08-25): fast mottagarlista via env
+    // (HANDYMATE_SUPPORT_ALERT_PHONES), inget business_id, ingen kund —
+    // opt-out-spärren och kundkvoten är per definition inte tillämpliga.
+    // Filens eget filhuvud dokumenterar avgränsningen; facit-vakten i
+    // tests/facit-handymate-team-alert.spec.ts låser att kvotkoll INTE
+    // smyger in (den ska inte gå genom strypunkten).
+    'lib/notifications/handymate-team-alert.ts',
   ]
 
   /** Strypunkten själv ska förstås anropa 46elks — den är målet, inte läckan. */

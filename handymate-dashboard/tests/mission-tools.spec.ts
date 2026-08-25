@@ -407,7 +407,9 @@ test.describe('matte/chat/route.ts — möjlighetsportfölj-kontextblock', () =>
   })
 
   test('Etapp F: mission-selecten är select(\'*\') — inte en explicit kolumnlista som fallerar pre-v145', () => {
-    expect(chatSrc).toContain(".from('mission')\n            .select('*')")
+    // 2026-08-25: radslutsneutralt — filen kan ligga med CRLF på disk
+    // (git autocrlf på Windows) och då matchar aldrig ett rent \n-mönster.
+    expect(chatSrc.replace(/\r\n/g, '\n')).toContain(".from('mission')\n            .select('*')")
   })
 
   test('Etapp I: kontextblocket instruerar Matte om kontaktmål (goal_type contact + goal_count)', () => {

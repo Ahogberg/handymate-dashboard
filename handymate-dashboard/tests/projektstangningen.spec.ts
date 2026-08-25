@@ -49,7 +49,9 @@ test.describe('sidoeffekter eldas på övergången, inte på statusen', () => {
     expect(route).toContain('completeProject(')
     expect(route).not.toContain('fireEvent')
 
-    const compareAndSet = command.indexOf("or('status.neq.completed,status.is.null')")
+    // 2026-08-25: or() ersatt av neq+is-null (två atomära försök) — se
+    // canonical-project-completion.spec.ts för PostgREST-bugg-motiveringen.
+    const compareAndSet = command.indexOf(".neq('status', 'completed')")
     const eventBlock = command.indexOf("fireEvent(supabase, 'job_completed'")
     expect(compareAndSet).toBeGreaterThan(-1)
     expect(eventBlock).toBeGreaterThan(compareAndSet)
@@ -63,7 +65,9 @@ test.describe('sidoeffekter eldas på övergången, inte på statusen', () => {
 
   test('upprepad stängning skriver inte om stängningsdatumet', () => {
     const command = kod(COMMAND)
-    expect(command).toContain("or('status.neq.completed,status.is.null')")
+    // 2026-08-25: or() ersatt av neq+is-null — samma vakt, ny filterform.
+    expect(command).toContain(".neq('status', 'completed')")
+    expect(command).toContain(".is('status', null)")
     expect(command).toContain('already_completed: true')
     expect(command).toContain('effects: []')
   })

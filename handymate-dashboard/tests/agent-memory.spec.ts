@@ -723,7 +723,10 @@ test.describe('källref trådad in i extractAndSaveMemory-anropen', () => {
     const s = read('app/api/matte/chat/route.ts')
     const i = s.indexOf("extractAndSaveMemory(businessId, currentAgent, cleanReply, 'chat'")
     expect(i, 'anropet hittades inte').toBeGreaterThan(-1)
-    const gren = s.slice(i, i + 400)
+    // 2026-08-25: 400-teckensfönstret var för snålt — förklarande
+    // kommentarsrader i källref-blocket sköt id-raden precis förbi kanten
+    // och facitet blev rött trots att referensen (som är poängen) fanns.
+    const gren = s.slice(i, i + 700)
     expect(gren).toContain("type: 'chat_thread'")
     expect(gren).toContain('id: thread?.id ?? null')
   })

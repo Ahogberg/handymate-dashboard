@@ -90,6 +90,12 @@ const EXTERNAL_DENIED_TOOLS: Record<string, string> = {
   confirm_mission: 'skrivande, internt uppdragsverktyg',
   send_agent_message: 'internt team-till-team-verktyg',
   get_agent_messages: 'internt team-till-team-verktyg',
+  // Klassade 2026-08-25 (launch desk-etappen, commit 7cecac62 införde
+  // verktygen utan att uppdatera detta facit — testet blev rött EXAKT som
+  // dess eget filhuvud lovar vid oklassade tillägg; runtime var aldrig
+  // öppet, EXTERNAL_SAFE_TOOLS är fortsatt tom/fail-closed):
+  get_account_billing_status: 'internt abonnemangs-/faktureringsunderlag för ägaren — aldrig en extern part',
+  escalate_to_handymate_team: 'skrivande (skapar support_ticket + triggar internt SMS-larm till teamets nummer) — en oidentifierad extern part kunde annars spamma driftlarmet',
 }
 
 test.describe('Etapp S — fail-closed klassificeringsfacit', () => {

@@ -50,11 +50,20 @@ test.describe('stegkedjan startar vid födseln', () => {
   })
 
   test('initieringen är fire-and-forget — får aldrig sinka skapandet', () => {
+    // Föråldrat facit uppdaterat 2026-08-25: create-from-quote.ts SKÄRPTE
+    // felhanteringen (commit 2c5d7994, "log soft-fail explicit") — den läser
+    // numera stageResult.moved och loggar båda felgrenarna explicit
+    // ("returnerade moved:false" + "kastade"), vilket är STARKARE än den
+    // gamla catch-only-texten facitet letade efter. Acceptera båda formerna.
     for (const fil of ['lib/projects/create-from-quote.ts', 'lib/autopilot/trigger.ts', 'lib/e2e-deal-flow.ts']) {
       const s = kod(fil)
       const init = s.indexOf('SYSTEM_STAGES.CONTRACT_SIGNED')
-      const felhantering = s.indexOf('stage init error (non-blocking)', init - 800)
-      expect(felhantering, `${fil}: stegfel skulle krascha skapandet`).toBeGreaterThan(-1)
+      const gamlaFormen = s.indexOf('stage init error (non-blocking)', init - 800)
+      const skarptaFormen = s.indexOf('stage init kastade (non-blocking)', init - 800)
+      expect(
+        gamlaFormen > -1 || skarptaFormen > -1,
+        `${fil}: stegfel skulle krascha skapandet`,
+      ).toBe(true)
     }
   })
 
@@ -101,10 +110,18 @@ test.describe('Jobb igång har verkliga producenter (2026-08-10)', () => {
   test('sidoflödena läser flytt-resultatet — motorn kastar inte', () => {
     // Motorn svarar { moved, error }; try/catch räcker inte. Utan läsningen
     // är ett misslyckande osynligt i just pengavägarna.
+    // 2026-08-25: fakturasändningens stegflytt bor sedan Etapp Q (TD-86,
+    // 2026-08-18) i den delade sändkärnan lib/invoices/send-invoice.ts —
+    // rutten är numera tunn (auth/validering) och rör inte stegmotorn.
+    // Facitet pekade kvar på rutten och låg rött sedan dess.
+    // 2026-08-25: complete-job-rutten delegerar sedan kanoniseringen
+    // (d53c90d4) hela stängningskedjan till lib/projects/complete-project.ts
+    // — det är DÄR stegflytten görs och .moved läses numera (effects-raden i
+    // runCompletionEffects). Facitet pekade kvar på rutten.
     for (const fil of [
-      'app/api/invoices/send/route.ts',
+      'lib/invoices/send-invoice.ts',
       'lib/invoices/apply-payment.ts',
-      'app/api/booking/complete-job/route.ts',
+      'lib/projects/complete-project.ts',
       'app/api/bookings/route.ts',
       'lib/fortnox/sync-payments.ts',
     ]) {

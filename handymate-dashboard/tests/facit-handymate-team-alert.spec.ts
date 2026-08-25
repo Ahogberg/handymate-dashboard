@@ -27,8 +27,13 @@ test.describe('notifyHandymateSupportTeam', () => {
   })
 
   test('ett fel vid sandning kastar aldrig — fire-and-forget, loggas bara', () => {
+    // 2026-08-25: fast 1500-teckensfönster ersatt med hela funktionsresten —
+    // summary-trunkeringen (v166) växte funktionen förbi fönstret och
+    // facitet blev rött trots att catch:en (som är poängen) fanns kvar.
     const idx = FILE.indexOf('export async function notifyHandymateSupportTeam')
-    const block = FILE.slice(idx, idx + 1500)
+    expect(idx).toBeGreaterThan(-1)
+    const block = FILE.slice(idx)
     expect(block).toMatch(/catch/)
+    expect(block).toContain('non-blocking')
   })
 })

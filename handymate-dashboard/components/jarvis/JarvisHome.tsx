@@ -99,10 +99,18 @@ import { ProjektPulsRad } from '@/components/jarvis/home/ProjektPulsRad'
  *      heron med hälsningen, beslut-räknaren och dygnets auto-count.
  *      Ingen egen fråga — den SAMMANFATTAR fråga 1 och 3.
  *   1. Det här behöver dig idag — beslutskorten, agenten leder varje kort.
- *   2. Pengar just nu           — PengarBand, tyst utelämnad utan ägarsvar.
- *   3. Det här sköter teamet    — dygnsdigestens auto-rader synliga
+ *   2. Det här sköter teamet    — dygnsdigestens auto-rader synliga
  *                                 (home/SkottUtanDig) + TeamBevakning
  *                                 (✓-lista) under samma rubrik.
+ *   3. Pengar just nu           — PengarBand, tyst utelämnad utan ägarsvar.
+ *                                 (Flyttad NED under teamet 2026-08-18,
+ *                                 c241d8c7 — bandet knuffade agentlistan
+ *                                 utanför no-scroll. Denna lista rättad
+ *                                 2026-08-25: den listade gamla ordningen
+ *                                 medan JSX:en var korrekt, vilket lurade
+ *                                 designkontrakts-skanningen i
+ *                                 tests/jarvis-hem.spec.ts som läser
+ *                                 första förekomsten av varje rubrik.)
  *   4. Värdekvittoraden         — sist, som tidigare (grad-tint-teasern).
  *
  * "Värt att veta" (agentobservationerna) är inte en av de fyra — den är kvar

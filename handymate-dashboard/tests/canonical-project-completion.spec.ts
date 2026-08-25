@@ -100,9 +100,16 @@ test.describe('primär övergång före sidoeffekter', () => {
 
   test('bara vinnaren av inte-klart→klart får köra kedjan', () => {
     const s = kod(COMMAND)
-    const compareAndSet = s.indexOf("or('status.neq.completed,status.is.null')")
+    // 2026-08-25: or() ersatt av två atomära försök (neq + is-null) —
+    // PostgREST-buggen där eq()+or() på en update-representation gav tom
+    // retur trots lyckad skrivning (verkligt prod-repro, avvikelse #14).
+    // Vaktens semantik är oförändrad: bara den som faktiskt flippar
+    // status får köra sidoeffektskedjan.
+    const compareAndSet = s.indexOf(".neq('status', 'completed')")
+    const nullBranch = s.indexOf(".is('status', null)")
     const effects = s.indexOf('runCompletionEffects(')
     expect(compareAndSet, 'atomisk övergångsvakt saknas').toBeGreaterThan(-1)
+    expect(nullBranch, 'NULL-status-grenen saknas').toBeGreaterThan(compareAndSet)
     expect(effects, 'gemensam sidoeffektskedja saknas').toBeGreaterThan(compareAndSet)
     expect(s).toContain("already_completed: true")
   })

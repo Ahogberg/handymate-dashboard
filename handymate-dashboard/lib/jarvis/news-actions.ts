@@ -40,6 +40,11 @@ const PER_AGENT: Record<string, NyhetsAtgard> = {
   karin:  { label: 'Se fakturorna', href: '/dashboard/invoices',           ikon: 'pengar' },
   lars:   { label: 'Öppna schemat', href: '/dashboard/schedule',           ikon: 'dokument' },
   hanna:  { label: 'Se kampanjen',  href: '/dashboard/campaigns',          ikon: 'dokument' },
+  // Support (sjunde agenten, launch desk 2026-08-21) chattar i samma yta
+  // som teamet — samma mönster som Matte. Utan denna rad var supportens
+  // nyhetsrader en återvändsgränd (fångat av tests/jarvis-hem.spec.ts
+  // täckningsfacit 2026-08-25 — exakt felet filhuvudet beskriver).
+  support: { label: 'Öppna supporten', href: '/dashboard/agent',          ikon: 'person' },
 }
 
 export function nyhetsAtgard(

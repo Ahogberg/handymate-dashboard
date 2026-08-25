@@ -18,7 +18,11 @@ function fakeSupabase(responses: Array<{ data: unknown; error: { message: string
     from() {
       const response = responses[calls++]
       const builder: Record<string, (...args: unknown[]) => unknown> = {}
-      for (const method of ['update', 'eq', 'or', 'select']) {
+      // 2026-08-25: or() ersatt av neq()/is() — PostgREST-buggen där
+      // eq()+or() på en update-representation gav tom retur (verkligt
+      // prod-repro, se transitionProjectToCompleted:s BUGFIX-kommentar).
+      // Mocken speglar de metoder koden faktiskt anropar.
+      for (const method of ['update', 'eq', 'neq', 'is', 'or', 'select']) {
         builder[method] = () => builder
       }
       builder.maybeSingle = async () => response
@@ -59,8 +63,28 @@ test.describe('atomisk projektövergång', () => {
     expect(fake.calls()).toBe(1)
   })
 
+  test('projekt med NULL-status stängs via det andra atomära försöket', async () => {
+    // Nya tvåförsöksflödet (2026-08-25): neq('status','completed') matchar
+    // aldrig NULL (SQL-semantik) — det andra försöket (.is('status', null))
+    // är det som stänger äldre rader utan status. Fortfarande atomärt per
+    // försök via Postgres radlås.
+    const fake = fakeSupabase([
+      { data: null, error: null },            // försök 1: neq — miss (status är NULL)
+      { data: completedProject, error: null }, // försök 2: is null — vinner
+    ])
+    const result = await transitionProjectToCompleted(
+      fake.supabase as any,
+      'business-1',
+      'project-1',
+    )
+    expect(result).toMatchObject({ ok: true, transitioned: true, already_completed: false })
+    expect(fake.calls()).toBe(2)
+  })
+
   test('förloraren skiljer idempotent replay från misslyckad övergång', async () => {
+    // 3 svar sedan tvåförsöksflödet: neq-miss → is-null-miss → efterläsning.
     const replay = fakeSupabase([
+      { data: null, error: null },
       { data: null, error: null },
       { data: completedProject, error: null },
     ])
@@ -72,6 +96,7 @@ test.describe('atomisk projektövergång', () => {
     expect(replayResult).toMatchObject({ ok: true, transitioned: false, already_completed: true })
 
     const failed = fakeSupabase([
+      { data: null, error: null },
       { data: null, error: null },
       { data: { ...completedProject, status: 'active' }, error: null },
     ])
