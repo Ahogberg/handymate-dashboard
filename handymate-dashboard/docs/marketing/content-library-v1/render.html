@@ -51,7 +51,7 @@
     .example { position:absolute; left:78px; right:78px; bottom:72px; min-height:210px; border-radius:30px; background:white; border:1px solid var(--line); box-shadow:0 25px 65px rgba(15,23,42,.09); padding:30px 34px; display:flex; flex-direction:column; justify-content:center; }
     .example-label { font:700 18px/1 Space; color:var(--agent); letter-spacing:.08em; text-transform:uppercase; margin-bottom:12px; }
     .example-text { font-size:27px; line-height:1.34; color:#334155; }
-    .agent-mark { position:absolute; left:76px; top:260px; width:54px; height:7px; border-radius:9px; background:var(--agent); }
+    .agent-mark { position:absolute; left:76px; top:226px; width:54px; height:7px; border-radius:9px; background:var(--agent); }
     .avatar-stack { display:flex; margin-top:75px; }
     .avatar-stack img { width:150px; height:150px; margin-left:-22px; object-fit:cover; object-position:top; border:6px solid white; border-radius:50%; box-shadow:0 14px 36px rgba(0,0,0,.18); }
     .avatar-stack img:first-child { margin-left:0; }
@@ -96,15 +96,12 @@
     .outline-team img { width:132px; height:132px; border-radius:50%; object-fit:cover; object-position:top; border:5px solid rgba(255,255,255,.78); filter:saturate(.35); }
     .countdown { font:700 390px/.78 Space; letter-spacing:-.1em; color:#78d1c0; }
     .launch-chip { display:inline-flex; width:max-content; padding:14px 22px; border:1px solid rgba(255,255,255,.24); border-radius:999px; color:white; font:700 20px/1 Space; letter-spacing:.08em; text-transform:uppercase; }
-    .hype-shell { position:relative; margin-top:122px; z-index:2; }
-    .hype-shell::after { content:''; position:absolute; z-index:-1; width:660px; height:660px; right:-330px; top:-255px; border:2px solid rgba(141,215,201,.16); border-radius:50%; box-shadow:0 0 0 95px rgba(141,215,201,.035),0 0 0 210px rgba(141,215,201,.02); }
-    .hype-kicker { display:inline-flex; align-items:center; gap:12px; padding:13px 20px; border-radius:999px; border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.08); color:#bce9df; font:700 19px/1 Space; letter-spacing:.08em; text-transform:uppercase; }
-    .hype-kicker::before { content:''; width:10px; height:10px; border-radius:50%; background:#78d1c0; box-shadow:0 0 0 7px rgba(120,209,192,.13); }
-    .hype-title { margin-top:36px; max-width:900px; font:650 84px/.98 Space; letter-spacing:-.052em; }
-    .hype-card { margin-top:64px; width:835px; padding:29px 34px; border:1px solid rgba(255,255,255,.2); border-radius:26px; background:rgba(255,255,255,.08); box-shadow:0 28px 70px rgba(0,0,0,.16); backdrop-filter:blur(8px); }
-    .hype-card-row { display:flex; align-items:center; gap:22px; color:#d9efea; font-size:28px; line-height:1.2; }
-    .hype-card-row + .hype-card-row { margin-top:19px; padding-top:19px; border-top:1px solid rgba(255,255,255,.13); }
-    .hype-card-row strong { min-width:168px; color:#78d1c0; font:700 18px/1 Space; letter-spacing:.08em; text-transform:uppercase; }
+    .hype-shell { position:relative; margin-top:112px; z-index:2; }
+    .editorial-kicker { color:#8dd7c9; font:700 19px/1 Space; letter-spacing:.16em; text-transform:uppercase; }
+    .editorial-word { margin-top:44px; color:rgba(255,255,255,.085); font:700 150px/.75 Space; letter-spacing:-.075em; text-transform:uppercase; }
+    .hype-title { margin-top:38px; max-width:900px; font:650 84px/.98 Space; letter-spacing:-.052em; }
+    .editorial-rule { width:180px; height:8px; margin-top:44px; border-radius:1px; background:#78d1c0; }
+    .editorial-sub { margin-top:34px; max-width:820px; color:#cfeae5; font:500 34px/1.28 DM; }
     .profile-canvas { position:absolute; inset:0; display:grid; place-items:center; }
     .profile-canvas img { width:950px; height:950px; object-fit:contain; }
     .profile-primary { background:linear-gradient(145deg,#052f2c,#073f3b); }
@@ -249,8 +246,8 @@
     add('reel-team-at-work','reel',`<img class="photo-bg" src="${launchBase}van-morning-source.png" alt=""><div class="photo-shade"></div><div class="pad overlay">${logoRow(true,'MEDAN DU JOBBAR')}<div class="standalone-copy" style="margin-top:320px"><h1 class="hero">Teamet arbetar vidare.</h1><p class="sub" style="margin-top:55px">Du godkänner. Handymate tar nästa steg.</p></div>${footer(true)}</div>`,'story dark')
 
     add('prelaunch-01-market','prelaunch',`<div class="pad dark">${logoRow(true)}
-      <div class="hype-shell"><div class="hype-kicker">Något nytt är på väg</div><h1 class="hype-title">Snart får hantverkare ett system som faktiskt arbetar.</h1>
-      <div class="hype-card"><div class="hype-card-row"><strong>Du berättar</strong><span>Vad företaget behöver uppnå.</span></div><div class="hype-card-row"><strong>Teamet agerar</strong><span>Rätt specialist hittar nästa steg.</span></div></div></div>${footer(true,'Handymate lanserar snart.')}</div>`,'dark')
+      <div class="hype-shell"><div class="editorial-kicker">Handymate / 2026</div><div class="editorial-word">Arbetar</div><h1 class="hype-title">Snart får hantverkare ett system som faktiskt arbetar.</h1>
+      <div class="editorial-rule"></div><p class="editorial-sub">Inte ännu en meny att lära sig. Ett digitalt team som hjälper företaget framåt.</p></div>${footer(true,'Handymate lanserar snart.')}</div>`,'dark')
     add('prelaunch-02-2006','prelaunch',`<div class="pad dark">${logoRow(true,'2006 → 2026')}
       <div style="margin-top:180px"><div class="year old">2006</div><div class="arrow-line"></div><div class="year new">2026</div><h1 class="hero small" style="margin-top:70px">Dags att lämna det gamla arbetssättet.</h1></div>${footer(true,'Handymate lanserar snart.')}</div>`,'dark')
     add('prelaunch-03-not-system','prelaunch',`<div class="pad dark">${logoRow(true,'EN NY KATEGORI')}
@@ -258,18 +255,18 @@
     add('prelaunch-04-works-for-you','prelaunch',`<img class="photo-bg" src="${launchBase}van-morning-source.png" alt=""><div class="photo-shade"></div><div class="pad overlay">${logoRow(true,'ETT NYTT ARBETSSÄTT')}
       <div class="standalone-copy" style="margin-top:180px"><h1 class="hero">Du ska inte arbeta för systemet.</h1><p class="sub" style="margin-top:44px">Systemet ska arbeta för dig.</p></div>${footer(true,'Handymate lanserar snart.')}</div>`,'dark')
     add('prelaunch-05-team-reveal','prelaunch',`<div class="pad dark">${logoRow(true)}
-      <div style="margin-top:170px"><div class="launch-chip">Det digitala teamet</div><h1 class="hero small" style="margin-top:34px">Sex AI-kollegor. Byggda för hantverksföretag.</h1><div class="outline-team">${agents.map(a=>`<img src="${assetBase}${a.id}.png" alt="${a.name}">`).join('')}</div></div>${footer(true,'Snart får du hälsa på dem.')}</div>`,'dark')
+      <div style="margin-top:170px"><div class="editorial-kicker">Det digitala teamet</div><h1 class="hero small" style="margin-top:34px">Sex AI-kollegor. Byggda för hantverksföretag.</h1><div class="outline-team">${agents.map(a=>`<img src="${assetBase}${a.id}.png" alt="${a.name}">`).join('')}</div></div>${footer(true,'Snart får du hälsa på dem.')}</div>`,'dark')
     add('prelaunch-06-matte','prelaunch',`<div class="pad" style="--agent:#0f766e">${logoRow(false)}
-      <div class="agent-mark"></div><div class="agent-copy" style="margin-top:135px"><div class="pill"><span class="dot"></span>Din chefsagent</div><h2 class="agent-name" style="margin-top:28px">Matte</h2><p class="agent-promise">Du berättar vad du vill uppnå. Matte samordnar teamet.</p></div>
+      <div class="agent-mark"></div><div class="agent-copy" style="margin-top:135px"><div class="agent-role" style="margin-top:0">Din chefsagent</div><h2 class="agent-name" style="margin-top:28px">Matte</h2><p class="agent-promise">Du berättar vad du vill uppnå. Matte samordnar teamet.</p></div>
       <div class="example"><div class="example-label">Snart i Handymate</div><div class="example-text">En kontaktpunkt. Rätt specialist. Tydlig återkoppling.</div></div><div class="portrait-halo"></div><img class="portrait portrait-large" src="${assetBase}matte.png" alt="Matte"></div>`)
     add('prelaunch-07-launch-soon','prelaunch',`<div class="pad dark">${logoRow(true,'HANDYMATE')}
-      <div style="margin-top:280px"><div class="launch-chip">Lanserar snart</div><h1 class="hero" style="margin-top:38px">Välkommen till framtidens hantverksföretag.</h1></div>${footer(true,'Det digitala teamet är snart på plats.')}</div>`,'dark')
+      <div style="margin-top:280px"><div class="editorial-kicker">Lanserar snart</div><h1 class="hero" style="margin-top:38px">Välkommen till framtidens hantverksföretag.</h1></div>${footer(true,'Det digitala teamet är snart på plats.')}</div>`,'dark')
     add('prelaunch-08-three-days','prelaunch',`<div class="pad dark">${logoRow(true,'NEDRÄKNING')}
       <div style="margin-top:265px"><div class="countdown">3</div><h1 class="hero small" style="margin-top:65px">dagar kvar.</h1><p class="sub" style="margin-top:38px">Sedan börjar systemet arbeta för dig.</p></div>${footer(true,'Handymate lanserar snart.')}</div>`,'story dark')
     add('prelaunch-09-tomorrow','prelaunch',`<div class="pad dark">${logoRow(true,'IMORGON')}
       <div style="margin-top:390px"><div class="teaser-word">Framtiden</div><div class="teaser-rule"></div><h1 class="hero">Imorgon börjar den.</h1></div>${footer(true,'Det digitala teamet för hantverksföretag.')}</div>`,'story dark')
     add('prelaunch-10-launch','prelaunch',`<img class="photo-bg" src="${launchBase}worksite-morning-source.png" alt=""><div class="photo-shade"></div><div class="pad overlay">${logoRow(true,'NU LANSERAR VI')}
-      <div class="standalone-copy" style="margin-top:230px"><div class="launch-chip">Handymate är här</div><h1 class="hero" style="margin-top:38px">Välkommen till framtidens hantverksföretag.</h1><p class="sub" style="margin-top:46px">Möt det digitala teamet som arbetar med dig.</p></div>${footer(true,'Det digitala teamet för hantverksföretag')}</div>`,'story dark')
+      <div class="standalone-copy" style="margin-top:230px"><div class="editorial-kicker">Handymate är här</div><h1 class="hero" style="margin-top:38px">Välkommen till framtidens hantverksföretag.</h1><p class="sub" style="margin-top:46px">Möt det digitala teamet som arbetar med dig.</p></div>${footer(true,'Det digitala teamet för hantverksföretag')}</div>`,'story dark')
 
     add('profile-01-primary-dark','profile',`<div class="profile-canvas profile-primary"><img src="${logo}" alt="Handymate"></div>`,'profile')
     add('profile-02-light','profile',`<div class="profile-canvas profile-light"><img src="${logo}" alt="Handymate"></div>`,'profile')

@@ -84,10 +84,17 @@ test.describe('Handymate content library V1', () => {
     for (const agent of ['matte', 'karin', 'daniel', 'lars', 'hanna', 'lisa']) {
       const card = await page.locator(`[id$="-${agent}"][data-campaign="team"] .example`).boundingBox()
       const portrait = await page.locator(`[id$="-${agent}"][data-campaign="team"] .portrait-large`).boundingBox()
+      const mark = await page.locator(`[id$="-${agent}"][data-campaign="team"] .agent-mark`).boundingBox()
+      const name = await page.locator(`[id$="-${agent}"][data-campaign="team"] .agent-name`).boundingBox()
       expect(card, `${agent}: exempel`).not.toBeNull()
       expect(portrait, `${agent}: porträtt`).not.toBeNull()
+      expect(mark, `${agent}: färgmarkör`).not.toBeNull()
+      expect(name, `${agent}: namn`).not.toBeNull()
       expect(portrait!.y + portrait!.height, `${agent}: porträttet överlappar textkortet`).toBeLessThanOrEqual(card!.y)
+      expect(mark!.y + mark!.height, `${agent}: färgmarkören överlappar namnet`).toBeLessThanOrEqual(name!.y)
     }
+
+    await expect(page.locator('[data-campaign="prelaunch"] .pill, [data-campaign="prelaunch"] .launch-chip')).toHaveCount(0)
 
     const source = fs.readFileSync(path.join(docs, 'render.html'), 'utf8')
     expect(source).not.toMatch(/AVSLÖJANDE 0[12]/)
