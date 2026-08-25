@@ -116,22 +116,50 @@ setup('demo-employee: hitta-eller-skapa + storageState', async ({ page }) => {
     console.log('demo-employee.setup — business_users-rad skapad')
   }
 
-  // ── 3. Magic link + spara storageState ──────────────────────────────────
-  const { data, error } = await supabase.auth.admin.generateLink({
-    type: 'magiclink',
-    email: EMPLOYEE_EMAIL,
+  // ── 3. Riktig lösenordsinloggning + spara storageState ──────────────────
+  // BUGFIX (2026-08-25, verklig repro mot produktion): magic-link +
+  // page.goto(action_link) + waitForURL gav en TOM storageState ({cookies:
+  // [], origins: []}) — sessionen studsade tyst tillbaka till /login efter
+  // den korta waitForTimeout-fönstret, men waitForURL:s regex hade redan
+  // (falskt) matchat en transient /dashboard-URL. Konsekvens: HELA A9-testet
+  // (permission-check.spec.ts, som konsumerar precis den här filen) körde
+  // med en helt oautentiserad session. "UI-bevis"-testet (kollar att
+  // 'Ekonomi & offert' INTE syns) blev ett falskt positivt — inloggningssidan
+  // saknar förstås också den texten — och API-bevis-testet fick 401
+  // (genuint oautentiserad) i stället för det förväntade 403 (autentiserad
+  // men nekad), vilket tidigare felaktigt avfärdats som en "cookie-timing-
+  // kvirk". Riktig produktionsinbjudan (app/api/invite/[token]/accept)
+  // använder ALDRIG magic link — bara lösenord (admin.createUser +
+  // signInWithPassword). Samma mönster här: sätt ett känt lösenord, logga in
+  // genom det RIKTIGA formuläret (samma bevisat pålitliga väg som Station
+  // 1:s "riktig UI-inloggning").
+  const EMPLOYEE_PASSWORD = process.env.DEMO_EMPLOYEE_PASSWORD || 'E2eTestanstalld!2026'
+  const { error: pwErr } = await supabase.auth.admin.updateUserById(userId, {
+    password: EMPLOYEE_PASSWORD,
   })
-
-  if (error || !data?.properties?.action_link) {
-    throw new Error(`Kunde inte skapa magic link för test-anställd: ${error?.message || 'Ingen länk genererad'}`)
+  if (pwErr) {
+    throw new Error(`Kunde inte sätta lösenord för test-anställd: ${pwErr.message}`)
   }
 
-  await page.goto(data.properties.action_link)
-  await page.waitForURL(/\/(dashboard|onboarding)/, { timeout: 15_000 })
-  await page.waitForTimeout(2000)
+  await page.goto('/login')
+  await page.locator('input[type="email"]').fill(EMPLOYEE_EMAIL)
+  await page.locator('input[type="password"]').fill(EMPLOYEE_PASSWORD)
+  await page.getByRole('button', { name: 'Logga in' }).click()
+  await page.waitForURL(/\/dashboard/, { timeout: 15_000 })
+  await page.waitForTimeout(1000)
 
   console.log('demo-employee.setup — Inloggad, URL:', page.url())
 
-  await page.context().storageState({ path: AUTH_FILE })
-  console.log('demo-employee.setup — Session sparad till', AUTH_FILE)
+  // Ärlighetsvakt: en tom storageState (inga cookies) är exakt buggen som
+  // fick A9 att tyst falskt-passera tidigare — hellre ett tydligt kastat
+  // fel här än en oautentiserad session som permission-check.spec.ts sedan
+  // omedvetet testar mot.
+  const state = await page.context().storageState({ path: AUTH_FILE })
+  if (state.cookies.length === 0) {
+    throw new Error(
+      `demo-employee.setup: inloggningen gav noll cookies — sessionen sparades ALDRIG. ` +
+      `URL efter inloggningsförsök: ${page.url()}`,
+    )
+  }
+  console.log('demo-employee.setup — Session sparad till', AUTH_FILE, `(${state.cookies.length} cookies)`)
 })
