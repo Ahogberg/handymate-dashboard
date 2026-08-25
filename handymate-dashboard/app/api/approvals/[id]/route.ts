@@ -25,8 +25,17 @@ export const dynamic = 'force-dynamic'
 // fakturan på riktigt inline (sendInvoice, Chromium-PDF via
 // buildInvoicePdfBuffer) via four_eyes_project_close-godkännandet — samma
 // anledning som invoices/send/route.ts behöver 30s.
+//
+// 30 → 60 (2026-08-25, Reality Week Pass 2, verkligt repro): ett
+// review_auto_invoice-godkännande fick 504 vid 30s — kall Chromium-start +
+// PDF + mejl inline överskred gränsen. Värst är HALVLÄGET: CAS-flippen till
+// 'approved' sker FÖRE exekveringen, så vid gateway-timeout ser användaren
+// ett fel medan kortet redan är godkänt (retry-vägen finns, men 504:an i
+// sig är exakt "klickade Godkänn, fick fel"-upplevelsen). 60s ger kall
+// PDF-generering dubbel marginal; körbokens "försök igen"-råd kvarstår som
+// sista utväg.
 export const runtime = 'nodejs'
-export const maxDuration = 30
+export const maxDuration = 60
 
 /**
  * GET /api/approvals/[id]
