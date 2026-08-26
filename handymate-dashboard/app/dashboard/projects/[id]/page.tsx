@@ -90,19 +90,16 @@ import { ProjectBookingsTable } from './components/ProjectBookingsTable'
 import { ProjectStageModal } from '@/components/pipeline/unified/ProjectStageModal'
 import { ProjectEconomicsCard } from '@/components/projects/ProjectEconomicsCard'
 import { GuardianOrsaker } from '@/components/projects/GuardianOrsaker'
-import { ProjectInfoCard } from '@/components/projects/economy/ProjectInfoCard'
 import { ProjectCustomerFactsCard } from '@/components/projects/ProjectCustomerFactsCard'
-import { EkonomiPulsCard } from '@/components/projects/economy/EkonomiPulsCard'
 import { FramdriftCard } from '@/components/projects/economy/FramdriftCard'
 import { ProjectQuoteSpec } from '@/components/projects/ProjectQuoteSpec'
 import { ProjectQuoteDocumentCard } from '@/components/projects/ProjectQuoteDocumentCard'
-import { ProjectStatusCard, getStageBucket } from '@/components/projects/ProjectStatusCard'
-import { ProjectStageStrip } from '@/components/projects/ProjectStageStrip'
-import { FLOW_SYSTEM_STAGES } from '@/components/pipeline/unified/flow-constants'
+import { getStageBucket } from '@/components/projects/ProjectStatusCard'
 import ProjectTodoBlock, { type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
-import { deriveTodoMode } from '@/lib/projects/derive-todo'
-import { TwinStrip } from '@/components/projects/TwinStrip'
-import { RedoAttFakturera } from '@/components/projects/RedoAttFakturera'
+import { deriveTodoMode, TODO_PRIMARY_LABEL } from '@/lib/projects/derive-todo'
+import { ProjectStatusBand } from '@/components/projects/ProjectStatusBand'
+import { ProjectDatesInline } from '@/components/projects/ProjectDatesInline'
+import { deriveProjectLifecycle, type LifecyclePhase } from '@/lib/projects/derive-lifecycle'
 import { beraknaFakturaberedskap } from '@/lib/projects/fakturaberedskap'
 import { formatSEK } from '@/lib/format-price'
 import type { ProjectEconomics } from '@/lib/projects/compute-economics'
@@ -894,6 +891,15 @@ export default function ProjectDetailPage() {
     })()
     return () => { cancelled = true }
   }, [project?.customer?.customer_id])
+
+  // Livscykel-chipen i sidhuvudet (Statusbandet, 2026-08-26) härleds ur
+  // fakturafakta — hämta fakturorna direkt, inte först när Ekonomi-fliken
+  // öppnas. Samma endpoint, bara tidigare.
+  useEffect(() => {
+    if (!projectId) return
+    fetchProjectInvoices()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId])
 
   useEffect(() => {
     // Projektvy Fas 1: economy/quote_spec/material/leverantorer är nu grupperade
@@ -1860,9 +1866,21 @@ export default function ProjectDetailPage() {
   // arbete alls registrerats?).
   const canSeeFinancials = can('see_financials')
   const stageBucket = getStageBucket(project.current_workflow_stage_id)
-  // null = inget steg ännu (ärligt), inte "Kontrakt signerat" (Del B, 2026-08-26)
-  const currentWorkflowStage =
-    FLOW_SYSTEM_STAGES.find(stage => stage.id === project.current_workflow_stage_id) || null
+  // Livscykeln — samma härledning som projektlistan (status + fakturafakta),
+  // sex lägen: chipen får aldrig säga "Klart — ofakturerat" om det är fakturerat.
+  const lifecycle = deriveProjectLifecycle({
+    status: project.status,
+    completed_at: (project as any).completed_at ?? null,
+    invoices: projectInvoices.map(inv => ({ status: (inv as any).status ?? null })),
+  })
+  const LIFECYCLE_CHIP: Record<LifecyclePhase, string> = {
+    planering: 'bg-slate-100 text-slate-500',
+    pagar: 'bg-primary-50 text-primary-700',
+    klart_ofakturerat: 'bg-amber-50 text-amber-700',
+    fakturerat: 'bg-sky-50 text-sky-700',
+    betalt: 'bg-emerald-50 text-emerald-700',
+    avbrutet: 'bg-slate-100 text-slate-500',
+  }
   const nedlagtKr = statusEconomics?.kostnader.total_kr ?? null
   const offereratKr = statusEconomics?.intakter.forvantad_intakt_kr ?? 0
   const isOverBudget = canSeeFinancials && nedlagtKr != null && offereratKr > 0 && nedlagtKr > offereratKr
@@ -2189,21 +2207,11 @@ export default function ProjectDetailPage() {
               {project.name}
             </h1>
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-              {/* Statuschip — DESIGN-NOTES: teal Pågående / grön Klart {datum} /
-                  neutral Planering, härledd från samma stageBucket som stepper. */}
-              {stageBucket === 'klart' ? (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                  Klart{(project.completed_at || project.end_date) ? ` ${formatDate((project.completed_at || project.end_date) as string)}` : ''}
-                </span>
-              ) : stageBucket === 'pagaende' ? (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-primary-50 text-primary-700">
-                  Pågående
-                </span>
-              ) : (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
-                  Planering
-                </span>
-              )}
+              {/* Faschip — livscykeln (sex lägen), inte stageBucket: ett
+                  fakturerat/betalt projekt får aldrig heta "Klart — ofakturerat". */}
+              <span className={`inline-flex items-center px-2.5 py-[3px] rounded-full text-[11px] font-semibold ${LIFECYCLE_CHIP[lifecycle.phase]}`}>
+                {lifecycle.label}
+              </span>
               {isOverBudget && (
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
                   Över offererat
@@ -2221,20 +2229,55 @@ export default function ProjectDetailPage() {
                   <span>{project.customer.address_line}</span>
                 </>
               )}
+              <span className="text-slate-300">·</span>
+              {/* Datumraden — samma deriveProjectDates som listan, redigerbar
+                  på plats (Del A flyttad hit från TwinStrip). */}
+              <ProjectDatesInline
+                status={project.status}
+                startDate={project.start_date}
+                endDate={project.end_date}
+                completedAt={(project as any).completed_at ?? null}
+                onSaveDates={async (start, end) => {
+                  // Del A (2026-08-26): planerad start/slut redigeras på plats.
+                  // Samma PUT som statusbytet — inga nya rutter.
+                  try {
+                    const res = await fetch('/api/projects', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ project_id: project.project_id, start_date: start, end_date: end }),
+                    })
+                    if (!res.ok) throw new Error()
+                    setProject({ ...project, start_date: start, end_date: end })
+                    showToast('Datum sparade', 'success')
+                    return true
+                  } catch {
+                    showToast('Kunde inte spara datumen', 'error')
+                    return false
+                  }
+                }}
+              />
             </div>
           </div>
 
-          {/* Desktop-actions: BARA "Fler åtgärder". Primärknappen bodde här
-              OCH i vänsterkolumnens Att göra — samma åtgärd som två knappar
-              på samma skärm (samma felklass som offert-sprintens "en sanning
-              per kontroll"). Att göra äger den: det är listan man läser när
-              man undrar vad som ska hända härnäst. */}
-          <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+          {/* Desktop-actions: primärknappen (projektets NÄSTA åtgärd — samma
+              deriveTodoMode som listan, fyra lägen inkl. "Skapa ÄTA") + "Fler
+              åtgärder". Att göra-blocket döljer sin egen kopia (hidePrimary)
+              så åtgärden finns på EN plats. */}
+          <div className="hidden lg:flex items-center gap-2.5 flex-shrink-0">
+            {todoPrimaryHref ? (
+              <Link href={todoPrimaryHref} className="inline-flex items-center h-11 px-[22px] rounded-xl text-white text-sm font-semibold bg-gradient-to-br from-primary-700 to-teal-500 shadow-[0_4px_14px_rgba(15,118,110,0.25)] hover:opacity-[0.92] active:scale-[0.98] transition">
+                {TODO_PRIMARY_LABEL[todoMode]}
+              </Link>
+            ) : (
+              <button type="button" onClick={todoPrimaryOnClick} className="inline-flex items-center h-11 px-[22px] rounded-xl text-white text-sm font-semibold bg-gradient-to-br from-primary-700 to-teal-500 shadow-[0_4px_14px_rgba(15,118,110,0.25)] hover:opacity-[0.92] active:scale-[0.98] transition">
+                {TODO_PRIMARY_LABEL[todoMode]}
+              </button>
+            )}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setMoreMenuOpen(o => !o)}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white text-slate-700 text-sm font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+                className="inline-flex items-center gap-1.5 h-11 px-4 bg-white text-slate-700 text-sm rounded-xl border border-slate-200 hover:bg-slate-100 active:scale-[0.98] transition"
               >
                 Fler åtgärder
                 <ChevronDown className="w-3.5 h-3.5" />
@@ -2260,108 +2303,37 @@ export default function ProjectDetailPage() {
           />
         )}
 
-        {/* Projektets kanoniska 8-stegsöversikt. Samma ProjectStageStrip som
-            i Verksamhetsöversikten, men med permanenta kortnamn i headerläge.
-            Klick öppnar den befintliga detalj-/ändringsytan; ekonomin fortsätter
-            ägas av statuskortet längre ned så två ansvar inte blandas ihop. */}
-        <section className="relative z-10 bg-white border border-slate-200 rounded-xl px-4 sm:px-5 pt-4 pb-3 mb-5 shadow-sm">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                Projektets flöde
-              </p>
-              <p className="mt-1 text-sm font-semibold text-slate-900 truncate">
-                {currentWorkflowStage
-                  ? `Steg ${currentWorkflowStage.position} av ${FLOW_SYSTEM_STAGES.length} · ${currentWorkflowStage.name}`
-                  : 'Inget steg ännu — flyttas när kontrakt signeras, möte bokas eller arbete rapporteras'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setStageModalOpen(true)}
-              className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 transition-colors"
-            >
-              Visa detaljer
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          <ProjectStageStrip
-            currentStageId={project.current_workflow_stage_id}
-            variant="header"
-            showStageNames
-            onStageClick={() => setStageModalOpen(true)}
-          />
-        </section>
-
-        {/* Twin-strip (Etapp D1) — mockupens fem svarskort direkt under
-            titeln, ovanför tvåkolumnsgriden. Allt props ur redan hämtad
-            data — noll nya anrop. */}
-        <TwinStrip
-          startDate={project.start_date}
-          endDate={project.end_date}
+        {/* Statusbandet (Claude Design-handoffen 2026-08-26): ETT kort för
+            läge, ekonomi och fakturaberedskap — ersätter KPI-raden, 8-stegs-
+            headern (bakom "Visa alla 8 steg"), TwinStrip, statuskortet,
+            "Redo att fakturera?" och Ekonomi-pulsen. Allt props ur redan
+            hämtad data — noll nya anrop. */}
+        <ProjectStatusBand
           stageBucket={stageBucket}
-          isOverBudget={isOverBudget}
           canSeeFinancials={canSeeFinancials}
           economics={statusEconomics}
           economicsLoading={statusEconomicsLoading}
           beredskap={fakturaberedskap}
-          todoMode={todoMode}
-          approvalsCount={projectApprovalsCount}
-          onSaveDates={async (start, end) => {
-            // Del A (2026-08-26): planerad start/slut redigeras på plats.
-            // Samma PUT som statusbytet — inga nya rutter.
-            try {
-              const res = await fetch('/api/projects', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ project_id: project.project_id, start_date: start, end_date: end }),
-              })
-              if (!res.ok) throw new Error()
-              setProject({ ...project, start_date: start, end_date: end })
-              showToast('Datum sparade', 'success')
-              return true
-            } catch {
-              showToast('Kunde inte spara datumen', 'error')
-              return false
-            }
-          }}
+          uninvoicedKr={canSeeFinancials && summary ? summary.uninvoiced_revenue : null}
+          onShowAllStages={() => setStageModalOpen(true)}
         />
 
-        {/* Body — Del 3a: desktop tvåkolumn 400px|1fr, mobil enkolumn
-            (statuskort → Att göra → nav). Vänsterkolumnen ÄR mobilvyns
-            översta block, i samma ordning på båda. */}
-        <div className="lg:grid lg:grid-cols-[400px_1fr] lg:gap-5 lg:items-start">
-          {/* Vänsterkolumn: statuskort + Att göra */}
-          <div className="space-y-4 mb-6 lg:mb-0">
-            <ProjectStatusCard
-              currentStageId={project.current_workflow_stage_id}
-              quoteTitle={quote?.title || null}
-              startDate={project.start_date}
-              endDate={project.end_date}
-              canSeeFinancials={canSeeFinancials}
-              economics={statusEconomics}
-              economicsLoading={statusEconomicsLoading}
-              showStageStepper={false}
-            />
-            <ProjectTodoBlock
-              projectId={projectId}
-              mode={todoMode}
-              primaryHref={todoPrimaryHref}
-              onPrimaryClick={todoPrimaryOnClick}
-              overBudgetAlert={overBudgetAlert}
-              actionRows={todoActionRows}
-              onApprovalsCount={setProjectApprovalsCount}
-            />
-            {/* "Redo att fakturera?" (Etapp D2) — samma beräknade aggregat
-                som twin-stripen; vänsterkolumnen är vår layouts motsvarighet
-                till mockupens högerrail. */}
-            <RedoAttFakturera
-              beredskap={fakturaberedskap}
-              uninvoicedKr={canSeeFinancials && summary ? summary.uninvoiced_revenue : null}
-            />
-          </div>
+        {/* Mobil primärknapp — desktopens bor i sidhuvudet. */}
+        <div className="lg:hidden mb-4">
+          {todoPrimaryHref ? (
+            <Link href={todoPrimaryHref} className="w-full inline-flex items-center justify-center h-12 rounded-xl text-white text-[15px] font-semibold bg-gradient-to-br from-primary-700 to-teal-500 shadow-[0_4px_14px_rgba(15,118,110,0.25)]">
+              {TODO_PRIMARY_LABEL[todoMode]}
+            </Link>
+          ) : (
+            <button type="button" onClick={todoPrimaryOnClick} className="w-full inline-flex items-center justify-center h-12 rounded-xl text-white text-[15px] font-semibold bg-gradient-to-br from-primary-700 to-teal-500 shadow-[0_4px_14px_rgba(15,118,110,0.25)]">
+              {TODO_PRIMARY_LABEL[todoMode]}
+            </button>
+          )}
+        </div>
 
-          {/* Högerkolumn: nav (accordion mobil / flikrad desktop) + paneler */}
+        {/* Body: flikrad över hela bredden; Att göra bor i Översikt-flikens
+            innehållsyta (inte längre i en egen vänsterkolumn). */}
+        <div>
           <div className="min-w-0">
             {/* Mobil accordion — sex grupper, en öppen åt gången (Del 3a) */}
             <div className="lg:hidden space-y-2 mb-4">
@@ -2414,117 +2386,119 @@ export default function ProjectDetailPage() {
 
         {/* === TAB: Oversikt === */}
         {activeGroup === 'overview' && (
-          <div className="space-y-6">
-            {/* Projektinfo (Etapp 4b steg 3) */}
-            <ProjectInfoCard
-              projectType={project.project_type}
-              projectTypeLabel={PROJECT_TYPE_LABELS[project.project_type] || project.project_type}
-              startDate={project.start_date}
-              endDate={project.end_date}
-              customer={project.customer}
-              quote={quote}
-              description={project.description}
-              formatDate={formatDate}
-            />
+          <div>
+            {/* Innehållsytan (Statusbandet-handoffen): vänster = Att göra +
+                Framdrift, höger = Personal + Projektinfo, snabbåtgärder sist. */}
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5 items-start">
+              <div className="min-w-0 space-y-3.5">
+                <ProjectTodoBlock
+                  projectId={projectId}
+                  mode={todoMode}
+                  primaryHref={todoPrimaryHref}
+                  onPrimaryClick={todoPrimaryOnClick}
+                  overBudgetAlert={overBudgetAlert}
+                  actionRows={todoActionRows}
+                  onApprovalsCount={setProjectApprovalsCount}
+                  hidePrimary
+                />
 
-            {/* Att tänka på — Customer Facts V1 (injektionspunkt 2, 2026-08-12) */}
-            <ProjectCustomerFactsCard facts={projectCustomerFacts} />
-
-            {/* Ekonomi-puls — samma state-källa som Ekonomi-fliken */}
-            <EkonomiPulsCard
-              projectId={projectId}
-              onOpenFull={() => setActiveTab('economy')}
-              refreshKey={economicsRefreshKey}
-            />
-
-            {/* Framdrift (progress + Budget vs Utfall) */}
-            <FramdriftCard
-              progressPercent={project.progress_percent}
-              budgetHours={project.budget_hours ?? null}
-              actualHours={summary?.total_hours ?? 0}
-              budgetAmount={project.budget_amount ?? null}
-              actualRevenue={summary?.total_revenue ?? null}
-              formatHours={formatHours}
-              formatCurrency={formatCurrency}
-            />
-
-            {/* Personal (team allocation) */}
-            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-primary-700" />
-                  Personal ({projectTeam.length})
-                </h2>
-                <button
-                  onClick={() => setActiveTab('team')}
-                  className="text-sm text-primary-700 hover:text-primary-800 flex items-center gap-1"
-                >
-                  Hantera <ChevronRight className="w-4 h-4" />
-                </button>
+                {/* Framdrift — bara när arbete pågår/är klart; i Planering
+                    finns inget att rita. */}
+                {stageBucket !== 'planering' && (
+                  <FramdriftCard
+                    progressPercent={project.progress_percent}
+                    budgetHours={project.budget_hours ?? null}
+                    actualHours={summary?.total_hours ?? 0}
+                    budgetAmount={project.budget_amount ?? null}
+                    actualRevenue={summary?.total_revenue ?? null}
+                    formatHours={formatHours}
+                    formatCurrency={formatCurrency}
+                  />
+                )}
               </div>
-              {projectTeam.length === 0 ? (
-                <div className="text-center py-6">
-                  <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-400 mb-3">Ingen tilldelad ännu</p>
-                  <button
-                    onClick={() => { setActiveTab('team'); setTimeout(() => setShowAddMember(true), 100) }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90"
-                  >
-                    <UserPlus className="w-3.5 h-3.5" />
-                    Tilldela personal
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-3">
-                  {projectTeam.map(assignment => (
-                    <div key={assignment.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-[#E2E8F0]">
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: assignment.business_user.color }}
+
+              <div className="space-y-3.5">
+                {/* Personal (team allocation) */}
+                <div className="bg-white rounded-[14px] border border-[#E2E8F0] px-5 py-[18px]">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-[15px] font-semibold text-slate-900">Personal ({projectTeam.length})</h2>
+                    <button
+                      onClick={() => setActiveTab('team')}
+                      className="text-[13px] font-semibold text-primary-700 hover:text-primary-800"
+                    >
+                      Hantera
+                    </button>
+                  </div>
+                  {projectTeam.length === 0 ? (
+                    <div className="flex items-center justify-between gap-2.5 text-[13px] text-slate-400">
+                      <span>Ingen tilldelad ännu</span>
+                      <button
+                        onClick={() => { setActiveTab('team'); setTimeout(() => setShowAddMember(true), 100) }}
+                        className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary-700 hover:text-primary-800"
                       >
-                        <span className="text-gray-900 text-xs font-bold">
-                          {assignment.business_user.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm text-gray-900 font-medium truncate">{assignment.business_user.name}</p>
-                        <p className="text-xs text-gray-400">{assignment.role === 'lead' ? 'Ansvarig' : 'Medlem'}</p>
-                      </div>
+                        <UserPlus className="w-3.5 h-3.5" />
+                        Tilldela personal
+                      </button>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {projectTeam.map(assignment => (
+                        <div key={assignment.id} className="flex items-center gap-2 bg-slate-50 border border-[#E2E8F0] rounded-full pl-[5px] pr-3.5 py-[5px]" title={assignment.role === 'lead' ? 'Ansvarig' : 'Medlem'}>
+                          <span className="w-7 h-7 rounded-full bg-[#ccfbf1] text-primary-700 text-[11px] font-bold inline-flex items-center justify-center flex-shrink-0">
+                            {assignment.business_user.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+                          </span>
+                          <span className="text-[13px] font-medium text-slate-700 truncate">{assignment.business_user.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {/* Projektinfo — en rad: typ + kund (länk). Beskrivning/offert
+                    bor kvar i ProjectInfoCard under Ekonomi & offert. */}
+                <div className="bg-white rounded-[14px] border border-[#E2E8F0] px-5 py-3.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-slate-500">
+                  <span className="text-[10.5px] tracking-[0.14em] font-semibold uppercase text-slate-400">Projektinfo</span>
+                  <span>Typ <span className="text-slate-700 font-medium">{PROJECT_TYPE_LABELS[project.project_type] || project.project_type}</span></span>
+                  {project.customer && (
+                    <span>
+                      Kund{' '}
+                      <Link href={`/dashboard/customers/${project.customer.customer_id}`} className="text-primary-700 font-medium hover:text-primary-800">
+                        {project.customer.name}
+                      </Link>
+                    </span>
+                  )}
+                </div>
+
+                {/* Att tänka på — Customer Facts V1 (injektionspunkt 2, 2026-08-12) */}
+                <ProjectCustomerFactsCard facts={projectCustomerFacts} />
+              </div>
             </div>
 
-            {/* Quick actions */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* Snabbåtgärder */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
               <button
                 onClick={() => openTimeModal()}
-                className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 transition-all text-center"
+                className="h-11 bg-white rounded-xl border border-[#E2E8F0] text-[13.5px] font-medium text-slate-700 hover:bg-slate-50 hover:border-primary-300 active:scale-[0.98] transition"
               >
-                <Timer className="w-5 h-5 text-primary-700" />
-                <span className="text-sm text-gray-700">Lägg till tid</span>
+                Lägg till tid
               </button>
               <button
                 onClick={() => { setActiveTab('milestones'); setMilestoneModal({ open: true, editing: null }) }}
-                className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 transition-all text-center"
+                className="h-11 bg-white rounded-xl border border-[#E2E8F0] text-[13.5px] font-medium text-slate-700 hover:bg-slate-50 hover:border-primary-300 active:scale-[0.98] transition"
               >
-                <Layers className="w-5 h-5 text-primary-500" />
-                <span className="text-sm text-gray-700">Nytt delmoment</span>
+                Nytt delmoment
               </button>
               <button
                 onClick={() => { setActiveTab('changes'); setChangeModal({ open: true, editing: null }) }}
-                className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 transition-all text-center"
+                className="h-11 bg-white rounded-xl border border-[#E2E8F0] text-[13.5px] font-medium text-slate-700 hover:bg-slate-50 hover:border-primary-300 active:scale-[0.98] transition"
               >
-                <AlertTriangle className="w-5 h-5 text-amber-400" />
-                <span className="text-sm text-gray-700">Ny ATA</span>
+                Ny ÄTA
               </button>
               <button
                 onClick={() => setActiveTab('economy')}
-                className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 transition-all text-center"
+                className="h-11 bg-white rounded-xl border border-[#E2E8F0] text-[13.5px] font-medium text-slate-700 hover:bg-slate-50 hover:border-primary-300 active:scale-[0.98] transition"
               >
-                <Receipt className="w-5 h-5 text-emerald-600" />
-                <span className="text-sm text-gray-700">Fakturera</span>
+                Fakturera
               </button>
             </div>
           </div>

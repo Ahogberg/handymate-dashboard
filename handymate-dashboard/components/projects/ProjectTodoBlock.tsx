@@ -47,6 +47,9 @@ interface ProjectTodoBlockProps {
       twin-stripens "Nästa steg" kan visa "X förslag väntar" — samma
       räkning som badgen här, aldrig en egen hämtning. */
   onApprovalsCount?: (count: number) => void
+  /** Statusbandet-layouten (2026-08-26): primärknappen bor i sidhuvudet —
+      då renderas den INTE här ("samma åtgärd, aldrig två knappar"). */
+  hidePrimary?: boolean
 }
 
 export default function ProjectTodoBlock({
@@ -57,6 +60,7 @@ export default function ProjectTodoBlock({
   overBudgetAlert,
   actionRows,
   onApprovalsCount,
+  hidePrimary = false,
 }: ProjectTodoBlockProps) {
   const [approvalsCount, setApprovalsCount] = useState(0)
   const [approvalsReady, setApprovalsReady] = useState(false)
@@ -84,7 +88,7 @@ export default function ProjectTodoBlock({
           finnas — men det kan inte garanteras (godkänn-kortet kommer från
           en fristående pending_approvals-rad). Primärknappen visas därför
           alltid så åtgärden aldrig blir onåbar; se handoff-rapporten. */}
-      {primaryHref ? (
+      {!hidePrimary && (primaryHref ? (
         <Link href={primaryHref} className={primaryButtonCls}>
           {primaryLabel}
         </Link>
@@ -92,7 +96,7 @@ export default function ProjectTodoBlock({
         <button type="button" onClick={onPrimaryClick} className={primaryButtonCls}>
           {primaryLabel}
         </button>
-      )}
+      ))}
 
       {overBudgetAlert && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex items-start gap-2.5">

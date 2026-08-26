@@ -131,9 +131,12 @@ test.describe('steglösa projekt visas ärligt', () => {
   test('ProjectStageStrip: null = position 0 (allt kommande), inte ps-01', () => {
     expect(read('components/projects/ProjectStageStrip.tsx')).toContain('?.position ?? 0')
   })
-  test('projektsidans header säger "Inget steg ännu" i stället för att låtsas', () => {
+  test('projektsidan låtsas aldrig ps-01 för ett steglöst projekt (listan säger "Inget steg ännu")', () => {
+    // 2026-08-26 (Statusbandet): 8-stegsheadern är ersatt av bandets
+    // 3-stegs stepper (getStageBucket: null → planering, ärligt) och
+    // stegmodalen. Fallbacken `|| FLOW_SYSTEM_STAGES[0]` får aldrig komma tillbaka.
     const s = read('app/dashboard/projects/[id]/page.tsx')
-    expect(s).toContain('Inget steg ännu')
     expect(s).not.toContain('|| FLOW_SYSTEM_STAGES[0]')
+    expect(read('app/dashboard/projects/page.tsx')).toContain('Inget steg ännu')
   })
 })
