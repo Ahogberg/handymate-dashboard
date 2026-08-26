@@ -1814,6 +1814,27 @@ export default function PipelinePage() {
               stages={stages}
               onDealClick={openDealDetail}
               onProjectClick={(projectId) => router.push(`/dashboard/projects/${projectId}`)}
+              onProjectStageChanged={(projectId, stageId) => {
+                // Uppdatera båda projektkällorna direkt. Verksamhetsöversiktens
+                // filter, räknare och fasstrip ska dela samma nya sanning utan
+                // att invänta en full nätverksrefetch.
+                setDeals(current => current.map(deal =>
+                  deal.project?.id === projectId
+                    ? {
+                        ...deal,
+                        project: {
+                          ...deal.project,
+                          current_workflow_stage_id: stageId,
+                        },
+                      }
+                    : deal
+                ))
+                setOrphanProjects(current => current.map(project =>
+                  project.id === projectId
+                    ? { ...project, current_workflow_stage_id: stageId }
+                    : project
+                ))
+              }}
               density="comfortable"
               draggingDealId={draggingDealId}
               dragOverStageId={dragOverStageId}

@@ -1,6 +1,6 @@
 'use client'
 
-import { FileSignature, CalendarCheck, Hammer, Target, Search, FileText, CircleDollarSign, Star, type LucideIcon } from 'lucide-react'
+import { FileSignature, CalendarCheck, Hammer, Target, Search, FileText, CircleDollarSign, Star, Loader2, type LucideIcon } from 'lucide-react'
 import { FLOW_SYSTEM_STAGES } from '@/components/pipeline/unified/flow-constants'
 import styles from '@/components/pipeline/unified/flow.module.css'
 
@@ -38,16 +38,25 @@ const STAGE_ICONS: Record<string, LucideIcon> = {
 }
 
 interface ProjectStageStripProps {
-  currentStageId: string
+  currentStageId: string | null | undefined
   density?: 'comfortable' | 'compact'
   /** Om satt: varje fas blir klickbar och callback körs med stage-id */
   onStageClick?: (stageId: string) => void
+  /** Visar de korta fasnamnen permanent, avsett för projektsidans header. */
+  showStageNames?: boolean
+  /** Större header-variant med horisontell scroll på smala skärmar. */
+  variant?: 'default' | 'header'
+  /** Fas som håller på att sparas. Hindrar dubbelklick och visar spinner. */
+  changingStageId?: string | null
 }
 
 export function ProjectStageStrip({
   currentStageId,
   density = 'comfortable',
   onStageClick,
+  showStageNames = false,
+  variant = 'default',
+  changingStageId = null,
 }: ProjectStageStripProps) {
   const currentPos =
     FLOW_SYSTEM_STAGES.find(s => s.id === currentStageId)?.position || 1
@@ -55,8 +64,15 @@ export function ProjectStageStrip({
   const clickable = onStageClick != null
 
   return (
-    <>
-      <div className={`${styles.stageBars} ${density === 'compact' ? styles.stageBarsCompact : ''}`}>
+    <div className={`${styles.projectStageStripScroller} ${variant === 'header' ? styles.projectStageStripScrollerHeader : ''}`}>
+      <div
+        className={[
+          styles.projectStageStrip,
+          variant === 'header' ? styles.projectStageStripHeader : '',
+          density === 'compact' ? styles.projectStageStripCompact : '',
+        ].filter(Boolean).join(' ')}
+        data-project-stage-strip
+      >
         {FLOW_SYSTEM_STAGES.map(s => {
           const status =
             s.position < currentPos
@@ -64,83 +80,75 @@ export function ProjectStageStrip({
               : s.position === currentPos
                 ? 'current'
                 : 'upcoming'
-          const cls = [
-            styles.stageSeg,
-            status === 'done' ? styles.stageSegDone : '',
-            status === 'current' ? styles.stageSegCurrent : '',
-            status === 'upcoming' ? styles.stageSegUpcoming : '',
-          ]
-            .filter(Boolean)
-            .join(' ')
-          return (
-            <div
-              key={s.id}
-              className={cls}
-              style={{
-                background: status === 'upcoming' ? undefined : s.color,
-                ['--seg-color' as any]: s.color,
-                cursor: clickable ? 'pointer' : undefined,
-              }}
-              title={`${s.position}. ${s.name}${clickable ? ' (klicka för detaljer)' : ''}`}
-              onClick={clickable ? () => onStageClick!(s.id) : undefined}
-              role={clickable ? 'button' : undefined}
-              tabIndex={clickable ? 0 : undefined}
-              onKeyDown={clickable
-                ? e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      onStageClick!(s.id)
-                    }
-                  }
-                : undefined
-              }
-            />
-          )
-        })}
-      </div>
-      <div className={styles.stageBarsLabels}>
-        {FLOW_SYSTEM_STAGES.map(s => {
-          const status =
-            s.position < currentPos
-              ? 'done'
-              : s.position === currentPos
-                ? 'current'
-                : 'upcoming'
-          const cls = [
-            styles.stageBarsLabel,
-            status === 'done' ? styles.stageBarsLabelDone : '',
-            status === 'current' ? styles.stageBarsLabelCurrent : '',
-          ]
-            .filter(Boolean)
-            .join(' ')
           const Icon = STAGE_ICONS[s.id]
+          const changing = changingStageId === s.id
+          const canSelect = clickable && !changingStageId && s.id !== currentStageId
+          const statusLabel = status === 'done' ? 'Klart' : status === 'current' ? 'Pågår' : 'Kommande'
+
+          const activate = () => {
+            if (canSelect) onStageClick!(s.id)
+          }
+
           return (
             <div
               key={s.id}
-              className={cls}
+              className={[
+                styles.projectStageStep,
+                canSelect ? styles.projectStageStepClickable : '',
+                changing ? styles.projectStageStepChanging : '',
+              ].filter(Boolean).join(' ')}
               style={{
-                ['--stage-current-color' as any]: s.color,
-                cursor: clickable ? 'pointer' : undefined,
+                ['--stage-color' as any]: s.color,
+                ['--stage-soft' as any]: `${s.color}18`,
               }}
-              title={`${s.position}. ${s.name}`}
-              onClick={clickable ? () => onStageClick!(s.id) : undefined}
-              role={clickable ? 'button' : undefined}
-              tabIndex={clickable ? 0 : undefined}
-              onKeyDown={clickable
+              onClick={canSelect ? activate : undefined}
+              role={canSelect ? 'button' : undefined}
+              tabIndex={canSelect ? 0 : undefined}
+              aria-current={status === 'current' ? 'step' : undefined}
+              aria-label={`${s.position}. ${s.name} · ${statusLabel}${canSelect ? ' · byt till detta steg' : ''}`}
+              onKeyDown={canSelect
                 ? e => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
-                      onStageClick!(s.id)
+                      activate()
                     }
                   }
                 : undefined
               }
             >
-              <Icon className="w-3.5 h-3.5" strokeWidth={1.75} />
+              <span
+                className={[
+                  styles.projectStageSegment,
+                  status === 'done' ? styles.projectStageSegmentDone : '',
+                  status === 'current' ? styles.projectStageSegmentCurrent : '',
+                  status === 'upcoming' ? styles.projectStageSegmentUpcoming : '',
+                ].filter(Boolean).join(' ')}
+              />
+              <span
+                className={[
+                  styles.projectStageIcon,
+                  status === 'done' ? styles.projectStageIconDone : '',
+                  status === 'current' ? styles.projectStageIconCurrent : '',
+                ].filter(Boolean).join(' ')}
+              >
+                {changing
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={2} />
+                  : <Icon className="w-3.5 h-3.5" strokeWidth={1.75} />}
+              </span>
+              {showStageNames && (
+                <span className={styles.projectStageName}>{s.short}</span>
+              )}
+              <span className={styles.projectStageTooltip} role="tooltip">
+                <Icon className="w-4 h-4" strokeWidth={1.8} />
+                <span>
+                  <strong>Steg {s.position} · {s.name}</strong>
+                  <small>{changing ? 'Sparar ändringen…' : canSelect ? `${statusLabel} · klicka för att byta` : statusLabel}</small>
+                </span>
+              </span>
             </div>
           )
         })}
       </div>
-    </>
+    </div>
   )
 }

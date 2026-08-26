@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, Calendar, Check } from 'lucide-react'
+import { ArrowRight, Calendar } from 'lucide-react'
 import type { Deal, Stage } from '@/app/dashboard/pipeline/types'
 import {
   FLOW_SYSTEM_STAGES,
@@ -35,8 +35,10 @@ interface FlowPipelineProps {
   stages: Stage[]
   /** Klick på deal-kort öppnar detail-modalen */
   onDealClick: (deal: Deal) => void
-  /** Klick på projekt-rad navigerar till projektsidan */
+  /** Den separata Öppna projekt-knappen navigerar till projektsidan */
   onProjectClick: (projectId: string) => void
+  /** Håller parentens projektdata sann direkt efter ett lyckat stage-byte. */
+  onProjectStageChanged: (projectId: string, stageId: string) => void
   /** Densitet — påverkar padding på kort */
   density?: 'comfortable' | 'compact'
   /**
@@ -85,6 +87,7 @@ export default function FlowPipeline({
   stages,
   onDealClick,
   onProjectClick,
+  onProjectStageChanged,
   density = 'comfortable',
   initialSplitPercent = SPLIT_DEFAULT,
   draggingDealId,
@@ -252,12 +255,12 @@ export default function FlowPipeline({
         customerTypeFilter={customerTypeFilterProp === 'all' ? null : customerTypeFilterProp}
         availableCustomerTypes={Array.from(new Set(allProjects.map(p => p.project.customer_type).filter(Boolean) as string[]))}
         onProjectClick={onProjectClick}
+        onProjectStageChanged={onProjectStageChanged}
         density={density}
       />
     </div>
   )
 }
-
 // ────────────────────────────────────────────────────────────────────────────
 // Sales Pane (vänster) — Kanban-kolumner
 // ────────────────────────────────────────────────────────────────────────────
@@ -546,6 +549,7 @@ function ProjectExecutionPane({
   customerTypeFilter,
   availableCustomerTypes,
   onProjectClick,
+  onProjectStageChanged,
   density,
 }: {
   projects: Array<{ deal: Deal | null; project: NonNullable<Deal['project']> }>
@@ -556,6 +560,7 @@ function ProjectExecutionPane({
   customerTypeFilter: string | null
   availableCustomerTypes: string[]
   onProjectClick: (projectId: string) => void
+  onProjectStageChanged: (projectId: string, stageId: string) => void
   density: 'comfortable' | 'compact'
 }) {
   const totalValue = projects.reduce((s, p) => s + (p.project.budget_sek || 0), 0)
@@ -610,6 +615,7 @@ function ProjectExecutionPane({
             deal={p.deal}
             project={p.project}
             onClick={() => onProjectClick(p.project.id)}
+            onStageChanged={onProjectStageChanged}
             density={density}
           />
         ))}
@@ -672,15 +678,19 @@ function ProjectRow({
   deal,
   project,
   onClick,
+  onStageChanged,
   density,
 }: {
   /** Null när projektet saknar koppling till en deal (manuellt skapat). */
   deal: Deal | null
   project: NonNullable<Deal['project']>
   onClick: () => void
+  onStageChanged: (projectId: string, stageId: string) => void
   density: 'comfortable' | 'compact'
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const [pendingStageId, setPendingStageId] = useState<string | null>(null)
+  const [changingStageId, setChangingStageId] = useState<string | null>(null)
+  const [stageFeedback, setStageFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const cat = categoryMeta(deal?.category)
   // Kund-namn: deal.customer.name → project.customer_name (orphan) → fallback
   const customerName = deal?.customer?.name || (project as any).customer_name || null
@@ -693,10 +703,44 @@ function ProjectRow({
   const isOverdue = days != null && days < 0 && project.progress_percent < 100
   const isDone = project.progress_percent >= 100 || project.status === 'completed'
 
-  function handleRowClick(e: React.MouseEvent) {
-    // Klick på "öppna projekt"-länken navigerar — annars expanderar/kollapsar
-    e.stopPropagation()
-    setExpanded(prev => !prev)
+  const pendingStage = pendingStageId
+    ? FLOW_SYSTEM_STAGES.find(stage => stage.id === pendingStageId) || null
+    : null
+
+  useEffect(() => {
+    if (!stageFeedback) return
+    const timer = window.setTimeout(() => setStageFeedback(null), 4000)
+    return () => window.clearTimeout(timer)
+  }, [stageFeedback])
+
+  async function changeProjectStage() {
+    if (!pendingStage || changingStageId) return
+
+    setChangingStageId(pendingStage.id)
+    setStageFeedback(null)
+    try {
+      const response = await fetch(`/api/projects/${project.id}/advance-stage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to_stage_id: pendingStage.id }),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunde inte byta projektsteg')
+      }
+
+      const nextStageId = result.new_stage?.id || pendingStage.id
+      onStageChanged(project.id, nextStageId)
+      setPendingStageId(null)
+      setStageFeedback({ type: 'success', message: `Projektet flyttades till ${result.new_stage?.name || pendingStage.name}.` })
+    } catch (error) {
+      setStageFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Kunde inte byta projektsteg',
+      })
+    } finally {
+      setChangingStageId(null)
+    }
   }
 
   return (
@@ -706,7 +750,6 @@ function ProjectRow({
         borderLeftColor: currentStage.color,
         ['--stage-color' as any]: currentStage.color,
       }}
-      onClick={handleRowClick}
     >
       <div className={styles.projectRowTop}>
         <div className={styles.projectInfo}>
@@ -755,7 +798,61 @@ function ProjectRow({
         </div>
       </div>
 
-      <ProjectStageStrip currentStageId={currentStage.id} density={density} />
+      <ProjectStageStrip
+        currentStageId={currentStage.id}
+        density={density}
+        changingStageId={changingStageId}
+        onStageClick={(stageId) => {
+          setStageFeedback(null)
+          setPendingStageId(stageId)
+        }}
+      />
+
+      {pendingStage && (
+        <div
+          className={styles.projectStageConfirm}
+          style={{
+            ['--stage-color' as any]: pendingStage.color,
+            ['--stage-soft' as any]: `${pendingStage.color}12`,
+          }}
+          role="region"
+          aria-label="Bekräfta byte av projektsteg"
+        >
+          <span className={styles.projectStageConfirmIcon}>
+            <ArrowRight size={15} strokeWidth={2} />
+          </span>
+          <span className={styles.projectStageConfirmText}>
+            Flytta till <strong>{pendingStage.name}</strong>? Stegbytet kan starta automationer.
+          </span>
+          <span className={styles.projectStageConfirmActions}>
+            <button
+              type="button"
+              className={styles.projectStageCancelButton}
+              disabled={!!changingStageId}
+              onClick={() => setPendingStageId(null)}
+            >
+              Avbryt
+            </button>
+            <button
+              type="button"
+              className={styles.projectStageSaveButton}
+              disabled={!!changingStageId}
+              onClick={changeProjectStage}
+            >
+              {changingStageId ? 'Sparar…' : 'Byt steg'}
+            </button>
+          </span>
+        </div>
+      )}
+
+      {stageFeedback && (
+        <div
+          className={`${styles.projectStageFeedback} ${stageFeedback.type === 'success' ? styles.projectStageFeedbackSuccess : styles.projectStageFeedbackError}`}
+          role={stageFeedback.type === 'error' ? 'alert' : 'status'}
+        >
+          {stageFeedback.message}
+        </div>
+      )}
 
       {/* AI-aktivitet (live från v3_automation_logs via customer_id) */}
       {project.latest_automation && (
@@ -764,50 +861,21 @@ function ProjectRow({
 
       {/* Snabbåtgärder — pilot-feedback 2026-05-20: Christoffer vill ha
           snabbåtgärds-knappar vid varje projekt (likt deal-cards i säljtratten).
-          Ring/SMS/Karta + Öppna projekt. e.stopPropagation så de inte
-          triggar row-expand. */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          marginTop: 8,
-          paddingTop: 8,
-          borderTop: '1px solid #f1f5f9',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
+          Ring/SMS/Karta + en tydlig, separat Öppna projekt-knapp. */}
+      <div className={styles.projectActions}>
         {deal?.customer?.phone_number && (
           <>
             <a
               href={`tel:${deal.customer.phone_number}`}
               title="Ring kund"
-              style={{
-                padding: '4px 8px',
-                fontSize: 10,
-                color: '#64748b',
-                textDecoration: 'none',
-                borderRadius: 6,
-                fontWeight: 500,
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f766e' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#64748b' }}
+              className={styles.projectQuickAction}
             >
               📞 Ring
             </a>
             <a
               href={`sms:${deal.customer.phone_number}`}
               title="SMS kund"
-              style={{
-                padding: '4px 8px',
-                fontSize: 10,
-                color: '#64748b',
-                textDecoration: 'none',
-                borderRadius: 6,
-                fontWeight: 500,
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f766e' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#64748b' }}
+              className={styles.projectQuickAction}
             >
               💬 SMS
             </a>
@@ -819,16 +887,7 @@ function ProjectRow({
             target="_blank"
             rel="noopener noreferrer"
             title={deal.customer.address_line}
-            style={{
-              padding: '4px 8px',
-              fontSize: 10,
-              color: '#64748b',
-              textDecoration: 'none',
-              borderRadius: 6,
-              fontWeight: 500,
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f766e' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#64748b' }}
+            className={styles.projectQuickAction}
           >
             📍 Karta
           </a>
@@ -836,26 +895,14 @@ function ProjectRow({
         <button
           type="button"
           onClick={() => onClick()}
-          style={{
-            marginLeft: 'auto',
-            background: 'transparent',
-            border: 'none',
-            padding: '4px 8px',
-            cursor: 'pointer',
-            color: '#0f766e',
-            fontSize: 11,
-            fontWeight: 600,
-          }}
+          className={styles.openProjectButton}
         >
-          Öppna projekt →
+          Öppna projekt <ArrowRight size={14} strokeWidth={2.2} />
         </button>
       </div>
-
-      {expanded && <ProjectExpandDetail currentStageId={currentStage.id} />}
     </div>
   )
 }
-
 // ────────────────────────────────────────────────────────────────────────────
 // AiActivityStrip — visar senaste AI-aktivitet (agent-avatar + action + tid)
 // ────────────────────────────────────────────────────────────────────────────
@@ -880,105 +927,4 @@ function AiActivityStrip({
     </div>
   )
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// StageBars — 8 färgade segment (done / current / upcoming)
-// ────────────────────────────────────────────────────────────────────────────
-
-function StageBars({ currentStageId, density }: { currentStageId: string; density: 'comfortable' | 'compact' }) {
-  const currentPos = FLOW_SYSTEM_STAGES.find(s => s.id === currentStageId)?.position || 1
-  return (
-    <>
-      <div className={`${styles.stageBars} ${density === 'compact' ? styles.stageBarsCompact : ''}`}>
-        {FLOW_SYSTEM_STAGES.map(s => {
-          const status = s.position < currentPos ? 'done' : s.position === currentPos ? 'current' : 'upcoming'
-          const cls = [
-            styles.stageSeg,
-            status === 'done' ? styles.stageSegDone : '',
-            status === 'current' ? styles.stageSegCurrent : '',
-            status === 'upcoming' ? styles.stageSegUpcoming : '',
-          ].filter(Boolean).join(' ')
-          return (
-            <div
-              key={s.id}
-              className={cls}
-              style={{
-                background: status === 'upcoming' ? undefined : s.color,
-                ['--seg-color' as any]: s.color,
-              }}
-              title={`${s.position}. ${s.name}`}
-            />
-          )
-        })}
-      </div>
-      <div className={styles.stageBarsLabels}>
-        {FLOW_SYSTEM_STAGES.map(s => {
-          const status = s.position < currentPos ? 'done' : s.position === currentPos ? 'current' : 'upcoming'
-          const cls = [
-            styles.stageBarsLabel,
-            status === 'done' ? styles.stageBarsLabelDone : '',
-            status === 'current' ? styles.stageBarsLabelCurrent : '',
-          ].filter(Boolean).join(' ')
-          return (
-            <div
-              key={s.id}
-              className={cls}
-              style={{ ['--stage-current-color' as any]: s.color }}
-            >
-              {s.icon}
-            </div>
-          )
-        })}
-      </div>
-    </>
-  )
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Expand-detail — full 8-stage timeline med markers
-// ────────────────────────────────────────────────────────────────────────────
-
-function ProjectExpandDetail({ currentStageId }: { currentStageId: string }) {
-  const currentPos = FLOW_SYSTEM_STAGES.find(s => s.id === currentStageId)?.position || 1
-  return (
-    <div className={styles.projectDetail}>
-      <div className={styles.projectDetailHead}>Alla 8 faser</div>
-      <div className={styles.detailStageList}>
-        {FLOW_SYSTEM_STAGES.map(s => {
-          const status = s.position < currentPos ? 'done' : s.position === currentPos ? 'current' : 'upcoming'
-          const stageClass = [
-            styles.detailStage,
-            status === 'done' ? styles.detailStageDone : '',
-            status === 'current' ? styles.detailStageCurrent : '',
-            status === 'upcoming' ? styles.detailStageUpcoming : '',
-          ].filter(Boolean).join(' ')
-          return (
-            <div
-              key={s.id}
-              className={stageClass}
-              style={{
-                ['--stage-color' as any]: s.color,
-                ['--stage-soft' as any]: s.color + '2A',
-              }}
-            >
-              <div className={styles.detailStageMarker}>{s.icon}</div>
-              <div className={styles.detailStageBody}>
-                <div className="nm" style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</div>
-                <div className="dt" style={{ fontSize: 11 }}>
-                  {status === 'done' && 'Klart'}
-                  {status === 'current' && 'Pågår'}
-                  {status === 'upcoming' && 'Kommande'}
-                </div>
-              </div>
-              {status === 'done' && (
-                <div className={styles.detailCheck}>
-                  <Check size={11} />
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
+// End of unified pipeline module.

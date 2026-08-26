@@ -97,6 +97,8 @@ import { FramdriftCard } from '@/components/projects/economy/FramdriftCard'
 import { ProjectQuoteSpec } from '@/components/projects/ProjectQuoteSpec'
 import { ProjectQuoteDocumentCard } from '@/components/projects/ProjectQuoteDocumentCard'
 import { ProjectStatusCard, getStageBucket } from '@/components/projects/ProjectStatusCard'
+import { ProjectStageStrip } from '@/components/projects/ProjectStageStrip'
+import { FLOW_SYSTEM_STAGES } from '@/components/pipeline/unified/flow-constants'
 import ProjectTodoBlock, { type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
 import { TwinStrip } from '@/components/projects/TwinStrip'
 import { RedoAttFakturera } from '@/components/projects/RedoAttFakturera'
@@ -1857,6 +1859,9 @@ export default function ProjectDetailPage() {
   // arbete alls registrerats?).
   const canSeeFinancials = can('see_financials')
   const stageBucket = getStageBucket(project.current_workflow_stage_id)
+  const currentWorkflowStage =
+    FLOW_SYSTEM_STAGES.find(stage => stage.id === project.current_workflow_stage_id) ||
+    FLOW_SYSTEM_STAGES[0]
   const nedlagtKr = statusEconomics?.kostnader.total_kr ?? null
   const offereratKr = statusEconomics?.intakter.forvantad_intakt_kr ?? 0
   const isOverBudget = canSeeFinancials && nedlagtKr != null && offereratKr > 0 && nedlagtKr > offereratKr
@@ -2253,6 +2258,37 @@ export default function ProjectDetailPage() {
           />
         )}
 
+        {/* Projektets kanoniska 8-stegsöversikt. Samma ProjectStageStrip som
+            i Verksamhetsöversikten, men med permanenta kortnamn i headerläge.
+            Klick öppnar den befintliga detalj-/ändringsytan; ekonomin fortsätter
+            ägas av statuskortet längre ned så två ansvar inte blandas ihop. */}
+        <section className="relative z-10 bg-white border border-slate-200 rounded-xl px-4 sm:px-5 pt-4 pb-3 mb-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                Projektets flöde
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-900 truncate">
+                Steg {currentWorkflowStage.position} av {FLOW_SYSTEM_STAGES.length} · {currentWorkflowStage.name}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setStageModalOpen(true)}
+              className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+            >
+              Visa detaljer
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <ProjectStageStrip
+            currentStageId={project.current_workflow_stage_id}
+            variant="header"
+            showStageNames
+            onStageClick={() => setStageModalOpen(true)}
+          />
+        </section>
+
         {/* Twin-strip (Etapp D1) — mockupens fem svarskort direkt under
             titeln, ovanför tvåkolumnsgriden. Allt props ur redan hämtad
             data — noll nya anrop. */}
@@ -2283,7 +2319,7 @@ export default function ProjectDetailPage() {
               canSeeFinancials={canSeeFinancials}
               economics={statusEconomics}
               economicsLoading={statusEconomicsLoading}
-              onStageClick={() => setStageModalOpen(true)}
+              showStageStepper={false}
             />
             <ProjectTodoBlock
               projectId={projectId}

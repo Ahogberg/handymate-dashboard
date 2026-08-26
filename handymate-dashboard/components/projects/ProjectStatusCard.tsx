@@ -59,7 +59,9 @@ interface ProjectStatusCardProps {
   canSeeFinancials: boolean
   economics: ProjectEconomics | null
   economicsLoading: boolean
-  onStageClick: () => void
+  onStageClick?: () => void
+  /** Projektsidan visar nu den fulla 8-stegsstripen i sidhuvudet. */
+  showStageStepper?: boolean
 }
 
 /** "Vecka X av Y" ur projektets start/slutdatum. Exporterad (Etapp D1) så
@@ -85,6 +87,7 @@ export function ProjectStatusCard({
   economics,
   economicsLoading,
   onStageClick,
+  showStageStepper = true,
 }: ProjectStatusCardProps) {
   const bucket = getStageBucket(currentStageId)
   const bucketPos = FAS_ORDER[bucket]
@@ -93,6 +96,10 @@ export function ProjectStatusCard({
   const overBudget =
     canSeeFinancials && state === 'confirmed' && (economics?.marginal.marginal_kr ?? 0) < 0
   const chip = weekChip(startDate, endDate) || (quoteTitle ? 'Skapad från offert' : null)
+
+  // När den fulla fasöversikten ägs av sidhuvudet skulle ett tomt statuskort
+  // sakna funktion för roller utan ekonomibehörighet.
+  if (!showStageStepper && !canSeeFinancials) return null
 
   return (
     <div className={`bg-white border rounded-card p-4 sm:p-5 ${overBudget ? 'border-red-200' : 'border-[#E2E8F0]'}`}>
@@ -106,7 +113,8 @@ export function ProjectStatusCard({
         )}
       </div>
 
-      {/* Fas-stepper */}
+      {/* Fas-stepper — valfri när projektsidans header visar alla åtta steg. */}
+      {showStageStepper && (
       <div className="flex items-center mb-1">
         {FASER.map((f, i) => {
           const status: 'done' | 'current' | 'upcoming' =
@@ -162,6 +170,7 @@ export function ProjectStatusCard({
           )
         })}
       </div>
+      )}
 
       {/* Ekonomistaplar + prognosrad — ägar-gating */}
       {canSeeFinancials && (

@@ -379,7 +379,7 @@
   border-left-width: 4px;
   border-radius: 10px;
   padding: 12px 14px;
-  cursor: pointer;
+  cursor: default;
   transition: box-shadow 150ms, border-color 150ms, transform 150ms;
   position: relative;
   box-shadow: 0 1px 2px rgba(15,23,42,0.04);
@@ -471,6 +471,262 @@
 .stageBarsLabel { color: #94a3b8; }
 .stageBarsLabelDone { color: #64748b; }
 .stageBarsLabelCurrent { color: var(--stage-current-color, #0f766e); font-weight: 700; transform: scale(1.15); }
+
+/* Delad projektfas-strip — verksamhetsöversikt + projektsidans header. */
+.projectStageStripScroller {
+  overflow: visible;
+  padding-top: 2px;
+  scrollbar-width: thin;
+}
+.projectStageStripScrollerHeader {
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin-top: -64px;
+  padding-top: 66px;
+}
+.projectStageStrip {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 3px;
+  min-width: 0;
+  padding-bottom: 6px;
+}
+.projectStageStripHeader {
+  min-width: 690px;
+  gap: 8px;
+  padding: 2px 2px 8px;
+}
+.projectStageStep {
+  position: relative;
+  min-width: 0;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 2px 3px;
+  color: #94a3b8;
+  text-align: center;
+  outline: none;
+  transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+}
+.projectStageStepClickable { cursor: pointer; }
+.projectStageStepClickable:hover,
+.projectStageStepClickable:focus-visible {
+  background: var(--stage-soft, rgba(15, 118, 110, 0.08));
+  color: var(--stage-color, #0f766e);
+  transform: translateY(-1px);
+}
+.projectStageStep:focus-visible {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--stage-color, #0f766e);
+}
+.projectStageStepChanging {
+  background: var(--stage-soft, rgba(15, 118, 110, 0.08));
+  color: var(--stage-color, #0f766e);
+}
+.projectStageSegment {
+  display: block;
+  height: 14px;
+  border-radius: 4px;
+  background: #e2e8f0;
+  overflow: hidden;
+  position: relative;
+  transition: background 140ms ease, box-shadow 140ms ease;
+}
+.projectStageStripCompact .projectStageSegment { height: 10px; }
+.projectStageSegmentDone { background: var(--stage-color, #0f766e); }
+.projectStageSegmentCurrent {
+  background: var(--stage-color, #0f766e);
+  box-shadow: 0 0 0 1.5px #fff, 0 0 0 3px var(--stage-color, #0f766e);
+}
+.projectStageSegmentCurrent::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+  animation: segShimmer 2s ease-in-out infinite;
+}
+.projectStageSegmentUpcoming { background: #e2e8f0; }
+.projectStageStepClickable:hover .projectStageSegmentUpcoming,
+.projectStageStepClickable:focus-visible .projectStageSegmentUpcoming {
+  background: color-mix(in srgb, var(--stage-color, #0f766e) 28%, #e2e8f0);
+}
+.projectStageIcon {
+  width: 24px;
+  height: 24px;
+  margin: 6px auto 0;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.projectStageIconDone {
+  color: #fff;
+  background: var(--stage-color, #0f766e);
+  border-color: var(--stage-color, #0f766e);
+}
+.projectStageIconCurrent {
+  color: var(--stage-color, #0f766e);
+  background: #fff;
+  border: 2px solid var(--stage-color, #0f766e);
+  box-shadow: 0 0 0 3px var(--stage-soft, rgba(15,118,110,0.10));
+}
+.projectStageName {
+  display: block;
+  margin-top: 5px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.projectStageStep[aria-current='step'] .projectStageName {
+  color: var(--stage-color, #0f766e);
+  font-weight: 750;
+}
+.projectStageTooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 9px);
+  z-index: 40;
+  width: max-content;
+  max-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid #dbe4ea;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--stage-color, #0f766e);
+  box-shadow: 0 12px 30px -12px rgba(15, 23, 42, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.projectStageTooltip strong,
+.projectStageTooltip small { display: block; white-space: nowrap; }
+.projectStageTooltip strong { color: #0f172a; font-size: 11px; font-weight: 700; }
+.projectStageTooltip small { margin-top: 1px; color: #64748b; font-size: 10px; font-weight: 500; }
+.projectStageStep:hover .projectStageTooltip,
+.projectStageStep:focus-visible .projectStageTooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.projectStageStep:first-child .projectStageTooltip {
+  left: 0;
+  transform: translate(0, 4px);
+}
+.projectStageStep:first-child:hover .projectStageTooltip,
+.projectStageStep:first-child:focus-visible .projectStageTooltip { transform: translate(0, 0); }
+.projectStageStep:last-child .projectStageTooltip {
+  left: auto;
+  right: 0;
+  transform: translate(0, 4px);
+}
+.projectStageStep:last-child:hover .projectStageTooltip,
+.projectStageStep:last-child:focus-visible .projectStageTooltip { transform: translate(0, 0); }
+
+.projectStageConfirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--stage-color, #0f766e) 35%, #e2e8f0);
+  border-radius: 9px;
+  background: var(--stage-soft, rgba(15, 118, 110, 0.06));
+  color: #334155;
+  font-size: 11px;
+}
+.projectStageConfirmIcon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--stage-color, #0f766e);
+  border: 1px solid #e2e8f0;
+}
+.projectStageConfirmText { flex: 1; min-width: 0; }
+.projectStageConfirmActions { display: flex; align-items: center; gap: 6px; }
+.projectStageCancelButton,
+.projectStageSaveButton,
+.openProjectButton {
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+.projectStageCancelButton {
+  padding: 6px 9px;
+  border: 1px solid #dbe4ea;
+  background: #fff;
+  color: #64748b;
+}
+.projectStageCancelButton:hover { background: #f8fafc; color: #334155; }
+.projectStageSaveButton {
+  padding: 6px 10px;
+  border: 1px solid #0f766e;
+  background: #0f766e;
+  color: #fff;
+}
+.projectStageSaveButton:hover { background: #115e59; border-color: #115e59; }
+.projectStageSaveButton:disabled { opacity: .55; cursor: wait; }
+.projectStageFeedback {
+  margin-top: 7px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.projectStageFeedbackSuccess { color: #047857; }
+.projectStageFeedbackError { color: #dc2626; }
+
+.projectActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+.projectQuickAction {
+  padding: 5px 8px;
+  border-radius: 7px;
+  color: #64748b;
+  font-size: 10.5px;
+  font-weight: 550;
+  text-decoration: none;
+  transition: background 120ms ease, color 120ms ease;
+}
+.projectQuickAction:hover { background: #f1f5f9; color: #0f766e; }
+.openProjectButton {
+  min-height: 36px;
+  margin-left: auto;
+  padding: 8px 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #0f766e;
+  background: #0f766e;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  box-shadow: 0 4px 12px -6px rgba(15,118,110,.65);
+}
+.openProjectButton:hover { background: #115e59; border-color: #115e59; transform: translateY(-1px); }
+
+@media (max-width: 640px) {
+  .projectStageConfirm { align-items: flex-start; flex-wrap: wrap; }
+  .projectStageConfirmActions { width: 100%; justify-content: flex-end; }
+  .projectActions { flex-wrap: wrap; }
+  .openProjectButton { width: 100%; justify-content: center; margin-left: 0; margin-top: 3px; }
+}
 
 /* AI activity strip */
 .aiStrip {
