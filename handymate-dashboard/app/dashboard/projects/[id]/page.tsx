@@ -100,6 +100,7 @@ import { ProjectStatusCard, getStageBucket } from '@/components/projects/Project
 import { ProjectStageStrip } from '@/components/projects/ProjectStageStrip'
 import { FLOW_SYSTEM_STAGES } from '@/components/pipeline/unified/flow-constants'
 import ProjectTodoBlock, { type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
+import { deriveTodoMode } from '@/lib/projects/derive-todo'
 import { TwinStrip } from '@/components/projects/TwinStrip'
 import { RedoAttFakturera } from '@/components/projects/RedoAttFakturera'
 import { beraknaFakturaberedskap } from '@/lib/projects/fakturaberedskap'
@@ -1868,14 +1869,15 @@ export default function ProjectDetailPage() {
   const uninvoicedRevenue = canSeeFinancials ? (summary?.uninvoiced_revenue ?? 0) : 0
   const noWorkYet = (summary?.total_hours ?? 0) === 0 && materials.length === 0
 
-  let todoMode: TodoMode = 'pagaende'
-  if (isOverBudget) {
-    todoMode = 'over_budget'
-  } else if (stageBucket === 'klart' && canSeeFinancials && uninvoicedRevenue > 0) {
-    todoMode = 'klart_ofakturerat'
-  } else if (stageBucket === 'planering' && noWorkYet) {
-    todoMode = 'nystartat'
-  }
+  // EN beräkning, två ytor (Del C, 2026-08-26): samma deriveTodoMode som
+  // GET /api/projects använder för listans "Nästa: …" — aldrig en andra kopia.
+  const todoMode: TodoMode = deriveTodoMode({
+    stageId: project.current_workflow_stage_id,
+    isOverBudget,
+    canSeeFinancials,
+    hasUninvoicedWork: uninvoicedRevenue > 0,
+    noWorkYet,
+  })
 
   // Röd över-budget-alert kräver ett specifikt delmoment med registrerad
   // överskriden timbudget (copy-mallen behöver {moment} + {n tim}) — annars

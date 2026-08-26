@@ -50,6 +50,18 @@ interface Project {
   /** Datumraden (Del A, 2026-08-26): planerat spann, faktisk start, försening — härledd i API:t. */
   dates?: { label: string; sublabel: string | null; tone: 'neutral' | 'upcoming' | 'late' | 'done' | 'cancelled'; is_late: boolean; days_late: number }
   actual_start?: string | null
+  /** Systemsteget ur den rena stegtabellen (Del C); null = inget steg ännu. */
+  stage?: { id: string; name: string; short: string; position: number; total: number } | null
+  /** "Nästa att göra" (Del C): översta väntande kortet, annars härledd primäråtgärd. */
+  next_todo?: {
+    mode: 'nystartat' | 'pagaende' | 'klart_ofakturerat' | 'over_budget'
+    label: string
+    source: 'card' | 'derived'
+    agent: string | null
+    approval_id: string | null
+    approval_type: string | null
+    pending_count: number
+  }
   /** include=workflow */
   current_stage_id?: string | null
   current_stage_name?: string | null
@@ -335,9 +347,14 @@ export default function ProjectsPage() {
       const matchesJobType = !jobTypeFilter || p.job_type === jobTypeFilter
       return matchesSearch && matchesJobType
     })
-    // Det som kräver handling (klart men ofakturerat — pengar som väntar)
-    // ligger överst. Stabil sortering: inbördes ordning behålls.
-    .sort((a, b) => Number(b.lifecycle?.needsAction ?? false) - Number(a.lifecycle?.needsAction ?? false))
+    // Det som kräver handling ligger överst (Del C, 2026-08-26): klart men
+    // ofakturerat → försenat → flest väntande kort → API:ts ordning
+    // (created_at desc). Stabil sortering: inbördes ordning behålls.
+    .sort((a, b) =>
+      (Number(b.lifecycle?.needsAction ?? false) - Number(a.lifecycle?.needsAction ?? false))
+      || (Number(b.dates?.is_late ?? false) - Number(a.dates?.is_late ?? false))
+      || ((b.next_todo?.pending_count ?? 0) - (a.next_todo?.pending_count ?? 0)),
+    )
 
   // Stats
   const activeCount = projects.filter(p => p.status === 'active' || p.status === 'planning').length
@@ -511,6 +528,20 @@ export default function ProjectsPage() {
                             {getStatusText(project.status)}
                           </span>
                         )}
+                        {/* Systemsteget (Del C) — "Steg 3/8 · Jobb påbörjat";
+                            ärligt "Inget steg ännu" när inget hänt. */}
+                        {project.status !== 'completed' && project.status !== 'cancelled' && (
+                          project.stage ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border border-slate-200 bg-white text-slate-600" title={project.stage.name}>
+                              <span className="font-mono text-[10px] text-slate-400">{project.stage.position}/{project.stage.total}</span>
+                              {project.stage.name}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 text-xs rounded-full border border-dashed border-slate-300 text-slate-400">
+                              Inget steg ännu
+                            </span>
+                          )
+                        )}
                         {/* Hälsan syns BARA när den avviker, och med ORD. Ett
                             "80" på varje frisk rad är ett hittepå-score som
                             blir tapet efter dag två (rådets Business Health-
@@ -593,6 +624,23 @@ export default function ProjectsPage() {
                           </span>
                         )}
                       </div>
+                      {/* Nästa att göra (Del C): EN sak per rad — det översta
+                          väntande kortet (med agentens namn), annars samma
+                          primäråtgärd som detaljsidans "Att göra". */}
+                      {project.next_todo && project.status !== 'completed' && project.status !== 'cancelled' && (
+                        <div className="mt-1.5 flex items-center gap-1.5 text-sm min-w-0">
+                          <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-primary-700 flex-shrink-0">Nästa</span>
+                          <span className={`truncate ${project.next_todo.source === 'card' ? 'text-slate-900 font-medium' : 'text-slate-600'}`}>
+                            {project.next_todo.label}
+                          </span>
+                          {project.next_todo.source === 'card' && project.next_todo.agent && (
+                            <span className="text-xs text-slate-400 flex-shrink-0">
+                              — {project.next_todo.agent.charAt(0).toUpperCase() + project.next_todo.agent.slice(1)}
+                              {project.next_todo.pending_count > 1 ? ` · +${project.next_todo.pending_count - 1} till` : ''}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-6">

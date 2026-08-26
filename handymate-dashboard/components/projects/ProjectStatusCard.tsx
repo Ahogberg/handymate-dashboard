@@ -35,14 +35,11 @@ import type { ProjectEconomics } from '@/lib/projects/compute-economics'
  * "Klart + ofakturerat"-läget i Att göra-blocket beskriver.
  */
 
-export type StageBucket = 'planering' | 'pagaende' | 'klart'
-
-export function getStageBucket(stageId: string | null | undefined): StageBucket {
-  const pos = FLOW_SYSTEM_STAGES.find(s => s.id === stageId)?.position ?? 1
-  if (pos <= 2) return 'planering'
-  if (pos <= 4) return 'pagaende'
-  return 'klart'
-}
+// Fas-bucketen bor sedan 2026-08-26 i lib/projects/derive-todo.ts (ren modul,
+// delas med GET /api/projects). Re-exporteras här för befintliga importer.
+import { getStageBucket, type StageBucket } from '@/lib/projects/derive-todo'
+export { getStageBucket }
+export type { StageBucket }
 
 const FASER: { key: StageBucket; label: string }[] = [
   { key: 'planering', label: 'Planering' },

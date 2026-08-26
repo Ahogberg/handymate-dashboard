@@ -9,6 +9,8 @@ import { verifyOwnership } from '@/lib/auth/verify-ownership'
 import { completeProject, type CompleteProjectResult } from '@/lib/projects/complete-project'
 import { deriveProjectLifecycle } from '@/lib/projects/derive-lifecycle'
 import { deriveProjectDates } from '@/lib/projects/derive-dates'
+import { deriveProjectTodo } from '@/lib/projects/derive-todo'
+import { getSystemStage, PROJECT_SYSTEM_STAGES } from '@/lib/project-stages/stages'
 
 // completeProject → autoInvoiceOnComplete kan nu (Etapp Q, TD-86) skicka
 // fakturan på riktigt inline (sendInvoice, Chromium-PDF via
@@ -134,6 +136,29 @@ export async function GET(request: NextRequest) {
       for (const b of bookingData || []) bumpStart(b.project_id, b.scheduled_start)
     }
 
+    // Väntande godkännandekort per projekt (Del C, 2026-08-26): EN query för
+    // hela företaget, grupperad i JS på payload.project_id (den etablerade
+    // konventionen — det finns ingen project_id-kolumn på pending_approvals).
+    // Listan visar det översta kortet per rad ("Nästa: … — Lars").
+    const pendingByProject = new Map<string, Array<{ id: string; approval_type: string; risk_level: string | null; created_at: string | null; title: string | null; payload: Record<string, unknown> | null }>>()
+    if (projectIds.length > 0) {
+      const { data: pendingCards, error: pendingError } = await supabase
+        .from('pending_approvals')
+        .select('id, approval_type, risk_level, created_at, title, payload')
+        .eq('business_id', businessId)
+        .eq('status', 'pending')
+        .not('payload->>project_id', 'is', null)
+        .limit(500)
+      if (pendingError) console.error('[projects] pending_approvals-uppslag misslyckades (non-blocking):', pendingError.message)
+      for (const c of pendingCards || []) {
+        const pid = (c.payload as Record<string, unknown> | null)?.project_id
+        if (typeof pid !== 'string' || !pid) continue
+        const list = pendingByProject.get(pid) || []
+        list.push(c as any)
+        pendingByProject.set(pid, list)
+      }
+    }
+
     // Fakturafakta för den härledda livscykeln (P1-2): en bulk-query,
     // bara status per projekt. Verkligheten, inte progress_percent.
     let invoiceData: any[] = []
@@ -248,6 +273,25 @@ export async function GET(request: NextRequest) {
           end_date: project.end_date,
           completed_at: project.completed_at,
           actual_start: actualStartByProject.get(project.project_id) || null,
+        }),
+        // Systemsteget (Del C): alltid med, ur den rena stegtabellen —
+        // ingen DB-runda, inget include-krav. null = inget steg ännu.
+        stage: (() => {
+          const s = getSystemStage(project.current_workflow_stage_id)
+          return s ? { id: s.id, name: s.name, short: s.short, position: s.position, total: PROJECT_SYSTEM_STAGES.length } : null
+        })(),
+        // "Nästa att göra" (Del C): samma deriveTodoMode som detaljsidan,
+        // plus det översta väntande kortet (högst risk → äldst).
+        next_todo: deriveProjectTodo({
+          stageId: project.current_workflow_stage_id,
+          isOverBudget: canSeeFinancials && (
+            (Number(project.budget_amount) > 0 && actual_amount > Number(project.budget_amount))
+            || (Number(project.budget_hours) > 0 && actual_minutes / 60 > Number(project.budget_hours))
+          ),
+          canSeeFinancials,
+          hasUninvoicedWork: uninvoiced_minutes > 0,
+          noWorkYet: actual_minutes === 0 && actual_amount === 0,
+          pending: pendingByProject.get(project.project_id) || [],
         }),
       }
 

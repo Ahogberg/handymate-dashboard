@@ -14,17 +14,13 @@ import ProjectApprovalsBlock from '@/components/projects/ProjectApprovalsBlock'
  * åtgärdsrader → tomt-läge (bara om helt inget att visa).
  */
 
-export type TodoMode = 'nystartat' | 'pagaende' | 'klart_ofakturerat' | 'over_budget'
-
-/** Exporterad så sidhuvudets dubblerade primärknapp (Del 3c) alltid visar
-    exakt samma etikett som knappen här — "samma åtgärd, aldrig två olika
-    primärer" (HANDOFF.md). */
-export const TODO_PRIMARY_LABEL: Record<TodoMode, string> = {
-  nystartat: 'Boka första besök',
-  pagaende: 'Rapportera tid',
-  klart_ofakturerat: 'Godkänn & skicka',
-  over_budget: 'Skapa ÄTA',
-}
+/** Typen och etiketterna bor sedan 2026-08-26 i lib/projects/derive-todo.ts
+    (ren modul — delas med GET /api/projects så projektlistan visar EXAKT
+    samma "nästa steg" som den här knappen: "samma åtgärd, aldrig två olika
+    primärer", HANDOFF.md). Re-exporteras här för befintliga importer. */
+import { TODO_PRIMARY_LABEL, type TodoMode } from '@/lib/projects/derive-todo'
+export { TODO_PRIMARY_LABEL }
+export type { TodoMode }
 
 export interface TodoRow {
   id: string
