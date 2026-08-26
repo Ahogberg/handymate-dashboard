@@ -82,7 +82,10 @@ test.describe('Fakturor — strukturlyft', () => {
 
   test('datakällan (fetchInvoices mot /api/invoices) och filtreringslogiken är oförändrad', () => {
     expect(source).toContain('fetch(`/api/invoices?businessId=${business.business_id}`)')
-    expect(source).toContain("const matchesFilter = filter === 'all' || inv.status === filter")
+    // 2026-08-26 (medveten spec-ändring, customer_paid): "Betalda"-fliken
+    // visar även ROT/RUT-fakturor där kunden betalat sin del — filtret går
+    // via isCustomerSettled i stället för strikt status === filter.
+    expect(source).toContain("(filter === 'paid' ? isCustomerSettled(inv.status) : inv.status === filter)")
     expect(source).not.toMatch(/\binvoices\s*\.\s*sort\(/)
   })
 

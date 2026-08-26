@@ -1,3 +1,4 @@
+import { isCustomerSettled } from '@/lib/invoices/status'
 /**
  * Projektets driftläge — HÄRLETT ur fakta, aldrig lagrat
  * (2026-08-09, projektauditen P1-2).
@@ -61,7 +62,7 @@ export function deriveProjectLifecycle(input: LifecycleInput): DerivedLifecycle 
   const status = (input.status || '').toLowerCase()
   const fakturor = input.invoices || []
 
-  const harBetald = fakturor.some(f => f.status === 'paid')
+  const harBetald = fakturor.some(f => isCustomerSettled(f.status))
   // En skickad faktura är ute hos kund; ett utkast är det inte — men båda
   // betyder att underlaget finns och att nästa steg är känt.
   const harSkickad = fakturor.some(f => f.status === 'sent' || f.status === 'overdue')

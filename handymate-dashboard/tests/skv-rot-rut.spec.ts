@@ -267,6 +267,19 @@ test.describe('validateInvoiceForSkv — varje regel', () => {
   test('ej betald', () => {
     expect(err(validInput({ invoice: { ...validInput().invoice, status: 'sent' } }))).toContain('inte betald')
   })
+  test('customer_paid (kundens del betald, Skatteverkets del väntar) räcker för begäran', () => {
+    const r = validateInvoiceForSkv(validInput({ invoice: { ...validInput().invoice, status: 'customer_paid' } }))
+    expect(r.errors).toEqual([])
+    expect(r.valid).toBe(true)
+  })
+  test('registrerat betalt belopp under kundens andel stoppar begäran (begärt ≤ betalt)', () => {
+    const inv = { ...validInput().invoice, status: 'customer_paid', total: 13000, rot_rut_deduction: 3000, customer_pays: 10000, paid_amount: 4000 }
+    expect(err(validInput({ invoice: inv }))).toContain('har betalat 4000 kr men ska betala 10000 kr')
+  })
+  test('registrerat betalt belopp = kundens andel → inget fel', () => {
+    const inv = { ...validInput().invoice, status: 'customer_paid', total: 13000, rot_rut_deduction: 3000, customer_pays: 10000, paid_amount: 10000 }
+    expect(validateInvoiceForSkv(validInput({ invoice: inv })).errors).toEqual([])
+  })
   test('saknar betalningsdatum', () => {
     expect(err(validInput({ invoice: { ...validInput().invoice, paid_at: null } }))).toContain('betalningsdatum')
   })

@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { generateOCR } from '@/lib/ocr'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { isCustomerSettled } from '@/lib/invoices/status'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -45,7 +46,13 @@ export async function POST(
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }
 
-    if (invoice.status === 'paid') {
+    if (invoice.status === 'customer_paid') {
+      return NextResponse.json(
+        { error: 'Kundens del är betald — återstående belopp begärs från Skatteverket, inte från kunden' },
+        { status: 400 },
+      )
+    }
+    if (isCustomerSettled(invoice.status)) {
       return NextResponse.json({ error: 'Fakturan är redan betald' }, { status: 400 })
     }
 

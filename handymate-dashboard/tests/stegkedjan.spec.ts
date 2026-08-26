@@ -118,14 +118,19 @@ test.describe('Jobb igång har verkliga producenter (2026-08-10)', () => {
     // (d53c90d4) hela stängningskedjan till lib/projects/complete-project.ts
     // — det är DÄR stegflytten görs och .moved läses numera (effects-raden i
     // runCompletionEffects). Facitet pekade kvar på rutten.
+    // 2026-08-26: Fortnox-betalsynken (lib/fortnox/sync-payments.ts) rör
+    // inte stegmotorn själv längre — den går genom applyInvoicePayment,
+    // vars runPostPaymentAutomations är den enda kopian av kedjan och
+    // läser .moved. Låses nedan i stället för via sync-payments.
     for (const fil of [
       'lib/invoices/send-invoice.ts',
       'lib/invoices/apply-payment.ts',
       'lib/projects/complete-project.ts',
       'app/api/bookings/route.ts',
-      'lib/fortnox/sync-payments.ts',
     ]) {
       expect(kod(fil), `${fil} läser inte flytt-resultatet`).toContain('.moved')
     }
+    expect(kod('lib/fortnox/sync-payments.ts'), 'synken ska gå genom betal-kärnan').toContain('applyInvoicePayment(')
+    expect(kod('lib/fortnox/sync-payments.ts'), 'ingen egen stegflytt i synken').not.toContain('advanceProjectStage')
   })
 })

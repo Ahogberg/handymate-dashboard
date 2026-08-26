@@ -22,6 +22,7 @@ import {
 import { useBusiness } from '@/lib/BusinessContext'
 import { PermissionGate } from '@/components/PermissionGate'
 import Link from 'next/link'
+import { isCustomerSettled } from '@/lib/invoices/status'
 
 // Strukturlyft (Etapp L2b2, 2026-08-18, docs/HANDYMATE_DESIGN_SYSTEM.md):
 // dag-rubriken för mobilkortlistan. Listan hämtas utan sortBy-param
@@ -44,7 +45,7 @@ interface Invoice {
   invoice_id: string
   invoice_number: string
   invoice_type?: string
-  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'credited'
+  status: 'draft' | 'sent' | 'customer_paid' | 'paid' | 'overdue' | 'cancelled' | 'credited'
   is_credit_note?: boolean
   subtotal: number
   vat_amount: number
@@ -194,6 +195,7 @@ export default function InvoicesPage() {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
       case 'sent': return 'bg-primary-100 text-primary-700 border-primary-200'
+      case 'customer_paid': return 'bg-teal-100 text-teal-700 border-teal-200'
       case 'paid': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
       case 'overdue': return 'bg-red-100 text-red-600 border-red-200'
       case 'cancelled': return 'bg-gray-100 text-gray-500 border-gray-300'
@@ -206,6 +208,7 @@ export default function InvoicesPage() {
     switch (status) {
       case 'draft': return 'Utkast'
       case 'sent': return 'Skickad'
+      case 'customer_paid': return 'Kundens del betald'
       case 'paid': return 'Betald'
       case 'overdue': return 'Förfallen'
       case 'cancelled': return 'Makulerad'
@@ -218,6 +221,7 @@ export default function InvoicesPage() {
     switch (status) {
       case 'draft': return <FileText className="w-3.5 h-3.5" />
       case 'sent': return <Send className="w-3.5 h-3.5" />
+      case 'customer_paid': return <CheckCircle className="w-3.5 h-3.5" />
       case 'paid': return <CheckCircle className="w-3.5 h-3.5" />
       case 'overdue': return <AlertCircle className="w-3.5 h-3.5" />
       default: return <Clock className="w-3.5 h-3.5" />
@@ -226,7 +230,9 @@ export default function InvoicesPage() {
 
   // Filter
   const filteredInvoices = invoices.filter(inv => {
-    const matchesFilter = filter === 'all' || inv.status === filter
+    // "Betalda"-fliken visar även customer_paid (kunden har gjort sitt).
+    const matchesFilter = filter === 'all'
+      || (filter === 'paid' ? isCustomerSettled(inv.status) : inv.status === filter)
     const matchesSearch = !searchTerm ||
       inv.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       inv.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -237,7 +243,7 @@ export default function InvoicesPage() {
   const unpaidInvoices = invoices.filter(i => i.status === 'sent' || i.status === 'overdue')
   const overdueInvoices = invoices.filter(i => i.status === 'overdue')
   const paidThisMonth = invoices.filter(i => {
-    if (i.status !== 'paid' || !i.paid_at) return false
+    if (!isCustomerSettled(i.status) || !i.paid_at) return false
     const paidDate = new Date(i.paid_at)
     const now = new Date()
     return paidDate.getMonth() === now.getMonth() && paidDate.getFullYear() === now.getFullYear()
@@ -247,12 +253,14 @@ export default function InvoicesPage() {
     total: invoices.length,
     draft: invoices.filter(i => i.status === 'draft').length,
     sent: invoices.filter(i => i.status === 'sent').length,
-    paid: invoices.filter(i => i.status === 'paid').length,
+    paid: invoices.filter(i => isCustomerSettled(i.status)).length,
     overdue: overdueInvoices.length,
     unpaidCount: unpaidInvoices.length,
     unpaidValue: unpaidInvoices.reduce((sum, i) => sum + (i.customer_pays || i.total || 0), 0),
     overdueValue: overdueInvoices.reduce((sum, i) => sum + (i.customer_pays || i.total || 0), 0),
-    paidValue: invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + (i.total || 0), 0),
+    // Kundens andel — inte total: totalen överskattade kassan för ROT/RUT
+    // (Skatteverkets del är inte inbetald förrän fakturan är slutbetald).
+    paidValue: invoices.filter(i => isCustomerSettled(i.status)).reduce((sum, i) => sum + (i.status === 'paid' ? (i.total || 0) : (i.customer_pays || i.total || 0)), 0),
     paidThisMonthValue: paidThisMonth.reduce((sum, i) => sum + (i.customer_pays || i.total || 0), 0)
   }
 

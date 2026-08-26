@@ -946,7 +946,7 @@ async function executeApprovalPayload(
           action: 'confirm_payment',
           ok: r.ok,
           error: r.error,
-          metadata: { already_paid: r.already_paid ?? false, fortnox_synced: r.fortnox_synced ?? null },
+          metadata: { already_paid: r.already_paid ?? false, transition: r.transition ?? null, remaining_rot_kr: r.remaining_rot_kr ?? 0 },
         }
       }
 

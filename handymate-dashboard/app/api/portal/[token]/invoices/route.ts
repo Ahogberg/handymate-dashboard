@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { generateOCR } from '@/lib/ocr'
 import { getCustomerFromPortalToken } from '@/lib/portal-link'
+import { PORTAL_VISIBLE_STATUSES } from '@/lib/invoices/status'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,9 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
       `)
       .eq('business_id', customer.business_id)
       .eq('customer_id', customer.customer_id)
-      .in('status', ['sent', 'paid', 'overdue'])
+      // customer_paid MÅSTE med — annars försvinner en ROT/RUT-faktura ur
+      // kundens portal i samma sekund som kunden betalat sin del.
+      .in('status', [...PORTAL_VISIBLE_STATUSES])
       .order('created_at', { ascending: false })
 
     // TD-22: tidigare bara `{ data: invoices }` — en kolumnmissmatch eller

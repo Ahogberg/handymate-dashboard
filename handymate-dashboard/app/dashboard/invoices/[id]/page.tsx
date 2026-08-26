@@ -42,7 +42,7 @@ export default function InvoiceDetailPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentData, setPaymentData] = useState<PaymentData>({
     paid_at: new Date().toISOString().split('T')[0],
-    payment_method: 'swish',
+    paid_via: 'swish',
     paid_amount: 0,
   })
   const [updatingStatus, setUpdatingStatus] = useState(false)
@@ -113,9 +113,12 @@ export default function InvoiceDetailPage() {
 
   useEffect(() => {
     if (invoice) {
+      // customer_paid: nästa registrering är Skatteverkets del = total − redan betalt.
       setPaymentData(prev => ({
         ...prev,
-        paid_amount: invoice.customer_pays || invoice.total,
+        paid_amount: invoice.status === 'customer_paid'
+          ? Math.max(0, (invoice.total || 0) - (invoice.paid_amount ?? invoice.customer_pays ?? 0))
+          : (invoice.customer_pays || invoice.total),
       }))
     }
   }, [invoice])
@@ -199,14 +202,15 @@ export default function InvoiceDetailPage() {
         body: JSON.stringify({
           status: 'paid',
           paid_at: paymentData.paid_at,
-          payment_method: paymentData.payment_method,
+          paid_via: paymentData.paid_via,
           paid_amount: paymentData.paid_amount,
         }),
       })
 
       if (!response.ok) throw new Error('Kunde inte uppdatera')
+      const result = await response.json().catch(() => null)
 
-      showToast('Faktura markerad som betald!', 'success')
+      showToast(result?.message || 'Faktura markerad som betald!', 'success')
       setShowPaymentModal(false)
       fetchInvoice()
     } catch {
@@ -333,7 +337,9 @@ export default function InvoiceDetailPage() {
     )
   }
 
-  const amountDue = invoice.customer_pays || invoice.total
+  const amountDue = invoice.status === 'customer_paid'
+    ? Math.max(0, (invoice.total || 0) - (invoice.paid_amount ?? invoice.customer_pays ?? 0))
+    : (invoice.customer_pays || invoice.total)
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
@@ -451,6 +457,7 @@ export default function InvoiceDetailPage() {
         updatingStatus={updatingStatus}
         onClose={() => setShowPaymentModal(false)}
         onConfirm={handleMarkPaid}
+        mode={invoice.status === 'customer_paid' ? 'settle' : 'customer'}
       />
 
       <InvoiceCreditModal

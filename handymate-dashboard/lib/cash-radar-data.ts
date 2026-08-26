@@ -21,6 +21,7 @@ import {
   detectDips,
   type RadarWeek,
 } from './cash-radar'
+import { CUSTOMER_SETTLED_STATUSES } from '@/lib/invoices/status'
 
 /** Historikfönster för betalda fakturor (dagar). */
 const HISTORY_DAYS = 180
@@ -64,7 +65,7 @@ export async function assembleCashRadar(
       .from('invoice')
       .select('total, due_date, paid_at')
       .eq('business_id', businessId)
-      .eq('status', 'paid')
+      .in('status', [...CUSTOMER_SETTLED_STATUSES])
       .not('paid_at', 'is', null)
       .gte('paid_at', sinceIso)
       .limit(2000),

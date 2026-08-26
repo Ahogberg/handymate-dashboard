@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { isCustomerSettled } from '@/lib/invoices/status'
 
 /**
  * POST /api/portal/[token]/invoices/[id]/claim-paid
@@ -48,7 +49,9 @@ export async function POST(
     if (invErr || !invoice || invoice.customer_id !== customer.customer_id) {
       return NextResponse.json({ error: 'Fakturan hittades inte' }, { status: 404 })
     }
-    if (invoice.status === 'paid') {
+    // customer_paid räknas också: kunden har gjort sitt — resten begärs från
+    // Skatteverket, inte från kunden (2026-08-26).
+    if (isCustomerSettled(invoice.status)) {
       return NextResponse.json({ ok: true, already_paid: true })
     }
 

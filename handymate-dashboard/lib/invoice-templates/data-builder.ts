@@ -47,7 +47,9 @@ function unitLabel(unit: string | null | undefined): string {
  * för att tvinga fram 0. Ren funktion — se tests/invoice-derive-status.spec.ts.
  */
 export function deriveStatus(invoice: any): { status: InvoiceStatus; daysOverdue: number } {
-  if (invoice.status === 'paid' || invoice.paid_at) return { status: 'paid', daysOverdue: 0 }
+  // customer_paid (ROT/RUT, kundens del betald) visas för kunden som Betald:
+  // kundens skuld är reglerad, resten begärs från Skatteverket.
+  if (invoice.status === 'paid' || invoice.status === 'customer_paid' || invoice.paid_at) return { status: 'paid', daysOverdue: 0 }
 
   const due = invoice.due_date ? new Date(invoice.due_date) : null
   const daysOverdue = due && due.getTime() < Date.now()

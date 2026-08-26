@@ -634,6 +634,17 @@ export interface FortnoxInvoice {
   FullyPaid?: boolean
   Booked?: boolean
   Cancelled?: boolean
+  // Betalläge (läses av lib/fortnox/classify-payment.ts, 2026-08-26).
+  // FLAGGAT: fältnamnen/casingen är Fortnox v3-dokumentationens — verifieras
+  // mot ett riktigt svar i Pass 3/I2 (logga hela GET /invoices/{n} en gång).
+  /** Fakturans totalbelopp inkl. moms. */
+  Total?: number
+  /** Vad kunden ska betala (Total − skattereduktion vid ROT/RUT). */
+  TotalToPay?: number
+  /** Skattereduktionens belopp (ROT/RUT), heltal i kr. */
+  TaxReduction?: number
+  TaxReductionType?: 'ROT' | 'RUT' | 'GREEN' | string
+  FinalPayDate?: string
 }
 
 export interface FortnoxInvoiceResponse {

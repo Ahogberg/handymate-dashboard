@@ -26,6 +26,11 @@ test.describe('deriveStatus — status + förfallodagar', () => {
       .toEqual({ status: 'paid', daysOverdue: 0 })
   })
 
+  test('(b2) customer_paid (ROT/RUT, kundens del betald) → paid — kundens skuld är reglerad', () => {
+    expect(deriveStatus({ status: 'customer_paid', paid_at: isoDaysAgo(1), due_date: isoDaysAgo(30) }))
+      .toEqual({ status: 'paid', daysOverdue: 0 })
+  })
+
   test('(c) normal faktura, ej förfallen → unpaid, daysOverdue=0', () => {
     expect(deriveStatus({ status: 'sent', due_date: isoDaysAhead(10) })).toEqual({ status: 'unpaid', daysOverdue: 0 })
   })

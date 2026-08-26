@@ -1,30 +1,20 @@
-import { createClient } from '@supabase/supabase-js'
-import { fortnoxRequest, isFortnoxConnected } from '@/lib/fortnox'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
+import { getServerSupabase } from '@/lib/supabase'
+import { fortnoxRequest, isFortnoxConnected, type FortnoxInvoice } from '@/lib/fortnox'
+import { classifyFortnoxPayment, paidSoFarFromFortnox } from '@/lib/fortnox/classify-payment'
+import { applyInvoicePayment } from '@/lib/invoices/apply-payment'
+import { getCustomerShare } from '@/lib/invoices/customer-share'
 
 export interface SyncResult {
   business_id: string
   checked: number
   marked_paid: number
+  /** ROT/RUT: kunden har betalat SIN del, Skatteverkets del väntar (2026-08-26). */
+  marked_customer_paid: number
+  /** customer_paid → paid: Skatteverkets utbetalning registrerad i Fortnox. */
+  marked_settled: number
   marked_overdue: number
   marked_cancelled: number
   errors: string[]
-}
-
-interface FortnoxInvoiceListItem {
-  DocumentNumber: string
-  InvoiceNumber: string
-  Balance: number
-  DueDate: string
-  Booked: boolean
-  Cancelled: boolean
-  FullyPaid?: boolean
 }
 
 export interface SupplierInvoiceSyncResult {
@@ -39,27 +29,45 @@ interface FortnoxSupplierInvoiceDetail {
   Balance: number
 }
 
+interface LocalInvoiceRow {
+  invoice_id: string
+  business_id: string
+  status: string | null
+  fortnox_invoice_number: string | null
+  fortnox_document_number: string | null
+  due_date: string | null
+  customer_id: string | null
+  total: number | null
+  rot_rut_type: string | null
+  rot_rut_deduction: number | null
+  customer_pays: number | null
+  paid_amount: number | null
+}
+
 /**
  * Synka betal-status för alla Fortnox-kopplade fakturor i en business.
  *
- * Logik:
- *   - Hämta Handymate-fakturor med fortnox_invoice_number satt och status != 'paid'/'cancelled'
- *   - För varje: läs Fortnox-fakturan, jämför Balance + förfallodatum
- *   - Om Fortnox visar Cancelled → makulera lokalt. Prövas FÖRE betald-kollen:
- *     en makulerad faktura har Balance 0 och hade annars blivit "betald" och
- *     dragit igång hela post-payment-kedjan
- *   - Om Fortnox visar Balance=0 → markera som betald i Handymate
- *   - Om DueDate har passerats och Balance>0 → markera som overdue
+ * Klassificeringen är ren (lib/fortnox/classify-payment.ts) och skiljer sedan
+ * 2026-08-26 på:
+ *   - Cancelled → makulera lokalt (prövas FÖRST — makulerad har Balance 0)
+ *   - FullyPaid/Balance ≤ 0 → betald (från sent: to_paid; från customer_paid: settled)
+ *   - ROT/RUT där kunden betalat SIN del (Balance = skattereduktionen) →
+ *     customer_paid. Tidigare blev den "förfallen" och påminnelsetrappan
+ *     jagade kunden för beloppet Skatteverket ska betala.
+ *   - DueDate passerad, obetald → overdue
  *
- * Statusändringen triggar samma event-pipeline som
- * /api/invoices/[id]/status (Karin-påminnelser, projekt-stage,
- * recensions-SMS, smart-communication).
+ * Själva skrivningen + automationerna går genom SAMMA kärna som manuell
+ * markering (lib/invoices/apply-payment.ts) — ingen egen kopia av
+ * post-payment-kedjan här längre. Varje skrivning läser error; räknarna
+ * räknas bara upp vid lyckad skrivning.
  */
 export async function syncFortnoxPaymentsForBusiness(businessId: string): Promise<SyncResult> {
   const result: SyncResult = {
     business_id: businessId,
     checked: 0,
     marked_paid: 0,
+    marked_customer_paid: 0,
+    marked_settled: 0,
     marked_overdue: 0,
     marked_cancelled: 0,
     errors: [],
@@ -71,12 +79,13 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string): Promis
     return result
   }
 
-  const supabase = getSupabase()
+  const supabase = getServerSupabase()
 
-  // Fakturor att synka: har Fortnox-kopplat ID + ej slutbehandlad i Handymate
+  // Fakturor att synka: har Fortnox-kopplat ID + ej slutbehandlad i Handymate.
+  // customer_paid ska MED — den väntar på Skatteverkets utbetalning (settle).
   const { data: invoices, error } = await supabase
     .from('invoice')
-    .select('invoice_id, business_id, status, fortnox_invoice_number, fortnox_document_number, due_date, customer_id, total')
+    .select('invoice_id, business_id, status, fortnox_invoice_number, fortnox_document_number, due_date, customer_id, total, rot_rut_type, rot_rut_deduction, customer_pays, paid_amount')
     .eq('business_id', businessId)
     .not('fortnox_invoice_number', 'is', null)
     .not('status', 'in', '(paid,cancelled)')
@@ -88,12 +97,12 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string): Promis
 
   const todayStr = new Date().toISOString().split('T')[0]
 
-  for (const inv of invoices || []) {
+  for (const inv of (invoices || []) as LocalInvoiceRow[]) {
     result.checked++
     try {
       // Föredra DocumentNumber (Fortnox internt id) över InvoiceNumber
-      const docNum = (inv as any).fortnox_document_number || inv.fortnox_invoice_number
-      const fnRes = await fortnoxRequest<{ Invoice: FortnoxInvoiceListItem }>(
+      const docNum = inv.fortnox_document_number || inv.fortnox_invoice_number
+      const fnRes = await fortnoxRequest<{ Invoice: FortnoxInvoice }>(
         businessId,
         'GET',
         `/invoices/${docNum}`
@@ -101,49 +110,63 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string): Promis
       const fnInv = fnRes?.Invoice
       if (!fnInv) continue
 
-      if (fnInv.Cancelled === true) {
+      const cls = classifyFortnoxPayment(fnInv, inv, todayStr)
+
+      if (cls === 'cancelled') {
         if (inv.status !== 'cancelled') {
-          await markInvoiceCancelled(inv.invoice_id, businessId)
-          result.marked_cancelled++
+          const ok = await markInvoiceCancelled(inv.invoice_id, businessId)
+          if (ok) result.marked_cancelled++
         }
         continue
       }
 
-      const isPaid = fnInv.FullyPaid === true || (typeof fnInv.Balance === 'number' && fnInv.Balance <= 0)
-      const isOverdue = !isPaid && fnInv.DueDate && fnInv.DueDate < todayStr
-
-      if (isPaid && inv.status !== 'paid') {
-        await markInvoicePaid(inv.invoice_id, businessId, inv.customer_id)
-        result.marked_paid++
-
-        // Portal-notifikation: tack för betalning
-        if (inv.customer_id) {
-          try {
-            const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
-            await sendPortalNotification(businessId, inv.customer_id, 'invoice_paid', {
-              context: {
-                amount: inv.total ?? null,
-                invoice_number: inv.fortnox_invoice_number || inv.invoice_id,
-              },
-            })
-          } catch (notifErr) {
-            console.error('[fortnox-sync] portal notification invoice_paid failed:', notifErr)
-          }
-        }
-      } else if (isOverdue && inv.status !== 'overdue') {
-        await markInvoiceOverdue(inv.invoice_id, businessId)
-        result.marked_overdue++
+      if (cls === 'paid') {
+        // Från customer_paid: belopp utelämnat = återstoden → 'settled'.
+        // Från sent/overdue: hela beloppet → 'to_paid'.
+        const r = await applyInvoicePayment({
+          businessId,
+          invoiceId: inv.invoice_id,
+          amount: inv.status === 'customer_paid'
+            ? undefined
+            : (typeof fnInv.Total === 'number' && fnInv.Total > 0 ? fnInv.Total : undefined),
+          paidVia: 'fortnox',
+          source: 'fortnox',
+        })
+        if (!r.ok) throw new Error(r.error || 'apply-payment failed')
+        if (r.transition === 'to_paid') result.marked_paid++
+        else if (r.transition === 'settled') result.marked_settled++
+        continue
       }
-    } catch (err: any) {
-      result.errors.push(`${inv.invoice_id}: ${err?.message || 'sync error'}`)
+
+      if (cls === 'customer_paid') {
+        const r = await applyInvoicePayment({
+          businessId,
+          invoiceId: inv.invoice_id,
+          amount: paidSoFarFromFortnox(fnInv) ?? getCustomerShare(inv),
+          paidVia: 'fortnox',
+          source: 'fortnox',
+        })
+        if (!r.ok) throw new Error(r.error || 'apply-payment failed')
+        if (r.transition === 'to_customer_paid') result.marked_customer_paid++
+        else if (r.transition === 'to_paid') result.marked_paid++
+        continue
+      }
+
+      if (cls === 'overdue' && inv.status !== 'overdue') {
+        const ok = await markInvoiceOverdue(inv.invoice_id, businessId)
+        if (ok) result.marked_overdue++
+      }
+    } catch (err: unknown) {
+      result.errors.push(`${inv.invoice_id}: ${err instanceof Error ? err.message : 'sync error'}`)
     }
   }
 
   // Uppdatera last_synced_at
-  await supabase
+  const { error: stampError } = await supabase
     .from('business_config')
     .update({ fortnox_last_synced_at: new Date().toISOString() })
     .eq('business_id', businessId)
+  if (stampError) result.errors.push(`last_synced_at: ${stampError.message}`)
 
   return result
 }
@@ -177,7 +200,7 @@ export async function syncSupplierInvoicePayments(businessId: string): Promise<S
     return result
   }
 
-  const supabase = getSupabase()
+  const supabase = getServerSupabase()
 
   const { data: invoices, error } = await supabase
     .from('supplier_invoices')
@@ -206,131 +229,46 @@ export async function syncSupplierInvoicePayments(businessId: string): Promise<S
       const isPaid = typeof fnInv.Balance === 'number' && fnInv.Balance <= 0
 
       if (isPaid && inv.status !== 'paid') {
-        await supabase
+        const { error: updError } = await supabase
           .from('supplier_invoices')
           .update({ status: 'paid', paid_at: new Date().toISOString() })
           .eq('id', inv.id)
           .eq('business_id', businessId)
+        if (updError) throw updError
         result.marked_paid++
       }
-    } catch (err: any) {
-      result.errors.push(`${inv.id}: ${err?.message || 'sync error'}`)
+    } catch (err: unknown) {
+      result.errors.push(`${inv.id}: ${err instanceof Error ? err.message : 'sync error'}`)
     }
   }
 
   return result
 }
 
-async function markInvoicePaid(invoiceId: string, businessId: string, customerId: string | null) {
-  const supabase = getSupabase()
-  const now = new Date().toISOString()
-
-  await supabase
+async function markInvoiceCancelled(invoiceId: string, businessId: string): Promise<boolean> {
+  const supabase = getServerSupabase()
+  const { error } = await supabase
     .from('invoice')
-    .update({
-      status: 'paid',
-      paid_at: now,
-      payment_method: 'fortnox',
-    })
+    .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
     .eq('invoice_id', invoiceId)
     .eq('business_id', businessId)
-
-  // Trigga automation-pipeline (samma som /api/invoices/[id]/status PATCH)
-  await runPostPaymentAutomations(invoiceId, businessId, customerId).catch(err =>
-    console.error('[fortnox-sync] post-payment automations failed:', err)
-  )
+  if (error) throw error
+  return true
 }
 
-async function markInvoiceCancelled(invoiceId: string, businessId: string) {
-  const supabase = getSupabase()
-  await supabase
-    .from('invoice')
-    .update({ status: 'cancelled' })
-    .eq('invoice_id', invoiceId)
-    .eq('business_id', businessId)
-}
-
-async function markInvoiceOverdue(invoiceId: string, businessId: string) {
-  const supabase = getSupabase()
-  await supabase
+async function markInvoiceOverdue(invoiceId: string, businessId: string): Promise<boolean> {
+  const supabase = getServerSupabase()
+  const { error } = await supabase
     .from('invoice')
     .update({ status: 'overdue' })
     .eq('invoice_id', invoiceId)
     .eq('business_id', businessId)
+  if (error) throw error
 
   // Karin/automation-engine plockar upp via check-overdue/send-reminders cron
   try {
     const { fireEvent } = await import('@/lib/automation-engine')
-    const { getServerSupabase } = await import('@/lib/supabase')
-    const sb = getServerSupabase()
-    await fireEvent(sb, 'invoice_overdue', businessId, { invoice_id: invoiceId })
+    await fireEvent(supabase, 'invoice_overdue', businessId, { invoice_id: invoiceId })
   } catch { /* non-blocking */ }
-}
-
-/**
- * Replikerar samma side-effects som /api/invoices/[id]/status PATCH när
- * status sätts till 'paid'. Trigga: smart-communication, project-stage advance,
- * pipeline-flytt till 'paid', schedulera review-SMS.
- */
-async function runPostPaymentAutomations(
-  invoiceId: string,
-  businessId: string,
-  customerId: string | null
-): Promise<void> {
-  // 1. Pipeline: flytta deal till 'paid' om kopplad
-  try {
-    const { findDealByInvoice, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')
-    const settings = await getAutomationSettings(businessId)
-    if (settings?.auto_move_on_payment) {
-      const deal = await findDealByInvoice(businessId, invoiceId)
-      if (deal) {
-        await moveDeal({
-          dealId: deal.id,
-          businessId,
-          toStageSlug: 'won',
-          triggeredBy: 'system',
-          aiReason: 'Faktura betald (Fortnox-synk)',
-        })
-      }
-    }
-  } catch (err) {
-    console.error('[fortnox-sync] pipeline error:', err)
-  }
-
-  // 2. Project workflow stage: INVOICE_PAID
-  try {
-    const { advanceProjectStage, SYSTEM_STAGES, findProjectForEntity } = await import('@/lib/project-stages/automation-engine')
-    const project = await findProjectForEntity({ businessId, invoiceId })
-    if (project) {
-      const flytt = await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_PAID, businessId)
-      if (!flytt.moved) console.error('[fortnox-sync] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: project.project_id })
-    }
-  } catch (err) {
-    console.error('[fortnox-sync] project-stage error:', err)
-  }
-
-  // 3. Smart-communication invoice_paid (kräver customer_id)
-  if (customerId) {
-    try {
-      const { triggerEventCommunication } = await import('@/lib/smart-communication')
-      await triggerEventCommunication({
-        businessId,
-        event: 'invoice_paid',
-        customerId,
-        context: { invoiceId },
-      })
-    } catch (err) {
-      console.error('[fortnox-sync] smart-communication error:', err)
-    }
-  }
-
-  // 4. Automation-engine event
-  try {
-    const { fireEvent } = await import('@/lib/automation-engine')
-    const { getServerSupabase } = await import('@/lib/supabase')
-    const sb = getServerSupabase()
-    await fireEvent(sb, 'payment_received', businessId, { invoice_id: invoiceId })
-  } catch (err) {
-    console.error('[fortnox-sync] fireEvent error:', err)
-  }
+  return true
 }

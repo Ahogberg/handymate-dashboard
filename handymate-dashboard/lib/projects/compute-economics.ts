@@ -23,6 +23,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { isCustomerSettled } from '@/lib/invoices/status'
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
@@ -309,11 +310,13 @@ export async function computeProjectEconomics(
   for (const inv of invoices) {
     const v = Number(inv.total || 0)
     fakturerat += v
-    if (inv.status === 'paid') betalt += v
+    // customer_paid räknas som betalt: kunden har gjort sitt, ROT-delen är
+    // en fordran på Skatteverket — inte en risk hos kunden.
+    if (isCustomerSettled(inv.status)) betalt += v
     // Utkast är ännu inte en realiserad intäkt. Makulerade/krediterade
     // original ska inte heller träna marginalen. En eventuell kreditnota
     // representeras av sin egen negativa subtotal när den är utfärdad.
-    if (['sent', 'overdue', 'paid'].includes(inv.status || '')) {
+    if (['sent', 'overdue', 'customer_paid', 'paid'].includes(inv.status || '')) {
       realizedInvoiceCount += 1
       if (inv.subtotal == null) invoiceNetAmountComplete = false
       else faktureratExMoms += Number(inv.subtotal)

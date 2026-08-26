@@ -1,3 +1,4 @@
+import { isCustomerSettled } from '@/lib/invoices/status'
 /**
  * Delade typer + utility-funktioner för agent-aggregation.
  *
@@ -71,7 +72,7 @@ export interface InvoiceStats {
 export function computeInvoiceStats(invoices: InvoiceRow[]): InvoiceStats {
   const count = invoices.length
   const totalInvoiced = invoices.reduce((s, i) => s + Number(i.total || 0), 0)
-  const paid = invoices.filter(i => i.status === 'paid' && i.paid_at)
+  const paid = invoices.filter(i => isCustomerSettled(i.status) && i.paid_at)
   const overdue = invoices.filter(i => i.status === 'overdue')
   const sent = invoices.filter(i => i.status === 'sent')
 

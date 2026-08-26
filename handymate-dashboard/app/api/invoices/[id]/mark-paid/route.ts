@@ -7,10 +7,14 @@ import { applyInvoicePayment } from '@/lib/invoices/apply-payment'
  * POST /api/invoices/[id]/mark-paid
  *
  * Manuell betal-markering — överstyr cron-syncen. Delar kärnlogiken
- * (status-flip + Fortnox-synk + automation-pipeline + portal-notis) med
- * kundens "Jag har betalat"-bekräftelse via `lib/invoices/apply-payment`.
+ * (status-flip + automation-pipeline + portal-notis) med kundens "Jag har
+ * betalat"-bekräftelse och Fortnox-synken via `lib/invoices/apply-payment`.
  *
- * Body (optional): { paid_at?: string, amount?: number }
+ * ROT/RUT (2026-08-26): utan `amount` registreras kundens andel → fakturan
+ * blir `customer_paid` (Skatteverkets del väntar). Anrop igen på en
+ * customer_paid-faktura registrerar Skatteverkets utbetalning → `paid`.
+ *
+ * Body (optional): { paid_at?: string, amount?: number, paid_via?: string }
  */
 export async function POST(
   request: NextRequest,
@@ -36,6 +40,7 @@ export async function POST(
       invoiceId: params.id,
       paidAt: (body?.paid_at as string) || undefined,
       amount: body?.amount != null ? Number(body.amount) : undefined,
+      paidVia: (body?.paid_via as string) || undefined,
       markedByUserId: currentUser?.id || null,
       source: 'manual',
     })
@@ -50,15 +55,23 @@ export async function POST(
       return NextResponse.json({ error: 'Fakturan är redan betald' }, { status: 400 })
     }
 
+    const remaining = Math.round(result.remaining_rot_kr || 0)
+    const message = result.transition === 'to_customer_paid'
+      ? `Kundens del registrerad — ROT/RUT-delen (${remaining.toLocaleString('sv-SE')} kr) väntar på Skatteverket.`
+      : result.transition === 'settled'
+        ? 'Skatteverkets utbetalning registrerad — fakturan är slutbetald.'
+        : result.transition === 'none'
+          ? `Delbelopp registrerat — ${remaining.toLocaleString('sv-SE')} kr återstår.`
+          : 'Faktura markerad som betald.'
+
     return NextResponse.json({
       success: true,
       status: result.status,
+      transition: result.transition,
       paid_at: result.paid_at,
-      fortnox_synced: result.fortnox_synced,
-      fortnox_error: result.fortnox_error || null,
-      message: result.fortnox_synced !== false
-        ? 'Faktura markerad som betald.'
-        : `Markerad som betald i Handymate. Fortnox-synk misslyckades: ${result.fortnox_error}`,
+      paid_amount: result.paid_amount,
+      remaining_rot_kr: remaining,
+      message,
     })
   } catch (err: any) {
     console.error('[mark-paid] error:', err)

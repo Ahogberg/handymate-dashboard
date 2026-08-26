@@ -4,6 +4,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { validateInvoiceForSkv } from '@/lib/skv/validate-rot-request'
 import { buildSkvXml, type SkvArende } from '@/lib/skv/rot-rut-xml'
+import { CUSTOMER_SETTLED_STATUSES } from '@/lib/invoices/status'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
     .select('*, customer:customer_id (name, personal_number, property_designation)')
     .in('invoice_id', invoiceIds)
     .eq('business_id', business.business_id)
-    .eq('status', 'paid')
+    .in('status', [...CUSTOMER_SETTLED_STATUSES])
     .eq('rot_rut_type', requestType)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -141,12 +142,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Kunde inte spara begäran' }, { status: 500 })
   }
 
+  // 'skv_requested' = vår egen XML-begäran genererad (skiljs från
+  // 'submitted' = Fortnox bokförde fakturan med skattereduktion). Beslutsfilen
+  // (import-decision) matchar på rot_payment_request_id, inte på status.
   const idsUsed = (invoices as any[]).map(i => i.invoice_id)
-  await supabase
+  const { error: markErr } = await supabase
     .from('invoice')
-    .update({ rot_payment_request_id: requestId, rot_application_status: 'submitted' })
+    .update({ rot_payment_request_id: requestId, rot_application_status: 'skv_requested' })
     .in('invoice_id', idsUsed)
     .eq('business_id', business.business_id)
+  if (markErr) console.error('[rot-payment/generate] kunde inte markera fakturorna som begärda:', markErr)
 
   // 6. Returnera filen (BOM för korrekt UTF-8 vid uppladdning)
   return new NextResponse('﻿' + xml, {

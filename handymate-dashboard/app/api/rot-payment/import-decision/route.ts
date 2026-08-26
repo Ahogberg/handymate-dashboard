@@ -34,12 +34,15 @@ export async function POST(request: NextRequest) {
 
   const supabase = getServerSupabase()
 
-  // Hämta företagets submitted ROT/RUT-fakturor (med kund-pnr för fallback-matchning).
+  // Hämta företagets fakturor som ingått i en egen XML-begäran (med kund-pnr
+  // för fallback-matchning). Matchar på rot_payment_request_id — inte på
+  // rot_application_status, som sedan 2026-08-26 skiljer 'submitted'
+  // (Fortnox-bokfört) från 'skv_requested' (vår begäran).
   const { data: submitted } = await supabase
     .from('invoice')
     .select('invoice_id, invoice_number, rot_payment_request_id, rot_deduction, rut_deduction, rot_rut_type, customer:customer_id (personal_number)')
     .eq('business_id', business.business_id)
-    .eq('rot_application_status', 'submitted')
+    .not('rot_payment_request_id', 'is', null)
 
   const byFaktura = new Map<string, any>()
   const byPnr = new Map<string, any[]>()

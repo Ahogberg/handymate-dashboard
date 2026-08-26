@@ -4,6 +4,7 @@ import { generateOCR } from '@/lib/ocr'
 import { generateSwishQR } from '@/lib/swish-qr'
 import { buildInvoiceTemplateData, selectInvoiceTemplate } from '@/lib/invoice-templates'
 import { stripPrintBar } from '@/lib/document-html'
+import { PORTAL_VISIBLE_STATUSES } from '@/lib/invoices/status'
 
 // Chromium ligger inte i denna väg (bara HTML-strängar/React-rendering till
 // markup) — men buildInvoiceTemplateData/selectInvoiceTemplate går via
@@ -80,7 +81,7 @@ export async function GET(
       .eq('invoice_id', invoiceId)
       .eq('customer_id', customer.customer_id)
       .eq('business_id', customer.business_id)
-      .in('status', ['sent', 'paid', 'overdue'])
+      .in('status', [...PORTAL_VISIBLE_STATUSES])
       .single()
 
     if (invErr || !invoice) {

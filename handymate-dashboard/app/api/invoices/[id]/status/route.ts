@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { applyInvoicePayment } from '@/lib/invoices/apply-payment'
 
 /**
  * PATCH - Update invoice status with payment details
- * Body: { status: 'paid' | 'cancelled', paid_at?: string }
+ * Body: { status: 'paid' | 'cancelled' | 'sent', paid_at?, paid_amount?, paid_via? }
+ *
+ * 2026-08-26: `status: 'paid'` går genom den delade betal-kärnan
+ * (lib/invoices/apply-payment.ts) — samma beslut som mark-paid, kundens
+ * bekräftelse och Fortnox-synken. En ROT/RUT-faktura där bara kundens del
+ * registreras blir `customer_paid` (Skatteverkets del väntar); utan ROT
+ * blir den `paid` precis som förr. De tidigare duplicerade automations-
+ * blocken här är borta (kärnan äger dem). Golden Path tack-SMS +
+ * recensionsschemaläggning bor kvar här och körs bara när kunden JUST
+ * gjort sitt (to_paid / to_customer_paid) — aldrig vid slutreglering.
  */
 export async function PATCH(
   request: NextRequest,
@@ -21,7 +31,7 @@ export async function PATCH(
 
     const supabase = getServerSupabase()
     const body = await request.json()
-    const { status, paid_at } = body
+    const { status, paid_at, paid_amount, paid_via, payment_method } = body
 
     if (!status) {
       return NextResponse.json({ error: 'Missing status' }, { status: 400 })
@@ -39,23 +49,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }
 
-    // Build update object
-    const updates: Record<string, any> = { status }
-
-    if (status === 'paid') {
-      updates.paid_at = paid_at || new Date().toISOString()
-    }
-
-    if (status === 'cancelled') {
-      updates.cancelled_at = new Date().toISOString()
-    }
-
-    // Update invoice
-    const { data: invoice, error: updateError } = await supabase
-      .from('invoice')
-      .update(updates)
-      .eq('invoice_id', invoiceId)
-      .select(`
+    const INVOICE_SELECT = `
         *,
         customer:customer_id (
           customer_id,
@@ -63,88 +57,54 @@ export async function PATCH(
           phone_number,
           email
         )
-      `)
+      `
+
+    if (status !== 'paid') {
+      const updates: Record<string, unknown> = { status }
+      if (status === 'cancelled') {
+        updates.cancelled_at = new Date().toISOString()
+      }
+
+      const { data: invoice, error: updateError } = await supabase
+        .from('invoice')
+        .update(updates)
+        .eq('invoice_id', invoiceId)
+        .eq('business_id', business.business_id)
+        .select(INVOICE_SELECT)
+        .single()
+
+      if (updateError) throw updateError
+
+      return NextResponse.json({ success: true, invoice, message: 'Fakturastatus uppdaterad' })
+    }
+
+    // ── status === 'paid' → delad betal-kärna ──────────────────────────────
+    const result = await applyInvoicePayment({
+      businessId: business.business_id,
+      invoiceId,
+      paidAt: (paid_at as string) || undefined,
+      amount: paid_amount != null && paid_amount !== '' ? Number(paid_amount) : undefined,
+      paidVia: (paid_via as string) || (payment_method as string) || undefined,
+      markedByUserId: null,
+      source: 'status_patch',
+    })
+
+    if (!result.ok) {
+      const code = result.error === 'Faktura hittades inte' ? 404 : 500
+      return NextResponse.json({ error: result.error || 'Serverfel' }, { status: code })
+    }
+
+    const { data: invoice, error: refetchError } = await supabase
+      .from('invoice')
+      .select(INVOICE_SELECT)
+      .eq('invoice_id', invoiceId)
+      .eq('business_id', business.business_id)
       .single()
+    if (refetchError) throw refetchError
 
-    if (updateError) throw updateError
+    const customerJustSettled = result.transition === 'to_paid' || result.transition === 'to_customer_paid'
 
-    // Pipeline: move deal to paid when invoice is paid
-    if (status === 'paid') {
-      try {
-        const { findDealByInvoice, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')
-        const settings = await getAutomationSettings(business.business_id)
-        if (settings?.auto_move_on_payment) {
-          const deal = await findDealByInvoice(business.business_id, invoiceId)
-          if (deal) {
-            await moveDeal({
-              dealId: deal.id,
-              businessId: business.business_id,
-              toStageSlug: 'won',
-              triggeredBy: 'system',
-            })
-          }
-        }
-      } catch (pipelineErr) {
-        console.error('Pipeline trigger error (non-blocking):', pipelineErr)
-      }
-
-      // Smart communication: trigger invoice_paid event
-      try {
-        if (invoice?.customer_id) {
-          const { triggerEventCommunication } = await import('@/lib/smart-communication')
-          await triggerEventCommunication({
-            businessId: business.business_id,
-            event: 'invoice_paid',
-            customerId: invoice.customer_id,
-            context: { invoiceId },
-          })
-        }
-      } catch (commErr) {
-        console.error('Communication trigger error (non-blocking):', commErr)
-      }
-
-      // AI Projektledare: kontrollera projektavslut
-      try {
-        const { handleProjectEvent } = await import('@/lib/project-ai-engine')
-        await handleProjectEvent({
-          type: 'invoice_paid',
-          businessId: business.business_id,
-          invoiceId,
-        })
-      } catch (err) {
-        console.error('[invoice status] handleProjectEvent invoice_paid failed (non-blocking):', invoiceId, err)
-      }
-
-      // Project workflow stage: 'Faktura betald' (ps-07)
-      try {
-        const { advanceProjectStage, SYSTEM_STAGES, findProjectForEntity } = await import('@/lib/project-stages/automation-engine')
-        const project = await findProjectForEntity({
-          businessId: business.business_id,
-          invoiceId,
-        })
-        if (project) {
-          const flytt = await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_PAID, business.business_id)
-          if (!flytt.moved) console.error('[invoice status] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: project.project_id })
-        }
-      } catch (err) {
-        console.error('[invoice status] advanceProjectStage INVOICE_PAID failed:', err)
-      }
-
-      // Portal-notifikation: tack för betalning (1h-dedup hanteras internt)
-      if (invoice?.customer_id) {
-        try {
-          const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
-          await sendPortalNotification(business.business_id, invoice.customer_id, 'invoice_paid', {
-            context: {
-              amount: (invoice as any).total ?? (invoice as any).total_amount ?? null,
-              invoice_number: (invoice as any).invoice_number || invoiceId,
-            },
-          })
-        } catch (notifErr) {
-          console.error('[invoice status] portal notification invoice_paid failed:', notifErr)
-        }
-      }
-
+    if (customerJustSettled) {
       // Golden Path: tack-SMS + recensionsförfrågan efter betalning
       try {
         const customerPhone = (invoice as any)?.customer?.phone_number
@@ -233,10 +193,23 @@ export async function PATCH(
       }
     }
 
+    const message = result.already_paid
+      ? 'Fakturan var redan betald'
+      : result.transition === 'to_customer_paid'
+        ? `Kundens del registrerad — ROT/RUT-delen (${Math.round(result.remaining_rot_kr || 0).toLocaleString('sv-SE')} kr) väntar på Skatteverket`
+        : result.transition === 'settled'
+          ? 'Skatteverkets utbetalning registrerad — fakturan är slutbetald'
+          : result.transition === 'none'
+            ? 'Delbelopp registrerat'
+            : 'Faktura markerad som betald'
+
     return NextResponse.json({
       success: true,
       invoice,
-      message: status === 'paid' ? 'Faktura markerad som betald' : 'Fakturastatus uppdaterad'
+      transition: result.transition,
+      already_paid: result.already_paid ?? false,
+      remaining_rot_kr: result.remaining_rot_kr ?? 0,
+      message,
     })
 
   } catch (error: any) {

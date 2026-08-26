@@ -26,10 +26,16 @@ export const PAYMENT_METHODS = [
   { value: 'cash', label: 'Kontant', icon: Banknote },
 ]
 
+const SYSTEM_PAYMENT_LABELS: Record<string, string> = {
+  fortnox: 'Fortnox',
+  manual: 'manuell registrering',
+  customer_confirmed: 'kundens bekräftelse',
+}
+
 export function getPaymentMethodText(method: string | null | undefined): string {
   if (!method) return 'Okänd'
   const found = PAYMENT_METHODS.find(m => m.value === method)
-  return found?.label || method
+  return found?.label || SYSTEM_PAYMENT_LABELS[method] || method
 }
 
 /**
@@ -42,6 +48,7 @@ export function getStatusStyle(status: string): string {
   switch (status) {
     case 'draft': return 'bg-slate-100 text-slate-600'
     case 'sent': return 'bg-amber-50 text-amber-700'
+    case 'customer_paid': return 'bg-teal-50 text-teal-700'
     case 'paid': return 'bg-green-50 text-green-700'
     case 'overdue': return 'bg-red-50 text-red-700'
     case 'credited': return 'bg-orange-50 text-orange-700'
@@ -54,6 +61,7 @@ export function getStatusText(status: string): string {
   switch (status) {
     case 'draft': return 'Utkast'
     case 'sent': return 'Skickad'
+    case 'customer_paid': return 'Kundens del betald'
     case 'paid': return 'Betald'
     case 'overdue': return 'Förfallen'
     case 'cancelled': return 'Makulerad'

@@ -8,32 +8,34 @@ Godkänd plan: `~/.claude/plans/ja-d-beh-ver-vi-sorted-avalanche.md`. Andreas-be
 - [x] sql/v170_invoice_customer_paid.sql — ny status + paid_amount/settled_at/cancelled_at + 'credited' i CHECK
 - [ ] Båda körda + facit-SELECT verifierad (väntar på "kör")
 
-## Del 1 — kundsynk vid skapande
-- [ ] P0: `syncCustomerToFortnox` returnerar aldrig success när numret inte persisterats; läser .error; scopar på business_id; rapporteraTystFel
-- [ ] `syncNewCustomerToFortnox` (kortslut på fortnox_connected → syncCustomerWithTracking → tyst-fel-rapport)
-- [ ] Fem anropsplatser: actions/create_customer, customers POST, tool-router createCustomer, golden-path lead→kund, approve-actions createCustomer
-- [ ] `batchSync` ordnar på created_at + läser .error; 2h-cronen sveper kunder per företag
-- [ ] Serverimporterna (import/bulk) anropar batchSync efter loopen
-- [ ] `sync/customers`-rutten går genom syncCustomerWithTracking (Type/OrgNr/GLN följer med)
-- [ ] tests/facit-customer-fortnox-create.spec.ts grönt; facit-fortnox-einvoice orört grönt
+## Del 1 — kundsynk vid skapande (commit ae0b7d32)
+- [x] P0: `syncCustomerToFortnox` returnerar aldrig success när numret inte persisterats; läser .error; scopar på business_id; rapporteraTystFel
+- [x] `syncNewCustomerToFortnox` (kortslut på fortnox_connected → syncCustomerWithTracking → tyst-fel-rapport)
+- [x] Fem anropsplatser: actions/create_customer, customers POST, tool-router createCustomer, golden-path lead→kund, approve-actions createCustomer
+- [x] `batchSync` ordnar på created_at + läser .error; 2h-cronen sveper kunder per företag
+- [x] Serverimporterna (import/bulk) anropar batchSync efter loopen
+- [x] `sync/customers`-rutten går genom syncCustomerWithTracking (Type/OrgNr/GLN följer med)
+- [x] tests/facit-customer-fortnox-create.spec.ts grönt; facit-fortnox-einvoice orört grönt
 
-## Del 2 — leverantörsfakturor i cronen
-- [ ] lib/fortnox/import-supplier-invoices.ts (ruttens rad 42–128 flyttade oförändrade, needs_reconnect vid 403)
-- [ ] Rutten tunn (auth + isFortnoxConnected + Återanslut-mappning kvar)
-- [ ] Cronen: import FÖRE betalstatus, needs_reconnect separat + dygnsdedupad tyst-fel-rapport
-- [ ] facit-fortnox-supplier-invoice-import ompekad; nytt cron-facit
+## Del 2 — leverantörsfakturor i cronen (commit 6921bfea)
+- [x] lib/fortnox/import-supplier-invoices.ts (ruttens rad 42–128 flyttade oförändrade, needs_reconnect vid 403)
+- [x] Rutten tunn (auth + isFortnoxConnected + Återanslut-mappning kvar)
+- [x] Cronen: import FÖRE betalstatus, needs_reconnect separat + dygnsdedupad tyst-fel-rapport
+- [x] facit-fortnox-supplier-invoice-import ompekad; nytt cron-facit
 
 ## Del 3 — customer_paid
-- [ ] Rena helpers + tester: status.ts, customer-share.ts, payment-decision.ts, fortnox/classify-payment.ts; typer (paid_via ersätter payment_method)
-- [ ] apply-payment-kärnan (transition, paid_amount/paid_via/settled_at, bort med registerFortnoxPayment, exporterad runPostPaymentAutomations + handleProjectEvent)
-- [ ] sync-payments via klassificeraren, alla UPDATE läser error, en runPostPaymentAutomations
-- [ ] Rutter: status PATCH via kärnan (Golden Path tack-SMS kvar), mark-paid-text, confirm_payment paidVia, claim-paid/reminder-spärr, portal-API-filter
-- [ ] ROT-grind: validate-rot-request, eligible/generate `.in('status',[paid,customer_paid])`, skv_requested, import-decision
-- [ ] Konsumenter via isCustomerSettled + minimal UI (badge/timeline/modal)
-- [ ] Facit + utökade skv-rot-rut/invoice-derive-status; alla listade "måste förbli gröna" gröna
+- [x] Rena helpers + tester: status.ts, customer-share.ts, payment-decision.ts, fortnox/classify-payment.ts; typer (paid_via ersätter payment_method)
+- [x] apply-payment-kärnan (transition, paid_amount/paid_via/settled_at, bort med registerFortnoxPayment, exporterad runPostPaymentAutomations + handleProjectEvent)
+- [x] sync-payments via klassificeraren, alla UPDATE läser error, en runPostPaymentAutomations
+- [x] Rutter: status PATCH via kärnan (Golden Path tack-SMS kvar), mark-paid-text, confirm_payment paidVia, claim-paid/reminder-spärr, portal-API-filter
+- [x] ROT-grind: validate-rot-request, eligible/generate `.in('status',[paid,customer_paid])`, skv_requested, import-decision
+- [x] Konsumenter via isCustomerSettled + minimal UI (badge/timeline/modal)
+- [x] Facit + utökade skv-rot-rut/invoice-derive-status; alla listade "måste förbli gröna" gröna
 
 ## Verifiering
-- [ ] tsc 0 fel → riktade specar → full svit → next build → push → CI-grind grön
+- [x] tsc 0 fel
+- [x] riktade specar gröna; full svit 5322 gröna (2 facit medvetet ompekade: invoices-page-design filter, stegkedjan sync-payments); next build exit 0
+- [ ] v169 + v170 körda efter "kör" → push → CI-grind grön → Vercel-deploy
 - [ ] docs/REALITY-WEEK.md avvikelser #23–26; tasks/lessons.md om fantomkolumn-klassen
 
 ---
@@ -321,6 +323,22 @@ denna sektion är endast utvecklingsbokföring.
   agentkort, mörk 4:5-bild, artikelomslag och socialt original.
 - Projektkontroll: `npx tsc --noEmit` och `npx next build` gröna. Builden
   behåller projektets befintliga varningar om dynamiska serverrutter.
+
+---
+
+# Verksamhetsöversikt — direkt stegbyte och projekt-header (2026-08-26)
+
+- [ ] Utöka den delade åttastegsstripen med hoverkort, mini-ikoner och tydliga
+  interaktions-/laddningstillstånd
+- [ ] Koppla verksamhetsöversikten till befintlig tenant-säkrad stage-route
+  med lokal bekräftelse, felåterställning och omedelbar UI-uppdatering
+- [ ] Ta bort radens generella utfällning och göra `Öppna projekt` till en
+  större, separat primär handling
+- [ ] Montera den delade åttastegsöversikten som kompakt header på projektsidan
+  utan att duplicera ekonomi- eller statuskortets ansvar
+- [ ] Lägg browserlösa kontraktstester för direktbytet, hoverkontraktet och
+  projekt-headerns återanvändning
+- [ ] Verifiera riktade tester, `npx tsc --noEmit`, `npx next build` och diff
 
 ---
 

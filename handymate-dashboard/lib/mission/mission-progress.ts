@@ -67,6 +67,7 @@ import { resolveGoalType, type MissionGoalType } from './goal-type'
 import { getWeekCapacity, mondayOfWeek } from '@/lib/capacity/week-capacity'
 import { svDateStrPlusDays } from '@/lib/dates'
 import { loadContactOutcomes, type ContactApprovalInput } from './contact-outcomes'
+import { isCustomerSettled } from '@/lib/invoices/status'
 
 export interface MissionRow {
   id: string
@@ -327,7 +328,7 @@ export function byggMissionProgress(input: {
     const entry = klass(cls)
     entry.invoiced_kr += belopp // FAKTURANS belopp — aldrig stegets frysta mått
 
-    if (inv.status !== 'paid' || !inv.paid_at) continue
+    if (!isCustomerSettled(inv.status) || !inv.paid_at) continue
     const paidMs = Date.parse(inv.paid_at)
     const inomFonstret = Number.isFinite(paidMs)
       && Number.isFinite(createdMs)

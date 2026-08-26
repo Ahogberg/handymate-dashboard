@@ -4,6 +4,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { validateInvoiceForSkv } from '@/lib/skv/validate-rot-request'
 import { defaultCategoryForIndustry } from '@/lib/skv/categories'
+import { CUSTOMER_SETTLED_STATUSES } from '@/lib/invoices/status'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,7 +42,9 @@ export async function GET(request: NextRequest) {
     .from('invoice')
     .select('*, customer:customer_id (name, personal_number, property_designation)')
     .eq('business_id', business.business_id)
-    .eq('status', 'paid')
+    // customer_paid = kunden har betalat SIN del (Skatteverkets del väntar)
+    // — det är exakt det tillstånd som gör fakturan ROT/RUT-berättigad.
+    .in('status', [...CUSTOMER_SETTLED_STATUSES])
     .in('rot_rut_type', ['rot', 'rut'])
     .is('rot_payment_request_id', null)
     .order('paid_at', { ascending: false })
@@ -71,7 +74,9 @@ export async function GET(request: NextRequest) {
         invoice_number: inv.invoice_number,
         customer_name: customer.name || null,
         personal_number: customer.personal_number || null,
+        status: inv.status,
         paid_at: inv.paid_at,
+        paid_amount: inv.paid_amount ?? null,
         tax_year: taxYear,
         rot_rut_type: inv.rot_rut_type,
         work_cost: Math.round((inv.rot_rut_type === 'rut' ? inv.rut_work_cost : inv.rot_work_cost) || 0),

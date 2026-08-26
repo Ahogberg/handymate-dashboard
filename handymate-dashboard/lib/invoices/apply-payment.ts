@@ -1,37 +1,57 @@
 import { getServerSupabase } from '@/lib/supabase'
-import { isFortnoxConnected, registerFortnoxPayment } from '@/lib/fortnox'
+import { decidePaymentOutcome, type PaymentTransition } from './payment-decision'
 
 /**
- * Delad betal-markeringskärna (2026-07-12).
+ * Delad betal-kärna (2026-07-12, utbyggd 2026-08-26 för ROT/RUT-delbetalning).
  *
- * Extraherad ur `app/api/invoices/[id]/mark-paid` så att BÅDE den manuella
- * dashboard-markeringen OCH kundens "Jag har betalat"-bekräftelse (efter
- * hantverkarens godkännande i kön) sätter faktura → betald på exakt samma
- * sätt: status-flip, Fortnox-synk (non-blocking), automation-pipeline
- * (pipeline→Vunnen, projekt-steg, smart-kommunikation, payment_received) +
- * portal-tack-notis. Semantik-drift mellan de två vägarna omöjlig.
+ * ALLA vägar som registrerar en betalning går härigenom: manuell mark-paid,
+ * betalmodalens PATCH /status, kundens "Jag har betalat"-bekräftelse
+ * (confirm_payment-kortet) och Fortnox-synken. Beslutet om VILKEN övergång
+ * som är sann är rent (lib/invoices/payment-decision.ts):
+ *
+ *   sent|overdue → paid            (ej ROT, eller hela beloppet)   'to_paid'
+ *   sent|overdue → customer_paid   (ROT/RUT, kundens del)          'to_customer_paid'
+ *   customer_paid → paid           (Skatteverkets del in)          'settled'
+ *
+ * Post-payment-automationerna (pipeline→Vunnen, projektsteg, smart-
+ * kommunikation, payment_received, portal-tack) körs vid to_paid OCH
+ * to_customer_paid — kundrelationen är klar när kunden betalat SIN del.
+ * Vid 'settled' körs de INTE igen (inget dubbelt tack-SMS när Skatteverket
+ * betalar ut).
+ *
+ * Fortnox-betalregistreringen (registerFortnoxPayment) är borttagen härifrån:
+ * Handymate skriver inte betalningar till Fortnox — Fortnox är sanningen för
+ * betalningar och synkas HIT via lib/fortnox/sync-payments (2h-cron).
+ * Anropet saknade dessutom scope och gav bara ett falskt "Fortnox-synk
+ * misslyckades" i svaret.
  */
+
+export type PaymentSource = 'manual' | 'customer_confirmed' | 'fortnox' | 'status_patch'
 
 export interface ApplyPaymentResult {
   ok: boolean
-  /** Fakturan var redan betald — ingen ändring gjord. Callern avgör om det
+  /** Fakturan var redan helt betald — ingen ändring gjord. Callern avgör om det
    *  är ett fel (manuell markering) eller ok (idempotent bekräftelse). */
   already_paid?: boolean
   error?: string
   status?: string
+  transition?: PaymentTransition
   paid_at?: string
-  fortnox_synced?: boolean
-  fortnox_error?: string | null
+  paid_amount?: number
+  /** Vad som återstår att få från Skatteverket (0 när inget återstår). */
+  remaining_rot_kr?: number
 }
 
 export async function applyInvoicePayment(opts: {
   businessId: string
   invoiceId: string
   paidAt?: string
+  /** Registrerat belopp. Utelämnat = kundens andel (hela totalen utan ROT/RUT). */
   amount?: number
+  /** Skrivs till invoice.paid_via (t.ex. 'swish', 'bankgiro', 'fortnox', 'customer_confirmed'). */
+  paidVia?: string | null
   markedByUserId?: string | null
-  /** Spårning: 'manual' = dashboard, 'customer_confirmed' = kundens knapp + godkänt kort. */
-  source: 'manual' | 'customer_confirmed'
+  source: PaymentSource
 }): Promise<ApplyPaymentResult> {
   const { businessId, invoiceId, markedByUserId = null, source } = opts
   const paidAt = opts.paidAt || new Date().toISOString()
@@ -39,7 +59,7 @@ export async function applyInvoicePayment(opts: {
 
   const { data: invoice, error: fetchErr } = await supabase
     .from('invoice')
-    .select('invoice_id, status, customer_id, fortnox_invoice_number, total')
+    .select('invoice_id, status, customer_id, invoice_number, fortnox_invoice_number, total, rot_rut_type, rot_rut_deduction, customer_pays, paid_amount, paid_at')
     .eq('invoice_id', invoiceId)
     .eq('business_id', businessId)
     .single()
@@ -48,18 +68,30 @@ export async function applyInvoicePayment(opts: {
     return { ok: false, error: 'Faktura hittades inte' }
   }
   if (invoice.status === 'paid') {
-    // Redan betald — callern avgör om det är fel (manuell) eller ok (bekräftelse).
-    return { ok: true, already_paid: true, status: 'paid', paid_at: paidAt }
+    return { ok: true, already_paid: true, status: 'paid', transition: 'none', paid_at: invoice.paid_at || paidAt }
+  }
+
+  const decision = decidePaymentOutcome(invoice, opts.amount)
+  const now = new Date().toISOString()
+  const paidVia = opts.paidVia
+    ?? (source === 'fortnox' ? 'fortnox' : source === 'customer_confirmed' ? 'customer_confirmed' : 'manual')
+
+  const updates: Record<string, unknown> = { paid_amount: decision.paid_amount }
+  if (decision.transition === 'to_paid') {
+    Object.assign(updates, { status: 'paid', paid_at: paidAt, settled_at: paidAt, paid_via: paidVia })
+  } else if (decision.transition === 'to_customer_paid') {
+    Object.assign(updates, { status: 'customer_paid', paid_at: paidAt, paid_via: paidVia })
+  } else if (decision.transition === 'settled') {
+    Object.assign(updates, { status: 'paid', settled_at: paidAt })
+  }
+  if (source !== 'fortnox' && decision.transition !== 'none') {
+    updates.manual_paid_marked_at = now
+    updates.manual_paid_by_user_id = markedByUserId
   }
 
   const { error: updateErr } = await supabase
     .from('invoice')
-    .update({
-      status: 'paid',
-      paid_at: paidAt,
-      manual_paid_marked_at: new Date().toISOString(),
-      manual_paid_by_user_id: markedByUserId,
-    })
+    .update(updates)
     .eq('invoice_id', invoiceId)
     .eq('business_id', businessId)
 
@@ -67,60 +99,59 @@ export async function applyInvoicePayment(opts: {
     return { ok: false, error: updateErr.message }
   }
 
-  // Fortnox-synk (non-blocking — Handymate-status ändras oavsett)
-  let fortnoxResult: { success: boolean; error?: string } = { success: true }
-  if (invoice.fortnox_invoice_number) {
-    const connected = await isFortnoxConnected(businessId)
-    if (connected) {
-      const amount = Number(opts.amount ?? invoice.total ?? 0)
-      if (amount > 0) {
-        fortnoxResult = await registerFortnoxPayment(
-          businessId,
-          invoice.fortnox_invoice_number,
-          amount,
-          paidAt.split('T')[0],
-        )
+  const customerJustSettled = decision.transition === 'to_paid' || decision.transition === 'to_customer_paid'
+
+  if (customerJustSettled) {
+    await runPostPaymentAutomations(invoiceId, businessId, invoice.customer_id, {
+      triggeredBy: source === 'fortnox' ? 'system' : 'user',
+      reason: source === 'fortnox' ? 'Faktura betald (Fortnox-synk)' : 'Betal-markering',
+      logPrefix: `[apply-payment/${source}]`,
+    }).catch(err =>
+      console.error(`[apply-payment/${source}] post-payment automations failed:`, err),
+    )
+
+    if (invoice.customer_id) {
+      try {
+        const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
+        await sendPortalNotification(businessId, invoice.customer_id, 'invoice_paid', {
+          context: {
+            amount: decision.paid_amount,
+            invoice_number: invoice.invoice_number || invoice.fortnox_invoice_number || invoiceId,
+          },
+        })
+      } catch (notifErr) {
+        console.error(`[apply-payment/${source}] portal notification invoice_paid failed:`, notifErr)
       }
-    }
-  }
-
-  await runPostPaymentAutomations(invoiceId, businessId, invoice.customer_id).catch(err =>
-    console.error(`[apply-payment/${source}] post-payment automations failed:`, err),
-  )
-
-  if (invoice.customer_id) {
-    try {
-      const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
-      await sendPortalNotification(businessId, invoice.customer_id, 'invoice_paid', {
-        context: {
-          amount: invoice.total ?? null,
-          invoice_number: invoice.fortnox_invoice_number || invoiceId,
-        },
-      })
-    } catch (notifErr) {
-      console.error(`[apply-payment/${source}] portal notification invoice_paid failed:`, notifErr)
     }
   }
 
   return {
     ok: true,
-    status: 'paid',
-    paid_at: paidAt,
-    fortnox_synced: fortnoxResult.success,
-    fortnox_error: fortnoxResult.error || null,
+    status: decision.status,
+    transition: decision.transition,
+    paid_at: customerJustSettled ? paidAt : (invoice.paid_at || paidAt),
+    paid_amount: decision.paid_amount,
+    remaining_rot_kr: decision.remaining_rot_kr,
   }
 }
 
 /**
- * Replikerar side-effects när status sätts till 'paid': pipeline→Vunnen,
- * projekt-steg, smart-kommunikation, payment_received-event. Karin/Hanna/Lars
- * börjar bevaka direkt.
+ * Side-effects när kunden har gjort sitt (paid ELLER customer_paid):
+ * pipeline→Vunnen, AI-projektledarens avslutskoll, projekt-steg
+ * (INVOICE_PAID), smart-kommunikation, payment_received-event. Karin/Hanna/
+ * Lars börjar bevaka direkt. EN implementation — kopian som tidigare låg i
+ * lib/fortnox/sync-payments.ts är borttagen (2026-08-26).
  */
-async function runPostPaymentAutomations(
+export async function runPostPaymentAutomations(
   invoiceId: string,
   businessId: string,
   customerId: string | null,
+  opts: { triggeredBy: 'user' | 'system'; reason: string; logPrefix: string } = {
+    triggeredBy: 'user', reason: 'Betal-markering', logPrefix: '[apply-payment]',
+  },
 ): Promise<void> {
+  const { triggeredBy, reason, logPrefix } = opts
+
   try {
     const { findDealByInvoice, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')
     const settings = await getAutomationSettings(businessId)
@@ -131,13 +162,21 @@ async function runPostPaymentAutomations(
           dealId: deal.id,
           businessId,
           toStageSlug: 'won',
-          triggeredBy: 'user',
-          aiReason: 'Betal-markering',
+          triggeredBy,
+          aiReason: reason,
         })
       }
     }
   } catch (err) {
-    console.error('[apply-payment] pipeline error:', err)
+    console.error(`${logPrefix} pipeline error:`, err)
+  }
+
+  // AI Projektledare: kontrollera projektavslut (låg tidigare bara i PATCH-rutten)
+  try {
+    const { handleProjectEvent } = await import('@/lib/project-ai-engine')
+    await handleProjectEvent({ type: 'invoice_paid', businessId, invoiceId })
+  } catch (err) {
+    console.error(`${logPrefix} handleProjectEvent invoice_paid failed (non-blocking):`, invoiceId, err)
   }
 
   try {
@@ -145,10 +184,10 @@ async function runPostPaymentAutomations(
     const project = await findProjectForEntity({ businessId, invoiceId })
     if (project) {
       const flytt = await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_PAID, businessId)
-      if (!flytt.moved) console.error('[apply-payment] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: project.project_id })
+      if (!flytt.moved) console.error(`${logPrefix} stegflytten misslyckades (non-blocking):`, flytt.error, { projectId: project.project_id })
     }
   } catch (err) {
-    console.error('[apply-payment] project-stage error:', err)
+    console.error(`${logPrefix} project-stage error:`, err)
   }
 
   if (customerId) {
@@ -161,7 +200,7 @@ async function runPostPaymentAutomations(
         context: { invoiceId },
       })
     } catch (err) {
-      console.error('[apply-payment] smart-communication error:', err)
+      console.error(`${logPrefix} smart-communication error:`, err)
     }
   }
 
@@ -170,6 +209,6 @@ async function runPostPaymentAutomations(
     const sb = getServerSupabase()
     await fireEvent(sb, 'payment_received', businessId, { invoice_id: invoiceId })
   } catch (err) {
-    console.error('[apply-payment] fireEvent error:', err)
+    console.error(`${logPrefix} fireEvent error:`, err)
   }
 }

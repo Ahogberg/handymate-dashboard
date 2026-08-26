@@ -8,6 +8,7 @@ import type { InvoiceTemplateData } from '@/lib/invoice-templates/types'
 import PortalSwishBlock from './PortalSwishBlock'
 import { formatCurrency, formatDate } from '../helpers'
 import type { Invoice, PaymentInfo } from '../types'
+import { isCustomerSettled } from '@/lib/invoices/status'
 
 interface PortalInvoiceDetailProps {
   invoice: Invoice
@@ -91,7 +92,7 @@ export default function PortalInvoiceDetail({
         </button>
         <div className="bp-brand">
           <div className="bp-brand-name">Faktura #{inv.invoice_number}</div>
-          <div className="bp-brand-sub">{inv.status === 'paid' ? 'Betald' : 'Att betala'}</div>
+          <div className="bp-brand-sub">{isCustomerSettled(inv.status) ? 'Betald' : 'Att betala'}</div>
         </div>
         <a
           href={pdfHref}
@@ -200,7 +201,7 @@ export default function PortalInvoiceDetail({
           >
             <Clock size={14} />
             <span style={{ fontSize: 12, fontWeight: 600 }}>
-              {inv.status === 'paid'
+              {isCustomerSettled(inv.status)
                 ? `Betald ${inv.paid_at ? formatDate(inv.paid_at) : ''}`
                 : `Förfaller ${formatDate(inv.due_date)}`}
             </span>
@@ -254,7 +255,7 @@ export default function PortalInvoiceDetail({
         </div>
 
         {/* Swish block */}
-        {inv.status !== 'paid' && paymentInfo.swish && (
+        {!isCustomerSettled(inv.status) && paymentInfo.swish && (
           <div style={{ padding: '0 18px 18px' }}>
             <PortalSwishBlock
               swishNumber={paymentInfo.swish}
@@ -267,7 +268,7 @@ export default function PortalInvoiceDetail({
         )}
 
         {/* Bankgiro alt */}
-        {inv.status !== 'paid' && (paymentInfo.bankgiro || paymentInfo.plusgiro) && (
+        {!isCustomerSettled(inv.status) && (paymentInfo.bankgiro || paymentInfo.plusgiro) && (
           <div style={{ padding: '0 18px 18px' }}>
             <div className="bp-card">
               <div

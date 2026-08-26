@@ -63,6 +63,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { manadsfonster } from '@/lib/value/vardekvitto'
 import { mapApprovalRowToCard, isWithinAttributionWindow } from '@/lib/value/recovered-revenue'
+import { isCustomerSettled } from '@/lib/invoices/status'
 
 export const MANADS_LEDGER_METHOD_VERSION = 1
 
@@ -426,7 +427,7 @@ export async function getManadsLedger(
     for (const inv of invRows || []) {
       invoices.set(String(inv.invoice_id), {
         total_kr: Number(inv.total) || 0,
-        paid: inv.status === 'paid',
+        paid: isCustomerSettled(inv.status),
         paid_at_ms: inv.paid_at ? new Date(inv.paid_at).getTime() : null,
       })
     }

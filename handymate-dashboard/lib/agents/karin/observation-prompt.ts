@@ -38,6 +38,7 @@ import {
   type ProjectEconomics,
 } from '@/lib/projects/compute-economics'
 import { getExplicitMarginTarget } from '@/lib/profitability'
+import { isCustomerSettled } from '@/lib/invoices/status'
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
@@ -422,7 +423,7 @@ async function buildAggregate(
   }
 
   for (const inv of invoices) {
-    if (inv.status === 'paid' && inv.paid_at) {
+    if (isCustomerSettled(inv.status) && inv.paid_at) {
       const key = ymKey(new Date(inv.paid_at))
       if (monthBuckets[key]) monthBuckets[key].paid += Number(inv.total || 0)
     }

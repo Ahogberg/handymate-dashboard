@@ -2,7 +2,13 @@
 
 export type InvoiceItemType = 'item' | 'heading' | 'text' | 'subtotal' | 'discount'
 export type InvoiceType = 'standard' | 'credit' | 'partial' | 'final' | 'reminder'
-export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'credited'
+/**
+ * customer_paid (sql/v170, 2026-08-26) = ROT/RUT-faktura där kunden betalat
+ * SIN del; skattereduktionen väntar på Skatteverket. paid = helt slutbetald
+ * (settled_at). Fråga "har kunden gjort sitt?" via isCustomerSettled()
+ * i lib/invoices/status.ts — inte med status === 'paid'.
+ */
+export type InvoiceStatus = 'draft' | 'sent' | 'customer_paid' | 'paid' | 'overdue' | 'cancelled' | 'credited'
 
 export interface InvoiceItem {
   id: string
@@ -118,8 +124,12 @@ export interface Invoice {
   rot_personal_number?: string
   rot_property_designation?: string
 
-  // Payment
-  payment_method?: string | null
+  // Payment. `paid_via` är DB-kolumnen (swish/bankgiro/card/cash/fortnox/
+  // manual/customer_confirmed) — `payment_method` fanns aldrig i databasen.
+  paid_via?: string | null
+  /** När hela fakturan är reglerad (inkl. Skatteverkets del vid ROT/RUT). */
+  settled_at?: string | null
+  cancelled_at?: string | null
   bankgiro_number?: string
   plusgiro_number?: string
   bank_account?: string

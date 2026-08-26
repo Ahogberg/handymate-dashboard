@@ -8,6 +8,8 @@
  */
 
 import { validatePersonnummer } from '@/lib/rot-rut'
+import { isCustomerSettled } from '@/lib/invoices/status'
+import { getCustomerShare } from '@/lib/invoices/customer-share'
 import { getCategory, type RotRutType } from './categories'
 
 const ROT_MAX_PER_YEAR = 50000
@@ -18,6 +20,11 @@ export interface SkvInvoiceLike {
   invoice_number?: string | null
   status?: string | null
   paid_at?: string | null
+  /** Registrerat betalt belopp (sql/v170). NULL = okänt (äldre rad). */
+  paid_amount?: number | null
+  total?: number | null
+  rot_rut_deduction?: number | null
+  customer_pays?: number | null
   rot_rut_type?: string | null
   rot_work_cost?: number | null
   rut_work_cost?: number | null
@@ -90,10 +97,23 @@ export function validateInvoiceForSkv(input: SkvValidationInput): ValidationResu
   const type = (inv.rot_rut_type === 'rot' || inv.rot_rut_type === 'rut') ? inv.rot_rut_type : null
   if (!type) errors.push('Saknar ROT/RUT-typ.')
 
-  // 2. Betald + betalningsdatum
-  if (inv.status !== 'paid') errors.push('Fakturan är inte betald (krävs innan begäran).')
+  // 2. Kundens del betald + betalningsdatum. `customer_paid` (ROT/RUT där
+  // kunden betalat SIN del, Skatteverkets del väntar) räcker — det är exakt
+  // tillståndet Skatteverket kräver: arbetet utfört och betalt av köparen.
+  if (!isCustomerSettled(inv.status)) errors.push('Kundens del av fakturan är inte betald (krävs innan begäran).')
   const paidAt = inv.paid_at ? new Date(inv.paid_at) : null
   if (!paidAt || isNaN(paidAt.getTime())) errors.push('Saknar betalningsdatum.')
+
+  // 2b. Skatteverket: begärt belopp ≤ vad köparen faktiskt betalat. Kollas
+  // bara när ett registrerat belopp finns (paid_amount NULL = äldre rad,
+  // okänt — då gäller status-regeln ovan ensam).
+  if (inv.paid_amount != null && inv.total != null) {
+    const share = getCustomerShare(inv)
+    const paid = Number(inv.paid_amount)
+    if (paid + 1 < share) {
+      errors.push(`Kunden har betalat ${Math.round(paid)} kr men ska betala ${Math.round(share)} kr innan begäran kan skickas.`)
+    }
+  }
 
   // 3. Köparens personnummer
   const rawPnr = cleanPersonnummer(input.customerPersonalNumber)

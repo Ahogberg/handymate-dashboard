@@ -27,7 +27,7 @@ export interface Invoice {
   invoice_number: string
   invoice_type?: string | null
   template_style?: 'modern' | 'premium' | 'friendly' | null
-  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'credited'
+  status: 'draft' | 'sent' | 'customer_paid' | 'paid' | 'overdue' | 'cancelled' | 'credited'
   items: InvoiceItem[]
   description?: string | null
   introduction_text?: string | null
@@ -48,7 +48,11 @@ export interface Invoice {
   viewed_at?: string | null
   paid_at: string | null
   paid_amount: number | null
-  payment_method: string | null
+  /** DB-kolumnen (sql/v170-kommentar). `payment_method` fanns aldrig i databasen. */
+  paid_via: string | null
+  /** Helt reglerad (inkl. Skatteverkets del vid ROT/RUT). */
+  settled_at?: string | null
+  cancelled_at?: string | null
   payment_reference?: string | null
   reminder_count: number
   reminder_fee: number | null

@@ -83,14 +83,36 @@ export function InvoiceStatusTimeline({ invoice, reminders }: InvoiceStatusTimel
     })
   }
 
-  if (invoice.paid_at) {
+  // Betalning. ROT/RUT (2026-08-26): kundens del och Skatteverkets del är två
+  // steg — `customer_paid` = kunden klar, `paid` + settled_at = slutbetald.
+  const isSplit = (invoice.rot_rut_type === 'rot' || invoice.rot_rut_type === 'rut')
+    && (invoice.status === 'customer_paid' || (invoice.status === 'paid' && !!invoice.settled_at && invoice.settled_at !== invoice.paid_at))
+  if (invoice.paid_at && isSplit) {
+    const remaining = Math.max(0, (invoice.total || 0) - (invoice.paid_amount ?? invoice.customer_pays ?? 0))
     steps.push({
-      label: `Betald via ${getPaymentMethodText(invoice.payment_method)}`,
+      label: `Kundens del betald via ${getPaymentMethodText(invoice.paid_via)}`,
+      date: invoice.paid_at,
+      sublabel: invoice.status === 'customer_paid'
+        ? `${formatCurrency(invoice.paid_amount ?? invoice.customer_pays)} · ${invoice.rot_rut_type?.toUpperCase()}-del ${formatCurrency(remaining)} väntar på Skatteverket`
+        : formatCurrency(invoice.paid_amount ?? invoice.customer_pays),
+      status: 'done',
+    })
+    steps.push({
+      label: 'Slutbetald',
+      date: invoice.settled_at,
+      sublabel: invoice.settled_at ? 'Skatteverkets utbetalning registrerad' : null,
+      status: invoice.settled_at ? 'done' : 'current',
+    })
+  } else if (invoice.paid_at) {
+    steps.push({
+      label: `Betald via ${getPaymentMethodText(invoice.paid_via)}`,
       date: invoice.paid_at,
       sublabel: invoice.payment_reference ? `Referens ${invoice.payment_reference}` : null,
       status: 'done',
     })
-  } else if (invoice.status !== 'credited' && invoice.status !== 'cancelled') {
+  } else if (invoice.status === 'cancelled') {
+    steps.push({ label: 'Makulerad', date: invoice.cancelled_at, status: 'done' })
+  } else if (invoice.status !== 'credited') {
     steps.push({ label: 'Betald', date: null, status: 'upcoming' })
   }
 

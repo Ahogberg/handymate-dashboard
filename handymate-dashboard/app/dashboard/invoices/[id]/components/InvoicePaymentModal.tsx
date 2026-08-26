@@ -5,7 +5,8 @@ import { PAYMENT_METHODS } from '../helpers'
 
 export interface PaymentData {
   paid_at: string
-  payment_method: string
+  /** DB-kolumnen heter paid_via (swish/bankgiro/card/cash). */
+  paid_via: string
   paid_amount: number
 }
 
@@ -17,6 +18,8 @@ interface InvoicePaymentModalProps {
   updatingStatus: boolean
   onClose: () => void
   onConfirm: () => void
+  /** 'customer' = kundens betalning (default); 'settle' = Skatteverkets utbetalning på en customer_paid-faktura. */
+  mode?: 'customer' | 'settle'
 }
 
 /**
@@ -36,6 +39,7 @@ export function InvoicePaymentModal({
   updatingStatus,
   onClose,
   onConfirm,
+  mode = 'customer',
 }: InvoicePaymentModalProps) {
   if (!show) return null
 
@@ -43,7 +47,9 @@ export function InvoicePaymentModal({
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 w-full max-w-md">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Markera som betald</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            {mode === 'settle' ? 'Registrera Skatteverkets utbetalning' : 'Markera som betald'}
+          </h3>
           <button
             onClick={onClose}
             className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
@@ -69,9 +75,9 @@ export function InvoicePaymentModal({
               {PAYMENT_METHODS.map((method) => (
                 <button
                   key={method.value}
-                  onClick={() => setPaymentData({ ...paymentData, payment_method: method.value })}
+                  onClick={() => setPaymentData({ ...paymentData, paid_via: method.value })}
                   className={`flex items-center gap-2 p-3 rounded-xl border transition-all ${
-                    paymentData.payment_method === method.value
+                    paymentData.paid_via === method.value
                       ? 'bg-primary-100 border-primary-600 text-gray-900'
                       : 'bg-gray-100 border-gray-300 text-gray-500 hover:border-gray-300'
                   }`}
@@ -95,7 +101,7 @@ export function InvoicePaymentModal({
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr</span>
             </div>
             <p className="text-xs text-gray-400 mt-1">
-              Att betala: {amountDue?.toLocaleString('sv-SE')} kr
+              {mode === 'settle' ? 'Återstår från Skatteverket' : 'Att betala'}: {amountDue?.toLocaleString('sv-SE')} kr
             </p>
           </div>
         </div>
