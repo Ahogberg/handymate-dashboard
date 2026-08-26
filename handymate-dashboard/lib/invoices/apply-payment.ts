@@ -179,13 +179,13 @@ export async function runPostPaymentAutomations(
     console.error(`${logPrefix} handleProjectEvent invoice_paid failed (non-blocking):`, invoiceId, err)
   }
 
+  // Projektsteg 'Faktura betald' — genom händelsebryggan (Del B, 2026-08-26):
+  // ps-07 först när ALLA projektets fakturor är reglerade (isCustomerSettled).
+  // Ett projekt med tre fakturor är inte betalt för att den första kom in.
   try {
-    const { advanceProjectStage, SYSTEM_STAGES, findProjectForEntity } = await import('@/lib/project-stages/automation-engine')
-    const project = await findProjectForEntity({ businessId, invoiceId })
-    if (project) {
-      const flytt = await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_PAID, businessId)
-      if (!flytt.moved) console.error(`${logPrefix} stegflytten misslyckades (non-blocking):`, flytt.error, { projectId: project.project_id })
-    }
+    const { bumpProjectStage } = await import('@/lib/project-stages/event-bridge')
+    const flytt = await bumpProjectStage(businessId, { invoiceId }, 'invoice_settled')
+    if (!flytt.moved && !flytt.skipped) console.error(`${logPrefix} stegflytten misslyckades (non-blocking):`, flytt.error, { projectId: flytt.projectId })
   } catch (err) {
     console.error(`${logPrefix} project-stage error:`, err)
   }

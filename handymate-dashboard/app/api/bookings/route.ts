@@ -301,29 +301,23 @@ export async function POST(request: NextRequest) {
       console.error('Dispatch suggestion error (non-blocking):', dispatchErr)
     }
 
-    // Project workflow stage: 'Startmöte bokat' när första bokningen skapas
-    // mot ett projekt där kunden just har signerat kontrakt (stage ps-01).
-    // Booking saknar direkt project_id — vi joinar via customer_id och letar
-    // efter ett projekt i CONTRACT_SIGNED-fasen.
-    if (customer_id) {
+    // Project workflow stage: 'Startmöte bokat' (Del B, 2026-08-26) — genom
+    // händelsebryggan: bokningens project_id först, annars kunden om hon
+    // har EXAKT ett aktivt projekt (aldrig "senaste"). Forward-only, så en
+    // bokning på ett pågående projekt rör inget. Sätter start_date om
+    // projektet saknar ett. Andra bokningsvägar fångas av cronens ps-02-svep.
+    if (customer_id || booking?.project_id) {
       try {
-        const { advanceProjectStage, SYSTEM_STAGES } = await import('@/lib/project-stages/automation-engine')
-        const { data: pendingProjects } = await supabase
-          .from('project')
-          .select('project_id, current_workflow_stage_id, created_at')
-          .eq('business_id', business.business_id)
-          .eq('customer_id', customer_id)
-          .eq('current_workflow_stage_id', SYSTEM_STAGES.CONTRACT_SIGNED)
-          .order('created_at', { ascending: false })
-          .limit(1)
-
-        const project = pendingProjects?.[0]
-        if (project) {
-          const flytt = await advanceProjectStage(project.project_id, SYSTEM_STAGES.MEETING_BOOKED, business.business_id)
-          if (!flytt.moved) console.error('[bookings] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: project.project_id })
-        }
+        const { bumpProjectStage } = await import('@/lib/project-stages/event-bridge')
+        const flytt = await bumpProjectStage(
+          business.business_id,
+          { projectId: booking?.project_id || null, customerId: customer_id || null },
+          'booking_created',
+          { startDateHint: scheduled_start || null },
+        )
+        if (!flytt.moved && !flytt.skipped) console.error('[bookings] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: flytt.projectId })
       } catch (err) {
-        console.error('[bookings] advanceProjectStage MEETING_BOOKED failed:', err)
+        console.error('[bookings] bumpProjectStage booking_created failed (non-blocking):', err)
       }
     }
 

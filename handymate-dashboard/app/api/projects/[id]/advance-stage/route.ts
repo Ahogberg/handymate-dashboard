@@ -90,7 +90,26 @@ export async function POST(
   //    automationer. Resultatet KONTROLLERAS: tidigare svarade rutten success
   //    även när engine tyst misslyckades (embed-buggen) → UI visade "Flyttad"
   //    medan projektet stod stilla.
-  const result = await advanceProjectStage(projectId, targetStageId, business.business_id)
+  // Bakåtflytt (Del B, 2026-08-26): kräver explicit allow_backwards och sker
+  // TYST — destinationsstegets automationer (kund-SMS m.m.) triggas inte
+  // igen, och ingen portal-notis går ut. Framåt-vakten i bryggan kan sedan
+  // flytta projektet framåt igen på nästa riktiga händelse.
+  const { data: currentStageRow } = project.current_workflow_stage_id
+    ? await supabase
+        .from('project_workflow_stages')
+        .select('position')
+        .eq('id', project.current_workflow_stage_id)
+        .maybeSingle()
+    : { data: null }
+  const isBackwards = !!currentStageRow && targetStage.position < currentStageRow.position
+  if (isBackwards && body?.allow_backwards !== true) {
+    return NextResponse.json(
+      { error: 'Projektet står redan längre fram. Bekräfta bakåtflytten (allow_backwards) om det verkligen är avsett.', requires_confirmation: true },
+      { status: 409 },
+    )
+  }
+
+  const result = await advanceProjectStage(projectId, targetStageId, business.business_id, { silent: isBackwards })
   if (!result.moved) {
     return NextResponse.json(
       { error: result.error || 'Kunde inte flytta projektet' },

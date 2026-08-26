@@ -39,6 +39,17 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       updated_at: new Date().toISOString(),
     }).eq('id', params.id)
 
+    // Projektsteg (Del B, 2026-08-26): kundens signatur på fältrapporten är
+    // en genomförd besiktning — forward-only via bryggan.
+    if (report.project_id) {
+      try {
+        const { bumpProjectStage } = await import('@/lib/project-stages/event-bridge')
+        await bumpProjectStage(report.business_id, { projectId: report.project_id }, 'field_report_signed')
+      } catch (err) {
+        console.error('[field-reports] bumpProjectStage field_report_signed failed (non-blocking):', err)
+      }
+    }
+
     // SMS till hantverkaren (non-blocking)
     try {
       const biz = report.business as any

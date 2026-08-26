@@ -235,6 +235,15 @@ export async function POST(
       payload: signedPayload,
     })
 
+    // Projektsteg (Del B, 2026-08-26): en signerad ÄTA är ett delmål i
+    // projektet — forward-only via bryggan (rör inget om projektet är längre).
+    try {
+      const { bumpProjectStage } = await import('@/lib/project-stages/event-bridge')
+      await bumpProjectStage(ata.business_id, { projectId: ata.project_id || null }, 'ata_signed')
+    } catch (err) {
+      console.error('[ata/sign] bumpProjectStage ata_signed failed (non-blocking):', err)
+    }
+
     // Fire event (non-blocking) — automation-engine reagerar inte på
     // 'ata_signed' i nuläget men eventet behålls för framtida rules.
     try {

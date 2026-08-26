@@ -58,8 +58,10 @@ export function ProjectStageStrip({
   variant = 'default',
   changingStageId = null,
 }: ProjectStageStripProps) {
+  // Inget steg = position 0: alla steg "kommande". Tidigare `|| 1` lät ett
+  // steglöst projekt (29/34 i prod) se ut som "Kontrakt signerat".
   const currentPos =
-    FLOW_SYSTEM_STAGES.find(s => s.id === currentStageId)?.position || 1
+    FLOW_SYSTEM_STAGES.find(s => s.id === currentStageId)?.position ?? 0
 
   const clickable = onStageClick != null
 

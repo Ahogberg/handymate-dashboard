@@ -68,6 +68,17 @@ export async function PATCH(
 
     if (error) throw error
 
+    // Projektsteg (Del B, 2026-08-26): en färdig egenkontroll ÄR
+    // slutbesiktningen — tidigare flyttade bara projektavslutet till ps-05.
+    if (updates.status === 'completed') {
+      try {
+        const { bumpProjectStage } = await import('@/lib/project-stages/event-bridge')
+        await bumpProjectStage(business.business_id, { projectId: params.id }, 'checklist_completed')
+      } catch (err) {
+        console.error('[checklists] bumpProjectStage checklist_completed failed (non-blocking):', err)
+      }
+    }
+
     return NextResponse.json({ checklist })
 
   } catch (error: any) {

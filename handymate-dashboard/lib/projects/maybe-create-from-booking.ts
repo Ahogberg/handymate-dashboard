@@ -115,11 +115,14 @@ export async function maybeCreateProjectFromBooking(
         project_type: 'hourly',
         status: 'active',
         start_date: startDate,
-        current_workflow_stage_id: SYSTEM_STAGES.CONTRACT_SIGNED,
-        workflow_stage_entered_at: nuIso,
-        workflow_stage_history: [
-          { stage_id: SYSTEM_STAGES.CONTRACT_SIGNED, entered_at: nuIso, previous_stage_id: null },
-        ],
+        // Steg NULL (Del B, 2026-08-26): offert-lös väg — inget kontrakt är
+        // signerat, bara en bokning gjord. Tidigare påstods ps-01 inline.
+        // Bokningsrutten flyttar sedan till ps-02 via bryggan (forward från
+        // null), och en senare signerad offert ger ps-01 bara om projektet
+        // inte redan är längre.
+        current_workflow_stage_id: null,
+        workflow_stage_entered_at: null,
+        workflow_stage_history: [],
         source_lead_data: {
           created_from: 'booking',
           booking_id: bookingId,

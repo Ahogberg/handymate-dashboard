@@ -1859,9 +1859,9 @@ export default function ProjectDetailPage() {
   // arbete alls registrerats?).
   const canSeeFinancials = can('see_financials')
   const stageBucket = getStageBucket(project.current_workflow_stage_id)
+  // null = inget steg ännu (ärligt), inte "Kontrakt signerat" (Del B, 2026-08-26)
   const currentWorkflowStage =
-    FLOW_SYSTEM_STAGES.find(stage => stage.id === project.current_workflow_stage_id) ||
-    FLOW_SYSTEM_STAGES[0]
+    FLOW_SYSTEM_STAGES.find(stage => stage.id === project.current_workflow_stage_id) || null
   const nedlagtKr = statusEconomics?.kostnader.total_kr ?? null
   const offereratKr = statusEconomics?.intakter.forvantad_intakt_kr ?? 0
   const isOverBudget = canSeeFinancials && nedlagtKr != null && offereratKr > 0 && nedlagtKr > offereratKr
@@ -2269,7 +2269,9 @@ export default function ProjectDetailPage() {
                 Projektets flöde
               </p>
               <p className="mt-1 text-sm font-semibold text-slate-900 truncate">
-                Steg {currentWorkflowStage.position} av {FLOW_SYSTEM_STAGES.length} · {currentWorkflowStage.name}
+                {currentWorkflowStage
+                  ? `Steg ${currentWorkflowStage.position} av ${FLOW_SYSTEM_STAGES.length} · ${currentWorkflowStage.name}`
+                  : 'Inget steg ännu — flyttas när kontrakt signeras, möte bokas eller arbete rapporteras'}
               </p>
             </div>
             <button

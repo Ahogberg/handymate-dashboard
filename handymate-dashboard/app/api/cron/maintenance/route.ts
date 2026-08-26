@@ -244,6 +244,51 @@ export async function GET(request: NextRequest) {
     results.job_started_error = err.message
   }
 
+  // ── 4b. Startmöte bokat-svepet (Del B, 2026-08-26) ────────────────────
+  //
+  // Bokningar skapas på tio ställen (rutt, agent-tool, portal, publik
+  // bokningssida, godkännandekort …). Bokningsrutten flyttar i realtid via
+  // bryggan; det här svepet är skyddsnätet för resten: projekt på null/ps-01
+  // med en bekräftad bokning kopplad via booking.project_id → ps-02.
+  // Forward-only, non-blocking.
+  try {
+    const { bumpProjectStage } = await import('@/lib/project-stages/event-bridge')
+    const { data: kandidater2, error: kandErr2 } = await supabase
+      .from('project')
+      .select('project_id, business_id, current_workflow_stage_id')
+      .in('status', ['planning', 'active'])
+      .limit(500)
+    if (kandErr2) throw kandErr2
+    const utanMote = (kandidater2 || []).filter(p =>
+      p.current_workflow_stage_id === null || p.current_workflow_stage_id === 'ps-01',
+    )
+    let moteBokat = 0
+    if (utanMote.length > 0) {
+      const ids = utanMote.map(p => p.project_id)
+      const { data: bokningar, error: bokErr2 } = await supabase
+        .from('booking')
+        .select('project_id, scheduled_start')
+        .in('project_id', ids)
+        .in('status', ['confirmed', 'completed'])
+        .order('scheduled_start', { ascending: true })
+        .limit(2000)
+      if (bokErr2) throw bokErr2
+      const forstaBokning = new Map<string, string>()
+      for (const b of bokningar || []) if (b.project_id && !forstaBokning.has(b.project_id)) forstaBokning.set(b.project_id, b.scheduled_start)
+      for (const p of utanMote) {
+        const start = forstaBokning.get(p.project_id)
+        if (!start) continue
+        const r = await bumpProjectStage(p.business_id, { projectId: p.project_id }, 'booking_created', { startDateHint: start })
+        if (r.moved) moteBokat++
+      }
+    }
+    results.meeting_booked_moved = moteBokat
+    if (moteBokat > 0) console.log(`[maintenance] Startmöte bokat: ${moteBokat} projekt flyttade`)
+  } catch (err: any) {
+    console.error('[maintenance] startmöte-svepet failade:', err.message)
+    results.meeting_booked_error = err.message
+  }
+
   // ── 5. OperatingExperiment-redovisning (Etapp 2, 2026-08-19) ───────
   //
   // Rider på den här BEFINTLIGA dagliga cronen — ingen ny vercel.json-rad

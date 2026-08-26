@@ -255,6 +255,17 @@ async function onTimeLogged(businessId: string, projectId: string, entryId: stri
 
   if (!project || project.status === 'completed' || project.status === 'cancelled') return
 
+  // Jobb påbörjat i REALTID (Del B, 2026-08-26): en tidrapport är den
+  // tydligaste "arbetet pågår"-signalen. Tidigare bara check-in + dagliga
+  // cronen; POST /api/time-entry (den vanligaste vägen) flyttade inget
+  // förrän nästa morgon. Forward-only, non-blocking.
+  try {
+    const { bumpProjectStage } = await import('@/lib/project-stages/event-bridge')
+    await bumpProjectStage(businessId, { projectId }, 'work_logged')
+  } catch (err) {
+    console.error('[project-ai-engine] bumpProjectStage work_logged failed (non-blocking):', err)
+  }
+
   // Calculate actual totals
   const { data: entries } = await supabase
     .from('time_entry')

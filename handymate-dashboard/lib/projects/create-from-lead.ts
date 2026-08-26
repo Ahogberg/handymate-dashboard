@@ -112,11 +112,14 @@ export async function createProjectFromLead(
         // `address:` här gav 42703 och HELA skapandet avvisades; lead→projekt
         // har därför aldrig fungerat i prod. Adressen bor i source_lead_data.
         status: 'active',
-        current_workflow_stage_id: SYSTEM_STAGES.CONTRACT_SIGNED,
-        workflow_stage_entered_at: nuIso,
-        workflow_stage_history: [
-          { stage_id: SYSTEM_STAGES.CONTRACT_SIGNED, entered_at: nuIso, previous_stage_id: null },
-        ],
+        // Steg NULL (Del B, 2026-08-26): inget kontrakt är signerat här —
+        // quote?.status tillåter 'sent'. Tidigare påstods ps-01 "Kontrakt
+        // signerat" inline. Nu flyttar bryggan till ps-01 när offerten
+        // faktiskt signeras (quote_signed) och till ps-02/03 när bokning/
+        // tidrapport kommer — projektet startar ärligt utan steg.
+        current_workflow_stage_id: null,
+        workflow_stage_entered_at: null,
+        workflow_stage_history: [],
         source_lead_data: {
           lead_title: lead.title,
           lead_value: lead.estimated_value,

@@ -212,26 +212,23 @@ export async function PUT(
         }
       } catch { /* non-blocking */ }
 
-      // Project workflow stage advance baserat på milstones-status:
-      //   - första klar (av flera) → ps-04 MILESTONE_REACHED
-      //   - alla klara             → ps-05 FINAL_INSPECTION
-      // Om bara EN milstone finns hoppar vi rakt till ps-05 (delmål-fasen
-      // saknar mening då). advanceProjectStage är idempotent — försöker vi
-      // sätta samma stage som projektet redan är på händer inget.
+      // Project workflow stage (Del B, 2026-08-26) — genom händelsebryggan:
+      //   - någon milstolpe klar (inte bara den första) → ps-04 Delmål uppnått
+      //   - alla klara                                 → ps-05 Slutbesiktning
+      // Forward-only + idempotent: ett projekt som redan är längre rörs inte.
       try {
         const completed = (allMilestones || []).filter((m: any) => m.status === 'completed').length
         const total = allMilestones?.length || 0
-        if (total > 0) {
-          const { advanceProjectStage, SYSTEM_STAGES } = await import('@/lib/project-stages/automation-engine')
-          const flytt = completed === total
-            ? await advanceProjectStage(params.id, SYSTEM_STAGES.FINAL_INSPECTION, business.business_id)
-            : completed === 1 && total > 1
-              ? await advanceProjectStage(params.id, SYSTEM_STAGES.MILESTONE_REACHED, business.business_id)
-              : null
-          if (flytt && !flytt.moved) console.error('[milestones] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: params.id })
+        if (total > 0 && completed > 0) {
+          const { bumpProjectStage } = await import('@/lib/project-stages/event-bridge')
+          await bumpProjectStage(
+            business.business_id,
+            { projectId: params.id },
+            completed === total ? 'project_completed' : 'milestone_completed',
+          )
         }
       } catch (err) {
-        console.error('[milestones] advanceProjectStage failed:', err)
+        console.error('[milestones] bumpProjectStage failed (non-blocking):', err)
       }
     }
 

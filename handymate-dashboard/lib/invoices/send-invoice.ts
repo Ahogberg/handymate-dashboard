@@ -564,19 +564,15 @@ export async function triggerPostSendAutomations(params: PostSendAutomationsPara
     console.error('Pipeline trigger error (non-blocking):', pipelineErr)
   }
 
-  // Project workflow stage: 'Faktura skickad' (non-blocking)
+  // Project workflow stage: 'Faktura skickad' (non-blocking) — genom
+  // händelsebryggan (Del B, 2026-08-26): forward-only, hittar projektet via
+  // invoice.project_id, läser .moved och loggar ärligt.
   try {
-    const { advanceProjectStage, SYSTEM_STAGES, findProjectForEntity } = await import('@/lib/project-stages/automation-engine')
-    const project = await findProjectForEntity({
-      businessId,
-      invoiceId,
-    })
-    if (project) {
-      const flytt = await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_SENT, businessId)
-      if (!flytt.moved) console.error('[invoices/send] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: project.project_id })
-    }
+    const { bumpProjectStage } = await import('@/lib/project-stages/event-bridge')
+    const flytt = await bumpProjectStage(businessId, { invoiceId }, 'invoice_sent')
+    if (!flytt.moved && !flytt.skipped) console.error('[invoices/send] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: flytt.projectId })
   } catch (err) {
-    console.error('[invoices/send] advanceProjectStage failed:', err)
+    console.error('[invoices/send] bumpProjectStage invoice_sent failed:', err)
   }
 
   // Smart communication: trigger invoice_sent event

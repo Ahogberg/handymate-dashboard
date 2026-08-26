@@ -29,28 +29,25 @@ import path from 'path'
 const ROOT = path.resolve(__dirname, '..')
 const read = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
 
-test.describe('Nyfixade vägar (2026-08-19) — inline stage-init, ingen automation-sideeffekt', () => {
-  test('create-from-lead.ts sätter ps-01 inline i insert:en, inte via advanceProjectStage', () => {
+test.describe('Lead-/bokningsfödda projekt startar ÄRLIGT utan steg (Del B, 2026-08-26)', () => {
+  // 2026-08-19 sattes ps-01 "Kontrakt signerat" inline här — men inget
+  // kontrakt är signerat på de här vägarna (quote?.status tillåter 'sent';
+  // bokningsvägen är per definition offert-lös). Sedan Del B startar de på
+  // steg NULL; händelsebryggan flyttar till ps-01 vid faktisk signering
+  // (quote_signed) och till ps-02/ps-03 vid bokning/tidrapport.
+  test('create-from-lead.ts: steg null, ingen historik, aldrig advanceProjectStage', () => {
     const kalla = read('lib/projects/create-from-lead.ts')
-    expect(kalla).toContain("import { SYSTEM_STAGES } from '@/lib/project-stages/automation-engine'")
-    expect(kalla).toContain('current_workflow_stage_id: SYSTEM_STAGES.CONTRACT_SIGNED')
-    expect(kalla).toContain('workflow_stage_entered_at: nuIso')
-    expect(kalla).toContain('stage_id: SYSTEM_STAGES.CONTRACT_SIGNED, entered_at: nuIso, previous_stage_id: null')
-    // Får INTE ANROPA advanceProjectStage (bara nämna varför i en kommentar)
-    // — quote?.status tillåter 'sent' (ej signerad), och den funktionen
-    // triggar en kund-SMS-automation för ps-01 som skulle vara felaktig här.
+    expect(kalla).toContain('current_workflow_stage_id: null')
+    expect(kalla).toContain('workflow_stage_history: []')
+    expect(kalla).not.toContain('current_workflow_stage_id: SYSTEM_STAGES.CONTRACT_SIGNED')
     expect(kalla).not.toContain('advanceProjectStage(')
   })
 
-  test('maybe-create-from-booking.ts sätter ps-01 inline i minimal-projekt-grenen, inte via advanceProjectStage', () => {
+  test('maybe-create-from-booking.ts: steg null i minimal-projekt-grenen, aldrig advanceProjectStage', () => {
     const kalla = read('lib/projects/maybe-create-from-booking.ts')
-    expect(kalla).toContain("import { SYSTEM_STAGES } from '@/lib/project-stages/automation-engine'")
-    expect(kalla).toContain('current_workflow_stage_id: SYSTEM_STAGES.CONTRACT_SIGNED')
-    expect(kalla).toContain('workflow_stage_entered_at: nuIso')
-    expect(kalla).toContain('stage_id: SYSTEM_STAGES.CONTRACT_SIGNED, entered_at: nuIso, previous_stage_id: null')
-    // Offert-lös väg per filhuvudet — inget kontrakt signerat, bara en
-    // bokning gjord. Samma resonemang som create-from-lead.ts ovan (bara
-    // nämnt i en kommentar, aldrig faktiskt anropad).
+    expect(kalla).toContain('current_workflow_stage_id: null')
+    expect(kalla).toContain('workflow_stage_history: []')
+    expect(kalla).not.toContain('current_workflow_stage_id: SYSTEM_STAGES.CONTRACT_SIGNED')
     expect(kalla).not.toContain('advanceProjectStage(')
   })
 
@@ -93,7 +90,10 @@ test.describe('Redan fixade vägar (2026-08-13) — regressionslås', () => {
 
 test.describe('SYSTEM_STAGES-kontraktet (automation-engine.ts) — oförändrat av denna fix', () => {
   test('ps-01 är fortfarande CONTRACT_SIGNED och stegen är strängordnade', () => {
-    const kalla = read('lib/project-stages/automation-engine.ts')
+    // 2026-08-26: tabellen bor i lib/project-stages/stages.ts (en källa för
+    // motor + UI); automation-engine re-exporterar den.
+    const kalla = read('lib/project-stages/stages.ts')
     expect(kalla).toContain("CONTRACT_SIGNED:   'ps-01'")
+    expect(read('lib/project-stages/automation-engine.ts')).toContain('export { SYSTEM_STAGES }')
   })
 })

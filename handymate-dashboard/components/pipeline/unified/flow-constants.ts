@@ -3,6 +3,8 @@
  * System-stages speglar SQL-seed i sql/v39_project_stages.sql exakt.
  */
 
+import { PROJECT_SYSTEM_STAGES, type ProjectSystemStage } from '@/lib/project-stages/stages'
+
 export interface FlowSystemStage {
   id: string
   name: string
@@ -12,16 +14,9 @@ export interface FlowSystemStage {
   position: number
 }
 
-export const FLOW_SYSTEM_STAGES: FlowSystemStage[] = [
-  { id: 'ps-01', name: 'Kontrakt signerat',  short: 'Kontrakt',   color: '#0F766E', icon: '✍️', position: 1 },
-  { id: 'ps-02', name: 'Startmöte bokat',    short: 'Startmöte',  color: '#0284C7', icon: '📅', position: 2 },
-  { id: 'ps-03', name: 'Jobb påbörjat',      short: 'Pågående',   color: '#7C3AED', icon: '🔨', position: 3 },
-  { id: 'ps-04', name: 'Delmål uppnått',     short: 'Delmål',     color: '#B45309', icon: '🎯', position: 4 },
-  { id: 'ps-05', name: 'Slutbesiktning',     short: 'Besiktning', color: '#DC2626', icon: '🔍', position: 5 },
-  { id: 'ps-06', name: 'Faktura skickad',    short: 'Fakturerat', color: '#0369A1', icon: '📄', position: 6 },
-  { id: 'ps-07', name: 'Faktura betald',     short: 'Betald',     color: '#16A34A', icon: '💰', position: 7 },
-  { id: 'ps-08', name: 'Recension mottagen', short: 'Recension',  color: '#059669', icon: '⭐', position: 8 },
-]
+// EN källa sedan 2026-08-26: lib/project-stages/stages.ts (delas med
+// motorn). Tidigare en handsynkad kopia här.
+export const FLOW_SYSTEM_STAGES: FlowSystemStage[] = PROJECT_SYSTEM_STAGES.map((s: ProjectSystemStage) => ({ ...s }))
 
 export function getStageByPosition(pos: number): FlowSystemStage | undefined {
   return FLOW_SYSTEM_STAGES.find(s => s.position === pos)

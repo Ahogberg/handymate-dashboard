@@ -41,6 +41,15 @@ export async function createProjectFromQuote(
       .maybeSingle()
 
     if (existing) {
+      // Offerten signerades för ett projekt som REDAN finns (lead-/bokningsfött,
+      // startat utan steg): nu är kontraktet signerat på riktigt → ps-01.
+      // Forward-only — ett projekt som redan är längre rörs inte. (Del B, 2026-08-26)
+      try {
+        const { bumpProjectStage } = await import('@/lib/project-stages/event-bridge')
+        await bumpProjectStage(businessId, { projectId: existing.project_id }, 'quote_signed')
+      } catch (err) {
+        console.error('[createProjectFromQuote] bumpProjectStage quote_signed failed (non-blocking):', err)
+      }
       return { success: true, project_id: existing.project_id, already_existed: true }
     }
 

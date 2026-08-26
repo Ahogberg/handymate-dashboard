@@ -433,21 +433,19 @@ export async function PUT(request: NextRequest) {
 
     if (error) throw error
 
-    // Project workflow stage-uppdatering vid statusändring (non-blocking)
+    // Project workflow stage-uppdatering vid statusändring (non-blocking) —
+    // genom händelsebryggan (Del B, 2026-08-26). 'paid' ger ps-07 först när
+    // ALLA projektets fakturor är reglerade (bryggan kollar).
     if (fields.status === 'paid' || fields.status === 'sent') {
       try {
-        const { advanceProjectStage, SYSTEM_STAGES, findProjectForEntity } = await import('@/lib/project-stages/automation-engine')
-        const project = await findProjectForEntity({
-          businessId: business.business_id,
-          invoiceId: invoice.invoice_id,
-        })
-        if (project) {
-          const stage = fields.status === 'paid' ? SYSTEM_STAGES.INVOICE_PAID : SYSTEM_STAGES.INVOICE_SENT
-          const flytt = await advanceProjectStage(project.project_id, stage, business.business_id)
-          if (!flytt.moved) console.error('[invoices] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: project.project_id })
-        }
+        const { bumpProjectStage } = await import('@/lib/project-stages/event-bridge')
+        await bumpProjectStage(
+          business.business_id,
+          { invoiceId: invoice.invoice_id },
+          fields.status === 'paid' ? 'invoice_settled' : 'invoice_sent',
+        )
       } catch (err) {
-        console.error('[invoice status] advanceProjectStage failed:', err)
+        console.error('[invoice status] bumpProjectStage failed (non-blocking):', err)
       }
     }
 

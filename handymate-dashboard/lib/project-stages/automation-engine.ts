@@ -11,19 +11,12 @@ import { shouldQueueForApproval } from '@/lib/autonomy/agent-gating'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
-/** Läsbara id för system-stages — speglar SQL-seed (sql/v39_project_stages.sql) */
-export const SYSTEM_STAGES = {
-  CONTRACT_SIGNED:   'ps-01',
-  MEETING_BOOKED:    'ps-02',
-  JOB_STARTED:       'ps-03',
-  MILESTONE_REACHED: 'ps-04',
-  FINAL_INSPECTION:  'ps-05',
-  INVOICE_SENT:      'ps-06',
-  INVOICE_PAID:      'ps-07',
-  REVIEW_RECEIVED:   'ps-08',
-} as const
-
-export type SystemStageId = typeof SYSTEM_STAGES[keyof typeof SYSTEM_STAGES]
+/** Läsbara id för system-stages — EN källa sedan 2026-08-26:
+    lib/project-stages/stages.ts (ren modul, delas med UI:t). Re-exporteras
+    här så befintliga importer fortsätter fungera. */
+import { SYSTEM_STAGES, type SystemStageId } from '@/lib/project-stages/stages'
+export { SYSTEM_STAGES }
+export type { SystemStageId }
 
 /**
  * Flytta ENDAST framåt (2026-08-10, Jobb igång-producenten).
@@ -94,7 +87,13 @@ export interface AdvanceStageResult {
 export async function advanceProjectStage(
   projectId: string,
   stageId: string,
-  businessId: string
+  businessId: string,
+  opts: {
+    /** true = skriv bara steget + historiken; inga automationer, ingen
+     *  portal-notis. Används för manuella BAKÅT-flyttar (2026-08-26) — en
+     *  bakåtflytt fick tidigare destinationsstegets kund-SMS re-köat. */
+    silent?: boolean
+  } = {},
 ): Promise<AdvanceStageResult> {
   const supabase = getServerSupabase()
 
@@ -165,6 +164,8 @@ export async function advanceProjectStage(
   // viktigt för att rätt aktivitet visas på rätt projekt när en kund har
   // flera projekt.
   await logProjectStageEvent(supabase, businessId, project, stageId)
+
+  if (opts.silent) return { moved: true }
 
   await triggerStageAutomations(projectId, stageId, businessId, project)
 
