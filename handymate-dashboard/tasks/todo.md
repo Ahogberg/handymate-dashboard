@@ -85,6 +85,16 @@ direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 sak
 - [ ] Kvar från listan: "Koppla faktura till projekt"-knapp (6), "Nästa"-etikett (7), agentattribuering
       i en fil (8), facit som låser fasmodellerna mot varandra (9)
 
+## Del F — leverantörsfakturor ↔ projekt från Fortnox (Andreas "Ja kör" 2026-08-26)
+- [x] Steg 1: detaljhämtning per ny faktura (Project/CostCenter/referenser/rader) + VAT
+- [x] Steg 2: deterministisk matchning fortnox_project → row_project → reference → Karins kö;
+      svep i cronen för redan importerade okopplade rader. sql/v171 skriven.
+- [ ] v171 körd (väntar på "kör") → push → CI
+- [ ] Steg 3 (efter): stämpla projektnumret som märkning på materialbeställningar/arbetsordrar
+      (orders/send saknar märkning helt idag) + skapa projektet i Fortnox vid skapandet
+- [ ] Radvis allokering inom samma faktura (fortnox_rows finns nu) — bara om ett riktigt fall dyker upp
+- FLAGGAT Pass 3/I2: fältnamnen på SupplierInvoice-detaljen; om Fortnox fyller YourReference vid tolkning
+
 ## Öppet för Andreas
 - ps-08 Recension mottagen har ingen automatisk källa (ingen Google-webhook) — förblir manuell.
 - Handoffens "Framdrift"-kort och "Personal"-chips är byggda; ProjectInfoCard (beskrivning/offert)
