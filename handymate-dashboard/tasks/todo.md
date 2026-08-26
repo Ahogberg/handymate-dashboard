@@ -65,10 +65,22 @@ direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 sak
 - [ ] Polish (ej blockerande): "Nästa"-etiketten visar kortets fulla titel (kan bli en lång fråga);
       överväg `typeLabel: titel` eller trunkering på ordgräns
 
+## Del D — Statusbandet (Claude Design-handoffen, Andreas "kör på" 2026-08-26) — KLAR (69a7ee93)
+- [x] components/projects/ProjectStatusBand.tsx: 3-stegs stepper + "Visa alla 8 steg" (stegmodalen),
+      ekonomistaplar + prognos (Planering: bara offererat), Redo att fakturera som KLARSPRÅK
+      ("Ja — X kr ofakturerat" / "Nej — värsta blockeraren") i stället för procenten, marginal per
+      5-statskontraktet
+- [x] Sidhuvud: livscykelchip (sex lägen), datumraden (ProjectDatesInline, redigerbar), primärknapp
+      = deriveTodoMode (fyra lägen), Fler åtgärder; Att göra döljer sin egen primärknapp
+- [x] Översikt: Att göra + Framdrift vänster, Personal-chips + Projektinfo + Att tänka på höger,
+      snabbåtgärder; TwinStrip/ProjectStatusCard/RedoAttFakturera/EkonomiPulsCard borta från Översikt
+- [x] Fakturorna hämtas vid sidladdning (livscykelchipen sann från start)
+- [ ] Skärmdump mot prod efter deploy (scratchpad/screenshot-project.mjs) → till Andreas
+
 ## Öppet för Andreas
-- Främmande okommitterat arbete i ProjectStageStrip/ProjectStatusCard/projects/[id]/page.tsx/
-  FlowPipeline (8-stegs header) — committa det först (eget commit) eller ska jag bygga runt det?
 - ps-08 Recension mottagen har ingen automatisk källa (ingen Google-webhook) — förblir manuell.
+- Handoffens "Framdrift"-kort och "Personal"-chips är byggda; ProjectInfoCard (beskrivning/offert)
+  finns kvar bara under Ekonomi & offert — säg till om beskrivningen ska synas på Översikt.
 
 ---
 
