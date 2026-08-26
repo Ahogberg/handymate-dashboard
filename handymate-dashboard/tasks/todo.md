@@ -54,9 +54,16 @@ direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 sak
 
 ## Verifiering
 - [x] tsc (exkl. Codex WIP i CustomerTimeline) → riktade (324 gröna) — per del
-- [ ] full svit → next build → CI-grind per del (A: grön a35ee7dc; B: pågår; C: dispatchad)
-- [ ] Golden Path station 6/7/11 (projekt föds, steg flyttar) — mot prod efter deploy
-- [ ] Live: skapa bokning för kund utan offert → projekt föds (första gången någonsin) + ps-02
+- [x] full svit lokalt 5421/5421; CI-grind grön på Del C-koden (run 32990227485, 7be335c4).
+      `next build` lokalt EJ körd — Codex WIP i CustomerTimeline.tsx är tsc-röd i arbetsträdet; Vercel
+      bygger committad kod (list-API:t live-verifierat i prod → deployen är grön)
+- [x] Live-probe prod (demo-ägaren): tillfälligt projekt → list-API ger `dates` ("20 aug – 24 aug ·
+      försenad 2 dagar"), `stage` (inget steg — ärligt), `next_todo` (Lars checklistekort) → raderat
+- [x] Golden Path 16/16 grönt mot prod (inkl. Station 7 "Projektsteget flyttar sig självt", Station 11)
+- [ ] Live: skapa bokning för kund utan offert → projekt föds (första gången någonsin) + ps-02 —
+      kräver en riktig bokning på ett riktigt konto; Bee Service är kandidaten (Andreas)
+- [ ] Polish (ej blockerande): "Nästa"-etiketten visar kortets fulla titel (kan bli en lång fråga);
+      överväg `typeLabel: titel` eller trunkering på ordgräns
 
 ## Öppet för Andreas
 - Främmande okommitterat arbete i ProjectStageStrip/ProjectStatusCard/projects/[id]/page.tsx/
