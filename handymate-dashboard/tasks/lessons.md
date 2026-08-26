@@ -378,3 +378,35 @@ gissa i källkoden. Kontrollera ALLTID den faktiska DB-kolumntypen
 kommer från en generisk/oreglerad settings-kolumn (ALLOWED_COLUMNS-mönstret
 utan typvalidering, se app/api/settings/route.ts) — koden och schemat kan
 ha glidit isär utan att någon UI någonsin skrev ett verkligt värde dit.
+
+## 2026-08-26: Fantomkolumner — en oläst `.error` på en UPDATE med flera kolumner döljer att HELA skrivningen försvann
+
+**Vad hände:** Under Fortnox-planen hittades FYRA fall av samma klass på en
+dag, alla i "obevisade" vägar (Fortnox-licens saknas, ROT-fakturor 0 st i
+prod): `customer.fortnox_sync_error`, `invoice.payment_method`,
+`invoice.cancelled_at` finns inte i databasen; `'credited'` saknades i
+`invoice_status_check`. Mönstret var identiskt varje gång: koden skrev
+fantomkolumnen i SAMMA `.update({...})` som de kolumner som faktiskt
+spelar roll (`fortnox_customer_number`, `status:'paid'`), PostgREST
+avvisade hela satsen, `.error` lästes aldrig (eller bara `console.error`),
+och funktionen fortsatte som om skrivningen lyckats — returnerade
+`success:true`, räknade `marked_paid++`, körde automationer och SMS. Den
+värsta konsekvensen var inte den saknade kolumnen utan att ALLT som stod
+bredvid den i samma UPDATE också gick förlorat, tyst.
+
+**Varför missades det:** kolumnerna var med i TypeScript-typerna
+(`lib/types/invoice.ts` hade `payment_method`), så tsc var grön, UI
+skickade fältet, och ingen kontrakttest jämför typer mot
+`information_schema`. Kodvägen hade aldrig körts i prod.
+
+**Regel:** (1) Innan en UPDATE/INSERT som skriver en kolumn jag inte
+själv sett i en migration eller i `information_schema.columns` — slå upp
+den via MCP (regeln finns redan i CLAUDE.md; den gäller ÄVEN kolumner som
+finns i TS-typerna — typerna är inte schemat). (2) Varje Supabase-skrivning
+läser `.error`, och räknare/automationer/"success"-svar körs BARA efter
+lyckad skrivning — aldrig före eller oavsett. (3) När en feature är
+"obevisad" (integration utan licens, 0 rader i prod) är sannolikheten för
+fantomkolumner HÖG, inte låg — lägg en facit-SELECT mot
+`information_schema` i migrationsfilen och ett källskanningsfacit som
+förbjuder de kända fantomnamnen (`payment_method` i sync-payments är
+låst så nu).
