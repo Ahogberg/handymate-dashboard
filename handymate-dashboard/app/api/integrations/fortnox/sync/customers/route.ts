@@ -1,25 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import {
-  isFortnoxConnected,
-  createFortnoxCustomer,
-} from '@/lib/fortnox'
+import { isFortnoxConnected } from '@/lib/fortnox'
+import { syncCustomerWithTracking } from '@/lib/fortnox/sync'
 import { logFortnoxOperation } from '@/lib/fortnox/api-log'
-
-interface Customer {
-  customer_id: string
-  name: string
-  email: string | null
-  phone_number: string | null
-  address_line: string | null
-  fortnox_customer_number: string | null
-}
 
 /**
  * POST /api/integrations/fortnox/sync/customers
  *
- * Pushar alla kunder utan fortnox_customer_number till Fortnox.
+ * Pushar alla kunder utan fortnox_customer_number till Fortnox — i
+ * skapandeordning, så Fortnox löpnummer följer Handymates ordning.
+ *
+ * KONSOLIDERAD 2026-08-26: rutten reimplementerade tidigare skapandet inline
+ * (egen adressparsning + createFortnoxCustomer) UTAN Type/OrganisationNumber/
+ * GLN → manuellt pushade företagskunder fick fel typ i Fortnox och
+ * e-faktura kunde inte adresseras. Den skrev dessutom den då icke
+ * existerande kolumnen fortnox_sync_error (se sql/v169). Nu går varje kund
+ * genom samma väg som skapandesynken och fakturasynken:
+ * syncCustomerToFortnox (via syncCustomerWithTracking, som även skriver
+ * fortnox_sync-raden). En väg in, inga kopior som glider isär.
  */
 export async function POST(request: NextRequest) {
   let businessId: string | null = null
@@ -39,9 +38,10 @@ export async function POST(request: NextRequest) {
 
     const { data: customers, error: fetchError } = await supabase
       .from('customer')
-      .select('customer_id, name, email, phone_number, address_line, fortnox_customer_number')
+      .select('customer_id, name')
       .eq('business_id', businessId)
       .is('fortnox_customer_number', null)
+      .order('created_at', { ascending: true })
 
     if (fetchError) {
       throw fetchError
@@ -53,58 +53,17 @@ export async function POST(request: NextRequest) {
       errors: [] as { customerId: string; name: string; error: string }[]
     }
 
-    for (const customer of (customers as Customer[]) || []) {
-      try {
-        let address1 = ''
-        let zipCode = ''
-        let city = ''
-        if (customer.address_line) {
-          const parts = customer.address_line.split(',').map(p => p.trim())
-          if (parts.length >= 1) address1 = parts[0]
-          if (parts.length >= 2) {
-            const cityParts = parts[1].match(/(\d{5})\s*(.*)/)
-            if (cityParts) {
-              zipCode = cityParts[1]
-              city = cityParts[2] || ''
-            } else {
-              city = parts[1]
-            }
-          }
-        }
-
-        const fortnoxCustomer = await createFortnoxCustomer(businessId, {
-          Name: customer.name,
-          Email: customer.email || undefined,
-          Phone1: customer.phone_number || undefined,
-          Address1: address1 || undefined,
-          ZipCode: zipCode || undefined,
-          City: city || undefined
-        })
-
-        await supabase
-          .from('customer')
-          .update({
-            fortnox_customer_number: fortnoxCustomer.CustomerNumber,
-            fortnox_synced_at: new Date().toISOString(),
-            fortnox_sync_error: null
-          })
-          .eq('customer_id', customer.customer_id)
-
+    for (const customer of customers || []) {
+      const r = await syncCustomerWithTracking(businessId, customer.customer_id)
+      if (r.success) {
         results.synced++
-
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      } else {
         results.failed++
         results.errors.push({
           customerId: customer.customer_id,
           name: customer.name,
-          error: errorMessage
+          error: r.error || 'Unknown error',
         })
-
-        await supabase
-          .from('customer')
-          .update({ fortnox_sync_error: errorMessage })
-          .eq('customer_id', customer.customer_id)
       }
     }
 

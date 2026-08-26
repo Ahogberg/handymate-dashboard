@@ -1,3 +1,43 @@
+# Fortnox: kundsynk vid skapande, leverantörsfakturor i cronen, delbetalning/ROT (2026-08-26, pågår)
+
+Godkänd plan: `~/.claude/plans/ja-d-beh-ver-vi-sorted-avalanche.md`. Andreas-beslut: allt före
+1 sep trots freeze; explicit status `customer_paid`; kundsynk direkt på alla fem vägar.
+
+## Migrationer (skrivs nu, körs bara efter "kör", migration FÖRE deploy)
+- [x] sql/v169_customer_fortnox_sync_error.sql — fantomkolumnen som gav dubblettkunder i Fortnox
+- [x] sql/v170_invoice_customer_paid.sql — ny status + paid_amount/settled_at/cancelled_at + 'credited' i CHECK
+- [ ] Båda körda + facit-SELECT verifierad (väntar på "kör")
+
+## Del 1 — kundsynk vid skapande
+- [ ] P0: `syncCustomerToFortnox` returnerar aldrig success när numret inte persisterats; läser .error; scopar på business_id; rapporteraTystFel
+- [ ] `syncNewCustomerToFortnox` (kortslut på fortnox_connected → syncCustomerWithTracking → tyst-fel-rapport)
+- [ ] Fem anropsplatser: actions/create_customer, customers POST, tool-router createCustomer, golden-path lead→kund, approve-actions createCustomer
+- [ ] `batchSync` ordnar på created_at + läser .error; 2h-cronen sveper kunder per företag
+- [ ] Serverimporterna (import/bulk) anropar batchSync efter loopen
+- [ ] `sync/customers`-rutten går genom syncCustomerWithTracking (Type/OrgNr/GLN följer med)
+- [ ] tests/facit-customer-fortnox-create.spec.ts grönt; facit-fortnox-einvoice orört grönt
+
+## Del 2 — leverantörsfakturor i cronen
+- [ ] lib/fortnox/import-supplier-invoices.ts (ruttens rad 42–128 flyttade oförändrade, needs_reconnect vid 403)
+- [ ] Rutten tunn (auth + isFortnoxConnected + Återanslut-mappning kvar)
+- [ ] Cronen: import FÖRE betalstatus, needs_reconnect separat + dygnsdedupad tyst-fel-rapport
+- [ ] facit-fortnox-supplier-invoice-import ompekad; nytt cron-facit
+
+## Del 3 — customer_paid
+- [ ] Rena helpers + tester: status.ts, customer-share.ts, payment-decision.ts, fortnox/classify-payment.ts; typer (paid_via ersätter payment_method)
+- [ ] apply-payment-kärnan (transition, paid_amount/paid_via/settled_at, bort med registerFortnoxPayment, exporterad runPostPaymentAutomations + handleProjectEvent)
+- [ ] sync-payments via klassificeraren, alla UPDATE läser error, en runPostPaymentAutomations
+- [ ] Rutter: status PATCH via kärnan (Golden Path tack-SMS kvar), mark-paid-text, confirm_payment paidVia, claim-paid/reminder-spärr, portal-API-filter
+- [ ] ROT-grind: validate-rot-request, eligible/generate `.in('status',[paid,customer_paid])`, skv_requested, import-decision
+- [ ] Konsumenter via isCustomerSettled + minimal UI (badge/timeline/modal)
+- [ ] Facit + utökade skv-rot-rut/invoice-derive-status; alla listade "måste förbli gröna" gröna
+
+## Verifiering
+- [ ] tsc 0 fel → riktade specar → full svit → next build → push → CI-grind grön
+- [ ] docs/REALITY-WEEK.md avvikelser #23–26; tasks/lessons.md om fantomkolumn-klassen
+
+---
+
 # Etapp Å — Owner Absence V1 ("Matte håller ställningarna")
 
 Frånvarofönster: normala händelser samlas, en sluten lista deterministiska
@@ -257,6 +297,30 @@ skapar ingen konkurrerande launch-checklista eller roadmap.
 
 Resultaten rapporteras till Claude för den kanoniska lanseringsartefakten;
 denna sektion är endast utvecklingsbokföring.
+
+---
+
+# Kreativt slutgenomsvep — gemensam avsändare (2026-08-26)
+
+- [x] Ta bort dekorativa etiketter i övre högra hörnet från samtliga bildkällor
+- [x] Ta bort sidfotens vänstertexter och centrera `handymate.se`
+- [x] Förstora och standardisera H-logotypen till vänster
+- [x] Anpassa artikelomslag och social launch-kit till samma kontrakt
+- [x] Rendera om hela biblioteket och båda kontaktarken
+- [x] Facit- och visuellt granska desktop-, 4:5- och 9:16-original
+
+## Review
+
+- Båda renderkällorna använder nu en ren topp med en optiskt beskuren och
+  större H-symbol till vänster; ingen kampanjetikett renderas i övre höger.
+- Sidfoten innehåller endast `handymate.se`, centrerad oberoende av format.
+- 52 biblioteksoriginal, sju artikelomslag och åtta social-launch-original är
+  omrenderade. Det samlade slutarkivet innehåller även den nya logotypmastern
+  och social-launch-kitet under en egen mapp.
+- Layoutfacit: 21/21 Playwright-tester gröna. Fullstorlekskontroll utförd på
+  agentkort, mörk 4:5-bild, artikelomslag och socialt original.
+- Projektkontroll: `npx tsc --noEmit` och `npx next build` gröna. Builden
+  behåller projektets befintliga varningar om dynamiska serverrutter.
 
 ---
 

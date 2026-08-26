@@ -150,6 +150,15 @@ export async function POST(request: NextRequest) {
           .insert(insertData)
 
         if (error) throw error
+
+        // Fortnox-kundnummer vid SKAPANDET (2026-08-26) — se
+        // lib/fortnox/sync.ts syncNewCustomerToFortnox. Non-blocking: kunden
+        // är redan sparad; ett Fortnox-fel rapporteras till driftlarmet.
+        try {
+          const { syncNewCustomerToFortnox } = await import('@/lib/fortnox/sync')
+          await syncNewCustomerToFortnox(supabase, authBusiness.business_id, customerId)
+        } catch { /* non-blocking */ }
+
         return NextResponse.json({ success: true, customerId })
       }
 

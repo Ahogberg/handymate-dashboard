@@ -494,6 +494,14 @@ async function createCustomer(
   })
 
   if (error) return { success: false, error: error.message }
+
+  // Fortnox-kundnummer vid SKAPANDET (2026-08-26) — se
+  // lib/fortnox/sync.ts syncNewCustomerToFortnox. Non-blocking.
+  try {
+    const { syncNewCustomerToFortnox } = await import('@/lib/fortnox/sync')
+    await syncNewCustomerToFortnox(supabase, businessId, customerId)
+  } catch { /* non-blocking */ }
+
   return { success: true, data: { customer_id: customerId, customer_number: customerNumber, message: `Kund "${params.name}" skapad (${customerNumber})` } }
 }
 

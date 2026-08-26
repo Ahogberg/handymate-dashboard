@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { syncFortnoxPaymentsForBusiness, syncSupplierInvoicePayments } from '@/lib/fortnox/sync-payments'
+import { batchSync } from '@/lib/fortnox/sync'
 
 export const maxDuration = 300
 // Cron-route: får ALDRIG prerendras vid build (utan denna försöker Next
@@ -49,9 +50,29 @@ export async function GET(request: Request) {
   let totalMarkedOverdue = 0
   let totalSupplierChecked = 0
   let totalSupplierMarkedPaid = 0
+  let totalCustomersSynced = 0
   const errors: string[] = []
 
   for (const biz of businesses || []) {
+    // Kundsvepet (2026-08-26): skyddsnät för de skapandevägar som inte går
+    // genom syncNewCustomerToFortnox (CSV/bulk-import, klientsidans import,
+    // Gmail, storefront, röst). batchSync tar max 50 per körning i
+    // SKAPANDEORDNING. Körs FÖRST så en kund som skapats sedan förra
+    // körningen har sitt Fortnox-nummer innan något annat rör den.
+    try {
+      const customerSweep = await batchSync(biz.business_id, 'customer')
+      if (!customerSweep.skipped) {
+        totalCustomersSynced += customerSweep.synced
+        if (customerSweep.errors > 0) {
+          const failed = customerSweep.details.filter(d => d.status === 'error')
+          errors.push(`${biz.business_id} (customers): ${failed.map(d => `${d.entityId}: ${d.error}`).join('; ')}`)
+        }
+      }
+    } catch (err: any) {
+      console.error('[cron/fortnox-sync] batchSync(customer) failed:', biz.business_id, err)
+      errors.push(`${biz.business_id} (customers): ${err?.message || 'sync failed'}`)
+    }
+
     try {
       const result = await syncFortnoxPaymentsForBusiness(biz.business_id)
       results.push(result)
@@ -85,6 +106,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ok: true,
     businesses_synced: businesses?.length || 0,
+    total_customers_synced: totalCustomersSynced,
     total_checked: totalChecked,
     total_marked_paid: totalMarkedPaid,
     total_marked_overdue: totalMarkedOverdue,

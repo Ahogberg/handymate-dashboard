@@ -181,6 +181,16 @@ export async function createLeadAndDeal(
       .select('customer_id')
       .single()
     customerId = newCustomer?.customer_id || newId
+
+    // Fortnox-kundnummer vid SKAPANDET (2026-08-26, Andreas-beslut: även
+    // lead-vägen, så Fortnox löpnummer följer sann skapandeordning mellan
+    // leads och manuellt skapade kunder). Kortslutningen på
+    // fortnox_connected (en query) håller webhook-latensen nere för alla
+    // okopplade konton. Non-blocking.
+    try {
+      const { syncNewCustomerToFortnox } = await import('@/lib/fortnox/sync')
+      await syncNewCustomerToFortnox(supabase, businessId, customerId)
+    } catch { /* non-blocking */ }
   }
 
   // ── 2. Lead ──────────────────────────────────────────────────

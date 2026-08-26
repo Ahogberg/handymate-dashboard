@@ -86,6 +86,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Fortnox-kundsvep EFTER batcharna (2026-08-26): batchSync tar de nya
+    // kunderna i skapandeordning, max 50 per anrop; 2h-cronen tar resten.
+    // Non-blocking.
+    if (created > 0) {
+      try {
+        const { batchSync } = await import('@/lib/fortnox/sync')
+        await batchSync(businessId, 'customer')
+      } catch { /* non-blocking */ }
+    }
+
     return NextResponse.json({ created, skipped, errors })
   } catch (error: any) {
     console.error('[customers/bulk] Error:', error)

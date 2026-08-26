@@ -485,6 +485,15 @@ async function createCustomer(supabase: SupabaseClient, suggestion: any, actionD
 
     if (error) throw error
 
+    // Fortnox-kundnummer vid SKAPANDET (2026-08-26) — se
+    // lib/fortnox/sync.ts syncNewCustomerToFortnox. Non-blocking.
+    if (customer?.customer_id) {
+      try {
+        const { syncNewCustomerToFortnox } = await import('@/lib/fortnox/sync')
+        await syncNewCustomerToFortnox(supabase, businessId, customer.customer_id)
+      } catch { /* non-blocking */ }
+    }
+
     // Notify new lead
     if (customer?.customer_id) {
       try {

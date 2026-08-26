@@ -93,6 +93,13 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
+    // Fortnox-kundnummer vid SKAPANDET (2026-08-26) — se
+    // lib/fortnox/sync.ts syncNewCustomerToFortnox. Non-blocking.
+    try {
+      const { syncNewCustomerToFortnox } = await import('@/lib/fortnox/sync')
+      await syncNewCustomerToFortnox(supabase, business.business_id, customerId)
+    } catch { /* non-blocking */ }
+
     return NextResponse.json({ customer })
   } catch (error: any) {
     console.error('Create customer error:', error)

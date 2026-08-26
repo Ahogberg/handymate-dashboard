@@ -101,5 +101,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Fortnox-kundsvep EFTER loopen (2026-08-26): en batch-import synkar inte
+  // per rad (N Fortnox-anrop i request-vägen) — batchSync tar de nya kunderna
+  // i skapandeordning, max 50 per anrop; 2h-cronen tar resten. Non-blocking.
+  try {
+    const { batchSync } = await import('@/lib/fortnox/sync')
+    await batchSync(auth.business_id, 'customer')
+  } catch { /* non-blocking */ }
+
   return NextResponse.json({ success, failed, errors, total: customers.length })
 }

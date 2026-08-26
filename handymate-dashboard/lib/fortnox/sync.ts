@@ -5,7 +5,7 @@
  * Provides batch sync and status tracking per entity.
  */
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import {
   syncCustomerToFortnox,
   syncQuoteToFortnox,
@@ -94,6 +94,71 @@ export async function syncCustomerWithTracking(
     success: result.success,
     fortnoxId: result.customerNumber,
     error: result.error,
+  }
+}
+
+/**
+ * Kundsynk vid SKAPANDE (2026-08-26, Andreas-beslut: alla fem
+ * skapandevägar, inkl. lead-webhooken).
+ *
+ * ═══ VARFÖR ═══
+ * Synken var lat — bara vid första faktura/offert. Kunderna hamnade i
+ * Fortnox i FAKTURERINGSordning, inte skapandeordning, och aldrig
+ * fakturerade kunder fanns aldrig där. Fortnox tilldelar kundnumret vid
+ * skapandet (createFortnoxCustomer skickar medvetet inget eget nummer), så
+ * enda sättet att hålla Fortnox löpnummer i sann skapandeordning är att
+ * synka i samma ögonblick kunden skapas i Handymate.
+ *
+ * ═══ KONTRAKT ═══
+ * - Kastar ALDRIG. Awaitas i try/catch på anropsplatsen (repots konvention:
+ *   aldrig en lösryckt promise — serverless dödar den när svaret går).
+ * - Kortsluter på business_config.fortnox_connected (EN query) så en het
+ *   skapandeväg (lead-webhook) inte betalar 5 rundturer för okopplade konton.
+ *   OBS: isFortnoxConnected() läser en ANNAN sanning (token + connected_at)
+ *   — flaggan räcker som förfilter; syncCustomerToFortnox gör den riktiga
+ *   kollen ändå.
+ * - Idempotent via vakten i syncCustomerToFortnox (fortnox_customer_number
+ *   redan satt → inget nytt Fortnox-anrop). Dubbelanrop är billiga och
+ *   ofarliga; fakturasynkens lata väg finns kvar som skyddsnät.
+ * - Ett äkta fel (inte skipped) eskaleras via rapporteraTystFel så
+ *   driftlarmet ser det — annars är en trasig kundsynk osynlig tills första
+ *   fakturan failar.
+ */
+export async function syncNewCustomerToFortnox(
+  supabase: SupabaseClient,
+  businessId: string,
+  customerId: string,
+): Promise<{ synced: boolean; skipped: boolean; fortnoxId?: string; error?: string }> {
+  try {
+    const { data: cfg, error: cfgError } = await supabase
+      .from('business_config')
+      .select('fortnox_connected')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (cfgError || !cfg?.fortnox_connected) {
+      return { synced: false, skipped: true }
+    }
+
+    const result = await syncCustomerWithTracking(businessId, customerId)
+    if (result.skipped) return { synced: false, skipped: true }
+    if (!result.success) {
+      try {
+        const { rapporteraTystFel } = await import('@/lib/observability/driftlarm')
+        await rapporteraTystFel(
+          supabase,
+          businessId,
+          'customer-create:fortnox-sync',
+          result.error || 'okänt fel',
+          { customerId },
+        )
+      } catch { /* driftlarmet får aldrig fälla skapandet */ }
+      return { synced: false, skipped: false, error: result.error }
+    }
+    return { synced: true, skipped: false, fortnoxId: result.fortnoxId }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[syncNewCustomerToFortnox] oväntat fel (non-blocking):', message)
+    return { synced: false, skipped: false, error: message }
   }
 }
 
@@ -208,14 +273,23 @@ export async function batchSync(
   let synced = 0
   let errors = 0
 
-  // Sync customers
+  // Sync customers — i SKAPANDEORDNING (2026-08-26). Utan order gav
+  // Postgres godtycklig ordning → Fortnox löpnummer i slumpordning, vilket
+  // är motsatsen till hela poängen med svepet (skyddsnät för importer/
+  // klientvägar som inte går genom syncNewCustomerToFortnox). Felet läses:
+  // ett tyst misslyckat uppslag får inte se ut som "inga kunder att synka".
   if (!entityType || entityType === 'customer') {
-    const { data: customers } = await supabase
+    const { data: customers, error: customersError } = await supabase
       .from('customer')
       .select('customer_id')
       .eq('business_id', businessId)
       .is('fortnox_customer_number', null)
+      .order('created_at', { ascending: true })
       .limit(50)
+    if (customersError) {
+      errors++
+      details.push({ entityType: 'customer', entityId: '', status: 'error', error: customersError.message })
+    }
 
     for (const c of customers || []) {
       const result = await syncCustomerWithTracking(businessId, c.customer_id)

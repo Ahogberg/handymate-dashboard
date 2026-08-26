@@ -549,7 +549,17 @@ export async function syncCustomerToFortnox(
       GLNDelivery: customer.gln_number || undefined,
     })
 
-    // Update customer in DB
+    // Update customer in DB.
+    //
+    // BUGFIX (2026-08-26, verifierat mot prod): kolumnen fortnox_sync_error
+    // saknades i prod (sql/v70 la bara till två av tre) → PostgREST avvisade
+    // HELA den här UPDATE:en → Fortnox-numret sparades aldrig → felet bara
+    // console.error:ades OCH funktionen returnerade success:true ändå →
+    // nästa fakturasynk skapade kunden PÅ NYTT i Fortnox. Dubblettkunder i
+    // bokföringen vid varje faktura. sql/v169 lägger till kolumnen; koden
+    // här får ALDRIG mer påstå success när numret inte persisterats —
+    // Fortnox-kunden finns då, men Handymate vet inte om det, vilket är
+    // exakt dubblettläget. Scopat på business_id (saknades).
     const { error: updateError } = await supabase
       .from('customer')
       .update({
@@ -558,9 +568,25 @@ export async function syncCustomerToFortnox(
         fortnox_sync_error: null
       })
       .eq('customer_id', customerId)
+      .eq('business_id', businessId)
 
     if (updateError) {
-      console.error('Failed to update customer after Fortnox sync:', updateError)
+      console.error('[syncCustomerToFortnox] Fortnox-kund skapad men numret kunde inte sparas:', updateError.message)
+      try {
+        const { rapporteraTystFel } = await import('@/lib/observability/driftlarm')
+        await rapporteraTystFel(
+          supabase,
+          businessId,
+          'fortnox:customer-number-not-persisted',
+          updateError.message,
+          { customerId, fortnoxCustomerNumber: fortnoxCustomer.CustomerNumber },
+        )
+      } catch { /* driftlarmet får aldrig fälla synken */ }
+      return {
+        success: false,
+        customerNumber: fortnoxCustomer.CustomerNumber,
+        error: `Kunden skapades i Fortnox (${fortnoxCustomer.CustomerNumber}) men numret kunde inte sparas lokalt: ${updateError.message}`,
+      }
     }
 
     return { success: true, customerNumber: fortnoxCustomer.CustomerNumber }
@@ -568,11 +594,16 @@ export async function syncCustomerToFortnox(
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Sync failed'
 
-    // Log error to customer record
-    await supabase
+    // Log error to customer record — och läs felet: en misslyckad
+    // felloggning ska synas i serverloggen, inte försvinna.
+    const { error: markError } = await supabase
       .from('customer')
       .update({ fortnox_sync_error: errorMessage })
       .eq('customer_id', customerId)
+      .eq('business_id', businessId)
+    if (markError) {
+      console.error('[syncCustomerToFortnox] kunde inte skriva fortnox_sync_error:', markError.message)
+    }
 
     return { success: false, error: errorMessage }
   }
