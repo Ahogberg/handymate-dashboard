@@ -8,6 +8,7 @@ import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist
 import { verifyOwnership } from '@/lib/auth/verify-ownership'
 import { completeProject, type CompleteProjectResult } from '@/lib/projects/complete-project'
 import { deriveProjectLifecycle } from '@/lib/projects/derive-lifecycle'
+import { deriveProjectDates } from '@/lib/projects/derive-dates'
 
 // completeProject → autoInvoiceOnComplete kan nu (Etapp Q, TD-86) skicka
 // fakturan på riktigt inline (sendInvoice, Chromium-PDF via
@@ -103,10 +104,34 @@ export async function GET(request: NextRequest) {
     if (projectIds.length > 0) {
       const { data } = await supabase
         .from('time_entry')
-        .select('project_id, duration_minutes, hourly_rate, is_billable, invoiced')
+        .select('project_id, duration_minutes, hourly_rate, is_billable, invoiced, work_date')
         .in('project_id', projectIds)
 
       timeData = data || []
+    }
+
+    // Faktisk start (Del A, 2026-08-26): första arbetsdagen = min(första
+    // tidrapportens work_date, första bekräftade/genomförda bokningens
+    // scheduled_start som redan passerat). Härleds — lagras aldrig.
+    const actualStartByProject = new Map<string, string>()
+    const bumpStart = (projectId: string, iso: string | null | undefined) => {
+      if (!projectId || !iso) return
+      const day = iso.slice(0, 10)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return
+      const prev = actualStartByProject.get(projectId)
+      if (!prev || day < prev) actualStartByProject.set(projectId, day)
+    }
+    for (const t of timeData) bumpStart(t.project_id, t.work_date)
+    if (projectIds.length > 0) {
+      const { data: bookingData, error: bookingError } = await supabase
+        .from('booking')
+        .select('project_id, scheduled_start, status')
+        .eq('business_id', businessId)
+        .in('project_id', projectIds)
+        .in('status', ['confirmed', 'completed'])
+        .lte('scheduled_start', new Date().toISOString())
+      if (bookingError) console.error('[projects] booking-uppslag för faktisk start misslyckades (non-blocking):', bookingError.message)
+      for (const b of bookingData || []) bumpStart(b.project_id, b.scheduled_start)
     }
 
     // Fakturafakta för den härledda livscykeln (P1-2): en bulk-query,
@@ -186,7 +211,6 @@ export async function GET(request: NextRequest) {
       }
       totalStages = stagesById.size
     }
-    const nowMs = Date.now()
 
     const enrichedProjects = (projects || []).map((project: any) => {
       const entries = timeData.filter((t: any) => t.project_id === project.project_id)
@@ -215,6 +239,16 @@ export async function GET(request: NextRequest) {
           completed_at: project.completed_at,
           invoices: invoiceData.filter((i: any) => i.project_id === project.project_id),
         }),
+        // Datumraden (Del A): planerat spann, faktisk start, försening — EN
+        // härledning som listan och detaljsidan delar.
+        actual_start: actualStartByProject.get(project.project_id) || null,
+        dates: deriveProjectDates({
+          status: project.status,
+          start_date: project.start_date,
+          end_date: project.end_date,
+          completed_at: project.completed_at,
+          actual_start: actualStartByProject.get(project.project_id) || null,
+        }),
       }
 
       if (!includeWorkflow) return base
@@ -233,14 +267,10 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // is_late: projektets deadline har passerat och status är inte slutfört.
-      // project_workflow_stages har inget per-stage due_date; project.end_date
-      // är den auktoritativa deadlinen. Cancelled och completed räknas inte.
-      const isLate =
-        !!project.end_date &&
-        new Date(project.end_date).getTime() < nowMs &&
-        project.status !== 'completed' &&
-        project.status !== 'cancelled'
+      // is_late: samma härledning som datumraden (deriveProjectDates) —
+      // project.end_date är den auktoritativa deadlinen; klart/avbrutet
+      // räknas aldrig som försenat.
+      const isLate = base.dates.is_late
 
       return {
         ...base,
@@ -287,6 +317,67 @@ export async function POST(request: NextRequest) {
     const supabase = getServerSupabase()
     const body = await request.json()
     const businessId = business.business_id
+
+    const initialAssigneeId = typeof body.assigned_business_user_id === 'string'
+      ? body.assigned_business_user_id.trim()
+      : ''
+    const assigningUser = initialAssigneeId ? await getCurrentUser(request) : null
+
+    if (initialAssigneeId) {
+      if (!assigningUser || !hasPermission(assigningUser, 'see_all_projects')) {
+        return NextResponse.json({ error: 'Du saknar behörighet att tilldela projekt' }, { status: 403 })
+      }
+
+      // Service role kringgår RLS: personen måste verifieras mot samma tenant
+      // innan projektet skapas, annars kan request-body peka på ett främmande id.
+      const { data: targetAssignee } = await supabase
+        .from('business_users')
+        .select('id')
+        .eq('id', initialAssigneeId)
+        .eq('business_id', businessId)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (!targetAssignee) {
+        return NextResponse.json({ error: 'Den valda personen är inte aktiv i företaget' }, { status: 400 })
+      }
+    }
+
+    const assignInitialUser = async (projectId: string) => {
+      if (!initialAssigneeId || !assigningUser) return { assignment: null, assignment_error: null }
+
+      const { data: existingAssignment } = await supabase
+        .from('project_assignment')
+        .select('*')
+        .eq('business_id', businessId)
+        .eq('project_id', projectId)
+        .eq('business_user_id', initialAssigneeId)
+        .maybeSingle()
+
+      if (existingAssignment) return { assignment: existingAssignment, assignment_error: null }
+
+      const { data: assignment, error: assignmentError } = await supabase
+        .from('project_assignment')
+        .insert({
+          business_id: businessId,
+          project_id: projectId,
+          business_user_id: initialAssigneeId,
+          role: 'member',
+          assigned_by: assigningUser.id,
+        })
+        .select('*')
+        .single()
+
+      if (assignmentError) {
+        console.error('[projects POST] initial assignment error:', assignmentError)
+        return {
+          assignment: null,
+          assignment_error: 'Projektet skapades, men personen kunde inte tilldelas',
+        }
+      }
+
+      return { assignment, assignment_error: null }
+    }
 
     // customer_id kommer direkt från request-body vid manuellt skapande.
     // Service role kringgår RLS, så länken måste verifieras före varje insert.
@@ -338,7 +429,8 @@ export async function POST(request: NextRequest) {
         .eq('quote_id', body.from_quote_id)
         .maybeSingle()
       if (existingProject) {
-        return NextResponse.json({ project: existingProject, deduplicated: true })
+        const assignmentResult = await assignInitialUser(existingProject.project_id)
+        return NextResponse.json({ project: existingProject, deduplicated: true, ...assignmentResult })
       }
 
       const { data: quote, error: quoteError } = await supabase
@@ -478,12 +570,15 @@ export async function POST(request: NextRequest) {
           .eq('quote_id', body.from_quote_id)
           .maybeSingle()
         if (winner) {
-          return NextResponse.json({ project: winner, deduplicated: true })
+          const assignmentResult = await assignInitialUser(winner.project_id)
+          return NextResponse.json({ project: winner, deduplicated: true, ...assignmentResult })
         }
       }
       console.error('Project insert error:', insertError)
       return NextResponse.json({ error: insertError.message || 'Kunde inte skapa projekt' }, { status: 500 })
     }
+
+    const assignmentResult = await assignInitialUser(project.project_id)
 
     // Stegkedjan startar vid födseln (auditens P1-1). Kommer projektet ur en
     // offert är avtalet tecknat; skapas det manuellt som aktivt är jobbet
@@ -536,7 +631,7 @@ export async function POST(request: NextRequest) {
       console.error('[projects] suggestChecklistForProject error (non-blocking):', err)
     })
 
-    return NextResponse.json({ project })
+    return NextResponse.json({ project, ...assignmentResult })
 
   } catch (error: any) {
     console.error('Create project error:', error)

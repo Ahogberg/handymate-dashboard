@@ -337,6 +337,7 @@ export async function POST(request: NextRequest) {
           customerId: customer_id,
           bookingId,
           serviceType: service_type || null,
+          scheduledStart: scheduled_start || null,
         })
         if (result.created && result.project_id) {
           booking.project_id = result.project_id

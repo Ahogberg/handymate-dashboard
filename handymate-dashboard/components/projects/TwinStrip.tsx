@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { formatSEK } from '@/lib/format-price'
 import { weekChip, type StageBucket } from '@/components/projects/ProjectStatusCard'
 import { TODO_PRIMARY_LABEL, type TodoMode } from '@/components/projects/ProjectTodoBlock'
@@ -39,6 +40,9 @@ interface TwinStripProps {
   todoMode: TodoMode
   /** Antal väntande godkännandekort för projektet (från ProjectApprovalsBlock). */
   approvalsCount: number
+  /** Del A (2026-08-26): start/slut redigerbara direkt i kortet. Returnerar
+   *  true vid lyckad sparning. Utan prop är kortet rent läsläge. */
+  onSaveDates?: (start: string | null, end: string | null) => Promise<boolean>
 }
 
 const BUCKET_LABEL: Record<StageBucket, string> = {
@@ -102,9 +106,29 @@ export function TwinStrip({
   beredskap,
   todoMode,
   approvalsCount,
+  onSaveDates,
 }: TwinStripProps) {
   const vecka = weekChip(startDate, endDate)
   const marginalState = economics ? deriveMarginalState(economics) : null
+
+  // Inline-redigering av planerat start/slut. Fanns ingenstans i UI:t
+  // tidigare — datumen kunde bara sättas i "Nytt projekt"-modalen.
+  const [editingDates, setEditingDates] = useState(false)
+  const [draftStart, setDraftStart] = useState(startDate || '')
+  const [draftEnd, setDraftEnd] = useState(endDate || '')
+  const [savingDates, setSavingDates] = useState(false)
+  const openDates = () => {
+    setDraftStart(startDate || '')
+    setDraftEnd(endDate || '')
+    setEditingDates(true)
+  }
+  const saveDates = async () => {
+    if (!onSaveDates) return
+    setSavingDates(true)
+    const ok = await onSaveDates(draftStart || null, draftEnd || null)
+    setSavingDates(false)
+    if (ok) setEditingDates(false)
+  }
 
   // Marginalkortet döljs HELT utan behörighet — samma canSeeFinancials-grind
   // som sidans övriga ekonomiblock. Griden krymper då till fyra kolumner.
@@ -112,12 +136,64 @@ export function TwinStrip({
 
   return (
     <div className={`grid grid-cols-2 ${visaMarginal ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-2.5 sm:gap-3 mb-5`}>
-      {/* 1. Planerat klart — projektets slutdatum, ingen prognos (skärlistan). */}
-      <Kort eyebrow="Planerat klart" sub={endDate ? vecka : null}>
-        {endDate ? (
-          <Varde>Klart {datumSv(endDate)}</Varde>
+      {/* 1. Planerat klart — projektets slutdatum, ingen prognos (skärlistan).
+          Klickbart när onSaveDates finns: start + slut redigeras på plats. */}
+      <Kort
+        eyebrow="Planerat klart"
+        sub={editingDates ? null : endDate ? (vecka || (startDate ? `start ${datumSv(startDate)}` : null)) : (onSaveDates ? 'klicka för att sätta datum' : null)}
+      >
+        {editingDates ? (
+          <div className="space-y-1.5" onClick={e => e.preventDefault()}>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={draftStart}
+                onChange={e => setDraftStart(e.target.value)}
+                aria-label="Planerad start"
+                className="w-full min-w-0 px-1.5 py-1 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-primary-600"
+              />
+              <span className="text-slate-400 text-xs">–</span>
+              <input
+                type="date"
+                value={draftEnd}
+                min={draftStart || undefined}
+                onChange={e => setDraftEnd(e.target.value)}
+                aria-label="Planerat slut"
+                className="w-full min-w-0 px-1.5 py-1 text-xs border border-slate-200 rounded-md focus:outline-none focus:border-primary-600"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={saveDates}
+                disabled={savingDates}
+                className="px-2.5 py-1 text-xs font-semibold rounded-md bg-primary-700 text-white hover:bg-primary-600 disabled:opacity-50"
+              >
+                {savingDates ? 'Sparar…' : 'Spara'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingDates(false)}
+                className="px-2 py-1 text-xs text-slate-500 hover:text-slate-900"
+              >
+                Avbryt
+              </button>
+            </div>
+          </div>
         ) : (
-          <Varde className="text-slate-400">Inget slutdatum satt</Varde>
+          <button
+            type="button"
+            onClick={onSaveDates ? openDates : undefined}
+            disabled={!onSaveDates}
+            className={`block w-full text-left min-w-0 ${onSaveDates ? 'cursor-pointer hover:text-primary-700' : 'cursor-default'}`}
+            title={onSaveDates ? 'Ändra planerad start och slut' : undefined}
+          >
+            {endDate ? (
+              <Varde>Klart {datumSv(endDate)}</Varde>
+            ) : (
+              <Varde className="text-slate-400">Inget slutdatum satt</Varde>
+            )}
+          </button>
         )}
       </Kort>
 

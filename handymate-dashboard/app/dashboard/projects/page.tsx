@@ -47,6 +47,16 @@ interface Project {
   next_deadline: string | null
   /** Härlett driftläge (P1-2): fakta ur fakturatabellen, inte statusfältet. */
   lifecycle?: { phase: string; label: string; needsAction: boolean }
+  /** Datumraden (Del A, 2026-08-26): planerat spann, faktisk start, försening — härledd i API:t. */
+  dates?: { label: string; sublabel: string | null; tone: 'neutral' | 'upcoming' | 'late' | 'done' | 'cancelled'; is_late: boolean; days_late: number }
+  actual_start?: string | null
+  /** include=workflow */
+  current_stage_id?: string | null
+  current_stage_name?: string | null
+  current_stage_color?: string | null
+  stage_progress?: number
+  total_stages?: number
+  is_late?: boolean
   ai_health_score: number | null
   ai_health_summary: string | null
   ai_auto_created: boolean
@@ -122,7 +132,9 @@ export default function ProjectsPage() {
   async function fetchProjects() {
     setLoading(true)
     try {
-      const response = await fetch(`/api/projects?status=${filter}`)
+      // include=workflow → steg + is_late per rad (fanns i API:t sedan
+      // mobil-appen, men listan bad aldrig om det).
+      const response = await fetch(`/api/projects?status=${filter}&include=workflow`)
       if (response.ok) {
         const data = await response.json()
         setProjects(data.projects || [])
@@ -544,10 +556,32 @@ export default function ProjectsPage() {
                             {project.customer.name}
                           </span>
                         )}
-                        {project.next_deadline && (
-                          <span className="flex items-center gap-1">
+                        {/* Datumraden (Del A): planerat start–slut, faktisk
+                            start, försening — härledd i API:t, aldrig gissad. */}
+                        {project.dates && (
+                          <span
+                            className={`flex items-center gap-1 ${
+                              project.dates.tone === 'late'
+                                ? 'text-red-600 font-medium'
+                                : project.dates.tone === 'done'
+                                  ? 'text-emerald-700'
+                                  : project.dates.tone === 'upcoming'
+                                    ? 'text-primary-700'
+                                    : ''
+                            }`}
+                            title={project.dates.sublabel || undefined}
+                          >
                             <Calendar className="w-3 h-3" />
-                            {new Date(project.next_deadline).toLocaleDateString('sv-SE')}
+                            {project.dates.label}
+                            {project.dates.sublabel && (
+                              <span className="text-xs text-slate-400 font-normal hidden sm:inline">· {project.dates.sublabel}</span>
+                            )}
+                          </span>
+                        )}
+                        {project.next_deadline && (
+                          <span className="flex items-center gap-1" title="Nästa milstolpe">
+                            <AlertTriangle className="w-3 h-3" />
+                            milstolpe {new Date(project.next_deadline).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}
                           </span>
                         )}
                         {project.project_type === 'hourly' && <span>Löpande</span>}

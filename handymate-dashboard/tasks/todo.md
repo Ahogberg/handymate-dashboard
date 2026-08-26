@@ -16,17 +16,15 @@ direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 sak
       → BESLUT FÖR ANDREAS: ska "Ny deal vunnen"-SMS till ägaren + portal-SMS till kunden (steg 7–8 i
       create-from-quote, aldrig live hittills) slås på vid signering? Idag: nej.
 
-## Del A — Datum i listan (ingen migration: start_date/end_date/completed_at finns redan)
-- [ ] `GET /api/projects`: räkna `actual_start` (min(time_entry.date, bekräftad booking.scheduled_start))
-      ur redan hämtade time_entry-batchen + en booking-batch; `is_late` finns redan bakom
-      `include=workflow` → listan skickar `include=workflow`
-- [ ] Rad-UI: "12 aug – 30 sep · vecka 3 av 7" (weekChip, redan exporterad) / "Startar 3 sep" /
-      "Startade 14 aug (planerat 12 aug)" / "Slut ej satt" / "Försenad 6 dagar" / "Klart 14 aug"
-- [ ] Skapare sätter datum när de faktiskt VET: maybe-create-from-booking → start_date =
-      bokningens dag; create-from-quote → start_date från första bekräftade bokning för offerten
-      (annars null, aldrig gissat)
-- [ ] Detaljsidan: start/slut redigerbara inline (TwinStrip "Planerat klart" → klick = datumfält,
-      PUT /api/projects finns redan)
+## Del A — Datum i listan (ingen migration: start_date/end_date/completed_at finns redan) — KLAR
+- [x] `GET /api/projects`: `actual_start` (min(time_entry.work_date, passerad bekräftad/genomförd
+      booking.scheduled_start)) + `dates` via lib/projects/derive-dates.ts på varje rad; `is_late`
+      = samma härledning; listan skickar `include=workflow`
+- [x] Rad-UI: datumraden med ton (sen/klart/kommande); milstolpe märkt som milstolpe
+- [x] maybe-create-from-booking → start_date = bokningens dag; onQuoteAccepted gissar inte längre
+      start_date=idag. (Offert→projekt får start via Del B: första bokningen sätter start_date om null)
+- [x] Detaljsidan: start/slut redigerbara inline i TwinStrip via befintlig PUT
+- [x] tests/project-derive-dates.spec.ts (12) + tests/facit-project-list-dates.spec.ts
 
 ## Del B — Stegen flyttar på riktiga events (en brygga, forward-only, idempotent)
 - [ ] `lib/project-stages/event-bridge.ts`: `bumpProjectStage(businessId, {projectId|invoiceId|
@@ -745,15 +743,46 @@ denna sektion är endast utvecklingsbokföring.
 
 ## Plan
 
-- [ ] Kartlägg vilka tidslinjehändelser som har en bevisbar projektkoppling
-- [ ] Lägg ett gemensamt, tenant-säkert projektkontextlager på tidslinjesvaret
-- [ ] Bygg en mobilvänlig projektgrupperad vy med kanalöversikt och kronologiskt alternativ
-- [ ] Låt osäkra kundövergripande kontakter ligga i en tydlig restgrupp — gissa aldrig projekt
-- [ ] Lägg browserlösa facit för resolver, tenantfilter, grupperings-UX och direktlänkar
-- [ ] Kör riktade tester, `npx tsc --noEmit` och `npx next build`
+- [x] Kartlägg vilka tidslinjehändelser som har en bevisbar projektkoppling
+- [x] Lägg ett gemensamt, tenant-säkert projektkontextlager på tidslinjesvaret
+- [x] Bygg en mobilvänlig projektgrupperad vy med kanalöversikt och kronologiskt alternativ
+- [x] Låt osäkra kundövergripande kontakter ligga i en tydlig restgrupp — gissa aldrig projekt
+- [x] Lägg browserlösa facit för resolver, tenantfilter, grupperings-UX och direktlänkar
+- [x] Kör riktade tester, `npx tsc --noEmit` och `npx next build`
 
 ## Review
 
-- Pågår.
+- Kundtidslinjen startar nu projektgrupperad men kan växlas tillbaka till en
+  enda kronologisk lista. Varje projektgrupp visar sina bevisade kanaler,
+  händelseantal och en direktlänk till projektet.
+- Projektkopplingen är fail-closed och accepterar bara direkt `project_id`
+  eller tenant-/kundfiltrerade kedjor via bokning, faktura, ärende, offert
+  eller lead. Fritext och "kundens enda projekt" används aldrig som gissning.
+- Utgående SMS läses nu ur revisionskällan `sms_log`, så säkra relationer för
+  offert-, faktura-, boknings- och projektstegs-SMS kan följa med. Den enklare
+  speglingen i `sms_conversation` dedupliceras mekaniskt.
+- 53/53 riktade kommunikations-/resolverfacit gröna, `npx tsc --noEmit` rent
+  och `npx next build` exit 0. Kolumnvakten hade ett samtidigt, orelaterat
+  rött fynd i `lib/project-ai-engine.ts` (`project_milestone.id`); inga nya
+  fel pekade på kundtidslinjens frågor.
+
+---
+
+# Tilldela projekt från vunnen-affären (2026-08-26)
+
+## Plan
+
+- [x] Återanvänd affärens befintliga ansvarige och projektets `project_assignment`
+- [x] Lägg ett frivilligt, mobilvänligt personval i Grattis-modalen
+- [x] Validera behörighet, aktiv användare och tenant före projektskapandet
+- [x] Skapa tilldelningen server-side och visa ett ärligt delresultat om just tilldelningen misslyckas
+- [x] Lägg browserlösa facit och kör tester, `tsc` och build
+
+## Review
+
+- Grattis-modalen har nu ett frivilligt personval som förväljer affärens aktiva ansvarige när det finns en sådan.
+- Samma projektskapandeanrop skapar en riktig `project_assignment`; behörighet, aktiv användare och tenant valideras före första projektskrivningen.
+- Deduplicerings- och retry-vägarna återanvänder samma idempotenta tilldelning, och ett tilldelningsfel visas som ett ärligt delresultat utan falskt lyckandebesked.
+- Verifierat: 43/43 riktade browserlösa facit gröna, `npx tsc --noEmit` rent och `npx next build` exit 0.
 
 ---

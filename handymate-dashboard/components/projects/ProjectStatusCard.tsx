@@ -67,16 +67,8 @@ interface ProjectStatusCardProps {
 /** "Vecka X av Y" ur projektets start/slutdatum. Exporterad (Etapp D1) så
     TwinStrips "Planerat klart"-kort visar exakt samma text som chipen här —
     en beräkning, två ytor. */
-export function weekChip(start: string | null | undefined, end: string | null | undefined): string | null {
-  if (!start || !end) return null
-  const s = new Date(start).getTime()
-  const e = new Date(end).getTime()
-  if (Number.isNaN(s) || Number.isNaN(e) || e <= s) return null
-  const now = Date.now()
-  const totalWeeks = Math.max(1, Math.ceil((e - s) / (7 * 86400000)))
-  const elapsedWeeks = Math.min(totalWeeks, Math.max(1, Math.ceil((now - s) / (7 * 86400000))))
-  return `Vecka ${elapsedWeeks} av ${totalWeeks}`
-}
+import { weekChip } from '@/lib/projects/derive-dates'
+export { weekChip }
 
 export function ProjectStatusCard({
   currentStageId,

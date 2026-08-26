@@ -31,9 +31,13 @@ interface MaybeCreateResult {
 export async function maybeCreateProjectFromBooking(
   supabase: SupabaseClient,
   businessId: string,
-  opts: { customerId: string; bookingId: string; serviceType?: string | null },
+  opts: { customerId: string; bookingId: string; serviceType?: string | null; scheduledStart?: string | null },
 ): Promise<MaybeCreateResult> {
-  const { customerId, bookingId, serviceType } = opts
+  const { customerId, bookingId, serviceType, scheduledStart } = opts
+  // Bokningens dag ÄR en känd start (Del A, 2026-08-26) — det enda
+  // skapandeflöde som faktiskt vet ett datum. Aldrig gissat: saknas
+  // scheduledStart förblir start_date null.
+  const startDate = scheduledStart && /^\d{4}-\d{2}-\d{2}/.test(scheduledStart) ? scheduledStart.slice(0, 10) : null
 
   // Guard 1 — finns redan ett aktivt projekt för kunden? Då hör bokningen dit.
   const { data: existingProject } = await supabase
@@ -110,6 +114,7 @@ export async function maybeCreateProjectFromBooking(
         customer_id: customerId,
         project_type: 'hourly',
         status: 'active',
+        start_date: startDate,
         current_workflow_stage_id: SYSTEM_STAGES.CONTRACT_SIGNED,
         workflow_stage_entered_at: nuIso,
         workflow_stage_history: [

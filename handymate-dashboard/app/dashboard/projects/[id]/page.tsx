@@ -2303,6 +2303,24 @@ export default function ProjectDetailPage() {
           beredskap={fakturaberedskap}
           todoMode={todoMode}
           approvalsCount={projectApprovalsCount}
+          onSaveDates={async (start, end) => {
+            // Del A (2026-08-26): planerad start/slut redigeras på plats.
+            // Samma PUT som statusbytet — inga nya rutter.
+            try {
+              const res = await fetch('/api/projects', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ project_id: project.project_id, start_date: start, end_date: end }),
+              })
+              if (!res.ok) throw new Error()
+              setProject({ ...project, start_date: start, end_date: end })
+              showToast('Datum sparade', 'success')
+              return true
+            } catch {
+              showToast('Kunde inte spara datumen', 'error')
+              return false
+            }
+          }}
         />
 
         {/* Body — Del 3a: desktop tvåkolumn 400px|1fr, mobil enkolumn
