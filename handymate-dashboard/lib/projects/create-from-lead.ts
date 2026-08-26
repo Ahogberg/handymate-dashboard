@@ -136,6 +136,12 @@ export async function createProjectFromLead(
       return { success: false, error: insertError?.message || 'Kunde inte skapa projekt' }
     }
 
+    // Projektet i Fortnox projektregister (steg 3, 2026-08-26). Non-blocking.
+    try {
+      const { syncNewProjectToFortnox } = await import('@/lib/fortnox/sync')
+      await syncNewProjectToFortnox(supabase, businessId, project.project_id)
+    } catch { /* non-blocking */ }
+
     // Egenkontroll-agenten (etapp 1d, tasks/easoft-gap-plan.md). Fire-and-
     // forget — föreslår en branschchecklista i godkännande-kön om
     // projektet saknar checklista sedan tidigare. suggestChecklistForProject

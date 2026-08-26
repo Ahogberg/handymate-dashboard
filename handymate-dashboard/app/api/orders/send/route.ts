@@ -70,12 +70,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Supplier has no email address' }, { status: 400 })
     }
 
+    // Märkning (littrat, 2026-08-26): projektnumret på beställningen så
+    // leverantören skriver det på fakturan → Fortnox YourReference → vår
+    // matchning kopplar fakturan säkert till projektet. material_order har
+    // ingen project_id — projektet hittas via offerten. Ingen offert/projekt
+    // → ingen märkning (aldrig gissad).
+    let markning: string | null = null
+    if (order.quote_id) {
+      const { data: proj } = await supabase
+        .from('project')
+        .select('project_number, name')
+        .eq('business_id', business.business_id)
+        .eq('quote_id', order.quote_id)
+        .maybeSingle()
+      if (proj?.project_number) markning = proj.project_number
+    }
+
     // Skicka beställning via email
     try {
       await resend.emails.send({
         from: `${business?.business_name || 'Handymate'} <bestallning@${process.env.RESEND_DOMAIN || 'handymate.se'}>`,
         to: order.supplier.contact_email,
-        subject: `Materialbeställning från ${business?.business_name || 'oss'}${order.supplier.customer_number ? ` - Kundnr: ${order.supplier.customer_number}` : ''}`,
+        subject: `Materialbeställning från ${business?.business_name || 'oss'}${markning ? ` - Märkning: ${markning}` : ''}${order.supplier.customer_number ? ` - Kundnr: ${order.supplier.customer_number}` : ''}`,
         html: `
 <!DOCTYPE html>
 <html>
@@ -110,6 +126,12 @@ export async function POST(request: NextRequest) {
           <span class="info-label">Från:</span>
           <span class="info-value">${business?.business_name || 'Okänt företag'}</span>
         </div>
+        ${markning ? `
+        <div class="info-row">
+          <span class="info-label">Märkning (ange på fakturan):</span>
+          <span class="info-value">${markning}</span>
+        </div>
+        ` : ''}
         ${order.supplier.customer_number ? `
         <div class="info-row">
           <span class="info-label">Kundnummer:</span>

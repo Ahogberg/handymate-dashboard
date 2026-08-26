@@ -139,6 +139,12 @@ export async function maybeCreateProjectFromBooking(
     projectId = project.project_id
     reason = 'created_minimal'
 
+    // Projektet i Fortnox projektregister (steg 3, 2026-08-26). Non-blocking.
+    try {
+      const { syncNewProjectToFortnox } = await import('@/lib/fortnox/sync')
+      await syncNewProjectToFortnox(supabase, businessId, project.project_id)
+    } catch { /* non-blocking */ }
+
     // Fire project_created (fire-and-forget) så automationer hänger med.
     try {
       const { fireEvent } = await import('@/lib/automation-engine')

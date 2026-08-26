@@ -39,13 +39,16 @@ export async function POST(
     // Fetch project name
     const { data: project } = await supabase
       .from('project')
-      .select('name')
+      .select('name, project_number')
       .eq('project_id', wo.project_id)
       .single()
 
     // Build SMS message
     const lines: string[] = []
     lines.push(`Hej ${wo.assigned_to || ''}! Arbetsorder för ${project?.name || 'projekt'}:`)
+    // Märkning (littrat, 2026-08-26): underentreprenören skriver projektnumret
+    // på sin faktura → kopplas säkert till projektet vid Fortnox-importen.
+    if (project?.project_number) lines.push(`Märkning på fakturan: ${project.project_number}`)
     lines.push('')
 
     if (wo.scheduled_date) {

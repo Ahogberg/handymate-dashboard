@@ -640,6 +640,15 @@ export async function POST(request: NextRequest) {
         .catch(err => console.error('[projects POST] stage init error (non-blocking):', err))
     }
 
+    // Projektet i Fortnox projektregister (steg 3, 2026-08-26) — awaitas i
+    // try/catch (aldrig en lösryckt promise), kortsluter utan Fortnox.
+    if (project) {
+      try {
+        const { syncNewProjectToFortnox } = await import('@/lib/fortnox/sync')
+        await syncNewProjectToFortnox(supabase, businessId, project.project_id)
+      } catch { /* non-blocking */ }
+    }
+
     // If from quote, create milestones from quote items
     // Pilot-blocker fix 2026-05-22: använder samma budget-derivation-helper
     // som ovan så milestones bygger på quote_items-tabellen, inte tom JSONB.

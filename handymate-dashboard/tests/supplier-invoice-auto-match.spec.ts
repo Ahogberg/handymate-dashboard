@@ -60,6 +60,17 @@ test.describe('matchSupplierInvoiceToProject — ordning och säkerhet', () => {
     expect(matchSupplierInvoiceToProject({}, PROJECTS)).toBeNull()
   })
 
+  test('exakt Fortnox-projektnummer (v172) vinner över sifferjämförelsen', () => {
+    const withFortnox = [
+      { project_id: 'proj_a', project_number: 'P-1042', fortnox_project_number: '77' },
+      { project_id: 'proj_b', project_number: 'P-1043', fortnox_project_number: '1042' },
+    ]
+    // "1042" i Fortnox ÄR proj_b:s Fortnox-nummer — även om siffrorna råkar
+    // vara proj_a:s projektnummer.
+    expect(matchSupplierInvoiceToProject({ Project: '1042' }, withFortnox)?.project_id).toBe('proj_b')
+    expect(matchSupplierInvoiceToProject({ Project: '77' }, withFortnox)?.project_id).toBe('proj_a')
+  })
+
   test('dubbla projekt med samma nummer → aldrig en gissning', () => {
     const dup = [...PROJECTS, { project_id: 'proj_dup', project_number: 'P-1042' }]
     expect(matchSupplierInvoiceToProject({ Project: '1042' }, dup)).toBeNull()

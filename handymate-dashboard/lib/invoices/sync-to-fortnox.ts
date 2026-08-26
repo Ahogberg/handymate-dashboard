@@ -208,8 +208,23 @@ export async function syncInvoiceToFortnox(
     ? new Date(invoice.due_date).toISOString().split('T')[0]
     : new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
 
+  // Projektet i Fortnox (steg 3, 2026-08-26): kundfakturan konteras på samma
+  // Fortnox-projekt som leverantörsfakturorna → projektresultat i Fortnox.
+  // Bara när projektet redan har ett Fortnox-nummer; aldrig gissat.
+  let fortnoxProjectNumber: string | null = null
+  if (invoice.project_id) {
+    const { data: proj } = await supabase
+      .from('project')
+      .select('fortnox_project_number')
+      .eq('project_id', invoice.project_id)
+      .eq('business_id', businessId)
+      .maybeSingle()
+    fortnoxProjectNumber = proj?.fortnox_project_number || null
+  }
+
   const invoicePayload: Record<string, unknown> = {
     CustomerNumber: customerNumber,
+    Project: fortnoxProjectNumber || undefined,
     InvoiceDate: today,
     DueDate: dueDate,
     Currency: 'SEK',

@@ -13,6 +13,7 @@ import {
   isFortnoxConnected,
 } from '@/lib/fortnox'
 import { syncInvoiceToFortnox } from '@/lib/invoices/sync-to-fortnox'
+import { syncProjectToFortnox } from '@/lib/fortnox'
 
 function getSupabase() {
   return createClient(
@@ -253,9 +254,59 @@ export async function syncPaymentWithTracking(
  * Batch sync all unsynced entities for a business.
  * Safe to call even if Fortnox is not connected — returns skipped.
  */
+export async function syncProjectWithTracking(
+  businessId: string,
+  projectId: string,
+): Promise<{ success: boolean; skipped?: boolean; fortnoxId?: string; error?: string }> {
+  const result = await syncProjectToFortnox(businessId, projectId)
+  if (result.skipped) {
+    return { success: false, skipped: true, error: result.error }
+  }
+  await trackSync(businessId, 'project', projectId, result.success ? 'synced' : 'error', result.projectNumber, result.error)
+  return { success: result.success, fortnoxId: result.projectNumber, error: result.error }
+}
+
+/**
+ * Projektsynk vid SKAPANDE (2026-08-26, steg 3 i leverantörsfaktura-kedjan)
+ * — samma kontrakt som syncNewCustomerToFortnox: kastar aldrig, kortsluter
+ * på fortnox_connected, idempotent via vakten i syncProjectToFortnox, äkta
+ * fel eskaleras till driftlarmet. Awaitas i try/catch på anropsplatsen.
+ */
+export async function syncNewProjectToFortnox(
+  supabase: SupabaseClient,
+  businessId: string,
+  projectId: string,
+): Promise<{ synced: boolean; skipped: boolean; fortnoxId?: string; error?: string }> {
+  try {
+    const { data: cfg, error: cfgError } = await supabase
+      .from('business_config')
+      .select('fortnox_connected')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (cfgError || !cfg?.fortnox_connected) {
+      return { synced: false, skipped: true }
+    }
+
+    const result = await syncProjectWithTracking(businessId, projectId)
+    if (result.skipped) return { synced: false, skipped: true }
+    if (!result.success) {
+      try {
+        const { rapporteraTystFel } = await import('@/lib/observability/driftlarm')
+        await rapporteraTystFel(supabase, businessId, 'project-create:fortnox-sync', result.error || 'okänt fel', { projectId })
+      } catch { /* driftlarmet får aldrig fälla skapandet */ }
+      return { synced: false, skipped: false, error: result.error }
+    }
+    return { synced: true, skipped: false, fortnoxId: result.fortnoxId }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[syncNewProjectToFortnox] oväntat fel (non-blocking):', message)
+    return { synced: false, skipped: false, error: message }
+  }
+}
+
 export async function batchSync(
   businessId: string,
-  entityType?: 'customer' | 'invoice' | 'quote'
+  entityType?: 'customer' | 'invoice' | 'quote' | 'project'
 ): Promise<SyncResult> {
   const connected = await isFortnoxConnected(businessId)
   if (!connected) {
@@ -299,6 +350,36 @@ export async function batchSync(
         entityType: 'customer',
         entityId: c.customer_id,
         status: result.success ? 'synced' : 'error',
+        fortnoxId: result.fortnoxId,
+        error: result.error,
+      })
+    }
+  }
+
+  // Sync projects (2026-08-26) — skyddsnät för skapandevägar utan hook
+  // (autopilot, deal-flöde, mall). Skapandeordning, felet läses.
+  if (entityType === 'project') {
+    const { data: projects, error: projectsError } = await supabase
+      .from('project')
+      .select('project_id')
+      .eq('business_id', businessId)
+      .is('fortnox_project_number', null)
+      .not('project_number', 'is', null)
+      .neq('status', 'cancelled')
+      .order('created_at', { ascending: true })
+      .limit(50)
+    if (projectsError) {
+      errors++
+      details.push({ entityType: 'project', entityId: '', status: 'error', error: projectsError.message })
+    }
+    for (const p of projects || []) {
+      const result = await syncProjectWithTracking(businessId, p.project_id)
+      if (result.success) synced++
+      else if (!result.skipped) errors++
+      details.push({
+        entityType: 'project',
+        entityId: p.project_id,
+        status: result.success ? 'synced' : result.skipped ? 'skipped' : 'error',
         fortnoxId: result.fortnoxId,
         error: result.error,
       })

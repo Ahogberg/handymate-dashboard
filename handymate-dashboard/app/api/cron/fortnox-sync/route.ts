@@ -53,6 +53,7 @@ export async function GET(request: Request) {
   let totalSupplierChecked = 0
   let totalSupplierMarkedPaid = 0
   let totalCustomersSynced = 0
+  let totalProjectsSynced = 0
   let totalSupplierImported = 0
   let totalSupplierAutoMatched = 0
   let businessesNeedingReconnect = 0
@@ -76,6 +77,22 @@ export async function GET(request: Request) {
     } catch (err: any) {
       console.error('[cron/fortnox-sync] batchSync(customer) failed:', biz.business_id, err)
       errors.push(`${biz.business_id} (customers): ${err?.message || 'sync failed'}`)
+    }
+
+    // Projektsvepet (2026-08-26, steg 3): skyddsnät för skapandevägar utan
+    // hook (autopilot, deal-flöde, mall). Skapandeordning, max 50/körning.
+    try {
+      const projectSweep = await batchSync(biz.business_id, 'project')
+      if (!projectSweep.skipped) {
+        totalProjectsSynced += projectSweep.synced
+        if (projectSweep.errors > 0) {
+          const failed = projectSweep.details.filter(d => d.status === 'error')
+          errors.push(`${biz.business_id} (projects): ${failed.map(d => `${d.entityId}: ${d.error}`).join('; ')}`)
+        }
+      }
+    } catch (err: any) {
+      console.error('[cron/fortnox-sync] batchSync(project) failed:', biz.business_id, err)
+      errors.push(`${biz.business_id} (projects): ${err?.message || 'sync failed'}`)
     }
 
     try {
@@ -164,6 +181,7 @@ export async function GET(request: Request) {
     ok: true,
     businesses_synced: businesses?.length || 0,
     total_customers_synced: totalCustomersSynced,
+    total_projects_synced: totalProjectsSynced,
     total_checked: totalChecked,
     total_marked_paid: totalMarkedPaid,
     total_marked_overdue: totalMarkedOverdue,

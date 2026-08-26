@@ -31,6 +31,8 @@ export interface SupplierInvoiceMatchInput {
 export interface ProjectRef {
   project_id: string
   project_number: string | null
+  /** ProjectNumber i Fortnox (v172) — exakt nyckel, vinner över sifferjämförelsen. */
+  fortnox_project_number?: string | null
 }
 
 export type SupplierInvoiceMatchSource = 'fortnox_project' | 'row_project' | 'reference'
@@ -82,8 +84,14 @@ export function matchSupplierInvoiceToProject(
     return list && list.length === 1 ? list[0] : null
   }
 
-  // 1. Konterad på projekt i Fortnox
-  const headProject = unique(projectDigits(detail.Project))
+  // 1. Konterad på projekt i Fortnox — exakt Fortnox-nummer först (v172),
+  //    sedan sifferjämförelsen mot vårt projektnummer.
+  const fortnoxNo = (detail.Project || '').trim()
+  const exact = fortnoxNo ? projects.filter(p => (p.fortnox_project_number || '').trim() === fortnoxNo) : []
+  if (exact.length === 1) {
+    return { project_id: exact[0].project_id, source: 'fortnox_project', evidence: `Konterad på projekt ${fortnoxNo} i Fortnox` }
+  }
+  const headProject = exact.length === 0 ? unique(projectDigits(detail.Project)) : null
   if (headProject) {
     return { project_id: headProject.project_id, source: 'fortnox_project', evidence: `Konterad på projekt ${detail.Project} i Fortnox` }
   }

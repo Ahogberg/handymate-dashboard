@@ -158,6 +158,14 @@ export async function createProjectFromQuote(
     // forget — föreslår en branschchecklista i godkännande-kön om
     // projektet saknar checklista sedan tidigare. Fail-safe (kastar
     // aldrig), får inte sinka projekt-skapandet.
+    // Projektet i Fortnox projektregister (steg 3, 2026-08-26) — så
+    // leverantörsfakturor kan konteras på det. Non-blocking, kortsluter
+    // utan Fortnox.
+    try {
+      const { syncNewProjectToFortnox } = await import('@/lib/fortnox/sync')
+      await syncNewProjectToFortnox(supabase, businessId, projectId)
+    } catch { /* non-blocking */ }
+
     suggestChecklistForProject({ businessId, projectId }).catch(err => {
       console.error('[createProjectFromQuote] suggestChecklistForProject error (non-blocking):', err)
     })

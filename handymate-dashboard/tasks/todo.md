@@ -90,8 +90,11 @@ direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 sak
 - [x] Steg 2: deterministisk matchning fortnox_project → row_project → reference → Karins kö;
       svep i cronen för redan importerade okopplade rader. sql/v171 skriven.
 - [x] v171 körd via MCP 2026-08-26 (Andreas "Kör"), facit-SELECT: 6 kolumner → pushad
-- [ ] Steg 3 (efter): stämpla projektnumret som märkning på materialbeställningar/arbetsordrar
-      (orders/send saknar märkning helt idag) + skapa projektet i Fortnox vid skapandet
+- [x] Steg 3 (Andreas "Kör steg 3"): märkning (projektnummer) i materialbeställningens ämne+infobox
+      (via offerten) och i arbetsorderns SMS; projektet skapas i Fortnox projektregister vid
+      födseln (syncNewProjectToFortnox på fyra skapandevägar + batchSync 'project' i cronen);
+      kundfakturan bokförs med Project; matchningen använder exakt Fortnox-nummer först. sql/v172.
+- [ ] v172 körd (väntar på "kör") → push → CI
 - [ ] Radvis allokering inom samma faktura (fortnox_rows finns nu) — bara om ett riktigt fall dyker upp
 - FLAGGAT Pass 3/I2: fältnamnen på SupplierInvoice-detaljen; om Fortnox fyller YourReference vid tolkning
 
@@ -99,6 +102,22 @@ direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 sak
 - ps-08 Recension mottagen har ingen automatisk källa (ingen Google-webhook) — förblir manuell.
 - Handoffens "Framdrift"-kort och "Personal"-chips är byggda; ProjectInfoCard (beskrivning/offert)
   finns kvar bara under Ekonomi & offert — säg till om beskrivningen ska synas på Översikt.
+
+---
+
+# Read-only inventering av alla utskick (2026-08-26)
+
+## Plan
+
+- [ ] Avgränsa samtliga verkliga SMS-, e-post-, push- och interna notifieringsvägar
+- [ ] Spåra varje utskick till trigger, mottagare, textkälla, transport, loggning och nuvarande kontroll
+- [ ] Klassificera kundresa, interna händelser, obligatoriska systemmeddelanden, dubletter och döda mallar
+- [ ] Dokumentera ett kanoniskt eventregister och rekommenderad migreringsordning för Kommunikationshubben
+- [ ] Kvalitetssäkra rapportens filreferenser och kontrollera att ingen produktionskod eller SQL ändrats
+
+## Review
+
+- Pågår.
 
 ---
 

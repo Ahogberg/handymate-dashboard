@@ -40,7 +40,7 @@ async function loadProjectRefs(businessId: string): Promise<ProjectRef[]> {
   const supabase = getServerSupabase()
   const { data, error } = await supabase
     .from('project')
-    .select('project_id, project_number')
+    .select('project_id, project_number, fortnox_project_number')
     .eq('business_id', businessId)
     .not('project_number', 'is', null)
   if (error) {

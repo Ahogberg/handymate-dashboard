@@ -610,6 +610,136 @@ export async function syncCustomerToFortnox(
 }
 
 // ============================================
+// PROJECT SYNC (2026-08-26, steg 3 i leverantörsfaktura-kedjan)
+// ============================================
+
+/**
+ * Fortnox Project-resursen. FLAGGAT Pass 3/I2: fältnamn/format enligt
+ * Fortnox dokumentation (ProjectNumber, Description, StartDate, EndDate,
+ * Status: NOTSTARTED | ONGOING | FINISHED) — verifiera mot ett riktigt svar.
+ */
+export interface FortnoxProject {
+  ProjectNumber: string
+  Description: string
+  StartDate?: string
+  EndDate?: string
+  Status?: 'NOTSTARTED' | 'ONGOING' | 'FINISHED'
+  Comments?: string
+}
+
+export async function createFortnoxProject(
+  businessId: string,
+  project: FortnoxProject,
+): Promise<FortnoxProject> {
+  const response = await fortnoxRequest<{ Project: FortnoxProject }>(
+    businessId,
+    'POST',
+    '/projects',
+    { Project: project },
+  )
+  return response.Project
+}
+
+/** Fortnox-status ur vår projektstatus — aldrig gissad framåt. */
+export function fortnoxProjectStatus(status: string | null | undefined): FortnoxProject['Status'] {
+  if (status === 'active' || status === 'paused') return 'ONGOING'
+  if (status === 'completed' || status === 'cancelled') return 'FINISHED'
+  return 'NOTSTARTED'
+}
+
+/** Fortnox ProjectNumber = siffrorna i vårt projektnummer ("P-1042" → "1042"). */
+export function fortnoxProjectNumberFor(projectNumber: string | null | undefined): string | null {
+  if (!projectNumber) return null
+  const digits = String(projectNumber).replace(/\D/g, '')
+  return digits.length >= 3 ? digits : null
+}
+
+/**
+ * Skapa projektet i Fortnox projektregister. Samma kontrakt som
+ * syncCustomerToFortnox: idempotent via fortnox_project_number-vakten,
+ * UPDATE:en business-scopad och FELKONTROLLERAD — ett Fortnox-projekt vars
+ * nummer inte kunde sparas lokalt är INTE success (annars skapas det på
+ * nytt nästa gång — exakt dubblettbuggen från kundsynken, REALITY-WEEK #23).
+ */
+export async function syncProjectToFortnox(
+  businessId: string,
+  projectId: string,
+): Promise<{ success: boolean; skipped?: boolean; projectNumber?: string; error?: string }> {
+  const supabase = getSupabase()
+
+  try {
+    const connected = await isFortnoxConnected(businessId)
+    if (!connected) {
+      return { success: false, skipped: true, error: 'fortnox_not_connected' }
+    }
+
+    const { data: project, error: fetchError } = await supabase
+      .from('project')
+      .select('project_id, name, project_number, start_date, end_date, status, fortnox_project_number')
+      .eq('project_id', projectId)
+      .eq('business_id', businessId)
+      .single()
+    if (fetchError || !project) {
+      return { success: false, error: 'Project not found' }
+    }
+    if (project.fortnox_project_number) {
+      return { success: true, projectNumber: project.fortnox_project_number }
+    }
+
+    const projectNumber = fortnoxProjectNumberFor(project.project_number)
+    if (!projectNumber) {
+      // Utan projektnummer finns inget att synka på — ärligt skipped, inte fel.
+      return { success: false, skipped: true, error: 'project_number_missing' }
+    }
+
+    const created = await createFortnoxProject(businessId, {
+      ProjectNumber: projectNumber,
+      Description: `${project.name || 'Projekt'} (${project.project_number})`.slice(0, 50),
+      StartDate: project.start_date || undefined,
+      EndDate: project.end_date || undefined,
+      Status: fortnoxProjectStatus(project.status),
+    })
+
+    const { error: updateError } = await supabase
+      .from('project')
+      .update({
+        fortnox_project_number: created.ProjectNumber,
+        fortnox_synced_at: new Date().toISOString(),
+        fortnox_sync_error: null,
+      })
+      .eq('project_id', projectId)
+      .eq('business_id', businessId)
+
+    if (updateError) {
+      try {
+        const { rapporteraTystFel } = await import('@/lib/observability/driftlarm')
+        await rapporteraTystFel(supabase, businessId, 'fortnox:project-number-not-persisted', updateError.message, {
+          projectId, fortnoxProjectNumber: created.ProjectNumber,
+        })
+      } catch { /* driftlarmet får aldrig fälla synken */ }
+      return {
+        success: false,
+        projectNumber: created.ProjectNumber,
+        error: `Projektet skapades i Fortnox (${created.ProjectNumber}) men numret kunde inte sparas lokalt: ${updateError.message}`,
+      }
+    }
+
+    return { success: true, projectNumber: created.ProjectNumber }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Sync failed'
+    const { error: markError } = await supabase
+      .from('project')
+      .update({ fortnox_sync_error: errorMessage })
+      .eq('project_id', projectId)
+      .eq('business_id', businessId)
+    if (markError) {
+      console.error('[syncProjectToFortnox] kunde inte skriva fortnox_sync_error:', markError.message)
+    }
+    return { success: false, error: errorMessage }
+  }
+}
+
+// ============================================
 // INVOICE SYNC FUNCTIONS
 // ============================================
 
