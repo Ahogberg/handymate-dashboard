@@ -104,12 +104,16 @@ export async function createProjectFromQuote(
         job_type: quote.job_type || null,
         budget_hours: budgetHours,
         budget_amount: budgetAmount || quote.customer_pays || quote.total || null,
-        address: quote.project_address || null,
+        // OBS: `project` har ingen address-kolumn (live-verifierat 2026-08-26).
+        // Insertet skrev tidigare `address:` → 42703 → HELA skapandet
+        // avvisades tyst och onQuoteAccepted "vann racet" (REALITY-WEEK #2).
+        // Adressen följer med i source_lead_data i stället.
         status: 'active',
         source_lead_data: {
           created_from: 'quote_signed',
           quote_title: quote.title,
           quote_total: quote.total,
+          project_address: quote.project_address || null,
           created_at: new Date().toISOString(),
         },
       })

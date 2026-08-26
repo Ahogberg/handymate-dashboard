@@ -84,9 +84,13 @@ export async function maybeCreateProjectFromBooking(
     reason = 'created_from_lead'
   } else {
     // Ingen lead (t.ex. manuellt upplagd kund) → minimalt projekt från kunden.
+    // customer.address finns inte längre (uppdelad i address_line/postal_code/
+    // city, jfr REALITY-WEEK #9) — och project har ingen address-kolumn alls.
+    // Båda fantomerna gjorde att bokning→projekt ALDRIG lyckades i prod
+    // (live-verifierat 2026-08-26).
     const { data: cust } = await supabase
       .from('customer')
-      .select('name, address')
+      .select('name, address_line')
       .eq('customer_id', customerId)
       .maybeSingle()
 
@@ -106,7 +110,6 @@ export async function maybeCreateProjectFromBooking(
         customer_id: customerId,
         project_type: 'hourly',
         status: 'active',
-        address: cust?.address || null,
         current_workflow_stage_id: SYSTEM_STAGES.CONTRACT_SIGNED,
         workflow_stage_entered_at: nuIso,
         workflow_stage_history: [
@@ -115,6 +118,7 @@ export async function maybeCreateProjectFromBooking(
         source_lead_data: {
           created_from: 'booking',
           booking_id: bookingId,
+          customer_address: cust?.address_line || null,
           created_at: new Date().toISOString(),
         },
       })

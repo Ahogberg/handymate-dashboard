@@ -1,3 +1,82 @@
+# Projektöversikten: datum, dynamiska steg, status + nästa att-göra i listan (2026-08-26, PLAN — väntar på avstämning)
+
+Andreas ask: projektlistan ska redovisa start/slut tydligt; stegen MÅSTE flytta dynamiskt
+på riktiga events/automationer; projektets status + nästa "att göra" (Lars m.m.) ska synas
+direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 saknar steg helt).
+
+## P0 — buggfixar som inte kan vänta (görs direkt, ren korrekthet)
+- [x] `project.address` finns inte → alla tre automatiska skapare (quote/lead/booking) skrev
+      `address:` → 42703 → skapandet avvisades tyst. Förklarar REALITY-WEEK #2. Lead→projekt och
+      bokning→projekt har ALDRIG fungerat i prod. + `customer.address` (död) i booking-vägen.
+      Facit: tests/facit-project-create-no-phantom-columns.spec.ts
+- [ ] `advanceProjectStageForward` returnerar `{moved:true}` vid no-op → anropare kan inte skilja
+      "flyttade" från "hoppade över" → `{moved:false, skipped:true}` + uppdatera 2 anropare
+- [ ] `onQuoteAccepted` (project-ai-engine) + `createProjectFromQuote` = två skapare för samma
+      event (REALITY-WEEK #2/#3). Nu när #P0-1 är fixad KOMMER båda lyckas → dubbla projekt
+      (v103-unikheten på quote_id räddar insertet men ordningen avgör vem som sätter steg/
+      milstolpar). Beslut: onQuoteAccepted delegerar till createProjectFromQuote (en skapare),
+      behåller sin egen efterlogik (checklista, notis, project_ai_log).
+
+## Del A — Datum i listan (ingen migration: start_date/end_date/completed_at finns redan)
+- [ ] `GET /api/projects`: räkna `actual_start` (min(time_entry.date, bekräftad booking.scheduled_start))
+      ur redan hämtade time_entry-batchen + en booking-batch; `is_late` finns redan bakom
+      `include=workflow` → listan skickar `include=workflow`
+- [ ] Rad-UI: "12 aug – 30 sep · vecka 3 av 7" (weekChip, redan exporterad) / "Startar 3 sep" /
+      "Startade 14 aug (planerat 12 aug)" / "Slut ej satt" / "Försenad 6 dagar" / "Klart 14 aug"
+- [ ] Skapare sätter datum när de faktiskt VET: maybe-create-from-booking → start_date =
+      bokningens dag; create-from-quote → start_date från första bekräftade bokning för offerten
+      (annars null, aldrig gissat)
+- [ ] Detaljsidan: start/slut redigerbara inline (TwinStrip "Planerat klart" → klick = datumfält,
+      PUT /api/projects finns redan)
+
+## Del B — Stegen flyttar på riktiga events (en brygga, forward-only, idempotent)
+- [ ] `lib/project-stages/event-bridge.ts`: `bumpProjectStage(businessId, {projectId|invoiceId|
+      quoteId|bookingId}, stage, {reason})` → findProjectForEntity + advanceProjectStageForward,
+      läser resultatet, loggar orsak i workflow_stage_history. Alla producenter nedan går genom den.
+- [ ] ps-01 Kontrakt signerat: bara när något ÄR signerat. Lead-/bokningsfödda projekt startar på
+      steg NULL (strip/lista visar "Inget kontrakt ännu"); `quote_signed`/accept för ett
+      BEFINTLIGT projekt → ps-01 (saknas helt idag)
+- [ ] ps-02 Startmöte bokat: booking med project_id (alla skapandevägar: rutt, agent-tool, mobil,
+      kalendersynk) → ps-02; kund-fallback bara när kunden har exakt ett aktivt projekt
+- [ ] ps-03 Jobb påbörjat: ALLA time_entry-vägar (POST, bulk, agent-tool, check-in) i realtid —
+      inte bara dagliga cronen; booking status→completed → ps-03
+- [ ] ps-04 Delmål uppnått: varje milstolpe klar (inte bara första), ÄTA signerad på ps-03,
+      progress_percent ≥ 50 utan milstolpar
+- [ ] ps-05 Slutbesiktning: egenkontroll-checklista klar (alla obligatoriska) / jobbrapport
+      signerad → ps-05; completeProject behåller
+- [ ] ps-06/07: `invoice.project_id` sätts i ALLA fakturaskapare när projektet är känt;
+      ps-07 först när alla ej-makulerade fakturor på projektet är isCustomerSettled (flera fakturor)
+- [ ] Manuell `advance-stage`: bakåtflytt kräver explicit `allow_backwards` och triggar INTE
+      destinationsstegets automationer igen (kund-SMS re-köades)
+- [ ] `FLOW_SYSTEM_STAGES` (UI) läser från `SYSTEM_STAGES` (motorn) — en källa, inte tre
+- [ ] Facit: tests/facit-project-stage-producers.spec.ts (varje steg har ≥1 automatisk producent
+      via bryggan; inga inline-flyttar utanför bryggan utom födseln)
+
+## Del C — Status + nästa att-göra i listan (en beräkning, två ytor)
+- [ ] `lib/projects/derive-todo.ts`: `deriveProjectTodo()` REN — lyft ur projects/[id]/page.tsx:1871
+      (todoMode) + prioritering av väntande kort: högst risk_level → äldst; källa 'lars'|'karin'|
+      'hanna'|'system' via lib/jarvis/approval-view agentForApproval
+- [ ] `GET /api/projects`: EN query pending_approvals (status=pending, payload->>project_id not null)
+      grupperad i JS; per projekt: `next_todo {label, kind, agent, approval_id, pending_count}`,
+      `stage {id, name, position}`, `is_late`, `actual_start`
+- [ ] Rad-UI: statuschip (lifecycle) + "Steg 3/8 · Jobb påbörjat" (ProjectStageStrip compact) +
+      datumrad + "Nästa: Skapa ÄTA-utkast — Lars" (klick → kortet) ; sortering needsAction → försenad
+      → väntande kort → created_at
+- [ ] Detaljsidan använder samma deriveProjectTodo (ta bort inline-kopian) — dedup-regeln:
+      listan visar EN sak, detaljsidan allt (jfr lib/jarvis/project-case.ts:18-26)
+- [ ] Facit: derive-todo enhetstest; list-API-kontrakt; ingen andra kopia av todoMode
+
+## Verifiering
+- [ ] tsc → riktade → full svit → next build; Golden Path station 6/7/11 (projekt föds, steg flyttar)
+- [ ] Live: skapa bokning för kund utan offert → projekt föds (första gången någonsin) + ps-02
+
+## Öppet för Andreas
+- Främmande okommitterat arbete i ProjectStageStrip/ProjectStatusCard/projects/[id]/page.tsx/
+  FlowPipeline (8-stegs header) — committa det först (eget commit) eller ska jag bygga runt det?
+- ps-08 Recension mottagen har ingen automatisk källa (ingen Google-webhook) — förblir manuell.
+
+---
+
 # Fortnox: kundsynk vid skapande, leverantörsfakturor i cronen, delbetalning/ROT (2026-08-26, pågår)
 
 Godkänd plan: `~/.claude/plans/ja-d-beh-ver-vi-sorted-avalanche.md`. Andreas-beslut: allt före
@@ -36,7 +115,7 @@ Godkänd plan: `~/.claude/plans/ja-d-beh-ver-vi-sorted-avalanche.md`. Andreas-be
 - [x] tsc 0 fel
 - [x] riktade specar gröna; full svit 5322 gröna (2 facit medvetet ompekade: invoices-page-design filter, stegkedjan sync-payments); next build exit 0
 - [ ] v169 + v170 körda efter "kör" → push → CI-grind grön → Vercel-deploy
-- [ ] docs/REALITY-WEEK.md avvikelser #23–26; tasks/lessons.md om fantomkolumn-klassen
+- [x] docs/REALITY-WEEK.md avvikelser #23–26; tasks/lessons.md om fantomkolumn-klassen (cbcfb372)
 
 ---
 
@@ -328,17 +407,36 @@ denna sektion är endast utvecklingsbokföring.
 
 # Verksamhetsöversikt — direkt stegbyte och projekt-header (2026-08-26)
 
-- [ ] Utöka den delade åttastegsstripen med hoverkort, mini-ikoner och tydliga
+- [x] Utöka den delade åttastegsstripen med hoverkort, mini-ikoner och tydliga
   interaktions-/laddningstillstånd
-- [ ] Koppla verksamhetsöversikten till befintlig tenant-säkrad stage-route
+- [x] Koppla verksamhetsöversikten till befintlig tenant-säkrad stage-route
   med lokal bekräftelse, felåterställning och omedelbar UI-uppdatering
-- [ ] Ta bort radens generella utfällning och göra `Öppna projekt` till en
+- [x] Ta bort radens generella utfällning och göra `Öppna projekt` till en
   större, separat primär handling
-- [ ] Montera den delade åttastegsöversikten som kompakt header på projektsidan
+- [x] Montera den delade åttastegsöversikten som kompakt header på projektsidan
   utan att duplicera ekonomi- eller statuskortets ansvar
-- [ ] Lägg browserlösa kontraktstester för direktbytet, hoverkontraktet och
+- [x] Lägg browserlösa kontraktstester för direktbytet, hoverkontraktet och
   projekt-headerns återanvändning
-- [ ] Verifiera riktade tester, `npx tsc --noEmit`, `npx next build` och diff
+- [x] Verifiera riktade tester, `npx tsc --noEmit`, `npx next build` och diff
+
+## Review
+
+- Verksamhetsöversikten byter nu projektsteg via den befintliga
+  `/api/projects/[id]/advance-stage`-rutten. Klicket öppnar en liten lokal
+  bekräftelserad eftersom stage-motorn kan starta automationer; ingen generell
+  dropdown eller projektutfällning används.
+- Lyckat byte uppdaterar både deal-kopplade projekt och orphan-projekt i
+  parent-state direkt. Fel lämnar föregående steg orört och visas på kortet.
+- Den delade stripen visar åtta Lucide-ikoner, hover/fokus-kort, laddning och
+  en namngiven header-variant. Projektsidan återanvänder exakt samma komponent.
+- `Öppna projekt` är nu en separat teal primärknapp och är enda vägen från
+  projektkortet till projektsidan; stegklick navigerar aldrig.
+- Verifiering: 16/16 riktade stage-/UX-facit gröna, `npx tsc --noEmit` rent,
+  `npx next build` exit 0. Builden visar endast projektets befintliga
+  statiska auth-/saknad lokal Supabase-env-varningar.
+- Shared-worktree-notering: Claudes Fortnox-commit `2896a6dc` inkluderade de
+  spårade UI-filerna medan verifieringen pågick. Inget har återställts eller
+  force-flyttats; det nya facittestet ligger separat i arbetskatalogen.
 
 ---
 
@@ -641,5 +739,22 @@ denna sektion är endast utvecklingsbokföring.
   `npx next build` exit 0. Fullsviten startades men de sessionsberoende testerna
   anropar `app.handymate.se`; nätverksgrinden gav `EACCES`, inte produktfel, och
   körningen avbröts vid 1 100/5 246.
+
+---
+
+# Kundtidslinje per projekt (2026-08-26)
+
+## Plan
+
+- [ ] Kartlägg vilka tidslinjehändelser som har en bevisbar projektkoppling
+- [ ] Lägg ett gemensamt, tenant-säkert projektkontextlager på tidslinjesvaret
+- [ ] Bygg en mobilvänlig projektgrupperad vy med kanalöversikt och kronologiskt alternativ
+- [ ] Låt osäkra kundövergripande kontakter ligga i en tydlig restgrupp — gissa aldrig projekt
+- [ ] Lägg browserlösa facit för resolver, tenantfilter, grupperings-UX och direktlänkar
+- [ ] Kör riktade tester, `npx tsc --noEmit` och `npx next build`
+
+## Review
+
+- Pågår.
 
 ---

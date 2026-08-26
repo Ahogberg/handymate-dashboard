@@ -108,7 +108,9 @@ export async function createProjectFromLead(
         project_type: projectType,
         budget_hours: budgetHours,
         budget_amount: budgetAmount || lead.estimated_value || null,
-        address: lead.address || null,
+        // `project` har ingen address-kolumn (live-verifierat 2026-08-26) —
+        // `address:` här gav 42703 och HELA skapandet avvisades; lead→projekt
+        // har därför aldrig fungerat i prod. Adressen bor i source_lead_data.
         status: 'active',
         current_workflow_stage_id: SYSTEM_STAGES.CONTRACT_SIGNED,
         workflow_stage_entered_at: nuIso,
@@ -119,6 +121,7 @@ export async function createProjectFromLead(
           lead_title: lead.title,
           lead_value: lead.estimated_value,
           lead_source: lead.source,
+          lead_address: lead.address || null,
           created_from: 'pipeline_automation',
           created_at: new Date().toISOString(),
         },
