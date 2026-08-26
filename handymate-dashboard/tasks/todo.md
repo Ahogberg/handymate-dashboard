@@ -26,45 +26,36 @@ direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 sak
 - [x] Detaljsidan: start/slut redigerbara inline i TwinStrip via befintlig PUT
 - [x] tests/project-derive-dates.spec.ts (12) + tests/facit-project-list-dates.spec.ts
 
-## Del B — Stegen flyttar på riktiga events (en brygga, forward-only, idempotent)
-- [ ] `lib/project-stages/event-bridge.ts`: `bumpProjectStage(businessId, {projectId|invoiceId|
-      quoteId|bookingId}, stage, {reason})` → findProjectForEntity + advanceProjectStageForward,
-      läser resultatet, loggar orsak i workflow_stage_history. Alla producenter nedan går genom den.
-- [ ] ps-01 Kontrakt signerat: bara när något ÄR signerat. Lead-/bokningsfödda projekt startar på
-      steg NULL (strip/lista visar "Inget kontrakt ännu"); `quote_signed`/accept för ett
-      BEFINTLIGT projekt → ps-01 (saknas helt idag)
-- [ ] ps-02 Startmöte bokat: booking med project_id (alla skapandevägar: rutt, agent-tool, mobil,
-      kalendersynk) → ps-02; kund-fallback bara när kunden har exakt ett aktivt projekt
-- [ ] ps-03 Jobb påbörjat: ALLA time_entry-vägar (POST, bulk, agent-tool, check-in) i realtid —
-      inte bara dagliga cronen; booking status→completed → ps-03
-- [ ] ps-04 Delmål uppnått: varje milstolpe klar (inte bara första), ÄTA signerad på ps-03,
-      progress_percent ≥ 50 utan milstolpar
-- [ ] ps-05 Slutbesiktning: egenkontroll-checklista klar (alla obligatoriska) / jobbrapport
-      signerad → ps-05; completeProject behåller
-- [ ] ps-06/07: `invoice.project_id` sätts i ALLA fakturaskapare när projektet är känt;
-      ps-07 först när alla ej-makulerade fakturor på projektet är isCustomerSettled (flera fakturor)
-- [ ] Manuell `advance-stage`: bakåtflytt kräver explicit `allow_backwards` och triggar INTE
-      destinationsstegets automationer igen (kund-SMS re-köades)
-- [ ] `FLOW_SYSTEM_STAGES` (UI) läser från `SYSTEM_STAGES` (motorn) — en källa, inte tre
-- [ ] Facit: tests/facit-project-stage-producers.spec.ts (varje steg har ≥1 automatisk producent
-      via bryggan; inga inline-flyttar utanför bryggan utom födseln)
+## Del B — Stegen flyttar på riktiga events (en brygga, forward-only, idempotent) — KLAR
+- [x] `lib/project-stages/event-bridge.ts` `bumpProjectStage` (projectId → invoice/quote → booking →
+      kund vid exakt ett aktivt projekt; forward-only; kastar aldrig; läser resultatet)
+- [x] ps-01 bara vid signering: lead-/bokningsfödda startar på NULL ("Inget steg ännu");
+      quote_signed för befintligt projekt → ps-01
+- [x] ps-02: bokningsrutten i realtid + cron-svep (skyddsnät för de andra nio bokningsvägarna);
+      sätter start_date om saknas
+- [x] ps-03: tidrapport i realtid via onTimeLogged (+ check-in + cron)
+- [x] ps-04: varje milstolpe + signerad ÄTA. (progress ≥ 50 utan milstolpar: EJ byggt — bedömt som
+      gissning, inte händelse)
+- [x] ps-05: färdig egenkontroll + signerad fältrapport + completeProject
+- [x] ps-06/07 genom bryggan; ps-07 först när ALLA fakturor är isCustomerSettled.
+      (invoice.project_id i ALLA fakturaskapare: EJ svept — auto-invoice/quote-vägen sätter det redan;
+      ad hoc-fakturor utan projekt får inget steg, ärligt)
+- [x] Manuell bakåtflytt kräver `allow_backwards`, sker tyst (409 + requires_confirmation annars)
+- [x] En stegtabell: lib/project-stages/stages.ts (motor + UI)
+- [x] Facit: tests/facit-project-stage-producers.spec.ts; utfallsfangst ompekat
 
-## Del C — Status + nästa att-göra i listan (en beräkning, två ytor)
-- [ ] `lib/projects/derive-todo.ts`: `deriveProjectTodo()` REN — lyft ur projects/[id]/page.tsx:1871
-      (todoMode) + prioritering av väntande kort: högst risk_level → äldst; källa 'lars'|'karin'|
-      'hanna'|'system' via lib/jarvis/approval-view agentForApproval
-- [ ] `GET /api/projects`: EN query pending_approvals (status=pending, payload->>project_id not null)
-      grupperad i JS; per projekt: `next_todo {label, kind, agent, approval_id, pending_count}`,
-      `stage {id, name, position}`, `is_late`, `actual_start`
-- [ ] Rad-UI: statuschip (lifecycle) + "Steg 3/8 · Jobb påbörjat" (ProjectStageStrip compact) +
-      datumrad + "Nästa: Skapa ÄTA-utkast — Lars" (klick → kortet) ; sortering needsAction → försenad
-      → väntande kort → created_at
-- [ ] Detaljsidan använder samma deriveProjectTodo (ta bort inline-kopian) — dedup-regeln:
-      listan visar EN sak, detaljsidan allt (jfr lib/jarvis/project-case.ts:18-26)
-- [ ] Facit: derive-todo enhetstest; list-API-kontrakt; ingen andra kopia av todoMode
+## Del C — Status + nästa att-göra i listan (en beräkning, två ytor) — KLAR
+- [x] `lib/projects/derive-todo.ts`: deriveTodoMode (lyft ur detaljsidan), pickTopCard (risk → äldst),
+      deriveProjectTodo (kort vinner), TODO_PRIMARY_LABEL + getStageBucket flyttade hit
+- [x] `GET /api/projects`: EN pending_approvals-query; per rad `stage` + `next_todo` + `dates` + `actual_start`
+- [x] Rad-UI: stegchip + "Nästa: … — Lars (+N till)"; sortering needsAction → försenad → väntande kort
+- [x] Detaljsidan använder deriveTodoMode — inline-kopian borttagen
+- [x] tests/project-derive-todo.spec.ts (14) + tests/facit-project-list-next-todo.spec.ts
 
 ## Verifiering
-- [ ] tsc → riktade → full svit → next build; Golden Path station 6/7/11 (projekt föds, steg flyttar)
+- [x] tsc (exkl. Codex WIP i CustomerTimeline) → riktade (324 gröna) — per del
+- [ ] full svit → next build → CI-grind per del (A: grön a35ee7dc; B: pågår; C: dispatchad)
+- [ ] Golden Path station 6/7/11 (projekt föds, steg flyttar) — mot prod efter deploy
 - [ ] Live: skapa bokning för kund utan offert → projekt föds (första gången någonsin) + ps-02
 
 ## Öppet för Andreas
