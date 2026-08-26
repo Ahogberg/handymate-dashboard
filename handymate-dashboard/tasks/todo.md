@@ -77,6 +77,14 @@ direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 sak
 - [x] Fakturorna hämtas vid sidladdning (livscykelchipen sann från start)
 - [ ] Skärmdump mot prod efter deploy (scratchpad/screenshot-project.mjs) → till Andreas
 
+## Del E — förbättringsytor 2 + 5 (Andreas "kör på" 2026-08-26) — KLAR
+- [x] Fortnox ROT/RUT i Fortnox form: lib/fortnox/housework.ts (kategori → HouseWorkType, radfält,
+      /taxreductions-payload), det påhittade TaxReduction-objektet borta, 'submitted' bara vid lyckad
+      begäran (ROT + RUT), driftlarm vid saknad kategori/personnummer. FLAGGAT Pass 3/I2: fältnamnen.
+- [x] Sidebar-badge på Leverantörsfakturor = okopplade rader (Karins kö), 30s-puls
+- [ ] Kvar från listan: "Koppla faktura till projekt"-knapp (6), "Nästa"-etikett (7), agentattribuering
+      i en fil (8), facit som låser fasmodellerna mot varandra (9)
+
 ## Öppet för Andreas
 - ps-08 Recension mottagen har ingen automatisk källa (ingen Google-webhook) — förblir manuell.
 - Handoffens "Framdrift"-kort och "Personal"-chips är byggda; ProjectInfoCard (beskrivning/offert)
