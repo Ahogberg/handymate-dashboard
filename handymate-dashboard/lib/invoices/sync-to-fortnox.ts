@@ -3,6 +3,8 @@ import { fortnoxRequest, isFortnoxConnected, syncCustomerToFortnox, updateFortno
 import { prepareInvoiceManifest, markInvoiceDelivered } from '@/lib/invoices/evidence-manifest'
 import { generateOCR } from '@/lib/ocr'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
+import { buildTaxReductionPayload, fortnoxHouseWorkType, fortnoxTaxReductionType, houseWorkRowFields } from '@/lib/fortnox/housework'
+import { defaultCategoryForIndustry, type RotRutType } from '@/lib/skv/categories'
 
 /**
  * Fortnox-bokföringssteget för en kundfaktura. Bruten ut ur
@@ -168,19 +170,38 @@ export async function syncInvoiceToFortnox(
     return { success: false, error: 'Fakturan saknar rader' }
   }
 
+  const { data: bizConfig } = await supabase
+    .from('business_config')
+    .select('business_name, contact_name, industry, default_rot_work_category')
+    .eq('business_id', businessId)
+    .single()
+
+  // ROT/RUT i Fortnox-fakturan (2026-08-26, se lib/fortnox/housework.ts):
+  // TaxReductionType på fakturan + HouseWork/HouseWorkType/HouseWorkHours-
+  // ToReport på VARJE rad. Kategorin (vad arbetet är) är Skatteverkets kod
+  // på fakturan, annars företagets default — aldrig gissad: saknas den
+  // bokförs fakturan UTAN husarbete och driftlarmet får veta.
+  const taxReductionType = fortnoxTaxReductionType(invoice.rot_rut_type)
+  const skvCategory: string | null = taxReductionType
+    ? (invoice.rot_work_category || bizConfig?.default_rot_work_category || defaultCategoryForIndustry(bizConfig?.industry) || null)
+    : null
+  const houseWorkType = fortnoxHouseWorkType(skvCategory)
+  const rotType: RotRutType | null = taxReductionType === 'ROT' ? 'rot' : taxReductionType === 'RUT' ? 'rut' : null
+  if (taxReductionType && !houseWorkType) {
+    await rapporteraTystFel(supabase, businessId, 'fortnox:housework-category-missing',
+      `ROT/RUT-fakturan saknar arbetskategori (rot_work_category) — bokförs i Fortnox utan husarbete.`,
+      { invoiceId, rot_rut_type: invoice.rot_rut_type, skvCategory })
+  }
+  const withHouseWork = !!(taxReductionType && houseWorkType && rotType)
+
   const invoiceRows: FortnoxInvoiceRow[] = items.map(item => ({
     Description: (item.description || 'Arbete').slice(0, 200),
     DeliveredQuantity: Number(item.quantity ?? 1),
     Price: Number(item.unit_price ?? 0),
     Unit: mapUnit(item.unit),
     VAT: 25,
+    ...(withHouseWork ? houseWorkRowFields(item, rotType as RotRutType, houseWorkType as string) : {}),
   }))
-
-  const { data: bizConfig } = await supabase
-    .from('business_config')
-    .select('business_name, contact_name')
-    .eq('business_id', businessId)
-    .single()
 
   const today = new Date().toISOString().split('T')[0]
   const dueDate = invoice.due_date
@@ -200,23 +221,16 @@ export async function syncInvoiceToFortnox(
     ExternalInvoiceReference1: invoiceId,
   }
 
-  const isRot = invoice.rot_rut_type === 'ROT' || invoice.rot_rut_type === 'rot'
-  const isRut = invoice.rot_rut_type === 'RUT' || invoice.rot_rut_type === 'rut'
-  if (isRot || isRut) {
-    invoicePayload.TaxReductionType = isRot ? 'ROT' : 'RUT'
-    const reductionAmount = Number(invoice.rot_deduction || invoice.rot_rut_deduction || 0)
-    const personalNumber = invoice.rot_personal_number || invoice.customer?.personal_number || null
-    const propertyDesignation = invoice.rot_property_designation || invoice.customer?.property_designation || null
-    if (reductionAmount > 0 && personalNumber) {
-      invoicePayload.TaxReduction = {
-        Type: isRot ? 'ROT' : 'RUT',
-        PropertyType: 'Villa',
-        PropertyDesignation: propertyDesignation,
-        TaxReductionAmount: reductionAmount,
-        AskerSocialSecurityNumber: personalNumber,
-      }
-    }
+  // Invoice.TaxReduction är READ-ONLY i Fortnox (ett heltal Fortnox räknar
+  // fram) — det gamla påhittade objektet med belopp och personnummer på
+  // fakturan skickas inte längre. Köparens uppgifter går via
+  // POST /taxreductions efter bokföringen (nedan).
+  if (withHouseWork) {
+    invoicePayload.TaxReductionType = taxReductionType
   }
+  const reductionAmount = Number(invoice.rot_deduction || invoice.rot_rut_deduction || 0)
+  const personalNumber: string | null = invoice.rot_personal_number || invoice.customer?.personal_number || null
+  const propertyDesignation: string | null = invoice.rot_property_designation || invoice.customer?.property_designation || null
 
   await prepareInvoiceManifest(supabase, {
     businessId,
@@ -315,6 +329,43 @@ export async function syncInvoiceToFortnox(
     return { success: false, error: 'No document number returned' }
   }
 
+  // Skattereduktionsbegäran i Fortnox (2026-08-26): POST /taxreductions —
+  // posten som Fortnox skickar till Skatteverket när kundens betalning är
+  // registrerad. Best-effort: bokföringen ovan är redan klar; misslyckas
+  // detta står fakturan kvar i Fortnox utan begäran, rot_application_status
+  // förblir null (INTE 'submitted' — det ordet ska betyda att Fortnox har
+  // en begäran), och driftlarmet får veta. Andreas kan då skicka via vår
+  // egen XML (/dashboard/invoices/rot-payment) eller registrera i Fortnox.
+  let taxReductionCreated = false
+  if (withHouseWork) {
+    if (reductionAmount > 0 && personalNumber) {
+      try {
+        await fortnoxRequest(businessId, 'POST', '/taxreductions', {
+          TaxReduction: buildTaxReductionPayload({
+            documentNumber: fortnoxDocumentNumber,
+            askedAmountKr: reductionAmount,
+            customerName: invoice.customer?.name,
+            personalNumber,
+            propertyDesignation,
+            brfOrgNumber: invoice.rot_brf_org_number || null,
+            apartmentNumber: invoice.rot_apartment_number || null,
+          }),
+        })
+        taxReductionCreated = true
+      } catch (trErr: any) {
+        const message = trErr?.message || 'taxreductions failed'
+        console.error('[sync-to-fortnox] POST /taxreductions misslyckades (bokföringen kvarstår):', message)
+        await rapporteraTystFel(supabase, businessId, 'fortnox:taxreduction-failed', message, {
+          invoiceId, fortnoxDocumentNumber, askedAmountKr: reductionAmount,
+        })
+      }
+    } else {
+      await rapporteraTystFel(supabase, businessId, 'fortnox:taxreduction-skipped',
+        'ROT/RUT-fakturan bokfördes i Fortnox men ingen begäran skapades — personnummer eller avdragsbelopp saknas.',
+        { invoiceId, fortnoxDocumentNumber, hasPersonalNumber: !!personalNumber, askedAmountKr: reductionAmount })
+    }
+  }
+
   const now = new Date().toISOString()
   // Nummer-unifiering (2026-08-20): skriv över Handymates eget
   // invoice_number/ocr_number med Fortnox-härledda värden, så kunden
@@ -336,7 +387,8 @@ export async function syncInvoiceToFortnox(
     invoice_number: fortnoxDocumentNumber,
     ocr_number: newOcrNumber,
   }
-  if (isRot) {
+  // 'submitted' = Fortnox HAR en begäran (ROT och RUT), annars null.
+  if (taxReductionCreated) {
     updateData.rot_application_status = 'submitted'
   }
   if (eInvoiceSent) {

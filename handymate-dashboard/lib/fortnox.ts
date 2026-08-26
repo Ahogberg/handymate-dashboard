@@ -619,6 +619,12 @@ export interface FortnoxInvoiceRow {
   DeliveredQuantity: number
   Price: number
   Unit?: string
+  VAT?: number
+  // Husarbete (ROT/RUT) — se lib/fortnox/housework.ts. HouseWorkType måste
+  // sättas på VARJE rad när fakturan har husarbete.
+  HouseWork?: boolean
+  HouseWorkType?: string
+  HouseWorkHoursToReport?: number
 }
 
 export interface FortnoxInvoice {

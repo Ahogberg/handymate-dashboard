@@ -68,6 +68,9 @@ interface NavChild {
   /** Lanseringsnyckel — se lib/launch-visibility.ts. INTE samma sak som featureGate. */
   launchGate?: string
   dotKey?: string
+  /** Köräknare (2026-08-26): 'supplier_queue' = okopplade leverantörsfakturor
+      (project_id IS NULL) — samma filter som Karins matchningskö. */
+  queueKey?: 'supplier_queue'
 }
 
 type NavItem =
@@ -116,7 +119,10 @@ const NAV: NavItem[] = [
       // Leverantörsfakturor (2026-08-20): tidigare bara synliga per projekt
       // eller i Karins matchningskö (bara de okopplade) — ingen samlad vy
       // fanns. see_financials-skyddad data, samma döljregel som Fakturor.
-      { label: 'Leverantörsfakturor', href: '/dashboard/supplier-invoices' },
+      // Köräknaren (2026-08-26): sedan 2h-cronen importerar leverantörs-
+      // fakturor från Fortnox automatiskt växer matchningskön tyst — badgen
+      // räknar rader utan projekt, samma filter som /api/karin/supplier-invoices.
+      { label: 'Leverantörsfakturor', href: '/dashboard/supplier-invoices', queueKey: 'supplier_queue' },
       // Underentreprenörer (2026-08-20): sidan (app/dashboard/subcontractors)
       // fanns redan sedan tidigare men var helt orphanad — ingen länk till
       // den existerade någonstans i appen.
@@ -193,6 +199,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifCount, setNotifCount] = useState(0)
   const [automationFailed, setAutomationFailed] = useState(false)
+  const [supplierQueueCount, setSupplierQueueCount] = useState(0)
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [notifLoading, setNotifLoading] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
@@ -430,6 +437,18 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         .gte('created_at', yesterday)
       setAutomationFailed((failedCount || 0) > 0)
     } catch { /* table may not exist yet */ }
+
+    // Okopplade leverantörsfakturor — Karins matchningskö (project_id IS
+    // NULL). Samma 30s-puls som godkännandena; fel läses, en tyst 0 vore
+    // exakt det som gjorde kön osynlig från början.
+    try {
+      const { count: queueCount, error: queueError } = await supabase
+        .from('supplier_invoices')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', businessId)
+        .is('project_id', null)
+      if (!queueError) setSupplierQueueCount(queueCount || 0)
+    } catch { /* silent */ }
   }
 
   async function fetchPendingCount() {
@@ -570,6 +589,14 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
                     ) : null}
                     {child.dotKey === 'automation_failed' && automationFailed && (
                       <span className="w-2 h-2 rounded-full bg-red-500 inline-block" title="Misslyckad automation" />
+                    )}
+                    {child.queueKey === 'supplier_queue' && supplierQueueCount > 0 && !childLocked && !barnKommerSnart && (
+                      <span
+                        className="ml-auto text-[10px] font-bold bg-amber-500 text-white rounded-full min-w-[18px] h-[18px] px-1.5 inline-flex items-center justify-center"
+                        title={`${supplierQueueCount} leverantörsfakturor väntar på projekt`}
+                      >
+                        {supplierQueueCount > 99 ? '99+' : supplierQueueCount}
+                      </span>
                     )}
                   </span>
                 </ChildWrapper>
