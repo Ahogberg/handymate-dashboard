@@ -40,13 +40,21 @@ test.describe('taket är en regel, inte en text', () => {
 
 test.describe('copyn och regeln säger samma siffra', () => {
   test('alla "Upp till"-texter matchar USER_LIMITS.professional', () => {
+    // 2026-08-26 (feature-gates-konsolideringen): copyn interpolerar numera
+    // FIRMAN_FACTS.users — som via getPlanCommercialFacts → getUserLimit är
+    // BUNDEN till USER_LIMITS per konstruktion. Det är STARKARE än den
+    // gamla bokstavssträngen ("Upp till 5 användare") som facitet letade
+    // efter: siffran kan inte längre driftas isär ens av ett slarvigt
+    // copy-byte. Facitet låser nu interpolationsformen + att inga
+    // hårdkodade användartal smugit tillbaka.
     for (const fil of [
       'app/onboarding/components/Step5Activate.tsx',
       'app/dashboard/settings/billing/page.tsx',
     ]) {
       const s = read(fil)
-      expect(s, `${fil} lovar fel antal`).toContain(`Upp till ${USER_LIMITS.professional} användare`)
+      expect(s, `${fil} interpolerar inte enkällans användartal`).toContain('_FACTS.users} användare')
       expect(s, `${fil} har kvar gamla treans copy`).not.toContain('Upp till 3 användare')
+      expect(s, `${fil} har en hårdkodad femma igen`).not.toContain('Upp till 5 användare')
     }
   })
 

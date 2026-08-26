@@ -84,7 +84,7 @@ export interface FlowAgentMeta {
 }
 
 export const FLOW_AGENTS: Record<string, FlowAgentMeta> = {
-  matte:  { name: 'Matte',  role: 'Chefsassistent',  icon: '🎩', color: '#0F766E' },
+  matte:  { name: 'Matte',  role: 'Chefsagent',  icon: '🎩', color: '#0F766E' },
   karin:  { name: 'Karin',  role: 'Ekonom',          icon: '💰', color: '#0369A1' },
   hanna:  { name: 'Hanna',  role: 'Marknadschef',    icon: '⭐', color: '#059669' },
   daniel: { name: 'Daniel', role: 'Säljare',         icon: '🤝', color: '#B45309' },

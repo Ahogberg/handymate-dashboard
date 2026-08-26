@@ -20,7 +20,13 @@ import {
   Receipt
 } from 'lucide-react'
 import { FuelBillingCard } from '@/components/fuel/FuelBillingCard'
-import { getPlanPrice, getPlanLabel, getPlanYearlyPrice, YEARLY_MONTHS_FREE, type PlanType } from '@/lib/feature-gates'
+import {
+  FOUNDERS_GUARANTEE_DAYS,
+  STANDARD_GUARANTEE_DAYS,
+  getPlanCommercialFacts,
+  YEARLY_MONTHS_FREE,
+  type PlanType,
+} from '@/lib/feature-gates'
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 }).format(amount)
@@ -79,36 +85,40 @@ interface BillingData {
   }>
 }
 
+const STARTER_FACTS = getPlanCommercialFacts('starter')
+const FIRMAN_FACTS = getPlanCommercialFacts('professional')
+const STORFIRMAN_FACTS = getPlanCommercialFacts('business')
+
 const PLANS = [
   {
     id: 'starter',
-    name: getPlanLabel('starter'),
-    price: getPlanPrice('starter'),
-    yearlyPrice: getPlanYearlyPrice('starter'),
+    name: STARTER_FACTS.label,
+    price: STARTER_FACTS.monthlyPriceSek,
+    yearlyPrice: STARTER_FACTS.yearlyPriceSek,
     features: [
-      '50 SMS/mån (0,89 kr/extra)',
-      '100 samtal/mån',
-      '1 användare',
-      '3 offertmallar',
+      `${STARTER_FACTS.smsPerMonth} SMS/mån (0,89 kr/extra)`,
+      `${STARTER_FACTS.callsPerMonth} samtal/mån`,
+      `${STARTER_FACTS.users} användare`,
+      '5 offertmallar',
       '3 automationer',
-      'Bara Matte (chefsassistent)',
-      'AI-telefonassistent',
+      'Bara Matte (chefsagent)',
+      'Samtalsfångst med Lisa',
       'Offerter & fakturor',
       'Kundhantering (CRM)',
       'Pipeline',
       'Tidrapportering',
     ],
-    limits: { sms: 50, calls: 100, automations: 3, users: 1, templates: 3 },
+    limits: { sms: STARTER_FACTS.smsPerMonth, calls: STARTER_FACTS.callsPerMonth, automations: 3, users: STARTER_FACTS.users, templates: 5 },
   },
   {
     id: 'professional',
-    name: getPlanLabel('professional'),
-    price: getPlanPrice('professional'),
-    yearlyPrice: getPlanYearlyPrice('professional'),
+    name: FIRMAN_FACTS.label,
+    price: FIRMAN_FACTS.monthlyPriceSek,
+    yearlyPrice: FIRMAN_FACTS.yearlyPriceSek,
     features: [
-      '300 SMS/mån (0,79 kr/extra)',
-      '400 samtal/mån',
-      'Upp till 5 användare',
+      `${FIRMAN_FACTS.smsPerMonth} SMS/mån (0,79 kr/extra)`,
+      `${FIRMAN_FACTS.callsPerMonth} samtal/mån`,
+      `Upp till ${FIRMAN_FACTS.users} användare`,
       '10 offertmallar',
       'Alla automationer + custom',
       'Hela AI-teamet — sex medarbetare',
@@ -118,25 +128,25 @@ const PLANS = [
       'AI-offertgenerering',
       'Fortnox-integration',
     ],
-    limits: { sms: 300, calls: 400, automations: null, users: 10, templates: 10 },
+    limits: { sms: FIRMAN_FACTS.smsPerMonth, calls: FIRMAN_FACTS.callsPerMonth, automations: null, users: FIRMAN_FACTS.users, templates: 10 },
   },
   {
     id: 'business',
-    name: getPlanLabel('business'),
-    price: getPlanPrice('business'),
-    yearlyPrice: getPlanYearlyPrice('business'),
+    name: STORFIRMAN_FACTS.label,
+    price: STORFIRMAN_FACTS.monthlyPriceSek,
+    yearlyPrice: STORFIRMAN_FACTS.yearlyPriceSek,
     features: [
-      '1 000 SMS/mån (0,69 kr/extra)',
+      `${STORFIRMAN_FACTS.smsPerMonth.toLocaleString('sv-SE')} SMS/mån (0,69 kr/extra)`,
       'Obegränsade samtal',
       'Obegränsade användare',
       'Obegränsade mallar',
       'Allt i Firman',
       'Leads-addon inkluderat',
-      'Anpassad AI-röst',
+      'Skräddarsydda företagsregler',
       'Dedikerad support',
       'Egen domän',
     ],
-    limits: { sms: 1000, calls: null, automations: null, users: null, templates: null },
+    limits: { sms: STORFIRMAN_FACTS.smsPerMonth, calls: STORFIRMAN_FACTS.callsPerMonth, automations: null, users: STORFIRMAN_FACTS.users, templates: null },
   },
 ]
 
@@ -187,6 +197,9 @@ export default function BillingPage() {
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
   // Årsavtal (Andreas-beslut 2026-08-19): default Månadsvis vid plan-byte.
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
+  const guaranteeDays = billing?.founders_available
+    ? FOUNDERS_GUARANTEE_DAYS
+    : STANDARD_GUARANTEE_DAYS
 
   useEffect(() => {
     if (!business?.business_id) return
@@ -266,7 +279,8 @@ export default function BillingPage() {
   // billing.plan, som aldrig bar dessa fält.
   const trialDaysLeft = billing?.trial?.is_trialing ? billing.trial.days_left : null
   const status = getStatusLabel(billing?.subscription?.status || 'active')
-  const planPrice = billing?.plan?.price_sek ?? getPlanPrice(currentPlanId)
+  const currentPlanFacts = getPlanCommercialFacts(currentPlanId)
+  const planPrice = billing?.plan?.price_sek ?? currentPlanFacts.monthlyPriceSek
 
   return (
     <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
@@ -318,7 +332,7 @@ export default function BillingPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-3 flex-wrap">
-                        <h2 className="text-xl font-bold text-gray-900">{currentPlan?.name || billing?.plan?.name || getPlanLabel('starter')}</h2>
+                        <h2 className="text-xl font-bold text-gray-900">{currentPlan?.name || billing?.plan?.name || STARTER_FACTS.label}</h2>
                         <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${status.className}`}>
                           {status.text}
                         </span>
@@ -433,7 +447,7 @@ export default function BillingPage() {
                     Lanseringserbjudande — Grundarkunderna
                   </strong>
                   <p className="text-sm text-gray-600 leading-relaxed">
-                    Just nu finns grundarkundsplatser kvar: ditt pris låses för alltid — det höjs aldrig för dig — och du får en direktlinje till grundaren under hela första året.
+                    Just nu finns grundarkundsplatser kvar: ditt pris låses för alltid, du får {FOUNDERS_GUARANTEE_DAYS} dagars pengarna-tillbaka-garanti och en direktlinje till grundaren under hela första året.
                   </p>
                 </div>
               )}
@@ -465,7 +479,7 @@ export default function BillingPage() {
 
               {billingInterval === 'yearly' && (
                 <p className="text-xs text-primary-700 font-medium mb-4">
-                  30 dagars pengarna-tillbaka-garanti. Inga frågor. Gäller även årsavtal.
+                  {guaranteeDays} dagars pengarna-tillbaka-garanti. Inga frågor. Gäller även årsavtal.
                 </p>
               )}
 

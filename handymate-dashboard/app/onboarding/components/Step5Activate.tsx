@@ -5,7 +5,12 @@ import { ArrowRight, Check, Info, Loader2, Shield } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import InfoSheet from './InfoSheet'
 import { TEAM } from '@/lib/agents/team'
-import { getPlanPrice, getPlanYearlyPrice, YEARLY_MONTHS_FREE } from '@/lib/feature-gates'
+import {
+  FOUNDERS_GUARANTEE_DAYS,
+  STANDARD_GUARANTEE_DAYS,
+  getPlanCommercialFacts,
+  YEARLY_MONTHS_FREE,
+} from '@/lib/feature-gates'
 import { isDemoBusinessId } from '@/lib/demo/is-demo-client'
 import type { OnboardingFormData } from '../types-redesign'
 
@@ -26,12 +31,15 @@ import type { OnboardingFormData } from '../types-redesign'
 // BÅDA planerna ger hela AI-teamet (sex medarbetare) — det är
 // kategorilöftet; skillnaden är volym & människor, aldrig agenter
 // (tidigare copy här påstod fel att Lars/Matte krävde Business).
+const FIRMAN_FACTS = getPlanCommercialFacts('professional')
+const STORFIRMAN_FACTS = getPlanCommercialFacts('business')
+
 const PLANS = [
   {
     id: 'professional',
     name: 'Firman',
-    price: getPlanPrice('professional'),
-    yearlyPrice: getPlanYearlyPrice('professional'),
+    price: FIRMAN_FACTS.monthlyPriceSek,
+    yearlyPrice: FIRMAN_FACTS.yearlyPriceSek,
     popular: true,
     agents: ['lisa', 'karin', 'daniel', 'hanna', 'lars', 'matte'],
     // Utfall, inte funktioner (Andreas-beslut 2026-08-09): varje rad svarar
@@ -43,7 +51,7 @@ const PLANS = [
       'Färdig offert på minuter — ROT-avdraget rätt räknat',
       'Jobbet klart → fakturan skapad. Inget glöms',
       'Tyst vecka? Teamet föreslår utskicket som fyller den',
-      'Upp till 5 användare',
+      `Upp till ${FIRMAN_FACTS.users} användare`,
     ],
     valueBullets: [
       'Daniel följer upp offerter som blivit liggande',
@@ -56,8 +64,8 @@ const PLANS = [
   {
     id: 'business',
     name: 'Storfirman',
-    price: getPlanPrice('business'),
-    yearlyPrice: getPlanYearlyPrice('business'),
+    price: STORFIRMAN_FACTS.monthlyPriceSek,
+    yearlyPrice: STORFIRMAN_FACTS.yearlyPriceSek,
     popular: false,
     agents: ['lisa', 'karin', 'daniel', 'hanna', 'lars', 'matte'],
     features: ['Allt i Firman', 'Obegränsade användare', 'Större utrymme för SMS & utskick', 'Egen hemsida med SEO', 'Dedikerad support'],
@@ -131,6 +139,9 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
   }
 
   const selectedPlan = PLANS.find(p => p.id === plan) || PLANS[0]
+  const guaranteeDays = data.foundersAvailable
+    ? FOUNDERS_GUARANTEE_DAYS
+    : STANDARD_GUARANTEE_DAYS
 
   return (
     <div className="ob-screen">
@@ -162,7 +173,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
               Lanseringserbjudande — Grundarkunderna
             </strong>
             <p style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.45 }}>
-              Just nu finns grundarkundsplatser kvar: ditt pris låses för alltid — det höjs aldrig för dig — och du får en direktlinje till grundaren under hela första året.
+              Just nu finns grundarkundsplatser kvar: ditt pris låses för alltid, du får {FOUNDERS_GUARANTEE_DAYS} dagars resultatgaranti och en direktlinje till grundaren under hela första året.
             </p>
           </div>
         )}
@@ -213,7 +224,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
                   letterSpacing: '-0.01em',
                 }}
               >
-                30 dagars resultatgaranti
+                {guaranteeDays} dagars resultatgaranti
               </strong>
             </div>
             <p style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.45 }}>
@@ -339,7 +350,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
           <Shield size={18} style={{ color: 'var(--ob-primary-700)', flexShrink: 0 }} />
           <span style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.45 }}>
             Du anger kortuppgifterna säkert hos Stripe i nästa steg. Prenumerationen
-            startar direkt — täckt av vår 30-dagars resultatgaranti.
+            startar direkt — täckt av vår {guaranteeDays}-dagars resultatgaranti.
           </span>
         </div>
 

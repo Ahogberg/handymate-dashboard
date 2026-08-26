@@ -113,9 +113,9 @@ test.describe('checkout-rutterna — interval-whitelist och fail-closed', () => 
 test.describe('Step5Activate — köpflödet i onboarding', () => {
   const FILE = 'app/onboarding/components/Step5Activate.tsx'
 
-  test('importerar getPlanYearlyPrice/YEARLY_MONTHS_FREE — priser beräknas, hårdkodas inte', () => {
+  test('importerar getPlanCommercialFacts/YEARLY_MONTHS_FREE — alla plansiffror kommer från samma källa', () => {
     const s = read(FILE)
-    expect(s).toContain('getPlanYearlyPrice')
+    expect(s).toContain('getPlanCommercialFacts')
     expect(s).toContain('YEARLY_MONTHS_FREE')
   })
 
@@ -142,9 +142,9 @@ test.describe('Step5Activate — köpflödet i onboarding', () => {
     const s = read(FILE)
     expect(s).toContain("billingInterval === 'yearly'")
     expect(s).toContain('Gäller även årsavtal.')
-    // Grundformuleringen av garantin (30 dagars resultatgaranti / pengarna
-    // tillbaka / Inga frågor) ska stå KVAR oförändrad — bara kompletterad.
-    expect(s).toContain('30 dagars resultatgaranti')
+    expect(s).toContain('STANDARD_GUARANTEE_DAYS')
+    expect(s).toContain('FOUNDERS_GUARANTEE_DAYS')
+    expect(s).toContain('{guaranteeDays} dagars resultatgaranti')
     expect(s).toContain('pengarna tillbaka')
   })
 
@@ -157,9 +157,9 @@ test.describe('Step5Activate — köpflödet i onboarding', () => {
 test.describe('Billing-sidan (Inställningar) — årsalternativ vid plan-byte', () => {
   const FILE = 'app/dashboard/settings/billing/page.tsx'
 
-  test('importerar getPlanYearlyPrice/YEARLY_MONTHS_FREE — priser beräknas, hårdkodas inte', () => {
+  test('importerar getPlanCommercialFacts/YEARLY_MONTHS_FREE — alla plansiffror kommer från samma källa', () => {
     const s = read(FILE)
-    expect(s).toContain('getPlanYearlyPrice')
+    expect(s).toContain('getPlanCommercialFacts')
     expect(s).toContain('YEARLY_MONTHS_FREE')
   })
 
@@ -178,7 +178,9 @@ test.describe('Billing-sidan (Inställningar) — årsalternativ vid plan-byte',
 
   test('garantitexten nämns explicit när Årsvis visas', () => {
     const s = read(FILE)
-    expect(s).toContain('30 dagars pengarna-tillbaka-garanti')
+    expect(s).toContain('STANDARD_GUARANTEE_DAYS')
+    expect(s).toContain('FOUNDERS_GUARANTEE_DAYS')
+    expect(s).toContain('{guaranteeDays} dagars pengarna-tillbaka-garanti')
     expect(s).toContain('Gäller även årsavtal.')
   })
 

@@ -67,8 +67,27 @@ export const USER_LIMITS: Record<PlanType, number | null> = {
 }
 
 export function getUserLimit(plan: PlanType): number | null {
-  return USER_LIMITS[plan] ?? 3
+  return Object.prototype.hasOwnProperty.call(USER_LIMITS, plan)
+    ? USER_LIMITS[plan]
+    : USER_LIMITS.starter
 }
+
+/** Samtalsvolymen som kundcopy och feature-gaten delar. */
+export const CALL_LIMITS: Record<PlanType, number | null> = {
+  starter: 100,
+  professional: 400,
+  business: null,
+}
+
+export function getCallLimit(plan: PlanType): number | null {
+  return Object.prototype.hasOwnProperty.call(CALL_LIMITS, plan)
+    ? CALL_LIMITS[plan]
+    : CALL_LIMITS.starter
+}
+
+/** En garanti, två nivåer. Grundarkundserbjudandet är uttryckligen 90 dagar. */
+export const STANDARD_GUARANTEE_DAYS = 30
+export const FOUNDERS_GUARANTEE_DAYS = 90
 
 // ---------------------------------------------------------------------------
 // Team-agenter per plan (Bas = bara Matte)
@@ -92,7 +111,7 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
   // === ALLA PLANER ===
   ai_phone_assistant: {
     key: 'ai_phone_assistant',
-    name: 'AI-telefonassistent',
+    name: 'Samtalsfångst med Lisa',
     plans: ['starter', 'professional', 'business'],
   },
   quotes: {
@@ -171,7 +190,7 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     key: 'call_volume',
     name: 'Samtal per månad',
     plans: ['starter', 'professional', 'business'],
-    limit: { starter: 100, professional: 400, business: null },
+    limit: CALL_LIMITS,
   },
   automations: {
     key: 'automations',
@@ -373,13 +392,14 @@ export function getNextPlan(currentPlan: PlanType): PlanType | null {
   return null
 }
 
+export const PLAN_PRICES_SEK: Record<PlanType, number> = {
+  starter: 2495,
+  professional: 5995,
+  business: 11995,
+}
+
 export function getPlanPrice(plan: PlanType): number {
-  const prices: Record<PlanType, number> = {
-    starter: 2495,
-    professional: 5995,
-    business: 11995,
-  }
-  return prices[plan]
+  return PLAN_PRICES_SEK[plan]
 }
 
 // ---------------------------------------------------------------------------
@@ -417,4 +437,33 @@ export function getPlanLabel(plan: PlanType): string {
     business: 'Storfirman',
   }
   return labels[plan]
+}
+
+export interface PlanCommercialFacts {
+  id: PlanType
+  label: string
+  monthlyPriceSek: number
+  yearlyPriceSek: number | null
+  smsPerMonth: number
+  smsHardCap: number
+  callsPerMonth: number | null
+  users: number | null
+}
+
+/**
+ * Den kanoniska, kodnära prissanningen. Kundytor får formulera fördelar
+ * olika, men får inte bära egna siffror för pris, användare, SMS eller
+ * samtal.
+ */
+export function getPlanCommercialFacts(plan: PlanType): PlanCommercialFacts {
+  return {
+    id: plan,
+    label: getPlanLabel(plan),
+    monthlyPriceSek: getPlanPrice(plan),
+    yearlyPriceSek: getPlanYearlyPrice(plan),
+    smsPerMonth: getSmsQuota(plan).monthlyQuota,
+    smsHardCap: getSmsQuota(plan).hardCap,
+    callsPerMonth: getCallLimit(plan),
+    users: getUserLimit(plan),
+  }
 }

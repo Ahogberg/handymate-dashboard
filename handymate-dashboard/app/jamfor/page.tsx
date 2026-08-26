@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { getPlanCommercialFacts } from '@/lib/feature-gates'
 
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -26,7 +27,7 @@ const features: FeatureCategory[] = [
   {
     category: 'AI & Automation',
     items: [
-      { name: 'AI-assistent som svarar på samtal', handymate: 'full', easoft: 'none', bygglet: 'none', highlight: true },
+      { name: 'Lisa fångar missade samtal och återkopplar via SMS', handymate: 'full', easoft: 'none', bygglet: 'none', highlight: true },
       { name: 'Automatisk SMS-svar till kunder', handymate: 'full', easoft: 'none', bygglet: 'none', highlight: true },
       { name: 'AI-kvalificering av leads', handymate: 'full', easoft: 'none', bygglet: 'none', highlight: true },
       { name: 'Proaktiv offertuppföljning', handymate: 'full', easoft: 'none', bygglet: 'none', highlight: true },
@@ -87,7 +88,7 @@ const features: FeatureCategory[] = [
 const faqs = [
   {
     q: 'Är Handymate dyrare än Bygglet?',
-    a: 'Handymates startpris (2 495 kr/mån) är högre än Bygglets billigaste paket (1 089 kr/mån). Men Handymate inkluderar AI-assistent, automatisk offerthantering och lead-pipeline — funktioner som varken Bygglet eller Easoft erbjuder. Den tid du sparar betalar sig redan första veckan.',
+    a: 'Handymates publika plan börjar med Firman. Den inkluderar ett koordinerat AI-team, offertflöden och lead-pipeline. Jämför alltid vad systemen faktiskt kan utföra — och vilka åtgärder som kräver ditt godkännande — inte bara antalet menyer.',
   },
   {
     q: 'Kan jag byta från Easoft till Handymate?',
@@ -95,11 +96,11 @@ const faqs = [
   },
   {
     q: 'Har Handymate Fortnox-integration?',
-    a: 'Fortnox-integration lanseras Q3 2026. Tills dess kan du exportera fakturor och bokföringsunderlag manuellt.',
+    a: 'Ja. Fortnox-kopplingen finns i Handymate och aktiveras med företagets egen Fortnox-anslutning och licens. Kontrollera integrationsstatusen i onboarding innan skarp drift.',
   },
   {
     q: 'Funkar det för stora team?',
-    a: 'Ja. Handymate Enterprise stödjer obegränsat antal användare med rollbaserad åtkomst, godkännandeflöden och löneexport.',
+    a: 'Ja. Storfirman stödjer obegränsat antal användare med rollbaserad åtkomst och godkännandeflöden.',
   },
   {
     q: 'Vad händer om AI:n gör fel?',
@@ -151,17 +152,19 @@ export default function JamforPage() {
   const [showAllFeatures, setShowAllFeatures] = useState(false)
 
   const displayFeatures = showAllFeatures ? features : features.slice(0, 3)
+  const firman = getPlanCommercialFacts('professional')
+  const storfirman = getPlanCommercialFacts('business')
 
   const plans = [
     {
       name: 'Handymate',
-      price: '2 495',
-      range: '2 495 – 11 995',
+      price: firman.monthlyPriceSek.toLocaleString('sv-SE'),
+      range: `${firman.monthlyPriceSek.toLocaleString('sv-SE')} – ${storfirman.monthlyPriceSek.toLocaleString('sv-SE')}`,
       color: '#0F766E',
       bg: '#F0FDFA',
       border: '#99F6E4',
       tagline: 'AI back office',
-      perks: ['AI-assistent som svarar & agerar', 'Offert på minuter, inte dagar', 'Alla planer inkl. AI'],
+      perks: ['Chefsagenten Matte samlar rätt team', 'Offert på minuter, inte dagar', 'AI-teamet ingår i planerna'],
       featured: true,
     },
     {
@@ -189,9 +192,9 @@ export default function JamforPage() {
   ]
 
   const whyItems = [
-    { icon: '📞', title: 'Missa aldrig ett samtal', desc: 'AI:n svarar när du inte kan. Kvalificerar kunden, skapar lead, föreslår tid.' },
-    { icon: '📋', title: 'Offert på minuter', desc: 'Från samtal till skickad offert med digital signering — utan att du lyfter ett finger.' },
-    { icon: '🔄', title: 'Automatisk uppföljning', desc: 'Ingen offert glöms bort. Agenten följer upp efter 72h och påminner om förfallna fakturor.' },
+    { icon: '📞', title: 'Fånga nästa kund', desc: 'Lisa fångar samtalet, skapar affären och återkopplar via SMS när du inte hann svara.' },
+    { icon: '📋', title: 'Offert på minuter', desc: 'Bygg professionella offerter med digital signering och tydligt kundunderlag.' },
+    { icon: '🔄', title: 'Uppföljning som inte glöms', desc: 'Teamet hittar offerter och fakturor som behöver nästa steg. Du godkänner innan externa utskick.' },
     { icon: '☀️', title: 'Morgonrapport', desc: 'Vakna till en sammanfattning: dagens bokningar, heta leads, vad som behöver uppmärksamhet.' },
     { icon: '🌐', title: 'Egen hemsida', desc: 'Professionell hemsida med kontaktformulär som matar din lead-pipeline automatiskt.' },
     { icon: '📱', title: 'Byggt för fältet', desc: 'Ljust tema, stora knappar, svenska. Designat för att användas med smutsiga händer på bygget.' },
@@ -428,7 +431,7 @@ export default function JamforPage() {
             Varför hantverkare väljer Handymate
           </h2>
           <p style={{ color: '#94A3B8', fontSize: 16, marginBottom: 40, lineHeight: 1.6 }}>
-            Bygglet och Easoft är bra verktyg för projekthantering. Men de kräver att du gör allt jobb själv — skapa offerter, svara på samtal, följa upp kunder. Handymate gör det åt dig.
+            Traditionella system kan vara bra på projekthantering, men väntar på att du ska hitta rätt vy och driva nästa steg. Handymate samlar dessutom ett AI-team som hittar arbetet, föreslår nästa steg och agerar inom de gränser du satt.
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 20, textAlign: 'left' }}>
@@ -492,7 +495,7 @@ export default function JamforPage() {
           Redo att sluta jaga pappersarbete?
         </h2>
         <p style={{ color: '#B2DFDB', fontSize: 16, maxWidth: 500, margin: '0 auto 28px', lineHeight: 1.6 }}>
-          14 dagars gratis test. Ingen bindningstid. Vi hjälper dig igång på 15 minuter.
+          Prenumerationen startar direkt och täcks av garantin som visas i köpflödet. Vi hjälper dig igång.
         </p>
         <a href="https://handymate.se" className="cta-btn" style={{
           display: 'inline-block', padding: '16px 40px', borderRadius: 12,

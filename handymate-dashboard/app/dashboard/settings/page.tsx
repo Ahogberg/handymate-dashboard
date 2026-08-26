@@ -4100,7 +4100,7 @@ export default function SettingsPage() {
         {activeTab === 'ai' && (
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 space-y-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">AI-assistent</h2>
-            <p className="text-sm text-gray-400">Konfigurera hur Lisa svarar på samtal</p>
+            <p className="text-sm text-gray-400">Konfigurera hur Lisa tar hand om samtal</p>
             
             <div>
               <label className="text-sm text-gray-500 mb-2 block">Hälsningsfras</label>

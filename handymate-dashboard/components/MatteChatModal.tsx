@@ -360,7 +360,7 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
                 <p className="text-sm font-semibold text-gray-900">Matte</p>
                 <p className="text-[11px] text-gray-500 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Chefsassistent · online
+                  Chefsagent · online
                 </p>
               </div>
             </div>

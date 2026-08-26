@@ -276,7 +276,7 @@ export async function generateAnalysis(
     }
   }
 
-  const system = `Du är Matte, AI-chefsassistent för ett svenskt hantverksföretag.
+  const system = `Du är Matte, AI-chefsagent för ett svenskt hantverksföretag.
 Du har fått föregående månads affärsdata. Skriv en kort, ärlig och handlingsorienterad månadsrapport på svenska.
 
 Strukturera svaret EXAKT så här (använd dessa rubriker):

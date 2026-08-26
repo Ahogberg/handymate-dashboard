@@ -71,7 +71,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'matte',
     title: 'Här pratar du med Matte',
-    body: 'Din chefsassistent. Fråga vad som helst — han har koll på allt.',
+    body: 'Din chefsagent. Säg vad du vill uppnå — han samlar rätt team och håller ihop nästa steg.',
     placement: 'top',
   },
   {

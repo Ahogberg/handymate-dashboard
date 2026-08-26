@@ -25,7 +25,7 @@ const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
 const HELPER = 'lib/billing/founders-offer.ts'
 const BANNER_TITLE = 'Lanseringserbjudande — Grundarkunderna'
 const BANNER_BODY =
-  'Just nu finns grundarkundsplatser kvar: ditt pris låses för alltid — det höjs aldrig för dig — och du får en direktlinje till grundaren under hela första året.'
+  'Just nu finns grundarkundsplatser kvar: ditt pris låses för alltid, du får {FOUNDERS_GUARANTEE_DAYS} dagars'
 
 test.describe('isFoundersOfferAvailable — frågan mot riktiga prenumerationsfält', () => {
   test('räknar på stripe_subscription_id + subscription_status = active', () => {
@@ -98,9 +98,11 @@ test.describe('Step5Activate — bannern', () => {
     expect(s.indexOf(BANNER_TITLE, titleIdx + 1)).toBe(-1)
   })
 
-  test('befintliga 30-dagars-garantiraden står kvar oförändrad', () => {
+  test('garantin hämtas från samma kanoniska grund-/grundarkundskonstanter', () => {
     const s = read(FILE)
-    expect(s).toContain('30 dagars resultatgaranti')
+    expect(s).toContain('STANDARD_GUARANTEE_DAYS')
+    expect(s).toContain('FOUNDERS_GUARANTEE_DAYS')
+    expect(s).toContain('{guaranteeDays} dagars resultatgaranti')
     expect(s).toContain('pengarna tillbaka')
   })
 })

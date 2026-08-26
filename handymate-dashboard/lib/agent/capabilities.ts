@@ -36,7 +36,7 @@ export const AGENT_CAPABILITIES: Record<AgentId, AgentCapability> = {
   matte: {
     id: 'matte',
     name: 'Matte',
-    domain: 'Chefsassistent och orkestrator — koordinerar teamet och pratar med dig.',
+    domain: 'Chefsagent och orkestrator — koordinerar teamet och pratar med dig.',
     expertise: [
       'Övergripande sammanhang och daglig översikt',
       'Identifiera vilken specialist som ska ta ärendet',
