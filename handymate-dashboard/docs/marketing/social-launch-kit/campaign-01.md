@@ -24,7 +24,7 @@ och vad som inte gick att verifiera.
 Ingen autonom låtsasvärld. Kundpåverkande åtgärder ligger bakom ditt
 godkännande. Resultat räknas först när underlaget bevisar dem.
 
-Det är Mission Control i Handymate.
+Det är Uppdrag i Handymate.
 
 Vill du se teamet arbeta mot ett riktigt mål i din firma? Boka en demo på
 handymate.se.
@@ -74,7 +74,7 @@ arbeta.”
 | 0–3 s | Hantverkare vid servicebil, morgon | “Du är på väg till första jobbet.” |
 | 3–6 s | Skärminspelning: öppna Matte | “Men firman har redan gett dig fem andra saker att lösa.” |
 | 6–10 s | Skriv ett mål i Matte | “Säg vad du vill uppnå — inte vilken meny du vill öppna.” |
-| 10–15 s | Mission Control och specialiststeg | “Matte bygger planen och samlar rätt team.” |
+| 10–15 s | Uppdrag och specialiststeg | “Chefsagenten Matte bygger planen och samlar rätt team.” |
 | 15–19 s | Godkännande och status | “Du behåller kontrollen. Teamet håller tempot.” |
 | 19–22 s | Teal slutkort + logotyp | “Handymate. Ge teamet ett mål.” |
 
@@ -103,4 +103,3 @@ faktiskt ringde om.
 
 Tiderna är startvärden, inte sanning. Efter två veckor styr faktisk räckvidd,
 sparningar, profilbesök och bokade demos.
-

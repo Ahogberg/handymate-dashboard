@@ -484,3 +484,80 @@ denna sektion är endast utvecklingsbokföring.
   `npx next build`: exit 0 (befintliga miljö-/dynamic-route-varningar kvar).
 
 ---
+
+# Lanseringspaket — kommersiell sanning och produktbevis (2026-08-26)
+
+## 1. Bränsle som verkligt tak
+
+- [x] Kartlägg alla kostnadsbärande strypunkter och definiera ett fail-closed entitlement-kontrakt
+- [x] Bygg valbara, namngivna påfyllningsnivåer från en kanonisk serverkonfiguration
+- [x] Stoppa ny kostnadsbärande agentverkställighet vid tomt Bränsle utan att stoppa läsning, användarens manuella arbete eller redan pågående externa leveranser
+- [x] Visa exakt vad som pausas, vad som fortsätter och hur en påfyllning återstartar teamet
+- [ ] Facit-testa nollgräns, påfyllning, samtidighet, ägargrind, Stripe-webhook och fail-closed mätfel — allt utom atomisk samtidighetsreservation är täckt; V1 stoppar nästa nya kostnad men två exakt samtidiga anrop kan fortfarande passera samma sista saldoavläsning
+
+## 2. En enda prissanning
+
+- [x] Konsolidera planvolymer, användargränser, månads-/årspris och garantitext till kanoniska källor
+- [x] Synka onboarding, billing, publik copy i detta repo och marknadsdokumentation
+- [x] Bestäm och implementera grundarkundsgarantin konsekvent
+- [x] Förklara årsbetalning, uppsägning och Bränsle utan intern kredit-/COGS-vokabulär
+
+## 3. Lisa — skarpbevis
+
+- [x] Definiera exakt marknadsförd kedja och skilj bevisade delsteg från framtida röstagentfunktion
+- [x] Bygg/utöka ett säkert käll- och kontraktsbevis för inkommande/missat samtal → kund/lead/deal → SMS/dialog → synligt facit
+- [ ] Kör hela kedjan inklusive bokning mot disponibel test-/demomiljö — blockerat av tomt 46elks-saldo och avsaknad av tilldelat telefonnummer på testföretagen
+- [x] Justera copy så ingen yta påstår att Lisa redan är en fri talande röstagent
+
+## 4. Namn och resultatlandningssidor
+
+- [x] Standardisera Matte som "chefsagent" i kundvänd copy; behåll Uppdrag som funktionsnamn
+- [x] Skapa tre publika resultatberättelser: hitta pengar, skydda marginal, ta bort administration
+- [x] Återanvänd verkliga produktkedjor, godkännanden och verifierade utfall; inga fejkade kundcase
+- [x] Lägg till browserlösa copy-/route-facit
+
+## 5. Oklippt produktdemo
+
+- [x] Synka demo-manus mot sexstegsstoryn och nuvarande pris-/produktlöften
+- [x] Skapa en reproducerbar inspelningskörning med demoreset, exakta klick och fallback
+- [x] Verifiera de nya publika landningarna visuellt i riktig webbläsare på desktop och mobil
+- [ ] Spela in den oklippta produktfilmen — körplanen är klar men den anslutna webbläsarytan saknar videoexport och produktionsdemon kräver en godkänd inloggning
+
+## Slutverifiering
+
+- [x] Riktade facit gröna
+- [x] `npx tsc --noEmit` rent
+- [x] `npx next build` grönt
+- [x] Visuell mobil/desktop-QA på de publika ytorna
+- [x] Review-sektion med exakta kvarvarande externa blockerare
+
+## Review
+
+- Bränsle är nu en serverauktoritativ stoppgrind före Matte, agenttrigger,
+  central SMS-sändning och de direkta AI-/röstvägarna. Påfyllning erbjuds som
+  tre namngivna, planrelativa nivåer; klienten kan inte bestämma beloppet och
+  Stripe-retry kan inte fylla på två gånger för samma checkout-session.
+- Planpris, årspris, användare, SMS, samtal och garanti läses från samma
+  kommersiella fakta i onboarding och billing. Ett äldre `null`-fel i
+  obegränsade användar-/samtalsnivåer upptäcktes och rättades samtidigt.
+- Matte heter publikt Chefsagent och funktionen Uppdrag. `Mission Control`
+  förblir ett internt arkitekturnamn. Tre riktiga resultatlandningar finns i
+  applikationen och sitemapen och har granskats i desktop- och mobilbredd.
+- Lisas kodkedja har ett separat lanseringsfacit och ett skarpt
+  sjustegsprotokoll. Det externa facitet är INTE grönt än: 46elks har tomt
+  saldo och testföretagen saknar tilldelade nummer. Ingen kundcopy lovar därför
+  en komplett talande röstagent.
+- Den oklippta sexstegsdemon har ett synkat manus och en exakt
+  inspelningskörning. En MP4 skapades inte eftersom webbläsarverktyget saknar
+  videoexport; inspelningen är ett mänskligt capture-steg efter inloggning och
+  demoreset.
+- Kvarvarande Bränslebegränsning: stoppet är praktiskt fail-closed före varje
+  nytt kostnadsanrop, men är inte en atomisk reservationsmotor. Två anrop som
+  startar i exakt samma ögonblick kan läsa samma sista saldo. En strikt
+  öresgräns under samtidighet kräver ett separat reservations-/avräkningssteg.
+- Slutfacit: 102/102 riktade tester gröna, `npx tsc --noEmit` 0 fel och
+  `npx next build` exit 0. Fullsviten startades men de sessionsberoende testerna
+  anropar `app.handymate.se`; nätverksgrinden gav `EACCES`, inte produktfel, och
+  körningen avbröts vid 1 100/5 246.
+
+---

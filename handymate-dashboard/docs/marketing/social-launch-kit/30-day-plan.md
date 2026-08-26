@@ -9,7 +9,7 @@ för kommentarer, återbruk, kunddialog och produktion.
 | 2 | Kommentarer | Grundaren svarar på varje relevant fråga | Samla invändningar |
 | 3 | Reel | Teamet är igång före första jobbet | Produktklipp + demo |
 | 4 | Stories | Omröstning: Vad stjäl mest tid? | Faktura / offert / planering |
-| 5 | LinkedIn text | Varför vi inte byggde ännu en chatbot | Mission Control-principen |
+| 5 | LinkedIn text | Varför vi inte byggde ännu en chatbot | Uppdrag-principen |
 | 6 | Instagram bild | Ge Handymate ett mål | Länk i profil |
 | 7 | Produktion | Klipp om Reel till 8-sekundersversion | Ingen publicering |
 | 8 | LinkedIn dokument | Tre pengar som ofta blir liggande | ÄTA, offert, faktura |
@@ -47,4 +47,3 @@ Mät per innehållsspår, inte bara per kanal:
 
 Vanity metrics får aldrig rapporteras som pipeline. Ett inlägg kan vara starkt
 för varumärket utan att ha skapat en bokning; en bokning är inte en kund.
-

@@ -13,6 +13,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // fallback om DB-läsningen nedan failar, så /sitemap.xml aldrig blir tom.
   const staticEntries: MetadataRoute.Sitemap = [
     { url: baseUrl, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${baseUrl}/hitta-pengar`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.9 },
+    { url: `${baseUrl}/skydda-marginalen`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.9 },
+    { url: `${baseUrl}/slipp-administrationen`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.9 },
   ]
 
   try {
