@@ -85,7 +85,7 @@ Godkänd plan: `~/.claude/plans/ja-d-beh-ver-vi-sorted-avalanche.md`. Andreas-be
 ## Migrationer (skrivs nu, körs bara efter "kör", migration FÖRE deploy)
 - [x] sql/v169_customer_fortnox_sync_error.sql — fantomkolumnen som gav dubblettkunder i Fortnox
 - [x] sql/v170_invoice_customer_paid.sql — ny status + paid_amount/settled_at/cancelled_at + 'credited' i CHECK
-- [ ] Båda körda + facit-SELECT verifierad (väntar på "kör")
+- [x] Båda körda via MCP 2026-08-26 (Andreas: "Kör du även de nya SQL 169 och 170") + facit-SELECT verifierad: CHECK innehåller customer_paid+credited, 4 kolumner finns, settled_at-backfill 2 rader / 0 saknade, index finns
 
 ## Del 1 — kundsynk vid skapande (commit ae0b7d32)
 - [x] P0: `syncCustomerToFortnox` returnerar aldrig success när numret inte persisterats; läser .error; scopar på business_id; rapporteraTystFel
