@@ -3,6 +3,8 @@ import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { syncFortnoxPaymentsForBusiness, syncSupplierInvoicePayments } from '@/lib/fortnox/sync-payments'
 import { batchSync } from '@/lib/fortnox/sync'
+import { importSupplierInvoicesForBusiness } from '@/lib/fortnox/import-supplier-invoices'
+import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 
 export const maxDuration = 300
 // Cron-route: får ALDRIG prerendras vid build (utan denna försöker Next
@@ -51,6 +53,8 @@ export async function GET(request: Request) {
   let totalSupplierChecked = 0
   let totalSupplierMarkedPaid = 0
   let totalCustomersSynced = 0
+  let totalSupplierImported = 0
+  let businessesNeedingReconnect = 0
   const errors: string[] = []
 
   for (const biz of businesses || []) {
@@ -89,6 +93,45 @@ export async function GET(request: Request) {
       errors.push(`${biz.business_id}: ${err?.message || 'sync failed'}`)
     }
 
+    // Leverantörsfaktura-IMPORT (2026-08-26): tidigare bara betalstatus på
+    // redan importerade rader — nya leverantörsfakturor kom aldrig in utan
+    // att någon tryckte på "Hämta historik". Körs FÖRE betalstatus-synken så
+    // nyimporterade rader får sin status i samma körning. Ett konto utan
+    // supplierinvoice-scope (anslutet före 2026-08-19) räknas som
+    // needs_reconnect — INTE som ett fel varannan timme för evigt — och
+    // rapporteras till driftlarmet högst en gång per dygn per företag.
+    try {
+      const importResult = await importSupplierInvoicesForBusiness(biz.business_id)
+      if (importResult.needs_reconnect) {
+        businessesNeedingReconnect++
+        const { data: nyligen } = await supabase
+          .from('automation_activity')
+          .select('id')
+          .eq('business_id', biz.business_id)
+          .eq('automation_type', 'tyst_fel')
+          .eq('action', 'fortnox-sync:supplier-import-needs-reconnect')
+          .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+          .limit(1)
+        if (!nyligen || nyligen.length === 0) {
+          await rapporteraTystFel(
+            supabase,
+            biz.business_id,
+            'fortnox-sync:supplier-import-needs-reconnect',
+            'Fortnox-anslutningen saknar supplierinvoice-scope — leverantörsfakturor importeras inte förrän ägaren återansluter Fortnox.',
+            { cron: 'fortnox-sync' },
+          )
+        }
+      } else {
+        totalSupplierImported += importResult.imported
+        if (importResult.errors.length > 0) {
+          errors.push(`${biz.business_id} (supplier_invoices import): ${importResult.errors.map(e => `${e.documentNumber}: ${e.error}`).join('; ')}`)
+        }
+      }
+    } catch (err: any) {
+      console.error('[cron/fortnox-sync] importSupplierInvoicesForBusiness failed:', biz.business_id, err)
+      errors.push(`${biz.business_id} (supplier_invoices import): ${err?.message || 'import failed'}`)
+    }
+
     try {
       const supplierResult = await syncSupplierInvoicePayments(biz.business_id)
       supplierResults.push(supplierResult)
@@ -112,6 +155,8 @@ export async function GET(request: Request) {
     total_marked_overdue: totalMarkedOverdue,
     total_supplier_invoices_checked: totalSupplierChecked,
     total_supplier_invoices_marked_paid: totalSupplierMarkedPaid,
+    total_supplier_invoices_imported: totalSupplierImported,
+    businesses_needing_reconnect: businessesNeedingReconnect,
     errors,
     results,
     supplier_results: supplierResults,

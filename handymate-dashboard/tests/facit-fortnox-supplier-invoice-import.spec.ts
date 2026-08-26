@@ -1,4 +1,12 @@
 // tests/facit-fortnox-supplier-invoice-import.spec.ts
+//
+// OMPEKAT 2026-08-26 (medveten spec-ändring): importlogiken (hämta → dedup
+// → mappa → infoga → audit) flyttade ur rutten till
+// lib/fortnox/import-supplier-invoices.ts så att 2h-cronen kan köra samma
+// kod (cronen kan inte anropa rutten — session-grindad). Rutten är nu tunn:
+// POST-export, auth först, anslutningskoll och den svenska återanslut-
+// texten bor kvar där. Assertions om fetch/dedup/insert/felisolering pekar
+// därför på lib-filen.
 import { test, expect } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
@@ -6,33 +14,54 @@ import path from 'path'
 const ROUTE_PATH = path.join(
   __dirname, '..', 'app/api/integrations/fortnox/import/supplier-invoices/route.ts',
 )
+const LIB_PATH = path.join(__dirname, '..', 'lib/fortnox/import-supplier-invoices.ts')
 
-test.describe('POST /api/integrations/fortnox/import/supplier-invoices', () => {
+const route = () => fs.readFileSync(ROUTE_PATH, 'utf8')
+const lib = () => fs.readFileSync(LIB_PATH, 'utf8')
+
+test.describe('POST /api/integrations/fortnox/import/supplier-invoices — tunn rutt', () => {
   test('rutten finns och exporterar POST', () => {
     expect(fs.existsSync(ROUTE_PATH)).toBe(true)
-    const src = fs.readFileSync(ROUTE_PATH, 'utf8')
-    expect(src).toContain('export async function POST')
+    expect(route()).toContain('export async function POST')
   })
 
-  test('kräver autentisering före allt annat', () => {
-    const src = fs.readFileSync(ROUTE_PATH, 'utf8')
+  test('kräver autentisering före importen', () => {
+    const src = route()
     const authIdx = src.indexOf('getAuthenticatedBusiness')
-    const fetchIdx = src.indexOf('getFortnoxSupplierInvoices')
+    const importIdx = src.indexOf('importSupplierInvoicesForBusiness(businessId)')
     expect(authIdx).toBeGreaterThan(-1)
-    expect(fetchIdx).toBeGreaterThan(authIdx)
+    expect(importIdx).toBeGreaterThan(authIdx)
   })
 
-  test('dedup mot befintliga fortnox_supplier_invoice_number', () => {
-    const src = fs.readFileSync(ROUTE_PATH, 'utf8')
+  test('rutten delegerar — ingen egen Fortnox-hämtning eller insert kvar', () => {
+    const src = route()
+    expect(src).not.toContain('getFortnoxSupplierInvoices')
+    expect(src).not.toMatch(/\.from\('supplier_invoices'\)/)
+  })
+
+  test('scope-fel (403 fran Fortnox) ger en tydlig svensk atenanslut-text, inte ett generiskt fel', () => {
+    const src = route()
+    expect(src).toMatch(/[åa]teranslut/i)
+    expect(src).toContain('needs_reconnect')
+  })
+})
+
+test.describe('lib/fortnox/import-supplier-invoices.ts — den delade importen', () => {
+  test('exporterar importSupplierInvoicesForBusiness och hämtar via getFortnoxSupplierInvoices', () => {
+    const src = lib()
+    expect(src).toContain('export async function importSupplierInvoicesForBusiness')
+    expect(src).toContain('getFortnoxSupplierInvoices(businessId)')
+  })
+
+  test('dedup mot befintliga fortnox_supplier_invoice_number — och dedup-uppslaget läser error', () => {
+    const src = lib()
     expect(src).toContain('fortnox_supplier_invoice_number')
     expect(src).toMatch(/new Set\(/)
+    expect(src, 'ett misslyckat dedup-uppslag får aldrig tolkas som "inga befintliga"').toContain('if (existingError) throw existingError')
   })
 
   test('nya rader skapas ALDRIG med project_id eller subcontractor_id satt', () => {
-    const src = fs.readFileSync(ROUTE_PATH, 'utf8')
-    // Whitespace-tolerant sökning (route:ens insert ligger nästlad i en for/try
-    // -block, med annan indentering än det platta exemplet i planen) — se
-    // plan-anteckningen i Task 2.5.
+    const src = lib()
     const match = src.match(/\.from\('supplier_invoices'\)\s*\.insert\(/)
     expect(match).not.toBeNull()
     const insertIdx = match!.index!
@@ -41,14 +70,50 @@ test.describe('POST /api/integrations/fortnox/import/supplier-invoices', () => {
     expect(insertBlock).not.toMatch(/subcontractor_id:/)
   })
 
-  test('scope-fel (403 fran Fortnox) ger en tydlig svensk atenanslut-text, inte ett generiskt fel', () => {
-    const src = fs.readFileSync(ROUTE_PATH, 'utf8')
-    expect(src).toMatch(/[åa]teranslut/i)
+  test('per-rad felisolering — ett trasigt insert stoppar inte hela batchen', () => {
+    expect(lib()).toMatch(/results\.errors\.push/)
   })
 
-  test('per-rad felisolering — ett trasigt insert stoppar inte hela batchen', () => {
-    const src = fs.readFileSync(ROUTE_PATH, 'utf8')
-    expect(src).toMatch(/results\.errors\.push/)
+  test('403/scope-fel returnerar needs_reconnect i stället för att kasta', () => {
+    const src = lib()
+    expect(src).toContain('needs_reconnect: true')
+    expect(src).toMatch(/message\.includes\('403'\)/)
+  })
+
+  test('aggregatlogg via logFortnoxOperation finns kvar', () => {
+    expect(lib()).toContain("logFortnoxOperation(businessId, 'import_supplier_invoices'")
+  })
+})
+
+test.describe('2h-cronen importerar leverantörsfakturor automatiskt', () => {
+  const CRON = fs.readFileSync(
+    path.join(__dirname, '..', 'app/api/cron/fortnox-sync/route.ts'),
+    'utf8',
+  )
+
+  test('cronen anropar importSupplierInvoicesForBusiness FÖRE betalstatus-synken', () => {
+    const importIdx = CRON.indexOf('importSupplierInvoicesForBusiness(biz.business_id)')
+    const paymentsIdx = CRON.indexOf('syncSupplierInvoicePayments(biz.business_id)')
+    expect(importIdx).toBeGreaterThan(-1)
+    expect(paymentsIdx).toBeGreaterThan(importIdx)
+  })
+
+  test('needs_reconnect räknas separat — hamnar inte i errors[]', () => {
+    const block = CRON.slice(CRON.indexOf('importSupplierInvoicesForBusiness(biz.business_id)'))
+    const reconnectBranch = block.slice(block.indexOf('if (importResult.needs_reconnect)'), block.indexOf('} else {'))
+    expect(reconnectBranch).toContain('businessesNeedingReconnect++')
+    expect(reconnectBranch).not.toContain('errors.push')
+  })
+
+  test('needs_reconnect rapporteras till driftlarmet högst en gång per dygn', () => {
+    expect(CRON).toContain("'fortnox-sync:supplier-import-needs-reconnect'")
+    expect(CRON).toContain('rapporteraTystFel(')
+    expect(CRON).toContain('24 * 60 * 60 * 1000')
+  })
+
+  test('svaret bär de nya aggregatfälten (additivt)', () => {
+    expect(CRON).toContain('total_supplier_invoices_imported')
+    expect(CRON).toContain('businesses_needing_reconnect')
   })
 })
 
