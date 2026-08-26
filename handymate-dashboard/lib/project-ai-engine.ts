@@ -442,26 +442,38 @@ async function onMilestoneCompleted(businessId: string, projectId: string, miles
 async function onInvoicePaid(businessId: string, invoiceId: string): Promise<void> {
   const supabase = getServerSupabase()
 
-  // Find invoice with quote_id to find project
   const { data: invoice } = await supabase
     .from('invoice')
-    .select('invoice_id, quote_id, customer_id, total')
+    .select('invoice_id, project_id, quote_id, customer_id, total')
     .eq('invoice_id', invoiceId)
     .eq('business_id', businessId)
     .single()
 
   if (!invoice) return
 
-  // Find project by quote_id or by direct match
+  // Projektet hittas via invoice.project_id — SAMMA uppslag som stegbryggan
+  // (findProjectForEntity) och ekonomin. Tidigare bara via quote_id →
+  // bokningsfödda projekt (ingen offert) fick aldrig avslutsförslaget trots
+  // att steget flyttade. quote_id är kvar som fallback för äldre fakturor
+  // utan project_id. (2026-08-26)
   let project: { project_id: string; name: string; status: string } | null = null
 
-  if (invoice.quote_id) {
+  if (invoice.project_id) {
+    const { data } = await supabase
+      .from('project')
+      .select('project_id, name, status')
+      .eq('project_id', invoice.project_id)
+      .eq('business_id', businessId)
+      .maybeSingle()
+    project = data
+  }
+  if (!project && invoice.quote_id) {
     const { data } = await supabase
       .from('project')
       .select('project_id, name, status')
       .eq('quote_id', invoice.quote_id)
       .eq('business_id', businessId)
-      .single()
+      .maybeSingle()
     project = data
   }
 

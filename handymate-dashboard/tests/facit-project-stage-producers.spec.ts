@@ -83,6 +83,14 @@ test.describe('producenterna går genom bryggan', () => {
     }
   })
 
+  test('AI-projektledarens onInvoicePaid hittar projektet via invoice.project_id (samma uppslag som bryggan)', () => {
+    const s = read('lib/project-ai-engine.ts')
+    const fn = s.slice(s.indexOf('async function onInvoicePaid'), s.indexOf('async function onDailyHealthCheck'))
+    expect(fn).toContain("select('invoice_id, project_id, quote_id, customer_id, total')")
+    expect(fn).toContain('if (invoice.project_id) {')
+    expect(fn, 'quote_id bara som fallback').toContain('if (!project && invoice.quote_id) {')
+  })
+
   test('bokningsrutten joinar inte längre "senaste projektet på ps-01" via kunden', () => {
     const s = read('app/api/bookings/route.ts')
     expect(s).not.toContain(".eq('current_workflow_stage_id', SYSTEM_STAGES.CONTRACT_SIGNED)")

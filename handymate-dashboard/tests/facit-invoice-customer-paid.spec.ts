@@ -176,8 +176,11 @@ test.describe('PATCH /status går genom kärnan; fantomen payment_method är bor
     }
   })
 
-  test('statusetiketten finns i båda vyerna', () => {
-    expect(read('app/dashboard/invoices/[id]/helpers.ts')).toContain("case 'customer_paid': return 'Kundens del betald'")
-    expect(read('app/dashboard/invoices/page.tsx')).toContain("case 'customer_paid': return 'Kundens del betald'")
+  test('statusetiketten läses som BETALD i båda vyerna — ROT-delen är ett tillägg, inte ett förbehåll', () => {
+    // Andreas 2026-08-26: kunden är klar, fakturan ska stå som betald;
+    // tillägget säger bara att skattereduktionen väntar hos Skatteverket.
+    const label = "case 'customer_paid': return 'Betald · ROT-del hos Skatteverket'"
+    expect(read('app/dashboard/invoices/[id]/helpers.ts')).toContain(label)
+    expect(read('app/dashboard/invoices/page.tsx')).toContain(label)
   })
 })

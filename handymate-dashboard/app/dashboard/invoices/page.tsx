@@ -208,7 +208,7 @@ export default function InvoicesPage() {
     switch (status) {
       case 'draft': return 'Utkast'
       case 'sent': return 'Skickad'
-      case 'customer_paid': return 'Kundens del betald'
+      case 'customer_paid': return 'Betald · ROT-del hos Skatteverket'
       case 'paid': return 'Betald'
       case 'overdue': return 'Förfallen'
       case 'cancelled': return 'Makulerad'

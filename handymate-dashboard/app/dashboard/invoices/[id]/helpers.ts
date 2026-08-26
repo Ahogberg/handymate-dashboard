@@ -61,7 +61,9 @@ export function getStatusText(status: string): string {
   switch (status) {
     case 'draft': return 'Utkast'
     case 'sent': return 'Skickad'
-    case 'customer_paid': return 'Kundens del betald'
+    // Kunden ÄR klar — det ska läsas som betald. Tillägget säger bara att
+    // ROT/RUT-delen ännu inte kommit från Skatteverket (Andreas 2026-08-26).
+    case 'customer_paid': return 'Betald · ROT-del hos Skatteverket'
     case 'paid': return 'Betald'
     case 'overdue': return 'Förfallen'
     case 'cancelled': return 'Makulerad'
