@@ -720,6 +720,46 @@ interface FortnoxSupplierInvoicesListResponse {
   MetaInformation?: { '@TotalPages'?: number; '@CurrentPage'?: number }
 }
 
+/**
+ * Enskild leverantörsfaktura (GET /supplierinvoices/{GivenNumber}) — bär det
+ * listvyn saknar: Fortnox-projektet, kostnadsstället, referenserna
+ * (leverantörens "Er referens/Märkning" = littrat) och raderna med eget
+ * Project/CostCenter. Det är den deterministiska kopplingen till våra
+ * projekt (2026-08-26). FLAGGAT Pass 3/I2: fältnamnen följer Fortnox
+ * dokumentation — verifiera mot ett riktigt svar.
+ */
+export interface FortnoxSupplierInvoiceRowDetail {
+  Project?: string | null
+  CostCenter?: string | null
+  Account?: number | string | null
+  Total?: number | null
+  Description?: string | null
+  ItemDescription?: string | null
+}
+
+export interface FortnoxSupplierInvoiceDetail extends FortnoxSupplierInvoiceListItem {
+  Project?: string | null
+  CostCenter?: string | null
+  YourReference?: string | null
+  OurReference?: string | null
+  Comments?: string | null
+  ExternalInvoiceNumber?: string | null
+  VAT?: number | null
+  SupplierInvoiceRows?: FortnoxSupplierInvoiceRowDetail[]
+}
+
+export async function getFortnoxSupplierInvoice(
+  businessId: string,
+  givenNumber: string,
+): Promise<FortnoxSupplierInvoiceDetail | null> {
+  const response = await fortnoxRequest<{ SupplierInvoice?: FortnoxSupplierInvoiceDetail }>(
+    businessId,
+    'GET',
+    `/supplierinvoices/${encodeURIComponent(givenNumber)}`,
+  )
+  return response?.SupplierInvoice ?? null
+}
+
 interface FortnoxInvoicesListResponse {
   Invoices?: FortnoxInvoiceListItem[]
   MetaInformation?: {

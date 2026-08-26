@@ -3,7 +3,7 @@ import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { syncFortnoxPaymentsForBusiness, syncSupplierInvoicePayments } from '@/lib/fortnox/sync-payments'
 import { batchSync } from '@/lib/fortnox/sync'
-import { importSupplierInvoicesForBusiness } from '@/lib/fortnox/import-supplier-invoices'
+import { importSupplierInvoicesForBusiness, rescanUnlinkedSupplierInvoices } from '@/lib/fortnox/import-supplier-invoices'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 
 export const maxDuration = 300
@@ -54,6 +54,7 @@ export async function GET(request: Request) {
   let totalSupplierMarkedPaid = 0
   let totalCustomersSynced = 0
   let totalSupplierImported = 0
+  let totalSupplierAutoMatched = 0
   let businessesNeedingReconnect = 0
   const errors: string[] = []
 
@@ -123,8 +124,21 @@ export async function GET(request: Request) {
         }
       } else {
         totalSupplierImported += importResult.imported
+        totalSupplierAutoMatched += importResult.auto_matched
         if (importResult.errors.length > 0) {
           errors.push(`${biz.business_id} (supplier_invoices import): ${importResult.errors.map(e => `${e.documentNumber}: ${e.error}`).join('; ')}`)
+        }
+        // Svep (2026-08-26): okopplade rader utan Fortnox-detalj (importerade
+        // före v171 eller med misslyckad detaljhämtning) får detaljen + en
+        // säker koppling om den finns. Rader med detalj men utan match rörs
+        // inte igen — de är Karins kö.
+        try {
+          const rescan = await rescanUnlinkedSupplierInvoices(biz.business_id)
+          totalSupplierAutoMatched += rescan.matched
+          if (rescan.errors.length > 0) errors.push(`${biz.business_id} (supplier_invoices rescan): ${rescan.errors.join('; ')}`)
+        } catch (err: any) {
+          console.error('[cron/fortnox-sync] rescanUnlinkedSupplierInvoices failed:', biz.business_id, err)
+          errors.push(`${biz.business_id} (supplier_invoices rescan): ${err?.message || 'rescan failed'}`)
         }
       }
     } catch (err: any) {
@@ -156,6 +170,7 @@ export async function GET(request: Request) {
     total_supplier_invoices_checked: totalSupplierChecked,
     total_supplier_invoices_marked_paid: totalSupplierMarkedPaid,
     total_supplier_invoices_imported: totalSupplierImported,
+    total_supplier_invoices_auto_matched: totalSupplierAutoMatched,
     businesses_needing_reconnect: businessesNeedingReconnect,
     errors,
     results,

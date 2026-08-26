@@ -60,14 +60,21 @@ test.describe('lib/fortnox/import-supplier-invoices.ts — den delade importen',
     expect(src, 'ett misslyckat dedup-uppslag får aldrig tolkas som "inga befintliga"').toContain('if (existingError) throw existingError')
   })
 
-  test('nya rader skapas ALDRIG med project_id eller subcontractor_id satt', () => {
+  test('nya rader: subcontractor_id ALDRIG satt av importen; project_id BARA via säker matchning (match_source)', () => {
+    // 2026-08-26 (medveten spec-ändring): importen får koppla projekt när
+    // Fortnox själv säger vilket (konterad på projektet / littrat) — se
+    // lib/fortnox/match-supplier-invoice.ts. Gissningar går fortfarande
+    // till Karins kö. UE-kopplingen ägs av kön/UI:t som förr.
     const src = lib()
     const match = src.match(/\.from\('supplier_invoices'\)\s*\.insert\(/)
     expect(match).not.toBeNull()
     const insertIdx = match!.index!
-    const insertBlock = src.slice(insertIdx, insertIdx + 500)
-    expect(insertBlock).not.toMatch(/project_id:/)
+    const insertBlock = src.slice(insertIdx, insertIdx + 900)
     expect(insertBlock).not.toMatch(/subcontractor_id:/)
+    expect(insertBlock).toContain('...detailColumns(detail, match, nowIso)')
+    const cols = src.slice(src.indexOf('function detailColumns('), src.indexOf('async function loadProjectRefs('))
+    expect(cols).toContain('project_id: match?.project_id ?? null')
+    expect(cols).toContain('match_source: match?.source ?? null')
   })
 
   test('per-rad felisolering — ett trasigt insert stoppar inte hela batchen', () => {

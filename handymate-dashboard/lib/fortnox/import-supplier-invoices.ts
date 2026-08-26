@@ -1,7 +1,54 @@
 import { getServerSupabase } from '@/lib/supabase'
-import { getFortnoxSupplierInvoices } from '@/lib/fortnox'
+import { getFortnoxSupplierInvoices, getFortnoxSupplierInvoice, type FortnoxSupplierInvoiceDetail } from '@/lib/fortnox'
 import { mapFortnoxSupplierInvoice } from '@/lib/fortnox/map-supplier-invoice'
+import { matchSupplierInvoiceToProject, type ProjectRef, type SupplierInvoiceMatch } from '@/lib/fortnox/match-supplier-invoice'
 import { logFortnoxOperation } from '@/lib/fortnox/api-log'
+
+/**
+ * Detaljen för en faktura (Project/CostCenter/referenser/rader) + den
+ * deterministiska matchningen. Best-effort: misslyckas detaljhämtningen
+ * importeras fakturan ändå — utan koppling, som förr.
+ */
+async function fetchDetailAndMatch(
+  businessId: string,
+  docNumber: string,
+  projects: ProjectRef[],
+): Promise<{ detail: FortnoxSupplierInvoiceDetail | null; match: SupplierInvoiceMatch | null }> {
+  try {
+    const detail = await getFortnoxSupplierInvoice(businessId, docNumber)
+    if (!detail) return { detail: null, match: null }
+    return { detail, match: matchSupplierInvoiceToProject(detail, projects) }
+  } catch (err: unknown) {
+    console.error('[import-supplier-invoices] detaljhämtning misslyckades (importerar utan koppling):', docNumber, err instanceof Error ? err.message : err)
+    return { detail: null, match: null }
+  }
+}
+
+function detailColumns(detail: FortnoxSupplierInvoiceDetail | null, match: SupplierInvoiceMatch | null, nowIso: string) {
+  return {
+    fortnox_project_number: detail?.Project ?? null,
+    fortnox_cost_center: detail?.CostCenter ?? null,
+    fortnox_reference: [detail?.YourReference, detail?.OurReference, detail?.Comments].filter(Boolean).join(' | ') || null,
+    fortnox_rows: detail?.SupplierInvoiceRows ?? null,
+    project_id: match?.project_id ?? null,
+    match_source: match?.source ?? null,
+    matched_at: match ? nowIso : null,
+  }
+}
+
+async function loadProjectRefs(businessId: string): Promise<ProjectRef[]> {
+  const supabase = getServerSupabase()
+  const { data, error } = await supabase
+    .from('project')
+    .select('project_id, project_number')
+    .eq('business_id', businessId)
+    .not('project_number', 'is', null)
+  if (error) {
+    console.error('[import-supplier-invoices] projektuppslag misslyckades — ingen automatisk matchning denna körning:', error.message)
+    return []
+  }
+  return (data || []) as ProjectRef[]
+}
 
 /**
  * Importerar leverantörsfakturor från Fortnox till lokala supplier_invoices-
@@ -38,6 +85,8 @@ export interface SupplierInvoiceImportResult {
   business_id: string
   imported: number
   skipped: number
+  /** Kopplade automatiskt till projekt vid importen (säker matchning). */
+  auto_matched: number
   total: number
   total_amount_kr: number
   errors: { documentNumber: string; error: string }[]
@@ -64,6 +113,7 @@ export async function importSupplierInvoicesForBusiness(
         business_id: businessId,
         imported: 0,
         skipped: 0,
+        auto_matched: 0,
         total: 0,
         total_amount_kr: 0,
         errors: [],
@@ -91,11 +141,14 @@ export async function importSupplierInvoicesForBusiness(
   const results = {
     imported: 0,
     skipped: 0,
+    auto_matched: 0,
     total_amount_kr: 0,
     errors: [] as { documentNumber: string; error: string }[],
   }
 
   const today = new Date().toISOString().split('T')[0]
+  // Projektnumren hämtas EN gång per körning (matchningen är ren).
+  let projectRefs: ProjectRef[] | null = null
 
   for (const fi of fortnoxSupplierInvoices) {
     const mapped = mapFortnoxSupplierInvoice(fi, today)
@@ -112,7 +165,16 @@ export async function importSupplierInvoicesForBusiness(
     }
 
     try {
+      // Detalj + deterministisk matchning (2026-08-26): bara för NYA
+      // fakturor — en extra GET per faktura, aldrig per körning.
+      if (projectRefs === null) projectRefs = await loadProjectRefs(businessId)
+      const { detail, match } = await fetchDetailAndMatch(businessId, docNumber, projectRefs)
+      const nowIso = new Date().toISOString()
+      const vat = typeof detail?.VAT === 'number' ? detail.VAT : row.vat_amount
+
       const id = `sinv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+      // subcontractor_id sätts ALDRIG här — UE-kopplingen ägs av kön/UI:t.
+      // project_id sätts BARA när matchningen är säker (match_source).
       const { error: insertError } = await supabase
         .from('supplier_invoices')
         .insert({
@@ -122,19 +184,21 @@ export async function importSupplierInvoicesForBusiness(
           invoice_number: row.invoice_number,
           invoice_date: row.invoice_date,
           due_date: row.due_date,
-          amount_excl_vat: row.amount_excl_vat,
-          vat_amount: row.vat_amount,
+          amount_excl_vat: Math.max(0, row.total_amount - vat),
+          vat_amount: vat,
           total_amount: row.total_amount,
           status: row.status === 'overdue' ? 'unpaid' : row.status,
           fortnox_supplier_invoice_number: row.fortnox_supplier_invoice_number,
           fortnox_supplier_number: row.fortnox_supplier_number,
-          fortnox_synced_at: new Date().toISOString(),
+          fortnox_synced_at: nowIso,
+          ...detailColumns(detail, match, nowIso),
         })
 
       if (insertError) throw insertError
 
       existingDocNumbers.add(docNumber)
       results.imported++
+      if (match) results.auto_matched++
       results.total_amount_kr += row.total_amount
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
@@ -145,6 +209,7 @@ export async function importSupplierInvoicesForBusiness(
   await logFortnoxOperation(businessId, 'import_supplier_invoices', {
     imported: results.imported,
     skipped: results.skipped,
+    auto_matched: results.auto_matched,
     total: fortnoxSupplierInvoices.length,
     total_amount_kr: Math.round(results.total_amount_kr),
     error_count: results.errors.length,
@@ -154,8 +219,73 @@ export async function importSupplierInvoicesForBusiness(
     business_id: businessId,
     imported: results.imported,
     skipped: results.skipped,
+    auto_matched: results.auto_matched,
     total: fortnoxSupplierInvoices.length,
     total_amount_kr: Math.round(results.total_amount_kr),
     errors: results.errors,
   }
+}
+
+export interface UnlinkedRescanResult {
+  business_id: string
+  scanned: number
+  matched: number
+  errors: string[]
+}
+
+/**
+ * Svep över redan importerade OKOPPLADE rader som saknar Fortnox-detalj
+ * (importerade före v171, eller vars detaljhämtning misslyckades). Hämtar
+ * detaljen en gång per rad (cap per körning) och kopplar när matchningen
+ * är säker. Rader som fått detalj men ingen match rörs inte igen — de är
+ * Karins kö. Anropas från 2h-cronen efter importen.
+ */
+export async function rescanUnlinkedSupplierInvoices(
+  businessId: string,
+  opts: { limit?: number } = {},
+): Promise<UnlinkedRescanResult> {
+  const supabase = getServerSupabase()
+  const result: UnlinkedRescanResult = { business_id: businessId, scanned: 0, matched: 0, errors: [] }
+
+  const { data: rows, error } = await supabase
+    .from('supplier_invoices')
+    .select('id, fortnox_supplier_invoice_number')
+    .eq('business_id', businessId)
+    .is('project_id', null)
+    .is('fortnox_rows', null)
+    .is('matched_at', null)
+    .not('fortnox_supplier_invoice_number', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(opts.limit ?? 40)
+  if (error) {
+    result.errors.push(`fetch: ${error.message}`)
+    return result
+  }
+  if (!rows || rows.length === 0) return result
+
+  const projects = await loadProjectRefs(businessId)
+  for (const r of rows) {
+    result.scanned++
+    try {
+      const { detail, match } = await fetchDetailAndMatch(businessId, r.fortnox_supplier_invoice_number as string, projects)
+      if (!detail) continue
+      const nowIso = new Date().toISOString()
+      const { error: updError } = await supabase
+        .from('supplier_invoices')
+        .update({
+          ...detailColumns(detail, match, nowIso),
+          // Aldrig skriva över en manuell koppling: svepet tar bara rader
+          // med project_id IS NULL (filtret ovan) — men vaktas igen här.
+          ...(match ? {} : { project_id: null }),
+        })
+        .eq('id', r.id)
+        .eq('business_id', businessId)
+        .is('project_id', null)
+      if (updError) throw updError
+      if (match) result.matched++
+    } catch (err: unknown) {
+      result.errors.push(`${r.id}: ${err instanceof Error ? err.message : 'rescan error'}`)
+    }
+  }
+  return result
 }
