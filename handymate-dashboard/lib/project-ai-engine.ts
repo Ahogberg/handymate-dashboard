@@ -206,7 +206,7 @@ async function onQuoteAccepted(businessId: string, quoteId: string): Promise<voi
 
   const { count: milestoneCount } = await supabase
     .from('project_milestone')
-    .select('id', { count: 'exact', head: true })
+    .select('milestone_id', { count: 'exact', head: true })
     .eq('project_id', projectId)
     .eq('business_id', businessId)
 
