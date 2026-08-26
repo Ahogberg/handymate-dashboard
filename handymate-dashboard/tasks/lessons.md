@@ -410,3 +410,11 @@ fantomkolumner HÖG, inte låg — lägg en facit-SELECT mot
 `information_schema` i migrationsfilen och ett källskanningsfacit som
 förbjuder de kända fantomnamnen (`payment_method` i sync-payments är
 låst så nu).
+
+**Tillägg samma dag:** jag skrev själv en ny fantom (`project_milestone.id`,
+PK:n heter `milestone_id`) i den konsoliderade `onQuoteAccepted` — riktade
+facit var gröna, CI-grinden fångade den via `tests/column-contract.spec.ts`.
+**Regel:** varje ändring som lägger till eller ändrar en `.select(…)`/
+`.eq(…)`/`.order(…)` körs med `column-contract.spec.ts` i den riktade
+körningen — det är det billigaste schemafacit som finns, och det ersätter
+inte MCP-uppslaget utan kompletterar det.
