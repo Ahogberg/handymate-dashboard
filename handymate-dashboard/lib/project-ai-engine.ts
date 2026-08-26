@@ -14,9 +14,6 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { createNotification } from '@/lib/notifications'
-import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
-import { advanceProjectStage, SYSTEM_STAGES } from '@/lib/project-stages/automation-engine'
-import { getQuoteBudgetDerivation } from '@/lib/quotes/get-quote-budget-derivation'
 
 // ── Event Types ───────────────────────────────────────────────
 
@@ -160,133 +157,86 @@ function calculateHealthScore(params: {
 async function onQuoteAccepted(businessId: string, quoteId: string): Promise<void> {
   const supabase = getServerSupabase()
 
-  // Check if project already exists for this quote
-  const { data: existingProject } = await supabase
+  // EN skapare (2026-08-26). Tidigare fanns två hela projektskapare för
+  // samma händelse: den här (RPC-/portal-signering, awaitad tidigt i
+  // request-kedjan) och lib/projects/create-from-quote.ts (accept-rutten).
+  // Den här "vann racet" — inte för att den var snabbare utan för att
+  // create-from-quote skrev fantomkolumnen `address` och kraschade
+  // (REALITY-WEEK #2/#23-serien). Nu delegerar vi: create-from-quote äger
+  // insert, budget-härledning, stegstart (ps-01 via advanceProjectStage —
+  // genuint signerad offert, automation OK), milstolpar, egenkontroll-
+  // förslag och project_created-eventet. Kvar här: AI-projektledarens egna
+  // fält, project_ai_log och ägarnotisen.
+  //
+  // sendSms: false bevarar dagens observerade beteende — ingen av vägarna
+  // har i praktiken skickat "Ny deal vunnen"-SMS:et till ägaren eller
+  // portal-SMS:et till kunden (create-from-quote nådde aldrig dit). Accept-
+  // rutten skickar redan sitt eget bekräftelse-SMS till kunden. Beslut om
+  // att slå på dem tas separat (tasks/todo.md).
+  const { createProjectFromQuote } = await import('@/lib/projects/create-from-quote')
+  const result = await createProjectFromQuote(businessId, quoteId, { sendSms: false })
+  if (!result.success || !result.project_id) {
+    console.error('[AI ProjectManager] createProjectFromQuote misslyckades:', { businessId, quoteId, error: result.error })
+    return
+  }
+  if (result.already_existed) return // Already handled
+
+  const projectId = result.project_id
+
+  // AI-projektledarens egna fält. OBS: inget start_date = idag längre —
+  // signeringsdagen är inte en byggstart (sanning före gissning; faktisk
+  // start härleds ur tidrapporter/bokningar i projektlistan).
+  const { error: aiErr } = await supabase
     .from('project')
-    .select('project_id')
-    .eq('quote_id', quoteId)
-    .eq('business_id', businessId)
-    .maybeSingle()
-
-  if (existingProject) return // Already handled
-
-  // Fetch quote data
-  const { data: quote, error: quoteError } = await supabase
-    .from('quotes')
-    .select('quote_id, title, customer_id, total, labor_total, material_total')
-    .eq('quote_id', quoteId)
-    .eq('business_id', businessId)
-    .single()
-
-  if (quoteError || !quote) return
-
-  // FYND 2026-08-13 (Golden Path-harnesset): denna funktion läste tidigare
-  // BARA quote.items (JSONB) — exakt samma bugg som getQuoteBudgetDerivation
-  // skrevs för att fixa 2026-05-22 (se den filens huvudkommentar), men
-  // onQuoteAccepted missades när fixen rullades ut i create-from-quote.ts/
-  // /api/projects POST. För nya offerter är JSONB:en tom → budget_amount/
-  // milestones blev alltid noll för RPC-signerade offerter (den väg den
-  // här funktionen faktiskt hanterar, se create-from-quote.ts:s kommentar).
-  const budgetDerivation = await getQuoteBudgetDerivation(supabase, quoteId, businessId)
-  const laborHours = budgetDerivation.budget_hours || 0
-  const totalAmount = budgetDerivation.budget_amount || 0
-  const projectType = budgetDerivation.project_type
-
-  // Create the project
-  const { data: project, error: projectError } = await supabase
-    .from('project')
-    .insert({
-      business_id: businessId,
-      customer_id: quote.customer_id || null,
-      quote_id: quoteId,
-      name: quote.title || 'Projekt från offert',
-      project_type: projectType,
-      status: 'active',
-      budget_hours: laborHours || null,
-      budget_amount: totalAmount || null,
+    .update({
       ai_auto_created: true,
       ai_health_score: 100,
       ai_health_summary: 'Nytt projekt — redo att starta',
-      start_date: new Date().toISOString().split('T')[0],
     })
-    .select('project_id')
-    .single()
+    .eq('project_id', projectId)
+    .eq('business_id', businessId)
+  if (aiErr) console.error('[AI ProjectManager] kunde inte sätta AI-fälten (non-blocking):', aiErr.message, { projectId })
 
-  if (projectError || !project) {
-    console.error('[AI ProjectManager] Failed to create project:', projectError)
-    return
-  }
+  const { data: project } = await supabase
+    .from('project')
+    .select('name, customer_id, budget_hours, budget_amount')
+    .eq('project_id', projectId)
+    .eq('business_id', businessId)
+    .maybeSingle()
 
-  // Egenkontroll-agenten (etapp 1d, tasks/easoft-gap-plan.md). Fire-and-
-  // forget, fail-safe — samma mönster som app/api/projects/route.ts.
-  suggestChecklistForProject({ businessId, projectId: project.project_id }).catch(err => {
-    console.error('[project-ai-engine] suggestChecklistForProject error (non-blocking):', err)
-  })
+  const { count: milestoneCount } = await supabase
+    .from('project_milestone')
+    .select('id', { count: 'exact', head: true })
+    .eq('project_id', projectId)
+    .eq('business_id', businessId)
 
-  // Stegkedjan startar VID födseln (auditens P1-1) — samma regel som
-  // lib/projects/create-from-quote.ts. FYND 2026-08-13 (Golden Path-
-  // harnesset, root-cause): DEN HÄR funktionen är den som FAKTISKT skapar
-  // projektet för en RPC-signerad offert (triggas tidigare i request-kedjan
-  // än create-from-quote.ts's egen anropare, se den filens motsvarande
-  // kommentar) — men saknade helt denna initiering. Bekräftat i produktion:
-  // 29 av 33 projekt hade current_workflow_stage_id=null, reproducerat
-  // lokalt. `.catch()`/if-check: ett fel här får aldrig fälla projekt-
-  // skapandet, och advanceProjectStage kastar inte vid fel (returnerar
-  // {moved:false,error}) — båda vägarna loggas explicit.
-  try {
-    const stageResult = await advanceProjectStage(project.project_id, SYSTEM_STAGES.CONTRACT_SIGNED, businessId)
-    if (!stageResult.moved) {
-      console.error('[project-ai-engine] stage init returnerade moved:false (non-blocking):', {
-        projectId: project.project_id, businessId, error: stageResult.error,
-      })
-    }
-  } catch (err) {
-    console.error('[project-ai-engine] stage init kastade (non-blocking):', err)
-  }
-
-  // Create milestones from labor items — via budgetDerivation.labor_items
-  // (quote_items-tabellen), inte den gamla quote.items JSONB-filtreringen
-  // (se fyndkommentaren ovan vid budgetDerivation).
-  if (budgetDerivation.labor_items.length > 1) {
-    const milestones = budgetDerivation.labor_items.map((item, idx) => ({
-      business_id: businessId,
-      project_id: project.project_id,
-      name: item.description || `Moment ${idx + 1}`,
-      budget_hours: item.unit === 'tim' || item.unit === 'h' ? item.quantity : null,
-      budget_amount: item.total || null,
-      sort_order: idx,
-      status: 'pending',
-    }))
-    await supabase.from('project_milestone').insert(milestones)
-  }
-
-  // Log and notify
-  await logAiAction(businessId, project.project_id, 'quote_accepted', 'Projekt skapat automatiskt från accepterad offert', {
+  await logAiAction(businessId, projectId, 'quote_accepted', 'Projekt skapat automatiskt från accepterad offert', {
     quote_id: quoteId,
-    budget_hours: laborHours,
-    budget_amount: totalAmount,
-    milestones_created: budgetDerivation.labor_items.length > 1 ? budgetDerivation.labor_items.length : 0,
+    budget_hours: project?.budget_hours ?? null,
+    budget_amount: project?.budget_amount ?? null,
+    milestones_created: milestoneCount ?? 0,
   })
 
   // Fetch customer name for notification
   let customerName = 'Kund'
-  if (quote.customer_id) {
+  if (project?.customer_id) {
     const { data: customer } = await supabase
       .from('customer')
       .select('name')
-      .eq('customer_id', quote.customer_id)
-      .single()
+      .eq('customer_id', project.customer_id)
+      .maybeSingle()
     if (customer?.name) customerName = customer.name
   }
 
+  const totalAmount = Number(project?.budget_amount ?? 0)
   await createNotification({
     businessId,
     type: 'system',
-    title: `Nytt projekt: ${quote.title || 'Från offert'}`,
-    message: `Projekt skapades automatiskt för ${customerName} (${totalAmount?.toLocaleString('sv-SE')} kr)`,
+    title: `Nytt projekt: ${project?.name || 'Från offert'}`,
+    message: `Projekt skapades automatiskt för ${customerName} (${totalAmount.toLocaleString('sv-SE')} kr)`,
     icon: 'folder-kanban',
-    link: `/dashboard/projects/${project.project_id}`,
-    metadata: { project_id: project.project_id, ai_action: 'auto_create_project' },
+    link: `/dashboard/projects/${projectId}`,
+    metadata: { project_id: projectId, ai_action: 'auto_create_project' },
   })
 }
 

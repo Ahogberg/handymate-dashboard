@@ -53,8 +53,11 @@ export async function advanceProjectStageForward(
 
   const current = p.current_workflow_stage_id as string | null
   if (current) {
-    if (!/^ps-\d\d$/.test(current)) return { moved: true } // eget steg — rör inte
-    if (current >= stageId) return { moved: true }          // redan där eller längre
+    // 2026-08-26: en no-op är INTE en flytt. Tidigare returnerades
+    // { moved: true } här, så anropare (cronen, check-in) inte kunde skilja
+    // "flyttade" från "hoppade över" — cronen fick jämföra steg-id själv.
+    if (!/^ps-\d\d$/.test(current)) return { moved: false, skipped: true, reason: 'custom_stage' } // eget steg — rör inte
+    if (current >= stageId) return { moved: false, skipped: true, reason: 'already_at_or_past' } // redan där eller längre
   }
   return advanceProjectStage(projectId, stageId, businessId)
 }
@@ -70,6 +73,10 @@ interface StageHistoryEntry {
 export interface AdvanceStageResult {
   moved: boolean
   error?: string
+  /** true = framåt-vakten avstod medvetet (projektet står redan där/längre,
+   *  eller på ett eget steg). Inte ett fel — men inte en flytt heller. */
+  skipped?: boolean
+  reason?: 'custom_stage' | 'already_at_or_past'
 }
 
 /**

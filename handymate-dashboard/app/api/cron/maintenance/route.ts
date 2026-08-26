@@ -233,8 +233,8 @@ export async function GET(request: NextRequest) {
       for (const p of tidiga) {
         if (!harArbete.has(p.project_id)) continue
         const flytt = await advanceProjectStageForward(p.project_id, SYSTEM_STAGES.JOB_STARTED, p.business_id)
-        if (flytt.moved && p.current_workflow_stage_id !== SYSTEM_STAGES.JOB_STARTED) jobbIgang++
-        else if (!flytt.moved) console.error('[maintenance] Jobb igång-flytt misslyckades:', flytt.error, { projectId: p.project_id })
+        if (flytt.moved) jobbIgang++
+        else if (!flytt.skipped) console.error('[maintenance] Jobb igång-flytt misslyckades:', flytt.error, { projectId: p.project_id })
       }
     }
     results.job_started_moved = jobbIgang

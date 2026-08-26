@@ -40,11 +40,13 @@ function projectInsertBlocks(src: string): string[] {
   return blocks
 }
 
+// project-ai-engine.ts (onQuoteAccepted) skapar inte längre projekt själv —
+// den delegerar till create-from-quote sedan 2026-08-26 (en skapare per
+// signerad offert). Låst separat nedan.
 const CREATORS = [
   'lib/projects/create-from-quote.ts',
   'lib/projects/create-from-lead.ts',
   'lib/projects/maybe-create-from-booking.ts',
-  'lib/project-ai-engine.ts',
   'lib/autopilot/trigger.ts',
   'lib/e2e-deal-flow.ts',
   'app/api/projects/route.ts',
@@ -60,6 +62,10 @@ test.describe('project-insert utan fantomkolumner', () => {
       }
     })
   }
+
+  test('project-ai-engine.ts har inget eget project-insert längre (delegerar till create-from-quote)', () => {
+    expect(projectInsertBlocks(read('lib/project-ai-engine.ts'))).toHaveLength(0)
+  })
 
   test('maybe-create-from-booking läser customer.address_line, inte den döda customer.address', () => {
     const s = read('lib/projects/maybe-create-from-booking.ts')

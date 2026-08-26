@@ -19,9 +19,16 @@ interface CreateResult {
 
 export async function createProjectFromQuote(
   businessId: string,
-  quoteId: string
+  quoteId: string,
+  opts: {
+    /** false = hoppa över ägar-/kund-SMS:en (steg 7–8). Används av
+     *  onQuoteAccepted (project-ai-engine) som delegerar hit sedan
+     *  2026-08-26 — bevarar dagens observerade beteende utan extra SMS. */
+    sendSms?: boolean
+  } = {},
 ): Promise<CreateResult> {
   const supabase = getServerSupabase()
+  const sendSms = opts.sendSms !== false
 
   try {
     // 1. Dedup: kolla om projekt redan finns för denna offert
@@ -204,8 +211,8 @@ export async function createProjectFromQuote(
       })
     } catch { /* non-blocking */ }
 
-    // 7. SMS till företagsägaren
-    try {
+    // 7. SMS till företagsägaren (bara när anroparen vill ha SMS)
+    if (sendSms) try {
       const { data: biz } = await supabase
         .from('business_config')
         .select('personal_phone, business_name')
@@ -231,8 +238,8 @@ export async function createProjectFromQuote(
       }
     } catch { /* non-blocking */ }
 
-    // 8. SMS till kund med portallänk
-    try {
+    // 8. SMS till kund med portallänk (bara när anroparen vill ha SMS)
+    if (sendSms) try {
       const customer = quote.customer as any
       if (customer?.phone_number && customer?.portal_token && customer?.portal_enabled) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'

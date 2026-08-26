@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         try {
           const { advanceProjectStageForward, SYSTEM_STAGES } = await import('@/lib/project-stages/automation-engine')
           const flytt = await advanceProjectStageForward(checkInProjectId, SYSTEM_STAGES.JOB_STARTED, businessId)
-          if (!flytt.moved) {
+          if (!flytt.moved && !flytt.skipped) {
             console.error('[check-in] Jobb igång-flytten misslyckades (non-blocking):', flytt.error, { projectId: checkInProjectId })
           }
         } catch (stageErr) {

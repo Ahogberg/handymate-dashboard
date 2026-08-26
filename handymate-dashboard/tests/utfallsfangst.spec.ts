@@ -67,9 +67,15 @@ test.describe('Redan fixade vägar (2026-08-13) — regressionslås', () => {
     expect(kalla).toContain('advanceProjectStage(projectId, SYSTEM_STAGES.CONTRACT_SIGNED, businessId)')
   })
 
-  test('project-ai-engine.ts (onQuoteAccepted, den dominerande RPC-signeringsvägen) initierar steget', () => {
+  test('project-ai-engine.ts (onQuoteAccepted) delegerar till createProjectFromQuote — EN skapare, steget initieras där', () => {
+    // 2026-08-26: onQuoteAccepted var en hel duplicerad projektskapare
+    // (REALITY-WEEK #2). Nu delegerar den; stegstarten ägs av
+    // create-from-quote.ts (låst i testet ovan).
     const kalla = read('lib/project-ai-engine.ts')
-    expect(kalla).toContain('advanceProjectStage(project.project_id, SYSTEM_STAGES.CONTRACT_SIGNED, businessId)')
+    expect(kalla).toContain('createProjectFromQuote(businessId, quoteId, { sendSms: false })')
+    const fn = kalla.slice(kalla.indexOf('async function onQuoteAccepted'), kalla.indexOf('async function onTimeLogged'))
+    expect(fn, 'onQuoteAccepted får inte ha ett eget project-insert').not.toMatch(/\.from\('project'\)\s*\.insert\(/)
+    expect(fn, 'ingen egen stegstart — den ägs av create-from-quote').not.toContain('advanceProjectStage(')
   })
 
   test('e2e-deal-flow.ts (executeProjectCreation, pipeline-flödet) initierar steget', () => {
