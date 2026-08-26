@@ -89,7 +89,7 @@ direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 sak
 - [x] Steg 1: detaljhämtning per ny faktura (Project/CostCenter/referenser/rader) + VAT
 - [x] Steg 2: deterministisk matchning fortnox_project → row_project → reference → Karins kö;
       svep i cronen för redan importerade okopplade rader. sql/v171 skriven.
-- [ ] v171 körd (väntar på "kör") → push → CI
+- [x] v171 körd via MCP 2026-08-26 (Andreas "Kör"), facit-SELECT: 6 kolumner → pushad
 - [ ] Steg 3 (efter): stämpla projektnumret som märkning på materialbeställningar/arbetsordrar
       (orders/send saknar märkning helt idag) + skapa projektet i Fortnox vid skapandet
 - [ ] Radvis allokering inom samma faktura (fortnox_rows finns nu) — bara om ett riktigt fall dyker upp
