@@ -15,9 +15,11 @@
     .shade { position:absolute; inset:0; background:linear-gradient(90deg,rgba(8,30,28,.89) 0%,rgba(8,30,28,.70) 42%,rgba(8,30,28,.08) 74%); }
     .shade-reel { position:absolute; inset:0; background:linear-gradient(180deg,rgba(7,24,28,.72) 0%,rgba(7,24,28,.18) 45%,rgba(7,24,28,.72) 100%); }
     .pad { position:absolute; inset:0; padding:76px 72px; display:flex; flex-direction:column; }
-    .logo { width:62px; height:62px; object-fit:contain; }
-    .brand { display:flex; align-items:center; gap:16px; font:700 28px Space,Arial; letter-spacing:-.02em; }
+    .logo { width:82px; height:82px; object-fit:contain; }
+    .brand { display:flex; align-items:center; }
     .brand.light { color:white; }
+    .brand.light .logo, .cta-center .logo { filter:brightness(0) invert(1); }
+    .brand.light .logo, .cta-center .logo { filter:brightness(0) invert(1); }
     .eyebrow { font:700 18px DM,Arial; letter-spacing:.14em; text-transform:uppercase; color:var(--teal); }
     .eyebrow.light { color:#99F6E4; }
     h1,h2 { font-family:Space,Arial,sans-serif; margin:0; letter-spacing:-.035em; line-height:1.04; }
@@ -28,11 +30,10 @@
     .cover-copy { margin:auto 0 88px; width:620px; color:white; }
     .cover-copy h1 { font-size:82px; }
     .cover-copy p { margin:30px 0 0; font-size:28px; line-height:1.45; color:rgba(255,255,255,.76); }
-    .footer { margin-top:auto; display:flex; justify-content:space-between; align-items:center; color:var(--muted); font-size:20px; }
+    .footer { margin-top:auto; display:flex; justify-content:center; align-items:center; width:100%; color:var(--muted); font-size:20px; text-align:center; }
     .footer.light { color:rgba(255,255,255,.64); }
     .arrow { font-size:32px; color:var(--teal); }
-    .header { display:flex; justify-content:space-between; align-items:center; }
-    .slide-no { font:600 20px Space,Arial; color:var(--subtle); }
+    .header { display:flex; justify-content:flex-start; align-items:center; }
     .content { margin:auto 0; }
     .quote { margin-top:52px; background:white; border:1px solid var(--border); border-radius:24px; padding:42px 44px; font:600 38px Space,Arial; line-height:1.35; box-shadow:0 12px 32px rgba(15,23,42,.08); }
     .quote::before { content:'“'; color:var(--teal); font-size:60px; line-height:0; vertical-align:-16px; margin-right:8px; }
@@ -54,7 +55,7 @@
     .proof b { font:600 25px Space,Arial; }
     .proof span { margin-left:auto; color:var(--muted); font-size:19px; }
     .cta-center { margin:auto; text-align:center; max-width:870px; }
-    .cta-center .logo { width:88px; height:88px; margin-bottom:42px; }
+    .cta-center .logo { width:116px; height:116px; margin-bottom:42px; }
     .cta-center h2 { font-size:78px; }
     .cta-center p { font-size:29px; line-height:1.45; color:rgba(255,255,255,.68); margin:30px auto 46px; max-width:740px; }
     .button { display:inline-block; background:white; color:var(--teal); border-radius:16px; padding:20px 34px; font-size:24px; font-weight:700; }
@@ -62,63 +63,62 @@
     .reel-copy { margin-top:160px; max-width:760px; color:white; }
     .reel-copy h1 { font-size:96px; }
     .reel-copy p { font-size:30px; line-height:1.45; color:rgba(255,255,255,.75); max-width:620px; }
-    .reel-bottom { margin-top:auto; color:white; }
-    .reel-bottom .line { width:78px; height:7px; background:#5EEAD4; border-radius:999px; margin-bottom:24px; }
-    .reel-bottom b { font:600 30px Space,Arial; }
+    .reel-bottom { margin-top:auto; color:white; text-align:center; }
+    .reel-bottom b { font:500 24px DM,Arial; }
   </style>
 </head>
 <body>
   <section class="asset" id="linkedin-01-cover">
     <img class="photo" src="../../../public/marketing/social/launch-01/worksite-morning-source.png" alt="">
     <div class="shade"></div><div class="pad">
-      <div class="brand light"><img class="logo" src="../../../public/logo.png" alt="">Handymate</div>
-      <div class="cover-copy"><div class="eyebrow light">Mission Control</div><h1>Ge Handymate ett mål.<br>Se teamet arbeta.</h1><p>Matte koordinerar. Specialisterna gör jobbet. Du behåller kontrollen.</p></div>
-      <div class="footer light"><span>AI-teamet för hantverksföretag</span><span>1 / 6&nbsp;&nbsp;→</span></div>
+      <div class="brand light"><img class="logo" src="../../../public/marketing/content-library-v1/brand/handymate-mark.png" alt="Handymate"></div>
+      <div class="cover-copy"><div class="eyebrow light">Uppdrag</div><h1>Ge Handymate ett mål.<br>Se teamet arbeta.</h1><p>Matte koordinerar. Specialisterna gör jobbet. Du behåller kontrollen.</p></div>
+      <div class="footer light"><span>handymate.se</span></div>
     </div>
   </section>
 
   <section class="asset" id="linkedin-02-goal"><div class="pad">
-    <div class="header"><div class="brand"><img class="logo" src="../../../public/logo.png" alt="">Handymate</div><div class="slide-no">2 / 6</div></div>
+    <div class="header"><div class="brand"><img class="logo" src="../../../public/marketing/content-library-v1/brand/handymate-mark.png" alt="Handymate"></div></div>
     <div class="content"><div class="eyebrow">Börja med resultatet</div><h2>Du säger vad du vill uppnå.</h2><p class="lead">Inte vilken meny du vill öppna. Inte vilken agent du behöver. Bara vad firman behöver få gjort.</p><div class="quote">Frigör mer likviditet före månadsskiftet.</div></div>
-    <div class="footer"><span>Matte gör målet begripligt</span><span class="arrow">→</span></div>
+    <div class="footer"><span>handymate.se</span></div>
   </div></section>
 
   <section class="asset dark" id="linkedin-03-plan"><div class="pad">
-    <div class="header"><div class="brand light"><img class="logo" src="../../../public/logo.png" alt="">Handymate</div><div class="slide-no" style="color:rgba(255,255,255,.45)">3 / 6</div></div>
+    <div class="header"><div class="brand light"><img class="logo" src="../../../public/marketing/content-library-v1/brand/handymate-mark.png" alt="Handymate"></div></div>
     <div class="content"><div class="eyebrow light">Matte planerar</div><h2>Planen byggs från det som faktiskt finns i firman.</h2><p class="lead light">Inga påhittade belopp. Inga generiska råd. Saknas underlag säger teamet det.</p><div class="signal-grid"><div class="signal"><div class="signal-icon">F</div><b>Fakturor</b><span>Vad är skickat, förfallet och betalt?</span></div><div class="signal"><div class="signal-icon">◎</div><b>Offerter</b><span>Vad väntar på kund eller uppföljning?</span></div><div class="signal"><div class="signal-icon">✓</div><b>Projekt</b><span>Vad är klart — och vad kan bevisas?</span></div></div></div>
-    <div class="footer light"><span>Underlaget styr planen</span><span>→</span></div>
+    <div class="footer light"><span>handymate.se</span></div>
   </div></section>
 
   <section class="asset" id="linkedin-04-team"><div class="pad">
-    <div class="header"><div class="brand"><img class="logo" src="../../../public/logo.png" alt="">Handymate</div><div class="slide-no">4 / 6</div></div>
+    <div class="header"><div class="brand"><img class="logo" src="../../../public/marketing/content-library-v1/brand/handymate-mark.png" alt="Handymate"></div></div>
     <div class="content"><div class="eyebrow">Rätt specialist</div><h2>Teamet tar nästa steg.</h2><p class="lead">Matte håller ihop samtalet. Varje specialist äger sin domän.</p><div class="team"><div class="agent"><div class="avatar" style="background:#D97706">D</div><b>Daniel</b><p>Affärer, offerter och uppföljning.</p></div><div class="agent"><div class="avatar" style="background:#059669">L</div><b>Lars</b><p>Projekt, bevis och marginal.</p></div><div class="agent"><div class="avatar" style="background:#2563EB">K</div><b>Karin</b><p>Fakturering och pengar hem.</p></div></div><div class="approval">Kundpåverkande åtgärder kräver ditt godkännande.</div></div>
-    <div class="footer"><span>Specialister bakom en enkel yta</span><span class="arrow">→</span></div>
+    <div class="footer"><span>handymate.se</span></div>
   </div></section>
 
   <section class="asset" id="linkedin-05-proof"><div class="pad">
-    <div class="header"><div class="brand"><img class="logo" src="../../../public/logo.png" alt="">Handymate</div><div class="slide-no">5 / 6</div></div>
+    <div class="header"><div class="brand"><img class="logo" src="../../../public/marketing/content-library-v1/brand/handymate-mark.png" alt="Handymate"></div></div>
     <div class="content"><div class="eyebrow">Ärlig redovisning</div><h2>Du ser vad som faktiskt hände.</h2><p class="lead">Resultatet kommer från verkliga verktygsutfall — inte från vad modellen säger att den gjorde.</p><div class="proofs"><div class="proof"><div class="dot" style="background:#16A34A"></div><b>Utfört</b><span>Verifierat resultat</span></div><div class="proof"><div class="dot" style="background:#D97706"></div><b>Väntar</b><span>Behöver ditt beslut</span></div><div class="proof"><div class="dot" style="background:#DC2626"></div><b>Gick inte</b><span>Orsaken syns</span></div></div></div>
-    <div class="footer"><span>Inga falska framgångar</span><span class="arrow">→</span></div>
+    <div class="footer"><span>handymate.se</span></div>
   </div></section>
 
   <section class="asset dark" id="linkedin-06-cta"><div class="pad">
-    <div class="cta-center"><img class="logo" src="../../../public/logo.png" alt=""><h2>Inte ännu en chatbot.</h2><p>Ett team som arbetar mot företagets mål — medan du gör jobbet kunden ringde om.</p><div class="button">Boka demo på handymate.se</div></div>
-    <div class="footer light"><span>Handymate</span><span>6 / 6</span></div>
+    <div class="cta-center"><img class="logo" src="../../../public/marketing/content-library-v1/brand/handymate-mark.png" alt="Handymate"><h2>Inte ännu en chatbot.</h2><p>Ett team som arbetar mot företagets mål — medan du gör jobbet kunden ringde om.</p><div class="button">Boka demo</div></div>
+    <div class="footer light"><span>handymate.se</span></div>
   </div></section>
 
   <section class="asset" id="instagram-mission-control">
     <img class="photo" src="../../../public/marketing/social/launch-01/worksite-morning-source.png" alt=""><div class="shade"></div><div class="pad">
-      <div class="brand light"><img class="logo" src="../../../public/logo.png" alt="">Handymate</div>
-      <div class="cover-copy"><div class="eyebrow light">Mission Control</div><h1>Ge Handymate ett mål.<br>Se teamet arbeta.</h1><p>Du ska inte behöva lära dig prata med AI. Säg bara vad firman behöver få gjort.</p></div>
-      <div class="footer light"><span>handymate.se</span><span>AI-teamet för hantverksföretag</span></div>
+      <div class="brand light"><img class="logo" src="../../../public/marketing/content-library-v1/brand/handymate-mark.png" alt="Handymate"></div>
+      <div class="cover-copy"><div class="eyebrow light">Uppdrag</div><h1>Ge Handymate ett mål.<br>Se teamet arbeta.</h1><p>Du ska inte behöva lära dig prata med AI. Säg bara vad firman behöver få gjort.</p></div>
+      <div class="footer light"><span>handymate.se</span></div>
     </div>
   </section>
 
   <section class="asset reel" id="reel-cover-teamet-ar-igang">
     <img class="photo" src="../../../public/marketing/social/launch-01/van-morning-source.png" alt=""><div class="shade-reel"></div><div class="pad">
-      <div class="brand light"><img class="logo" src="../../../public/logo.png" alt="">Handymate</div>
+      <div class="brand light"><img class="logo" src="../../../public/marketing/content-library-v1/brand/handymate-mark.png" alt="Handymate"></div>
       <div class="reel-copy"><div class="eyebrow light">En vanlig arbetsdag</div><h1>Du är på väg till första jobbet.</h1><p>Teamet är redan igång.</p></div>
-      <div class="reel-bottom"><div class="line"></div><b>Ge Handymate ett mål.</b></div>
+      <div class="reel-bottom"><b>handymate.se</b></div>
     </div>
   </section>
 </body>

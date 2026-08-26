@@ -2,6 +2,7 @@ import { chromium } from '@playwright/test'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import fs from 'node:fs/promises'
+import sharp from 'sharp'
 
 const root = process.cwd()
 const source = path.join(root, 'docs', 'marketing', 'content-library-v1', 'render.html')
@@ -52,7 +53,7 @@ for (const asset of assets) {
   await fs.mkdir(directory, { recursive: true })
   if (asset.campaign === 'linkedin' || asset.campaign === 'article') {
     const wideViewport = asset.campaign === 'linkedin'
-      ? { width: 4300, height: 800 }
+      ? { width: 1612, height: 356 }
       : { width: 2020, height: 1180 }
     const widePage = await browser.newPage({ viewport: wideViewport, deviceScaleFactor: 1 })
     await widePage.goto(pathToFileURL(source).href)
@@ -72,6 +73,11 @@ for (const asset of assets) {
     }, asset.id)
     const bytes = await widePage.locator(`#${asset.id}`).screenshot()
     await writePng(path.join(directory, `${asset.id}.png`), bytes)
+    if (asset.campaign === 'linkedin') {
+      await sharp(bytes)
+        .jpeg({ quality: 92, progressive: true, chromaSubsampling: '4:4:4' })
+        .toFile(path.join(directory, `${asset.id}-upload.jpg`))
+    }
     await widePage.close()
     continue
   }

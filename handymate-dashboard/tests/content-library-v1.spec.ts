@@ -68,6 +68,10 @@ test.describe('Handymate content library V1', () => {
     const renderer = fs.readFileSync(path.join(docs, 'render.html'), 'utf8')
     const script = fs.readFileSync(path.join(root, 'scripts', 'render-content-library.mjs'), 'utf8')
     expect(renderer).toContain("const logo = '../../../public/logo.png'")
+    expect(renderer).toContain("const brandMark = '../../../public/marketing/content-library-v1/brand/handymate-mark.png'")
+    expect(fs.statSync(path.join(assets, 'brand', 'handymate-mark.png')).size).toBeGreaterThan(20_000)
+    expect(renderer).toContain("const brandMark = '../../../public/marketing/content-library-v1/brand/handymate-mark.png'")
+    expect(fs.statSync(path.join(assets, 'brand', 'handymate-mark.png')).size).toBeGreaterThan(20_000)
     expect(renderer).toContain('content-library-v1/avatars/')
     expect(renderer).toContain('data-export')
     expect(script).toContain("page.locator('[data-export]')")
@@ -79,7 +83,7 @@ test.describe('Handymate content library V1', () => {
 
     await expect(page.locator('.series')).toHaveCount(0)
     const brand = await page.locator('#team-02-matte .brand').boundingBox()
-    expect(brand?.height).toBeGreaterThanOrEqual(50)
+    expect(brand?.height).toBeGreaterThanOrEqual(78)
 
     for (const agent of ['matte', 'karin', 'daniel', 'lars', 'hanna', 'lisa']) {
       const card = await page.locator(`[id$="-${agent}"][data-campaign="team"] .example`).boundingBox()
@@ -94,7 +98,31 @@ test.describe('Handymate content library V1', () => {
       expect(mark!.y + mark!.height, `${agent}: färgmarkören överlappar namnet`).toBeLessThanOrEqual(name!.y)
     }
 
+    const prelaunchText = await page.locator('#prelaunch-06-matte .example-text').boundingBox()
+    const prelaunchPortrait = await page.locator('#prelaunch-06-matte .portrait-large').boundingBox()
+    expect(prelaunchText).not.toBeNull()
+    expect(prelaunchPortrait).not.toBeNull()
+    expect(prelaunchText!.x + prelaunchText!.width)
+      .toBeLessThanOrEqual(prelaunchPortrait!.x - 30)
+
     await expect(page.locator('[data-campaign="prelaunch"] .pill, [data-campaign="prelaunch"] .launch-chip')).toHaveCount(0)
+    await expect(page.locator('.article-series')).toHaveCount(0)
+    await expect(page.locator('[data-campaign="article"] .article-logo')).toHaveCount(7)
+
+    const footerLayout = await page.locator('.footer').evaluateAll(nodes => nodes.map(node => {
+      const footer = node.getBoundingClientRect()
+      const asset = node.closest('.asset')!.getBoundingClientRect()
+      return {
+        text: node.textContent?.trim(),
+        children: node.children.length,
+        centerDelta: Math.abs((footer.left + footer.width / 2) - (asset.left + asset.width / 2)),
+      }
+    }))
+    for (const footer of footerLayout) {
+      expect(footer.text).toBe('handymate.se')
+      expect(footer.children).toBe(1)
+      expect(footer.centerDelta).toBeLessThanOrEqual(1)
+    }
 
     const source = fs.readFileSync(path.join(docs, 'render.html'), 'utf8')
     expect(source).not.toMatch(/AVSLÖJANDE 0[12]/)
@@ -156,12 +184,37 @@ test.describe('Handymate content library V1', () => {
 
   test('LinkedIn-bannern följer företagssidans aktuella format och säkra budskap', () => {
     const banner = fs.readFileSync(path.join(assets, 'linkedin', 'linkedin-banner-company.png'))
-    expect(banner.readUInt32BE(16)).toBe(4200)
-    expect(banner.readUInt32BE(20)).toBe(700)
+    expect(banner.readUInt32BE(16)).toBe(1512)
+    expect(banner.readUInt32BE(20)).toBe(256)
     expect(banner.length).toBeLessThan(3_000_000)
+    const uploadJpeg = path.join(assets, 'linkedin', 'linkedin-banner-company-upload.jpg')
+    expect(fs.existsSync(uploadJpeg)).toBe(true)
+    expect(fs.statSync(uploadJpeg).size).toBeLessThan(3_000_000)
     const source = fs.readFileSync(path.join(docs, 'render.html'), 'utf8')
     expect(source).toContain('Välkommen till framtidens hantverksföretag.')
     expect(source).toContain('Hittar pengar. Skyddar marginalen. Minskar admin.')
+  })
+
+  test('LinkedIn-bannerns text ligger mellan profilbilden och H-symbolen', async ({ page }) => {
+    await page.goto(pathToFileURL(path.join(docs, 'render.html')).href)
+    await page.evaluate(async () => { await document.fonts.ready })
+
+    const asset = await page.locator('#linkedin-banner-company').boundingBox()
+    const title = await page.locator('#linkedin-banner-company .linkedin-title').boundingBox()
+    const subtitle = await page.locator('#linkedin-banner-company .linkedin-sub').boundingBox()
+    const mark = await page.locator('#linkedin-banner-company .linkedin-mark').boundingBox()
+
+    expect(asset).not.toBeNull()
+    expect(title).not.toBeNull()
+    expect(subtitle).not.toBeNull()
+    expect(mark).not.toBeNull()
+
+    const leftSafeEdge = asset!.x + 320
+    const markSafeEdge = mark!.x - 60
+    expect(title!.x).toBeGreaterThanOrEqual(leftSafeEdge)
+    expect(subtitle!.x).toBeGreaterThanOrEqual(leftSafeEdge)
+    expect(title!.x + title!.width).toBeLessThanOrEqual(markSafeEdge)
+    expect(subtitle!.x + subtitle!.width).toBeLessThanOrEqual(markSafeEdge)
   })
 
   test('levererar sju kompletta LinkedIn-artiklar med egna omslag', () => {

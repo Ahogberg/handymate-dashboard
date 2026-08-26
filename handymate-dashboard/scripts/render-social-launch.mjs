@@ -19,6 +19,19 @@ const assets = [
 ]
 
 await fs.mkdir(output, { recursive: true })
+
+async function writePng(file, bytes) {
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    try {
+      await fs.writeFile(file, bytes)
+      return
+    } catch (error) {
+      if (attempt === 5) throw error
+      await new Promise(resolve => setTimeout(resolve, attempt * 100))
+    }
+  }
+}
+
 const browser = await chromium.launch({ headless: true })
 const page = await browser.newPage({ viewport: { width: 1200, height: 2100 }, deviceScaleFactor: 1 })
 await page.goto(pathToFileURL(source).href)
@@ -34,7 +47,8 @@ await page.evaluate(async () => {
 
 for (const id of assets) {
   const target = page.locator(`#${id}`)
-  await target.screenshot({ path: path.join(output, `${id}.png`) })
+  const bytes = await target.screenshot()
+  await writePng(path.join(output, `${id}.png`), bytes)
 }
 
 await page.addStyleTag({ content: `
@@ -43,7 +57,8 @@ await page.addStyleTag({ content: `
     padding:20px !important; width:600px !important; }
   .asset { zoom:.25; }
 ` })
-await page.screenshot({ path: path.join(output, 'contact-sheet.png'), fullPage: true })
+const contactSheet = await page.screenshot({ fullPage: true })
+await writePng(path.join(output, 'contact-sheet.png'), contactSheet)
 
 await browser.close()
 console.log(`Rendered ${assets.length} social assets plus contact sheet to ${output}`)

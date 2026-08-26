@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (file: string) => fs.readFileSync(path.join(ROOT, file), 'utf8')
@@ -48,9 +49,41 @@ test.describe('Social Launch Kit — kampanj 01', () => {
 
   test('renderaren använder riktig logotyp och kampanjens exakta huvudbudskap', () => {
     const html = read('docs/marketing/social-launch-kit/render.html')
-    expect(html).toContain('../../../public/logo.png')
+    expect(html).toContain('../../../public/marketing/content-library-v1/brand/handymate-mark.png')
     expect(html).toContain('Ge Handymate ett mål.')
     expect(html).toContain('Se teamet arbeta.')
     expect(html).not.toMatch(/kundomdöme|kundcitat/i)
+  })
+
+  test('alla sociala original har ren topp och centrerad webbplats', async ({ page }) => {
+    await page.goto(pathToFileURL(path.join(ROOT, 'docs/marketing/social-launch-kit/render.html')).href)
+    await page.evaluate(async () => { await document.fonts.ready })
+
+    await expect(page.locator('.slide-no')).toHaveCount(0)
+    const brands = await page.locator('.brand').evaluateAll(nodes => nodes.map(node => ({
+      children: node.children.length,
+      tag: node.firstElementChild?.tagName,
+      height: node.firstElementChild?.getBoundingClientRect().height,
+    })))
+    for (const brand of brands) {
+      expect(brand.children).toBe(1)
+      expect(brand.tag).toBe('IMG')
+      expect(brand.height).toBeGreaterThanOrEqual(80)
+    }
+
+    const footers = await page.locator('.footer').evaluateAll(nodes => nodes.map(node => {
+      const footer = node.getBoundingClientRect()
+      const asset = node.closest('.asset')!.getBoundingClientRect()
+      return {
+        text: node.textContent?.trim(),
+        children: node.children.length,
+        centerDelta: Math.abs((footer.left + footer.width / 2) - (asset.left + asset.width / 2)),
+      }
+    }))
+    for (const footer of footers) {
+      expect(footer.text).toBe('handymate.se')
+      expect(footer.children).toBe(1)
+      expect(footer.centerDelta).toBeLessThanOrEqual(1)
+    }
   })
 })

@@ -40,7 +40,7 @@ Fyra fristående 4:5-inlägg och tre 9:16-omslag för Reels/Stories.
 
 ### Profil och LinkedIn
 
-Fem profilbildsoriginal samt ett 4200×700-omslag för Handymates LinkedIn-sida.
+Fem profilbildsoriginal samt ett 1512×256-omslag för Handymates LinkedIn-sida.
 Omslagets huvudbudskap ligger i en central säker zon för varierande skärmstorlek.
 
 ### LinkedIn-artiklar

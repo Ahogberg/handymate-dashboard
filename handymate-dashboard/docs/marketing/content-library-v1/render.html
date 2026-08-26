@@ -18,12 +18,12 @@
     .asset { width:1080px; height:1350px; position:relative; overflow:hidden; background:var(--paper); color:var(--ink); font-family:DM, sans-serif; }
     .asset.story { height:1920px; }
     .asset.profile { height:1080px; }
-    .asset.linkedin-banner { width:4200px; height:700px; align-self:flex-start; }
+    .asset.linkedin-banner { width:1512px; height:256px; align-self:flex-start; }
     .asset.article-cover { width:1920px; height:1080px; align-self:flex-start; }
     .noise { position:absolute; inset:0; opacity:.055; pointer-events:none; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E"); }
     .pad { position:absolute; inset:0; padding:74px 78px; display:flex; flex-direction:column; }
-    .brand { height:56px; width:auto; object-fit:contain; object-position:left center; }
-    .brand-row { display:flex; align-items:center; min-height:58px; }
+    .brand { height:80px; width:auto; object-fit:contain; object-position:left center; }
+    .brand-row { display:flex; align-items:center; min-height:82px; }
     h1,h2,h3,p { margin:0; }
     h1,h2,h3 { font-family:Space, sans-serif; letter-spacing:-.045em; }
     .hero { font-size:92px; line-height:.98; max-width:900px; }
@@ -33,7 +33,7 @@
     .dark .sub { color:#cfebe5; }
     .overlay { color:white; }
     .overlay .sub { color:#cfebe5; }
-    .footer { margin-top:auto; display:flex; align-items:center; justify-content:space-between; gap:20px; font-size:22px; color:#64748b; }
+    .footer { margin-top:auto; display:flex; align-items:center; justify-content:center; width:100%; font-size:22px; color:#64748b; text-align:center; }
     .dark .footer { color:#b8dad4; }
     .overlay .footer { color:#d8eee9; }
     .pill { display:inline-flex; width:max-content; align-items:center; gap:10px; padding:12px 20px; border-radius:999px; background:var(--mint); color:var(--teal); font-weight:700; font-size:22px; }
@@ -51,6 +51,7 @@
     .example { position:absolute; left:78px; right:78px; bottom:72px; min-height:210px; border-radius:30px; background:white; border:1px solid var(--line); box-shadow:0 25px 65px rgba(15,23,42,.09); padding:30px 34px; display:flex; flex-direction:column; justify-content:center; }
     .example-label { font:700 18px/1 Space; color:var(--agent); letter-spacing:.08em; text-transform:uppercase; margin-bottom:12px; }
     .example-text { font-size:27px; line-height:1.34; color:#334155; }
+    .prelaunch-agent-example .example-text { max-width:400px; }
     .agent-mark { position:absolute; left:76px; top:226px; width:54px; height:7px; border-radius:9px; background:var(--agent); }
     .avatar-stack { display:flex; margin-top:75px; }
     .avatar-stack img { width:150px; height:150px; margin-left:-22px; object-fit:cover; object-position:top; border:6px solid white; border-radius:50%; box-shadow:0 14px 36px rgba(0,0,0,.18); }
@@ -113,19 +114,20 @@
     .safe-circle { position:absolute; inset:82px; border:4px dashed rgba(255,255,255,.65); border-radius:50%; }
     .safe-label { position:absolute; left:50%; top:85px; transform:translateX(-50%); padding:10px 18px; border-radius:999px; background:rgba(5,47,44,.78); color:white; font:700 20px/1 Space; letter-spacing:.08em; }
     .linkedin-shell { position:absolute; inset:0; overflow:hidden; background:linear-gradient(115deg,#052f2c 0%,#073f3b 48%,#0f766e 100%); color:white; }
-    .linkedin-shell::before { content:''; position:absolute; width:1150px; height:1150px; border:2px solid rgba(143,221,207,.16); border-radius:50%; left:-560px; top:-520px; box-shadow:0 0 0 135px rgba(143,221,207,.035),0 0 0 300px rgba(143,221,207,.025); }
-    .linkedin-shell::after { content:''; position:absolute; width:920px; height:920px; border-radius:50%; right:-110px; top:-320px; background:radial-gradient(circle,rgba(120,209,192,.22),rgba(120,209,192,0) 68%); }
-    .linkedin-wordmark { position:absolute; left:280px; top:284px; z-index:2; font:700 54px/1 Space; letter-spacing:.16em; }
-    .linkedin-copy { position:absolute; left:1120px; top:122px; z-index:2; width:2480px; }
-    .linkedin-kicker { color:#8dd7c9; font:700 30px/1 Space; letter-spacing:.13em; text-transform:uppercase; }
-    .linkedin-title { margin-top:30px; max-width:2500px; font:650 112px/.96 Space; letter-spacing:-.052em; }
-    .linkedin-sub { margin-top:38px; color:#cfeae5; font:500 42px/1.2 DM; letter-spacing:-.01em; }
-    .linkedin-mark { position:absolute; z-index:1; width:680px; height:680px; right:120px; top:8px; object-fit:contain; opacity:.13; filter:brightness(0) invert(1); }
+    .linkedin-shell::before { content:''; position:absolute; width:414px; height:414px; border:1px solid rgba(143,221,207,.16); border-radius:50%; left:-202px; top:-190px; box-shadow:0 0 0 49px rgba(143,221,207,.035),0 0 0 108px rgba(143,221,207,.025); }
+    .linkedin-shell::after { content:''; position:absolute; width:331px; height:331px; border-radius:50%; right:-40px; top:-117px; background:radial-gradient(circle,rgba(120,209,192,.22),rgba(120,209,192,0) 68%); }
+    .linkedin-wordmark { position:absolute; left:101px; top:104px; z-index:2; }
+    /* LinkedIn visar profilbilden över vänster nederkant. Textens hårda
+       säkerhetszon är x=320–1250; H-symbolen börjar först efter den. */
+    .linkedin-copy { position:absolute; left:350px; top:60px; z-index:2; width:900px; }
+    .linkedin-title { margin-top:12px; max-width:900px; font:650 46px/.94 Space; letter-spacing:-.057em; }
+    .linkedin-sub { margin-top:16px; color:#cfeae5; font:500 19px/1.2 DM; letter-spacing:-.01em; }
+    .linkedin-mark { position:absolute; z-index:1; width:180px; height:180px; right:22px; top:38px; object-fit:contain; opacity:.13; filter:brightness(0) invert(1); }
     .article-shell { position:absolute; inset:0; overflow:hidden; background:linear-gradient(135deg,#052f2c 0%,#073f3b 58%,#0f766e 100%); color:white; }
     .article-shell::before { content:''; position:absolute; width:930px; height:930px; right:-330px; top:-300px; border-radius:50%; border:2px solid rgba(141,215,201,.22); box-shadow:0 0 0 110px rgba(141,215,201,.045),0 0 0 245px rgba(141,215,201,.026); }
-    .article-top { position:absolute; left:104px; right:104px; top:84px; z-index:3; display:flex; align-items:center; justify-content:space-between; }
-    .article-brand { font:700 25px/1 Space; letter-spacing:.17em; }
-    .article-series { color:#8dd7c9; font:700 22px/1 Space; letter-spacing:.12em; text-transform:uppercase; }
+    .article-top { position:absolute; left:104px; right:104px; top:72px; z-index:3; display:flex; align-items:center; }
+    .article-logo { width:82px; height:82px; object-fit:contain; filter:brightness(0) invert(1); }
+    .article-site { position:absolute; left:0; right:0; bottom:54px; z-index:3; color:#b8dad4; font:500 22px/1 DM; text-align:center; }
     .article-copy { position:absolute; left:104px; top:268px; z-index:3; width:1390px; }
     .article-kicker { color:#8dd7c9; font:700 25px/1 Space; letter-spacing:.13em; text-transform:uppercase; }
     .article-title { margin-top:30px; font:650 104px/.98 Space; letter-spacing:-.052em; }
@@ -143,6 +145,7 @@
   <script>
     const assetBase = '../../../public/marketing/content-library-v1/avatars/'
     const logo = '../../../public/logo.png'
+    const brandMark = '../../../public/marketing/content-library-v1/brand/handymate-mark.png'
     const launchBase = '../../../public/marketing/social/launch-01/'
     const agents = [
       { id:'matte', name:'Matte', role:'Din chefsagent', color:'#0f766e', promise:'Berätta vad du vill uppnå. Matte samordnar rätt specialister och återkommer med läget.', example:'“Vilka projekt behöver mig?” → Matte samlar teamets bedömning och visar nästa steg.' },
@@ -156,10 +159,10 @@
     const root = document.querySelector('#root')
 
     function logoRow(dark=false) {
-      return `<div class="brand-row"><img class="brand ${dark ? 'mini-logo' : ''}" src="${logo}" alt="Handymate"></div>`
+      return `<div class="brand-row"><img class="brand ${dark ? 'mini-logo' : ''}" src="${brandMark}" alt="Handymate"></div>`
     }
-    function footer(dark=false, text='Det digitala teamet för hantverksföretag') {
-      return `<div class="footer"><span>${text}</span><span>handymate.se</span></div>${dark ? '' : ''}`
+    function footer() {
+      return `<div class="footer"><span>handymate.se</span></div>`
     }
     function add(id, campaign, html, classes='') {
       root.insertAdjacentHTML('beforeend', `<section id="${id}" data-export data-campaign="${campaign}" class="asset ${classes}">${html}<div class="noise"></div></section>`)
@@ -258,7 +261,7 @@
       <div style="margin-top:170px"><div class="editorial-kicker">Det digitala teamet</div><h1 class="hero small" style="margin-top:34px">Sex AI-kollegor. Byggda för hantverksföretag.</h1><div class="outline-team">${agents.map(a=>`<img src="${assetBase}${a.id}.png" alt="${a.name}">`).join('')}</div></div>${footer(true,'Snart får du hälsa på dem.')}</div>`,'dark')
     add('prelaunch-06-matte','prelaunch',`<div class="pad" style="--agent:#0f766e">${logoRow(false)}
       <div class="agent-mark"></div><div class="agent-copy" style="margin-top:135px"><div class="agent-role" style="margin-top:0">Din chefsagent</div><h2 class="agent-name" style="margin-top:28px">Matte</h2><p class="agent-promise">Du berättar vad du vill uppnå. Matte samordnar teamet.</p></div>
-      <div class="example"><div class="example-label">Snart i Handymate</div><div class="example-text">En kontaktpunkt. Rätt specialist. Tydlig återkoppling.</div></div><div class="portrait-halo"></div><img class="portrait portrait-large" src="${assetBase}matte.png" alt="Matte"></div>`)
+      <div class="example prelaunch-agent-example"><div class="example-label">Snart i Handymate</div><div class="example-text">En kontaktpunkt. Rätt specialist. Tydlig återkoppling.</div></div><div class="portrait-halo"></div><img class="portrait portrait-large" src="${assetBase}matte.png" alt="Matte"></div>`)
     add('prelaunch-07-launch-soon','prelaunch',`<div class="pad dark">${logoRow(true,'HANDYMATE')}
       <div style="margin-top:280px"><div class="editorial-kicker">Lanserar snart</div><h1 class="hero" style="margin-top:38px">Välkommen till framtidens hantverksföretag.</h1></div>${footer(true,'Det digitala teamet är snart på plats.')}</div>`,'dark')
     add('prelaunch-08-three-days','prelaunch',`<div class="pad dark">${logoRow(true,'NEDRÄKNING')}
@@ -276,17 +279,16 @@
     add('profile-05-safe-area-guide','profile',`<div class="profile-canvas profile-primary"><img src="${logo}" alt="Handymate"><div class="safe-circle"></div><div class="safe-label">SÄKER CIRKELBESKÄRNING</div></div>`,'profile')
 
     add('linkedin-banner-company','linkedin',`<div class="linkedin-shell">
-      <div class="linkedin-wordmark">HANDYMATE</div>
-      <div class="linkedin-copy"><div class="linkedin-kicker">Det digitala AI-teamet</div>
-      <h1 class="linkedin-title">Välkommen till framtidens hantverksföretag.</h1>
+      <div class="linkedin-wordmark" aria-hidden="true"></div>
+      <div class="linkedin-copy"><h1 class="linkedin-title">Välkommen till framtidens hantverksföretag.</h1>
       <p class="linkedin-sub">Hittar pengar. Skyddar marginalen. Minskar admin.</p></div>
       <img class="linkedin-mark" src="${logo}" alt="">
     </div>`,'linkedin-banner')
 
     function articleCover(id, number, kicker, title, visual='') {
-      add(id,'article',`<div class="article-shell"><div class="article-top"><div class="article-brand">HANDYMATE</div><div class="article-series">Framtidens hantverksföretag · ${number}</div></div>
+      add(id,'article',`<div class="article-shell"><div class="article-top"><img class="article-logo" src="${brandMark}" alt="Handymate"></div>
         <div class="article-copy"><div class="article-kicker">${kicker}</div><h1 class="article-title">${title}</h1><div class="article-rule"></div></div>
-        <div class="article-number">${number}</div>${visual}</div>`,'article-cover')
+        <div class="article-number">${number}</div>${visual}<div class="article-site">handymate.se</div></div>`,'article-cover')
     }
     articleCover('article-01-system-eller-team','01','Ett nytt arbetssätt','Affärssystemet visar. Ett AI-team hjälper dig agera.',`<div class="article-flow"><span>REGISTRERA</span><b>→</b><span>FÖRSTÅ</span><b>→</b><span>AGERA</span></div>`)
     articleCover('article-02-vad-gor-ett-ai-team','02','Möt teamet','Vad gör ett AI-team för ett hantverksföretag — på riktigt?',`<div class="article-visual">${agents.map(a=>`<img src="${assetBase}${a.id}.png" alt="${a.name}">`).join('')}</div>`)
