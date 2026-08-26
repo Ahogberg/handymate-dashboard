@@ -4,6 +4,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { triggerAgentFireAndForget, makeIdempotencyKey } from '@/lib/agent-trigger'
 import { recordCost } from '@/lib/costs/record'
 import { whisperCostOre } from '@/lib/costs/meter'
+import { checkFuelGate } from '@/lib/costs/fuel'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 const ELKS_API_USER = process.env.ELKS_API_USER
@@ -58,6 +59,11 @@ export async function POST(request: NextRequest) {
     // går att räkna ut genom att jämföra felkoder.
     if (!internalOk && recording.business_id !== authed!.business_id) {
       return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
+    }
+
+    const fuel = await checkFuelGate(supabase, recording.business_id)
+    if (!fuel.allowed) {
+      return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
     }
 
     if (recording.transcript) {

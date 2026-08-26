@@ -4,6 +4,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { recordCost } from '@/lib/costs/record'
 import { whisperCostOre, llmCostUsd } from '@/lib/costs/meter'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { checkFuelGate } from '@/lib/costs/fuel'
 
 const VOICE_PROCESS_MODEL = 'claude-haiku-4-5-20251001'
 
@@ -15,6 +16,12 @@ export async function POST(request: NextRequest) {
   const business = await getAuthenticatedBusiness(request)
   if (!business) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const supabase = getServerSupabase()
+  const fuel = await checkFuelGate(supabase, business.business_id)
+  if (!fuel.allowed) {
+    return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
   }
 
   const formData = await request.formData()
@@ -55,7 +62,7 @@ export async function POST(request: NextRequest) {
   const ljudSekunder = Number(whisperJson.duration) || 0
   if (ljudSekunder > 0) {
     await recordCost({
-      supabase: getServerSupabase(),
+      supabase,
       businessId: business.business_id,
       resource: 'whisper',
       units: ljudSekunder,

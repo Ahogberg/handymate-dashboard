@@ -27,11 +27,15 @@
  * över. En påfyllning från dag 31 tillbaka åldras alltså ur budgeten
  * samtidigt som förbrukningen den finansierade åldras ur täljaren — de
  * försvinner tillsammans, inte var för sig. Det är en medveten förenkling
- * för v1 (ingen ledger-saldo-bokföring): eftersom 0 %-läget är rent
- * informativt (Andreas-beslut — ingen koppling till agents_globally_paused/
- * agent_cost_cap_usd_daily i denna version) finns ingen ekonomisk skada av
- * att en gammal påfyllning slutar synas i mätaren — bara en visuell
- * avrundning.
+ * för V1 (ingen fristående saldobok): en påfyllning gäller för den aktuella
+ * abonnemangsperioden och förbrukningen + påfyllningen försvinner tillsammans
+ * när nästa period börjar.
+ *
+ * Sedan 2026-08-26 är 0 % ETT VERKLIGT TAK för nytt kostnadsbärande
+ * teamarbete. `checkFuelGate` är den serverauktoritativa förhandskontrollen;
+ * klientens procentmätare är bara presentation. Taket får aldrig uttryckas
+ * via `agents_globally_paused` (kundens manuella paus) eller det interna
+ * USD-dygnstaket — tre olika beslut ska aldrig dela samma flagga.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -45,6 +49,26 @@ export const FUEL_PLAN_BUDGET_ORE: Record<string, number> = {
   professional: 90_000,
   business: 180_000,
 }
+
+export type FuelTopupTierId = 'quarter' | 'half' | 'full'
+
+export interface FuelTopupOption {
+  id: FuelTopupTierId
+  label: string
+  percent: number
+  amountOre: number
+}
+
+/**
+ * Kundens tre valbara påfyllningar. Procentsatsen är kanonisk; beloppet
+ * härleds alltid server-side ur den aktiva planens Bränslenivå. Klienten får
+ * aldrig skicka ett eget öresbelopp till Stripe-rutten.
+ */
+export const FUEL_TOPUP_TIERS: ReadonlyArray<Omit<FuelTopupOption, 'amountOre'>> = [
+  { id: 'quarter', label: 'Liten påfyllning', percent: 25 },
+  { id: 'half', label: 'Halv tank', percent: 50 },
+  { id: 'full', label: 'Full tank', percent: 100 },
+]
 /** 'enterprise' och okända planer: inget produktbeslut finns ännu — faller
  *  till Storfirman-nivån (mest generöst, minst risk att skrämma en stor
  *  kund med en missvisande låg mätare). */
@@ -53,6 +77,22 @@ const FUEL_DEFAULT_BUDGET_ORE = FUEL_PLAN_BUDGET_ORE.business
 export function fuelBudgetOreForPlan(plan: string | null | undefined): number {
   if (plan && FUEL_PLAN_BUDGET_ORE[plan] != null) return FUEL_PLAN_BUDGET_ORE[plan]
   return FUEL_DEFAULT_BUDGET_ORE
+}
+
+export function fuelTopupOptionsForPlan(plan: string | null | undefined): FuelTopupOption[] {
+  const budgetOre = fuelBudgetOreForPlan(plan)
+  return FUEL_TOPUP_TIERS.map(tier => ({
+    ...tier,
+    amountOre: Math.round((budgetOre * tier.percent) / 100),
+  }))
+}
+
+export function resolveFuelTopupOption(
+  plan: string | null | undefined,
+  tierId: string | null | undefined,
+): FuelTopupOption | null {
+  if (!plan || FUEL_PLAN_BUDGET_ORE[plan] == null) return null
+  return fuelTopupOptionsForPlan(plan).find(option => option.id === tierId) ?? null
 }
 
 /**
@@ -200,6 +240,10 @@ export interface FuelCostRow {
 export interface FuelLevel {
   usedOre: number
   budgetOre: number
+  remainingOre: number
+  /** Serverns och klientens gemensamma sanning: nytt kostnadsbärande arbete
+   * stoppas när true. Procenten ensam används aldrig som grind. */
+  exhausted: boolean
   /** 0..1+, kan överstiga 1 vid överförbrukning. */
   usedRatio: number
   /** 0..100, ALLTID klampad — det som ritas i mätaren. */
@@ -231,6 +275,8 @@ export function computeFuelLevel(params: {
   const relevanta = rows.filter(r => RESOURCES.includes(r.resource))
   const usedOre = relevanta.reduce((s, r) => s + (r.cost_ore || 0), 0)
   const usedRatio = budgetOre > 0 ? usedOre / budgetOre : 0
+  const remainingOre = Math.max(0, budgetOre - usedOre)
+  const exhausted = budgetOre <= 0 || usedOre >= budgetOre
   const remainingPercent = Math.max(0, Math.min(100, Math.round((1 - usedRatio) * 100)))
 
   // Buckets — relativ andel av FÖRBRUKNINGEN, inte av budgeten.
@@ -273,7 +319,6 @@ export function computeFuelLevel(params: {
   // daysRemaining behåller den för att texten ska kunna säga "4 dagar"
   // i stället för att bara säga att det snart tar slut.
   const avgDailyOre = usedOre / windowDays
-  const remainingOre = Math.max(0, budgetOre - usedOre)
   const daysExact = avgDailyOre > 0 ? remainingOre / avgDailyOre : null
   const weeksRemaining = daysExact != null ? Math.round(daysExact / 7) : null
   const daysRemaining = daysExact != null ? Math.round(daysExact) : null
@@ -281,7 +326,7 @@ export function computeFuelLevel(params: {
   const state: FuelLevel['state'] =
     remainingPercent <= 10 ? 'critical' : remainingPercent <= 30 ? 'low' : 'normal'
 
-  return { usedOre, budgetOre, usedRatio, remainingPercent, weeksRemaining, daysRemaining, buckets, history, highlightIndex, state }
+  return { usedOre, budgetOre, remainingOre, exhausted, usedRatio, remainingPercent, weeksRemaining, daysRemaining, buckets, history, highlightIndex, state }
 }
 
 /**
@@ -353,4 +398,58 @@ export async function getFuelLevel(
     windowStart,
     windowEnd: now,
   })
+}
+
+export type FuelGateReason = 'fuel_exhausted' | 'fuel_unavailable'
+
+export type FuelGateDecision =
+  | { allowed: true; level: FuelLevel; plan: string }
+  | { allowed: false; reason: FuelGateReason; level?: FuelLevel; error?: string }
+
+/**
+ * Serverauktoritativ Bränslegrind för NYTT kostnadsbärande teamarbete.
+ *
+ * Fail-closed är avsiktligt: när den auktoritativa förbrukningen inte kan
+ * läsas vet vi inte att kunden har utrymme kvar. Anroparen ska returnera ett
+ * tydligt, retrybart besked — aldrig låtsas att nivån är noll i UI:t och
+ * aldrig fortsätta skapa extern kostnad i blindo.
+ */
+export async function checkFuelGate(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<FuelGateDecision> {
+  if (!businessId) return { allowed: false, reason: 'fuel_unavailable', error: 'business_id saknas' }
+
+  try {
+    const { data: config, error } = await supabase
+      .from('business_config')
+      .select('subscription_plan, billing_period_start')
+      .eq('business_id', businessId)
+      .maybeSingle()
+
+    if (error || !config?.subscription_plan || FUEL_PLAN_BUDGET_ORE[config.subscription_plan] == null) {
+      return {
+        allowed: false,
+        reason: 'fuel_unavailable',
+        error: error?.message || 'aktiv prisplan kunde inte verifieras',
+      }
+    }
+
+    const level = await getFuelLevel(
+      supabase,
+      businessId,
+      config.subscription_plan,
+      config.billing_period_start ?? null,
+    )
+
+    return level.exhausted
+      ? { allowed: false, reason: 'fuel_exhausted', level }
+      : { allowed: true, level, plan: config.subscription_plan }
+  } catch (err: unknown) {
+    return {
+      allowed: false,
+      reason: 'fuel_unavailable',
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
 }

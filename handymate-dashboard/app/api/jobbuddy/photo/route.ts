@@ -4,6 +4,7 @@ import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
+import { checkFuelGate } from '@/lib/costs/fuel'
 
 const JOBBUDDY_PHOTO_MODEL = 'claude-sonnet-4-6'
 
@@ -21,6 +22,12 @@ export async function POST(request: NextRequest) {
     const rateLimit = checkAiApiRateLimit(authBusiness.business_id)
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: rateLimit.error }, { status: 429 })
+    }
+
+    const supabase = getServerSupabase()
+    const fuel = await checkFuelGate(supabase, authBusiness.business_id)
+    if (!fuel.allowed) {
+      return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
     }
 
     const { image } = await request.json()
@@ -66,7 +73,7 @@ Var konkret och praktisk. Tänk som en erfaren hantverkare som ger en snabb bed�
     })
 
     await meterDirectLlmCall({
-      supabase: getServerSupabase(),
+      supabase,
       businessId: authBusiness.business_id,
       usage: response.usage,
       costUsd: llmCostUsd(response.usage, JOBBUDDY_PHOTO_MODEL),

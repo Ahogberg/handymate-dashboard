@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { Zap } from 'lucide-react'
 import { useFuel } from './FuelProvider'
 import { FuelGauge } from './FuelGauge'
-import { weeksRemainingPhrase } from '@/lib/costs/fuel'
+import { fuelTopupOptionsForPlan, weeksRemainingPhrase, type FuelTopupTierId } from '@/lib/costs/fuel'
+import { useBusiness } from '@/lib/BusinessContext'
 
 /**
  * Bränsle-sektionen på /dashboard/settings/billing — mellan USAGE OVERVIEW
@@ -13,8 +14,9 @@ import { weeksRemainingPhrase } from '@/lib/costs/fuel'
  * eget facit) — se lib/costs/fuel.ts:s docstring för varför.
  */
 export function FuelBillingCard() {
+  const business = useBusiness()
   const { level, refresh } = useFuel()
-  const [topupLoading, setTopupLoading] = useState(false)
+  const [topupLoading, setTopupLoading] = useState<FuelTopupTierId | null>(null)
 
   // "Påfyllning syns direkt i mätaren" — hämta om Bränsle-nivån efter en
   // lyckad Stripe-redirect. window.location.search i stället för
@@ -27,30 +29,37 @@ export function FuelBillingCard() {
 
   if (!level) return null // fail-soft: hellre ingenting än en felaktig siffra
 
-  const tanka = async () => {
-    setTopupLoading(true)
+  const tanka = async (tier: FuelTopupTierId) => {
+    setTopupLoading(tier)
     try {
-      const res = await fetch('/api/billing/fuel-topup', { method: 'POST' })
+      const res = await fetch('/api/billing/fuel-topup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier }),
+      })
       if (res.ok) {
         const data = await res.json()
         if (data.checkout_url) window.location.href = data.checkout_url
       }
     } finally {
-      setTopupLoading(false)
+      setTopupLoading(null)
     }
   }
 
   const estimateText = level.weeksRemaining != null
     ? `${weeksRemainingPhrase(level.weeksRemaining, level.daysRemaining)} som vanligt.`
     : 'Ingen förbrukning ännu den här perioden.'
-  const calmText = level.state === 'normal'
+  const calmText = level.exhausted
+    ? 'Teamet har pausat nytt AI-arbete och nya utskick. Läsning och ditt manuella arbete fungerar fortfarande.'
+    : level.state === 'normal'
     ? 'Ingen fara — teamet jobbar på som vanligt.'
     : 'Bra läge att tanka innan det börjar märkas.'
+  const topupOptions = fuelTopupOptionsForPlan(business.subscription_plan)
 
   const maxHistory = Math.max(1, ...level.history)
 
   return (
-    <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
+    <div id="fuel" className="bg-white rounded-xl border border-[#E2E8F0] p-6 scroll-mt-24">
       <div className="flex items-center gap-3 mb-6">
         <Zap className="w-5 h-5 text-gray-700" />
         <h2 className="text-lg font-semibold text-gray-900">Bränsle</h2>
@@ -61,17 +70,31 @@ export function FuelBillingCard() {
         <div className="flex-1 min-w-0 text-center sm:text-left">
           <p className="text-[15px] font-semibold text-gray-800 mb-1">{estimateText}</p>
           <p className="text-sm text-gray-500 leading-relaxed mb-4">{calmText}</p>
-          <div className="flex items-center gap-3 justify-center sm:justify-start">
-            <button
-              type="button"
-              onClick={tanka}
-              disabled={topupLoading}
-              className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-primary-700 hover:bg-primary-800 text-white text-sm font-medium transition-colors disabled:opacity-60"
-            >
-              {topupLoading ? 'Öppnar...' : 'Tanka mer'}
-            </button>
-            <span className="text-xs text-gray-400">Påfyllning syns direkt i mätaren</span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {topupOptions.map(option => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => tanka(option.id)}
+                disabled={topupLoading !== null}
+                className={`min-h-[72px] rounded-xl border px-3 py-2.5 text-left transition-colors disabled:opacity-60 ${
+                  option.id === 'full'
+                    ? 'bg-primary-700 border-primary-700 text-white'
+                    : 'bg-white border-gray-200 hover:border-primary-300 text-gray-900'
+                }`}
+              >
+                <span className="block text-sm font-semibold">
+                  {topupLoading === option.id ? 'Öppnar...' : option.label}
+                </span>
+                <span className={`block text-xs mt-0.5 ${option.id === 'full' ? 'text-primary-100' : 'text-gray-500'}`}>
+                  +{option.percent}% · {Math.round(option.amountOre / 100).toLocaleString('sv-SE')} kr
+                </span>
+              </button>
+            ))}
           </div>
+          <p className="text-xs text-gray-400 mt-2.5">
+            Påfyllningen gäller resten av din nuvarande abonnemangsperiod och aktiveras efter genomförd betalning.
+          </p>
         </div>
       </div>
 

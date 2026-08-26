@@ -5,6 +5,7 @@ import { buildPriceContext, PriceListItem } from '@/lib/ai-quote-generator'
 import { getServerSupabase } from '@/lib/supabase'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
+import { checkFuelGate } from '@/lib/costs/fuel'
 
 function getAnthropic() {
   return new Anthropic({
@@ -24,6 +25,12 @@ export async function POST(request: NextRequest) {
     const rateLimit = checkAiApiRateLimit(business.business_id)
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: rateLimit.error }, { status: 429 })
+    }
+
+    const supabase = getServerSupabase()
+    const fuel = await checkFuelGate(supabase, business.business_id)
+    if (!fuel.allowed) {
+      return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
     }
 
     const anthropic = getAnthropic()
@@ -95,7 +102,7 @@ Svara ENDAST med JSON (ingen markdown):
     // COGS-boken (etapp "svansen", 2026-08-14) — äldre offertvägen var
     // tidigare helt omätt. Mäts oavsett om JSON-parsningen nedan lyckas.
     await meterDirectLlmCall({
-      supabase: getServerSupabase(),
+      supabase,
       businessId: business.business_id,
       usage: response.usage,
       costUsd: llmCostUsd(response.usage, GENERATE_MODEL),

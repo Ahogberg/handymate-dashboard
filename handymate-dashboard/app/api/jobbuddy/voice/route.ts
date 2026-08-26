@@ -6,6 +6,7 @@ import { recordCost } from '@/lib/costs/record'
 import { whisperCostOre } from '@/lib/costs/meter'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
+import { checkFuelGate } from '@/lib/costs/fuel'
 
 const JOBBUDDY_VOICE_MODEL = 'claude-sonnet-4-6'
 
@@ -23,6 +24,12 @@ export async function POST(request: NextRequest) {
     const rateLimit = checkAiApiRateLimit(authBusiness.business_id)
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: rateLimit.error }, { status: 429 })
+    }
+
+    const fuelSupabase = getServerSupabase()
+    const fuel = await checkFuelGate(fuelSupabase, authBusiness.business_id)
+    if (!fuel.allowed) {
+      return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
     }
 
     const formData = await request.formData()

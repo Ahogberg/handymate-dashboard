@@ -33,6 +33,7 @@ import { getRelevantMemories, buildMemoryPrompt, extractAndSaveMemory } from '@/
 import { getAgentTools } from '@/lib/agents/personalities'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd, type TokenUsage } from '@/lib/costs/meter'
+import { checkFuelGate } from '@/lib/costs/fuel'
 import { byggAskCoverage } from '@/lib/matte/ask-coverage'
 import { createQuote } from '@/lib/quotes/create-quote'
 import {
@@ -1010,6 +1011,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Bränsle är ett verkligt periodtak för NYTT AI-arbete. Bekräftelsevägen
+    // ovan innehåller ingen ny Claude-runda och går därför vidare till
+    // respektive verktygs egen strypunkt (SMS har sin grind i sms-send).
+    // Vanlig chatt stoppas däremot här FÖRE trådskapande, kontextladdning och
+    // första modellanrop. Ett läsfel failar stängt — inga tokens i blindo.
+    const supabase = getServerSupabase()
+    const fuel = await checkFuelGate(supabase, businessId)
+    if (!fuel.allowed) {
+      const reply = fuel.reason === 'fuel_exhausted'
+        ? 'Bränslet är slut, så teamet har pausat nytt arbete. En ägare eller administratör kan välja påfyllning under Inställningar → Abonnemang.'
+        : 'Jag kunde inte verifiera Bränslenivån just nu, så teamet väntar hellre än att förbruka något i blindo. Försök igen om en stund.'
+      return NextResponse.json({
+        reply,
+        messages: [{ agent: 'matte', content: reply }],
+        current_agent: 'matte',
+        fuel_stopped: true,
+        fuel_reason: fuel.reason,
+        fuel_remaining_percent: fuel.level?.remainingPercent,
+      })
+    }
+
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
       return NextResponse.json({
@@ -1019,7 +1041,6 @@ export async function POST(request: NextRequest) {
 
     // Verktygskontext för de delade tool-router-verktygen (samma som den
     // autonoma agenten) — ger bl.a. Google-koppling för kalender/bokning.
-    const supabase = getServerSupabase()
     // TD-52: detta är en levande dashboard-/mobil-chatt (session-auth ovan
     // via getAuthenticatedBusiness) — triggerSource är alltid 'user'.
     const bizCtx = await fetchBusinessContext(supabase, businessId, 'user')

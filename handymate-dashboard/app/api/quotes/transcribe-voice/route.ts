@@ -3,6 +3,7 @@ import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { recordCost } from '@/lib/costs/record'
 import { whisperCostOre } from '@/lib/costs/meter'
+import { checkFuelGate } from '@/lib/costs/fuel'
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +15,12 @@ export async function POST(request: NextRequest) {
     const rateLimit = checkAiApiRateLimit(business.business_id)
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: rateLimit.error }, { status: 429 })
+    }
+
+    const supabase = getServerSupabase()
+    const fuel = await checkFuelGate(supabase, business.business_id)
+    if (!fuel.allowed) {
+      return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
     }
 
     const formData = await request.formData()
@@ -51,7 +58,7 @@ export async function POST(request: NextRequest) {
     const ljudSekunder = Number(result.duration) || 0
     if (ljudSekunder > 0) {
       await recordCost({
-        supabase: getServerSupabase(),
+        supabase,
         businessId: business.business_id,
         resource: 'whisper',
         units: ljudSekunder,

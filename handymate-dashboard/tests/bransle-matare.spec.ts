@@ -23,6 +23,8 @@ import {
   resolveFuelWindowStart,
   weeksRemainingPhrase,
   FUEL_PLAN_BUDGET_ORE,
+  fuelTopupOptionsForPlan,
+  resolveFuelTopupOption,
   type FuelCostRow,
 } from '../lib/costs/fuel'
 import { MEASUREMENT_STARTED_AT } from '../lib/costs/report'
@@ -51,6 +53,18 @@ test.describe('Bränsle — beräkningskärnan (ren funktion, ingen DB)', () => 
     const level = computeFuelLevel({ rows, planBudgetOre: 37_400, topupOreInWindow: 0, windowStart, windowEnd })
     expect(level.remainingPercent).toBe(0)
     expect(level.usedRatio).toBeGreaterThan(1)
+    expect(level.remainingOre).toBe(0)
+    expect(level.exhausted).toBe(true)
+  })
+
+  test('påfyllningsnivåerna är 25/50/100 % och belopp härleds ur planen', () => {
+    expect(fuelTopupOptionsForPlan('professional')).toEqual([
+      { id: 'quarter', label: 'Liten påfyllning', percent: 25, amountOre: 22_500 },
+      { id: 'half', label: 'Halv tank', percent: 50, amountOre: 45_000 },
+      { id: 'full', label: 'Full tank', percent: 100, amountOre: 90_000 },
+    ])
+    expect(resolveFuelTopupOption('professional', 'eget-belopp')).toBeNull()
+    expect(resolveFuelTopupOption('okand-plan', 'full')).toBeNull()
   })
 
   test('en Stripe-påfyllning i fönstret höjer budgeten, inte bara sänker förbrukningen', () => {
@@ -236,6 +250,9 @@ test.describe('Bränsle-webhooken', () => {
     expect(grenStart, 'fuel_topup-grenen saknas').toBeGreaterThan(-1)
     const efterGren = s.slice(grenStart)
     expect(efterGren).toContain("from('fuel_ledger')")
+    expect(efterGren).toContain('`fuel_${session.id}`')
+    expect(efterGren).toContain('ignoreDuplicates: true')
+    expect(efterGren).toContain('if (ledgerError)')
     expect(efterGren).toContain("event_type: 'fuel_topup_completed'")
     // Måste ligga FÖRE prenumerationslogiken (planId/subscription_status) —
     // annars skriver ett fuel-köp av misstag över kundens riktiga plan.
@@ -248,4 +265,77 @@ test.describe('Bränsle-webhooken', () => {
     expect(s).toContain('isOwnerOrAdmin(currentUser)')
     expect(s).toContain("mode: 'payment'")
   })
+
+  test('påfyllningsbeloppet härleds server-side från en whitelistad nivå', () => {
+    const s = kod('app/api/billing/fuel-topup/route.ts')
+    expect(s).toContain('resolveFuelTopupOption')
+    expect(s).toContain('body.tier')
+    expect(s).not.toContain('body.amountOre')
+  })
+
+  test('kundytan erbjuder de tre namngivna nivåerna — inte ett fritt belopp', () => {
+    const s = kod('components/fuel/FuelBillingCard.tsx')
+    expect(s).toContain('fuelTopupOptionsForPlan')
+    expect(s).toContain('option.id')
+    expect(s).toContain('option.amountOre')
+  })
+})
+
+test.describe('Bränslet är ett serverauktoritativt stopp, inte bara en mätare', () => {
+  test('agenternas kostnadsvakt stoppar på Bränsle före det interna USD-taket', () => {
+    const s = kod('lib/agents/shared/cost-guard.ts')
+    const fuel = s.indexOf('checkFuelGate')
+    const internal = s.indexOf("from('agent_runs')")
+    expect(fuel).toBeGreaterThan(-1)
+    expect(internal).toBeGreaterThan(fuel)
+    expect(s).toContain("'fuel_exhausted'")
+    expect(s).toContain("'fuel_unavailable'")
+    expect(s).toContain('skipped: fuel.reason')
+  })
+
+  test('Matte kontrollerar Bränslet före modellkallet', () => {
+    const s = kod('app/api/matte/chat/route.ts')
+    expect(s.indexOf('checkFuelGate')).toBeGreaterThan(-1)
+    expect(s.indexOf('callClaude')).toBeGreaterThan(s.indexOf('checkFuelGate'))
+  })
+
+  test('den centrala SMS-strypunkten kontrollerar Bränslet före 46elks', () => {
+    const s = kod('lib/sms-send.ts')
+    expect(s.indexOf('checkFuelGate')).toBeGreaterThan(-1)
+    expect(s.indexOf("fetch('https://api.46elks.com/a1/sms'")).toBeGreaterThan(s.indexOf('checkFuelGate'))
+  })
+
+  test('kundtrigger och systemtrigger kan inte gå runt Bränslet', () => {
+    const s = kod('app/api/agent/trigger/route.ts')
+    expect(s).toContain('checkFuelGate')
+    expect(s).toContain('checkCostGuards')
+    expect(s).toContain('fuel_stopped')
+  })
+
+  for (const route of [
+    'app/api/campaigns/generate-text/route.ts',
+    'app/api/jobbuddy/photo/route.ts',
+    'app/api/jobbuddy/voice/route.ts',
+    'app/api/quotes/generate/route.ts',
+    'app/api/quotes/transcribe-voice/route.ts',
+    'app/api/matte/transcribe/route.ts',
+    'app/api/voice/process/route.ts',
+    'app/api/voice/transcribe/route.ts',
+    'app/api/voice/analyze/route.ts',
+    'app/api/widget/chat/route.ts',
+  ]) {
+    test(`${route} kontrollerar Bränslet före ny extern AI-kostnad`, () => {
+      const s = kod(route)
+      const gate = s.indexOf('const fuel = await checkFuelGate')
+      const externalCalls = [
+        s.indexOf('anthropic.messages.create'),
+        s.indexOf("fetch('https://api.openai.com"),
+        s.lastIndexOf('anthropic.messages.create'),
+        s.lastIndexOf("fetch('https://api.openai.com"),
+      ].filter(index => index > gate)
+      expect(gate, `${route} saknar checkFuelGate`).toBeGreaterThan(-1)
+      expect(externalCalls.length, `${route} saknar förväntad extern AI-kostnad`).toBeGreaterThan(0)
+      expect(Math.min(...externalCalls), `${route} saknar ett externt anrop efter Bränslekontrollen`).toBeGreaterThan(gate)
+    })
+  }
 })

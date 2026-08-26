@@ -3,7 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import Stripe from 'stripe'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
-import { fuelBudgetOreForPlan } from '@/lib/costs/fuel'
+import { resolveFuelTopupOption } from '@/lib/costs/fuel'
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY is not configured')
@@ -18,10 +18,9 @@ function getStripe() {
  * inline i stället för en förskapad Stripe Price (ingen ny produkt behöver
  * skapas i Stripe-dashboarden för att skeppa detta).
  *
- * Ingen tier-väljare i UI (designen har en enda knapp): default-beloppet är
- * en hel månadsbudget för kundens plan ("fyll på en månads värde bränsle").
- * amountOre kan skickas explicit i body för en framtida beloppsväljare utan
- * att routen behöver ändras.
+ * Klienten skickar ENDAST ett tillåtet tier-id (quarter|half|full). Beloppet
+ * härleds server-side ur den aktiva planens Bränslenivå — ett godtyckligt
+ * amountOre från klienten accepteras aldrig.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -37,15 +36,24 @@ export async function POST(request: NextRequest) {
     const supabase = getServerSupabase()
     const body = await request.json().catch(() => ({}))
 
-    const { data: config } = await supabase
+    const { data: config, error: configError } = await supabase
       .from('business_config')
       .select('stripe_customer_id, contact_email, business_name, subscription_plan')
       .eq('business_id', business.business_id)
       .single()
 
-    const amountOre = Number.isFinite(body?.amountOre) && body.amountOre > 0
-      ? Math.round(body.amountOre)
-      : fuelBudgetOreForPlan(config?.subscription_plan ?? null)
+    if (configError || !config) {
+      return NextResponse.json({ error: 'Aktiv prisplan kunde inte verifieras' }, { status: 503 })
+    }
+
+    // `full` är bakåtkompatibel default för redan utrullade klienter som
+    // ännu inte skickar tier. Alla uttryckliga värden måste whitelistas.
+    const requestedTier = body?.tier == null ? 'full' : String(body.tier)
+    const topup = resolveFuelTopupOption(config.subscription_plan, requestedTier)
+    if (!topup) {
+      return NextResponse.json({ error: 'Ogiltig påfyllningsnivå' }, { status: 400 })
+    }
+    const amountOre = topup.amountOre
 
     let customerId = config?.stripe_customer_id
     if (!customerId) {
@@ -66,7 +74,7 @@ export async function POST(request: NextRequest) {
       line_items: [{
         price_data: {
           currency: 'sek',
-          product_data: { name: 'Handymate Bränsle-påfyllning' },
+          product_data: { name: `Handymate Bränsle — ${topup.label}` },
           unit_amount: amountOre, // öre — Stripes minsta enhet för SEK.
         },
         quantity: 1,
@@ -75,6 +83,8 @@ export async function POST(request: NextRequest) {
         business_id: business.business_id,
         addon: 'fuel_topup',
         amount_ore: String(amountOre),
+        fuel_tier: topup.id,
+        fuel_percent: String(topup.percent),
       },
       success_url: `${appUrl}/dashboard/settings/billing?fuel_topup=success`,
       cancel_url: `${appUrl}/dashboard/settings/billing`,

@@ -49,13 +49,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { recordCost } from '@/lib/costs/record'
 import { usdToOre } from '@/lib/costs/meter'
+import { checkFuelGate } from '@/lib/costs/fuel'
 
 /** Beslut att skippa businessen — caller returnerar denna info direkt
     utan att anropa runner. */
 export interface CostGuardSkip {
-  skipped: 'agents_globally_paused' | 'cost_cap_exceeded'
+  skipped: 'agents_globally_paused' | 'fuel_exhausted' | 'fuel_unavailable' | 'cost_cap_exceeded'
   today_cost_usd?: number
   cap_usd?: number
+  fuel_remaining_percent?: number
+  error?: string
 }
 
 /** Subset av business_config-fält som cost-guarden behöver. Caller
@@ -145,7 +148,26 @@ export async function checkCostGuards(
     return { skipped: 'agents_globally_paused' }
   }
 
-  // ── 2. Cost-cap ────────────────────────────────────────────────
+  // ── 2. Kundens Bränsletak ──────────────────────────────────────
+  // Till skillnad från det interna USD-dygnstaket nedan är detta kundens
+  // verkliga abonnemangsutrymme för hela perioden. När nivån är slut stoppas
+  // NYTT kostnadsbärande teamarbete tills perioden förnyas eller ägaren
+  // tankar. Läsfel failar stängt — vi får aldrig skapa ny extern kostnad när
+  // den auktoritativa nivån inte går att verifiera.
+  const fuel = await checkFuelGate(supabase, business.business_id)
+  if (!fuel.allowed) {
+    console.warn(`[cost-guard/${agentId}] skip — ${fuel.reason}`, {
+      business_id: business.business_id,
+      error: fuel.error,
+    })
+    return {
+      skipped: fuel.reason,
+      fuel_remaining_percent: fuel.level?.remainingPercent,
+      error: fuel.error,
+    }
+  }
+
+  // ── 3. Internt Cost-cap ────────────────────────────────────────
   const cap = resolveCostCapUsd(business)
 
   let todayCostUsd = 0

@@ -183,23 +183,38 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
   // uppdatering, ingen referral (det är inte en första betalning).
   if (session.metadata?.addon === 'fuel_topup') {
     const amountOre = Number(session.metadata?.amount_ore || session.amount_total || 0)
+    const fuelTier = session.metadata?.fuel_tier || null
+    const fuelPercent = Number(session.metadata?.fuel_percent || 0) || null
     if (amountOre > 0) {
-      await supabase.from('fuel_ledger').insert({
-        id: 'fuel_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10),
+      // Deterministiskt id + ignoreDuplicates gör återförsöket säkert om
+      // ledgern hann skrivas men billing_event-inserten felade. Stripe får
+      // då retria utan att kunden tankas dubbelt.
+      const { error: ledgerError } = await supabase.from('fuel_ledger').upsert({
+        id: `fuel_${session.id}`,
         business_id: businessId,
         amount_ore: amountOre,
         source: 'stripe_checkout',
         stripe_checkout_session_id: session.id,
         stripe_payment_intent_id: typeof session.payment_intent === 'string' ? session.payment_intent : null,
-      })
+      }, { onConflict: 'id', ignoreDuplicates: true })
+      if (ledgerError) throw new Error(`Bränslepåfyllningen kunde inte bokföras: ${ledgerError.message}`)
     }
-    await supabase.from('business_config')
+    const { error: customerUpdateError } = await supabase.from('business_config')
       .update({ stripe_customer_id: session.customer as string })
       .eq('business_id', businessId)
-    await supabase.from('billing_event').insert({
+    if (customerUpdateError) throw new Error(`Stripe-kunden kunde inte sparas: ${customerUpdateError.message}`)
+
+    const { error: billingEventError } = await supabase.from('billing_event').insert({
       business_id: businessId, event_type: 'fuel_topup_completed', stripe_event_id: event.id,
-      data: { amount_ore: amountOre, customer_id: session.customer, checkout_session_id: session.id },
+      data: {
+        amount_ore: amountOre,
+        fuel_tier: fuelTier,
+        fuel_percent: fuelPercent,
+        customer_id: session.customer,
+        checkout_session_id: session.id,
+      },
     })
+    if (billingEventError) throw new Error(`Bränslepåfyllningen kunde inte kvitteras: ${billingEventError.message}`)
     return
   }
 

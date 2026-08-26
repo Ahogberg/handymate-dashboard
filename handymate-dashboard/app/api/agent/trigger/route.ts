@@ -13,6 +13,7 @@ import { routeToAgent, getAgentPromptSuffix, getAgentTools } from '@/lib/agents/
 import { getRelevantMemories, buildMemoryPrompt, getAgentMessages as fetchAgentMessages, buildMessagesPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
 import { checkCostGuards, meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
+import { checkFuelGate } from '@/lib/costs/fuel'
 import {
   MAX_SPECIALIST_STEPS,
   outcomeFromToolResult,
@@ -163,17 +164,30 @@ export async function POST(request: NextRequest) {
       const skip = triggerSource === 'user'
         ? (guardConfig.agents_globally_paused === true
             ? { skipped: 'agents_globally_paused' as const }
-            : null)
+            : await checkFuelGate(supabase, businessId).then(fuel => fuel.allowed
+              ? null
+              : ({
+                  skipped: fuel.reason,
+                  fuel_remaining_percent: fuel.level?.remainingPercent,
+                  error: fuel.error,
+                })))
         : await checkCostGuards(supabase, guardConfig, body.agent_id || 'matte')
       if (skip) {
+        const fuelStopped = skip.skipped === 'fuel_exhausted' || skip.skipped === 'fuel_unavailable'
         return NextResponse.json({
           skipped: skip.skipped,
           agent_paused: skip.skipped === 'agents_globally_paused',
+          fuel_stopped: fuelStopped,
+          fuel_remaining_percent: 'fuel_remaining_percent' in skip ? skip.fuel_remaining_percent : undefined,
           final_response: skip.skipped === 'agents_globally_paused'
             ? 'Agenterna är pausade — ingen körning genomfördes.'
-            : 'Dagens kostnadstak är nått — ingen körning genomfördes.',
-          today_cost_usd: skip.today_cost_usd,
-          cap_usd: skip.cap_usd,
+            : skip.skipped === 'fuel_exhausted'
+              ? 'Bränslet är slut — teamet väntar tills en ägare eller administratör tankar under Abonnemang.'
+              : skip.skipped === 'fuel_unavailable'
+                ? 'Bränslenivån kunde inte verifieras — teamet väntar så att inget förbrukas i blindo.'
+                : 'Dagens interna säkerhetstak är nått — bakgrundsarbetet fortsätter vid nästa körning.',
+          today_cost_usd: 'today_cost_usd' in skip ? skip.today_cost_usd : undefined,
+          cap_usd: 'cap_usd' in skip ? skip.cap_usd : undefined,
         })
       }
     }

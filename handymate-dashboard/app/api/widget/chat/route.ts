@@ -7,6 +7,7 @@ import { formatKnowledgeForPrompt, formatGuardrailsForPrompt } from '@/lib/widge
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
+import { checkFuelGate } from '@/lib/costs/fuel'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -80,6 +81,14 @@ export async function POST(request: NextRequest) {
 
     if (!config || !config.widget_enabled) {
       return NextResponse.json({ error: 'Widget not enabled' }, { status: 403, headers: CORS_HEADERS })
+    }
+
+    const fuel = await checkFuelGate(supabase, business_id)
+    if (!fuel.allowed) {
+      return NextResponse.json({
+        error: 'Service temporarily unavailable',
+        reply: 'Vi kan inte svara automatiskt just nu. Kontakta företaget direkt så hjälper de dig.',
+      }, { status: 503, headers: CORS_HEADERS })
     }
 
     // Rate limit: check conversation count today

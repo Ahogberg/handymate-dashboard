@@ -8,6 +8,7 @@ import { filtreraAnalysforslag, type AnalysForslagsTyp } from '@/lib/voice/analy
 import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
 import { buildCustomerFactCard } from '@/lib/customer-facts/build-card'
 import { splitTranscript, MAP_REDUCE_TROSKEL_TECKEN } from '@/lib/meetings/split-transcript'
+import { checkFuelGate } from '@/lib/costs/fuel'
 
 function getAnthropic() {
   return new Anthropic({
@@ -344,6 +345,11 @@ export async function POST(request: NextRequest) {
     // inte samma sak som att ha rätt till just den här raden.
     if (!internalOk && recording.business_id !== authed!.business_id) {
       return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
+    }
+
+    const fuel = await checkFuelGate(supabase, recording.business_id)
+    if (!fuel.allowed) {
+      return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
     }
 
     if (!recording.transcript) {

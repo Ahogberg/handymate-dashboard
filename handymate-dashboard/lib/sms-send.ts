@@ -13,6 +13,7 @@ import {
 import { getBusinessPlanFromConfig } from './auth'
 import { checkSmsAllowance, trackSmsSent } from './sms-usage'
 import type { PlanType } from './feature-gates'
+import { checkFuelGate, type FuelGateReason } from './costs/fuel'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -78,7 +79,7 @@ export interface SendSmsResult {
   /** Felmeddelande när success=false. PostgrestError-detalj om sms_log INSERT failade. */
   error?: string
   /** Maskinläsbar orsak från den centrala säkerhetsgrinden. */
-  blockedReason?: SmsGateCode
+  blockedReason?: SmsGateCode | FuelGateReason
   /** true = samma approval hade redan ett levererat SMS; inget nytt skickades. */
   idempotent?: boolean
 }
@@ -206,7 +207,7 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
   let status: number | null = null
   let errorMsg: string | undefined
   let success = false
-  let blockedReason: SmsGateCode | undefined
+  let blockedReason: SmsGateCode | FuelGateReason | undefined
   let resolvedCustomerId: string | null = customerId || null
   // Cachar planuppslaget mellan kvotkollen (nedan) och uppräkningen (efter
   // en lyckad sändning) — slipper slå upp business_config två gånger.
@@ -242,6 +243,20 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
 
   if (!errorMsg && (!ELKS_API_USER || !ELKS_API_PASSWORD)) {
     errorMsg = '46elks credentials not configured'
+  }
+
+  // Bränsletaket ligger i samma sändningsstrypunkt som STOPP och SMS-kvoten,
+  // precis före den externa effekten. Ett redan levererat/idempotent SMS har
+  // returnerat ovan och behöver inget Bränsle. Alla 40+ riktiga sändvägar
+  // ärver därmed samma regel utan callsite-kopior.
+  if (!errorMsg) {
+    const fuel = await checkFuelGate(supabase, businessId)
+    if (!fuel.allowed) {
+      blockedReason = fuel.reason
+      errorMsg = fuel.reason === 'fuel_exhausted'
+        ? 'Bränslet är slut — meddelandet skickades inte. Tanka under Abonnemang.'
+        : 'Bränslenivån kunde inte verifieras — meddelandet skickades inte.'
+    }
   }
 
   // Kvotkollen — se doc-kommentaren ovan vid funktionsdeklarationen. Körs

@@ -4,6 +4,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
+import { checkFuelGate } from '@/lib/costs/fuel'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,10 @@ export async function POST(request: NextRequest) {
 
     // Fetch branch and service_area from business_config (not in AuthenticatedBusiness)
     const supabase = getServerSupabase()
+    const fuel = await checkFuelGate(supabase, business.business_id)
+    if (!fuel.allowed) {
+      return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
+    }
     const { data: bizConfig } = await supabase
       .from('business_config')
       .select('branch, service_area')

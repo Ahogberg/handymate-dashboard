@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import Link from 'next/link'
 import { useFuel } from '@/components/fuel/FuelProvider'
 import { FuelGauge } from '@/components/fuel/FuelGauge'
 import { weeksRemainingPhrase } from '@/lib/costs/fuel'
@@ -15,22 +15,8 @@ import { weeksRemainingPhrase } from '@/lib/costs/fuel'
  */
 export function FuelWarningCard() {
   const { level } = useFuel()
-  const [loading, setLoading] = useState(false)
 
   if (!level || level.state !== 'critical') return null
-
-  const tanka = async () => {
-    setLoading(true)
-    try {
-      const res = await fetch('/api/billing/fuel-topup', { method: 'POST' })
-      if (res.ok) {
-        const data = await res.json()
-        if (data.checkout_url) window.location.href = data.checkout_url
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-4">
@@ -47,10 +33,12 @@ export function FuelWarningCard() {
       </div>
 
       <h3 className="text-[15px] font-semibold text-slate-900 mb-0.5">
-        Bränslet börjar ta slut — {level.remainingPercent}% kvar
+        {level.exhausted ? 'Bränslet är slut — teamet väntar' : `Bränslet börjar ta slut — ${level.remainingPercent}% kvar`}
       </h3>
       <p className="text-sm text-slate-500 mb-3">
-        {level.weeksRemaining != null
+        {level.exhausted
+          ? 'Välj en påfyllning för att starta nytt AI-arbete och nya utskick igen.'
+          : level.weeksRemaining != null
           ? `${weeksRemainingPhrase(level.weeksRemaining, level.daysRemaining)} i nuvarande takt.`
           : 'Håll ett öga på förbrukningen den här perioden.'}
       </p>
@@ -62,14 +50,12 @@ export function FuelWarningCard() {
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={tanka}
-        disabled={loading}
-        className="w-full bg-primary-700 text-white text-sm font-medium rounded-xl py-2.5 hover:opacity-90 transition-opacity disabled:opacity-50"
+      <Link
+        href="/dashboard/settings/billing#fuel"
+        className="block w-full bg-primary-700 text-white text-sm font-medium text-center rounded-xl py-2.5 hover:opacity-90 transition-opacity"
       >
-        {loading ? 'Öppnar...' : 'Tanka nu'}
-      </button>
+        Välj påfyllning
+      </Link>
     </div>
   )
 }

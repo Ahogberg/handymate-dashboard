@@ -4,8 +4,14 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
+import { getPlanCommercialFacts } from '@/lib/feature-gates'
 
 const ONBOARDING_CHAT_MODEL = 'claude-haiku-4-5-20251001'
+const starterFacts = getPlanCommercialFacts('starter')
+const firmanFacts = getPlanCommercialFacts('professional')
+const storfirmanFacts = getPlanCommercialFacts('business')
+const planRow = (facts: ReturnType<typeof getPlanCommercialFacts>) =>
+  `${facts.label}: ${facts.monthlyPriceSek.toLocaleString('sv-SE')} kr/mån (${facts.callsPerMonth ?? 'obegränsat'} samtal, ${facts.users ?? 'obegränsat antal'} användare)`
 
 const SYSTEM_PROMPT = `Du är Handymate AI-assistenten som hjälper nya användare under onboarding.
 Svara kort och hjälpsamt på svenska. Max 3-4 meningar per svar.
@@ -13,10 +19,10 @@ Svara kort och hjälpsamt på svenska. Max 3-4 meningar per svar.
 Handymate är en AI-plattform för svenska hantverkare. Här är fakta du kan dela:
 
 PRISPLANER:
-- Starter: 2 495 kr/mån (100 samtal, 1 användare)
-- Professional: 5 995 kr/mån (400 samtal, 5 användare)
-- Business: 11 995 kr/mån (Obegränsat)
-- 14 dagars gratis provperiod, inget betalkort behövs
+- ${planRow(starterFacts)}
+- ${planRow(firmanFacts)}
+- ${planRow(storfirmanFacts)}
+- Prenumerationen startar direkt via Stripe och täcks av den garanti som visas i köpflödet. Lova aldrig en gratis provperiod.
 
 ROT-AVDRAG:
 - 30% av arbetskostnaden, max 50 000 kr/person/år
@@ -29,7 +35,7 @@ RUT-AVDRAG:
 - Handymate hanterar avdraget direkt på fakturan
 
 FUNKTIONER:
-- AI-telefonassistent som svarar och bokar åt dig
+- Lisa fångar nya och missade samtal, skapar lead och återkopplar via SMS. Hon är inte en fri talande röstagent vid lansering.
 - Automatisk samtalsanalys och transkribering
 - CRM med kundkort och tidslinje
 - Offert- och fakturagenerering med PDF
