@@ -9,13 +9,12 @@ direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 sak
       `address:` → 42703 → skapandet avvisades tyst. Förklarar REALITY-WEEK #2. Lead→projekt och
       bokning→projekt har ALDRIG fungerat i prod. + `customer.address` (död) i booking-vägen.
       Facit: tests/facit-project-create-no-phantom-columns.spec.ts
-- [ ] `advanceProjectStageForward` returnerar `{moved:true}` vid no-op → anropare kan inte skilja
-      "flyttade" från "hoppade över" → `{moved:false, skipped:true}` + uppdatera 2 anropare
-- [ ] `onQuoteAccepted` (project-ai-engine) + `createProjectFromQuote` = två skapare för samma
-      event (REALITY-WEEK #2/#3). Nu när #P0-1 är fixad KOMMER båda lyckas → dubbla projekt
-      (v103-unikheten på quote_id räddar insertet men ordningen avgör vem som sätter steg/
-      milstolpar). Beslut: onQuoteAccepted delegerar till createProjectFromQuote (en skapare),
-      behåller sin egen efterlogik (checklista, notis, project_ai_log).
+- [x] `advanceProjectStageForward` returnerar `{moved:true}` vid no-op → nu `{moved:false, skipped:true, reason}`,
+      2 anropare uppdaterade (ce44690f)
+- [x] `onQuoteAccepted` delegerar till `createProjectFromQuote` (en skapare; sendSms:false bevarar
+      dagens beteende; start_date=idag vid signering borttaget) (ce44690f)
+      → BESLUT FÖR ANDREAS: ska "Ny deal vunnen"-SMS till ägaren + portal-SMS till kunden (steg 7–8 i
+      create-from-quote, aldrig live hittills) slås på vid signering? Idag: nej.
 
 ## Del A — Datum i listan (ingen migration: start_date/end_date/completed_at finns redan)
 - [ ] `GET /api/projects`: räkna `actual_start` (min(time_entry.date, bekräftad booking.scheduled_start))
