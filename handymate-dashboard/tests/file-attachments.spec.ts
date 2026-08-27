@@ -80,7 +80,7 @@ test.describe('affärsdokument — riktig affärskoppling', () => {
 })
 
 test.describe('projektskapande — uppladdningsfel försvinner inte', () => {
-  test('projektdokument dual-writar produktionens legacy order_id och kanoniska project_id', () => {
+  test('projektdokument dual-writar produktionens legacykolumner och kanoniska kolumner', () => {
     const route = read('app/api/projects/[id]/documents/route.ts')
     const insert = route.slice(
       route.indexOf(".from('project_document')\n      .insert({"),
@@ -88,6 +88,10 @@ test.describe('projektskapande — uppladdningsfel försvinner inte', () => {
     )
     expect(insert).toContain('order_id: projectId')
     expect(insert).toContain('project_id: projectId')
+    expect(insert).toContain('file_name: file.name')
+    expect(insert).toContain('name: file.name')
+    expect(insert).toContain('file_url: filePath')
+    expect(insert).toContain('file_path: filePath')
   })
 
   test('felade File-objekt behålls och retry skapar inte ett andra projekt', () => {
