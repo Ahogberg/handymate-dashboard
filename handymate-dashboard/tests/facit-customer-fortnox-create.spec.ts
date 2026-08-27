@@ -84,7 +84,9 @@ test.describe('de fem skapandevägarna anropar hooken EFTER sin insert-felkoll',
       const s = read(v.fil)
       const start = s.indexOf(v.insertMarkor)
       expect(start, `${v.insertMarkor} hittades inte`).toBeGreaterThan(-1)
-      const block = s.slice(start, start + 4000)
+      // 6000 (2026-08-27): create_customer fick ett 409-block for telefonmatch
+      // fore hooken — 4000 tecken racker inte langre for den vagen.
+      const block = s.slice(start, start + 6000)
       const felkoll = block.indexOf(v.felkoll)
       const hook = block.indexOf('syncNewCustomerToFortnox(')
       expect(felkoll, 'insert-felkollen hittades inte').toBeGreaterThan(-1)
