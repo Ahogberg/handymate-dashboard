@@ -360,6 +360,11 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       requires: 'owner-admin',
       why: 'Publicerar en publik kundlänk med projektdata — samma känslighet som quotes/sign-link. Får aldrig kunna triggas av en anställd. Etapp Ä, 2026-08-18.',
     },
+    {
+      route: 'projects/[id]/jobbpass/notify',
+      requires: 'owner-admin',
+      why: 'Utskicket till kunden är en egen handling skild från publiceringen (sanningsgrind 5) — ett mejl i företagets namn får bara ägaren skicka. Fastighetspasset steg 1, 2026-08-27.',
+    },
   ],
 
   'Bolagskalendern (egna poster)': [

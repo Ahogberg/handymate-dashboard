@@ -187,3 +187,41 @@ export interface FieldReport {
   created_at: string
   project_id: string | null
 }
+
+// ── Fastighetspasset steg 1 (2026-08-27) ───────────────────────────────
+
+/** Ett publicerat jobbpass i portalen — vyn är samma allowlist-DTO som den publika sidan. */
+export interface PortalJobbpassSummary {
+  project_id: string
+  project_name: string
+  completed_at: string | null
+  published_at: string | null
+  view: import('@/lib/jobbpass/jobbpass').JobbpassCustomerView
+}
+
+/** Kundens fil i dokumentfliken — signerad URL, aldrig en rå storage-sökväg. */
+export interface PortalDocument {
+  id: string
+  source: 'customer' | 'project' | 'generated'
+  name: string
+  category: string | null
+  project_id: string | null
+  project_name: string | null
+  uploaded_at: string | null
+  url: string
+  mime_type: string | null
+}
+
+/** Fältrapport i portalen — samma rader som /api/portal/[token]/reports svarar med. */
+export interface PortalReport {
+  id: string
+  report_number: string | null
+  title: string | null
+  work_performed: string | null
+  materials_used: string | null
+  status: string | null
+  signed_at: string | null
+  signed_by: string | null
+  created_at: string
+  project_id: string | null
+}

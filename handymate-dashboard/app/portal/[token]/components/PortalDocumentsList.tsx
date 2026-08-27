@@ -5,12 +5,14 @@ import { Download, FileSignature, Receipt, Shield } from 'lucide-react'
 import PortalShellHeader from './PortalShellHeader'
 import PortalHandymateAttribution from './PortalHandymateAttribution'
 import { formatDate, formatCurrency } from '../helpers'
-import type { Invoice, PortalData, Quote } from '../types'
+import type { PortalDocument, Invoice, PortalData, Quote } from '../types'
 
 interface PortalDocumentsListProps {
   portal: PortalData
   quotes: Quote[]
   invoices: Invoice[]
+  /** Fastighetspasset steg 1: kundens filer (customer_document/project_document/generated_document). */
+  documents?: PortalDocument[]
   /** Deep-link från Hem (2026-08-10): "Fakturor"-knappen ska landa på
       fakturorna, inte i en ofiltrerad lista där kunden får leta. */
   initialFilter?: FilterId
@@ -21,11 +23,11 @@ interface PortalDocumentsListProps {
   onOpenMessages: () => void
 }
 
-type FilterId = 'all' | 'quotes' | 'invoices'
+type FilterId = 'all' | 'quotes' | 'invoices' | 'files'
 
 interface DocItem {
   id: string
-  kind: 'quote' | 'invoice'
+  kind: 'quote' | 'invoice' | 'file'
   title: string
   meta: string
   badge: string
@@ -36,12 +38,15 @@ interface DocItem {
 /**
  * Documents-vyn (port av bp-documents.jsx).
  * Filterbar lista över quotes + invoices. Andra dokumenttyper i mockupen
- * (cert/garanti/skötselråd) hidden tills customer_documents-tabell finns.
+ * (cert/garanti/skötselråd) — sedan Fastighetspasset steg 1 (2026-08-27) visas
+ * kundens filer ur customer_document/project_document/generated_document via
+ * /api/portal/[token]/documents med signerade URL:er.
  */
 export default function PortalDocumentsList({
   portal,
   quotes,
   invoices,
+  documents = [],
   initialFilter,
   onOpenQuote,
   onOpenInvoice,
@@ -70,11 +75,22 @@ export default function PortalDocumentsList({
     })),
   ]
 
-  const visible = filter === 'all'
+  const fileItems: DocItem[] = documents.map((d): DocItem => ({
+    id: d.id,
+    kind: 'file',
+    title: d.name,
+    meta: [d.uploaded_at ? formatDate(d.uploaded_at) : null, d.project_name, d.category].filter(Boolean).join(' · ') || 'Fil',
+    badge: d.source === 'generated' ? 'Signerat dokument' : d.source === 'project' ? 'Projektfil' : 'Fil',
+    tone: d.source === 'generated' ? 'green' : 'blue',
+    onClick: () => { window.open(d.url, '_blank', 'noopener') },
+  }))
+
+  const visibleQuotesInvoices = filter === 'all' || filter === 'files'
     ? docItems
     : filter === 'quotes'
       ? docItems.filter(d => d.kind === 'quote')
       : docItems.filter(d => d.kind === 'invoice')
+  const visible: DocItem[] = filter === 'files' ? fileItems : filter === 'all' ? [...fileItems, ...visibleQuotesInvoices] : visibleQuotesInvoices
 
   return (
     <>
@@ -101,9 +117,10 @@ export default function PortalDocumentsList({
           }}
         >
           {([
-            { id: 'all' as FilterId,      label: 'Alla',     count: docItems.length },
+            { id: 'all' as FilterId,      label: 'Alla',     count: docItems.length + fileItems.length },
             { id: 'quotes' as FilterId,   label: 'Offerter', count: quotes.length },
             { id: 'invoices' as FilterId, label: 'Fakturor', count: invoices.length },
+            { id: 'files' as FilterId,    label: 'Filer',    count: fileItems.length },
           ]).map(c => (
             <button
               type="button"
@@ -184,7 +201,7 @@ export default function PortalDocumentsList({
                     flexShrink: 0,
                   }}
                 >
-                  {d.kind === 'quote' ? <FileSignature size={20} /> : <Receipt size={20} />}
+                  {d.kind === 'quote' ? <FileSignature size={20} /> : d.kind === 'file' ? <Download size={20} /> : <Receipt size={20} />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div

@@ -11,12 +11,16 @@ import PortalProjectDetail from './components/PortalProjectDetail'
 import PortalQuotesList from './components/PortalQuotesList'
 import PortalInvoiceDetail from './components/PortalInvoiceDetail'
 import PortalDocumentsList from './components/PortalDocumentsList'
+import PortalJobbpass from './components/PortalJobbpass'
 import PortalMessagesThread from './components/PortalMessagesThread'
 import PortalReviewCTA from './components/PortalReviewCTA'
 import PortalContact from './components/PortalContact'
 import PortalHandymateAttribution from './components/PortalHandymateAttribution'
 import { formatDateTime, getProjectStatusText } from './helpers'
 import type {
+  PortalJobbpassSummary,
+  PortalDocument,
+  PortalReport,
   BusinessInfo,
   Invoice,
   Message,
@@ -35,7 +39,7 @@ import type {
  *
  * URL `?tab=review` öppnar review-vyn direkt (från review-SMS).
  */
-type SubRoute = 'project-detail' | 'quote' | 'invoice' | 'messages' | 'review' | null
+type SubRoute = 'project-detail' | 'quote' | 'invoice' | 'messages' | 'review' | 'jobbpass' | null
 
 export default function CustomerPortalPage() {
   const params = useParams()
@@ -54,9 +58,12 @@ export default function CustomerPortalPage() {
     if (t === 'quotes') return { tab: 'docs' as BottomTab, sub: 'quote' as SubRoute }
     if (t === 'invoices' || t === 'docs') return { tab: 'docs' as BottomTab, sub: null }
     if (t === 'contact') return { tab: 'contact' as BottomTab, sub: null }
+    // ?tab=jobbpass&project=<id> från utskicket (Fastighetspasset steg 1)
+    if (t === 'jobbpass') return { tab: 'project' as BottomTab, sub: 'jobbpass' as SubRoute }
     return { tab: 'home' as BottomTab, sub: null }
   })()
 
+  const initialJobbpassProject = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('project')
   const [tab, setTab] = useState<BottomTab>(initialFromUrl.tab)
   const [subRoute, setSubRoute] = useState<SubRoute>(initialFromUrl.sub)
 
@@ -87,6 +94,11 @@ export default function CustomerPortalPage() {
   const [loadingTab, setLoadingTab] = useState(false)
   // Dokumentflikens startsektion — sätts av Hem-knapparnas deep-links.
   const [docsSection, setDocsSection] = useState<'all' | 'quotes' | 'invoices'>('all')
+  // Fastighetspasset steg 1 (2026-08-27): kundens publicerade jobbpass, filer och fältrapporter.
+  const [passes, setPasses] = useState<PortalJobbpassSummary[]>([])
+  const [selectedPassProject, setSelectedPassProject] = useState<string | null>(initialJobbpassProject)
+  const [documents, setDocuments] = useState<PortalDocument[]>([])
+  const [reports, setReports] = useState<PortalReport[]>([])
 
   // Initial load
   useEffect(() => {
@@ -137,6 +149,19 @@ export default function CustomerPortalPage() {
           const data = await res.json()
           setMessages(data.messages || [])
         }
+        // Jobbpassen behövs på Hem ("Ditt hem"), i projektlistan och i passvyn.
+        if (tab === 'home' || tab === 'project' || subRoute === 'jobbpass') {
+          const res = await fetch(`/api/portal/${token}/jobbpass`)
+          if (res.ok) { const data = await res.json(); setPasses(data.passes || []) }
+        }
+        if (tab === 'docs') {
+          const res = await fetch(`/api/portal/${token}/documents`)
+          if (res.ok) { const data = await res.json(); setDocuments(data.documents || []) }
+        }
+        if (subRoute === 'project-detail') {
+          const res = await fetch(`/api/portal/${token}/reports`)
+          if (res.ok) { const data = await res.json(); setReports(data.reports || []) }
+        }
       } catch {
         console.error('Failed to fetch tab data')
       }
@@ -177,9 +202,10 @@ export default function CustomerPortalPage() {
 
   // Navigation helper for cross-screen jumps
   function navigate(
-    route: 'project' | 'docs' | 'contact' | 'messages' | 'project-detail',
+    route: 'project' | 'docs' | 'contact' | 'messages' | 'project-detail' | 'jobbpass',
     payload?: { projectId?: string; docsSection?: 'quotes' | 'invoices' },
   ) {
+    if (route === 'jobbpass') { setTab('project'); setSubRoute('jobbpass'); if (payload?.projectId) setSelectedPassProject(payload.projectId); return }
     if (route === 'project') { setTab('project'); setSubRoute(null); setSelectedProject(null) }
     else if (route === 'docs') {
       setTab('docs'); setSubRoute(null); setSelectedInvoice(null)
@@ -253,11 +279,24 @@ export default function CustomerPortalPage() {
     )
   }
 
+  if (subRoute === 'jobbpass') {
+    const pass = passes.find(x => x.project_id === selectedPassProject) ?? passes[0] ?? null
+    if (pass) {
+      return (
+        <PortalThemeProvider business={portal.business}>
+          <PortalJobbpass pass={pass} onBack={() => { setSubRoute(null); setSelectedPassProject(null) }} />
+        </PortalThemeProvider>
+      )
+    }
+  }
   if (subRoute === 'project-detail' && selectedProjectData) {
     return (
       <PortalThemeProvider business={portal.business}>
         <PortalProjectDetail
           project={selectedProjectData}
+          jobbpassAvailable={passes.some(x => x.project_id === selectedProjectData.project_id)}
+          onOpenJobbpass={() => navigate('jobbpass', { projectId: selectedProjectData.project_id })}
+          reports={reports.filter(r => r.project_id === selectedProjectData.project_id)}
           onBack={() => { setSubRoute(null); setSelectedProject(null) }}
           onAtaSigned={async () => {
             const res = await fetch(`/api/portal/${token}/projects`)
@@ -306,6 +345,7 @@ export default function CustomerPortalPage() {
         <PortalHome
           portal={portal}
           token={token}
+          passes={passes}
           onNavigate={navigate}
         />
       )}
@@ -329,6 +369,7 @@ export default function CustomerPortalPage() {
           portal={portal}
           quotes={quotes}
           invoices={invoices}
+          documents={documents}
           initialFilter={docsSection}
           onOpenQuote={() => setSubRoute('quote')}
           onOpenInvoice={(id) => { setSelectedInvoice(id); setSubRoute('invoice') }}

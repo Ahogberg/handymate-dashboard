@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import {
   Loader2, AlertTriangle, ArrowLeft, Check, Copy, ExternalLink,
   FileText, Sparkles, Wrench, ClipboardCheck, Receipt, ShieldCheck, Zap,
+  Mail,
 } from 'lucide-react'
 import type { JobbpassCustomerView } from '@/lib/jobbpass/jobbpass'
 
@@ -47,6 +48,7 @@ export default function JobbpassOwnerPage() {
   const [publishing, setPublishing] = useState(false)
   const [copied, setCopied] = useState(false)
   const [notice, setNotice] = useState('')
+  const [notifying, setNotifying] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -133,6 +135,27 @@ export default function JobbpassOwnerPage() {
     }
   }
 
+  // Sanningsgrind 5 (2026-08-27): publicering och utskick är två handlingar.
+  // Mejlet går bara när ägaren trycker här — genom portalens befintliga
+  // utskicksgrind (kundens portal på, e-post finns, 1 h-dedup). Aldrig SMS.
+  async function handleNotify() {
+    setNotifying(true)
+    setNotice('')
+    try {
+      const res = await fetch(`/api/projects/${projectId}/jobbpass/notify`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setNotice(data.error || 'Utskicket misslyckades')
+        return
+      }
+      setNotice(data.message || 'Kunden har meddelats.')
+    } catch {
+      setNotice('Något gick fel vid utskicket.')
+    } finally {
+      setNotifying(false)
+    }
+  }
+
   function publicUrl(token: string): string {
     if (typeof window === 'undefined') return `/jobbpass/${token}`
     return `${window.location.origin}/jobbpass/${token}`
@@ -205,7 +228,18 @@ export default function JobbpassOwnerPage() {
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               {copied ? 'Kopierad' : 'Kopiera länk'}
             </button>
+            <button
+              onClick={handleNotify}
+              disabled={notifying}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] text-xs font-medium bg-emerald-600 rounded-lg text-white hover:bg-emerald-700 disabled:opacity-60"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              {notifying ? 'Skickar...' : 'Meddela kunden via mejl'}
+            </button>
           </div>
+          <p className="text-xs text-emerald-700 mt-3">
+            Publiceringen skickar inget själv. Kunden får mejlet med länk till jobbpasset i sin portal först när du trycker — och bara om kundportalen är på och kunden har en e-postadress.
+          </p>
         </div>
       )}
 

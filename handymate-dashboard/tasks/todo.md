@@ -912,3 +912,35 @@ Verifierat: 8 steg (inte 10), Company Scan + Hemtur körs på /dashboard efter f
 - [x] B7 adaptiv Kom igång: Lisa → Karin → Daniel → Matte → Hanna → push ur riktiga luckor; LiveTourens mock läser samma lib
 - [x] B10 ekonomifrågorna ut ur steg 2; Karin ber om skatterytmen i kalenderkortet, Lars om timkostnad i statusbandet
 - Öppet: kommunikationshubben som dag 1–2-steg först efter OUTBOUND Etapp 1–4; LiveTouren kan på sikt krympas till payoff + CTA
+
+---
+
+## Fastighetspasset V1 (Andreas "Kör!" 2026-08-27, lansering ~14 sep)
+
+Princip: Handymate slutar inte arbeta när projektet fakturerats. Jobbpasset (v154) är 80 % — V1 är sammankoppling + ett installationsregister. Kedjan: utfört arbete → installerad tillgång → garanti → servicebehov → återkommande intäkt.
+
+### Andreas fem sanningsgrindar (2026-08-27) — varje grind får ett facit
+1. `project_material` får bara skapa installations**utkast** — inköpt/förbrukat material bevisar inte att produkten installerades.
+2. Serienummer får aldrig blockera projektavslut generellt — Lars frågar bara vid relevanta installationer, med "ej tillämpligt" / "komplettera senare".
+3. Garanti skiljer på produktgaranti, utförandegaranti och serviceavtal; garantigivare + källa ska framgå — portalen får aldrig lova mer än företaget ansvarar för.
+4. Serviceintervall bara från bekräftad produktinformation eller hantverkarens val — aldrig en modellgissning.
+5. Publicering och utskick är separata handlingar — passet kan publiceras vid godkännande, men mejl/SMS följer kommunikationshubben och befintlig utskicksgrind.
++ Installationen bär en adress-/platsögonblicksbild från projektet (samma kund kan ha flera fastigheter; "värmepump i källaren" pekar inte ut byggnaden).
+
+### Steg 1 — passet in i kundportalen (inga nya tabeller) — KLART 2026-08-27
+- [x] Delad `components/jobbpass/JobbpassView.tsx` (publika sidan + portalen renderar samma sak); delad sammansättning `assembleJobbpassView` i `lib/jobbpass/jobbpass.ts`
+- [x] `GET /api/portal/[token]/jobbpass` — kundens publicerade pass (project.customer_id → jobbpass status published), signerade foton
+- [x] Portal: "Ditt hem" på startsidan, jobbpass-CTA i projektdetaljen, `?tab=jobbpass&project=` djuplänk; dokumentfliken läser customer_document/project_document/generated_document (`GET /api/portal/[token]/documents`, filter "Filer"); fältrapporter (`/reports` hade ingen anropare) visas i projektdetaljen
+- [x] Grind 5: publish-rutten skickar INGET; utskicket är `POST /api/projects/[id]/jobbpass/notify` = ägarens knapp "Meddela kunden via mejl" genom `sendPortalNotification('jobbpass_published')` (portal på, e-post, 1 h-dedup, aldrig SMS); ärliga svenska svar per utfall. `?tab=photos`-buggen rättad (→ `?tab=project`)
+- [x] Facits: `facit-fastighetspass` (ny), portal-error-swallow + launch-public-token-contract (nya rutter registrerade), permission-contract (notify owner-admin), jobbpass — allt grönt, tsc 0 fel
+- [ ] Bevis mot prod efter deploy: publicera ett pass på ett testkonto → portalen visar "Ditt hem" → "Meddela kunden" → mejl med djuplänk landar rätt
+
+### Steg 2 — installationsregistret (v174)
+- [ ] `sql/v174_installation.sql`: installation (project, customer, produkt/modell, serienummer, placering, **adress-/platsögonblicksbild från projektet**, installerad, status utkast/bekräftad, garanti_till, serviceintervall_man + intervall_källa (produktinfo|hantverkare), skotselrad, källa)
+- [ ] Ur `project_material` skapas bara **utkast** (grind 1); Lars bekräftar vid avslut — frågar bara för relevanta installationer, med "ej tillämpligt"/"komplettera senare", blockerar aldrig avslut (grind 2)
+- [ ] Visas i passet ("Det här sitter hos dig") bara när bekräftad
+
+### Steg 3 — en garantisanning + service-trigger
+- [ ] `warranty.project_id` + garantityp (produkt | utförande | serviceavtal) + garantigivare + källa (grind 3); skapas vid avslut ur installationen
+- [ ] proactive-care läser intervall från installationen bara när intervall_källa finns (grind 4); Hannas "första service närmar sig" per fastighet — utskick via hubben, inte automatiskt (grind 5)
+

@@ -17,6 +17,8 @@ const MUTABLE_PUBLIC_GET_ROUTES = [
   'app/api/portal/[token]/messages/route.ts',
   'app/api/portal/[token]/quotes/route.ts',
   'app/api/portal/[token]/reports/route.ts',
+  'app/api/portal/[token]/jobbpass/route.ts',
+  'app/api/portal/[token]/documents/route.ts',
   'app/api/portal/[token]/invoices/[id]/route.ts',
   'app/api/portal/route.ts',
 ] as const
@@ -62,7 +64,13 @@ test.describe('Launchfacit — föränderliga publika kundrutter', () => {
   test('jobbpass kräver publicerad rad och passerar genom kundvyns allowlist', () => {
     const route = source('app/api/jobbpass/public/[token]/route.ts')
     expect(route).toContain('getPublishedJobbpassByToken')
-    expect(route).toContain('deriveJobbpassView({')
+    // Derivationen (allowlisten) bor sedan Fastighetspasset steg 1 (2026-08-27) i den
+    // delade assembleJobbpassView — samma väg för publika sidan och kundportalen.
+    expect(route).toContain('assembleJobbpassView(supabase, jobbpass)')
+    const lib = source('lib/jobbpass/jobbpass.ts')
+    const assembleStart = lib.indexOf('export async function assembleJobbpassView(')
+    expect(assembleStart).toBeGreaterThan(-1)
+    expect(lib.indexOf('deriveJobbpassView({', assembleStart)).toBeGreaterThan(assembleStart)
     expect(route).toMatch(/return NextResponse\.json\(\{\s*jobbpass:\s*view\s*\}\)/)
   })
 })

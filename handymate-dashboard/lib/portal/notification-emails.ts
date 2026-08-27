@@ -20,6 +20,8 @@ export type PortalNotificationEvent =
   | 'project_update'
   | 'photos_added'
   | 'review_request'
+  /** Fastighetspasset steg 1: ägaren valde att meddela kunden om det publicerade jobbpasset ("Ditt hem"). */
+  | 'jobbpass_published'
 
 interface PortalNotificationOptions {
   /** Extra context per event (t.ex. message preview, invoice belopp, stage-namn). */
@@ -128,6 +130,16 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
     },
     cta: 'Visa bilder',
     emoji: '📸',
+  },
+  jobbpass_published: {
+    subject: (ctx, biz) => ctx.project_name ? `Jobbpasset för ${ctx.project_name} är klart — ${biz}` : `Ditt jobbpass från ${biz}`,
+    heading: 'Vad som gjordes hos dig — samlat på ett ställe',
+    body: (ctx) => {
+      const proj = ctx.project_name ? `<strong>${escapeHtml(String(ctx.project_name))}</strong>` : 'Jobbet'
+      return `${proj} är klart. I din kundportal finns nu jobbpasset: vad som ingick, godkända tillägg, egenkontroll, bilder och garanti. Spara det — det är din dokumentation över arbetet.`
+    },
+    cta: 'Öppna jobbpasset',
+    emoji: '🏠',
   },
   review_request: {
     subject: (_ctx, biz) => `Hur var samarbetet med ${biz}?`,
@@ -293,7 +305,9 @@ function eventToPortalAnchor(event: PortalNotificationEvent, ctx?: Record<string
     // ?tab=review) — hittat 2026-08-14. ctx.review_already_sent sätts
     // redan ovan i sendPortalNotification, bara aldrig LÄST här förut.
     case 'invoice_paid': return ctx?.review_already_sent ? '?tab=invoices' : '?tab=review'
-    case 'photos_added': return '?tab=photos'
+    // ?tab=photos fanns inte i portalen — kunden landade på Hem (rättat 2026-08-27).
+    case 'photos_added': return '?tab=project'
+    case 'jobbpass_published': return ctx?.project_id ? `?tab=jobbpass&project=${ctx.project_id}` : '?tab=project'
     case 'project_update': return '?tab=project'
     case 'review_request': return '?tab=review'
     default: return ''

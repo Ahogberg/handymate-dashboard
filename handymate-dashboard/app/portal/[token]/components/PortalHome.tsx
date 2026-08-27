@@ -17,13 +17,15 @@ import PortalShellHeader from './PortalShellHeader'
 import PortalHandymateAttribution from './PortalHandymateAttribution'
 import PortalAgreements from './PortalAgreements'
 import { formatCurrency } from '../helpers'
-import type { PortalActivity, PortalData, Project } from '../types'
+import type { PortalJobbpassSummary, PortalActivity, PortalData, Project } from '../types'
 
 interface PortalHomeProps {
   portal: PortalData
   token: string
+  /** Fastighetspasset steg 1: kundens publicerade jobbpass → "Ditt hem". */
+  passes?: PortalJobbpassSummary[]
   onNavigate: (
-    route: 'project' | 'docs' | 'contact' | 'messages' | 'project-detail',
+    route: 'project' | 'docs' | 'contact' | 'messages' | 'project-detail' | 'jobbpass',
     payload?: { projectId?: string; docsSection?: 'quotes' | 'invoices' },
   ) => void
 }
@@ -40,7 +42,7 @@ const ICON_MAP: Record<string, typeof ImageIcon> = {
  * Hem-vy (port av bp-home.jsx).
  * Hämtar aktivt projekt + aktivitetsfeed.
  */
-export default function PortalHome({ portal, token, onNavigate }: PortalHomeProps) {
+export default function PortalHome({ portal, token, passes = [], onNavigate }: PortalHomeProps) {
   const [activeProject, setActiveProject] = useState<Project | null>(null)
   const [activity, setActivity] = useState<PortalActivity[]>([])
   const [polling, setPolling] = useState(false)
@@ -277,6 +279,39 @@ export default function PortalHome({ portal, token, onNavigate }: PortalHomeProp
             ))}
           </div>
         </div>
+
+        {/* Ditt hem (Fastighetspasset steg 1, 2026-08-27): det som är gjort hos
+            kunden — ett publicerat jobbpass per avslutat projekt. Visas bara när
+            något finns; aldrig en tom rubrik. */}
+        {passes.length > 0 && (
+          <div style={{ padding: '24px 18px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Ditt hem</h3>
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{passes.length} jobb dokumenterade</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {passes.map(pass => (
+                <button
+                  key={pass.project_id}
+                  type="button"
+                  className="bp-card bp-card-tap"
+                  onClick={() => onNavigate('jobbpass', { projectId: pass.project_id })}
+                  style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', cursor: 'pointer', width: '100%', fontFamily: 'inherit' }}
+                >
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--green-50)', color: 'var(--green-600)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <CheckCircle size={20} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', letterSpacing: '-0.01em' }}>{pass.project_name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                      Jobbpass{pass.completed_at ? ` · klart ${new Date(pass.completed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''} · garanti, egenkontroll, bilder
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Serviceavtal (Motor 2, Etapp 2) — visas bara vid aktiva avtal */}
         <PortalAgreements token={token} />

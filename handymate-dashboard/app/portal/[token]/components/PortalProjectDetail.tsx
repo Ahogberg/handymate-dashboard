@@ -10,18 +10,25 @@ import {
   PenTool,
   Shield,
   Truck,
+  ShieldCheck,
+  ChevronRight,
 } from 'lucide-react'
 import SignatureCanvas, {
   ClearSignatureButton,
   type SignatureCanvasHandle,
 } from './SignatureCanvas'
 import { formatCurrency, formatDate } from '../helpers'
-import type { Project } from '../types'
+import type { PortalReport, Project } from '../types'
 
 interface PortalProjectDetailProps {
   project: Project
   onBack: () => void
   onAtaSigned: () => void
+  /** Fastighetspasset steg 1: finns ett publicerat jobbpass för projektet? */
+  jobbpassAvailable?: boolean
+  onOpenJobbpass?: () => void
+  /** Projektets fältrapporter (rutten fanns, anropades av ingen). */
+  reports?: PortalReport[]
 }
 
 /**
@@ -43,6 +50,9 @@ export default function PortalProjectDetail({
   project,
   onBack,
   onAtaSigned,
+  jobbpassAvailable = false,
+  onOpenJobbpass,
+  reports = [],
 }: PortalProjectDetailProps) {
   const [animPct, setAnimPct] = useState(0)
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
@@ -260,6 +270,28 @@ export default function PortalProjectDetail({
           </div>
         )}
 
+        {/* Jobbpasset (Fastighetspasset steg 1): sammanställningen av vad som
+            gjordes — garanti, egenkontroll, bilder. Bara när ägaren publicerat. */}
+        {jobbpassAvailable && onOpenJobbpass && (
+          <div style={{ padding: '0 18px' }}>
+            <button
+              type="button"
+              className="bp-card bp-card-tap"
+              onClick={onOpenJobbpass}
+              style={{ width: '100%', padding: 14, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', background: 'linear-gradient(135deg, var(--green-50), #fff)' }}
+            >
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--green-50)', color: 'var(--green-600)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <ShieldCheck size={20} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Jobbpasset — vad som gjordes hos dig</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Garanti, egenkontroll, tillägg och bilder på ett ställe.</div>
+              </div>
+              <ChevronRight size={18} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+            </button>
+          </div>
+        )}
+
         {/* Photo gallery */}
         {photos.length > 0 && (
           <div style={{ padding: '0 18px' }}>
@@ -332,6 +364,29 @@ export default function PortalProjectDetail({
                     </span>
                   )}
                 </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Fältrapporter (Fastighetspasset steg 1): rutten /reports fanns sedan
+            tidigare men anropades aldrig — nu visas projektets rapporter här. */}
+        {reports.length > 0 && (
+          <div style={{ padding: '24px 18px 0' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', marginBottom: 10 }}>Fältrapporter</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {reports.map(r => (
+                <div key={r.id} className="bp-card" style={{ padding: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{r.title || (r.report_number ? `Rapport ${r.report_number}` : 'Fältrapport')}</div>
+                    <span className={`bp-badge ${r.signed_at ? 'green' : 'gray'}`}>{r.signed_at ? 'Godkänd' : 'Skickad'}</span>
+                  </div>
+                  {r.work_performed && <p style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.5, marginTop: 6, whiteSpace: 'pre-line' }}>{r.work_performed}</p>}
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+                    {new Date(r.created_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {r.signed_by ? ` · godkänd av ${r.signed_by}` : ''}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

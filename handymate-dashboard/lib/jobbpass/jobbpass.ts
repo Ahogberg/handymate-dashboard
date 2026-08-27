@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { signStorageUrl } from '@/lib/storage-signing'
 
 /**
  * Jobbpass V1 (Etapp Ä, Closeout-to-Lifetime, sql/v154_jobbpass.sql).
@@ -614,7 +615,7 @@ export interface JobbpassRow {
 }
 
 export type JobbpassResult =
-  | { ok: true; row: JobbpassRow }
+  | { ok: true; row: JobbpassRow; /** true bara vid FÖRSTA publiceringen — utskicket till kunden hänger på det. */ justPublished?: boolean }
   | { ok: false; error: string }
 
 /** Deterministiskt id — jp_<project_id> — högst ETT jobbpass per projekt
@@ -732,7 +733,7 @@ export async function publishJobbpass(
     if (existing.error) return { ok: false, error: existing.error.message }
     if (!existing.data) return { ok: false, error: 'Jobbpasset hittades inte — öppna ytan innan publicering' }
     const current = normalizeJobbpassRow(existing.data)
-    if (current.status === 'published') return { ok: true, row: current }
+    if (current.status === 'published') return { ok: true, row: current, justPublished: false }
 
     const now = new Date().toISOString()
     const token = crypto.randomUUID()
@@ -745,7 +746,7 @@ export async function publishJobbpass(
       .maybeSingle()
     if (error) return { ok: false, error: error.message }
     if (!data) return { ok: false, error: 'Publiceringen misslyckades' }
-    return { ok: true, row: normalizeJobbpassRow(data) }
+    return { ok: true, row: normalizeJobbpassRow(data), justPublished: true }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
@@ -798,5 +799,77 @@ export async function getJobbpassServiceConsent(
     return Boolean((data as Record<string, unknown>).service_consent)
   } catch {
     return null
+  }
+}
+
+// ── Fastighetspasset steg 1 (2026-08-27): passet in i kundportalen ─────────
+
+const PROJECT_FILES_BUCKET = 'project-files'
+
+/**
+ * Hela sammansättningen av kundvyn ur en jobbpass-rad: källdata, ägarens
+ * utvalda foton (signerade, 1 h), derivation. EN väg för den publika sidan
+ * (app/api/jobbpass/public/[token]) och portalen (app/api/portal/[token]/
+ * jobbpass) — samma allowlist, samma kvittoprincip. null ⇒ 404 hos anroparen.
+ */
+export async function assembleJobbpassView(
+  supabase: SupabaseClient,
+  jobbpass: JobbpassRow,
+): Promise<JobbpassCustomerView | null> {
+  const sourceData = await loadJobbpassSourceData(supabase, jobbpass.business_id, jobbpass.project_id)
+  if (!sourceData) return null
+  const selectedRows = await loadSelectedJobbpassPhotos(
+    supabase, jobbpass.business_id, jobbpass.project_id, jobbpass.selected_photo_ids,
+  )
+  const signedPhotos = (
+    await Promise.all(
+      selectedRows.map(async r => ({
+        id: r.id,
+        url: await signStorageUrl(supabase, PROJECT_FILES_BUCKET, r.file_path, 3600),
+        caption: null as string | null,
+      })),
+    )
+  ).filter((p): p is { id: string; url: string; caption: null } => !!p.url)
+  return deriveJobbpassView({ ...sourceData, photos: signedPhotos, serviceConsent: jobbpass.service_consent })
+}
+
+export interface CustomerJobbpassEntry {
+  row: JobbpassRow
+  project_name: string
+  completed_at: string | null
+}
+
+/**
+ * Kundens publicerade jobbpass — jobbpass ⟗ project.customer_id, bara
+ * status 'published'. Fel returneras (aldrig svalda) så portal-rutten kan
+ * svara ärligt i stället för med en tom lista.
+ */
+export async function listPublishedJobbpassForCustomer(
+  supabase: SupabaseClient,
+  businessId: string,
+  customerId: string,
+): Promise<{ entries: CustomerJobbpassEntry[]; error?: string }> {
+  const { data: projects, error: projErr } = await supabase
+    .from('project')
+    .select('project_id, name, completed_at')
+    .eq('business_id', businessId)
+    .eq('customer_id', customerId)
+  if (projErr) return { entries: [], error: projErr.message }
+  const byId = new Map((projects || []).map(p => [p.project_id as string, p]))
+  if (byId.size === 0) return { entries: [] }
+  const { data: rows, error } = await supabase
+    .from('jobbpass')
+    .select('*')
+    .eq('business_id', businessId)
+    .eq('status', 'published')
+    .in('project_id', Array.from(byId.keys()))
+    .order('published_at', { ascending: false })
+  if (error) return { entries: [], error: error.message }
+  return {
+    entries: (rows || []).map(r => {
+      const row = normalizeJobbpassRow(r as Record<string, unknown>)
+      const proj = byId.get(row.project_id)
+      return { row, project_name: (proj?.name as string) || 'Projekt', completed_at: (proj?.completed_at as string | null) ?? null }
+    }),
   }
 }
