@@ -41,7 +41,9 @@ export const dynamic = 'force-dynamic'
  * livstidsdedupen (samma regel som startkorten: INGET statusfilter — ett
  * löst kort ska inte födas om vid nästa inloggning).
  */
-export const FIRST_ACTION_SOURCE = 'company_scan'
+// Inte exporterad: Next.js validerar en route-fils värde-exporter (bara
+// GET/POST/dynamic m.fl. tillåts) — en exporterad const fäller next build.
+const FIRST_ACTION_SOURCE = 'company_scan'
 
 export interface FirstActionResponse {
   kind: 'karin_overdue' | 'daniel_stale_quote' | 'skapa_kund' | null

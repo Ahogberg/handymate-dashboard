@@ -54,7 +54,9 @@ test.describe('en väljare, cronarnas byggare, ingen modell', () => {
   })
 
   test('livstidsdedup på markören, utan statusfilter (startkortsregeln)', () => {
-    expect(route).toContain("export const FIRST_ACTION_SOURCE = 'company_scan'")
+    expect(route).toContain("const FIRST_ACTION_SOURCE = 'company_scan'")
+    // Next.js route-validering: inga värde-exporter utöver handlers/config
+    expect(route).not.toMatch(/^export const (?!dynamic)/m)
     const dedup = route.slice(route.indexOf('// ── 1. Livstidsdedup'), route.indexOf('// ── 2. Raderna'))
     expect(dedup).toContain(".contains('payload', { first_action_source: FIRST_ACTION_SOURCE })")
     expect(dedup).not.toContain(".eq('status'")

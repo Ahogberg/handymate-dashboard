@@ -440,3 +440,16 @@ Bränslet FÖRE anropet (`checkFuelGate`/`fuelAllows`/`checkCostGuards`)? 33 av
 tak utan mätning är blint. `tests/facit-ai-kostnad-sanning.spec.ts` ställer
 båda frågorna mekaniskt för varje fil som innehåller en extern AI-markör —
 ny AI-kod fäller testet tills den svarar på båda.
+
+## 2026-08-27 — route-filer får inte exportera värden utöver Next-handlers
+
+`app/api/onboarding/first-action/route.ts` exporterade `const
+FIRST_ACTION_SOURCE`. tsc är nöjd, alla facits gröna, CI grön — men
+`next build` fäller det ("is not a valid Route export field"), och Vercel
+var första bygget eftersom lokal `next build` blockeras av Codex tsc-röda
+WIP i arbetsträdet. Deployen uteblev tyst i 5 minuter innan jag förstod.
+**Regel:** i `app/**/route.ts` exporteras bara `GET/POST/...`, `dynamic`,
+`maxDuration`, `revalidate` och **typer**. Delade konstanter bor i lib/.
+Facit i `first-action-route.spec`: `not.toMatch(/^export const (?!dynamic)/m)`.
+När lokal build är blockerad av främmande WIP: gör en ren `git worktree`
+av HEAD och bygg där, eller vänta in Vercel-probe INNAN "klart" sägs.
