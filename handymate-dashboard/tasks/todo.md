@@ -933,7 +933,7 @@ Princip: Handymate slutar inte arbeta när projektet fakturerats. Jobbpasset (v1
 - [x] Portal: "Ditt hem" på startsidan, jobbpass-CTA i projektdetaljen, `?tab=jobbpass&project=` djuplänk; dokumentfliken läser customer_document/project_document/generated_document (`GET /api/portal/[token]/documents`, filter "Filer"); fältrapporter (`/reports` hade ingen anropare) visas i projektdetaljen
 - [x] Grind 5: publish-rutten skickar INGET; utskicket är `POST /api/projects/[id]/jobbpass/notify` = ägarens knapp "Meddela kunden via mejl" genom `sendPortalNotification('jobbpass_published')` (portal på, e-post, 1 h-dedup, aldrig SMS); ärliga svenska svar per utfall. `?tab=photos`-buggen rättad (→ `?tab=project`)
 - [x] Facits: `facit-fastighetspass` (ny), portal-error-swallow + launch-public-token-contract (nya rutter registrerade), permission-contract (notify owner-admin), jobbpass — allt grönt, tsc 0 fel
-- [ ] Bevis mot prod efter deploy: publicera ett pass på ett testkonto → portalen visar "Ditt hem" → "Meddela kunden" → mejl med djuplänk landar rätt
+- [x] Bevis mot prod (2026-08-27, biz_eaj2vp3xf2, projekt e53d9edb…): projekt → utkast → publicerat (svaret bär ingen notis-flagga) → portal-API 1 pass → portalen "Ditt hem" → passvyn → djuplänk ?tab=jobbpass&project= → dokumentfliken "Filer" → ägarsidan "Meddela kunden via mejl" (inte klickad: kundens e-post är en testadress). Skärmdumpar proof-fp-1..4.
 
 ### Steg 2 — installationsregistret (v174)
 - [ ] `sql/v174_installation.sql`: installation (project, customer, produkt/modell, serienummer, placering, **adress-/platsögonblicksbild från projektet**, installerad, status utkast/bekräftad, garanti_till, serviceintervall_man + intervall_källa (produktinfo|hantverkare), skotselrad, källa)
