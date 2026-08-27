@@ -40,6 +40,8 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { MEASUREMENT_STARTED_AT } from './report'
+import { llmCostOre } from './meter'
+import { currentPriceList, type PriceList } from './price-list'
 
 export const FUEL_WINDOW_DAYS = 30
 
@@ -50,24 +52,29 @@ export const FUEL_PLAN_BUDGET_ORE: Record<string, number> = {
   business: 180_000,
 }
 
-export type FuelTopupTierId = 'quarter' | 'half' | 'full'
+export type FuelTopupTierId = 'small' | 'medium' | 'large'
 
 export interface FuelTopupOption {
   id: FuelTopupTierId
   label: string
-  percent: number
   amountOre: number
 }
 
 /**
- * Kundens tre valbara påfyllningar. Procentsatsen är kanonisk; beloppet
- * härleds alltid server-side ur den aktiva planens Bränslenivå. Klienten får
- * aldrig skicka ett eget öresbelopp till Stripe-rutten.
+ * Kundens tre valbara påfyllningar — fasta kronbelopp, samma för alla planer
+ * (Andreas-beslut 2026-08-27: "förinställda nivåer i faktiska kronor").
+ * Säljs till självkostnad: 100 kr köper 100 kr Bränsle, inget påslag — det
+ * är ett internt beslut som INTE skrivs ut i kundytan. Beloppet härleds
+ * alltid server-side ur nivån; klienten får aldrig skicka ett eget
+ * öresbelopp till Stripe-rutten.
+ *
+ * Ersatte 25/50/100 %-av-plan-nivåerna: "+25 %" av en tank kunden inte ser
+ * botten på sa ingenting. Kronor + topupExamples() nedan säger något.
  */
-export const FUEL_TOPUP_TIERS: ReadonlyArray<Omit<FuelTopupOption, 'amountOre'>> = [
-  { id: 'quarter', label: 'Liten påfyllning', percent: 25 },
-  { id: 'half', label: 'Halv tank', percent: 50 },
-  { id: 'full', label: 'Full tank', percent: 100 },
+export const FUEL_TOPUP_TIERS: ReadonlyArray<FuelTopupOption> = [
+  { id: 'small', label: 'Tanka 100 kr', amountOre: 10_000 },
+  { id: 'medium', label: 'Tanka 250 kr', amountOre: 25_000 },
+  { id: 'large', label: 'Tanka 500 kr', amountOre: 50_000 },
 ]
 /** 'enterprise' och okända planer: inget produktbeslut finns ännu — faller
  *  till Storfirman-nivån (mest generöst, minst risk att skrämma en stor
@@ -79,20 +86,69 @@ export function fuelBudgetOreForPlan(plan: string | null | undefined): number {
   return FUEL_DEFAULT_BUDGET_ORE
 }
 
+/** Nivåerna är planoberoende; planen krävs bara som bevis på ett aktivt konto. */
 export function fuelTopupOptionsForPlan(plan: string | null | undefined): FuelTopupOption[] {
-  const budgetOre = fuelBudgetOreForPlan(plan)
-  return FUEL_TOPUP_TIERS.map(tier => ({
-    ...tier,
-    amountOre: Math.round((budgetOre * tier.percent) / 100),
-  }))
+  if (!plan) return []
+  return FUEL_TOPUP_TIERS.map(tier => ({ ...tier }))
 }
 
 export function resolveFuelTopupOption(
   plan: string | null | undefined,
   tierId: string | null | undefined,
 ): FuelTopupOption | null {
-  if (!plan || FUEL_PLAN_BUDGET_ORE[plan] == null) return null
   return fuelTopupOptionsForPlan(plan).find(option => option.id === tierId) ?? null
+}
+
+/**
+ * "Vad räcker 100 kr till?" — en BUNT, inte en prislista.
+ *
+ * Beloppet delas lika mellan SMS och AI-svar och räknas om till antal med
+ * samma prislista som bokför den verkliga kostnaden (en beräkning, två
+ * ytor). Avrundas NEDÅT till närmaste tiotal och visas alltid som en bunt
+ * ("≈ 90 SMS och 50 AI-svar") — aldrig "X kr per SMS". Buntformen är
+ * avsiktlig: kunden får en intuitiv känsla för volymen utan att kunna räkna
+ * baklänges till våra styckkostnader (Andreas-beslut 2026-08-27).
+ *
+ * "Ett AI-svar" = en typisk Matte-tur (flera modellanrop) uttryckt som en
+ * token-profil, prissatt via meter.ts — inte som ett öresbelopp här, så
+ * prislistan förblir enda stället med inköpspriser.
+ */
+export const TYPICAL_AI_REPLY_USAGE = { input_tokens: 18_000, output_tokens: 3_000 } as const
+export const TYPICAL_AI_REPLY_MODEL = 'claude-sonnet-4-6'
+
+export interface TopupExamples {
+  smsParts: number
+  aiReplies: number
+}
+
+function nerTillTiotal(n: number): number {
+  return Math.max(0, Math.floor(n / 10) * 10)
+}
+
+export function topupExamples(amountOre: number, p: PriceList = currentPriceList()): TopupExamples {
+  const halva = Math.max(0, amountOre) / 2
+  const smsOre = p.sms_part_ore
+  const aiOre = llmCostOre(TYPICAL_AI_REPLY_USAGE, TYPICAL_AI_REPLY_MODEL, p)
+  return {
+    smsParts: smsOre > 0 ? nerTillTiotal(halva / smsOre) : 0,
+    aiReplies: aiOre > 0 ? nerTillTiotal(halva / aiOre) : 0,
+  }
+}
+
+export function formatTopupExamples(ex: TopupExamples): string {
+  if (ex.smsParts <= 0 && ex.aiReplies <= 0) return ''
+  return `≈ ${ex.smsParts} SMS och ${ex.aiReplies} AI-svar`
+}
+
+/**
+ * "I din takt räcker det ≈ N dagar till" — kontots egen genomsnittliga
+ * dygnsförbrukning (samma bråktal som daysRemaining i computeFuelLevel).
+ * null utan förbrukningshistorik: då finns ingen takt att räkna på, och
+ * kortet visar bara bunten.
+ */
+export function topupDaysAtPace(amountOre: number, avgDailyOre: number | null | undefined): number | null {
+  if (!avgDailyOre || avgDailyOre <= 0 || amountOre <= 0) return null
+  return Math.max(1, Math.round(amountOre / avgDailyOre))
 }
 
 /**
@@ -255,6 +311,9 @@ export interface FuelLevel {
    *  weeksRemainingPhrase när mindre än en vecka återstår. null under
    *  exakt samma villkor som weeksRemaining (ingen förbrukning ännu). */
   daysRemaining: number | null
+  /** Genomsnittlig dygnsförbrukning i fönstret (öre) — underlag för
+      "i din takt räcker en påfyllning ≈ N dagar" (topupDaysAtPace). */
+  avgDailyOre: number
   buckets: Array<{ key: FuelBucket; label: string; percent: number }>
   /** 30 tal, äldst→nyast, daglig kostnad i öre. */
   history: number[]
@@ -327,7 +386,7 @@ export function computeFuelLevel(params: {
   const state: FuelLevel['state'] =
     remainingPercent <= 10 ? 'critical' : remainingPercent <= 30 ? 'low' : 'normal'
 
-  return { usedOre, budgetOre, remainingOre, exhausted, usedRatio, remainingPercent, weeksRemaining, daysRemaining, buckets, history, highlightIndex, state }
+  return { usedOre, budgetOre, remainingOre, exhausted, usedRatio, remainingPercent, weeksRemaining, daysRemaining, avgDailyOre, buckets, history, highlightIndex, state }
 }
 
 /**

@@ -46,9 +46,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Aktiv prisplan kunde inte verifieras' }, { status: 503 })
     }
 
-    // `full` är bakåtkompatibel default för redan utrullade klienter som
+    // `large` är bakåtkompatibel default för redan utrullade klienter som
     // ännu inte skickar tier. Alla uttryckliga värden måste whitelistas.
-    const requestedTier = body?.tier == null ? 'full' : String(body.tier)
+    const requestedTier = body?.tier == null ? 'large' : String(body.tier)
     const topup = resolveFuelTopupOption(config.subscription_plan, requestedTier)
     if (!topup) {
       return NextResponse.json({ error: 'Ogiltig påfyllningsnivå' }, { status: 400 })
@@ -84,7 +84,6 @@ export async function POST(request: NextRequest) {
         addon: 'fuel_topup',
         amount_ore: String(amountOre),
         fuel_tier: topup.id,
-        fuel_percent: String(topup.percent),
       },
       success_url: `${appUrl}/dashboard/settings/billing?fuel_topup=success`,
       cancel_url: `${appUrl}/dashboard/settings/billing`,

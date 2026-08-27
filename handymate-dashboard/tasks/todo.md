@@ -874,3 +874,10 @@ Princip: **Bränsle slut/oläsbart ⇒ samma väg som saknad API-nyckel** (fail-
 - [x] tsc rent, riktade specar (99), full svit 5499/5499; REALITY-WEEK #29–30; lessons
 
 Medvetet utanför: `app/api/admin/support-tickets/[id]/reply` (Handymate-adminens eget supportsvar bokförs i dag på kundens business — vår kostnad, borde bokföras internt; ingen grind, avsiktligt). `isLikelyLead` anropar modellen även för förhandsgodkända avsändare ("Always return YES") — en deterministisk kortslutning skulle spara tokens; inte ändrad nu (beteende, inte sanning).
+
+### Påfyllning av Bränsle — fasta kronor (2026-08-27, Andreas-beslut)
+- [x] Nivåer 100/250/500 kr, samma för alla planer (`FUEL_TOPUP_TIERS`), självkostnad utan påslag (internt beslut, skrivs inte ut i kundytan)
+- [x] "Vad räcker det till" som bunt ur prislistan (`topupExamples`: 100 kr ≈ 90 SMS och 50 AI-svar), nedåt till tiotal — styckpris går inte att räkna baklänges
+- [x] "I din takt: ≈ N dagar till" ur kontots egen dygnsförbrukning (`avgDailyOre` → `topupDaysAtPace`)
+- [x] Kortet: "Priser exklusive moms"; facit låser att kortet aldrig visar styckpris/självkostnad/påslag
+- [ ] Stripe automatic tax: INTE påslaget — Stripe Tax är inte aktiverat på kontot (webhook-kommentaren "Idag kör Stripe utan automatic_tax"); aktivering i Stripe-dashboarden är ett Andreas-steg, sedan `automatic_tax: { enabled: true }` i fuel-topup + övriga checkouts

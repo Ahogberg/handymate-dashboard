@@ -4,7 +4,14 @@ import { useEffect, useState } from 'react'
 import { Zap } from 'lucide-react'
 import { useFuel } from './FuelProvider'
 import { FuelGauge } from './FuelGauge'
-import { fuelTopupOptionsForPlan, weeksRemainingPhrase, type FuelTopupTierId } from '@/lib/costs/fuel'
+import {
+  fuelTopupOptionsForPlan,
+  formatTopupExamples,
+  topupDaysAtPace,
+  topupExamples,
+  weeksRemainingPhrase,
+  type FuelTopupTierId,
+} from '@/lib/costs/fuel'
 import { useBusiness } from '@/lib/BusinessContext'
 
 /**
@@ -71,29 +78,41 @@ export function FuelBillingCard() {
           <p className="text-[15px] font-semibold text-gray-800 mb-1">{estimateText}</p>
           <p className="text-sm text-gray-500 leading-relaxed mb-4">{calmText}</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            {topupOptions.map(option => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => tanka(option.id)}
-                disabled={topupLoading !== null}
-                className={`min-h-[72px] rounded-xl border px-3 py-2.5 text-left transition-colors disabled:opacity-60 ${
-                  option.id === 'full'
-                    ? 'bg-primary-700 border-primary-700 text-white'
-                    : 'bg-white border-gray-200 hover:border-primary-300 text-gray-900'
-                }`}
-              >
-                <span className="block text-sm font-semibold">
-                  {topupLoading === option.id ? 'Öppnar...' : option.label}
-                </span>
-                <span className={`block text-xs mt-0.5 ${option.id === 'full' ? 'text-primary-100' : 'text-gray-500'}`}>
-                  +{option.percent}% · {Math.round(option.amountOre / 100).toLocaleString('sv-SE')} kr
-                </span>
-              </button>
-            ))}
+            {topupOptions.map(option => {
+              const framhavd = option.id === 'medium'
+              const bunt = formatTopupExamples(topupExamples(option.amountOre))
+              const dagar = topupDaysAtPace(option.amountOre, level.avgDailyOre)
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => tanka(option.id)}
+                  disabled={topupLoading !== null}
+                  className={`min-h-[84px] rounded-xl border px-3 py-2.5 text-left transition-colors disabled:opacity-60 ${
+                    framhavd
+                      ? 'bg-primary-700 border-primary-700 text-white'
+                      : 'bg-white border-gray-200 hover:border-primary-300 text-gray-900'
+                  }`}
+                >
+                  <span className="block text-sm font-semibold">
+                    {topupLoading === option.id ? 'Öppnar...' : option.label}
+                  </span>
+                  {bunt && (
+                    <span className={`block text-xs mt-0.5 ${framhavd ? 'text-primary-100' : 'text-gray-500'}`}>
+                      {bunt}
+                    </span>
+                  )}
+                  {dagar != null && (
+                    <span className={`block text-xs mt-0.5 ${framhavd ? 'text-primary-200' : 'text-gray-400'}`}>
+                      I din takt: ≈ {dagar} {dagar === 1 ? 'dag' : 'dagar'} till
+                    </span>
+                  )}
+                </button>
+              )
+            })}
           </div>
           <p className="text-xs text-gray-400 mt-2.5">
-            Påfyllningen gäller resten av din nuvarande abonnemangsperiod och aktiveras efter genomförd betalning.
+            Priser exklusive moms. Påfyllningen gäller resten av din nuvarande abonnemangsperiod och aktiveras efter genomförd betalning.
           </p>
         </div>
       </div>

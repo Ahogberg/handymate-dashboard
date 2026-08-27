@@ -57,14 +57,43 @@ test.describe('Bränsle — beräkningskärnan (ren funktion, ingen DB)', () => 
     expect(level.exhausted).toBe(true)
   })
 
-  test('påfyllningsnivåerna är 25/50/100 % och belopp härleds ur planen', () => {
-    expect(fuelTopupOptionsForPlan('professional')).toEqual([
-      { id: 'quarter', label: 'Liten påfyllning', percent: 25, amountOre: 22_500 },
-      { id: 'half', label: 'Halv tank', percent: 50, amountOre: 45_000 },
-      { id: 'full', label: 'Full tank', percent: 100, amountOre: 90_000 },
-    ])
+  test('påfyllningsnivåerna är 100/250/500 kr — fasta kronor, samma för alla planer (Andreas-beslut 2026-08-27)', () => {
+    const forvantat = [
+      { id: 'small', label: 'Tanka 100 kr', amountOre: 10_000 },
+      { id: 'medium', label: 'Tanka 250 kr', amountOre: 25_000 },
+      { id: 'large', label: 'Tanka 500 kr', amountOre: 50_000 },
+    ]
+    expect(fuelTopupOptionsForPlan('starter')).toEqual(forvantat)
+    expect(fuelTopupOptionsForPlan('professional')).toEqual(forvantat)
+    expect(fuelTopupOptionsForPlan('enterprise')).toEqual(forvantat)
     expect(resolveFuelTopupOption('professional', 'eget-belopp')).toBeNull()
-    expect(resolveFuelTopupOption('okand-plan', 'full')).toBeNull()
+    // Utan plan finns inget aktivt konto att tanka
+    expect(resolveFuelTopupOption(null, 'large')).toBeNull()
+    expect(fuelTopupOptionsForPlan(undefined)).toEqual([])
+  })
+
+  test('"vad räcker det till" är en bunt avrundad nedåt till tiotal — aldrig ett styckpris', () => {
+    const { topupExamples, formatTopupExamples, topupDaysAtPace } = require('../lib/costs/fuel')
+    const liten = topupExamples(10_000)
+    const stor = topupExamples(50_000)
+    // Tiotal — styckkostnaden går inte att läsa ut ur en enskild siffra
+    expect(liten.smsParts % 10).toBe(0)
+    expect(liten.aiReplies % 10).toBe(0)
+    expect(liten.smsParts).toBeGreaterThan(0)
+    expect(liten.aiReplies).toBeGreaterThan(0)
+    // Mer pengar, mer volym — aldrig tvärtom
+    expect(stor.smsParts).toBeGreaterThan(liten.smsParts)
+    expect(stor.aiReplies).toBeGreaterThan(liten.aiReplies)
+    // Buntformen: "och", inte "per"
+    const text = formatTopupExamples(liten)
+    expect(text).toMatch(/^≈ \d+ SMS och \d+ AI-svar$/)
+    expect(text).not.toMatch(/per|styck|kr\//)
+    expect(formatTopupExamples({ smsParts: 0, aiReplies: 0 })).toBe('')
+    // Personlig takt: null utan historik, minst en dag med
+    expect(topupDaysAtPace(10_000, 0)).toBeNull()
+    expect(topupDaysAtPace(10_000, null)).toBeNull()
+    expect(topupDaysAtPace(10_000, 900)).toBe(11)
+    expect(topupDaysAtPace(100, 5_000)).toBe(1)
   })
 
   test('en Stripe-påfyllning i fönstret höjer budgeten, inte bara sänker förbrukningen', () => {
@@ -278,6 +307,17 @@ test.describe('Bränsle-webhooken', () => {
     expect(s).toContain('fuelTopupOptionsForPlan')
     expect(s).toContain('option.id')
     expect(s).toContain('option.amountOre')
+  })
+
+  test('kundytan visar bunten och den personliga takten — aldrig styckpris eller "självkostnad"', () => {
+    const s = kod('components/fuel/FuelBillingCard.tsx')
+    expect(s).toContain('formatTopupExamples(topupExamples(option.amountOre))')
+    expect(s).toContain('topupDaysAtPace(option.amountOre, level.avgDailyOre)')
+    expect(s).toContain('exklusive moms')
+    // Inget som låter kunden räkna baklänges till våra inköpspriser
+    expect(s).not.toMatch(/kr\s*\/\s*SMS|per SMS|\böre\b|styckpris|självkostnad|påslag|option\.percent/i)
+    // Procent-av-tank-nivåerna är borta
+    expect(kod('app/api/billing/fuel-topup/route.ts')).not.toContain('fuel_percent')
   })
 })
 
