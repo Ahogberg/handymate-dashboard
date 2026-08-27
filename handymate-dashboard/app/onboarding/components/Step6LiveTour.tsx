@@ -434,7 +434,7 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
                 }}
               >
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ob-green-600)' }} />
-                5 aktiva
+                {teamRow.length} på plats
               </span>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -491,7 +491,7 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
             ['Kunder', nf(customerCount), 'importerade', false],
             ['Obetalda', nf(unpaidCount), 'fakturor', false],
             ['Öppna affärer', nf(openDealsCount), 'att följa upp', false],
-            ['AI-kollegor', '5', 'aktiva', true],
+            ['AI-kollegor', String(TEAM.length), 'i ditt team', true],
           ].map((s, i) => {
             const hero = s[3] as boolean
             return (
@@ -643,25 +643,37 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
                 borderRadius: 'var(--ob-r-lg)',
               }}
             >
+              {/* Mock av den riktiga Kom igång-railen (components/jarvis/
+                  KomIgangRail.tsx, samma tre uppdrag). Inget antal, ingen
+                  stapel — förut stod här ett påhittat antal-klart och en fast procentstapel
+                  (bort 2026-08-27). Etiketterna hålls i synk för hand tills
+                  railen exporterar dem. */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <span style={{ color: 'var(--ob-primary-700)' }}>
                   <Target size={16} />
                 </span>
-                <strong style={{ fontSize: 13, color: 'var(--ob-primary-700)' }}>Komplettera setup</strong>
-                <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 600, color: 'var(--ob-muted)' }}>
-                  2/5 klart
-                </span>
+                <strong style={{ fontSize: 13, color: 'var(--ob-primary-700)' }}>Kom igång</strong>
               </div>
-              <div style={{ height: 5, background: 'var(--ob-primary-100)', borderRadius: 3, overflow: 'hidden' }}>
-                <div
-                  style={{
-                    width: '40%',
-                    height: '100%',
-                    background: 'linear-gradient(90deg, var(--ob-primary-600), var(--ob-primary-500))',
-                    borderRadius: 3,
-                  }}
-                />
-              </div>
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[
+                  'Ring ditt nummer — hör Lisa fånga samtalet',
+                  'Spela in ett testmöte eller skapa din första offert',
+                  'Lägg appen på hemskärmen',
+                ].map(label => (
+                  <li key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--ob-ink)' }}>
+                    <span
+                      style={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: '50%',
+                        border: '1.5px solid var(--ob-primary-300)',
+                        flexShrink: 0,
+                      }}
+                    />
+                    {label}
+                  </li>
+                ))}
+              </ul>
             </div>
           </TourTarget>
         </div>

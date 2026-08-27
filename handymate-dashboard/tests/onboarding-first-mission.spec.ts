@@ -134,3 +134,20 @@ test.describe('components/jarvis/home/Uppdragsrad.tsx — stabilt ankare för tu
     expect(uppdragsrad).toContain("const TOUR_ANCHOR = 'uppdragsband'")
   })
 })
+
+test.describe('Step6LiveTour — inga påhittade tal i mock-dashboarden (2026-08-27)', () => {
+  const liveTour = fs.readFileSync(path.join(ROOT, 'app/onboarding/components/Step6LiveTour.tsx'), 'utf8')
+
+  test('teambadgen och statrutan räknas ur TEAM — aldrig ett hårdkodat "5 aktiva"', () => {
+    expect(liveTour).not.toMatch(/\d+ aktiva/)
+    expect(liveTour).toContain('{teamRow.length} på plats')
+    expect(liveTour).toContain("String(TEAM.length), 'i ditt team'")
+  })
+
+  test('setup-rutan är en mock av den riktiga Kom igång-railen — inget påhittat "2/5 klart" eller 40 %-stapel', () => {
+    expect(liveTour).not.toContain('2/5')
+    expect(liveTour).not.toContain("width: '40%'")
+    expect(liveTour).not.toContain('Komplettera setup')
+    expect(liveTour).toContain('Kom igång')
+  })
+})
