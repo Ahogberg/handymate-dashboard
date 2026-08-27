@@ -122,7 +122,7 @@ export async function deliverInvoiceReminder(
 
   if (!smsSent && !emailSent) {
     const orsak = smsFel
-      ? smsFel.replace(/[.s]+$/, '')
+      ? smsFel.replace(/[.\s]+$/, '')
       : !customerPhone
         ? 'kunden saknar telefonnummer'
         : !process.env.ELKS_API_USER

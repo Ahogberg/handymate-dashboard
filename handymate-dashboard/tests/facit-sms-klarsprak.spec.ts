@@ -59,5 +59,8 @@ test('hemmets kvitto-banner dubblerar inte punkten', () => {
 test('påminnelseleveransen skickar den svenska meningen vidare som den är — ingen "SMS:et stoppades (råtext)"-inpackning', () => {
   const s = kod('lib/invoice-reminder-send.ts')
   expect(s).not.toContain('SMS:et stoppades (')
-  expect(s).toContain("? smsFel.replace(/[.\s]+$/, '')")
+  // Backslashen måste överleva: "[.\\s]" i JS-strängen = [.\s] i koden. En
+  // sed-körning åt upp den en gång (2026-08-27) och facitet matchade felet.
+  expect(s).toContain("? smsFel.replace(/[.\\s]+$/, '')")
+  expect(s).not.toContain('[.s]+$')
 })
