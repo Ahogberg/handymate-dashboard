@@ -8,6 +8,7 @@ import { sendSmsViaElks } from '@/lib/sms-send'
 import { getBusinessPlanFromConfig } from '@/lib/auth'
 import { checkSmsAllowance } from '@/lib/sms-usage'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
+import { filterOutConflicting, UNOPENED_CONFLICT_WINDOW_HOURS } from '@/lib/agents/daniel/unopened-quotes'
 import { arTestId, arTestNamn } from '@/lib/testdata'
 import { registerMandateDeliveryFailure } from '@/lib/mandates/mission-mandate'
 import { loadMandateResolutionCache, resolveMandateForAction, MANDATE_TRUTH_CLASS, type MandateResolutionCache } from '@/lib/mandates/resolve'
@@ -414,8 +415,33 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // 3.5 Konflikt-avoidance (2026-08-27): en offert som redan fått ett
+    // send_sms-kort de senaste 168 h — oavsett status — följs inte upp igen
+    // av agenten. Onboardingens första verifierade handling (POST /api/
+    // onboarding/first-action) skapar Daniels kort dag 0; utan detta hade
+    // morgoncronen köat ett andra SMS för samma offert dagen efter.
+    // Samma fönster och samma rena filter som Daniels aggregat använder.
+    const konflikter = new Set<string>()
+    {
+      const bizIds = Array.from(new Set((sentQuotes || []).map((q: any) => q.business_id as string)))
+      if (bizIds.length > 0) {
+        const konfliktSedan = new Date(now.getTime() - UNOPENED_CONFLICT_WINDOW_HOURS * 3600_000).toISOString()
+        const { data: konfliktRader, error: konfliktErr } = await supabase
+          .from('pending_approvals')
+          .select('payload')
+          .eq('approval_type', 'send_sms')
+          .in('business_id', bizIds)
+          .gte('created_at', konfliktSedan)
+        if (konfliktErr) console.warn('[quote-follow-up] konfliktläsning misslyckades (ingen dedup denna körning):', konfliktErr.message)
+        for (const r of konfliktRader || []) {
+          const rid = (r.payload as { related_id?: unknown } | null)?.related_id
+          if (typeof rid === 'string') konflikter.add(rid)
+        }
+      }
+    }
+
     // 4. Group candidates by business
-    const byBusiness = new Map<string, Array<{ quote: any; daysSinceSent: number; channel: string }>>()
+    const byBusiness = new Map<string, Array<{ quote: any; daysSinceSent: number; channel: string; quote_id: string }>>()
 
     for (const quote of sentQuotes || []) {
       const customer = quote.customer as any
@@ -453,13 +479,15 @@ export async function GET(request: NextRequest) {
       // räknaren steg) innan något skickats — och inserten saknade dessutom
       // trigger_type (NOT NULL) så den har i praktiken tyst failat hela tiden.
       const list = byBusiness.get(quote.business_id) || []
-      list.push({ quote, daysSinceSent, channel })
+      list.push({ quote, daysSinceSent, channel, quote_id: quote.quote_id })
       byBusiness.set(quote.business_id, list)
     }
 
     // 5. Trigger agent per business, logga utfall EFTER köningen
     let agentTriggered = 0
-    for (const [businessId, items] of Array.from(byBusiness)) {
+    for (const [businessId, allaItems] of Array.from(byBusiness)) {
+      const items = filterOutConflicting(allaItems, konflikter)
+      if (items.length === 0) continue
       const quoteList = items.map((item: any) => {
         const c = item.quote.customer as any
         const daysLeft = Math.floor((new Date(item.quote.valid_until).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
