@@ -8,7 +8,6 @@ import {
   Hammer,
   Loader2,
   PenTool,
-  Shield,
   Truck,
   ShieldCheck,
   ChevronRight,
@@ -43,7 +42,6 @@ const MILESTONE_DEFAULTS = [
   { id: 'prep',  name: 'Förberedelse',  Icon: Truck,         status: 'done' as const },
   { id: 'work',  name: 'Pågående',      Icon: Hammer,        status: 'active' as const },
   { id: 'done',  name: 'Slutfört',      Icon: CheckCircle,   status: 'pending' as const },
-  { id: 'warr',  name: 'Garanti',       Icon: Shield,        status: 'pending' as const },
 ]
 
 export default function PortalProjectDetail({
@@ -271,7 +269,7 @@ export default function PortalProjectDetail({
         )}
 
         {/* Jobbpasset (Fastighetspasset steg 1): sammanställningen av vad som
-            gjordes — garanti, egenkontroll, bilder. Bara när ägaren publicerat. */}
+            gjordes — omfattning, tillägg, egenkontroll, bilder. Bara när ägaren publicerat. */}
         {jobbpassAvailable && onOpenJobbpass && (
           <div style={{ padding: '0 18px' }}>
             <button
@@ -285,7 +283,7 @@ export default function PortalProjectDetail({
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Jobbpasset — vad som gjordes hos dig</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Garanti, egenkontroll, tillägg och bilder på ett ställe.</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Omfattning, tillägg, egenkontroll och bilder på ett ställe.</div>
               </div>
               <ChevronRight size={18} style={{ color: 'var(--muted)', flexShrink: 0 }} />
             </button>

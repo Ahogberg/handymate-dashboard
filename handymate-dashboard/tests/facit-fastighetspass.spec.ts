@@ -67,6 +67,17 @@ test.describe('portalen', () => {
   })
 })
 
+test.describe('garanti nämns inte (Andreas 2026-08-27: varierar per bransch, lovas aldrig generiskt)', () => {
+  test('ingen garantisektion i passet, förhandsvisningen, portalens copy eller mejlet', () => {
+    expect(kod('lib/jobbpass/jobbpass.ts')).not.toMatch(/warranty|garanti/i)
+    expect(kod('components/jobbpass/JobbpassView.tsx')).not.toMatch(/garanti/i)
+    expect(kod('app/dashboard/projects/[id]/jobbpass/page.tsx')).not.toMatch(/garanti/i)
+    expect(kod('app/portal/[token]/components/PortalHome.tsx')).not.toMatch(/garanti/i)
+    expect(kod('app/portal/[token]/components/PortalProjectDetail.tsx')).not.toMatch(/garanti/i)
+    expect(kod('lib/portal/notification-emails.ts')).not.toMatch(/garanti/i)
+  })
+})
+
 test.describe('publicering och utskick är två handlingar (sanningsgrind 5)', () => {
   test('publiceringen skickar inget själv — inget mejl, inget SMS', () => {
     const publish = kod('app/api/projects/[id]/jobbpass/publish/route.ts')

@@ -8,7 +8,7 @@
  * principen: hellre missa än gissa).
  */
 import {
-  CheckCircle2, FileText, Wrench, ClipboardCheck, Receipt, ShieldCheck,
+  CheckCircle2, FileText, Wrench, ClipboardCheck, Receipt,
   Image as ImageIcon, Sparkles, Zap,
 } from 'lucide-react'
 import type { JobbpassCustomerView } from '@/lib/jobbpass/jobbpass'
@@ -152,10 +152,6 @@ export function JobbpassView({ pass }: { pass: JobbpassCustomerView }) {
           )}
         </Card>
       )}
-
-      <Card icon={ShieldCheck} title="Garanti">
-        <p className="text-sm text-gray-700">{pass.warranty.text}</p>
-      </Card>
 
       {pass.future_service.consent && (
         <Card icon={Zap} title="Framtida service">

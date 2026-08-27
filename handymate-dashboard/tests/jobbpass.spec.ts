@@ -26,7 +26,6 @@ import {
   deriveJobbpassView,
   assertJobbpassShape,
   JOBBPASS_ALLOWED_FIELDS,
-  JOBBPASS_WARRANTY_MONTHS,
   loadSelectedJobbpassPhotos,
   getOrCreateDraftJobbpass,
   setJobbpassSelection,
@@ -369,11 +368,11 @@ test.describe('(d) portalvyns data läcker inget internt', () => {
     expect(view.invoice_reference).toBeNull()
   })
 
-  test('garantitexten anger 12 månader och closeout-datumet, aldrig en hittad garantitabell', () => {
-    const view = deriveJobbpassView(baseInput())
-    expect(view.warranty.months).toBe(JOBBPASS_WARRANTY_MONTHS)
-    expect(view.warranty.text).toContain('12 månader')
-    expect(view.warranty.text).toMatch(/2026/)
+  test('ingen garanti nämns — den varierar per bransch och lovas aldrig generiskt (Andreas 2026-08-27)', () => {
+    const view = deriveJobbpassView(baseInput()) as unknown as Record<string, unknown>
+    expect('warranty' in view).toBe(false)
+    expect((JOBBPASS_ALLOWED_FIELDS.top as readonly string[]).includes('warranty')).toBe(false)
+    expect(JSON.stringify(view)).not.toMatch(/garanti/i)
   })
 
   test('certifikat-sektionen är en ärlig "kommer snart"-text, aldrig påhittad data', () => {

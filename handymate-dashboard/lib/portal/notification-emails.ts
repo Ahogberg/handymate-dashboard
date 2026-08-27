@@ -136,7 +136,7 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
     heading: 'Vad som gjordes hos dig — samlat på ett ställe',
     body: (ctx) => {
       const proj = ctx.project_name ? `<strong>${escapeHtml(String(ctx.project_name))}</strong>` : 'Jobbet'
-      return `${proj} är klart. I din kundportal finns nu jobbpasset: vad som ingick, godkända tillägg, egenkontroll, bilder och garanti. Spara det — det är din dokumentation över arbetet.`
+      return `${proj} är klart. I din kundportal finns nu jobbpasset: vad som ingick, godkända tillägg, egenkontroll och bilder. Spara det — det är din dokumentation över arbetet.`
     },
     cta: 'Öppna jobbpasset',
     emoji: '🏠',

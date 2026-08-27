@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Loader2, AlertTriangle, ArrowLeft, Check, Copy, ExternalLink,
-  FileText, Sparkles, Wrench, ClipboardCheck, Receipt, ShieldCheck, Zap,
+  FileText, Sparkles, Wrench, ClipboardCheck, Receipt, Zap,
   Mail,
 } from 'lucide-react'
 import type { JobbpassCustomerView } from '@/lib/jobbpass/jobbpass'
@@ -331,7 +331,6 @@ function PreviewSummary({ preview }: { preview: JobbpassCustomerView }) {
   if (preview.work_report) rows.push({ icon: Wrench, label: 'Utfört arbete', value: 'Signerad fältrapport ingår' })
   if (preview.checklists.length > 0) rows.push({ icon: ClipboardCheck, label: 'Egenkontroll', value: `${preview.checklists.length} checklista(or)` })
   if (preview.invoice_reference) rows.push({ icon: Receipt, label: 'Faktura', value: preview.invoice_reference.invoice_number || 'Referens finns' })
-  rows.push({ icon: ShieldCheck, label: 'Garanti', value: preview.warranty.text })
   if (preview.future_service.consent) rows.push({ icon: Zap, label: 'Service', value: 'Kunden har sagt ja till framtida servicepåminnelse' })
 
   return (

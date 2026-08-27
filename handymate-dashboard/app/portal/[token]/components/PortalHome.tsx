@@ -304,7 +304,7 @@ export default function PortalHome({ portal, token, passes = [], onNavigate }: P
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', letterSpacing: '-0.01em' }}>{pass.project_name}</div>
                     <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                      Jobbpass{pass.completed_at ? ` · klart ${new Date(pass.completed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''} · garanti, egenkontroll, bilder
+                      Jobbpass{pass.completed_at ? ` · klart ${new Date(pass.completed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''} · omfattning, egenkontroll, bilder
                     </div>
                   </div>
                 </button>

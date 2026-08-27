@@ -83,12 +83,6 @@ export interface JobbpassInvoiceReference {
   total: number | null
 }
 
-export interface JobbpassWarranty {
-  months: number
-  start_date: string | null
-  text: string
-}
-
 export interface JobbpassCustomerView {
   project: {
     project_id: string
@@ -114,7 +108,6 @@ export interface JobbpassCustomerView {
   photos: JobbpassPhoto[]
   /** null = inget skickat/betalt/förfallet underlag att peka på ännu. */
   invoice_reference: JobbpassInvoiceReference | null
-  warranty: JobbpassWarranty
   future_service: { consent: boolean }
   certificates_note: string
 }
@@ -127,7 +120,7 @@ export interface JobbpassCustomerView {
 export const JOBBPASS_ALLOWED_FIELDS = {
   top: [
     'project', 'business', 'scope', 'changes', 'work_report', 'checklists',
-    'photos', 'invoice_reference', 'warranty', 'future_service', 'certificates_note',
+    'photos', 'invoice_reference', 'future_service', 'certificates_note',
   ],
   project: ['project_id', 'name', 'completed_at'],
   business: ['name', 'logo_url', 'accent_color', 'phone', 'email'],
@@ -139,7 +132,6 @@ export const JOBBPASS_ALLOWED_FIELDS = {
   checklist_item: ['text', 'checked'],
   photo: ['id', 'url', 'caption'],
   invoice_reference: ['invoice_number', 'invoice_date', 'total'],
-  warranty: ['months', 'start_date', 'text'],
   future_service: ['consent'],
 } as const
 
@@ -181,7 +173,6 @@ export function assertJobbpassShape(view: JobbpassCustomerView): JobbpassCustome
   if (view.invoice_reference) {
     assertKeys(view.invoice_reference as unknown as Record<string, unknown>, JOBBPASS_ALLOWED_FIELDS.invoice_reference, 'invoice_reference')
   }
-  assertKeys(view.warranty as unknown as Record<string, unknown>, JOBBPASS_ALLOWED_FIELDS.warranty, 'warranty')
   assertKeys(view.future_service as unknown as Record<string, unknown>, JOBBPASS_ALLOWED_FIELDS.future_service, 'future_service')
   return view
 }
@@ -295,7 +286,6 @@ export interface JobbpassSourceInput {
 // Ren derivation — ingen I/O.
 // ─────────────────────────────────────────────────────────────────
 
-export const JOBBPASS_WARRANTY_MONTHS = 12
 export const JOBBPASS_CERTIFICATES_NOTE = 'Kommer snart: certifikat och skötselråd.'
 
 const ACCEPTED_QUOTE_STATUSES = new Set(['accepted', 'signed'])
@@ -312,12 +302,6 @@ function formatSvenskDatum(iso: string): string {
   return parsed.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-function byggGarantitext(completedAt: string | null): string {
-  if (!completedAt) {
-    return `Standardgaranti ${JOBBPASS_WARRANTY_MONTHS} månader från slutfört arbete. Startdatum sätts när projektet avslutas.`
-  }
-  return `Standardgaranti ${JOBBPASS_WARRANTY_MONTHS} månader från slutfört arbete, startdatum ${formatSvenskDatum(completedAt)}.`
-}
 
 /**
  * Bygger kundvyn ur redan hämtade källrader. Ren funktion — samma indata
@@ -420,12 +404,6 @@ export function deriveJobbpassView(input: JobbpassSourceInput): JobbpassCustomer
     }
   }
 
-  const warranty: JobbpassWarranty = {
-    months: JOBBPASS_WARRANTY_MONTHS,
-    start_date: input.project.completed_at,
-    text: byggGarantitext(input.project.completed_at),
-  }
-
   const view: JobbpassCustomerView = {
     project,
     business,
@@ -435,7 +413,6 @@ export function deriveJobbpassView(input: JobbpassSourceInput): JobbpassCustomer
     checklists,
     photos,
     invoice_reference,
-    warranty,
     future_service: { consent: input.serviceConsent },
     certificates_note: JOBBPASS_CERTIFICATES_NOTE,
   }
