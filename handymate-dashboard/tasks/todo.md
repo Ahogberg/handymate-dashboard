@@ -903,6 +903,6 @@ Verifierat: 8 steg (inte 10), Company Scan + Hemtur körs på /dashboard efter f
 - [x] Steg 6 + A3: `value-receipt.ts` send_sms + hemkön
 - [x] Steg 4–5: CompanyScan-CTA ("Börja med X →" / "Visa mig runt först" / "Lägg till din första kund"), JarvisHome (omhämtning, expandera, scroll+ring, Hemtur väntar på första beslutet), facits, Golden Path-overlay
 - [x] Steg 8: Daniel-dedup i quote-follow-up (168 h, alla statusar, `filterOutConflicting`)
-- [ ] Full svit, CI, Golden Path 16/16, manuell genomgång, skärmdump till Andreas
+- [x] Full svit 5541/5541 lokalt, CI grön (c8eb273c), Golden Path 19/19 mot prod (efter Station 3-fixen, REALITY-WEEK #32), liveprobe: POST first-action som demoägare → `{ kind: null }` (0 kandidater — förväntat). Skärmdump av skanningens slutskärm EJ tagen: kräver ett konto med `welcome_tour_seen IS NULL` OCH en kandidat (förfallen faktura/gammal offert) — finns inte i prod ännu; första riktiga kontot med data blir beviset
 
 ### Lager 3 (efter lansering): B9 dag-7-mail → B8 aktiveringsmått → B6 first_focus → B7 adaptiv Kom igång → B10 ekonomifrågor ut ur steg 2
