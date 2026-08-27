@@ -1,11 +1,13 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   Loader2, AlertTriangle, ArrowLeft, Check, Copy, ExternalLink,
   FileText, Sparkles, Wrench, ClipboardCheck, Receipt, Zap,
   Mail,
+  Package,
 } from 'lucide-react'
 import type { JobbpassCustomerView } from '@/lib/jobbpass/jobbpass'
 
@@ -331,12 +333,16 @@ function PreviewSummary({ preview }: { preview: JobbpassCustomerView }) {
   if (preview.work_report) rows.push({ icon: Wrench, label: 'Utfört arbete', value: 'Signerad fältrapport ingår' })
   if (preview.checklists.length > 0) rows.push({ icon: ClipboardCheck, label: 'Egenkontroll', value: `${preview.checklists.length} checklista(or)` })
   if (preview.invoice_reference) rows.push({ icon: Receipt, label: 'Faktura', value: preview.invoice_reference.invoice_number || 'Referens finns' })
+  if (preview.installations.length > 0) rows.push({ icon: Package, label: 'Sitter hos kunden', value: `${preview.installations.length} bekräftad${preview.installations.length === 1 ? '' : 'e'} installation${preview.installations.length === 1 ? '' : 'er'}` })
   if (preview.future_service.consent) rows.push({ icon: Zap, label: 'Service', value: 'Kunden har sagt ja till framtida servicepåminnelse' })
 
   return (
     <section className="bg-slate-50 rounded-2xl border border-gray-200 p-5 sm:p-6 mb-6">
       <h2 className="text-base font-semibold text-gray-900 mb-1">Så här ser kundens jobbpass ut</h2>
-      <p className="text-xs text-gray-500 mb-4">Bara det som faktiskt finns underlag för visas — inget hittat på.</p>
+      <p className="text-xs text-gray-500 mb-4">
+        Bara det som faktiskt finns underlag för visas — inget hittat på.{' '}
+        <Link href={`/dashboard/projects/${preview.project.project_id}/installationer`} className="text-primary-700 hover:underline">Installationer →</Link>
+      </p>
       <ul className="space-y-2.5">
         {rows.map((row, i) => (
           <li key={i} className="flex items-start gap-3 text-sm">

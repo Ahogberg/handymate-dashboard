@@ -368,6 +368,18 @@ test.describe('(d) portalvyns data läcker inget internt', () => {
     expect(view.invoice_reference).toBeNull()
   })
 
+  test('installationer: bara bekräftade rader når kundvyn, utkast aldrig (Fastighetspasset steg 2)', () => {
+    const base = { installation_id: 'i', business_id: 'b', customer_id: 'c', project_id: 'p', material_id: null, name: 'Värmepump', manufacturer: 'Nibe', model: 'F2120', serial_number: null, serial_pending: true, sku: null, supplier_name: null, placement: 'Pannrummet', site_address_line: null, site_postal_code: null, site_city: null, site_property_designation: null, installed_at: '2026-08-10', confirmed_at: null, source: 'manual' as const, service_interval_months: 12, service_interval_source: 'product_info' as const, service_note: null, care_instructions: null, notes: null, created_at: '', updated_at: '' }
+    const view = deriveJobbpassView(baseInput({ installations: [
+      { ...base, status: 'draft' as const },
+      { ...base, installation_id: 'i2', status: 'confirmed' as const, confirmed_at: '2026-08-11T00:00:00Z' },
+      { ...base, installation_id: 'i3', status: 'not_applicable' as const },
+    ] }))
+    expect(view.installations).toHaveLength(1)
+    expect(view.installations[0]).toEqual({ name: 'Värmepump', manufacturer: 'Nibe', model: 'F2120', serial_number: null, placement: 'Pannrummet', installed_at: '2026-08-10', service_interval_months: 12, service_interval_source: 'product_info', care_instructions: null })
+    expect(deriveJobbpassView(baseInput({ installations: 'error' })).installations).toEqual([])
+  })
+
   test('ingen garanti nämns — den varierar per bransch och lovas aldrig generiskt (Andreas 2026-08-27)', () => {
     const view = deriveJobbpassView(baseInput()) as unknown as Record<string, unknown>
     expect('warranty' in view).toBe(false)

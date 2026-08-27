@@ -34,6 +34,7 @@ import {
   ListChecks,
   Camera,
   FlaskConical,
+  Wrench,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -1309,6 +1310,17 @@ export default function ApprovalsPage() {
                           >
                             Avbryt
                           </button>
+                        </>
+                      ) : approval.approval_type === 'installation_register' ? (
+                        // Installationsregistret — bekräftas rad för rad på egen sida, aldrig med ett kö-klick.
+                        <>
+                          <Link
+                            href={(approval.payload?.target_route as string) || `/dashboard/projects/${approval.payload?.project_id}/installationer`}
+                            className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-primary-700 hover:bg-primary-800 text-white text-sm font-medium rounded-lg transition-all"
+                          >
+                            <Wrench className="w-4 h-4" />
+                            Registrera installationer
+                          </Link>
                         </>
                       ) : approval.approval_type === 'jobbpass_proposal' ? (
                         // Får INTE godkännas rakt av — det finns inget att

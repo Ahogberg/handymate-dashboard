@@ -8,10 +8,11 @@
  * principen: hellre missa än gissa).
  */
 import {
-  CheckCircle2, FileText, Wrench, ClipboardCheck, Receipt,
+  CheckCircle2, FileText, Wrench, ClipboardCheck, Receipt, Package,
   Image as ImageIcon, Sparkles, Zap,
 } from 'lucide-react'
 import type { JobbpassCustomerView } from '@/lib/jobbpass/jobbpass'
+import { SERVICE_INTERVAL_SOURCE_LABEL } from '@/lib/installation/installation'
 
 const formatSEK = (amount: number) =>
   new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 }).format(amount)
@@ -110,6 +111,29 @@ export function JobbpassView({ pass }: { pass: JobbpassCustomerView }) {
               </ul>
             </div>
           ))}
+        </Card>
+      )}
+
+      {pass.installations.length > 0 && (
+        <Card icon={Package} title="Det här sitter hos dig">
+          {pass.installations.map((inst, i) => {
+            const produkt = [inst.manufacturer, inst.model].filter(Boolean).join(' ')
+            return (
+              <div key={i} className={i > 0 ? 'mt-4 pt-4 border-t border-gray-100' : ''}>
+                <p className="text-sm font-semibold text-gray-900">{inst.name}</p>
+                {produkt && <p className="text-sm text-gray-700">{produkt}</p>}
+                <dl className="mt-1 space-y-0.5 text-sm">
+                  {inst.placement && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Placering</dt><dd className="text-gray-700">{inst.placement}</dd></div>}
+                  {inst.serial_number && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Serienummer</dt><dd className="text-gray-700 break-all">{inst.serial_number}</dd></div>}
+                  {inst.installed_at && <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Installerad</dt><dd className="text-gray-700">{formatJobbpassDatum(inst.installed_at)}</dd></div>}
+                  {inst.service_interval_months && inst.service_interval_source && (
+                    <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Service</dt><dd className="text-gray-700">Var {inst.service_interval_months}:e månad, {SERVICE_INTERVAL_SOURCE_LABEL[inst.service_interval_source]}</dd></div>
+                  )}
+                </dl>
+                {inst.care_instructions && <p className="mt-2 text-sm text-gray-600 whitespace-pre-line">{inst.care_instructions}</p>}
+              </div>
+            )
+          })}
         </Card>
       )}
 

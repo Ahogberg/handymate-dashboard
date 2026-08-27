@@ -154,6 +154,11 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // aldrig via ett kö-klick). "Hoppa över" = vanlig avvisning. Ett godkänn-
   // klick ska aldrig publicera något åt kunden.
   jobbpass_proposal: 'REVIEW_REQUIRED',
+  // Installationsregistret (Fastighetspasset steg 2, 2026-08-27): kortet
+  // routar till /dashboard/projects/[id]/installationer där hantverkaren
+  // bekräftar rad för rad. Ett kö-klick bekräftar aldrig en installation —
+  // "inköpt" är inte "installerat" (grind 1). Avvisa = ingen registrering.
+  installation_register: 'REVIEW_REQUIRED',
   review_auto_invoice: 'REVIEW_REQUIRED',
   four_eyes_quote: 'REVIEW_REQUIRED',
   four_eyes_project_close: 'REVIEW_REQUIRED',

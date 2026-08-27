@@ -29,6 +29,7 @@ export type CloseoutEffectName =
   | 'agent_trigger'
   | 'review_request'
   | 'jobbpass_proposal'
+  | 'installation_register'
   | 'deal_stage'
   | 'completion_batch'
 
@@ -569,6 +570,12 @@ async function runCompletionEffects(params: {
   // publicerar själv i egen yta. Dedupe på samma sätt som recensionskortet.
   effects.push(await proposeJobbpass(supabase, businessId, project))
 
+  // 7c. Installationsregistret (Fastighetspasset steg 2, sql/v174): Lars
+  // frågar vad som sitter kvar hos kunden — BARA när projektet har material
+  // eller namnet pekar på en produkt (grind 2), efter att projektet redan
+  // är klart. Materialrader blir utkast, aldrig bekräftade (grind 1).
+  effects.push(await proposeInstallationRegister(supabase, businessId, project))
+
   // 8. Flytta kopplad deal till vunnen; saknad deal är ett legitimt skip.
   try {
     if (!project.quote_id && !project.lead_id) {
@@ -613,7 +620,7 @@ async function runCompletionEffects(params: {
       .select('id, payload')
       .eq('business_id', businessId)
       .eq('status', 'pending')
-      .in('approval_type', ['review_auto_invoice', 'project_debrief', 'scheduled_review_request', 'jobbpass_proposal'])
+      .in('approval_type', ['review_auto_invoice', 'project_debrief', 'scheduled_review_request', 'jobbpass_proposal', 'installation_register'])
     if (batchReadError) throw batchReadError
 
     let stamped = 0
@@ -804,6 +811,88 @@ async function proposeJobbpass(
   }
 }
 
+/**
+ * Installationsregistret (Fastighetspasset steg 2). Skapar materialutkast
+ * (idempotent, bara 'draft') och ett granskningskort som routar till
+ * /installationer — inget klick i kön bekräftar något. Irrelevanta projekt
+ * (inget material, inget produktord i namnet) får inget kort alls.
+ */
+async function proposeInstallationRegister(
+  supabase: SupabaseClient,
+  businessId: string,
+  project: CompletedProjectRow,
+): Promise<CloseoutEffectResult> {
+  try {
+    if (!project.customer_id) {
+      return { effect: 'installation_register', status: 'skipped', message: 'Ingen kund kopplad' }
+    }
+    const { installationRelevance, ensureMaterialDrafts, loadProjectSite } = await import('@/lib/installation/installation')
+
+    const { count: materialCount, error: countError } = await supabase
+      .from('project_material')
+      .select('material_id', { count: 'exact', head: true })
+      .eq('business_id', businessId)
+      .eq('project_id', project.project_id)
+    if (countError) throw countError
+
+    const ctx = await loadProjectSite(supabase, businessId, project.project_id)
+    const relevance = installationRelevance({
+      name: project.name,
+      description: ctx?.description ?? null,
+      materialCount: materialCount ?? 0,
+    })
+    if (!relevance.relevant) {
+      return { effect: 'installation_register', status: 'skipped', message: 'Inget i projektet pekar på en installation' }
+    }
+
+    const existingResult = await supabase
+      .from('pending_approvals')
+      .select('id')
+      .eq('business_id', businessId)
+      .eq('approval_type', 'installation_register')
+      .contains('payload', { project_id: project.project_id })
+      .limit(1)
+    if (existingResult.error) throw existingResult.error
+    if (existingResult.data && existingResult.data.length > 0) {
+      return { effect: 'installation_register', status: 'skipped', message: 'Redan föreslaget', artifact_id: existingResult.data[0].id }
+    }
+
+    const drafts = await ensureMaterialDrafts(supabase, businessId, project.project_id)
+    if (drafts.error) throw new Error(drafts.error)
+
+    const beskrivning = relevance.reason === 'material'
+      ? `Projektet har ${drafts.materialCount} materialrad${drafts.materialCount === 1 ? '' : 'er'}. Bekräfta vad som faktiskt sitter kvar hos kunden — tillverkare, modell, serienummer, placering. Saknas serienumret går det att komplettera senare.`
+      : `"${project.name}" ser ut att innehålla en installation. Registrera vad som sitter hos kunden så att service och uppföljning får något att utgå från. Inget är obligatoriskt.`
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('pending_approvals')
+      .insert({
+        business_id: businessId,
+        approval_type: 'installation_register',
+        title: `Vad sitter kvar hos kunden? — ${project.name}`,
+        description: beskrivning,
+        risk_level: 'low',
+        status: 'pending',
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        payload: {
+          project_id: project.project_id,
+          project_name: project.name,
+          customer_id: project.customer_id,
+          target_route: `/dashboard/projects/${project.project_id}/installationer`,
+          agent_id: 'lars',
+          relevance_reason: relevance.reason,
+          drafts_created: drafts.created,
+        },
+      })
+      .select('id')
+      .single()
+    if (insertError) throw insertError
+    return { effect: 'installation_register', status: 'succeeded', artifact_id: inserted.id }
+  } catch (error) {
+    return effectFailure('installation_register', error)
+  }
+}
+
 function effectFailure(effect: CloseoutEffectName, error: unknown): CloseoutEffectResult {
   return {
     effect,
@@ -827,6 +916,7 @@ function userWarningForEffect(effect: CloseoutEffectName): string {
     agent_trigger: 'Lars kunde inte starta sin projektuppföljning.',
     review_request: 'Recensionsförfrågan kunde inte förberedas.',
     jobbpass_proposal: 'Jobbpasset kunde inte föreslås.',
+    installation_register: 'Installationsregistret kunde inte föreslås.',
     deal_stage: 'Säljstatusen kunde inte uppdateras.',
     completion_batch: 'Efterarbetets kort kunde inte grupperas.',
   }

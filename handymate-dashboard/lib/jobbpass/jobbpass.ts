@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { signStorageUrl } from '@/lib/storage-signing'
+import { listConfirmedInstallationsForProject, type InstallationRow } from '@/lib/installation/installation'
 
 /**
  * Jobbpass V1 (Etapp Ä, Closeout-to-Lifetime, sql/v154_jobbpass.sql).
@@ -83,6 +84,19 @@ export interface JobbpassInvoiceReference {
   total: number | null
 }
 
+/** En bekräftad installation — bara det kunden har nytta av. Intervallet bär alltid sin källa (grind 4). */
+export interface JobbpassInstallation {
+  name: string
+  manufacturer: string | null
+  model: string | null
+  serial_number: string | null
+  placement: string | null
+  installed_at: string | null
+  service_interval_months: number | null
+  service_interval_source: 'product_info' | 'craftsman' | null
+  care_instructions: string | null
+}
+
 export interface JobbpassCustomerView {
   project: {
     project_id: string
@@ -108,6 +122,8 @@ export interface JobbpassCustomerView {
   photos: JobbpassPhoto[]
   /** null = inget skickat/betalt/förfallet underlag att peka på ännu. */
   invoice_reference: JobbpassInvoiceReference | null
+  /** Bara status 'confirmed' (Fastighetspasset steg 2) — utkast når aldrig kunden. */
+  installations: JobbpassInstallation[]
   future_service: { consent: boolean }
   certificates_note: string
 }
@@ -120,7 +136,7 @@ export interface JobbpassCustomerView {
 export const JOBBPASS_ALLOWED_FIELDS = {
   top: [
     'project', 'business', 'scope', 'changes', 'work_report', 'checklists',
-    'photos', 'invoice_reference', 'future_service', 'certificates_note',
+    'photos', 'invoice_reference', 'installations', 'future_service', 'certificates_note',
   ],
   project: ['project_id', 'name', 'completed_at'],
   business: ['name', 'logo_url', 'accent_color', 'phone', 'email'],
@@ -132,6 +148,7 @@ export const JOBBPASS_ALLOWED_FIELDS = {
   checklist_item: ['text', 'checked'],
   photo: ['id', 'url', 'caption'],
   invoice_reference: ['invoice_number', 'invoice_date', 'total'],
+  installation: ['name', 'manufacturer', 'model', 'serial_number', 'placement', 'installed_at', 'service_interval_months', 'service_interval_source', 'care_instructions'],
   future_service: ['consent'],
 } as const
 
@@ -149,6 +166,7 @@ export function assertJobbpassShape(view: JobbpassCustomerView): JobbpassCustome
   assertKeys(view as unknown as Record<string, unknown>, JOBBPASS_ALLOWED_FIELDS.top, 'toppnivå')
   assertKeys(view.project as unknown as Record<string, unknown>, JOBBPASS_ALLOWED_FIELDS.project, 'project')
   assertKeys(view.business as unknown as Record<string, unknown>, JOBBPASS_ALLOWED_FIELDS.business, 'business')
+  for (const inst of view.installations || []) assertKeys(inst as unknown as Record<string, unknown>, JOBBPASS_ALLOWED_FIELDS.installation, 'installation')
   if (view.scope) {
     assertKeys(view.scope as unknown as Record<string, unknown>, JOBBPASS_ALLOWED_FIELDS.scope, 'scope')
     for (const item of view.scope.items) {
@@ -280,6 +298,8 @@ export interface JobbpassSourceInput {
   invoices: JobbpassInvoiceRow[] | 'error'
   photos: JobbpassPhotoInput[]
   serviceConsent: boolean
+  /** Bekräftade installationer (v174). Valfri — saknas tabellen eller failar frågan visas inget. */
+  installations?: InstallationRow[] | 'error'
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -404,6 +424,20 @@ export function deriveJobbpassView(input: JobbpassSourceInput): JobbpassCustomer
     }
   }
 
+  const installations: JobbpassInstallation[] = (Array.isArray(input.installations) ? input.installations : [])
+    .filter(r => r.status === 'confirmed')
+    .map(r => ({
+      name: r.name,
+      manufacturer: r.manufacturer,
+      model: r.model,
+      serial_number: r.serial_number,
+      placement: r.placement,
+      installed_at: r.installed_at,
+      service_interval_months: r.service_interval_months,
+      service_interval_source: r.service_interval_source,
+      care_instructions: r.care_instructions,
+    }))
+
   const view: JobbpassCustomerView = {
     project,
     business,
@@ -413,6 +447,7 @@ export function deriveJobbpassView(input: JobbpassSourceInput): JobbpassCustomer
     checklists,
     photos,
     invoice_reference,
+    installations,
     future_service: { consent: input.serviceConsent },
     certificates_note: JOBBPASS_CERTIFICATES_NOTE,
   }
@@ -807,7 +842,8 @@ export async function assembleJobbpassView(
       })),
     )
   ).filter((p): p is { id: string; url: string; caption: null } => !!p.url)
-  return deriveJobbpassView({ ...sourceData, photos: signedPhotos, serviceConsent: jobbpass.service_consent })
+  const installations = await listConfirmedInstallationsForProject(supabase, jobbpass.business_id, jobbpass.project_id)
+  return deriveJobbpassView({ ...sourceData, photos: signedPhotos, serviceConsent: jobbpass.service_consent, installations })
 }
 
 export interface CustomerJobbpassEntry {
