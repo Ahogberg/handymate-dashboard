@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useFilePreview } from '@/components/documents/FilePreviewProvider'
 import {
   FileText,
   Plus,
@@ -111,7 +112,7 @@ interface GeneratedDocument {
 
 interface UploadedFile {
   id: string
-  source: 'customer' | 'project'
+  source: 'customer' | 'project' | 'deal'
   file_name: string
   file_url: string | null
   file_type: string | null
@@ -121,6 +122,7 @@ interface UploadedFile {
   customer_name: string | null
   project_id: string | null
   project_name: string | null
+  deal_id: string | null
   created_at: string
 }
 
@@ -198,6 +200,7 @@ function getStatusBadge(status: string) {
 // ============================================
 
 export default function DocumentsPage() {
+  const { openFilePreview } = useFilePreview()
   // Data state
   const [categories, setCategories] = useState<TemplateCategory[]>([])
   const [templates, setTemplates] = useState<DocumentTemplate[]>([])
@@ -469,6 +472,12 @@ export default function DocumentsPage() {
           headers,
         })
         if (!res.ok) throw new Error('Delete failed')
+      } else if (file.source === 'deal' && file.deal_id) {
+        const res = await fetch(`/api/deals/${file.deal_id}/documents/${file.id}`, {
+          method: 'DELETE',
+          headers,
+        })
+        if (!res.ok) throw new Error('Delete failed')
       }
       setUploadedFiles(prev => prev.filter(f => f.id !== file.id))
       showToast('Fil borttagen')
@@ -482,31 +491,24 @@ export default function DocumentsPage() {
    * Direkta publika storage-URL:er fungerar inte tillförlitligt om bucket
    * är privat — server-side signerad URL fungerar oavsett bucket-config.
    */
-  async function openUploadedFile(file: UploadedFile) {
-    try {
-      const headers = await getAuthHeaders()
-      let url: string | null = null
-      if (file.source === 'customer' && file.customer_id) {
-        const res = await fetch(`/api/customers/${file.customer_id}/documents/${file.id}`, { headers })
-        if (res.ok) {
-          const data = await res.json()
-          url = data.url
-        }
-      } else if (file.source === 'project' && file.project_id) {
-        const res = await fetch(`/api/projects/${file.project_id}/documents/${file.id}`, { headers })
-        if (res.ok) {
-          const data = await res.json()
-          url = data.url
-        }
-      }
-      if (url) {
-        window.open(url, '_blank', 'noopener,noreferrer')
-      } else {
-        showToast('Kunde inte öppna filen', 'error')
-      }
-    } catch {
+  function openUploadedFile(file: UploadedFile) {
+    const base = file.source === 'project' && file.project_id
+      ? `/api/projects/${file.project_id}/documents/${file.id}`
+      : file.source === 'deal' && file.deal_id
+        ? `/api/deals/${file.deal_id}/documents/${file.id}`
+        : file.customer_id
+          ? `/api/customers/${file.customer_id}/documents/${file.id}`
+          : null
+    if (!base) {
       showToast('Kunde inte öppna filen', 'error')
+      return
     }
+    openFilePreview({
+      name: file.file_name,
+      mimeType: file.file_type,
+      inlineUrl: `${base}?view=inline`,
+      downloadUrl: `${base}?view=download`,
+    })
   }
 
   // ============================================
@@ -942,7 +944,7 @@ export default function DocumentsPage() {
                               file.source === 'customer' ? 'bg-primary-50 text-primary-700' : 'bg-primary-50 text-primary-700'
                             }`}>
                               {file.source === 'customer' ? <Users className="w-3 h-3" /> : <FolderKanban className="w-3 h-3" />}
-                              {file.source === 'customer' ? 'Kund' : 'Projekt'}
+                              {file.source === 'customer' ? 'Kund' : file.source === 'deal' ? 'Affär' : 'Projekt'}
                             </span>
                             {file.customer_name && (
                               <span className="flex items-center gap-1">

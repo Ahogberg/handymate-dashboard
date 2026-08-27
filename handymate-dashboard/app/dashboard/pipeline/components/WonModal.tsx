@@ -1,6 +1,6 @@
 'use client'
 
-import { PartyPopper, X } from 'lucide-react'
+import { PartyPopper, User, X } from 'lucide-react'
 import { usePipelineContext } from '../context'
 
 /**
@@ -14,7 +14,10 @@ export function WonModal() {
     showWonModal,
     dismissWonModal,
     deals,
+    teamMembers,
     wonDealId,
+    wonAssigneeId,
+    setWonAssigneeId,
     creatingProjectFromWon,
     createProjectFromWonDeal,
   } = usePipelineContext()
@@ -46,6 +49,33 @@ export function WonModal() {
               {deal?.title ? <><span className="font-medium text-gray-900">{deal.title}</span> är nu vunnen. </> : null}
               Vill du skapa ett projekt av dealen?
             </p>
+
+            <div className="mt-5">
+              <label htmlFor="won-project-assignee" className="mb-1.5 block text-sm font-medium text-gray-800">
+                Tilldela projektet
+              </label>
+              <div className="relative">
+                <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <select
+                  id="won-project-assignee"
+                  value={wonAssigneeId}
+                  onChange={event => setWonAssigneeId(event.target.value)}
+                  disabled={creatingProjectFromWon}
+                  className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-9 text-sm text-gray-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-gray-50 disabled:text-gray-400"
+                >
+                  <option value="">Ingen ännu</option>
+                  {teamMembers.map(member => (
+                    <option key={member.id} value={member.id}>
+                      {member.name}{member.role ? ` · ${member.role === 'owner' ? 'Ägare' : member.role === 'admin' ? 'Admin' : member.role === 'project_manager' ? 'Projektledare' : 'Medarbetare'}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">⌄</span>
+              </div>
+              <p className="mt-1.5 text-xs text-gray-500">
+                Förifylls från affärens ansvarige och kan ändras senare på projektsidan.
+              </p>
+            </div>
           </div>
           <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
             <button

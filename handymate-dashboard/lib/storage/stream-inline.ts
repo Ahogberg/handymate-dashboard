@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { safePreviewContentType } from '@/lib/documents/file-preview'
 
 /**
  * Streamar en fil från Supabase Storage direkt till browsern med
@@ -30,6 +31,7 @@ export async function streamInline(
   path: string,
   fileName: string,
   fileType: string | null,
+  requestedDisposition: 'inline' | 'attachment' = 'inline',
 ): Promise<NextResponse> {
   const { data, error } = await supabase.storage.from(bucket).download(path)
 
@@ -44,14 +46,19 @@ export async function streamInline(
   // filename*= så svenska tecken (å, ä, ö) i filnamn renderas korrekt
   // i browserns tab-titel.
   const safeName = encodeURIComponent(fileName)
+  const previewContentType = safePreviewContentType(fileName, fileType)
+  // Okända/aktiva format (HTML, SVG, Office m.fl.) får aldrig bäddas in på
+  // appens origin. De levereras som download även om anroparen bad om inline.
+  const disposition = requestedDisposition === 'inline' && previewContentType ? 'inline' : 'attachment'
 
   return new NextResponse(buffer, {
     status: 200,
     headers: {
-      'Content-Type': fileType || 'application/octet-stream',
-      'Content-Disposition': `inline; filename*=UTF-8''${safeName}`,
+      'Content-Type': previewContentType || 'application/octet-stream',
+      'Content-Disposition': `${disposition}; filename*=UTF-8''${safeName}`,
       'Content-Length': String(buffer.byteLength),
       'Cache-Control': 'private, max-age=300',
+      'X-Content-Type-Options': 'nosniff',
     },
   })
 }

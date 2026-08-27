@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     // Normalize uploaded files into a unified shape
     const customerUploads = (custDocs || []).map((d: any) => ({
       id: d.id,
-      source: 'customer' as const,
+      source: d.deal_id ? 'deal' as const : 'customer' as const,
       file_name: d.file_name,
       file_url: d.file_url,
       file_type: d.file_type,
@@ -75,6 +75,7 @@ export async function GET(request: NextRequest) {
       customer_name: d.customer?.name || null,
       project_id: null,
       project_name: null,
+      deal_id: d.deal_id || null,
       created_at: d.uploaded_at,
     }))
 
@@ -90,6 +91,7 @@ export async function GET(request: NextRequest) {
       customer_name: null,
       project_id: d.project_id,
       project_name: d.project?.name || null,
+      deal_id: null,
       created_at: d.created_at,
     }))
 

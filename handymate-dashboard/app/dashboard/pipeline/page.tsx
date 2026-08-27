@@ -103,6 +103,7 @@ import {
   getTriggeredByStyle,
 } from './helpers'
 import { PipelineProvider, type PipelineContextValue } from './context'
+import { uploadDocumentFiles } from '@/lib/documents/client-upload'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -155,6 +156,7 @@ export default function PipelinePage() {
   // Grattis-modal (vunnen deal utan projekt) — speglar LossModal fast omvänt
   const [showWonModal, setShowWonModal] = useState(false)
   const [wonDealId, setWonDealId] = useState<string | null>(null)
+  const [wonAssigneeId, setWonAssigneeId] = useState('')
   const [creatingProjectFromWon, setCreatingProjectFromWon] = useState(false)
 
   // Quick actions
@@ -361,9 +363,9 @@ export default function PipelinePage() {
     }
   }, [business.business_id])
 
-  const fetchDealDocuments = useCallback(async (customerId: string) => {
+  const fetchDealDocuments = useCallback(async (dealId: string) => {
     try {
-      const res = await fetch(`/api/customers/${customerId}/documents`)
+      const res = await fetch(`/api/deals/${dealId}/documents`)
       if (!res.ok) return
       const data = await res.json()
       setDealDocuments(data.documents || [])
@@ -422,7 +424,7 @@ export default function PipelinePage() {
     setDealUploading(false)
     e.target.value = ''
     if (successCount > 0) {
-      fetchDealDocuments(selectedDeal.customer_id || selectedDeal.id)
+      fetchDealDocuments(selectedDeal.id)
       showToast(successCount === 1 ? 'Dokument uppladdat' : `${successCount} dokument uppladdade`, 'success')
     }
     if (failCount > 0) {
@@ -928,6 +930,11 @@ export default function PipelinePage() {
       // (t.ex. signeringsflödet har redan auto-skapat ett — modal vore brus).
       if (targetStage?.is_won && !dealBeingMoved?.project) {
         setWonDealId(dealId)
+        const activeAssignee = dealBeingMoved?.assigned_to
+          && teamMembers.some(member => member.id === dealBeingMoved.assigned_to)
+          ? dealBeingMoved.assigned_to
+          : ''
+        setWonAssigneeId(activeAssignee)
         setShowWonModal(true)
       }
     } catch {
@@ -946,6 +953,7 @@ export default function PipelinePage() {
       const body: Record<string, any> = deal.quote_id
         ? { from_quote_id: deal.quote_id, name: deal.title }
         : { from_deal_id: deal.id, name: deal.title }
+      if (wonAssigneeId) body.assigned_business_user_id = wonAssigneeId
 
       const res = await fetch('/api/projects', {
         method: 'POST',
@@ -962,7 +970,13 @@ export default function PipelinePage() {
       const data = await res.json()
       setShowWonModal(false)
       setWonDealId(null)
-      showToast('Projekt skapat!', 'success')
+      setWonAssigneeId('')
+      if (data.assignment_error) {
+        showToast('Projektet skapades, men personen kunde inte tilldelas. Lägg till personen på projektsidan.', 'warning')
+      } else {
+        const assignee = teamMembers.find(member => member.id === wonAssigneeId)
+        showToast(assignee ? `Projekt skapat och tilldelat ${assignee.name}!` : 'Projekt skapat!', 'success')
+      }
       await fetchPipeline()
       router.push(`/dashboard/projects/${data.project.project_id}`)
     } catch {
@@ -975,6 +989,7 @@ export default function PipelinePage() {
   function dismissWonModal() {
     setShowWonModal(false)
     setWonDealId(null)
+    setWonAssigneeId('')
   }
 
   async function confirmLossReason() {
@@ -1014,28 +1029,17 @@ export default function PipelinePage() {
       const dealData = await res.json()
       const createdDeal = dealData.deal
 
-      // Upload attached documents if customer is linked
-      // v151: customer-documents är privat — uppladdningen går via
-      // server-rutten (upload+storage+DB-insert i ett), samma väg som
-      // DealModal-fliken redan använder för befintliga deals.
-      if (newDealFiles.length > 0 && createdDeal.customer_id) {
-        let uploadFails = 0
-        for (const file of newDealFiles) {
-          try {
-            const formData = new FormData()
-            formData.append('file', file)
-            formData.append('category', 'other')
-            const docRes = await fetch(`/api/customers/${createdDeal.customer_id}/documents/upload`, {
-              method: 'POST',
-              body: formData,
-            })
-            if (!docRes.ok) uploadFails++
-          } catch {
-            uploadFails++
-          }
-        }
-        if (uploadFails > 0) {
-          showToast(`Deal skapad, men ${uploadFails} dokument misslyckades`, 'error')
+      // Dokumentet hör till AFFÄREN även om kunden ännu inte är vald. Den
+      // gamla vägen hoppade över alla filer utan customer_id och tappade
+      // dessutom affärskopplingen när kund fanns.
+      if (newDealFiles.length > 0) {
+        const upload = await uploadDocumentFiles(
+          `/api/deals/${createdDeal.id}/documents/upload`,
+          newDealFiles,
+          { category: 'other', maxBytes: 10 * 1024 * 1024 },
+        )
+        if (upload.failures.length > 0) {
+          showToast(`Deal skapad, men ${upload.failures[0].message}`, 'error')
         } else {
           showToast('Deal skapad med dokument', 'success')
         }
@@ -1354,7 +1358,7 @@ export default function PipelinePage() {
     fetchDealActivities(deal.id)
     fetchDealNotes(deal.id)
     fetchDealTasks(deal.id)
-    fetchDealDocuments(deal.customer_id || deal.id)
+    fetchDealDocuments(deal.id)
     if (deal.customer_id) {
       fetchCustomerEnrichment(deal.customer_id)
     }
@@ -1674,6 +1678,8 @@ export default function PipelinePage() {
     showWonModal,
     setShowWonModal,
     wonDealId,
+    wonAssigneeId,
+    setWonAssigneeId,
     creatingProjectFromWon,
     createProjectFromWonDeal,
     dismissWonModal,

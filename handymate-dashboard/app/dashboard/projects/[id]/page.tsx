@@ -93,6 +93,7 @@ import { GuardianOrsaker } from '@/components/projects/GuardianOrsaker'
 import { ProjectCustomerFactsCard } from '@/components/projects/ProjectCustomerFactsCard'
 import { FramdriftCard } from '@/components/projects/economy/FramdriftCard'
 import { ProjectQuoteSpec } from '@/components/projects/ProjectQuoteSpec'
+import { useFilePreview } from '@/components/documents/FilePreviewProvider'
 import { ProjectQuoteDocumentCard } from '@/components/projects/ProjectQuoteDocumentCard'
 import { getStageBucket } from '@/components/projects/ProjectStatusCard'
 import ProjectTodoBlock, { type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
@@ -529,6 +530,7 @@ function SortableMilestoneRow({
 // --- Main Component ---
 
 export default function ProjectDetailPage() {
+  const { openFilePreview } = useFilePreview()
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -1301,15 +1303,13 @@ export default function ProjectDetailPage() {
     }
   }
 
-  const handleDocDownload = async (docId: string) => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}/documents/${docId}`)
-      if (!res.ok) throw new Error()
-      const data = await res.json()
-      window.open(data.url, '_blank')
-    } catch {
-      showToast('Kunde inte hämta fil', 'error')
-    }
+  const handleDocOpen = (doc: any) => {
+    openFilePreview({
+      name: doc.name || 'Dokument',
+      mimeType: doc.mime_type,
+      inlineUrl: `/api/projects/${projectId}/documents/${doc.id}?view=inline`,
+      downloadUrl: `/api/projects/${projectId}/documents/${doc.id}?view=download`,
+    })
   }
 
   const handleSaveLog = async (logData: any) => {
@@ -3740,10 +3740,10 @@ export default function ProjectDetailPage() {
                       </div>
                       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
                         <button
-                          onClick={() => handleDocDownload(doc.id)}
+                          onClick={() => handleDocOpen(doc)}
                           className="flex items-center gap-1 text-xs text-primary-700 hover:text-primary-800"
                         >
-                          <Download className="w-3.5 h-3.5" /> Ladda ner
+                          <Eye className="w-3.5 h-3.5" /> Visa
                         </button>
                         <button
                           onClick={() => handleDocDelete(doc.id)}

@@ -27,6 +27,7 @@ import { CurrentUserProvider } from '@/lib/CurrentUserContext'
 import { JobbuddyProvider } from '@/lib/JobbuddyContext'
 import PresenterBar from '@/components/demo/PresenterBar'
 import FirstMissionHandoff from '@/components/jarvis/FirstMissionHandoff'
+import { FilePreviewProvider } from '@/components/documents/FilePreviewProvider'
 
 export default function DashboardLayout({
   children,
@@ -94,6 +95,7 @@ export default function DashboardLayout({
         <JobbuddyProvider>
           <ErrorBoundary>
             <ToastProvider>
+              <FilePreviewProvider>
               {/* MomentsProvider ovanför Jobbkompisen: bubblan konsumerar
                   useMoments() för badge och beloppsläge. Providern renderar
                   själv det enda globala fynd-kortet (z-100, under Toast). */}
@@ -129,6 +131,7 @@ export default function DashboardLayout({
                   </MissionProvider>
                 </FuelProvider>
               </MomentsProvider>
+              </FilePreviewProvider>
             </ToastProvider>
           </ErrorBoundary>
         </JobbuddyProvider>

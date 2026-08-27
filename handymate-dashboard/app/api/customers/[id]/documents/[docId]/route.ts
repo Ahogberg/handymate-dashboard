@@ -6,6 +6,8 @@ import { extractStoragePath } from '@/lib/storage-signing'
 
 const BUCKET = 'customer-documents'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/customers/[id]/documents/[docId]
  * Returnerar signerad URL (1h expiry) för att öppna dokumentet.
@@ -60,8 +62,15 @@ export async function GET(
     // (utan param) returnerar signedUrl för bakåtkompatibilitet med call-sites
     // som ber om download-länk.
     const viewMode = request.nextUrl.searchParams.get('view')
-    if (viewMode === 'inline') {
-      return streamInline(supabase, BUCKET, path, doc.file_name || 'dokument', doc.file_type)
+    if (viewMode === 'inline' || viewMode === 'download') {
+      return streamInline(
+        supabase,
+        BUCKET,
+        path,
+        doc.file_name || 'dokument',
+        doc.file_type,
+        viewMode === 'download' ? 'attachment' : 'inline',
+      )
     }
 
     const { data: signed, error: signErr } = await supabase.storage

@@ -53,20 +53,22 @@ export async function POST(
     }
 
     // Look up the deal to get customer_id if available
-    const { data: deal } = await supabase
+    const { data: deal, error: dealError } = await supabase
       .from('deal')
       .select('customer_id')
       .eq('id', dealId)
       .eq('business_id', business.business_id)
       .single()
 
+    if (dealError || !deal) {
+      return NextResponse.json({ error: 'Affären hittades inte' }, { status: 404 })
+    }
+
     const timestamp = Date.now()
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
 
-    // Use customer-based path if customer exists, otherwise deal-based path
-    const filePath = deal?.customer_id
-      ? `${business.business_id}/${deal.customer_id}/documents/${timestamp}_${safeName}`
-      : `${business.business_id}/deals/${dealId}/documents/${timestamp}_${safeName}`
+    // Affärssökvägen är stabil även om en kund kopplas eller byts senare.
+    const filePath = `${business.business_id}/deals/${dealId}/documents/${timestamp}_${safeName}`
 
     let buffer: Buffer
     try {
@@ -108,7 +110,8 @@ export async function POST(
       .from('customer_document')
       .insert({
         id: docId,
-        customer_id: deal?.customer_id || dealId,
+        customer_id: deal.customer_id || null,
+        deal_id: dealId,
         business_id: business.business_id,
         file_name: file.name,
         file_url: filePath,

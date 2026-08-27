@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Phone,
   PhoneIncoming,
   PhoneOutgoing,
   PhoneCall,
@@ -23,6 +22,8 @@ import {
   DollarSign,
   AlertCircle,
   Receipt,
+  FolderOpen,
+  List,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -33,9 +34,32 @@ interface TimelineEvent {
   description: string | null
   timestamp: string
   metadata: Record<string, unknown>
+  project: TimelineProjectReference | null
+}
+
+interface TimelineProjectReference {
+  project_id: string
+  name: string
+  project_number: string | null
+  status: string | null
+}
+
+type TimelineDisplayItem =
+  | { id: string; type: 'event'; date: Date; data: TimelineEvent }
+  | { id: string; type: 'email_thread'; date: Date; data: any }
+
+interface TimelineProjectGroup {
+  key: string
+  project: TimelineProjectReference | null
+  items: TimelineDisplayItem[]
+  channels: string[]
+  latestAt: number
 }
 
 type TimelineFilter = 'all' | 'calls' | 'sms' | 'quotes' | 'invoices' | 'bookings' | 'leads' | 'agent' | 'time' | 'notes' | 'email' | 'portal' | 'chat'
+type TimelineView = 'projects' | 'chronological'
+
+const TIMELINE_PAGE_SIZE = 150
 
 interface Props {
   customerId: string
@@ -58,11 +82,59 @@ const FILTERS: { key: TimelineFilter; label: string }[] = [
   { key: 'time', label: 'Tid' },
 ]
 
+function projectForItem(item: TimelineDisplayItem): TimelineProjectReference | null {
+  return item.type === 'event' ? item.data.project : null
+}
+
+function channelForItem(item: TimelineDisplayItem): string | null {
+  if (item.type === 'email_thread') return 'E-post'
+  const type = item.data.type
+  if (type.startsWith('sms_')) return 'SMS'
+  if (type.startsWith('email_')) return 'E-post'
+  if (type.startsWith('call_') || type.startsWith('meeting_')) return 'Samtal & möten'
+  if (type.startsWith('portal_')) return 'Kundportal'
+  if (type === 'widget_chat') return 'Webbchatt'
+  return null
+}
+
+export function groupTimelineItemsByProject(items: TimelineDisplayItem[]): TimelineProjectGroup[] {
+  const byProject = new Map<string, TimelineProjectGroup>()
+
+  for (const item of items) {
+    const project = projectForItem(item)
+    const key = project ? `project:${project.project_id}` : 'other'
+    const existing = byProject.get(key) || {
+      key,
+      project,
+      items: [],
+      channels: [],
+      latestAt: item.date.getTime(),
+    }
+    existing.items.push(item)
+    existing.latestAt = Math.max(existing.latestAt, item.date.getTime())
+    const channel = channelForItem(item)
+    if (channel && !existing.channels.includes(channel)) existing.channels.push(channel)
+    byProject.set(key, existing)
+  }
+
+  return Array.from(byProject.values())
+    .map(group => ({
+      ...group,
+      items: group.items.sort((a, b) => b.date.getTime() - a.date.getTime()),
+    }))
+    .sort((a, b) => {
+      if (a.key === 'other') return 1
+      if (b.key === 'other') return -1
+      return b.latestAt - a.latestAt
+    })
+}
+
 export default function CustomerTimeline({ customerId, customerEmail }: Props) {
   const [events, setEvents] = useState<TimelineEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [filter, setFilter] = useState<TimelineFilter>('all')
+  const [view, setView] = useState<TimelineView>('projects')
   const [hasMore, setHasMore] = useState(false)
   const [total, setTotal] = useState(0)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -80,7 +152,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
     else setLoading(true)
 
     try {
-      const res = await fetch(`/api/customers/${customerId}/timeline?filter=${currentFilter}&offset=${offset}&limit=50`)
+      const res = await fetch(`/api/customers/${customerId}/timeline?filter=${currentFilter}&offset=${offset}&limit=${TIMELINE_PAGE_SIZE}`)
       if (!res.ok) throw new Error()
       const data = await res.json()
 
@@ -175,6 +247,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
     if (m.invoice_id) return `/dashboard/invoices/${m.invoice_id}`
     if (m.booking_id) return `/dashboard/calendar`
     if (m.lead_id) return `/dashboard/pipeline`
+    if (m.project_id) return `/dashboard/projects/${m.project_id}`
     return null
   }
 
@@ -195,25 +268,72 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
 
   // Merge timeline events with email threads for "all" and "email" filters
   const showEmails = filter === 'all' || filter === 'email'
-  const emailItems = showEmails ? emailThreads.map(t => ({
+  const emailItems: TimelineDisplayItem[] = showEmails ? emailThreads.map(t => ({
     id: `email_${t.threadId}`,
     type: 'email_thread' as const,
     date: new Date(t.date),
     data: t,
   })) : []
 
-  const eventItems = events.map(e => ({
+  const eventItems: TimelineDisplayItem[] = events.map(e => ({
     id: e.id,
     type: 'event' as const,
     date: new Date(e.timestamp),
     data: e,
   }))
 
-  const allItems = [...eventItems, ...emailItems]
+  const allItems: TimelineDisplayItem[] = [...eventItems, ...emailItems]
   allItems.sort((a, b) => b.date.getTime() - a.date.getTime())
 
   // For email-only filter, only show emails
   const displayItems = filter === 'email' ? emailItems.sort((a, b) => b.date.getTime() - a.date.getTime()) : allItems
+  const projectGroups = groupTimelineItemsByProject(displayItems)
+  const groupedItems = projectGroups.flatMap(group => group.items)
+  const itemsToRender = view === 'projects' ? groupedItems : displayItems
+  const groupByItemId = new Map(
+    projectGroups.flatMap(group => group.items.map(item => [item.id, group] as const)),
+  )
+
+  function renderProjectGroupHeader(group: TimelineProjectGroup) {
+    const project = group.project
+    return (
+      <div className="border-b border-gray-100 bg-gradient-to-r from-primary-50/80 to-white px-4 py-3 sm:px-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <div className={`mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-lg ${project ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500'}`}>
+              {project ? <FolderOpen className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-gray-900">
+                {project?.name || 'Övrig kunddialog'}
+              </p>
+              <p className="mt-0.5 text-xs text-gray-500">
+                {project
+                  ? `${project.project_number ? `${project.project_number} · ` : ''}${group.items.length} händelser`
+                  : 'Saknar en säker koppling till ett specifikt projekt'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+            {group.channels.map(channel => (
+              <span key={channel} className="rounded-full border border-primary-100 bg-white px-2 py-1 text-[10px] font-medium text-primary-700">
+                {channel}
+              </span>
+            ))}
+            {project && (
+              <Link
+                href={`/dashboard/projects/${project.project_id}`}
+                className="ml-1 inline-flex items-center rounded-lg px-2 py-1 text-xs font-semibold text-primary-700 hover:bg-primary-100"
+              >
+                Öppna projekt
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (loading) {
     return (
@@ -225,6 +345,41 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
 
   return (
     <div className="space-y-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-gray-900">Kunddialog och historik</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {view === 'projects'
+              ? 'Samlat per projekt när kopplingen kan bevisas.'
+              : 'Alla händelser i tidsordning.'}
+          </p>
+        </div>
+        <div className="inline-flex self-start rounded-xl border border-gray-200 bg-gray-50 p-1" aria-label="Välj tidslinjevy">
+          <button
+            type="button"
+            onClick={() => setView('projects')}
+            aria-pressed={view === 'projects'}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+              view === 'projects' ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <FolderOpen className="h-3.5 w-3.5" />
+            Per projekt
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('chronological')}
+            aria-pressed={view === 'chronological'}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+              view === 'chronological' ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <List className="h-3.5 w-3.5" />
+            Kronologiskt
+          </button>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="flex gap-1.5 flex-wrap">
         {FILTERS.map(f => (
@@ -245,7 +400,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
 
       {/* Timeline */}
       <div className="bg-white shadow-sm rounded-xl border border-gray-200">
-        {displayItems.length === 0 ? (
+        {itemsToRender.length === 0 ? (
           <div className="p-8 text-center">
             <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-400">Ingen historik ännu</p>
@@ -255,13 +410,19 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
-            {displayItems.map(item => {
+            {itemsToRender.map((item, index) => {
+              const group = groupByItemId.get(item.id)
+              const previousGroup = index > 0 ? groupByItemId.get(itemsToRender[index - 1].id) : null
+              const showGroupHeader = view === 'projects' && group && group.key !== previousGroup?.key
+
               if (item.type === 'email_thread') {
                 const thread = item.data
                 const isExpanded = expandedThreadId === thread.threadId
                 const msgs = threadMessages[thread.threadId]
                 return (
-                  <div key={item.id} className="p-4 hover:bg-gray-50/50 transition-all">
+                  <div key={item.id}>
+                    {showGroupHeader ? renderProjectGroupHeader(group) : null}
+                    <div className="p-4 hover:bg-gray-50/50 transition-all">
                     <div className="flex gap-3">
                       <div className="flex-shrink-0 relative">
                         <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">
@@ -309,6 +470,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
                         )}
                       </div>
                     </div>
+                    </div>
                   </div>
                 )
               }
@@ -320,7 +482,9 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
               const hasDetails = !!(event.description || event.metadata.transcript || event.metadata.recording_url)
 
               return (
-                <div key={item.id} className="p-4 hover:bg-gray-50/50 transition-all">
+                <div key={item.id}>
+                  {showGroupHeader ? renderProjectGroupHeader(group) : null}
+                  <div className="p-4 hover:bg-gray-50/50 transition-all">
                   <div className="flex gap-3">
                     <div className="flex-shrink-0 relative">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center ${getIconBg(event.type)}`}>
@@ -403,6 +567,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
                         </div>
                       )}
                     </div>
+                  </div>
                   </div>
                 </div>
               )

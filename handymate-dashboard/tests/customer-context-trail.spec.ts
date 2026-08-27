@@ -166,15 +166,16 @@ test.describe('fynd 4: kundtidslinjen är nu en komplett kommunikationslogg', ()
     expect(s).toContain("'portal_message_received'")
   })
 
-  test('historiska utgående SMS läses ur sms_log, tidsavgränsat mot speglingens start', () => {
+  test('utgående SMS läses ur sms_log och speglade konversationsrader dedupliceras', () => {
     const s = read(TIMELINE)
     const i = s.indexOf("from('sms_log')")
     expect(i, 'sms_log-sektionen saknas').toBeGreaterThan(-1)
-    const gren = s.slice(i, i + 700)
+    const gren = s.slice(i, i + 900)
     expect(gren).toContain("eq('direction', 'outbound')")
-    // Bara rader FÖRE speglingens deploy — framåt är sms_conversation komplett,
-    // utan gränsen hade varje utskick visats dubbelt.
-    expect(gren).toContain(".lt('sent_at'")
+    expect(gren).toContain('related_id')
+    expect(gren).not.toContain(".lt('sent_at'")
+    expect(s).toContain("event.metadata.source === 'sms_log'")
+    expect(s).toContain("event.metadata.role !== 'assistant'")
   })
 
   test('offertöppningar (quote_tracking_events) finns med, tenant-filtrerade', () => {

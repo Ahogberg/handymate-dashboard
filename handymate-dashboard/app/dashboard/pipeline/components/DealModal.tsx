@@ -13,7 +13,7 @@ import {
   ChevronRight,
   ChevronUp,
   Clock,
-  Download,
+  Eye,
   Edit3,
   File as FileIcon,
   FileText,
@@ -39,6 +39,7 @@ import {
   X,
   Zap,
 } from 'lucide-react'
+import { useFilePreview } from '@/components/documents/FilePreviewProvider'
 import { CopyId } from '@/components/CopyId'
 import { PortalLankKnapp } from '@/components/customers/PortalLankKnapp'
 import { DealTimeline } from '@/components/pipeline/DealTimeline'
@@ -73,6 +74,7 @@ const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas')
  * Komponenten har inga props — `selectedDeal` styr om den renderas.
  */
 export function DealModal() {
+  const { openFilePreview } = useFilePreview()
   const {
     selectedDeal,
     stages,
@@ -1069,13 +1071,17 @@ export function DealModal() {
                                 // customer-documents är privat sedan v151 — doc.file_url är bara
                                 // en path, inte en klickbar URL. Samma signerad-proxy-mönster som
                                 // kundkortets openDocument().
-                                const cid = selectedDeal.customer_id || selectedDeal.id
-                                window.open(`/api/customers/${cid}/documents/${doc.id}?view=inline`, '_blank', 'noopener,noreferrer')
+                                openFilePreview({
+                                  name: doc.file_name,
+                                  mimeType: doc.file_type,
+                                  inlineUrl: `/api/deals/${selectedDeal.id}/documents/${doc.id}?view=inline`,
+                                  downloadUrl: `/api/deals/${selectedDeal.id}/documents/${doc.id}?view=download`,
+                                })
                               }}
                               className="p-1.5 text-gray-400 hover:text-primary-700 rounded-lg hover:bg-primary-50 transition-colors"
                               title="Öppna"
                             >
-                              <Download className="w-4 h-4" />
+                              <Eye className="w-4 h-4" />
                             </button>
                           </div>
                         ))}

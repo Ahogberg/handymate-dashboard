@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import {
+  emptyTimelineProjectContext,
+  resolveTimelineProject,
+  type TimelineProjectReference,
+} from '@/lib/customers/timeline-project-context'
 
 interface TimelineEvent {
   id: string
@@ -9,6 +14,7 @@ interface TimelineEvent {
   description: string | null
   timestamp: string
   metadata: Record<string, unknown>
+  project?: TimelineProjectReference | null
 }
 
 export async function GET(
@@ -35,9 +41,74 @@ export async function GET(
     .from('customer')
     .select('phone_number, email')
     .eq('customer_id', customerId)
+    .eq('business_id', businessId)
     .single()
 
   const customerPhone = customer?.phone_number || null
+
+  // Projektkontexten läses tenant- OCH kundfiltrerat. Den används bara för
+  // verifierade id-kedjor; en kontakt utan sådan kedja lämnas okopplad.
+  const [projectContextRows, dealContextRows, quoteContextRows, invoiceContextRows, bookingContextRows] = await Promise.all([
+    supabase
+      .from('project')
+      .select('project_id, name, project_number, status')
+      .eq('business_id', businessId)
+      .eq('customer_id', customerId)
+      .limit(100),
+    supabase
+      .from('deal')
+      .select('id, project_id, lead_id')
+      .eq('business_id', businessId)
+      .eq('customer_id', customerId)
+      .limit(100),
+    supabase
+      .from('quotes')
+      .select('quote_id, deal_id')
+      .eq('business_id', businessId)
+      .eq('customer_id', customerId)
+      .limit(100),
+    supabase
+      .from('invoice')
+      .select('invoice_id, project_id')
+      .eq('business_id', businessId)
+      .eq('customer_id', customerId)
+      .limit(100),
+    supabase
+      .from('booking')
+      .select('booking_id, project_id')
+      .eq('business_id', businessId)
+      .eq('customer_id', customerId)
+      .limit(100),
+  ])
+
+  const projectContext = emptyTimelineProjectContext()
+  for (const project of projectContextRows.data || []) {
+    projectContext.projects[project.project_id] = {
+      project_id: project.project_id,
+      name: project.name || 'Namnlöst projekt',
+      project_number: project.project_number || null,
+      status: project.status || null,
+    }
+  }
+  for (const deal of dealContextRows.data || []) {
+    if (!deal.project_id || !projectContext.projects[deal.project_id]) continue
+    projectContext.dealToProject[deal.id] = deal.project_id
+    if (deal.lead_id) projectContext.leadToProject[deal.lead_id] = deal.project_id
+  }
+  for (const quote of quoteContextRows.data || []) {
+    const projectId = quote.deal_id ? projectContext.dealToProject[quote.deal_id] : null
+    if (projectId) projectContext.quoteToProject[quote.quote_id] = projectId
+  }
+  for (const invoice of invoiceContextRows.data || []) {
+    if (invoice.project_id && projectContext.projects[invoice.project_id]) {
+      projectContext.invoiceToProject[invoice.invoice_id] = invoice.project_id
+    }
+  }
+  for (const booking of bookingContextRows.data || []) {
+    if (booking.project_id && projectContext.projects[booking.project_id]) {
+      projectContext.bookingToProject[booking.booking_id] = booking.project_id
+    }
+  }
 
   // ── 1. customer_activity (existing activity log) ──────────────
   if (filter === 'all' || filter === 'calls' || filter === 'sms' || filter === 'notes') {
@@ -128,7 +199,7 @@ export async function GET(
   if (filter === 'all' || filter === 'calls') {
     const { data: recordings } = await supabase
       .from('call_recording')
-      .select('recording_id, source, phone_number, transcript_summary, duration_seconds, created_at')
+      .select('recording_id, source, phone_number, transcript_summary, duration_seconds, booking_id, created_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
@@ -142,7 +213,13 @@ export async function GET(
         title: arMote ? 'Platsbesök inspelat' : 'Samtal inspelat',
         description: r.transcript_summary ? String(r.transcript_summary).substring(0, 300) : null,
         timestamp: r.created_at,
-        metadata: { phone: r.phone_number, source: r.source, duration_seconds: r.duration_seconds, recording_id: r.recording_id },
+        metadata: {
+          phone: r.phone_number,
+          source: r.source,
+          duration_seconds: r.duration_seconds,
+          recording_id: r.recording_id,
+          booking_id: r.booking_id,
+        },
       })
     }
   }
@@ -194,20 +271,17 @@ export async function GET(
   }
 
   // ── 3e. sms_log — utgående transaktions-/proaktiva SMS ────────
-  // Historiska utskick (före 2026-08-16 speglades bara ~3 av ~20 utgående
-  // vägar till sms_conversation) — sms_log har ALLTID haft allt. Dedupas
-  // klient-side mot sms_conversation-raderna via innehåll+minut vore
-  // överkurs; i stället visas bara rader ÄLDRE än speglingens deploy-datum
-  // härifrån när de gäller kunder (framåt är sms_conversation komplett).
+  // sms_log är revisionskällan och bär related_id. Efter 2026-08-16 finns
+  // samma utskick även i sms_conversation; dubbletten tas bort mekaniskt
+  // längre ned så den mer precisa sms_log-raden (med projektkedja) vinner.
   if ((filter === 'all' || filter === 'sms')) {
     const { data: smsLogRows } = await supabase
       .from('sms_log')
-      .select('sms_id, message, message_type, status, sent_at')
+      .select('sms_id, message, message_type, related_id, status, sent_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .eq('direction', 'outbound')
       .in('status', ['sent', 'delivered'])
-      .lt('sent_at', '2026-08-17T00:00:00Z')
       .order('sent_at', { ascending: false })
       .limit(50)
 
@@ -218,7 +292,12 @@ export async function GET(
         title: 'SMS skickat',
         description: s.message,
         timestamp: s.sent_at,
-        metadata: { message_type: s.message_type, source: 'sms_log' },
+        metadata: {
+          message_type: s.message_type,
+          related_id: s.related_id,
+          source: 'sms_log',
+          ...smsRelationMetadata(s.message_type, s.related_id),
+        },
       })
     }
   }
@@ -357,7 +436,7 @@ export async function GET(
   if (filter === 'all' || filter === 'invoices') {
     const { data: invoices } = await supabase
       .from('invoice')
-      .select('invoice_id, invoice_number, status, total, due_date, rot_rut_type, created_at, sent_at, paid_at')
+      .select('invoice_id, invoice_number, project_id, status, total, due_date, rot_rut_type, created_at, sent_at, paid_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
@@ -370,7 +449,7 @@ export async function GET(
         title: `Faktura #${inv.invoice_number || '–'} skapad`,
         description: `Belopp: ${formatSEK(inv.total)}${inv.rot_rut_type ? ` (${inv.rot_rut_type.toUpperCase()})` : ''}`,
         timestamp: inv.created_at,
-        metadata: { invoice_id: inv.invoice_id, total: inv.total, status: inv.status, invoice_number: inv.invoice_number },
+        metadata: { invoice_id: inv.invoice_id, project_id: inv.project_id, total: inv.total, status: inv.status, invoice_number: inv.invoice_number },
       })
 
       if (inv.sent_at) {
@@ -380,7 +459,7 @@ export async function GET(
           title: `Faktura #${inv.invoice_number || '–'} skickad`,
           description: `Förfallodatum: ${inv.due_date || '–'}`,
           timestamp: inv.sent_at,
-          metadata: { invoice_id: inv.invoice_id, due_date: inv.due_date },
+          metadata: { invoice_id: inv.invoice_id, project_id: inv.project_id, due_date: inv.due_date },
         })
       }
 
@@ -391,7 +470,7 @@ export async function GET(
           title: `Faktura #${inv.invoice_number || '–'} betald`,
           description: `${formatSEK(inv.total)} betald`,
           timestamp: inv.paid_at,
-          metadata: { invoice_id: inv.invoice_id, total: inv.total },
+          metadata: { invoice_id: inv.invoice_id, project_id: inv.project_id, total: inv.total },
         })
       } else if (inv.status === 'overdue') {
         events.push({
@@ -400,7 +479,7 @@ export async function GET(
           title: `Faktura #${inv.invoice_number || '–'} förfallen`,
           description: `Förfallodatum: ${inv.due_date || '–'}`,
           timestamp: inv.due_date || inv.created_at,
-          metadata: { invoice_id: inv.invoice_id },
+          metadata: { invoice_id: inv.invoice_id, project_id: inv.project_id },
         })
       }
     }
@@ -410,7 +489,7 @@ export async function GET(
   if (filter === 'all' || filter === 'bookings') {
     const { data: bookingRows } = await supabase
       .from('booking')
-      .select('booking_id, status, job_status, notes, scheduled_start, completed_at, created_at')
+      .select('booking_id, project_id, status, job_status, notes, scheduled_start, completed_at, created_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
@@ -423,7 +502,7 @@ export async function GET(
         title: 'Bokning skapad',
         description: b.notes ? b.notes.substring(0, 150) : `Schemalagd: ${b.scheduled_start ? new Date(b.scheduled_start).toLocaleDateString('sv-SE') : '–'}`,
         timestamp: b.created_at,
-        metadata: { booking_id: b.booking_id, status: b.status, job_status: b.job_status, scheduled_start: b.scheduled_start },
+        metadata: { booking_id: b.booking_id, project_id: b.project_id, status: b.status, job_status: b.job_status, scheduled_start: b.scheduled_start },
       })
 
       if (b.job_status === 'completed' && b.completed_at) {
@@ -433,7 +512,7 @@ export async function GET(
           title: 'Jobb slutfört',
           description: b.notes ? b.notes.substring(0, 100) : null,
           timestamp: b.completed_at,
-          metadata: { booking_id: b.booking_id },
+          metadata: { booking_id: b.booking_id, project_id: b.project_id },
         })
       }
     }
@@ -533,6 +612,11 @@ export async function GET(
             trigger_type: ar.trigger_type,
             tool_calls: ar.tool_calls,
             duration_ms: ar.duration_ms,
+            project_id: triggerData.project_id,
+            booking_id: triggerData.booking_id,
+            quote_id: triggerData.quote_id,
+            invoice_id: triggerData.invoice_id,
+            deal_id: triggerData.deal_id,
           },
         })
       }
@@ -547,7 +631,7 @@ export async function GET(
       // (sql/new_tables.sql:14). Frågan bad om `notes`, PostgREST svarade 42703,
       // och eftersom `error` inte plockas ut nedan blev `data` null och hela
       // tidrapporterings-sektionen tyst tom. Inte ett fel i loggen på månader.
-      .select('time_entry_id, work_date, start_time, end_time, duration_minutes, hourly_rate, is_billable, notes:description, created_at')
+      .select('time_entry_id, project_id, work_date, start_time, end_time, duration_minutes, hourly_rate, is_billable, notes:description, created_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('work_date', { ascending: false })
@@ -564,6 +648,7 @@ export async function GET(
         timestamp: te.created_at || te.work_date,
         metadata: {
           time_entry_id: te.time_entry_id,
+          project_id: te.project_id,
           work_date: te.work_date,
           duration_minutes: te.duration_minutes,
           hourly_rate: te.hourly_rate,
@@ -742,9 +827,18 @@ export async function GET(
   }
 
   // ── Deduplicate, sort, paginate ───────────────────────────────
+  const authoritativeSmsRows = events.filter(event => event.metadata.source === 'sms_log')
+  const withoutMirroredSms = events.filter(event => {
+    if (event.metadata.role !== 'assistant' || event.type !== 'sms_sent') return true
+    return !authoritativeSmsRows.some(logged => (
+      logged.description === event.description
+      && Math.abs(new Date(logged.timestamp).getTime() - new Date(event.timestamp).getTime()) < 120_000
+    ))
+  })
+
   // Deduplicate by id
   const seen = new Set<string>()
-  const unique = events.filter(e => {
+  const unique = withoutMirroredSms.filter(e => {
     if (seen.has(e.id)) return false
     seen.add(e.id)
     return true
@@ -753,9 +847,16 @@ export async function GET(
   // Sort by timestamp descending
   unique.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
+  // Projektet sätts först när ett explicit id eller en verifierad relationskedja
+  // pekar på ett av kundens projekt i samma företag.
+  const enriched = unique.map(event => ({
+    ...event,
+    project: resolveTimelineProject(event.metadata, projectContext),
+  }))
+
   // Paginate
-  const total = unique.length
-  const paginated = unique.slice(offset, offset + limit)
+  const total = enriched.length
+  const paginated = enriched.slice(offset, offset + limit)
 
   return NextResponse.json({
     events: paginated,
@@ -793,4 +894,22 @@ function getAgentTriggerLabel(trigger: string): string {
     manual: 'Manuell åtgärd',
   }
   return map[trigger] || trigger
+}
+
+function smsRelationMetadata(
+  messageType: string | null,
+  relatedId: string | null,
+): Record<string, string> {
+  if (!messageType || !relatedId) return {}
+  if (messageType === 'quote' || messageType === 'quote_nudge' || messageType === 'quote_expiry_nudge') {
+    return { quote_id: relatedId }
+  }
+  if (messageType === 'invoice' || messageType === 'invoice_reminder') {
+    return { invoice_id: relatedId }
+  }
+  if (messageType === 'booking_confirmation' || messageType === 'booking_reminder' || messageType === 'reschedule') {
+    return { booking_id: relatedId }
+  }
+  if (messageType.startsWith('project_stage_')) return { project_id: relatedId }
+  return {}
 }

@@ -25,6 +25,7 @@ import { useCurrentUser } from '@/lib/CurrentUserContext'
 import Link from 'next/link'
 import { JobTypeBadge, type JobTypeMeta } from './components/JobTypeBadge'
 import { ProjectDeleteConfirmModal } from '@/components/projects/ProjectDeleteConfirmModal'
+import { uploadDocumentFiles } from '@/lib/documents/client-upload'
 
 interface Project {
   project_id: string
@@ -109,6 +110,7 @@ export default function ProjectsPage() {
     end_date: '',
   })
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [createdProjectForFiles, setCreatedProjectForFiles] = useState<{ id: string; name: string } | null>(null)
   const [teamMembers, setTeamMembers] = useState<{ id: string; name: string; role: string }[]>([])
   const [selectedTeam, setSelectedTeam] = useState<string[]>([])
 
@@ -181,6 +183,34 @@ export default function ProjectsPage() {
   }
 
   async function handleCreateProject() {
+    // Om projektet redan skapats men en fil misslyckades får knappen bara
+    // försöka filerna igen. Den får aldrig skapa ett dubblettprojekt.
+    if (createdProjectForFiles) {
+      setCreating(true)
+      try {
+        const upload = await uploadDocumentFiles(
+          `/api/projects/${createdProjectForFiles.id}/documents`,
+          pendingFiles,
+          { category: 'other', maxBytes: 50 * 1024 * 1024 },
+        )
+        setPendingFiles(upload.failures.map(failure => failure.file))
+        if (upload.failures.length > 0) {
+          showToast(upload.failures[0].message, 'error')
+          return
+        }
+        showToast(`Dokumenten laddades upp till ${createdProjectForFiles.name}`, 'success')
+        setShowCreateModal(false)
+        setCreatedProjectForFiles(null)
+        setPendingFiles([])
+        setSelectedTeam([])
+        setNewProject({ name: '', customer_id: '', project_type: 'hourly', job_type: '', budget_hours: '', budget_amount: '', start_date: '', end_date: '' })
+        fetchProjects()
+      } finally {
+        setCreating(false)
+      }
+      return
+    }
+
     if (!newProject.name.trim()) {
       showToast('Ange ett projektnamn', 'error')
       return
@@ -223,21 +253,21 @@ export default function ProjectsPage() {
 
       // Upload pending files if any
       if (newProjectId && pendingFiles.length > 0) {
-        let uploadedCount = 0
-        for (const file of pendingFiles) {
-          try {
-            const formData = new FormData()
-            formData.append('file', file)
-            formData.append('category', 'other')
-            const uploadRes = await fetch(`/api/projects/${newProjectId}/documents`, { method: 'POST', body: formData })
-            if (uploadRes.ok) uploadedCount++
-          } catch { /* continue with next file */ }
+        const upload = await uploadDocumentFiles(
+          `/api/projects/${newProjectId}/documents`,
+          pendingFiles,
+          { category: 'other', maxBytes: 50 * 1024 * 1024 },
+        )
+        if (upload.failures.length > 0) {
+          // Projektet finns redan. Behåll bara de felade File-objekten och
+          // låt användaren försöka igen utan att skapa en dubblett.
+          setCreatedProjectForFiles({ id: newProjectId, name: newProject.name })
+          setPendingFiles(upload.failures.map(failure => failure.file))
+          showToast(`Projektet skapades, men ${upload.failures[0].message}`, 'error')
+          fetchProjects()
+          return
         }
-        if (uploadedCount > 0) {
-          showToast(`Projekt skapat med ${uploadedCount} dokument!`, 'success')
-        } else {
-          showToast('Projekt skapat, men dokumenten kunde inte laddas upp', 'error')
-        }
+        showToast(`Projekt skapat med ${upload.uploaded} dokument!`, 'success')
       } else {
         showToast('Projekt skapat!', 'success')
       }
@@ -245,6 +275,7 @@ export default function ProjectsPage() {
       setShowCreateModal(false)
       setNewProject({ name: '', customer_id: '', project_type: 'hourly', job_type: '', budget_hours: '', budget_amount: '', start_date: '', end_date: '' })
       setPendingFiles([])
+      setCreatedProjectForFiles(null)
       setSelectedTeam([])
       fetchProjects()
     } catch (err: any) {
@@ -909,6 +940,19 @@ export default function ProjectsPage() {
               {/* Dokument */}
               <div>
                 <label className="block text-xs font-semibold text-slate-800 mb-2">Dokument</label>
+                {createdProjectForFiles && (
+                  <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <div>
+                        <p className="font-medium">Projektet är skapat, men {pendingFiles.length === 1 ? 'filen återstår' : `${pendingFiles.length} filer återstår`}.</p>
+                        <Link href={`/dashboard/projects/${createdProjectForFiles.id}?tab=documents`} className="mt-1 inline-block text-xs font-medium text-amber-900 underline">
+                          Öppna projektet
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <label className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 border-2 border-dashed border-slate-300 rounded-[10px] text-slate-500 cursor-pointer hover:border-primary-500 hover:text-primary-700 transition">
                   <Upload className="w-4 h-4" />
                   <span className="text-sm">Välj filer att bifoga...</span>
@@ -951,13 +995,15 @@ export default function ProjectsPage() {
                   className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-b from-primary-600 to-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 shadow-brand"
                 >
                   {creating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-                  {creating && pendingFiles.length > 0 ? 'Skapar & laddar upp...' : 'Skapa projekt'}
+                  {createdProjectForFiles
+                    ? (creating ? 'Laddar upp igen...' : 'Försök ladda upp igen')
+                    : (creating && pendingFiles.length > 0 ? 'Skapar & laddar upp...' : 'Skapa projekt')}
                 </button>
                 <button
-                  onClick={() => { setShowCreateModal(false); setPendingFiles([]) }}
+                  onClick={() => { setShowCreateModal(false); setPendingFiles([]); setCreatedProjectForFiles(null) }}
                   className="px-6 py-3 bg-white border border-[#E2E8F0] rounded-xl text-slate-500 hover:text-slate-900"
                 >
-                  Avbryt
+                  {createdProjectForFiles ? 'Stäng' : 'Avbryt'}
                 </button>
               </div>
             </div>

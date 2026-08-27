@@ -25,6 +25,7 @@ import {
   Copy,
   RefreshCw,
   ExternalLink,
+  Eye,
   Upload,
   X,
   Save,
@@ -49,6 +50,7 @@ import { CopyId } from '@/components/CopyId'
 import { normalizeSwedishPhone, formatSwedishPhone } from '@/lib/phone-normalize'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { formatSEK } from '@/lib/format-price'
+import { useFilePreview } from '@/components/documents/FilePreviewProvider'
 
 interface Customer {
   customer_id: string
@@ -221,6 +223,7 @@ const FACT_TYPE_BADGE: Record<string, { label: string; className: string }> = {
 }
 
 export default function CustomerDetailPage() {
+  const { openFilePreview } = useFilePreview()
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -680,11 +683,15 @@ export default function CustomerDetailPage() {
    * undviker Supabase's default `attachment`-disposition.
    */
   function openDocument(doc: CustomerDocument) {
-    const url =
+    const inlineUrl =
       doc.source === 'project' && doc.project_id
         ? `/api/projects/${doc.project_id}/documents/${doc.id}?view=inline`
         : `/api/customers/${customerId}/documents/${doc.id}?view=inline`
-    window.open(url, '_blank', 'noopener,noreferrer')
+    const downloadUrl =
+      doc.source === 'project' && doc.project_id
+        ? `/api/projects/${doc.project_id}/documents/${doc.id}?view=download`
+        : `/api/customers/${customerId}/documents/${doc.id}?view=download`
+    openFilePreview({ name: doc.file_name, mimeType: doc.file_type, inlineUrl, downloadUrl })
   }
 
   function formatFileSize(bytes: number | null) {
@@ -1483,7 +1490,7 @@ export default function CustomerDetailPage() {
                               className="p-2.5 text-gray-400 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
                               title="Öppna"
                             >
-                              <Download className="w-4 h-4" />
+                              <Eye className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => deleteDocument(doc.id)}

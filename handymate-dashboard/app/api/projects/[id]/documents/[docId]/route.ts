@@ -5,6 +5,8 @@ import { streamInline } from '@/lib/storage/stream-inline'
 
 const BUCKET = 'project-files'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/projects/[id]/documents/[docId]
  * Default: returnerar signedUrl JSON (legacy).
@@ -36,8 +38,15 @@ export async function GET(
     }
 
     const viewMode = request.nextUrl.searchParams.get('view')
-    if (viewMode === 'inline') {
-      return streamInline(supabase, BUCKET, doc.file_path, doc.name || 'dokument', doc.mime_type)
+    if (viewMode === 'inline' || viewMode === 'download') {
+      return streamInline(
+        supabase,
+        BUCKET,
+        doc.file_path,
+        doc.name || 'dokument',
+        doc.mime_type,
+        viewMode === 'download' ? 'attachment' : 'inline',
+      )
     }
 
     // Generate signed URL

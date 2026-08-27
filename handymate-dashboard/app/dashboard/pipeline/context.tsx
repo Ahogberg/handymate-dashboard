@@ -215,6 +215,8 @@ export interface PipelineContextValue {
   showWonModal: boolean
   setShowWonModal: Dispatch<SetStateAction<boolean>>
   wonDealId: string | null
+  wonAssigneeId: string
+  setWonAssigneeId: Dispatch<SetStateAction<string>>
   creatingProjectFromWon: boolean
   createProjectFromWonDeal: () => Promise<void>
   dismissWonModal: () => void
