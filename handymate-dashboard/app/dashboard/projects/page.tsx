@@ -532,8 +532,26 @@ export default function ProjectsPage() {
           ) : filteredProjects.length === 0 ? (
             <div className="text-center py-20">
               <FolderKanban className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-              <p className="text-slate-500 mb-2">Inga projekt ännu</p>
-              <p className="text-sm text-slate-400">Skapa ett projekt eller konvertera en accepterad offert</p>
+              {/* Ärligt tomläge (2026-08-27): "Inga projekt ännu" var fel när sök-
+                  termen eller filtret dolde träffarna — t.ex. ett avslutat projekt
+                  sökt på nummer under Aktiva. */}
+              {projects.length > 0 && (searchTerm.trim() || filter !== 'all') ? (
+                <>
+                  <p className="text-slate-500 mb-2">
+                    Inga projekt matchar{searchTerm.trim() ? ` "${searchTerm.trim()}"` : ''}{filter === 'active' ? ' bland aktiva' : filter === 'completed' ? ' bland avslutade' : filter === 'cancelled' ? ' bland avbrutna' : ''}
+                  </p>
+                  {filter !== 'all' && (
+                    <button type="button" onClick={() => setFilter('all')} className="text-sm font-semibold text-primary-700 hover:text-primary-800">
+                      Sök bland alla projekt →
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-slate-500 mb-2">Inga projekt ännu</p>
+                  <p className="text-sm text-slate-400">Skapa ett projekt eller konvertera en accepterad offert</p>
+                </>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-slate-200">
