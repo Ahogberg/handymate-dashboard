@@ -125,3 +125,28 @@ test.describe('godkännandesidan använder samma kontrakt första gången och vi
     expect(approvalPage.slice(skipped, receipt)).toContain('ingen handling utfördes')
   })
 })
+
+test.describe('send_sms — Daniels uppföljning får ett kvitto utan belopp (2026-08-27)', () => {
+  test('kräver sms_sent + sms_id; med quote_id länkas offerten, annars bara "SMS skickat"', () => {
+    expect(buildValueReceipt(
+      { approval_type: 'send_sms', payload: { quote_id: 'q_1', customer_name: 'Anna Andersson', related_id: 'q_1' } },
+      { action: 'send_sms', sms_sent: true, sms_id: 'sms_1' },
+      'success',
+    )).toEqual({ text: 'Uppföljning skickad till Anna Andersson', link: '/dashboard/quotes/q_1', linkLabel: 'Öppna offerten' })
+    expect(buildValueReceipt(
+      { approval_type: 'send_sms', payload: { customer_name: 'Anna Andersson' } },
+      { action: 'send_sms', sms_sent: true, sms_id: 'sms_1' },
+      'success',
+    )).toEqual({ text: 'SMS skickat till Anna Andersson' })
+    expect(buildValueReceipt(
+      { approval_type: 'send_sms', payload: { quote_id: 'q_1' } },
+      { action: 'send_sms', sms_sent: false, error: 'STOPP' },
+      'success',
+    )).toBeNull()
+    expect(buildValueReceipt(
+      { approval_type: 'send_sms', payload: { quote_id: 'q_1' } },
+      { action: 'send_sms', sms_sent: true },
+      'success',
+    )).toBeNull()
+  })
+})

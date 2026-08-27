@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { buildValueReceipt } from '@/lib/approvals/value-receipt'
 import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, FileText, Loader2, Mic, Phone, Undo2, User } from 'lucide-react'
 import { nyhetsAtgard, type NyhetsIkon } from '@/lib/jarvis/news-actions'
 import { byggBevakning, fyndPerAgent, type BevakningsRad } from '@/lib/jarvis/bevakning'
@@ -313,7 +314,7 @@ export default function JarvisHome({
   const [revenueRecoveryError, setRevenueRecoveryError] = useState(false)
   const [nbaHiddenIds, setNbaHiddenIds] = useState<Set<string>>(new Set())
   const [snack, setSnack] = useState<{ approvalId: string; text: string } | null>(null)
-  const [feedback, setFeedback] = useState<{ text: string; isError: boolean } | null>(null)
+  const [feedback, setFeedback] = useState<{ text: string; isError: boolean; link?: string; linkLabel?: string } | null>(null)
   const [proof, setProof] = useState<string | null>(null)
   const [bevakning, setBevakning] = useState<BevakningsRad[]>([])
   const [pengarData, setPengarData] = useState<PengarSummary | null>(null)
@@ -328,6 +329,12 @@ export default function JarvisHome({
   // hoppad, eller aldrig aktuell för kontot). HemTur behåller sina egna
   // gates orörda — den öppnar bara inte förrän den här flaggan är sann.
   const [scanKlar, setScanKlar] = useState(false)
+  // Första verifierade handlingen (2026-08-27): kortet skanningen skapade.
+  // Sätts av CompanyScans onClose, expanderas + scrollas till nedan, och
+  // håller Hemturen tillbaka tills det första beslutet faktiskt skickats
+  // (executeSend nollar det). Kön är created_at DESC — kortet skapades
+  // sekunder innan, så det ligger överst av sig självt efter omhämtningen.
+  const [forstaAtgardId, setForstaAtgardId] = useState<string | null>(null)
 
   // Måndagsmötet-takeovern (Måndagsmötet etapp 2, 2026-08-13): egen,
   // OBEROENDE gate — rör inte scanKlar/CompanyScan/HemTur-kedjan ovan, läser
@@ -728,14 +735,17 @@ export default function JarvisHome({
     setMandagsmoteOpen(false)
   }
 
-  function flash(text: string, isError = false) {
-    setFeedback({ text, isError })
-    setTimeout(() => setFeedback(null), 4000)
+  function flash(text: string, isError = false, link?: string, linkLabel?: string) {
+    setFeedback({ text, isError, link, linkLabel })
+    // En länk förtjänar tid att klickas på (samma 10 s som godkännandesidan).
+    setTimeout(() => setFeedback(null), link ? 10000 : 4000)
   }
 
   async function executeSend(approval: Approval, action: 'approve' | 'reject' | 'edit', editedText?: string) {
     pendingTimers.current.delete(approval.id)
     pendingActions.current.delete(approval.id)
+    // Första beslutet är på väg — Hemturen får starta oavsett utfall.
+    if (approval.id === forstaAtgardId) setForstaAtgardId(null)
     try {
       const body: Record<string, unknown> = { action }
       if (action === 'edit') {
@@ -769,13 +779,25 @@ export default function JarvisHome({
       // { success, action, execution, execution_outcome }), inte på toppnivå.
       const svar = await res.json().catch(() => ({} as any))
       const utforande = svar?.execution ?? {}
+      // Värdekvittot (2026-08-27): samma facit-låsta byggare som godkännande-
+      // sidan — bara när serverns klassade utfall är success OCH handlingen
+      // bär sitt eget bevis. Ett misslyckat utförande sägs rakt ut; tidigare
+      // visade hemmet ingenting alls i det fallet.
+      const utfall = (svar?.execution_outcome?.outcome ?? null) as 'success' | 'failed' | 'skipped' | null
+      const kvitto = action === 'approve' ? buildValueReceipt(approval, utforande, utfall) : null
+      if (action === 'approve' && utfall === 'failed') {
+        const orsak = typeof svar?.execution_outcome?.error_text === 'string' ? svar.execution_outcome.error_text : null
+        flash(`Godkänt — men utförandet misslyckades${orsak ? `: ${orsak}` : ''}. Öppna ärendet för att försöka igen.`, true, '/dashboard/approvals', 'Öppna ärendet')
+      } else if (kvitto) {
+        flash(kvitto.text, false, kvitto.link, kvitto.linkLabel)
+      }
 
       setApprovals(prev => prev.filter(a => a.id !== approval.id))
       setDoneRows(prev => [{
         key: `fresh-${approval.id}`,
         time: formatClock(new Date().toISOString()),
         agent: agentForApproval(approval),
-        text: doneRowText({
+        text: kvitto?.text ?? doneRowText({
           action,
           title: approval.title,
           executed: utforande?.executed,
@@ -956,6 +978,26 @@ export default function JarvisHome({
   // väntar, bara visade i en annan yta — utan dem sa räknaren, hälsningens
   // bevisrad och heron "inget behöver dig" fast tre kort stod ovanför.
   const grupper = groupApprovals(synliga)
+
+  // Första verifierade handlingen: när kortet finns i den omhämtade kön —
+  // expandera, scrolla dit och ringa det i två sekunder (samma mönster som
+  // godkännandesidans #approval-ankare). Finns det INTE (routing till en
+  // anställd, utgånget, testdatafiltret) släpps Hemturen i stället för att
+  // vänta på ett kort som aldrig kommer.
+  useEffect(() => {
+    if (!forstaAtgardId || !queueLoaded) return
+    if (!approvals.some(a => a.id === forstaAtgardId)) { setForstaAtgardId(null); return }
+    setExpandedIds(prev => new Set(prev).add(forstaAtgardId))
+    const target = document.getElementById(`beslut-${forstaAtgardId}`)
+    if (!target) return
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    target.classList.add('ring-2', 'ring-primary-400', 'ring-offset-2', 'rounded-2xl')
+    const timer = setTimeout(() => {
+      target.classList.remove('ring-2', 'ring-primary-400', 'ring-offset-2', 'rounded-2xl')
+    }, 2000)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forstaAtgardId, queueLoaded, approvals])
   const beslut = grupper.length + reschedules.length + (fuelCritical ? 1 : 0) + (closeoutCandidates.length > 0 ? 1 : 0) + synligaNba.length
   const koTom = queueLoaded && beslut === 0
 
@@ -1077,12 +1119,17 @@ export default function JarvisHome({
         {/* ── Huvudspalten ─────────────────────────────────────────────── */}
         <div className="min-w-0 lg:row-start-2 lg:col-start-1">
           {feedback && (
-            <div className={`mb-4 px-3.5 py-2.5 border rounded-xl text-sm font-medium ${
+            <div className={`mb-4 px-3.5 py-2.5 border rounded-xl text-sm font-medium flex items-center justify-between gap-3 ${
               feedback.isError
                 ? 'bg-amber-50 border-amber-300 text-amber-800'
                 : 'bg-emerald-50 border-emerald-200 text-emerald-700'
             }`}>
-              {feedback.text}
+              <span>{feedback.text}</span>
+              {feedback.link && (
+                <Link href={feedback.link} className="shrink-0 underline underline-offset-2 font-semibold">
+                  {feedback.linkLabel ?? 'Öppna'}
+                </Link>
+              )}
             </div>
           )}
 
@@ -1550,13 +1597,21 @@ export default function JarvisHome({
           allra första ögonblick, INNAN Hemturen. Äger sin egen gate
           (welcome_tour_seen + hm_scan_klar) och anropar onClose när den
           stängs oavsett anledning; Hemturen renderas inte förrän dess. */}
-      <CompanyScan onClose={() => setScanKlar(true)} />
+      <CompanyScan onClose={r => {
+        setScanKlar(true)
+        // Första verifierade handlingen: kortet skapades efter köns första
+        // hämtning — hämta om så det syns, och håll Hemturen tills beslutet.
+        if (r?.firstActionId) {
+          setForstaAtgardId(r.firstActionId)
+          void fetchQueue()
+        }
+      }} />
 
       {/* Hemturen (docs/design/FORSTA-30-MINUTERNA.md) — spotlightar de fem
           data-tour-target-noderna ovan. Gatead på welcome_tour_seen +
           localStorage; renderar ingenting förrän gaten öppnar OCH skannen
-          har stängts (scanKlar). */}
-      {scanKlar && <HemTur />}
+          har stängts (scanKlar) OCH ett ev. första kort är beslutat. */}
+      {scanKlar && !forstaAtgardId && <HemTur />}
 
       {/* Måndagsmötet — egen, oberoende gate (se useEffect ovan). Kan öppna
           sig SAMTIDIGT som CompanyScan/HemTur teoretiskt existerar i DOM:en,

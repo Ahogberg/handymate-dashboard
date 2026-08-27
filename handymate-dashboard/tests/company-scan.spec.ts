@@ -242,18 +242,57 @@ test.describe('kedjningen i JarvisHome — CompanyScan före Hemturen', () => {
 
   test('HemTur renderas villkorat på skannens onClose-flagga, inte ovillkorat längre', () => {
     expect(hem).toContain('const [scanKlar, setScanKlar] = useState(false)')
-    expect(hem).toContain('{scanKlar && <HemTur />}')
+    expect(hem).toContain('{scanKlar && !forstaAtgardId && <HemTur />}')
   })
 
   test('CompanyScan står FÖRE HemTur i JSX-trädet', () => {
     const scanIdx = hem.indexOf('<CompanyScan onClose=')
-    const hemturIdx = hem.indexOf('{scanKlar && <HemTur />}')
+    const hemturIdx = hem.indexOf('{scanKlar && !forstaAtgardId && <HemTur />}')
     expect(scanIdx).toBeGreaterThan(-1)
     expect(hemturIdx).toBeGreaterThan(-1)
     expect(scanIdx).toBeLessThan(hemturIdx)
   })
 
   test('onClose sätter scanKlar till true — den enda vägen HemTur kan börja rendera', () => {
-    expect(hem).toContain('onClose={() => setScanKlar(true)}')
+    expect(hem).toContain('setScanKlar(true)')
+    expect(hem).toContain('setForstaAtgardId(r.firstActionId)')
+  })
+})
+
+test.describe('första verifierade handlingen (2026-08-27) — skanningen slutar med en handling, inte en tur', () => {
+  const scan = read('components/tour/CompanyScan.tsx')
+  const hem = read(HEM)
+
+  test('POST first-action körs först när GET-datat finns, med egen vakthund och kill-switch', () => {
+    expect(scan).toContain('const FORSTA_ATGARD_PA = true')
+    expect(scan).toContain("fetch('/api/onboarding/first-action', { method: 'POST' })")
+    const effekt = scan.slice(scan.indexOf('// Första verifierade handlingen — parallellt'), scan.indexOf('const isEmpty ='))
+    expect(effekt).toContain('if (!active || !data || !FORSTA_ATGARD_PA) return')
+    expect(effekt).toContain('HANG_TIMEOUT_MS')
+    // Allt annat än ett tydligt svar ⇒ null ⇒ dagens knapp
+    expect(effekt).toContain('if (cancelled || !json || !json.kind) return')
+  })
+
+  test('slutknappen är handlingen; "Visa mig runt först" är sekundär; utan kort finns dagens "Visa mig" kvar', () => {
+    expect(scan).toContain('onClick={() => finishMed(forstaKort.approvalId!)}')
+    expect(scan).toContain('Visa mig runt först')
+    expect(scan.match(/>\s*Visa mig\s*</g)?.length).toBe(2)
+    expect(scan).toContain('{skapaKund.cta ?? \'Lägg till din första kund\'} →')
+  })
+
+  test('finish() är fortfarande ende skrivaren av hm_scan_klar-vägen — finishMed skriver samma nyckel och skickar id:t', () => {
+    expect(scan.match(/localStorage\.setItem\(SEEN_KEY, '1'\)/g)?.length).toBe(2)
+    expect(scan).toContain('onCloseRef.current({ firstActionId })')
+    expect(scan).not.toContain("config: { welcome_tour_seen")
+  })
+
+  test('JarvisHome: kortet hämtas om, expanderas och scrollas till; Hemturen väntar på första beslutet', () => {
+    expect(hem).toContain('const [forstaAtgardId, setForstaAtgardId] = useState<string | null>(null)')
+    expect(hem).toContain('if (r?.firstActionId) {')
+    expect(hem).toContain('void fetchQueue()')
+    expect(hem).toContain('if (approval.id === forstaAtgardId) setForstaAtgardId(null)')
+    expect(hem).toContain("document.getElementById(`beslut-${forstaAtgardId}`)")
+    // Saknas kortet i kön (routing/utgånget/testdata) släpps turen i stället för att vänta
+    expect(hem).toContain('if (!approvals.some(a => a.id === forstaAtgardId)) { setForstaAtgardId(null); return }')
   })
 })

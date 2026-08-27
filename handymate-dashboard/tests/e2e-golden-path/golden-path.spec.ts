@@ -121,6 +121,15 @@ const KNOWN_OVERLAYS: {
     trigger: (p) => p.getByRole('button', { name: 'Godkänn alla' }),
     dismiss: async (_p, t) => { await t.click({ timeout: 2000 }) },
   },
+  // Company Scan (components/tour/CompanyScan.tsx) — mountas bara när
+  // welcome_tour_seen är null, vilket demokontot inte har. Försäkring
+  // (2026-08-27): skulle flaggan nollas (demo-replay) stänger vi skannen
+  // via dess "Hoppa över" i stället för att Station 1 fastnar bakom den.
+  {
+    name: 'CompanyScan',
+    trigger: (p) => p.getByRole('button', { name: 'Hoppa över' }),
+    dismiss: async (_p, t) => { await t.click({ timeout: 2000 }) },
+  },
 ]
 
 /**

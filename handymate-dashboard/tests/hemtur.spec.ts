@@ -183,10 +183,10 @@ test.describe('kedjningen (Company Scan, tasks/jaunty-pondering-hummingbird.md) 
   test('JarvisHome väntar med HemTur tills CompanyScan stängts — HemTur renderas villkorat, inte ovillkorat', () => {
     const hem = read(HEM)
     expect(hem).toContain('const [scanKlar, setScanKlar] = useState(false)')
-    expect(hem).toContain('{scanKlar && <HemTur />}')
+    expect(hem).toContain('{scanKlar && !forstaAtgardId && <HemTur />}')
     // CompanyScan står FÖRE i JSX-trädet — det är hela kedjningen.
     const scanIdx = hem.indexOf('<CompanyScan onClose=')
-    const hemturIdx = hem.indexOf('{scanKlar && <HemTur />}')
+    const hemturIdx = hem.indexOf('{scanKlar && !forstaAtgardId && <HemTur />}')
     expect(scanIdx).toBeGreaterThan(-1)
     expect(scanIdx).toBeLessThan(hemturIdx)
   })

@@ -24,13 +24,28 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { Check } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { fmt } from '@/lib/onboarding/instant-value'
 import type { CompanyScanResult } from '@/app/api/onboarding/company-scan/route'
+import type { FirstActionResponse } from '@/app/api/onboarding/first-action/route'
 
 const SEEN_KEY = 'hm_scan_klar'
+/**
+ * Första verifierade handlingen (2026-08-27): skanningen ber POST
+ * /api/onboarding/first-action välja EN riktig sak (Karins förfallna
+ * faktura, Daniels väntande offert) och skapa kortet — så slutknappen blir
+ * "Börja med Andersson →" i stället för "Visa mig". Kill-switch: false ⇒
+ * exakt dagens beteende, inget anrop görs.
+ */
+const FORSTA_ATGARD_PA = true
+
+export interface CompanyScanCloseResult {
+  /** Id på kortet skanningen skapade och kunden valde att börja med. */
+  firstActionId?: string
+}
 /** Tid mellan varje ✓-rad. */
 const ROW_INTERVAL_MS = 700
 /** Säkerhetsnät (B7-mönstret): både nätverkshämtningen och varje enskild
@@ -81,10 +96,12 @@ export function buildScanRows(d: CompanyScanResult): ScanRow[] {
   return rows
 }
 
-export default function CompanyScan({ onClose }: { onClose: () => void }) {
+export default function CompanyScan({ onClose }: { onClose: (r?: CompanyScanCloseResult) => void }) {
   const business = useBusiness()
   const [active, setActive] = useState(false)
   const [data, setData] = useState<CompanyScanResult | null>(null)
+  // null = inget svar än (eller avstängt/misslyckat → dagens "Visa mig").
+  const [firstAction, setFirstAction] = useState<FirstActionResponse | null>(null)
   const [visibleCount, setVisibleCount] = useState(0)
   const [reducedMotion, setReducedMotion] = useState(false)
   const finishedRef = useRef(false)
@@ -119,6 +136,16 @@ export default function CompanyScan({ onClose }: { onClose: () => void }) {
       localStorage.setItem(SEEN_KEY, '1')
     } catch { /* best effort — se HemTur.tsx för samma resonemang */ }
     onCloseRef.current()
+  }
+  /** Som finish(), men berättar för JarvisHome vilket kort kunden valde att börja med. */
+  function finishMed(firstActionId: string) {
+    if (finishedRef.current) return
+    finishedRef.current = true
+    setActive(false)
+    try {
+      localStorage.setItem(SEEN_KEY, '1')
+    } catch { /* best effort */ }
+    onCloseRef.current({ firstActionId })
   }
 
   // ═══ GRINDEN ═══ — samma fält som Hemturen (business.welcome_tour_seen),
@@ -157,8 +184,28 @@ export default function CompanyScan({ onClose }: { onClose: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active])
 
+  // Första verifierade handlingen — parallellt med radanimationen, egen
+  // vakthund. Allt annat än ett tydligt svar ⇒ null ⇒ dagens "Visa mig".
+  useEffect(() => {
+    if (!active || !data || !FORSTA_ATGARD_PA) return
+    let cancelled = false
+    const watchdog = setTimeout(() => { cancelled = true }, HANG_TIMEOUT_MS)
+    fetch('/api/onboarding/first-action', { method: 'POST' })
+      .then(r => (r.ok ? r.json() : null))
+      .then((json: FirstActionResponse | null) => {
+        clearTimeout(watchdog)
+        if (cancelled || !json || !json.kind) return
+        setFirstAction(json)
+      })
+      .catch(() => { clearTimeout(watchdog) })
+    return () => { cancelled = true; clearTimeout(watchdog) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, data])
+
   const isEmpty = data !== null && data.customerCount === 0
   const rows = data && !isEmpty ? buildScanRows(data) : []
+  const forstaKort = firstAction && firstAction.kind && firstAction.kind !== 'skapa_kund' && firstAction.approvalId ? firstAction : null
+  const skapaKund = firstAction && firstAction.kind === 'skapa_kund' && firstAction.href ? firstAction : null
 
   // Rad-för-rad-avslöjandet. prefers-reduced-motion visar allt direkt, utan
   // en enda timer i den vägen.
@@ -212,13 +259,23 @@ export default function CompanyScan({ onClose }: { onClose: () => void }) {
             <div>
               <p className="m-0 text-[15px] font-semibold text-slate-900">Teamet är på plats och redo</p>
               <p className="mt-1 mb-4 text-sm text-slate-500">Lägg till din första kund så börjar de jobba.</p>
-              <button
-                type="button"
-                onClick={finish}
-                className="px-4 py-2 rounded-full bg-primary-700 text-white text-sm font-semibold min-h-[40px]"
-              >
-                Visa mig
-              </button>
+              {skapaKund ? (
+                <Link
+                  href={skapaKund.href!}
+                  onClick={finish}
+                  className="inline-flex items-center px-4 py-2 rounded-full bg-primary-700 text-white text-sm font-semibold min-h-[40px]"
+                >
+                  {skapaKund.cta ?? 'Lägg till din första kund'} →
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={finish}
+                  className="px-4 py-2 rounded-full bg-primary-700 text-white text-sm font-semibold min-h-[40px]"
+                >
+                  Visa mig
+                </button>
+              )}
             </div>
           </div>
         ) : (
@@ -240,7 +297,30 @@ export default function CompanyScan({ onClose }: { onClose: () => void }) {
                 </li>
               ))}
             </ul>
-            {finished && (
+            {finished && forstaKort ? (
+              <div>
+                {/* Första verifierade handlingen: agentens fynd + knappen som
+                    ÄR handlingen. Sekundärlänken ger dagens väg (Hemturen). */}
+                <div className="flex items-start gap-2.5 mb-3 pt-3 border-t border-slate-100">
+                  {forstaKort.agent && forstaKort.agent !== 'matte' && <AgentAvatar agentKey={forstaKort.agent} size="sm" />}
+                  <p className="m-0 text-sm font-medium text-slate-800">{forstaKort.headline}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => finishMed(forstaKort.approvalId!)}
+                  className="w-full px-4 py-2.5 rounded-full bg-primary-700 text-white text-sm font-semibold min-h-[44px]"
+                >
+                  {forstaKort.cta ?? 'Börja här'} →
+                </button>
+                <button
+                  type="button"
+                  onClick={finish}
+                  className="w-full mt-2 text-xs text-slate-500 hover:text-slate-700 min-h-[32px]"
+                >
+                  Visa mig runt först
+                </button>
+              </div>
+            ) : finished && (
               <button
                 type="button"
                 onClick={finish}

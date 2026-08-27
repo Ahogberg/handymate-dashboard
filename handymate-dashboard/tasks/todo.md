@@ -894,15 +894,15 @@ Verifierat: 8 steg (inte 10), Company Scan + Hemtur körs på /dashboard efter f
 - [x] A2 LiveTouren: "5 aktiva" → `{teamRow.length} på plats`, "5 aktiva"-statruta → `TEAM.length` "i ditt team", "Komplettera setup 2/5 klart / 40 %" → mock av Kom igång-railen utan tal + facit
 - [x] A1 MalNudge ut ur "Det här behöver dig idag" → månadsrapporten före MalBlock + facit omskrivet
 - [x] A4 hygien: CLAUDE.md onboarding-sektion, GYLLENE-VAGEN 8 steg, OnboardingHeader default 6, döda Step1BusinessAccount/Step3Phone/StepProgress borta + facit
-- [ ] A3 värdekvitto på hemkön (`buildValueReceipt` i `JarvisHome.executeSend`, röd flash vid misslyckat utförande) — byggs ihop med Lager 2 steg 6
+- [x] A3 värdekvitto på hemkön (`buildValueReceipt` i `JarvisHome.executeSend`, röd flash vid misslyckat utförande)
 
 ### Lager 2 — första besöket slutar med en verklig handling
-- [ ] Steg 1: `lib/onboarding/first-action.ts` (ren picker + copy) + `tests/first-action.spec.ts`
-- [ ] Steg 2: `lib/invoice-reminder-card.ts` ur send-reminders (beteendeidentiskt) + `lib/agents/daniel/quote-follow-up-card.ts` + `buildOpenedQuoteFollowUpMessage`
-- [ ] Steg 3: POST `/api/onboarding/first-action` + rutt-facit
-- [ ] Steg 6 + A3: `value-receipt.ts` send_sms + hemkön
-- [ ] Steg 4–5: CompanyScan-CTA, JarvisHome-pinning, Hemtur-grind, facits, Golden Path-overlay
-- [ ] Steg 8: Daniel-dedup i quote-follow-up (eller `enabledTiers=['karin']`)
+- [x] Steg 1: `lib/onboarding/first-action.ts` (ren picker + copy) + `tests/first-action.spec.ts` (22)
+- [x] Steg 2: `lib/invoice-reminder-card.ts` ur send-reminders (verbatim, cronen 583→289 rader, alla pinnade strängar kvar) + `lib/agents/daniel/quote-follow-up-card.ts` + `buildOpenedQuoteFollowUpMessage`
+- [x] Steg 3: POST `/api/onboarding/first-action` + rutt-facit
+- [x] Steg 6 + A3: `value-receipt.ts` send_sms + hemkön
+- [x] Steg 4–5: CompanyScan-CTA ("Börja med X →" / "Visa mig runt först" / "Lägg till din första kund"), JarvisHome (omhämtning, expandera, scroll+ring, Hemtur väntar på första beslutet), facits, Golden Path-overlay
+- [x] Steg 8: Daniel-dedup i quote-follow-up (168 h, alla statusar, `filterOutConflicting`)
 - [ ] Full svit, CI, Golden Path 16/16, manuell genomgång, skärmdump till Andreas
 
 ### Lager 3 (efter lansering): B9 dag-7-mail → B8 aktiveringsmått → B6 first_focus → B7 adaptiv Kom igång → B10 ekonomifrågor ut ur steg 2

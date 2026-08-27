@@ -88,6 +88,20 @@ export function buildValueReceipt(
       }
     }
 
+    case 'send_sms': {
+      // Executor-kontraktet (app/api/approvals/[id]/route.ts, send_sms-casen):
+      // { sms_sent: boolean, sms_id?: string }. Inget belopp — inget fakturerades.
+      // Daniels offertuppföljning bär payload.quote_id (lib/agents/daniel/
+      // quote-follow-up-card.ts); ett generiskt SMS-kort saknar det och får
+      // ett kvitto utan länk.
+      if (execution.sms_sent !== true || !id(execution.sms_id)) return null
+      const customerName = id(payload.customer_name)
+      const quoteId = id(payload.quote_id)
+      const vem = customerName ? ` till ${customerName}` : ''
+      return quoteId
+        ? { text: `Uppföljning skickad${vem}`, link: `/dashboard/quotes/${quoteId}`, linkLabel: 'Öppna offerten' }
+        : { text: `SMS skickat${vem}` }
+    }
     case 'create_ata_draft': {
       const amount = positiveAmount(execution.total)
       if (execution.ok !== true || amount === null) return null
