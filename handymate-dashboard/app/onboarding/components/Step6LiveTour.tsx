@@ -22,6 +22,7 @@ import { ListChecks, Rocket, Target, Crown, TrendingUp, Compass } from 'lucide-r
 import { TEAM, getAgentById } from '@/lib/agents/team'
 import { TourTarget, SpotlightOverlay, type TourStepBase } from '@/components/tour/TourPrimitives'
 import { buildFirstMissionPrompt, writeFirstMissionPrompt } from '@/lib/onboarding/first-mission-handoff'
+import { KOM_IGANG_DEFAULT_LABELS, KOM_IGANG_HEADING } from '@/lib/onboarding/kom-igang-tasks'
 import type { OnboardingFormData } from '../types-redesign'
 
 interface Step6Props {
@@ -643,23 +644,19 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
                 borderRadius: 'var(--ob-r-lg)',
               }}
             >
-              {/* Mock av den riktiga Kom igång-railen (components/jarvis/
-                  KomIgangRail.tsx, samma tre uppdrag). Inget antal, ingen
-                  stapel — förut stod här ett påhittat antal-klart och en fast procentstapel
-                  (bort 2026-08-27). Etiketterna hålls i synk för hand tills
-                  railen exporterar dem. */}
+              {/* Mock av den riktiga railen (components/jarvis/KomIgangRail.tsx) —
+                  rubrik och etiketter ur samma lib som railen läser
+                  (lib/onboarding/kom-igang-tasks.ts), så förhandsvisningen
+                  visar exakt det som väntar. Inget antal, ingen stapel —
+                  förut stod här ett påhittat antal-klart (bort 2026-08-27). */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <span style={{ color: 'var(--ob-primary-700)' }}>
                   <Target size={16} />
                 </span>
-                <strong style={{ fontSize: 13, color: 'var(--ob-primary-700)' }}>Kom igång</strong>
+                <strong style={{ fontSize: 13, color: 'var(--ob-primary-700)' }}>{KOM_IGANG_HEADING}</strong>
               </div>
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {[
-                  'Ring ditt nummer — hör Lisa fånga samtalet',
-                  'Spela in ett testmöte eller skapa din första offert',
-                  'Lägg appen på hemskärmen',
-                ].map(label => (
+                {KOM_IGANG_DEFAULT_LABELS.map(label => (
                   <li key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--ob-ink)' }}>
                     <span
                       style={{

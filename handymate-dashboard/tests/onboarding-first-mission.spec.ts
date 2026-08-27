@@ -148,6 +148,7 @@ test.describe('Step6LiveTour — inga påhittade tal i mock-dashboarden (2026-08
     expect(liveTour).not.toContain('2/5')
     expect(liveTour).not.toContain("width: '40%'")
     expect(liveTour).not.toContain('Komplettera setup')
-    expect(liveTour).toContain('Kom igång')
+    expect(liveTour).toContain('{KOM_IGANG_HEADING}')
+    expect(liveTour).toContain('KOM_IGANG_DEFAULT_LABELS.map')
   })
 })

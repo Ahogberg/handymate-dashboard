@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { deriveKomIgangTasks, type KomIgangSignals, type KomIgangTask } from '@/lib/onboarding/kom-igang-tasks'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,12 @@ export const dynamic = 'force-dynamic'
  *   pwa                — minst en push-prenumeration (push_subscriptions,
  *                         sql/v2_push_subscriptions.sql).
  *
+ * Lager 3 / B7 (2026-08-27): svaret bär dessutom `tasks` — uppgifter
+ * härledda ur kontots riktiga luckor (lib/onboarding/kom-igang-tasks.ts):
+ * Lisa (testsamtal), Karin (Fortnox/faktura), Daniel (första offerten),
+ * Matte (första uppdraget), Hanna (kundsegment), push (bara när ett riktigt
+ * kort väntar). De tre booleanerna ovan finns kvar oförändrade.
+ *
  * Fail-safe: går EN delfråga sönder faller den till false (aldrig ett kastat
  * fel som tar ner hela railen) — se catch-blocket.
  */
@@ -32,12 +39,17 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabase()
     const businessId = business.business_id
 
-    const [configRes, callRecRes, meetingRes, quoteRes, pushRes] = await Promise.all([
-      supabase.from('business_config').select('onboarding_data').eq('business_id', businessId).maybeSingle(),
+    const [configRes, callRecRes, meetingRes, quoteRes, pushRes, invoiceRes, missionRes, customerRes, segmentedRes, pendingRes] = await Promise.all([
+      supabase.from('business_config').select('onboarding_data, fortnox_connected').eq('business_id', businessId).maybeSingle(),
       supabase.from('call_recording').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
       supabase.from('meeting_job').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
       supabase.from('quotes').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
       supabase.from('push_subscriptions').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
+      supabase.from('invoice').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
+      supabase.from('mission').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
+      supabase.from('customer').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
+      supabase.from('customer').select('*', { count: 'exact', head: true }).eq('business_id', businessId).not('segment_id', 'is', null),
+      supabase.from('pending_approvals').select('*', { count: 'exact', head: true }).eq('business_id', businessId).eq('status', 'pending').neq('approval_type', 'team_intro'),
     ])
 
     const testCall = (configRes.data?.onboarding_data as Record<string, unknown> | null | undefined)
@@ -47,7 +59,19 @@ export async function GET(request: NextRequest) {
     const forsta_artefakten = (meetingRes.count ?? 0) > 0 || (quoteRes.count ?? 0) > 0
     const pwa = (pushRes.count ?? 0) > 0
 
-    return NextResponse.json({ ring_test, forsta_artefakten, pwa })
+    const signals: KomIgangSignals = {
+      ring_test,
+      karin_has_invoice_data: Boolean(configRes.data?.fortnox_connected) || (invoiceRes.count ?? 0) > 0,
+      has_quote: (quoteRes.count ?? 0) > 0,
+      has_mission: (missionRes.count ?? 0) > 0,
+      customer_count: customerRes.count ?? 0,
+      segmented_customer_count: segmentedRes.count ?? 0,
+      pwa,
+      pending_real_cards: pendingRes.count ?? 0,
+    }
+    const tasks: KomIgangTask[] = deriveKomIgangTasks(signals)
+
+    return NextResponse.json({ ring_test, forsta_artefakten, pwa, tasks })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Okänt fel'
     console.error('GET /api/onboarding/kom-igang error:', msg)
