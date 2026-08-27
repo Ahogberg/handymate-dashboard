@@ -88,7 +88,6 @@ test.describe('projektskapande — uppladdningsfel försvinner inte', () => {
     )
     expect(insert).toContain('order_id: projectId')
     expect(insert).toContain('project_id: projectId')
-    expect(insert).toContain('file_name: file.name')
     expect(insert).toContain('name: file.name')
     expect(insert).toContain('file_url: filePath')
     expect(insert).toContain('file_path: filePath')

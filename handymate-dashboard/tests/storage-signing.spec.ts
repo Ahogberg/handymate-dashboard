@@ -236,7 +236,6 @@ test.describe('regression — signeringshelpern används bara i läsvägar, inte
     const insertBlock = body.slice(insertIndex, body.indexOf('.select()', insertIndex))
     expect(insertBlock).toContain('order_id: projectId')
     expect(insertBlock).toContain('project_id: projectId')
-    expect(insertBlock).toContain('file_name: file.name')
     expect(insertBlock).toContain('file_url: filePath')
     expect(insertBlock).toContain('file_path: filePath')
     expect(insertBlock).not.toContain('signStorageUrl')

@@ -150,11 +150,10 @@ export async function POST(
         order_id: projectId,
         project_id: projectId,
         business_id: business.business_id,
-        // Samma produktionsschema har legacy-namnen file_name/file_url som
-        // NOT NULL. De ska bära exakt samma sanning som name/file_path.
+        // Samma produktionsschema har legacykolumnen file_url som NOT NULL.
+        // Den ska bära exakt samma sanning som file_path.
         // Ingen publik URL sparas här: file_url är historiskt kolumnnamn för
         // den privata storage-sökvägen och signeras först i läsvägen.
-        file_name: file.name,
         name: file.name,
         file_url: filePath,
         file_path: filePath,
