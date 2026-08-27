@@ -44,6 +44,7 @@ export function DuplicateConflictModal({
   onClose,
   onForceCreate,
 }: DuplicateConflictModalProps) {
+  const phoneBlocked = duplicates.some(d => d.match_type === 'phone')
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
@@ -105,8 +106,9 @@ export function DuplicateConflictModal({
         </div>
 
         <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-          Klicka en kund ovan för att öppna den befintliga, eller skapa en ny kund ändå om det
-          verkligen är en separat person/företag.
+          {phoneBlocked
+            ? 'Samma telefonnummer kan inte finnas på två kunder. Öppna den befintliga kunden ovan — eller ändra numret om det verkligen är en annan person.'
+            : 'Klicka en kund ovan för att öppna den befintliga, eller skapa en ny kund ändå om det verkligen är en separat person/företag.'}
         </p>
 
         <div className="flex gap-2">
@@ -115,16 +117,21 @@ export function DuplicateConflictModal({
             onClick={onClose}
             className="flex-1 px-4 py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition-colors"
           >
-            Avbryt
+            {phoneBlocked ? 'Tillbaka och ändra' : 'Avbryt'}
           </button>
-          <button
-            type="button"
-            onClick={onForceCreate}
-            disabled={saving}
-            className="flex-1 px-4 py-2.5 bg-primary-700 hover:bg-primary-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
-          >
-            {saving ? 'Skapar…' : 'Skapa ändå'}
-          </button>
+          {/* "Skapa ändå" lovar bara det den kan hålla: vid telefonmatch stoppar
+              unique_phone_per_business inserten (2026-08-27) — knappen visas
+              inte alls i stället för att fejka en väg som alltid failar. */}
+          {!phoneBlocked && (
+            <button
+              type="button"
+              onClick={onForceCreate}
+              disabled={saving}
+              className="flex-1 px-4 py-2.5 bg-primary-700 hover:bg-primary-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
+            >
+              {saving ? 'Skapar…' : 'Skapa ändå'}
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -72,7 +72,7 @@ test.describe('syncNewCustomerToFortnox — hooken', () => {
 
 test.describe('de fem skapandevägarna anropar hooken EFTER sin insert-felkoll', () => {
   const vagar: Array<{ fil: string; insertMarkor: string; felkoll: string }> = [
-    { fil: 'app/api/actions/route.ts', insertMarkor: "case 'create_customer'", felkoll: 'if (error) throw error' },
+    { fil: 'app/api/actions/route.ts', insertMarkor: "case 'create_customer'", felkoll: 'throw error' },
     { fil: 'app/api/customers/route.ts', insertMarkor: 'export async function POST', felkoll: 'if (error) throw error' },
     { fil: 'app/api/agent/trigger/tool-router.ts', insertMarkor: 'async function createCustomer(', felkoll: 'if (error) return { success: false, error: error.message }' },
     { fil: 'lib/leads/golden-path.ts', insertMarkor: "const newId = 'cust_'", felkoll: 'customerId = newCustomer?.customer_id || newId' },

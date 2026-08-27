@@ -149,7 +149,23 @@ export async function POST(request: NextRequest) {
           .from('customer')
           .insert(insertData)
 
-        if (error) throw error
+        if (error) {
+          // Sanning (2026-08-27): "Skapa ändå" kan inte skapa en andra kund
+          // med samma telefonnummer — unique_phone_per_business stoppar
+          // inserten. Förut blev det ett 500 och dialogen stod kvar utan
+          // förklaring. Säg det rakt ut med 409 så UI:t kan peka på den
+          // befintliga kunden.
+          if ((error as { code?: string }).code === '23505' && error.message.includes('unique_phone_per_business')) {
+            return NextResponse.json(
+              {
+                error: 'phone_taken',
+                message: 'Telefonnumret används redan av en annan kund — öppna den befintliga kunden i stället.',
+              },
+              { status: 409 },
+            )
+          }
+          throw error
+        }
 
         // Fortnox-kundnummer vid SKAPANDET (2026-08-26) — se
         // lib/fortnox/sync.ts syncNewCustomerToFortnox. Non-blocking: kunden

@@ -298,6 +298,14 @@ export default function CustomersPage() {
           setActionLoading(false)
           return
         }
+        // Samma telefonnummer kan inte finnas två gånger (unik-constraint):
+        // backend säger det ärligt med phone_taken — dialogen står kvar så
+        // hantverkaren kan öppna den befintliga kunden.
+        if (errBody?.error === 'phone_taken') {
+          showToast(errBody.message || 'Telefonnumret används redan av en annan kund.', 'error')
+          setActionLoading(false)
+          return
+        }
       }
 
       if (!response.ok) throw new Error('Något gick fel')
