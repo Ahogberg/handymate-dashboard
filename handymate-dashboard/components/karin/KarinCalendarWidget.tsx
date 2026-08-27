@@ -83,8 +83,23 @@ export function KarinCalendarWidget() {
     )
   }
 
-  // Saknas uppgifter är kalendern tom av fel skäl. Hellre tyst än osann.
-  if (!data || data.missing.length > 0) return null
+  if (!data) return null
+
+  // Saknas uppgifter är kalendern tom av fel skäl. Förut helt tyst — sedan
+  // 2026-08-27 (Lager 3 / B10) frågas skatterytmen inte längre i
+  // onboardingen, så det här är stället Karin BER om den: en rad, en länk,
+  // aldrig en påhittad kalender.
+  if (data.missing.length > 0) {
+    const n = data.missing.length
+    return (
+      <RailCard title="Bolagskalendern" href="/dashboard/settings/bolagsprofil" leading={<AgentAvatar agentKey="karin" size="sm" />}>
+        <p className="m-0 text-[13px] text-slate-700 leading-snug">
+          Karin behöver {n === 1 ? 'ett svar' : `${n} svar`} för att räkna dina deadlines
+          <span className="text-slate-400"> · {data.missing.join(', ')}</span>
+        </p>
+      </RailCard>
+    )
+  }
 
   const kommande = data.months.flatMap(m => m.events).slice(0, 4)
   if (kommande.length === 0) return null

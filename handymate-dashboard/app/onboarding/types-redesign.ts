@@ -15,18 +15,9 @@ export interface OnboardingFormData {
    * en får han en halv artikelbank för ett helt jobb.
    */
   secondaryTrades?: string[]
-  /**
-   * Skatterytmen (v94) — det Karins bolagskalender räknar deadlines ur.
-   *
-   * Alla tre är frivilliga. `undefined` betyder att frågan hoppades över, och
-   * då pekar kalendern ut vad som saknas i stället för att anta något — en
-   * tom kalender som betyder "vi vet inte" får aldrig se ut som en som
-   * betyder "allt är lugnt".
-   */
-  vatPeriod?: string
-  isEmployer?: boolean
-  /** 12 = kalenderår · 0 = brutet år, månaden fylls i under Bolagsprofil. */
-  fiscalYearEndMonth?: number
+  // Skatterytmen (momsperiod/arbetsgivare/räkenskapsår) frågas inte längre i
+  // onboardingen (Lager 3 / B10, 2026-08-27) — Karin ber om den i
+  // bolagskalendern → Bolagsprofil när hon behöver den.
   orgNumber?: string
   fSkatt?: boolean
   area?: string
@@ -63,13 +54,8 @@ export interface OnboardingFormData {
   endHour?: number
   priceMin?: number
   priceMax?: number
-  /**
-   * Intern timkostnad (2026-08-12) — vad en arbetstimme faktiskt KOSTAR
-   * företaget (lön + sociala avgifter), inte vad kunden debiteras. Frivilligt:
-   * lämnas den tom räknar lönsamhetsmotorn hellre ingen marginal alls än en
-   * falsk (se lib/projects/compute-economics.ts arbetskostnad_konfigurerad).
-   */
-  internalHourlyCost?: number
+  // Intern timkostnad frågas inte längre här (Lager 3 / B10) — Lars ber om
+  // den i projektekonomin när ett marginalunderlag ska bedömas.
   /**
    * "Vad vill du att teamet hjälper dig med först?" (Lager 3 / B6, 2026-08-27).
    * Ersatte årsomsättnings-/marginalmålet som onboardingfråga — de sätts i

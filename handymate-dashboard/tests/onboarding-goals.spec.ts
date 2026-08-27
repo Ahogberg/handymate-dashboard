@@ -65,3 +65,38 @@ test.describe('typer och hemvist', () => {
     expect(settings).toContain('revenue_target_annual_sek')
   })
 })
+
+test.describe('steg 2 frågar bara det Lisa behöver (Lager 3 / B10, 2026-08-27)', () => {
+  test('intern timkostnad och skatterytmen är borta ur Step3HowYouWork', () => {
+    expect(step3).not.toContain('Intern timkostnad')
+    expect(step3).not.toContain('Skatterytm')
+    for (const f of ['internalHourlyCost', 'vatPeriod', 'isEmployer', 'fiscalYearEndMonth']) {
+      expect(step3, `${f} finns kvar i steg 2`).not.toContain(f)
+    }
+    // Det Lisa behöver finns kvar
+    expect(step3).toContain('Specialiteter')
+    expect(step3).toContain('FIRST_FOCUS_OPTIONS.map')
+  })
+
+  test('page.tsx skriver inte längre skatterytm/timkostnad ur steg 2', () => {
+    const grenStart = onboardingPage.indexOf('if (step === 2)')
+    const gren = onboardingPage.slice(grenStart, onboardingPage.indexOf('if (step === 3', grenStart))
+    for (const k of ['config.vat_period', 'config.is_employer', 'config.fiscal_year_end_month', 'config.default_internal_hourly_cost', "config.company_profile_source = 'user'"]) {
+      expect(gren, `${k} skrivs fortfarande ur steg 2`).not.toContain(k)
+    }
+  })
+
+  test('Karin ber om skatterytmen där hon behöver den — kalenderkortet är inte längre tyst', () => {
+    const widget = read('components/karin/KarinCalendarWidget.tsx')
+    expect(widget).not.toContain('if (!data || data.missing.length > 0) return null')
+    expect(widget).toContain('för att räkna dina deadlines')
+    expect(widget).toContain('href="/dashboard/settings/bolagsprofil"')
+  })
+})
+
+test('Lars ber om intern timkostnad där marginalen ska bedömas — "Timkostnad ej satt" är en länk, inte bara en etikett', () => {
+  const band = read('components/projects/ProjectStatusBand.tsx')
+  expect(band).toContain("import Link from 'next/link'")
+  expect(band.match(/href="\/dashboard\/settings\?tab=economics"/g)?.length).toBe(2)
+  expect(band).not.toMatch(/<span[^>]*>Timkostnad ej satt<\/span>/)
+})

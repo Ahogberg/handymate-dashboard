@@ -169,22 +169,12 @@ export default function OnboardingPage() {
           ? Math.round(((data.priceMin || 0) + data.priceMax) / 2)
           : null
 
-        // Skatterytmen (v94) — det Karins bolagskalender räknar deadlines ur.
-        // Bara det som faktiskt besvarats skickas: `undefined` betyder att
-        // frågan hoppades över, och då ska kalendern säga att uppgiften
-        // saknas i stället för att anta något.
-        if (data.vatPeriod) config.vat_period = data.vatPeriod
-        if (typeof data.isEmployer === 'boolean') config.is_employer = data.isEmployer
-        // 0 = "brutet år" i knappvalet — månaden fylls i under Bolagsprofil.
-        if (data.fiscalYearEndMonth) config.fiscal_year_end_month = data.fiscalYearEndMonth
-        config.company_profile_source = 'user'
-
-        // Intern timkostnad (2026-08-12) — frivillig, precis som skatterytmen
-        // ovan: `undefined` betyder att frågan hoppades över, och lönsamhets-
-        // motorn ska då säga "ej konfigurerad" i stället för att anta ett tal.
-        if (typeof data.internalHourlyCost === 'number') {
-          config.default_internal_hourly_cost = data.internalHourlyCost
-        }
+        // Skatterytmen och intern timkostnad frågas inte längre här (Lager 3 /
+        // B10, 2026-08-27). Karin ber om momsperiod/arbetsgivare/räkenskapsår
+        // när hon behöver dem (bolagskalendern → Bolagsprofil), och Lars om
+        // intern timkostnad när ett marginalunderlag ska bedömas
+        // (projektekonomin → Inställningar). Steg 2 frågar bara det Lisa
+        // behöver för att svara rätt: specialiteter, tider och timdebitering.
 
         // Årsmål/marginalmål frågas inte längre i onboardingen (Lager 3 / B6,
         // 2026-08-27) — de sätts under Inställningar → Ekonomi. Fokuset

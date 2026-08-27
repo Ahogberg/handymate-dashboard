@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { Check } from 'lucide-react'
 import { formatSEK } from '@/lib/format-price'
 import type { ProjectEconomics } from '@/lib/projects/compute-economics'
@@ -135,7 +136,11 @@ function EconomyZone({ economics, loading, bucket }: { economics: ProjectEconomi
           <div>
             <div className="flex items-baseline justify-between mb-[3px]">
               <span className="text-xs font-medium text-slate-500">Nedlagt</span>
-              <span className="text-xs text-amber-700 font-semibold">Timkostnad ej satt</span>
+              {/* Lars ber om intern timkostnad HÄR — där marginalen ska bedömas —
+                  i stället för i onboardingen (Lager 3 / B10, 2026-08-27). */}
+              <Link href="/dashboard/settings?tab=economics" className="text-xs text-amber-700 font-semibold hover:underline">
+                Timkostnad ej satt — ange den →
+              </Link>
             </div>
             <div className="h-1.5 bg-slate-100 rounded-full" />
           </div>
@@ -179,7 +184,11 @@ function MarginalRow({ economics }: { economics: ProjectEconomics }) {
   let sub: string | null = null
   switch (state) {
     case 'gate':
-      value = <span className="text-[12.5px] font-semibold text-amber-700">Timkostnad ej satt</span>
+      value = (
+        <Link href="/dashboard/settings?tab=economics" className="text-[12.5px] font-semibold text-amber-700 hover:underline">
+          Timkostnad ej satt — ange den →
+        </Link>
+      )
       break
     case 'empty':
       value = <span className="font-heading text-base font-bold text-slate-400">—</span>
