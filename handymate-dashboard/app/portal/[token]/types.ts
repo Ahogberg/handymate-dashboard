@@ -81,6 +81,8 @@ export interface ProjectPhoto {
 
 export interface Project {
   project_id: string
+  /** Ärendenumret (P-1042) — så kunden refererar till jobbet. */
+  project_number?: string | null
   name: string
   status: string
   description: string

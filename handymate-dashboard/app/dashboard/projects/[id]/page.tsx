@@ -97,6 +97,7 @@ import { useFilePreview } from '@/components/documents/FilePreviewProvider'
 import { ProjectQuoteDocumentCard } from '@/components/projects/ProjectQuoteDocumentCard'
 import { getStageBucket } from '@/components/projects/ProjectStatusCard'
 import ProjectTodoBlock, { type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
+import ProjectTasksBlock from '@/components/projects/ProjectTasksBlock'
 import { deriveTodoMode, TODO_PRIMARY_LABEL } from '@/lib/projects/derive-todo'
 import { ProjectStatusBand } from '@/components/projects/ProjectStatusBand'
 import { ProjectDatesInline } from '@/components/projects/ProjectDatesInline'
@@ -129,6 +130,8 @@ interface Project {
   business_id: string
   customer_id: string
   quote_id: string | null
+  /** P-<löpnummer> per företag (v176: trigger garanterar, unikt). */
+  project_number: string | null
   name: string
   description: string | null
   project_type: string
@@ -245,13 +248,16 @@ type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'tim
 // Projektvy Fas 1 (2026-07-31) — ny IA: 16 gamla flikar grupperas i 6 nya.
 // `canvas` hör inte till någon grupp (TD-75: dold, nås bara via ?tab=canvas,
 // oförändrat). Se handoff/projektvy/HANDOFF.md.
-type GroupKey = 'overview' | 'economy_offert' | 'changes' | 'planning' | 'time_team' | 'documentation'
+type GroupKey = 'overview' | 'economy_offert' | 'changes' | 'planning' | 'tasks' | 'time_team' | 'documentation'
 
 const NEW_GROUPS: { key: GroupKey; label: string; tabs: TabKey[] }[] = [
   { key: 'overview', label: 'Översikt', tabs: ['overview'] },
   { key: 'economy_offert', label: 'Ekonomi & offert', tabs: ['economy', 'quote_spec', 'material', 'leverantorer'] },
   { key: 'changes', label: 'ÄTA', tabs: ['changes'] },
-  { key: 'planning', label: 'Planering', tabs: ['milestones', 'tasks', 'schedule', 'arbetsorder'] },
+  { key: 'planning', label: 'Planering', tabs: ['milestones', 'schedule', 'arbetsorder'] },
+  // Uppgifter (2026-08-27): egen flik. Låg under Planering efter delmomenten —
+  // ingen hittade den. Nås också från Översikt (ProjectTasksBlock).
+  { key: 'tasks', label: 'Uppgifter', tabs: ['tasks'] },
   { key: 'time_team', label: 'Tid & team', tabs: ['time', 'team'] },
   { key: 'documentation', label: 'Dokumentation', tabs: ['checklists', 'field_reports', 'log', 'documents'] },
 ]
@@ -570,6 +576,8 @@ export default function ProjectDetailPage() {
   const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium')
   const [savingNewTask, setSavingNewTask] = useState(false)
   const [showTaskPresetPicker, setShowTaskPresetPicker] = useState(false)
+  // "Ny uppgift"-snabbåtgärden fokuserar blockets fält på Översikt.
+  const [nyUppgiftFokus, setNyUppgiftFokus] = useState(0)
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
   const [materials, setMaterials] = useState<ProjectMaterial[]>([])
@@ -1048,6 +1056,9 @@ export default function ProjectDetailPage() {
     if (activeGroup === 'planning') {
       fetchProjectSchedule()
       fetchWorkOrders()
+    }
+    // Uppgifter behövs på Översikt (blocket), i egna fliken och för räknaren i flikraden.
+    if (activeGroup === 'overview' || activeGroup === 'tasks') {
       fetchProjectTasks()
       // Återanvänd team-listan om vi inte redan hämtat den (för assignee-dropdown)
       if (allTeamMembers.length === 0) fetchProjectTeam()
@@ -2039,6 +2050,11 @@ export default function ProjectDetailPage() {
         const done = milestones.filter(m => m.status === 'completed').length
         return `Delmoment ${done} av ${milestones.length} klara`
       }
+      case 'tasks': {
+        if (projectTasks.length === 0) return null
+        const open = projectTasks.filter(t => t.status !== 'done').length
+        return open > 0 ? `${open} öppna` : 'Alla klara'
+      }
       case 'time_team': {
         const hrs = summary?.total_hours ?? 0
         if (hrs <= 0) return 'Inga tidrapporter ännu'
@@ -2080,6 +2096,7 @@ export default function ProjectDetailPage() {
     economy_offert: Receipt,
     changes: AlertTriangle,
     planning: Calendar,
+    tasks: ClipboardList,
     time_team: Users,
     documentation: FolderOpen,
   }
@@ -2213,6 +2230,24 @@ export default function ProjectDetailPage() {
               {project.name}
             </h1>
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+              {/* Projektnumret (2026-08-27): renderades ingenstans på sidan trots
+                  att det fanns i datat. Klick kopierar — det är så man refererar
+                  till jobbet i telefon, mejl och Fortnox. */}
+              {project.project_number && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(project.project_number as string)
+                      .then(() => showToast(`${project.project_number} kopierat`, 'success'))
+                      .catch(() => showToast('Kunde inte kopiera', 'error'))
+                  }}
+                  title="Kopiera projektnummer"
+                  data-testid="project-number-chip"
+                  className="inline-flex items-center px-2 py-[3px] rounded-md text-[12px] font-mono font-bold tracking-wide bg-slate-900 text-white hover:bg-slate-700 transition"
+                >
+                  {project.project_number}
+                </button>
+              )}
               {/* Faschip — livscykeln (sex lägen), inte stageBucket: ett
                   fakturerat/betalt projekt får aldrig heta "Klart — ofakturerat". */}
               <span className={`inline-flex items-center px-2.5 py-[3px] rounded-full text-[11px] font-semibold ${LIFECYCLE_CHIP[lifecycle.phase]}`}>
@@ -2397,6 +2432,17 @@ export default function ProjectDetailPage() {
                 Framdrift, höger = Personal + Projektinfo, snabbåtgärder sist. */}
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5 items-start">
               <div className="min-w-0 space-y-3.5">
+                {/* Hantverkarens egna uppgifter överst — agenternas förslag under. */}
+                <ProjectTasksBlock
+                  projectId={projectId}
+                  tasks={projectTasks}
+                  teamMembers={allTeamMembers}
+                  onChanged={fetchProjectTasks}
+                  onOpenAll={() => setActiveTab('tasks')}
+                  focusSignal={nyUppgiftFokus}
+                  onError={msg => showToast(msg, 'error')}
+                />
+
                 <ProjectTodoBlock
                   projectId={projectId}
                   mode={todoMode}
@@ -2481,7 +2527,13 @@ export default function ProjectDetailPage() {
             </div>
 
             {/* Snabbåtgärder */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6">
+              <button
+                onClick={() => { setNyUppgiftFokus(n => n + 1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                className="h-11 bg-white rounded-xl border border-[#E2E8F0] text-[13.5px] font-medium text-slate-700 hover:bg-slate-50 hover:border-primary-300 active:scale-[0.98] transition"
+              >
+                Ny uppgift
+              </button>
               <button
                 onClick={() => openTimeModal()}
                 className="h-11 bg-white rounded-xl border border-[#E2E8F0] text-[13.5px] font-medium text-slate-700 hover:bg-slate-50 hover:border-primary-300 active:scale-[0.98] transition"
@@ -2918,7 +2970,7 @@ export default function ProjectDetailPage() {
         )}
 
         {/* === TAB: Uppgifter === */}
-        {activeGroup === 'planning' && (
+        {activeGroup === 'tasks' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>

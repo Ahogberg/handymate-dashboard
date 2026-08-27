@@ -75,7 +75,9 @@ export default function ProjectTodoBlock({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <h2 className="text-[15px] font-semibold text-gray-900">Att göra</h2>
+        {/* 2026-08-27: "Att göra" är nu hantverkarens uppgifter (ProjectTasksBlock);
+            det här blocket är agenternas förslag + nästa steg som väntar på ägaren. */}
+        <h2 className="text-[15px] font-semibold text-gray-900">Väntar på ditt OK</h2>
         {totalCount > 0 && (
           <span className="font-heading text-xs font-bold bg-primary-700 text-white rounded-full min-w-[21px] h-[21px] px-1.5 inline-flex items-center justify-center">
             {totalCount}

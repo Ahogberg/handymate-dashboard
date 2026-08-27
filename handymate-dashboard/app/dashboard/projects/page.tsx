@@ -372,9 +372,12 @@ export default function ProjectsPage() {
 
   const filteredProjects = visibleProjects
     .filter(p => {
+      const q = searchTerm.toLowerCase().trim()
       const matchesSearch =
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+        p.name.toLowerCase().includes(q) ||
+        p.customer?.name?.toLowerCase().includes(q) ||
+        // Projektnumret (2026-08-27): "1042" eller "P-1042" ska träffa.
+        (p.project_number || '').toLowerCase().includes(q)
       const matchesJobType = !jobTypeFilter || p.job_type === jobTypeFilter
       return matchesSearch && matchesJobType
     })
@@ -546,7 +549,7 @@ export default function ProjectsPage() {
                         {/* Bara riktiga projektnummer — ett rått id-fragment
                             (P-877e3f) är tekniskt läckage, inte information. */}
                         {project.project_number && (
-                          <span className="text-xs font-mono text-slate-400 flex-shrink-0">{project.project_number}</span>
+                          <span className="text-[11px] font-mono font-bold tracking-wide text-white bg-slate-900 rounded px-1.5 py-[2px] flex-shrink-0">{project.project_number}</span>
                         )}
                         <h3 className="font-semibold text-slate-900 truncate">{project.name}</h3>
                         <JobTypeBadge slug={project.job_type} jobTypes={jobTypes} />

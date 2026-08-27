@@ -115,6 +115,9 @@ const NAV: NavItem[] = [
     children: [
       { label: 'Offerter', href: '/dashboard/quotes' },
       { label: 'Projekt', href: '/dashboard/projects' },
+      // Mina uppgifter (2026-08-27): sidan fanns men var bara länkad från en
+      // gömd panel i projektvyn.
+      { label: 'Mina uppgifter', href: '/dashboard/tasks' },
       { label: 'Fakturor', href: '/dashboard/invoices' },
       // Leverantörsfakturor (2026-08-20): tidigare bara synliga per projekt
       // eller i Karins matchningskö (bara de okopplade) — ingen samlad vy

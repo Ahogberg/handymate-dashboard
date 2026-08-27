@@ -260,9 +260,12 @@ export default function PortalProjectDetail({
               >
                 JUST NU
               </div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 10 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: project.project_number ? 2 : 10 }}>
                 {project.name}
               </div>
+              {project.project_number && (
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>Ärende {project.project_number}</div>
+              )}
               <p style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.5 }}>{project.description}</p>
             </div>
           </div>

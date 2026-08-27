@@ -260,7 +260,7 @@ export function ProjectStageModal({ projectId, onClose, onChanged }: ProjectStag
                       }}
                       title="Samma ID-nummer som dealen hade i säljtratten"
                     >
-                      P-{data.project.project_number}
+                      {data.project.project_number}
                     </span>
                   )}
                   {data.project.name}

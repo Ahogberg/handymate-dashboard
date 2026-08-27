@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
     // sväljde error tyst (data=null → []). Anti-pattern fixad nedan.
     const { data: rawProjects, error: projectsError } = await supabase
       .from('project')
-      .select('project_id, name, status, description, progress:progress_percent, created_at, updated_at, completed_at')
+      .select('project_id, project_number, name, status, description, progress:progress_percent, created_at, updated_at, completed_at')
       .eq('business_id', customer.business_id)
       .eq('customer_id', customer.customer_id)
       .order('created_at', { ascending: false })

@@ -571,8 +571,10 @@ export async function POST(request: NextRequest) {
         projectNumber = await getNextProjectNumber(supabase, businessId)
       }
       projectData.project_number = projectNumber
-    } catch {
-      // Kolumnen kanske inte finns — skippa
+    } catch (numErr) {
+      // v176 (2026-08-27): databasens BEFORE INSERT-trigger sätter nummer om
+      // vi inte hann — aldrig tyst NULL. Logga bara.
+      console.warn('[projects] projektnummer kunde inte dras i förväg, triggern tar över:', numErr)
     }
 
     let project: any = null
@@ -586,16 +588,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (result1.error && projectNumber) {
-      // Om felet beror på project_number-kolumnen, försök utan den
-      console.warn('Project insert failed with project_number, retrying without:', result1.error.message)
-      delete projectData.project_number
-      const result2 = await supabase
-        .from('project')
-        .insert(projectData)
-        .select('*')
-        .single()
-      project = result2.data
-      insertError = result2.error
+      // v176: ingen omkörning utan nummer — ett projekt utan nummer är inte
+      // ett bättre utfall än ett ärligt fel. Kolumnen finns (live-verifierad).
+      console.error('[projects] insert misslyckades:', result1.error.message)
+      project = null
+      insertError = result1.error
     } else {
       project = result1.data
       insertError = result1.error

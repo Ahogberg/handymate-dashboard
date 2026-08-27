@@ -762,7 +762,7 @@ function ProjectRow({
                 style={{ marginLeft: 0, marginRight: 8 }}
                 title={deal?.deal_number ? `Tidigare Deal #${deal.deal_number}` : undefined}
               >
-                P-{(project as any).project_number}
+                {(project as any).project_number}
               </span>
             )}
             {project.name}

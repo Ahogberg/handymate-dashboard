@@ -167,6 +167,9 @@ export default function PortalHome({ portal, token, passes = [], installations =
                     <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
                       {activeProject.name}
                     </div>
+                    {activeProject.project_number && (
+                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Ärende {activeProject.project_number}</div>
+                    )}
                     {activeProject.description && (
                       <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
                         {activeProject.description}
