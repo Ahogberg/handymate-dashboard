@@ -289,7 +289,9 @@ test.describe('första verifierade handlingen (2026-08-27) — skanningen slutar
   test('JarvisHome: kortet hämtas om, expanderas och scrollas till; Hemturen väntar på första beslutet', () => {
     expect(hem).toContain('const [forstaAtgardId, setForstaAtgardId] = useState<string | null>(null)')
     expect(hem).toContain('if (r?.firstActionId) {')
-    expect(hem).toContain('void fetchQueue()')
+    expect(hem).toContain('void fetchQueue().finally(() => setForstaAtgardHamtad(true))')
+    // Bevisat 2026-08-27: utan vantan pa omhamtningen nollades id:t mot den GAMLA kon
+    expect(hem).toContain('if (!forstaAtgardId || !queueLoaded || !forstaAtgardHamtad) return')
     expect(hem).toContain('if (approval.id === forstaAtgardId) setForstaAtgardId(null)')
     expect(hem).toContain("document.getElementById(`beslut-${forstaAtgardId}`)")
     // Saknas kortet i kön (routing/utgånget/testdata) släpps turen i stället för att vänta

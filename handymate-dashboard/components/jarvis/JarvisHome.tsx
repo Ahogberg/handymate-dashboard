@@ -335,6 +335,11 @@ export default function JarvisHome({
   // (executeSend nollar det). Kön är created_at DESC — kortet skapades
   // sekunder innan, så det ligger överst av sig självt efter omhämtningen.
   const [forstaAtgardId, setForstaAtgardId] = useState<string | null>(null)
+  // Sätts först när omhämtningen efter skanningen är KLAR — annars såg
+  // effekten nedan den gamla kön (utan det nya kortet), nollade id:t och
+  // släppte Hemturen innan kortet ens hunnit visas (bevisat 2026-08-27 på
+  // Provfirman: turen startade ovanpå det pinnade kortet).
+  const [forstaAtgardHamtad, setForstaAtgardHamtad] = useState(false)
 
   // Måndagsmötet-takeovern (Måndagsmötet etapp 2, 2026-08-13): egen,
   // OBEROENDE gate — rör inte scanKlar/CompanyScan/HemTur-kedjan ovan, läser
@@ -985,7 +990,7 @@ export default function JarvisHome({
   // anställd, utgånget, testdatafiltret) släpps Hemturen i stället för att
   // vänta på ett kort som aldrig kommer.
   useEffect(() => {
-    if (!forstaAtgardId || !queueLoaded) return
+    if (!forstaAtgardId || !queueLoaded || !forstaAtgardHamtad) return
     if (!approvals.some(a => a.id === forstaAtgardId)) { setForstaAtgardId(null); return }
     setExpandedIds(prev => new Set(prev).add(forstaAtgardId))
     const target = document.getElementById(`beslut-${forstaAtgardId}`)
@@ -997,7 +1002,7 @@ export default function JarvisHome({
     }, 2000)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [forstaAtgardId, queueLoaded, approvals])
+  }, [forstaAtgardId, forstaAtgardHamtad, queueLoaded, approvals])
   const beslut = grupper.length + reschedules.length + (fuelCritical ? 1 : 0) + (closeoutCandidates.length > 0 ? 1 : 0) + synligaNba.length
   const koTom = queueLoaded && beslut === 0
 
@@ -1603,7 +1608,8 @@ export default function JarvisHome({
         // hämtning — hämta om så det syns, och håll Hemturen tills beslutet.
         if (r?.firstActionId) {
           setForstaAtgardId(r.firstActionId)
-          void fetchQueue()
+          setForstaAtgardHamtad(false)
+          void fetchQueue().finally(() => setForstaAtgardHamtad(true))
         }
       }} />
 
