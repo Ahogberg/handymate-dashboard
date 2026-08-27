@@ -55,3 +55,9 @@ test('hemmets kvitto-banner dubblerar inte punkten', () => {
   const s = kod('components/jarvis/JarvisHome.tsx')
   expect(s).toContain("const orsak = orsakRaw.replace(/[.\\s]+$/, '')")
 })
+
+test('påminnelseleveransen skickar den svenska meningen vidare som den är — ingen "SMS:et stoppades (råtext)"-inpackning', () => {
+  const s = kod('lib/invoice-reminder-send.ts')
+  expect(s).not.toContain('SMS:et stoppades (')
+  expect(s).toContain("? smsFel.replace(/[.\s]+$/, '')")
+})
