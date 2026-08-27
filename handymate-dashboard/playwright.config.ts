@@ -18,7 +18,7 @@ export default defineConfig({
   // user.json istället för demo-employee.json). De tre nya golden-path-*-
   // projekten längst ner sätter egen testIgnore:[] för att inte ärva
   // undantaget de själva behöver träffa.
-  testIgnore: [/.*\.integration\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/],
+  testIgnore: [/.*\.integration\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/, /tests[\\/]e2e-launch-promise[\\/]/],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -144,6 +144,20 @@ export default defineConfig({
       testDir: './tests/e2e-golden-path',
       testMatch: /experiment-proof\.spec\.ts/,
       testIgnore: [],
+      use: { storageState: { cookies: [], origins: [] } },
+    },
+
+    // ── Launch Promise Gauntlet ─────────────────────────────────────────
+    // Skarp, städande API-resa mot två uttryckligt disponibla testtenants.
+    // Körs aldrig av standardsviten: den skapar kund/deal/projekt/dokument/
+    // tid och provar fel tenant innan alla exakta ID:n + storage-paths tas
+    // bort i finally. Inga externa utskick eller Fortnox-anrop initieras.
+    {
+      name: 'launch-promise',
+      testDir: './tests/e2e-launch-promise',
+      testMatch: /launch-promise\.spec\.ts/,
+      testIgnore: [],
+      timeout: 120_000,
       use: { storageState: { cookies: [], origins: [] } },
     },
 

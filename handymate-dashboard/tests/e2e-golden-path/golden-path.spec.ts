@@ -862,7 +862,13 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
         const [statusResponse] = await Promise.all([
           ownerPage.waitForResponse(
             (r) => r.url().endsWith('/api/projects') && r.request().method() === 'PUT',
-            { timeout: 15_000 },
+            // Projektstängningen väntar in hela den kanoniska effektkedjan
+            // (faktura, utfall, debrief, jobbpass, installation m.m.). En
+            // kall serverless-körning kan därför legitimt passera 15 s utan
+            // att ha hängt. Ruttens egen hårda gräns är 30 s; harnesset får
+            // lite marginal för nätverk/Playwright och granskar sedan det
+            // verkliga HTTP-svaret + samtliga DB-facit nedan.
+            { timeout: 45_000 },
           ),
           ownerPage.getByRole('button', { name: 'Aktivt' }).click(),
         ])
