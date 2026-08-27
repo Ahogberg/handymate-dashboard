@@ -881,3 +881,28 @@ Medvetet utanför: `app/api/admin/support-tickets/[id]/reply` (Handymate-adminen
 - [x] "I din takt: ≈ N dagar till" ur kontots egen dygnsförbrukning (`avgDailyOre` → `topupDaysAtPace`)
 - [x] Kortet: "Priser exklusive moms"; facit låser att kortet aldrig visar styckpris/självkostnad/påslag
 - [ ] Stripe automatic tax: INTE påslaget — Stripe Tax är inte aktiverat på kontot (webhook-kommentaren "Idag kör Stripe utan automatic_tax"); aktivering i Stripe-dashboarden är ett Andreas-steg, sedan `automatic_tax: { enabled: true }` i fuel-topup + övriga checkouts
+
+---
+
+## Onboarding & första dagarna — Codex-analysen granskad, plan godkänd (2026-08-27)
+
+Lanseringen flyttad minst en vecka (Andreas 2026-08-27). Plan: `.claude/plans/ja-d-beh-ver-vi-sorted-avalanche.md`.
+Verifierat: 8 steg (inte 10), Company Scan + Hemtur körs på /dashboard efter finalize, dag 0 finns noll riktiga kort.
+
+### Lager 1 — sanning/korrekthet/hygien
+- [x] A0 grind-buggen `onboarding_step >= 7` → `>= 8` (REALITY-WEEK #31) + facit
+- [x] A2 LiveTouren: "5 aktiva" → `{teamRow.length} på plats`, "5 aktiva"-statruta → `TEAM.length` "i ditt team", "Komplettera setup 2/5 klart / 40 %" → mock av Kom igång-railen utan tal + facit
+- [x] A1 MalNudge ut ur "Det här behöver dig idag" → månadsrapporten före MalBlock + facit omskrivet
+- [x] A4 hygien: CLAUDE.md onboarding-sektion, GYLLENE-VAGEN 8 steg, OnboardingHeader default 6, döda Step1BusinessAccount/Step3Phone/StepProgress borta + facit
+- [ ] A3 värdekvitto på hemkön (`buildValueReceipt` i `JarvisHome.executeSend`, röd flash vid misslyckat utförande) — byggs ihop med Lager 2 steg 6
+
+### Lager 2 — första besöket slutar med en verklig handling
+- [ ] Steg 1: `lib/onboarding/first-action.ts` (ren picker + copy) + `tests/first-action.spec.ts`
+- [ ] Steg 2: `lib/invoice-reminder-card.ts` ur send-reminders (beteendeidentiskt) + `lib/agents/daniel/quote-follow-up-card.ts` + `buildOpenedQuoteFollowUpMessage`
+- [ ] Steg 3: POST `/api/onboarding/first-action` + rutt-facit
+- [ ] Steg 6 + A3: `value-receipt.ts` send_sms + hemkön
+- [ ] Steg 4–5: CompanyScan-CTA, JarvisHome-pinning, Hemtur-grind, facits, Golden Path-overlay
+- [ ] Steg 8: Daniel-dedup i quote-follow-up (eller `enabledTiers=['karin']`)
+- [ ] Full svit, CI, Golden Path 16/16, manuell genomgång, skärmdump till Andreas
+
+### Lager 3 (efter lansering): B9 dag-7-mail → B8 aktiveringsmått → B6 first_focus → B7 adaptiv Kom igång → B10 ekonomifrågor ut ur steg 2

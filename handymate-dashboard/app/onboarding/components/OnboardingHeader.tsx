@@ -12,13 +12,13 @@ interface HeaderProps {
 
 /**
  * Återanvändbar onboarding-header: bakåt-knapp + progress-prickar + skip.
- * Fem prickar för de fem interaktiva stegen (Business, Arbetssätt, Telefon,
- * Betalning, Import) — Step 1 (välkomst) och Step 6 (live tour) är passiva
- * payoff-skärmar utan progress.
+ * Sex prickar för de sex interaktiva stegen (Business, Arbetssätt, Telefon,
+ * Betalning, Import, Produktregister) — steg 0 (välkomst) och steg 7 (live
+ * tour) är passiva payoff-skärmar utan progress.
  */
 export default function OnboardingHeader({
   step = 0,
-  total = 5,
+  total = 6,
   onBack,
   onSkip,
   hideProgress = false,

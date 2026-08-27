@@ -109,10 +109,15 @@ Detta dokument läses automatiskt av Claude Code vid sessionsstart. Följ alltid
 
 ### Onboarding
 
-- Onboarding har 10 steg (completed = steg 10) efter V2
-- Befintliga kunder med `onboarding_step >= 8` skall migreras till 10
-- Steg 8: preferensinsamling (5 frågor med knappalternativ, alla frivilliga)
-- Steg 9: PWA-installation guide
+- Onboardingen har **8 UI-steg** (`app/onboarding/page.tsx`, `TOTAL_STEPS = 8`):
+  0 Step1MeetTheTeam · 1 Step2Business (konto skapas) · 2 Step3HowYouWork ·
+  3 Step4PhoneNumber · 4 Step5Activate (Stripe) · 5 StepImportData ·
+  6 StepProductRegister · 7 Step6LiveTour
+- Finalize (`POST /api/onboarding`) skriver `onboarding_step = 10` (kompat) +
+  `onboarding_completed_at`, seedar defaults och startkort
+- Dashboard-grinden (`app/dashboard/layout.tsx`): `onboarding_completed_at`
+  eller `onboarding_step >= 8` — `saveProgress` når aldrig 8, bara finalize
+- Efter finalize, på `/dashboard`: Company Scan → Hemtur (inte onboardingsteg)
 
 ### Tech stack
 

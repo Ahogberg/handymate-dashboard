@@ -12,8 +12,8 @@ import {
 // ─── Redesign-onboarding (V3, 2026-05) ──────────────────────────────
 // Step2Business.tsx + Step3HowYouWork.tsx läser nedanstående TRADES +
 // SPECIALTIES_BY_TRADE. Legacy-konstanter (BRANCHES, BRANCH_SERVICES m.fl.
-// längre ner) används fortfarande av Step1BusinessAccount.tsx + StepProgress.tsx
-// och får ligga kvar — bryt inte bakåtkompatibilitet.
+// längre ner) är oanvända sedan de döda V2-komponenterna togs bort 2026-08-27
+// — får ligga kvar tills de städas separat.
 
 export interface Trade {
   id: string
@@ -66,7 +66,7 @@ export function getTradeLabel(tradeId: string | null | undefined): string {
   return TRADES.find(t => t.id === tradeId)?.label || tradeId
 }
 
-// ─── Legacy V2-konstanter (används av Step1BusinessAccount + StepProgress) ─
+// ─── Legacy V2-konstanter (oanvända sedan 2026-08-27, städas separat) ─
 
 // ─── Steps (V2 — bantad till 4 steg) ────────────────────────────────
 
