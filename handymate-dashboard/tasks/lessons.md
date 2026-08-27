@@ -464,3 +464,16 @@ loggdata (sms_log, console, driftlarm) — det som returneras till anroparen
 är alltid en svensk mening om vad hantverkaren kan göra, mappad på EN plats
 (`lib/sms/klarsprak.ts`). Fel som är vår sak (saldo, konfiguration) larmar
 oss och säger "Handymate har larmats" — inte "ditt konto".
+
+## 2026-08-27 — CRLF syns inte i Git Bash, och heredocs tål inte skript
+
+Sju varv gick åt innan portalkopplingen ens kördes. Två orsaker:
+(1) `grep $'\r'`, `sed | od -c` och `cat -A` i Git Bash visade LF fast
+filerna var CRLF (`git config core.autocrlf` normaliserar på vägen) —
+`node -e "fs.readFileSync(...).includes('\r')"` var enda sanningen.
+(2) Bash-verktygets heredoc bröt på JS-skript med `\n`, `${}` och
+blandade citattecken. **Regel:** flerfils-redigeringar = ett node-skript
+skrivet med Write till scratchpad, som läser med CR-strippning och sparar
+tillbaka med filens ursprungliga radslut; varje ankare kontrolleras med
+`includes` innan något skrivs (ingen fil rörs om ett ankare saknas). Ge
+skriptet en NY sökväg om det ändras utanför Write/Edit — annars vägrar Write.
