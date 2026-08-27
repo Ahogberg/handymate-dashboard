@@ -790,7 +790,7 @@ async function proposeJobbpass(
         business_id: businessId,
         approval_type: 'jobbpass_proposal',
         title: `Jobbpass — ${project.name}`,
-        description: `Skapa ett digitalt jobbpass åt kunden för "${project.name}": vad som gjordes, valda foton och garantivillkor.`,
+        description: `Skapa ett digitalt jobbpass åt kunden för "${project.name}": vad som gjordes, valda foton och egenkontroll.`,
         risk_level: 'low',
         status: 'pending',
         expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),

@@ -306,7 +306,7 @@ export interface JobbpassSourceInput {
 // Ren derivation — ingen I/O.
 // ─────────────────────────────────────────────────────────────────
 
-export const JOBBPASS_CERTIFICATES_NOTE = 'Kommer snart: certifikat och skötselråd.'
+export const JOBBPASS_CERTIFICATES_NOTE = 'Kommer snart: certifikat.'
 
 const ACCEPTED_QUOTE_STATUSES = new Set(['accepted', 'signed'])
 const SENT_INVOICE_STATUSES = new Set(['sent', 'paid', 'overdue'])

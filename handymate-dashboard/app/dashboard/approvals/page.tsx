@@ -138,6 +138,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   monday_brief: { label: 'Måndagskortet', icon: ListChecks, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   // Jobbpass (Etapp Ä, Closeout-to-Lifetime, 2026-08-18) — se lib/jobbpass/jobbpass.ts.
   jobbpass_proposal: { label: 'Jobbpass', icon: Camera, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
+  installation_register: { label: 'Installation', icon: Wrench, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   // OperatingExperiment Etapp 2 (2026-08-19) — se lib/experiment/propose.ts + report.ts.
   operating_experiment_proposal: { label: 'Försök', icon: FlaskConical, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   operating_experiment_readout: { label: 'Försöksresultat', icon: FlaskConical, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },

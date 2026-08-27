@@ -1646,7 +1646,7 @@ export async function resetDemoAccount(
     business_id: businessId,
     approval_type: 'jobbpass_proposal',
     title: 'Jobbpass — Gästtoalett – renovering, Sjövägen 19',
-    description: 'Skapa ett digitalt jobbpass åt kunden för "Gästtoalett – renovering, Sjövägen 19": vad som gjordes, valda foton och garantivillkor.',
+    description: 'Skapa ett digitalt jobbpass åt kunden för "Gästtoalett – renovering, Sjövägen 19": vad som gjordes, valda foton och egenkontroll.',
     risk_level: 'low',
     status: 'pending',
     expires_at: isoAt(14),
