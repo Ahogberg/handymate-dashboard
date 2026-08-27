@@ -138,3 +138,26 @@ export function filterOutConflicting<T extends { quote_id: string }>(
   if (conflictingQuoteIds.size === 0) return candidates
   return candidates.filter(c => !conflictingQuoteIds.has(c.quote_id))
 }
+
+/**
+ * Systerfunktion till buildUnopenedNudgeMessage för en offert kunden HAR
+ * öppnat (view_count > 0) men inte svarat på. "Inte hunnit titta" vore
+ * osant där — texten säger i stället "hunnit fundera". Samma längdbudget
+ * och samma trunkeringsstrategi. (Första verifierade handlingen, 2026-08-27.)
+ */
+export function buildOpenedQuoteFollowUpMessage(opts: {
+  customerFirstName: string | null | undefined
+  contactFirstName: string | null | undefined
+}): string {
+  const customer = extractFirstName(opts.customerFirstName)
+  const contact = extractFirstName(opts.contactFirstName)
+  const greeting = customer ? `Hej ${customer}!` : 'Hej!'
+  const body = 'Har du hunnit fundera på offerten jag skickade? Hör gärna av dig om du har frågor.'
+  const signature = contact ? ` Mvh ${contact}` : ''
+  const full = `${greeting} ${body}${signature}`
+  if (full.length <= NUDGE_SMS_MAX_LENGTH) return full
+  const overhead = greeting.length + 1 + signature.length + 1
+  const bodyBudget = NUDGE_SMS_MAX_LENGTH - overhead
+  if (bodyBudget <= 0) return `${greeting} ${body}`.slice(0, NUDGE_SMS_MAX_LENGTH)
+  return `${greeting} ${body.slice(0, bodyBudget)}…${signature}`
+}
