@@ -68,6 +68,8 @@ test('kund → affär → dokument → projekt → dokument → tid, med fel-ten
   }
   const createdStages: string[] = []
   const storagePaths: { bucket: string; path: string }[] = []
+  let originalOnboarding: { onboarding_step: number | null; onboarding_completed_at: string | null } | null = null
+  let onboardingTemporarilyCompleted = false
 
   const ensureStage = async (businessId: string, suffix: string) => {
     const existing = await service
@@ -137,6 +139,14 @@ test('kund → affär → dokument → projekt → dokument → tid, med fel-ten
     await exactDelete('customer', 'customer_id', [ids.customerA, ids.customerB])
     await exactDelete('pipeline_stage', 'id', createdStages)
 
+    if (onboardingTemporarilyCompleted && originalOnboarding) {
+      const restored = await service
+        .from('business_config')
+        .update(originalOnboarding)
+        .eq('business_id', businessA)
+      if (restored.error) throw new Error(`Cleanup business_config: ${restored.error.message}`)
+    }
+
     // Cleanup är en del av facitet. Ett grönt prov får aldrig lämna data
     // och samtidigt hävda att det städade.
     for (const [table, column, values] of [
@@ -158,6 +168,14 @@ test('kund → affär → dokument → projekt → dokument → tid, med fel-ten
       expect(businessA).not.toBe(businessB)
       ids.stageA = await ensureStage(businessA, 'a')
       ids.stageB = await ensureStage(businessB, 'b')
+
+      const onboarding = await service
+        .from('business_config')
+        .select('onboarding_step, onboarding_completed_at')
+        .eq('business_id', businessA)
+        .single()
+      if (onboarding.error) throw onboarding.error
+      originalOnboarding = onboarding.data
 
       const customerB = await service.from('customer').insert({
         customer_id: ids.customerB,
@@ -392,15 +410,57 @@ test('kund → affär → dokument → projekt → dokument → tid, med fel-ten
     })
 
     await test.step('mobil/PWA-viewport kan öppna projektet utan krasch och data finns efter reload', async () => {
+      // De disponibla säkerhetskontona kan avsiktligt vara o-onboardade.
+      // Dashboard-layouten ska fortfarande provas, så statusen sätts endast
+      // för testets längd och återställs exakt i finally.
+      if (!originalOnboarding?.onboarding_completed_at && (originalOnboarding?.onboarding_step ?? 0) < 8) {
+        const completed = await service
+          .from('business_config')
+          .update({ onboarding_step: 10, onboarding_completed_at: new Date().toISOString() })
+          .eq('business_id', businessA)
+        if (completed.error) throw completed.error
+        onboardingTemporarilyCompleted = true
+      }
+
       await page.setViewportSize({ width: 390, height: 844 })
       await page.goto(`${baseUrl}/dashboard/projects/${ids.projectA}?tab=documents`)
       await page.waitForLoadState('domcontentloaded')
       expect(page.url()).not.toContain('/login')
-      await expect(page.getByRole('heading', { name: `${run} projekt` })).toBeVisible()
-      expect(await page.locator('body').evaluate((body) => body.scrollWidth <= window.innerWidth + 2)).toBe(true)
+      await expect(page.getByRole('heading', { name: `${run} projekt`, exact: true })).toBeVisible()
+      const mobileLayout = await page.locator('body').evaluate((body) => {
+        const viewport = window.innerWidth
+        const offenders = Array.from(body.querySelectorAll<HTMLElement>('*'))
+          .map((element) => {
+            const rect = element.getBoundingClientRect()
+            const style = window.getComputedStyle(element)
+            return {
+              tag: element.tagName.toLowerCase(),
+              className: element.className?.toString().slice(0, 180),
+              text: element.innerText?.replace(/\s+/g, ' ').trim().slice(0, 100),
+              left: Math.round(rect.left),
+              right: Math.round(rect.right),
+              width: Math.round(rect.width),
+              display: style.display,
+              visibility: style.visibility,
+            }
+          })
+          .filter((item) =>
+            item.display !== 'none' &&
+            item.visibility !== 'hidden' &&
+            item.width > 0 &&
+            item.right > viewport + 2,
+          )
+          .sort((a, b) => b.right - a.right)
+          .slice(0, 12)
+        return { viewport, bodyWidth: body.scrollWidth, offenders }
+      })
+      expect(
+        mobileLayout.bodyWidth,
+        `Horisontell overflow: ${JSON.stringify(mobileLayout, null, 2)}`,
+      ).toBeLessThanOrEqual(mobileLayout.viewport + 2)
 
       await page.reload()
-      await expect(page.getByRole('heading', { name: `${run} projekt` })).toBeVisible()
+      await expect(page.getByRole('heading', { name: `${run} projekt`, exact: true })).toBeVisible()
       const persisted = await service
         .from('time_entry')
         .select('time_entry_id, project_id, customer_id')
