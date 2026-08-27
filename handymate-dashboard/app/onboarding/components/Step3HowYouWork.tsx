@@ -6,6 +6,7 @@ import OnboardingHeader from './OnboardingHeader'
 import InfoSheet from './InfoSheet'
 import { TEAM } from '@/lib/agents/team'
 import type { OnboardingFormData } from '../types-redesign'
+import { FIRST_FOCUS_OPTIONS } from '@/lib/onboarding/first-focus'
 import { SPECIALTIES_BY_TRADE, TRADES, getTradeLabel } from '../constants'
 
 interface Step3Props {
@@ -30,8 +31,7 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
   const priceMin = data.priceMin ?? 600
   const priceMax = data.priceMax ?? 1200
   const internalHourlyCost = data.internalHourlyCost
-  const revenueTargetAnnual = data.revenueTargetAnnual
-  const marginTargetPercent = data.marginTargetPercent
+  const firstFocus = data.firstFocus
 
   const [extraSheetOpen, setExtraSheetOpen] = useState(false)
   const [expandedTrade, setExpandedTrade] = useState<string | null>(null)
@@ -341,101 +341,31 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
           </p>
         </section>
 
-        {/* ── Mål (2026-08-15, backlog #11) ────────────────────────────────
-             Frivilligt, precis som intern timkostnad ovan. Utan de här
-             siffrorna kan varken Matte (Gör detta först) eller Månads-
-             rapporten visa en verklig takt mot ett mål — bara historik. */}
+        {/* ── Vad först? (Lager 3 / B6, 2026-08-27) ──────────────────────
+             Ersätter årsomsättningsmålet som onboardingfråga: ett årsmål är
+             ett planeringsverktyg (Inställningar → Ekonomi, månadsrapporten),
+             inte något en hantverkare kan svara på i steg 2. Fem knappar ger
+             Matte ett omedelbart mål. Frivilligt — samma hoppa-över-disciplin. */}
         <section style={{ marginBottom: 28 }}>
-          <label className="ob-label">Mål för i år (frivilligt)</label>
+          <label className="ob-label">Vad vill du att teamet hjälper dig med först? (frivilligt)</label>
           <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ob-muted)', lineHeight: 1.5 }}>
-            Ett omsättnings- och marginalmål gör att Matte kan visa hur ni ligger till mot
-            målet, inte bara vad som redan hänt.
+            Matte börjar där du pekar. Du kan ändra dig när som helst.
           </p>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', width: 200 }}>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={10000}
-                placeholder="t.ex. 1 200 000"
-                value={revenueTargetAnnual ?? ''}
-                onChange={e => {
-                  const raw = e.target.value
-                  update({ revenueTargetAnnual: raw === '' ? undefined : Math.max(0, Number(raw)) })
-                }}
-                style={{
-                  width: '100%',
-                  height: 56,
-                  paddingLeft: 14,
-                  paddingRight: 44,
-                  border: '1px solid var(--ob-border)',
-                  borderRadius: 'var(--ob-r-md)',
-                  background: 'var(--ob-surface)',
-                  fontSize: 16,
-                  fontWeight: 600,
-                  color: 'var(--ob-ink)',
-                  fontFamily: 'inherit',
-                }}
-              />
-              <span
-                style={{
-                  position: 'absolute',
-                  right: 14,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  fontSize: 13,
-                  color: 'var(--ob-muted)',
-                  pointerEvents: 'none',
-                }}
+          <div className="ob-chip-grid">
+            {FIRST_FOCUS_OPTIONS.map(o => (
+              <button
+                type="button"
+                key={o.id}
+                className={`ob-chip ${firstFocus === o.id ? 'selected' : ''}`}
+                onClick={() => update({ firstFocus: firstFocus === o.id ? undefined : o.id })}
               >
-                kr/år
-              </span>
-            </div>
-            <div style={{ position: 'relative', width: 140 }}>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={100}
-                step={1}
-                placeholder="t.ex. 30"
-                value={marginTargetPercent ?? ''}
-                onChange={e => {
-                  const raw = e.target.value
-                  update({ marginTargetPercent: raw === '' ? undefined : Math.min(100, Math.max(0, Number(raw))) })
-                }}
-                style={{
-                  width: '100%',
-                  height: 56,
-                  paddingLeft: 14,
-                  paddingRight: 36,
-                  border: '1px solid var(--ob-border)',
-                  borderRadius: 'var(--ob-r-md)',
-                  background: 'var(--ob-surface)',
-                  fontSize: 16,
-                  fontWeight: 600,
-                  color: 'var(--ob-ink)',
-                  fontFamily: 'inherit',
-                }}
-              />
-              <span
-                style={{
-                  position: 'absolute',
-                  right: 14,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  fontSize: 13,
-                  color: 'var(--ob-muted)',
-                  pointerEvents: 'none',
-                }}
-              >
-                %
-              </span>
-            </div>
+                {firstFocus === o.id && <Check size={14} />}
+                {o.label}
+              </button>
+            ))}
           </div>
           <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--ob-muted)', lineHeight: 1.5 }}>
-            Vet du inte exakt — hoppa över. Du kan fylla i det senare under
+            Vet du inte än — hoppa över. Årsmål och marginalmål sätter du senare under
             Inställningar → Ekonomi.
           </p>
         </section>

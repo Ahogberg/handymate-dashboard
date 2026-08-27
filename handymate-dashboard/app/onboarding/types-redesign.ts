@@ -1,3 +1,4 @@
+import type { FirstFocusId } from '@/lib/onboarding/first-focus'
 /**
  * Delad form-state för det nya onboarding-flödet (Claude Design redesign).
  * Hanterar både pre-registrerings-state (Step 2 skapar kontot) och
@@ -70,13 +71,12 @@ export interface OnboardingFormData {
    */
   internalHourlyCost?: number
   /**
-   * Omsättnings-/marginalmål (2026-08-15, Business Twin-backlog #11).
-   * Frivilliga, precis som intern timkostnad ovan. Lämnas de tomma sätts
-   * inget värde alls (aldrig 0/null skrivet i onboarding-API:et) — samma
-   * ärlighetsprincip: ett osatt mål ska aldrig se ut som ett mål på 0 kr.
+   * "Vad vill du att teamet hjälper dig med först?" (Lager 3 / B6, 2026-08-27).
+   * Ersatte årsomsättnings-/marginalmålet som onboardingfråga — de sätts i
+   * Inställningar → Ekonomi. Frivilligt: undefined = hoppade över. Sparas i
+   * onboarding_data (JSONB) via sanitizeForSave, ingen egen kolumn.
    */
-  revenueTargetAnnual?: number
-  marginTargetPercent?: number
+  firstFocus?: FirstFocusId
 
   // ── Step 4: Telefonnummer ────────────────────────────────
   lisaNumber?: string

@@ -17,6 +17,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { svDateStr } from '@/lib/dates'
 import { computeRevenuePace } from '@/lib/economy/revenue-pace'
+import { firstFocusContextLine } from '@/lib/onboarding/first-focus'
 
 /**
  * Ren. Ingen I/O. `null` om inget mål är satt eller om målet inte är ett
@@ -58,10 +59,16 @@ export async function getGoalContext(
 
   const { data: config, error: configErr } = await supabase
     .from('business_config')
-    .select('revenue_target_annual_sek')
+    .select('revenue_target_annual_sek, onboarding_data')
     .eq('business_id', businessId)
     .single()
-  if (configErr || !config?.revenue_target_annual_sek) return null
+  if (configErr || !config) return null
+  // Ägarens uttalade fokus från onboardingen (Lager 3 / B6, 2026-08-27) —
+  // bakgrundsfakta på samma villkor som årsmålet: aldrig en regel, aldrig
+  // en spärr. onboarding_data sparas med formulärets fältnamn (firstFocus).
+  const od = (config.onboarding_data as Record<string, unknown> | null) || null
+  const fokusRad = firstFocusContextLine(od?.firstFocus ?? od?.first_focus)
+  if (!config.revenue_target_annual_sek) return fokusRad
 
   const { data: invoices, error: invErr } = await supabase
     .from('invoice')
@@ -70,14 +77,15 @@ export async function getGoalContext(
     .gte('created_at', `${year}-01-01T00:00:00.000Z`)
   if (invErr) {
     console.error('[next-best-action-goals] YTD-fakturasumma misslyckades:', invErr.message)
-    return null
+    return fokusRad
   }
 
   const invoicedYtdSek = (invoices || []).reduce((s, i) => s + (Number(i.total) || 0), 0)
 
-  return buildGoalContextLine({
+  const malRad = buildGoalContextLine({
     revenueTargetAnnualSek: Number(config.revenue_target_annual_sek),
     invoicedYtdSek,
     todayIso,
   })
+  return [malRad, fokusRad].filter((r): r is string => !!r).join(' ') || null
 }

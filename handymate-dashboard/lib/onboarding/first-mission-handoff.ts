@@ -17,6 +17,8 @@
  * sidladdning på /dashboard utan en väntande prompt gör ingenting.
  */
 
+import { firstFocusOption } from '@/lib/onboarding/first-focus'
+
 export const FIRST_MISSION_PROMPT_KEY = 'hm_first_mission_prompt'
 
 /**
@@ -27,7 +29,14 @@ export const FIRST_MISSION_PROMPT_KEY = 'hm_first_mission_prompt'
  * viktigast"), inte ett confirm_mission-tvång. Ett osatt/0-mål ger den
  * generiska, målfria frågan i stället för att låtsas ett mål finnas.
  */
-export function buildFirstMissionPrompt(revenueTargetAnnualSek?: number): string {
+export function buildFirstMissionPrompt(revenueTargetAnnualSek?: number, firstFocus?: unknown): string {
+  // Fokuset vinner (Lager 3 / B6, 2026-08-27): "Vad vill du att teamet
+  // hjälper dig med först?" är det onboardingen numera frågar. Årsmålet
+  // finns kvar för konton som satt det i Inställningar.
+  const fokus = firstFocusOption(firstFocus)
+  if (fokus) {
+    return `${fokus.promptLine} Vad är det viktigaste vi kan göra den här veckan?`
+  }
   if (typeof revenueTargetAnnualSek === 'number' && Number.isFinite(revenueTargetAnnualSek) && revenueTargetAnnualSek > 0) {
     const formatted = Math.round(revenueTargetAnnualSek).toLocaleString('sv-SE')
     return `Vi siktar på ${formatted} kr i år. Vad är det viktigaste vi kan göra den här veckan för att komma närmare?`

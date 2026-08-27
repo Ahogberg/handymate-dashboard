@@ -268,7 +268,7 @@ export default function Step6LiveTour({ onFinish, data }: Step6Props) {
             type="button"
             className="ob-cta"
             onClick={() => {
-              writeFirstMissionPrompt(buildFirstMissionPrompt(data.revenueTargetAnnual))
+              writeFirstMissionPrompt(buildFirstMissionPrompt(undefined, data.firstFocus))
               onFinish()
             }}
           >
