@@ -791,7 +791,9 @@ export default function JarvisHome({
       const utfall = (svar?.execution_outcome?.outcome ?? null) as 'success' | 'failed' | 'skipped' | null
       const kvitto = action === 'approve' ? buildValueReceipt(approval, utforande, utfall) : null
       if (action === 'approve' && utfall === 'failed') {
-        const orsak = typeof svar?.execution_outcome?.error_text === 'string' ? svar.execution_outcome.error_text : null
+        const orsakRaw = typeof svar?.execution_outcome?.error_text === 'string' ? svar.execution_outcome.error_text.trim() : ''
+        // Serverns orsak slutar ofta redan med punkt — ingen ".." i bannern.
+        const orsak = orsakRaw.replace(/[.\s]+$/, '')
         flash(`Godkänt — men utförandet misslyckades${orsak ? `: ${orsak}` : ''}. Öppna ärendet för att försöka igen.`, true, '/dashboard/approvals', 'Öppna ärendet')
       } else if (kvitto) {
         flash(kvitto.text, false, kvitto.link, kvitto.linkLabel)

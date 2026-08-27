@@ -14,6 +14,8 @@ import { getBusinessPlanFromConfig } from './auth'
 import { checkSmsAllowance, trackSmsSent } from './sms-usage'
 import type { PlanType } from './feature-gates'
 import { checkFuelGate, type FuelGateReason } from './costs/fuel'
+import { elksFelKlarsprak, klassaElksFel, ELKS_FEL_VAR_SAK } from './sms/klarsprak'
+import { rapporteraTystFel } from './observability/driftlarm'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -206,6 +208,11 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
   let elksId: string | undefined
   let status: number | null = null
   let errorMsg: string | undefined
+  // Klarspråk (2026-08-27): leverantörens råtext (errorMsg) går till sms_log
+  // och console — men det anroparen får, och därmed kort/kvitton/banners,
+  // är alltid en svensk mening (lib/sms/klarsprak.ts). Gate-/kvot-/Bränsle-
+  // felen ovan är redan svenska och lämnas orörda.
+  let felTillHantverkaren: string | undefined
   let success = false
   let blockedReason: SmsGateCode | FuelGateReason | undefined
   let resolvedCustomerId: string | null = customerId || null
@@ -243,6 +250,7 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
 
   if (!errorMsg && (!ELKS_API_USER || !ELKS_API_PASSWORD)) {
     errorMsg = '46elks credentials not configured'
+    felTillHantverkaren = elksFelKlarsprak('credentials', 401)
   }
 
   // Bränsletaket ligger i samma sändningsstrypunkt som STOPP och SMS-kvoten,
@@ -315,9 +323,18 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
           body: (errorMsg || '').substring(0, 200),
           to: phone,
         })
+        felTillHantverkaren = elksFelKlarsprak(errorMsg, status)
+        // Vår sak (tomt 46elks-saldo, felkonfiguration): hantverkaren kan
+        // inte göra något — larma Handymate via driftlarmet i stället för
+        // att visa leverantörens engelska text.
+        const klass = klassaElksFel(errorMsg, status)
+        if (ELKS_FEL_VAR_SAK.includes(klass)) {
+          await rapporteraTystFel(supabase, businessId, `sms:leverantorsfel-${klass}`, errorMsg || `HTTP ${status}`, { status, to: phone })
+        }
       }
     } catch (err: any) {
       errorMsg = err?.message || 'fetch exception'
+      felTillHantverkaren = elksFelKlarsprak(errorMsg, null)
       console.error('[sendSmsViaElks] fetch exception:', err)
     }
   }
@@ -431,7 +448,7 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
     smsId,
     elksId,
     status,
-    error: success ? undefined : errorMsg,
+    error: success ? undefined : (felTillHantverkaren ?? errorMsg),
     blockedReason,
   }
 }

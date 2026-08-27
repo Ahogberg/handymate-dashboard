@@ -453,3 +453,14 @@ WIP i arbetsträdet. Deployen uteblev tyst i 5 minuter innan jag förstod.
 Facit i `first-action-route.spec`: `not.toMatch(/^export const (?!dynamic)/m)`.
 När lokal build är blockerad av främmande WIP: gör en ren `git worktree`
 av HEAD och bygg där, eller vänta in Vercel-probe INNAN "klart" sägs.
+
+## 2026-08-27 — leverantörsfel översätts i strypunkten, aldrig hos anroparen
+
+46elks "Not enough credits on your account to send this SMS" gick rakt
+igenom `sendSmsViaElks` → påminnelseleveransen → godkännandemotorn →
+hemmets kvitto. Fyrtio anropare, ingen av dem borde behöva veta att
+leverantören pratar engelska. **Regel:** en extern tjänsts feltext är
+loggdata (sms_log, console, driftlarm) — det som returneras till anroparen
+är alltid en svensk mening om vad hantverkaren kan göra, mappad på EN plats
+(`lib/sms/klarsprak.ts`). Fel som är vår sak (saldo, konfiguration) larmar
+oss och säger "Handymate har larmats" — inte "ditt konto".
