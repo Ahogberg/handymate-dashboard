@@ -1,3 +1,4 @@
+import { checkFuelGate } from '@/lib/costs/fuel'
 import { NextRequest, NextResponse } from 'next/server'
 import dns from 'node:dns'
 import Anthropic from '@anthropic-ai/sdk'
@@ -189,6 +190,15 @@ export async function POST(request: NextRequest) {
     // används bara för att spåra per business istället för per IP när den
     // finns; ett fel/timeout i auth-uppslaget ska inte blockera flödet.
     const business = await getAuthenticatedBusiness(request).catch(() => null)
+
+    // Med session gäller Bränslestoppet (extraktionen nedan kostar tokens och
+    // bokförs på kunden). Utan session: Handymates förvärvskostnad.
+    if (business) {
+      const fuel = await checkFuelGate(getServerSupabase(), business.business_id)
+      if (!fuel.allowed) {
+        return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
+      }
+    }
 
     const ip = extractClientIp(
       request.headers.get('x-forwarded-for'),

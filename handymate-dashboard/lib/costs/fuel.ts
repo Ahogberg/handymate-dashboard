@@ -190,6 +190,7 @@ const REF_TYPE_BUCKET: Record<string, FuelBucket> = {
   egenkontroll_foto: 'quotes_analysis',
   jobbuddy_photo: 'quotes_analysis',
   ai_copilot: 'quotes_analysis',
+  pipeline_call_analysis: 'quotes_analysis',
   matte_chat_turn: 'quotes_analysis',
   matte_intent_agent: 'quotes_analysis',
   onboarding_chat: 'quotes_analysis',
@@ -427,7 +428,11 @@ export async function checkFuelGate(
       .eq('business_id', businessId)
       .maybeSingle()
 
-    if (error || !config?.subscription_plan || FUEL_PLAN_BUDGET_ORE[config.subscription_plan] == null) {
+    // Okänd/enterprise-plan faller till Storfirman-nivån i fuelBudgetOreForPlan
+    // (dokumenterat produktbeslut ovan). Grinden ska följa samma regel — annars
+    // står ett enterprise-konto med SMS och AI avstängda i tysthet
+    // (fuel_unavailable), vilket var fallet fram till 2026-08-27.
+    if (error || !config?.subscription_plan) {
       return {
         allowed: false,
         reason: 'fuel_unavailable',
@@ -452,4 +457,26 @@ export async function checkFuelGate(
       error: err instanceof Error ? err.message : String(err),
     }
   }
+}
+
+/**
+ * Bränslestoppet som en-radare för AI-ytor som inte har en egen 402-väg
+ * (libs, crons, inkommande signaler). Regeln: Bränsle slut eller oläsbart
+ * ⇒ samma väg som saknad API-nyckel — den deterministiska fallbacken körs,
+ * ingen extern kostnad uppstår, inget kastas. Loggar en rad per stopp så
+ * driften ser varför en AI-yta var tyst.
+ */
+export async function fuelAllows(
+  supabase: SupabaseClient,
+  businessId: string,
+  site: string,
+): Promise<boolean> {
+  const fuel = await checkFuelGate(supabase, businessId)
+  if (fuel.allowed) return true
+  console.warn(`[fuel/${site}] stoppad — ${fuel.reason}`, {
+    business_id: businessId,
+    error: fuel.error,
+    remaining_percent: fuel.level?.remainingPercent,
+  })
+  return false
 }

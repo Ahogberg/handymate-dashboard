@@ -9,6 +9,7 @@
  * INTE denna fil för röst/foto — de flikarna använder egna routes
  * (/api/jobbuddy/voice, /api/jobbuddy/photo), inte den här.
  */
+import { checkFuelGate } from '@/lib/costs/fuel'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServerSupabase } from '@/lib/supabase'
@@ -162,6 +163,11 @@ export async function POST(request: NextRequest) {
     const rateLimit = checkAiApiRateLimit(authBusiness.business_id)
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: rateLimit.error }, { status: 429 })
+    }
+
+    const fuel = await checkFuelGate(getServerSupabase(), authBusiness.business_id)
+    if (!fuel.allowed) {
+      return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
     }
 
     const anthropic = getAnthropic()

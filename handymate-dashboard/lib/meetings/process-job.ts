@@ -21,6 +21,7 @@
  * lyckades syns som ett explicit hål i transkriptet, aldrig en tyst lucka.
  */
 
+import { fuelAllows } from '@/lib/costs/fuel'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { assembleTranscript, type TranscriptSegment } from './assemble-transcript'
 import { recordCost } from '@/lib/costs/record'
@@ -127,6 +128,18 @@ export async function processMeetingJob(
   }
 
   const job = claimed as MeetingJobRow
+
+  // Bränslestoppet (Whisper kostar per sekund). Släpp claimet så jobbet
+  // ligger kvar orört och tas nästa tick när tanken fyllts — ett mötesjobb
+  // ska aldrig markeras 'failed' för att kunden behöver tanka.
+  if (!(await fuelAllows(supabase, job.business_id, 'meeting_transcribe'))) {
+    const { error: releaseErr } = await supabase
+      .from('meeting_job')
+      .update({ status: 'finalized', claimed_at: null, updated_at: new Date().toISOString() })
+      .eq('id', jobId)
+    if (releaseErr) console.error('[meeting-worker] kunde inte släppa claim efter Bränslestopp:', jobId, releaseErr.message)
+    return { processed: false, error: 'Bränslet är slut — transkriberingen väntar' }
+  }
 
   // ── 2. Transkribera väntande segment ────────────────────────────────
   const { data: segments, error: segError } = await supabase

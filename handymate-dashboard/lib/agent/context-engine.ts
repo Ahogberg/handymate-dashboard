@@ -5,6 +5,7 @@
  * och upserar tolkad insikt till agent_context-tabellen.
  */
 
+import { fuelAllows } from '@/lib/costs/fuel'
 import { getServerSupabase } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
@@ -25,6 +26,9 @@ export async function generateAgentContext(businessId: string): Promise<{
   error?: string
 }> {
   const supabase = getServerSupabase()
+  if (!(await fuelAllows(supabase, businessId, 'agent_context_nightly'))) {
+    return { success: false, error: 'fuel_exhausted' }
+  }
 
   try {
     // 1. Hämta rådata parallellt
@@ -253,6 +257,9 @@ export async function updateBusinessPreferences(businessId: string): Promise<{
   error?: string
 }> {
   const supabase = getServerSupabase()
+  if (!(await fuelAllows(supabase, businessId, 'business_preferences_nightly'))) {
+    return { success: false, error: 'fuel_exhausted' }
+  }
 
   try {
     // Hämta senaste 50 learning_events

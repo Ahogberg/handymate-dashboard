@@ -3,6 +3,7 @@
  * Genererar personliga, professionella brev per fastighet.
  */
 
+import { fuelAllows } from '@/lib/costs/fuel'
 import type { PropertyLead } from './types'
 import { getServerSupabase } from '@/lib/supabase'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
@@ -31,8 +32,14 @@ export async function generateLetter(
   },
   letterAngle: string
 ): Promise<LetterResult> {
-  if (!ANTHROPIC_API_KEY) {
-    console.warn('[generateLetter] API-nyckel saknas — använder malltext')
+  // LLM bara med business_id (kostnaden måste kunna bokföras) och Bränsle
+  // kvar — annars malltexten, samma väg som saknad API-nyckel.
+  if (
+    !ANTHROPIC_API_KEY ||
+    !business.business_id ||
+    !(await fuelAllows(getServerSupabase(), business.business_id, 'outbound_letter'))
+  ) {
+    console.warn('[generateLetter] API-nyckel/business_id saknas eller Bränslet är slut — använder malltext')
     return {
       content: buildMockLetter(property, business, letterAngle),
       mock: true,

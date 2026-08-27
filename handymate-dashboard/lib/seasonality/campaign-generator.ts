@@ -3,6 +3,7 @@
  * Max 1 förslag per månad per företag.
  */
 
+import { fuelAllows } from '@/lib/costs/fuel'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { getSeasonalTheme } from './industry-themes'
@@ -38,6 +39,11 @@ export async function generateSeasonalCampaign(
     .maybeSingle()
 
   if (existing) return { generated: false, reason: 'already_exists' }
+
+  // Bränslestoppet — säsongsförslaget är AI-genererat och kostar tokens.
+  if (!(await fuelAllows(supabase, businessId, 'seasonal_campaign'))) {
+    return { generated: false, reason: 'fuel_exhausted' }
+  }
 
   // 2. Hämta tema
   const theme = getSeasonalTheme(branch, month)

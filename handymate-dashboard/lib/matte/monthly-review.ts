@@ -6,6 +6,7 @@
  *  - Manuell trigger från dashboarden
  */
 
+import { fuelAllows } from '@/lib/costs/fuel'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
@@ -272,6 +273,14 @@ export async function generateAnalysis(
   if (!apiKey) {
     return {
       analysis: `Månadsrapport för ${data.month_label} — AI-analys saknas (ANTHROPIC_API_KEY ej konfigurerad).`,
+      recommendations: [],
+    }
+  }
+  // Bränslestoppet: siffrorna (data) är kompletta och deterministiska — bara
+  // AI-texten uteblir.
+  if (!(await fuelAllows(supabase, businessId, 'monthly_review'))) {
+    return {
+      analysis: `Månadsrapport för ${data.month_label} — AI-analysen pausad (Bränslet är slut). Siffrorna är kompletta.`,
       recommendations: [],
     }
   }

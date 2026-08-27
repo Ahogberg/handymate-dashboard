@@ -1,3 +1,4 @@
+import { fuelAllows } from '@/lib/costs/fuel'
 import { extractFirstName, halsning } from '@/lib/customers/namn'
 import { getServerSupabase } from '@/lib/supabase'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
@@ -27,9 +28,10 @@ export async function generateCustomerSms(params: {
   const { businessName, contactName, customerName, bookingDate, businessId, refId } = params
   const customerFirstName = extractFirstName(customerName)
 
-  // Försök med Claude Haiku
+  // Försök med Claude Haiku — bara med ett businessId (annars kan kostnaden
+  // inte bokföras på någon kund) och bara om Bränslet räcker. Annars malltext.
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (apiKey) {
+  if (apiKey && businessId && (await fuelAllows(getServerSupabase(), businessId, 'autopilot_sms'))) {
     try {
       const bookingPart = bookingDate
         ? `Nämn att vi föreslår att påbörja arbetet ${bookingDate}.`

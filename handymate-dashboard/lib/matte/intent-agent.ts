@@ -2,6 +2,7 @@
  * Matte Intent Agent — Sonnet analyserar intent + bestämmer actions.
  */
 
+import { fuelAllows } from '@/lib/costs/fuel'
 import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ResolvedEntity } from './resolver'
@@ -102,6 +103,19 @@ export async function runIntentAgent(
   businessId: string,
   supabase: SupabaseClient
 ): Promise<MatteDecision> {
+  // Bränslestoppet: slut/oläsbart ⇒ ingen AI-tolkning, inga åtgärder, inget
+  // kundsvar. Meddelandet är redan sparat av anroparen (SMS-tråd/mejlarkiv)
+  // så inget går förlorat — hantverkaren ser det manuellt.
+  if (!(await fuelAllows(supabase, businessId, 'matte_intent_agent'))) {
+    return {
+      intent: 'fuel_stopped',
+      confidence: 0,
+      suggestedAgent: 'matte',
+      actions: [],
+      customerReply: { send: false, message: '' },
+      reasoning: 'Bränslet är slut — meddelandet tolkades inte av AI.',
+    }
+  }
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
   const context = buildContext(signal, entity, businessConfig, availableSlots)

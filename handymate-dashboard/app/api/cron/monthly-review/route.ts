@@ -1,3 +1,4 @@
+import { checkFuelGate } from '@/lib/costs/fuel'
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
@@ -110,6 +111,11 @@ export async function POST(request: NextRequest) {
   // Den manuella vägen får aldrig välja tenant ur request-body.
   const businessId = business.business_id
   const monthDate = body.month ? new Date(body.month) : undefined
+
+  const fuel = await checkFuelGate(supabase, businessId)
+  if (!fuel.allowed) {
+    return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
+  }
 
   try {
     const report = await generateMonthlyReview(supabase, businessId, monthDate)

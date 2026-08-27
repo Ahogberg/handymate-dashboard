@@ -1,3 +1,4 @@
+import { checkFuelGate } from '@/lib/costs/fuel'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getAuthenticatedBusiness } from '@/lib/auth'
@@ -68,6 +69,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ reply: 'AI-chatten är inte konfigurerad. Kontakta support@handymate.se för hjälp.' })
     }
 
+    // Sessionen är valfri här (routen körs före kontoskapande i vissa
+    // onboarding-lägen). Finns den: Bränslestoppet gäller, och kostnaden
+    // bokförs på kunden nedan. Utan session är det Handymates egen
+    // förvärvskostnad — ingen kund att belasta.
+    const business = await getAuthenticatedBusiness(request).catch(() => null)
+    if (business) {
+      const fuel = await checkFuelGate(getServerSupabase(), business.business_id)
+      if (!fuel.allowed) {
+        return NextResponse.json({ reply: 'Bränslet är slut — AI-chatten pausar tills du tankat under Abonnemang.' })
+      }
+    }
+
     const anthropic = new Anthropic({ apiKey })
 
     const messages: Array<{ role: 'user' | 'assistant'; content: string }> = []
@@ -93,7 +106,6 @@ export async function POST(request: NextRequest) {
     // före kontoskapande i vissa onboarding-lägen (ingen session ännu), och
     // cost_event kräver ett business_id — utan session finns ingen kund att
     // bokföra kostnaden på (recordCost hoppar tyst över annars).
-    const business = await getAuthenticatedBusiness(request).catch(() => null)
     if (business) {
       const supabase = getServerSupabase()
       await meterDirectLlmCall({

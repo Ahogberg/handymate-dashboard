@@ -1,3 +1,4 @@
+import { checkFuelGate } from '@/lib/costs/fuel'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
@@ -42,6 +43,11 @@ export async function POST(request: NextRequest) {
 
   if (!biz.leads_addon) {
     return NextResponse.json({ error: 'Leads-tillägget är inte aktiverat' }, { status: 403 })
+  }
+
+  const fuel = await checkFuelGate(supabase, business.business_id)
+  if (!fuel.allowed) {
+    return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
   }
 
   const segment = getSegmentForBranch(biz.branch)

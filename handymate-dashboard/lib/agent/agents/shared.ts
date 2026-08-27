@@ -34,6 +34,16 @@ export interface AgentRunResult {
   steps: StepLog[]
   toolCallCount: number
   tokensUsed: number
+  /** Summerad Anthropic-usage över alla steg — underlag för riktig kostnad
+      (llmCostUsd × modell) i stället för den gamla flat-taxan. */
+  usage: {
+    input_tokens: number
+    output_tokens: number
+    cache_creation_input_tokens: number
+    cache_read_input_tokens: number
+  }
+  /** Modellen som körde loopen — kostnaden beror på den. */
+  model: string
   durationMs: number
   escalation?: {
     reason: string
@@ -319,6 +329,7 @@ export async function runAgentLoop(
 
   const steps: StepLog[] = []
   let totalTokens = 0
+  const usage = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }
   let toolCallCount = 0
   let finalResponse = ''
   let escalation: AgentRunResult['escalation'] = undefined
@@ -337,6 +348,10 @@ export async function runAgentLoop(
     totalTokens +=
       (response.usage?.input_tokens || 0) +
       (response.usage?.output_tokens || 0)
+    usage.input_tokens += response.usage?.input_tokens || 0
+    usage.output_tokens += response.usage?.output_tokens || 0
+    usage.cache_creation_input_tokens += response.usage?.cache_creation_input_tokens || 0
+    usage.cache_read_input_tokens += response.usage?.cache_read_input_tokens || 0
 
     const textBlocks = (response.content || []).filter(
       (b: any) => b.type === 'text'
@@ -420,6 +435,8 @@ export async function runAgentLoop(
     steps,
     toolCallCount,
     tokensUsed: totalTokens,
+    usage,
+    model: config.model,
     durationMs: Date.now() - startTime,
     escalation,
   }

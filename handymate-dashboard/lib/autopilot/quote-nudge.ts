@@ -1,3 +1,4 @@
+import { fuelAllows } from '@/lib/costs/fuel'
 import { getServerSupabase } from '@/lib/supabase'
 import { extractFirstName, halsning } from '@/lib/customers/namn'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
@@ -62,8 +63,9 @@ export async function createQuoteNudge(
   const customerFirstName = extractFirstName(customer.name)
   let nudgeMessage = `${halsning(customer.name)} Jag såg att du tittade på offerten. Har du några frågor? Hör gärna av dig! //${business?.contact_name || ''}`
 
+  // Bränsle slut ⇒ malltexten ovan (samma väg som saknad API-nyckel).
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (apiKey) {
+  if (apiKey && (await fuelAllows(supabase, businessId, 'quote_nudge'))) {
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',

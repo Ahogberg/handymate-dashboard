@@ -1,3 +1,4 @@
+import { checkFuelGate } from '@/lib/costs/fuel'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
 import { generateQuoteFromInput, getAveragePrice, analyzeJobImage, resolveCustomerPriceList } from '@/lib/ai-quote-generator'
@@ -13,6 +14,11 @@ export async function POST(request: NextRequest) {
     const rateLimit = checkAiApiRateLimit(business.business_id)
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: rateLimit.error }, { status: 429 })
+    }
+
+    const fuel = await checkFuelGate(getServerSupabase(), business.business_id)
+    if (!fuel.allowed) {
+      return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
     }
 
     // jobType/job_type: valfritt fält — ingen befintlig UI-anropare skickar

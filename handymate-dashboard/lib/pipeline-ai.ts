@@ -1,3 +1,5 @@
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServerSupabase } from '@/lib/supabase'
 import { createDealFromCall, moveDeal, getStageBySlug, getAutomationSettings } from '@/lib/pipeline'
@@ -23,10 +25,14 @@ function getAnthropic() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 }
 
+const PIPELINE_MODEL = 'claude-haiku-4-5-20251001'
+
 export async function analyzeCallForPipeline(params: {
   transcript: string
   businessId: string
   existingCustomerPhone?: string
+  /** Samtalets id — blir cost_event-refId. */
+  callId?: string
 }): Promise<CallAnalysis> {
   const anthropic = getAnthropic()
   const supabase = getServerSupabase()
@@ -55,7 +61,7 @@ export async function analyzeCallForPipeline(params: {
   }
 
   const response = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: PIPELINE_MODEL,
     max_tokens: 1000,
     system: `Du analyserar telefonsamtal för en svensk hantverkare och avgör om det är en ny affärsmöjlighet eller uppdatering av en befintlig.${existingContext}
 
@@ -79,6 +85,17 @@ Svara ENDAST med JSON:
     messages: [
       { role: 'user', content: `Analysera detta samtal:\n\n${params.transcript}` }
     ]
+  })
+
+  // COGS-boken (var omätt fram till 2026-08-27 — anropas efter varje
+  // analyserat samtal via app/api/voice/analyze, som är Bränsle-grindad).
+  await meterDirectLlmCall({
+    supabase,
+    businessId: params.businessId,
+    usage: response.usage,
+    costUsd: llmCostUsd(response.usage, PIPELINE_MODEL),
+    refType: 'pipeline_call_analysis',
+    refId: params.callId || `pipeline_${Date.now()}`,
   })
 
   const text = response.content[0].type === 'text' ? response.content[0].text : ''
@@ -118,6 +135,7 @@ export async function processCallForPipeline(params: {
     transcript: params.transcript,
     businessId: params.businessId,
     existingCustomerPhone: params.callerPhone,
+    callId: params.callId,
   })
 
   const threshold = settings.ai_auto_move_threshold || 80

@@ -1,3 +1,4 @@
+import { checkFuelGate } from '@/lib/costs/fuel'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
@@ -21,6 +22,10 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
+    const fuel = await checkFuelGate(supabase, business.business_id)
+    if (!fuel.allowed) {
+      return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
+    }
     const result = await generateStorefrontContent(supabase, business.business_id, { isPublished: true })
 
     if (!result.ok) {

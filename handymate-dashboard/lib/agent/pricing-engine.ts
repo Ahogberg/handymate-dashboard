@@ -5,6 +5,7 @@
  * Används av ekonomi-agenten för datadrivna prisförslag.
  */
 
+import { fuelAllows } from '@/lib/costs/fuel'
 import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
@@ -125,6 +126,9 @@ export async function updatePricingIntelligence(businessId: string): Promise<{
   error?: string
 }> {
   const supabase = getServerSupabase()
+  if (!(await fuelAllows(supabase, businessId, 'pricing_intelligence'))) {
+    return { success: false, jobTypesAnalyzed: 0, quotesClassified: 0, error: 'fuel_exhausted' }
+  }
 
   try {
     // 1. Hämta alla offerter med belopp

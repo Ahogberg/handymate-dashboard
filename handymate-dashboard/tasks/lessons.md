@@ -418,3 +418,25 @@ facit var gröna, CI-grinden fångade den via `tests/column-contract.spec.ts`.
 `.eq(…)`/`.order(…)` körs med `column-contract.spec.ts` i den riktade
 körningen — det är det billigaste schemafacit som finns, och det ersätter
 inte MCP-uppslaget utan kompletterar det.
+
+## 2026-08-27 — "död kod"-slutsatser kräver grep på basnamnet, inte bara `@/lib/...`
+
+`lib/jarvis/next-best-action-prompt.ts` klassades som oanvänd efter en grep
+på `from '@/lib/jarvis/next-best-action-prompt'`. Den importeras med relativ
+sökväg (`./next-best-action-prompt`) från grannfilen och körs varje natt.
+Facitet som skulle "bevisa" oanvändheten fällde påståendet — bra — men
+slutsatsen hade redan hunnit in i planen.
+**Regel:** innan en fil kallas död eller onåbar: grep på **basnamnet** utan
+prefix (`next-best-action-prompt`) över lib/app/components, inklusive
+dynamiska `import('...')`. Samma sak gäller "vem anropar X" — relativa
+importer är vanliga inne i en mapp.
+
+## 2026-08-27 — kostnadsbärande anrop: två frågor per plats, inte en
+
+För varje extern AI-anropsplats finns två oberoende sanningar: (1) bokförs
+kostnaden på en kund (`meterDirectLlmCall`/`logAgentRun`) och (2) kontrolleras
+Bränslet FÖRE anropet (`checkFuelGate`/`fuelAllows`/`checkCostGuards`)? 33 av
+47 platser hade (1) men inte (2). Mätning utan tak är en faktura i efterhand;
+tak utan mätning är blint. `tests/facit-ai-kostnad-sanning.spec.ts` ställer
+båda frågorna mekaniskt för varje fil som innehåller en extern AI-markör —
+ny AI-kod fäller testet tills den svarar på båda.

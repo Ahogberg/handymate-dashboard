@@ -34,6 +34,7 @@
  * "inget mönster hittades", aldrig ett kastat undantag som skulle kunna
  * fälla anroparen (lib/playbook/propose-pattern.ts, cron-svepet).
  */
+import { fuelAllows } from '@/lib/costs/fuel'
 import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getClaudeModel } from '@/lib/ai/get-model'
@@ -172,6 +173,7 @@ export async function detectPattern(params: {
   const { businessId, jobType, lessons, supabase } = params
   if (lessons.length < MIN_SAMPLE_SIZE) return null
   if (!process.env.ANTHROPIC_API_KEY) return null
+  if (!(await fuelAllows(supabase, businessId, 'playbook_pattern'))) return null
 
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })

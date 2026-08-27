@@ -23,6 +23,7 @@
  * som inte finns i email_inbound_route — se resolveInboundBusinessId nedan.
  */
 
+import { fuelAllows } from '@/lib/costs/fuel'
 import { NextRequest } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { verifyPostmarkBasicAuth } from '@/lib/email/postmark-signature'
@@ -217,6 +218,13 @@ export async function POST(request: NextRequest) {
     }
   } catch (keepEx) {
     console.error('[email/inbound] email_conversations-arkivering exception:', keepEx)
+  }
+
+  // ── 2.95 Bränslestoppet ────────────────────────────────────────
+  // Brödtexten är arkiverad ovan (2.9) — mejlet finns kvar att hitta
+  // manuellt. Utan Bränsle körs ingen av de två AI-stegen.
+  if (!(await fuelAllows(supabase, businessId, 'email_inbound_lead'))) {
+    return Response.json({ skipped: true, reason: 'fuel_exhausted' })
   }
 
   // ── 3. Stage 1: lead-detektion ────────────────────────────────

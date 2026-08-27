@@ -56,7 +56,7 @@ export async function isLikelyLead(
   email: EmailInput,
   approvedSenders: string[],
   blockedSenders: string[],
-  meterCtx?: LeadDetectionMeterCtx
+  meterCtx: LeadDetectionMeterCtx
 ): Promise<boolean> {
   const fromEmail = extractEmailAddress(email.from)
 
@@ -128,7 +128,7 @@ Svar (YES/NO):`
  */
 const LEAD_PARSE_MODEL = 'claude-haiku-4-5-20251001'
 
-export async function parseLeadFromEmail(email: EmailInput, meterCtx?: LeadDetectionMeterCtx): Promise<LeadData> {
+export async function parseLeadFromEmail(email: EmailInput, meterCtx: LeadDetectionMeterCtx): Promise<LeadData> {
   const prompt = `Du är en assistent som extraherar lead-information från e-postmeddelanden till svenska hantverkare.
 
 Analysera detta e-postmeddelande och extrahera all relevant information. Returnera BARA ett JSON-objekt (inget annat).

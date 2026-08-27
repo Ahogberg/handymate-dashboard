@@ -15,6 +15,7 @@
  * före kortskapande, och månader räknas via tyst-kund-primitiven.
  */
 
+import { fuelAllows } from '@/lib/costs/fuel'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { canContactCustomer } from '@/lib/outbound/frequency-guard'
@@ -183,6 +184,9 @@ export async function checkProactiveCare(businessId: string): Promise<{
 }> {
   const supabase = getServerSupabase()
   let contactsCreated = 0
+  if (!(await fuelAllows(supabase, businessId, 'proactive_care'))) {
+    return { success: false, contactsCreated: 0, error: 'fuel_exhausted' }
+  }
 
   try {
     // ═══ AVSTÄNGNINGEN LÄSTES FRÅN EN KOLUMN SOM INTE FINNS (2026-08-07) ═══

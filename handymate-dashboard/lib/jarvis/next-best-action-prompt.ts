@@ -17,6 +17,7 @@
  * tvingat/trunkerat till något som ser giltigt ut.
  */
 
+import { fuelAllows } from '@/lib/costs/fuel'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { NormalizedCandidate } from './next-best-action-normalize'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
@@ -187,6 +188,9 @@ export async function callNextBestActionModel(
     console.warn('[next-best-action] ANTHROPIC_API_KEY saknas')
     return null
   }
+  // Bränsle slut ⇒ samma väg som saknad nyckel: anroparen faller tillbaka på
+  // sin deterministiska rankning.
+  if (!(await fuelAllows(supabase, businessId, 'next_best_action'))) return null
 
   const candidateIds = candidates.map(c => c.approval_id)
 

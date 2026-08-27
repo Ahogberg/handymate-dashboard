@@ -1,3 +1,4 @@
+import { fuelAllows } from '@/lib/costs/fuel'
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { google } from 'googleapis'
@@ -64,6 +65,13 @@ export async function GET(request: NextRequest) {
     let errors = 0
 
     try {
+      // Bränslestoppet: hoppa över hela kontot — de olästa mejlen ligger kvar
+      // i Gmail och plockas nästa körning när tanken fyllts. Inget lead tappas.
+      if (!(await fuelAllows(supabase, businessId, 'gmail_lead_import'))) {
+        results.push({ businessId, imported: 0, skipped: 0, errors: 0 })
+        continue
+      }
+
       // Ensure valid token
       const tokenResult = await ensureValidToken({
         id: conn.id,

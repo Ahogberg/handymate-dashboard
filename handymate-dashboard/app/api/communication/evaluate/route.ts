@@ -1,5 +1,7 @@
+import { checkFuelGate } from '@/lib/costs/fuel'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getServerSupabase } from '@/lib/supabase'
 import { evaluateCustomerCommunication } from '@/lib/communication-ai'
 
 export async function POST(request: NextRequest) {
@@ -13,6 +15,11 @@ export async function POST(request: NextRequest) {
 
     if (!customerId) {
       return NextResponse.json({ error: 'Missing customerId' }, { status: 400 })
+    }
+
+    const fuel = await checkFuelGate(getServerSupabase(), business.business_id)
+    if (!fuel.allowed) {
+      return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
     }
 
     const decision = await evaluateCustomerCommunication(

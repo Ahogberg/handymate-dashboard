@@ -6,6 +6,8 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { llmCostUsd } from '@/lib/costs/meter'
+import { checkCostGuards, meterDirectLlmCall, type CostGuardBusiness } from '@/lib/agents/shared/cost-guard'
 import {
   fetchBusinessContext,
   runAgentLoop,
@@ -182,6 +184,44 @@ export async function orchestrate(params: OrchestrateParams): Promise<Orchestrat
     }
 
     // 3. Classify event
+    // Samma kostnadsvakt som /api/agent/trigger och nattagenterna: paus-
+    // flaggan, Bränslet (15 %-budgeten) och dygnstaket. V3 run_agent gick
+    // förbi alla tre fram till 2026-08-27.
+    const { data: guardRow, error: guardErr } = await supabase
+      .from('business_config')
+      .select('business_id, agents_globally_paused, agent_cost_cap_usd_daily, subscription_plan')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (guardErr || !guardRow) {
+      return {
+        success: false,
+        runId: '',
+        agentType: 'lead',
+        finalResponse: '',
+        steps: 0,
+        toolCalls: 0,
+        tokensUsed: 0,
+        durationMs: Date.now() - startTime,
+        escalated: false,
+        error: `Kostnadsvakten kunde inte läsa företaget: ${guardErr?.message || 'saknas'}`,
+      }
+    }
+    const skip = await checkCostGuards(supabase, guardRow as CostGuardBusiness, 'orchestrator')
+    if (skip) {
+      return {
+        success: false,
+        runId: '',
+        agentType: 'lead',
+        finalResponse: '',
+        steps: 0,
+        toolCalls: 0,
+        tokensUsed: 0,
+        durationMs: Date.now() - startTime,
+        escalated: false,
+        error: `Stoppad av kostnadsvakten: ${skip.skipped}`,
+      }
+    }
+
     let agentType = classifyEvent(triggerType, triggerData)
 
     // 4. Build user message
@@ -380,7 +420,10 @@ async function logAgentRun(
   }
 ): Promise<void> {
   const { runId, businessId, triggerType, triggerData, agentType, result, idempotencyKey } = params
-  const estimatedCost = +(result.tokensUsed * 0.000009).toFixed(4)
+  // Riktig kostnad: usage × modellens pris (Haiku för lead/ekonomi, Sonnet för
+  // strategi). Den gamla blandtaxan per token bokfördes bara i agent_runs och
+  // nådde aldrig cost_event — V3 run_agent var osynlig för Bränslet.
+  const estimatedCost = llmCostUsd(result.usage, result.model)
 
   try {
     await supabase
@@ -404,4 +447,14 @@ async function logAgentRun(
   } catch (err: any) {
     console.error('[Orchestrator] Failed to log agent_run:', err?.message || err)
   }
+  // Samma värde till boken (cost_event → Bränsle) som till governorn ovan.
+  await meterDirectLlmCall({
+    supabase,
+    businessId,
+    usage: result.usage,
+    costUsd: estimatedCost,
+    refType: 'agent_run',
+    refId: runId,
+    meta: { agent: `orchestrator:${agentType}`, trigger_type: triggerType, model: result.model },
+  })
 }

@@ -23,6 +23,7 @@
  * Misslyckas något returneras [] — extraktion är berikning och får aldrig
  * blockera mejlflödet.
  */
+import { fuelAllows } from '@/lib/costs/fuel'
 import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getClaudeModel } from '@/lib/ai/get-model'
@@ -166,6 +167,7 @@ export async function extractCustomerFacts(input: {
   const text = (input.text || '').trim()
   if (text.length < MIN_TEXT_LANGD) return []
   if (!process.env.ANTHROPIC_API_KEY) return []
+  if (!(await fuelAllows(input.supabase, input.businessId, 'customer_facts'))) return []
 
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })

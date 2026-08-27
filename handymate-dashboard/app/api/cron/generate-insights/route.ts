@@ -1,3 +1,4 @@
+import { fuelAllows } from '@/lib/costs/fuel'
 import { NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { internalPushHeaders } from '@/lib/notifications/push-internal'
@@ -50,12 +51,17 @@ export async function GET(request: Request) {
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
     let totalGenerated = 0
+    let skippedFuel = 0
 
     // Process up to 20 businesses per run to stay within timeout
     const batch = businesses.slice(0, 20)
 
     for (const biz of batch) {
       try {
+        if (!(await fuelAllows(supabase, biz.business_id, 'generate_insights'))) {
+          skippedFuel++
+          continue
+        }
         // Gather business stats for context
         const [bookingsRes, customersRes, quotesRes, invoicesRes] = await Promise.all([
           supabase.from('booking').select('status, created_at').eq('business_id', biz.business_id).gte('created_at', since),
@@ -184,7 +190,7 @@ Generera 3-4 konkreta, actionbara affärsinsikter. Returnera ENDAST ett JSON-arr
     }
 
     console.log(`[generate-insights] Generated ${totalGenerated} insights for ${batch.length} businesses`)
-    return NextResponse.json({ generated: totalGenerated, businesses: batch.length })
+    return NextResponse.json({ generated: totalGenerated, businesses: batch.length, skipped_fuel: skippedFuel })
   } catch (error: any) {
     console.error('[generate-insights] Fatal error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

@@ -851,3 +851,26 @@ denna sektion är endast utvecklingsbokföring.
 - Verifierat: 43/43 riktade browserlösa facit gröna, `npx tsc --noEmit` rent och `npx next build` exit 0.
 
 ---
+
+---
+
+## Plan: AI-kostnad — varje token mäts per kund, Bränsletaket (15 %) gäller överallt (2026-08-27)
+
+Andreas: "väldigt viktigt att säkerställa att alla anrop som kostar tokens faktiskt mäts av för respektive kund" + taket = 15 % av planpriset (finns redan som Bränsle, `FUEL_PLAN_BUDGET_ORE`).
+
+Källgranskning 2026-08-27 (47 externa AI-anropsplatser i lib/ + app/):
+- Omätta: `lib/agent/orchestrator.ts` (V3 run_agent: flat-taxa 0.000009/token, bara agent_runs — aldrig cost_event/Bränsle), `lib/pipeline-ai.ts` (Haiku via voice/analyze), `lib/ai.ts` (död kod).
+- Ogrindade (kostar tokens utan Bränslekoll): ai-copilot, onboarding-chat/scrape, generate-insights-cron, agent-context-cron (context/preferences/pricing/proactive-care), communication/evaluate, gmail-lead-import + email/inbound, leads/outbound + neighbours, monthly-review, meeting-worker (Whisper), playbook-pattern, storefront/generate, quotes/ai-generate, Matte intent-agent (SMS + Gmail), customer-facts, quote-nudge, autopilot-SMS, seasonality, orchestrator.
+- Inkonsekvens: `checkFuelGate` ger `fuel_unavailable` för planen `enterprise` (1 konto i prod) medan `fuelBudgetOreForPlan` dokumenterat faller till Storfirman-nivån → det kontot har SMS + agenter avstängda i tysthet.
+
+Princip: **Bränsle slut/oläsbart ⇒ samma väg som saknad API-nyckel** (fail-closed, deterministisk fallback, aldrig krasch).
+
+- [x] `lib/costs/fuel.ts`: `fuelAllows(supabase, businessId, site)` en-radare; enterprise-konsekvens; ny bucket `pipeline_call_analysis`
+- [x] Mätning: orchestrator (riktig usage×modell via `meterDirectLlmCall`, flat-taxan bort), pipeline-ai, ta bort `lib/ai.ts`
+- [x] Grindar i libs (fallback-vägen): intent-agent, customer-facts, quote-nudge, autopilot generate-sms, seasonality, neighbour/letter, monthly-review, detect-pattern, context-engine ×2, pricing-engine, proactive-care, process-job (släpper claim), orchestrator (`checkCostGuards`), next-best-action-prompt (användes via relativ import — inte död)
+- [x] Grindar i rutter (402 + `code`): ai-copilot, onboarding ×2 (bara med session), communication/evaluate, leads/outbound, leads/neighbours, monthly-review POST, storefront/generate, quotes/ai-generate; crons: generate-insights, gmail-lead-import (meddelanden lämnas olästa), email/inbound (arkiveras, ingen lead)
+- [x] "Ingen kund ⇒ ingen LLM": generate-letter/neighbour/autopilot-SMS kör malltext utan business_id; `isLikelyLead`/`parseLeadFromEmail` kräver mätkontext
+- [x] Facit `tests/facit-ai-kostnad-sanning.spec.ts` (16 tester): varje extern AI-fil mäts (själv eller av namngiven anropare) och grindas (själv eller i namngiven entrypoint); explicit, motiverad undantagslista (launch-desk = intern COGS); orchestrator utan flat-taxa; taket = 15 % av planpriset ±1 kr
+- [x] tsc rent, riktade specar (99), full svit 5499/5499; REALITY-WEEK #29–30; lessons
+
+Medvetet utanför: `app/api/admin/support-tickets/[id]/reply` (Handymate-adminens eget supportsvar bokförs i dag på kundens business — vår kostnad, borde bokföras internt; ingen grind, avsiktligt). `isLikelyLead` anropar modellen även för förhandsgodkända avsändare ("Always return YES") — en deterministisk kortslutning skulle spara tokens; inte ändrad nu (beteende, inte sanning).

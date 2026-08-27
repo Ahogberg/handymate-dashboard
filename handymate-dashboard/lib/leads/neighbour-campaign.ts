@@ -3,6 +3,7 @@
  * Delar kvot med outbound-brev. 15 kr/brev för kund, 9.49 kr internt.
  */
 
+import { fuelAllows } from '@/lib/costs/fuel'
 import { getServerSupabase } from '@/lib/supabase'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
@@ -43,9 +44,11 @@ export async function generateNeighbourLetter(params: {
   businessId?: string
 }): Promise<string> {
   const angle = getAngle(params.jobType)
+  // LLM bara med businessId (kostnaden måste kunna bokföras) och Bränsle
+  // kvar — annars malltexten nedan, samma väg som saknad API-nyckel.
   const apiKey = process.env.ANTHROPIC_API_KEY
 
-  if (apiKey) {
+  if (apiKey && params.businessId && (await fuelAllows(getServerSupabase(), params.businessId, 'neighbour_letter'))) {
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',

@@ -94,15 +94,20 @@ async function main() {
   // Dynamic import EFTER env-laddning — annars instansieras Anthropic() utan key
   const { isLikelyLead, parseLeadFromEmail } = await import('../lib/gmail-lead-detection')
 
+  // Mätkontexten är obligatorisk sedan 2026-08-27 (ingen kund ⇒ ingen LLM i
+  // produktion). Det här är ett utvecklarskript på Handymates egen nyckel:
+  // utan business_id hoppar recordCost över bokföringen — det är vår kostnad.
+  const meterCtx = { businessId: process.env.DEV_METER_BUSINESS_ID || '', refId: 'test-parser-webolia' }
+
   console.log('=== STAGE 1: isLikelyLead ===')
-  const likely = await isLikelyLead(exempelMail, [], [])
+  const likely = await isLikelyLead(exempelMail, [], [], meterCtx)
   console.log(`  Resultat: ${likely ? 'YES' : 'NO'}`)
   if (!likely) {
     console.log('  ⚠️ Mailet klassades som icke-lead → Stage 2 körs inte i produktion')
   }
 
   console.log('\n=== STAGE 2: parseLeadFromEmail ===')
-  const parsed = await parseLeadFromEmail(exempelMail)
+  const parsed = await parseLeadFromEmail(exempelMail, meterCtx)
 
   console.log('\nKritiska fält (mot förväntat):')
   check('name    ', parsed.name, FÖRVÄNTAT.name)
