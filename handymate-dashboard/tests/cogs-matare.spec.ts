@@ -461,6 +461,12 @@ test.describe('spärrhaken — läckaget får bara krympa', () => {
       'app/api/work-orders/[id]/send/route.ts',
       'app/api/field-reports/[id]/sign/route.ts',
       'app/api/public/book/[slug]/route.ts',
+      // Etapp 0 (2026-08-27, OUTBOUND_COMMUNICATION_INVENTORY 8.1): ägar-
+      // notiser som tidigare gick via den sessions-grindade /api/sms/send
+      // (401) och nu går genom strypunkten — till ÄGAREN, inte kunden.
+      'lib/projects/auto-invoice-on-complete.ts',
+      'lib/projects/create-from-lead.ts',
+      'lib/projects/create-from-quote.ts',
     ]
     const träffar: string[] = []
     const gå = (dir: string) => {

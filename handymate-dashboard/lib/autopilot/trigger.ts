@@ -3,6 +3,7 @@ import { findNextAvailableSlot } from './find-slot'
 import { generateCustomerSms } from './generate-sms'
 import { hasFeature, PlanType } from '@/lib/feature-gates'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 export interface AutopilotAction {
   id: string
@@ -253,7 +254,7 @@ export async function triggerAutopilot(
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
       await fetch(`${appUrl}/api/push/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: internalPushHeaders(),
         body: JSON.stringify({
           business_id: businessId,
           title: 'Autopilot klar',

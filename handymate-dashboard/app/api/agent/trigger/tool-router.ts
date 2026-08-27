@@ -40,6 +40,7 @@ import type { MissionPlanPresentation } from '@/lib/mission/mission-presentation
 import { buildMissionSummaryText, buildMissionHeadline } from '@/lib/mission/mission-summary'
 import { resolveGoalType } from '@/lib/mission/goal-type'
 import { isToolAllowedForActor, EXTERNAL_TOOL_DENIED_MESSAGE, type ActorType } from '@/lib/agent/external-actor'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 interface ToolResult {
   success: boolean
@@ -1317,7 +1318,7 @@ async function queueAgentSendForApproval(
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   fetch(`${appUrl}/api/push/send`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: internalPushHeaders(),
     body: JSON.stringify({
       business_id: businessId,
       title: 'Nytt att godkänna',
@@ -2128,7 +2129,7 @@ async function createApprovalRequest(
   // Send push notification (fire-and-forget)
   fetch(`${appUrl}/api/push/send`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: internalPushHeaders(),
     body: JSON.stringify({
       business_id: businessId,
       title: 'Nytt att godkänna',
@@ -2156,7 +2157,14 @@ async function createApprovalRequest(
  * fail-closed vid low/medium — kortet blir pending i stället för att
  * markeras utfört utan utförande.
  */
-const INTERNAL_EXEC_TYPES = new Set(['send_sms', 'send_quote', 'send_invoice', 'create_booking'])
+// Etapp 0 (2026-08-27, OUTBOUND_COMMUNICATION_INVENTORY 8.1/8.2): send_sms
+// gick mot den sessions-grindade /api/sms/send (401) och send_quote/
+// send_invoice mot rutter som INTE FINNS (/api/quotes/{id}/send, /api/
+// invoices/{id}/send) — varje low/medium-autogodkännande av dem "utfördes"
+// utan att något skickades. Nu: SMS genom strypunkten, faktura genom
+// sändkärnan, och send_quote är BORTTAGEN ur mängden (ingen sändkärna
+// utan session finns) → kortet blir pending, aldrig falskt utfört.
+const INTERNAL_EXEC_TYPES = new Set(['send_sms', 'send_invoice', 'create_booking'])
 
 async function executeApprovalPayloadInternal(
   appUrl: string,
@@ -2167,30 +2175,34 @@ async function executeApprovalPayloadInternal(
   try {
     switch (approval_type) {
       case 'send_sms': {
-        const res = await fetch(`${appUrl}/api/sms/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ business_id: businessId, to: payload.to, message: payload.message }),
+        if (!payload.to || !payload.message) return { action: 'send_sms', ok: false, error: 'payload saknar to eller message' }
+        const { getServerSupabase } = await import('@/lib/supabase')
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const r = await sendSmsViaElks({
+          supabase: getServerSupabase(),
+          businessId,
+          to: String(payload.to),
+          message: String(payload.message),
+          customerId: (payload.customer_id as string) || null,
+          messageType: 'agent_sms',
+          recipient: 'customer',
+          purpose: 'conversational',
         })
-        return { action: 'send_sms', ok: res.ok }
-      }
-      case 'send_quote': {
-        if (!payload.quote_id) return { action: 'send_quote', skipped: 'no quote_id' }
-        const res = await fetch(`${appUrl}/api/quotes/${payload.quote_id}/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ business_id: businessId }),
-        })
-        return { action: 'send_quote', ok: res.ok }
+        return { action: 'send_sms', ok: r.success, error: r.success ? undefined : r.error }
       }
       case 'send_invoice': {
         if (!payload.invoice_id) return { action: 'send_invoice', skipped: 'no invoice_id' }
-        const res = await fetch(`${appUrl}/api/invoices/${payload.invoice_id}/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ business_id: businessId }),
+        const { getServerSupabase } = await import('@/lib/supabase')
+        const { sendInvoice } = await import('@/lib/invoices/send-invoice')
+        const r = await sendInvoice(getServerSupabase(), {
+          businessId,
+          invoiceId: String(payload.invoice_id),
+          sendEmail: payload.send_email !== false,
+          sendSms: payload.send_sms !== false,
+          source: 'automation',
         })
-        return { action: 'send_invoice', ok: res.ok }
+        const delivered = r.found && !!(r.email || r.sms || r.einvoice)
+        return { action: 'send_invoice', ok: delivered, error: delivered ? undefined : (r.errors.join('; ') || 'ingen leverans') }
       }
       case 'create_booking': {
         const res = await fetch(`${appUrl}/api/bookings`, {

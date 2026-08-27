@@ -8,6 +8,7 @@ import type { ResolvedEntity } from './resolver'
 import type { TimeSlot } from './calendar-slots'
 import { suggestAtaDraft } from '@/lib/ata/suggest-ata-draft'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 export async function executeMatteActions(
   decision: MatteDecision,
@@ -210,7 +211,7 @@ async function createApproval(
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   fetch(`${appUrl}/api/push/send`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: internalPushHeaders(),
     body: JSON.stringify({
       business_id: businessId,
       title: `Matte: ${action.description}`,
@@ -227,16 +228,25 @@ async function sendCustomerReply(
 ): Promise<void> {
   if (!entity.phone) return
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-  await fetch(`${appUrl}/api/sms/send`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      business_id: businessId,
+  // Etapp 0 (2026-08-27): tidigare fetch mot den sessions-grindade
+  // /api/sms/send → 401 (Mattes svar nådde aldrig kunden). Nu strypunkten.
+  try {
+    const { getServerSupabase } = await import('@/lib/supabase')
+    const { sendSmsViaElks } = await import('@/lib/sms-send')
+    const r = await sendSmsViaElks({
+      supabase: getServerSupabase(),
+      businessId,
       to: entity.phone,
       message,
-    }),
-  }).catch(err => console.error('[Matte] Reply SMS failed:', err))
+      customerId: entity.customerId ?? null,
+      messageType: 'matte_reply',
+      recipient: 'customer',
+      purpose: 'conversational',
+    })
+    if (!r.success) console.error('[Matte] Reply SMS failed:', r.error)
+  } catch (err) {
+    console.error('[Matte] Reply SMS failed:', err)
+  }
 }
 
 async function logMatteAction(

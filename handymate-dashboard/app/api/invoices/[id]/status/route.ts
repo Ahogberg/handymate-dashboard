@@ -119,16 +119,23 @@ export async function PATCH(
           const bizName = config?.business_name || 'Vi'
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
-          // Tack-SMS (alltid)
-          await fetch(`${appUrl}/api/sms/send`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              business_id: business.business_id,
-              to: customerPhone,
-              message: `Tack ${customerName}! Vi har mottagit din betalning. Det var ett nöje att hjälpa dig — hör av dig om du behöver mer hjälp! // ${bizName}`,
-            }),
+          // Tack-SMS (alltid). Etapp 0 (2026-08-27): gick tidigare via den
+          // sessions-grindade /api/sms/send utan cookie → 401 — tack-SMS:et
+          // har aldrig nått en kund. Nu strypunkten (STOPP/kvot/logg).
+          const { sendSmsViaElks } = await import('@/lib/sms-send')
+          const tack = await sendSmsViaElks({
+            supabase,
+            businessId: business.business_id,
+            businessName: bizName,
+            to: customerPhone,
+            message: `Tack ${customerName}! Vi har mottagit din betalning. Det var ett nöje att hjälpa dig — hör av dig om du behöver mer hjälp! // ${bizName}`,
+            customerId: invoice.customer_id ?? null,
+            relatedId: invoiceId,
+            messageType: 'invoice_paid_thanks',
+            recipient: 'customer',
+            purpose: 'transactional',
           })
+          if (!tack.success) console.error('[invoice status] tack-SMS misslyckades (non-blocking):', tack.error)
 
           // Recensionsförfrågan med Google Reviews-länk (om aktiverad).
           //

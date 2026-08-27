@@ -13,6 +13,7 @@ import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
 import { halsning } from '@/lib/customers/namn'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 // ── Stegdefinitioner med risknivåer ──────────────────────
 
@@ -931,7 +932,7 @@ async function suggestSiteVisit(
     // Push-notis
     fetch(`${APP_URL}/api/push/send`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: internalPushHeaders(),
       body: JSON.stringify({
         business_id: businessId,
         title: 'Platsbesök föreslaget',
@@ -976,7 +977,7 @@ async function createDealFlowApproval(
   if (step.risk === 'high') {
     fetch(`${APP_URL}/api/push/send`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: internalPushHeaders(),
       body: JSON.stringify({
         business_id: businessId,
         title: 'Godkännande krävs',

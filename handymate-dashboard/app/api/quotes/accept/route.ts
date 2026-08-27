@@ -187,16 +187,22 @@ export async function POST(request: NextRequest) {
         const contactName = config?.contact_name || ''
         const smsText = `Tack ${customerName}! Vi har mottagit din signatur på offerten. Vi återkommer inom kort med en tid för att påbörja arbetet. // ${contactName}, ${bizName}`
 
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-        await fetch(`${appUrl}/api/sms/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            business_id: business.business_id,
-            to: customerPhone,
-            message: smsText,
-          }),
+        // Etapp 0 (2026-08-27): strypunkten i stället för den sessions-
+        // grindade /api/sms/send (401 — signaturtacket gick aldrig ut).
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const r = await sendSmsViaElks({
+          supabase,
+          businessId: business.business_id,
+          businessName: bizName,
+          to: customerPhone,
+          message: smsText,
+          customerId: quote.customer_id ?? null,
+          relatedId: quoteId,
+          messageType: 'quote_signed_thanks',
+          recipient: 'customer',
+          purpose: 'transactional',
         })
+        if (!r.success) console.error('[quotes/accept] bekräftelse-SMS misslyckades (non-blocking):', r.error)
       }
     } catch (err) {
       console.error('[quotes/accept] bekräftelse-SMS failed (non-blocking):', quoteId, err)

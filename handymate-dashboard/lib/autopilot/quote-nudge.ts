@@ -2,6 +2,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { extractFirstName, halsning } from '@/lib/customers/namn'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 const QUOTE_NUDGE_MODEL = 'claude-haiku-4-5-20251001'
 
@@ -128,7 +129,7 @@ export async function createQuoteNudge(
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
     await fetch(`${appUrl}/api/push/send`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: internalPushHeaders(),
       body: JSON.stringify({
         business_id: businessId,
         title: `💡 ${customer.name} har tittat ${viewCount}x`,

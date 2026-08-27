@@ -6,6 +6,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 
 export async function sendMorningReport(businessId: string): Promise<{
@@ -175,7 +176,7 @@ export async function sendMorningReport(businessId: string): Promise<{
       const firstSentence = message.split('\n').filter(Boolean).slice(0, 2).join(' ').slice(0, 120)
       await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'}/api/push/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: internalPushHeaders(),
         body: JSON.stringify({
           business_id: businessId,
           title: 'God morgon! Din dagliga rapport är klar',

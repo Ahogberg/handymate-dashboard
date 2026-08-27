@@ -618,18 +618,11 @@ ${suffix}`
       console.error('Pipeline trigger error (non-blocking):', pipelineErr)
     }
 
-    // Smart communication: trigger quote_sent event
-    try {
-      const { triggerEventCommunication } = await import('@/lib/smart-communication')
-      await triggerEventCommunication({
-        businessId: business.business_id,
-        event: 'quote_sent',
-        customerId: quote.customer_id,
-        context: { quoteId },
-      })
-    } catch (commErr) {
-      console.error('Communication trigger error (non-blocking):', commErr)
-    }
+    // Smart Communication-triggern för quote_sent är BORTTAGEN (Etapp 0,
+    // 2026-08-27, Andreas-beslut): offerten är redan levererad ovan
+    // (e-post/SMS); den globala communication_rule kunde skicka ett ANDRA
+    // offert-SMS via setTimeout i en serverless-request — dubblett och
+    // opålitligt. V3-events nedan är kvar (pipeline/regler).
 
     // V4 Automation Engine: fire quote_sent event (pipeline stage move)
     try {

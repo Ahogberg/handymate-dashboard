@@ -18,6 +18,7 @@ import { rapporteraTystFel, arSchemaSaknas } from '@/lib/observability/driftlarm
 import { halsning } from '@/lib/customers/namn'
 import { completeProject } from '@/lib/projects/complete-project'
 import { normalizeDueDateIso } from '@/lib/customer-facts/build-card'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 export const dynamic = 'force-dynamic'
 
@@ -2004,7 +2005,7 @@ async function executeApprovalPayload(
         // behövs ej här.
         fetch(`${appUrl}/api/push/send`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: internalPushHeaders(),
           body: JSON.stringify({
             business_id: businessId,
             title: 'Offert godkänd',

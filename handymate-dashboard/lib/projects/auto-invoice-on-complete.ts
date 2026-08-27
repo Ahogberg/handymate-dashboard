@@ -219,15 +219,20 @@ export async function autoInvoiceOnComplete(
           smsMessage = `✅ ${project.name} är klart! Faktura på ${amountStr} kr är skapad som utkast — granska och skicka: ${invoiceUrl}`
         }
 
-        await fetch(`${appUrl}/api/sms/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: config.personal_phone,
-            message: smsMessage,
-            business_id: businessId,
-          }),
+        // Etapp 0 (2026-08-27): tidigare fetch mot den sessions-grindade
+        // /api/sms/send → 401 (ägaren fick aldrig utfallet). Nu strypunkten.
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const r = await sendSmsViaElks({
+          supabase,
+          businessId,
+          to: config.personal_phone,
+          message: smsMessage,
+          relatedId: invoice.invoice_id,
+          messageType: 'auto_invoice_result',
+          recipient: 'internal',
+          purpose: 'internal',
         })
+        if (!r.success) console.error('[auto-invoice] ägar-SMS misslyckades (non-blocking):', r.error)
       }
     } catch {
       // Non-blocking

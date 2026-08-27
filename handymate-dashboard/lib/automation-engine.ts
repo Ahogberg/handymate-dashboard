@@ -14,6 +14,7 @@ import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 import { arTestId, arTestNamn } from '@/lib/testdata'
 import { extractFirstName } from '@/lib/customers/namn'
 import { registerMandateDeliveryFailure } from '@/lib/mandates/mission-mandate'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 import { loadMandateResolutionCache, resolveMandateForAction, type MandateResolutionCache } from '@/lib/mandates/resolve'
 
 // ── Types ───────────────────────────────────────────────
@@ -337,13 +338,30 @@ async function handleSendEmail(
   const body = (config.body as string) || ''
 
   try {
-    const res = await fetch(`${APP_URL}/api/email/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ business_id: businessId, to, subject, body }),
+    // Etapp 0 (2026-08-27): den e-postrutt som tidigare anropades här har
+    // aldrig funnits — varje V3 send_email-regel failade med 404. Går nu
+    // direkt via e-postkärnan (Resend) och läser dess resultat.
+    const { sendEmail, logEmail } = await import('@/lib/email')
+    const { data: biz } = await supabase
+      .from('business_config')
+      .select('business_name')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    const html = body
+      .split(/\r?\n/)
+      .map(line => line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+      .join('<br>')
+    const result = await sendEmail({ to, subject, html, fromName: biz?.business_name || undefined })
+    await logEmail({
+      businessId,
+      customerId: (context.customer_id as string) || undefined,
+      to,
+      subject,
+      status: result.success ? 'sent' : 'failed',
+      messageId: result.messageId,
     })
-    if (!res.ok) return { success: false, error: `E-post misslyckades: HTTP ${res.status}` }
-    return { success: true, data: { to, subject } }
+    if (!result.success) return { success: false, error: `E-post misslyckades: ${result.error || 'okänt fel'}` }
+    return { success: true, data: { to, subject, messageId: result.messageId } }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Email send failed'
     return { success: false, error: msg }
@@ -455,7 +473,7 @@ async function handleCreateApproval(
   // Send push notification
   fetch(`${APP_URL}/api/push/send`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: internalPushHeaders(),
     body: JSON.stringify({
       business_id: businessId,
       title: 'Godkännande krävs',
@@ -552,17 +570,17 @@ async function handleNotifyOwner(
   const body = (config.body as string) || ''
 
   try {
-    await fetch(`${APP_URL}/api/push/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        business_id: businessId,
-        title,
-        body,
-        url: (config.url as string) || '/dashboard',
-      }),
+    // Etapp 0 (2026-08-27): signerad intern push + ärligt utfall — "0
+    // mottagare" är inte "levererat".
+    const { sendInternalPush } = await import('@/lib/notifications/push-internal')
+    const push = await sendInternalPush({
+      business_id: businessId,
+      title,
+      body,
+      url: (config.url as string) || '/dashboard',
     })
-    return { success: true, data: { title } }
+    if (!push.delivered) return { success: false, error: `Push nådde ingen mottagare (${push.reason || 'no_recipients'})`, data: { title, sent: push.sent } }
+    return { success: true, data: { title, sent: push.sent } }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Push failed'
     return { success: false, error: msg }
@@ -1037,7 +1055,7 @@ export async function executeRule(
     try {
       await fetch(`${APP_URL}/api/push/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: internalPushHeaders(),
         body: JSON.stringify({
           business_id: typedRule.business_id,
           title: 'Självständig åtgärd misslyckades',

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 import { getServerSupabase } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
@@ -165,10 +166,7 @@ Generera 3-4 konkreta, actionbara affärsinsikter. Returnera ENDAST ett JSON-arr
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
           await fetch(`${appUrl}/api/push/send`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-internal-secret': process.env.CRON_SECRET || '',
-            },
+            headers: internalPushHeaders(),
             body: JSON.stringify({
               business_id: biz.business_id,
               title: 'Veckans affärsinsikter',

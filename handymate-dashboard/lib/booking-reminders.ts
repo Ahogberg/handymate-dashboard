@@ -75,17 +75,25 @@ export async function sendBookingReminders(
       // "ditt besök".
       const message = `${halsning(customer.name)} Påminnelse om ditt besök imorgon kl ${time}. Vi ses!\n${suffix}`
 
+      // Etapp 0 (2026-08-27): tidigare fetch mot den sessions-grindade
+      // /api/sms/send → 401, men sent++ räknades ändå. Nu genom strypunkten,
+      // och bara ett verkligt skickat SMS räknas.
       try {
-        await fetch(`${appUrl}/api/sms/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            business_id: businessId,
-            to: customer.phone_number,
-            message,
-          }),
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const r = await sendSmsViaElks({
+          supabase,
+          businessId,
+          businessName: bizName,
+          to: customer.phone_number,
+          message,
+          customerId: customer.customer_id ?? null,
+          relatedId: booking.booking_id ?? null,
+          messageType: 'booking_reminder',
+          recipient: 'customer',
+          purpose: 'transactional',
         })
-        sent++
+        if (r.success) sent++
+        else console.error('[booking-reminders] SMS misslyckades:', r.error, { bookingId: booking.booking_id })
       } catch { /* continue with next */ }
     }
 

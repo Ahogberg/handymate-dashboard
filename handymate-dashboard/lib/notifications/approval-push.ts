@@ -17,6 +17,7 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { getAbsenceWindow, isAbsenceActive } from '@/lib/absence/absence-window'
 import { classifyAbsenceEvent } from '@/lib/absence/escalation'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 interface ApprovalLike {
   business_id: string
@@ -310,7 +311,7 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
   try {
     const res = await fetch(`${appUrl}/api/push/send`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: internalPushHeaders(),
       body: JSON.stringify({
         business_id: approval.business_id,
         title: template.title,

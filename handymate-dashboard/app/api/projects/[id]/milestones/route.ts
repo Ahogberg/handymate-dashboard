@@ -199,15 +199,22 @@ export async function PUT(
               portalLink = ` Följ projektet här: ${appUrl}/portal/${cust.portal_token}?tab=projects`
             }
 
-            await fetch(`${appUrl}/api/sms/send`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                business_id: business.business_id,
-                to: cust.phone_number,
-                message: `Hej${firstName ? ' ' + firstName : ''}! "${milestoneName}" i ditt projekt "${project.name}" är nu klart (${completedCount}/${totalCount}).${portalLink} // ${bizName}`,
-              }),
+            // Etapp 0 (2026-08-27): strypunkten i stället för den sessions-
+            // grindade /api/sms/send (401 — milstolpe-SMS:et gick aldrig ut).
+            const { sendSmsViaElks } = await import('@/lib/sms-send')
+            const r = await sendSmsViaElks({
+              supabase,
+              businessId: business.business_id,
+              businessName: bizName,
+              to: cust.phone_number,
+              message: `Hej${firstName ? ' ' + firstName : ''}! "${milestoneName}" i ditt projekt "${project.name}" är nu klart (${completedCount}/${totalCount}).${portalLink} // ${bizName}`,
+              customerId: project.customer_id,
+              relatedId: params.id,
+              messageType: 'milestone_completed',
+              recipient: 'customer',
+              purpose: 'transactional',
             })
+            if (!r.success) console.error('[milestones] kund-SMS misslyckades (non-blocking):', r.error)
           }
         }
       } catch { /* non-blocking */ }

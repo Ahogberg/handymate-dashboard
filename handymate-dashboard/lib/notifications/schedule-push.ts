@@ -24,6 +24,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { resolveTargetUserId } from '@/lib/notifications/approval-push'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 function dateLabel(iso: string): string {
   try {
@@ -65,7 +66,7 @@ async function sendSchedulePush(
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
     const res = await fetch(`${appUrl}/api/push/send`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: internalPushHeaders(),
       body: JSON.stringify({
         business_id: businessId,
         title,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 /**
  * PUT /api/suppliers/manual/[id] — Uppdatera leverantör
@@ -62,7 +63,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
           await fetch(`${appUrl}/api/push/send`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: internalPushHeaders(),
             body: JSON.stringify({
               business_id: business.business_id,
               title: `${existing.name} — ${discount}% billigare`,

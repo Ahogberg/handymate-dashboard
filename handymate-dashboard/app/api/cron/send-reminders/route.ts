@@ -10,6 +10,7 @@ import { svDateStr } from '@/lib/dates'
 import { arTestId, arTestNamn } from '@/lib/testdata'
 import { registerMandateDeliveryFailure } from '@/lib/mandates/mission-mandate'
 import { loadMandateResolutionCache, resolveMandateForAction, MANDATE_TRUTH_CLASS, type MandateResolutionCache } from '@/lib/mandates/resolve'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -545,7 +546,7 @@ async function sendAutoReminders() {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.handymate.se'
       fetch(`${appUrl}/api/push/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: internalPushHeaders(),
         body: JSON.stringify({
           business_id: inv.business_id,
           title: 'Godkännande krävs',

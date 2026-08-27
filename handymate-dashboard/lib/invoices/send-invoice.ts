@@ -575,18 +575,12 @@ export async function triggerPostSendAutomations(params: PostSendAutomationsPara
     console.error('[invoices/send] bumpProjectStage invoice_sent failed:', err)
   }
 
-  // Smart communication: trigger invoice_sent event
-  try {
-    const { triggerEventCommunication } = await import('@/lib/smart-communication')
-    await triggerEventCommunication({
-      businessId,
-      event: 'invoice_sent',
-      customerId: invoice.customer_id,
-      context: { invoiceId },
-    })
-  } catch (commErr) {
-    console.error('Communication trigger error (non-blocking):', commErr)
-  }
+  // Smart Communication-triggern för invoice_sent är BORTTAGEN (Etapp 0,
+  // 2026-08-27, Andreas-beslut): fakturan är redan levererad ovan; den
+  // globala communication_rule kunde skicka ett extra faktura-SMS via
+  // setTimeout i en serverless-request (dubblett, och reglaget hette
+  // dessutom sms_invoice_reminder). Kanoniska påminnelser bor i
+  // lib/invoice-reminder-send.ts.
 
   // Portal-notifikation borttagen (2026-08-20): sendInvoice() skickar redan
   // ett komplett mejl (PDF-bilaga + länk "Visa i kundportalen") och/eller

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 /**
  * POST /api/field-reports/[id]/sign — Publik signering/avvisning via token
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
       await fetch(`${appUrl}/api/push/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: internalPushHeaders(),
         body: JSON.stringify({
           business_id: report.business_id,
           title: 'Rapport signerad!',

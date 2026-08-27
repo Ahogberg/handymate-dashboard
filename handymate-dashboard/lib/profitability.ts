@@ -14,6 +14,7 @@ import {
   normalizeExplicitMarginTarget,
   type LonsamhetsVarning,
 } from '@/lib/projects/margin-guardian'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 export interface ProjectProfitability {
   project_id: string
@@ -369,7 +370,7 @@ export async function checkProfitabilityWarnings(businessId: string): Promise<nu
       try {
         await fetch(`${APP_URL}/api/push/send`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: internalPushHeaders(),
           body: JSON.stringify({
             business_id: businessId,
             title: '🔴 Budget överskriden',

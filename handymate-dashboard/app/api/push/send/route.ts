@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { getAuthenticatedBusiness } from '@/lib/auth'
+import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { sendExpoPushNotification } from '@/lib/notifications/expo-push'
 
 export const dynamic = 'force-dynamic'
@@ -32,6 +34,18 @@ export async function POST(request: NextRequest) {
 
     if (!business_id || !title) {
       return NextResponse.json({ error: 'Missing business_id or title' }, { status: 400 })
+    }
+
+    // Auth (Etapp 0, 2026-08-27): rutten var helt öppen — vem som helst
+    // kunde posta en push till valfritt business_id. Nu: intern signatur
+    // (x-internal-secret = CRON_SECRET, se lib/notifications/push-internal.ts)
+    // ELLER en inloggad session som tillhör business_id.
+    const internalOk = verifyCronSecret(request)
+    if (!internalOk) {
+      const business = await getAuthenticatedBusiness(request)
+      if (!business || business.business_id !== business_id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
     }
 
     // Check if web-push is configured

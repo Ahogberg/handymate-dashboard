@@ -21,6 +21,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { resolveTargetUserId } from '@/lib/notifications/approval-push'
 import { bokningarAttPaminna, type ReminderCandidate } from '@/lib/meetings/reminder-window'
 import { arTestNamn } from '@/lib/testdata'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -91,7 +92,7 @@ export async function GET(request: NextRequest) {
 
         const res = await fetch(`${appUrl}/api/push/send`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: internalPushHeaders(),
           body: JSON.stringify({
             business_id: booking.business_id,
             title: 'Möte om 15 min',

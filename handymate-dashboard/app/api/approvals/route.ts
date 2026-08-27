@@ -4,6 +4,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/permissions'
 import { canActOnApproval, type ApprovalRoutingRow } from '@/lib/approvals/routing'
 import { arTestdataApproval } from '@/lib/testdata'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 export const dynamic = 'force-dynamic'
 
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
     fetch(`${appUrl}/api/push/send`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: internalPushHeaders(),
       body: JSON.stringify({
         business_id: business.business_id,
         title: 'Nytt att godkänna',

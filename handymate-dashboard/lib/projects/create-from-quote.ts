@@ -243,15 +243,21 @@ export async function createProjectFromQuote(
         const budgetStr = budget ? ` (${Math.round(budget).toLocaleString('sv-SE')} kr)` : ''
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
-        await fetch(`${appUrl}/api/sms/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: biz.personal_phone,
-            message: `Ny deal vunnen! Projekt "${projectName}" för ${customerName}${budgetStr} skapat automatiskt.\n→ ${appUrl}/dashboard/projects/${projectId}`,
-            business_id: businessId,
-          }),
+        // Etapp 0 (2026-08-27): strypunkten i stället för den sessions-
+        // grindade /api/sms/send (401).
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const r = await sendSmsViaElks({
+          supabase,
+          businessId,
+          businessName: biz.business_name,
+          to: biz.personal_phone,
+          message: `Ny deal vunnen! Projekt "${projectName}" för ${customerName}${budgetStr} skapat automatiskt.\n→ ${appUrl}/dashboard/projects/${projectId}`,
+          relatedId: projectId,
+          messageType: 'project_won',
+          recipient: 'internal',
+          purpose: 'internal',
         })
+        if (!r.success) console.error('[createProjectFromQuote] ägar-SMS misslyckades (non-blocking):', r.error)
       }
     } catch { /* non-blocking */ }
 
@@ -270,15 +276,20 @@ export async function createProjectFromQuote(
 
         // R2: projectName kommer från quote.title (hantverkarens interna
         // arbetsnamn) — refereras aldrig i kundtext, "ditt projekt" istället.
-        await fetch(`${appUrl}/api/sms/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: customer.phone_number,
-            message: `${halsning(customer.name)} Ditt projekt hos ${biz?.business_name || ''} har startats. Följ projektets gång här: ${portalUrl}`,
-            business_id: businessId,
-          }),
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const r = await sendSmsViaElks({
+          supabase,
+          businessId,
+          businessName: biz?.business_name,
+          to: customer.phone_number,
+          message: `${halsning(customer.name)} Ditt projekt hos ${biz?.business_name || ''} har startats. Följ projektets gång här: ${portalUrl}`,
+          customerId: quote.customer_id,
+          relatedId: projectId,
+          messageType: 'project_started',
+          recipient: 'customer',
+          purpose: 'transactional',
         })
+        if (!r.success) console.error('[createProjectFromQuote] kund-SMS misslyckades (non-blocking):', r.error)
       }
     } catch { /* non-blocking */ }
 

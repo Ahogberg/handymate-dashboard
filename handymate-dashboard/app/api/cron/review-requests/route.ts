@@ -6,6 +6,7 @@ import { normalizeSwedishPhone } from '@/lib/phone-normalize'
 import { buildReferralUrl } from '@/lib/referral/link'
 import { registerMandateDeliveryFailure } from '@/lib/mandates/mission-mandate'
 import { loadMandateResolutionCache, resolveMandateForAction } from '@/lib/mandates/resolve'
+import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 export const dynamic = 'force-dynamic'
 
@@ -397,7 +398,7 @@ export async function GET(request: NextRequest) {
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
           await fetch(`${appUrl}/api/push/send`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: internalPushHeaders(),
             body: JSON.stringify({
               business_id: biz.business_id,
               title: 'Autonom recensionsförfrågan misslyckades',

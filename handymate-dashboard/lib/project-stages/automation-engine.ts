@@ -546,15 +546,20 @@ async function sendStageSms(opts: {
 }
 
 async function sendSMS(phone: string, message: string, businessId: string) {
+  // Etapp 0 (2026-08-27): gick tidigare mot den sessions-grindade
+  // /api/sms/send med en header ingen rutt läste → 401. Nu strypunkten.
   try {
-    await fetch(`${APP_URL}/api/sms/send`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-internal-secret': process.env.CRON_SECRET || '',
-      },
-      body: JSON.stringify({ to: phone, message, business_id: businessId }),
+    const { sendSmsViaElks } = await import('@/lib/sms-send')
+    const r = await sendSmsViaElks({
+      supabase: getServerSupabase(),
+      businessId,
+      to: phone,
+      message,
+      messageType: 'project_stage',
+      recipient: 'customer',
+      purpose: 'transactional',
     })
+    if (!r.success) console.error('[project-stages] sendSMS failed:', r.error)
   } catch (err) {
     console.error('[project-stages] sendSMS failed:', err)
   }
