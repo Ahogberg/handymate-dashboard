@@ -60,7 +60,6 @@ import { ProjectCloseoutCopilotCard } from '@/components/jarvis/ProjectCloseoutC
 import type { CloseoutCandidate } from '@/lib/agents/lars/closeout-copilot'
 import { RevenueRecoveryCaseKort } from '@/components/jarvis/RevenueRecoveryCaseKort'
 import type { RevenueRecoveryCase } from '@/lib/value/revenue-recovery-case'
-import { MalNudge } from '@/components/jarvis/MalNudge'
 import { FuelWarningCard } from '@/components/jarvis/FuelWarningCard'
 import { ReaktiveringsInsikt, type ReaktiveringsSignal } from '@/components/jarvis/ReaktiveringsInsikt'
 import { useFuel } from '@/components/fuel/FuelProvider'
@@ -1142,7 +1141,8 @@ export default function JarvisHome({
             )
           })()}
 
-          <MalNudge />
+          {/* Mål-nudgen (omsättningsmål) bor på månadsrapporten sedan
+              2026-08-27 — "Det här behöver dig idag" är bara beslut. */}
 
           {closeoutCandidates[0] && (
             <ProjectCloseoutCopilotCard candidate={closeoutCandidates[0]} />

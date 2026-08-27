@@ -42,12 +42,19 @@ test.describe('MalNudge — fail-soft, ingen falsk nudge', () => {
   })
 })
 
-test.describe('MalNudge är monterad i JarvisHome', () => {
-  test('importeras och renderas i systemnivå-zonen, före ProjektCaseKort', () => {
-    expect(jarvisHome).toContain("import { MalNudge } from '@/components/jarvis/MalNudge'")
-    const nudgeRender = jarvisHome.indexOf('<MalNudge />')
-    const caseKort = jarvisHome.indexOf('<ProjektCaseKort')
+test.describe('MalNudge bor på månadsrapporten — inte i hemmets beslutszon (2026-08-27)', () => {
+  const monthlyReview = read('app/dashboard/monthly-review/page.tsx')
+
+  test('JarvisHome varken importerar eller renderar nudgen — "Det här behöver dig idag" är bara beslut', () => {
+    expect(jarvisHome).not.toContain("from '@/components/jarvis/MalNudge'")
+    expect(jarvisHome).not.toContain('<MalNudge')
+  })
+
+  test('månadsrapporten renderar nudgen före MalBlock, där målet faktiskt konsumeras', () => {
+    expect(monthlyReview).toContain("import { MalNudge } from '@/components/jarvis/MalNudge'")
+    const nudgeRender = monthlyReview.indexOf('<MalNudge />')
+    const malBlock = monthlyReview.indexOf('<MalBlock')
     expect(nudgeRender).toBeGreaterThan(-1)
-    expect(nudgeRender).toBeLessThan(caseKort)
+    expect(nudgeRender).toBeLessThan(malBlock)
   })
 })

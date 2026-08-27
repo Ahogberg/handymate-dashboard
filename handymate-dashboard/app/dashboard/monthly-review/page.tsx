@@ -7,6 +7,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
 import { AgarrapportBlock } from '@/components/value/AgarrapportBlock'
 import { MalBlock } from '@/components/value/MalBlock'
+import { MalNudge } from '@/components/jarvis/MalNudge'
 import type { MonthlyReviewData } from '@/lib/matte/monthly-review'
 
 interface MonthlyReviewRow {
@@ -124,6 +125,11 @@ export default function MonthlyReviewPage() {
             Renderar ingenting för anställda (API:t svarar 403) och inget
             när det inte finns något att säga. */}
         <AgarrapportBlock />
+
+        {/* Omsättningsmålet hör hemma där det konsumeras (MalBlock nedan),
+            inte i hemmets beslutszon (flyttad hit 2026-08-27). Renderar
+            bara när målet BEVISAT saknas; egen dismiss per företag. */}
+        <MalNudge />
 
         {reviews[0] && (
           <MalBlock monthLabel={reviews[0].data.month_label} profitability={reviews[0].data.profitability} />
