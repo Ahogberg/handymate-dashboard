@@ -822,20 +822,27 @@ export default function PipelinePage() {
     pollIntervalMs: 30_000,
   })
 
-  // Öppna ny deal-modal om redirect från kundregistrering
+  // Konsumera kund-prefillen exakt en gång. Kundens id och synliga namn
+  // måste sättas tillsammans: tidigare sattes bara customer_id medan det
+  // synliga sökfältet lämnades tomt. Första tangenttrycket i det tomma
+  // fältet rensade då relationen, men titeln "Jobb för ..." låg kvar.
+  const newDealPrefillHandled = useRef(false)
   useEffect(() => {
-    if (searchParams?.get('newDeal') === 'true') {
-      const custId = searchParams.get('customer_id') || ''
-      const custName = searchParams.get('customer_name') || ''
-      setShowNewDeal(true)
-      setNewDealForm(prev => ({ ...prev, customer_id: custId, title: custName ? `Jobb för ${custName}` : '' }))
-      fetchCustomers()
-      fetchJobTypes()
-      fetchLeadSources()
-      fetchJobTypeOptions()
-      // Rensa URL:en
-      window.history.replaceState(null, '', '/dashboard/pipeline')
-    }
+    if (searchParams?.get('newDeal') !== 'true' || newDealPrefillHandled.current) return
+
+    const custId = searchParams.get('customer_id') || ''
+    const custName = searchParams.get('customer_name') || ''
+    newDealPrefillHandled.current = true
+    setShowNewDeal(true)
+    setNewDealForm(prev => ({ ...prev, customer_id: custId, title: custName ? `Jobb för ${custName}` : '' }))
+    setCustomerSearch(custName)
+    setShowCustomerDropdown(false)
+    fetchCustomers()
+    fetchJobTypes()
+    fetchLeadSources()
+    fetchJobTypeOptions()
+    // Rensa URL:en först efter att hela prefillen kopierats till state.
+    window.history.replaceState(null, '', '/dashboard/pipeline')
   }, [searchParams])
 
   // Deep-link: ?deal=X → öppna deal-detalj direkt (från dashboardens "Att göra idag")
@@ -1016,7 +1023,7 @@ export default function PipelinePage() {
         body: JSON.stringify({
           business_id: business.business_id,
           title: newDealForm.title.trim(),
-          customerId: newDealForm.customer_id || null,
+          customer_id: newDealForm.customer_id || null,
           value: newDealForm.value ? parseFloat(newDealForm.value) : null,
           priority: newDealForm.priority,
           description: newDealForm.description.trim() || null,

@@ -168,6 +168,7 @@ export function NewDealModal() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input type="text" value={customerSearch}
+                  readOnly={Boolean(newDealForm.customer_id)}
                   onChange={e => {
                     setCustomerSearch(e.target.value)
                     setShowCustomerDropdown(true)
@@ -176,7 +177,7 @@ export function NewDealModal() {
                   }}
                   onFocus={() => { if (customerSearch && !newDealForm.customer_id) setShowCustomerDropdown(true) }}
                   placeholder="Sök kund..."
-                  className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
+                  className={`w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400 ${newDealForm.customer_id ? 'cursor-default' : ''}`} />
               </div>
               {newDealForm.customer_id && (
                 <div className="mt-1.5 flex items-center gap-2">

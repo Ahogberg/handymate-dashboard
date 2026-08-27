@@ -298,7 +298,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       title,
-      customerId,
       value,
       stageSlug,
       description,
@@ -307,9 +306,29 @@ export async function POST(request: NextRequest) {
       source,
       assigned_to,
     } = body
+    // Acceptera äldre camelCase-anropare men ha customer_id som kanoniskt
+    // klientkontrakt. Relationen valideras alltid tenant-säkert före insert.
+    const customerId = body.customer_id || body.customerId || null
 
     if (!title) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+    }
+
+    if (customerId) {
+      const { data: customer, error: customerError } = await supabase
+        .from('customer')
+        .select('customer_id')
+        .eq('business_id', business.business_id)
+        .eq('customer_id', customerId)
+        .maybeSingle()
+
+      if (customerError) throw customerError
+      if (!customer) {
+        return NextResponse.json(
+          { error: 'Kunden hittades inte i företaget' },
+          { status: 400 },
+        )
+      }
     }
 
     // Default stage to first pipeline stage
