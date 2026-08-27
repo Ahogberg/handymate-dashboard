@@ -80,6 +80,16 @@ test.describe('affärsdokument — riktig affärskoppling', () => {
 })
 
 test.describe('projektskapande — uppladdningsfel försvinner inte', () => {
+  test('projektdokument dual-writar produktionens legacy order_id och kanoniska project_id', () => {
+    const route = read('app/api/projects/[id]/documents/route.ts')
+    const insert = route.slice(
+      route.indexOf(".from('project_document')\n      .insert({"),
+      route.indexOf('.select()', route.indexOf(".from('project_document')\n      .insert({")),
+    )
+    expect(insert).toContain('order_id: projectId')
+    expect(insert).toContain('project_id: projectId')
+  })
+
   test('felade File-objekt behålls och retry skapar inte ett andra projekt', () => {
     const page = read('app/dashboard/projects/page.tsx')
     const retryGuard = page.indexOf('if (createdProjectForFiles)')
@@ -115,4 +125,3 @@ test.describe('en gemensam förhandsvisningsyta', () => {
     }
   })
 })
-

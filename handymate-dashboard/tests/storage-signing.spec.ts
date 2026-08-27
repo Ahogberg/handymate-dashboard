@@ -234,6 +234,8 @@ test.describe('regression — signeringshelpern används bara i läsvägar, inte
     expect(signIndex, 'signStorageUrl måste ske EFTER insert — annars kan resultatet av den läcka in i payloaden').toBeGreaterThan(insertIndex)
     // Insert-payloaden själv innehåller bara den lokala `filePath`-variabeln.
     const insertBlock = body.slice(insertIndex, body.indexOf('.select()', insertIndex))
+    expect(insertBlock).toContain('order_id: projectId')
+    expect(insertBlock).toContain('project_id: projectId')
     expect(insertBlock).toContain('file_path: filePath')
     expect(insertBlock).not.toContain('signStorageUrl')
     expect(insertBlock).not.toContain('signedForAnalysis')

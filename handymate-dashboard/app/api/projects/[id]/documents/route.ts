@@ -142,6 +142,12 @@ export async function POST(
       .from('project_document')
       .insert({
         id,
+        // Produktionens äldsta project_document-tabell använder fortfarande
+        // order_id som NOT NULL-ägarkolumn. project_id lades till senare och
+        // är den kanoniska läskolumnen. Dual-write tills legacykolumnen kan
+        // saneras i en separat, verifierad migration; annars avvisas HELA
+        // metadata-inserten efter att storage-uploaden redan lyckats.
+        order_id: projectId,
         project_id: projectId,
         business_id: business.business_id,
         name: file.name,
