@@ -3835,12 +3835,12 @@ export default function ProjectDetailPage() {
         {/* === TAB: Byggdagbok === */}
         {activeGroup === 'documentation' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="min-w-0 text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-amber-400" />
                 Byggdagbok {project?.name ? `\u2014 ${project.name}` : ''}
               </h2>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {logs.length > 0 && (
                   <button
                     onClick={async () => {
