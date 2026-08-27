@@ -11,6 +11,7 @@ import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-item
 import { resolveTimeEntryBusinessUserId } from '@/lib/egenkontroll/suggest-time-entry'
 import { getBusinessPlanFromConfig } from '@/lib/auth'
 import { checkSmsAllowance } from '@/lib/sms-usage'
+import { hubAllowsProactiveSend } from '@/lib/outbound/hub-gate'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { classify, nonExecutableResult } from '@/lib/approvals/action-contract'
 import { extractAgentId } from '@/lib/patterns/utils/extract-agent-id'
@@ -1495,6 +1496,13 @@ async function executeApprovalPayload(
         if (!pl.customer_phone || !pl.suggested_sms) {
           return { action: 'proactive_care', skipped: 'no phone or message' }
         }
+        // Grind 5 (Fastighetspasset steg 3, 2026-08-27): ägarens godkännande är
+        // avsikten — hubbens tysta timmar och veckotak gäller ändå. Stoppat
+        // utskick blir ett ärligt "Godkänt — men …" med Försök igen.
+        const hub = await hubAllowsProactiveSend(businessId, pl.customer_id || null)
+        if (!hub.allowed) {
+          return { action: 'proactive_care', sms_sent: false, error: hub.reason, customer: pl.customer_name }
+        }
         // Audit-3 Fix A (2026-06-01)
         const r = await sendSms({
           to: pl.customer_phone,
@@ -1541,6 +1549,13 @@ async function executeApprovalPayload(
         const pl = payload as any
         if (!pl.customer_phone || !pl.suggested_sms) {
           return { action: 'warranty_followup', skipped: 'no phone or message' }
+        }
+        // Grind 5 (Fastighetspasset steg 3, 2026-08-27): ägarens godkännande är
+        // avsikten — hubbens tysta timmar och veckotak gäller ändå. Stoppat
+        // utskick blir ett ärligt "Godkänt — men …" med Försök igen.
+        const hub = await hubAllowsProactiveSend(businessId, pl.customer_id || null)
+        if (!hub.allowed) {
+          return { action: 'warranty_followup', sms_sent: false, error: hub.reason, customer: pl.customer_name }
         }
         // Audit-3 Fix A (2026-06-01)
         const r = await sendSms({

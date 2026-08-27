@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkFeatureAccess } from '@/lib/auth'
+import { validateWarrantyTruth } from '@/lib/warranty/warranty-truth'
 
 /**
  * GET /api/warranties - Hämta garantier
@@ -71,11 +72,14 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
     const body = await request.json()
-    const { customer_id, booking_id, invoice_id, title, description, start_date, end_date, warranty_type, terms } = body
+    const { customer_id, booking_id, invoice_id, title, description, start_date, end_date, warranty_type, terms, project_id, installation_id } = body
 
     if (!customer_id || !title || !start_date || !end_date) {
-      return NextResponse.json({ error: 'customer_id, title, start_date och end_date krävs' }, { status: 400 })
+      return NextResponse.json({ error: 'Kund, titel, startdatum och slutdatum krävs' }, { status: 400 })
     }
+    // Grind 3 (Fastighetspasset steg 3): typ ⇒ garantigivare + källa, annars inget löfte.
+    const truth = validateWarrantyTruth(body)
+    if (!truth.ok) return NextResponse.json({ error: truth.error }, { status: 400 })
 
     const { data, error } = await supabase
       .from('warranty')
@@ -91,6 +95,9 @@ export async function POST(request: NextRequest) {
         warranty_type: warranty_type || 'standard',
         terms: terms || null,
         status: 'active',
+        project_id: project_id || null,
+        installation_id: installation_id || null,
+        ...truth.value,
       })
       .select(`*, customer:customer_id (customer_id, name, phone_number)`)
       .single()
@@ -125,6 +132,11 @@ export async function PUT(request: NextRequest) {
 
     if (!warranty_id) {
       return NextResponse.json({ error: 'warranty_id krävs' }, { status: 400 })
+    }
+    if ('warranty_kind' in updates || 'issuer' in updates || 'source' in updates) {
+      const truth = validateWarrantyTruth(updates)
+      if (!truth.ok) return NextResponse.json({ error: truth.error }, { status: 400 })
+      Object.assign(updates, truth.value)
     }
 
     const { data, error } = await supabase

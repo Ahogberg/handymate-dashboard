@@ -10,6 +10,7 @@
 import {
   CheckCircle2, FileText, Wrench, ClipboardCheck, Receipt, Package,
   Image as ImageIcon, Sparkles, Zap,
+  ShieldCheck,
 } from 'lucide-react'
 import type { JobbpassCustomerView } from '@/lib/jobbpass/jobbpass'
 import { SERVICE_INTERVAL_SOURCE_LABEL } from '@/lib/installation/installation'
@@ -134,6 +135,22 @@ export function JobbpassView({ pass }: { pass: JobbpassCustomerView }) {
               </div>
             )
           })}
+        </Card>
+      )}
+
+      {pass.warranties.length > 0 && (
+        <Card icon={ShieldCheck} title="Garantier">
+          {pass.warranties.map((w, i) => (
+            <div key={i} className={i > 0 ? 'mt-4 pt-4 border-t border-gray-100' : ''}>
+              <p className="text-sm font-semibold text-gray-900">{w.kind_label} — {w.title}</p>
+              <dl className="mt-1 space-y-0.5 text-sm">
+                <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Garantigivare</dt><dd className="text-gray-700">{w.issuer}</dd></div>
+                <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Gäller t.o.m.</dt><dd className="text-gray-700">{formatJobbpassDatum(w.end_date)}</dd></div>
+                <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Uppgift</dt><dd className="text-gray-700">{w.source_label}</dd></div>
+              </dl>
+              {w.description && <p className="mt-2 text-sm text-gray-600 whitespace-pre-line">{w.description}</p>}
+            </div>
+          ))}
         </Card>
       )}
 

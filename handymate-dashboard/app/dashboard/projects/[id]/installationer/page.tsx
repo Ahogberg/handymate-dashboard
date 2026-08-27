@@ -321,6 +321,14 @@ function InstallationCard({ row, projectId, onChanged, onNotice }: {
             Ångra bekräftelse
           </button>
         )}
+        {row.status === 'confirmed' && (
+          <Link
+            href={`/dashboard/warranties?new=1&customer=${encodeURIComponent(row.customer_id || '')}&project=${encodeURIComponent(projectId)}&installation=${encodeURIComponent(row.installation_id)}&title=${encodeURIComponent(row.name)}`}
+            className="px-3 py-1.5 min-h-[40px] inline-flex items-center text-sm text-primary-700 hover:underline"
+          >
+            Registrera garanti →
+          </Link>
+        )}
         <button onClick={remove} disabled={saving} className="ml-auto inline-flex items-center gap-1 text-xs text-gray-400 hover:text-red-600" aria-label="Ta bort">
           <Trash2 className="w-3.5 h-3.5" />
           Ta bort

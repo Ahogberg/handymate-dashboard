@@ -18,6 +18,7 @@ import PortalContact from './components/PortalContact'
 import PortalHandymateAttribution from './components/PortalHandymateAttribution'
 import { formatDateTime, getProjectStatusText } from './helpers'
 import type {
+  PortalInstallation,
   PortalJobbpassSummary,
   PortalDocument,
   PortalReport,
@@ -99,6 +100,7 @@ export default function CustomerPortalPage() {
   const [selectedPassProject, setSelectedPassProject] = useState<string | null>(initialJobbpassProject)
   const [documents, setDocuments] = useState<PortalDocument[]>([])
   const [reports, setReports] = useState<PortalReport[]>([])
+  const [installations, setInstallations] = useState<PortalInstallation[]>([])
 
   // Initial load
   useEffect(() => {
@@ -153,6 +155,10 @@ export default function CustomerPortalPage() {
         if (tab === 'home' || tab === 'project' || subRoute === 'jobbpass') {
           const res = await fetch(`/api/portal/${token}/jobbpass`)
           if (res.ok) { const data = await res.json(); setPasses(data.passes || []) }
+        }
+        if (tab === 'home') {
+          const res = await fetch(`/api/portal/${token}/installations`)
+          if (res.ok) { const data = await res.json(); setInstallations(data.installations || []) }
         }
         if (tab === 'docs') {
           const res = await fetch(`/api/portal/${token}/documents`)
@@ -346,6 +352,7 @@ export default function CustomerPortalPage() {
           portal={portal}
           token={token}
           passes={passes}
+          installations={installations}
           onNavigate={navigate}
         />
       )}

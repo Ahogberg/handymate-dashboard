@@ -138,6 +138,15 @@ export function snapshotSiteAddress(customer: CustomerAddressRow | null | undefi
   }
 }
 
+/** Nästa service = installed_at + intervall. Utan båda: null — ingen gissning (grind 4). */
+export function nextServiceDate(installedAt: string | null, months: number | null): string | null {
+  if (!installedAt || !months) return null
+  const d = new Date(installedAt)
+  if (Number.isNaN(d.getTime())) return null
+  d.setUTCMonth(d.getUTCMonth() + months)
+  return d.toISOString().slice(0, 10)
+}
+
 export function formatSite(site: SiteSnapshot): string | null {
   const parts = [site.site_address_line, [site.site_postal_code, site.site_city].filter(Boolean).join(' ') || null].filter(Boolean)
   return parts.length > 0 ? parts.join(', ') : null

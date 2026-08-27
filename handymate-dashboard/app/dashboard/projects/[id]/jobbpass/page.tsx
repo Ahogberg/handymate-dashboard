@@ -8,6 +8,7 @@ import {
   FileText, Sparkles, Wrench, ClipboardCheck, Receipt, Zap,
   Mail,
   Package,
+  ShieldCheck,
 } from 'lucide-react'
 import type { JobbpassCustomerView } from '@/lib/jobbpass/jobbpass'
 
@@ -334,6 +335,7 @@ function PreviewSummary({ preview }: { preview: JobbpassCustomerView }) {
   if (preview.checklists.length > 0) rows.push({ icon: ClipboardCheck, label: 'Egenkontroll', value: `${preview.checklists.length} checklista(or)` })
   if (preview.invoice_reference) rows.push({ icon: Receipt, label: 'Faktura', value: preview.invoice_reference.invoice_number || 'Referens finns' })
   if (preview.installations.length > 0) rows.push({ icon: Package, label: 'Sitter hos kunden', value: `${preview.installations.length} bekräftad${preview.installations.length === 1 ? '' : 'e'} installation${preview.installations.length === 1 ? '' : 'er'}` })
+  if (preview.warranties.length > 0) rows.push({ icon: ShieldCheck, label: 'Garantier', value: `${preview.warranties.length} registrerad${preview.warranties.length === 1 ? '' : 'e'} — visas med garantigivare och källa` })
   if (preview.future_service.consent) rows.push({ icon: Zap, label: 'Service', value: 'Kunden har sagt ja till framtida servicepåminnelse' })
 
   return (

@@ -943,7 +943,13 @@ Princip: Handymate slutar inte arbeta när projektet fakturerats. Jobbpasset (v1
 - [x] Jobbpasset: "Det här sitter hos dig" — bara status confirmed, intervall visas alltid med källa (grind 4); allowlisten utökad
 - [x] Facit `tests/facit-installation.spec.ts` (grind 1, 2, 4, adress, kundvy) + jobbpass.spec
 - [x] v174 körd via MCP 2026-08-27 (28 kolumner, 6 CHECK, RLS, 1 policy verifierat med SELECT). Prod-bevis (Provfirman biz_eaj2vp3xf2, projekt 56435441…): avslut → effekt installation_register succeeded → relevans keyword "varmepump" → intervall utan källa 400 → manuell rad → bekräftad → publik vy bär installationen, ingen warranty-nyckel → portalen "Det här sitter hos dig" → Lars-kortet i kön med "Registrera installationer" → registersidan. Skärmdumpar proof-inst-1..3.
-### Steg 3 — en garantisanning + service-trigger
-- [ ] `warranty.project_id` + garantityp (produkt | utförande | serviceavtal) + garantigivare + källa (grind 3); skapas vid avslut ur installationen
-- [ ] proactive-care läser intervall från installationen bara när intervall_källa finns (grind 4); Hannas "första service närmar sig" per fastighet — utskick via hubben, inte automatiskt (grind 5)
-
+### Steg 3 — garantisanning, service ur installationen, hubbens grind, Min bostad — BYGGT 2026-08-27 (v175 körd)
+- [x] `sql/v175_warranty_truth.sql` (körd via MCP, verifierad): warranty + project_id, installation_id, warranty_kind (product|workmanship|service_agreement), issuer, source (product_info|contract|craftsman); CHECK "typ ⇒ garantigivare + källa" (grind 3). Äldre rader/warranty_type orörda och når aldrig kunden.
+- [x] `lib/warranty/warranty-truth.ts` (validateWarrantyTruth, customerWarrantiesFromRows — bara aktiva, registrerade, gällande) · `/api/warranties` validerar · garantisidan: sort/garantigivare/källa, inget förifyllt 2-årsdatum, badge "Visas inte för kunden" på äldre rader · installationssidan länkar "Registrera garanti →" (förifyllt)
+- [x] Jobbpasset: sektionen "Garantier" bara ur registrerade rader, alltid med garantigivare + källa; allowlisten utökad
+- [x] Grind 4: proactive-care läser bekräftade installationer — intervall + källa styr; registrerad tillgång utan intervall ⇒ ingen påminnelse (ingen gissning); nyckelordstabellen bara för projekt utan installation; `jobbpass.service_consent = false` stoppar; payload bär installation_id/interval_source
+- [x] Grind 5: `lib/outbound/hub-gate.ts` (tysta timmar + veckotak ur communication_settings, aldrig auto-inställningen) kopplad i approvals-caset för proactive_care och warranty_followup före sendSms — stoppat utskick = ärligt "Godkänt — men …" med Försök igen
+- [x] Min bostad: `GET /api/portal/[token]/installations` (bara confirmed, nästa service ur installed_at + intervall) · `bostad.ts` grupperar per adressögonblicksbild · PortalHome "Min bostad" ersätter "Ditt hem" (installationer överst, passen under)
+- [x] Facit `tests/facit-fastighetspass-steg3.spec.ts` (grind 3, 4, 5, Min bostad) + steg 1-facitet uppdaterat
+- [ ] Prod-bevis efter deploy: Provfirman — Min bostad i portalen, garanti registrerad på värmepumpen syns i passet med garantigivare
+- Känt: dedupen i proactive-care är fortfarande livstids per projekt+kund ⇒ installationsdrivna påminnelser blir engångs, inte återkommande (kräver datumavgränsad dedup per installation — separat beslut)

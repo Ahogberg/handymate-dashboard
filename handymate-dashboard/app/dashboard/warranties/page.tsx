@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { WARRANTY_KIND_LABEL, WARRANTY_SOURCE_LABEL, type WarrantyKind, type WarrantySource } from '@/lib/warranty/warranty-truth'
 
 interface Warranty {
   warranty_id: string
@@ -30,6 +31,11 @@ interface Warranty {
   status: 'active' | 'expired' | 'claimed' | 'voided'
   warranty_type: 'standard' | 'extended' | 'manufacturer' | 'custom'
   terms: string | null
+  project_id?: string | null
+  installation_id?: string | null
+  warranty_kind?: WarrantyKind | null
+  issuer?: string | null
+  source?: WarrantySource | null
   created_at: string
   customer?: { customer_id: string; name: string; phone_number: string }
 }
@@ -60,11 +66,35 @@ export default function WarrantiesPage() {
     end_date: '',
     warranty_type: 'standard' as string,
     terms: '',
+    project_id: '',
+    installation_id: '',
+    warranty_kind: '' as '' | WarrantyKind,
+    issuer: '',
+    source: '' as '' | WarrantySource,
   })
 
   useEffect(() => {
     if (business.business_id) fetchData()
   }, [business.business_id])
+
+  // Länk från installationsregistret (Fastighetspasset steg 3):
+  // ?new=1&customer=&project=&installation=&title= öppnar formuläret förifyllt.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('new') !== '1') return
+    setEditingWarranty(null)
+    setForm(f => ({
+      ...f,
+      customer_id: q.get('customer') || '',
+      project_id: q.get('project') || '',
+      installation_id: q.get('installation') || '',
+      title: q.get('title') || '',
+      start_date: new Date().toISOString().split('T')[0],
+      end_date: '',
+    }))
+    setModalOpen(true)
+  }, [])
 
   async function fetchData() {
     setLoading(true)
@@ -89,17 +119,20 @@ export default function WarrantiesPage() {
 
   const openCreateModal = () => {
     setEditingWarranty(null)
-    const today = new Date()
-    const nextYear = new Date(today)
-    nextYear.setFullYear(nextYear.getFullYear() + 2)
+    // Inget förifyllt slutdatum — en garantitid är ett löfte, inte en default.
     setForm({
       customer_id: '',
       title: '',
       description: '',
-      start_date: today.toISOString().split('T')[0],
-      end_date: nextYear.toISOString().split('T')[0],
+      start_date: new Date().toISOString().split('T')[0],
+      end_date: '',
       warranty_type: 'standard',
       terms: '',
+      project_id: '',
+      installation_id: '',
+      warranty_kind: '',
+      issuer: '',
+      source: '',
     })
     setModalOpen(true)
   }
@@ -114,6 +147,11 @@ export default function WarrantiesPage() {
       end_date: w.end_date,
       warranty_type: w.warranty_type,
       terms: w.terms || '',
+      project_id: w.project_id || '',
+      installation_id: w.installation_id || '',
+      warranty_kind: w.warranty_kind || '',
+      issuer: w.issuer || '',
+      source: w.source || '',
     })
     setModalOpen(true)
   }
@@ -123,6 +161,10 @@ export default function WarrantiesPage() {
       showToast('Kund, titel och slutdatum krävs', 'error')
       return
     }
+    if (form.warranty_kind && (!form.issuer.trim() || !form.source)) {
+      showToast('Ange garantigivare och var uppgiften kommer ifrån — annars visas garantin inte för kunden', 'error')
+      return
+    }
     setActionLoading(true)
     try {
       const response = await fetch('/api/warranties', {
@@ -130,12 +172,15 @@ export default function WarrantiesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editingWarranty ? { warranty_id: editingWarranty.warranty_id, ...form } : form),
       })
-      if (!response.ok) throw new Error()
+      if (!response.ok) {
+        const d = await response.json().catch(() => ({}))
+        throw new Error(d.error || 'Något gick fel')
+      }
       showToast(editingWarranty ? 'Garanti uppdaterad!' : 'Garanti skapad!', 'success')
       setModalOpen(false)
       fetchData()
-    } catch {
-      showToast('Något gick fel', 'error')
+    } catch (err) {
+      showToast(err instanceof Error && err.message ? err.message : 'Något gick fel', 'error')
     } finally {
       setActionLoading(false)
     }
@@ -355,8 +400,11 @@ export default function WarrantiesPage() {
                             {getStatusText(w.status)}
                           </span>
                           <span className="px-2 py-0.5 text-xs rounded-full bg-primary-50 text-primary-700 border border-[#E2E8F0]">
-                            {getTypeText(w.warranty_type)}
+                            {w.warranty_kind ? `${WARRANTY_KIND_LABEL[w.warranty_kind]} · ${w.issuer}` : getTypeText(w.warranty_type)}
                           </span>
+                          {!w.warranty_kind && (
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-amber-50 text-amber-700 border border-amber-200">Visas inte för kunden — saknar typ, garantigivare, källa</span>
+                          )}
                           {isExpiringSoon && (
                             <span className="px-2 py-0.5 text-xs rounded-full bg-amber-50 text-amber-600 border border-amber-200 flex items-center gap-1">
                               <AlertTriangle className="w-3 h-3" /> {daysLeft} dagar kvar
@@ -441,19 +489,47 @@ export default function WarrantiesPage() {
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm text-gray-500 mb-1">Typ</label>
-                <select
-                  value={form.warranty_type}
-                  onChange={(e) => setForm({ ...form, warranty_type: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
-                >
-                  <option value="standard">Standard (2 år)</option>
-                  <option value="extended">Utökad</option>
-                  <option value="manufacturer">Tillverkargaranti</option>
-                  <option value="custom">Anpassad</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Sorts garanti</label>
+                  <select
+                    value={form.warranty_kind}
+                    onChange={(e) => setForm({ ...form, warranty_kind: e.target.value as '' | WarrantyKind })}
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  >
+                    <option value="">Välj…</option>
+                    {(Object.keys(WARRANTY_KIND_LABEL) as WarrantyKind[]).map(k => (
+                      <option key={k} value={k}>{WARRANTY_KIND_LABEL[k]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Garantigivare</label>
+                  <input
+                    type="text"
+                    value={form.issuer}
+                    onChange={(e) => setForm({ ...form, issuer: e.target.value })}
+                    placeholder="T.ex. Nibe eller ert företag"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Uppgiften kommer från</label>
+                  <select
+                    value={form.source}
+                    onChange={(e) => setForm({ ...form, source: e.target.value as '' | WarrantySource })}
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                  >
+                    <option value="">Välj…</option>
+                    {(Object.keys(WARRANTY_SOURCE_LABEL) as WarrantySource[]).map(k => (
+                      <option key={k} value={k}>{WARRANTY_SOURCE_LABEL[k]}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
+              <p className="text-xs text-gray-500 -mt-2">
+                Kunden ser garantin i sitt jobbpass bara när sort, garantigivare och källa är ifyllda — portalen lovar aldrig mer än någon ansvarar för.
+              </p>
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Beskrivning</label>
                 <textarea

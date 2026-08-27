@@ -12,18 +12,23 @@ import {
   Receipt,
   RotateCw,
   Sun,
+  MapPin,
+  Package,
 } from 'lucide-react'
 import PortalShellHeader from './PortalShellHeader'
 import PortalHandymateAttribution from './PortalHandymateAttribution'
 import PortalAgreements from './PortalAgreements'
 import { formatCurrency } from '../helpers'
-import type { PortalJobbpassSummary, PortalActivity, PortalData, Project } from '../types'
+import type { PortalInstallation, PortalJobbpassSummary, PortalActivity, PortalData, Project } from '../types'
+import { groupBostad, formatDatum, formatManad } from './bostad'
 
 interface PortalHomeProps {
   portal: PortalData
   token: string
-  /** Fastighetspasset steg 1: kundens publicerade jobbpass → "Ditt hem". */
+  /** Fastighetspasset steg 1/3: kundens publicerade jobbpass → "Min bostad". */
   passes?: PortalJobbpassSummary[]
+  /** Fastighetspasset steg 3: bekräftade installationer → "Min bostad". */
+  installations?: PortalInstallation[]
   onNavigate: (
     route: 'project' | 'docs' | 'contact' | 'messages' | 'project-detail' | 'jobbpass',
     payload?: { projectId?: string; docsSection?: 'quotes' | 'invoices' },
@@ -42,7 +47,8 @@ const ICON_MAP: Record<string, typeof ImageIcon> = {
  * Hem-vy (port av bp-home.jsx).
  * Hämtar aktivt projekt + aktivitetsfeed.
  */
-export default function PortalHome({ portal, token, passes = [], onNavigate }: PortalHomeProps) {
+export default function PortalHome({ portal, token, passes = [], installations = [], onNavigate }: PortalHomeProps) {
+  const bostad = groupBostad(passes, installations)
   const [activeProject, setActiveProject] = useState<Project | null>(null)
   const [activity, setActivity] = useState<PortalActivity[]>([])
   const [polling, setPolling] = useState(false)
@@ -280,39 +286,74 @@ export default function PortalHome({ portal, token, passes = [], onNavigate }: P
           </div>
         </div>
 
-        {/* Ditt hem (Fastighetspasset steg 1, 2026-08-27): det som är gjort hos
-            kunden — ett publicerat jobbpass per avslutat projekt. Visas bara när
-            något finns; aldrig en tom rubrik. */}
-        {passes.length > 0 && (
+        {/* Min bostad (Fastighetspasset steg 3, 2026-08-27): det som sitter i
+            kundens bostad och det som gjorts där — grupperat per plats
+            (installationens adressögonblicksbild; kunden kan ha flera
+            fastigheter). Bara bekräftade installationer och publicerade
+            jobbpass. Visas bara när något finns; aldrig en tom rubrik. */}
+        {bostad.length > 0 && (
           <div style={{ padding: '24px 18px 0' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Ditt hem</h3>
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{passes.length} jobb dokumenterade</span>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Min bostad</h3>
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                {installations.length > 0 ? `${installations.length} installation${installations.length === 1 ? '' : 'er'} · ` : ''}{passes.length} jobb dokumenterade
+              </span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {passes.map(pass => (
-                <button
-                  key={pass.project_id}
-                  type="button"
-                  className="bp-card bp-card-tap"
-                  onClick={() => onNavigate('jobbpass', { projectId: pass.project_id })}
-                  style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', cursor: 'pointer', width: '100%', fontFamily: 'inherit' }}
-                >
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--green-50)', color: 'var(--green-600)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <CheckCircle size={20} />
+            {bostad.map(group => (
+              <div key={group.key} style={{ marginBottom: 14 }}>
+                {group.label && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', margin: '6px 0 8px' }}>
+                    <MapPin size={14} /> {group.label}
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', letterSpacing: '-0.01em' }}>{pass.project_name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                      Jobbpass{pass.completed_at ? ` · klart ${new Date(pass.completed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''} · omfattning, egenkontroll, bilder
-                    </div>
+                )}
+                {group.installations.length > 0 && (
+                  <div className="bp-card" style={{ padding: 14, marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.06em', marginBottom: 8 }}>DET HÄR SITTER HOS DIG</div>
+                    {group.installations.map((inst, i) => {
+                      const produkt = [inst.manufacturer, inst.model].filter(Boolean).join(' ')
+                      const rad = [inst.placement, inst.installed_at ? `installerad ${formatDatum(inst.installed_at)}` : null].filter(Boolean).join(' · ')
+                      return (
+                        <div key={inst.installation_id} style={{ paddingTop: i > 0 ? 10 : 0, marginTop: i > 0 ? 10 : 0, borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
+                          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                            <Package size={16} style={{ color: 'var(--green-600)', flexShrink: 0, marginTop: 2 }} />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{inst.name}{produkt ? ` · ${produkt}` : ''}</div>
+                              {rad && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{rad}</div>}
+                              {inst.next_service_at && inst.service_source_label && (
+                                <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 4 }}>Nästa service omkring {formatManad(inst.next_service_at)} — {inst.service_source_label}</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                </button>
-              ))}
-            </div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {group.passes.map(pass => (
+                    <button
+                      key={pass.project_id}
+                      type="button"
+                      className="bp-card bp-card-tap"
+                      onClick={() => onNavigate('jobbpass', { projectId: pass.project_id })}
+                      style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', cursor: 'pointer', width: '100%', fontFamily: 'inherit' }}
+                    >
+                      <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--green-50)', color: 'var(--green-600)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <CheckCircle size={20} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', letterSpacing: '-0.01em' }}>{pass.project_name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                          Jobbpass{pass.completed_at ? ` · klart ${formatDatum(pass.completed_at)}` : ''} · omfattning, egenkontroll, bilder
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
-
         {/* Serviceavtal (Motor 2, Etapp 2) — visas bara vid aktiva avtal */}
         <PortalAgreements token={token} />
 

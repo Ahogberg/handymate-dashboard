@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { signStorageUrl } from '@/lib/storage-signing'
 import { listConfirmedInstallationsForProject, type InstallationRow } from '@/lib/installation/installation'
+import { listWarrantiesForProject, customerWarrantiesFromRows, type WarrantyRow, type CustomerWarranty } from '@/lib/warranty/warranty-truth'
 
 /**
  * Jobbpass V1 (Etapp Ä, Closeout-to-Lifetime, sql/v154_jobbpass.sql).
@@ -124,6 +125,8 @@ export interface JobbpassCustomerView {
   invoice_reference: JobbpassInvoiceReference | null
   /** Bara status 'confirmed' (Fastighetspasset steg 2) — utkast når aldrig kunden. */
   installations: JobbpassInstallation[]
+  /** Bara registrerade garantier med typ + garantigivare + källa (grind 3, v175). Aldrig en generisk text. */
+  warranties: CustomerWarranty[]
   future_service: { consent: boolean }
   certificates_note: string
 }
@@ -136,7 +139,7 @@ export interface JobbpassCustomerView {
 export const JOBBPASS_ALLOWED_FIELDS = {
   top: [
     'project', 'business', 'scope', 'changes', 'work_report', 'checklists',
-    'photos', 'invoice_reference', 'installations', 'future_service', 'certificates_note',
+    'photos', 'invoice_reference', 'installations', 'warranties', 'future_service', 'certificates_note',
   ],
   project: ['project_id', 'name', 'completed_at'],
   business: ['name', 'logo_url', 'accent_color', 'phone', 'email'],
@@ -149,6 +152,7 @@ export const JOBBPASS_ALLOWED_FIELDS = {
   photo: ['id', 'url', 'caption'],
   invoice_reference: ['invoice_number', 'invoice_date', 'total'],
   installation: ['name', 'manufacturer', 'model', 'serial_number', 'placement', 'installed_at', 'service_interval_months', 'service_interval_source', 'care_instructions'],
+  warranty_item: ['title', 'kind', 'kind_label', 'issuer', 'source_label', 'start_date', 'end_date', 'description', 'installation_id'],
   future_service: ['consent'],
 } as const
 
@@ -167,6 +171,7 @@ export function assertJobbpassShape(view: JobbpassCustomerView): JobbpassCustome
   assertKeys(view.project as unknown as Record<string, unknown>, JOBBPASS_ALLOWED_FIELDS.project, 'project')
   assertKeys(view.business as unknown as Record<string, unknown>, JOBBPASS_ALLOWED_FIELDS.business, 'business')
   for (const inst of view.installations || []) assertKeys(inst as unknown as Record<string, unknown>, JOBBPASS_ALLOWED_FIELDS.installation, 'installation')
+  for (const w of view.warranties || []) assertKeys(w as unknown as Record<string, unknown>, JOBBPASS_ALLOWED_FIELDS.warranty_item, 'warranty_item')
   if (view.scope) {
     assertKeys(view.scope as unknown as Record<string, unknown>, JOBBPASS_ALLOWED_FIELDS.scope, 'scope')
     for (const item of view.scope.items) {
@@ -300,6 +305,10 @@ export interface JobbpassSourceInput {
   serviceConsent: boolean
   /** Bekräftade installationer (v174). Valfri — saknas tabellen eller failar frågan visas inget. */
   installations?: InstallationRow[] | 'error'
+  /** Registrerade garantier (v175). Valfri — fel eller saknad tabell visar inget. */
+  warranties?: WarrantyRow[] | 'error'
+  /** Dagens datum (ISO) för giltighetsfiltret — injiceras i test. */
+  today?: string
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -438,6 +447,8 @@ export function deriveJobbpassView(input: JobbpassSourceInput): JobbpassCustomer
       care_instructions: r.care_instructions,
     }))
 
+  const warranties = customerWarrantiesFromRows(Array.isArray(input.warranties) ? input.warranties : [], input.today ?? new Date().toISOString())
+
   const view: JobbpassCustomerView = {
     project,
     business,
@@ -448,6 +459,7 @@ export function deriveJobbpassView(input: JobbpassSourceInput): JobbpassCustomer
     photos,
     invoice_reference,
     installations,
+    warranties,
     future_service: { consent: input.serviceConsent },
     certificates_note: JOBBPASS_CERTIFICATES_NOTE,
   }
@@ -843,7 +855,8 @@ export async function assembleJobbpassView(
     )
   ).filter((p): p is { id: string; url: string; caption: null } => !!p.url)
   const installations = await listConfirmedInstallationsForProject(supabase, jobbpass.business_id, jobbpass.project_id)
-  return deriveJobbpassView({ ...sourceData, photos: signedPhotos, serviceConsent: jobbpass.service_consent, installations })
+  const warranties = await listWarrantiesForProject(supabase, jobbpass.business_id, jobbpass.project_id)
+  return deriveJobbpassView({ ...sourceData, photos: signedPhotos, serviceConsent: jobbpass.service_consent, installations, warranties })
 }
 
 export interface CustomerJobbpassEntry {

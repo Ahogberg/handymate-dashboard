@@ -43,7 +43,8 @@ test.describe('portalen', () => {
     expect(page).toContain("new URLSearchParams(window.location.search).get('project')")
     expect(page).toContain('<PortalJobbpass pass={pass}')
     expect(page).toContain('passes={passes}')
-    expect(kod('app/portal/[token]/components/PortalHome.tsx')).toContain("<h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Ditt hem</h3>")
+    // Steg 3 (2026-08-27): "Ditt hem" blev "Min bostad" — grupperat per plats, se facit-fastighetspass-steg3
+    expect(kod('app/portal/[token]/components/PortalHome.tsx')).toContain("<h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Min bostad</h3>")
   })
 
   test('projektdetaljen visar passet och fältrapporterna — rutten /reports har äntligen en anropare', () => {
@@ -67,11 +68,11 @@ test.describe('portalen', () => {
   })
 })
 
-test.describe('garanti nämns inte (Andreas 2026-08-27: varierar per bransch, lovas aldrig generiskt)', () => {
-  test('ingen garantisektion i passet, förhandsvisningen, portalens copy eller mejlet', () => {
-    expect(kod('lib/jobbpass/jobbpass.ts')).not.toMatch(/warranty|garanti/i)
-    expect(kod('components/jobbpass/JobbpassView.tsx')).not.toMatch(/garanti/i)
-    expect(kod('app/dashboard/projects/[id]/jobbpass/page.tsx')).not.toMatch(/garanti/i)
+test.describe('ingen generisk garanti (Andreas 2026-08-27: varierar per bransch) — bara registrerade, med garantigivare och källa (steg 3)', () => {
+  test('ingen hårdkodad garanti i passet, förhandsvisningen, portalens copy eller mejlet', () => {
+    expect(kod('lib/jobbpass/jobbpass.ts')).not.toMatch(/JOBBPASS_WARRANTY_MONTHS|Standardgaranti|byggGarantitext/)
+    expect(kod('components/jobbpass/JobbpassView.tsx')).not.toMatch(/Standardgaranti|12 månader/)
+    expect(kod('app/dashboard/projects/[id]/jobbpass/page.tsx')).not.toMatch(/Standardgaranti/)
     expect(kod('app/portal/[token]/components/PortalHome.tsx')).not.toMatch(/garanti/i)
     expect(kod('app/portal/[token]/components/PortalProjectDetail.tsx')).not.toMatch(/garanti/i)
     expect(kod('lib/portal/notification-emails.ts')).not.toMatch(/garanti/i)

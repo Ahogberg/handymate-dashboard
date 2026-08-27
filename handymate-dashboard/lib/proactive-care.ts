@@ -24,6 +24,7 @@ import { monthsSinceLastJob } from '@/lib/customers/quiet-customer'
 import { extractFirstName, halsning } from '@/lib/customers/namn'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
+import { SERVICE_INTERVAL_SOURCE_LABEL, type InstallationRow, type ServiceIntervalSource } from '@/lib/installation/installation'
 
 const PROACTIVE_CARE_MODEL = 'claude-haiku-4-5-20251001'
 
@@ -273,6 +274,45 @@ export async function checkProactiveCare(businessId: string): Promise<{
 
     const now = new Date()
 
+    // Fastighetspasset steg 3 (grind 4, 2026-08-27): bekräftade installationer
+    // med registrerat serviceintervall + källa styr påminnelsen. En registrerad
+    // tillgång UTAN bekräftat intervall ger ingen påminnelse alls — nyckelords-
+    // tabellen är en gissning och används bara för projekt utan installation.
+    // Kundens nej i jobbpasset (service_consent = false) stoppar allt.
+    const projectIds = projects.map(p => p.project_id)
+    const installationsByProject = new Map<string, InstallationRow[]>()
+    const consentByProject = new Map<string, boolean>()
+    {
+      const { data: instRows, error: instErr } = await supabase
+        .from('installation')
+        .select('*')
+        .eq('business_id', businessId)
+        .eq('status', 'confirmed')
+        .in('project_id', projectIds)
+      if (instErr) {
+        await logAutomationActivity({
+          businessId,
+          automationType: 'proactive_care',
+          action: 'fetch_installations',
+          description: `Proaktiv kundvård kunde inte läsa installationerna: ${instErr.message}`,
+          status: 'failed',
+        }).catch(() => { /* best-effort */ })
+        return { success: false, contactsCreated: 0, error: instErr.message }
+      }
+      for (const r of (instRows || []) as InstallationRow[]) {
+        if (!r.project_id) continue
+        const list = installationsByProject.get(r.project_id) || []
+        list.push(r)
+        installationsByProject.set(r.project_id, list)
+      }
+      const { data: jpRows } = await supabase
+        .from('jobbpass')
+        .select('project_id, service_consent')
+        .eq('business_id', businessId)
+        .in('project_id', projectIds)
+      for (const r of jpRows || []) consentByProject.set(String(r.project_id), Boolean(r.service_consent))
+    }
+
     for (const project of projects) {
       // Max 3 proactive contacts per business per day
       if (contactsCreated >= 3) break
@@ -281,20 +321,53 @@ export async function checkProactiveCare(businessId: string): Promise<{
       if (!customer?.phone_number) continue
       if (!project.completed_at) continue
 
-      // Determine job type by keyword matching
-      const jobType = matchJobType(project.name, project.description)
-      const lifecycle = JOB_LIFECYCLE[jobType] || JOB_LIFECYCLE['default']
+      // Kunden har uttryckligen sagt nej till framtida servicepåminnelse.
+      if (consentByProject.get(project.project_id) === false) continue
 
-      // Månader sedan avslut — via tyst-kund-primitiven (30-dagarsmånad,
-      // samma beräkning som hanna-outbound; tidigare 30.44 här — förenat i VP3)
-      const monthsSince = monthsSinceLastJob(project.completed_at, now.getTime())
-      if (monthsSince === null) continue
+      let jobType: string
+      let lifecycle: { months: number; reason: string; suggestedService: string }
+      let monthsSince: number
+      let installation: InstallationRow | null = null
+      const projectInstallations = installationsByProject.get(project.project_id) || []
+      if (projectInstallations.length > 0) {
+        // Grind 4: bara installationer med bekräftat intervall OCH källa.
+        const withInterval = projectInstallations.filter(i => i.service_interval_months && i.service_interval_source)
+        let pick: { inst: InstallationRow; since: number } | null = null
+        for (const inst of withInterval) {
+          const since = monthsSinceLastJob(inst.installed_at || project.completed_at, now.getTime())
+          if (since === null) continue
+          const m = inst.service_interval_months as number
+          if (since < m || since > m + 6) continue
+          pick = { inst, since }
+          break
+        }
+        if (!pick) continue
+        installation = pick.inst
+        monthsSince = pick.since
+        jobType = 'installation'
+        const src = installation.service_interval_source as ServiceIntervalSource
+        lifecycle = {
+          months: installation.service_interval_months as number,
+          reason: `Serviceintervall var ${installation.service_interval_months}:e månad ${SERVICE_INTERVAL_SOURCE_LABEL[src]}`,
+          suggestedService: `Service av ${installation.name}`,
+        }
+      } else {
+        // Determine job type by keyword matching (bara projekt utan registrerad installation)
+        jobType = matchJobType(project.name, project.description)
+        lifecycle = JOB_LIFECYCLE[jobType] || JOB_LIFECYCLE['default']
 
-      // Check if enough months have passed
-      if (monthsSince < lifecycle.months) continue
+        // Månader sedan avslut — via tyst-kund-primitiven (30-dagarsmånad,
+        // samma beräkning som hanna-outbound; tidigare 30.44 här — förenat i VP3)
+        const since = monthsSinceLastJob(project.completed_at, now.getTime())
+        if (since === null) continue
+        monthsSince = since
 
-      // Also skip if too far past (more than 6 months over cycle — avoid ancient contacts)
-      if (monthsSince > lifecycle.months + 6) continue
+        // Check if enough months have passed
+        if (monthsSince < lifecycle.months) continue
+
+        // Also skip if too far past (more than 6 months over cycle — avoid ancient contacts)
+        if (monthsSince > lifecycle.months + 6) continue
+      }
 
       // Dedup (fixad 2026-08-11): kollade tidigare bara de senaste 60 dagarna,
       // men eligibility-fönstret ovan (lifecycle.months till +6 månader) är
@@ -370,6 +443,10 @@ export async function checkProactiveCare(businessId: string): Promise<{
           job_type: jobType,
           suggested_service: lifecycle.suggestedService,
           suggested_sms: suggestedSms,
+          // Fastighetspasset steg 3: vilken tillgång påminnelsen gäller och varifrån intervallet kommer.
+          installation_id: installation?.installation_id ?? null,
+          installation_name: installation?.name ?? null,
+          interval_source: installation?.service_interval_source ?? null,
         },
         status: 'pending',
         risk_level: 'medium',

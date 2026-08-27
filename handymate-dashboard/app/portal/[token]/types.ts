@@ -225,3 +225,23 @@ export interface PortalReport {
   created_at: string
   project_id: string | null
 }
+
+/** Min bostad (Fastighetspasset steg 3): bekräftad installation ur /api/portal/[token]/installations. */
+export interface PortalInstallation {
+  installation_id: string
+  project_id: string | null
+  name: string
+  manufacturer: string | null
+  model: string | null
+  serial_number: string | null
+  placement: string | null
+  installed_at: string | null
+  service_interval_months: number | null
+  service_interval_source: 'product_info' | 'craftsman' | null
+  service_source_label: string | null
+  next_service_at: string | null
+  care_instructions: string | null
+  site_address_line: string | null
+  site_postal_code: string | null
+  site_city: string | null
+}
