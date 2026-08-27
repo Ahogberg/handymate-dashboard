@@ -8,6 +8,7 @@ export interface TimeEntry {
   booking_id: string | null
   customer_id: string | null
   work_type_id: string | null
+  project_id: string | null
   business_user_id: string | null
   description: string | null
   work_date: string

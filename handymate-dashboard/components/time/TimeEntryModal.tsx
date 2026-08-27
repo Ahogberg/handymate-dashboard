@@ -417,11 +417,14 @@ export default function TimeEntryModal({
                     min="0"
                     value={formData.hourly_rate}
                     onChange={e => setFormData((prev: any) => ({ ...prev, hourly_rate: e.target.value }))}
-                    placeholder="Standard"
+                    placeholder="Företagets standardpris"
                     className={inputClass}
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-[#94A3B8]">kr/tim</span>
                 </div>
+                <p className="text-[11px] text-[#94A3B8] mt-1">
+                  Lämna tomt för teammedlemmens eller företagets sparade timpris.
+                </p>
               </div>
             </div>
           )}

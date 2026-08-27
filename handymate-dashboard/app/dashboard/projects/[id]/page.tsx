@@ -221,7 +221,7 @@ interface TimeEntry {
   start_time: string | null
   end_time: string | null
   duration_minutes: number
-  hourly_rate: number
+  hourly_rate: number | null
   is_billable: boolean
   invoiced: boolean
   work_type?: { name: string; multiplier: number } | null
@@ -383,8 +383,10 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
   mixed: 'Blandat'
 }
 
-function formatCurrency(amount: number): string {
-  return amount.toLocaleString('sv-SE') + ' kr'
+function formatCurrency(amount: number | null | undefined): string {
+  return typeof amount === 'number' && Number.isFinite(amount)
+    ? amount.toLocaleString('sv-SE') + ' kr'
+    : '—'
 }
 
 function formatDate(date: string): string {
@@ -780,7 +782,6 @@ export default function ProjectDetailPage() {
       const assignToUser = isOwnerOrAdmin && timeFormPersonId ? timeFormPersonId : currentUser?.id || null
 
       const entryData: Record<string, unknown> = {
-        business_id: business.business_id,
         customer_id: timeFormData.customer_id || null,
         booking_id: timeFormData.booking_id || null,
         work_type_id: timeFormData.work_type_id || null,
@@ -797,8 +798,13 @@ export default function ProjectDetailPage() {
         is_billable: timeFormData.is_billable
       }
 
-      const { error } = await supabase.from('time_entry').insert(entryData)
-      if (error) throw error
+      const response = await fetch('/api/time-entry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entryData),
+      })
+      const result = await response.json().catch(() => ({ error: 'Kunde inte registrera tiden' }))
+      if (!response.ok) throw new Error(result.error || 'Kunde inte registrera tiden')
       showToast('Tid registrerad!', 'success')
       setShowTimeModal(false)
       fetchProjectData()
@@ -3141,7 +3147,9 @@ export default function ProjectDetailPage() {
 
                 {timeEntries.map(entry => {
                   const hours = (entry.duration_minutes || 0) / 60
-                  const total = hours * (entry.hourly_rate || 0)
+                  const total = entry.hourly_rate === null
+                    ? null
+                    : hours * entry.hourly_rate
                   return (
                     <div key={entry.time_entry_id} className="p-4 hover:bg-gray-50 transition-all">
                       {/* Mobile layout */}
@@ -3166,7 +3174,9 @@ export default function ProjectDetailPage() {
                         {entry.description && <p className="text-sm text-gray-500">{entry.description}</p>}
                         <div className="flex items-center justify-between text-xs text-gray-400 tabular-nums">
                           <span>{formatHours(hours)}</span>
-                          <span>{formatCurrency(Math.round(total))}</span>
+                          <span className={entry.hourly_rate === null ? 'text-amber-600' : undefined}>
+                            {entry.hourly_rate === null ? 'Timpris saknas' : formatCurrency(Math.round(total!))}
+                          </span>
                         </div>
                       </div>
 
@@ -3175,8 +3185,12 @@ export default function ProjectDetailPage() {
                         <div className="col-span-2 text-sm text-gray-900">{formatDate(entry.work_date)}</div>
                         <div className="col-span-3 text-sm text-gray-500 truncate">{entry.description || '-'}</div>
                         <div className="col-span-1 text-sm text-gray-900 text-right tabular-nums">{formatHours(hours)}</div>
-                        <div className="col-span-2 text-sm text-gray-500 text-right tabular-nums">{formatCurrency(entry.hourly_rate)}/tim</div>
-                        <div className="col-span-2 text-sm text-gray-900 text-right font-medium tabular-nums">{formatCurrency(Math.round(total))}</div>
+                        <div className={`col-span-2 text-sm text-right tabular-nums ${entry.hourly_rate === null ? 'text-amber-600' : 'text-gray-500'}`}>
+                          {entry.hourly_rate === null ? 'Timpris saknas' : `${formatCurrency(entry.hourly_rate)}/tim`}
+                        </div>
+                        <div className="col-span-2 text-sm text-gray-900 text-right font-medium tabular-nums">
+                          {total === null ? '—' : formatCurrency(Math.round(total))}
+                        </div>
                         <div className="col-span-2 flex items-center justify-end gap-2">
                           {entry.work_type?.name && (
                             <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-primary-700 border border-[#E2E8F0]">

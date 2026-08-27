@@ -878,20 +878,10 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
       })
 
       // ── 7c: Riktig UI-tidrapport ─────────────────────────────────────────
-      // KÄLLGRANSKAT: handleTimeSave() i app/dashboard/projects/[id]/page.tsx
-      // skriver DIREKT till Supabase klient-sidan (`supabase.from('time_entry')
-      // .insert(...)`) — INTE via POST /api/time-entry. Samma mönster i
-      // TodayView.tsx. Ingen UI-yta i hela kodbasen (mobil eller desktop)
-      // postar till /api/time-entry för en manuell tidrapport — bara check-in/
-      // check-out/bulk/approve gör det, och TimerWidget (check-in) skickar
-      // aldrig med project_id. Konsekvens: klicket nedan skapar en RIKTIG
-      // time_entry-rad (bevisas), men triggar VARKEN Margin Guardians
-      // checkProfitabilityWarnings NOCH advanceProjectStageForward — de
-      // anropen finns bara i POST /api/time-entry-routen, som produktions-UI:t
-      // aldrig når idag. Ett verkligt, källgranskat produktionsgap (samma typ
-      // av upptäckt som /api/quotes/accept-divergensen redan i planen) — se
-      // slutrapportens judgment calls för resonemanget bakom 7d nedan.
-      await test.step('Logga tid via "Lägg till tid" (real UI-klick — se kommentar ovan för vad den INTE triggar)', async () => {
+      // KÄLLGRANSKAT 2026-08-27: båda manuella UI-ytorna går nu genom
+      // POST /api/time-entry. Klicket nedan skapar därför både den riktiga
+      // raden och kör samma projekt-/marginalreaktioner som övriga skrivare.
+      await test.step('Logga tid via "Lägg till tid" (riktig kanonisk UI-skrivväg)', async () => {
         await ownerPage.getByRole('button', { name: 'Lägg till tid' }).first().click()
         await ownerPage.getByRole('button', { name: '2h' }).click()
         await ownerPage.getByRole('button', { name: 'Spara' }).click()
@@ -907,14 +897,9 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
       })
 
       // ── 7d: Guardian-/automationsbevis ───────────────────────────────────
-      // Eftersom INGEN nuvarande UI-yta kan trigga checkProfitabilityWarnings
-      // (se 7c), anropas den RIKTIGA produktionsrouten POST /api/time-entry
-      // direkt via den redan autentiserade ägar-sessionens request-context
-      // (delar cookies med ownerPage — INTE ett separat/anonymt anrop).
-      // Detta skiljer sig från /api/quotes/accept-fallet i planen: den routen
-      // är en KÄND ALTERNATIV väg med annat (sämre) beteende. POST
-      // /api/time-entry är istället den ENDA riktiga vägen till Guardian-
-      // kortet idag — den är bara inte (ännu) kopplad till en UI-knapp.
+      // API-anropen nedan använder exakt samma kanoniska route som UI:t ovan,
+      // men med kontrollerade timmängder för att skarpbevisa båda Guardian-
+      // trösklarna och dedupliceringen deterministiskt.
       const rateInfo = await test.step('Slå upp intern timkostnad (för exakta 75%/95%-trösklar)', async () => {
         const ownerBu = await assertRow<{ id: string; internal_hourly_cost: number | null }>(
           'business_users',
@@ -926,8 +911,18 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
           { business_id: DEMO_BUSINESS_ID },
           'business_config',
         )
+        const { data: existingTime, error: existingTimeError } = await getSupabaseAdmin()
+          .from('time_entry')
+          .select('duration_minutes')
+          .eq('business_id', DEMO_BUSINESS_ID)
+          .eq('project_id', ids.projectId)
+        if (existingTimeError) throw new Error(`Kunde inte läsa befintlig projekttid: ${existingTimeError.message}`)
+        const existingHours = (existingTime || []).reduce(
+          (sum: number, row: { duration_minutes: number | null }) => sum + (row.duration_minutes || 0) / 60,
+          0,
+        )
         const cost = ownerBu.internal_hourly_cost ?? bizConfig.default_internal_hourly_cost ?? null
-        return { businessUserId: ownerBu.id as string, internalCost: cost }
+        return { businessUserId: ownerBu.id as string, internalCost: cost, existingHours }
       })
 
       if (rateInfo.internalCost == null) {
@@ -948,8 +943,14 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
         }
       }
 
-      const hoursForAtRisk = Math.ceil(((SEEDED_BUDGET_KR * 0.85) / rateInfo.internalCost) * 10) / 10
-      const hoursForOverBudget = Math.ceil(((SEEDED_BUDGET_KR * 1.05) / rateInfo.internalCost) * 10) / 10
+      const hoursForAtRisk = Math.max(
+        0.5,
+        Math.ceil((((SEEDED_BUDGET_KR * 0.85) / rateInfo.internalCost) - rateInfo.existingHours) * 10) / 10,
+      )
+      const hoursForOverBudget = Math.max(
+        0.5,
+        Math.ceil((((SEEDED_BUDGET_KR * 1.05) / rateInfo.internalCost) - rateInfo.existingHours) * 10) / 10,
+      )
       const secondEntryHours = Math.max(0.5, Math.round((hoursForOverBudget - hoursForAtRisk) * 10) / 10)
 
       let firstApprovalId: string | null = null
@@ -1033,7 +1034,7 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
       })
 
       return {
-        ui: 'Boka platsbesök (kundsida) → statusändring Aktivt (projektsida) → Lägg till tid (projektsida) → 2× riktig POST /api/time-entry',
+        ui: 'Boka platsbesök (kundsida) → statusändring Aktivt (projektsida) → Lägg till tid via kanonisk POST /api/time-entry → 2× kontrollerat API-bevis',
         db: `stage ps-01→ps-02→ps-03, ${ids.timeEntryIds.length} time_entry-rader, Guardian-kort ${ids.approvalId} (dedupe-with-update bevisat: samma id, count=1)`,
       }
     })

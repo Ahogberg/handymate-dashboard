@@ -307,11 +307,11 @@ export default function TodayView() {
       // Determine which user to assign the entry to
       const assignToUser = isOwnerOrAdmin && formPersonId ? formPersonId : currentUser?.id || null
 
-      const entryData: any = {
-        business_id: business.business_id,
+      const entryData: Record<string, unknown> = {
         customer_id: formData.customer_id || null,
         booking_id: formData.booking_id || null,
         work_type_id: formData.work_type_id || null,
+        project_id: formData.project_id || null,
         work_category: formData.work_category || 'work',
         business_user_id: assignToUser,
         description: formData.description || null,
@@ -325,15 +325,16 @@ export default function TodayView() {
         is_billable: formData.is_billable
       }
 
-      if (editingEntry) {
-        const { error } = await supabase.from('time_entry').update(entryData).eq('time_entry_id', editingEntry.time_entry_id)
-        if (error) throw error
-        showToast('Tidpost uppdaterad!', 'success')
-      } else {
-        const { error } = await supabase.from('time_entry').insert(entryData)
-        if (error) throw error
-        showToast('Tid registrerad!', 'success')
-      }
+      const response = await fetch('/api/time-entry', {
+        method: editingEntry ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingEntry
+          ? { entry_id: editingEntry.time_entry_id, ...entryData }
+          : entryData),
+      })
+      const result = await response.json().catch(() => ({ error: 'Kunde inte spara tidposten' }))
+      if (!response.ok) throw new Error(result.error || 'Kunde inte spara tidposten')
+      showToast(editingEntry ? 'Tidpost uppdaterad!' : 'Tid registrerad!', 'success')
       setShowModal(false)
       fetchEntries()
       fetchStats()
@@ -347,8 +348,11 @@ export default function TodayView() {
   const handleDelete = async (id: string) => {
     if (!confirm('Ta bort denna tidpost?')) return
     try {
-      const { error } = await supabase.from('time_entry').delete().eq('time_entry_id', id)
-      if (error) throw error
+      const response = await fetch(`/api/time-entry?entryId=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      })
+      const result = await response.json().catch(() => ({ error: 'Kunde inte ta bort tidposten' }))
+      if (!response.ok) throw new Error(result.error || 'Kunde inte ta bort tidposten')
       showToast('Tidpost borttagen', 'success')
       fetchEntries()
       fetchStats()
