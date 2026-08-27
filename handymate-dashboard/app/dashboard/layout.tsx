@@ -107,7 +107,10 @@ export default function DashboardLayout({
                   <MissionProvider>
                     <div className="flex min-h-screen bg-[#F8FAFC]">
                       <Sidebar businessName={business.business_name} businessId={business.business_id} onLogout={logout} />
-                      <main className="flex-1 md:ml-64">
+                      {/* min-w-0 är flexgränsen som låter dashboardens innehåll
+                          krympa till mobilens viewport. Utan den kan ett brett
+                          barn tvinga hela sidan utanför skärmen. */}
+                      <main className="min-w-0 flex-1 md:ml-64">
                         <ImpersonationBanner />
                         <PresenterBar />
                         <BillingStatusBanner />
