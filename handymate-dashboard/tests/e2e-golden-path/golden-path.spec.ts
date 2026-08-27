@@ -28,6 +28,7 @@ import {
   DEMO_OWNER_EMAIL,
   E2E_TEST_PHONE,
   E2E_TEST_EMAIL,
+  sweepE2eResidue,
   requireDemoOwnerPassword,
 } from './fixtures/db'
 import { pushResult, resetReportFile, type Verdict } from './fixtures/report'
@@ -280,6 +281,25 @@ async function cleanupCore(): Promise<string[]> {
 test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
   test.beforeAll(async ({ browser }) => {
     resetReportFile()
+    // Sopa harnessets egna rester FÖRE körning (2026-08-27): en kvarlämnad
+    // "E2E Testkund" på det fasta testnumret gör att Station 3:s dublettkoll
+    // slår till — och "Skapa ändå" kan inte skapa en andra kund på samma
+    // nummer (unique_phone_per_business). Bokförs i rapporten.
+    try {
+      const svep = await sweepE2eResidue()
+      if (svep.swept.length > 0 || svep.leftover.length > 0) {
+        pushResult({
+          station: 'Städning',
+          steg: 'beforeAll — svep av tidigare körningars rester',
+          ui_bevis: '',
+          db_bevis: svep.swept.length > 0 ? `Sopade: ${svep.swept.join('; ')}` : '',
+          verdict: svep.leftover.length > 0 ? 'FAIL' : 'PASS',
+          detalj: svep.leftover.length > 0 ? `Kunde inte sopa: ${svep.leftover.join('; ')}` : 'Inga rester kvar inför körningen.',
+        })
+      }
+    } catch (err) {
+      pushResult({ station: 'Städning', steg: 'beforeAll — svep', ui_bevis: '', db_bevis: '', verdict: 'FAIL', detalj: `sweepE2eResidue kastade: ${err instanceof Error ? err.message : String(err)}` })
+    }
     ownerCtx = await browser.newContext()
     ownerPage = await ownerCtx.newPage()
   })

@@ -179,3 +179,84 @@ export async function countRows(table: string, filters: Record<string, unknown>)
   if (error) throw new Error(`[golden-path] countRows('${table}') DB-fel: ${error.message}`)
   return count ?? 0
 }
+
+/**
+ * Sopar harnessets EGNA rester i demokontot (2026-08-27).
+ *
+ * Bakgrund: golden-path lämnar (medvetet) kärnraderna åt permission-check:s
+ * afterAll — men den städningen saknade barn som `deal` och
+ * `sms_conversation`, så FK:n mot customer stoppade kundraderingen och en
+ * "E2E Testkund"-rad blev kvar. Nästa körning krockar då i Station 3:
+ * E2E_TEST_PHONE är fast, dublettkollen slår till, och "Skapa ändå" kan
+ * inte skapa en andra kund på samma nummer (unique_phone_per_business).
+ *
+ * Svepet hittar rester på namnprefix ELLER det fasta testnumret i
+ * DEMO_BUSINESS_ID — aldrig något annat företag — och tar barn före
+ * förälder enligt FK-listan mot customer (information_schema, 2026-08-27).
+ * Körs i golden-path:s beforeAll och som sista steg i permission-check:s
+ * afterAll. Rapporterar vad som sopades och vad som inte gick.
+ */
+export async function sweepE2eResidue(): Promise<{ swept: string[]; leftover: string[] }> {
+  const supabase = getSupabaseAdmin()
+  const swept: string[] = []
+  const leftover: string[] = []
+  const { data: rester, error: findErr } = await supabase
+    .from('customer')
+    .select('customer_id, name, phone_number')
+    .eq('business_id', DEMO_BUSINESS_ID)
+    .or(`name.ilike.E2E Testkund%,phone_number.eq.${E2E_TEST_PHONE}`)
+  if (findErr) return { swept, leftover: [`residue-find (${findErr.message})`] }
+  if (!rester || rester.length === 0) return { swept, leftover }
+
+  const del = async (table: string, column: string, value: string) => {
+    const { error } = await supabase.from(table).delete().eq(column, value)
+    if (error) leftover.push(`${table}.${column}=${value} (${error.message})`)
+  }
+  const delPayload = async (nyckel: string, value: string) => {
+    const { error } = await supabase
+      .from('pending_approvals')
+      .delete()
+      .eq('business_id', DEMO_BUSINESS_ID)
+      .contains('payload', { [nyckel]: value })
+    if (error) leftover.push(`pending_approvals.payload.${nyckel}=${value} (${error.message})`)
+  }
+
+  for (const kund of rester) {
+    const cid = kund.customer_id as string
+    // Projekt + deras barn
+    const { data: projekt } = await supabase.from('project').select('project_id').eq('customer_id', cid)
+    for (const p of projekt || []) {
+      const pid = p.project_id as string
+      await delPayload('project_id', pid)
+      for (const t of ['project_outcome', 'project_lesson', 'project_milestone', 'time_entry', 'invoice']) await del(t, 'project_id', pid)
+      await del('project', 'project_id', pid)
+    }
+    // Offerter + spårning
+    const { data: offerter } = await supabase.from('quotes').select('quote_id').eq('customer_id', cid)
+    for (const q of offerter || []) {
+      const qid = q.quote_id as string
+      await delPayload('quote_id', qid)
+      await delPayload('related_id', qid)
+      await del('quote_tracking_events', 'quote_id', qid)
+      await del('quotes', 'quote_id', qid)
+    }
+    // Fakturor
+    const { data: fakturor } = await supabase.from('invoice').select('invoice_id').eq('customer_id', cid)
+    for (const f of fakturor || []) await delPayload('invoice_id', f.invoice_id as string)
+    await del('invoice', 'customer_id', cid)
+    // Övriga FK-barn mot customer (information_schema 2026-08-27)
+    await delPayload('customer_id', cid)
+    for (const t of [
+      'booking', 'time_entry', 'travel_entry', 'customer_activity', 'customer_fact', 'customer_tag_assignment',
+      'sms_conversation', 'sms_campaign_recipient', 'conversations', 'email_conversations', 'call', 'call_recording',
+      'case_record', 'ai_suggestion', 'automation_queue', 'generated_document', 'nurture_enrollment', 'warranty',
+      'deal', 'leads',
+    ]) await del(t, 'customer_id', cid)
+    await del('deal', 'referral_customer_id', cid)
+    await del('leads', 'referral_customer_id', cid)
+    const { error: kundErr } = await supabase.from('customer').delete().eq('customer_id', cid).eq('business_id', DEMO_BUSINESS_ID)
+    if (kundErr) leftover.push(`customer:${cid} (${kundErr.message})`)
+    else swept.push(`${cid} "${kund.name}"`)
+  }
+  return { swept, leftover }
+}

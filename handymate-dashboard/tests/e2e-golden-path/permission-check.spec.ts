@@ -23,7 +23,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { test, expect } from '@playwright/test'
-import { getSupabaseAdmin, DEMO_BUSINESS_ID } from './fixtures/db'
+import { getSupabaseAdmin, DEMO_BUSINESS_ID, sweepE2eResidue } from './fixtures/db'
 import { pushResult } from './fixtures/report'
 
 const IDS_HANDOFF_FILE = path.join(process.cwd(), 'test-results', 'golden-path', 'ids.json')
@@ -119,6 +119,16 @@ test.describe('A9 — Behörighetstestet (anställd utan ekonomibehörighet)', (
     // Samma FK-fynd som golden-path.spec.ts:s cleanupCore — se dess kommentar.
     await del('customer_activity', 'customer_id', handoff.customerId)
     await del('customer', 'customer_id', handoff.customerId)
+    // Sista svepet (2026-08-27): allt som bär harnessets namnprefix eller det
+    // fasta testnumret i demokontot — barn före förälder enligt FK-listan.
+    // Fångar det de diskreta id-fälten ovan missar (deal, sms_conversation …)
+    // så nästa körning inte krockar i Station 3:s dublettkoll.
+    try {
+      const svep = await sweepE2eResidue()
+      leftover.push(...svep.leftover)
+    } catch (err) {
+      leftover.push(`sweepE2eResidue kastade: ${err instanceof Error ? err.message : String(err)}`)
+    }
 
     pushResult({
       station: 'Städning',
