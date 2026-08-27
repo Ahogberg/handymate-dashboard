@@ -905,4 +905,10 @@ Verifierat: 8 steg (inte 10), Company Scan + Hemtur körs på /dashboard efter f
 - [x] Steg 8: Daniel-dedup i quote-follow-up (168 h, alla statusar, `filterOutConflicting`)
 - [x] Full svit 5541/5541 lokalt, CI grön (c8eb273c), Golden Path 19/19 mot prod (efter Station 3-fixen, REALITY-WEEK #32), liveprobe: POST first-action som demoägare → `{ kind: null }` (0 kandidater — förväntat). Skärmdump av skanningens slutskärm EJ tagen: kräver ett konto med `welcome_tour_seen IS NULL` OCH en kandidat (förfallen faktura/gammal offert) — finns inte i prod ännu; första riktiga kontot med data blir beviset
 
-### Lager 3 (efter lansering): B9 dag-7-mail → B8 aktiveringsmått → B6 first_focus → B7 adaptiv Kom igång → B10 ekonomifrågor ut ur steg 2
+### Lager 3 — KLART 2026-08-27 (Andreas: "Vi kör även lager 3")
+- [x] B9 dag-7-mailet: "Nästa bästa steg" (Mattes topp-kort, annars äldsta väntande, aldrig testdata) med djuplänk; fönstret från onboarding_completed_at
+- [x] B8 aktiveringsmått: tid till första fynd/beslut/utförda/kvitto ur befintliga tidsstämplar (ingen tabell/vy), kolumn i admin/onboard; RECEIPT_APPROVAL_TYPES facit-låst mot kvittot
+- [x] B6 "Vad vill du att teamet hjälper dig med först?" (5 chips, onboarding_data.firstFocus — ingen migration) ersätter årsmålet; första Matte-frågan + NBA-bakgrundsrad läser fokuset
+- [x] B7 adaptiv Kom igång: Lisa → Karin → Daniel → Matte → Hanna → push ur riktiga luckor; LiveTourens mock läser samma lib
+- [x] B10 ekonomifrågorna ut ur steg 2; Karin ber om skatterytmen i kalenderkortet, Lars om timkostnad i statusbandet
+- Öppet: kommunikationshubben som dag 1–2-steg först efter OUTBOUND Etapp 1–4; LiveTouren kan på sikt krympas till payoff + CTA
