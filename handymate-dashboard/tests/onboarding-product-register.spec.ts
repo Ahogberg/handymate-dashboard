@@ -122,6 +122,25 @@ test.describe('onboarding-flödets ledningsdragning', () => {
       expect(src, `${f} saknar total={6}`).toContain('total={6}')
     }
   })
+
+  test('dashboard-grinden släpper bara in slutförda konton — steg >= 8, aldrig 7 (2026-08-27)', () => {
+    // Steg 6 (produktregistret) skriver steg 7 vid "Fortsätt". Med `>= 7`
+    // hamnade en användare som öppnade /dashboard från LiveTouren på en
+    // dashboard utan seedade defaults och utan startkort.
+    const layout = source('app/dashboard/layout.tsx')
+    expect(layout).toContain('business.onboarding_step >= 8')
+    expect(layout).not.toContain('onboarding_step >= 7')
+  })
+
+  test('de döda V2-komponenterna är borta', () => {
+    for (const f of [
+      'app/onboarding/components/Step1BusinessAccount.tsx',
+      'app/onboarding/components/Step3Phone.tsx',
+      'app/onboarding/components/StepProgress.tsx',
+    ]) {
+      expect(fs.existsSync(path.join(ROOT, f)), `${f} finns fortfarande`).toBe(false)
+    }
+  })
 })
 
 test.describe('seed-products-routen (POST /api/onboarding/seed-products)', () => {

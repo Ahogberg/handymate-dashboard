@@ -40,9 +40,14 @@ export default function DashboardLayout({
   const router = useRouter()
   const pathname = usePathname()
 
-  // Redirect to onboarding if not completed
-  // step >= 7 also counts as done (old 6-step flow finalized at step 7)
-  const onboardingDone = !!(business?.onboarding_completed_at || (business && business.onboarding_step >= 7))
+  // Redirect to onboarding if not completed.
+  // Finalize (POST /api/onboarding) skriver onboarding_step 10 + completed_at.
+  // Grinden var `>= 7` från 6-stegsflödet; sedan TOTAL_STEPS blev 8
+  // (produktregistret, 2026-08-16) skriver steg 6 → 7 vid "Fortsätt", så
+  // `>= 7` släppte in konton mitt i LiveTouren utan seedade defaults och
+  // utan startkort (hittat 2026-08-27). 8 nås aldrig av saveProgress —
+  // bara finalize passerar.
+  const onboardingDone = !!(business?.onboarding_completed_at || (business && business.onboarding_step >= 8))
 
   // Trial-spärr: utgången trial eller past_due skickas till billing-sidan.
   // Pilots och aktiva prenumerationer släpps förbi. Billing-sidan själv är alltid öppen.

@@ -1,7 +1,8 @@
 # Reality Week — protokoll
 
 **Syfte:** Bevisa att produktberättelsen vi säljer faktiskt händer, pålitligt,
-innan 1 september. Inte enhetstester — en riktig genomkörning av hela
+innan lanseringen (ursprungligen 1 september; **flyttad minst en vecka 2026-08-27**,
+nytt datum ej satt). Inte enhetstester — en riktig genomkörning av hela
 livscykeln plus felvägarna, med bevis per steg.
 
 **Manus:** docs/GYLLENE-VAGEN.md (station 1–14 + adversarial A1–A15).
@@ -147,11 +148,14 @@ körningen. Duplicera inte stationsdetaljerna hit; körboken äger dem.
 | 28 | Projektöversikten (kartläggning), 2026-08-26 | Projektstegen var i praktiken statiska: 29/34 projekt i prod utan steg; event-bussen (`fireEvent`, 22 events) och stegmotorn helt frikopplade; ps-02 flyttades bara om en bokning skapades i exakt ett läge (kund-join, "senaste"); ps-04 oåtkomligt utan ≥2 milstolpar; ps-05 triggat av avslut, inte besiktning; ps-07 på FÖRSTA betalda fakturan; framåt-vakten svarade `moved:true` på no-ops; manuell bakåtflytt re-köade kund-SMS | Ingen brygga mellan händelser och steg — varje flytt var ett inline-anrop med egen projektuppslagning. Tre handsynkade kopior av stegtabellen. | `7eeea54d` (händelsebrygga `bumpProjectStage`, forward-only, ps-07 kräver alla fakturor reglerade, steg NULL för lead-/bokningsfödda, tyst bakåtflytt bakom `allow_backwards`, en stegtabell) | ✅ facit-låst (`facit-project-stage-producers`, `facit-project-stage-forward-skip`). Live-bevis: Golden Path station 6/7/11 mot prod efter deploy |
 | 29 | AI-kostnad, källgranskning 2026-08-27 | V3 `run_agent` (orkestratorn) och samtalsanalysen `lib/pipeline-ai.ts` kostade tokens utan att någonsin nå `cost_event` — osynliga för Bränslet och COGS-rapporten. Orkestratorn räknade dessutom en flat-taxa 0,000009 USD/token oavsett modell (Haiku/Sonnet) och bokförde bara i `agent_runs`-governorn | Två mätvägar (agent_runs-governor vs cost_event-bok) byggda vid olika tidpunkter; pipeline-ai tillkom före mätaren; `lib/ai.ts` var död, omätt kod | `6283a8d6` | ✅ facit-låst (`facit-ai-kostnad-sanning`) |
 | 30 | AI-kostnad, källgranskning 2026-08-27 | 33 av 47 externa AI-anropsplatser saknade Bränslekoll — bl.a. Matte intent-agent på VARJE inkommande SMS/mejl, nattliga context/pricing/proactive-care, Whisper-mötesjobb, copilot, onboarding, insights-cron. Dessutom gav `checkFuelGate` `fuel_unavailable` för planen `enterprise` → Elexperten (1 konto) hade SMS + agenter tyst avstängda sedan 2026-08-26 | Grinden byggdes 2026-08-26 för 14 rutter; resten aldrig svept. Enterprise-regeln fanns i `fuelBudgetOreForPlan` men inte i grinden | `6283a8d6` | ✅ facit-låst — Bränsle slut ⇒ samma väg som saknad API-nyckel (deterministisk fallback), 402 i användarrutter, claim släpps för mötesjobb, mejl lämnas olästa |
+| 31 | Onboarding-granskningen 2026-08-27 | Dashboard-grinden `app/dashboard/layout.tsx` släppte in konton med `onboarding_step >= 7` — sedan produktregistret (steg 6) lades till 2026-08-16 skriver "Fortsätt" där steg 7, så en användare som öppnade `/dashboard` från LiveTouren (eller vars finalize failade) hamnade på en dashboard utan seedade defaults, utan startkort och utan `onboarding_completed_at` | Grinden skrevs för 6-stegsflödet (finalize = 7) och uppdaterades inte när `TOTAL_STEPS` blev 8. Prod-kontroll: inga rader på steg 7, alla på 8/9/10 har completed_at | `>= 8` + facit i `onboarding-product-register.spec` | ✅ |
 
 ---
 
 **Feature freeze: måndag 25 augusti 18:00.** Efter det: endast korrekthet,
 tillförlitlighet, UX-blockerare, säkerhet, prestanda, lanserings-GTM.
+(2026-08-27: lanseringen flyttad minst en vecka; onboardingens "första verifierade
+handling" — Lager 2 i planen — byggs före lansering som medvetet undantag.)
 
 ---
 

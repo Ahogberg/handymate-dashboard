@@ -44,15 +44,15 @@ funkar direkt.
   **före** det datumet har `f_skatt_registered = false` oavsett svar —
   rätta i Inställningar → Bolagsprofil.
 
-## Station 2 — Onboarding (7 UI-steg)
+## Station 2 — Onboarding (8 UI-steg)
 
-**Vägen:** orkestreras av `app/onboarding/page.tsx` (`TOTAL_STEPS = 7`;
+**Vägen:** orkestreras av `app/onboarding/page.tsx` (`TOTAL_STEPS = 8`;
 `onboarding_step` skrivs som 10 vid avslut av bakåtkompatibilitetsskäl).
 
 **Ska hända vid avslut:** `seedAllDefaults` seedar pipeline-steg, offertmallar,
 standardtexter, reservationstexter, prislista, checklistmallar, automationsregler.
 
-**Bevis:** `/dashboard` öppnas (grinden: `onboarding_completed_at` eller steg ≥ 7).
+**Bevis:** `/dashboard` öppnas (grinden: `onboarding_completed_at` eller steg ≥ 8 — bara finalize når dit).
 
 **Om det inte händer:**
 - Steg-sparning sväljer fel tyst (`saveProgress`) — en pilot som "tappat" ett
