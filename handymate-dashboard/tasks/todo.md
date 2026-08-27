@@ -94,7 +94,7 @@ direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 sak
       (via offerten) och i arbetsorderns SMS; projektet skapas i Fortnox projektregister vid
       födseln (syncNewProjectToFortnox på fyra skapandevägar + batchSync 'project' i cronen);
       kundfakturan bokförs med Project; matchningen använder exakt Fortnox-nummer först. sql/v172.
-- [ ] v172 körd (väntar på "kör") → push → CI
+- [x] v172 körd via MCP 2026-08-27 (Andreas "Kör!"), facit-SELECT: 3 kolumner + index → pushad
 - [ ] Radvis allokering inom samma faktura (fortnox_rows finns nu) — bara om ett riktigt fall dyker upp
 - FLAGGAT Pass 3/I2: fältnamnen på SupplierInvoice-detaljen; om Fortnox fyller YourReference vid tolkning
 
@@ -109,15 +109,22 @@ direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 sak
 
 ## Plan
 
-- [ ] Avgränsa samtliga verkliga SMS-, e-post-, push- och interna notifieringsvägar
-- [ ] Spåra varje utskick till trigger, mottagare, textkälla, transport, loggning och nuvarande kontroll
-- [ ] Klassificera kundresa, interna händelser, obligatoriska systemmeddelanden, dubletter och döda mallar
-- [ ] Dokumentera ett kanoniskt eventregister och rekommenderad migreringsordning för Kommunikationshubben
-- [ ] Kvalitetssäkra rapportens filreferenser och kontrollera att ingen produktionskod eller SQL ändrats
+- [x] Avgränsa samtliga verkliga SMS-, e-post-, push- och interna notifieringsvägar
+- [x] Spåra varje utskick till trigger, mottagare, textkälla, transport, loggning och nuvarande kontroll
+- [x] Klassificera kundresa, interna händelser, obligatoriska systemmeddelanden, dubletter och döda mallar
+- [x] Dokumentera ett kanoniskt eventregister och rekommenderad migreringsordning för Kommunikationshubben
+- [x] Kvalitetssäkra rapportens filreferenser och kontrollera att ingen produktionskod eller SQL ändrats
 
 ## Review
 
-- Pågår.
+- Leverans: `docs/audits/OUTBOUND_COMMUNICATION_INVENTORY.md`.
+- Rapporten kartlägger kund-, ägar-, team-, system- och tredjepartsutskick med trigger, kanal,
+  mottagare, budskap, textkälla, kontroll och verklig status.
+- Bekräftade huvudfynd: auth-trasiga server-SMS, saknad V3-emailroute, trasig Smart
+  Communication-email, parallella offert/faktura-/reminder-/reviewmotorer, frikopplad
+  email_template-yta och pushroute utan intern authgräns.
+- Verifiering: samtliga 67 relativa fillänkar i rapporten finns. Endast rapporten och denna
+  uppgiftslogg berördes av inventeringen; ingen produktionskod, SQL eller migration ändrades.
 
 ---
 
