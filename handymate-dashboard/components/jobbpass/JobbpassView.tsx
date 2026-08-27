@@ -142,7 +142,7 @@ export function JobbpassView({ pass }: { pass: JobbpassCustomerView }) {
         <Card icon={ShieldCheck} title="Garantier">
           {pass.warranties.map((w, i) => (
             <div key={i} className={i > 0 ? 'mt-4 pt-4 border-t border-gray-100' : ''}>
-              <p className="text-sm font-semibold text-gray-900">{w.kind_label} — {w.title}</p>
+              <p className="text-sm font-semibold text-gray-900">{w.title.toLowerCase().startsWith(w.kind_label.toLowerCase()) ? w.title : `${w.kind_label} — ${w.title}`}</p>
               <dl className="mt-1 space-y-0.5 text-sm">
                 <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Garantigivare</dt><dd className="text-gray-700">{w.issuer}</dd></div>
                 <div className="flex gap-2"><dt className="text-gray-400 w-28 shrink-0">Gäller t.o.m.</dt><dd className="text-gray-700">{formatJobbpassDatum(w.end_date)}</dd></div>
