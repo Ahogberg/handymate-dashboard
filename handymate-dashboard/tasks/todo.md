@@ -953,3 +953,48 @@ Princip: Handymate slutar inte arbeta när projektet fakturerats. Jobbpasset (v1
 - [x] Facit `tests/facit-fastighetspass-steg3.spec.ts` (grind 3, 4, 5, Min bostad) + steg 1-facitet uppdaterat
 - [x] Prod-bevis 2026-08-27 (Provfirman): portal-API bär installationen med nästa service 2027-08-27 "enligt produktinformationen" → Hem visar "Min bostad / DET HÄR SITTER HOS DIG" → garantirad (Nibe, produkt, produktinformationen) insatt direkt i DB (kontot saknar warranty_tracking ⇒ API 403) → publik vy + passet visar "Garantier" med garantigivare och källa. CHECK-avvisningen bevisad i enhetstest, inte i prod (verktyget stoppade det avsiktligt felaktiga INSERT:et). Skärmdumpar proof-s3-1..2.
 - Känt: dedupen i proactive-care är fortfarande livstids per projekt+kund ⇒ installationsdrivna påminnelser blir engångs, inte återkommande (kräver datumavgränsad dedup per installation — separat beslut)
+
+---
+
+## Launch Promise Gauntlet — adversarial lanseringsbevis (Codex, 2026-08-27)
+
+Avgränsning: bevisa och vid behov laga skarvarna i kärnresorna. Fortnox,
+Stripe-live och externa kundutskick ligger utanför. Detta är ett testprotokoll,
+inte en andra lanseringschecklista.
+
+- [ ] Baslinje: arbetskatalog, befintliga harnessar och aktuella lane-gränser verifierade
+- [ ] Tvåtenantbeviset körs mot riktig databas med två authenticated-konton
+- [ ] Kund → affär → dokument: relation, lagring, listning och visning bevisas
+- [ ] Affär/offert → vunnen → projekt: kund, ansvarig och dokument bevaras
+- [ ] Projekt → tid/material/ÄTA → avslut → fakturaunderlag bevisas utan extern leverans
+- [ ] Owner/anställd och fel tenant: mutationer nekas på rätt lager
+- [ ] Felvägar ger synligt fel och aldrig falskt lyckat svar
+- [ ] Mobil/PWA samt reload/återbesök verifieras för kärnytorna
+- [ ] Varje reproducerad defekt rotorsaksfixas och får regressionstest
+- [ ] Riktade facit, `npx tsc --noEmit` och `npx next build` är gröna
+- [ ] Smalt resultatprotokoll skrivs med BYGGT/KODBEVISAT/SKARPBEVISAT per löfte
+
+### Review
+
+- Pågår.
+
+## Projektöversikten — uppgifter + projektnummer (Andreas 2026-08-27: "Kör A och B")
+
+Bakgrund: efter statusbandet (26 aug) var "Att göra" på Översikt bara agenternas kort — uppgiftsytan låg gömd under Planering efter delmomenten, "Ny uppgift" saknades bland snabbåtgärderna, "Mina uppgifter" var olänkad. Projektnumret renderades ingenstans på sidan, söktes inte i listan, dubblerades i pipelinen ("P-P-1042") och saknades på 19 av 37 projekt (bara POST /api/projects satte det, och tappade det tyst vid fel).
+
+### A — projektnumret — KLART 2026-08-27 (v176 körd)
+- [x] Kopierbar chip i headern (`data-testid=project-number-chip`), fältet typat
+- [x] Listan: sök på "1042"/"P-1042", tydlig chip
+- [x] Pipelinen: dubbelprefixet bort
+- [x] Portalen: "Ärende P-1042" på projektkortet (Hem) och i projektdetaljen; DTO bär numret
+- [x] v176: BEFORE INSERT-trigger ur `increment_counter` (alla sju skapare täcks), backfill i skapandeordning (19 → 0 utan nummer, verifierat), unikt per företag; skaparen kör aldrig om utan nummer
+- [ ] Ej gjort: numret på offert-/faktura-PDF (ingen projektreferens finns i PDF-mallarna i dag — separat beslut)
+
+### B — uppgifter — KLART 2026-08-27
+- [x] `components/projects/ProjectTasksBlock.tsx` på Översikt, ovanför agenternas kort: öppna uppgifter (försenade först), bock direkt, inline-skapande (titel + ansvarig + datum), "Visa alla →"
+- [x] Agentblocket heter "Väntar på ditt OK" — hantverkarens uppgifter och agenternas förslag är två saker
+- [x] Egen flik "Uppgifter" med räknare ("N öppna") — bort från Planering
+- [x] Snabbåtgärd "Ny uppgift" (fokuserar fältet)
+- [x] "Mina uppgifter" i sidomenyn under Jobb
+- [x] Facit `tests/facit-projekt-uppgifter-nummer.spec.ts`; 183 kringliggande tester gröna
+- [ ] Steg 2 (efter lansering): förfallna/dagens uppgifter in i hemmets "Dagens plan" + signal till Matte
