@@ -266,6 +266,64 @@ från ~35 till ~15 kr/konto/mån och profilernas totaler hamnar under
 
 ---
 
+## 9. Tillägg 2026-08-27 — inventeringen av alla AI-anropsplatser
+
+Källgranskning av **47 externa AI-anropsplatser** (Anthropic + Whisper) och
+facit-låsning i `tests/facit-ai-kostnad-sanning.spec.ts` (commit `6283a8d6`).
+Frågan var: ändrade inventeringen estimatet i §4? **Nej i storlek — ja i
+tillförlitlighet.**
+
+### 9.1 De omätta ytorna, mätt mot prod [MÄTT 2026-08-27]
+
+| Yta | Prod senaste 30 d | Fanns i §1/§4? | Effekt på estimatet |
+|---|---|---|---|
+| Orkestratorn (V3 `run_agent`, `lib/agent/orchestrator.ts`) | 9 körningar, 84 k tokens, 1 konto (`bee_services_ab_te6uga`, regeln "Morgonrapport", ekonomi-agenten/Haiku, dagligen). All-time: 56 körningar, 500 k tokens, 4 konton | Ja — §1.1 "ekonomi-agenten (automation_rule) $0,080/körning" | **Överskattad ~4×.** Flat-taxan 0,000009 $/token låg långt över Haikus pris; verklig kostnad ≈ $0,01–0,02/körning. Governorns $4,50 all-time är i verkligheten ~$1–1,5 |
+| `lib/pipeline-ai.ts` (Haiku-analys efter samtal) | 2 anrop (2 samtal med transkript) ≈ ören | Ja — §4 "Haiku-analys 0,15 kr/samtal" [LISTPRIS] | Ingen |
+| `lib/ai.ts` | Död kod, 0 anrop | — | Ingen (borttagen) |
+| All bokförd LLM-kostnad (`cost_event`, resource=llm) | 473 rader, $4,28 ≈ **41 kr totalt** över 22 konton ≈ 2 kr/konto | §1: "$0,31 / 30 d" | Skillnaden är **mätteckning** (Matte, widget, agent-trigger m.fl. mäts sedan 14 aug), inte ökad användning |
+
+Ingen av de tre omätta ytorna saknades i §4:s händelsemodell — de saknades i
+**boken**. Estimatet per tier (~400 / ~1 025 / ~2 020 kr vid full aktivitet)
+står oförändrat.
+
+### 9.2 Vad som faktiskt ändrades
+
+1. **§4 slutsats 1:s förbehåll är stängt för LLM + Whisper.** "Budgeten
+   spricker eller håller beroende på ytor vi inte ser" — det finns inga
+   osedda LLM/Whisper-ytor längre. Facitet inventerar anropsplatserna
+   mekaniskt och kräver att varje fil både bokför på kund och kontrollerar
+   Bränslet före anropet; kartorna över undantag får inte ha döda poster.
+   Kvar overifierat: **telefoniminuterna** (46elks-vidarekoppling, §3
+   listpris) — orört i detta pass.
+2. **Taket gäller nu alla ytor, inte 14 rutter.** 33 av 47 anropsplatser
+   saknade Bränslekoll 26 aug (bl.a. Matte intent-agent på varje inkommande
+   SMS/mejl, nattliga context/pricing/proactive-care, Whisper-mötesjobb,
+   copilot, onboarding, insights-cron). Regel: Bränsle slut/oläsbart ⇒ samma
+   väg som saknad API-nyckel — deterministisk fallback, 402 i användarrutter,
+   claim släpps för mötesjobb, Gmail-mejl lämnas olästa.
+3. **Dygnstaket (§6, `PLAN_COST_CAPS_USD`) räknade på för höga tal** för
+   Haiku-körningar via orkestratorn (flat-taxan). Nu usage × modellpris —
+   taket blev *effektivt* något rymligare, men mot verklig kostnad.
+4. **`enterprise`-planen stoppades som "okänd plan"** i `checkFuelGate`
+   (`fuel_unavailable`) — Elexperten hade SMS + agenter tyst avstängda sedan
+   grinden byggdes 26 aug. Följer nu `fuelBudgetOreForPlan` (Storfirman-nivå,
+   1 800 kr) tills ett produktbeslut för enterprise finns.
+
+### 9.3 Läget 27 aug
+
+Verklig LLM-förbrukning: **~2 kr/konto/månad** mot budget 374–1 800 kr. Taket
+är fortfarande ett skydd mot framtida volym och missbruk, inte mot dagens
+användning — §4:s slutsats 2 gäller. Den dyraste återkommande posten är
+oförändrat nattpaketet (§1.2, ~35 kr/konto/mån vid full aktivitet), vilket
+är den post som växer linjärt med kundstocken.
+
+Medvetet utanför (beteende, inte sanning): admin-supportsvaret bokför
+Handymates egen AI-kostnad på kundens konto; `isLikelyLead` anropar modellen
+även för förhandsgodkända avsändare.
+
+---
+
 *Underlag: agent_runs/cost_event/sms_log/billing_plan/business_config via
 Supabase MCP 2026-08-14; 46elks API-läsning samma dag; två Explore-pass över
-hela kodbasen. Inga kodändringar gjorda i detta pass.*
+hela kodbasen. Inga kodändringar gjorda i detta pass. §9: agent_runs/
+cost_event/call_recording via Supabase MCP 2026-08-27.*
