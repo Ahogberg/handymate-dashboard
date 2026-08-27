@@ -98,6 +98,17 @@ direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 sak
 - [ ] Radvis allokering inom samma faktura (fortnox_rows finns nu) — bara om ett riktigt fall dyker upp
 - FLAGGAT Pass 3/I2: fältnamnen på SupplierInvoice-detaljen; om Fortnox fyller YourReference vid tolkning
 
+## Del G — Utgående kommunikation, Etapp 0 (OUTBOUND_COMMUNICATION_INVENTORY, Andreas "kör allihop" 2026-08-27)
+- [x] 8.1: tio sessionslösa serveranrop till /api/sms/send → sendSmsViaElks, resultatet läses
+- [x] 8.2: V3 send_email via lib/email; tool-routerns 404-rutter borta (faktura via sändkärnan,
+      send_quote fail-closed)
+- [x] 8.4: /api/push/send kräver x-cron-secret eller ägande session; 21 anropare via
+      internalPushHeaders(); notify_owner läser delivered
+- [x] 8.5/8.6: Smart Communications dubblerande SMS efter offert/faktura borttagna
+- [x] tests/facit-outbound-truth.spec.ts (allowlist + push-signatur + inga 404-rutter)
+- [ ] Etapp 1–4 (eventregister, konsolidering av tre uppföljningsmotorer, e-poststrypunkt, hubben) —
+      efter lansering
+
 ## Öppet för Andreas
 - ps-08 Recension mottagen har ingen automatisk källa (ingen Google-webhook) — förblir manuell.
 - Handoffens "Framdrift"-kort och "Personal"-chips är byggda; ProjectInfoCard (beskrivning/offert)
