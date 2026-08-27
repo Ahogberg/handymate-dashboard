@@ -47,6 +47,8 @@ interface Pilot {
   isPilot: boolean
   createdAt: string
   onboardingCompleted: boolean
+  /** Aktiveringsmått (B8): "fynd 2 h · beslut 5 h · utfört 5 h · kvitto —", null före slutförd onboarding */
+  activationLabel?: string | null
   callMode: string
   userEmail: string
 }
@@ -585,6 +587,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">AI-nummer</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Skapad</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Aktivering</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Åtgärd</th>
                   </tr>
                 </thead>
@@ -620,6 +623,9 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-sm">
                         {new Date(pilot.createdAt).toLocaleDateString('sv-SE')}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap" title="Timmar från slutförd onboarding till första fynd / beslut / utförda handling / kvitto">
+                        {pilot.activationLabel ?? '—'}
                       </td>
                       <td className="px-4 py-3">
                         <button

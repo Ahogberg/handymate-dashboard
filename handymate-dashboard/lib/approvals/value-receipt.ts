@@ -12,6 +12,20 @@ export interface ValueReceipt {
   linkLabel?: string
 }
 
+/**
+ * Korttyperna som kan ge ett verifierat kvitto (switchen nedan). Exporterad
+ * så aktiveringsmåtten (lib/admin/activation-metrics.ts) och kvittot aldrig
+ * glider isär — facit låser att listan matchar case-satserna.
+ */
+export const RECEIPT_APPROVAL_TYPES = [
+  'confirm_payment',
+  'review_auto_invoice',
+  'invoice_reminder',
+  'fakturera_projekt',
+  'send_sms',
+  'create_ata_draft',
+] as const
+
 const positiveAmount = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null
 

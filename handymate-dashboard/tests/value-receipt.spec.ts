@@ -150,3 +150,13 @@ test.describe('send_sms — Daniels uppföljning får ett kvitto utan belopp (20
     )).toBeNull()
   })
 })
+
+test.describe('RECEIPT_APPROVAL_TYPES speglar kvittots case-satser (aktiveringsmåtten läser listan)', () => {
+  test('varje typ i listan har ett case, och varje case finns i listan', () => {
+    const { RECEIPT_APPROVAL_TYPES } = require('../lib/approvals/value-receipt')
+    const src = fs.readFileSync(path.join(ROOT, 'lib/approvals/value-receipt.ts'), 'utf8')
+    const switchStart = src.indexOf('switch (approval.approval_type)')
+    const cases = Array.from(src.slice(switchStart).matchAll(/case '([a-z_]+)':/g)).map(m => m[1])
+    expect([...cases].sort()).toEqual([...RECEIPT_APPROVAL_TYPES].sort())
+  })
+})

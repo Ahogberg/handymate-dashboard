@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdmin, getAdminSupabase } from '@/lib/admin-auth'
+import { computeActivation, formatActivation, type ActivationRow } from '@/lib/admin/activation-metrics'
 
 interface BusinessConfig {
   business_id: string
@@ -74,6 +75,26 @@ export async function GET(request: NextRequest) {
       userEmails[user.id] = user.email || ''
     })
 
+    // Aktiveringsmått (Lager 3 / B8, 2026-08-27): tid från slutförd onboarding
+    // till första fynd/beslut/utförda handling/kvitto — ur pending_approvals'
+    // egna tidsstämplar, ingen ny tabell. Läsfel ger tomma mått, aldrig 500.
+    const activationRowsByBusiness = new Map<string, ActivationRow[]>()
+    {
+      const { data: approvalRows, error: approvalErr } = await supabase
+        .from('pending_approvals')
+        .select('business_id, approval_type, status, created_at, resolved_at, outcome:payload->execution_result->>outcome')
+        .neq('approval_type', 'team_intro')
+        .limit(20000)
+      if (approvalErr) {
+        console.warn('[admin/pilots] aktiveringsrader kunde inte läsas (måtten utelämnas):', approvalErr.message)
+      }
+      for (const r of (approvalRows || []) as Array<ActivationRow & { business_id: string }>) {
+        const list = activationRowsByBusiness.get(r.business_id) || []
+        list.push(r)
+        activationRowsByBusiness.set(r.business_id, list)
+      }
+    }
+
     // Enrich business data with user info
     const pilots = typedBusinesses?.map(business => ({
       businessId: business.business_id,
@@ -90,6 +111,16 @@ export async function GET(request: NextRequest) {
       isPilot: business.is_pilot,
       createdAt: business.created_at,
       onboardingCompleted: !!business.onboarding_completed_at,
+      activation: computeActivation(activationRowsByBusiness.get(business.business_id) || [], {
+        created_at: business.created_at,
+        onboarding_completed_at: business.onboarding_completed_at,
+      }),
+      activationLabel: business.onboarding_completed_at
+        ? formatActivation(computeActivation(activationRowsByBusiness.get(business.business_id) || [], {
+            created_at: business.created_at,
+            onboarding_completed_at: business.onboarding_completed_at,
+          }))
+        : null,
       callMode: business.call_mode,
       hasWorkingHours: !!business.working_hours,
       userEmail: userEmails[business.user_id] || business.contact_email
