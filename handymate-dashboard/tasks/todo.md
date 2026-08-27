@@ -935,14 +935,14 @@ Princip: Handymate slutar inte arbeta när projektet fakturerats. Jobbpasset (v1
 - [x] Facits: `facit-fastighetspass` (ny), portal-error-swallow + launch-public-token-contract (nya rutter registrerade), permission-contract (notify owner-admin), jobbpass — allt grönt, tsc 0 fel
 - [x] Bevis mot prod (2026-08-27, biz_eaj2vp3xf2, projekt e53d9edb…): projekt → utkast → publicerat (svaret bär ingen notis-flagga) → portal-API 1 pass → portalen "Ditt hem" → passvyn → djuplänk ?tab=jobbpass&project= → dokumentfliken "Filer" → ägarsidan "Meddela kunden via mejl" (inte klickad: kundens e-post är en testadress). Skärmdumpar proof-fp-1..4.
 
-### Steg 2 — installationsregistret (v174) — BYGGT 2026-08-27, väntar på migration + prod-bevis
+### Steg 2 — installationsregistret (v174) — KLART 2026-08-27
 - [x] `sql/v174_installation.sql`: installation (project, customer, material_id, namn/tillverkare/modell/serienummer/sku/leverantör/placering, **site_* adressögonblicksbild**, installed_at, status draft/confirmed/not_applicable, serial_pending, service_interval_months + service_interval_source (product_info|craftsman) med CHECK "båda eller ingen", care_instructions, source project_material|manual). RLS service_role. Unikt utkast per materialrad.
 - [x] `lib/installation/installation.ts`: rena regler (installationRelevance, snapshotSiteAddress, draftFromMaterial, validateInstallationPatch) + DB (ensureMaterialDrafts idempotent, create/update/delete, listConfirmed…)
 - [x] `/api/projects/[id]/installations` GET (synkar utkast) / POST / PATCH / DELETE; ägarsida `/dashboard/projects/[id]/installationer` med Bekräfta · Ej tillämpligt · Komplettera serienumret senare · Spara
 - [x] Avslutsmotorn: effekt `installation_register` — bara vid relevans (material eller produktord i namn/beskrivning), efter att projektet redan är klart, REVIEW_REQUIRED-kort med target_route, 30 dagar; grind 1 (bara utkast ur material), grind 2 (blockerar aldrig)
 - [x] Jobbpasset: "Det här sitter hos dig" — bara status confirmed, intervall visas alltid med källa (grind 4); allowlisten utökad
 - [x] Facit `tests/facit-installation.spec.ts` (grind 1, 2, 4, adress, kundvy) + jobbpass.spec
-- [ ] Andreas kör v174 (verifiera med SELECT efteråt) → push → CI → prod-bevis: avsluta ett projekt med "värmepump" i namnet på Provfirman → kortet → sidan → bekräfta → passet visar "Det här sitter hos dig"
+- [x] v174 körd via MCP 2026-08-27 (28 kolumner, 6 CHECK, RLS, 1 policy verifierat med SELECT). Prod-bevis (Provfirman biz_eaj2vp3xf2, projekt 56435441…): avslut → effekt installation_register succeeded → relevans keyword "varmepump" → intervall utan källa 400 → manuell rad → bekräftad → publik vy bär installationen, ingen warranty-nyckel → portalen "Det här sitter hos dig" → Lars-kortet i kön med "Registrera installationer" → registersidan. Skärmdumpar proof-inst-1..3.
 ### Steg 3 — en garantisanning + service-trigger
 - [ ] `warranty.project_id` + garantityp (produkt | utförande | serviceavtal) + garantigivare + källa (grind 3); skapas vid avslut ur installationen
 - [ ] proactive-care läser intervall från installationen bara när intervall_källa finns (grind 4); Hannas "första service närmar sig" per fastighet — utskick via hubben, inte automatiskt (grind 5)
