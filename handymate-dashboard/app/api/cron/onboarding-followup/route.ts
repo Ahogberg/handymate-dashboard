@@ -4,6 +4,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getWeeklyValue, type WeeklyValue } from '@/lib/weekly-value'
 import { sendEmail, logEmail } from '@/lib/email'
 import { setBusinessPreference, deleteBusinessPreference } from '@/lib/business-preferences'
+import { pickDay7NextAction, type Day7NextAction } from '@/lib/onboarding/day7-next-action'
 
 
 // force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
@@ -50,11 +51,18 @@ async function runDay7Followup() {
     const from = new Date(now - 10 * 24 * 3600_000).toISOString()
     const to = new Date(now - 7 * 24 * 3600_000).toISOString()
 
+    // Fönstret räknas från onboarding_completed_at (Lager 3 / B9, 2026-08-27):
+    // "Din första vecka" ska vara veckan MED teamet, inte veckan sedan
+    // registreringen — den som registrerade dag 1 och blev klar dag 6 fick
+    // annars ett tomt mail. Konton utan completed_at (äldre flöden) faller
+    // tillbaka på created_at som förut.
     const { data: candidates, error } = await supabase
       .from('business_config')
-      .select('business_id, contact_name, contact_email, created_at')
-      .gte('created_at', from)
-      .lt('created_at', to)
+      .select('business_id, contact_name, contact_email, created_at, onboarding_completed_at')
+      .or(
+        `and(onboarding_completed_at.gte.${from},onboarding_completed_at.lt.${to}),` +
+        `and(onboarding_completed_at.is.null,created_at.gte.${from},created_at.lt.${to})`,
+      )
 
     if (error) throw error
     if (!candidates || candidates.length === 0) {
@@ -95,8 +103,11 @@ async function runDay7Followup() {
         }
 
         const value = await getWeeklyValue(supabase, biz.business_id)
+        // Ett konkret nästa steg — bara om ett riktigt kort väntar (annars null
+        // och blocket utelämnas). Läsfel utelämnar också, mailet går ändå.
+        const nextAction = await pickDay7NextAction(supabase, biz.business_id).catch(() => null)
         const firstName = (biz.contact_name || '').trim().split(/\s+/)[0] || ''
-        const html = buildDay7EmailHtml(firstName, value)
+        const html = buildDay7EmailHtml(firstName, value, nextAction)
 
         const result = await sendEmail({
           to: biz.contact_email,
@@ -139,9 +150,23 @@ function kr(n: number): string {
   return n.toLocaleString('sv-SE')
 }
 
-function buildDay7EmailHtml(firstName: string, value: WeeklyValue): string {
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function buildDay7EmailHtml(firstName: string, value: WeeklyValue, nextAction: Day7NextAction | null = null): string {
   const greeting = firstName ? `Hej ${firstName},` : 'Hej,'
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+
+  // "Nästa bästa steg" — ett riktigt väntande kort med djuplänk, aldrig ett
+  // påhittat. Utelämnas helt när inget kort väntar.
+  const nextStepHtml = nextAction
+    ? `<div style="background: #F0FDFA; border: 1px solid #99F6E4; border-radius: 10px; padding: 14px 16px; margin: 20px 0;">
+         <p style="margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #0F766E;">Nästa bästa steg</p>
+         <p style="margin: 0 0 10px; font-size: 15px; line-height: 1.5; color: #134E4A;">${escapeHtml(nextAction.title)}</p>
+         <a href="${appUrl}${nextAction.href}" style="font-size: 14px; font-weight: 600; color: #0F766E; text-decoration: underline;">Öppna och besluta →</a>
+       </div>`
+    : ''
 
   const bullets: string[] = []
   if (value.calls_captured > 0) {
@@ -188,6 +213,7 @@ function buildDay7EmailHtml(firstName: string, value: WeeklyValue): string {
   <div style="background: #ffffff; border: 1px solid #E5E7EB; border-top: none; border-radius: 0 0 12px 12px; padding: 24px;">
     <p style="font-size: 15px; line-height: 1.6; color: #374151;">${greeting}</p>
     ${bodyHtml}
+    ${nextStepHtml}
     <div style="text-align: center; margin: 28px 0;">
       <a href="${appUrl}/dashboard" style="display: inline-block; background: #0F766E; color: white; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">
         Se hela veckan →
