@@ -38,3 +38,16 @@ Saldo styr ambitionen: kolla `balance` först. En hel film = 1–5 scener × 1�
 - VO-spår: riktig svensk röst (handbokens krav) — spela in, eller `create_voice` med samtycke/avtal; läggs på i steg 4.
 - Hook-varianter A/B/C: samma master, tre olika seg1-texter — tre ffmpeg-körningar, 0 extra krediter.
 - Matte nivå 2 i scen: Seedance 2.5 omni-referens med `assets/agents/matte.png` — kör identitets-QA per klipp (`reference-pack/03`).
+
+## Tillägg 2026-08-28 (efter Knappen v2, åtta versioner)
+
+| Lärdom | Regel |
+|---|---|
+| 720p helbild ger ~150 px ansikte — läppsynk och hud blir aldrig bra | Talande scener i halvnära/närbild. Iterera i 720p, slutrendera i 1080p. |
+| Varje skarv mellan två genereringar syns (drift), övertoning gömmer den inte | Klipp bara mellan OLIKA bildstorlekar (hel -> nära). Beats som ska hänga ihop = en tagning. |
+| Seedance audio_references styr munnen bara löst | Alltid Sync Lipsync 3 (sync_so) på talklipp — levererar ljudspår inbakat. ~30 kr. |
+| Ingen modell levererar ljud när audio_references används | Mixa repliken vid ihopsättning eller ta ljudet från Sync-klippet. |
+| Seedance 2.5 tar porträtt direkt som image_references (inga Elements) och håller identiteten | Använd 2.5 för tvåkaraktärsscener; 2.0 + Elements fungerar lika bra i 720p. |
+| Topaz 4K-uppskalning ~1 kr/s | Standard leveranssteg. Native 4K (2.0) kostar 198 kr/9 s — undvik. |
+| Timing av tal i en lång tagning | Padda ljudfilen med tystnad före repliken och ge den som audio_references. |
+| Preset-varning från generate_video ("IN THE DARK") | Skicka om med declined_preset_id — inget debiteras av varningen. |

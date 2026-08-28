@@ -99,3 +99,16 @@ Andreas: fortfarande "lite orealistiskt", A-klippet kvar, läppsynken inte perfe
 
 Kostnad V07: ~195 krediter (609 -> 414,6). Totalt Knappen v2: ~585.
 Regler: (1) talande scener görs i halvnära/närbild — läppsynk och realism följer ansiktets pixelstorlek; (2) klipp mellan tagningar ska vara MOTIVERADE (byte av bildstorlek), aldrig samma bild två gånger; (3) iterera i 720p, slutrendera i 1080p.
+
+## V08 (2026-08-28) — 4K-leverans
+
+Andreas frågade om uppskalning är svaret. Svar: skärpa ja, läppsynk nej (uppskalning lägger till pixlar, inte information; läppsynk följer NATIV upplösning per ansikte). Native 4K i Seedance 2.0 preflightat: 198 kr per 9 s — inte vägen.
+
+| # | Steg | Verktyg | Kostnad | Resultat |
+|---|---|---|---|---|
+| 20 | Närbild 1080p -> 4K | upscale_video provider topaz 2160p | 8 kr | job 16997f01, 2160x3840, finare hår/kanter, inget påhittat |
+| 21 | Helbild 1080p -> 4K | topaz 2160p | 8 kr | job 315c6f13 |
+| 22 | Ihopsättning 4K | ffmpeg i sandbox (bakgrundsjobb), text/slutkort renderade i 2160x3840, crf 18 | 0 | HM_F04_KNAPPEN_V2_HARD_MASTER_V08_4K_9x16_SE.mp4, 26,7 s, 33 MB |
+
+Saldo efter: 398,6. Totalt Knappen v2: ~600 krediter över 8 versioner.
+Regel: Topaz-uppskalning till 4K kostar ~1 kr/s och är standard sista steg för leverans — men aldrig ett substitut för rätt bildstorlek i genereringen.
