@@ -1038,3 +1038,14 @@ Bakgrund: efter statusbandet (26 aug) var "Att göra" på Översikt bara agenter
 - [x] Avvikelse #34 (leads.lead_number saknades — ingen Golden Path-lead har någonsin sparats) → v179
 - [x] Avvikelse #35 (onboardingens stegseeder skrev fel form — 14/27 företag utan steg, ingen affär) → 2a1e40cf + backfill av de 13 återstående företagen
 - [ ] Block B: kanalhälsa på Kom igång-railen (Claude/Codex på befintliga rälsar)
+  - [x] Codex: ren `lib/onboarding/channel-health.ts` med fyra bevisnivåer per kanal: inte aktiverad → aktiverad men oprövad → kanal verifierad → lead + affär verifierade
+  - [x] Codex: tenant-säker `GET /api/onboarding/channel-health`; telefon ur test_call, e-post ur inbound-rutt, webb ur widget/storefront; inga flaggor får ensamma bevisa inflöde
+  - [x] Codex: browserlösa facit för sanningsordning, auth, business_id-filter och att både lead- och dealrad krävs för starkaste nivån
+  - [ ] Claude: koppla de härledda signalerna till befintlig Kom igång-rail för "Få in fler jobb" utan nytt onboardingsteg eller lanseringsspärr
+
+## "Kontaktad" gäller alla kontaktvägar (Andreas 2026-08-28) — KLART
+- [x] `lib/pipeline/contacted.ts`: en regel, moveDeal som system (framåt-only, aldrig bakåt), idempotent, kastar aldrig
+- [x] Kopplad i: SMS-strypunkten (alla SMS), lib/email med kundkontext (+ nurture, offertbekräftelsen), agentens mejl (Gmail + Resend), portalmeddelande, bokat besök, smart kundkommunikation
+- [x] Facit `tests/facit-kontaktad.spec.ts`
+- [x] Prod-bevis: affär i Ny förfrågan → bokat besök via API → Kontaktad ("Flyttad till Kontaktad")
+- Kvar utanför: inkommande samtal (Lisa) räknas inte som "vi kontaktade kunden" — medvetet; ändra om du vill
