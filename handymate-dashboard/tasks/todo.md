@@ -1088,6 +1088,7 @@ kunna bli en levande huvudperson i fler annonser.
 - [x] Facit `tests/facit-inspelningslage.spec.ts` (7/7): spärr på is_demo_tenant före första skrivning, inga testdata-namn,
       inga cron-/debug-anrop, Daniels kort bara via produktens byggare, readiness via produktens funktion
 - [x] tsc 0, alla tre filmerna gröna mot prod-demokontot, zip:ar skickade till Andreas
+- [x] Bonusfynd: hemskärmen 499 px bred på 432 px-skärm (avvikelse #37, `450b7575` grid-cols-1) — hittad av overflow-mätningen
 - [ ] Andreas: demokontots contact_name är "Demo" → Daniels SMS slutar "Mvh Demo". Sätt ett riktigt förnamn på demokontot
       (Inställningar → Företag) innan F06 klipps
 - [ ] Andreas: 46elks-saldo → kör `FILMING_APPROVE=1` för F06 beat 6 ("skickat"-utfallet)
