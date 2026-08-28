@@ -51,3 +51,4 @@ Saldo styr ambitionen: kolla `balance` först. En hel film = 1–5 scener × 1�
 | Topaz 4K-uppskalning ~1 kr/s | Standard leveranssteg. Native 4K (2.0) kostar 198 kr/9 s — undvik. |
 | Timing av tal i en lång tagning | Padda ljudfilen med tystnad före repliken och ge den som audio_references. |
 | Preset-varning från generate_video ("IN THE DARK") | Skicka om med declined_preset_id — inget debiteras av varningen. |
+| Närbild och helbild blir två olika "tolkningar" av samma porträtt (V07-fyndet) | Klipp startbilden till närbilden UR helbildens 4K-fil (crop -> 1080x1920) och ge den som start_image + Element. Då är det bevisligen samma person i båda bildstorlekarna (V09). |

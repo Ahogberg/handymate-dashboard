@@ -112,3 +112,20 @@ Andreas frågade om uppskalning är svaret. Svar: skärpa ja, läppsynk nej (upp
 
 Saldo efter: 398,6. Totalt Knappen v2: ~600 krediter över 8 versioner.
 Regel: Topaz-uppskalning till 4K kostar ~1 kr/s och är standard sista steg för leverans — men aldrig ett substitut för rätt bildstorlek i genereringen.
+
+V08b: omkodad crf 22 -> 21 MB för leverans under 30 MiB-gränsen (V08 33 MB arkiverad).
+
+## V09 (2026-08-29) — närbilden bunden till helbilden
+
+Andreas: "Matte ser lite annorlunda ut i närbilden, det var ganska snyggt utzoomat." Orsak: tagning 2 (2.5, omni-reference från porträttet) och tagning 1 är två olika tolkningar av samma porträtt. Fix: klipp Mattes ansikte ur 4K-helbilden (bild 8,5 s, crop 864x1536 -> 1080x1920) och använd som START-bild för närbilden, så att närbilden börjar med exakt den Matte som helbilden visar.
+
+| # | Steg | Verktyg | Kostnad | Resultat |
+|---|---|---|---|---|
+| 23 | Kontaktark 5,0–8,9 s ur helbild 4K (uppladdad som media 1305b624) | ffmpeg i sandbox | 0 | qa-t1-frames-5-9s.png — 8,5 s vald (armar nere, blick i kameran) |
+| 24 | Startbild: crop 864x1536 @ (605,240) -> 1080x1920, lanczos + lätt unsharp | ffmpeg | 0 | media 6a8e9794, tagning3-startbild-ur-helbild.png |
+| 25 | Tagning 3 (halvnära): start_image = #24, Element char_matte, audio_ref Benji (64e497e1), 8 s 1080p | seedance_2_0 std | 72 kr | job 66206fd3 |
+| 26 | QA tagning 3 | kontaktark 0–7,9 s | 0 | qa-tagning3-narbild-bunden.png — identitet = helbilden i alla rutor, ren hoodie, gubben in/ut 4–5 s. Klippet hade eget ljudspår (aac) — 2.0 med audio_references + start_image levererar ljud |
+| 27 | Sync Lipsync 3 på tagning 3 | sync_so, input_audio Benji, silence | ~30 kr | job 29b774af |
+| 28 | Ihopsättning V09 (V07-receptet, tagning 2 -> tagning 3) | ffmpeg i sandbox, crf 18 | 0 | HM_F04_KNAPPEN_V2_HARD_MASTER_V09_1080p_9x16_SE.mp4, 26,1 s, 7,5 MB |
+
+Regel (ny): när en talande närbild ska matcha en helbild — klipp startbilden UR helbilden (4K-versionen) i stället för att generera om från porträttet. Startbilden låser identitet, ljus och kläder; Elementet håller den genom tagningen.
