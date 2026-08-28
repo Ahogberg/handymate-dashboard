@@ -3570,176 +3570,27 @@ export default function SettingsPage() {
               )}
             </div>
 
-            {/* Hemsideintegration (Embed Widget) */}
+            {/* AI på hemsidan — en enda installationsyta. */}
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 rounded-lg bg-primary-100">
-                  <ExternalLink className="w-6 h-6 text-primary-600" />
+                  <Bot className="w-6 h-6 text-primary-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Hemsideintegration</h2>
-                  <p className="text-sm text-gray-400">Leads från din hemsida direkt i Handymate</p>
+                  <h2 className="text-lg font-semibold text-gray-900">AI på hemsidan</h2>
+                  <p className="text-sm text-gray-400">Svarar på frågor och samlar kundförfrågningar</p>
                 </div>
               </div>
-
               <p className="text-sm text-gray-500 mb-4">
-                Koppla din hemsida till Handymate — leads som skickas via ditt kontaktformulär hamnar automatiskt i din pipeline.
+                Konfigurera innehåll och gränser, aktivera widgeten och hämta den enda aktuella installationskoden på widgetsidan.
               </p>
-
-              {config?.website_api_key ? (
-                <div className="space-y-4">
-                  {/* Embed code */}
-                  <div>
-                    <label className="text-sm font-medium text-gray-900 block mb-2">Din inbäddningskod</label>
-                    <div className="relative">
-                      <pre className="p-4 bg-gray-50 border border-gray-300 rounded-xl text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap break-all select-all">
-{`<script src="https://app.handymate.se/embed.js"
-        data-key="${config.website_api_key}">
-</script>`}
-                      </pre>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(
-                            `<script src="https://app.handymate.se/embed.js" data-key="${config.website_api_key}"></script>`
-                          )
-                          showToast('Kod kopierad!', 'success')
-                        }}
-                        className="absolute top-2 right-2 px-3 py-1.5 bg-primary-700 text-white text-xs rounded-lg hover:opacity-90"
-                      >
-                        Kopiera
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Action buttons */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(
-                          `<script src="https://app.handymate.se/embed.js" data-key="${config.website_api_key}"></script>`
-                        )
-                        showToast('Kod kopierad!', 'success')
-                      }}
-                      className="flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90"
-                    >
-                      <Download className="w-4 h-4" />
-                      Kopiera kod
-                    </button>
-                    <a
-                      href={`mailto:?subject=${encodeURIComponent('Lägg till kontaktformulär på vår hemsida')}&body=${encodeURIComponent(
-                        `Hej!\n\nKan du lägga till denna kod precis före </body> på vår hemsida?\n\n<script src="https://app.handymate.se/embed.js" data-key="${config.website_api_key}"></script>\n\nDet räcker med det — ett kontaktformulär dyker upp automatiskt.\n\nTack!`
-                      )}`}
-                      className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-700 font-medium hover:bg-gray-200"
-                    >
-                      <Mail className="w-4 h-4" />
-                      Skicka till webbyrå
-                    </a>
-                  </div>
-
-                  {/* DIY Guide */}
-                  <div className="p-4 bg-gray-50 rounded-xl space-y-3">
-                    <p className="text-sm font-medium text-gray-700">Gör det själv — steg för steg</p>
-                    <ol className="text-sm text-gray-500 space-y-2 list-decimal list-inside">
-                      <li>
-                        <strong className="text-gray-700">WordPress:</strong> Gå till <em>Utseende → Temaredigerare → footer.php</em> och klistra in koden precis före <code className="bg-gray-200 px-1 rounded text-xs">&lt;/body&gt;</code>
-                      </li>
-                      <li>
-                        <strong className="text-gray-700">Wix:</strong> Gå till <em>Inställningar → Anpassad kod</em> och lägg till koden i &quot;Body - end&quot;
-                      </li>
-                      <li>
-                        <strong className="text-gray-700">Squarespace:</strong> Gå till <em>Inställningar → Avancerat → Kodinmatning</em> och klistra in i &quot;Footer&quot;
-                      </li>
-                      <li>
-                        <strong className="text-gray-700">Vanlig HTML:</strong> Klistra in koden precis före <code className="bg-gray-200 px-1 rounded text-xs">&lt;/body&gt;</code> i din HTML-fil
-                      </li>
-                    </ol>
-                    <div className="pt-2 border-t border-gray-200 mt-3">
-                      <p className="text-xs text-gray-400">
-                        Vill du visa formuläret på en specifik plats istället för den flytande knappen? Lägg till <code className="bg-gray-200 px-1 rounded">&lt;div id=&quot;handymate-form&quot;&gt;&lt;/div&gt;</code> där du vill att det ska synas.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-4 bg-gray-50 rounded-xl text-center">
-                  <Loader2 className="w-5 h-5 text-gray-400 animate-spin mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">Genererar din widget-nyckel...</p>
-                </div>
-              )}
-
-              {/* Cross-link: AI-chatbot-alternativet (Commit B + D) */}
-              <div className="mt-6 p-5 bg-gradient-to-br from-primary-50 to-white border border-primary-200 rounded-xl">
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="p-2 rounded-lg bg-primary-100 flex-shrink-0">
-                    <Bot className="w-5 h-5 text-primary-700" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-base font-semibold text-gray-900 mb-1">
-                      Vill du ha AI-chatbot istället?
-                    </h3>
-                    <p className="text-sm text-gray-600 leading-relaxed">
-                      Du kan välja mellan ett enkelt kontaktformulär (ovan) eller en AI-driven chatbot som svarar på frågor om dina tjänster, ger prisuppskattningar och samlar leads — båda funkar med samma installations-snippet på din hemsida.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Jämförelse-tabell — form vs chatbot */}
-                <div className="bg-white rounded-lg border border-[#E2E8F0] overflow-hidden mb-4">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b border-[#E2E8F0]">
-                      <tr>
-                        <th className="text-left p-3 font-medium text-gray-700">Funktion</th>
-                        <th className="text-center p-3 font-medium text-gray-700">Kontaktformulär</th>
-                        <th className="text-center p-3 font-medium text-primary-700">AI-chatbot</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      <tr>
-                        <td className="p-3 text-gray-600">Tar emot leads</td>
-                        <td className="text-center p-3">✓</td>
-                        <td className="text-center p-3 text-primary-700">✓</td>
-                      </tr>
-                      <tr>
-                        <td className="p-3 text-gray-600">Svarar på kundfrågor automatiskt</td>
-                        <td className="text-center p-3 text-gray-300">—</td>
-                        <td className="text-center p-3 text-primary-700">✓</td>
-                      </tr>
-                      <tr>
-                        <td className="p-3 text-gray-600">Ger prisuppskattningar</td>
-                        <td className="text-center p-3 text-gray-300">—</td>
-                        <td className="text-center p-3 text-primary-700">✓</td>
-                      </tr>
-                      <tr>
-                        <td className="p-3 text-gray-600">Konversation 24/7</td>
-                        <td className="text-center p-3 text-gray-300">—</td>
-                        <td className="text-center p-3 text-primary-700">✓</td>
-                      </tr>
-                      <tr>
-                        <td className="p-3 text-gray-600">Visar din kunskapsbas publikt</td>
-                        <td className="text-center p-3 text-gray-300">—</td>
-                        <td className="text-center p-3 text-amber-600">⚠️ Ja</td>
-                      </tr>
-                      <tr>
-                        <td className="p-3 text-gray-600">Kräver setup</td>
-                        <td className="text-center p-3 text-emerald-700">Minimal</td>
-                        <td className="text-center p-3 text-gray-600">~5 min</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <p className="text-xs text-gray-500 mb-4">
-                  <strong>Tumregel:</strong> Använd kontaktformulär om du vill ha enkel lead-fångst. Använd AI-chatbot om du vill att kunder ska kunna ställa frågor och få svar innan de bokar — fungerar bäst när du har en uppdaterad kunskapsbas + prislista.
-                </p>
-
-                <Link
-                  href="/dashboard/settings/website-widget"
-                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-700 hover:bg-primary-800 text-white text-sm font-medium rounded-lg transition-colors"
-                >
-                  <Bot className="w-4 h-4" />
-                  Konfigurera AI-chatbot
-                </Link>
-              </div>
+              <Link
+                href="/dashboard/settings/website-widget"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-700 hover:bg-primary-800 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Konfigurera och installera
+              </Link>
             </div>
 
             {/* Grossist-kopplingar */}

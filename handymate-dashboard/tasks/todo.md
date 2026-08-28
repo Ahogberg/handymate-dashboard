@@ -978,6 +978,23 @@ inte en andra lanseringschecklista.
 
 - Pågår.
 
+## Block A — webbkanalens inflöde, sant (Codex, 2026-08-28)
+
+- [x] A1: alla synliga installationssnippets använder `/widget/loader.js` + `data-business-id`; legacy `public/embed.js` lämnas orörd
+- [x] A2: v178 + throttlad loader-signal + autentiserad statusrutt med fem ärliga lägen
+- [x] A2 UI: Integrationer visar aldrig ”Kopplad” ur en flagga och länkar till enda installationsytan
+- [x] A3: storefront-kontakt går via `createLeadAndDeal`, med honeypot och databasbaserad rate limit
+- [x] A4: facit låser installationskontrakt, sann status och Golden Path för samtliga strukturerade webbinflöden
+- [x] Verifiering: riktade facit, `npx tsc --noEmit` och `npx next build`
+- [x] v178 levereras som fil men körs inte
+
+### Review
+
+- Klart i arbetsytan. `467/467` facit gröna, riktade kontrakt `73/73`,
+  `npx tsc --noEmit` rent och `npx next build` exit 0. v178 är medvetet
+  okörd. Skarpa statusövergångar och storefront-dedup lämnas till Claudes
+  prodbevis enligt uppdragsbeskrivningen.
+
 ## Projektöversikten — uppgifter + projektnummer (Andreas 2026-08-27: "Kör A och B")
 
 Bakgrund: efter statusbandet (26 aug) var "Att göra" på Översikt bara agenternas kort — uppgiftsytan låg gömd under Planering efter delmomenten, "Ny uppgift" saknades bland snabbåtgärderna, "Mina uppgifter" var olänkad. Projektnumret renderades ingenstans på sidan, söktes inte i listan, dubblerades i pipelinen ("P-P-1042") och saknades på 19 av 37 projekt (bara POST /api/projects satte det, och tappade det tyst vid fel).

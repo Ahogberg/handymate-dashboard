@@ -2,7 +2,7 @@
 
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
-import { ArrowLeft, Globe, Calendar, Mail, Code, ChevronRight, Copy, Check, Loader2, Lock, Receipt, RefreshCw, Download } from 'lucide-react'
+import { ArrowLeft, Globe, Calendar, Mail, ChevronRight, Copy, Check, Loader2, Lock, Receipt, RefreshCw, Download } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 
@@ -11,6 +11,25 @@ interface FortnoxStatus {
   company_name: string | null
   connected_at: string | null
   last_synced_at: string | null
+}
+
+type WidgetState = 'not_enabled' | 'enabled_unverified' | 'installed' | 'tested' | 'lead_verified'
+
+interface WidgetStatus {
+  state: WidgetState
+  label: string
+  last_seen_at: string | null
+  last_seen_host: string | null
+  last_tested_at: string | null
+  lead_verified_at: string | null
+}
+
+const WIDGET_BADGE: Record<WidgetState, string> = {
+  not_enabled: 'bg-gray-100 text-gray-500',
+  enabled_unverified: 'bg-amber-100 text-amber-700',
+  installed: 'bg-blue-100 text-blue-700',
+  tested: 'bg-cyan-100 text-cyan-700',
+  lead_verified: 'bg-emerald-100 text-emerald-700',
 }
 
 function relativeTime(iso: string | null): string {
@@ -25,9 +44,8 @@ function relativeTime(iso: string | null): string {
 export default function IntegrationsPage() {
   const business = useBusiness()
   const searchParams = useSearchParams()
-  const [copied, setCopied] = useState(false)
   const [calendarConnected, setCalendarConnected] = useState(false)
-  const [widgetEnabled, setWidgetEnabled] = useState(false)
+  const [widgetStatus, setWidgetStatus] = useState<WidgetStatus | null>(null)
   const [statusLoading, setStatusLoading] = useState(true)
   const [fortnox, setFortnox] = useState<FortnoxStatus | null>(null)
   const [fortnoxAction, setFortnoxAction] = useState<'syncing' | 'disconnecting' | 'importing' | null>(null)
@@ -38,14 +56,6 @@ export default function IntegrationsPage() {
   const [emailLeadActivating, setEmailLeadActivating] = useState(false)
   const [emailLeadCopied, setEmailLeadCopied] = useState(false)
   const [emailLeadError, setEmailLeadError] = useState<string | null>(null)
-
-  const embedCode = `<script src="https://app.handymate.se/embed.js" data-key="HM-${business.business_id?.slice(0, 8) || 'abc123'}"></script>`
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(embedCode)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
 
   const refreshFortnox = useCallback(async () => {
     try {
@@ -78,14 +88,15 @@ export default function IntegrationsPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const [googleRes] = await Promise.all([
+        const [googleRes, widgetRes] = await Promise.all([
           fetch('/api/google/status').then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch('/api/widget/status').then(r => r.ok ? r.json() : null).catch(() => null),
           refreshFortnox(),
           refreshEmailLead(),
         ])
         if (cancelled) return
         setCalendarConnected(!!(googleRes?.connected && googleRes?.syncEnabled))
-        setWidgetEnabled(false)
+        setWidgetStatus(widgetRes)
       } catch {
         /* non-blocking */
       } finally {
@@ -254,14 +265,21 @@ export default function IntegrationsPage() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-gray-900">Hemsida-widget</span>
-                {!statusLoading && widgetEnabled && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">Kopplad</span>
-                )}
-                {!statusLoading && !widgetEnabled && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">Ej kopplad</span>
+                {!statusLoading && widgetStatus && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${WIDGET_BADGE[widgetStatus.state]}`}>
+                    {widgetStatus.label}
+                  </span>
                 )}
               </div>
-              <p className="text-sm text-gray-500 truncate">Lägg till en chattwidget på din hemsida så kunder kan kontakta dig direkt</p>
+              <p className="text-sm text-gray-500 truncate">
+                {widgetStatus?.state === 'installed' && widgetStatus.last_seen_host
+                  ? `Senast sedd på ${widgetStatus.last_seen_host} ${relativeTime(widgetStatus.last_seen_at)}`
+                  : widgetStatus?.state === 'tested'
+                    ? `Senast testad ${relativeTime(widgetStatus.last_tested_at)}`
+                    : widgetStatus?.state === 'lead_verified'
+                      ? `Leadflödet verifierades ${relativeTime(widgetStatus.lead_verified_at)}`
+                      : 'Lägg till en chattwidget på din hemsida så kunder kan kontakta dig direkt'}
+              </p>
             </div>
             <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
           </Link>
@@ -444,32 +462,6 @@ export default function IntegrationsPage() {
           </div>
         </div>
 
-        {/* Embed code section */}
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <Code className="w-5 h-5 text-gray-700" />
-            <h2 className="text-lg font-semibold text-gray-900">Snabbinstallation</h2>
-          </div>
-          <p className="text-sm text-gray-500 mb-4">
-            Klistra in denna kod på din hemsida för att aktivera Handymate-widgeten
-          </p>
-
-          <div className="relative">
-            <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto font-mono">
-              {embedCode}
-            </pre>
-            <button
-              onClick={handleCopy}
-              className="absolute top-2 right-2 p-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
-              title="Kopiera"
-            >
-              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-            </button>
-          </div>
-          {copied && (
-            <p className="text-xs text-emerald-600 mt-2">Kopierat till urklipp!</p>
-          )}
-        </div>
       </div>
     </div>
   )
