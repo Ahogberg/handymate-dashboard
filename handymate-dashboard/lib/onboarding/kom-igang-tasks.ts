@@ -31,12 +31,30 @@ export interface KomIgangSignals {
   pwa: boolean
   /** Antal väntande riktiga kort (inte team_intro). */
   pending_real_cards: number
+  /**
+   * Kundinflödet (Block B, 2026-08-28) — ur /api/onboarding/channel-health.
+   * Saknas signalen (läsfel) visas ingen uppgift: hellre tyst än gissat.
+   *  - any_lead_verified: minst en kanal har en riktig lead OCH affär —
+   *    det ENDA som får betyda "kundinflödet fungerar".
+   *  - any_channel_verified: en kanal har nåtts (samtal/mejl/widget) —
+   *    får bara användas för att säga att kanalen nåtts, inte att inflödet
+   *    fungerar.
+   *  - fler_jobb: kunden valde "Få in fler jobb" i onboardingen — uppgiften
+   *    går då först.
+   *  - kanaler: en läsbar rad per kanal ("Telefon: provsamtal mottaget · …").
+   */
+  kundinflode?: {
+    any_lead_verified: boolean
+    any_channel_verified: boolean
+    fler_jobb: boolean
+    kanaler: string
+  }
 }
 
 export type KomIgangAgent = 'lisa' | 'karin' | 'daniel' | 'matte' | 'hanna'
 
 export interface KomIgangTask {
-  key: 'ring' | 'karin_data' | 'daniel_quote' | 'matte_mission' | 'hanna_segment' | 'pwa'
+  key: 'ring' | 'karin_data' | 'daniel_quote' | 'matte_mission' | 'hanna_segment' | 'pwa' | 'kundinflode'
   agent: KomIgangAgent
   label: string
   /** Vad som låses upp — en mening. */
@@ -62,13 +80,28 @@ export const KOM_IGANG_DEFAULT_LABELS: ReadonlyArray<string> = [
 export const KOM_IGANG_HEADING = 'Teamet behöver detta för att hjälpa dig bättre'
 
 export function deriveKomIgangTasks(s: KomIgangSignals): KomIgangTask[] {
+  // Kundinflödet: en uppgift som aldrig säger "fungerar" förrän en riktig
+  // förfrågan blivit lead + affär (any_lead_verified). Nådd kanal ändrar bara
+  // formuleringen. Väljs "Få in fler jobb" går den först, annars efter Lisa.
+  const inflode: KomIgangTask | null = s.kundinflode ? {
+    key: 'kundinflode', agent: 'hanna',
+    label: s.kundinflode.any_lead_verified
+      ? 'Kundinflödet är bevisat — en riktig förfrågan blev lead och affär'
+      : s.kundinflode.any_channel_verified
+        ? 'Kundinflödet är nått men inte bevisat — låt en provförfrågan bli lead och affär'
+        : 'Bevisa att nya kunder når dig — skicka en provförfrågan hela vägen',
+    varde: s.kundinflode.kanaler || 'Handymate säger aldrig att kundinflödet fungerar förrän en riktig förfrågan blivit lead och affär.',
+    minuter: 5, href: '/dashboard/settings/integrations', klar: s.kundinflode.any_lead_verified,
+  } : null
   const alla: KomIgangTask[] = [
+    ...(inflode && s.kundinflode?.fler_jobb ? [inflode] : []),
     {
       key: 'ring', agent: 'lisa',
       label: 'Ring ditt nummer — hör Lisa fånga samtalet',
       varde: 'Lisa kan svara på missade samtal först när du hört hur det låter.',
       minuter: 2, href: '/dashboard/settings/phone', klar: s.ring_test,
     },
+    ...(inflode && !s.kundinflode?.fler_jobb ? [inflode] : []),
     {
       key: 'karin_data', agent: 'karin',
       label: 'Koppla Fortnox eller skicka din första faktura så Karin kan bevaka betalningarna',

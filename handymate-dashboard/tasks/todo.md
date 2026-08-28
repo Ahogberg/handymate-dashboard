@@ -1049,3 +1049,8 @@ Bakgrund: efter statusbandet (26 aug) var "Att göra" på Översikt bara agenter
 - [x] Facit `tests/facit-kontaktad.spec.ts`
 - [x] Prod-bevis: affär i Ny förfrågan → bokat besök via API → Kontaktad ("Flyttad till Kontaktad")
 - Kvar utanför: inkommande samtal (Lisa) räknas inte som "vi kontaktade kunden" — medvetet; ändra om du vill
+
+## Block B — kundinflödet i Kom igång-railen (2026-08-28)
+- [x] Codex: `lib/onboarding/channel-health.ts` + `GET /api/onboarding/channel-health` (fyra ärliga nivåer per kanal, fail-closed, facit) — committat baed0868
+- [x] Claude: uppgiften "Kundinflödet" i `deriveKomIgangTasks` — bara `any_lead_verified` = bevisat; nådd kanal ändrar bara formuleringen; först vid "Få in fler jobb", annars efter Lisa; saknad signal ⇒ ingen uppgift. Rutten anropar Codex kanalhälsa som funktion med samma request. Facit `facit-kundinflode-rail`
+- [ ] Prod-bevis: Provfirman (webb: storefront publicerad + Golden Path-affär finns) → kanalhälsa "Lead och affär verifierade" för webb → railen visar uppgiften som klar
