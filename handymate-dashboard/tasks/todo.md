@@ -1053,4 +1053,4 @@ Bakgrund: efter statusbandet (26 aug) var "Att göra" på Översikt bara agenter
 ## Block B — kundinflödet i Kom igång-railen (2026-08-28)
 - [x] Codex: `lib/onboarding/channel-health.ts` + `GET /api/onboarding/channel-health` (fyra ärliga nivåer per kanal, fail-closed, facit) — committat baed0868
 - [x] Claude: uppgiften "Kundinflödet" i `deriveKomIgangTasks` — bara `any_lead_verified` = bevisat; nådd kanal ändrar bara formuleringen; först vid "Få in fler jobb", annars efter Lisa; saknad signal ⇒ ingen uppgift. Rutten anropar Codex kanalhälsa som funktion med samma request. Facit `facit-kundinflode-rail`
-- [ ] Prod-bevis: Provfirman (webb: storefront publicerad + Golden Path-affär finns) → kanalhälsa "Lead och affär verifierade" för webb → railen visar uppgiften som klar
+- [x] Prod-bevis 2026-08-28: channel-health → phone not_enabled, email not_enabled, web lead_verified; any_lead_verified true → kom-igang-uppgiften "Kundinflödet är bevisat — en riktig förfrågan blev lead och affär" (klar, kanalrad med alla tre) i ordningen ring → kundinflode → …
