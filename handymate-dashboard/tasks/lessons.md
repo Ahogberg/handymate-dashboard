@@ -477,3 +477,15 @@ skrivet med Write till scratchpad, som läser med CR-strippning och sparar
 tillbaka med filens ursprungliga radslut; varje ankare kontrolleras med
 `includes` innan något skrivs (ingen fil rörs om ett ankare saknas). Ge
 skriptet en NY sökväg om det ändras utanför Write/Edit — annars vägrar Write.
+
+## 2026-08-28 — testsviten skickade riktiga mejl, 40 gånger på två dygn
+
+Andreas: "Varför får jag testmail konstant? Ibland var femte minut." Två
+kontraktstester postade mot `/api/debug/mail` (som skickar "Test-mail från …"
+till företagets kontaktmejl = hans gmail) och CI-grinden kör hela sviten på
+varje push — mina ~40 pushar blev ~80 mejl. SMS-debugtesterna var undantagna
+i CI sedan 25 aug; mejlet var det inte, för ingen hade frågat vart det gick.
+**Regel:** en debug-rutt som SKICKAR något (mejl, SMS, push) får bara nås av
+tester med `dry_run: true`, och rutten svarar då utan att sända. Facit-låst
+i `tests/facit-inga-testmejl.spec.ts` som skannar alla spec-filer. Innan en
+ny rutt läggs i sviten: "vad gör den när den lyckas, och vem märker det?"

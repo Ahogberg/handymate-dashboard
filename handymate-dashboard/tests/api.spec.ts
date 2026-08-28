@@ -28,7 +28,8 @@ test.describe('Kritiska API-endpoints', () => {
   })
 
   test('POST /api/debug/mail diagnostik fungerar', async ({ request }) => {
-    const res = await request.post('/api/debug/mail', { data: {} })
+    // dry_run: rutten skickar annars ett riktigt mejl till kontaktadressen — se facit-inga-testmejl
+    const res = await request.post('/api/debug/mail', { data: { dry_run: true } })
     expect([200, 401]).toContain(res.status())
   })
 

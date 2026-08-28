@@ -28,6 +28,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Ingen mailadress att skicka till' }, { status: 400 })
   }
 
+  // dry_run (2026-08-28): testsviten (CI på varje push) postade hit och skickade
+  // ett riktigt "Test-mail" till företagets kontaktmejl — ~2 per körning, 40
+  // körningar på två dygn. Med dry_run svarar rutten med diagnostiken utan att
+  // röra Gmail eller Resend. Ett riktigt test-mail kräver ett medvetet anrop.
+  if (body.dry_run === true) {
+    const { isGmailSendEnabled } = await import('@/lib/gmail-send')
+    const gmailStatus = await isGmailSendEnabled(business.business_id).catch(() => ({ enabled: false, email: null as string | null }))
+    return NextResponse.json({
+      success: true,
+      dry_run: true,
+      message: `Torrkörning — inget skickades till ${to}`,
+      recipient: to,
+      gmail: { tested: false, enabled: gmailStatus.enabled, email: gmailStatus.email },
+      resend: { tested: false, configured: Boolean(process.env.RESEND_API_KEY) },
+      diagnostics: {
+        RESEND_API_KEY: process.env.RESEND_API_KEY ? '✅ Set' : '❌ Saknas',
+        RESEND_DOMAIN: process.env.RESEND_DOMAIN || 'handymate.se (default)',
+        GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? '✅ Set' : '❌ Saknas',
+      },
+    })
+  }
+
   const results: Record<string, any> = {
     recipient: to,
     gmail: { tested: false },
