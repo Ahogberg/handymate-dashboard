@@ -12,6 +12,9 @@ export interface SendEmailParams {
   fromName?: string
   fromAddress?: string
   replyTo?: string
+  /** Kontaktad (2026-08-28): med businessId + customerId flyttas kundens öppna affärer till Kontaktad vid lyckat utskick. */
+  businessId?: string | null
+  customerId?: string | null
 }
 
 export interface SendEmailResult {
@@ -35,6 +38,8 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
     fromName = 'Handymate',
     fromAddress = 'noreply@handymate.se',
     replyTo,
+    businessId,
+    customerId,
   } = params
 
   try {
@@ -61,6 +66,13 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
     }
 
     const data = await response.json()
+    if (businessId && customerId) {
+      try {
+        const { markCustomerContacted } = await import('@/lib/pipeline/contacted')
+        const { getServerSupabase } = await import('@/lib/supabase')
+        await markCustomerContacted(getServerSupabase(), businessId, customerId, 'mejl')
+      } catch { /* best-effort */ }
+    }
     return { success: true, messageId: data.id }
   } catch (error: any) {
     return { success: false, error: error.message }

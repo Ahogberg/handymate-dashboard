@@ -86,6 +86,8 @@ export async function sendQuoteSignedConfirmation(
   })
 
   const result = await sendEmail({
+    businessId,
+    customerId: quote.customer_id,
     to: customer.email,
     subject,
     html,

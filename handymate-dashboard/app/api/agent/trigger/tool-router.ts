@@ -1463,6 +1463,7 @@ async function sendEmail(
         customerId: (params.customer_id as string) || null,
         sentVia: 'gmail',
       })
+      try { const { markCustomerContacted } = await import('@/lib/pipeline/contacted'); await markCustomerContacted(supabase, businessId, (params.customer_id as string) || null, 'mejl') } catch { /* best-effort */ }
       return { success: true, data: {
         message: `E-post skickad via Gmail till ${params.to}`,
         message_id: result.messageId, thread_id: result.threadId, sent_via: 'gmail',
@@ -1502,6 +1503,7 @@ async function sendEmail(
     customerId: (params.customer_id as string) || null,
     sentVia: 'resend',
   })
+  try { const { markCustomerContacted } = await import('@/lib/pipeline/contacted'); await markCustomerContacted(supabase, businessId, (params.customer_id as string) || null, 'mejl') } catch { /* best-effort */ }
 
   return { success: true, data: { message: `E-post skickad till ${params.to}`, email_id: result.id, sent_via: 'resend' } }
 }

@@ -277,6 +277,14 @@ export async function sendSmartMessage(params: {
     if (!r.success) errorMessage = r.error || 'SMS failed'
   }
 
+  // Kontaktad (2026-08-28): varje lyckat utskick till kunden — SMS eller mejl.
+  if (sendSuccess && params.customerId) {
+    try {
+      const { markCustomerContacted } = await import('@/lib/pipeline/contacted')
+      await markCustomerContacted(supabase, params.businessId, params.customerId, params.channel === 'sms' ? 'sms' : 'mejl')
+    } catch { /* best-effort */ }
+  }
+
   // Log the communication
   const { data: log } = await supabase
     .from('communication_log')

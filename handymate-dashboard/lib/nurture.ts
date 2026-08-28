@@ -779,6 +779,8 @@ async function sendNurtureEmail(params: {
     })
 
     const result = await sendEmail({
+      businessId: params.businessId,
+      customerId: params.customerId,
       to: params.to,
       subject: params.subject,
       html,

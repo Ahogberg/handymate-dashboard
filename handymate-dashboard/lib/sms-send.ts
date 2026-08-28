@@ -430,6 +430,13 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
   // SMS-strypunkten och sms-gaten rätt). Bara lyckade kundutskick — interna
   // notiser hör inte hemma i en kundkonversation. Best-effort, kastar aldrig.
   if (success && recipient === 'customer') {
+    // Kontaktad gäller alla kontaktvägar (2026-08-28): ett lyckat kund-SMS
+    // flyttar kundens öppna affärer till Kontaktad — här i strypunkten, så
+    // varje SMS-väg räknas (påminnelser, offertnudgar, agenter, manuellt).
+    try {
+      const { markCustomerContacted } = await import('@/lib/pipeline/contacted')
+      await markCustomerContacted(supabase, businessId, resolvedCustomerId, 'sms')
+    } catch { /* best-effort */ }
     try {
       const { error: convErr } = await supabase.from('sms_conversation').insert({
         business_id: businessId,

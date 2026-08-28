@@ -9,6 +9,7 @@ import {
 } from '@/lib/google-calendar-sync'
 import { computeBookingDayProgress, fetchProjectBookings } from '@/lib/bookings/day-progress'
 import { notifyBookingAssignment } from '@/lib/notifications/schedule-push'
+import { markCustomerContacted } from '@/lib/pipeline/contacted'
 
 /**
  * GET - Lista bokningar för ett företag
@@ -239,6 +240,12 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) throw error
+
+    // Kontaktad (2026-08-28): ett bokat besök är en kontakt — kundens öppna
+    // affärer flyttas till Kontaktad (framåt-only, aldrig tillbaka).
+    if (customer_id && booking) {
+      await markCustomerContacted(supabase, business.business_id, customer_id, 'besök bokat')
+    }
 
     // Hämta kundnamn för dispatch + calendar (en gång)
     let customerName: string | null = null

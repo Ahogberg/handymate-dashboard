@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { markCustomerContacted } from '@/lib/pipeline/contacted'
 
 
 // force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
@@ -67,6 +68,9 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) throw error
+
+    // Kontaktad (2026-08-28): ett meddelande från företaget är en kontakt.
+    await markCustomerContacted(supabase, business.business_id, customerId, 'portalmeddelande')
 
     // Notifiera kunden via portal-notifikation (anti-spam dedup hanteras internt)
     try {
