@@ -72,3 +72,16 @@ Regel framåt: scener som startar från föregående scens sista bildruta ska AL
 
 Andreas fynd på V04: synligt skifte i ljus/skärpa/hållning mellan B2:s slut och C3:s början (modelldrift i Seedance 2.5 trots start_image; jämförelsebild qa-skarv-b2-c3.png). Fix utan krediter: B2 klipps -to 5.7 (i rörelsen, direkt efter att han borstat händerna), C3 startar -ss 0.5, xfade 0.4 s + acrossfade. HM_F04_KNAPPEN_V2_HARD_MASTER_V05_9x16_SE.mp4, 25,7 s.
 Regel: scenskarvar mellan två genereringar får alltid 0,3–0,5 s övertoning och klipps i rörelse, aldrig i stillhet.
+
+## V06 (2026-08-28) — skarvfri: B+C som EN tagning
+
+Andreas: skarven knuff -> replik syntes fortfarande trots övertoning (V05). Fix: ta bort skarven i stället för att gömma den.
+
+| # | Steg | Verktyg | Resultat |
+|---|---|---|---|
+| 12 | Paddat ljud: 6 s tystnad + Benji-repliken | ffmpeg i sandbox -> media 1d83ebeb (mp3, 13,2 s) | talet landar efter knuffen |
+| 13 | B+C som en 14 s-tagning från A:s sista bildruta | seedance_2_5 omni_reference, start_image a-last, porträtt som image_references, audio_references = #12 | job e5a692ea: gubben sitter ~4,5 s, storm + knuff ~4,5–6, replik från 6 s, gubben tillbaka ~13 s |
+| 14 | Sync Lipsync 3 på hela tagningen | sync_so, input_audio = #12 | job 854ebabf, ljudspår inbakat |
+| 15 | Ihopsättning V06 | A -> xfade 0,3 s -> tagningen från 3,8 s (huvudet med stilla gubbe bortklippt) -> bevis -> slutkort | HM_F04_KNAPPEN_V2_HARD_MASTER_V06_9x16_SE.mp4, 24,0 s |
+
+Regel: när två beats ska hänga ihop utan synlig skarv — generera dem som EN tagning (Seedance 2.5 klarar 14 s med två karaktärer) och styr talets timing med paddat ljud. Skarvar mellan genereringar läggs bara där bilden är stilla.
