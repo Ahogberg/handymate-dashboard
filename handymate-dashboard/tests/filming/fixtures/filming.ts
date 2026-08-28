@@ -172,6 +172,10 @@ export async function beat(
     const el = document.scrollingElement
     if (el) el.scrollLeft = 0
     window.scrollTo(0, window.scrollY)
+    // …och varje inre scrollcontainer (layouten scrollar i <main>, inte i dokumentet).
+    document.querySelectorAll<HTMLElement>('*').forEach((n) => {
+      if (n.scrollLeft > 0) n.scrollLeft = 0
+    })
   }).catch(() => undefined)
   await session.page.waitForTimeout(dwellMs)
   const file = path.join(session.dir, `HM_${film}_BEAT-${String(n).padStart(2, '0')}_${label}_1080x1920.png`)
@@ -258,6 +262,74 @@ export function daysAgoIso(days: number, hour = 9): string {
 
 export function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+/**
+ * Mobil-overflow-diagnos: element som är bredare än viewporten på den sida
+ * som filmas. Produkten är mobil-först — allt som dyker upp här är ett fynd,
+ * inte ett inspelningsproblem. Skrivs in i sanningsfilen.
+ */
+export async function measureOverflow(
+  page: Page,
+  label: string,
+): Promise<{
+  label: string
+  skarm: number
+  layout_viewport: number
+  dokumentbredd: number
+  viewport_meta: string | null
+  overflow: Array<{ tag: string; cls: string; right: number; text: string }>
+  syndabockar: Array<{ tag: string; cls: string; width: number; why: string; text: string }>
+}> {
+  // Med isMobile zoomar Chromium ut när innehållet är bredare än skärmen —
+  // då växer window.innerWidth. Därför jämförs mot SKÄRMENS bredd, inte innerWidth.
+  return page.evaluate((args) => {
+    const { lbl, skarm } = args
+    const hits: Array<{ tag: string; cls: string; right: number; text: string }> = []
+    document.querySelectorAll<HTMLElement>('body *').forEach((n) => {
+      const r = n.getBoundingClientRect()
+      if (r.right > skarm + 2 && r.width < 4000 && r.height > 0 && n.offsetParent !== null) {
+        hits.push({
+          tag: n.tagName.toLowerCase(),
+          cls: (typeof n.className === 'string' ? n.className : '').slice(0, 90),
+          right: Math.round(r.right),
+          text: (n.innerText || '').slice(0, 60).replace(/\s+/g, ' '),
+        })
+      }
+    })
+    hits.sort((a, b) => b.right - a.right)
+    // Syndabockar: element som TVINGAR bredden (nowrap, fast px-bredd/min-width,
+    // eller eget innehåll bredare än sin box) — det är dessa som ska fixas.
+    const culprits: Array<{ tag: string; cls: string; width: number; why: string; text: string }> = []
+    document.querySelectorAll<HTMLElement>('body *').forEach((n) => {
+      const r = n.getBoundingClientRect()
+      if (r.height === 0 || n.offsetParent === null || r.width >= 4000) return
+      const cs = getComputedStyle(n)
+      const why: string[] = []
+      if (cs.whiteSpace === 'nowrap' && r.width > skarm - 48) why.push('nowrap')
+      if (cs.minWidth.endsWith('px') && parseFloat(cs.minWidth) > skarm - 48) why.push(`min-width:${cs.minWidth}`)
+      if (cs.width.endsWith('px') && parseFloat(cs.width) > skarm - 48 && !cs.width.startsWith('auto') && n.scrollWidth > (n.parentElement?.clientWidth ?? 0) + 2) why.push(`width:${cs.width}`)
+      if (n.scrollWidth > n.clientWidth + 2 && cs.overflowX !== 'auto' && cs.overflowX !== 'scroll') why.push(`scrollWidth:${n.scrollWidth}`)
+      if (why.length) {
+        culprits.push({
+          tag: n.tagName.toLowerCase(),
+          cls: (typeof n.className === 'string' ? n.className : '').slice(0, 90),
+          width: Math.round(r.width),
+          why: why.join(' '),
+          text: (n.innerText || '').slice(0, 60).replace(/\s+/g, ' '),
+        })
+      }
+    })
+    return {
+      label: lbl,
+      skarm,
+      layout_viewport: window.innerWidth,
+      dokumentbredd: document.documentElement.scrollWidth,
+      viewport_meta: document.querySelector('meta[name="viewport"]')?.getAttribute('content') ?? null,
+      overflow: hits.slice(0, 6),
+      syndabockar: culprits.slice(0, 10),
+    }
+  }, { lbl: label, skarm: FILM_VIEWPORT.width })
 }
 
 /** Skriv sanningsfilen bredvid inspelningen: vad databasen sa när bilden togs. */

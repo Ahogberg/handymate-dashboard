@@ -34,6 +34,7 @@ import {
   finishFilm,
   getSupabaseAdmin,
   loginOwner,
+  measureOverflow,
   openFilmContext,
   pickId,
   pollRow,
@@ -162,14 +163,25 @@ test('F07 — projektet är klart men ÄTA:n väntar på kunden: inte fakturerin
     await falt.pressSequentially(`Är ${projekt.name} redo att fakturera?`, { delay: 45 })
     await beat(session, FILM, 3, 'fragan-till-matte', 1_200)
     await falt.press('Enter')
-    await expect(page.getByText(/väntar på kundgodkännande|inte redo att fakturera|ÄTA/i).last()).toBeVisible({ timeout: 90_000 })
+    // Vänta på att Matte faktiskt svarat: "Tänker…" ska synas och sedan försvinna,
+    // och svaret ska nämna blockeraren. Sökningen scope:as till chattens dialog så
+    // att ÄTA-fliken bakom modalen inte räknas som svar.
+    await expect(page.getByText('Tänker…')).toBeVisible({ timeout: 15_000 }).catch(() => undefined)
+    await expect(page.getByText('Tänker…')).toBeHidden({ timeout: 120_000 })
+    // Ordet "ÄTA" ensamt räcker inte (fliken bakom modalen heter så) — svaret
+    // ska bära produktens blockerarmening eller verdictet.
+    const svar = page.getByText(/kundgodkännande|inte redo att fakturera|väntar på kund/i).last()
+    await expect(svar).toBeVisible({ timeout: 15_000 })
     await beat(session, FILM, 4, 'matte-namnger-blockeraren', 4_000)
+    const matteSvar = await svar.innerText().catch(() => '')
 
     writeTruth(session, FILM, {
       film: 'F07',
       kund: KUND,
       projekt: { project_id: projectId, name: projekt.name },
       ata: { change_id: changeId, status: 'sent' },
+      matte_svar: matteSvar,
+      mobil_overflow: [await measureOverflow(page, 'projekt-oversikt')],
       readiness: {
         verdict: readiness.verdict,
         blockers: readiness.blockers,

@@ -1093,7 +1093,7 @@ export default function JarvisHome({
 
   return (
     <div className="max-w-[1180px] mx-auto px-4 sm:px-8 pt-6 sm:pt-7 pb-9">
-      <div className="grid lg:grid-cols-[1fr_320px] gap-6 lg:gap-7">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 lg:gap-7">
         {/* ── Mattes dagsbesked — egen fullbreddsrad (Etapp C1, 2026-08-17).
              Ersätter hälsningsradens visuella roll; hälsningen bor kvar
              INUTI heron. Spänner över båda kolumnerna som förut, så railen

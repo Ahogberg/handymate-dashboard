@@ -33,6 +33,7 @@ import {
   finishFilm,
   getSupabaseAdmin,
   loginOwner,
+  measureOverflow,
   openFilmContext,
   pickId,
   pollRow,
@@ -127,6 +128,7 @@ test('F06 — offert skickad för sex dagar sedan, Daniel förbereder uppföljni
     await dismissOverlays(page, 4_000)
     const kortTitel = page.getByText('Följ upp offerten som väntar').first()
     await expect(kortTitel).toBeVisible({ timeout: 25_000 })
+    const overflowHem = await measureOverflow(page, 'hemmet')
     await kortTitel.scrollIntoViewIfNeeded()
     await beat(session, FILM, 3, 'hemkon-daniels-kort', 2_500)
     const lasRaderna = page.getByRole('button', { name: 'Läs raderna' }).first()
@@ -157,6 +159,7 @@ test('F06 — offert skickad för sex dagar sedan, Daniel förbereder uppföljni
       offert: { quote_id: quoteId, status: skickad.status, sent_at: sentAt, total: skickad.total, dagar_sedan_skickad: dagar },
       daniels_kort: { id: approvalId, approval_type: 'send_sms', meddelande: message },
       utfall,
+      mobil_overflow: [overflowHem],
       sanningsgrans: 'Uppföljningen är ett SMS via 46elks. Utan saldo blir godkännandet ett ärligt fel — filma "skickat" först efter påfyllning.',
     })
   } finally {
