@@ -998,3 +998,11 @@ Bakgrund: efter statusbandet (26 aug) var "Att göra" på Översikt bara agenter
 - [x] "Mina uppgifter" i sidomenyn under Jobb
 - [x] Facit `tests/facit-projekt-uppgifter-nummer.spec.ts`; 183 kringliggande tester gröna
 - [ ] Steg 2 (efter lansering): förfallna/dagens uppgifter in i hemmets "Dagens plan" + signal till Matte
+
+## "Lars tipsar" — uppgiftstips ur steg och data (Andreas 2026-08-28: "Love it", max litet antal)
+- [x] `lib/tasks/lars-tips.ts`: rena regler (startmöte, material, delmoment, ROT-uppgifter, egenkontroll våtrum/el, tid, slutbesiktning, serienummer v174, jobbpass ej meddelat) — varje tips med varför-rad ur data; dedup mot öppna uppgifter + avvisade; **max 2** åt gången
+- [x] `GET/POST /api/projects/[id]/tips` — GET skriver aldrig; POST accept = riktig uppgift (tilldelad projektledaren) + minne, dismiss = minne (v177 `project_tip_dismissal`, körd)
+- [x] Blocket: "Lars tipsar" under listan, + / Inte aktuellt
+- [x] Facit `tests/facit-lars-tipsar.spec.ts` (regler, cap, dedup, tyst-när-tomt, rutten skriver inget i GET)
+- [ ] Prod-bevis efter deploy (Provfirman: nytt projekt med start om 6 dagar → två tips → accept → dismiss → tyst)
+- Steg 2: samma tips i hemmets "Dagens plan" för projektledaren; fler regler från Andreas hantverkskunskap
