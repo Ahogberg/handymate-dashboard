@@ -1004,5 +1004,5 @@ Bakgrund: efter statusbandet (26 aug) var "Att göra" på Översikt bara agenter
 - [x] `GET/POST /api/projects/[id]/tips` — GET skriver aldrig; POST accept = riktig uppgift (tilldelad projektledaren) + minne, dismiss = minne (v177 `project_tip_dismissal`, körd)
 - [x] Blocket: "Lars tipsar" under listan, + / Inte aktuellt
 - [x] Facit `tests/facit-lars-tipsar.spec.ts` (regler, cap, dedup, tyst-när-tomt, rutten skriver inget i GET)
-- [ ] Prod-bevis efter deploy (Provfirman: nytt projekt med start om 6 dagar → två tips → accept → dismiss → tyst)
+- [x] Prod-bevis 2026-08-28 (Provfirman P-1003/P-1004): start om 6 dagar → "Boka startmöte" + "Beställ material" med varför-rader → accept skapade uppgiften → nästa regel fyllde på till max två. Fynd: snabbt "Inte aktuellt" på ett nyss accepterat tips skrev över accepted→dismissed (UI:t väntade på omhämtning) → fix f8425876: accept vinner alltid i rutten + optimistiskt borttag i blocket; bevisat igen (dismiss på accepterat → unchanged:true, task_id kvar)
 - Steg 2: samma tips i hemmets "Dagens plan" för projektledaren; fler regler från Andreas hantverkskunskap
