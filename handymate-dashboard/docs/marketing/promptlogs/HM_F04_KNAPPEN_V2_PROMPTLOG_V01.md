@@ -40,3 +40,19 @@ seg1 A + hook-text (Space Grotesk, off-white platta) · seg2 B · seg3 C + line.
 
 ## Kostnad
 Porträtt ×2 + TTS + tre Seedance-scener = **90,2 krediter** (balance 1000 → 909,8).
+
+## V02 och V03 (2026-08-28, senare samma dag)
+
+Beslut Andreas: AI-märkning görs på plattformen (Meta/TikTok/YouTube), inte i bild. Röst: Benji (ElevenLabs-motorn) efter röstbank med sex presets — Harrison (Seed-motorn) hade engelsk brytning. Lugna läsningen vald tills vidare; två energiskare Benji-läsningar (A/B) finns i rostbank/.
+
+| # | Scen | Modell | Referenser | Längd | Resultat | Beslut |
+|---|---|---|---|---|---|---|
+| 6 | Benji-replik (lugn) | text2speech_v2 elevenlabs | – | 7,5 s | job 64e497e1 | vald |
+| 7 | C2 — Matte talar (Benji) | seedance_2_0, start = B sista bildruta, audio_ref #6 | Elements matte+gubben | 8 s | job 19a65c47 — samma gag, ren hoodie | V02 |
+| 8 | B2 — HÅRD: Matte stormar in, slungar stolen | seedance_2_5 omni_reference, start = A sista bildruta | porträtt som image_references (2.5 stöder inte Elements-placeholder) | 6 s | job 9a1f0700 — rörelseoskärpa, papper i luften, borstar händerna, blick i kameran | V03 |
+| 9 | C3 — HÅRD: Matte talar, gubben tillbaka, hård utskjutning | seedance_2_5 omni_reference, start = B2 sista bildruta, audio_ref #6 | porträtt som image_references | 8 s | job 6ba186c0 — gubben in, trycker, ut | V03 |
+
+Masters: HM_F04_KNAPPEN_V2_MASTER_V02_9x16_SE.mp4 (mjuk, 2.0 + Benji) · HM_F04_KNAPPEN_V2_HARD_MASTER_V03_9x16_SE.mp4 (hård, 2.5 + Benji).
+Kostnad V02+V03 inkl. röstbank: 130 krediter (909,8 → 779,65). Totalt Knappen v2 hittills: 220 krediter.
+
+Lärdomar: Seedance 2.5 tar porträtten direkt som image_references och höll identiteten lika bra som 2.0 + Elements. Ingen av modellerna levererar ljudspår när audio_references används — repliken mixas in vid ihopsättningen. Kvalitetshöjning: Topaz/ByteDance-uppskalning av godkända klipp går inte att preflighta; 1080p-omgenerering kostar 72 kr/8 s i både 2.0 och 2.5.
