@@ -56,3 +56,14 @@ Masters: HM_F04_KNAPPEN_V2_MASTER_V02_9x16_SE.mp4 (mjuk, 2.0 + Benji) · HM_F04_
 Kostnad V02+V03 inkl. röstbank: 130 krediter (909,8 → 779,65). Totalt Knappen v2 hittills: 220 krediter.
 
 Lärdomar: Seedance 2.5 tar porträtten direkt som image_references och höll identiteten lika bra som 2.0 + Elements. Ingen av modellerna levererar ljudspår när audio_references används — repliken mixas in vid ihopsättningen. Kvalitetshöjning: Topaz/ByteDance-uppskalning av godkända klipp går inte att preflighta; 1080p-omgenerering kostar 72 kr/8 s i både 2.0 och 2.5.
+
+## V04 (2026-08-28) — fix av dubbelklipp + riktig läppsynk
+
+Andreas fynd på V03: (1) B2 börjar från A:s sista bildruta -> första sekunden dubblerar A:s slut i annan kvalitet och utan text; (2) läppsynken i C3 helt off (Seedance audio_references styr munnen bara löst).
+
+| # | Steg | Verktyg | Resultat |
+|---|---|---|---|
+| 10 | C3 -> Sync Lipsync 3 | model sync_so, input_video = job 6ba186c0, input_audio = job 64e497e1 (Benji), sync_mode silence | job 8e4e71bc, 8 s, levererar ljudspår (aac) med repliken inbakad |
+| 11 | Ihopsättning V04 | ffmpeg: B2 trimmad -ss 1.2 (stormningen börjar direkt efter A), C3-sync trimmad -ss 0.3, ljudet från sync-klippet | HM_F04_KNAPPEN_V2_HARD_MASTER_V04_9x16_SE.mp4, 26,6 s |
+
+Regel framåt: scener som startar från föregående scens sista bildruta ska ALLTID trimmas i huvudet vid ihopsättning (0,3–1,2 s beroende på när handlingen börjar). Talande scener: generera tyst med audio_references för timing, kör sedan Sync Lipsync 3 på klippet innan ihopsättning.
