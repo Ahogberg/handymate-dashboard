@@ -98,6 +98,7 @@ import { ProjectQuoteDocumentCard } from '@/components/projects/ProjectQuoteDocu
 import { getStageBucket } from '@/components/projects/ProjectStatusCard'
 import ProjectTodoBlock, { type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
 import ProjectTasksBlock from '@/components/projects/ProjectTasksBlock'
+import type { LarsTip } from '@/lib/tasks/lars-tips'
 import { deriveTodoMode, TODO_PRIMARY_LABEL } from '@/lib/projects/derive-todo'
 import { ProjectStatusBand } from '@/components/projects/ProjectStatusBand'
 import { ProjectDatesInline } from '@/components/projects/ProjectDatesInline'
@@ -569,6 +570,7 @@ export default function ProjectDetailPage() {
   }
   const [projectTasks, setProjectTasks] = useState<ProjectTaskRow[]>([])
   const [taskScope, setTaskScope] = useState<'all' | 'own'>('all')
+  const [larsTips, setLarsTips] = useState<LarsTip[]>([])
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDescription, setNewTaskDescription] = useState('')
@@ -1043,6 +1045,11 @@ export default function ProjectDetailPage() {
         const data = await res.json()
         setProjectTasks(data.tasks || [])
         setTaskScope(data.scope === 'own' ? 'own' : 'all')
+        // Lars tipsar — räknas ur samma data, fel visar inget (aldrig ett påhittat tips).
+        try {
+          const tr = await fetch(`/api/projects/${projectId}/tips`)
+          if (tr.ok) { const tj = await tr.json(); setLarsTips(tj.tips || []) } else setLarsTips([])
+        } catch { setLarsTips([]) }
       }
     } catch { /* ignore */ }
   }, [projectId])
@@ -2443,6 +2450,24 @@ export default function ProjectDetailPage() {
                   onOpenAll={() => setActiveTab('tasks')}
                   focusSignal={nyUppgiftFokus}
                   scope={taskScope}
+                  tips={larsTips}
+                  onAcceptTip={async tip => {
+                    const res = await fetch(`/api/projects/${projectId}/tips`, {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ action: 'accept', key: tip.key, title: tip.title, due_date: tip.dueDate }),
+                    })
+                    if (!res.ok) { showToast('Kunde inte lägga till uppgiften', 'error'); return }
+                    showToast('Uppgift tillagd', 'success')
+                    fetchProjectTasks()
+                  }}
+                  onDismissTip={async tip => {
+                    const res = await fetch(`/api/projects/${projectId}/tips`, {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ action: 'dismiss', key: tip.key }),
+                    })
+                    if (!res.ok) { showToast('Kunde inte spara', 'error'); return }
+                    fetchProjectTasks()
+                  }}
                   onError={msg => showToast(msg, 'error')}
                 />
 

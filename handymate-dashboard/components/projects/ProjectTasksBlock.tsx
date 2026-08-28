@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Check, Circle, Plus, AlertTriangle } from 'lucide-react'
+import { Check, Circle, Plus, AlertTriangle, X } from 'lucide-react'
+import { AgentAvatar } from '@/components/agents/AgentAvatar'
+import type { LarsTip } from '@/lib/tasks/lars-tips'
 
 /**
  * ProjectTasksBlock — projektets egna arbetsuppgifter på Översikt (2026-08-27).
@@ -40,6 +42,10 @@ interface ProjectTasksBlockProps {
   onError?: (message: string) => void
   /** 'own' = anställd utan ledarroll i projektet: ser bara egna. Sägs rakt ut. */
   scope?: 'all' | 'own'
+  /** "Lars tipsar" (2026-08-28): max två deterministiska förslag ur steg + data. */
+  tips?: LarsTip[]
+  onAcceptTip?: (tip: LarsTip) => void | Promise<void>
+  onDismissTip?: (tip: LarsTip) => void | Promise<void>
 }
 
 const MAX_VISIBLE = 5
@@ -52,7 +58,8 @@ function formatDue(iso: string, todayIso: string): { text: string; overdue: bool
   return { text, overdue, today: false }
 }
 
-export default function ProjectTasksBlock({ projectId, tasks, teamMembers, onChanged, onOpenAll, focusSignal = 0, onError, scope = 'all' }: ProjectTasksBlockProps) {
+export default function ProjectTasksBlock({ projectId, tasks, teamMembers, onChanged, onOpenAll, focusSignal = 0, onError, scope = 'all', tips = [], onAcceptTip, onDismissTip }: ProjectTasksBlockProps) {
+  const [tipBusy, setTipBusy] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [assignee, setAssignee] = useState('')
   const [dueDate, setDueDate] = useState('')
@@ -185,6 +192,46 @@ export default function ProjectTasksBlock({ projectId, tasks, teamMembers, onCha
           <div className="px-4 py-3 text-[13px] text-slate-500 flex items-center gap-2">
             <Circle className="w-3.5 h-3.5 text-slate-300" />
             {done.length > 0 ? `Alla ${done.length} uppgifter klara.` : 'Inga uppgifter ännu — skriv den första nedan.'}
+          </div>
+        )}
+
+        {/* Lars tipsar — förslag, aldrig automatik. Ett tryck på + skapar en riktig
+            uppgift; "Inte aktuellt" minns beslutet för projektet. Max två (lib/tasks/
+            lars-tips.ts) så godkännandekorten under aldrig trycks ner. */}
+        {tips.length > 0 && (
+          <div className="px-4 py-3 bg-primary-50/40" data-testid="lars-tips">
+            <div className="flex items-center gap-2 mb-2">
+              <AgentAvatar agentKey="lars" size="sm" />
+              <span className="text-[12px] font-semibold text-primary-800">Lars tipsar</span>
+            </div>
+            <div className="space-y-1.5">
+              {tips.map(tip => (
+                <div key={tip.key} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={tipBusy === tip.key}
+                    onClick={async () => { setTipBusy(tip.key); try { await onAcceptTip?.(tip) } finally { setTipBusy(null) } }}
+                    className="flex-1 min-w-0 text-left inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-primary-100 hover:border-primary-400 disabled:opacity-50 transition"
+                    title="Lägg till som uppgift"
+                  >
+                    <Plus className="w-4 h-4 text-primary-700 shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block text-[13px] font-medium text-slate-900 truncate">{tip.title}</span>
+                      <span className="block text-[11.5px] text-slate-500 truncate">{tip.reason}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={tipBusy === tip.key}
+                    onClick={async () => { setTipBusy(tip.key); try { await onDismissTip?.(tip) } finally { setTipBusy(null) } }}
+                    className="shrink-0 inline-flex items-center gap-1 px-2 py-1.5 text-[12px] text-slate-500 hover:text-slate-800 disabled:opacity-50"
+                    title="Visa inte det här tipset för projektet"
+                  >
+                    <X className="w-3.5 h-3.5" /> Inte aktuellt
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
