@@ -27,7 +27,7 @@ test('varje kontaktväg anropar regeln', () => {
     ['lib/sms-send.ts', "markCustomerContacted(supabase, businessId, resolvedCustomerId, 'sms')"],
     ['lib/email.ts', "markCustomerContacted(getServerSupabase(), businessId, customerId, 'mejl')"],
     ['lib/nurture.ts', 'customerId: params.customerId,\n      to: params.to,'],
-    ['lib/quote-confirmation-email.ts', 'customerId: customer.customer_id,\n    to: customer.email,'],
+    ['lib/quote-confirmation-email.ts', 'customerId: quote.customer_id,\n    to: customer.email,'],
     ['app/api/agent/trigger/tool-router.ts', "(params.customer_id as string) || null, 'mejl')"],
     ['app/api/portal-messages/route.ts', "markCustomerContacted(supabase, business.business_id, customerId, 'portalmeddelande')"],
     ['app/api/bookings/route.ts', "customer_id, 'besök bokat')"],
