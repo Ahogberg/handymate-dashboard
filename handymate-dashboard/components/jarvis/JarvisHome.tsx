@@ -16,6 +16,7 @@ import { AgentNewsRow } from '@/components/agents/AgentNewsRow'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { SkrivRad } from '@/components/jarvis/SkrivRad'
 import { RailCard } from '@/components/jarvis/RailCard'
+import DagensPlanExtra from '@/components/jarvis/DagensPlanExtra'
 import { KomIgangRail } from '@/components/jarvis/KomIgangRail'
 import HemTur from '@/components/tour/HemTur'
 import CompanyScan from '@/components/tour/CompanyScan'
@@ -1526,6 +1527,8 @@ export default function JarvisHome({
                 ))}
               </div>
             )}
+            {/* Dina uppgifter i dag + Lars tips över alla projekt (2026-08-28). */}
+            <DagensPlanExtra />
           </RailCard>
 
           {/* Firman just nu (Etapp C4): kassaradarn (see_financials-grindad,

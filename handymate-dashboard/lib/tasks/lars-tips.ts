@@ -168,13 +168,17 @@ const TIP_KEYWORDS: Record<string, string[]> = {
   jobbpass_meddela: ['jobbpass'],
 }
 
-/** Ren: alla regler → dedup mot avvisade och öppna uppgifter → max två. */
-export function suggestProjectTasks(input: TipInput): LarsTip[] {
-  return allaTips(input)
+/** Ren: dedup mot avvisade tips och öppna uppgifter med liknande titel. Delad av projektsidan och startsidan. */
+export function filterTips(input: Pick<TipInput, 'dismissedKeys' | 'openTaskTitles'>, tips: LarsTip[]): LarsTip[] {
+  return tips
     .filter(t => !input.dismissedKeys.includes(t.key))
     .filter(t => {
       const kws = t.key.startsWith('serienummer_') ? ['serienum'] : (TIP_KEYWORDS[t.key] || [t.title])
       return !coveredByOpenTask(kws, input.openTaskTitles)
     })
-    .slice(0, MAX_TIPS_PER_PROJECT)
+}
+
+/** Ren: alla regler → dedup → max två. */
+export function suggestProjectTasks(input: TipInput): LarsTip[] {
+  return filterTips(input, allaTips(input)).slice(0, MAX_TIPS_PER_PROJECT)
 }
