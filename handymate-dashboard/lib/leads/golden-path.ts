@@ -20,7 +20,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getNextLeadNumber, getNextCaseNumber } from '@/lib/numbering'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
-import { getStageBySlug } from '@/lib/pipeline'
+import { ensureDefaultStages, getStageBySlug } from '@/lib/pipeline'
 import { normalizeSwedishPhone } from '@/lib/phone-normalize'
 import { findCustomerDuplicates } from '@/lib/customer-dedupe'
 
@@ -250,7 +250,15 @@ export async function createLeadAndDeal(
   let dealId: string | null = null
   let dealError: string | null = null
   try {
-    const stage = await getStageBySlug(businessId, 'new_inquiry')
+    let stage = await getStageBySlug(businessId, 'new_inquiry')
+    if (!stage) {
+      // Avvikelse #35: 14 av 27 företag i prod saknade steg (onboardingens
+      // seeder skrev en gammal form). Seeda kanoniskt och försök igen — samma
+      // ensureDefaultStages som /api/pipeline. Idempotent, aldrig destruktivt
+      // när deals finns.
+      try { await ensureDefaultStages(businessId) } catch (e) { console.warn('[golden-path] ensureDefaultStages:', e instanceof Error ? e.message : e) }
+      stage = await getStageBySlug(businessId, 'new_inquiry')
+    }
     if (!stage) {
       // Stages ej seedade → inget giltigt stage_id finns. Skapa INGEN deal med
       // ogiltigt stage_id (FK skulle avvisa). Logga och signalera till callern.

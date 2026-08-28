@@ -5,6 +5,7 @@ import { getDefaultPriceList, getDefaultProducts } from '@/lib/product-defaults'
 import { getDefaultReservations } from '@/lib/reservation-defaults'
 import { getDefaultQuoteTemplates, normalizeTemplateBranch } from '@/lib/quote-template-defaults'
 import { getDefaultAgreementTypes } from '@/lib/agreement-type-defaults'
+import { ensureDefaultStages } from '@/lib/pipeline'
 
 type SupabaseClient = ReturnType<typeof getServerSupabase>
 
@@ -185,30 +186,16 @@ async function seedLeadScoringRules(supabase: SupabaseClient, businessId: string
  *     self-seedar lazy vid första läsning — seedas alltså INTE här.
  * Förväxla inte tabellerna när du skriver queries.
  */
-async function seedPipelineStages(supabase: SupabaseClient, businessId: string) {
-  const { data: existing } = await supabase
-    .from('pipeline_stage')
-    .select('id')
-    .eq('business_id', businessId)
-    .limit(1)
-
-  if (existing && existing.length > 0) return
-
-  const defaultStages = [
-    { name: 'Ny förfrågan', position: 0, color: '#3B82F6' },
-    { name: 'Offert skickad', position: 1, color: '#F59E0B' },
-    { name: 'Förhandling', position: 2, color: '#8B5CF6' },
-    { name: 'Accepterad', position: 3, color: '#10B981' },
-    { name: 'Avslutad', position: 4, color: '#6B7280' },
-  ]
-
-  await supabase.from('pipeline_stage').insert(
-    defaultStages.map((s, i) => ({
-      id: `ps_${businessId}_${i}`,
-      business_id: businessId,
-      ...s,
-    }))
-  )
+async function seedPipelineStages(_supabase: SupabaseClient, businessId: string) {
+  // Avvikelse #35 (2026-08-28): den här funktionen skrev en gammal form
+  // (name/position/color, ingen slug) — `position` finns inte i
+  // pipeline_stage, insertet föll tyst i Promise.allSettled och nya konton
+  // fick INGA steg. Golden Path frågar efter slug 'new_inquiry' → null →
+  // ingen affär för någon lead. En seeder: lib/pipeline.ts ensureDefaultStages
+  // (DEFAULT_STAGES med slug + sort_order), samma som /api/pipeline redan
+  // använder lazy. Idempotent.
+  void _supabase
+  await ensureDefaultStages(businessId)
 }
 
 async function seedQuoteStandardTexts(supabase: SupabaseClient, businessId: string, branch: string) {
