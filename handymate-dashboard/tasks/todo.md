@@ -1054,3 +1054,17 @@ Bakgrund: efter statusbandet (26 aug) var "Att göra" på Översikt bara agenter
 - [x] Codex: `lib/onboarding/channel-health.ts` + `GET /api/onboarding/channel-health` (fyra ärliga nivåer per kanal, fail-closed, facit) — committat baed0868
 - [x] Claude: uppgiften "Kundinflödet" i `deriveKomIgangTasks` — bara `any_lead_verified` = bevisat; nådd kanal ändrar bara formuleringen; först vid "Få in fler jobb", annars efter Lisa; saknad signal ⇒ ingen uppgift. Rutten anropar Codex kanalhälsa som funktion med samma request. Facit `facit-kundinflode-rail`
 - [x] Prod-bevis 2026-08-28: channel-health → phone not_enabled, email not_enabled, web lead_verified; any_lead_verified true → kom-igang-uppgiften "Kundinflödet är bevisat — en riktig förfrågan blev lead och affär" (klar, kanalrad med alla tre) i ordningen ring → kundinflode → …
+
+## Pass 2/3 Block A — Golden Path, cron-hälsa, A2, A7, inventering (2026-08-28)
+
+Rapport: `docs/reality-week/pass2-block-a-2026-08-28.md`.
+
+- [x] Golden Path mot prod på HEAD → 16/16 (3.6 min)
+- [x] Cron-hälsa ur DB-fotavtryck (Launch Truth Gate punkt 6, delvis) — tabell i rapporten §B
+- [x] A2: `POST /api/cron/send-reminders?business_id=` admin-grindad scope:ad körning (`2583a741`, facit `facit-paminnelse-scope`, 128 påminnelse-tester gröna, CI grön) — live: 403 oinloggad, 200 som admin, vakterna höll
+- [x] A7 live: samma `idempotency_key` → samma `run_id`, `duplicate:true`
+- [x] Automationsinventering (punkt 8) — 28 st, fyra helt ogrindade mot kund (rapporten §F)
+- [x] Avvikelse #36: två kort för samma förfallna faktura (V3 + check-overdue); trappan avstängd för 26/26 företag
+- [ ] Andreas: trappan end-to-end på Provfirman (toggle på + V3-regeln av → scope:ad körning → återställ) — blockerades som prod-konfigändring
+- [ ] Andreas: beslut punkt 8 (stäng av 1–4 i §F) och #36 (vilken väg äger dag 7+)
+- [ ] A4 live — lämnad på kontraktsnivå
