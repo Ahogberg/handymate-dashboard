@@ -34,13 +34,26 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Pass 2 / A2 (2026-08-28): en admin får köra påminnelsetrappan för ETT
+  // företag (?business_id=) — samma logik som cronen, men utan att svepa
+  // alla anslutna företags fakturor (för stor blast radius för ett bevis).
+  // Cronvägen (CRON_SECRET, osvept) är oförändrad.
+  const scopeBusinessId = request.nextUrl.searchParams.get('business_id')
+  if (scopeBusinessId) {
+    const { isAdmin } = await import('@/lib/admin-auth')
+    const adminCheck = await isAdmin(request)
+    if (!adminCheck.isAdmin) {
+      return NextResponse.json({ error: 'Endast admin får köra påminnelser för ett enskilt företag' }, { status: 403 })
+    }
+    return sendAutoReminders(scopeBusinessId)
+  }
   if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   return sendAutoReminders()
 }
 
-async function sendAutoReminders() {
+async function sendAutoReminders(scopeBusinessId: string | null = null) {
   try {
     const supabase = getServerSupabase()
     const today = new Date()
@@ -49,8 +62,8 @@ async function sendAutoReminders() {
     // oavsett schema-tid framöver — se lib/dates.ts.
     const todayStr = svDateStr(today)
 
-    // Hämta alla förfallna fakturor
-    const { data: overdueInvoices, error } = await supabase
+    // Hämta alla förfallna fakturor (eller ett företags, vid admin-scope:ad körning)
+    let invoiceQuery = supabase
       .from('invoice')
       .select(`
         invoice_id, invoice_number, ocr_number, due_date, business_id, customer_id,
@@ -61,6 +74,8 @@ async function sendAutoReminders() {
       .in('status', ['sent', 'overdue'])
       .lt('due_date', todayStr)
       .or(`next_reminder_at.is.null,next_reminder_at.lte.${today.toISOString()}`)
+    if (scopeBusinessId) invoiceQuery = invoiceQuery.eq('business_id', scopeBusinessId)
+    const { data: overdueInvoices, error } = await invoiceQuery
 
     if (error) throw error
     if (!overdueInvoices || overdueInvoices.length === 0) {
