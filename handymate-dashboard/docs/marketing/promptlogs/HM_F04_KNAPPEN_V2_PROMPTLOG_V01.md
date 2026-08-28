@@ -85,3 +85,17 @@ Andreas: skarven knuff -> replik syntes fortfarande trots övertoning (V05). Fix
 | 15 | Ihopsättning V06 | A -> xfade 0,3 s -> tagningen från 3,8 s (huvudet med stilla gubbe bortklippt) -> bevis -> slutkort | HM_F04_KNAPPEN_V2_HARD_MASTER_V06_9x16_SE.mp4, 24,0 s |
 
 Regel: när två beats ska hänga ihop utan synlig skarv — generera dem som EN tagning (Seedance 2.5 klarar 14 s med två karaktärer) och styr talets timing med paddat ljud. Skarvar mellan genereringar läggs bara där bilden är stilla.
+
+## V07 (2026-08-28) — 1080p, två tagningar med motiverat klipp
+
+Andreas: fortfarande "lite orealistiskt", A-klippet kvar, läppsynken inte perfekt. Orsak: 720p + helbild (ansikten ~150 px). Fix: 1080p och en NÄRBILD för repliken.
+
+| # | Steg | Verktyg | Resultat |
+|---|---|---|---|
+| 16 | Tagning 1 (helbild): tryck x3 -> Matte stormar in -> knuff -> borstar händer -> blick | seedance_2_5 omni_reference 1080p, 9 s, refs: rum (a-last) + gubbe + Matte, generate_audio on | job bf565fec — ersätter A+B, ingen skarv |
+| 17 | Tagning 2 (halvnära på Matte): repliken; gubben in vid knappen, skjuts ut | seedance_2_5 omni_reference 1080p, 9 s, audio_ref Benji | job 0d7f18c5 — hud/ögon/mun i full skärpa |
+| 18 | Sync Lipsync 3 på tagning 2 | sync_so | job 7f0e6a5f |
+| 19 | Ihopsättning V07 | tagning 1 (text 0–3,2 s) -> hårt klipp -> tagning 2 (ljud inbakat) -> bevis -> slutkort, crf 18 | HM_F04_KNAPPEN_V2_HARD_MASTER_V07_1080p_9x16_SE.mp4, 27,1 s |
+
+Kostnad V07: ~195 krediter (609 -> 414,6). Totalt Knappen v2: ~585.
+Regler: (1) talande scener görs i halvnära/närbild — läppsynk och realism följer ansiktets pixelstorlek; (2) klipp mellan tagningar ska vara MOTIVERADE (byte av bildstorlek), aldrig samma bild två gånger; (3) iterera i 720p, slutrendera i 1080p.
