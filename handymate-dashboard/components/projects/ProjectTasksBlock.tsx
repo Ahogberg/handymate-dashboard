@@ -38,6 +38,8 @@ interface ProjectTasksBlockProps {
   /** Ökas av "Ny uppgift"-snabbåtgärden → fältet får fokus. */
   focusSignal?: number
   onError?: (message: string) => void
+  /** 'own' = anställd utan ledarroll i projektet: ser bara egna. Sägs rakt ut. */
+  scope?: 'all' | 'own'
 }
 
 const MAX_VISIBLE = 5
@@ -50,7 +52,7 @@ function formatDue(iso: string, todayIso: string): { text: string; overdue: bool
   return { text, overdue, today: false }
 }
 
-export default function ProjectTasksBlock({ projectId, tasks, teamMembers, onChanged, onOpenAll, focusSignal = 0, onError }: ProjectTasksBlockProps) {
+export default function ProjectTasksBlock({ projectId, tasks, teamMembers, onChanged, onOpenAll, focusSignal = 0, onError, scope = 'all' }: ProjectTasksBlockProps) {
   const [title, setTitle] = useState('')
   const [assignee, setAssignee] = useState('')
   const [dueDate, setDueDate] = useState('')
@@ -133,9 +135,12 @@ export default function ProjectTasksBlock({ projectId, tasks, teamMembers, onCha
             </span>
           )}
         </div>
-        <button type="button" onClick={onOpenAll} className="text-[13px] font-semibold text-primary-700 hover:text-primary-800">
-          {tasks.length > 0 ? `Visa alla (${tasks.length}) →` : 'Öppna fliken →'}
-        </button>
+        <div className="flex items-center gap-3">
+          {scope === 'own' && <span className="text-[12px] text-slate-500">Du ser dina egna uppgifter</span>}
+          <button type="button" onClick={onOpenAll} className="text-[13px] font-semibold text-primary-700 hover:text-primary-800">
+            {tasks.length > 0 ? `Visa alla (${tasks.length}) →` : 'Öppna fliken →'}
+          </button>
+        </div>
       </div>
 
       <div className="bg-white border border-[#E2E8F0] rounded-xl divide-y divide-[#EEF2F6]">

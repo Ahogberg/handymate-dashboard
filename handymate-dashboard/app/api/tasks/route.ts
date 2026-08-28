@@ -3,6 +3,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { verifyOwnership } from '@/lib/auth/verify-ownership'
 import { getCurrentUser } from '@/lib/permissions'
+import { resolveTaskScope, taskListOrFilter, canSeeTask, canEditTask } from '@/lib/tasks/visibility'
 
 // Helper: log task activity
 async function logTaskActivity(
@@ -82,12 +83,11 @@ export async function GET(request: NextRequest) {
   const myOnly = searchParams.get('my') === 'true'
   const userId = auth.user_id
   // Nyckel-mixen i task-tabellen (Bee-buggfix): assigned_to = business_users.id,
-  // created_by = auth user_id. Tidigare jämfördes assigned_to mot auth-id:t →
-  // "Mina uppgifter" matchade aldrig tilldelningar. Hämta business_user-raden
-  // för rätt id. Anställda ser dessutom ALLTID bara egna/tilldelade.
+  // created_by = auth user_id. Synlighetsregeln bor i lib/tasks/visibility.ts
+  // (2026-08-28): ägare/admin ser allt, anställd ser egna + projekt hen leder.
   const currentUser = await getCurrentUser(request).catch(() => null)
-  const memberId = currentUser?.id || null
-  const isEmployee = currentUser?.role === 'employee'
+  const scope = await resolveTaskScope(supabase, auth.business_id, currentUser ? { id: currentUser.id, role: currentUser.role } : null, userId)
+  const memberId = scope.memberId
 
   let query = supabase
     .from('task')
@@ -100,24 +100,22 @@ export async function GET(request: NextRequest) {
   if (dealId) query = query.eq('deal_id', dealId)
   if (projectId) query = query.eq('project_id', projectId)
 
-  // "Mina uppgifter" (frivilligt filter) ELLER anställd (tvingande):
-  // bara tilldelade till mig eller skapade av mig
-  if ((myOnly || isEmployee) && (memberId || userId)) {
+  // "Mina uppgifter" (frivilligt filter): bara tilldelade till mig eller skapade av mig.
+  if (myOnly && (memberId || userId)) {
     const ors: string[] = []
     if (memberId) ors.push(`assigned_to.eq.${memberId}`)
     if (userId) ors.push(`created_by.eq.${userId}`)
     query = query.or(ors.join(','))
+  } else {
+    // Rollgränsen (tvingande): anställd ser egna + projekt hen leder.
+    const orFilter = taskListOrFilter(scope)
+    if (orFilter) query = query.or(orFilter)
   }
 
   const { data, error } = await query
 
-  // Filtrera privata uppgifter — visa bara om jag är skapare eller tilldelad
-  const filtered = (data || []).filter((t: any) => {
-    if (t.visibility === 'private') {
-      return t.created_by === userId || (memberId !== null && t.assigned_to === memberId)
-    }
-    return true // team + project synliga för alla
-  })
+  // Privata uppgifter bara för skapare/tilldelad; rollgränsen en gång till i minnet.
+  const filtered = (data || []).filter((t: any) => canSeeTask(t, scope))
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
@@ -141,7 +139,7 @@ export async function GET(request: NextRequest) {
     assigned_user: t.assigned_to ? userMap[t.assigned_to] || null : null,
   }))
 
-  return NextResponse.json({ tasks: enrichedTasks })
+  return NextResponse.json({ tasks: enrichedTasks, scope: scope.mode })
 }
 
 export async function POST(request: NextRequest) {
@@ -235,6 +233,16 @@ export async function PUT(request: NextRequest) {
 
   if (!oldTask) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+  }
+
+  // Rollgräns (2026-08-28): tidigare räckte ett id — en anställd kunde ändra
+  // vilken uppgift som helst i företaget. Samma gräns som synligheten.
+  {
+    const cu = await getCurrentUser(request).catch(() => null)
+    const scope = await resolveTaskScope(supabase, auth.business_id, cu ? { id: cu.id, role: cu.role } : null, auth.user_id)
+    if (!canEditTask(oldTask, scope)) {
+      return NextResponse.json({ error: 'Du kan bara ändra dina egna uppgifter' }, { status: 403 })
+    }
   }
 
   // Cross-business-skydd för ev. nya kopplingar (project_id/customer_id/deal_id
@@ -336,13 +344,23 @@ export async function DELETE(request: NextRequest) {
 
   const supabase = getServerSupabase()
 
-  // Get task title for log
+  // Läs det rollkontrollen behöver (inte bara titeln)
   const { data: task } = await supabase
     .from('task')
-    .select('title')
+    .select('title, assigned_to, created_by, project_id, visibility')
     .eq('id', taskId)
     .eq('business_id', auth.business_id)
     .single()
+  if (!task) {
+    return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+  }
+  {
+    const cu = await getCurrentUser(request).catch(() => null)
+    const scope = await resolveTaskScope(supabase, auth.business_id, cu ? { id: cu.id, role: cu.role } : null, auth.user_id)
+    if (!canEditTask(task, scope)) {
+      return NextResponse.json({ error: 'Du kan bara ändra dina egna uppgifter' }, { status: 403 })
+    }
+  }
 
   const { error } = await supabase
     .from('task')

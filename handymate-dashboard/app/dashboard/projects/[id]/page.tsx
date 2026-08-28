@@ -568,6 +568,7 @@ export default function ProjectDetailPage() {
     assigned_user: { id: string; name: string; color: string } | null
   }
   const [projectTasks, setProjectTasks] = useState<ProjectTaskRow[]>([])
+  const [taskScope, setTaskScope] = useState<'all' | 'own'>('all')
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDescription, setNewTaskDescription] = useState('')
@@ -1041,6 +1042,7 @@ export default function ProjectDetailPage() {
       if (res.ok) {
         const data = await res.json()
         setProjectTasks(data.tasks || [])
+        setTaskScope(data.scope === 'own' ? 'own' : 'all')
       }
     } catch { /* ignore */ }
   }, [projectId])
@@ -2440,6 +2442,7 @@ export default function ProjectDetailPage() {
                   onChanged={fetchProjectTasks}
                   onOpenAll={() => setActiveTab('tasks')}
                   focusSignal={nyUppgiftFokus}
+                  scope={taskScope}
                   onError={msg => showToast(msg, 'error')}
                 />
 
