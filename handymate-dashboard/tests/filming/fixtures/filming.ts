@@ -40,7 +40,14 @@ export const FILM_EMAIL = E2E_TEST_EMAIL
 /** 9:16 i CSS-pixlar × skalfaktor = 1080×1920 (handbokens Reels/TikTok/Shorts-format). */
 export const FILM_VIEWPORT = { width: 432, height: 768 }
 export const FILM_SCALE = 2.5
-export const FILM_VIDEO_SIZE = { width: 1080, height: 1920 }
+/**
+ * Playwright skalar bara NER till recordVideo.size — en större size ger
+ * innehållet oskalat i övre vänstra hörnet (upptäckt i F04-piloten
+ * 2026-08-28). Videon spelas därför in i viewport-storlek och skalas upp i
+ * klippet; SKARPA bilder kommer från beat-stillbilderna (1080×1920 via
+ * deviceScaleFactor) — använd dem för stillastående produktbevis-segment.
+ */
+export const FILM_VIDEO_SIZE = FILM_VIEWPORT
 
 export const RECORDINGS_ROOT = path.join(__dirname, '..', '..', '..', 'docs', 'marketing', 'recordings')
 

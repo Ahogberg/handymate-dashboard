@@ -1094,3 +1094,13 @@ kunna bli en levande huvudperson i fler annonser.
 - [ ] Andreas: 46elks-saldo → kör `FILMING_APPROVE=1` för F06 beat 6 ("skickat"-utfallet)
 - [ ] Sanningsjustering i handboken (Codex eller jag): F07 shotlist rad 2–3 → "Matte namnger blockeraren" (Evidence-to-Payment har
       ingen egen sida); F08 "hemsidan eller mejlen" → "hemsidan"; F11 Lisa-raden
+
+## Filmfabriken — automatiserat videoannons-flöde via Higgsfield MCP (2026-08-28)
+
+- [x] Higgsfield MCP kartlagd: workflows-katalog, modellkostnader preflightade (Kling 7,5 / Veo 11 / Seedance 32,5 kr per klipp)
+- [x] Pilot F04 "AI-knappen" end-to-end: Veo 3.1-hook (11 krediter) + riktigt produktbevis (F07 Matte-svar) + slutkort,
+      ihopsatt med ffmpeg i Higgsfield-sandboxen (Space Grotesk hämtad per körning), QA via frame-extraktion, master 14,8 s levererad
+- [x] Två V01-fynd fixade: Playwright skalar aldrig upp video (FILM_VIDEO_SIZE = viewport; skarpa stillbilder för statiska bevis)
+      och handymate-mark-transparent.png är VIT (slutkort använder public/logo.png)
+- [x] Körbok docs/marketing/film-factory.md — "kör F06" är hela flödet; saldo 65 → 54 krediter
+- [ ] Andreas: riktigt frilagd teal-SVG av loggan (dagens PNG har svag grå platta); VO-röst; fler krediter innan hel filmserie
