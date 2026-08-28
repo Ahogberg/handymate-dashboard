@@ -67,3 +67,8 @@ Andreas fynd på V03: (1) B2 börjar från A:s sista bildruta -> första sekunde
 | 11 | Ihopsättning V04 | ffmpeg: B2 trimmad -ss 1.2 (stormningen börjar direkt efter A), C3-sync trimmad -ss 0.3, ljudet från sync-klippet | HM_F04_KNAPPEN_V2_HARD_MASTER_V04_9x16_SE.mp4, 26,6 s |
 
 Regel framåt: scener som startar från föregående scens sista bildruta ska ALLTID trimmas i huvudet vid ihopsättning (0,3–1,2 s beroende på när handlingen börjar). Talande scener: generera tyst med audio_references för timing, kör sedan Sync Lipsync 3 på klippet innan ihopsättning.
+
+## V05 (2026-08-28) — skarven knuff -> replik
+
+Andreas fynd på V04: synligt skifte i ljus/skärpa/hållning mellan B2:s slut och C3:s början (modelldrift i Seedance 2.5 trots start_image; jämförelsebild qa-skarv-b2-c3.png). Fix utan krediter: B2 klipps -to 5.7 (i rörelsen, direkt efter att han borstat händerna), C3 startar -ss 0.5, xfade 0.4 s + acrossfade. HM_F04_KNAPPEN_V2_HARD_MASTER_V05_9x16_SE.mp4, 25,7 s.
+Regel: scenskarvar mellan två genereringar får alltid 0,3–0,5 s övertoning och klipps i rörelse, aldrig i stillhet.
