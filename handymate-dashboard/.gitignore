@@ -18,3 +18,8 @@ scripts/scraping/output/*.csv
 
 # git worktrees (isolated workspaces for agentic development)
 .worktrees/
+
+# Inspelningsläge + referenspaket: genererade artefakter (körs om med scriptet/testerna)
+docs/marketing/recordings/*/
+docs/marketing/reference-pack/assets/
+docs/marketing/*.zip

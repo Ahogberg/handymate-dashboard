@@ -18,7 +18,7 @@ export default defineConfig({
   // user.json istället för demo-employee.json). De tre nya golden-path-*-
   // projekten längst ner sätter egen testIgnore:[] för att inte ärva
   // undantaget de själva behöver träffa.
-  testIgnore: [/.*\.integration\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/, /tests[\\/]e2e-launch-promise[\\/]/],
+  testIgnore: [/.*\.integration\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/, /tests[\\/]e2e-launch-promise[\\/]/, /tests[\\/]filming[\\/]/],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -174,6 +174,23 @@ export default defineConfig({
       testDir: './tests/e2e-margin-guardian',
       testMatch: /margin-guardian\.spec\.ts/,
       testIgnore: [],
+      use: { storageState: { cookies: [], origins: [] } },
+    },
+
+    // ── Inspelningsläge (Video Creative Bible) ───────────────────────────
+    // Sätter DEMOKONTOT i exakt det tillstånd en film behöver via
+    // produktens egna API:er och spelar in skärmen i 9:16 (1080×1920) —
+    // video + stillbild per "beat" till docs/marketing/recordings/. Körs
+    // aldrig av standardsviten; vägrar köra mot konton som inte är
+    // demo-flaggade i databasen (tests/filming/fixtures/filming.ts).
+    // Egen kontext per film (recordVideo) — därför ingen device/video här.
+    {
+      name: 'filming',
+      testDir: './tests/filming',
+      testMatch: /f\d\d-.*\.spec\.ts/,
+      testIgnore: [],
+      timeout: 240_000,
+      retries: 0,
       use: { storageState: { cookies: [], origins: [] } },
     },
   ],

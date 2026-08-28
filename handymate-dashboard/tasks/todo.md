@@ -1068,3 +1068,28 @@ Rapport: `docs/reality-week/pass2-block-a-2026-08-28.md`.
 - [ ] Andreas: trappan end-to-end på Provfirman (toggle på + V3-regeln av → scope:ad körning → återställ) — blockerades som prod-konfigändring
 - [ ] Andreas: beslut punkt 8 (stäng av 1–4 i §F) och #36 (vilken väg äger dag 7+)
 - [ ] A4 live — lämnad på kontraktsnivå
+
+## Inspelningsläge + referenspaket för Video Creative Bible (2026-08-28)
+
+Beslut Andreas: "Ja kör det" — inspelningsläge (seed + Playwright-inspelning) för F08, F07, F06 samt referenspaketet
+(Codex slog i token-taket). Sanningsjustering: Lisa SVARAR inte på samtal — all Lisa-copy gäller webb/mejl. Matte ska
+kunna bli en levande huvudperson i fler annonser.
+
+- [x] Kartläggning: brand-assets/porträtt, Golden Path-harness + målsidor, seed-vägar för de tre tillstånden
+- [x] `tests/filming/` — eget Playwright-projekt `filming` (432×768 @2.5 = 1080×1920, egen kontext med recordVideo, overlays bort,
+      presentatörsbandet dolt via CSS — demoverktyg, inte produkt)
+- [x] Seed per film via produktens egna vägar: F08 hemsidans formulär → kund/lead/affär (nr 1030, "Ny förfrågan"); F06 kund → offert →
+      riktigt mejlutskick → sent_at backdaterat 6 dagar (det enda produkten inte kan) → Daniels kort via produktens byggare;
+      F07 kund → offert → skickad → accepterad (projekt) → tid → ÄTA (utkast → skickad) → avslutad → readiness `blocked`
+      med exakt "ÄTA 1 väntar på kundgodkännande"
+- [x] Inspelning: webm + PNG per beat + sanningsfil per film i `docs/marketing/recordings/<film>/` (gitignorerat — körs om)
+- [x] Referenspaket `docs/marketing/reference-pack/` (README, brand kit, agenter, Matte-huvudperson i tre nivåer, ljus/miljö,
+      negativ lista, promptlogg-mall) + `scripts/marketing/build-reference-pack.mjs --zip` (assets gitignorerade, byggs om)
+- [x] Facit `tests/facit-inspelningslage.spec.ts` (7/7): spärr på is_demo_tenant före första skrivning, inga testdata-namn,
+      inga cron-/debug-anrop, Daniels kort bara via produktens byggare, readiness via produktens funktion
+- [x] tsc 0, alla tre filmerna gröna mot prod-demokontot, zip:ar skickade till Andreas
+- [ ] Andreas: demokontots contact_name är "Demo" → Daniels SMS slutar "Mvh Demo". Sätt ett riktigt förnamn på demokontot
+      (Inställningar → Företag) innan F06 klipps
+- [ ] Andreas: 46elks-saldo → kör `FILMING_APPROVE=1` för F06 beat 6 ("skickat"-utfallet)
+- [ ] Sanningsjustering i handboken (Codex eller jag): F07 shotlist rad 2–3 → "Matte namnger blockeraren" (Evidence-to-Payment har
+      ingen egen sida); F08 "hemsidan eller mejlen" → "hemsidan"; F11 Lisa-raden
