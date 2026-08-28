@@ -1006,3 +1006,10 @@ Bakgrund: efter statusbandet (26 aug) var "Att göra" på Översikt bara agenter
 - [x] Facit `tests/facit-lars-tipsar.spec.ts` (regler, cap, dedup, tyst-när-tomt, rutten skriver inget i GET)
 - [x] Prod-bevis 2026-08-28 (Provfirman P-1003/P-1004): start om 6 dagar → "Boka startmöte" + "Beställ material" med varför-rader → accept skapade uppgiften → nästa regel fyllde på till max två. Fynd: snabbt "Inte aktuellt" på ett nyss accepterat tips skrev över accepted→dismissed (UI:t väntade på omhämtning) → fix f8425876: accept vinner alltid i rutten + optimistiskt borttag i blocket; bevisat igen (dismiss på accepterat → unchanged:true, task_id kvar)
 - Steg 2: samma tips i hemmets "Dagens plan" för projektledaren; fler regler från Andreas hantverkskunskap
+
+## "Dagens plan" på startsidan — uppgifter i dag + Lars tips globalt (Andreas 2026-08-28: "Kör!")
+- [x] `lib/tasks/lars-tips-batch.ts`: batchad laddning (en fråga per tabell över alla projekt) + `suggestHomeTips` — max 3 totalt, max 2 per projekt, prioritet passerat slut → besök i dag → närmast start; dagens bokning prefixar varför-raden
+- [x] `GET /api/tips/home`: dina uppgifter i dag (förfallna + dagens, rollgräns via `resolveTaskScope`) + tips; ägare/admin alla aktiva projekt, anställd projekt hen är med i; läser bara
+- [x] `components/jarvis/DagensPlanExtra.tsx` monterad i "Dagens plan"-kortet under bokningarna; bock via /api/tasks, accept/avvisa via projektets tips-rutt (samma minne); tyst vid fel/tomt
+- [x] Facit `tests/facit-dagens-plan.spec.ts` + jarvis-hem/hemtur/att-hamta gröna
+- [ ] Prod-bevis efter deploy (Provfirman: uppgifter på P-1002, tips på P-1003/P-1004)
