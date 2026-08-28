@@ -82,6 +82,12 @@ test.describe('kopplingen', () => {
     const get = r.slice(r.indexOf('export async function GET'), r.indexOf('export async function POST'))
     expect(get).not.toMatch(/\.insert\(|\.update\(|\.delete\(/)
     expect(r).toContain("from('project_tip_dismissal')")
+    // Accept vinner alltid — en avvisning skriver aldrig över ett accepterat tips
+    expect(r).toContain("if (existing?.outcome === 'accepted') {")
+    expect(r.indexOf("existing?.outcome === 'accepted'")).toBeLessThan(r.indexOf('.upsert({'))
+    // Optimistiskt borttag i UI:t — ett andra klick träffar aldrig ett gammalt tips
+    const sida = kod('app/dashboard/projects/[id]/page.tsx')
+    expect(sida.split('setLarsTips(prev => prev.filter(t => t.key !== tip.key))').length - 1).toBe(2)
     expect(kod('sql/v177_project_tip_dismissal.sql')).toContain('UNIQUE (project_id, tip_key)')
     const b = kod('components/projects/ProjectTasksBlock.tsx')
     expect(b).toContain('Lars tipsar')

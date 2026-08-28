@@ -122,6 +122,20 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       .maybeSingle()
     if (!project) return NextResponse.json({ error: 'Projektet hittades inte' }, { status: 404 })
 
+    // Ett accepterat tips får aldrig skrivas över av en avvisning (bevisat
+    // 2026-08-28: ett snabbt "Inte aktuellt" på ett redan accepterat tips
+    // raderade kopplingen till uppgiften). Accept vinner alltid.
+    const { data: existing } = await supabase
+      .from('project_tip_dismissal')
+      .select('outcome, task_id')
+      .eq('business_id', businessId)
+      .eq('project_id', projectId)
+      .eq('tip_key', body.key)
+      .maybeSingle()
+    if (existing?.outcome === 'accepted') {
+      return NextResponse.json({ ok: true, unchanged: true, task_id: existing.task_id ?? null })
+    }
+
     let taskId: string | null = null
     if (body.action === 'accept') {
       const title = (body.title || '').trim()

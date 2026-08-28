@@ -2452,6 +2452,8 @@ export default function ProjectDetailPage() {
                   scope={taskScope}
                   tips={larsTips}
                   onAcceptTip={async tip => {
+                    // Optimistiskt: tipset försvinner direkt så ett andra klick aldrig träffar det.
+                    setLarsTips(prev => prev.filter(t => t.key !== tip.key))
                     const res = await fetch(`/api/projects/${projectId}/tips`, {
                       method: 'POST', headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ action: 'accept', key: tip.key, title: tip.title, due_date: tip.dueDate }),
@@ -2461,6 +2463,7 @@ export default function ProjectDetailPage() {
                     fetchProjectTasks()
                   }}
                   onDismissTip={async tip => {
+                    setLarsTips(prev => prev.filter(t => t.key !== tip.key))
                     const res = await fetch(`/api/projects/${projectId}/tips`, {
                       method: 'POST', headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ action: 'dismiss', key: tip.key }),
