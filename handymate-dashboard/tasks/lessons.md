@@ -489,3 +489,13 @@ i CI sedan 25 aug; mejlet var det inte, för ingen hade frågat vart det gick.
 tester med `dry_run: true`, och rutten svarar då utan att sända. Facit-låst
 i `tests/facit-inga-testmejl.spec.ts` som skannar alla spec-filer. Innan en
 ny rutt läggs i sviten: "vad gör den när den lyckas, och vem märker det?"
+
+## 2026-08-28 — backticks i en bash-sträng är kommandon
+
+Tre gånger samma dag: en text med `kodord` skickad genom `node -e "…"`
+eller en heredoc utan citat — skalet körde backtick-innehållet som kommandon
+och lämnade tomrum i texten (avvikelserad #34, #35, todo-raden). **Regel:**
+text som innehåller backticks, ${} eller blandade citattecken skrivs ALDRIG
+inline i Bash — den går via Write till en skriptfil (eller Edit på en läst
+fil) och körs sedan med `node fil.js`. Kontrollera resultatet med grep innan
+commit.
