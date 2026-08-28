@@ -1012,4 +1012,4 @@ Bakgrund: efter statusbandet (26 aug) var "Att göra" på Översikt bara agenter
 - [x] `GET /api/tips/home`: dina uppgifter i dag (förfallna + dagens, rollgräns via `resolveTaskScope`) + tips; ägare/admin alla aktiva projekt, anställd projekt hen är med i; läser bara
 - [x] `components/jarvis/DagensPlanExtra.tsx` monterad i "Dagens plan"-kortet under bokningarna; bock via /api/tasks, accept/avvisa via projektets tips-rutt (samma minne); tyst vid fel/tomt
 - [x] Facit `tests/facit-dagens-plan.spec.ts` + jarvis-hem/hemtur/att-hamta gröna
-- [ ] Prod-bevis efter deploy (Provfirman: uppgifter på P-1002, tips på P-1003/P-1004)
+- [x] Prod-bevis 2026-08-28: /api/tips/home → 1 uppgift (P-1002 försenad) + 3 tips (P-1004 material/delmoment, P-1003 material) → kortet på startsidan under "Inget bokat idag". Skärmdump proof-dagens-plan.png
