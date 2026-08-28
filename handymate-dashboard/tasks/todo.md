@@ -1030,3 +1030,11 @@ Bakgrund: efter statusbandet (26 aug) var "Att göra" på Översikt bara agenter
 - [x] `components/jarvis/DagensPlanExtra.tsx` monterad i "Dagens plan"-kortet under bokningarna; bock via /api/tasks, accept/avvisa via projektets tips-rutt (samma minne); tyst vid fel/tomt
 - [x] Facit `tests/facit-dagens-plan.spec.ts` + jarvis-hem/hemtur/att-hamta gröna
 - [x] Prod-bevis 2026-08-28: /api/tips/home → 1 uppgift (P-1002 försenad) + 3 tips (P-1004 material/delmoment, P-1003 material) → kortet på startsidan under "Inget bokat idag". Skärmdump proof-dagens-plan.png
+
+### Block A — Claudes granskning och prod-bevis (2026-08-28)
+- [x] Granskat + committat som Codex (5448a4a0); kolumnerna koden lutar sig på verifierade i prod; fail-soft före v178 bekräftad
+- [x] v178 + v179 körda ("kör"), verifierade med SELECT
+- [x] Prod-bevis: honeypot tyst 200 · storefront → Golden Path: ny kund → lead + affär, Anna → dedup (1 rad) + lead + affär · widget-status "Inte aktiverad" (0 företag har widgeten på) · ingen embed.js/data-key i integrationssidans HTML
+- [x] Avvikelse #34 (leads.lead_number saknades — ingen Golden Path-lead har någonsin sparats) → v179
+- [x] Avvikelse #35 (onboardingens stegseeder skrev fel form — 14/27 företag utan steg, ingen affär) → 2a1e40cf + backfill av de 13 återstående företagen
+- [ ] Block B: kanalhälsa på Kom igång-railen (Claude/Codex på befintliga rälsar)
