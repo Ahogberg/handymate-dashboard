@@ -125,9 +125,9 @@ Rum-kontor + lysrör under 2006-världen. Klocka-loop under B4. Klockstoppet exa
 ## 12. Grindar
 Ingen scen eller nästa bildruta utan godkännande. Kostnad preflightas före varje batch. En variabel per iteration. Prompt/modell/referenser/inställningar i shot log (`promptlogs/HM_F14_…`). Kassera vid identitetsdrift, felaktiga händer, skiftande skala, syntetiskt kroppsspråk, oläsbar fysik. UI, logotyp och svensk text AI-genereras aldrig.
 
-## Öppna beslut (Andreas)
-1. Ankylosaurus — ja/nej (alternativ: Triceratops = "tre huvuden som inte pratar med varandra", också ofarlig).
-2. Matte-repliker: två i bild (B7, B8) + VO — eller bara VO?
-3. Hantverkaren = samma som F13?
-4. Pass A på webben (0 kr) eller via MCP (~800)?
-5. Riktig svensk berättarröst — det här är filmen där det spelar störst roll.
+## Beslut (Andreas 2026-08-29)
+1. **Ankylosaurus — internt "Adminsaurus".**
+2. **Två Matte-repliker i bild (B7, B8) + viskande VO.**
+3. **Samma hantverkare som F13.**
+4. **Pass A på webben** (Unlimited där modellen tillåter), pass B/C via MCP.
+5. **Två röster:** riktig svensk berättarröst (mörk dokumentär) för öppningsrader + produktdel; Matte (Benji tills klonad) för expeditions-VO + repliker.
