@@ -30,3 +30,20 @@ Uppdaterad 2026-08-29. Partnerrösten i F13 ("Kommer du och lägger dig?") är e
 - Kloning: Higgsfield `create_voice` på uppläsningstexten → framtida repliker genereras med klonen.
 - Läppsynk om: Sync körs om på fyra tagningar — Knappen närbilden, F13 Matte-tagningen, F14 B7 + B8b (~120 kr totalt).
 - VO-raderna byts rakt i mixarna (0 kr) och alla tre mastrar renderas om.
+
+## Voice Design-prompt (ElevenLabs "Create a voice from a prompt")
+
+Testad väg när biblioteksröster (som Adam Composer) krävde betald plan för API-åtkomst — en egen Voice Design-röst räknas normalt inte som "library voice" och kan därför fungera även på lägre nivåer. Generera på elevenlabs.io → Voice Design (eller "Text to Voice"), välj bästa av de tre förslagen, spara i biblioteket.
+
+**Prompt (engelska — ElevenLabs Voice Design tolkar beskrivande engelska mest exakt, även för en svensktalande röst):**
+
+> A calm, dry-witted Swedish man in his early thirties, native Swedish accent. Warm but understated voice, medium-low pitch, relaxed chest resonance, unhurried pacing with natural short pauses for effect. Speaks with quiet confidence and deadpan humor — never salesy, never overly enthusiastic, always sounds like he is quietly in control of the situation. Clear articulation, minimal vocal fry, the tone of a trusted colleague calmly explaining something simple. Capable of a light whisper for hushed documentary narration without losing warmth.
+
+**Textprov att läsa upp (klistra in i "Sample text", svenska — visar registret Matte behöver):**
+
+> Vi tar över nu. Inget dramatiskt, ingen show — bara fakturorna, kalendern, offerterna, telefonen, kunderna. Du sover, vi jobbar. I morgon godkänner du det som är viktigt, och vi sköter resten. Vissa system hör hemma på museum. Det här gör det inte.
+
+**Efter generering:**
+1. Lyssna på alla tre förslag, spara den bästa i biblioteket (ger den ett voice_id).
+2. Testa om `text_to_speech`-anropet fungerar mot den nya rösten via API (kringgår ev. "library voice"-spärren från betalkravet).
+3. Om den håller: läs in de åtta replikerna ovan med den nya rösten, annars fortsätt med manuell export.
