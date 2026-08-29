@@ -33,3 +33,13 @@ Regel bekräftad: karaktärsreferensen görs FÖRE scenstillsen, annars blir det
 | 18 | Ihopsättning UTKAST V01 (720p): skåpbil + "16:03" · kök + "Kommer du?" · Matte-replik (inbakat ljud, ingen Sync i utkastet) · teamet + VO 21 + namnetiketter · platshållare för produktbevis + VO "Du säger ja i morgon" · slutrad · CTA-platta | ffmpeg | 0 | HM_F13_EFTER_JOBBET_UTKAST_V01_720p_9x16_SE.mp4, 34,5 s |
 
 Kostnad hittills F13: ~150 kr (stills 23 + tagningar 27+18+27+58,5). Saldo ~234.
+
+## Steg 3 — produktbevis (inspelningsläge, 0 kr)
+
+`tests/filming/f13-lagg-dig.spec.ts` (1 passed, 1,5 min; facit 15/15; tsc 0). Demokontot, kund "Lena Nyström" (harnessets kontaktuppgifter). Tre riktiga kort av produktens egna byggare: **Karin** `invoice_reminder` (faktura FV-2026-028, skickad på riktigt, förfallodag backdaterad 12 d, `createInvoiceReminderCard`) · **Daniel** `send_sms` (offert "Fasadmålning, Björkvägen 12", skickad, `sent_at` −6 d, `createQuoteFollowUpCard`) · **Lars** `checklist_forslag` (projekt "Garage och carport, Tallstigen 3", `suggestChecklistForProject`). Filer: `HM_F13_LAGG_DIG_BEAT-01_tre-kort_1080x1920.png`, `BEAT-02_karin-kort`, `BEAT-03_daniel-lars-kort`, `HM_F13_LAGG_DIG_PRODUKTBEVIS_9x16.webm`, `HM_F13_LAGG_DIG_SANNING.json`.
+
+Fynd att hantera:
+- Kön visar **5** (två äldre `create_quote_draft`-kort på demokontot, inga testrester). Antingen låt räknaren vara, eller rensa dem — Andreas beslut. Textremsan "tre ja" stryks tills vidare; VO bär raden.
+- **Mobil-UI:** hamburgerknappen ligger över rubriken "Det här behöver dig idag"; Matte-FAB + "+"-knapp täcker kortens nedre vänstra hörn. För filmen: dölj via injicerad CSS i specen (som presenter-baren). Är det ett riktigt UI-fel även för kunder? (kolla på riktig mobil).
+- **Produktbugg (Vercel):** `POST /api/projects` skriver checklistförslaget fire-and-forget efter svaret — på Vercel fryses funktionen och kortet skapas aldrig för `status: planning`. Sannolikt samma klass i create-from-quote/lead/booking. → Reality Week-avvikelse.
+- Cronen hade inte skapat Karins kort (auto_reminder_enabled=false på demokontot) — byggaren anropas direkt.
