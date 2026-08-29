@@ -68,6 +68,24 @@ test('F07: readiness läses med produktens egen funktion, ÄTA blockerar, verdic
   expect(s).toContain("status: 'sent'")
 })
 
+test('F13: alla tre korten kommer från produktens egna byggare, kön läses via produktens rutt, godkännandet är flaggat', () => {
+  const s = las('tests/filming/f13-lagg-dig.spec.ts')
+  expect(s).toContain("from '@/lib/invoice-reminder-card'")
+  expect(s).toContain("from '@/lib/agents/daniel/quote-follow-up-card'")
+  expect(s).toContain("from '@/lib/agents/daniel/unopened-quotes'")
+  expect(s).toContain("pollKort('checklist_forslag'")
+  expect(s).toContain("'/api/approvals?status=pending&limit=15'")
+  expect(s).toContain("process.env.FILMING_APPROVE === '1'")
+  // Harnesset skriver aldrig ett kort självt — bara produktens byggare gör det.
+  expect(s).not.toContain('.insert(')
+  // Cronens tidsvakt ska vara uppfylld, inte kringgådd.
+  expect(s).toContain('expect(steg.daysOverdue).toBeGreaterThanOrEqual(steg.requiredDays')
+  // EN kund (unique_phone_per_business på demokontot; alla filmkunder bär
+  // harnessets nummer). Säkert mot kund-case: bara invoice_reminder av de tre
+  // typerna finns i lib/jarvis/customer-case.ts allowlist, ett case kräver två.
+  expect(new Set(Array.from(s.matchAll(/assertFilmName\('([^']+)'\)/g)).map((m) => m[1])).size).toBe(1)
+})
+
 test('F08: lead OCH affär läses ur databasen innan pipelinen filmas', () => {
   const s = las('tests/filming/f08-ny-kund.spec.ts')
   const lead = s.indexOf("pollRow<")

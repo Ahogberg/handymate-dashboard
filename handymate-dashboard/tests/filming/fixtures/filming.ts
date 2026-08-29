@@ -80,6 +80,16 @@ export async function assertFilmingTenant(): Promise<void> {
 export async function sweepFilmResidue(): Promise<void> {
   const { leftover } = await sweepE2eResidue()
   if (leftover.length) throw new Error(`Filmrester kunde inte städas: ${leftover.join(', ')}`)
+  // Kort som en filmspec skapat via produktens byggare bär payload.filming_source
+  // (F06, F13). Städas kunden före kortet (vilket hände efter F06 2026-08-28)
+  // når sweepE2eResidue inte kortet via kund → offert/faktura — det låg kvar
+  // som ett fjärde kort på hemskärmen. Därför städas de här på sin egen stämpel.
+  const { error } = await getSupabaseAdmin()
+    .from('pending_approvals')
+    .delete()
+    .eq('business_id', DEMO_BUSINESS_ID)
+    .not('payload->>filming_source', 'is', null)
+  if (error) throw new Error(`Filmkort (filming_source) kunde inte städas: ${error.message}`)
 }
 
 export interface FilmSession {
