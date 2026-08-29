@@ -140,3 +140,7 @@ Andreas levererade `CTA-platta.mp4` (1080x1920, 30 fps, 2,6 s, eget ljud: mörk 
 | 30 | Ihopsättning V10 (= V09 + ny platta) | ffmpeg, crf 18 | 0 | HM_F04_KNAPPEN_V2_HARD_MASTER_V10_1080p_9x16_SE.mp4, 27,1 s |
 
 Röstbeslut (Andreas): Benji låter "stel och AI" och uttalar Karin fel. Åtgärd: inga agentnamn i tal — namnen sätts som text i bild. Uttals-/motortester (Kaarin/Karrin/pauser/MiniMax) finns i `recordings/f13-lagg-dig/rostbank/`. Röstbyte i efterhand kostar ~40 kr per film (bara Sync + ihopsättning), inte en ny film.
+
+## V11 (2026-08-29) — tillbaka till halvnära tagning 2
+
+Andreas: den bundna närbilden (tagning 3) tappar gag:en — gubben "glider in konstigt". Tagning 2 (job 0d7f18c5, Sync 7f0e6a5f) är vidare och visar gubben rulla in på kontorsstolen och skjutas ut. V11 = V10 med tagning 2 i stället för tagning 3. 28,1 s, 0 kr. Kvarstående skillnad: Matte i tagning 2 är 2.5:s tolkning av porträttet, inte identisk med helbilden (V09-fyndet). Om det stör: gör om tagning 2:s bildstorlek med startbild ur helbilden (72 + 30 kr).
