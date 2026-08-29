@@ -144,3 +144,17 @@ Röstbeslut (Andreas): Benji låter "stel och AI" och uttalar Karin fel. Åtgär
 ## V11 (2026-08-29) — tillbaka till halvnära tagning 2
 
 Andreas: den bundna närbilden (tagning 3) tappar gag:en — gubben "glider in konstigt". Tagning 2 (job 0d7f18c5, Sync 7f0e6a5f) är vidare och visar gubben rulla in på kontorsstolen och skjutas ut. V11 = V10 med tagning 2 i stället för tagning 3. 28,1 s, 0 kr. Kvarstående skillnad: Matte i tagning 2 är 2.5:s tolkning av porträttet, inte identisk med helbilden (V09-fyndet). Om det stör: gör om tagning 2:s bildstorlek med startbild ur helbilden (72 + 30 kr).
+
+## V12 (2026-08-29) — halvnära bunden till helbilden
+
+Andreas: gag:en från tagning 2 (gubben rullar in) men ljus och Matte identiska med helbilden — "viktigt för realismen". Metod: V09-metoden i tagning 2:s bildstorlek.
+
+| # | Steg | Verktyg | Kostnad | Resultat |
+|---|---|---|---|---|
+| 31 | Startbild: 1080x1920 @ (497,200) direkt ur helbild 4K bild 8,5 s — ingen skalning | ffmpeg | 0 | media 23e5bcba, tagning4-startbild-halvnara-ur-helbild.png |
+| 32 | Tagning 4 (halvnära, huvud–midja): start_image #31, Element char_matte, audio_ref Benji, gubbe rullar in nere höger och skjuts ut | seedance_2_0 std 1080p 8 s | 72 kr | job 3c64ebe0 |
+| 33 | QA tagning 4 | kontaktark 0–7,9 s | 0 | qa-tagning4-halvnara-bunden.png — ansikte/ljus = helbilden, gubben in 4 s, hand på axeln 5 s, ute 6 s |
+| 34 | Sync Lipsync 3 på tagning 4 | sync_so, Benji, silence | ~30 kr | job 05298b71 |
+| 35 | Ihopsättning V12 (= V10-receptet, tagning 4 i stället för 3) | ffmpeg, crf 18 | 0 | HM_F04_KNAPPEN_V2_HARD_MASTER_V12_1080p_9x16_SE.mp4, 27,1 s |
+
+Kostnad V12: ~102 kr. Regel bekräftad: startbild ur helbilden fungerar i alla bildstorlekar — välj beskärning efter vad gag:en behöver (halvnära för gubben på stolen).
