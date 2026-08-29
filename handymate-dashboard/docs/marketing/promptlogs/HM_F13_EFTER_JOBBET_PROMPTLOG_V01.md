@@ -69,3 +69,13 @@ Andreas levererade Handymate-ljudsystemet från Claude Design till `reference-pa
 | 25 | **Full-mix** ur stems (elpiano −4 dB, övriga 0) → tvåpass loudnorm −16 LUFS / TP −1,5 → `handymate-tema-{120,88,140}-fullmix.wav` (24-bit). Uppmätt −16,3 / −1,5, loop-skarv ren | ffmpeg + python | Standardspåret för socialt innehåll = 120-mixen |
 | 26 | Klocka-stopp: sista ticket vid 4,01 s, tyst därefter → startas vid 1,0 s i köksscenen så tickandet slutar exakt 5,0 s när Matte lyfter blicken | silencedetect | |
 | 27 | V04 = V03 med ljudsystemet: rum-kök under kök/Matte (×1,6), klocka-stopp, partnerröst över tickandet, ingen musik förrän teamet syns (regel 1), bädden in vid 2,4 s i teamscenen (0,5 under VO → 0,8), fortsätter under produktbeviset med duck under slutrepliken, godkänn-snäpp vid 3,9 s, outron på slutraden (3,4 s), signaturen ENSAM på plattan (plattans eget ljud bortplockat, regel 2). Integrerad ljudnivå −17,0 LUFS | ffmpeg | HM_F13_EFTER_JOBBET_UTKAST_V04_720p_9x16_SE.mp4, 37,7 s |
+
+## Steg 6 — feedback på V04 → V05 (2026-08-29, ~1 kr TTS)
+
+Andreas: läppsynk av (väntat — Sync körs på 1080p-tagningen när repliken är låst); partnern låter som om hon står vid mikrofonen; Mattes replik kommer från ingenstans; vita slutplattan ska vara teal i CTA-familjen med större bold text som övergår i plattan.
+
+| # | Steg | Verktyg | Resultat |
+|---|---|---|---|
+| 28 | Ny replik ×3 (Benji): 61 "Ja, gå och lägg dig. Vi tar över härifrån." · 62 "Gå och lägg dig, du. Vi tar det härifrån." · 63 "Ja. Gå och lägg dig. Vi tar över härifrån." | text2speech_v2 | rostbank/61–63; 61 i utkastet |
+| 29 | Partnern "i andra rummet": highpass 300 Hz, lowpass 2,8 kHz, aecho 38/71 ms, −10 dB | ffmpeg | |
+| 30 | Slutrad på teal-platta (#103129 sampla ur CTA-plattan, knappteal #1B967E på rad 2), Space Grotesk Bold 60, text tonar in + lyfter 20 px, xfade 0,6 s in i CTA-plattan; outro under texten, signaturen vid 3,3 s | PIL + ffmpeg | HM_F13_EFTER_JOBBET_UTKAST_V05_720p_9x16_SE.mp4, 37,1 s |
