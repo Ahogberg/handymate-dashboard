@@ -129,3 +129,14 @@ Andreas: "Matte ser lite annorlunda ut i närbilden, det var ganska snyggt utzoo
 | 28 | Ihopsättning V09 (V07-receptet, tagning 2 -> tagning 3) | ffmpeg i sandbox, crf 18 | 0 | HM_F04_KNAPPEN_V2_HARD_MASTER_V09_1080p_9x16_SE.mp4, 26,1 s, 7,5 MB |
 
 Regel (ny): när en talande närbild ska matcha en helbild — klipp startbilden UR helbilden (4K-versionen) i stället för att generera om från porträttet. Startbilden låser identitet, ljus och kläder; Elementet håller den genom tagningen.
+
+## V10 (2026-08-29) — ny slutplatta
+
+Andreas levererade `CTA-platta.mp4` (1080x1920, 30 fps, 2,6 s, eget ljud: mörk teal, vitt H-märke, "Ett AI-team för hantverksföretag.", knapp "Boka demo på handymate.se"). Arkiverad i `reference-pack/assets/brand/`, Higgsfield-media ebf2353b.
+
+| # | Steg | Verktyg | Kostnad | Resultat |
+|---|---|---|---|---|
+| 29 | Slutkort -> CTA-plattan, sista bildrutan hålls +1,0 s (tpad clone) så knappen hinner läsas | ffmpeg | 0 | seg5 3,6 s |
+| 30 | Ihopsättning V10 (= V09 + ny platta) | ffmpeg, crf 18 | 0 | HM_F04_KNAPPEN_V2_HARD_MASTER_V10_1080p_9x16_SE.mp4, 27,1 s |
+
+Röstbeslut (Andreas): Benji låter "stel och AI" och uttalar Karin fel. Åtgärd: inga agentnamn i tal — namnen sätts som text i bild. Uttals-/motortester (Kaarin/Karrin/pauser/MiniMax) finns i `recordings/f13-lagg-dig/rostbank/`. Röstbyte i efterhand kostar ~40 kr per film (bara Sync + ihopsättning), inte en ny film.

@@ -52,3 +52,5 @@ Saldo styr ambitionen: kolla `balance` först. En hel film = 1–5 scener × 1�
 | Timing av tal i en lång tagning | Padda ljudfilen med tystnad före repliken och ge den som audio_references. |
 | Preset-varning från generate_video ("IN THE DARK") | Skicka om med declined_preset_id — inget debiteras av varningen. |
 | Närbild och helbild blir två olika "tolkningar" av samma porträtt (V07-fyndet) | Klipp startbilden till närbilden UR helbildens 4K-fil (crop -> 1080x1920) och ge den som start_image + Element. Då är det bevisligen samma person i båda bildstorlekarna (V09). |
+| Slutplattan är en färdig video (`reference-pack/assets/brand/CTA-platta.mp4`, 2,6 s, eget ljud) | Sista segmentet = plattan, skalad till masterns fps, sista bildrutan hålls +1 s (tpad clone) så CTA-knappen hinner läsas. Ingen egen slutkortsrendering längre. |
+| Syntetisk röst snubblar på svenska namn ("Karin") och låter stel | Inga egennamn i tal — namn som text i bild. Röst kan bytas i efterhand för ~40 kr/film (Sync + ihopsättning), tagningarna görs alltid utan inbakad röst. |

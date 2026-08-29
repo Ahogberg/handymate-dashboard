@@ -12,13 +12,13 @@ Tillägg till Video Creative Bible (2026-08-29). Idé: Andreas ("Gå och lägg d
 Klockan 22.14 på en mikrovågsugn. Ett köksbord täckt av fakturor, offerter och en papperskalender. Hantverkaren i arbetskläder med kaffe. Partnern i dörren, redan i morgonrock. Ingen säger något.
 
 ### Manus / voiceover
-Ingen VO. Matte pratar (nivå 3, Benji-rösten) — det är hans andra talade film efter Knappen.
+Matte pratar i bild en gång (nivå 3, läppsynk) och därefter som voiceover med samma röst — ingen annan röst i filmen. Repliker läses in med Benji (ElevenLabs) tills en riktig svensk röst finns; ljudskisser i `recordings/f13-lagg-dig/`.
 
 - Beat 1 (0–4 s): Köksbordet. Hantverkaren bläddrar, suckar, tittar på klockan. Partnern i dörren: "Kommer du?" (text i bild, inte tal — sparar en läppsynk).
 - Beat 2 (4–9 s): Matte står plötsligt bakom stolen, hoodie, händerna i fickan. Torr, lugn: **"Gå och lägg dig. Ditt digitala team tar över."**
-- Beat 3 (9–16 s): Hantverkaren reser sig, går. I samma tagning kliver teamet in bakom Matte och tar bordet: Karin drar fakturahögen till sig, Lars vecklar upp kalendern, Daniel tar offertbunten, Hanna ställer sig med telefonen, Lisa vänder hantverkarens telefon uppåt och läser. Matte tittar in i kameran. Ingen dramatik — de sätter sig och jobbar.
-- Beat 4 (16–20 s): Riktigt produktbevis: morgon, hemmet i Handymate: "Det här behöver dig idag" — tre riktiga kort med agentnamn, redo att godkännas.
-- Slutrad (20–24 s): "Inte ett system. Ett team." · handymate.se
+- Beat 3 (9–20 s): Hantverkaren reser sig, går. I samma tagning kliver teamet in bakom Matte och tar bordet: Karin drar fakturahögen till sig, Lars vecklar upp kalendern, Daniel tar offertbunten, Hanna ställer sig med telefonen, Lisa vänder hantverkarens telefon uppåt och läser. Matte (voiceover, hans röst, ingen läppsynk): **"Fakturorna. Kalendern. Offerterna. Telefonen."** Namnen sätts som text när var och en sätter sig ("Karin · din ekonom") — aldrig i tal (beslut 2026-08-29: syntetisk röst uttalar Karin fel). Ingen dramatik — de sätter sig och jobbar.
+- Beat 4 (20–24 s): Riktigt produktbevis: morgon, hemmet i Handymate: "Det här behöver dig idag" — tre riktiga kort med agentnamn, redo att godkännas. Matte (voiceover): **"Du säger ja i morgon."**
+- Slutrad (24–26 s): text "Inte ett system. Ett team." över produktbevisets sista sekund, sedan CTA-plattan (`reference-pack/assets/brand/CTA-platta.mp4`, hålls 3,6 s).
 
 ### Shotlist
 1. **Tagning 1 · helbild, låst kamera (9 s, Seedance 2.5 omni-referens):** kök kväll, hantverkare vid bordet, Matte kliver in bakom stolen vid ~4 s och står stilla. Refs: kök-still (genereras först, 1 bild), hantverkare (ny karaktärsbild, INTE gubben från Knappen), Matte-porträtt.
@@ -26,7 +26,7 @@ Ingen VO. Matte pratar (nivå 3, Benji-rösten) — det är hans andra talade fi
 3. **Tagning 3 · helbild, samma kamera som tagning 1 (9–12 s, Seedance 2.5):** startbild = tagning 1:s sista bildruta. Hantverkaren reser sig och går ut vänster; teamet kommer in höger/bakifrån och tar platserna. Refs: tagning 1-sista-bild + fem agentporträtt (se sanningsgrind om identitet).
 4. **Inserts (valfria, 2 × 5 s, Seedance 2.0 + Element per agent):** Karin lyfter fakturahögen; Lars stryker med fingret längs kalenderraden. En agent per generering (reference-pack `02`). Ger klippet rytm och gör teamet igenkännbart även om helbilden tappar ansikten.
 5. **Produktbevis (0 kr, inspelningsläge):** ny spec `tests/filming/f13-lagg-dig.spec.ts` — seedar tre riktiga kort på demokontot (fakturapåminnelse Karin, offertuppföljning Daniel, ett tredje sant kort) och filmar "Det här behöver dig idag" i morgonläge.
-6. Slutkort som Knappen (off-white, teal-logga, Space Grotesk).
+6. Slutplatta: Andreas CTA-platta (mörk teal, H-märke, "Ett AI-team för hantverksföretag.", "Boka demo på handymate.se"), som i Knappen V10.
 
 ### Higgsfield-prompter
 
