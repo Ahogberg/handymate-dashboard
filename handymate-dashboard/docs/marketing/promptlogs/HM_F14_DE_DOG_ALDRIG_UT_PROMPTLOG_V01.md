@@ -14,3 +14,4 @@ Paket: `video-creative-bible/F14-de-dog-aldrig-ut-produktionspaket.md`. Regler: 
 | # | Steg | Verktyg | Kostnad | Resultat |
 |---|---|---|---|---|
 | 1 | Tre kandidater: (71) helkropp i kontorslandskapet, (72) trekvart bakom skrivbordet "övervakar", (73) huvud i närbild 85 mm | nano_banana_pro 2k 3:4 | ~9 kr | jobs 7ce77ede, ce808384, 5b2c7c6c |
+| 2 | Jämförelseark till Andreas | ffmpeg | 0 | recordings/f14-de-dog-aldrig-ut/hero-stills/qa-adminsaurus-1-2-3.png |
