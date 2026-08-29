@@ -94,3 +94,6 @@ Andreas valde replik 62 "Gå och lägg dig, du. Vi tar det härifrån." · partn
 | 36 | **MASTER V06 1080p**: skåpbil + kök uppskalade från 720p (lanczos), Matte 1080p Sync + fyra delogo-fönster, teamet 1080p, grafik omrenderad i 1080-skala (×1,5), ljudsystemet som V04/V05, partner 53, slutrad 55, crf 18, AAC 192k. Integrerat −18,7 LUFS | ffmpeg | 0 | HM_F13_EFTER_JOBBET_MASTER_V06_1080p_9x16_SE.mp4, 37,1 s, 13,6 MB |
 
 Kostnad 1080p-steget: 54 + 110 + 30 = ~194 kr. Saldo ~34.
+
+## FINAL (2026-08-29)
+Andreas: "Svinbra V06! … vi kör." **HM_F13_EFTER_JOBBET_MASTER_V06_1080p_9x16_SE.mp4 är final.** Ingen Topaz (kan läggas till senare, ~37 kr). Känd pytt-detalj: läppsynken något off i några stavelser (Sync på Seedance-tagning; nästa nivå är riktig röst + Sync på tagning genererad utan audio_reference). Totalkostnad F13: ~365 kr.
