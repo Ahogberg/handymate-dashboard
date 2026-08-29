@@ -88,3 +88,9 @@ Andreas valde replik 62 "Gå och lägg dig, du. Vi tar det härifrån." · partn
 |---|---|---|---|---|
 | 31 | Matte-tagning 1080p: start_image C1, Element, audio_ref 62, "plain dark grey laptop with NO logo on the lid" | seedance_2_0 std 1080p 6 s | 54 kr | job 8987dca4 |
 | 32 | Teamtagning 1080p: samma sex refs, "his chair stays empty… Karin sits on a different chair" | seedance_2_5 omni 1080p 9 s | ~110 kr | job c4735649 |
+| 33 | QA Matte 1080p | kontaktark + lock-crop med rutnät | 0 | qa-tagning2-matte-1080p.png, qa-delogo-koordinater.png — identitet/hud bra; **Apple-loggan tillbaka trots prompt** (modellen ritar MacBook). Loggan vandrar 0,5–1,4 s och ligger sedan stilla ~(735,1760) → fyra delogo-fönster i post. |
+| 34 | QA teamet 1080p | kontaktark | 0 | qa-tagning3-teamet-1080p.png — alla fem med rätt garderob, hantverkaren ut vänster 1–3 s. Modellen ignorerade "stolen tom": **Lars** sitter nu på hantverkarens stol. Accepterad (poängen står: bordet fullt, ägaren gick). |
+| 35 | Sync Lipsync 3 på Matte 1080p med replik 62 | sync_so | ~30 kr | job 9759d0e4 |
+| 36 | **MASTER V06 1080p**: skåpbil + kök uppskalade från 720p (lanczos), Matte 1080p Sync + fyra delogo-fönster, teamet 1080p, grafik omrenderad i 1080-skala (×1,5), ljudsystemet som V04/V05, partner 53, slutrad 55, crf 18, AAC 192k. Integrerat −18,7 LUFS | ffmpeg | 0 | HM_F13_EFTER_JOBBET_MASTER_V06_1080p_9x16_SE.mp4, 37,1 s, 13,6 MB |
+
+Kostnad 1080p-steget: 54 + 110 + 30 = ~194 kr. Saldo ~34.
