@@ -58,3 +58,14 @@ Andreas: (a) Mattes replik obegriplig ("På 10 år?") — orsak: utkastet använ
 | 21 | Ordgränser ur VO:n (silencedetect −32 dB) → kortens in-tider; tystnaderna komprimerade till 0,55 s | ffmpeg | 0 | vo5.wav 5,7 s |
 | 22 | Grafik i PIL (2x render → nedskalning): fem namnkort 560×120 (porträtt i cirkel, ring-färg per agent, Space Grotesk Bold namn, roll), platta "Kl 16:03" 460×130, pratbubbla med svans | python3 PIL i sandbox | 0 | qa-grafik-v1.png |
 | 23 | Ihopsättning V03: platta fade in/ut centrerad · bubbla fade + lyft 12 px vid 1,4 s med partnerröst (51) · Benji l31 rakt över Matte-tagningen (inbakat ljud borttaget) · kort glider in från höger (0,3 s) på varje ord, ett i taget vid y=1040 · produktbevis + slutrad 54 · text · platta | ffmpeg | 0 | HM_F13_EFTER_JOBBET_UTKAST_V03_720p_9x16_SE.mp4, 35,9 s |
+
+## Steg 5 — ljudsystemet in (2026-08-29, 0 kr)
+
+Andreas levererade Handymate-ljudsystemet från Claude Design till `reference-pack/assets/audio/` (26 WAV + regelblad): stems bas/trummor/elpiano/atmosfär i 88/120/140, bädd "Teamet tar över" (20 s), signatur, godkänn-snäpp, notis, klart, fel, klocka-loop/-stopp, rumsljud kök/kontor/garage, övergångspuls, stopp, outro.
+
+| # | Steg | Verktyg | Resultat |
+|---|---|---|---|
+| 24 | Analys: 48 kHz/16-bit stereo, stems exakt 8 takter (16,000 / 21,818 / 13,714 s), loop-skarvar rena (Δ<0,001), elpiano hetast (−14,3 LUFS), rum-kök −35 LUFS | ffprobe/ebur128/numpy | Kittet är tekniskt korrekt byggt |
+| 25 | **Full-mix** ur stems (elpiano −4 dB, övriga 0) → tvåpass loudnorm −16 LUFS / TP −1,5 → `handymate-tema-{120,88,140}-fullmix.wav` (24-bit). Uppmätt −16,3 / −1,5, loop-skarv ren | ffmpeg + python | Standardspåret för socialt innehåll = 120-mixen |
+| 26 | Klocka-stopp: sista ticket vid 4,01 s, tyst därefter → startas vid 1,0 s i köksscenen så tickandet slutar exakt 5,0 s när Matte lyfter blicken | silencedetect | |
+| 27 | V04 = V03 med ljudsystemet: rum-kök under kök/Matte (×1,6), klocka-stopp, partnerröst över tickandet, ingen musik förrän teamet syns (regel 1), bädden in vid 2,4 s i teamscenen (0,5 under VO → 0,8), fortsätter under produktbeviset med duck under slutrepliken, godkänn-snäpp vid 3,9 s, outron på slutraden (3,4 s), signaturen ENSAM på plattan (plattans eget ljud bortplockat, regel 2). Integrerad ljudnivå −17,0 LUFS | ffmpeg | HM_F13_EFTER_JOBBET_UTKAST_V04_720p_9x16_SE.mp4, 37,7 s |
