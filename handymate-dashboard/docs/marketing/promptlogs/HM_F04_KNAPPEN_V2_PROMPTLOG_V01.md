@@ -175,3 +175,19 @@ Nästa: vald still som start_image direkt (1536x2752 — ingen uppskalning behö
 | 40 | Ihopsättning V13 (= V12-receptet, tagning 5 i stället för 4) | ffmpeg, crf 18 | 0 | HM_F04_KNAPPEN_V2_HARD_MASTER_V13_1080p_9x16_SE.mp4, 27,1 s |
 
 Kostnad V13: ~112 kr (stills 10 + tagning 72 + Sync 30). Regel (ny, fabriken): **hero-still först för alla talande tagningar** — generate_image (nano_banana_pro 2k) med startbildruta + porträtt som image_references, "recreate as a real photograph, same composition, calm deadpan", välj bland 2–3, ge stillen direkt som start_image. Videomodellen ärver hudtexturen.
+
+## V14–V15 (2026-08-29) — färgmatchning + gubben med stol
+
+Andreas: (a) hoodien i närbilden avviker "pyttelite" från Handymate-teal, (b) gubben "glider in som ett spöke" — tagning 2 (2.5) hade synlig stol och rullning.
+
+| # | Steg | Verktyg | Kostnad | Resultat |
+|---|---|---|---|---|
+| 41 | Färgmätning: helbild ärm 177,3° (Handymate-teal ~171°), närbild bröst 188,0° — ~11° för blå | PIL i sandbox | 0 | |
+| 42 | Grid-sökning selectivecolor på cyan-området, huden som vakt | ffmpeg + PIL | 0 | `selectivecolor=cyans=0 -0.1 0.1 0` → bröst 177,6°, huden oförändrad (13,5°) |
+| 43 | Ihopsättning V14 (= V13 + färgmatchad seg2) | ffmpeg | 0 | HM_F04_KNAPPEN_V2_HARD_MASTER_V14_1080p_9x16_SE.mp4; qa-fargmatch-hoodie.png |
+| 44 | Tagning 6: samma hero-still, Elements matte + gubben, prompt med fysik ("rolls into frame from the right edge on a black office swivel chair with visible casters, legs travelling sideways, real momentum… chair rolls away") | seedance_2_0 std 1080p 8 s | 72 kr | job c38df49f — in från högerkanten 3,5 s, rullar in 4,0–4,5, hand 5,5, rullar ut 6,5–7,9 med stolen synlig. Matte ler till vid 3,0 s (minus). |
+| 45 | Sync Lipsync 3 på tagning 6 | sync_so | ~30 kr | job 8e0cfed2 |
+| 46 | Ihopsättning V15 (= V14-receptet, tagning 6 i stället för 5) | ffmpeg, crf 18 | 0 | HM_F04_KNAPPEN_V2_HARD_MASTER_V15_1080p_9x16_SE.mp4, 27,1 s |
+
+Kostnad V14–V15: ~102 kr. Saldo efter: 485 (Andreas fyllde på 500). Kandidater att låsa: V14 (tagning 5, lugnast ansikte) eller V15 (tagning 6, gubben med stol; Matte ler till vid 3 s).
+Lärdom: för fysik i en gag räcker det inte med "rolls in" — skriv ut vad kameran ska SE (stolen, hjulen, benen, riktningen, att den rullar bort igen). 2.0 + båda Elements levererade det.
