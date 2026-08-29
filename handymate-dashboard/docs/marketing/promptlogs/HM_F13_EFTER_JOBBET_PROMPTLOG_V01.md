@@ -14,3 +14,17 @@ Storyboard: `video-creative-bible/F13-lagg-dig-storyboard.md` (V02). Regler: `fi
 | 6 | Skåpbil (720p-utkast): start_image = A2, dörren skjuts igen, axlarna sjunker, blick mot kameran | seedance_2_0 std 720p 4 s | 18 kr | job ccd87a9f |
 
 Regel bekräftad: karaktärsreferensen görs FÖRE scenstillsen, annars blir det olika personer per scen. Negativa listan gäller stillbilder också — bilmärken och regskyltar dyker upp oombedda.
+
+## Steg 2 — tagningar i 720p
+
+| # | Steg | Verktyg | Kostnad | Resultat |
+|---|---|---|---|---|
+| 7 | QA tagning 1 kök (720p) | kontaktark | 0 | qa-tagning1-kok-720p.png — hantverkaren sänker handen, öppnar laptopen; Matte andas, lyfter blicken 4–5,9 s. Identiteter håller. Godkänd som utkast. |
+| 8 | QA skåpbil (720p) | kontaktark | 0 | qa-skapbil-720p.png — dörren igen 0–2,1 s, vänder sig mot kameran 3,5–3,9 s. Godkänd som utkast. |
+| 9 | Replik 1 nya lydelsen: "Ditt jobb, ja. Gå och lägg dig." (2 läsningar: punkt / ellips) | text2speech_v2 elevenlabs Benji | ~1 kr | jobs 31ae9285 (punkt, 2,6 s), d3bf8eb6 (ellips, ~4 s). rostbank/benji-31, -32 |
+| 10 | Hero-still C: halvnära Matte vid laptopen, refs B2 + Matte-porträtt, 2 kandidater | nano_banana_pro 2k | ~5 kr | jobs 194e4fb8 (C1), 7957de6d (C2). hero-stills/still-C1, C2 |
+| 11 | Fem agentporträtt (reference-pack/assets/agents) upp till Higgsfield inför teamtagningen | media_upload | 0 | media karin f99785a6 · lars 50c3d508 · daniel b66ed224 · hanna 67317a86 · lisa 57db69a3 |
+| 12 | Val hero-still C: **C1** (hand på halvstängd laptop, blick i kameran, mikrovågsklockan bakom). C2 = hand mot öppen skärm, hantverkaren gnuggar ögonen — bra alternativ om vi vill ha "avbrottet" tydligare. | | | |
+| 13 | Sista bildrutan ur tagning 1 (720p) som startbild för teamtagningen | ffmpeg -sseof | 0 | media 8ae55d41 |
+| 14 | Tagning 2 (720p-utkast): start_image = C1, Element char_matte, audio_ref läsning 31, stänger locket → repliken | seedance_2_0 std 720p 6 s | 27 kr | job 8b6c57bc |
+| 15 | Tagning 3 (720p-utkast): teamet kliver in. image_references = tagning 1 sista bild + fem agentporträtt, `mode: omni_reference` (utan mode → 422 "t2v does not accept reference media") | seedance_2_5 720p 9 s | 58,5 kr | job 9dc906b5 |
