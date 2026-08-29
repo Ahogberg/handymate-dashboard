@@ -79,3 +79,12 @@ Andreas: läppsynk av (väntat — Sync körs på 1080p-tagningen när repliken 
 | 28 | Ny replik ×3 (Benji): 61 "Ja, gå och lägg dig. Vi tar över härifrån." · 62 "Gå och lägg dig, du. Vi tar det härifrån." · 63 "Ja. Gå och lägg dig. Vi tar över härifrån." | text2speech_v2 | rostbank/61–63; 61 i utkastet |
 | 29 | Partnern "i andra rummet": highpass 300 Hz, lowpass 2,8 kHz, aecho 38/71 ms, −10 dB | ffmpeg | |
 | 30 | Slutrad på teal-platta (#103129 sampla ur CTA-plattan, knappteal #1B967E på rad 2), Space Grotesk Bold 60, text tonar in + lyfter 20 px, xfade 0,6 s in i CTA-plattan; outro under texten, signaturen vid 3,3 s | PIL + ffmpeg | HM_F13_EFTER_JOBBET_UTKAST_V05_720p_9x16_SE.mp4, 37,1 s |
+
+## Steg 7 — låsning: 62 + 53 + 55 (2026-08-29)
+
+Andreas valde replik 62 "Gå och lägg dig, du. Vi tar det härifrån." · partner 53 (Faye) · slutrad 55 "Du godkänner i morgon. Vi gör resten."
+
+| # | Steg | Verktyg | Kostnad | Resultat |
+|---|---|---|---|---|
+| 31 | Matte-tagning 1080p: start_image C1, Element, audio_ref 62, "plain dark grey laptop with NO logo on the lid" | seedance_2_0 std 1080p 6 s | 54 kr | job 8987dca4 |
+| 32 | Teamtagning 1080p: samma sex refs, "his chair stays empty… Karin sits on a different chair" | seedance_2_5 omni 1080p 9 s | ~110 kr | job c4735649 |
