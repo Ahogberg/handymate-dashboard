@@ -28,3 +28,8 @@ Regel bekräftad: karaktärsreferensen görs FÖRE scenstillsen, annars blir det
 | 13 | Sista bildrutan ur tagning 1 (720p) som startbild för teamtagningen | ffmpeg -sseof | 0 | media 8ae55d41 |
 | 14 | Tagning 2 (720p-utkast): start_image = C1, Element char_matte, audio_ref läsning 31, stänger locket → repliken | seedance_2_0 std 720p 6 s | 27 kr | job 8b6c57bc |
 | 15 | Tagning 3 (720p-utkast): teamet kliver in. image_references = tagning 1 sista bild + fem agentporträtt, `mode: omni_reference` (utan mode → 422 "t2v does not accept reference media") | seedance_2_5 720p 9 s | 58,5 kr | job 9dc906b5 |
+| 16 | QA tagning 2 (720p) | kontaktark | 0 | qa-tagning2-matte-720p.png — locket stängs 0–1,4 s, repliken 1,4–4 s, deadpan, identitet håller. **Fel: Apple-logga på laptoplocket** (negativa listan). Till 1080p: "plain grey laptop, no logo on the lid"; om den återkommer → delogo-mask i post (statisk kamera). |
+| 17 | QA tagning 3 (720p) | kontaktark | 0 | qa-tagning3-teamet-720p.png — hantverkaren går ut vänster 0–4 s; alla fem in med rätt garderob (Karin marinblå kavaj sätter sig, Lars kalendern, Daniel ljusblå skjorta offerterna, Hanna telefon + mönstrad topp, Lisa läser hans mobil), Matte bakom. **Avvikelse mot storyboard: Karin sätter sig på hantverkarens stol** (storyboard: stolen tom). Beslut Andreas. |
+| 18 | Ihopsättning UTKAST V01 (720p): skåpbil + "16:03" · kök + "Kommer du?" · Matte-replik (inbakat ljud, ingen Sync i utkastet) · teamet + VO 21 + namnetiketter · platshållare för produktbevis + VO "Du säger ja i morgon" · slutrad · CTA-platta | ffmpeg | 0 | HM_F13_EFTER_JOBBET_UTKAST_V01_720p_9x16_SE.mp4, 34,5 s |
+
+Kostnad hittills F13: ~150 kr (stills 23 + tagningar 27+18+27+58,5). Saldo ~234.
