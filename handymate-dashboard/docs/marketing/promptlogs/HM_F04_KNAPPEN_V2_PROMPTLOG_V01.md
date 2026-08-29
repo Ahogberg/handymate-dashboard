@@ -191,3 +191,16 @@ Andreas: (a) hoodien i närbilden avviker "pyttelite" från Handymate-teal, (b) 
 
 Kostnad V14–V15: ~102 kr. Saldo efter: 485 (Andreas fyllde på 500). Kandidater att låsa: V14 (tagning 5, lugnast ansikte) eller V15 (tagning 6, gubben med stol; Matte ler till vid 3 s).
 Lärdom: för fysik i en gag räcker det inte med "rolls in" — skriv ut vad kameran ska SE (stolen, hjulen, benen, riktningen, att den rullar bort igen). 2.0 + båda Elements levererade det.
+
+## V16 (2026-08-29) — mindre callback
+
+Andreas: scenen ser fortfarande konstig ut. Diagnos: gag:en händer två gånger (knuff i helbilden, gubben rullar in igen i halvnära) och tvåpersonskontakt i halvnära är modellens svåraste läge. Vald väg (2 av 3): gubbens hjälm sticker upp i nederkant höger, Matte trycker ner den utan att titta.
+
+| # | Steg | Verktyg | Kostnad | Resultat |
+|---|---|---|---|---|
+| 47 | Tagning 7: samma hero-still, båda Elements, "only the top of the hard hat and his eyes rise into view at the bottom right… pushes it back down… never comes higher than his eyes", "no smiling, mouth relaxed between words" | seedance_2_0 std 1080p 8 s | 72 kr | job 4b3fe15a |
+| 48 | QA tagning 7 | kontaktark halvsekunder | 0 | qa-tagning7-hjalm.png — hjälm + ögon upp 2,0–3,5, hand på hjälmen 5,0, nedtryckt 6,0, borta 6,5, hjälmkant tittar upp igen 7,9. Inget leende. |
+| 49 | Sync Lipsync 3 på tagning 7 | sync_so | ~30 kr | (se V16) |
+| 50 | Ihopsättning V16 (= V14-receptet, tagning 7) | ffmpeg, crf 18 | 0 | HM_F04_KNAPPEN_V2_HARD_MASTER_V16_1080p_9x16_SE.mp4, 27,1 s |
+
+Kostnad V16: ~102 kr. Saldo: 384. Lärdom (regi): upprepa aldrig samma gag i två bildstorlekar — callbacken ska vara mindre än originalet. Och: ju mindre rörelse du ber modellen om i en tvåpersonsbild, desto mer trovärdig blir den.
