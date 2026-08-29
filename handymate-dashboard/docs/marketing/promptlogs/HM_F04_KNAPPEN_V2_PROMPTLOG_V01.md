@@ -169,3 +169,9 @@ Andreas (efter ChatGPT:s pipeline-bedömning): kör om närbilden med "hero fram
 
 Lärdom: "enhance"-formuleringen drar in porträttets leende; "recreate … calm deadpan expression" håller uttrycket. Soul 2.0 tar bara en referens och är fel verktyg när kompositionen ska bevaras.
 Nästa: vald still som start_image direkt (1536x2752 — ingen uppskalning behövs, videomodellen skalar ner) -> tagning 5 (72) -> Sync (30) -> V13.
+| 37 | Andreas valde still 2 (cc232f7c). Tagning 5: start_image = stillen (1536x2752), Element char_matte, audio_ref Benji, samma gag som tagning 4 | seedance_2_0 std 1080p 8 s | 72 kr | job a0a957af |
+| 38 | QA tagning 5 | kontaktark + ansiktsutsnitt 2,0/7,0 s | 0 | qa-tagning5-herostill.png — stillens hudtextur och stubb kvar genom tagningen, gubben in 3 s / hand 4 s / ute 5 s |
+| 39 | Sync Lipsync 3 på tagning 5 | sync_so, Benji, silence | ~30 kr | job c9982786 |
+| 40 | Ihopsättning V13 (= V12-receptet, tagning 5 i stället för 4) | ffmpeg, crf 18 | 0 | HM_F04_KNAPPEN_V2_HARD_MASTER_V13_1080p_9x16_SE.mp4, 27,1 s |
+
+Kostnad V13: ~112 kr (stills 10 + tagning 72 + Sync 30). Regel (ny, fabriken): **hero-still först för alla talande tagningar** — generate_image (nano_banana_pro 2k) med startbildruta + porträtt som image_references, "recreate as a real photograph, same composition, calm deadpan", välj bland 2–3, ge stillen direkt som start_image. Videomodellen ärver hudtexturen.
