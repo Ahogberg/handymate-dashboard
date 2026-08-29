@@ -43,3 +43,7 @@ Fynd att hantera:
 - **Mobil-UI:** hamburgerknappen ligger över rubriken "Det här behöver dig idag"; Matte-FAB + "+"-knapp täcker kortens nedre vänstra hörn. För filmen: dölj via injicerad CSS i specen (som presenter-baren). Är det ett riktigt UI-fel även för kunder? (kolla på riktig mobil).
 - **Produktbugg (Vercel):** `POST /api/projects` skriver checklistförslaget fire-and-forget efter svaret — på Vercel fryses funktionen och kortet skapas aldrig för `status: planning`. Sannolikt samma klass i create-from-quote/lead/booking. → Reality Week-avvikelse.
 - Cronen hade inte skapat Karins kort (auto_reminder_enabled=false på demokontot) — byggaren anropas direkt.
+
+| # | Steg | Verktyg | Kostnad | Resultat |
+|---|---|---|---|---|
+| 19 | Ihopsättning UTKAST V02: platshållaren ersatt med BEAT-01 (långsam zoompan nedåt över Karin → Daniel) + VO "Du säger ja i morgon" | ffmpeg | 0 | HM_F13_EFTER_JOBBET_UTKAST_V02_720p_9x16_SE.mp4, 35,5 s |
