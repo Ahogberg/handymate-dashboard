@@ -47,3 +47,14 @@ Fynd att hantera:
 | # | Steg | Verktyg | Kostnad | Resultat |
 |---|---|---|---|---|
 | 19 | Ihopsättning UTKAST V02: platshållaren ersatt med BEAT-01 (långsam zoompan nedåt över Karin → Daniel) + VO "Du säger ja i morgon" | ffmpeg | 0 | HM_F13_EFTER_JOBBET_UTKAST_V02_720p_9x16_SE.mp4, 35,5 s |
+
+## Steg 4 — Andreas feedback på V02 → V03 (0 kr utom TTS)
+
+Andreas: (a) Mattes replik obegriplig ("På 10 år?") — orsak: utkastet använde Seedance inbakade ljud (modellens egen förvrängda version av referensen), inte Benjis mp3. Regel: **inbakat ljud från audio_references används ALDRIG, inte ens i utkast** — lägg alltid originalfilen över (och Sync i final). (b) "Kl 16:03" stort och centrerat, inte i hörnet. (c) Partnern som röst: "Kommer du och lägger dig?" + snyggare bubbla. (d) Namnkort med porträttrutor animerade in en i taget på VO:n. (e) Slutrad "Du godkänner i morgon, så utför vi jobbet" i stället för "Du säger ja i morgon".
+
+| # | Steg | Verktyg | Kostnad | Resultat |
+|---|---|---|---|---|
+| 20 | TTS: partner ×3 (Isla 87466644, Maeve bb07f798, Faye a067e42a) · slutrad ×2 Benji (54 "Så utför vi jobbet" bfa234ca, 55 "Vi gör resten" 5103fdec) · fem-ords-VO "Fakturorna. Kalendern. Offerterna. Telefonen. Kunderna." (639efe3d) så Hanna får ett ord | text2speech_v2 | ~2 kr | rostbank/51–56 |
+| 21 | Ordgränser ur VO:n (silencedetect −32 dB) → kortens in-tider; tystnaderna komprimerade till 0,55 s | ffmpeg | 0 | vo5.wav 5,7 s |
+| 22 | Grafik i PIL (2x render → nedskalning): fem namnkort 560×120 (porträtt i cirkel, ring-färg per agent, Space Grotesk Bold namn, roll), platta "Kl 16:03" 460×130, pratbubbla med svans | python3 PIL i sandbox | 0 | qa-grafik-v1.png |
+| 23 | Ihopsättning V03: platta fade in/ut centrerad · bubbla fade + lyft 12 px vid 1,4 s med partnerröst (51) · Benji l31 rakt över Matte-tagningen (inbakat ljud borttaget) · kort glider in från höger (0,3 s) på varje ord, ett i taget vid y=1040 · produktbevis + slutrad 54 · text · platta | ffmpeg | 0 | HM_F13_EFTER_JOBBET_UTKAST_V03_720p_9x16_SE.mp4, 35,9 s |
