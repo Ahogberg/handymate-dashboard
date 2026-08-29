@@ -158,3 +158,14 @@ Andreas: gag:en från tagning 2 (gubben rullar in) men ljus och Matte identiska 
 | 35 | Ihopsättning V12 (= V10-receptet, tagning 4 i stället för 3) | ffmpeg, crf 18 | 0 | HM_F04_KNAPPEN_V2_HARD_MASTER_V12_1080p_9x16_SE.mp4, 27,1 s |
 
 Kostnad V12: ~102 kr. Regel bekräftad: startbild ur helbilden fungerar i alla bildstorlekar — välj beskärning efter vad gag:en behöver (halvnära för gubben på stolen).
+
+## V13 (2026-08-29, pågår) — hero-still först
+
+Andreas (efter ChatGPT:s pipeline-bedömning): kör om närbilden med "hero frame first" för högkvalitativt ansikte. Bedömning: rätt för halvnära (tagning 4), meningslöst för helbilden (~150 px ansikte).
+
+| # | Steg | Verktyg | Kostnad | Resultat |
+|---|---|---|---|---|
+| 36 | Hero-stills: startbild (23e5bcba) + Matte-porträtt som image_references, "recreate as a real photograph, same composition, real skin texture" ×2, "enhance" ×1; Soul 2.0 med startbilden ×1 | nano_banana_pro 2k (1536x2752), soul_2 | ~10 kr | jobs 70165123 (1), cc232f7c (2), e1cbc3e6 (3), c2fd14f5 (4). 1–2 håller komposition + identitet med tydligt mer hud/stubb än videobildrutan. 3: log leende (porträttets uttryck läckte in) — fel för deadpan. 4: Soul bytte person och komposition — kasserad. |
+
+Lärdom: "enhance"-formuleringen drar in porträttets leende; "recreate … calm deadpan expression" håller uttrycket. Soul 2.0 tar bara en referens och är fel verktyg när kompositionen ska bevaras.
+Nästa: vald still som start_image direkt (1536x2752 — ingen uppskalning behövs, videomodellen skalar ner) -> tagning 5 (72) -> Sync (30) -> V13.
