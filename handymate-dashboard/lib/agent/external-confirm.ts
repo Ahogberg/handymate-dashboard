@@ -29,7 +29,9 @@ export function isExternalSendTool(toolName: string): boolean {
  * skickat require_confirm_external (dashboard-bubblan); mobilappens anrop
  * utan parametern är opåverkade, precis som för SMS/e-post.
  */
-const CONFIRM_GATED_TOOL_NAMES = new Set(Array.from(EXTERNAL_SEND_TOOL_NAMES).concat('log_time'))
+const CONFIRM_GATED_TOOL_NAMES = new Set(
+  Array.from(EXTERNAL_SEND_TOOL_NAMES).concat('log_time', 'log_material', 'add_work_note')
+)
 
 export function isConfirmGatedTool(toolName: string): boolean {
   return CONFIRM_GATED_TOOL_NAMES.has(toolName)
@@ -131,10 +133,26 @@ export function buildExternalActionSummary(
       ? `Matte uppfattade: logga ${tidsdel}${datum}${beskrivning}`
       : `Matte uppfattade: logga tid${datum}${beskrivning}`
   }
+  if (toolName === 'log_material') {
+    const antal = Number(toolInput.quantity)
+    const mangd = Number.isFinite(antal) && antal > 0 ? antal : 1
+    const enhet = typeof toolInput.unit === 'string' && toolInput.unit ? toolInput.unit : 'st'
+    return `Matte uppfattade: bokför ${mangd} ${enhet} ${toolInput.name} på projektet`
+  }
+  if (toolName === 'add_work_note') {
+    const text = typeof toolInput.work_performed === 'string' ? toolInput.work_performed : ''
+    // Anteckningen kan vara lång — kortet visar början, hela texten sparas.
+    const kort = text.length > 140 ? `${text.slice(0, 140)}…` : text
+    return `Matte uppfattade: skriv arbetsanteckning — "${kort}"`
+  }
   return `Utför ${toolName}`
 }
 
-/** Knapplabel för bekräftelsekortet — "Skicka" är fel verb för intern tid. */
+/** Knapplabel för bekräftelsekortet — "Skicka" är fel verb för interna
+ *  skrivningar som stannar i huset. */
 export function confirmLabelForTool(toolName: string): string {
-  return toolName === 'log_time' ? 'Logga' : 'Skicka'
+  if (toolName === 'log_time') return 'Logga'
+  if (toolName === 'log_material') return 'Bokför'
+  if (toolName === 'add_work_note') return 'Spara'
+  return 'Skicka'
 }

@@ -149,6 +149,9 @@ Skriv alltid på svenska.`,
     allowedTools: [
       'get_customer', 'search_customers',
       'create_booking', 'check_calendar', 'update_project', 'log_time',
+      // Fältkommandon (Matte Mobile Voice V1): materialåtgång och
+      // arbetsanteckning hör till projektuppföljningen — Lars domän.
+      'log_material', 'add_work_note',
       'get_daily_stats', 'create_approval_request',
       'check_pending_approvals', 'log_automation_action',
       'get_project_profitability', 'get_efterkalkyl_insight',

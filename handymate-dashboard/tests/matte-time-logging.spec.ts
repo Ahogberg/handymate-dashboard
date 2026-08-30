@@ -89,15 +89,86 @@ test.describe('2. inga påhittade klockslag', () => {
 test.describe('3. samma pass loggas aldrig två gånger', () => {
   test('dubblettkontrollen ligger före insert:en', () => {
     const kropp = logTimeKropp()
-    const kontroll = kropp.indexOf('dubblettFonster')
+    const kontroll = kropp.indexOf('hittaNyligDubblett')
     expect(kontroll, 'inget dubbelregistreringsskydd').toBeGreaterThan(-1)
     expect(kropp.indexOf('.insert(')).toBeGreaterThan(kontroll)
   })
 
-  test('en tidrad utan projekt känns också igen som dubblett', () => {
+  test('en rad utan projekt känns också igen som dubblett', () => {
     // .eq() matchar aldrig NULL i Postgres — utan is()-grenen hade allmän
-    // tid (utan projekt) kunnat dubbelregistreras fritt.
-    expect(logTimeKropp()).toContain("is('project_id', null)")
+    // tid (utan projekt) kunnat dubbelregistreras fritt. Regeln bor i den
+    // delade hjälparen, så alla tre fältskrivningarna ärver den.
+    expect(kod('lib/agent/recent-duplicate.ts')).toContain('is(kolumn, null)')
+  })
+
+  test('ett läsfel avbryter i stället för att skriva i blindo', () => {
+    // Kan vi inte se om raden redan finns får vi inte gissa — då skriver vi
+    // hellre ingenting och säger det.
+    expect(logTimeKropp()).toContain('Kunde inte kontrollera dubbelregistrering')
+  })
+})
+
+test.describe('5. fältkommandon: material och arbetsanteckning', () => {
+  const router = kod('app/api/agent/trigger/tool-router.ts')
+
+  test('båda verktygen är dirigerade och tenantvaktade', () => {
+    for (const verktyg of ['log_material', 'add_work_note']) {
+      expect(router, `${verktyg} saknar case i routern`).toContain(`case '${verktyg}':`)
+    }
+    // Projektet måste bevisligen tillhöra företaget innan något skrivs —
+    // ett id från en röstkontext är en referens, aldrig ett tenantbevis.
+    for (const fn of ['async function logMaterial', 'async function addWorkNote']) {
+      const start = router.indexOf(fn)
+      expect(start, `${fn} saknas`).toBeGreaterThan(-1)
+      const kropp = router.slice(start, router.indexOf('\nasync function ', start + 10))
+      const vakt = kropp.indexOf("eq('business_id', businessId)")
+      expect(vakt, `${fn} verifierar inte projektet`).toBeGreaterThan(-1)
+      expect(kropp.indexOf('.insert('), `${fn} skriver före tenantvakten`).toBeGreaterThan(vakt)
+    }
+  })
+
+  test('byggdagboken skrivs med databasens faktiska kolumnnamn', () => {
+    // project_log heter order_id/date/work_performed i live-schemat — INTE
+    // project_id/log_date/work_description som sql/rot_rut_documents.sql
+    // antyder. Fel namn här ger 42703 och en tyst förlorad anteckning.
+    // Mät på SJÄLVA insert-anropet: returvärdet nedanför bär project_id som
+    // ett svarsfält, och det är helt korrekt.
+    const start = router.indexOf('async function addWorkNote')
+    const kropp = router.slice(start, router.indexOf('\nasync function ', start + 10))
+    const insertStart = kropp.indexOf("from('project_log').insert({")
+    expect(insertStart, 'ingen insert mot project_log').toBeGreaterThan(-1)
+    const insertBlock = kropp.slice(insertStart, kropp.indexOf('})', insertStart))
+    expect(insertBlock).toContain('order_id:')
+    expect(insertBlock).toContain('work_performed:')
+    expect(insertBlock).toContain('date:')
+    for (const fantom of ['project_id:', 'log_date:', 'work_description:']) {
+      expect(insertBlock, `${fantom} finns inte som kolumn i project_log`).not.toContain(fantom)
+    }
+  })
+
+  test('anteckningen bär vem som skrev den', () => {
+    const start = router.indexOf('async function addWorkNote')
+    const kropp = router.slice(start, router.indexOf('\nasync function ', start + 10))
+    expect(kropp).toContain('context.businessUserId')
+  })
+
+  test('båda passerar ett mänskligt ja med rätt verb', () => {
+    const confirm = kod('lib/agent/external-confirm.ts')
+    for (const verktyg of ['log_material', 'add_work_note']) {
+      expect(confirm, `${verktyg} gatas inte`).toContain(`'${verktyg}'`)
+    }
+    expect(confirm).toContain("'Bokför'")
+    expect(confirm).toContain("'Spara'")
+  })
+
+  test('verktygen ligger hos Lars, inte hos alla', () => {
+    const p = kod('lib/agents/personalities.ts')
+    const lars = p.indexOf('id: \'lars\'')
+    expect(lars).toBeGreaterThan(-1)
+    const nasta = p.indexOf('id: \'lisa\'', lars)
+    const larsBlock = p.slice(lars, nasta === -1 ? undefined : nasta)
+    expect(larsBlock).toContain('log_material')
+    expect(larsBlock).toContain('add_work_note')
   })
 })
 

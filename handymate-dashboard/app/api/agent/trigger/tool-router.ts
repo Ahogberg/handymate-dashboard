@@ -28,6 +28,7 @@ import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
 import { resolveTimeEntryHourlyRate } from '@/lib/time-entry/rate'
+import { hittaNyligDubblett } from '@/lib/agent/recent-duplicate'
 import { suggestQuoteDraftForLead } from '@/lib/quotes/suggest-quote-draft'
 import { suggestAtaDraft } from '@/lib/ata/suggest-ata-draft'
 import { fetchPersonDays } from '@/lib/schedule/person-day'
@@ -162,6 +163,10 @@ export async function executeTool(
         return await updateProject(supabase, businessId, input)
       case 'log_time':
         return await logTime(supabase, businessId, input, context)
+      case 'log_material':
+        return await logMaterial(supabase, businessId, input)
+      case 'add_work_note':
+        return await addWorkNote(supabase, businessId, input, context)
       case 'get_person_schedule':
         return await getPersonSchedule(supabase, businessId, input)
       case 'send_sms':
@@ -1273,39 +1278,31 @@ async function logTime(
     legacyDefaultRate: config.default_hourly_rate,
   })
 
-  // Dubbelregistreringsskydd (Matte Mobile Voice V1, 2026-08-30). Röstvägen
-  // har flera sätt att skicka samma pass två gånger: dubbeltryck på
-  // bekräftelsekortet, en återanvänd bekräftelse-token inom dess
-  // giltighetstid (lib/agent/external-confirm.ts), eller modellen som
-  // anropar verktyget en gång till i samma tur. Skyddet sitter HÄR vid
-  // skrivningen, inte i transporten, så det gäller alla vägar in.
-  // Samma person, samma dag, samma längd, samma projekt inom fem minuter är
-  // alltid en dubblett — inte ett nytt arbetspass.
-  const dubblettFonster = new Date(Date.now() - 5 * 60 * 1000).toISOString()
-  let dubblettFraga = supabase
-    .from('time_entry')
-    .select('time_entry_id')
-    .eq('business_id', businessId)
-    .eq('business_user_id', businessUserId)
-    .eq('work_date', workDate)
-    .eq('duration_minutes', duration)
-    .gte('created_at', dubblettFonster)
-    .limit(1)
-  // .eq() matchar aldrig NULL i Postgres — utan is()-grenen hade en tidrad
-  // utan projekt aldrig känts igen som dubblett.
-  dubblettFraga = projectId
-    ? dubblettFraga.eq('project_id', projectId)
-    : dubblettFraga.is('project_id', null)
-
-  const { data: dubbletter, error: dubblettFel } = await dubblettFraga
-  if (dubblettFel) {
-    return { success: false, error: `Kunde inte kontrollera dubbelregistrering: ${dubblettFel.message}` }
+  // Dubbelregistreringsskydd: samma person, dag, längd och projekt inom
+  // fönstret är alltid en dubblett — aldrig ett nytt arbetspass. Se
+  // lib/agent/recent-duplicate.ts för varför skyddet sitter vid skrivningen.
+  let befintligTid: string | null = null
+  try {
+    befintligTid = await hittaNyligDubblett({
+      supabase,
+      tabell: 'time_entry',
+      idKolumn: 'time_entry_id',
+      filter: {
+        business_id: businessId,
+        business_user_id: businessUserId,
+        work_date: workDate,
+        duration_minutes: duration,
+        project_id: projectId,
+      },
+    })
+  } catch (err) {
+    return { success: false, error: `Kunde inte kontrollera dubbelregistrering: ${(err as Error).message}` }
   }
-  if (dubbletter && dubbletter.length > 0) {
+  if (befintligTid) {
     return {
       success: true,
       data: {
-        time_entry_id: dubbletter[0].time_entry_id,
+        time_entry_id: befintligTid,
         project_id: projectId,
         business_user_id: businessUserId,
         duration_minutes: duration,
@@ -1342,6 +1339,179 @@ async function logTime(
       business_user_id: businessUserId,
       duration_minutes: duration,
       message: `${(duration / 60).toLocaleString('sv-SE', { maximumFractionDigits: 2 })} timmar loggade${projectName ? ` på ${projectName}` : ''}`,
+    },
+  }
+}
+
+/**
+ * Fältkommando (Matte Mobile Voice V1): materialåtgång ute på jobbet.
+ *
+ * Prisberäkningen är MEDVETET identisk med app/api/projects/[id]/materials —
+ * samma rad ska bli samma siffror oavsett om hantverkaren sa den eller
+ * knappade in den, annars stämmer inte efterkalkylen med sig själv.
+ * Utan inköpspris bokförs artikeln med noll: att åtgången är registrerad är
+ * det som räknas i fält, priset kan sättas när fakturan från grossisten kommer.
+ */
+async function logMaterial(
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+): Promise<ToolResult> {
+  const projectId = typeof params.project_id === 'string' ? params.project_id.trim() : ''
+  const name = typeof params.name === 'string' ? params.name.trim() : ''
+  if (!projectId || !name) return { success: false, error: 'project_id och name krävs.' }
+
+  const { data: project, error: projectErr } = await supabase
+    .from('project')
+    .select('project_id, name')
+    .eq('business_id', businessId)
+    .eq('project_id', projectId)
+    .maybeSingle()
+  if (projectErr) return { success: false, error: `Kunde inte verifiera projektet: ${projectErr.message}` }
+  if (!project) return { success: false, error: 'Projektet finns inte i det här företaget' }
+
+  const quantity = Number(params.quantity) > 0 ? Number(params.quantity) : 1
+  const purchasePrice = Number(params.purchase_price) > 0 ? Number(params.purchase_price) : 0
+  const markupPercent = Number.isFinite(Number(params.markup_percent)) && params.markup_percent != null
+    ? Number(params.markup_percent)
+    : 20
+  const sellPrice = Math.round(purchasePrice * (1 + markupPercent / 100) * 100) / 100
+
+  let befintligt: string | null = null
+  try {
+    befintligt = await hittaNyligDubblett({
+      supabase,
+      tabell: 'project_material',
+      idKolumn: 'material_id',
+      filter: { business_id: businessId, project_id: projectId, name, quantity },
+    })
+  } catch (err) {
+    return { success: false, error: `Kunde inte kontrollera dubbelregistrering: ${(err as Error).message}` }
+  }
+  if (befintligt) {
+    return {
+      success: true,
+      data: {
+        material_id: befintligt,
+        project_id: projectId,
+        duplicate: true,
+        message: `${name} var redan bokfört på ${project.name || 'projektet'} — står kvar som en enda post.`,
+      },
+    }
+  }
+
+  const { data: material, error } = await supabase
+    .from('project_material')
+    .insert({
+      project_id: projectId,
+      business_id: businessId,
+      name,
+      quantity,
+      unit: typeof params.unit === 'string' && params.unit.trim() ? params.unit.trim() : 'st',
+      purchase_price: purchasePrice,
+      sell_price: sellPrice,
+      markup_percent: markupPercent,
+      total_purchase: Math.round(quantity * purchasePrice * 100) / 100,
+      total_sell: Math.round(quantity * sellPrice * 100) / 100,
+      notes: typeof params.notes === 'string' && params.notes.trim() ? params.notes.trim() : null,
+    })
+    .select('material_id')
+    .single()
+
+  if (error) return { success: false, error: error.message }
+  return {
+    success: true,
+    data: {
+      material_id: material.material_id,
+      project_id: projectId,
+      message: `${quantity} ${typeof params.unit === 'string' && params.unit.trim() ? params.unit.trim() : 'st'} ${name} bokfört på ${project.name || 'projektet'}`,
+    },
+  }
+}
+
+/**
+ * Fältkommando (Matte Mobile Voice V1): arbetsanteckning i byggdagboken.
+ *
+ * OBS kolumnnamnen: project_log heter `order_id`, `date` och `work_performed`
+ * i den faktiska databasen — INTE project_id/log_date/work_description som
+ * sql/rot_rut_documents.sql antyder. Verifierat mot live-schemat 2026-08-30;
+ * app/api/projects/[id]/logs/route.ts skriver mot samma namn.
+ * Anteckningen är intern och går aldrig ut till kunden.
+ */
+async function addWorkNote(
+  supabase: SupabaseClient,
+  businessId: string,
+  params: Record<string, unknown>,
+  context: ToolContext,
+): Promise<ToolResult> {
+  const projectId = typeof params.project_id === 'string' ? params.project_id.trim() : ''
+  const workPerformed = typeof params.work_performed === 'string' ? params.work_performed.trim() : ''
+  if (!projectId || !workPerformed) {
+    return { success: false, error: 'project_id och work_performed krävs.' }
+  }
+
+  const logDate = typeof params.log_date === 'string' && params.log_date.trim()
+    ? params.log_date.trim()
+    : svDateStr()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(logDate) || Number.isNaN(Date.parse(`${logDate}T12:00:00Z`))) {
+    return { success: false, error: 'log_date måste vara ett giltigt datum (YYYY-MM-DD)' }
+  }
+
+  const { data: project, error: projectErr } = await supabase
+    .from('project')
+    .select('project_id, name')
+    .eq('business_id', businessId)
+    .eq('project_id', projectId)
+    .maybeSingle()
+  if (projectErr) return { success: false, error: `Kunde inte verifiera projektet: ${projectErr.message}` }
+  if (!project) return { success: false, error: 'Projektet finns inte i det här företaget' }
+
+  let befintlig: string | null = null
+  try {
+    befintlig = await hittaNyligDubblett({
+      supabase,
+      tabell: 'project_log',
+      idKolumn: 'id',
+      filter: {
+        business_id: businessId,
+        order_id: projectId,
+        date: logDate,
+        work_performed: workPerformed,
+      },
+    })
+  } catch (err) {
+    return { success: false, error: `Kunde inte kontrollera dubbelregistrering: ${(err as Error).message}` }
+  }
+  if (befintlig) {
+    return {
+      success: true,
+      data: {
+        log_id: befintlig,
+        project_id: projectId,
+        duplicate: true,
+        message: `Den anteckningen fanns redan på ${project.name || 'projektet'} — står kvar som en enda post.`,
+      },
+    }
+  }
+
+  const logId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+  const workersCount = Number(params.workers_count)
+  const { error } = await supabase.from('project_log').insert({
+    id: logId,
+    order_id: projectId,
+    business_id: businessId,
+    business_user_id: context.businessUserId ?? null,
+    date: logDate,
+    work_performed: workPerformed,
+    issues: typeof params.issues === 'string' && params.issues.trim() ? params.issues.trim() : null,
+    workers_count: Number.isFinite(workersCount) && workersCount > 0 ? Math.round(workersCount) : null,
+  })
+
+  if (error) return { success: false, error: error.message }
+  return {
+    success: true,
+    data: {
+      log_id: logId,
+      project_id: projectId,
+      message: `Arbetsanteckning sparad på ${project.name || 'projektet'} (${logDate})`,
     },
   }
 }

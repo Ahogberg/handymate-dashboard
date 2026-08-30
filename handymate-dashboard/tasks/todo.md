@@ -23,16 +23,34 @@ INTE rörda här (se pausade punkter).
       log_time när require_confirm_external är satt — "Matte uppfattade: logga X timmar…"
       med knappen [Logga]/[Avbryt]. Mobilappens anrop utan parametern är opåverkade.
 
-## PAUSAT — väntar på att Codex okommitterade arbete pushas (rör samma filer)
-- [ ] log_time-ombyggnad i tool-router: attribution till context.businessUserId, project_id-
-      stöd (härled kund), duration_minutes utan påhittade klockslag, dedup-skydd, taxa via
-      resolveTimeEntryHourlyRate. Kontrollera först om Codex +149-diff i tool-router.ts
-      redan gör delar av detta.
-- [ ] Nya fältverktyg log_material (project_material) + add_work_note (project_log, som
-      logs-routen: order_id/date/work_performed) + Lars allowlist i lib/agents/personalities.ts.
-      OBS: project_log-kolumnerna i sql/rot_rut_documents.sql stämmer INTE med live-DB —
-      livekolumner verifierade via MCP 2026-08-30: order_id, date, work_performed, description,
-      issues, workers_count.
+## Klart efter att Codex arbete pushats till main och mergats in (samma dag)
+- [x] Beständig mikrofon: mic-knapp intill Matte-bubblan, som är monterad i dashboard-
+      layouten och därmed följer med till projektsidor, kundkort och verksamhetsvyn.
+      Inspelningen startas synkront i klicket — iOS Safari kräver getUserMedia inuti gesten.
+- [x] log_time-ombyggnaden gjordes av Codex (identitet, projekt, duration utan påhittade
+      klockslag, kanonisk taxa). Granskad och verifierad av Claude: kolumnerna
+      default_hourly_rate/pricing_settings/time_require_description/require_project finns
+      i live-DB, svDateStr importeras, project-ai-eventet 'time_logged' finns.
+- [x] DUBBELSKYDD (lucka i skarven mellan arbetena): bekräftelse-token är giltig i 15 min
+      och är ingen engångsnyckel, så ett dubbeltryck skrev två tidrader. Skyddet ligger nu
+      vid skrivningen via lib/agent/recent-duplicate.ts — gäller alla vägar in, inte bara
+      chattknappen, och används av alla tre fältskrivningarna.
+- [x] Fältverktygen log_material (project_material) + add_work_note (project_log) klara,
+      med tenantvakt på projektet, dubbelskydd, Lars allowlist och bekräftelsekort med rätt
+      verb (Bokför / Spara). project_log skrivs med livekolumnerna order_id/date/
+      work_performed — sql/rot_rut_documents.sql är föråldrad och får inte användas som facit.
+- [x] Facit: tests/matte-time-logging.spec.ts (16 tester) täcker rätt person, inga påhittade
+      klockslag, ingen dubblett, mänskligt ja före skrivning, samt fältverktygens tenantvakt
+      och kolumnnamn.
+- [x] Verifierat på hela det sammanslagna trädet: tsc 0 fel, ren build (345 sidor), hela
+      Playwright-sviten 5591 gröna / 1 överhoppad.
+
+## ÅTERSTÅR — i Ahogberg/handymate-mobile (annat repo)
+- [ ] Codex punkt E: Expo-röstvyn (live text + servertranskribering, redigerbar bekräftelse,
+      fel-fallback, projektkontext från projektsidan). Dashboard-sidan av kontraktet är klar —
+      /api/matte/chat verifierar sidkontextens id:n mot tenanten och injicerar inloggad
+      användare, så mobilen kan lita på svaret.
+- [ ] Codex punkt H: verifiera mobile (Jest-facit + tsc).
 
 ---
 
