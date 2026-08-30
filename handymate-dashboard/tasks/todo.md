@@ -1,3 +1,59 @@
+# Matte Mobile Voice V1 — röst först på hemskärmen (2026-08-30, Claude-branchen claude/lisa-prata-matte-integration-ao7nv3)
+
+Andreas ask: mobilappen (PWA:n) ska vara klar; "Prata med Matte" lättillgänglig direkt på
+första skärmen enligt Codex-designen. Deconfliction: Codex arbetar samtidigt lokalt i
+tool-definitions.ts + tool-router.ts + app/api/voice/* + handymate-mobile — de filerna är
+INTE rörda här (se pausade punkter).
+
+## Klart (verifierat: tsc 0 fel, ren next build, 49/49 i voice-boundaries + matte-page-context + jarvis-hem)
+- [x] Hemskärmens mikrofon är riktig: SkrivRads mic-knapp (båda lägena) öppnar Jobbkompisen
+      på Röst-fliken och AUTOSTARTAR inspelningen (pendingVoice i JobbuddyContext). Textytan
+      öppnar chatten som förut. ETT tryck → prata.
+- [x] EN röstväg: Jobbkompisens inline-MediaRecorder ersatt med delade hooks/useAudioRecording
+      (iOS audio/mp4-fallback, 5 min-tak, spårstädning) och transkriberingen flyttad från
+      legacy /api/jobbuddy/voice till kanoniska /api/matte/transcribe (auth + bränslegrind +
+      kostnadsmätning — routen var byggd men oanvänd). denied/unsupported visas i UI:t.
+- [x] Serverägd sidkontext: /api/matte/chat ägarskapsverifierar customer/project/quote/
+      invoice-id mot business_id innan de styr trådval eller nämns i systemprompten
+      (verifyPageContextOwnership — främmande ID släpps + loggas, felar aldrig chatten).
+- [x] Serverägd identitet: INLOGGAD ANVÄNDARE-block i systemprompten ("jag/mig" = alltid
+      autentiserad business_user, aldrig modellgissning). Bekräftelsevägen trår nu också
+      businessUserId in i ToolContext (handleConfirmedExternalAction).
+- [x] Bekräftelsekort för tid: confirm-gaten (HMAC-token, extern-confirm) omfattar nu även
+      log_time när require_confirm_external är satt — "Matte uppfattade: logga X timmar…"
+      med knappen [Logga]/[Avbryt]. Mobilappens anrop utan parametern är opåverkade.
+
+## Klart efter att Codex arbete pushats till main och mergats in (samma dag)
+- [x] Beständig mikrofon: mic-knapp intill Matte-bubblan, som är monterad i dashboard-
+      layouten och därmed följer med till projektsidor, kundkort och verksamhetsvyn.
+      Inspelningen startas synkront i klicket — iOS Safari kräver getUserMedia inuti gesten.
+- [x] log_time-ombyggnaden gjordes av Codex (identitet, projekt, duration utan påhittade
+      klockslag, kanonisk taxa). Granskad och verifierad av Claude: kolumnerna
+      default_hourly_rate/pricing_settings/time_require_description/require_project finns
+      i live-DB, svDateStr importeras, project-ai-eventet 'time_logged' finns.
+- [x] DUBBELSKYDD (lucka i skarven mellan arbetena): bekräftelse-token är giltig i 15 min
+      och är ingen engångsnyckel, så ett dubbeltryck skrev två tidrader. Skyddet ligger nu
+      vid skrivningen via lib/agent/recent-duplicate.ts — gäller alla vägar in, inte bara
+      chattknappen, och används av alla tre fältskrivningarna.
+- [x] Fältverktygen log_material (project_material) + add_work_note (project_log) klara,
+      med tenantvakt på projektet, dubbelskydd, Lars allowlist och bekräftelsekort med rätt
+      verb (Bokför / Spara). project_log skrivs med livekolumnerna order_id/date/
+      work_performed — sql/rot_rut_documents.sql är föråldrad och får inte användas som facit.
+- [x] Facit: tests/matte-time-logging.spec.ts (16 tester) täcker rätt person, inga påhittade
+      klockslag, ingen dubblett, mänskligt ja före skrivning, samt fältverktygens tenantvakt
+      och kolumnnamn.
+- [x] Verifierat på hela det sammanslagna trädet: tsc 0 fel, ren build (345 sidor), hela
+      Playwright-sviten 5591 gröna / 1 överhoppad.
+
+## ÅTERSTÅR — i Ahogberg/handymate-mobile (annat repo)
+- [ ] Codex punkt E: Expo-röstvyn (live text + servertranskribering, redigerbar bekräftelse,
+      fel-fallback, projektkontext från projektsidan). Dashboard-sidan av kontraktet är klar —
+      /api/matte/chat verifierar sidkontextens id:n mot tenanten och injicerar inloggad
+      användare, så mobilen kan lita på svaret.
+- [ ] Codex punkt H: verifiera mobile (Jest-facit + tsc).
+
+---
+
 # Projektöversikten: datum, dynamiska steg, status + nästa att-göra i listan (2026-08-26, PLAN — väntar på avstämning)
 
 > Aktiv Codex-lane 2026-08-30: [Prelaunch Voice V1](./codex-prelaunch-voice-v1.md)

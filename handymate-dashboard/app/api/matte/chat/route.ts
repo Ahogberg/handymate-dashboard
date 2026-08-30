@@ -24,10 +24,11 @@ import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { executeTool as executeSharedTool } from '@/app/api/agent/trigger/tool-router'
 import { filterTools, fetchBusinessContext, type ToolContext } from '@/lib/agent/agents/shared'
 import {
-  isExternalSendTool,
+  isConfirmGatedTool,
   signPendingExternalAction,
   verifyPendingExternalAction,
   buildExternalActionSummary,
+  confirmLabelForTool,
 } from '@/lib/agent/external-confirm'
 import { getRelevantMemories, buildMemoryPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
 import { getAgentTools } from '@/lib/agents/personalities'
@@ -77,6 +78,66 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 function safeContextId(value: unknown): string | null {
   const text = typeof value === 'string' ? value.trim() : ''
   return /^[A-Za-z0-9_-]{1,100}$/.test(text) ? text : null
+}
+
+interface VerifiedPageContext {
+  customerId: string | null
+  projectId: string | null
+  quoteId: string | null
+  invoiceId: string | null
+}
+
+/**
+ * Serverägd sidkontext (Matte Mobile Voice V1, 2026-08-30). Klientens ID:n
+ * var hittills bara regex-sanerade — här verifieras ägarskapet mot tenanten
+ * innan de får styra trådval eller nämnas i systemprompten. Ett ID som inte
+ * tillhör företaget SLÄPPS (och loggas) i stället för att fela requesten:
+ * chatten ska fungera även när klienten skickar skräp. Verktygslagret
+ * behåller sina egna business_id-vakter — det här är försvar i djup, inte
+ * en ersättning.
+ */
+async function verifyPageContextOwnership(
+  supabase: ReturnType<typeof getServerSupabase>,
+  businessId: string,
+  ids: VerifiedPageContext
+): Promise<VerifiedPageContext> {
+  const out: VerifiedPageContext = { customerId: null, projectId: null, quoteId: null, invoiceId: null }
+  const kontroller: Array<PromiseLike<void>> = []
+
+  const verifiera = (
+    tabell: string,
+    idKolumn: string,
+    varde: string | null,
+    falt: keyof VerifiedPageContext
+  ) => {
+    if (!varde) return
+    kontroller.push(
+      supabase
+        .from(tabell)
+        .select(idKolumn)
+        .eq('business_id', businessId)
+        .eq(idKolumn, varde)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) {
+            // Fail-soft: ett läsfel får inte fälla chatten — men ett
+            // overifierat ID går heller aldrig vidare in i prompten.
+            console.error(`[matte/chat] sidkontext ${falt} kunde inte verifieras (släpps):`, error.message)
+            return
+          }
+          if (data) out[falt] = varde
+          else console.warn(`[matte/chat] sidkontext ${falt}=${varde} tillhör inte företaget — släpps`)
+        })
+    )
+  }
+
+  verifiera('customer', 'customer_id', ids.customerId, 'customerId')
+  verifiera('project', 'project_id', ids.projectId, 'projectId')
+  verifiera('quotes', 'quote_id', ids.quoteId, 'quoteId')
+  verifiera('invoice', 'invoice_id', ids.invoiceId, 'invoiceId')
+
+  await Promise.all(kontroller)
+  return out
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -774,7 +835,7 @@ async function runAgentTurn(opts: {
     // tillbaka till modellen. Klienten får en pending_confirmation och måste
     // svara med en explicit bekräftelse innan exakt detta anrop körs.
     if (opts.requireConfirmExternal) {
-      const gatedBlock = toolUseBlocks.find((b: any) => isExternalSendTool(b.name))
+      const gatedBlock = toolUseBlocks.find((b: any) => isConfirmGatedTool(b.name))
       if (gatedBlock) {
         const text = (response.content || [])
           .filter((b: any) => b.type === 'text')
@@ -886,7 +947,11 @@ async function runAgentTurn(opts: {
  * som resten av Matte, så t.ex. SMS-nattspärren i sendSms gäller precis som
  * vanligt — det här ÄR den enda exekveringen, ingen dubbelgating.
  */
-async function handleConfirmedExternalAction(businessId: string, token: string): Promise<NextResponse> {
+async function handleConfirmedExternalAction(
+  request: NextRequest,
+  businessId: string,
+  token: string
+): Promise<NextResponse> {
   const pending = verifyPendingExternalAction(token, businessId)
   if (!pending) {
     return NextResponse.json(
@@ -897,11 +962,18 @@ async function handleConfirmedExternalAction(businessId: string, token: string):
 
   const supabase = getServerSupabase()
   const bizCtx = await fetchBusinessContext(supabase, businessId, 'user')
-  const toolContext: ToolContext = bizCtx?.toolContext ?? {
-    businessName: '',
-    contactEmail: '',
-    googleConnection: null,
-    triggerSource: 'user',
+  // Identiteten följer med även i bekräftelsevägen (Matte Mobile Voice V1):
+  // ett bekräftat log_time ska attribueras till den som tryckte på knappen,
+  // inte tappa användaren för att exekveringen sker i en senare request.
+  const currentBusinessUser = await getCurrentUser(request, businessId)
+  const toolContext: ToolContext = {
+    ...(bizCtx?.toolContext ?? {
+      businessName: '',
+      contactEmail: '',
+      googleConnection: null,
+      triggerSource: 'user' as const,
+    }),
+    businessUserId: currentBusinessUser?.id ?? null,
   }
 
   const result: any = await executeSharedTool(pending.toolName, pending.toolInput, supabase, businessId, toolContext as any)
@@ -948,7 +1020,7 @@ export async function POST(request: NextRequest) {
     // pending_confirmation-svar när hantverkaren tryckt [Skicka]. Ingen
     // Claude-inblandning här alls — se handleConfirmedExternalAction.
     if (body?.confirm?.token) {
-      return await handleConfirmedExternalAction(business.business_id, String(body.confirm.token))
+      return await handleConfirmedExternalAction(request, business.business_id, String(body.confirm.token))
     }
 
     const { messages, context, images: rawImages, require_confirm_external } = body
@@ -969,8 +1041,10 @@ export async function POST(request: NextRequest) {
     const businessId = business.business_id
     // Optionella thread-params — bakåtkompat: utan dessa beter sig endpoint
     // som tidigare (Matte tar varje meddelande, ingen thread skapas).
-    const customerId: string | null = safeContextId(context?.customerId)
-    const projectId: string | null = safeContextId(context?.projectId)
+    // Sanerade här; ägarskapsverifieras mot tenanten nedan (efter
+    // bränslegrinden) innan de används till trådval eller systemprompt.
+    const rawCustomerId: string | null = safeContextId(context?.customerId)
+    const rawProjectId: string | null = safeContextId(context?.projectId)
     const explicitThreadId: string | null = context?.threadId || null
 
     // ── Bilder: normalisera + validera ─────────────────────────────────
@@ -1038,6 +1112,17 @@ export async function POST(request: NextRequest) {
         reply: 'Hej! Jag är Matte, din AI-assistent. Just nu kan jag inte svara — be din admin kontrollera API-inställningarna.',
       })
     }
+
+    // Serverägd sidkontext: bara ID:n som bevisligen tillhör tenanten går
+    // vidare — se verifyPageContextOwnership ovan.
+    const sidkontext = await verifyPageContextOwnership(supabase, businessId, {
+      customerId: rawCustomerId,
+      projectId: rawProjectId,
+      quoteId: safeContextId(context?.quoteId),
+      invoiceId: safeContextId(context?.invoiceId),
+    })
+    const customerId = sidkontext.customerId
+    const projectId = sidkontext.projectId
 
     // Verktygskontext för de delade tool-router-verktygen (samma som den
     // autonoma agenten) — ger bl.a. Google-koppling för kalender/bokning.
@@ -1338,13 +1423,22 @@ export async function POST(request: NextRequest) {
       const pageRefs = [
         projectId ? `project_id: ${projectId}` : null,
         customerId ? `customer_id: ${customerId}` : null,
-        safeContextId(context?.quoteId) ? `quote_id: ${safeContextId(context?.quoteId)}` : null,
-        safeContextId(context?.invoiceId) ? `invoice_id: ${safeContextId(context?.invoiceId)}` : null,
+        sidkontext.quoteId ? `quote_id: ${sidkontext.quoteId}` : null,
+        sidkontext.invoiceId ? `invoice_id: ${sidkontext.invoiceId}` : null,
       ].filter(Boolean)
       if (pageRefs.length > 0) {
         systemArray.push({
           type: 'text',
-          text: `AKTUELL PRODUKTVY (använd vid ”den här”):\n${pageRefs.join('\n')}\nID:t är en referens, inte ett tenantbevis; verktyget måste fortfarande verifiera ägarskap.`,
+          text: `AKTUELL PRODUKTVY (använd vid ”den här”):\n${pageRefs.join('\n')}\nID:na är serververifierade mot företaget; verktygen behåller ändå sina egna ägarskapskontroller.`,
+        })
+      }
+      // Identiteten är serverns, aldrig modellens: "jag/mig" i samtalet är
+      // ALLTID den autentiserade användaren — Matte får inte gissa vem som
+      // pratar ur samtalstexten (Matte Mobile Voice V1, 2026-08-30).
+      if (currentBusinessUser) {
+        systemArray.push({
+          type: 'text',
+          text: `INLOGGAD ANVÄNDARE: ${currentBusinessUser.name || userName} (business_user_id: ${currentBusinessUser.id}, roll: ${currentBusinessUser.role}). När hantverkaren skriver eller säger "jag", "mig", "min tid" eller "för mig" avses alltid exakt denna användare — aldrig någon annan i teamet.`,
         })
       }
       // Inkludera summary av äldre meddelanden om token-budgeten översteg
@@ -1405,7 +1499,7 @@ export async function POST(request: NextRequest) {
 
         const summary = buildExternalActionSummary(turn.pendingExternal.toolName, turn.pendingExternal.toolInput)
         const token = signPendingExternalAction({
-          toolName: turn.pendingExternal.toolName as 'send_sms' | 'send_email',
+          toolName: turn.pendingExternal.toolName,
           toolInput: turn.pendingExternal.toolInput,
           businessId,
           threadId: thread?.id || null,
@@ -1424,6 +1518,9 @@ export async function POST(request: NextRequest) {
             tool_name: turn.pendingExternal.toolName,
             args: turn.pendingExternal.toolInput,
             summary,
+            // Kortets bekräftelseknapp: "Skicka" för utskick, "Logga" för
+            // tid. Klienten faller tillbaka till "Skicka" om fältet saknas.
+            confirm_label: confirmLabelForTool(turn.pendingExternal.toolName),
             token,
           },
         })

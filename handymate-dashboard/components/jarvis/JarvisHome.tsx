@@ -255,7 +255,7 @@ export default function JarvisHome({
   const business = useBusiness()
   const { level: fuelLevel } = useFuel()
   const fuelCritical = fuelLevel?.state === 'critical'
-  const { setIsOpen: openJobbkompisen, setPendingPrompt } = useJobbuddy()
+  const { setIsOpen: openJobbkompisen, setPendingPrompt, setPendingVoice } = useJobbuddy()
 
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [queueLoaded, setQueueLoaded] = useState(false)
@@ -1598,6 +1598,7 @@ export default function JarvisHome({
         <SkrivRad
           stor={beslut <= 1}
           onOppna={() => openJobbkompisen(true)}
+          onRost={() => { setPendingVoice(true); openJobbkompisen(true) }}
           onChip={prompt => { setPendingPrompt(prompt); openJobbkompisen(true) }}
           tourTarget="hemtur-skriv"
         />

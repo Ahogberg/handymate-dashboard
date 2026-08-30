@@ -39,11 +39,17 @@ export const SKRIVRAD_CHIPS: Array<{ label: string; href: string; prompt: string
 export function SkrivRad({
   stor,
   onOppna,
+  onRost,
   onChip,
   tourTarget,
 }: {
   stor: boolean
   onOppna: () => void
+  /** Matte Mobile Voice V1 (2026-08-30): mikrofonen är inte längre kosmetisk.
+   *  Klick på mic-cirkeln startar en riktig inspelning (Jobbkompisen öppnas
+   *  på Röst-fliken med autostart); klick på textytan öppnar chatten som
+   *  förut. Saknas prop:en faller micken tillbaka till onOppna. */
+  onRost?: () => void
   onChip?: (prompt: string) => void
   /** Hemturens sista stopp (components/tour/HemTur.tsx) markerar rotelementet
    *  direkt i stället för att wrappas — SkrivRad äger sin egen grid-placering
@@ -51,39 +57,54 @@ export function SkrivRad({
   tourTarget?: string
 }) {
   if (!stor) {
-    // Pillen — flyttad ordagrant från JarvisHome (besluten äger skärmen).
+    // Pillen — besluten äger skärmen. Två klickytor: texten → chatt,
+    // micken → röst.
     return (
-      <button
-        type="button"
-        onClick={onOppna}
+      <div
         data-tour-target={tourTarget}
         className="lg:row-start-3 lg:col-start-1 w-full flex items-center gap-2.5 h-12 pl-[18px] pr-2 bg-white border border-slate-200 rounded-full text-sm text-slate-400 hover:border-slate-300 transition-colors"
       >
-        <span className="flex-1 text-left truncate">Säg till Matte — eller tryck. Allt ovanför klaras utan tangentbord.</span>
-        <span className="w-9 h-9 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center shrink-0">
+        <button
+          type="button"
+          onClick={onOppna}
+          className="flex-1 h-full text-left truncate text-slate-400"
+        >
+          Säg till Matte — eller tryck. Allt ovanför klaras utan tangentbord.
+        </button>
+        <button
+          type="button"
+          onClick={onRost ?? onOppna}
+          aria-label="Prata med Matte"
+          className="w-9 h-9 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center shrink-0 hover:bg-primary-100 transition-colors"
+        >
           <Mic className="w-4 h-4" />
-        </span>
-      </button>
+        </button>
+      </div>
     )
   }
 
   return (
     <div data-tour-target={tourTarget} className="lg:row-start-3 lg:col-start-1 bg-white border border-slate-200 rounded-2xl p-4">
-      <button
-        type="button"
-        onClick={onOppna}
-        className="w-full flex items-center gap-3 min-h-[52px] text-left"
-      >
+      <div className="w-full flex items-center gap-3 min-h-[52px]">
         {/* Orkestreringen demonstreras där den ANVÄNDS: här delegerar man
             till Matte, som dirigerar specialisterna. Copyn säger det —
             hellre än ett org-diagram som säger samma sak varje dag. */}
-        <span className="flex-1 text-[15px] text-slate-400 truncate">
+        <button
+          type="button"
+          onClick={onOppna}
+          className="flex-1 min-h-[52px] text-left text-[15px] text-slate-400 truncate"
+        >
           Säg till Matte — teamet tar det därifrån …
-        </span>
-        <span className="w-11 h-11 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center shrink-0 shadow-sm">
+        </button>
+        <button
+          type="button"
+          onClick={onRost ?? onOppna}
+          aria-label="Prata med Matte"
+          className="w-11 h-11 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center shrink-0 shadow-sm hover:opacity-90 transition-opacity"
+        >
           <Mic className="w-5 h-5" />
-        </span>
-      </button>
+        </button>
+      </div>
       <div className="flex flex-wrap gap-2 mt-3">
         {SKRIVRAD_CHIPS.map(chip => (
           <button

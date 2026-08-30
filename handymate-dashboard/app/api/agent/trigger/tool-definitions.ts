@@ -193,6 +193,42 @@ export const toolDefinitions = [
       required: ["duration_minutes"],
     },
   },
+  // Fältkommandon (Matte Mobile Voice V1, 2026-08-30): det hantverkaren
+  // säger med rösten ute på jobbet — "vi använde tre kopplingar och tolv
+  // meter kabel", "skriv en arbetsrapport". Båda kräver ett projekt: utan
+  // det finns ingenstans att bokföra åtgången eller anteckningen.
+  {
+    name: "log_material",
+    description: "Bokför material som gått åt på ett projekt. Använd när hantverkaren berättar vad som förbrukats, t.ex. \"tre kopplingar och tolv meter kabel\". Ett anrop per artikel. Priser är valfria — utan inköpspris bokförs artikeln med noll och kan prissättas senare.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        project_id: { type: "string", description: "Projektets id. Använd aktiv projektkontext när den finns." },
+        name: { type: "string", description: "Artikelns namn, t.ex. \"kopplingar\" eller \"kabel 3G1,5\"." },
+        quantity: { type: "number", description: "Antal. Utelämnas = 1." },
+        unit: { type: "string", description: "Enhet, t.ex. st, m, kg. Utelämnas = st." },
+        purchase_price: { type: "number", description: "Inköpspris per enhet exkl. moms." },
+        markup_percent: { type: "number", description: "Påslag i procent. Utelämnas = företagets standard (20)." },
+        notes: { type: "string" },
+      },
+      required: ["project_id", "name"],
+    },
+  },
+  {
+    name: "add_work_note",
+    description: "Skriv en arbetsanteckning i projektets dagbok — vad som utfördes, avvikelser och antal personer på plats. Använd när hantverkaren sammanfattar dagen eller ett moment. Skriver ALDRIG något som går ut till kunden.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        project_id: { type: "string", description: "Projektets id. Använd aktiv projektkontext när den finns." },
+        work_performed: { type: "string", description: "Vad som utfördes. Referera bara det hantverkaren faktiskt sagt." },
+        log_date: { type: "string", description: "YYYY-MM-DD. Utelämnas = idag i svensk tid." },
+        issues: { type: "string", description: "Avvikelser, hinder eller skador — utelämnas om inget nämnts." },
+        workers_count: { type: "number", description: "Antal personer på plats, om det sagts." },
+      },
+      required: ["project_id", "work_performed"],
+    },
+  },
   // R5 (tasks/resurs-masterplan.md) — persondagen som agentverktyg. Läser
   // SAMMA sammanslagningskälla som resurstavlan (lib/schedule/person-day.ts,
   // "en dag, en sanning") — ingen egen datakälla.
