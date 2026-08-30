@@ -105,7 +105,8 @@ test.describe('telefongrenen bygger korrekt kort (Customer Memory V2, 2026-08-16
     expect(gren).toContain('buildCustomerFactCard(s')
     expect(gren).toContain("evidensKalla: arMote ? 'mötet' : 'samtalet'")
     expect(gren).not.toContain("from('ai_suggestion')")
-    expect(s.slice(i)).toContain("from('pending_approvals')")
+    expect(s.slice(i)).toContain('publishCallCards(')
+    expect(read('sql/v180_call_processing_and_retention.sql')).toContain('INSERT INTO public.pending_approvals')
   })
 
   test('telefongrenen hoppar tyst utan känd kund — samma vakt som mötesgrenen', () => {

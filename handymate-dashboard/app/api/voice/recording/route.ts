@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { verifyElksSignature } from '@/lib/elks-signature'
+import { callRecordingId } from '@/lib/voice/call-processing'
+
+export const maxDuration = 300
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
@@ -40,26 +43,20 @@ export async function POST(request: NextRequest) {
     const to = formData.get('to') as string
     const direction = formData.get('direction') as string
 
-    console.log('Recording received:', {
-      callId,
-      recordingId,
-      duration,
-      recordingUrl,
-      from,
-      to
-    })
-
-    if (!recordingUrl) {
+    if (!recordingUrl || !callId) {
       console.error('No recording URL received')
       return NextResponse.json({ error: 'No recording URL' }, { status: 400 })
     }
 
     // Hitta tidigare inspelning/samtal baserat på elks_recording_id
-    const { data: existingRecording } = await supabase
+    const { data: existingRecording, error: existingError } = await supabase
       .from('call_recording')
-      .select('recording_id, business_id, customer_id')
+      .select('*')
       .eq('elks_recording_id', callId)
-      .single()
+      .maybeSingle()
+    if (existingError) throw existingError
+    // Provider retry must never resurrect data that was already purged.
+    if (existingRecording?.raw_deleted_at) return NextResponse.json({ success: true, ignored: 'expired' })
 
     // Om vi inte hittar samtalet, försök hitta business via telefonnummer
     let businessId = existingRecording?.business_id
@@ -67,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     if (!businessId) {
       // Försök hitta business baserat på to-nummer (inkommande samtal)
-      const phoneToCheck = direction === 'inbound' ? to : from
+      const phoneToCheck = direction === 'outbound' ? from : to
       const { data: business } = await supabase
         .from('business_config')
         .select('business_id')
@@ -86,7 +83,10 @@ export async function POST(request: NextRequest) {
     let error
 
     // Om vi har en befintlig inspelning, uppdatera den. Annars skapa ny.
-    if (existingRecording?.recording_id) {
+    if (existingRecording?.transcript) {
+      // Do not put an audio pointer back after transcription/retention.
+      recording = { recording_id: existingRecording.recording_id }
+    } else if (existingRecording?.recording_id) {
       const result = await supabase
         .from('call_recording')
         .update({
@@ -94,6 +94,8 @@ export async function POST(request: NextRequest) {
           duration_seconds: duration
         })
         .eq('recording_id', existingRecording.recording_id)
+        .eq('business_id', businessId)
+        .is('raw_deleted_at', null)
         .select('recording_id')
         .single()
 
@@ -105,19 +107,20 @@ export async function POST(request: NextRequest) {
       // för hela fyndet (call_recording hade NOLL rader i produktion).
       const result = await supabase
         .from('call_recording')
-        .insert({
-          recording_id: 'rec_' + Math.random().toString(36).substr(2, 9),
+        .upsert({
+          recording_id: callRecordingId(businessId, callId),
           business_id: businessId,
           customer_id: customerId,
-          elks_recording_id: recordingId,
+          source: 'phone',
+          elks_recording_id: callId,
           recording_url: recordingUrl,
           duration_seconds: duration,
-          phone_number: direction === 'inbound' ? from : to,
+          phone_number: direction === 'outbound' ? to : from,
           from_number: from,
           to_number: to,
           direction: direction || 'inbound',
           created_at: new Date().toISOString()
-        })
+        }, { onConflict: 'recording_id', ignoreDuplicates: true })
         .select('recording_id')
         .single()
 
@@ -130,9 +133,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Database error' }, { status: 500 })
     }
 
-    // Trigga transkribering asynkront (fire and forget)
+    // Await the chain: a returned success means the handoff was accepted, not
+    // a fire-and-forget promise that serverless may discard.
     if (recording?.recording_id) {
-      fetch(`${APP_URL}/api/voice/transcribe`, {
+      const downstream = await fetch(`${APP_URL}/api/voice/transcribe`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -142,7 +146,8 @@ export async function POST(request: NextRequest) {
           ...(process.env.CRON_SECRET ? { 'x-internal-secret': process.env.CRON_SECRET } : {}),
         },
         body: JSON.stringify({ recording_id: recording.recording_id })
-      }).catch(err => console.error('Failed to trigger transcription:', err))
+      })
+      if (!downstream.ok) return NextResponse.json({ error: 'Inspelningen är sparad men efterarbetet behöver ett nytt försök.' }, { status: 503 })
     }
 
     console.log('Recording saved:', recording?.recording_id)

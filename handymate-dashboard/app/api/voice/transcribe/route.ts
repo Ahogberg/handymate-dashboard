@@ -4,6 +4,9 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { recordCost } from '@/lib/costs/record'
 import { whisperCostOre } from '@/lib/costs/meter'
 import { checkFuelGate } from '@/lib/costs/fuel'
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
+
+export const maxDuration = 300
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 const ELKS_API_USER = process.env.ELKS_API_USER
@@ -59,13 +62,29 @@ export async function POST(request: NextRequest) {
     if (!internalOk && recording.business_id !== authed!.business_id) {
       return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
     }
+    if (!internalOk) {
+      const user = await getCurrentUser(request, authed!.business_id)
+      if (!user || !isOwnerOrAdmin(user) || authed!._impersonation) return NextResponse.json({ error: 'Saknar behörighet' }, { status: 403 })
+    }
 
     const fuel = await checkFuelGate(supabase, recording.business_id)
     if (!fuel.allowed) {
       return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
     }
 
+    if (recording.raw_deleted_at) return NextResponse.json({ error: 'Samtalets underlag har gallrats.' }, { status: 410 })
+    const continueAnalysis = async () => {
+      if (!process.env.CRON_SECRET) throw new Error('Efterarbetet saknar intern autentisering.')
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+      const response = await fetch(`${appUrl}/api/voice/analyze`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.CRON_SECRET },
+        body: JSON.stringify({ recording_id }),
+      })
+      return response.ok
+    }
     if (recording.transcript) {
+      if (!await continueAnalysis()) return NextResponse.json({ success: false, transcribed: true, recording_id,
+        error: 'Transkriptet finns, men efterarbetet behöver kompletteras från samtalsvyn.' }, { status: 503 })
       return NextResponse.json({
         success: true,
         message: 'Already transcribed',
@@ -83,9 +102,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Ladda ner inspelningen från 46elks
-    console.log('Downloading recording from:', recording.recording_url)
-
-    const audioResponse = await fetch(recording.recording_url, {
+    // Credentials must never follow a supplied URL or redirect to a third party.
+    const audioUrl = new URL(recording.recording_url || '')
+    if (audioUrl.protocol !== 'https:' || audioUrl.hostname !== 'api.46elks.com' || audioUrl.username || audioUrl.password) {
+      return NextResponse.json({ error: 'Inspelningsadressen kunde inte verifieras.' }, { status: 400 })
+    }
+    const audioResponse = await fetch(audioUrl.toString(), {
+      redirect: 'error',
       headers: {
         'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64')
       }
@@ -120,19 +143,22 @@ export async function POST(request: NextRequest) {
     const whisperResult = await whisperResponse.json()
     const transcript = whisperResult.text
 
-    console.log('Transcription complete:', transcript?.substring(0, 100))
+    if (typeof transcript !== 'string' || !transcript.trim()) throw new Error('Inget tal kunde transkriberas.')
 
     // Spara transkriptet i databasen
-    const { error: updateError } = await supabase
+    const { data: savedTranscript, error: updateError } = await supabase
       .from('call_recording')
       .update({
         transcript: transcript,
         transcribed_at: new Date().toISOString()
       })
       .eq('recording_id', recording_id)
+      .eq('business_id', recording.business_id)
+      .is('raw_deleted_at', null)
+      .select('recording_id').maybeSingle()
 
-    if (updateError) {
-      console.error('Error saving transcript:', updateError)
+    if (updateError || !savedTranscript) {
+      throw new Error('Transkriptet kunde inte sparas. Ingen analys startades.')
     }
 
     // ═══ WHISPER-KOSTNADEN BOKFÖRS (COGS-mätaren, 2026-08-08) ═══
@@ -166,15 +192,8 @@ export async function POST(request: NextRequest) {
     // på instruktioner som råkade sägas i samtalet. Efteranalysen nedan är den
     // enda mottagaren: den kvalificerar leadet och skapar granskningsbara kort.
     // Missat-samtal-SMS:et körs separat i 46elks whenhangup-rälsen.
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-    fetch(`${appUrl}/api/voice/analyze`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-internal-secret': process.env.CRON_SECRET || '',
-      },
-      body: JSON.stringify({ recording_id })
-    }).catch(err => console.error('Failed to trigger analysis:', err))
+    if (!await continueAnalysis()) return NextResponse.json({ success: false, transcribed: true, recording_id,
+      error: 'Transkriptet är sparat, men efterarbetet behöver kompletteras från samtalsvyn.' }, { status: 503 })
 
     return NextResponse.json({
       success: true,

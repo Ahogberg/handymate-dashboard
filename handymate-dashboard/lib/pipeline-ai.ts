@@ -2,8 +2,9 @@ import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServerSupabase } from '@/lib/supabase'
-import { moveDeal, getAutomationSettings } from '@/lib/pipeline'
+import { getAutomationSettings } from '@/lib/pipeline'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
+import type { CallPipelineResult } from '@/lib/voice/call-processing'
 
 interface CallAnalysis {
   isNewLead: boolean
@@ -53,6 +54,7 @@ export async function analyzeCallForPipeline(params: {
         .from('deal')
         .select('id, title, stage_id')
         .eq('customer_id', customer.customer_id)
+        .eq('business_id', params.businessId)
         .limit(5)
 
       if (deals && deals.length > 0) {
@@ -122,13 +124,7 @@ export async function processCallForPipeline(params: {
   businessId: string
   transcript: string
   callerPhone: string
-}): Promise<{
-  action: string
-  leadId?: string
-  dealId?: string
-  customerId?: string
-  aiConfidence: number
-}> {
+}): Promise<CallPipelineResult> {
   const settings = await getAutomationSettings(params.businessId)
   if (!settings || !settings.ai_analyze_calls) {
     return { action: 'skipped', aiConfidence: 0 }
@@ -148,7 +144,8 @@ export async function processCallForPipeline(params: {
   if (
     analysis.isNewLead &&
     analysis.leadConfidence >= leadThreshold &&
-    settings.auto_create_leads
+    settings.auto_create_leads &&
+    /^\+[1-9]\d{7,14}$/.test(params.callerPhone)
   ) {
     const supabase = getServerSupabase()
 
@@ -166,12 +163,14 @@ export async function processCallForPipeline(params: {
     if (existingLeadError) throw existingLeadError
 
     if (existingLead) {
-      const { data: existingDeal } = await supabase
+      const { data: existingDeal, error: existingDealError } = await supabase
         .from('deal')
         .select('id')
         .eq('business_id', params.businessId)
         .eq('lead_id', existingLead.lead_id)
         .maybeSingle()
+      if (existingDealError) throw existingDealError
+      if (!existingDeal) throw new Error('Lead finns men saknar affär. Kräver granskning; ingen dubblett skapas.')
       return {
         action: 'already_created',
         leadId: existingLead.lead_id,
@@ -226,110 +225,28 @@ export async function processCallForPipeline(params: {
     }
   }
 
-  // Move existing deal based on intent
-  if (
-    analysis.suggestedAction === 'move_to_accepted' &&
-    analysis.intentConfidence >= threshold
-  ) {
-    // Find existing deal for this caller
-    const supabase = getServerSupabase()
-    const { data: customer } = await supabase
-      .from('customer')
-      .select('customer_id')
-      .eq('business_id', params.businessId)
-      .eq('phone_number', params.callerPhone)
-      .single()
-
-    if (customer) {
-      const { data: deal } = await supabase
-        .from('deal')
-        .select('id')
-        .eq('customer_id', customer.customer_id)
-        .eq('business_id', params.businessId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      if (deal) {
-        // V80: 'quote_accepted' är borttaget (sql/v80_merge_accepted_into_won.sql)
-        // — AI-detekterat accept under samtal flyttar numera direkt till 'won'.
-        await moveDeal({
-          dealId: deal.id,
-          businessId: params.businessId,
-          toStageSlug: 'won',
-          triggeredBy: 'ai',
-          aiConfidence: analysis.intentConfidence,
-          aiReason: analysis.reasoning,
-          sourceCallId: params.callId,
-        })
-
-        return {
-          action: 'moved_to_accepted',
-          dealId: deal.id,
-          customerId: customer.customer_id,
-          aiConfidence: analysis.intentConfidence,
-        }
-      }
-    }
-  }
-
-  if (
-    analysis.suggestedAction === 'move_to_lost' &&
-    analysis.intentConfidence >= threshold
-  ) {
-    const supabase = getServerSupabase()
-    const { data: customer } = await supabase
-      .from('customer')
-      .select('customer_id')
-      .eq('business_id', params.businessId)
-      .eq('phone_number', params.callerPhone)
-      .single()
-
-    if (customer) {
-      const { data: deal } = await supabase
-        .from('deal')
-        .select('id')
-        .eq('customer_id', customer.customer_id)
-        .eq('business_id', params.businessId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      if (deal) {
-        await moveDeal({
-          dealId: deal.id,
-          businessId: params.businessId,
-          toStageSlug: 'lost',
-          triggeredBy: 'ai',
-          aiConfidence: analysis.intentConfidence,
-          aiReason: analysis.extractedInfo.declineReason || analysis.reasoning,
-          sourceCallId: params.callId,
-        })
-
-        return {
-          action: 'moved_to_lost',
-          dealId: deal.id,
-          customerId: customer.customer_id,
-          aiConfidence: analysis.intentConfidence,
-        }
-      }
-    }
-  }
+  // Ett telefonnummer identifierar inte en affär. Ingen senaste-affär-gissning
+  // och ingen statusmutation från ett externt transkript. Granskningen nedan
+  // skapar en vanlig uppföljningsuppgift, inte ett nytt statusverktyg.
+  const needsReview = ['move_to_accepted', 'move_to_lost'].includes(analysis.suggestedAction)
+    && analysis.intentConfidence >= threshold
 
   // Även utan pipelineåtgärd får efteranalysen använda en SÄKER, tenant-
   // verifierad befintlig kundmatch för sina granskningskort.
   const supabase = getServerSupabase()
-  const { data: matchedCustomer } = params.callerPhone
+  const { data: matchedCustomer, error: matchError } = params.callerPhone
     ? await supabase
         .from('customer')
         .select('customer_id')
         .eq('business_id', params.businessId)
         .eq('phone_number', params.callerPhone)
         .maybeSingle()
-    : { data: null }
+    : { data: null, error: null }
+  if (matchError) throw matchError
 
   return {
-    action: 'no_action',
+    action: needsReview ? 'review_required' : 'no_action',
+    ...(needsReview ? { reviewReason: 'Samtalet kan gälla ett ja eller nej till en affär. Kontrollera vilken affär det gäller och uppdatera den manuellt. Ingen affärsstatus har ändrats.' } : {}),
     customerId: matchedCustomer?.customer_id || undefined,
     aiConfidence: analysis.intentConfidence,
   }

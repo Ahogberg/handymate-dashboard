@@ -321,7 +321,9 @@ export default function ApprovalsPage() {
       // .in('status', ['approved','rejected','expired','auto_approved']).
       const { data: { session } } = await supabase.auth.getSession()
       const status = activeTab === 'pending' ? 'pending' : 'resolved'
-      const res = await fetch(`/api/approvals?status=${status}&limit=50`, {
+      const recordingId = new URLSearchParams(window.location.search).get('recording_id')
+      const callFilter = recordingId ? `&recording_id=${encodeURIComponent(recordingId)}` : ''
+      const res = await fetch(`/api/approvals?status=${status}&limit=50${callFilter}`, {
         headers: {
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
@@ -332,7 +334,7 @@ export default function ApprovalsPage() {
       }
       // Misslyckade utföranden (senaste 7 dagarna) — egen pseudo-status i
       // GET-routen. Hämtas tyst; ett fel här får aldrig störa huvudkön.
-      const failedRes = await fetch(`/api/approvals?status=execution_failed&limit=20`, {
+      const failedRes = await fetch(`/api/approvals?status=execution_failed&limit=20${callFilter}`, {
         headers: {
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },

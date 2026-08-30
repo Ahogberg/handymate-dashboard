@@ -17,6 +17,8 @@ interface TimelineEvent {
   project?: TimelineProjectReference | null
 }
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -199,7 +201,8 @@ export async function GET(
   if (filter === 'all' || filter === 'calls') {
     const { data: recordings } = await supabase
       .from('call_recording')
-      .select('recording_id, source, phone_number, transcript_summary, duration_seconds, booking_id, created_at')
+      // v180 project_id is optional during manual deployment; DTO below is explicit.
+      .select('*')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
@@ -219,6 +222,7 @@ export async function GET(
           duration_seconds: r.duration_seconds,
           recording_id: r.recording_id,
           booking_id: r.booking_id,
+          project_id: r.project_id || null,
         },
       })
     }

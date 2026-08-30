@@ -81,7 +81,7 @@ function truncate(text: unknown, max: number): string {
  * Bygg push-template per approval_type. Returnerar null om typen
  * inte ska generera push (default-case för okända typer).
  */
-function buildPushTemplate(
+export function buildPushTemplate(
   approvalType: string,
   payload: Record<string, any>,
 ): PushTemplate | null {
@@ -218,8 +218,9 @@ function buildPushTemplate(
       const isPhoneCall = payload.source === 'phone_call'
       return {
         title: isPhoneCall ? 'Lisa har sammanfattat ett samtal' : 'Matte har sammanfattat ett möte',
-        body: truncate(payload.summary || 'Öppna sammanfattningen och se vad teamet föreslår.', 110),
-        url: '/approvals?filter=meeting_summary',
+        body: isPhoneCall ? 'Se vad som registrerats och vad som behöver ditt beslut.' : truncate(payload.summary || 'Öppna sammanfattningen och se vad teamet föreslår.', 110),
+        url: isPhoneCall && typeof payload.recording_id === 'string'
+          ? `/dashboard/recordings/${encodeURIComponent(payload.recording_id)}` : '/approvals?filter=meeting_summary',
       }
     }
 
@@ -316,6 +317,11 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
   // faller tillbaka till oförändrat businessblast, precis som innan detta
   // fält fanns.
   const targetUserId = await resolveTargetUserId(approval.routed_business_user_id)
+  // A confidential call must never fall back to a whole-business blast.
+  if (approval.approval_type === 'meeting_summary' && payload.source === 'phone_call' && !targetUserId) {
+    console.error('[approval-push] samtalsnotis saknar verifierad mottagare')
+    return
+  }
 
   try {
     const res = await fetch(`${appUrl}/api/push/send`, {

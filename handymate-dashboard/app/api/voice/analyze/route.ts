@@ -10,6 +10,10 @@ import { buildCustomerFactCard } from '@/lib/customer-facts/build-card'
 import { splitTranscript, MAP_REDUCE_TROSKEL_TECKEN } from '@/lib/meetings/split-transcript'
 import { checkFuelGate } from '@/lib/costs/fuel'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
+import { claimCallProcessing, callProcessingRpc, publishCallCards, type CallPipelineResult } from '@/lib/voice/call-processing'
+
+export const maxDuration = 300
 
 function getAnthropic() {
   return new Anthropic({
@@ -269,6 +273,8 @@ async function runMeetingMapReduce(params: {
  * POST body: { recording_id: string }
  */
 export async function POST(request: NextRequest) {
+  let releaseWork: ((failed: boolean) => Promise<void>) | undefined
+  let published = false
   try {
     // Behörighet: antingen inloggat företag (dashboard) eller internt anrop
     // (transcribe-kedjan server-till-server med CRON_SECRET). Routen skrev
@@ -280,8 +286,12 @@ export async function POST(request: NextRequest) {
     if (!authed && !internalOk) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    if (!internalOk) {
+      const user = await getCurrentUser(request, authed!.business_id)
+      if (!user || !isOwnerOrAdmin(user) || authed!._impersonation) return NextResponse.json({ error: 'Saknar behörighet' }, { status: 403 })
+    }
 
-    let supabase
+    let supabase: SupabaseClient
     try {
       supabase = getServerSupabase()
     } catch {
@@ -312,6 +322,7 @@ export async function POST(request: NextRequest) {
         *,
         customer (
           customer_id,
+          business_id,
           name,
           phone_number,
           email,
@@ -346,45 +357,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Recording not found' }, { status: 404 })
     }
 
-    const fuel = await checkFuelGate(supabase, recording.business_id)
-    if (!fuel.allowed) {
-      return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
+    // Service role bypasses RLS; a stored FK is not proof of tenant ownership.
+    if (recording.customer_id && (!recording.customer || recording.customer.business_id !== recording.business_id)) {
+      return NextResponse.json({ error: 'Kundkopplingen kunde inte verifieras. Kontakta supporten.' }, { status: 409 })
     }
 
+    if (recording.raw_deleted_at) return NextResponse.json({ error: 'Samtalets underlag har gallrats.' }, { status: 410 })
     if (!recording.transcript) {
       return NextResponse.json({
         error: 'No transcript available for analysis'
       }, { status: 400 })
     }
 
-    // Dubbelkörningsspärr. Analysen körs numera ALLTID automatiskt efter
-    // transkriberingen — men UI:t har också en Analysera-knapp. Utan spärren
-    // hade knappen skapat en andra uppsättning identiska kort (och betalat
-    // en Haiku-körning till). Samma samtal analyseras en gång.
-    const [{ data: befintligaLegacy }, { data: befintligaKort }] = await Promise.all([
-      supabase
-        .from('ai_suggestion')
-        .select('suggestion_id, suggestion_type, title, status')
-        .eq('recording_id', recording_id)
-        .limit(20),
-      supabase
-        .from('pending_approvals')
-        .select('id, approval_type, title, status')
-        .eq('business_id', recording.business_id)
-        .contains('payload', { recording_id })
-        .limit(20),
-    ])
-    const befintliga = [...(befintligaKort || []), ...(befintligaLegacy || [])]
-
-    if (befintliga.length > 0) {
-      return NextResponse.json({
-        success: true,
-        recording_id,
-        already_analyzed: true,
-        summary: recording.transcript_summary || null,
-        suggestions_created: 0,
-        suggestions: befintliga,
-      })
+    // V180: claim is atomic; another worker cannot run the lead producer.
+    // A cached extraction survives an insert failure. Old batches are NOT
+    // declared complete merely because one summary happened to be saved.
+    const work = await claimCallProcessing(supabase, recording.business_id, recording_id)
+    if (work.status === 'complete') return NextResponse.json({ success: true, already_analyzed: true, recording_id, summary: recording.transcript_summary, suggestions_created: 0 })
+    if (work.status !== 'claimed') return NextResponse.json({
+      error: work.status === 'legacy' ? 'Äldre samtalsförslag finns. Granska dem innan en ny analys görs.' : 'Samtalet bearbetas redan eller underlaget är gallrat.',
+      code: work.status,
+    }, { status: 409 })
+    const checkpoint = (data: Record<string, unknown>) => callProcessingRpc(supabase, recording.business_id, recording_id, 'checkpoint', work.token, data)
+    releaseWork = async (failed) => {
+      await callProcessingRpc(supabase, recording.business_id, recording_id, 'release', work.token,
+        failed ? { error_code: 'analysis_failed' } : {})
+    }
+    if (!work.state.result || !work.state.pipeline) {
+      const fuel = await checkFuelGate(supabase, recording.business_id)
+      if (!fuel.allowed) return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
     }
 
     // Hämta business-info för kontext
@@ -599,6 +600,8 @@ Svara ENDAST med JSON i följande format:
     // omedvetet om vilken väg som kördes.
     const anvandMapReduce = arMote && recording.transcript.length > MAP_REDUCE_TROSKEL_TECKEN
 
+    let analysisResult = work.state.result
+    if (!analysisResult) {
     const response = anvandMapReduce
       ? await runMeetingMapReduce({
           anthropic,
@@ -641,7 +644,6 @@ Svara ENDAST med JSON i följande format:
     const responseText = response.content[0].type === 'text' ? response.content[0].text : ''
 
     // Extrahera JSON från svaret
-    let analysisResult
     try {
       // Försök parsa hela svaret som JSON
       analysisResult = JSON.parse(responseText)
@@ -655,48 +657,29 @@ Svara ENDAST med JSON i följande format:
       }
     }
 
-    console.log('Analysis result:', analysisResult)
-
-    // Spara sammanfattningen på inspelningen
-    await supabase
-      .from('call_recording')
-      .update({
-        transcript_summary: analysisResult.summary
-      })
-      .eq('recording_id', recording_id)
+    if (!analysisResult || typeof analysisResult.summary !== 'string' || !Array.isArray(analysisResult.suggestions)) {
+      throw new Error('Analysen saknade ett läsbart resultat. Försök igen.')
+    }
+    await checkpoint({ result: analysisResult })
+    }
 
     // Om det är en ny kund och vi har info, skapa/uppdatera kund
     const extractedInfo = analysisResult.extracted_info || {}
     let customerId = recording.customer_id
 
-    if (!customerId && extractedInfo.customer_name) {
+    if (!customerId && recording.phone_number) {
       // Kolla om kund redan finns med samma telefonnummer
-      const { data: existingCustomer } = await supabase
+      const { data: existingCustomer, error: customerError } = await supabase
         .from('customer')
         .select('customer_id')
         .eq('business_id', recording.business_id)
         .eq('phone_number', recording.phone_number)
         .maybeSingle()
+      if (customerError) throw customerError
 
       if (existingCustomer) {
         customerId = existingCustomer.customer_id
-        // Uppdatera med ny info om det finns
-        // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): address är
-        // inte en kolumn på customer (address_line/postal_code/city sedan
-        // tidigare) — samma fynd som i embedded-selecten ovan. Skriver till
-        // address_line (bästa enkla platsen för en ostrukturerad AI-
-        // extraherad adress) istället för det obefintliga fältet.
-        if (extractedInfo.address || extractedInfo.email) {
-          await supabase
-            .from('customer')
-            .update({
-              name: extractedInfo.customer_name,
-              address_line: extractedInfo.address || undefined,
-              email: extractedInfo.email || undefined
-            })
-            .eq('customer_id', customerId)
-            .eq('business_id', recording.business_id)
-        }
+        // Caller-ID is a candidate, never authority to overwrite contact details.
       }
     }
 
@@ -722,23 +705,19 @@ Svara ENDAST med JSON i följande format:
     // inget offert-, uppföljnings- eller kundfaktautfall verkställs direkt
     // från ett externt transkript. Det gamla ai_suggestion/auto-approve-
     // sidospåret är därmed borta ur den körande vägen.
-    let pipelineResult: {
-      action: string
-      leadId?: string
-      dealId?: string
-      customerId?: string
-      aiConfidence: number
-    } | null = null
+    let pipelineResult: CallPipelineResult | null = work.state.pipeline || null
+    let pipelineFailed = false
 
     if (!arMote) {
       try {
         const { processCallForPipeline } = await import('@/lib/pipeline-ai')
-        pipelineResult = await processCallForPipeline({
+        pipelineResult = pipelineResult || await processCallForPipeline({
           callId: recording_id,
           businessId: recording.business_id,
           transcript: recording.transcript,
           callerPhone: recording.phone_number || '',
         })
+        await checkpoint({ pipeline: pipelineResult })
         if (!customerId && pipelineResult.customerId) {
           customerId = pipelineResult.customerId
           const { error: kopplingsFel } = await supabase
@@ -747,14 +726,20 @@ Svara ENDAST med JSON i följande format:
             .eq('recording_id', recording_id)
             .eq('business_id', recording.business_id)
           if (kopplingsFel) {
-            console.error('[voice/analyze] kunde inte koppla samtalet till Golden Path-kunden:', kopplingsFel.message)
+            throw kopplingsFel
           }
         }
       } catch (pipelineError) {
         // Analysen och sammanfattningskortet är fortfarande värdefulla. Vi
         // påstår aldrig att leadet skapades; felet syns i svaret/loggen.
         console.error('[voice/analyze] pipeline-kvalificering misslyckades:', pipelineError)
+        pipelineFailed = true
       }
+    }
+    if (customerId && customerId !== recording.customer_id) {
+      const { error: linkError } = await supabase.from('call_recording').update({ customer_id: customerId })
+        .eq('business_id', recording.business_id).eq('recording_id', recording_id)
+      if (linkError) throw linkError
     }
 
     {
@@ -809,7 +794,8 @@ Svara ENDAST med JSON i följande format:
 
       const kort: Array<Record<string, unknown>> = []
       let utelamnadeUtanKund = 0
-      for (const s of suggestions) {
+      for (let suggestionIndex = 0; suggestionIndex < suggestions.length; suggestionIndex++) {
+        const s = suggestions[suggestionIndex]
         if (s.confidence < 0.4) continue
         const kallform = arMote ? 'mötet' : 'samtalet'
         const evidens = s.source_text ? ` Ur ${kallform}: "${s.source_text}"` : ''
@@ -867,6 +853,15 @@ Svara ENDAST med JSON i följande format:
             },
           })
         }
+        const lastCard = kort[kort.length - 1]
+        lastCard.payload = { ...(lastCard.payload as Record<string, unknown>), call_card_key: `suggestion:${suggestionIndex}` }
+      }
+
+      if (pipelineResult?.action === 'review_required') {
+        kort.push({ approval_type: 'meeting_followup', title: 'Kontrollera vilken affär samtalet gäller',
+          description: pipelineResult.reviewReason, risk_level: 'low',
+          payload: { title: 'Kontrollera vilken affär samtalet gäller', description: pipelineResult.reviewReason,
+            recording_id, customer_id: customerId, routed_agent: 'lisa', call_card_key: 'pipeline-review' } })
       }
 
       // Sammanfattningskortet — alltid, även när inga förslag hittades.
@@ -902,40 +897,30 @@ Svara ENDAST med JSON i följande format:
         ...(!arMote && routedBusinessUserId ? { routed_business_user_id: routedBusinessUserId } : {}),
       })
 
-      let skapadeKort = 0
-      for (const k of kort) {
-        const { error: kortFel } = await supabase.from('pending_approvals').insert({
-          id: `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-          business_id: recording.business_id,
-          status: 'pending',
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          ...k,
+      const batch = await publishCallCards(supabase, recording.business_id, recording_id, work.token, kort, pipelineFailed)
+      published = true
+      // Single notification AFTER every proposal is durable. No customer text on
+      // the lock screen; no broadcast when the recipient cannot be resolved.
+      if (!arMote && routedBusinessUserId) {
+        const notice = await callProcessingRpc(supabase, recording.business_id, recording_id, 'notify', work.token)
+        if (notice.claimed) await sendApprovalPush({
+          business_id: recording.business_id, approval_type: 'meeting_summary',
+          payload: { recording_id, source: 'phone_call' }, risk_level: kort.some(k => k.risk_level === 'high') ? 'high' : 'low',
+          routed_business_user_id: routedBusinessUserId,
         })
-        if (kortFel) {
-          console.error('[voice/analyze] samtalskort kunde inte skapas:', kortFel.message)
-        } else {
-          skapadeKort++
-          if (!arMote && k.approval_type === 'meeting_summary') {
-            void sendApprovalPush({
-              business_id: recording.business_id,
-              approval_type: 'meeting_summary',
-              payload: k.payload as Record<string, unknown>,
-              risk_level: 'low',
-              routed_business_user_id: routedBusinessUserId,
-            })
-          }
-        }
       }
 
       // Smart communication körs medvetet inte här. Ett transkript är evidens
       // till ägarens granskningskort, aldrig ett självständigt kundutskick.
       return NextResponse.json({
-        success: true,
+        success: !pipelineFailed,
         recording_id,
         summary: analysisResult.summary,
-        cards_created: skapadeKort,
+        cards_created: batch.cards_created,
+        suggestions_created: batch.cards_created,
         pipeline: pipelineResult,
-      })
+        ...(pipelineFailed ? { error: 'Sammanfattningen är sparad, men affärskopplingen kunde inte slutföras. Försök igen.', partial: true } : {}),
+      }, { status: pipelineFailed ? 503 : 200 })
     }
 
   } catch (error: any) {
@@ -943,5 +928,7 @@ Svara ENDAST med JSON i följande format:
     return NextResponse.json({
       error: error.message || 'Analysis failed'
     }, { status: 500 })
+  } finally {
+    if (releaseWork) await releaseWork(!published).catch(() => console.error('[voice/analyze] bearbetningslåset kunde inte släppas; tidsgränsen frigör det'))
   }
 }

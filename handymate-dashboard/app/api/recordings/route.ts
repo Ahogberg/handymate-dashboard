@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 
 /**
  * GET - Lista inspelningar för ett företag
@@ -47,11 +48,16 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const user = await getCurrentUser(request, business.business_id)
+    if (!user || !isOwnerOrAdmin(user) || business._impersonation) {
+      return NextResponse.json({ error: 'Saknar behörighet' }, { status: 403 })
+    }
+
     const supabase = getServerSupabase()
     const { recording_id, transcript } = await request.json()
 
-    if (!recording_id) {
-      return NextResponse.json({ error: 'Missing recording_id' }, { status: 400 })
+    if (typeof recording_id !== 'string' || typeof transcript !== 'string') {
+      return NextResponse.json({ error: 'Inspelning och transkript krävs.' }, { status: 400 })
     }
 
     const updateData: any = {}
@@ -66,12 +72,16 @@ export async function PATCH(request: NextRequest) {
       .update(updateData)
       .eq('recording_id', recording_id)
       .eq('business_id', business.business_id)
+      .is('raw_deleted_at', null)
+      .eq('call_processing', '{}')
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    if (!data) return NextResponse.json({ error: 'Transkriptet kan inte ändras efter påbörjad analys eller gallring, eller så saknas inspelningen.' }, { status: 409 })
 
     return NextResponse.json({ success: true, recording: data })
 
@@ -91,6 +101,11 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const user = await getCurrentUser(request, business.business_id)
+    if (!user || !isOwnerOrAdmin(user) || business._impersonation) {
+      return NextResponse.json({ error: 'Saknar behörighet' }, { status: 403 })
+    }
+
     const supabase = getServerSupabase()
     const { searchParams } = new URL(request.url)
     const recording_id = searchParams.get('recording_id')
@@ -99,11 +114,22 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Missing recording_id' }, { status: 400 })
     }
 
-    // Ta bort relaterade AI-förslag först
-    await supabase
+    // Resolve ownership BEFORE child deletion. Phone tombstones must survive
+    // callbacks; deleting one row is not erasure at the recording provider.
+    const existing = await supabase.from('call_recording').select('recording_id, source')
+      .eq('business_id', business.business_id).eq('recording_id', recording_id).maybeSingle()
+    if (existing.error) throw existing.error
+    if (!existing.data) return NextResponse.json({ error: 'Inspelningen hittades inte.' }, { status: 404 })
+    if (existing.data.source === 'phone') return NextResponse.json({
+      error: 'Telefonsamtal gallras enligt lagringspolicyn. Kontakta supporten för en tidigare radering även hos inspelningsleverantören.',
+    }, { status: 409 })
+
+    const suggestions = await supabase
       .from('ai_suggestion')
       .delete()
       .eq('recording_id', recording_id)
+      .eq('business_id', business.business_id)
+    if (suggestions.error) throw suggestions.error
 
     // Ta bort inspelningen
     const { error } = await supabase

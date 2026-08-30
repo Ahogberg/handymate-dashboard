@@ -1,3 +1,35 @@
+# Samtalsefterarbete — Codex 2026-08-30
+
+Andreas godkände fortsatt bygge: säker affärsmatchning, återförsök, samlat
+samtalsutfall/push och avstängd gallring enligt policyförslaget. Inga skarpa
+raderingar eller migrationer körs i detta pass. Claudes mobil-/Mattearbete
+och alla befintliga marketingändringar lämnas orörda.
+
+- [x] Ta bort automatisk vunnen/förlorad-matchning på senaste kundaffär.
+- [x] Bearbetningslås, sparad analys och atomisk/idempotent kortpublicering.
+- [x] Samlad läsmodell, behörig samtalsvy och en diskret push efter sparning.
+- [x] Explicit, tenant-verifierad projektkoppling; återanvänd kundtidslinjen.
+- [x] Gallringskod + migration v180; avstängd tills policy/leverantör verifierats.
+- [x] Felvägstester, kolumnkontrakt, tsc/build och överlämningsprotokoll.
+
+## Granskning
+
+Lokalt klart, inte committat/deployat. Dashboard: 289 browserlösa facit gröna,
+tsc exit 0 och next build exit 0. Expo: tsc rent, 17 sviter/112 tester gröna.
+Migration v180 kompilerad och provad med 29 gröna kontroller i isolerad
+PGlite/PostgreSQL — aldrig körd mot Supabase. Live-schema läst enbart via
+information_schema. Webbvyn visuellt kontrollerad i 390 px mobilbredd.
+Builden loggar även miljö-/metadata-/cachevarningar; exitkoden är 0, men det
+är inte ett skarpbevis av integrationerna eller hela sessionsberoende sviten.
+
+Se docs/audits/CALL_POSTPROCESSING_V1_HANDOFF.md för filområden, återförsöks-
+begränsningar och aktiveringsordning. Leverantörsradering, policybeslut och
+fysisk telefon-/mobilprovning återstår som skarpa grindar. Inspelning vidare-
+kopplar oinspelat utan explicit godkännande/leverantörsverifiering/ljudmanus.
+Gallring är avstängd. Ingen ny behandling eller radering har aktiverats i prod.
+
+---
+
 # Matte Mobile Voice V1 — röst först på hemskärmen (2026-08-30, Claude-branchen claude/lisa-prata-matte-integration-ao7nv3)
 
 Andreas ask: mobilappen (PWA:n) ska vara klar; "Prata med Matte" lättillgänglig direkt på

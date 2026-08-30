@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { verifyElksSignature } from '@/lib/elks-signature'
+import { recordingNoticeUrl } from '@/lib/voice/retention'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
         personal_phone,
         forward_phone_number,
         call_recording_consent_message,
+        call_recording_enabled,
         assigned_phone_number
       `)
       .eq('assigned_phone_number', to)
@@ -60,34 +62,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ "hangup": "no_forward_number" })
     }
 
-    // Consent-meddelande (default om inget är satt)
-    const consentMessage = business.call_recording_consent_message ||
-      'Detta samtal kan komma att spelas in för kvalitets- och utbildningsändamål.'
-
-    /*
-    46elks IVR-format:
-    - "play": URL till ljudfil ELLER text som ska läsas upp (TTS)
-    - "next": Vad som händer efter (connect, hangup, eller ny IVR-URL)
-
-    För TTS används formatet: "tts:sv-SE:meddelande"
-    */
-
-    return NextResponse.json({
-      // Spela upp consent-meddelande med svensk TTS
-      "play": `tts:sv-SE:${consentMessage}`,
-      // Efter meddelandet, koppla vidare till hantverkaren med inspelning
-      "next": {
+    const connect = {
         "connect": transferPhone,
         "callerid": business.assigned_phone_number || to,
         "timeout": 20,
-        // Aktivera inspelning - skickar recording till vår webhook när samtalet avslutas
-        "recordcall": `${APP_URL}/api/voice/recording`,
         // Samma missat-samtal-räls som den oinspelade connect-vägen. 46elks
         // avgör via answered/state om Lisa ska skicka catch-SMS; ett besvarat
         // samtal skapar aldrig den händelsen.
         "whenhangup": `${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${encodeURIComponent(callId)}`,
-      }
-    })
+    }
+    const noticeUrl = recordingNoticeUrl()
+    // Missing approval/notice never disconnects the customer: forward without recording.
+    if (!noticeUrl || !business.call_recording_enabled) return NextResponse.json(connect)
+    if (request.nextUrl.searchParams.get('step') === 'connect') {
+      // 'next' also runs after failed playback. Only explicit success may record.
+      if (formData.get('result') !== 'ok') return NextResponse.json(connect)
+      return NextResponse.json({ ...connect, recordcall: `${APP_URL}/api/voice/recording` })
+    }
+    return NextResponse.json({ play: noticeUrl, skippable: false,
+      next: `${APP_URL}/api/voice/consent?step=connect` })
 
   } catch (error) {
     console.error('Consent IVR error:', error)

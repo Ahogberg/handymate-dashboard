@@ -151,7 +151,10 @@ test.describe('producenterna stämplar — kopplingen kan inte tyst försvinna',
   for (const [fil, nyckel] of PRODUCENTER) {
     test(`${nyckel} stämplas i ${fil}`, () => {
       const s = fs.readFileSync(path.join(ROOT, fil), 'utf8')
-      expect(s, `${fil} importerar inte beslutsposten`).toContain('withDecisionRecord')
+      if (nyckel === 'callAnalysis') {
+        expect(s).toContain('buildDecisionRecord(')
+        expect(s).toContain('decision_record: beslutsstampel')
+      } else expect(s, `${fil} importerar inte beslutsposten`).toContain('withDecisionRecord')
       expect(s, `${fil} stämplar inte med nyckeln ${nyckel}`).toContain(`prompt: '${nyckel}'`)
     })
   }

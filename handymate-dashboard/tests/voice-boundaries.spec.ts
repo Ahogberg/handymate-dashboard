@@ -91,7 +91,7 @@ test.describe('3. voice/analyze — inloggad någonstans ≠ rätt till raden', 
     const s = kod('app/api/voice/analyze/route.ts')
     const i = s.indexOf('recording.business_id !== authed')
     expect(i, 'ingen tenantmatchning').toBeGreaterThan(-1)
-    expect(s.indexOf("from('pending_approvals')"), 'approval-skrivningen sker före matchningen').toBeGreaterThan(i)
+    expect(s.indexOf('publishCallCards('), 'approval-skrivningen sker före matchningen').toBeGreaterThan(i)
     expect(s, 'legacy auto-approve får inte köras från externt transkript').not.toContain('tryAutoApprove')
   })
 })

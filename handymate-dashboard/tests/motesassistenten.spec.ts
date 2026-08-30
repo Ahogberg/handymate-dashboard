@@ -217,7 +217,7 @@ test.describe('mötesutfall på approval-rälsen (Epic 2)', () => {
   test('den gemensamma talgrenen skapar pending_approvals-kort, inte legacy-kort', () => {
     const s = kod(ANALYZE)
     const filter = s.indexOf('filtreraAnalysforslag')
-    const approval = s.indexOf("from('pending_approvals')", filter)
+    const approval = s.indexOf('publishCallCards(', filter)
     expect(filter).toBeGreaterThan(-1)
     expect(approval).toBeGreaterThan(filter)
     expect(s.slice(approval)).toContain('return NextResponse.json')

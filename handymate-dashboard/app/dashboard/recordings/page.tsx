@@ -22,6 +22,8 @@ import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { format, parseISO } from 'date-fns'
 import { sv } from 'date-fns/locale'
+import Link from 'next/link'
+import { CallOutcomeCard } from '@/components/voice/CallOutcomeCard'
 
 interface Recording {
   recording_id: string
@@ -227,7 +229,7 @@ export default function RecordingsPage() {
         throw new Error(result.error || 'Analysis failed')
       }
 
-      showToast(`Analys klar! ${result.suggestions_created} förslag skapade.`, 'success')
+      showToast(result.already_analyzed ? 'Samtalet är redan analyserat.' : `Efterarbetet är sparat. Öppna samtalet för status.`, 'success')
       fetchRecordings()
       fetchSuggestions(recordingId)
 
@@ -261,7 +263,8 @@ export default function RecordingsPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to save transcript')
+        const data = await response.json()
+        throw new Error(data.error || 'Kunde inte spara transkriptet.')
       }
 
       showToast('Transkript sparat!', 'success')
@@ -344,7 +347,7 @@ export default function RecordingsPage() {
               <p className="text-gray-900 font-medium">AI-analys av samtal</p>
               <p className="text-sm text-gray-500 mt-1">
                 När ett samtal transkriberas analyserar AI:n innehållet och skapar förslag på åtgärder
-                som bokningar, uppföljningar och offerter. Du hittar förslagen i AI Inbox.
+                för uppföljningar och offertutkast. Öppna samtalet för att se vad som finns registrerat och vad som behöver ditt beslut.
               </p>
             </div>
           </div>
@@ -437,6 +440,8 @@ export default function RecordingsPage() {
                   {/* Expanded content */}
                   {expandedId === recording.recording_id && (
                     <div className="px-4 pb-4 space-y-4">
+                      <Link href={`/dashboard/recordings/${encodeURIComponent(recording.recording_id)}`} className="inline-block py-2 font-medium text-teal-700 underline">Öppna samlat samtalsutfall →</Link>
+                      <CallOutcomeCard recordingId={recording.recording_id} />
                       {/* Summary */}
                       {recording.transcript_summary && (
                         <div className="p-4 bg-gray-50 rounded-xl">

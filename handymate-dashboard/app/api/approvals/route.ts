@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabase()
     const status = request.nextUrl.searchParams.get('status') || 'pending'
     const approvalType = request.nextUrl.searchParams.get('approval_type')
+    const recordingId = request.nextUrl.searchParams.get('recording_id')
     const limitParam = request.nextUrl.searchParams.get('limit')
     const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 0, 1), 200) : 100
 
@@ -72,6 +73,7 @@ export async function GET(request: NextRequest) {
     if (approvalType) {
       query = query.eq('approval_type', approvalType)
     }
+    if (recordingId) query = query.contains('payload', { recording_id: recordingId })
 
     const { data, error } = await query
 

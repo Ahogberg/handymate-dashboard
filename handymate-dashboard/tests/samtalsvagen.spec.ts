@@ -284,14 +284,12 @@ test.describe('rollfördelningen är kod, inte prompttillit', () => {
   test('filtret körs FÖRE databasskrivningen', () => {
     const s = kod(ANALYZE)
     const filter = s.indexOf('filtreraAnalysforslag')
-    const insert = s.indexOf("from('ai_suggestion')\n")
-    const insertAlt = s.indexOf(".from('ai_suggestion')")
-    const skrivning = insert > -1 ? insert : insertAlt
     expect(filter, 'filtret saknas i analyze').toBeGreaterThan(-1)
-    // Dubbelkörningsspärrens SELECT ligger först; jämför mot insert-stället.
-    const insertIdx = s.indexOf('.insert({', s.indexOf('Skapa AI-förslag') > -1 ? s.indexOf('Skapa AI-förslag') : filter)
+    // v180 publishes the entire filtered batch in a single transaction.
+    const insertIdx = s.indexOf('publishCallCards(', filter)
+    expect(insertIdx).toBeGreaterThan(-1)
     expect(filter, 'filtret körs efter skrivningen — då är det ingen grind').toBeLessThan(insertIdx)
-    expect(skrivning).toBeGreaterThan(-1)
+    expect(read('sql/v180_call_processing_and_retention.sql')).toContain('INSERT INTO public.pending_approvals')
   })
 
   test('det som kastas loggas — en svamlande modell ska synas', () => {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { callRecordingId } from '@/lib/voice/call-processing'
 import { getServerSupabase } from '@/lib/supabase'
 import { verifyElksSignature } from '@/lib/elks-signature'
 
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
     const to = params.get('to') ?? ''
     const callId = params.get('callid') ?? ''
     const direction = params.get('direction') ?? 'inbound'
+    if (!callId || !to) return NextResponse.json({ error: 'Missing call reference' }, { status: 400 })
 
     console.log('Incoming call:', { from, to, callId, direction })
 
@@ -168,17 +170,18 @@ export async function POST(request: NextRequest) {
     // för hela fyndet (call_recording hade NOLL rader i produktion).
     const { error: recordingInsertError } = await supabase
       .from('call_recording')
-      .insert({
-        recording_id: 'rec_' + Math.random().toString(36).substr(2, 9),
+      .upsert({
+        recording_id: callRecordingId(business.business_id, callId),
         business_id: business.business_id,
         customer_id: customerId,
+        source: 'phone',
         phone_number: from,
         from_number: from,
         to_number: to,
         direction: direction,
         elks_recording_id: callId,
         created_at: new Date().toISOString()
-      })
+      }, { onConflict: 'recording_id', ignoreDuplicates: true })
       .select('recording_id')
       .single()
 

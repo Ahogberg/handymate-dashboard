@@ -23,6 +23,14 @@ export async function GET(request: NextRequest) {
   const supabase = getServerSupabase()
   const results: Record<string, any> = {}
 
+  // Off until legal review and provider disposal have been verified. No new cron.
+  try {
+    const { sweepCallRetention } = await import('@/lib/voice/retention')
+    results.call_retention = await sweepCallRetention(supabase)
+  } catch {
+    results.call_retention = { error: 'Gallringen kunde inte slutföras' }
+  }
+
   // ── 1. Expire old approvals ────────────────────────────────
   try {
     const { data, error } = await supabase
