@@ -1,5 +1,9 @@
 # Projektöversikten: datum, dynamiska steg, status + nästa att-göra i listan (2026-08-26, PLAN — väntar på avstämning)
 
+> Aktiv Codex-lane 2026-08-30: [Prelaunch Voice V1](./codex-prelaunch-voice-v1.md)
+> — Lisa samtalsefterarbete + Matte-röst i mobilappen. Fortnox/preflight-lanen
+> lämnas orörd.
+
 Andreas ask: projektlistan ska redovisa start/slut tydligt; stegen MÅSTE flytta dynamiskt
 på riktiga events/automationer; projektets status + nästa "att göra" (Lars m.m.) ska synas
 direkt i listan. Kartlagt av tre utforskare + live-DB (34 projekt i prod: 29 saknar steg helt).
@@ -977,6 +981,44 @@ inte en andra lanseringschecklista.
 ### Review
 
 - Pågår.
+
+## Launch Truth Closure — Codex, 2026-08-30
+
+Avgränsning: stäng kvarvarande kodmässig lanseringsrisk och gör de externa
+go/no-go-bevisen körbara. Fortnox-lanen ägs samtidigt av Claude och rörs inte.
+
+- [x] Fastställ en kanonisk ägare för förfallna fakturor och förhindra dubbla
+      `automation`/`invoice_reminder`-kort för samma faktura och påminnelsenivå.
+- [x] Skriv regressionstest som reproducerar REALITY-WEEK #36 och fäller vid
+      två synliga åtgärder för samma faktura.
+- [x] Bygg en read-only launch preflight som redovisar konfiguration och färsk
+      körsignal för Stripe, 46elks, Resend, Google, push och produktionscrons.
+- [x] Preflight får aldrig skicka SMS/mejl/push, skapa betalning eller mutera
+      leverantörs-/kunddata.
+- [x] Uppdatera befintlig lanseringsrunbook med manuella stationer för verkligt
+      Stripe-köp, STOPP/inbound-SMS, mejlleverans, OAuth och fysisk iPhone/Android.
+- [x] Kör riktade facit, `npx tsc --noEmit` och `npx next build`; dokumentera
+      exakt vad som är KODBEVISAT respektive fortfarande kräver extern verklighet.
+
+### Review
+
+- Klart i arbetsytan, ej committat eller deployat. `66/66` riktade facit
+  gröna (launch readiness, påminnelseägarskap, Lisa-kontrakt och cron-auth),
+  `npx tsc --noEmit` rent och `npx next build` exit 0.
+- Publikt rökprov mot gamla produktionen: fyra felvägar PASS (ogiltig offert-,
+  portal- och Jobbpass-token = 404; cron utan hemlighet = 401), health FAIL
+  eftersom produktionen serverar gårdagens cachade gröna timestamp. Fix finns
+  i arbetsytan; omtest sker efter deploy.
+- Hela standardkommandot `npx playwright test --no-deps` startades men är inte
+  en browserlös kontraktssvit i nuvarande config (11 472 tester inklusive
+  sessions-/produktionsprojekt). Det stoppades efter att `comprehensive.spec`
+  gav upprepade `connect EACCES` mot app.handymate.se i sandboxen; inga sådana
+  nätverksfel räknas som produktfel eller som ett grönt bevis.
+- KODBEVISAT: kanonisk V3-ägare för fakturapåminnelser; reservvägen dedupar
+  även pending-kort; superadmin-/no-store-preflight; verkliga schemaprober;
+  Stripe-plan-/Storage-kontroll; read-only token/cron-smoke.
+- EXTERN VERKLIGHET KVAR: Stripe live, Lisa/46elks, extern e-post, Google,
+  fysisk iPhone/PWA, Fortnox samt omtest av health och dubblettfix efter deploy.
 
 ## Block A — webbkanalens inflöde, sant (Codex, 2026-08-28)
 

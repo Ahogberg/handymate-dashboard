@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { triggerAgentFireAndForget, makeIdempotencyKey } from '@/lib/agent-trigger'
 import { recordCost } from '@/lib/costs/record'
 import { whisperCostOre } from '@/lib/costs/meter'
 import { checkFuelGate } from '@/lib/costs/fuel'
@@ -22,8 +21,8 @@ export async function POST(request: NextRequest) {
     //
     // Enda inputen var recording_id. Vem som helst kunde alltså bränna
     // Whisper-krediter och — allvarligare — STARTA EN LISA-AGENTKÖRNING i
-    // ett främmande företag (se triggerAgentFireAndForget längre ner) genom
-    // att gissa ett id. Samma mönster som voice/analyze redan hade lagat.
+    // ett främmande företag och starta dyr samtalsanalys genom att gissa ett
+    // id. Samma mönster som voice/analyze redan hade lagat.
     //
     // Två tillåtna anropare: den interna kedjan recording→transcribe (delad
     // hemlighet, server-till-server) och en inloggad användare som tittar på
@@ -159,38 +158,14 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // ═══ TVÅ MOTTAGARE, TVÅ ROLLER (etapp 2b) ═══
+    // ═══ EN MOTTAGARE, REVIEW-FIRST (prelaunch Voice V1) ═══
     //
-    // Analysmotorn var tidigare en fallback i catch-grenen nedan — den kördes
-    // i praktiken aldrig, och de fem förslagstyper den var ensam om (offert,
-    // uppföljning, återuppringning, påminnelse, ombokning) hade tyst slutat
-    // produceras. Nu är den ett AVSIKTLIGT andra steg:
-    //
-    //   Lisa (agentmotorn)  AGERAR — bokar, SMS:ar, registrerar kund.
-    //   Analysmotorn        FÖRESLÅR — enbart de typer Lisa saknar verktyg
-    //                       för; gränsen är kod i lib/voice/analysis-scope.ts.
-    //
-    // Båda är fire-and-forget: samtalet är redan avslutat, ingen väntar, och
-    // typgränsen — inte ordningen — är det som hindrar dubbelåtgärder.
-    try {
-      triggerAgentFireAndForget(
-        recording.business_id,
-        'phone_call',
-        {
-          recording_id,
-          transcript,
-          phone_number: recording.phone_number || '',
-          duration_seconds: recording.duration_seconds || 0,
-          direction: recording.direction || 'inbound',
-        },
-        makeIdempotencyKey('call', recording_id)
-      )
-    } catch (agentErr) {
-      // Lisa uteblir — men analysmotorn nedan kör ändå, så samtalet blir
-      // åtminstone föreslaget om inte utfört.
-      console.error('[Transcribe] Agent trigger failed:', agentErr)
-    }
-
+    // Ett inkommande kundtranskript är extern, opålitlig input. Det får inte
+    // skickas in som ett "user"-meddelande till den generella agentmotorn,
+    // eftersom den motorn har interna verktyg och därmed skulle kunna agera
+    // på instruktioner som råkade sägas i samtalet. Efteranalysen nedan är den
+    // enda mottagaren: den kvalificerar leadet och skapar granskningsbara kort.
+    // Missat-samtal-SMS:et körs separat i 46elks whenhangup-rälsen.
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
     fetch(`${appUrl}/api/voice/analyze`, {
       method: 'POST',

@@ -2,7 +2,8 @@ import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServerSupabase } from '@/lib/supabase'
-import { createDealFromCall, moveDeal, getStageBySlug, getAutomationSettings } from '@/lib/pipeline'
+import { moveDeal, getAutomationSettings } from '@/lib/pipeline'
+import { createLeadAndDeal } from '@/lib/leads/golden-path'
 
 interface CallAnalysis {
   isNewLead: boolean
@@ -123,7 +124,9 @@ export async function processCallForPipeline(params: {
   callerPhone: string
 }): Promise<{
   action: string
+  leadId?: string
   dealId?: string
+  customerId?: string
   aiConfidence: number
 }> {
   const settings = await getAutomationSettings(params.businessId)
@@ -147,23 +150,78 @@ export async function processCallForPipeline(params: {
     analysis.leadConfidence >= leadThreshold &&
     settings.auto_create_leads
   ) {
+    const supabase = getServerSupabase()
+
+    // Ett provider-callback eller manuellt omförsök får aldrig skapa en ny
+    // affär för samma samtal. Golden Path dedupar kunden, men skapar medvetet
+    // ett nytt lead/deal per anrop — därför äger samtalsvägen idempotensen via
+    // leads.source_ref = callId.
+    const { data: existingLead, error: existingLeadError } = await supabase
+      .from('leads')
+      .select('lead_id, customer_id')
+      .eq('business_id', params.businessId)
+      .eq('source_ref', params.callId)
+      .limit(1)
+      .maybeSingle()
+    if (existingLeadError) throw existingLeadError
+
+    if (existingLead) {
+      const { data: existingDeal } = await supabase
+        .from('deal')
+        .select('id')
+        .eq('business_id', params.businessId)
+        .eq('lead_id', existingLead.lead_id)
+        .maybeSingle()
+      return {
+        action: 'already_created',
+        leadId: existingLead.lead_id,
+        dealId: existingDeal?.id || undefined,
+        customerId: existingLead.customer_id || undefined,
+        aiConfidence: analysis.leadConfidence,
+      }
+    }
+
     const urgencyMap: Record<string, string> = { high: 'high', medium: 'medium', low: 'low' }
-    const deal = await createDealFromCall({
+    const name = analysis.extractedInfo.customerName?.trim() || `Ny kund (${params.callerPhone})`
+    const message = analysis.extractedInfo.jobType
+      ? `${analysis.extractedInfo.jobType}${analysis.reasoning ? ` — ${analysis.reasoning}` : ''}`
+      : analysis.reasoning || 'Kvalificerat inkommande samtal'
+    const created = await createLeadAndDeal({
       businessId: params.businessId,
-      callId: params.callId,
-      customerName: analysis.extractedInfo.customerName,
-      customerPhone: params.callerPhone,
-      title: analysis.extractedInfo.jobType
-        ? `${analysis.extractedInfo.customerName || 'Ny kund'} - ${analysis.extractedInfo.jobType}`
-        : `Ny lead från samtal`,
-      description: analysis.reasoning,
-      estimatedValue: analysis.extractedInfo.estimatedValue || undefined,
-      priority: urgencyMap[analysis.extractedInfo.urgency || 'medium'] || 'medium',
-    })
+      businessPhoneNumber: null,
+      name,
+      phone: params.callerPhone,
+      email: null,
+      message,
+      source: 'vapi_call',
+      sourceRef: params.callId,
+      // Samtalskort/push nedan är ägarens enda notifiering. Golden Paths
+      // eget SMS hade gett en andra notis för samma kvalificerade samtal.
+      notify: false,
+    }, supabase)
+
+    if (created.dealError || !created.dealId) {
+      throw new Error(created.dealError || 'Golden Path skapade inget deal-id')
+    }
+
+    // Golden Path äger kund/lead/deal. Samtalsvägen kompletterar bara den
+    // spårning som är specifik för telefoni; varje skrivning tenantfiltreras.
+    const { error: dealUpdateError } = await supabase
+      .from('deal')
+      .update({
+        source_call_id: params.callId,
+        value: analysis.extractedInfo.estimatedValue || null,
+        priority: urgencyMap[analysis.extractedInfo.urgency || 'medium'] || 'medium',
+      })
+      .eq('id', created.dealId)
+      .eq('business_id', params.businessId)
+    if (dealUpdateError) throw dealUpdateError
 
     return {
       action: 'created_lead',
-      dealId: deal.id,
+      leadId: created.leadId,
+      dealId: created.dealId,
+      customerId: created.customerId,
       aiConfidence: analysis.leadConfidence,
     }
   }
@@ -208,6 +266,7 @@ export async function processCallForPipeline(params: {
         return {
           action: 'moved_to_accepted',
           dealId: deal.id,
+          customerId: customer.customer_id,
           aiConfidence: analysis.intentConfidence,
         }
       }
@@ -250,11 +309,28 @@ export async function processCallForPipeline(params: {
         return {
           action: 'moved_to_lost',
           dealId: deal.id,
+          customerId: customer.customer_id,
           aiConfidence: analysis.intentConfidence,
         }
       }
     }
   }
 
-  return { action: 'no_action', aiConfidence: analysis.intentConfidence }
+  // Även utan pipelineåtgärd får efteranalysen använda en SÄKER, tenant-
+  // verifierad befintlig kundmatch för sina granskningskort.
+  const supabase = getServerSupabase()
+  const { data: matchedCustomer } = params.callerPhone
+    ? await supabase
+        .from('customer')
+        .select('customer_id')
+        .eq('business_id', params.businessId)
+        .eq('phone_number', params.callerPhone)
+        .maybeSingle()
+    : { data: null }
+
+  return {
+    action: 'no_action',
+    customerId: matchedCustomer?.customer_id || undefined,
+    aiConfidence: analysis.intentConfidence,
+  }
 }

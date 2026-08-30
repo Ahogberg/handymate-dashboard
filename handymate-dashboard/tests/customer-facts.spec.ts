@@ -62,7 +62,7 @@ test.describe('mötesgrenen bygger korrekt kort', () => {
     expect(i, 'grenen för customer_fact saknas i kortbygget').toBeGreaterThan(-1)
     const gren = s.slice(i, i + 500)
     expect(gren).toContain('buildCustomerFactCard(s')
-    expect(gren).toContain("evidensKalla: 'mötet'")
+    expect(gren).toContain("evidensKalla: arMote ? 'mötet' : 'samtalet'")
   })
 
   test('inget kort skapas utan en härledd kund — hoppas tyst', () => {
@@ -84,7 +84,7 @@ test.describe('telefongrenen bygger korrekt kort (Customer Memory V2, 2026-08-16
 
   test('telefongrenens prompt lär modellen customer_fact-reglerna, inte bara mötesgrenen', () => {
     const s = read(ANALYZE)
-    const elseIdx = s.indexOf(': `VIKTIGT: En kollega (AI-agenten Lisa)')
+    const elseIdx = s.indexOf(': `Detta är ett AVSLUTAT telefonsamtal')
     expect(elseIdx, 'telefongrenens instruktionsblock hittades inte').toBeGreaterThan(-1)
     const svarsformatIdx = s.indexOf('=== SVARSFORMAT ===')
     const gren = s.slice(elseIdx, svarsformatIdx)
@@ -97,30 +97,22 @@ test.describe('telefongrenen bygger korrekt kort (Customer Memory V2, 2026-08-16
     expect(s).not.toMatch(/endast för customer_fact, endast vid platsbesök/)
   })
 
-  test('telefongrenen routar customer_fact via pending_approvals, inte ai_suggestion', () => {
+  test('den delade talgrenen routar customer_fact via pending_approvals, inte legacy-insert', () => {
     const s = read(ANALYZE)
-    // Mötesgrenens "s.type === 'customer_fact'"-förekomst kommer först i
-    // filen (rad ~727) — telefongrenens är den SISTA förekomsten.
-    const i = s.lastIndexOf("suggestion.type === 'customer_fact'")
-    expect(i, 'telefongrenen har ingen egen gren för customer_fact').toBeGreaterThan(-1)
-    // Filen har en TIDIGARE, orelaterad from('ai_suggestion')-fråga (en
-    // dubblettkontroll långt innan förslagsloopen) — den riktiga inserten
-    // som customer_fact-grenen måste ligga FÖRE är den SISTA förekomsten.
-    const aiSuggestionInsertIdx = s.lastIndexOf("from('ai_suggestion')")
-    expect(i, 'customer_fact-grenen ska ligga FÖRE ai_suggestion-inserten (early continue)').toBeLessThan(aiSuggestionInsertIdx)
+    const i = s.indexOf("s.type === 'customer_fact'")
+    expect(i, 'den delade talgrenen saknar customer_fact').toBeGreaterThan(-1)
     const gren = s.slice(i, i + 900)
-    expect(gren).toContain('buildCustomerFactCard(suggestion')
-    expect(gren).toContain("evidensKalla: 'samtalet'")
-    expect(gren).toContain("from('pending_approvals')")
+    expect(gren).toContain('buildCustomerFactCard(s')
+    expect(gren).toContain("evidensKalla: arMote ? 'mötet' : 'samtalet'")
     expect(gren).not.toContain("from('ai_suggestion')")
-    expect(gren, 'grenen måste hoppa vidare — aldrig falla igenom till ai_suggestion-inserten').toContain('continue')
+    expect(s.slice(i)).toContain("from('pending_approvals')")
   })
 
   test('telefongrenen hoppar tyst utan känd kund — samma vakt som mötesgrenen', () => {
     const s = read(ANALYZE)
-    const i = s.lastIndexOf("suggestion.type === 'customer_fact'")
+    const i = s.indexOf("s.type === 'customer_fact'")
     const gren = s.slice(i, i + 300)
-    expect(gren, 'ingen vakt mot saknad kund i telefongrenen').toContain('if (!customerId) continue')
+    expect(gren, 'ingen vakt mot saknad kund i talgrenen').toContain('if (!factCustomerId) continue')
   })
 
   test('kortbygget är en delad funktion — mötes-, telefon- och e-postgrenen kan inte glida isär', () => {
@@ -141,9 +133,10 @@ test.describe('telefongrenen bygger korrekt kort (Customer Memory V2, 2026-08-16
     const s = read(ANALYZE)
     expect(s).toContain("from '@/lib/customer-facts/build-card'")
     expect(s, 'lokal kopia av kortbyggaren i voice/analyze').not.toContain('function buildCustomerFactCard')
-    // Båda talgrenarna (möte + telefon) ska gå genom samma funktion.
+    // Båda talgrenarna (möte + telefon) ska gå genom samma gemensamma anrop.
     const anrop = s.match(/buildCustomerFactCard\(/g) || []
-    expect(anrop.length, 'kortbyggaren ska anropas från både mötes- och telefongrenen').toBeGreaterThanOrEqual(2)
+    expect(anrop.length, 'kortbyggaren ska anropas från den gemensamma talgrenen').toBe(1)
+    expect(s).toContain("evidensKalla: arMote ? 'mötet' : 'samtalet'")
   })
 })
 

@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
     // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): recording_id är
     // NOT NULL utan DEFAULT — se app/api/admin/demo-seed-meeting/route.ts
     // för hela fyndet (call_recording hade NOLL rader i produktion).
-    await supabase
+    const { error: recordingInsertError } = await supabase
       .from('call_recording')
       .insert({
         recording_id: 'rec_' + Math.random().toString(36).substr(2, 9),
@@ -182,31 +182,20 @@ export async function POST(request: NextRequest) {
       .select('recording_id')
       .single()
 
-    // Auto-skapa lead om det inte redan finns en kund (ny uppringare)
-    if (!customerId && from) {
-      try {
-        // Golden Path: skapa kund + lead + DEAL via samma helper som webb-intake.
-        // Tidigare skrevs customer/lead direkt med source 'phone_call' — ogiltig
-        // enligt valid_source-CHECK (v56) → lead-inserten failade tyst, OCH ingen
-        // deal skapades → telefon-leads hamnade aldrig i pipelinen. 'vapi_call' är
-        // en giltig källa; createLeadAndDeal skapar deal + fireEvent('lead_received').
-        const { createLeadAndDeal } = await import('@/lib/leads/golden-path')
-        const gp = await createLeadAndDeal({
-          businessId: business.business_id,
-          businessPhoneNumber: null, // telefonflödet notifierar redan separat (missat samtal/transfer)
-          name: `Ny kund (${from})`,
-          phone: from,
-          email: null,
-          message: 'Inkommande samtal',
-          source: 'vapi_call',
-        }, supabase)
-        customerId = gp.customerId
-        if (gp.dealError) console.error('[Voice] Golden Path deal misslyckades:', gp.dealError)
-        console.log(`[Voice] Golden Path: lead ${gp.leadId} + deal ${gp.dealId} + customer ${gp.customerId} from ${from}`)
-      } catch (leadErr) {
-        console.error('[Voice] Auto-lead creation error (non-blocking):', leadErr)
-      }
+    if (recordingInsertError) {
+      // Ett samtal som inte fick sin call_recording-rad kan varken knytas till
+      // recording-webhooken eller transkriberas. Vidarekoppla fortfarande
+      // (kunden ska inte drabbas), men gör felet synligt i driftloggen.
+      console.error('[Voice] call_recording insert misslyckades:', recordingInsertError.message)
     }
+
+    // VIKTIG SANNINGSGRÄNS: ett telefonnummer som börjar ringa är INTE ett
+    // kvalificerat lead. Okända uppringare materialiseras först efter det
+    // slutliga transkriptet i processCallForPipeline, när ett uttryckligt
+    // affärsbehov passerat företagets confidence-grind. Felringningar, spam
+    // och rena informationssamtal lämnar därför inga falska kund-/lead-/deal-
+    // rader efter sig. customerId ovan är bara en kandidatmatch mot en redan
+    // existerande kund.
 
     // Pause nurture sequences when customer calls
     if (customerId) {
@@ -241,6 +230,16 @@ export async function POST(request: NextRequest) {
           })
         } catch (err) {
           console.error('[Voice] fireEvent call_transferred failed (non-blocking):', business.business_id, callId, err)
+        }
+
+        // Inspelningsinformationen måste ligga FÖRE vidarekopplingen och
+        // recordcall måste sitta på connect-steget. Den gamla direktgrenen
+        // hoppade över båda och gjorde att just de samtal hantverkaren svarade
+        // på aldrig kunde transkriberas.
+        if (business.call_recording_enabled) {
+          return NextResponse.json({
+            ivr: `${APP_URL}/api/voice/consent`,
+          })
         }
 
         return NextResponse.json({
@@ -293,7 +292,7 @@ export async function POST(request: NextRequest) {
 
     if (business.call_recording_enabled) {
       return NextResponse.json({
-        ivr: `${APP_URL}/api/voice/consent?business_id=${business.business_id}`,
+        ivr: `${APP_URL}/api/voice/consent`,
       })
     }
 

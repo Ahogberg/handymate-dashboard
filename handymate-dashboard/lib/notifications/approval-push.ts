@@ -214,6 +214,15 @@ function buildPushTemplate(
       }
     }
 
+    case 'meeting_summary': {
+      const isPhoneCall = payload.source === 'phone_call'
+      return {
+        title: isPhoneCall ? 'Lisa har sammanfattat ett samtal' : 'Matte har sammanfattat ett möte',
+        body: truncate(payload.summary || 'Öppna sammanfattningen och se vad teamet föreslår.', 110),
+        url: '/approvals?filter=meeting_summary',
+      }
+    }
+
     default:
       return null
   }

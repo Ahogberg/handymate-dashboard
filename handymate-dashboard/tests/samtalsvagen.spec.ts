@@ -298,15 +298,11 @@ test.describe('rollfördelningen är kod, inte prompttillit', () => {
     expect(read(ANALYZE)).toContain('kastade')
   })
 
-  test('analysen är ett avsiktligt steg, inte en catch-gren', () => {
+  test('analysen är enda mottagaren — transkriptet körs inte som agentinstruktion', () => {
     const s = kod(TRANSCRIBE)
-    const catchIdx = s.indexOf('catch (agentErr)')
     const analyzeIdx = s.indexOf('/api/voice/analyze')
     expect(analyzeIdx, 'analyze anropas inte alls').toBeGreaterThan(-1)
-    expect(catchIdx).toBeGreaterThan(-1)
-    // Anropet ska ligga EFTER catch-blockets slut — i huvudflödet.
-    const catchSlut = s.indexOf('}', s.indexOf('console.error', catchIdx))
-    expect(analyzeIdx, 'analyze bor fortfarande i catch-grenen').toBeGreaterThan(catchSlut)
+    expect(s, 'extern samtalstext får fortfarande starta den generella verktygsagenten').not.toContain('triggerAgentFireAndForget')
   })
 
   test('samma samtal analyseras en gång — knappen ger inga dubbletter', () => {

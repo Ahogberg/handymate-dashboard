@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 
+// En health-check måste beskriva nuvarande leverans, inte en tidigare
+// statiskt byggd/cachad respons. 2026-08-30 svarade produktion med gårdagens
+// timestamp trots ett nytt anrop.
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const checks: Record<string, 'ok' | 'error'> = {}
 
@@ -25,5 +30,10 @@ export async function GET() {
     timestamp: new Date().toISOString(),
     version: process.env.VERCEL_GIT_COMMIT_SHA?.substring(0, 7) || 'dev',
     checks
-  }, { status: allOk ? 200 : 503 })
+  }, {
+    status: allOk ? 200 : 503,
+    headers: {
+      'Cache-Control': 'no-store',
+    },
+  })
 }

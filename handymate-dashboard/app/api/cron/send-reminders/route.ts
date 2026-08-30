@@ -9,6 +9,7 @@ import { arTestId, arTestNamn } from '@/lib/testdata'
 import { registerMandateDeliveryFailure } from '@/lib/mandates/mission-mandate'
 import { loadMandateResolutionCache, resolveMandateForAction, MANDATE_TRUTH_CLASS, type MandateResolutionCache } from '@/lib/mandates/resolve'
 import { internalPushHeaders } from '@/lib/notifications/push-internal'
+import { loadV3InvoiceReminderOwnerBusinessIds } from '@/lib/cron/invoice-reminder-ownership'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -92,20 +93,10 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
 
     // Dedup: kolla vilka företag som har aktiva V3 threshold-regler för fakturapåminnelser
     // Om ja → V3 evaluate-thresholds hanterar redan påminnelser, skippa cron-sändning
-    const v3HandlesInvoiceReminders = new Set<string>()
-    if (businessIds.length > 0) {
-      const { data: v3InvoiceRules } = await supabase
-        .from('v3_automation_rules')
-        .select('business_id')
-        .eq('trigger_type', 'threshold')
-        .eq('is_active', true)
-        .in('business_id', businessIds)
-        .like('trigger_config', '%"entity":"invoice"%')
-
-      for (const r of v3InvoiceRules || []) {
-        v3HandlesInvoiceReminders.add(r.business_id)
-      }
-    }
+    const v3HandlesInvoiceReminders = await loadV3InvoiceReminderOwnerBusinessIds(
+      supabase,
+      businessIds,
+    )
 
     let remindersSent = 0
     let feesApplied = 0
