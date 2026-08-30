@@ -1,13 +1,22 @@
 /**
  * Fas 0 — säkerhetsräcke för matte/chat: "kommando med koppel".
  *
- * När require_confirm_external=true i requesten (dashboard-bubblan sätter
- * detta; mobilappen skickar inte parametern och är alltså OPÅVERKAD) får
- * modellen inte exekvera verktyg som lämnar huset (SMS/e-post) direkt.
- * Istället signeras det föreslagna verktygsanropet till en kort-livad token
- * som klienten skickar tillbaka vid explicit bekräftelse ([Skicka]-knappen).
- * Routen exekverar då EXAKT det signerade anropet — inget annat — via samma
- * delade tool-router som resten av Matte.
+ * När require_confirm_external=true i requesten får modellen inte exekvera
+ * de gatade verktygen direkt. Istället signeras det föreslagna
+ * verktygsanropet till en kort-livad token som klienten skickar tillbaka vid
+ * explicit bekräftelse. Routen exekverar då EXAKT det signerade anropet —
+ * inget annat — via samma delade tool-router som resten av Matte.
+ *
+ * ALLA tre ytorna sätter flaggan sedan 2026-08-30: dashboard-bubblan,
+ * MatteChatModal och mobilappen (handymate-mobile, branch
+ * claude/matte-confirmation-gate). Mobilen utelämnade den tidigare och kunde
+ * därför SMS:a kunder direkt medan samma mening på webben krävde ett tryck —
+ * gränsen får aldrig bero på vilken dörr man kom in genom.
+ *
+ * VARNING till den som lägger till en ny klient: att sätta flaggan utan att
+ * rendera pending_confirmation är värre än att låta bli. Servern svarar då
+ * med kortet i stället för att utföra något, och en klient som ignorerar det
+ * gör INGENTING medan hantverkaren tror att det gjordes.
  *
  * Samma mönster som lib/partners/approve-token.ts (HMAC, fail-closed om
  * secret saknas, timingSafeEqual).
@@ -25,9 +34,10 @@ export function isExternalSendTool(toolName: string): boolean {
  * Matte Mobile Voice V1 (2026-08-30): samma koppel för interna skrivningar
  * som förtjänar en snabb bekräftelse i chatten. Rösttranskript hör fel
  * ("fyra" / "fyra och en halv") — tidsregistrering visas därför som ett
- * "Matte uppfattade …"-kort innan något skrivs. Gatas BARA när klienten
- * skickat require_confirm_external (dashboard-bubblan); mobilappens anrop
- * utan parametern är opåverkade, precis som för SMS/e-post.
+ * "Matte uppfattade …"-kort innan något skrivs. Gatas när klienten skickat
+ * require_confirm_external, vilket alla tre ytorna gör (se filhuvudet).
+ * Verktygen är interna och reversibla, så verbet på knappen är Logga/Bokför/
+ * Spara — aldrig "Skicka", som antyder att något lämnar huset.
  */
 const CONFIRM_GATED_TOOL_NAMES = new Set(
   Array.from(EXTERNAL_SEND_TOOL_NAMES).concat('log_time', 'log_material', 'add_work_note')

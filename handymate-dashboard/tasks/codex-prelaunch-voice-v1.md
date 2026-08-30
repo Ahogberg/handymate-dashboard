@@ -20,7 +20,7 @@ arbetskatalogen lämnas helt orörda.
 
 Status efter Claudes granskning 2026-08-30 (branch
 claude/lisa-prata-matte-integration-ao7nv3): A–D och F–G är genomgångna och
-verifierade; E och H ligger kvar i mobil-repot.
+verifierade; E och H är gjorda i handymate-mobile och verifierade där.
 
 - [x] A. Laga 46elks-routingen: besvarad human_work_hours-väg går genom
       information + recordcall, behåller rätt mottagarnummer och missat-samtal-
@@ -46,12 +46,12 @@ verifierade; E och H ligger kvar i mobil-repot.
       kan skicka samma pass två gånger (dubbeltryck, återanvänd
       bekräftelse-token inom 15 min, eller ett upprepat verktygsanrop).
       Skyddet ligger nu vid skrivningen, inte i transporten.
-- [ ] E. Förbättra Expo-röstvyn: live text + servertranskribering, redigerbar
+- [x] E. Förbättra Expo-röstvyn: live text + servertranskribering, redigerbar
       bekräftelse, fel-fallback och projektkontext från projektsidan.
-      ÅTERSTÅR — ligger i Ahogberg/handymate-mobile (inte pushat; senaste
-      push där är 2026-08-19). Dashboard-sidan av kontraktet är klar:
-      `/api/matte/chat` verifierar sidkontextens id:n mot tenanten och
-      injicerar den inloggade användaren, så mobilen kan lita på svaret.
+      Gjord i handymate-mobile 14a57c9 (main). Kontraktet granskat mot den här
+      servern: transcribeAudio träffar /api/matte/transcribe och läser `text`
+      precis som routen svarar, och projektsidan skickar project_id/customer_id
+      hela vägen in i `context` — där de nu ägarskapsverifieras mot tenanten.
 - [x] F. Facit: inspelning i besvarad väg, ingen förtida Golden Path,
       kvalificerad/idempotent lead, extern transkription får inga interna tools,
       samt korrekt person/projekt/duration för tid.
@@ -62,8 +62,10 @@ verifierade; E och H ligger kvar i mobil-repot.
       `npx next build`.
       Kört på det sammanslagna trädet: tsc 0 fel, ren build (345 sidor),
       hela Playwright-sviten 5586 gröna / 1 överhoppad.
-- [ ] H. Verifiera mobile: Jest-facit och `npx tsc --noEmit`.
-      ÅTERSTÅR tillsammans med E, i mobil-repot.
+- [x] H. Verifiera mobile: Jest-facit och `npx tsc --noEmit`.
+      Kört av Claude på mobil-repot: tsc 0 fel, hela sviten 105/105 gröna
+      (16 suites). Testet photo-upload som tidigare setts flaka passerade också.
+      KVAR: EAS-test på riktig enhet — kan inte köras härifrån.
 
 ## Sanningsgränser
 
@@ -92,4 +94,18 @@ claude/lisa-prata-matte-integration-ao7nv3:
   tidrader. Åtgärdat vid skrivningen (fem minuters fönster på samma person,
   dag, längd och projekt) så skyddet gäller alla vägar in — inte bara
   chattens knapp.
-- Kvar att göra ligger i mobil-repot (E + H).
+- E och H är nu också klara och verifierade.
+
+FYND vid granskningen av mobilkontraktet (varken Codex eller terminalsessionen
+såg det, och det var ingen regression — så hade det alltid varit): mobilen
+skickade aldrig `require_confirm_external` och hanterade inte
+`pending_confirmation`. "SMS:a Anna att vi kommer imorgon" gick alltså iväg
+direkt i mobilen medan samma mening på webben krävde ett tryck — trots att
+mobilen är den primära röstytan, där transkriptet dessutom kan ha hört fel.
+Andreas valde hela grinden. Byggd i handymate-mobile, branch
+`claude/matte-confirmation-gate` (1f76f24): flaggan OCH kortet, aldrig bara
+flaggan — en klient som ber om bekräftelse utan att rendera kortet gör
+INGENTING medan användaren tror att det gjordes. 9 facit i
+__tests__/matte-confirmation.test.ts. Kommentarerna i
+lib/agent/external-confirm.ts som påstod att mobilen är "opåverkad" är
+rättade; de var sanna när de skrevs men hade blivit vilseledande.
