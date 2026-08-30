@@ -1722,6 +1722,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       reply: 'Något gick fel — försök igen.',
       messages: [],
+      // TEMPORÄR P0-DIAGNOS (2026-08-31): chatten svarar apology för ALLA
+      // konton i prod och Vercels loggström tappar function-output. Bara
+      // felmeddelandet (aldrig stack/hemligheter) exponeras så rotorsaken
+      // kan läsas ur svaret. TAS BORT så fort felet är åtgärdat.
+      debug_error: String(error?.message || error).slice(0, 300),
     })
   }
 }
