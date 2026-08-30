@@ -1,3 +1,41 @@
+# Matte Mobile Voice V1 — röst först på hemskärmen (2026-08-30, Claude-branchen claude/lisa-prata-matte-integration-ao7nv3)
+
+Andreas ask: mobilappen (PWA:n) ska vara klar; "Prata med Matte" lättillgänglig direkt på
+första skärmen enligt Codex-designen. Deconfliction: Codex arbetar samtidigt lokalt i
+tool-definitions.ts + tool-router.ts + app/api/voice/* + handymate-mobile — de filerna är
+INTE rörda här (se pausade punkter).
+
+## Klart (verifierat: tsc 0 fel, ren next build, 49/49 i voice-boundaries + matte-page-context + jarvis-hem)
+- [x] Hemskärmens mikrofon är riktig: SkrivRads mic-knapp (båda lägena) öppnar Jobbkompisen
+      på Röst-fliken och AUTOSTARTAR inspelningen (pendingVoice i JobbuddyContext). Textytan
+      öppnar chatten som förut. ETT tryck → prata.
+- [x] EN röstväg: Jobbkompisens inline-MediaRecorder ersatt med delade hooks/useAudioRecording
+      (iOS audio/mp4-fallback, 5 min-tak, spårstädning) och transkriberingen flyttad från
+      legacy /api/jobbuddy/voice till kanoniska /api/matte/transcribe (auth + bränslegrind +
+      kostnadsmätning — routen var byggd men oanvänd). denied/unsupported visas i UI:t.
+- [x] Serverägd sidkontext: /api/matte/chat ägarskapsverifierar customer/project/quote/
+      invoice-id mot business_id innan de styr trådval eller nämns i systemprompten
+      (verifyPageContextOwnership — främmande ID släpps + loggas, felar aldrig chatten).
+- [x] Serverägd identitet: INLOGGAD ANVÄNDARE-block i systemprompten ("jag/mig" = alltid
+      autentiserad business_user, aldrig modellgissning). Bekräftelsevägen trår nu också
+      businessUserId in i ToolContext (handleConfirmedExternalAction).
+- [x] Bekräftelsekort för tid: confirm-gaten (HMAC-token, extern-confirm) omfattar nu även
+      log_time när require_confirm_external är satt — "Matte uppfattade: logga X timmar…"
+      med knappen [Logga]/[Avbryt]. Mobilappens anrop utan parametern är opåverkade.
+
+## PAUSAT — väntar på att Codex okommitterade arbete pushas (rör samma filer)
+- [ ] log_time-ombyggnad i tool-router: attribution till context.businessUserId, project_id-
+      stöd (härled kund), duration_minutes utan påhittade klockslag, dedup-skydd, taxa via
+      resolveTimeEntryHourlyRate. Kontrollera först om Codex +149-diff i tool-router.ts
+      redan gör delar av detta.
+- [ ] Nya fältverktyg log_material (project_material) + add_work_note (project_log, som
+      logs-routen: order_id/date/work_performed) + Lars allowlist i lib/agents/personalities.ts.
+      OBS: project_log-kolumnerna i sql/rot_rut_documents.sql stämmer INTE med live-DB —
+      livekolumner verifierade via MCP 2026-08-30: order_id, date, work_performed, description,
+      issues, workers_count.
+
+---
+
 # Projektöversikten: datum, dynamiska steg, status + nästa att-göra i listan (2026-08-26, PLAN — väntar på avstämning)
 
 Andreas ask: projektlistan ska redovisa start/slut tydligt; stegen MÅSTE flytta dynamiskt

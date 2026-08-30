@@ -14,15 +14,29 @@
  */
 import crypto from 'crypto'
 
-/** Verktyg som faktiskt skickar något UT ur huset — de enda som gatas. */
+/** Verktyg som faktiskt skickar något UT ur huset. */
 const EXTERNAL_SEND_TOOL_NAMES = new Set(['send_sms', 'send_email'])
 
 export function isExternalSendTool(toolName: string): boolean {
   return EXTERNAL_SEND_TOOL_NAMES.has(toolName)
 }
 
+/**
+ * Matte Mobile Voice V1 (2026-08-30): samma koppel för interna skrivningar
+ * som förtjänar en snabb bekräftelse i chatten. Rösttranskript hör fel
+ * ("fyra" / "fyra och en halv") — tidsregistrering visas därför som ett
+ * "Matte uppfattade …"-kort innan något skrivs. Gatas BARA när klienten
+ * skickat require_confirm_external (dashboard-bubblan); mobilappens anrop
+ * utan parametern är opåverkade, precis som för SMS/e-post.
+ */
+const CONFIRM_GATED_TOOL_NAMES = new Set(Array.from(EXTERNAL_SEND_TOOL_NAMES).concat('log_time'))
+
+export function isConfirmGatedTool(toolName: string): boolean {
+  return CONFIRM_GATED_TOOL_NAMES.has(toolName)
+}
+
 export interface PendingExternalAction {
-  toolName: 'send_sms' | 'send_email'
+  toolName: string
   toolInput: Record<string, unknown>
   businessId: string
   threadId: string | null
@@ -79,7 +93,7 @@ export function verifyPendingExternalAction(
   }
 
   if (!payload || payload.businessId !== businessId) return null
-  if (!isExternalSendTool(payload.toolName)) return null
+  if (!isConfirmGatedTool(payload.toolName)) return null
   if (typeof payload.ts !== 'number' || Date.now() - payload.ts > TOKEN_TTL_MS) return null
 
   return payload
@@ -96,5 +110,31 @@ export function buildExternalActionSummary(
   if (toolName === 'send_email') {
     return `Skicka e-post till ${toolInput.to} (ämne: "${toolInput.subject}")`
   }
+  if (toolName === 'log_time') {
+    // Robust mot båda formerna: klockslag (start/slut) eller ren varaktighet.
+    // Timtalet räknas ur det som faktiskt kommer skrivas — hittas inget
+    // begripligt visas verktygsargumenten hellre än en gissning.
+    const start = typeof toolInput.start_time === 'string' ? toolInput.start_time : null
+    const slut = typeof toolInput.end_time === 'string' ? toolInput.end_time : null
+    const durMin = Number(toolInput.duration_minutes)
+    let tidsdel: string | null = null
+    if (Number.isFinite(durMin) && durMin > 0) {
+      tidsdel = `${Math.round((durMin / 60) * 10) / 10} timmar`
+    } else if (start && slut) {
+      tidsdel = `${start}–${slut}`
+    }
+    const datum = typeof toolInput.work_date === 'string' && toolInput.work_date ? ` den ${toolInput.work_date}` : ''
+    const beskrivning = typeof toolInput.description === 'string' && toolInput.description
+      ? ` — ${toolInput.description}`
+      : ''
+    return tidsdel
+      ? `Matte uppfattade: logga ${tidsdel}${datum}${beskrivning}`
+      : `Matte uppfattade: logga tid${datum}${beskrivning}`
+  }
   return `Utför ${toolName}`
+}
+
+/** Knapplabel för bekräftelsekortet — "Skicka" är fel verb för intern tid. */
+export function confirmLabelForTool(toolName: string): string {
+  return toolName === 'log_time' ? 'Logga' : 'Skicka'
 }

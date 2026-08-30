@@ -24,6 +24,7 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useJobbuddy } from '@/lib/JobbuddyContext'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useAudioRecording, type RecordingState } from '@/hooks/useAudioRecording'
 import { getAgentById } from '@/lib/agents/team'
 import { useMoments } from '@/components/moments/MomentsProvider'
 import { pageContextFromPathname } from '@/lib/matte/page-context'
@@ -51,11 +52,14 @@ interface ChatMessage {
   presentation?: BusinessScenarioPresentation | MissionPlanPresentation
 }
 
-/** Fas 0-säkerhetsräcke: kort som visas när Matte vill skicka något ut ur huset. */
+/** Fas 0-säkerhetsräcke: kort som visas när Matte vill skicka något ut ur
+ *  huset — eller (Matte Mobile Voice V1) logga tid som förtjänar en snabb
+ *  bekräftelse. confirm_label styr knappen: "Skicka" resp. "Logga". */
 interface PendingConfirmation {
   tool_name: string
   args: Record<string, any>
   summary: string
+  confirm_label?: string
   token: string
 }
 
@@ -89,7 +93,7 @@ type Tab = 'chat' | 'voice' | 'photo'
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function Jobbkompisen() {
-  const { activeTimer, isOpen, setIsOpen, activeTab, setActiveTab, suggestions, clearSuggestion, pendingPrompt, setPendingPrompt } = useJobbuddy()
+  const { activeTimer, isOpen, setIsOpen, activeTab, setActiveTab, suggestions, clearSuggestion, pendingPrompt, setPendingPrompt, pendingVoice, setPendingVoice } = useJobbuddy()
   const business = useBusiness()
 
   // ═══ Matte 2.0 (2026-08-08) ═══
@@ -131,15 +135,13 @@ export default function Jobbkompisen() {
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Voice state
-  const [isRecording, setIsRecording] = useState(false)
-  const [voiceDuration, setVoiceDuration] = useState(0)
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
+  // Voice state — Matte Mobile Voice V1 (2026-08-30): den inline-kopierade
+  // MediaRecorder-logiken ersatt med den delade hooken (iOS-fallback till
+  // audio/mp4, hårt maxtak, spår-städning) — samma kod som Snabbofferten.
+  // 5 min-taket håller filen långt under Whispers 25 MB-gräns.
+  const inspelning = useAudioRecording({ maxDurationSeconds: 300 })
   const [voiceProcessing, setVoiceProcessing] = useState(false)
   const [voiceResult, setVoiceResult] = useState<VoiceAnalysis | null>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const voiceTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Photo state (Matte-flytten 2026-08-03: bara analys-flaggan + kamera-ref
   // kvar — preview/result/fileInputRef hörde till den borttagna foto-fliken)
@@ -154,15 +156,19 @@ export default function Jobbkompisen() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Cleanup on unmount
+  // Hemskärmens mikrofon (Matte Mobile Voice V1): SkrivRads mic-knapp sätter
+  // pendingVoice — hoppa till Röst-fliken och starta inspelningen direkt så
+  // hantverkaren pratar efter ETT tryck. Klicket på micken är användar-
+  // gesten; getUserMedia får därmed be om mikrofontillstånd som vanligt.
   useEffect(() => {
-    return () => {
-      if (voiceTimerRef.current) clearInterval(voiceTimerRef.current)
-      if (mediaRecorderRef.current?.state === 'recording') {
-        mediaRecorderRef.current.stop()
-      }
+    if (isOpen && pendingVoice) {
+      setPendingVoice(false)
+      setActiveTab('voice')
+      setVoiceResult(null)
+      inspelning.start()
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, pendingVoice])
 
   // ── Chat ────────────────────────────────────────────────────────────────────
 
@@ -303,78 +309,39 @@ export default function Jobbkompisen() {
   // inget att ångra på servern.
   function cancelPendingAction() {
     setPendingConfirmation(null)
-    setMessages(prev => [...prev, { role: 'assistant', content: 'Avbrutet — inget skickades.' }])
+    setMessages(prev => [...prev, { role: 'assistant', content: 'Avbrutet — ingenting utfördes.' }])
   }
 
   // ── Voice ───────────────────────────────────────────────────────────────────
 
-  async function startRecording() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
-      const mediaRecorder = new MediaRecorder(stream, { mimeType })
-      mediaRecorderRef.current = mediaRecorder
-      chunksRef.current = []
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
-      }
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mimeType })
-        setAudioBlob(blob)
-        stream.getTracks().forEach(track => track.stop())
-      }
-
-      mediaRecorder.start()
-      setIsRecording(true)
-      setVoiceDuration(0)
-      setVoiceResult(null)
-
-      voiceTimerRef.current = setInterval(() => {
-        setVoiceDuration(d => d + 1)
-      }, 1000)
-    } catch {
-      // Microphone not available
-    }
-  }
-
-  function stopRecording() {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop()
-    }
-    setIsRecording(false)
-    if (voiceTimerRef.current) {
-      clearInterval(voiceTimerRef.current)
-      voiceTimerRef.current = null
-    }
-  }
-
-  // Matte-flytten (Andreas 2026-08-03): rösten är nu "prata istället för
-  // skriva" in i SAMMA Matte-tråd som chatten — Whisper transkriberar
-  // (transcribe_only, jobbuddy/voice:s egna Claude-analys hoppas över),
-  // transkriptet skickas genom sendChat → multi-agent-dirigering +
-  // Fas 0-säkerhetsräcket, istället för den gamla parallella
-  // understood/actions-vägen utan endera.
+  // Matte-flytten (Andreas 2026-08-03): rösten är "prata istället för
+  // skriva" in i SAMMA Matte-tråd som chatten — transkriptet skickas genom
+  // sendChat → multi-agent-dirigering + Fas 0-säkerhetsräcket.
+  // Matte Mobile Voice V1 (2026-08-30): transkriberingen går nu genom den
+  // kanoniska /api/matte/transcribe (auth + bränslegrind + kostnadsmätning)
+  // i stället för legacy /api/jobbuddy/voice, och filnamnet följer blobbens
+  // faktiska format (iOS spelar in audio/mp4, inte webm).
   async function processVoice() {
-    if (!audioBlob) return
+    if (!inspelning.blob) return
 
     setVoiceProcessing(true)
     try {
+      const mime = inspelning.blob.type || 'audio/webm'
       const formData = new FormData()
-      formData.append('audio', audioBlob, 'recording.webm')
-      formData.append('transcribe_only', '1')
+      formData.append('audio', inspelning.blob, mime.includes('mp4') ? 'matte-rost.mp4' : 'matte-rost.webm')
 
-      const response = await fetch('/api/jobbuddy/voice', {
+      const response = await fetch('/api/matte/transcribe', {
         method: 'POST',
         body: formData,
       })
 
       const data = await response.json()
-      const transcript = (data.transcript || '').trim()
+      const transcript = (data.text || '').trim()
       if (transcript.length < 3) {
         setVoiceResult({
-          understood: 'Kunde inte uppfatta vad du sa. Försök igen.',
+          understood: response.ok
+            ? 'Kunde inte uppfatta vad du sa. Försök igen.'
+            : (data.error || 'Kunde inte bearbeta inspelningen. Försök igen.'),
           actions: [],
         })
         return
@@ -394,8 +361,7 @@ export default function Jobbkompisen() {
   }
 
   function resetVoice() {
-    setAudioBlob(null)
-    setVoiceDuration(0)
+    inspelning.reset()
     setVoiceResult(null)
     setVoiceProcessing(false)
   }
@@ -684,14 +650,15 @@ export default function Jobbkompisen() {
 
         {activeTab === 'voice' && (
           <VoiceTab
-            isRecording={isRecording}
-            duration={voiceDuration}
-            audioBlob={audioBlob}
+            micState={inspelning.state}
+            isRecording={inspelning.state === 'recording'}
+            duration={inspelning.duration}
+            audioBlob={inspelning.blob}
             processing={voiceProcessing}
             result={voiceResult}
             executingActions={executingActions}
-            onStartRecording={startRecording}
-            onStopRecording={stopRecording}
+            onStartRecording={() => { setVoiceResult(null); inspelning.start() }}
+            onStopRecording={inspelning.stop}
             onProcess={processVoice}
             onReset={resetVoice}
             onExecuteAction={executeAction}
@@ -940,7 +907,7 @@ function ChatTab({
                 disabled={loading}
                 className="flex-1 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
-                Skicka
+                {pendingConfirmation.confirm_label || 'Skicka'}
               </button>
               <button
                 onClick={onCancelPending}
@@ -1031,6 +998,7 @@ function ChatTab({
 // ── VoiceTab ────────────────────────────────────────────────────────────────
 
 function VoiceTab({
+  micState,
   isRecording,
   duration,
   audioBlob,
@@ -1046,6 +1014,9 @@ function VoiceTab({
   formatTime,
   actionIcon,
 }: {
+  /** Hookens tillstånd — 'denied'/'unsupported' måste synas för hantverkaren,
+   *  aldrig tystas (se hooks/useAudioRecording.ts). */
+  micState: RecordingState
   isRecording: boolean
   duration: number
   audioBlob: Blob | null
@@ -1183,6 +1154,18 @@ function VoiceTab({
   // Ready to record
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6">
+      {micState === 'denied' && (
+        <p className="text-sm text-red-600 mb-4 text-center max-w-[280px]">
+          Mikrofonen är blockerad. Tillåt mikrofon för app.handymate.se i
+          webbläsarens inställningar och försök igen.
+        </p>
+      )}
+      {micState === 'unsupported' && (
+        <p className="text-sm text-red-600 mb-4 text-center max-w-[280px]">
+          Den här enheten eller webbläsaren stöder inte röstinspelning.
+          Skriv till Matte i chatten i stället.
+        </p>
+      )}
       <p className="text-sm text-gray-500 mb-6 text-center max-w-[260px]">
         Berätta vad du gjort, vad som behövs eller säg ett kommando.
         AI:n förstår och utför.

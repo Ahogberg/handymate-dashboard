@@ -45,6 +45,13 @@ interface JobbuddyContextValue {
   // och nollar värdet när den öppnas.
   pendingPrompt: string | null
   setPendingPrompt: (prompt: string | null) => void
+
+  // Matte Mobile Voice V1 (2026-08-30): hemskärmens mikrofon ska starta en
+  // RIKTIG inspelning, inte bara öppna chatten. Flaggan sätts av SkrivRads
+  // mic-knapp; Jobbkompisen läser den vid öppning, hoppar till Röst-fliken,
+  // autostartar inspelningen och nollar flaggan.
+  pendingVoice: boolean
+  setPendingVoice: (v: boolean) => void
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -67,6 +74,7 @@ export function JobbuddyProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'chat' | 'voice' | 'photo'>('chat')
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null)
+  const [pendingVoice, setPendingVoice] = useState(false)
 
   const clearSuggestion = useCallback((id: string) => {
     setSuggestions(prev => prev.filter(s => s.id !== id))
@@ -85,6 +93,8 @@ export function JobbuddyProvider({ children }: { children: ReactNode }) {
       setActiveTab,
       pendingPrompt,
       setPendingPrompt,
+      pendingVoice,
+      setPendingVoice,
     }}>
       {children}
     </JobbuddyContext.Provider>
