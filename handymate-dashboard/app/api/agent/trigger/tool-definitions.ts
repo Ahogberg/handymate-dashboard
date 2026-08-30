@@ -176,19 +176,21 @@ export const toolDefinitions = [
   },
   {
     name: "log_time",
-    description: "Logga arbetstid för tidrapportering.",
+    description: "Logga arbetstid för den inloggade användaren. När samtalet sker i ett projekt ska project_id alltid skickas. duration_minutes kan användas utan klockslag, t.ex. 240 för fyra timmar.",
     input_schema: {
       type: "object" as const,
       properties: {
+        project_id: { type: "string", description: "Projektets id. Använd aktiv projektkontext när den finns." },
         customer_id: { type: "string" },
         booking_id: { type: "string" },
-        work_date: { type: "string" },
-        start_time: { type: "string" },
-        end_time: { type: "string" },
+        work_date: { type: "string", description: "YYYY-MM-DD. Utelämnas = idag i svensk tid." },
+        duration_minutes: { type: "number", description: "Arbetstid i minuter, t.ex. 240 för fyra timmar." },
+        start_time: { type: "string", description: "HH:MM, valfritt om duration_minutes anges." },
+        end_time: { type: "string", description: "HH:MM, valfritt om duration_minutes anges." },
         description: { type: "string" },
         is_billable: { type: "boolean" },
       },
-      required: ["customer_id", "work_date", "start_time", "end_time"],
+      required: ["duration_minutes"],
     },
   },
   // R5 (tasks/resurs-masterplan.md) — persondagen som agentverktyg. Läser

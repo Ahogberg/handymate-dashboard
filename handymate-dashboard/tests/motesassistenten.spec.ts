@@ -214,18 +214,14 @@ test.describe('möteskontext (Epic 1)', () => {
 })
 
 test.describe('mötesutfall på approval-rälsen (Epic 2)', () => {
-  test('mötesgrenen skapar pending_approvals-kort, inte ai_suggestion', () => {
+  test('den gemensamma talgrenen skapar pending_approvals-kort, inte legacy-kort', () => {
     const s = kod(ANALYZE)
-    // Mötesgrenen (if (arMote)) ska returnera FÖRE legacy-loopens
-    // ai_suggestion-INSERT (lastIndexOf — en tidigare läsning finns i
-    // tenant-guarden högst upp i filen).
-    const moteGren = s.indexOf('if (arMote) {')
-    const aiSuggestionInsert = s.lastIndexOf(".from('ai_suggestion')")
-    expect(moteGren, 'mötesgrenen saknas').toBeGreaterThan(-1)
-    expect(moteGren, 'mötesgrenen ligger efter legacy-kön').toBeLessThan(aiSuggestionInsert)
-    const gren = s.slice(moteGren, aiSuggestionInsert)
-    expect(gren).toContain("from('pending_approvals')")
-    expect(gren, 'mötesgrenen faller igenom till legacy-kön').toContain('return NextResponse.json')
+    const filter = s.indexOf('filtreraAnalysforslag')
+    const approval = s.indexOf("from('pending_approvals')", filter)
+    expect(filter).toBeGreaterThan(-1)
+    expect(approval).toBeGreaterThan(filter)
+    expect(s.slice(approval)).toContain('return NextResponse.json')
+    expect(s).not.toMatch(/from\('ai_suggestion'\)[\s\S]{0,200}\.insert/)
   })
 
   test('kommunikationstriggern körs INTE för möten', () => {
@@ -233,9 +229,8 @@ test.describe('mötesutfall på approval-rälsen (Epic 2)', () => {
     // börjat skicka kundkommunikation utifrån hantverkarens eget möte —
     // exakt det Lisa-exkluderingen förbjuder.
     const s = kod(ANALYZE)
-    const moteGren = s.slice(s.indexOf('if (arMote) {'), s.lastIndexOf(".from('ai_suggestion')"))
-    expect(moteGren).not.toContain('triggerEventCommunication')
-    expect(moteGren).not.toContain('tryAutoApprove')
+    expect(s).not.toContain('triggerEventCommunication')
+    expect(s).not.toContain('tryAutoApprove')
   })
 
   test('nya korttyperna är klassade i action-kontraktet', () => {

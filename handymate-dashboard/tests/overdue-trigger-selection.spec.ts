@@ -5,6 +5,8 @@
  * Körs: npx playwright test tests/overdue-trigger-selection.spec.ts --no-deps
  */
 import { test, expect } from '@playwright/test'
+import fs from 'fs'
+import path from 'path'
 import {
   pickOverdueInvoicesToNotifyKarin,
   MAX_AGENT_TRIGGERS_PER_RUN,
@@ -12,19 +14,37 @@ import {
 
 test.describe('pickOverdueInvoicesToNotifyKarin', () => {
   test('inga fakturor har pending påminnelse → alla väljs (under cap)', () => {
-    const invoices = [{ invoice_id: 'inv_1' }, { invoice_id: 'inv_2' }]
+    const invoices = [
+      { invoice_id: 'inv_1', business_id: 'biz_1' },
+      { invoice_id: 'inv_2', business_id: 'biz_2' },
+    ]
     const result = pickOverdueInvoicesToNotifyKarin(invoices, () => false)
     expect(result).toEqual(invoices)
   })
 
   test('dedup: faktura med pending invoice_reminder-kort hoppas över', () => {
-    const invoices = [{ invoice_id: 'inv_1' }, { invoice_id: 'inv_2' }]
-    const result = pickOverdueInvoicesToNotifyKarin(invoices, (id) => id === 'inv_1')
-    expect(result).toEqual([{ invoice_id: 'inv_2' }])
+    const invoices = [
+      { invoice_id: 'inv_1', business_id: 'biz_1' },
+      { invoice_id: 'inv_2', business_id: 'biz_2' },
+    ]
+    const result = pickOverdueInvoicesToNotifyKarin(invoices, (invoice) => invoice.invoice_id === 'inv_1')
+    expect(result).toEqual([{ invoice_id: 'inv_2', business_id: 'biz_2' }])
+  })
+
+  test('kanonisk ägare: aktiv V3-fakturaregel blockerar Karins reservväg endast för rätt företag', () => {
+    const invoices = [
+      { invoice_id: 'inv_1', business_id: 'biz_v3' },
+      { invoice_id: 'inv_2', business_id: 'biz_fallback' },
+    ]
+    const result = pickOverdueInvoicesToNotifyKarin(
+      invoices,
+      (invoice) => invoice.business_id === 'biz_v3',
+    )
+    expect(result).toEqual([{ invoice_id: 'inv_2', business_id: 'biz_fallback' }])
   })
 
   test('cap: fler fakturor än max → trunkeras, resten faller till send-reminders-fallbacken', () => {
-    const invoices = Array.from({ length: 15 }, (_, i) => ({ invoice_id: `inv_${i}` }))
+    const invoices = Array.from({ length: 15 }, (_, i) => ({ invoice_id: `inv_${i}`, business_id: 'biz_1' }))
     const result = pickOverdueInvoicesToNotifyKarin(invoices, () => false, 10)
     expect(result.length).toBe(10)
     expect(result[0].invoice_id).toBe('inv_0')
@@ -32,17 +52,17 @@ test.describe('pickOverdueInvoicesToNotifyKarin', () => {
   })
 
   test('default cap matchar MAX_AGENT_TRIGGERS_PER_RUN', () => {
-    const invoices = Array.from({ length: 25 }, (_, i) => ({ invoice_id: `inv_${i}` }))
+    const invoices = Array.from({ length: 25 }, (_, i) => ({ invoice_id: `inv_${i}`, business_id: 'biz_1' }))
     const result = pickOverdueInvoicesToNotifyKarin(invoices, () => false)
     expect(result.length).toBe(MAX_AGENT_TRIGGERS_PER_RUN)
   })
 
   test('dedup filtrerar INNAN cap appliceras (dedupade fakturor tar inte upp cap-platser)', () => {
-    const invoices = Array.from({ length: 12 }, (_, i) => ({ invoice_id: `inv_${i}` }))
+    const invoices = Array.from({ length: 12 }, (_, i) => ({ invoice_id: `inv_${i}`, business_id: 'biz_1' }))
     // De tre första har redan ett kort — resten (9 st) ryms under cap 10.
     const result = pickOverdueInvoicesToNotifyKarin(
       invoices,
-      (id) => ['inv_0', 'inv_1', 'inv_2'].includes(id),
+      (invoice) => ['inv_0', 'inv_1', 'inv_2'].includes(invoice.invoice_id),
       10,
     )
     expect(result.length).toBe(9)
@@ -54,7 +74,33 @@ test.describe('pickOverdueInvoicesToNotifyKarin', () => {
   })
 
   test('alla fakturor dedupade → tom lista', () => {
-    const invoices = [{ invoice_id: 'inv_1' }, { invoice_id: 'inv_2' }]
+    const invoices = [
+      { invoice_id: 'inv_1', business_id: 'biz_1' },
+      { invoice_id: 'inv_2', business_id: 'biz_2' },
+    ]
     expect(pickOverdueInvoicesToNotifyKarin(invoices, () => true)).toEqual([])
   })
+})
+
+test('fakturapåminnelser har en delad, fail-closed V3-ägarkontroll', () => {
+  const ownershipSource = fs.readFileSync(
+    path.join(process.cwd(), 'lib/cron/invoice-reminder-ownership.ts'),
+    'utf8',
+  )
+  const checkOverdueSource = fs.readFileSync(
+    path.join(process.cwd(), 'app/api/cron/check-overdue/route.ts'),
+    'utf8',
+  )
+  const sendRemindersSource = fs.readFileSync(
+    path.join(process.cwd(), 'app/api/cron/send-reminders/route.ts'),
+    'utf8',
+  )
+
+  expect(ownershipSource).toContain(".from('v3_automation_rules')")
+  expect(ownershipSource).toContain(".eq('trigger_type', 'threshold')")
+  expect(ownershipSource).toContain(".eq('is_active', true)")
+  expect(ownershipSource).toContain(`.like('trigger_config', '%"entity":"invoice"%')`)
+  expect(ownershipSource).toMatch(/if \(error\) \{\s*throw new Error/)
+  expect(checkOverdueSource).toContain('loadV3InvoiceReminderOwnerBusinessIds')
+  expect(sendRemindersSource).toContain('loadV3InvoiceReminderOwnerBusinessIds')
 })

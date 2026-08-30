@@ -72,9 +72,11 @@ test.describe('2. voice/transcribe — inte längre en öppen dörr till Lisa', 
   test('inloggad väg matchar inspelningens företag — auth räcker inte', () => {
     const i = s.indexOf('recording.business_id !== authed')
     expect(i, 'ingen tenantmatchning').toBeGreaterThan(-1)
-    // Matchningen måste ligga före agenttriggern.
-    const trigger = s.indexOf('triggerAgentFireAndForget')
-    expect(trigger).toBeGreaterThan(i)
+    // Matchningen måste ligga före den enda efteranalysen. Någon generell
+    // agenttrigger får inte längre finnas för extern samtalstext.
+    const analyze = s.indexOf('/api/voice/analyze')
+    expect(analyze).toBeGreaterThan(i)
+    expect(s).not.toContain('triggerAgentFireAndForget')
   })
 
   test('den interna kedjan legitimerar sig', () => {
@@ -89,9 +91,8 @@ test.describe('3. voice/analyze — inloggad någonstans ≠ rätt till raden', 
     const s = kod('app/api/voice/analyze/route.ts')
     const i = s.indexOf('recording.business_id !== authed')
     expect(i, 'ingen tenantmatchning').toBeGreaterThan(-1)
-    for (const skrivning of ['ai_suggestion', 'tryAutoApprove']) {
-      expect(s.indexOf(skrivning), `${skrivning} sker före matchningen`).toBeGreaterThan(i)
-    }
+    expect(s.indexOf("from('pending_approvals')"), 'approval-skrivningen sker före matchningen').toBeGreaterThan(i)
+    expect(s, 'legacy auto-approve får inte köras från externt transkript').not.toContain('tryAutoApprove')
   })
 })
 

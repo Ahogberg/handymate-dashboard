@@ -27,6 +27,7 @@ import { arTestId, arTestNamn } from '@/lib/testdata'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
+import { resolveTimeEntryHourlyRate } from '@/lib/time-entry/rate'
 import { suggestQuoteDraftForLead } from '@/lib/quotes/suggest-quote-draft'
 import { suggestAtaDraft } from '@/lib/ata/suggest-ata-draft'
 import { fetchPersonDays } from '@/lib/schedule/person-day'
@@ -160,7 +161,7 @@ export async function executeTool(
       case 'update_project':
         return await updateProject(supabase, businessId, input)
       case 'log_time':
-        return await logTime(supabase, businessId, input)
+        return await logTime(supabase, businessId, input, context)
       case 'get_person_schedule':
         return await getPersonSchedule(supabase, businessId, input)
       case 'send_sms':
@@ -1155,42 +1156,79 @@ async function updateProject(
 }
 
 async function logTime(
-  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+  supabase: SupabaseClient,
+  businessId: string,
+  params: Record<string, unknown>,
+  context: ToolContext,
 ): Promise<ToolResult> {
-  // Tenantvakten FÖRE insert:en — se assertCustomerInBusiness.
-  const tenantFel = await assertCustomerInBusiness(supabase, businessId, params.customer_id)
-  if (tenantFel) return { success: false, error: tenantFel }
+  const optionalId = (value: unknown): string | null =>
+    typeof value === 'string' && value.trim() ? value.trim() : null
+  const projectId = optionalId(params.project_id)
+  const bookingId = optionalId(params.booking_id)
+  const requestedCustomerId = optionalId(params.customer_id)
+  const workDate = optionalId(params.work_date) || svDateStr()
+  const description = typeof params.description === 'string' ? params.description.trim() : ''
 
-  const [sH, sM] = (params.start_time as string).split(':').map(Number)
-  const [eH, eM] = (params.end_time as string).split(':').map(Number)
-  const duration = (eH * 60 + eM) - (sH * 60 + sM)
-  if (duration <= 0) return { success: false, error: 'Sluttid måste vara efter starttid' }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(workDate) || Number.isNaN(Date.parse(`${workDate}T12:00:00Z`))) {
+    return { success: false, error: 'work_date måste vara ett giltigt datum (YYYY-MM-DD)' }
+  }
+  if (context.triggerSource === 'user' && !context.businessUserId) {
+    return { success: false, error: 'Kunde inte verifiera vem tiden ska registreras på' }
+  }
 
-  const { data: config } = await supabase.from('business_config')
-    .select('pricing_settings').eq('business_id', businessId).single()
-  const rate = config?.pricing_settings?.hourly_rate || 695
+  const { data: config, error: configError } = await supabase
+    .from('business_config')
+    .select('default_hourly_rate, pricing_settings, time_require_description, require_project')
+    .eq('business_id', businessId)
+    .maybeSingle()
+  if (configError) return { success: false, error: `Kunde inte verifiera tidinställningarna: ${configError.message}` }
+  if (!config) return { success: false, error: 'Företagets tidinställningar saknas' }
+  if (config.require_project && !projectId) return { success: false, error: 'Projekt krävs för tidrapporter' }
+  if (config.time_require_description && !description) return { success: false, error: 'Beskrivning krävs för tidrapporter' }
 
-  // Etapp 1 Tier B (multi-employee-parity-plan.md): logTime() har ingen
-  // inloggad-användare-identitet i sitt anrop (telefon-/Matte-triggat).
-  // Fallback-kedja: bokningens assigned_user_id (Etapp 5) → sole-firma-
-  // fallback → null. Se lib/time-entries/resolve-attribution.ts.
+  let projectCustomerId: string | null = null
+  let projectName: string | null = null
+  if (projectId) {
+    const { data: project, error: projectError } = await supabase
+      .from('project')
+      .select('project_id, customer_id, name')
+      .eq('business_id', businessId)
+      .eq('project_id', projectId)
+      .maybeSingle()
+    if (projectError) return { success: false, error: `Kunde inte verifiera projektet: ${projectError.message}` }
+    if (!project) return { success: false, error: 'Projektet finns inte i det här företaget' }
+    projectCustomerId = project.customer_id || null
+    projectName = project.name || null
+  }
+
   let bookingAssignedUserId: string | null = null
-  if (params.booking_id) {
+  let bookingCustomerId: string | null = null
+  if (bookingId) {
     const { data: booking, error: bookingErr } = await supabase
       .from('booking')
-      .select('assigned_user_id')
+      .select('assigned_user_id, customer_id')
       .eq('business_id', businessId)
-      .eq('booking_id', params.booking_id)
+      .eq('booking_id', bookingId)
       .maybeSingle()
-    // Tenantvakten även för bokningen: utan den skrevs ett främmande
-    // booking_id in i tidraden, bara utan attribution.
     if (bookingErr) return { success: false, error: `Kunde inte verifiera bokningen: ${bookingErr.message}` }
     if (!booking) return { success: false, error: 'Bokningen finns inte i det här företaget' }
     bookingAssignedUserId = booking.assigned_user_id ?? null
+    bookingCustomerId = booking.customer_id ?? null
+  }
+
+  const customerId = requestedCustomerId || projectCustomerId || bookingCustomerId
+  for (const linkedCustomerId of [projectCustomerId, bookingCustomerId]) {
+    if (customerId && linkedCustomerId && customerId !== linkedCustomerId) {
+      return { success: false, error: 'Kunden matchar inte valt projekt eller bokning' }
+    }
+  }
+  if (customerId) {
+    const tenantFel = await assertCustomerInBusiness(supabase, businessId, customerId)
+    if (tenantFel) return { success: false, error: tenantFel }
   }
 
   let activeBusinessUserIds: string[] = []
-  if (!bookingAssignedUserId) {
+  if (!context.businessUserId && !bookingAssignedUserId) {
     const { data: activeBusinessUsers } = await supabase
       .from('business_users')
       .select('id')
@@ -1199,21 +1237,71 @@ async function logTime(
     activeBusinessUserIds = (activeBusinessUsers || []).map((u) => u.id)
   }
 
-  const businessUserId = resolveTimeEntryAttribution(bookingAssignedUserId, activeBusinessUserIds)
+  const businessUserId = context.businessUserId || resolveTimeEntryAttribution(bookingAssignedUserId, activeBusinessUserIds)
+  if (!businessUserId) return { success: false, error: 'Välj vem tiden ska registreras på' }
+
+  const { data: businessUser, error: userError } = await supabase
+    .from('business_users')
+    .select('id, hourly_rate')
+    .eq('business_id', businessId)
+    .eq('id', businessUserId)
+    .eq('is_active', true)
+    .maybeSingle()
+  if (userError) return { success: false, error: `Kunde inte verifiera användaren: ${userError.message}` }
+  if (!businessUser) return { success: false, error: 'Användaren tillhör inte det här företaget' }
+
+  const startTime = optionalId(params.start_time)
+  const endTime = optionalId(params.end_time)
+  let duration = Number(params.duration_minutes)
+  if (!Number.isFinite(duration) || duration <= 0) {
+    if (!startTime || !endTime || !/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
+      return { success: false, error: 'duration_minutes eller giltig start- och sluttid krävs' }
+    }
+    const [sH, sM] = startTime.split(':').map(Number)
+    const [eH, eM] = endTime.split(':').map(Number)
+    duration = (eH * 60 + eM) - (sH * 60 + sM)
+  }
+  duration = Math.round(duration)
+  if (duration <= 0 || duration > 24 * 60) {
+    return { success: false, error: 'Tidslängden måste vara mellan 1 minut och 24 timmar' }
+  }
+
+  const rate = resolveTimeEntryHourlyRate({
+    explicitRate: params.hourly_rate,
+    userRate: businessUser.hourly_rate,
+    pricingSettings: config.pricing_settings,
+    legacyDefaultRate: config.default_hourly_rate,
+  })
 
   const entryId = generateId('time')
   const { error } = await supabase.from('time_entry').insert({
     time_entry_id: entryId, business_id: businessId,
     business_user_id: businessUserId,
-    booking_id: params.booking_id || null, customer_id: params.customer_id,
-    work_date: params.work_date, start_time: params.start_time, end_time: params.end_time,
-    duration_minutes: duration, description: params.description || null,
+    project_id: projectId,
+    booking_id: bookingId, customer_id: customerId,
+    work_date: workDate, start_time: startTime, end_time: endTime,
+    duration_minutes: duration, work_category: 'work', description: description || null,
     hourly_rate: rate, is_billable: params.is_billable !== false,
     created_at: new Date().toISOString(),
   })
 
   if (error) return { success: false, error: error.message }
-  return { success: true, data: { time_entry_id: entryId, duration_minutes: duration, message: `${(duration/60).toFixed(1)} timmar loggade` } }
+  if (projectId) {
+    try {
+      const { handleProjectEvent } = await import('@/lib/project-ai-engine')
+      await handleProjectEvent({ type: 'time_logged', businessId, projectId, entryId })
+    } catch { /* non-blocking */ }
+  }
+  return {
+    success: true,
+    data: {
+      time_entry_id: entryId,
+      project_id: projectId,
+      business_user_id: businessUserId,
+      duration_minutes: duration,
+      message: `${(duration / 60).toLocaleString('sv-SE', { maximumFractionDigits: 2 })} timmar loggade${projectName ? ` på ${projectName}` : ''}`,
+    },
+  }
 }
 
 /**

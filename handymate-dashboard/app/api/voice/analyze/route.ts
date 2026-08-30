@@ -5,10 +5,11 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { getClaudeModel } from '@/lib/ai/get-model'
 import { filtreraAnalysforslag, type AnalysForslagsTyp } from '@/lib/voice/analysis-scope'
-import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
+import { buildDecisionRecord } from '@/lib/ai/decision-record'
 import { buildCustomerFactCard } from '@/lib/customer-facts/build-card'
 import { splitTranscript, MAP_REDUCE_TROSKEL_TECKEN } from '@/lib/meetings/split-transcript'
 import { checkFuelGate } from '@/lib/costs/fuel'
+import { sendApprovalPush } from '@/lib/notifications/approval-push'
 
 function getAnthropic() {
   return new Anthropic({
@@ -17,11 +18,9 @@ function getAnthropic() {
 }
 
 /**
- * Rollfördelningen (etapp 2b): analysmotorn FÖRESLÅR enbart de typer Lisa
- * saknar verktyg för — quote, follow_up, callback, reminder, reschedule.
- * booking, sms och create_customer GÖR Lisa själv i agentkörningen som löper
- * parallellt; producerades de även här blev det två åtgärder på samma mening.
- * Gränsen upprätthålls i kod (filtreraAnalysforslag), inte i prompten.
+ * Efteranalysen FÖRESLÅR endast säkra, reviewbara utfall. Ett kundsamtal är
+ * extern input och körs därför aldrig direkt genom den generella verktygs-
+ * routern. Gränsen upprätthålls i kod (filtreraAnalysforslag), inte i prompten.
  */
 interface AISuggestion {
   type: AnalysForslagsTyp
@@ -362,13 +361,22 @@ export async function POST(request: NextRequest) {
     // transkriberingen — men UI:t har också en Analysera-knapp. Utan spärren
     // hade knappen skapat en andra uppsättning identiska kort (och betalat
     // en Haiku-körning till). Samma samtal analyseras en gång.
-    const { data: befintliga } = await supabase
-      .from('ai_suggestion')
-      .select('suggestion_id, suggestion_type, title, status')
-      .eq('recording_id', recording_id)
-      .limit(20)
+    const [{ data: befintligaLegacy }, { data: befintligaKort }] = await Promise.all([
+      supabase
+        .from('ai_suggestion')
+        .select('suggestion_id, suggestion_type, title, status')
+        .eq('recording_id', recording_id)
+        .limit(20),
+      supabase
+        .from('pending_approvals')
+        .select('id, approval_type, title, status')
+        .eq('business_id', recording.business_id)
+        .contains('payload', { recording_id })
+        .limit(20),
+    ])
+    const befintliga = [...(befintligaKort || []), ...(befintligaLegacy || [])]
 
-    if (befintliga && befintliga.length > 0) {
+    if (befintliga.length > 0) {
       return NextResponse.json({
         success: true,
         recording_id,
@@ -497,9 +505,9 @@ affären framåt efter besöket:
 - Innehåller transkriptet ovan tidsstämpel-markörer ([mm:ss] eller
   [h:mm:ss]) — inled source_text med den närmaste markören, t.ex.
   "[05:30] ...", så evidensen blir tidsatt.`
-  : `VIKTIGT: En kollega (AI-agenten Lisa) hanterar samma samtal parallellt och
-sköter själv bokningar, SMS-bekräftelser och kundregistrering. Föreslå ALDRIG
-dessa — då görs samma sak två gånger. Du föreslår ENBART:
+  : `Detta är ett AVSLUTAT telefonsamtal. Du får bara identifiera vad som
+bör granskas av företaget efteråt. Boka, skicka SMS eller skapa kund direkt
+utifrån transkriptet ALDRIG. Du föreslår ENBART:
 
 - Om pris/jobb diskuterades → "quote" (skapa offert)
 - Om "skicka offert" nämndes → "quote" med hög prioritet
@@ -576,7 +584,7 @@ Svara ENDAST med JSON i följande format:
 4. Om inget konkret diskuterades, returnera tom suggestions-array
 5. Prioritera "quote" om kunden har ett aktivt behov
 6. "urgent" prioritet ENDAST vid akuta problem (läcka, strömavbrott, etc)
-7. Föreslå ALDRIG booking, sms eller create_customer — de sköts av Lisa
+7. Föreslå ALDRIG booking, sms eller create_customer — de kräver en separat, säker verkställighetsväg
 8. Svara ENDAST med JSON, ingen annan text före eller efter`
 
     // Fångad i variabel så beslutsposten stämplar modellen som FAKTISKT
@@ -668,7 +676,7 @@ Svara ENDAST med JSON i följande format:
         .select('customer_id')
         .eq('business_id', recording.business_id)
         .eq('phone_number', recording.phone_number)
-        .single()
+        .maybeSingle()
 
       if (existingCustomer) {
         customerId = existingCustomer.customer_id
@@ -687,6 +695,7 @@ Svara ENDAST med JSON i följande format:
               email: extractedInfo.email || undefined
             })
             .eq('customer_id', customerId)
+            .eq('business_id', recording.business_id)
         }
       }
     }
@@ -706,21 +715,69 @@ Svara ENDAST med JSON i följande format:
         kastade.map(k => k.type).join(', ')
       )
     }
-    // ═══ MÖTESGRENEN → APPROVAL-RÄLSEN (Epic 2, 2026-08-11) ═══
+    // ═══ EN APPROVAL-RÄLS FÖR ALLT TAL ═══
     //
-    // Mötesutfall landar som pending_approvals-kort — INTE i legacy-
-    // ai_suggestion (voice-auditens "Epic 6-kärnproblem": två köer på samma
-    // transkript). Telefongrenen lämnas orörd nedan. Korten bär evidens
-    // (source_text + confidence) och går genom action-kontraktet:
-    // create_quote_draft är EXECUTABLE (exekveraren finns), meeting_followup
-    // EXECUTABLE → task-rad, meeting_summary INFORMATIONAL.
-    if (arMote) {
+    // Telefoni och platsbesök landar nu i samma action contract. Telefoni
+    // kvalificerar först eventuell ny kund/lead/deal via Golden Path, men
+    // inget offert-, uppföljnings- eller kundfaktautfall verkställs direkt
+    // från ett externt transkript. Det gamla ai_suggestion/auto-approve-
+    // sidospåret är därmed borta ur den körande vägen.
+    let pipelineResult: {
+      action: string
+      leadId?: string
+      dealId?: string
+      customerId?: string
+      aiConfidence: number
+    } | null = null
+
+    if (!arMote) {
+      try {
+        const { processCallForPipeline } = await import('@/lib/pipeline-ai')
+        pipelineResult = await processCallForPipeline({
+          callId: recording_id,
+          businessId: recording.business_id,
+          transcript: recording.transcript,
+          callerPhone: recording.phone_number || '',
+        })
+        if (!customerId && pipelineResult.customerId) {
+          customerId = pipelineResult.customerId
+          const { error: kopplingsFel } = await supabase
+            .from('call_recording')
+            .update({ customer_id: customerId })
+            .eq('recording_id', recording_id)
+            .eq('business_id', recording.business_id)
+          if (kopplingsFel) {
+            console.error('[voice/analyze] kunde inte koppla samtalet till Golden Path-kunden:', kopplingsFel.message)
+          }
+        }
+      } catch (pipelineError) {
+        // Analysen och sammanfattningskortet är fortfarande värdefulla. Vi
+        // påstår aldrig att leadet skapades; felet syns i svaret/loggen.
+        console.error('[voice/analyze] pipeline-kvalificering misslyckades:', pipelineError)
+      }
+    }
+
+    {
+      let routedBusinessUserId: string | null = null
+      if (!arMote) {
+        const { data: owner } = await supabase
+          .from('business_users')
+          .select('id')
+          .eq('business_id', recording.business_id)
+          .eq('is_active', true)
+          .eq('role', 'owner')
+          .limit(1)
+          .maybeSingle()
+        routedBusinessUserId = owner?.id || null
+      }
+
       let kundNamn: string | null = null
       if (customerId) {
         const { data: kund } = await supabase
           .from('customer')
           .select('name')
           .eq('customer_id', customerId)
+          .eq('business_id', recording.business_id)
           .maybeSingle()
         kundNamn = kund?.name || null
       }
@@ -751,10 +808,19 @@ Svara ENDAST med JSON i följande format:
       })
 
       const kort: Array<Record<string, unknown>> = []
+      let utelamnadeUtanKund = 0
       for (const s of suggestions) {
         if (s.confidence < 0.4) continue
-        const evidens = s.source_text ? ` Ur mötet: "${s.source_text}"` : ''
+        const kallform = arMote ? 'mötet' : 'samtalet'
+        const evidens = s.source_text ? ` Ur ${kallform}: "${s.source_text}"` : ''
         if (s.type === 'quote') {
+          // Offertutkastets exekverare behöver en tenant-verifierad kund.
+          // Om lead-automationen är avstängd visar sammanfattningen fyndet,
+          // men vi skapar inte ett kort som garanterat skulle fallera.
+          if (!customerId) {
+            utelamnadeUtanKund++
+            continue
+          }
           kort.push({
             approval_type: 'create_quote_draft',
             title: s.title,
@@ -766,6 +832,8 @@ Svara ENDAST med JSON i följande format:
               source_text: s.source_text || null,
               confidence: s.confidence,
               recording_id,
+              lead_id: pipelineResult?.leadId || null,
+              routed_agent: 'daniel',
               decision_record: beslutsstampel,
             },
           })
@@ -777,7 +845,7 @@ Svara ENDAST med JSON i följande format:
             customerId: factCustomerId,
             recordingId: recording_id,
             decisionRecord: beslutsstampel,
-            evidensKalla: 'mötet',
+            evidensKalla: arMote ? 'mötet' : 'samtalet',
           }))
         } else {
           // follow_up / reminder / reschedule → uppföljningskort → task.
@@ -794,6 +862,7 @@ Svara ENDAST med JSON i följande format:
               priority: s.priority || 'medium',
               customer_id: customerId,
               recording_id,
+              routed_agent: 'lisa',
               decision_record: beslutsstampel,
             },
           })
@@ -804,18 +873,33 @@ Svara ENDAST med JSON i följande format:
       // Ärlighet: kortet säger vad som FANNS, aldrig "allt är hanterat".
       kort.unshift({
         approval_type: 'meeting_summary',
-        title: kundNamn
-          ? `Mötet med ${kundNamn} är sammanfattat — ${kort.length} ${kort.length === 1 ? 'sak' : 'saker'} att ta vidare`
-          : `Mötet är sammanfattat — ${kort.length} ${kort.length === 1 ? 'sak' : 'saker'} att ta vidare`,
-        description: analysisResult.summary || 'Ingen sammanfattning kunde skapas.',
+        title: arMote
+          ? (kundNamn
+              ? `Mötet med ${kundNamn} är sammanfattat — ${kort.length} ${kort.length === 1 ? 'sak' : 'saker'} att ta vidare`
+              : `Mötet är sammanfattat — ${kort.length} ${kort.length === 1 ? 'sak' : 'saker'} att ta vidare`)
+          : (kundNamn
+              ? `Lisa har sammanfattat samtalet med ${kundNamn}`
+              : 'Lisa har sammanfattat ett inkommande samtal'),
+        description: [
+          analysisResult.summary || 'Ingen sammanfattning kunde skapas.',
+          utelamnadeUtanKund > 0
+            ? `${utelamnadeUtanKund} förslag kräver att kunden först kopplas till samtalet.`
+            : null,
+        ].filter(Boolean).join(' '),
         risk_level: 'low',
         payload: {
           recording_id,
           customer_id: customerId,
+          source: arMote ? 'site_visit' : 'phone_call',
           summary: analysisResult.summary || null,
           forslag: kort.length,
+          pipeline_action: pipelineResult?.action || null,
+          lead_id: pipelineResult?.leadId || null,
+          deal_id: pipelineResult?.dealId || null,
+          routed_agent: arMote ? 'matte' : 'lisa',
           decision_record: beslutsstampel,
         },
+        ...(!arMote && routedBusinessUserId ? { routed_business_user_id: routedBusinessUserId } : {}),
       })
 
       let skapadeKort = 0
@@ -827,171 +911,32 @@ Svara ENDAST med JSON i följande format:
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           ...k,
         })
-        if (kortFel) console.error('[voice/analyze] möteskort kunde inte skapas:', kortFel.message)
-        else skapadeKort++
+        if (kortFel) {
+          console.error('[voice/analyze] samtalskort kunde inte skapas:', kortFel.message)
+        } else {
+          skapadeKort++
+          if (!arMote && k.approval_type === 'meeting_summary') {
+            void sendApprovalPush({
+              business_id: recording.business_id,
+              approval_type: 'meeting_summary',
+              payload: k.payload as Record<string, unknown>,
+              risk_level: 'low',
+              routed_business_user_id: routedBusinessUserId,
+            })
+          }
+        }
       }
 
-      // OBS: tryAutoApprove/processCallForPipeline/triggerEventCommunication
-      // körs INTE för möten. Särskilt kommunikationstriggern: nu när möten
-      // bär customer_id (P0-fixen) hade den börjat skicka kundkommunikation
-      // utifrån ett möte hantverkaren själv satt i — exakt det rummet-
-      // principen förbjuder (Lisa-exkluderingen).
+      // Smart communication körs medvetet inte här. Ett transkript är evidens
+      // till ägarens granskningskort, aldrig ett självständigt kundutskick.
       return NextResponse.json({
         success: true,
         recording_id,
         summary: analysisResult.summary,
         cards_created: skapadeKort,
+        pipeline: pipelineResult,
       })
     }
-
-    const createdSuggestions = []
-
-    for (const suggestion of suggestions) {
-      // Skippa förslag med låg confidence
-      if (suggestion.confidence < 0.4) continue
-
-      // ═══ CUSTOMER MEMORY V2 (2026-08-16) ═══
-      // customer_fact hör INTE hemma i ai_suggestion (dagens tabell för
-      // resten av telefonförslagen) — det landar på samma pending_approvals
-      // →customer_fact-räls som mötesgrenen redan använder, annars godkänns
-      // det via app/api/suggestions/approve/route.ts som saknar ett case för
-      // typen och gör tyst ingenting. Ingen kund härledd → hoppa helt, tyst,
-      // samma vakt som mötesgrenen.
-      if (suggestion.type === 'customer_fact') {
-        if (!customerId) continue
-        const kort = buildCustomerFactCard(suggestion, {
-          customerId,
-          recordingId: recording_id,
-          decisionRecord: buildDecisionRecord({
-            model: analysModell,
-            prompt: 'callAnalysis',
-            input: recording.transcript,
-            now: new Date(),
-          }),
-          evidensKalla: 'samtalet',
-        })
-        const { error: faktaKortFel } = await supabase.from('pending_approvals').insert({
-          id: `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-          business_id: recording.business_id,
-          status: 'pending',
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          ...kort,
-        })
-        if (faktaKortFel) console.error('[voice/analyze] telefon-faktakort kunde inte skapas:', faktaKortFel.message)
-        continue
-      }
-
-      // Lägg till extraherad kundinfo i action_data
-      const actionData = withDecisionRecord(
-        {
-          ...suggestion.action_data,
-          customer_name: suggestion.action_data?.customer_name || extractedInfo.customer_name,
-          phone_number: suggestion.action_data?.phone_number || extractedInfo.phone_number || recording.phone_number,
-          address: suggestion.action_data?.address || extractedInfo.address,
-          email: suggestion.action_data?.email || extractedInfo.email,
-        },
-        // SPÅR 1.1: beslutsposten — vilken modell och promptversion som
-        // producerade förslaget, plus hash av transkriptet. Utan den går det
-        // inte att svara på om samtalsanalysen blir bättre.
-        buildDecisionRecord({
-          model: analysModell,
-          prompt: 'callAnalysis',
-          input: recording.transcript,
-          now: new Date(),
-        })
-      )
-
-      const { data: createdSuggestion, error: insertError } = await supabase
-        .from('ai_suggestion')
-        .insert({
-          business_id: recording.business_id,
-          recording_id: recording_id,
-          customer_id: customerId,
-          suggestion_type: suggestion.type,
-          title: suggestion.title,
-          description: suggestion.description,
-          priority: suggestion.priority,
-          status: 'pending',
-          action_data: actionData,
-          confidence_score: suggestion.confidence,
-          source_text: suggestion.source_text,
-          created_at: new Date().toISOString(),
-          // Förslag utgår efter 7 dagar om de inte hanteras
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-        })
-        .select()
-        .single()
-
-      if (createdSuggestion) {
-        createdSuggestions.push(createdSuggestion)
-      }
-
-      if (insertError) {
-        console.error('Error creating suggestion:', insertError)
-      }
-    }
-
-    // Auto-approve: try to auto-execute low-risk suggestions
-    const autoApproveResults = []
-    try {
-      const { tryAutoApprove } = await import('@/lib/auto-approve')
-      for (const created of createdSuggestions) {
-        const result = await tryAutoApprove({
-          suggestionId: created.suggestion_id,
-          businessId: recording.business_id,
-          actionType: created.suggestion_type,
-          confidence: created.confidence_score || 0,
-          suggestion: created,
-        })
-        autoApproveResults.push(result)
-      }
-    } catch (autoErr) {
-      console.error('Auto-approve error (non-blocking):', autoErr)
-    }
-
-    // Pipeline integration: process call for pipeline deals
-    try {
-      const { processCallForPipeline } = await import('@/lib/pipeline-ai')
-      if (recording.transcript && recording.business_id) {
-        await processCallForPipeline({
-          callId: recording_id,
-          businessId: recording.business_id,
-          transcript: recording.transcript,
-          callerPhone: recording.phone_number || '',
-        })
-      }
-    } catch (pipelineError) {
-      console.error('Pipeline processing error (non-blocking):', pipelineError)
-    }
-
-    // Smart communication: trigger call_completed event
-    try {
-      if (recording.business_id && recording.customer_id) {
-        const { triggerEventCommunication } = await import('@/lib/smart-communication')
-        await triggerEventCommunication({
-          businessId: recording.business_id,
-          event: 'call_completed',
-          customerId: recording.customer_id,
-        })
-      }
-    } catch (commErr) {
-      console.error('Communication trigger error (non-blocking):', commErr)
-    }
-
-    const autoApprovedCount = autoApproveResults.filter(r => r.auto_approved).length
-
-    return NextResponse.json({
-      success: true,
-      recording_id,
-      summary: analysisResult.summary,
-      sentiment: analysisResult.customer_sentiment,
-      urgency: analysisResult.urgency,
-      extracted_info: extractedInfo,
-      suggestions_created: createdSuggestions.length,
-      suggestions: createdSuggestions,
-      auto_approved: autoApprovedCount,
-      auto_approve_results: autoApproveResults,
-    })
 
   } catch (error: any) {
     console.error('Analysis error:', error)

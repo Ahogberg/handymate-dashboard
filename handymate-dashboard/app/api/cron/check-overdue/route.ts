@@ -3,6 +3,7 @@ import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { triggerAgentFireAndForget, makeIdempotencyKey } from '@/lib/agent-trigger'
 import { pickOverdueInvoicesToNotifyKarin } from '@/lib/cron/overdue-trigger-selection'
+import { loadV3InvoiceReminderOwnerBusinessIds } from '@/lib/cron/invoice-reminder-ownership'
 
 
 // force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
@@ -28,10 +29,10 @@ export const dynamic = 'force-dynamic'
  * körning — inte för fakturor som redan var 'overdue' sedan innan (de
  * matchar inte status='sent'-filtret nedan och triggas alltså bara en
  * gång). Karin ska BEDÖMA läget (kund/belopp/relation) och kan föreslå
- * något annat än send-reminders mekaniska mall-påminnelse. Dedup mot
- * send-reminders: fakturor som redan har ett pending invoice_reminder-kort
- * hoppas över (se lib/cron/overdue-trigger-selection.ts). Fire-and-forget,
- * cappat till MAX_AGENT_TRIGGERS_PER_RUN triggningar/körning.
+ * något annat än send-reminders mekaniska mall-påminnelse. En aktiv V3-
+ * fakturaregel är kanonisk ägare och blockerar denna reservväg; även fakturor
+ * med ett pending invoice_reminder-kort hoppas över. Fire-and-forget, cappat
+ * till MAX_AGENT_TRIGGERS_PER_RUN triggningar/körning.
  */
 export async function GET(request: NextRequest) {
   if (!verifyCronSecret(request)) {
@@ -87,22 +88,29 @@ async function checkOverdueInvoices() {
 
       // Batchad dedup-läsning (ett query, inte ett per faktura): alla
       // pending invoice_reminder-kort för de berörda företagen.
-      const { data: pendingReminders } = await supabase
-        .from('pending_approvals')
-        .select('payload')
-        .eq('approval_type', 'invoice_reminder')
-        .eq('status', 'pending')
-        .in('business_id', businessIds)
+      const [pendingResult, v3OwnerBusinessIds] = await Promise.all([
+        supabase
+          .from('pending_approvals')
+          .select('payload')
+          .eq('approval_type', 'invoice_reminder')
+          .eq('status', 'pending')
+          .in('business_id', businessIds),
+        loadV3InvoiceReminderOwnerBusinessIds(supabase, businessIds),
+      ])
+
+      if (pendingResult.error) throw pendingResult.error
 
       const invoiceIdsWithPendingReminder = new Set(
-        (pendingReminders || [])
+        (pendingResult.data || [])
           .map((r: any) => r.payload?.invoice_id)
           .filter(Boolean)
       )
 
       const toTrigger = pickOverdueInvoicesToNotifyKarin(
         overdueInvoices as any[],
-        (invoiceId) => invoiceIdsWithPendingReminder.has(invoiceId),
+        (invoice) =>
+          invoiceIdsWithPendingReminder.has(invoice.invoice_id)
+          || v3OwnerBusinessIds.has(invoice.business_id),
       )
 
       for (const inv of toTrigger as any[]) {
