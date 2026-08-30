@@ -366,6 +366,18 @@ export default function Jobbkompisen() {
     setVoiceProcessing(false)
   }
 
+  // Mikrofonen på den stängda bubblan: öppna panelen på Röst-fliken OCH
+  // starta inspelningen i samma gest. start() anropas direkt här i stället
+  // för via pendingVoice-effekten (som SkrivRad använder, eftersom den bor i
+  // en annan komponent) — iOS Safari kopplar mikrofontillståndet till själva
+  // klicket, och en effekt efter render ligger utanför den gesten.
+  function startVoiceFromBubble() {
+    setIsOpen(true)
+    setActiveTab('voice')
+    setVoiceResult(null)
+    inspelning.start()
+  }
+
   // ── Photo ───────────────────────────────────────────────────────────────────
 
   // Matte-flytten (Andreas 2026-08-03): fotot går nu in i SAMMA Matte-tråd
@@ -529,33 +541,48 @@ export default function Jobbkompisen() {
             {formatKr(unseenKr)} hittat
           </button>
         )}
-        <button
-          onClick={() => setIsOpen(true)}
-          aria-label="Öppna Matte"
-          className={`w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center hover:scale-105 transition-all overflow-hidden relative ${
-            hasActiveJob
-              ? 'bg-gradient-to-br from-emerald-500 to-primary-600 shadow-emerald-500/20 ring-2 ring-emerald-300'
-              : 'bg-white shadow-primary-600/10 ring-1 ring-primary-200'
-          }`}
-        >
-          {hasActiveJob ? (
-            <Mic className="w-6 h-6 text-white animate-pulse" />
-          ) : matte?.avatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={matte.avatar}
-              alt="Matte"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <Sparkles className="w-6 h-6 text-primary-700" />
-          )}
-          {antalFynd > 0 && !visaBelopp && (
-            <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 flex items-center justify-center text-[10px] font-bold bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full">
-              {antalFynd}
-            </span>
-          )}
-        </button>
+        {/* Beständig mikrofon (Matte Mobile Voice V1, 2026-08-30): bubblan
+            är monterad i dashboard-layouten, så den här knappen följer med
+            till projektsidor, kundkort och verksamhetsvyn — precis där
+            hantverkaren står när han vill säga något. Inspelningen startas
+            SYNKRONT i klicket (inte via en effekt efter render): iOS Safari
+            kräver att getUserMedia sker inuti användargesten. */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={startVoiceFromBubble}
+            aria-label="Prata med Matte"
+            className="w-11 h-11 rounded-full bg-white ring-1 ring-primary-200 shadow-lg shadow-primary-600/10 text-primary-700 flex items-center justify-center hover:bg-primary-50 hover:scale-105 transition-all"
+          >
+            <Mic className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => setIsOpen(true)}
+            aria-label="Öppna Matte"
+            className={`w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center hover:scale-105 transition-all overflow-hidden relative ${
+              hasActiveJob
+                ? 'bg-gradient-to-br from-emerald-500 to-primary-600 shadow-emerald-500/20 ring-2 ring-emerald-300'
+                : 'bg-white shadow-primary-600/10 ring-1 ring-primary-200'
+            }`}
+          >
+            {hasActiveJob ? (
+              <Mic className="w-6 h-6 text-white animate-pulse" />
+            ) : matte?.avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={matte.avatar}
+                alt="Matte"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <Sparkles className="w-6 h-6 text-primary-700" />
+            )}
+            {antalFynd > 0 && !visaBelopp && (
+              <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 flex items-center justify-center text-[10px] font-bold bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full">
+                {antalFynd}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
     )
   }

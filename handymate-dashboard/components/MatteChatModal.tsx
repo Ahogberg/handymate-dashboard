@@ -52,11 +52,14 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
 
-  // Bekräftelsekortet för externa utskick — samma kontrakt som Jobbkompisen:
-  // servern signerar en token för EXAKT det verktygsanrop som visas, och
-  // [Skicka] återanropar med enbart token. Inget skickas förrän man tryckt.
+  // Bekräftelsekortet — samma kontrakt som Jobbkompisen: servern signerar en
+  // token för EXAKT det verktygsanrop som visas, och knappen återanropar med
+  // enbart token. Inget utförs förrän man tryckt. Kortet bär numera även
+  // interna skrivningar som förtjänar ett ja (tidsregistrering), så verbet
+  // kommer från servern: "Skicka" för utskick, "Logga" för tid.
   const [pendingConfirmation, setPendingConfirmation] = useState<{
     summary: string
+    confirm_label?: string
     token: string
   } | null>(null)
 
@@ -93,7 +96,7 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
         created_at: now,
       }))])
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Kunde inte nå servern — inget skickades.', created_at: new Date().toISOString() }])
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Kunde inte nå servern — ingenting utfördes.', created_at: new Date().toISOString() }])
     } finally {
       setSending(false)
     }
@@ -435,7 +438,7 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
                   disabled={sending}
                   className="inline-flex items-center min-h-[40px] px-4 rounded-xl bg-primary-700 text-white text-sm font-semibold disabled:opacity-50"
                 >
-                  Skicka
+                  {pendingConfirmation.confirm_label || 'Skicka'}
                 </button>
                 <button
                   type="button"
