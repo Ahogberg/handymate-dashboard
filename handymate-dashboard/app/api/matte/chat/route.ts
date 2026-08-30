@@ -30,6 +30,11 @@ import {
   buildExternalActionSummary,
   confirmLabelForTool,
 } from '@/lib/agent/external-confirm'
+import {
+  classifyProviderOutage,
+  alertProviderOutageThrottled,
+  PROVIDER_OUTAGE_REPLY,
+} from '@/lib/ai/provider-outage'
 import { getRelevantMemories, buildMemoryPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
 import { getAgentTools } from '@/lib/agents/personalities'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
@@ -1719,14 +1724,22 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('[matte/chat] Error:', error)
+    // P0-lärdomen 2026-08-31: Anthropic-krediterna tog slut och kunderna
+    // fick generiska fel i två dygn utan att någon larmades. Ett känt
+    // leverantörsstopp får därför ett ÄRLIGT svar + throttlat internt
+    // driftlarm (fire-and-forget — larmvägen får aldrig blockera svaret).
+    const outage = classifyProviderOutage(error)
+    if (outage) {
+      void alertProviderOutageThrottled(outage).catch(() => {})
+      return NextResponse.json({
+        reply: PROVIDER_OUTAGE_REPLY,
+        messages: [],
+        provider_outage: true,
+      })
+    }
     return NextResponse.json({
       reply: 'Något gick fel — försök igen.',
       messages: [],
-      // TEMPORÄR P0-DIAGNOS (2026-08-31): chatten svarar apology för ALLA
-      // konton i prod och Vercels loggström tappar function-output. Bara
-      // felmeddelandet (aldrig stack/hemligheter) exponeras så rotorsaken
-      // kan läsas ur svaret. TAS BORT så fort felet är åtgärdat.
-      debug_error: String(error?.message || error).slice(0, 300),
     })
   }
 }
