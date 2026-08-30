@@ -96,6 +96,11 @@ const EXTERNAL_DENIED_TOOLS: Record<string, string> = {
   // öppet, EXTERNAL_SAFE_TOOLS är fortsatt tom/fail-closed):
   get_account_billing_status: 'internt abonnemangs-/faktureringsunderlag för ägaren — aldrig en extern part',
   escalate_to_handymate_team: 'skrivande (skapar support_ticket + triggar internt SMS-larm till teamets nummer) — en oidentifierad extern part kunde annars spamma driftlarmet',
+  // Klassade 2026-08-30 (Matte Mobile Voice V1, branch
+  // claude/lisa-prata-matte-integration-ao7nv3 införde verktygen utan att
+  // uppdatera detta facit — samma mönster som 2026-08-25 ovan):
+  log_material: 'skrivande, materialrad på ett projekt — samma kategori som log_time',
+  add_work_note: 'skrivande, arbetsanteckning på ett projekt — samma kategori som log_time',
 }
 
 test.describe('Etapp S — fail-closed klassificeringsfacit', () => {
