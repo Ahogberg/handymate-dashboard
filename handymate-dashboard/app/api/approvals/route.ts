@@ -68,6 +68,11 @@ export async function GET(request: NextRequest) {
         .gte('resolved_at', sevenDaysAgoIso)
     } else {
       query = query.eq('status', status)
+      // Snoozade kort (v181, "Skjut upp") göms ur pending-kön tills tiden
+      // passerat — de är fortfarande pending och återkommer av sig själva.
+      if (status === 'pending') {
+        query = query.or(`snoozed_until.is.null,snoozed_until.lt.${new Date().toISOString()}`)
+      }
     }
 
     if (approvalType) {

@@ -110,8 +110,8 @@ export async function POST(
 
     const body = await request.json()
     const { action, edited_payload, reject_reason, action_overrides } = body
-    if (!action || !['approve', 'reject', 'edit', 'retry'].includes(action)) {
-      return NextResponse.json({ error: 'action must be approve, reject, edit or retry' }, { status: 400 })
+    if (!action || !['approve', 'reject', 'edit', 'retry', 'snooze'].includes(action)) {
+      return NextResponse.json({ error: 'action must be approve, reject, edit, retry or snooze' }, { status: 400 })
     }
 
     const supabase = getServerSupabase()
@@ -143,6 +143,29 @@ export async function POST(
         { error: 'Du saknar behörighet att agera på detta godkännande' },
         { status: 403 },
       )
+    }
+
+    // "Skjut upp" (Mission Control mobil 4a, v181): kortet förblir pending
+    // men filtreras ur kön tills snoozed_until passerat. INGEN statusflipp,
+    // INGEN exekvering, ingen inlärningshändelse — att skjuta upp är inte
+    // ett beslut om innehållet. Default 4 h, klampat 1–72 h.
+    if (action === 'snooze') {
+      if (approval.status !== 'pending') {
+        return NextResponse.json(
+          { error: 'Endast väntande kort kan skjutas upp' },
+          { status: 409 },
+        )
+      }
+      const timmar = Math.min(Math.max(Number(body.snooze_hours) || 4, 1), 72)
+      const snoozedUntil = new Date(Date.now() + timmar * 60 * 60 * 1000).toISOString()
+      const { error: snoozeErr } = await supabase
+        .from('pending_approvals')
+        .update({ snoozed_until: snoozedUntil })
+        .eq('id', params.id)
+        .eq('business_id', business.business_id)
+        .eq('status', 'pending')
+      if (snoozeErr) throw snoozeErr
+      return NextResponse.json({ success: true, snoozed_until: snoozedUntil })
     }
 
     // Fas 0-härdning (exec-chain-arvet, plan 2026-08-05): omkörning av en
