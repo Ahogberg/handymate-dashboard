@@ -1273,6 +1273,48 @@ async function logTime(
     legacyDefaultRate: config.default_hourly_rate,
   })
 
+  // Dubbelregistreringsskydd (Matte Mobile Voice V1, 2026-08-30). Röstvägen
+  // har flera sätt att skicka samma pass två gånger: dubbeltryck på
+  // bekräftelsekortet, en återanvänd bekräftelse-token inom dess
+  // giltighetstid (lib/agent/external-confirm.ts), eller modellen som
+  // anropar verktyget en gång till i samma tur. Skyddet sitter HÄR vid
+  // skrivningen, inte i transporten, så det gäller alla vägar in.
+  // Samma person, samma dag, samma längd, samma projekt inom fem minuter är
+  // alltid en dubblett — inte ett nytt arbetspass.
+  const dubblettFonster = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+  let dubblettFraga = supabase
+    .from('time_entry')
+    .select('time_entry_id')
+    .eq('business_id', businessId)
+    .eq('business_user_id', businessUserId)
+    .eq('work_date', workDate)
+    .eq('duration_minutes', duration)
+    .gte('created_at', dubblettFonster)
+    .limit(1)
+  // .eq() matchar aldrig NULL i Postgres — utan is()-grenen hade en tidrad
+  // utan projekt aldrig känts igen som dubblett.
+  dubblettFraga = projectId
+    ? dubblettFraga.eq('project_id', projectId)
+    : dubblettFraga.is('project_id', null)
+
+  const { data: dubbletter, error: dubblettFel } = await dubblettFraga
+  if (dubblettFel) {
+    return { success: false, error: `Kunde inte kontrollera dubbelregistrering: ${dubblettFel.message}` }
+  }
+  if (dubbletter && dubbletter.length > 0) {
+    return {
+      success: true,
+      data: {
+        time_entry_id: dubbletter[0].time_entry_id,
+        project_id: projectId,
+        business_user_id: businessUserId,
+        duration_minutes: duration,
+        duplicate: true,
+        message: `Den tiden var redan loggad — ${(duration / 60).toLocaleString('sv-SE', { maximumFractionDigits: 2 })} timmar${projectName ? ` på ${projectName}` : ''} står kvar som en enda post.`,
+      },
+    }
+  }
+
   const entryId = generateId('time')
   const { error } = await supabase.from('time_entry').insert({
     time_entry_id: entryId, business_id: businessId,
