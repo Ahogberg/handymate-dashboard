@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Bookmark, Check, Loader2, Send, Sparkles } from 'lucide-react'
+import { QuoteCompletenessStrip } from './QuoteCompletenessStrip'
+import type { QuoteSection, SectionSummary } from '@/lib/quotes/quote-completeness'
 
 interface QuoteBuilderHeaderProps {
   /** 'create' (default om utelämnad) → "Ny offert", inga autosave-badges.
@@ -12,6 +14,17 @@ interface QuoteBuilderHeaderProps {
   mode?: 'create' | 'edit'
   /** Edit-läge: offertnumret bredvid titeln. */
   quoteNumber?: string
+  /** Offertens egen titel (Titel-fältet). Visas i stället för den
+      hårdkodade "Ny offert"/"Redigerar offert" så snart den är ifylld —
+      se headerTitle nedan. Tom/odefinierad → oförändrat fallback-beteende. */
+  title?: string
+  /** Completeness-remsan (Fas 1, offert-omtaget 2026-08-31): renderas som
+      header-RAD 2, inne i SAMMA sticky/backdrop-blur-wrapper som rad 1 —
+      inte en egen sticky-yta, och inte längre en separat <div> som
+      scrollar bort under headern (se QuoteBuilder.tsx/QuoteEditView.tsx).
+      Utelämnad (t.ex. om ingen sammanfattning finns) → ingen rad 2 alls. */
+  completenessSummaries?: Record<QuoteSection, SectionSummary>
+  onSelectSection?: (section: QuoteSection) => void
   /** Edit-läge: autosparets status — samma badge som gamla QuoteEditHeader. */
   autoSaveStatus?: 'idle' | 'saving' | 'saved' | 'error'
   aiGenerated?: boolean
@@ -60,6 +73,9 @@ interface QuoteBuilderHeaderProps {
 export function QuoteBuilderHeader({
   mode = 'create',
   quoteNumber,
+  title,
+  completenessSummaries,
+  onSelectSection,
   autoSaveStatus,
   aiGenerated,
   aiConfidence,
@@ -76,6 +92,14 @@ export function QuoteBuilderHeader({
   onSaveDraft,
   onSaveTemplate,
 }: QuoteBuilderHeaderProps) {
+  // Fallback oförändrat om titeln saknas/är tom — bara vilken text som
+  // vinner ändras, quoteNumber-badgen intill (edit-läge) rörs inte.
+  const headerTitle = title?.trim()
+    ? title
+    : mode === 'edit'
+      ? 'Redigerar offert'
+      : 'Ny offert'
+
   return (
     <div className="sticky top-0 z-30 -mx-4 sm:-mx-6 mb-6 px-4 sm:px-6 py-3 bg-slate-50/95 backdrop-blur-md border-b border-slate-200">
       <div className="flex items-center gap-3 flex-nowrap sm:flex-wrap">
@@ -90,7 +114,7 @@ export function QuoteBuilderHeader({
         <div className="h-4 w-px bg-slate-300 shrink-0" aria-hidden />
         <div className="flex items-baseline gap-2 min-w-0">
           <h1 className="font-heading text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">
-            {mode === 'edit' ? 'Redigerar offert' : 'Ny offert'}
+            {headerTitle}
           </h1>
           {mode === 'edit' && quoteNumber && (
             <span className="hidden sm:inline text-xs font-medium text-slate-500 font-mono">{quoteNumber}</span>
@@ -185,6 +209,17 @@ export function QuoteBuilderHeader({
           </div>
         </div>
       </div>
+
+      {/* Rad 2 — completeness-remsan (Fas 1, offert-omtaget 2026-08-31,
+          flyttad hit ur en egen <div className="mb-4"> under headern så
+          att den scrollar MED headern i stället för bort under den). Samma
+          sticky/backdrop-blur-wrapper som rad 1 ovan — ingen egen sticky-
+          yta. Utelämnad helt om anroparen inte skickar in en sammanfattning. */}
+      {completenessSummaries && onSelectSection && (
+        <div className="mt-2">
+          <QuoteCompletenessStrip summaries={completenessSummaries} onSelect={onSelectSection} />
+        </div>
+      )}
     </div>
   )
 }

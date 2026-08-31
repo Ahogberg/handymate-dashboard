@@ -50,6 +50,10 @@ const STANDARD_TEXTS_SECTION = fs.readFileSync(
   path.join(QUOTES_DIR, '_shared', 'QuoteStandardTextsSection.tsx'),
   'utf8',
 )
+const BUILDER_HEADER = fs.readFileSync(
+  path.join(QUOTES_DIR, '_shared', 'QuoteBuilderHeader.tsx'),
+  'utf8',
+)
 
 test.describe('Del 1 (redan skeppad, 2026-08-17) — onAtaTermsChange, läsande koll', () => {
   test('typen och dokumentet har fortfarande nyckeln', () => {
@@ -130,14 +134,36 @@ test.describe('"Mer"-raden är den ENDA vägen till de sex panelerna', () => {
 })
 
 test.describe('completeness-chipraden ersätter kvittots granskningskrav', () => {
-  test('QuoteCompletenessStrip monteras alltid, inte bakom en quickMode-gate', () => {
-    const mountIdx = BUILDER.indexOf('<QuoteCompletenessStrip')
-    expect(mountIdx, 'QuoteCompletenessStrip monteras inte').toBeGreaterThan(-1)
-    // Ingen `{quickMode === '...' && (` precis före monteringen — chippen
-    // ska vara ovillkorlig så fort man är i den fulla editorn (quickMode
-    // null-grenen, dit alla tre starterna redan konvergerat).
+  // Design-polish-etappen (offertskaparen-design-polish, 2026-08-31) flyttade
+  // remsans RENDERING in i QuoteBuilderHeader.tsx (header-rad 2, samma sticky-
+  // wrapper som rad 1) så den slutar scrolla bort under headern. Den låg
+  // tidigare i en egen <div className="mb-4"> direkt i QuoteBuilder.tsx —
+  // det stället testas inte längre, bara den nya monteringspunkten.
+  test('QuoteCompletenessStrip monteras i QuoteBuilderHeader, alltid synlig (ingen quickMode-gate)', () => {
+    const mountIdx = BUILDER_HEADER.indexOf('<QuoteCompletenessStrip')
+    expect(mountIdx, 'QuoteCompletenessStrip monteras inte i QuoteBuilderHeader.tsx').toBeGreaterThan(-1)
+  })
+
+  test('QuoteBuilder.tsx skickar completenessSummaries ovillkorligt till headern, inte bakom en quickMode-gate', () => {
+    const mountIdx = BUILDER.indexOf('<QuoteBuilderHeader')
+    expect(mountIdx, 'QuoteBuilderHeader monteras inte i QuoteBuilder.tsx').toBeGreaterThan(-1)
+    const propsBlock = BUILDER.slice(mountIdx, BUILDER.indexOf('/>', mountIdx))
+    expect(propsBlock).toContain('completenessSummaries={completenessSummaries}')
+    // Ingen `{quickMode === '...' && (` precis före monteringen — headern
+    // (och därmed chip-raden) ska vara ovillkorlig så fort man är i den
+    // fulla editorn (quickMode null-grenen, dit alla tre starterna redan
+    // konvergerat).
     const before = BUILDER.slice(Math.max(0, mountIdx - 200), mountIdx)
     expect(before).not.toContain("quickMode === 'overview'")
     expect(before).not.toContain("quickMode === 'review'")
+  })
+
+  test('edit-läget (QuoteEditView.tsx) får också en completeness-remsa — inte bara create-läget', () => {
+    const EDIT_VIEW = fs.readFileSync(path.join(QUOTES_DIR, '_shared', 'QuoteEditView.tsx'), 'utf8')
+    const mountIdx = EDIT_VIEW.indexOf('<QuoteBuilderHeader')
+    expect(mountIdx, 'QuoteBuilderHeader monteras inte i QuoteEditView.tsx').toBeGreaterThan(-1)
+    const propsBlock = EDIT_VIEW.slice(mountIdx, EDIT_VIEW.indexOf('/>', mountIdx))
+    expect(propsBlock).toContain('completenessSummaries={completenessSummaries}')
+    expect(propsBlock).toContain('onSelectSection={onSelectSection}')
   })
 })

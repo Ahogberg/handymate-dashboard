@@ -13,6 +13,7 @@ import type {
   QuoteItem,
   QuoteStandardText,
 } from '@/lib/types/quote'
+import type { QuoteSection, SectionSummary } from '@/lib/quotes/quote-completeness'
 import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 import type { CustomCategory } from '@/lib/constants/categories'
@@ -68,6 +69,13 @@ interface Customer {
 export interface QuoteEditViewProps {
   quoteId: string
   quoteNumber: string
+  /** Completeness-remsan (Fas 1, offert-omtaget 2026-08-31) — samma
+      sammanfattning som create-läget beräknar (sectionSummary/SECTION_ORDER
+      i lib/quotes/quote-completeness.ts), ägd av QuoteBuilder.tsx eftersom
+      den här komponenten är ren presentation (se docblock ovan). Renderas
+      som header-RAD 2 i QuoteBuilderHeader. */
+  completenessSummaries: Record<QuoteSection, SectionSummary>
+  onSelectSection: (section: QuoteSection) => void
   autoSaveStatus: 'idle' | 'saving' | 'saved' | 'error'
   saving: boolean
   onSendQuote: () => void
@@ -204,7 +212,8 @@ export interface QuoteEditViewProps {
 
 export function QuoteEditView(props: QuoteEditViewProps) {
   const {
-    quoteId, quoteNumber, autoSaveStatus, saving, onSendQuote, onSaveDraft, onSaveTemplate, hasItems,
+    quoteId, quoteNumber, completenessSummaries, onSelectSection,
+    autoSaveStatus, saving, onSendQuote, onSaveDraft, onSaveTemplate, hasItems,
     businessDefaultStyle, templateStyle, setTemplateStyle,
     reservations, recalculated,
     customers, selectedCustomer, setSelectedCustomer, validDays, setValidDays, title, setTitle, description, setDescription,
@@ -235,6 +244,9 @@ export function QuoteEditView(props: QuoteEditViewProps) {
         <QuoteBuilderHeader
           mode="edit"
           quoteNumber={quoteNumber}
+          title={title}
+          completenessSummaries={completenessSummaries}
+          onSelectSection={onSelectSection}
           autoSaveStatus={autoSaveStatus}
           saving={saving}
           canSend={!!selectedCustomer}

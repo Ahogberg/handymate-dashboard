@@ -52,7 +52,6 @@ import { QuoteSaveTemplateModal } from './QuoteSaveTemplateModal'
 import type { QuotePayloadContext } from './buildQuotePayload'
 import { useQuoteBuilderSave } from './useQuoteBuilderSave'
 import { QuoteBuilderHeader } from './QuoteBuilderHeader'
-import { QuoteCompletenessStrip } from './QuoteCompletenessStrip'
 import { QuoteEditView } from './QuoteEditView'
 import { fetchQuoteForEdit } from './loadEditQuote'
 import type { ReservationSnapshotEntry } from '@/lib/reservations/match'
@@ -817,6 +816,27 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       setMainView(liveAvailable ? 'document' : 'list')
     }
   }, [loading, liveAvailable])
+
+  /**
+   * Edit-lägets completeness-chip-klick (gap upptäckt i offertskaparens
+   * design-polish-etapp: edit-läget saknade helt chip-raden och därmed ett
+   * klick-mål). Återanvänder scrollToSection oförändrad — dess useEffect på
+   * pendingScrollSection kör samma querySelector('[data-section]') oavsett
+   * mode. Skillnaden mot create-läget: dokumentet ligger i edit-läget bakom
+   * QuotePreviewPanel (kollapsbar, Live/Slutdesign-flikar), inte direkt i
+   * huvudytan — så ett klick säkerställer först att panelen är öppen och på
+   * Live-fliken (där QuoteDocument/data-section faktiskt finns i DOM:en)
+   * innan samma scroll körs. Ren komposition av redan existerande
+   * setters/state (showPreviewPanel/previewMode/liveAvailable skickas redan
+   * till QuoteEditView) — ingen ny state.
+   */
+  const onSelectSectionEdit = useCallback((section: QuoteSection) => {
+    if (liveAvailable) {
+      setShowPreviewPanel(true)
+      setPreviewMode('live')
+    }
+    scrollToSection(section)
+  }, [liveAvailable, scrollToSection])
 
   // ETAPP 2a (offert-masterplan.md), punkt 6: id-baserade liveHandlers —
   // ersätter tidigare index-mutation. Återanvänder useQuoteItems' egna
@@ -2124,6 +2144,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       <QuoteEditView
         quoteId={quoteId}
         quoteNumber={quoteNumberRef.current}
+        completenessSummaries={completenessSummaries}
+        onSelectSection={onSelectSectionEdit}
         autoSaveStatus={autoSaveStatus}
         saving={saving}
         onSendQuote={() => saveQuote(true)}
@@ -2329,13 +2351,16 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       {/* FAS 1 (offert-omtaget, 2026-08-31): den tvingade steg-för-steg-
           granskningen ("quickMode === 'review' || 'overview'") är BORTA.
           AI-utkast, blankt och mall landar alla direkt här — samma canvas-
-          editor, oavsett startväg. Se completenessSummaries/
-          QuoteCompletenessStrip nedan för vad som ersatte kvittots
-          granskningskrav. */}
+          editor, oavsett startväg. Se completenessSummaries nedan — de
+          skickas in i QuoteBuilderHeader (rad 2, completeness-remsan) för
+          vad som ersatte kvittots granskningskrav. */}
       <div
         className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6"
       >
         <QuoteBuilderHeader
+          title={title}
+          completenessSummaries={completenessSummaries}
+          onSelectSection={scrollToSection}
           aiGenerated={aiGenerated}
           aiConfidence={aiConfidence}
           aiPriceWarning={aiPriceWarning}
@@ -2369,15 +2394,6 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
             confidence={aiConfidence}
           />
         )}
-
-        {/* FAS 1 (offert-omtaget, 2026-08-31): ersätter det borttagna
-            kvittots (QuickReceipt) granskningskrav — en alltid synlig,
-            icke-blockerande chip-rad. Varje chip scrollar till sitt ämne i
-            dokumentet (scrollToSection), filtrerar aldrig bort handlers och
-            blockerar aldrig sparande/skickande. */}
-        <div className="mb-4">
-          <QuoteCompletenessStrip summaries={completenessSummaries} onSelect={scrollToSection} />
-        </div>
 
         {/* ETAPP 2b (offert-masterplan.md): canvas-first-layouten. Dokumentet
             är huvudytan (majoritetsbredd) — assistentkolumnen innehåller bara
