@@ -21,9 +21,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Bränslet är slut eller kunde inte verifieras', code: fuel.reason }, { status: 402 })
     }
 
-    // jobType/job_type: valfritt fält — ingen befintlig UI-anropare skickar
-    // det ännu, men tas emot i båda stavningarna så en kommande avsändare
-    // (t.ex. offert-nya-sidan) kan börja skicka det utan API-ändring.
+    // jobType/job_type: valfritt fält. Sedan Fas 1.6 (offert-omtaget,
+    // 2026-08-31) skickar QuoteBuilder.tsx `jobType` från den kopplade
+    // dealens job_type på alla tre AI-generate-anropen (foto/text/
+    // snabbutkast) — tas ändå emot i båda stavningarna, dels för bakåt-
+    // kompatibilitet, dels för framtida anropare. Vid kallstart (ingen
+    // deal) skickas fältet inte alls.
     // Utan det hämtas inga project_lesson-lärdomar (sanningsprincipen,
     // lib/ai-quote-generator.ts) — hellre inga lärdomar än fel jobbtyps lärdomar.
     const { imageBase64, images, voiceTranscript, textDescription, customerId, jobType, job_type } = await request.json()

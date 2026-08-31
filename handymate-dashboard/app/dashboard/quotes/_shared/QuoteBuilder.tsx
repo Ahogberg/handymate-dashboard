@@ -1341,6 +1341,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
           images,
           textDescription: photoDescription || undefined,
           customerId: selectedCustomer || undefined,
+          jobType: quoteJobType || undefined,
         }),
       })
       const data = await response.json()
@@ -1375,6 +1376,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
     try {
       const body: Record<string, string> = { textDescription: inputText }
       if (sourceImageBase64) body.imageBase64 = sourceImageBase64
+      if (quoteJobType) body.jobType = quoteJobType
       const response = await fetch('/api/quotes/ai-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1425,6 +1427,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       const body: Record<string, unknown> = { textDescription: inputText }
       if (photos.length > 0) body.images = photos.map(p => p.split(',')[1])
       if (selectedCustomer) body.customerId = selectedCustomer
+      if (quoteJobType) body.jobType = quoteJobType
 
       const response = await fetch('/api/quotes/ai-generate', {
         method: 'POST',

@@ -33,3 +33,44 @@ test('lead-id skickas aldrig till deal-API:t', () => {
   expect(source).not.toMatch(/const dealId\s*=.*get\('lead_id'\)/)
   expect(source).toContain('fetchDealAndPrefill(dealId, !!customerId)')
 })
+
+// Fas 1.6 (offert-omtaget, 2026-08-31): deal.job_type var redan hämtat och
+// sparat i `quoteJobType`-state (Motor 1/efterkalkyl-insikten), och redan
+// skrivet till quotes.job_type via buildQuotePayload — men aldrig skickat
+// vidare till AI-generate-anropen. Dessa tester bevisar hela kedjan:
+// deal → quoteJobType → AI-generate-body → quotes.job_type.
+test('deal.job_type sätter quoteJobType-state vid deal-prefill', () => {
+  expect(source).toContain('const [quoteJobType, setQuoteJobType] = useState<string | null>(null)')
+  expect(source).toMatch(/if \(deal\.job_type\) \{\s*setQuoteJobType\(deal\.job_type\)/)
+})
+
+test('alla tre AI-generate-anrop skickar jobType från quoteJobType när en deal satt den', () => {
+  // Tre call sites: analyzePhoto (foto), generateFromText (AI-hjälpen text),
+  // buildQuickDraft (Snabbofferten) — se docblock ovanför buildQuickDraft.
+  const aiGenerateCallCount = (source.match(/fetch\('\/api\/quotes\/ai-generate'/g) || []).length
+  expect(aiGenerateCallCount).toBe(3)
+
+  // analyzePhoto: jobType är en direkt nyckel i JSON.stringify-objektet.
+  expect(source).toMatch(/textDescription: photoDescription \|\| undefined,\s*customerId: selectedCustomer \|\| undefined,\s*jobType: quoteJobType \|\| undefined,/)
+
+  // generateFromText och buildQuickDraft: jobType sätts villkorligt på
+  // body-objektet innan fetch — samma mönster som customerId där.
+  const conditionalJobTypeAssignments = (source.match(/if \(quoteJobType\) body\.jobType = quoteJobType/g) || []).length
+  expect(conditionalJobTypeAssignments).toBe(2)
+})
+
+test('kallstart (ingen deal) skickar inget jobType-fält i AI-generate-anropen', () => {
+  // quoteJobType initieras till null och sätts ENDAST i fetchDealAndPrefill
+  // (if (deal.job_type)) — utan deal-kontext förblir den null, och samtliga
+  // tre call sites villkorar/nollställer fältet i det läget i stället för
+  // att skicka jobType: null eller jobType: undefined explicit som en
+  // egen literal.
+  expect(source).not.toMatch(/jobType:\s*null/)
+  const setQuoteJobTypeCallSites = (source.match(/setQuoteJobType\(/g) || []).length
+  expect(setQuoteJobTypeCallSites).toBe(1) // bara i fetchDealAndPrefill
+})
+
+test('quotes.job_type skrivs från quoteJobType vid spar (buildQuotePayload)', () => {
+  expect(payloadSource).toContain('quoteJobType: string | null')
+  expect(payloadSource).toContain('job_type: input.quoteJobType')
+})
