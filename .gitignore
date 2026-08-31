@@ -37,3 +37,6 @@ package-lock.json
 # Claude
 .claude/
 .vercel
+
+# git worktrees (isolated workspaces for agentic development)
+.worktrees/
