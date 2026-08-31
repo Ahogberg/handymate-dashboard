@@ -35,7 +35,7 @@ import { QuoteQuickstartCard, type QuickstartRow } from './QuoteQuickstartCard'
 import { QuoteItemsSection } from './QuoteItemsSection'
 import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/business/quote-surface-select'
 import { useReservationSuggestions } from './useReservationSuggestions'
-import { ReservationSuggestionBanner, ReservationMutedNotice } from './ReservationSuggestionBanner'
+import { ReservationMutedNotice } from './ReservationSuggestionBanner'
 import { ReservationReviewSheet } from './ReservationReviewSheet'
 import { QuoteMarginCard } from './QuoteMarginCard'
 import { QuotePreviewPanel } from './QuotePreviewPanel'
@@ -2475,12 +2475,17 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
             <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />
             <QuoteNewEfterkalkylBanner insight={efterkalkylInsight} />
 
-            {/* Reservationsmotorn: tyst räknare, aldrig en avbrytande dialog.
-                15 matchande artiklar ger fortfarande EN banner med en siffra. */}
-            <ReservationSuggestionBanner
-              count={reservations.suggestions.length}
-              onReview={() => reservations.setReviewOpen(true)}
-            />
+            {/* FAS D (offertskaparen-design-polish, 2026-09-01): den
+                fristående "N reservationer matchar"-bannern som satt här
+                (ReservationSuggestionBanner) är borttagen — förslagen
+                renderas nu i dokumentets egen Reservationer-sektion
+                (QuoteDocument.tsx, se `reservationSuggestions`-proppen på
+                QuotePreviewPanel nedan) i stället för i assistentkolumnen,
+                utanför dokumentet. Discovery-vägen är completeness-chippen
+                (redan amber+räknare, se quote-completeness.ts) — ingen ny
+                mekanism byggd. ReservationMutedNotice är en ANNAN,
+                orelaterad affordans (inlärningens tystnings-kvitto) och
+                stannar kvar precis här. */}
             {reservations.mutedNotice && (
               <ReservationMutedNotice
                 title={reservations.mutedNotice.title}
@@ -2764,6 +2769,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
                   onRowTap={setSheetItemId}
                   onAddRowTap={() => setAddRowSheetOpen(true)}
                   templatePreviewPayload={templatePreviewPayload}
+                  reservationSuggestions={reservations.suggestions}
+                  onReviewReservationSuggestions={() => reservations.setReviewOpen(true)}
                 />
               </div>
             )}

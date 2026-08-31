@@ -8,6 +8,7 @@ import { DocumentScaler } from '@/components/quotes/document/DocumentScaler'
 import { useIsMobileViewport } from '@/components/quotes/document/useIsMobileViewport'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
 import type { QuoteSection } from '@/lib/quotes/quote-completeness'
+import type { ReservationSuggestion } from '@/lib/reservations/match'
 
 type PreviewMode = 'live' | 'design'
 
@@ -50,6 +51,16 @@ interface QuotePreviewPanelProps {
    * vid översikt → sektion hade spelat om revealen varje gång.
    */
   quickReveal?: boolean
+  /**
+   * FAS D (offertskaparen-design-polish, 2026-09-01): reservationsmotorns
+   * matchade-men-ej-tillagda förslag, vidarebefordrade rakt till
+   * QuoteDocument (se dess docblock för `reservationSuggestions`/
+   * `onReviewReservationSuggestions`) — den fristående bannern som satt
+   * här i panelen bredvid är borttagen, förslagen renderas nu inuti
+   * dokumentets egen Reservationer-sektion.
+   */
+  reservationSuggestions?: ReservationSuggestion[]
+  onReviewReservationSuggestions?: () => void
 }
 
 /**
@@ -72,6 +83,8 @@ export function QuotePreviewPanel({
   templatePreviewPayload,
   focusSection,
   quickReveal,
+  reservationSuggestions,
+  onReviewReservationSuggestions,
 }: QuotePreviewPanelProps) {
   const [fullscreen, setFullscreen] = useState(false)
   const [previewPending, setPreviewPending] = useState(false)
@@ -109,6 +122,8 @@ export function QuotePreviewPanel({
               // onItemAdd och gav en tom rad — artikelbanken nåddes inte alls
               // från standardvyn. Nu samma väg som mobilens knapp nedan.
               onAddRow={onAddRowTap}
+              reservationSuggestions={reservationSuggestions}
+              onReviewReservationSuggestions={onReviewReservationSuggestions}
             />
           </DocumentScaler>
 

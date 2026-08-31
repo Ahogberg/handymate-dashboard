@@ -5,8 +5,9 @@ import { MODERN_DOCUMENT_CSS } from './modern-css'
 import { QuoteDocumentRow } from './QuoteDocumentRow'
 import { SignatureCta } from './SignatureCta'
 import { InvoicePaymentSection } from './InvoicePaymentSection'
-import { mixWithWhite } from './format'
+import { mixWithWhite, describeReservationSuggestionRows } from './format'
 import type { QuoteDocumentHandlers, QuoteDocumentMode, QuoteDocumentMobileProps, MoneyDocumentData } from './types'
+import type { ReservationSuggestion } from '@/lib/reservations/match'
 
 export type { QuoteDocumentHandlers, QuoteItemPatch, QuoteDocumentMode, QuoteDocumentMobileProps, MoneyDocumentData } from './types'
 
@@ -76,12 +77,31 @@ export interface QuoteDocumentProps extends QuoteDocumentMobileProps {
    * förut, så fakturans canvas och andra anropare inte påverkas.
    */
   onAddRow?: () => void
+  /**
+   * FAS D (offertskaparen-design-polish, 2026-09-01): reservationsmotorns
+   * matchade-men-ej-tillagda förslag, och vad "Ta ställning"-knappen i
+   * dokumentets egen Reservationer-sektion ska göra.
+   *
+   * Ersätter den fristående ReservationSuggestionBanner:en som tidigare
+   * satt i assistentkolumnen, utanför själva dokumentet — förslagen hörde
+   * hemma i den sektion de faktiskt handlar om. Samma konvention som
+   * `onRowTap` (QuoteDocumentMobileProps ovan): UI-navigering (öppna
+   * granskningssheeten), inte en datamutation, så den ligger som egen
+   * toppnivåprop och INTE i QuoteDocumentHandlers.
+   *
+   * Utelämnad/tom → rutan renderas inte alls. Renderas ALDRIG i static-läge
+   * (kunden ska aldrig se en intern "ta ställning"-uppmaning) — se gaten i
+   * komponenten, samma edit/static-disciplin som "Sätt pris"-pillen
+   * (QuoteDocumentRow.tsx:s isPriceless).
+   */
+  reservationSuggestions?: ReservationSuggestion[]
+  onReviewReservationSuggestions?: () => void
 }
 
 /** Sektionerna hantverkaren granskar en i taget, i Andreas taxonomi. */
 export type DocumentSection = 'inkluderat' | 'exkluderat' | 'reservationer' | 'prisbild'
 
-export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTap, focusSection, onAddRow }: QuoteDocumentProps) {
+export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTap, focusSection, onAddRow, reservationSuggestions, onReviewReservationSuggestions }: QuoteDocumentProps) {
   const accent = data.business.accentColor
   const accent50 = mixWithWhite(accent, 0.92)
   const accent100 = mixWithWhite(accent, 0.82)
@@ -630,6 +650,71 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* FAS D (offertskaparen-design-polish, 2026-09-01): reservations-
+            motorns matchade-men-ej-tillagda förslag, flyttade hit från den
+            fristående ReservationSuggestionBanner:en i assistentkolumnen —
+            förslagen handlar om just den här sektionen, så de hör hemma i
+            den, inte utanför dokumentet.
+
+            EGEN sibling till listan ovan (INTE nästlad i dess
+            reservations.length>0-villkor): en offert kan ha noll
+            accepterade reservationer men ändå N matchade förslag, och
+            rutan ska synas då lika mycket.
+
+            Bär `section('reservationer')` OAVSETT om listan ovan redan
+            gjorde det — dubbla `data-section`-attribut i samma sektion är
+            harmlöst (scrollToSection använder querySelector, som tar den
+            FÖRSTA träffen), och det är den enda garantin att sektionen har
+            ETT element med attributet när accepterad-listan är tom (den
+            gamla platshållaren nedan renderas bara när focusSection är
+            satt, vilket i praktiken aldrig sker längre, se dess kommentar).
+
+            ALDRIG i static-läge — en kund ska aldrig se en intern
+            "ta ställning till förslag"-uppmaning, exakt samma disciplin
+            som "Sätt pris"-pillen (QuoteDocumentRow.tsx isPriceless). */}
+        {!isInvoice && mode === 'edit' && reservationSuggestions && reservationSuggestions.length > 0 && (
+          <div
+            {...section('reservationer')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              background: '#fffbeb',
+              border: '1px solid #fde68a',
+              borderRadius: 10,
+              padding: '9px 12px',
+              margin: '0 0 24px',
+            }}
+          >
+            <p style={{ margin: 0, fontSize: '12.5px', lineHeight: 1.5, color: '#92400e' }}>
+              <strong>{reservationSuggestions.length} förslag från Daniel</strong>
+              {' — följer med raderna '}
+              {describeReservationSuggestionRows(
+                reservationSuggestions.flatMap(s => s.triggeredBy.map(t => t.description)),
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={() => onReviewReservationSuggestions?.()}
+              style={{
+                background: '#fff',
+                border: '1px solid #fde68a',
+                color: '#92400e',
+                borderRadius: 9,
+                padding: '6px 12px',
+                fontSize: '12px',
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              Ta ställning
+            </button>
           </div>
         )}
 

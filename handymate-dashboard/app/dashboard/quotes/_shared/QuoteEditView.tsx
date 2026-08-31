@@ -19,7 +19,7 @@ import { ProductModal, type ProductInitialValues, type ProductSavePayload } from
 import type { CustomCategory } from '@/lib/constants/categories'
 
 import { useReservationSuggestions } from './useReservationSuggestions'
-import { ReservationSuggestionBanner, ReservationMutedNotice } from './ReservationSuggestionBanner'
+import { ReservationMutedNotice } from './ReservationSuggestionBanner'
 import { ReservationReviewSheet } from './ReservationReviewSheet'
 import { QuoteMarginCard } from './QuoteMarginCard'
 import { QuotePreviewPanel } from './QuotePreviewPanel'
@@ -279,11 +279,13 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               businessDefaultStyle={businessDefaultStyle}
             />
 
-            {/* Reservationsmotorn: tyst räknare, aldrig en avbrytande dialog. */}
-            <ReservationSuggestionBanner
-              count={reservations.suggestions.length}
-              onReview={() => reservations.setReviewOpen(true)}
-            />
+            {/* FAS D (offertskaparen-design-polish, 2026-09-01): den
+                fristående "N reservationer matchar"-bannern som satt här
+                (ReservationSuggestionBanner) är borttagen — förslagen
+                renderas nu i dokumentets egen Reservationer-sektion
+                (QuoteDocument.tsx, se `reservationSuggestions`-proppen på
+                QuotePreviewPanel nedan). ReservationMutedNotice är en
+                ANNAN, orelaterad affordans och stannar kvar precis här. */}
             {reservations.mutedNotice && (
               <ReservationMutedNotice
                 title={reservations.mutedNotice.title}
@@ -419,6 +421,8 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               onRowTap={setSheetItemId}
               onAddRowTap={() => setAddRowSheetOpen(true)}
               templatePreviewPayload={templatePreviewPayload}
+              reservationSuggestions={reservations.suggestions}
+              onReviewReservationSuggestions={() => reservations.setReviewOpen(true)}
             />
           </div>
         </div>

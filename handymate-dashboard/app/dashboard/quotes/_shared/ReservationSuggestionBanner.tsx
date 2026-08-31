@@ -1,61 +1,18 @@
 'use client'
 
-import { ShieldCheck, X } from 'lucide-react'
-import { useState } from 'react'
-
-interface ReservationSuggestionBannerProps {
-  count: number
-  onReview: () => void
-}
+import { X } from 'lucide-react'
 
 /**
- * Den tysta bannern — reservationsmotorns enda uppsökande yta.
+ * FAS D (offertskaparen-design-polish, 2026-09-01): ReservationSuggestionBanner
+ * (den fristående "N reservationer matchar dina offertrader"-bannern) är
+ * borttagen härifrån — förslagen renderas nu inuti dokumentets egen
+ * Reservationer-sektion (QuoteDocument.tsx, `reservationSuggestions`-proppen),
+ * inte i assistentkolumnen utanför dokumentet. Discovery-vägen är i stället
+ * completeness-chippen (redan amber+räknare, se lib/quotes/quote-completeness.ts).
  *
- * Designregeln: motorn AVBRYTER ALDRIG. 15 artiklar med 15 träffar ger
- * fortfarande EN banner med en siffra, aldrig 15 dialoger. Hantverkaren
- * öppnar granskningen när han själv vill.
- *
- * Mönstret är QuoteNewEfterkalkylBanner: självgardande (return null när det
- * inte finns något), avfärdbar lokalt (aldrig i databasen — nästa offert ska
- * få förslagen igen), agentavatar.
+ * ReservationMutedNotice nedan är en ANNAN, orelaterad affordans (inlärningens
+ * tystnings-kvitto) och lämnas orörd i samma fil.
  */
-export function ReservationSuggestionBanner({ count, onReview }: ReservationSuggestionBannerProps) {
-  const [dismissed, setDismissed] = useState(false)
-
-  if (count === 0 || dismissed) return null
-
-  return (
-    <div className="mb-4 rounded-xl border border-primary-100 bg-primary-50/60 p-3.5">
-      <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-full bg-primary-700 text-white flex items-center justify-center shrink-0">
-          <ShieldCheck className="w-4 h-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm text-slate-900">
-            {count === 1
-              ? '1 reservation matchar dina offertrader.'
-              : `${count} reservationer matchar dina offertrader.`}
-          </p>
-          <button
-            type="button"
-            onClick={onReview}
-            className="mt-2 min-h-[36px] inline-flex items-center px-3 py-1.5 bg-primary-700 text-white text-xs font-semibold rounded-lg hover:bg-primary-800 transition-colors"
-          >
-            Granska förslag
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={() => setDismissed(true)}
-          aria-label="Dölj"
-          className="p-1.5 -m-1 text-slate-400 hover:text-slate-700 rounded-lg transition-colors shrink-0"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  )
-}
 
 interface MutedNoticeProps {
   title: string

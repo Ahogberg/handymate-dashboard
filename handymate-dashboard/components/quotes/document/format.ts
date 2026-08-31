@@ -48,3 +48,33 @@ export function computeFitScale(containerWidthPx: number, contentWidthPx: number
   if (!Number.isFinite(contentWidthPx) || contentWidthPx <= 0) return 1
   return Math.min(1, containerWidthPx / contentWidthPx)
 }
+
+/**
+ * Fas D (offertskaparen-design-polish, 2026-09-01): radnamnen som utlöste
+ * reservationsförslagen, för den amberfärgade rutan i dokumentets
+ * Reservationer-sektion (flyttad dit från den fristående assistentkolumns-
+ * bannern, se QuoteDocument.tsx).
+ *
+ * Tar en platt lista beskrivningar (anroparen flattar `triggeredBy` från
+ * flera ReservationSuggestion — samma rad kan trigga flera förslag, och
+ * ska bara nämnas en gång) i stället för ReservationSuggestion[] direkt, så
+ * den här filen slipper importera lib/reservations/match-typerna och
+ * funktionen blir trivial att facit-testa isolerat.
+ *
+ * 1-2 distinkta radnamn: "A och B". 3+: "A och B m.fl." — aldrig en lång
+ * uppräkning som spränger den lilla rutan.
+ */
+export function describeReservationSuggestionRows(triggeredByDescriptions: string[]): string {
+  const names: string[] = []
+  const seen = new Set<string>()
+  for (const raw of triggeredByDescriptions) {
+    const d = raw.trim()
+    if (d && !seen.has(d)) {
+      seen.add(d)
+      names.push(d)
+    }
+  }
+  if (names.length === 0) return ''
+  if (names.length <= 2) return names.join(' och ')
+  return `${names[0]} och ${names[1]} m.fl.`
+}
