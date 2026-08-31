@@ -49,6 +49,7 @@ import { renderToStaticMarkup as renderToStaticMarkupUntyped } from 'react-dom/s
 import { createElement, type ReactElement } from 'react'
 import QuoteDocument from '../components/quotes/document/QuoteDocument'
 import type { QuoteTemplateData, QuoteTemplateItem } from '../lib/quote-templates/types'
+import type { InvoiceTemplateData } from '../lib/invoice-templates/types'
 
 const renderToStaticMarkup = renderToStaticMarkupUntyped as unknown as (element: ReactElement) => string
 
@@ -141,6 +142,71 @@ test.describe('Tomt-läge i edit-läge, oskalad canvas (Fas E)', () => {
     const html = renderDoc([], 'edit', { sheetMode: true, onOpenAiHelp: () => {} })
     expect(html).not.toContain(EMPTY_BOX_OPEN_TAG)
     expect(html).toContain('<table>')
+  })
+})
+
+function invoiceFixture(items: QuoteTemplateItem[]): InvoiceTemplateData {
+  return {
+    business: {
+      name: 'Bygg & Co AB', orgNumber: '556677-8899', address: 'Verkstadsgatan 4, 123 45 Storstad',
+      contactName: 'Anna Andersson', phone: '070-1234567', email: 'anna@byggco.se',
+      fSkatt: true, accentColor: '#0F766E',
+    },
+    customer: { name: 'Kalle Kund' },
+    invoice: {
+      number: 'FV-2026-0042', invoiceDate: '3 augusti 2026', dueDate: '2 september 2026', paidDate: null,
+      status: 'unpaid', daysOverdue: 0, ocrNumber: '420260002',
+      title: 'Badrumsrenovering', items,
+      subtotalExVat: 0, vatAmount: 0, vatRate: 25, totalIncVat: 0, amountToPay: 0,
+      paymentTerms: '30 dagar netto',
+      isCreditNote: false,
+    },
+  } as InvoiceTemplateData
+}
+
+/**
+ * Slutgranskningsfynd (offertskaparen-design-polish): Fas E:s tomt-läge
+ * (ovan) saknade `!isInvoice` — till skillnad från reservationsförslags-
+ * rutan (Fas D) och "Sätt pris"-pillen (Fas C), som båda redan gatar på
+ * isInvoice. QuoteDocument i mode="edit" är INTE bara offertskaparens egen
+ * yta: app/dashboard/invoices/_shared/InvoiceEditor.tsx monterar samma
+ * komponent, oförändrad av den här branchen, för sin egen (redan
+ * existerande) fakturaredigering. Utan guarden hade en faktura med noll
+ * rader tyst börjat visa offertens "+ Lägg till rad"/"beskriv jobbet"-ruta
+ * i stället för sin egen tomrads-hantering — en yta helt utanför uppdraget
+ * (branchen är uttryckligen bara offertskaparen, se PR-beskrivningen).
+ */
+test.describe('Fakturans egen editor är OPÅVERKAD av Fas E:s tomt-läge (!isInvoice-guard)', () => {
+  test('docType "invoice", noll rader, mode "edit" → OFÖRÄNDRAT: tabellen renderas, ingen offert-tomruta', () => {
+    const html = renderToStaticMarkup(
+      createElement(QuoteDocument, {
+        data: { ...invoiceFixture([]), docType: 'invoice' as const },
+        mode: 'edit',
+        onAddRow: () => {},
+      })
+    )
+    expect(html).not.toContain(EMPTY_BOX_OPEN_TAG)
+    expect(html).not.toContain('class="empty-items-hint"')
+    expect(html).not.toContain('beskriv jobbet')
+    expect(html).toContain('<table>')
+  })
+
+  test('docType "invoice" med rader, mode "edit" → OFÖRÄNDRAT (regressionskontroll för samma gren)', () => {
+    const html = renderToStaticMarkup(
+      createElement(QuoteDocument, {
+        data: {
+          ...invoiceFixture([
+            { itemType: 'item', id: 'i1', name: 'Rivning golv', quantity: 8, unit: 'tim', unitPrice: 650, total: 5200 },
+          ]),
+          docType: 'invoice' as const,
+        },
+        mode: 'edit',
+        onAddRow: () => {},
+      })
+    )
+    expect(html).not.toContain(EMPTY_BOX_OPEN_TAG)
+    expect(html).toContain('<table>')
+    expect(html).toContain('Rivning golv')
   })
 })
 

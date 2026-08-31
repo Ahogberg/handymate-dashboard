@@ -360,8 +360,20 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             tom tabell med bara en huvudrad var ingen affordans, bara
             frånvaron av en. sheetMode undantas: mobilens motsvarande
             tomruta renderas OSKALAD av QuotePreviewPanel.tsx, av samma
-            träffyte-skäl som "+ Lägg till rad" nedan. */}
-        {items.length === 0 && mode === 'edit' && !sheetMode ? (
+            träffyte-skäl som "+ Lägg till rad" nedan.
+
+            FIX (holistisk slutgranskning, offertskaparen-design-polish):
+            `!isInvoice` tillagt — saknades här till skillnad från
+            reservationsförslagsrutan (Fas D, rad ovan) och "Sätt pris"-
+            pillen (Fas C, QuoteDocumentRow.tsx), som båda redan gatar på
+            isInvoice. Utan den gick InvoiceEditor.tsx (app/dashboard/
+            invoices/_shared/InvoiceEditor.tsx, en OFÖRÄNDRAD, riktig
+            konsument av samma QuoteDocument i mode="edit") in i den här
+            grenen så fort en faktura hade noll rader och fick offertens
+            "Lägg till rad"/"beskriv jobbet"-ruta i stället för sin egen,
+            redan existerande tomrads-hantering — en yta helt utanför
+            uppdraget (branchen är uttryckligen bara offertskaparen). */}
+        {!isInvoice && items.length === 0 && mode === 'edit' && !sheetMode ? (
           <div className="empty-items">
             {(onAddRow || handlers?.onItemAdd) && (
               <button type="button" onClick={onAddRow || handlers?.onItemAdd} className="add-row-btn">
