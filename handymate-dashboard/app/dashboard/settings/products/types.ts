@@ -33,6 +33,13 @@ export interface ComponentPayload {
   unit_cost: number
 }
 
+/** Svarsraden från GET /api/reservations och GET /api/products/[id]/reservations */
+export interface ProductReservation {
+  id: string
+  title: string
+  content: string
+}
+
 export interface ProductRow {
   id: string
   name: string
