@@ -16,6 +16,7 @@ import {
   generateItemId, recalculateItems, getItemRotRutType,
 } from '@/lib/quote-calculations'
 import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
+import { resolveTemplateItemPrices } from '@/lib/quotes/resolve-template-item-prices'
 import { compressImageFile } from '@/lib/images/compress-photo'
 import { getAllCategories, type CustomCategory } from '@/lib/constants/categories'
 import {
@@ -1494,7 +1495,11 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
         sort_order: idx,
         total: item.item_type === 'item' ? item.quantity * item.unit_price : item.total,
       }))
-      setItems(cloned)
+      // Fas 1.7 (offert-omtaget): mallens hårdkodade priser (arbetsraders
+      // á-pris, materialradernas kronor, paketprisernas fasta belopp) betyder
+      // ingenting för DETTA företag — se lib/quotes/resolve-template-item-prices.ts
+      // för de tre kategoriernas separata behandling.
+      setItems(resolveTemplateItemPrices(cloned, products, pricingSettings?.hourly_rate))
     }
 
     if (template.default_payment_plan && template.default_payment_plan.length > 0) {
