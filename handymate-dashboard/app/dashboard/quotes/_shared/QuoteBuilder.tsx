@@ -2582,12 +2582,12 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
                     type="button"
                     onClick={() => setActivePanel(isActive ? null : p.key)}
                     title={status.state === 'attention' ? `${p.label} — ${status.hint}` : undefined}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-[10px] text-[12.5px] font-semibold transition-colors inline-flex items-center gap-1.5 ${
                       isActive
                         ? 'bg-primary-700 text-white'
                         : status.state === 'attention'
                           ? 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
-                          : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+                          : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
                     }`}
                   >
                     {status.state !== 'empty' && (
@@ -2768,6 +2768,14 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
                   quickReveal={quickMode !== null}
                   onRowTap={setSheetItemId}
                   onAddRowTap={() => setAddRowSheetOpen(true)}
+                  // FAS E (offertskaparen-design-polish, 2026-09-01): tomt-
+                  // läges-rutans "beskriv jobbet"/"Fota eller beskriv
+                  // jobbet" — återanvänder AI-hjälpens BEFINTLIGA state
+                  // (showAiHelper), ingen ny state uppfunnen. Create-läget
+                  // ENDA anropare som skickar denna: QuoteEditView.tsx har
+                  // ingen QuoteNewAIHelper/showAiHelper alls, se
+                  // QuoteDocument.tsx:s onOpenAiHelp-docblock.
+                  onOpenAiHelp={() => setShowAiHelper(true)}
                   templatePreviewPayload={templatePreviewPayload}
                   reservationSuggestions={reservations.suggestions}
                   onReviewReservationSuggestions={() => reservations.setReviewOpen(true)}

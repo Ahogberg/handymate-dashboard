@@ -79,6 +79,22 @@ export interface QuoteDocumentProps extends QuoteDocumentMobileProps {
    */
   onAddRow?: () => void
   /**
+   * FAS E (offertskaparen-design-polish, 2026-09-01): tom-läges-rutans
+   * "eller [beskriv jobbet] så bygger vi utkastet"-länk.
+   *
+   * Samma UI-navigerings-konvention som `onAddRow`/`onRowTap` ovan (öppnar
+   * ett gränssnittsläge, muterar ingen data) — därför en egen toppnivåprop
+   * och INTE en del av QuoteDocumentHandlers.
+   *
+   * GENUIN ASYMMETRI, inte en lucka att täppa till: AI-beskrivningsflödet
+   * (QuoteNewAIHelper) finns bara i create-flödet (QuoteBuilder.tsx →
+   * showAiHelper-state). Redigeringsvyn (QuoteEditView.tsx) har ingen
+   * motsvarighet och ska inte få en uppfunnen sådan här — den lämnar denna
+   * prop outnyttjad. Utelämnad → länken renderas inte alls, bara den
+   * primära "+ Lägg till rad"-knappen visas i tomrutan.
+   */
+  onOpenAiHelp?: () => void
+  /**
    * FAS D (offertskaparen-design-polish, 2026-09-01): reservationsmotorns
    * matchade-men-ej-tillagda förslag, och vad "Ta ställning"-knappen i
    * dokumentets egen Reservationer-sektion ska göra.
@@ -102,7 +118,7 @@ export interface QuoteDocumentProps extends QuoteDocumentMobileProps {
 /** Sektionerna hantverkaren granskar en i taget, i Andreas taxonomi. */
 export type DocumentSection = 'inkluderat' | 'exkluderat' | 'reservationer' | 'prisbild'
 
-export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTap, focusSection, onAddRow, reservationSuggestions, onReviewReservationSuggestions }: QuoteDocumentProps) {
+export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTap, focusSection, onAddRow, onOpenAiHelp, reservationSuggestions, onReviewReservationSuggestions }: QuoteDocumentProps) {
   const accent = data.business.accentColor
   const accent50 = mixWithWhite(accent, 0.92)
   const accent100 = mixWithWhite(accent, 0.82)
@@ -337,31 +353,61 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
         {/* Items-tabell — delad mellan offert och faktura (QuoteDocumentRow
             är docType-agnostisk sedan ETAPP 6a). Sektionsattributet bärs av
             wrappern ovan, inte av tabellen. */}
-        <table>
-          <thead>
-            <tr>
-              <th>Beskrivning</th>
-              {showQty && <th className="num">Antal</th>}
-              {showPrice && <th className="num">Á-pris</th>}
-              <th className="num">Summa</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item, idx) => (
-              <QuoteDocumentRow
-                key={item.id ?? idx}
-                item={item}
-                mode={mode}
-                showQty={showQty}
-                showPrice={showPrice}
-                colCount={colCount}
-                handlers={handlers}
-                sheetMode={sheetMode}
-                onTap={sheetMode && onRowTap && item.id ? () => onRowTap(item.id!) : undefined}
-              />
-            ))}
-          </tbody>
-        </table>
+        {/* FAS E (offertskaparen-design-polish, 2026-09-01): tomt-läge —
+            ADDITIV gren, inte en omskrivning. items.length > 0 tar alltid
+            samma väg som förut (tabellen nedan, orörd). Bara den nya
+            grenen (items.length === 0, edit, oskalad canvas) är ny — en
+            tom tabell med bara en huvudrad var ingen affordans, bara
+            frånvaron av en. sheetMode undantas: mobilens motsvarande
+            tomruta renderas OSKALAD av QuotePreviewPanel.tsx, av samma
+            träffyte-skäl som "+ Lägg till rad" nedan. */}
+        {items.length === 0 && mode === 'edit' && !sheetMode ? (
+          <div className="empty-items">
+            {(onAddRow || handlers?.onItemAdd) && (
+              <button type="button" onClick={onAddRow || handlers?.onItemAdd} className="add-row-btn">
+                + Lägg till rad
+              </button>
+            )}
+            {/* Se onOpenAiHelp:s docblock ovan — utelämnad i edit-läget
+                (QuoteEditView.tsx), så länken uteblir där utan att någon
+                ny AI-genereringsväg uppfinns för den ytan. */}
+            {onOpenAiHelp && (
+              <p className="empty-items-hint">
+                eller{' '}
+                <button type="button" onClick={onOpenAiHelp} className="empty-items-link">
+                  beskriv jobbet
+                </button>{' '}
+                så bygger vi utkastet
+              </p>
+            )}
+          </div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Beskrivning</th>
+                {showQty && <th className="num">Antal</th>}
+                {showPrice && <th className="num">Á-pris</th>}
+                <th className="num">Summa</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, idx) => (
+                <QuoteDocumentRow
+                  key={item.id ?? idx}
+                  item={item}
+                  mode={mode}
+                  showQty={showQty}
+                  showPrice={showPrice}
+                  colCount={colCount}
+                  handlers={handlers}
+                  sheetMode={sheetMode}
+                  onTap={sheetMode && onRowTap && item.id ? () => onRowTap(item.id!) : undefined}
+                />
+              ))}
+            </tbody>
+          </table>
+        )}
         {showOptionsNote && (
           <div className="options-note">Välj dina tillval i kundportalen innan du signerar.</div>
         )}
@@ -377,8 +423,11 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             träffytan ~15px vid 375px skärmbredd — långt under 44px-kravet,
             och just på den yta som är hantverkarens huvudvy. */}
         {/* SPÅR B1: onAddRow öppnar artikelbanken; onItemAdd ger en tom rad.
-            Fallbacken behålls för anropare som inte skickar in någon sheet. */}
-        {mode === 'edit' && (onAddRow || handlers?.onItemAdd) && !sheetMode && (
+            Fallbacken behålls för anropare som inte skickar in någon sheet.
+            FAS E: `items.length > 0` tillagt — vid noll rader ligger samma
+            knapp redan INUTI tomrutan ovan, den här hade annars dubblerat
+            den. */}
+        {mode === 'edit' && (onAddRow || handlers?.onItemAdd) && !sheetMode && items.length > 0 && (
           <button type="button" onClick={onAddRow || handlers?.onItemAdd} className="add-row-btn">
             + Lägg till rad
           </button>

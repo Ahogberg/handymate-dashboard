@@ -302,6 +302,16 @@ export const MODERN_DOCUMENT_CSS = `
 .quote-document .signature-cta .sig-edit-note { font-size: 10px; color: #94A3B8; font-style: italic; margin-top: 6px; }
 .quote-document .add-row-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: rgba(15, 118, 110, 0.08); border: 1px dashed var(--qd-accent); border-radius: 6px; color: var(--qd-accent); font-size: 12px; font-weight: 500; cursor: pointer; margin-bottom: 24px; transition: background 0.15s; }
 .quote-document .add-row-btn:hover { background: rgba(15, 118, 110, 0.15); }
+/* FAS E (offertskaparen-design-polish, 2026-09-01): tomt-läges-rutan.
+   Fast teal (#0f766e), INTE var(--qd-accent) — samma val som
+   .price-missing-pill ovan: det här är en intern hantverkar-uppmaning
+   (renderas bara i mode==='edit'), inte kundvänd dokumentfärg som ska
+   följa företagets brandade accent. */
+.quote-document .empty-items { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 36px 20px; border: 1px dashed #E2E8F0; border-radius: 10px; text-align: center; margin-bottom: 24px; }
+.quote-document .empty-items .add-row-btn { margin-bottom: 0; }
+.quote-document .empty-items-hint { margin: 0; font-size: 13px; color: #94A3B8; }
+.quote-document .empty-items-link { background: none; border: none; padding: 0; margin: 0; font: inherit; font-size: 13px; font-weight: 600; color: #0f766e; text-decoration: underline; cursor: pointer; }
+.quote-document .empty-items-link:hover { color: #0d9488; }
 .quote-document .row-action { opacity: 0; transition: opacity 0.15s; }
 .quote-document tbody tr.row-hover:hover .row-action { opacity: 1; }
 .quote-document .row-action button { background: transparent; border: none; cursor: pointer; padding: 2px 4px; color: #94a3b8; font-size: 14px; line-height: 1; }
