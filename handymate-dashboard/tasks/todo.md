@@ -1,3 +1,42 @@
+# Inför nästa jobb V1 — Codex 2026-08-31
+
+Andreas har godkänt bygget. Läsande förberedelse för verifierad bokning och
+projekt, Lars som avsändare och befintlig Matte-chatt som nästa steg.
+Inga utskick, nya godkännanden, migrationer eller agentmotorer. Native-appen
+ändras inte; webbytorna ska fungera på mobil och desktop. Tidigare ändringar
+i CSV/import, marknadsföring och dokument bevaras.
+
+- [x] Verifiera körande schema och befintliga behörighets-/källvägar.
+- [x] En läsande modell + autentiserad API-rutt; inga sidoeffekter vid GET.
+- [x] Förberedelse i dagsplan, bokning och projekt; källor, luckor och fel synliga.
+- [x] Fråga Matte via befintlig prompt-ingång, ingen automatisk chattur/åtgärd.
+- [x] 138 riktade tester gröna (60 nya), slutbuild exit 0, separat tsc exit 0, 11/11 läsande PostgREST-schema/filter-prober godkända.
+- [x] Dokumentera vad som är lokalt testat respektive skarpt verifierat i docs/audits/NEXT_JOB_PREPARATION_V1_2026-08-31.md.
+
+Lokalt färdig, inte committad/pushad/deployad. Kvar efter deploy: inloggat
+prov av en verklig testbokning, medarbetar-/tvåtenantprov och frivillig
+Matte-tur. Databasproberna läste noll kundrader och är inte det skarpbeviset.
+
+---
+
+# Nu-fördjupning inför lansering — Codex 2026-08-31
+
+Godkänt av Andreas efter konkurrentresearchen. Avgränsat till CSV-importens
+sanningskontrakt, kundspråk/operating plan och säkra verifieringar. Ingen ny
+lanseringschecklista, ingen Fortnox-/röstombyggnad, inga produktionsskrivningar.
+
+- [x] En serverväg för de två CSV-ytorna; returfel och noll bekräftade skrivningar räknas aldrig som lyckade.
+- [x] Båda importytorna visar delvis resultat och misslyckade rader ärligt; gemensam CSV-parser skyddar citerade fält och saknade kolumner.
+- [x] Synka produktbudskap och Christoffers första-dagen-/demoupplägg.
+- [x] 190 riktade tester gröna (44 nya), slutbygge exit 0, separat tsc exit 0, publikt läsande rökprov 5/5.
+- [x] Lokala bevis och kvarvarande skarpa kundresor särredovisade i docs/audits/PRELAUNCH_NOW_2026-08-31.md.
+
+Granskningsstatus: inga commits/push/deploy/migrationer i detta pass. Ingen
+aktuell tvåtenant-/telefon-/betalningsresa körd. Fortnox-kärnan och tidigare
+marketingändringar orörda. Befintlig extern checklista behåller go/no-go.
+
+---
+
 # Samtalsefterarbete — Codex 2026-08-30
 
 Andreas godkände fortsatt bygge: säker affärsmatchning, återförsök, samlat

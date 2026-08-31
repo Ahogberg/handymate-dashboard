@@ -98,6 +98,7 @@ import { ProjectQuoteDocumentCard } from '@/components/projects/ProjectQuoteDocu
 import { getStageBucket } from '@/components/projects/ProjectStatusCard'
 import ProjectTodoBlock, { type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
 import ProjectTasksBlock from '@/components/projects/ProjectTasksBlock'
+import JobPreparation from '@/components/projects/JobPreparation'
 import type { LarsTip } from '@/lib/tasks/lars-tips'
 import { deriveTodoMode, TODO_PRIMARY_LABEL } from '@/lib/projects/derive-todo'
 import { ProjectStatusBand } from '@/components/projects/ProjectStatusBand'
@@ -2441,6 +2442,7 @@ export default function ProjectDetailPage() {
                 Framdrift, höger = Personal + Projektinfo, snabbåtgärder sist. */}
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5 items-start">
               <div className="min-w-0 space-y-3.5">
+                <JobPreparation projectId={projectId} />
                 {/* Hantverkarens egna uppgifter överst — agenternas förslag under. */}
                 <ProjectTasksBlock
                   projectId={projectId}

@@ -20,6 +20,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
+import JobPreparation from '@/components/projects/JobPreparation'
 
 interface Booking {
   booking_id: string
@@ -192,6 +193,7 @@ export default function BookingDetailPage() {
           </span>
         </div>
 
+        <JobPreparation bookingId={bookingId} />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">

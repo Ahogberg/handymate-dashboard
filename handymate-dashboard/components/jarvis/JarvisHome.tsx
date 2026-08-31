@@ -17,6 +17,7 @@ import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { SkrivRad } from '@/components/jarvis/SkrivRad'
 import { RailCard } from '@/components/jarvis/RailCard'
 import DagensPlanExtra from '@/components/jarvis/DagensPlanExtra'
+import JobPreparation from '@/components/projects/JobPreparation'
 import { KomIgangRail } from '@/components/jarvis/KomIgangRail'
 import HemTur from '@/components/tour/HemTur'
 import CompanyScan from '@/components/tour/CompanyScan'
@@ -1516,14 +1517,17 @@ export default function JarvisHome({
             ) : (
               <div className="flex flex-col gap-2.5">
                 {bookings.slice(0, 3).map(b => (
-                  <Link key={b.booking_id} href={`/dashboard/bookings/${b.booking_id}`} className="flex items-center gap-2.5 min-h-[44px] -my-1">
-                    <span className="font-heading tabular-nums text-[13px] text-primary-700 w-11 shrink-0">{formatClock(b.scheduled_start)}</span>
-                    <span className="w-[3px] h-8 rounded-sm bg-primary-500 shrink-0" />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium text-slate-900 truncate">{b.customer?.name || 'Kund'}</span>
-                      <span className="block text-xs text-slate-400 truncate">{getServiceFromNotes(b.notes)}</span>
-                    </span>
-                  </Link>
+                  <div key={b.booking_id}>
+                    <Link href={`/dashboard/bookings/${b.booking_id}`} className="flex items-center gap-2.5 min-h-[44px] -my-1">
+                      <span className="font-heading tabular-nums text-[13px] text-primary-700 w-11 shrink-0">{formatClock(b.scheduled_start)}</span>
+                      <span className="w-[3px] h-8 rounded-sm bg-primary-500 shrink-0" />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-slate-900 truncate">{b.customer?.name || 'Kund'}</span>
+                        <span className="block text-xs text-slate-400 truncate">{getServiceFromNotes(b.notes)}</span>
+                      </span>
+                    </Link>
+                    <JobPreparation bookingId={b.booking_id} />
+                  </div>
                 ))}
               </div>
             )}
