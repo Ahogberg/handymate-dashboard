@@ -1,3 +1,15 @@
+# Prisslingan V2 — pass 5: faktura-UI + materialpåslag + städ (Claude 2026-08-31)
+
+Pass 4 + Work Report V1 LIVE (ea5078e9). v183 KÖRD+verifierad.
+
+- [ ] UX4a: InvoiceAddRowCombo (QuoteAddRowCombo-mönstret på delad useProductSearch — flytta hooken till neutral plats) monterad i LineItemEditor; "Sätt pris"-etikett för prislösa; ROT-flagga bara när fakturans globala typ matchar
+- [ ] Materialpåslag (beslut 4): projektmaterial-prissättningen använder kundlista → pricing_settings.material_markup_pct → inget påslag + varning; hårdkodade 20 bort ur projects/[id]/materials-routen; onboarding-värdet från steg 3 börjar verka
+- [ ] v184_drop_price_list.sql: DROP TABLE price_list CASCADE (0 rader — bevisat) — visa Andreas + "kör" före MCP-körning; + v185 drop supplier_pricelist (0 rader, 0 refs) i samma granskning
+- [ ] UX6: sql-vy prisloop_metrics (prissatt-andel per business, andel quote_items 30d med linked_product_id, AI-rader pris 0) + enkel admin-tabell
+- [ ] Facit + tsc + sviter + build + REN-worktree-tsc → push → deploy → SLUTRAPPORT för hela Prisslingan V2
+
+---
+
 # Prisslingan V2 — pass 4: agenterna + reservationer serverside (Claude 2026-08-31)
 
 Pass 3 LIVE (aa4e840c). v183 väntar Andreas "kör v183".

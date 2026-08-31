@@ -5,8 +5,52 @@ import { ChevronDown } from 'lucide-react'
 import { InvoiceItem, InvoiceItemType } from '@/lib/types/invoice'
 import {
   createDefaultInvoiceItem,
+  generateInvoiceItemId,
   recalculateItems,
 } from '@/lib/invoice-calculations'
+import { InvoiceAddRowCombo } from './InvoiceAddRowCombo'
+import type { ProductWithComponents } from '@/app/dashboard/quotes/_shared/applyProductToItem'
+
+/** Produktens enhet → fakturans UNITS-vokabulär (UX4a). */
+function fakturaEnhet(unit: string): string {
+  const u = (unit || '').toLowerCase()
+  if (u === 'tim' || u === 'timmar' || u === 'timme') return 'timmar'
+  if (u === 'h') return 'h'
+  if (u === 'kvm' || u === 'm2' || u === 'm²') return 'm²'
+  if (u === 'kbm' || u === 'm3' || u === 'm³') return 'm³'
+  if (u === 'm' || u === 'lpm' || u === 'meter') return 'm'
+  if (u === 'kg') return 'kg'
+  if (u === 'l' || u === 'liter') return 'l'
+  if (u === 'paket' || u === 'pkt') return 'paket'
+  return 'st'
+}
+
+/**
+ * UX4a (Prisslingan V2 pass 5): bankartikel → fakturarad. Produktkopplingen
+ * (linked_product_id/article_number/labor_amount) följer med så ROT-basen
+ * (A1/A2) och Fortnox-artikelnumret fungerar även för fakturabyggda rader.
+ * ROT/RUT sätts BARA när fakturans globala typ matchar produktens flagga.
+ */
+function produktTillRad(p: ProductWithComponents, sortOrder: number, rotRutType?: string): InvoiceItem {
+  const pris = Number(p.sales_price) || 0
+  const share = p.default_labor_share
+  return {
+    id: generateInvoiceItemId(),
+    item_type: 'item',
+    description: p.name,
+    quantity: 1,
+    unit: fakturaEnhet(p.unit),
+    unit_price: pris,
+    total: pris,
+    is_rot_eligible: rotRutType === 'rot' && !!p.rot_eligible,
+    is_rut_eligible: rotRutType === 'rut' && !!p.rut_eligible,
+    sort_order: sortOrder,
+    article_number: p.sku ?? undefined,
+    cost_price: p.purchase_price ?? undefined,
+    linked_product_id: p.id,
+    labor_amount: share != null ? Math.round(pris * share) : null,
+  }
+}
 
 interface LineItemEditorProps {
   items: InvoiceItem[]
@@ -213,8 +257,18 @@ export default function LineItemEditor({ items, onChange, rotRutType }: LineItem
         </div>
       )}
 
-      {/* Add row button */}
-      <div className="flex items-center gap-4 pt-2.5">
+      {/* Add row: artikelsök (UX4a) + tom rad + fler typer */}
+      <div className="flex flex-wrap items-center gap-3 pt-2.5">
+        <InvoiceAddRowCombo
+          onSelectProduct={p => {
+            const rad = produktTillRad(p, items.length, rotRutType)
+            onChange(recalculateItems([...items, rad]))
+          }}
+          onAddBlankRow={beskrivning => {
+            const rad = { ...createDefaultInvoiceItem('item', items.length), description: beskrivning }
+            onChange(recalculateItems([...items, rad]))
+          }}
+        />
         <button
           onClick={() => addItem('item')}
           className="flex items-center gap-2 text-[13px] text-[#0F766E] bg-transparent border-none cursor-pointer"

@@ -1,6 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { resolveCustomerPriceList } from '@/lib/ai-quote-generator'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+/**
+ * Materialpåslaget (Prisslingan V2 pass 5, Andreas beslut 4 2026-08-31):
+ * FÖRETAGET sätter sitt eget — aldrig en tyst hårdkodad 20.
+ * Prioritet: uttryckligt i anropet → kundens prislista (price_lists_v2.
+ * material_markup_pct via projektets kund) → företagets
+ * pricing_settings.material_markup_pct (onboardingens steg 3) → INGET
+ * påslag (säljpris = inköpspris) + varning i svaret.
+ */
+async function resolveraMaterialPaslag(
+  supabase: SupabaseClient,
+  businessId: string,
+  projectId: string,
+  explicit: number | undefined,
+): Promise<{ paslag: number | null; kalla: 'uttryckligt' | 'kundlista' | 'foretag' | null }> {
+  if (explicit !== undefined && explicit !== null) return { paslag: Number(explicit), kalla: 'uttryckligt' }
+  try {
+    const { data: projekt } = await supabase
+      .from('project')
+      .select('customer_id')
+      .eq('project_id', projectId)
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (projekt?.customer_id) {
+      const kundLista = await resolveCustomerPriceList(businessId, projekt.customer_id)
+      if (kundLista?.material_markup_pct != null) {
+        return { paslag: Number(kundLista.material_markup_pct), kalla: 'kundlista' }
+      }
+    }
+    const { data: config } = await supabase
+      .from('business_config')
+      .select('pricing_settings')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    const foretag = (config?.pricing_settings as any)?.material_markup_pct
+    if (foretag != null && Number.isFinite(Number(foretag))) {
+      return { paslag: Number(foretag), kalla: 'foretag' }
+    }
+  } catch { /* fail-soft → inget påslag + varning */ }
+  return { paslag: null, kalla: null }
+}
 // Auth via request.headers i importerad helper — utan force-dynamic kan
 // rutten frysas i Full Route Cache och servera fel företags data
 // (2026-08-22-klassen, se CLAUDE.md; residualsvep 2026-08-31).
@@ -77,10 +120,17 @@ export async function POST(
 
     const quantity = body.quantity || 1
     const purchasePrice = body.purchase_price || 0
-    const markupPercent = body.markup_percent ?? 20
+    // Beslut 4: företagets/kundens EGET påslag — den hårdkodade ?? 20 är borta.
+    const { paslag, kalla } = await resolveraMaterialPaslag(
+      supabase, business.business_id, params.id, body.markup_percent,
+    )
+    const markupPercent = paslag ?? 0
     const sellPrice = body.sell_price || Math.round(purchasePrice * (1 + markupPercent / 100) * 100) / 100
     const totalPurchase = Math.round(quantity * purchasePrice * 100) / 100
     const totalSell = Math.round(quantity * sellPrice * 100) / 100
+    const paslagVarning = !body.sell_price && paslag == null && purchasePrice > 0
+      ? 'Inget materialpåslag är satt — säljpriset blev lika med inköpspriset. Sätt ditt påslag under Inställningar → Prissättning.'
+      : null
 
     const { data: material, error } = await supabase
       .from('project_material')
@@ -106,7 +156,11 @@ export async function POST(
 
     if (error) throw error
 
-    return NextResponse.json({ material })
+    return NextResponse.json({
+      material,
+      paslag_kalla: kalla,
+      ...(paslagVarning ? { warning: paslagVarning } : {}),
+    })
 
   } catch (error: any) {
     console.error('Create material error:', error)
@@ -156,10 +210,15 @@ export async function PUT(
     if (body.name !== undefined) updates.name = body.name
     if (body.supplier_invoice_id !== undefined) updates.supplier_invoice_id = body.supplier_invoice_id
 
-    // Omberäkna priser
+    // Omberäkna priser. Beslut 4: raden utan eget påslag får det RESOLVERADE
+    // (kundlista → företag), aldrig en hårdkodad 20.
     const quantity = updates.quantity ?? existing.quantity
     const purchasePrice = updates.purchase_price ?? existing.purchase_price ?? 0
-    const markupPercent = updates.markup_percent ?? existing.markup_percent ?? 20
+    let markupPercent = updates.markup_percent ?? existing.markup_percent
+    if (markupPercent == null) {
+      const { paslag } = await resolveraMaterialPaslag(supabase, business.business_id, params.id, undefined)
+      markupPercent = paslag ?? 0
+    }
     updates.sell_price = Math.round(purchasePrice * (1 + markupPercent / 100) * 100) / 100
     updates.total_purchase = Math.round(quantity * purchasePrice * 100) / 100
     updates.total_sell = Math.round(quantity * updates.sell_price * 100) / 100

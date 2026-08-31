@@ -94,6 +94,41 @@ test.describe('Pass 4 — agentpriskontext + reservationer serverside (UX3/UX5/D
   })
 })
 
+test.describe('Pass 5 — fakturans artikelväljare + materialpåslaget (UX4/beslut 4)', () => {
+  test('UX4a: LineItemEditor monterar InvoiceAddRowCombo och bevarar produktkopplingen', () => {
+    const editor = source('components/invoices/LineItemEditor.tsx')
+    expect(editor).toContain('InvoiceAddRowCombo')
+    expect(editor).toContain('linked_product_id: p.id')
+    expect(editor).toContain('labor_amount')
+    // ROT/RUT bara när fakturans globala typ matchar produktens flagga
+    expect(editor).toContain("rotRutType === 'rot' && !!p.rot_eligible")
+  })
+
+  test('UX4a: combon visar "Sätt pris" för prislösa (delade pricing-state-språket)', () => {
+    const combo = source('components/invoices/InvoiceAddRowCombo.tsx')
+    expect(combo).toContain('priceLabel(p.sales_price')
+    expect(combo).toContain("from '@/lib/products/use-product-search'")
+  })
+
+  test('useProductSearch bor neutralt — offertens fil är en ren re-export', () => {
+    const gammal = source('app/dashboard/quotes/_shared/useProductSearch.ts')
+    expect(gammal).toContain("from '@/lib/products/use-product-search'")
+    expect(gammal).not.toContain('fetch(')
+  })
+
+  test('beslut 4: materialpåslaget resolveras (uttryckligt → kundlista → företag), aldrig hårdkodad 20', () => {
+    const route = source('app/api/projects/[id]/materials/route.ts')
+    expect(route).toContain('resolveraMaterialPaslag')
+    expect(route).toContain('resolveCustomerPriceList')
+    expect(route).toContain('pricing_settings')
+    // Kodmönstret (inte kommentarer): ingen fallback-kedja som slutar i 20.
+    expect(route).not.toMatch(/markup_percent \?\? 20/)
+    expect(route).not.toMatch(/existing\.markup_percent \?\? 20/)
+    // inget påslag = ärligt: varning, inte tyst nollmarginal
+    expect(route).toContain('Inget materialpåslag är satt')
+  })
+})
+
 test.describe('QuickPriceInput — kontraktet', () => {
   const komponent = source('components/products/QuickPriceInput.tsx')
 
