@@ -43,17 +43,20 @@ export const QUICKSTART_ROWS: ReadonlyArray<QuickstartRow> = [
     is_rut_eligible: false,
   },
   {
+    // UX1g (Prisslingan V2): samma pris som seedens HM-GEN-901 — kortet och
+    // banken sa tidigare olika (350 vs 450).
     name: 'Framkörning',
     unit: 'st',
-    sales_price: 350,
+    sales_price: 450,
     category_slug: 'ovrigt',
     is_rot_eligible: false,
     is_rut_eligible: false,
   },
   {
+    // UX1g: samma som seedens HM-GEN-902 (800 → 1200).
     name: 'Bortforsling avfall',
     unit: 'st',
-    sales_price: 800,
+    sales_price: 1200,
     category_slug: 'ovrigt',
     is_rot_eligible: false,
     is_rut_eligible: false,

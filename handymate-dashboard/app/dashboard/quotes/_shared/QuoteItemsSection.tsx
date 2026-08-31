@@ -41,6 +41,8 @@ interface QuoteItemsSectionProps {
   onSelectProductForRow: (itemId: string, product: ProductWithComponents) => void
   onAddBlankRow: (description: string) => void
   onSaveToProducts?: (item: QuoteItem) => void
+  /** UX1c: spara radens pris som artikelns standard (desktop-erbjudandet i ItemRow). */
+  onSaveAsStandard?: (productId: string, price: number) => void
   // Inline-skapande av kategori — valfri (om inte passas saknas funktionen
   // men UI:n förblir identisk).
   onCreateCategory?: (label: string, itemId: string) => Promise<void> | void
@@ -66,6 +68,7 @@ export function QuoteItemsSection({
   onAddBlankRow,
   onOpenGrossistSearch,
   onSaveToProducts,
+  onSaveAsStandard,
   onCreateCategory,
   showNewCategoryInput,
   setShowNewCategoryInput,
@@ -133,6 +136,12 @@ export function QuoteItemsSection({
                   setNewCategoryLabel={setNewCategoryLabel}
                   onSaveToProducts={onSaveToProducts}
                   onSelectProduct={onSelectProductForRow}
+                  linkedProductPrice={
+                    item.linked_product_id
+                      ? products.find(p => p.id === item.linked_product_id)?.sales_price ?? null
+                      : null
+                  }
+                  onSaveAsStandard={onSaveAsStandard}
                 />
               ))}
             </div>

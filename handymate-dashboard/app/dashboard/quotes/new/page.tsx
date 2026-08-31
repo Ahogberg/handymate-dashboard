@@ -1858,6 +1858,32 @@ export default function NewQuotePage() {
       // reflekteras synkront — linked_product_id måste hinna sättas innan
       // finalItems byggs nedan.
       let workingItems = items
+
+      // UX1e (Prisslingan V2): LÄNKADE prislösa rader prissätter BANKEN.
+      // Med UX1d länkas AI-rader till prislösa artiklar (handtag + productRef)
+      // — när hantverkaren fyllt i priset ska det landa på artikeln (PUT),
+      // inte skapa en dubblett. Det är hela "priset förtjänas"-loopen.
+      const linkedPriceCandidates = workingItems.filter(
+        i =>
+          i.item_type === 'item' &&
+          i.ai_price_missing &&
+          i.save_to_products !== false &&
+          i.unit_price > 0 &&
+          !!i.linked_product_id,
+      )
+      for (const row of linkedPriceCandidates) {
+        try {
+          const res = await fetch('/api/products', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: row.linked_product_id, sales_price: row.unit_price }),
+          })
+          if (res.ok) setLocalPrice(row.linked_product_id as string, row.unit_price)
+        } catch (err) {
+          console.error('[saveQuote] kunde inte prissätta bankartikeln:', err)
+        }
+      }
+
       const autoSaveCandidates = workingItems.filter(
         i =>
           i.item_type === 'item' &&
@@ -1870,6 +1896,26 @@ export default function NewQuotePage() {
       if (autoSaveCandidates.length > 0) {
         for (const row of autoSaveCandidates) {
           try {
+            // UX1e dubblettvakt: exakt namnmatch (case-okänslig) mot banken
+            // FÖRE POST. Träff på prislös artikel → prissätt + länka; träff
+            // på prissatt → bara länka. Backend-upserten (pass 3) blir
+            // huvudskyddet; detta är den billiga klientvakten.
+            const träff = products.find(
+              p => p.name.trim().toLowerCase() === row.description.trim().toLowerCase(),
+            )
+            if (träff) {
+              if (!(träff.sales_price > 0)) {
+                const res = await fetch('/api/products', {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ id: träff.id, sales_price: row.unit_price }),
+                })
+                if (res.ok) setLocalPrice(träff.id, row.unit_price)
+              }
+              workingItems = workingItems.map(i => (i.id === row.id ? { ...i, linked_product_id: träff.id } : i))
+              continue
+            }
+
             const res = await fetch('/api/products', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -1899,6 +1945,8 @@ export default function NewQuotePage() {
             console.error('[saveQuote] auto-save till produktbanken misslyckades:', err)
           }
         }
+      }
+      if (linkedPriceCandidates.length > 0 || autoSaveCandidates.length > 0) {
         setItems(workingItems)
       }
 
@@ -2722,6 +2770,7 @@ export default function NewQuotePage() {
                 allCategories={allCategories}
                 customCategories={localCustomCategories}
                 products={products}
+                onSaveAsStandard={saveStandardPrice}
                 dndSensors={dndSensors}
                 onDragEnd={handleDragEnd}
                 onAddItem={addItem}

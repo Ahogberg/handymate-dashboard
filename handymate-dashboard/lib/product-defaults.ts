@@ -42,6 +42,45 @@ const COMMON_EXTRAS: ProductDefault[] = [
   { sku: 'HM-GEN-903', name: 'Deponi- och miljöavgift', unit: 'st', unit_price: 650, category: 'övrigt', legacy_category: 'material', labor_share: 0, deduction: null },
 ]
 
+/**
+ * UX1f (Prisslingan V2): lägg hantverkarens EGET timpris (onboarding steg 3)
+ * på de seedade timartiklarna — statiska 550 kr motsade den enda prisuppgift
+ * han faktiskt lämnat, i hans allra första offert.
+ *
+ * Regeln: per bransch (sku-prefix, t.ex. HM-EL) är den FÖRSTA prissatta
+ * rena timartikeln (unit 'tim', labor_share 1, pris > 0) basen; varje sådan
+ * artikel i samma bransch får `rate + (artikelpris − baspris)` så relativa
+ * påslag bevaras (Felsökning +100, Jour +400). Prislösa rörs ALDRIG
+ * (0 = "osatt" är en signal, inte ett pris). rate null/0 → identitet.
+ */
+export function applyHourlyRateToDefaults(
+  products: ProductDefault[],
+  hourlyRate: number | null | undefined,
+): ProductDefault[] {
+  const rate = Number(hourlyRate)
+  if (!(rate > 0)) return products
+
+  const isTimArbete = (p: ProductDefault) =>
+    p.unit === 'tim' && p.labor_share === 1 && p.unit_price > 0
+
+  // Bas per sku-prefix ("HM-EL", "HM-BYG", "HM-GEN" …) = första tim-artikeln
+  // i seed-ordningen (den är prioritetsordningen).
+  const basePerPrefix = new Map<string, number>()
+  for (const p of products) {
+    if (!isTimArbete(p)) continue
+    const prefix = p.sku.split('-').slice(0, 2).join('-')
+    if (!basePerPrefix.has(prefix)) basePerPrefix.set(prefix, p.unit_price)
+  }
+
+  return products.map(p => {
+    if (!isTimArbete(p)) return p
+    const prefix = p.sku.split('-').slice(0, 2).join('-')
+    const base = basePerPrefix.get(prefix)
+    if (base == null) return p
+    return { ...p, unit_price: rate + (p.unit_price - base) }
+  })
+}
+
 const BRANCH_PRODUCTS: Record<string, ProductDefault[]> = {
   electrician: [
     { sku: 'HM-EL-001', name: 'Elinstallation', unit: 'tim', unit_price: 550, category: 'arbete', legacy_category: 'labor', labor_share: 1, deduction: 'rot' },

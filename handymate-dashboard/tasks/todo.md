@@ -1,3 +1,47 @@
+# Prisslingan V2 — pass 1: pengasanning + offertloopen (Claude 2026-08-31)
+
+Godkänd plan (C:\Users\Gaming\.claude\plans\recursive-painting-possum.md).
+Avstämning med Andreas efter pass 1. Inga migrationer i detta pass.
+
+- [x] A1: delad quote→invoice-mappare (lib/invoices/quote-to-invoice-items.ts) + rotRutLaborBasis; from-quote/create-final-invoice/project-invoice-draft/tool-router/invoices-POST byggs om; InvoiceItem får labor_amount + linked_product_id
+- [x] A2: ROT-sanning server-side i PUT /api/invoices (calculateCappedDeduction + excludeInvoiceId — som var en DÖD parameter och nu trätts in i usage-frågan)
+- [x] A3: buildFortnoxInvoiceRows (VAT-arv, negativ rabatt, subtotal bort, heading/text→textrader, ArticleNumber fasad)
+- [x] A4: påminnelsens total (inkl-moms + avgifter, beraknaPaminnelseTotaler) + femte ROT-formeln bort
+- [x] A5: prislös tid — bort med ||500/||895, warnings visas i ProjectInvoiceModal + from-time-entries returnerar warnings
+- [x] A6 FULL: ROT/RUT-val per ÄTA-rad i ChangeModal + AI-ÄTA-flaggor + create-final-invoice/draft/invoice-preview respekterar (TD-26 stängd)
+- [x] 1a: applyProductToItem — radpris överlever prislös artikel
+- [x] 1b: priceLabel i tre desktopväljare
+- [x] 1c: standardpris-erbjudandet i ItemRow (desktop) + trådning genom QuoteItemsSection till båda sidorna
+- [x] 1d: AI-prompten: prissatta + prislösa i separata block, handtag intakta
+- [x] 1e: auto-create prissätter bankartikeln i stället för dubblett (PUT-väg + namnmatch-vakt)
+- [x] 1f: timpris → seedade arbetsartiklar (applyHourlyRateToDefaults, seedProducts/finalize/seed-products-routen) + materialpåslags-fält i Step3HowYouWork → pricing_settings-merge i PUT /api/onboarding
+- [x] 1g: QuoteQuickstartCard i samklang med seeden (450/1200)
+- [x] Facit: quote-to-invoice-mapper, fortnox-row-builder, reminder-totals, apply-product-pricing, ai-quote-product-linking-utökning, onboarding-overlay — tsc 0 fel, 63/63 + 19/19 gröna
+- [ ] next build + bred riktad regression (ALDRIG pipat) → push → rapport till Andreas (AVSTÄMNING före pass 2)
+
+---
+
+# Rapportera dagens arbete V1 — Codex 2026-08-31
+
+Godkänt: projektbunden röst/text i native-appen, samma Matte/Lars och
+befintliga log_time/add_work_note. Ingen migration, fakturering, utskick,
+projektavslut eller deploy. Mobilen byggs från GitHub-snapshot 1d078364 i
+separat arbetskopia; Claudes lokala mobiländringar lämnas orörda.
+
+- [x] Spåra röst, MatteSheet, projektkontext, bekräftelse och verkliga skrivare.
+- [x] Avgränsat rapportläge med serverägd person/projekt/datum, behörighet och timerkontroll.
+- [x] Mobil ingång för röst/text, bevarad kontext och tydliga separata bekräftelser/kvitton.
+- [x] 174 riktade backendtester och 130 mobiltester; tsc rent i båda; next build exit 0; lokal Android/iOS-export; hash-/schema-/constraintkontroll; 9/9 skrivskyddade PostgREST-prober; granskbar mobilpatch.
+- [ ] Efter merge/deploy: fysisk telefon, faktisk medarbetare och tvåtenant-/återförsöksprov enligt docs/handoffs/WORK_REPORT_V1_2026-08-31.md. Ingen EAS-build eller deploy gjord här.
+
+Mobilpatch och gränser: docs/handoffs/WORK_REPORT_MOBILE_V1.patch och
+docs/handoffs/WORK_REPORT_V1_2026-08-31.md. Separat fynd: portalens äldre
+project_log-läsning använder fel kolumner; rätta först efter beslut om
+vilka historiska anteckningar kunden får se. Nya rapportanteckningar har
+uttryckligt portalfilter, oberoende av detta gamla frågefel.
+
+---
+
 # Inför nästa jobb V1 — Codex 2026-08-31
 
 Andreas har godkänt bygget. Läsande förberedelse för verifierad bokning och

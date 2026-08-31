@@ -53,11 +53,15 @@ test.describe('fakturan byggs ur sanningen, inte speglingen', () => {
   })
 
   test('bort-valda tillval faktureras aldrig; valda blir vanliga rader', () => {
+    // A1 (Prisslingan V2): filtret bor i den DELADE mapparen — draften ska
+    // anropa den (båda grenarna), och mapparen ska äga tillvalsregeln.
+    // Beteendet är dessutom facit-låst i tests/quote-to-invoice-mapper.spec.ts.
     const s = kod(FIL)
-    expect(s).toContain("item.item_type !== 'option' || item.option_selected === true")
-    // Valda tillval måste bli 'item' — subtotalens filter räknar bara items,
-    // och ett kvarlämnat 'option' hade tyst tappat beställt arbete ur summan.
-    expect(s).toContain("item.item_type === 'option' ? 'item'")
+    expect(s).toContain('mapQuoteItemsToInvoiceItems(strukturerade')
+    expect(s).toContain('mapQuoteItemsToInvoiceItems(quote.items')
+    const mapper = kod('lib/invoices/quote-to-invoice-items.ts')
+    expect(mapper).toContain("item.item_type !== 'option' || item.option_selected === true")
+    expect(mapper).toContain("item.item_type === 'option' ? 'item'")
   })
 
   test('offertens ROT/RUT-fält ärvs bara när rader faktiskt hittades', () => {

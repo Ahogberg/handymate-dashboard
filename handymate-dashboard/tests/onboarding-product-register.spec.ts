@@ -90,6 +90,31 @@ test.describe('seedPriceList — product_id-länken (v137) är en ren, determini
   })
 })
 
+test.describe('UX1f — timpriset från steg 3 når seedade timartiklar', () => {
+  test('seedProducts med hourlyRate: basen får timpriset, relativa påslag bevaras, prislösa orörda', async () => {
+    const fake = fakeSeedSupabase()
+    await seedProducts(fake.client, 'biz_rate', 'electrician', 900)
+
+    const byName = new Map(fake.inserted.products.map((p: any) => [p.name, p]))
+    // Bas: Elinstallation 550 → 900
+    expect(byName.get('Elinstallation')!.sales_price).toBe(900)
+    // Felsökning 650 (bas+100) → 1000; Jour 950 (bas+400) → 1300
+    expect(byName.get('Felsökning')!.sales_price).toBe(1000)
+    expect(byName.get('Jour och akut utryckning')!.sales_price).toBe(1300)
+    // Prislös timartikel rörs aldrig
+    expect(byName.get('Lärling')!.sales_price).toBe(0)
+    // Icke-tim-artikel orörd
+    expect(byName.get('Installation vägguttag')!.sales_price).toBe(850)
+  })
+
+  test('utan hourlyRate: exakt samma priser som förut (identitet)', async () => {
+    const fake = fakeSeedSupabase()
+    await seedProducts(fake.client, 'biz_norate', 'electrician')
+    const byName = new Map(fake.inserted.products.map((p: any) => [p.name, p]))
+    expect(byName.get('Elinstallation')!.sales_price).toBe(550)
+  })
+})
+
 test.describe('onboarding-flödets ledningsdragning', () => {
   test('TOTAL_STEPS är 8 och StepProductRegister monteras mellan StepImportData och Step6LiveTour', () => {
     const src = source('app/onboarding/page.tsx')

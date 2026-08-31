@@ -23,6 +23,19 @@ export interface InvoiceItem {
   total: number
   cost_price?: number
   article_number?: string
+  /**
+   * Arbetsandelen av raden (v67, Prisslingan V2 A1): ROT-/RUT-basens sanning.
+   * ??-semantik överallt — 0 är giltigt ("ren materialrad, bas 0"); null/saknas
+   * betyder "okänd andel, använd radtotalen". Kopieras från quote_items av
+   * lib/invoices/quote-to-invoice-items.ts.
+   */
+  labor_amount?: number | null
+  /**
+   * Produktkopplingen (Prisslingan V2 A1): behåller artikelbanks-länken hela
+   * vägen till fakturan (marginaluppföljning, Fortnox ArticleNumber,
+   * prisåterkoppling). Rader byggda före 2026-08-31 saknar fältet.
+   */
+  linked_product_id?: string | null
   is_rot_eligible: boolean
   is_rut_eligible: boolean
   sort_order: number

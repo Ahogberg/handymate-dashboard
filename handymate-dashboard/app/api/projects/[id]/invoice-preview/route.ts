@@ -310,12 +310,33 @@ export async function GET(
     // ── 7. ROT/RUT summary från quote_items ─────────────────────
     // Per berättigad rad: labor_amount (arbetsandelen, v67) ?? radens total.
     // ?? (ALDRIG ||): labor_amount 0 = ren material och skall ge bas 0.
-    const rotWorkCost = quoteItems
+    // A6 (Prisslingan V2, stänger TD-26 även här): signerade ÄTA-rader med
+    // egen ROT/RUT-flagga (eller rot_rut_type) räknas nu in i basen — samma
+    // regel som create-final-invoice. Removal-ÄTA drar ifrån. Utan detta
+    // visade förhandsvisningen ett annat avdrag än den faktiska fakturan.
+    const ataEligibleWork = (typ: 'rot' | 'rut') =>
+      signedAtas.reduce((s, ata) => {
+        const sign = ata.change_type === 'removal' ? -1 : 1
+        for (const it of ata.items as any[]) {
+          const berattigad =
+            typ === 'rot'
+              ? (it.is_rot_eligible ?? (it.rot_rut_type === 'rot'))
+              : (it.is_rut_eligible ?? (it.rot_rut_type === 'rut'))
+          if (berattigad) {
+            s += sign * Math.abs((Number(it.quantity) || 1) * (Number(it.unit_price) || 0))
+          }
+        }
+        return s
+      }, 0)
+
+    const rotWorkCost = Math.max(0, quoteItems
       .filter(it => it.is_rot_eligible)
       .reduce((s, it) => s + Number(it.labor_amount ?? (Number(it.quantity) || 0) * (Number(it.unit_price) || 0)), 0)
-    const rutWorkCost = quoteItems
+      + ataEligibleWork('rot'))
+    const rutWorkCost = Math.max(0, quoteItems
       .filter(it => it.is_rut_eligible)
       .reduce((s, it) => s + Number(it.labor_amount ?? (Number(it.quantity) || 0) * (Number(it.unit_price) || 0)), 0)
+      + ataEligibleWork('rut'))
 
     let rotRutSummary:
       | { type: 'ROT' | 'RUT'; eligible_amount: number; deduction_percent: 30 | 50; deduction_amount: number; customer_pays: number }
@@ -346,9 +367,7 @@ export async function GET(
     }
 
     // ── 8. VAT + total ──────────────────────────────────────────
-    // ÄTA v1 har ingen is_rot_eligible-flagga på items (TD-26) — så
-    // alla ÄTA-rader behandlas som non-ROT/RUT. Bara quote-items
-    // räknas mot rotRutSummary.
+    // (TD-26 stängd av A6 ovan: flaggade ÄTA-rader ingår i rotRutSummary.)
     const totalExclVat = quoteTotal + signedAtasTotal
     const vatAmount = Math.round(totalExclVat * 0.25 * 100) / 100
     const totalInclVat = totalExclVat + vatAmount

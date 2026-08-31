@@ -48,6 +48,8 @@ export default function NewInvoicePage() {
   const [customers, setCustomers] = useState<InvoiceEditorCustomer[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [defaultPaymentDays, setDefaultPaymentDays] = useState(30)
+  // A5 (Prisslingan V2): företagets eget timpris — ALDRIG ett hårdkodat 500.
+  const [defaultHourlyRate, setDefaultHourlyRate] = useState(0)
 
   // ─── Editor-state (kontrollerat, se InvoiceEditor) ──────────────────
   const [customerId, setCustomerId] = useState(searchParams?.get('customerId') || '')
@@ -93,7 +95,7 @@ export default function NewInvoicePage() {
         .order('work_date', { ascending: false }),
       supabase
         .from('business_config')
-        .select('default_payment_days')
+        .select('default_payment_days, default_hourly_rate')
         .eq('business_id', business.business_id)
         .single(),
     ])
@@ -108,6 +110,7 @@ export default function NewInvoicePage() {
     logBusinessConfigError('NewInvoice', configRes.error)
     const paymentDays = configRes.data?.default_payment_days || 30
     setDefaultPaymentDays(paymentDays)
+    setDefaultHourlyRate(Number(configRes.data?.default_hourly_rate) || 0)
 
     // Förfallodatum sätts EN gång, HÄR (inte i en separat effekt beroende
     // på defaultPaymentDays) — annars hinner ett effekt-varv köra med
@@ -159,7 +162,10 @@ export default function NewInvoicePage() {
 
     for (const entry of selected) {
       const hours = entry.hours_worked || (entry.duration_minutes ? entry.duration_minutes / 60 : 0)
-      const rate = entry.hourly_rate || 500
+      // A5: tidpostens eget pris → företagets timpris → 0 kr (synligt att
+      // rätta) — ALDRIG ett hårdkodat 500 (Kvittoprincipen; jfr serverside-
+      // förbudet i app/api/invoices/from-project/route.ts).
+      const rate = entry.hourly_rate || defaultHourlyRate || 0
       const laborItem = createDefaultInvoiceItem('item', items.length + newItems.length)
       newItems.push({
         ...laborItem,

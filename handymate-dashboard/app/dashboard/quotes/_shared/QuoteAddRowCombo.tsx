@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { Loader2, Search } from 'lucide-react'
 import type { ProductWithComponents } from './applyProductToItem'
 import { useProductSearch } from './useProductSearch'
+import { priceLabel, priceState } from '@/lib/products/pricing-state'
 
 interface QuoteAddRowComboProps {
   /** Triggas när användaren väljer en sparad produkt från dropdown —
@@ -118,8 +119,11 @@ export function QuoteAddRowCombo({ onSelectProduct, onAddBlankRow }: QuoteAddRow
                       </div>
                       {p.sku && <p className="text-[10px] text-slate-400 truncate mt-0.5">{p.sku}</p>}
                     </div>
-                    <span className="text-xs font-semibold text-slate-700 tabular-nums whitespace-nowrap">
-                      {p.sales_price?.toLocaleString('sv-SE')} kr/{p.unit}
+                    {/* UX1b: prislösa → "Sätt pris", aldrig "0 kr/st". */}
+                    <span className={`text-xs font-semibold tabular-nums whitespace-nowrap ${
+                      priceState(p.sales_price) === 'osatt' ? 'text-primary-700' : 'text-slate-700'
+                    }`}>
+                      {priceLabel(p.sales_price, p.unit)}
                     </span>
                   </button>
                 </li>

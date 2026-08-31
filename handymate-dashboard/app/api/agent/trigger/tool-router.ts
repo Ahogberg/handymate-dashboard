@@ -26,6 +26,7 @@ import { sweepMissedRevenue } from '@/lib/value/missed-revenue'
 import { arTestId, arTestNamn } from '@/lib/testdata'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
+import { mapQuoteItemsToInvoiceItems } from '@/lib/invoices/quote-to-invoice-items'
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
 import { resolveTimeEntryHourlyRate } from '@/lib/time-entry/rate'
 import { hittaNyligDubblett } from '@/lib/agent/recent-duplicate'
@@ -43,6 +44,8 @@ import { buildMissionSummaryText, buildMissionHeadline } from '@/lib/mission/mis
 import { resolveGoalType } from '@/lib/mission/goal-type'
 import { isToolAllowedForActor, EXTERNAL_TOOL_DENIED_MESSAGE, type ActorType } from '@/lib/agent/external-actor'
 import { internalPushHeaders } from '@/lib/notifications/push-internal'
+import { loadWorkReportContext, prepareWorkReportAction, isWorkReportTool, type WorkReportScope } from '@/lib/matte/work-report'
+import type { BusinessUser } from '@/lib/permissions'
 
 interface ToolResult {
   success: boolean
@@ -63,6 +66,8 @@ interface GoogleConnection {
 }
 
 interface ToolContext {
+  workReport?: WorkReportScope
+  confirmationId?: string
   businessName: string
   contactEmail: string
   googleConnection: GoogleConnection | null
@@ -138,6 +143,27 @@ export async function executeTool(
     return { success: false, error: EXTERNAL_TOOL_DENIED_MESSAGE }
   }
   try {
+    if (context.workReport) {
+      if (!isWorkReportTool(name) || !context.businessUserId || context.workReport.userId !== context.businessUserId) {
+        return { success: false, error: 'Rapportläget tillåter bara din egen tid och arbetsanteckning.' }
+      }
+      const { data: user, error } = await supabase.from('business_users').select('*')
+        .eq('business_id', businessId).eq('id', context.businessUserId).eq('is_active', true).maybeSingle()
+      if (error) return { success: false, error: 'Din behörighet kunde inte kontrolleras.' }
+      const report = await loadWorkReportContext(supabase, businessId, user as BusinessUser | null, context.workReport.projectId, context.workReport.date)
+      // Permission is checked even on replay. A previously saved action remains
+      // saved if a timer was started afterwards; don't mislabel that as failure.
+      if (context.confirmationId) {
+        const table = name === 'log_time' ? 'time_entry' : 'project_log'
+        const column = name === 'log_time' ? 'time_entry_id' : 'id'
+        const id = `${name === 'log_time' ? 'time' : 'log'}_report_${context.confirmationId}`
+        const { data: existing, error: readError } = await supabase.from(table).select(column)
+          .eq('business_id', businessId).eq('business_user_id', user.id).eq(column, id).maybeSingle()
+        if (readError) return { success: false, error: 'Kunde inte kontrollera den tidigare bekräftelsen.' }
+        if (existing) return { success: true, data: { duplicate: true, message: 'Den här bekräftelsen är redan sparad. Ingen ny post skapades.' } }
+      }
+      input = prepareWorkReportAction(name, input, report).toolInput
+    }
     switch (name) {
       case 'get_customer':
         return await getCustomer(supabase, businessId, input)
@@ -657,7 +683,10 @@ async function createInvoice(
       .select('items, rot_rut_type')
       .eq('business_id', businessId).eq('quote_id', params.quote_id).single()
     if (!quote) return { success: false, error: 'Offerten hittades inte' }
-    items = typeof quote.items === 'string' ? JSON.parse(quote.items) : quote.items
+    // A1: delade mapparen — tillvalsfilter + bevarad labor_amount/produktlänk
+    // även för agentens fakturaväg (JSONB-spegeln kan innehålla option-rader).
+    const raaRader = typeof quote.items === 'string' ? JSON.parse(quote.items) : quote.items
+    items = mapQuoteItemsToInvoiceItems(raaRader || [])
     rotRutType = rotRutType || quote.rot_rut_type
   } else if (params.items) {
     items = (params.items as any[]).map(i => ({ ...i, total: i.quantity * i.unit_price }))
@@ -1283,7 +1312,9 @@ async function logTime(
   // lib/agent/recent-duplicate.ts för varför skyddet sitter vid skrivningen.
   let befintligTid: string | null = null
   try {
-    befintligTid = await hittaNyligDubblett({
+    // Report cards use their stable confirmation ID, not a time-window match:
+    // an explicit additional pass must not be mistaken for someone else's retry.
+    befintligTid = context.workReport ? null : await hittaNyligDubblett({
       supabase,
       tabell: 'time_entry',
       idKolumn: 'time_entry_id',
@@ -1312,7 +1343,7 @@ async function logTime(
     }
   }
 
-  const entryId = generateId('time')
+  const entryId = context.workReport && context.confirmationId ? `time_report_${context.confirmationId}` : generateId('time')
   const { error } = await supabase.from('time_entry').insert({
     time_entry_id: entryId, business_id: businessId,
     business_user_id: businessUserId,
@@ -1324,7 +1355,13 @@ async function logTime(
     created_at: new Date().toISOString(),
   })
 
-  if (error) return { success: false, error: error.message }
+  if (error) {
+    if (error.code === '23505' && context.workReport && context.confirmationId) {
+      const { data: saved, error: readError } = await supabase.from('time_entry').select('time_entry_id').eq('business_id', businessId).eq('business_user_id', businessUserId).eq('time_entry_id', entryId).maybeSingle()
+      if (!readError && saved) return { success: true, data: { duplicate: true, message: 'Tiden är redan sparad. Ingen ny post skapades.' } }
+    }
+    return { success: false, error: error.message }
+  }
   if (projectId) {
     try {
       const { handleProjectEvent } = await import('@/lib/project-ai-engine')
@@ -1466,7 +1503,7 @@ async function addWorkNote(
 
   let befintlig: string | null = null
   try {
-    befintlig = await hittaNyligDubblett({
+    befintlig = context.workReport ? null : await hittaNyligDubblett({
       supabase,
       tabell: 'project_log',
       idKolumn: 'id',
@@ -1492,7 +1529,7 @@ async function addWorkNote(
     }
   }
 
-  const logId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+  const logId = context.workReport && context.confirmationId ? `log_report_${context.confirmationId}` : `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
   const workersCount = Number(params.workers_count)
   const { error } = await supabase.from('project_log').insert({
     id: logId,
@@ -1505,7 +1542,13 @@ async function addWorkNote(
     workers_count: Number.isFinite(workersCount) && workersCount > 0 ? Math.round(workersCount) : null,
   })
 
-  if (error) return { success: false, error: error.message }
+  if (error) {
+    if (error.code === '23505' && context.workReport && context.confirmationId) {
+      const { data: saved, error: readError } = await supabase.from('project_log').select('id').eq('business_id', businessId).eq('business_user_id', context.businessUserId!).eq('id', logId).maybeSingle()
+      if (!readError && saved) return { success: true, data: { duplicate: true, message: 'Anteckningen är redan sparad. Ingen ny post skapades.' } }
+    }
+    return { success: false, error: error.message }
+  }
   return {
     success: true,
     data: {

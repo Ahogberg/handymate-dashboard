@@ -5183,19 +5183,22 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
   const [hours, setHours] = useState(editing?.hours?.toString() || '')
   const [saving, setSaving] = useState(false)
 
-  // Item rows
-  const [items, setItems] = useState<{ id: string; name: string; quantity: number; unit: string; unit_price: number }[]>(
+  // Item rows. A6 (Prisslingan V2, stänger TD-26): rot_rut_type per rad —
+  // utan flaggan blev VARJE ÄTA-rad ROT-lös på fakturan (40 000 kr arbete
+  // → 0 kr avdrag). '' = inget avdrag (default, som förut).
+  const [items, setItems] = useState<{ id: string; name: string; quantity: number; unit: string; unit_price: number; rot_rut_type: '' | 'rot' | 'rut' }[]>(
     editing?.items?.map((item, idx) => ({
       id: `item_${idx}`,
       name: item.name || '',
       quantity: item.quantity || 1,
       unit: item.unit || 'st',
       unit_price: item.unit_price || 0,
-    })) || [{ id: 'item_0', name: '', quantity: 1, unit: 'st', unit_price: 0 }]
+      rot_rut_type: item.rot_rut_type === 'rot' ? 'rot' : item.rot_rut_type === 'rut' ? 'rut' : '',
+    })) || [{ id: 'item_0', name: '', quantity: 1, unit: 'st', unit_price: 0, rot_rut_type: '' as const }]
   )
 
   const addItem = () => {
-    setItems(prev => [...prev, { id: `item_${Date.now()}`, name: '', quantity: 1, unit: 'st', unit_price: 0 }])
+    setItems(prev => [...prev, { id: `item_${Date.now()}`, name: '', quantity: 1, unit: 'st', unit_price: 0, rot_rut_type: '' }])
   }
 
   const updateItemField = (id: string, field: string, value: any) => {
@@ -5221,6 +5224,11 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
         quantity: i.quantity,
         unit: i.unit,
         unit_price: i.unit_price,
+        // A6: både rot_rut_type (AtaItem-formen) och de explicita flaggorna
+        // som faktureringsvägarna läser (create-final-invoice, invoice-draft).
+        rot_rut_type: i.rot_rut_type || null,
+        is_rot_eligible: i.rot_rut_type === 'rot',
+        is_rut_eligible: i.rot_rut_type === 'rut',
       }))
 
       if (editing) {
@@ -5350,6 +5358,16 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
                     <option value="lpm">lpm</option>
                     <option value="kg">kg</option>
                     <option value="paket">pkt</option>
+                  </select>
+                  <select
+                    value={item.rot_rut_type}
+                    onChange={e => updateItemField(item.id, 'rot_rut_type', e.target.value)}
+                    title="ROT-/RUT-berättigat arbete — styr avdraget när ÄTA:n faktureras"
+                    className="w-16 px-1 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-600 text-sm focus:outline-none focus:border-[#0F766E]"
+                  >
+                    <option value="">–</option>
+                    <option value="rot">ROT</option>
+                    <option value="rut">RUT</option>
                   </select>
                   <input
                     type="number"

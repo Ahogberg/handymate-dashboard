@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import type { ProductWithComponents } from './applyProductToItem'
+import { priceLabel, priceState } from '@/lib/products/pricing-state'
 
 interface QuoteRowProductComboProps {
   /** Radens beskrivning — kontrollerad av föräldern */
@@ -157,8 +158,13 @@ export function QuoteRowProductCombo({
                   )}
                   <span className="truncate">{p.name}</span>
                 </span>
-                <span className="shrink-0 text-xs font-semibold text-slate-700 tabular-nums whitespace-nowrap">
-                  {p.sales_price?.toLocaleString('sv-SE')} kr/{p.unit}
+                {/* UX1b (Prisslingan V2): prislösa visar "Sätt pris" — aldrig
+                    "0 kr/st" (lib/products/pricing-state.ts, mobilen gör
+                    redan rätt via AddRowSheet). */}
+                <span className={`shrink-0 text-xs font-semibold tabular-nums whitespace-nowrap ${
+                  priceState(p.sales_price) === 'osatt' ? 'text-primary-700' : 'text-slate-700'
+                }`}>
+                  {priceLabel(p.sales_price, p.unit)}
                 </span>
               </button>
             </li>

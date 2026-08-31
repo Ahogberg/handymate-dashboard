@@ -151,7 +151,7 @@ export async function POST(
         quote = q
         const { data: qi, error: itemsError } = await supabase
           .from('quote_items')
-          .select('id, description, quantity, unit, unit_price, is_rot_eligible, is_rut_eligible, item_type, sort_order, group_name, cost_price, article_number, labor_amount')
+          .select('id, description, quantity, unit, unit_price, is_rot_eligible, is_rut_eligible, item_type, sort_order, group_name, cost_price, article_number, labor_amount, linked_product_id')
           .eq('quote_id', project.quote_id)
           .order('sort_order', { ascending: true })
 
@@ -186,6 +186,7 @@ export async function POST(
             article_number: item.article_number ?? null,
             // ?? (inte ||): labor_amount 0 = ren material och skall bevaras
             labor_amount: item.labor_amount ?? null,
+            linked_product_id: item.linked_product_id ?? null,
           }))
         } else {
           quoteItems = qi || []
@@ -249,13 +250,18 @@ export async function POST(
         article_number: qi.article_number ?? null,
         // Arbetsandelen (v67) följer med till ROT-basen — ?? (inte ||), 0 är giltigt
         labor_amount: qi.labor_amount ?? null,
+        // Produktkopplingen (A1): marginaluppföljning + Fortnox ArticleNumber
+        linked_product_id: qi.linked_product_id ?? null,
         _source: 'quote',
       })
     }
 
     // ÄTA-rader — gruppera per ÄTA via group_name + metadata
     // (_source, _change_id, _ata_number) för spårbarhet utan ny tabell.
-    // V1: ÄTA-items har inget is_rot_eligible-flagga (TD-26) → alla false.
+    // A6 (Prisslingan V2, stänger TD-26): ÄTA-radens EGEN is_rot/rut_eligible
+    // respekteras när den finns — sätts i ÄTA-editorn. Saknas flaggan
+    // (äldre ÄTA) → false som förut; enrads-fallbacken utan items har ingen
+    // raddata och förblir alltid false.
     for (const ata of signedAtas) {
       const groupLabel = `ÄTA #${ata.ata_number} · ${ata.description}`
       const ataItems = Array.isArray(ata.items) ? ata.items : []
@@ -276,8 +282,8 @@ export async function POST(
             unit: ai.unit || 'st',
             unit_price: price,
             total: qty * price,
-            is_rot_eligible: false,
-            is_rut_eligible: false,
+            is_rot_eligible: !!(ai.is_rot_eligible ?? (ai.rot_rut_type === 'rot')),
+            is_rut_eligible: !!(ai.is_rut_eligible ?? (ai.rot_rut_type === 'rut')),
             sort_order: sortOrder++,
             group_name: groupLabel,
             _source: 'ata',

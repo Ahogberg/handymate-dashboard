@@ -168,6 +168,9 @@ export default function OnboardingPage() {
         config.default_hourly_rate = data.priceMax
           ? Math.round(((data.priceMin || 0) + data.priceMax) / 2)
           : null
+        // Prisslingan V2 (beslut 4): företagets eget materialpåslag — synligt
+        // fält i steget (förifyllt 20 som förslag), aldrig en tyst konstant.
+        config.material_markup_pct = data.materialMarkup ?? 20
 
         // Skatterytmen och intern timkostnad frågas inte längre här (Lager 3 /
         // B10, 2026-08-27). Karin ber om momsperiod/arbetsgivare/räkenskapsår

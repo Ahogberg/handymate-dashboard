@@ -1275,6 +1275,7 @@ export default function EditQuotePage() {
               allCategories={allCategories}
               customCategories={localCustomCategories}
               products={products}
+              onSaveAsStandard={saveStandardPrice}
               dndSensors={dndSensors}
               onDragEnd={handleDragEnd}
               onAddItem={addItem}

@@ -67,7 +67,12 @@ export function applyProductToItem(
   quantity?: number,
 ): QuoteItem {
   const qty = quantity ?? item.quantity
-  const unitPrice = product.sales_price
+  // UX1a (Prisslingan V2): en PRISLÖS bankartikel (sales_price 0 = "osatt",
+  // se lib/products/pricing-state.ts) får förfylla namn/enhet/snapshot/ROT —
+  // men ALDRIG skriva över ett pris hantverkaren redan satt på raden.
+  // Tidigare nollades radpriset → AI-matchade prislösa artiklar gav rader
+  // som såg klara ut men var 0 kr.
+  const unitPrice = product.sales_price > 0 ? product.sales_price : (item.unit_price || 0)
   const total = qty * unitPrice
 
   const components: SnapshotComponent[] = (product.components ?? []).map(c => ({

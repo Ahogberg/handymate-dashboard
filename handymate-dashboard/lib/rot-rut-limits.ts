@@ -49,12 +49,17 @@ interface RotRutValidation {
 export async function getCustomerRotRutUsage(
   customerId: string,
   businessId: string,
-  year?: number
+  year?: number,
+  opts: { excludeInvoiceId?: string } = {}
 ): Promise<RotRutUsage> {
   const supabase = getServerSupabase()
   const currentYear = year || new Date().getFullYear()
 
-  const { data: invoices } = await supabase
+  // excludeInvoiceId (A2, Prisslingan V2): vid OMRÄKNING av en befintlig
+  // fakturas avdrag får fakturans EGET redan-lagrade avdrag inte räknas som
+  // förbrukat utrymme — då halveras taket för sig själv. Gäller i praktiken
+  // bara redigering av redan skickade fakturor (utkast räknas inte in alls).
+  let query = supabase
     .from('invoice')
     .select('rot_rut_type, rot_rut_deduction, status, is_credit_note')
     .eq('customer_id', customerId)
@@ -62,6 +67,10 @@ export async function getCustomerRotRutUsage(
     .in('status', ['sent', 'paid', 'overdue'])
     .gte('invoice_date', `${currentYear}-01-01`)
     .lte('invoice_date', `${currentYear}-12-31`)
+  if (opts.excludeInvoiceId) {
+    query = query.neq('invoice_id', opts.excludeInvoiceId)
+  }
+  const { data: invoices } = await query
 
   let rotUsed = 0
   let rutUsed = 0
@@ -162,7 +171,11 @@ export async function validateRotRutDeduction(
   laborCost: number,
   opts: { vatRate?: number; discountFactor?: number; excludeInvoiceId?: string } = {}
 ): Promise<RotRutValidation> {
-  const usage = await getCustomerRotRutUsage(customerId, businessId)
+  // excludeInvoiceId var tidigare deklarerad men trädde ALDRIG in i
+  // usage-frågan (A2-fixen) — parametern var död och exkluderade ingenting.
+  const usage = await getCustomerRotRutUsage(customerId, businessId, undefined, {
+    excludeInvoiceId: opts.excludeInvoiceId,
+  })
 
   // Beräkna begärt avdrag (inkl-moms-korrekt, se lib/rot-rut.ts)
   const requestedDeduction = calculateRawDeduction(type, laborCost, opts)
@@ -179,7 +192,7 @@ export async function calculateCappedDeduction(
   businessId: string,
   type: 'rot' | 'rut',
   laborCost: number,
-  opts: { vatRate?: number; discountFactor?: number } = {}
+  opts: { vatRate?: number; discountFactor?: number; excludeInvoiceId?: string } = {}
 ): Promise<{ deduction: number; capped: boolean; warning?: string }> {
   const validation = await validateRotRutDeduction(customerId, businessId, type, laborCost, opts)
 

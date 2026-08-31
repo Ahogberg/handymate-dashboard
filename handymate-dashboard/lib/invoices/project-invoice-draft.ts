@@ -23,6 +23,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
+import { mapQuoteItemsToInvoiceItems, rotRutLaborBasis } from '@/lib/invoices/quote-to-invoice-items'
 
 export interface ProjektFakturaUnderlag {
   ok: true
@@ -114,43 +115,23 @@ export async function byggProjektFakturaUnderlag(
       .eq('quote_id', project.quote_id)
       .single()
 
+    // A1: labor_amount/is_rut_eligible/cost_price/article_number/
+    // linked_product_id/group_name följde tidigare INTE med här — RUT-rader
+    // tappade sitt berättigande helt och ROT-basen föll tillbaka på radtotal.
     const { data: strukturerade } = await supabase
       .from('quote_items')
-      .select('item_type, description, quantity, unit, unit_price, total, is_rot_eligible, sort_order, is_hidden, option_selected')
+      .select('item_type, description, quantity, unit, unit_price, total, is_rot_eligible, is_rut_eligible, sort_order, is_hidden, option_selected, group_name, cost_price, article_number, labor_amount, linked_product_id')
       .eq('quote_id', project.quote_id)
       .eq('business_id', businessId)
       .order('sort_order')
 
     if (strukturerade && strukturerade.length > 0) {
-      quoteItems = strukturerade
-        // Tillval kunden INTE valde ska aldrig faktureras. Valda tillval blir
-        // vanliga rader — samma regel som quote-calculations.
-        .filter((item: any) => item.item_type !== 'option' || item.option_selected === true)
-        .map((item: any, i: number) => ({
-          id: 'ii_q_' + Math.random().toString(36).substr(2, 8),
-          item_type: item.item_type === 'option' ? 'item' : (item.item_type || 'item'),
-          description: item.description || '',
-          quantity: item.quantity || 1,
-          unit: item.unit || 'st',
-          unit_price: item.unit_price || 0,
-          total: item.total ?? (item.quantity || 1) * (item.unit_price || 0),
-          is_rot_eligible: item.is_rot_eligible || false,
-          sort_order: item.sort_order ?? i,
-        }))
+      // Delade mapparen (lib/invoices/quote-to-invoice-items.ts): tillvals-
+      // filtret, ??-kopierad labor_amount och bevarad produktkoppling.
+      quoteItems = mapQuoteItemsToInvoiceItems(strukturerade, { idPrefix: 'ii_q_' })
     } else if (quote?.items && Array.isArray(quote.items)) {
       // Legacy-offert: JSONB:n är den enda källan som finns.
-      quoteItems = quote.items.map((item: any, i: number) => ({
-        id: 'ii_q_' + Math.random().toString(36).substr(2, 8),
-        item_type: item.item_type || 'item',
-        description: item.description || item.name || '',
-        quantity: item.quantity || 1,
-        unit: item.unit || 'st',
-        unit_price: item.unit_price || item.price || 0,
-        total: (item.quantity || 1) * (item.unit_price || item.price || 0),
-        type: item.type,
-        is_rot_eligible: item.is_rot_eligible || false,
-        sort_order: item.sort_order ?? i,
-      }))
+      quoteItems = mapQuoteItemsToInvoiceItems(quote.items, { idPrefix: 'ii_q_' })
     }
 
     if (quote && quoteItems.length > 0) {
@@ -196,7 +177,11 @@ export async function byggProjektFakturaUnderlag(
             unit_price: Math.abs(item.unit_price || 0),
             total: sign * Math.abs((item.quantity || 1) * (item.unit_price || 0)),
             type: item.type || 'labor',
-            is_rot_eligible: false,
+            // A6 (stänger TD-26): ÄTA-radens EGEN flagga respekteras när den
+            // finns (sätts i ÄTA-editorn); rot_rut_type-fältet på äldre
+            // AtaItem-rader hedras också. Saknas båda → false som förut.
+            is_rot_eligible: !!(item.is_rot_eligible ?? (item.rot_rut_type === 'rot')),
+            is_rut_eligible: !!(item.is_rut_eligible ?? (item.rot_rut_type === 'rut')),
             sort_order: 900 + ataItems.length,
           })
         }
@@ -235,16 +220,12 @@ export async function byggProjektFakturaUnderlag(
 
   if (rotRutType) {
     const rate = rotRutType === 'rut' ? 0.5 : 0.3
-    let eligibleLabor: number
-    if (ataItems.length > 0) {
-      // ÄTA ändrade totalen → räkna om underlaget från ROT-berättigade rader
-      eligibleLabor = allItems
-        .filter(i => i.is_rot_eligible && i.item_type !== 'discount')
-        .reduce((sum, i) => sum + (i.total || 0), 0)
-    } else {
-      // Härled underlaget från offertens (kopierade) avdrag
-      eligibleLabor = rotRutDeduction ? rotRutDeduction / rate : 0
-    }
+    // A1: basen från raderna — labor_amount ?? radtotal per berättigad rad
+    // (delade rotRutLaborBasis; tidigare räknades HELA radtotalen även när
+    // arbetsandelen var känd → för högt avdrag som Skatteverket nekar).
+    // Legacy-rader utan flaggor: härled ur offertens kopierade avdrag.
+    const radBas = rotRutLaborBasis(allItems, rotRutType as 'rot' | 'rut')
+    const eligibleLabor = radBas > 0 ? radBas : (rotRutDeduction ? rotRutDeduction / rate : 0)
     if (eligibleLabor > 0) {
       const capped = await calculateCappedDeduction(
         project.customer_id,

@@ -27,8 +27,12 @@ test.describe('lib/invoices/sync-to-fortnox.ts — husarbete i Fortnox form', ()
   })
 
   test('raderna får HouseWork-fälten via den rena mappningen', () => {
+    // A3 (Prisslingan V2): radbyggandet är utbrutet till fortnox-rows.ts —
+    // sync-filen anropar byggaren, byggaren äger houseWorkRowFields-anropet.
     expect(s).toContain("from '@/lib/fortnox/housework'")
-    expect(s).toContain('houseWorkRowFields(item, rotType as RotRutType, houseWorkType as string)')
+    expect(s).toContain('buildFortnoxInvoiceRows(items, {')
+    const rows = read('lib/invoices/fortnox-rows.ts')
+    expect(rows).toContain('houseWorkRowFields(item, opts.houseWork.rotType, opts.houseWork.houseWorkType)')
     expect(s).toContain('invoicePayload.TaxReductionType = taxReductionType')
   })
 

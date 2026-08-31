@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { createInvoice } from '@/lib/invoices/create-invoice'
+import { mapQuoteItemsToInvoiceItems, rotRutLaborBasis } from '@/lib/invoices/quote-to-invoice-items'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 
 /**
@@ -55,37 +56,11 @@ export async function POST(request: NextRequest) {
         .order('sort_order', { ascending: true })
       if (structured && structured.length) quoteItems = structured
     }
-    // Tillval (item_type 'option'): fakturan skall spegla exakt kundens val.
-    // Valda tillval (option_selected === true) blir vanliga 'item'-rader —
-    // då räknas de automatiskt in i regularItems/subtotal och ROT/RUT nedan.
-    // Ovalda tillval exkluderas helt och når aldrig fakturan.
-    const items = quoteItems
-      .filter((item: any) => item.item_type !== 'option' || item.option_selected === true)
-      .map((item: any, i: number) => {
-        const itemType = item.item_type === 'option' ? 'item' : (item.item_type || 'item')
-        return {
-          id: 'ii_' + Math.random().toString(36).substr(2, 12),
-          item_type: itemType,
-          group_name: item.group_name || undefined,
-          description: item.description || item.name || '',
-          quantity: item.quantity || 1,
-          unit: item.unit || 'st',
-          unit_price: item.unit_price || item.price || 0,
-          // Endast riktiga 'item'-rader räknas om (antal × á-pris). Delsummor
-          // (quantity 0, lagrad total = summan) nollades av omräkningen, och
-          // rabatter (lagrad NEGATIV total) fick fel tecken i fakturans JSONB.
-          // Rubrik/text/delsumma/rabatt behåller därför sin lagrade total.
-          total: itemType === 'item'
-            ? (item.quantity || 1) * (item.unit_price || item.price || 0)
-            : (item.total || 0),
-          type: item.type,
-          is_rot_eligible: item.is_rot_eligible || false,
-          is_rut_eligible: item.is_rut_eligible || false,
-          sort_order: item.sort_order ?? i,
-          cost_price: item.cost_price,
-          article_number: item.article_number,
-        }
-      })
+    // Delade mapparen (Prisslingan V2 A1): tillvalsfilter, ??-kopierad
+    // labor_amount (ROT-basen), bevarad linked_product_id/article_number,
+    // och total-omräkning enbart för 'item'-rader — se
+    // lib/invoices/quote-to-invoice-items.ts + dess facit.
+    const items = mapQuoteItemsToInvoiceItems(quoteItems)
 
     // Dry run: returnera bara items utan att skapa faktura
     if (dry_run) {
@@ -148,8 +123,15 @@ export async function POST(request: NextRequest) {
     let customerPays = quote.customer_pays || total
     if (quote.rot_rut_type && quote.customer_id) {
       const rate = quote.rot_rut_type === 'rot' ? 0.30 : 0.50
+      // Basen från RADERNA (A1): labor_amount ?? radtotal per berättigad rad —
+      // nu när mapparen bevarar labor_amount är radbasen sanningen. Legacy-
+      // offerter utan radflaggor: fall tillbaka på quotens lagrade
+      // arbetskostnad, sist härledning ur avdraget (gamla beteendet).
+      const radBas = rotRutLaborBasis(items, quote.rot_rut_type as 'rot' | 'rut')
       const workCost = quote.rot_rut_type === 'rot' ? quote.rot_work_cost : quote.rut_work_cost
-      const laborCost = workCost || (quote.rot_rut_deduction ? quote.rot_rut_deduction / rate : 0)
+      const laborCost = radBas > 0
+        ? radBas
+        : (workCost || (quote.rot_rut_deduction ? quote.rot_rut_deduction / rate : 0))
       if (laborCost > 0) {
         const capped = await calculateCappedDeduction(
           quote.customer_id,

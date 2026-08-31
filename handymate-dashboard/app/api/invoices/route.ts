@@ -7,6 +7,7 @@ import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { InvoiceItem } from '@/lib/types/invoice'
 import { createInvoice } from '@/lib/invoices/create-invoice'
+import { mapQuoteItemsToInvoiceItems, rotRutLaborBasis } from '@/lib/invoices/quote-to-invoice-items'
 
 /**
  * GET - Lista fakturor för ett företag
@@ -207,22 +208,10 @@ export async function POST(request: NextRequest) {
       if (quoteError) throw quoteError
 
       if (quote.items && Array.isArray(quote.items)) {
-        items = quote.items.map((item: any, i: number) => ({
-          id: item.id || 'ii_' + Math.random().toString(36).substr(2, 12),
-          item_type: item.item_type || 'item',
-          group_name: item.group_name,
-          description: item.description || item.name,
-          quantity: item.quantity || 1,
-          unit: item.unit || 'st',
-          unit_price: item.unit_price || item.price || 0,
-          total: (item.quantity || 1) * (item.unit_price || item.price || 0),
-          type: item.type,
-          is_rot_eligible: item.is_rot_eligible || false,
-          is_rut_eligible: item.is_rut_eligible || false,
-          sort_order: item.sort_order ?? i,
-          cost_price: item.cost_price,
-          article_number: item.article_number,
-        }))
+        // A1: delade mapparen — tillvalsfilter (ovalda tillval fakturerades
+        // tidigare HÄR, till skillnad från from-quote), ??-kopierad
+        // labor_amount och bevarad linked_product_id.
+        items = mapQuoteItemsToInvoiceItems(quote.items)
       }
     }
 
@@ -241,9 +230,12 @@ export async function POST(request: NextRequest) {
     let rotRutWarning: string | undefined
 
     if (rot_rut_type && customer_id) {
+      // A1: respektera arbetsandelen när den finns — labor_amount ?? radtotal
+      // (?? så att 0 = ren material ger bas 0). Filtret behålls brett
+      // (type==='labor' utan flaggor täcker manuella/klientbyggda rader).
       const laborCost = items
         .filter((i: any) => i.is_rot_eligible || i.is_rut_eligible || i.type === 'labor')
-        .reduce((sum: number, i: any) => sum + (i.quantity * i.unit_price), 0)
+        .reduce((sum: number, i: any) => sum + Number(i.labor_amount ?? (i.quantity * i.unit_price)), 0)
 
       const cappedResult = await calculateCappedDeduction(
         customer_id,
@@ -408,6 +400,51 @@ export async function PUT(request: NextRequest) {
       updates.subtotal = sub - discFromRows
       updates.vat_amount = updates.subtotal * ((fields.vat_rate || 25) / 100)
       updates.total = updates.subtotal + updates.vat_amount
+    }
+
+    // A2 (Prisslingan V2): ROT/RUT-sanningen ägs av SERVERN. Edit-autosaven
+    // räknade tidigare om avdraget klient-side på radtotal-bas utan årstak
+    // och skrev över det korrekta, kappade avdraget på i princip varje
+    // redigerad faktura. Nu: när rader skickas räknas avdraget HÄR — basen
+    // är labor_amount ?? radtotal per berättigad rad (rotRutLaborBasis),
+    // kappad mot kundens årsutrymme EXKLUSIVE denna fakturas eget gamla
+    // avdrag (excludeInvoiceId). Klientens avdragsfält ignoreras; diff loggas.
+    if (fields.items && Array.isArray(fields.items)) {
+      const { data: befintlig } = await supabase
+        .from('invoice')
+        .select('customer_id, rot_rut_type, vat_rate, total')
+        .eq('invoice_id', invoice_id)
+        .eq('business_id', business.business_id)
+        .single()
+
+      const effRotTyp: 'rot' | 'rut' | null =
+        fields.rot_rut_type !== undefined
+          ? (fields.rot_rut_type || null)
+          : (befintlig?.rot_rut_type || null)
+      const effVat = Number(fields.vat_rate ?? befintlig?.vat_rate ?? 25)
+      const totalInkl = Number(updates.total ?? befintlig?.total ?? 0)
+
+      let serverAvdrag = 0
+      if (effRotTyp && befintlig?.customer_id) {
+        const bas = rotRutLaborBasis(fields.items, effRotTyp)
+        if (bas > 0) {
+          const kappat = await calculateCappedDeduction(
+            befintlig.customer_id,
+            business.business_id,
+            effRotTyp,
+            bas,
+            { vatRate: effVat, excludeInvoiceId: invoice_id },
+          )
+          serverAvdrag = kappat.deduction
+        }
+      }
+      if (fields.rot_rut_deduction !== undefined && Number(fields.rot_rut_deduction) !== serverAvdrag) {
+        console.warn('[invoice PUT] klientens rot_rut_deduction ignorerad (A2)', {
+          invoice_id, klient: fields.rot_rut_deduction, server: serverAvdrag,
+        })
+      }
+      updates.rot_rut_deduction = serverAvdrag
+      updates.customer_pays = totalInkl - serverAvdrag
     }
 
     if (fields.status === 'paid' && !fields.paid_at) {

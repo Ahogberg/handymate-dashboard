@@ -1,7 +1,7 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { getDefaultStandardTexts } from '@/lib/quote-standard-text-defaults'
 import { getChecklistsForBranch } from '@/lib/checklist-defaults'
-import { getDefaultPriceList, getDefaultProducts } from '@/lib/product-defaults'
+import { applyHourlyRateToDefaults, getDefaultPriceList, getDefaultProducts } from '@/lib/product-defaults'
 import { getDefaultReservations } from '@/lib/reservation-defaults'
 import { getDefaultQuoteTemplates, normalizeTemplateBranch } from '@/lib/quote-template-defaults'
 import { getDefaultAgreementTypes } from '@/lib/agreement-type-defaults'
@@ -26,7 +26,10 @@ export async function seedAllDefaults(
    * eller dubbla checklistor gör valet svårare, inte lättare, och det är ett
    * val hantverkaren gör per jobb ändå.
    */
-  secondaryBranches: string[] = []
+  secondaryBranches: string[] = [],
+  /** UX1f (Prisslingan V2): hantverkarens timpris från onboardingen —
+      läggs på seedade timartiklar (applyHourlyRateToDefaults). */
+  hourlyRate: number | null = null
 ) {
   const productBranches = [branch, ...secondaryBranches.filter(b => b && b !== branch)]
 
@@ -40,7 +43,7 @@ export async function seedAllDefaults(
     seedPipelineStages(supabase, businessId),
     seedQuoteStandardTexts(supabase, businessId, branch),
     seedChecklistTemplates(supabase, businessId, branch),
-    seedProducts(supabase, businessId, productBranches),
+    seedProducts(supabase, businessId, productBranches, hourlyRate),
     seedPriceList(supabase, businessId, productBranches),
     seedReservations(supabase, businessId, branch),
     seedQuoteTemplates(supabase, businessId, branch),
@@ -253,7 +256,7 @@ async function seedChecklistTemplates(supabase: SupabaseClient, businessId: stri
  * Idempotent — hoppar helt om businessen redan har produkter, så en kund som
  * hunnit lägga upp eget sortiment aldrig får seed-rader ovanpå.
  */
-export async function seedProducts(supabase: SupabaseClient, businessId: string, branch: string | string[]) {
+export async function seedProducts(supabase: SupabaseClient, businessId: string, branch: string | string[], hourlyRate?: number | null) {
   const { data: existing } = await supabase
     .from('products')
     .select('id')
@@ -262,7 +265,10 @@ export async function seedProducts(supabase: SupabaseClient, businessId: string,
 
   if (existing && existing.length > 0) return
 
-  const products = getDefaultProducts(branch)
+  // UX1f: hantverkarens EGET timpris (onboarding steg 3) läggs på de
+  // prissatta timartiklarna — statiska 550 kr motsade den enda prisuppgift
+  // han lämnat. Prislösa rörs aldrig; se applyHourlyRateToDefaults.
+  const products = applyHourlyRateToDefaults(getDefaultProducts(branch), hourlyRate)
   const { error } = await supabase.from('products').insert(
     products.map((p, i) => ({
       id: `prod_${businessId}_${i}`,

@@ -160,6 +160,25 @@ export async function PUT(request: NextRequest) {
       for (const col of ALLOWED_COLUMNS) {
         if (col in config) updates[col] = (config as Record<string, unknown>)[col]
       }
+
+      // Materialpåslag (Prisslingan V2, beslut 4): INGEN egen kolumn —
+      // fältet bor i pricing_settings-JSONB:n och måste MERGAS (en rak
+      // kolumnskrivning hade ersatt hela objektet och tappat hourly_rate
+      // m.m.). Specialfallas här i stället för att gå i vitlistans
+      // "tysta fälla" (se kommentaren ovan om f_skatt_registered).
+      if ('material_markup_pct' in config) {
+        const raw = Number((config as Record<string, unknown>).material_markup_pct)
+        const paslag = Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : null
+        if (paslag != null) {
+          const { data: psRow } = await supabase
+            .from('business_config')
+            .select('pricing_settings')
+            .eq('business_id', business.business_id)
+            .single()
+          const befintliga = (psRow?.pricing_settings as Record<string, unknown>) || {}
+          updates.pricing_settings = { ...befintliga, material_markup_pct: paslag }
+        }
+      }
     }
 
     if (Object.keys(updates).length === 0) {
@@ -282,11 +301,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Seed all defaults (idempotent — safe to run multiple times)
+    // UX1f: timpriset (steg 3) läses ur config så även den som hoppade över
+    // produktsteget (och därmed den tidiga seedningen) får sina timartiklar
+    // med eget pris. Redan seedade konton: no-op som förut.
+    const { data: rateRow } = await supabase
+      .from('business_config')
+      .select('default_hourly_rate')
+      .eq('business_id', business.business_id)
+      .single()
     const seedResult = await seedAllDefaults(
       supabase,
       business.business_id,
       branch || 'other',
-      extraBranches
+      extraBranches,
+      Number(rateRow?.default_hourly_rate) || null
     )
 
     // Startkorten (docs/design/FORSTA-30-MINUTERNA.md): fire-and-forget, får

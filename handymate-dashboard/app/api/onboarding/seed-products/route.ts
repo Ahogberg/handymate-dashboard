@@ -37,15 +37,18 @@ export async function POST(request: NextRequest) {
 
   const { data: config } = await supabase
     .from('business_config')
-    .select('branch, industry, secondary_branches')
+    .select('branch, industry, secondary_branches, default_hourly_rate')
     .eq('business_id', business.business_id)
     .single()
 
   const branches = resolveBranches(config || {})
+  // UX1f: timpriset från steg 3 är redan sparat när detta steg nås —
+  // seedade timartiklar får hantverkarens eget pris, inte statiska 550.
+  const hourlyRate = Number(config?.default_hourly_rate) || null
 
   try {
     await Promise.all([
-      seedProducts(supabase, business.business_id, branches),
+      seedProducts(supabase, business.business_id, branches, hourlyRate),
       seedPriceList(supabase, business.business_id, branches),
     ])
     return NextResponse.json({ ok: true })

@@ -54,6 +54,9 @@ export interface OnboardingFormData {
   endHour?: number
   priceMin?: number
   priceMax?: number
+  /** Materialpåslag i % (Prisslingan V2, beslut 4) — företagets EGET påslag,
+      förifyllt 20 som förslag i steg 3. Appliceras i fakturakedjan (pass 5). */
+  materialMarkup?: number
   // Intern timkostnad frågas inte längre här (Lager 3 / B10) — Lars ber om
   // den i projektekonomin när ett marginalunderlag ska bedömas.
   /**

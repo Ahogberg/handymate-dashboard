@@ -47,6 +47,34 @@ export interface ReminderDeliveryInput {
   daysOverdue: number
 }
 
+/**
+ * A4 (Prisslingan V2) — REN beräkning av påminnelsens total/customer_pays.
+ * Facit: tests/reminder-totals.spec.ts.
+ *
+ * Basen är kärnans subtotal + vat_amount (opåverkade av påminnelser) — INTE
+ * radernas summerade totals (exkl moms → fakturan tappade sin moms i
+ * total-kolumnen från andra påminnelsen) och INTE en egen ROT-formel
+ * (procent × alla rader utan årstak — det LAGRADE, kappade avdraget gäller).
+ * Avgifter/ränta är 0% moms och läggs rakt på.
+ */
+export function beraknaPaminnelseTotaler(
+  inv: {
+    subtotal?: number | null
+    vat_amount?: number | null
+    rot_rut_type?: string | null
+    rot_rut_deduction?: number | null
+  },
+  feesAndInterest: number,
+): { total: number; customer_pays: number } {
+  const ursprungligTotalInklMoms = Number(inv.subtotal ?? 0) + Number(inv.vat_amount ?? 0)
+  const total = ursprungligTotalInklMoms + feesAndInterest
+  if (inv.rot_rut_type) {
+    const avdrag = Number(inv.rot_rut_deduction ?? 0)
+    return { total, customer_pays: ursprungligTotalInklMoms - avdrag + feesAndInterest }
+  }
+  return { total, customer_pays: total }
+}
+
 export interface ReminderDeliveryResult {
   smsSent: boolean
   emailSent: boolean
@@ -139,7 +167,7 @@ export async function deliverInvoiceReminder(
     try {
       const { data: currentInvoice } = await supabase
         .from('invoice')
-        .select('items, total, customer_pays, rot_rut_type, rot_rut_percent')
+        .select('items, total, subtotal, vat_amount, rot_rut_deduction, customer_pays, rot_rut_type, rot_rut_percent')
         .eq('invoice_id', invoiceId)
         .single()
 
@@ -180,21 +208,16 @@ export async function deliverInvoiceReminder(
           interestAdded = roundedInterest
         }
 
-        const newTotal = items.reduce((sum: number, i: any) => sum + (i.total ?? 0), 0)
-        const updateData: Record<string, any> = { items, total: newTotal }
-
-        if (currentInvoice.rot_rut_type) {
-          const originalTotal = items
-            .filter((i: any) => i.type !== 'reminder_fee' && i.type !== 'penalty_interest')
-            .reduce((sum: number, i: any) => sum + (i.total ?? 0), 0)
-          const rotRutPercent = currentInvoice.rot_rut_percent ?? (currentInvoice.rot_rut_type === 'rot' ? 30 : 50)
-          const deduction = Math.round(originalTotal * rotRutPercent / 100)
-          const feesAndInterest = items
-            .filter((i: any) => i.type === 'reminder_fee' || i.type === 'penalty_interest')
-            .reduce((sum: number, i: any) => sum + (i.total ?? 0), 0)
-          updateData.customer_pays = originalTotal - deduction + feesAndInterest
-        } else {
-          updateData.customer_pays = newTotal
+        // A4 (Prisslingan V2): ren, facit-låst beräkning — se
+        // beraknaPaminnelseTotaler nedan + tests/reminder-totals.spec.ts.
+        const feesAndInterest = items
+          .filter((i: any) => i.type === 'reminder_fee' || i.type === 'penalty_interest')
+          .reduce((sum: number, i: any) => sum + (i.total ?? 0), 0)
+        const totaler = beraknaPaminnelseTotaler(currentInvoice, feesAndInterest)
+        const updateData: Record<string, any> = {
+          items,
+          total: totaler.total,
+          customer_pays: totaler.customer_pays,
         }
 
         await supabase.from('invoice').update(updateData).eq('invoice_id', invoiceId)

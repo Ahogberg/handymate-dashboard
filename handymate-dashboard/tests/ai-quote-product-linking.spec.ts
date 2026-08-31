@@ -61,6 +61,26 @@ test.describe('handtagen i prompten', () => {
     expect(buildPriceContext(PRICE_LIST, 650)).toContain('productRef')
   })
 
+  test('UX1d: prislösa artiklar får handtag men ALDRIG "0 kr" i prompten', () => {
+    const medPrislos: PriceListItem[] = [
+      ...PRICE_LIST,
+      { id: 'p-epsilon', name: 'Installation utomhusbelysning', unit: 'st', unit_price: 0, category: 'El' },
+    ]
+    const prompt = buildPriceContext(medPrislos, 650)
+    // Handtaget finns (länkningen är poängen) — index 5 → P5
+    expect(prompt).toContain('[P5] Installation utomhusbelysning')
+    // ...men aldrig som ett pris
+    expect(prompt).not.toContain('Installation utomhusbelysning: 0 kr')
+    // ...och i ett eget block med gissa-aldrig-instruktionen
+    expect(prompt).toContain('ARTIKLAR UTAN SATT PRIS')
+    expect(prompt).toContain('Gissa ALDRIG')
+    // Prissatta handtag är opåverkade (ingen indexförskjutning)
+    const handles = handlesInPrompt(prompt)
+    PRICE_LIST.forEach((product, index) => {
+      expect(handles.get(`P${index + 1}`)).toBe(product.name)
+    })
+  })
+
   test('prislista UTAN id får inga handtag och ingen instruktion om dem', () => {
     // Äldre anropare (app/api/quotes/generate) skickar bara namn och pris.
     // Att då be modellen ange ett handtag hade varit en instruktion den inte

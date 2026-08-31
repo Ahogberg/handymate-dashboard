@@ -3,8 +3,9 @@ import { fortnoxRequest, isFortnoxConnected, syncCustomerToFortnox, updateFortno
 import { prepareInvoiceManifest, markInvoiceDelivered } from '@/lib/invoices/evidence-manifest'
 import { generateOCR } from '@/lib/ocr'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
-import { buildTaxReductionPayload, fortnoxHouseWorkType, fortnoxTaxReductionType, houseWorkRowFields } from '@/lib/fortnox/housework'
+import { buildTaxReductionPayload, fortnoxHouseWorkType, fortnoxTaxReductionType } from '@/lib/fortnox/housework'
 import { defaultCategoryForIndustry, type RotRutType } from '@/lib/skv/categories'
+import { buildFortnoxInvoiceRows, type FortnoxInvoiceRow, type FortnoxRowSourceItem } from '@/lib/invoices/fortnox-rows'
 
 /**
  * Fortnox-bokföringssteget för en kundfaktura. Bruten ut ur
@@ -18,22 +19,6 @@ import { defaultCategoryForIndustry, type RotRutType } from '@/lib/skv/categorie
  */
 
 const FORTNOX_PENDING_TIMEOUT_MS = 5 * 60 * 1000
-
-interface InvoiceItem {
-  description?: string
-  quantity?: number
-  unit?: string
-  unit_price?: number
-}
-
-interface FortnoxInvoiceRow {
-  ArticleNumber?: string
-  Description: string
-  DeliveredQuantity: number
-  Price: number
-  Unit?: string
-  VAT?: number
-}
 
 export interface SyncToFortnoxResult {
   success: boolean
@@ -165,7 +150,7 @@ export async function syncInvoiceToFortnox(
     }
   }
 
-  const items: InvoiceItem[] = Array.isArray(invoice.items) ? invoice.items : []
+  const items: FortnoxRowSourceItem[] = Array.isArray(invoice.items) ? invoice.items : []
   if (items.length === 0) {
     return { success: false, error: 'Fakturan saknar rader' }
   }
@@ -194,14 +179,15 @@ export async function syncInvoiceToFortnox(
   }
   const withHouseWork = !!(taxReductionType && houseWorkType && rotType)
 
-  const invoiceRows: FortnoxInvoiceRow[] = items.map(item => ({
-    Description: (item.description || 'Arbete').slice(0, 200),
-    DeliveredQuantity: Number(item.quantity ?? 1),
-    Price: Number(item.unit_price ?? 0),
-    Unit: mapUnit(item.unit),
-    VAT: 25,
-    ...(withHouseWork ? houseWorkRowFields(item, rotType as RotRutType, houseWorkType as string) : {}),
-  }))
+  // A3 (Prisslingan V2): radbyggaren är utbruten och facit-låst —
+  // se lib/invoices/fortnox-rows.ts (VAT-arv per rad, negativa rabattrader,
+  // delsummor bort, rubrik/text som textrader, ArticleNumber fasad).
+  const invoiceRows: FortnoxInvoiceRow[] = buildFortnoxInvoiceRows(items, {
+    invoiceVatRate: invoice.vat_rate != null ? Number(invoice.vat_rate) : null,
+    houseWork: withHouseWork
+      ? { rotType: rotType as RotRutType, houseWorkType: houseWorkType as string }
+      : null,
+  })
 
   const today = new Date().toISOString().split('T')[0]
   const dueDate = invoice.due_date
@@ -447,13 +433,4 @@ export async function syncInvoiceToFortnox(
   }
 }
 
-function mapUnit(u: string | undefined): string | undefined {
-  if (!u) return undefined
-  const lower = u.toLowerCase()
-  if (lower === 'tim' || lower === 'h' || lower === 'timmar') return 'h'
-  if (lower === 'st' || lower === 'styck') return 'st'
-  if (lower === 'm' || lower === 'meter') return 'm'
-  if (lower === 'm2' || lower === 'kvm') return 'm2'
-  if (lower === 'kg') return 'kg'
-  return undefined
-}
+// mapUnit flyttad till lib/invoices/fortnox-rows.ts (mapFortnoxUnit) — A3.

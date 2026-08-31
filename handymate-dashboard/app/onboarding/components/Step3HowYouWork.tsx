@@ -30,6 +30,9 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
   const endHour = data.endHour ?? 17
   const priceMin = data.priceMin ?? 600
   const priceMax = data.priceMax ?? 1200
+  // Prisslingan V2 (beslut 4): företagets eget materialpåslag — 20 är ett
+  // synligt FÖRSLAG han kan ändra, aldrig en tyst applicerad konstant.
+  const materialMarkup = data.materialMarkup ?? 20
   const firstFocus = data.firstFocus
 
   const [extraSheetOpen, setExtraSheetOpen] = useState(false)
@@ -230,6 +233,31 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
               Default 25% moms — svenska standard. */}
           <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ob-muted)', lineHeight: 1.5 }}>
             {priceMin}–{priceMax} kr/h ex moms · {Math.round(priceMin * 1.25)}–{Math.round(priceMax * 1.25)} kr/h inkl moms
+          </div>
+          {/* Materialpåslag (Prisslingan V2, beslut 4): samma princip som
+              timpriset — en siffra varje hantverkare kan utantill. Fältet är
+              synligt förifyllt; att passera steget med det = bekräftat. */}
+          <div style={{ marginTop: 16 }}>
+            <label className="ob-label">Materialpåslag (%)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={materialMarkup}
+                onChange={e => update({ materialMarkup: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
+                style={{
+                  width: 90,
+                  padding: '10px 12px',
+                  border: '1px solid var(--ob-border, #E2E8F0)',
+                  borderRadius: 10,
+                  fontSize: 15,
+                }}
+              />
+              <span style={{ fontSize: 13, color: 'var(--ob-muted)' }}>
+                läggs på ditt inköpspris när material faktureras
+              </span>
+            </div>
           </div>
           <button
             type="button"

@@ -1814,6 +1814,12 @@ async function executeApprovalPayload(
             quantity: qi.quantity ?? 1,
             unit: qi.unit || 'st',
             unit_price: qi.unit_price ?? qi.price ?? 0,
+            // A6 (Prisslingan V2, TD-26): generatorns ROT/RUT-flaggor följer
+            // med in i ÄTA:n — annars blir AI-skapade ÄTA:or avdragslösa på
+            // fakturan även när arbetet är berättigat.
+            is_rot_eligible: !!qi.is_rot_eligible,
+            is_rut_eligible: !!qi.is_rut_eligible,
+            rot_rut_type: qi.is_rot_eligible ? 'rot' : qi.is_rut_eligible ? 'rut' : null,
           }))
           const ataRes = await fetch(`${appUrl}/api/ata`, {
             method: 'POST',

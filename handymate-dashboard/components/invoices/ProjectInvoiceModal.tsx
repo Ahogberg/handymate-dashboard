@@ -16,6 +16,8 @@ interface InvoiceLine {
   total: number
   is_rot_eligible: boolean
   is_rut_eligible: boolean
+  /** A5 (Prisslingan V2): satt av from-project när timpris saknades. */
+  price_missing?: boolean
 }
 
 interface ProjectInvoiceData {
@@ -59,6 +61,9 @@ export default function ProjectInvoiceModal({ projectId, onClose }: Props) {
   const [generating, setGenerating] = useState(false)
   const [data, setData] = useState<ProjectInvoiceData | null>(null)
   const [error, setError] = useState('')
+  // A5 (Prisslingan V2): from-project har returnerat warnings[] länge —
+  // men modalen läste dem ALDRIG. Prislös tid blev en tyst 0 kr-rad.
+  const [warnings, setWarnings] = useState<string[]>([])
 
   // Editable lines
   const [laborLines, setLaborLines] = useState<InvoiceLine[]>([])
@@ -80,6 +85,7 @@ export default function ProjectInvoiceModal({ projectId, onClose }: Props) {
       if (!res.ok) throw new Error('Kunde inte hämta underlag')
       const json = await res.json()
       setData(json)
+      setWarnings(Array.isArray(json.warnings) ? json.warnings : [])
       setLaborLines(json.labor.lines.map((l: any, i: number) => ({ ...l, id: `labor_${i}` })))
       setMaterialLines(json.materials.lines.map((l: any, i: number) => ({ ...l, id: `mat_${i}` })))
       setPaymentDays(json.config.default_payment_days || 30)
@@ -117,8 +123,11 @@ export default function ProjectInvoiceModal({ projectId, onClose }: Props) {
       description: '',
       quantity: 1,
       unit: source === 'time_entry' ? 'tim' : 'st',
-      unit_price: source === 'time_entry' ? (data?.config.default_hourly_rate || 895) : 0,
-      total: source === 'time_entry' ? (data?.config.default_hourly_rate || 895) : 0,
+      // A5: ALDRIG ett hårdkodat 895 — företagets eget timpris, annars 0 kr
+      // som hantverkaren ser och rättar (Kvittoprincipen, jfr serverside-
+      // kommentaren i app/api/invoices/from-project/route.ts).
+      unit_price: source === 'time_entry' ? (data?.config.default_hourly_rate ?? 0) : 0,
+      total: source === 'time_entry' ? (data?.config.default_hourly_rate ?? 0) : 0,
       is_rot_eligible: source === 'time_entry',
       is_rut_eligible: false,
     }
@@ -216,6 +225,15 @@ export default function ProjectInvoiceModal({ projectId, onClose }: Props) {
           <div className="p-8 text-center text-red-500 text-sm">{error}</div>
         ) : (
           <div className="p-5 space-y-6 max-h-[70vh] overflow-y-auto">
+            {/* A5: prislös tid m.m. — varningarna fanns i API-svaret men
+                renderades aldrig. Aldrig mer en tyst 0 kr-rad. */}
+            {warnings.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1">
+                {warnings.map((w, i) => (
+                  <p key={i} className="text-sm text-amber-800">{w}</p>
+                ))}
+              </div>
+            )}
             {/* Kund-info */}
             {data?.project.customer && (
               <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
@@ -395,7 +413,9 @@ function Section({
       ) : (
         <div className="space-y-1.5 mb-2">
           {lines.map(line => (
-            <div key={line.id} className="flex items-center gap-2 bg-white border rounded-lg px-3 py-2 group">
+            <div key={line.id} className={`flex items-center gap-2 bg-white border rounded-lg px-3 py-2 group ${
+              line.price_missing && !(line.unit_price > 0) ? 'border-amber-300 bg-amber-50/40' : ''
+            }`}>
               <input
                 value={line.description}
                 onChange={e => updateLine(lines, setLines, line.id, 'description', e.target.value)}

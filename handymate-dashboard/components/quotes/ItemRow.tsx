@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import type { QuoteItem } from '@/lib/types/quote'
 import { QuoteRowProductCombo } from '@/app/dashboard/quotes/_shared/QuoteRowProductCombo'
 import type { ProductWithComponents } from '@/app/dashboard/quotes/_shared/applyProductToItem'
+import { standardPriceOffer } from '@/lib/products/pricing-state'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -80,6 +81,19 @@ interface ItemRowProps {
    * När undefined är fältet ett vanligt textfält (fritext funkar alltid).
    */
   onSelectProduct?: (itemId: string, product: ProductWithComponents) => void
+  /**
+   * UX1c (Prisslingan V2): bankartikelns AKTUELLA standardpris för radens
+   * linked_product_id (slås upp i QuoteItemsSection). Utan den kan
+   * standardpris-erbjudandet inte avgöra om radens pris skiljer sig.
+   */
+  linkedProductPrice?: number | null
+  /**
+   * UX1c: spara radens pris som artikelns standard — samma saveStandardPrice
+   * som mobilens RowEditSheet använder. Fanns tidigare BARA på mobil
+   * (lg:hidden) — hela "priset förtjänas av användning"-loopen var osynlig
+   * på desktop. undefined → erbjudandet visas inte.
+   */
+  onSaveAsStandard?: (productId: string, price: number) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -102,6 +116,8 @@ export default function ItemRow({
   setNewCategoryLabel,
   onSaveToProducts,
   onSelectProduct,
+  linkedProductPrice,
+  onSaveAsStandard,
 }: ItemRowProps) {
   const badge = ITEM_TYPE_BADGE[item.item_type]
   const rowStyle = ITEM_TYPE_STYLES[item.item_type]
@@ -493,6 +509,31 @@ export default function ItemRow({
           )}
         </div>
       )}
+
+      {/* UX1c (Prisslingan V2): standardpris-erbjudandet på DESKTOP — samma
+          standardPriceOffer som mobilens RowEditSheet, samma placeringsmönster
+          som ai_uncertain-raden ovan. Visas bara när raden är bankkopplad och
+          priset skiljer sig (lib/products/pricing-state.ts avgör). */}
+      {(() => {
+        if (!onSaveAsStandard || item.item_type !== 'item' || !item.linked_product_id) return null
+        const erbjudande = standardPriceOffer({
+          linkedProductId: item.linked_product_id,
+          rowPrice: item.unit_price,
+          productPrice: linkedProductPrice,
+        })
+        if (!erbjudande.show) return null
+        return (
+          <div className="px-3 pb-2 md:px-2 md:pb-1.5">
+            <button
+              type="button"
+              onClick={() => onSaveAsStandard(item.linked_product_id as string, item.unit_price)}
+              className="text-xs font-semibold text-primary-700 hover:text-primary-600 underline underline-offset-2"
+            >
+              {erbjudande.label}
+            </button>
+          </div>
+        )
+      })()}
     </div>
   )
 }

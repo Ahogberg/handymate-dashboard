@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2, Search, X } from 'lucide-react'
 import type { ProductWithComponents } from './applyProductToItem'
+import { priceState } from '@/lib/products/pricing-state'
 
 /** Bakåtkompatibelt alias — modalen returnerar numera hela produkten
  *  (inkl. komponenter + default_labor_share) för applyProductToItem. */
@@ -160,10 +161,17 @@ export function QuoteProductSearchModal({ open, onClose, onSelect }: QuoteProduc
                     {p.sku && <p className="text-[11px] text-slate-400 truncate mt-0.5">{p.sku}</p>}
                   </div>
                   <div className="text-right ml-4 shrink-0">
-                    <span className="text-sm font-semibold text-slate-900 tabular-nums">
-                      {p.sales_price?.toLocaleString('sv-SE')} kr
-                    </span>
-                    <span className="text-[11px] text-slate-400 ml-1">/{p.unit}</span>
+                    {/* UX1b: prislösa → "Sätt pris", aldrig "0 kr". */}
+                    {priceState(p.sales_price) === 'osatt' ? (
+                      <span className="text-sm font-semibold text-primary-700">Sätt pris</span>
+                    ) : (
+                      <>
+                        <span className="text-sm font-semibold text-slate-900 tabular-nums">
+                          {Math.round(p.sales_price).toLocaleString('sv-SE')} kr
+                        </span>
+                        <span className="text-[11px] text-slate-400 ml-1">/{p.unit}</span>
+                      </>
+                    )}
                   </div>
                 </button>
               ))}

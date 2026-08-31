@@ -62,11 +62,20 @@ export async function POST(request: NextRequest) {
     }
 
     const items: any[] = []
+    // A5 (Prisslingan V2): prislös tid får ALDRIG bli en tyst 0 kr-rad.
+    // Interaktiva vägar (denna) skapar raden men flaggar + varnar synligt —
+    // samma policy som from-project; auto-generate exkluderar i stället.
+    const varningar: string[] = []
 
     // Gruppera tidrapporter och skapa items
     for (const entry of timeEntries || []) {
       const hours = (entry.duration_minutes || 0) / 60
       const rate = entry.hourly_rate || 0
+      if (rate === 0) {
+        varningar.push(
+          `Tidrapport ${new Date(entry.work_date).toLocaleDateString('sv-SE')} saknar timpris — raden är 0 kr och behöver rättas före utskick.`,
+        )
+      }
 
       items.push({
         id: 'ii_' + Math.random().toString(36).substr(2, 12),
@@ -80,6 +89,7 @@ export async function POST(request: NextRequest) {
         is_rot_eligible: rot_rut_type === 'rot',
         is_rut_eligible: rot_rut_type === 'rut',
         sort_order: items.length,
+        price_missing: rate === 0,
         business_user_id: entry.business_user_id ?? null,
         performed_by_name: entry.business_user_id
           ? businessUserNameById.get(entry.business_user_id) ?? null
@@ -202,7 +212,8 @@ export async function POST(request: NextRequest) {
       console.error('[from-time-entries] källmarkeringen misslyckades:', markering.errors)
     }
 
-    return NextResponse.json({ invoice })
+    // A5: varningarna följer med svaret så UI:t kan visa dem — aldrig tyst.
+    return NextResponse.json({ invoice, warnings: varningar })
 
   } catch (error: any) {
     console.error('Create invoice from time entries error:', error)

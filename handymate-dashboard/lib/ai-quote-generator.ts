@@ -410,13 +410,23 @@ export function buildPriceContext(
     })
     const useHandles = handleOf.size > 0
 
+    // UX1d (Prisslingan V2): prissatta och PRISLÖSA artiklar i separata
+    // block. Tidigare skrevs prislösa som "X: 0 kr/st" — modellen citerade
+    // nollan som ett pris. Nu behåller de sina handtag (länkningen är
+    // poängen: raden kopplas till bankartikeln, hantverkaren fyller i priset
+    // och erbjuds spara det som standard) men får ALDRIG ett påstått pris.
+    // OBS: handtagen numrerades ovan över HELA listan — uppdelningen här får
+    // inte förskjuta index (matchGeneratedItems använder samma lista).
+    const prissatta = priceList.filter(item => Number(item.unit_price) > 0)
+    const prislosa = priceList.filter(item => !(Number(item.unit_price) > 0))
+
     lines.push('HANTVERKARENS PRISLISTA (använd dessa priser exakt):')
     if (useHandles) {
       lines.push('Varje artikel har ett handtag inom hakparentes, t.ex. [P4]. Ange handtaget i fältet "productRef" på raden där du använt artikeln.')
     }
-    // Gruppera per kategori
+    // Gruppera per kategori (bara prissatta — de har ett pris att använda)
     const byCategory: Record<string, PriceListItem[]> = {}
-    for (const item of priceList) {
+    for (const item of prissatta) {
       const cat = item.category || 'Övrigt'
       if (!byCategory[cat]) byCategory[cat] = []
       byCategory[cat].push(item)
@@ -426,6 +436,15 @@ export function buildPriceContext(
       for (const item of items) {
         const handle = handleOf.get(item)
         lines.push(`  - ${handle ? `[${handle}] ` : ''}${item.name}: ${item.unit_price} kr/${item.unit}`)
+      }
+    }
+
+    if (prislosa.length > 0) {
+      lines.push('\nARTIKLAR UTAN SATT PRIS (finns i registret men hantverkaren har inte prissatt dem än):')
+      lines.push('Använd gärna artikelnamnet och ange handtaget i productRef — men sätt unit_price till 0 och markera raden "PRIS SAKNAS — fyll i manuellt". Gissa ALDRIG ett pris på dessa.')
+      for (const item of prislosa) {
+        const handle = handleOf.get(item)
+        lines.push(`  - ${handle ? `[${handle}] ` : ''}${item.name} (${item.unit})`)
       }
     }
   } else {
