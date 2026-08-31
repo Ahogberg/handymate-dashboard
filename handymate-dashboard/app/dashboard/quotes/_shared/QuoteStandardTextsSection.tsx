@@ -5,7 +5,7 @@ import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { StandardTextPicker } from './StandardTextPicker'
 import type { QuoteStandardText } from '@/lib/types/quote'
 
-interface QuoteEditStandardTextsSectionProps {
+interface QuoteStandardTextsSectionProps {
   open: boolean
   setOpen: (b: boolean) => void
   textsByType: Record<string, QuoteStandardText[]>
@@ -27,7 +27,7 @@ interface QuoteEditStandardTextsSectionProps {
   setTermsText?: (s: string) => void
 }
 
-export function QuoteEditStandardTextsSection({
+export function QuoteStandardTextsSection({
   open,
   setOpen,
   textsByType,
@@ -45,7 +45,7 @@ export function QuoteEditStandardTextsSection({
   setPaymentTermsText,
   termsText,
   setTermsText,
-}: QuoteEditStandardTextsSectionProps) {
+}: QuoteStandardTextsSectionProps) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
       <button

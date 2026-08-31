@@ -86,7 +86,9 @@ test.describe('hela kedjan renderar — dokument, PDF, portal, publika sidan', (
   })
 
   test('live-förhandsvisningarna visar samma sak som kunden får', () => {
-    for (const sida of ['app/dashboard/quotes/new/page.tsx', 'app/dashboard/quotes/[id]/edit/page.tsx']) {
+    // FAS 1 (offert-omtaget, 2026-08-31): create-orkestratorn flyttade från
+    // new/page.tsx (nu en tunn wrapper) till _shared/QuoteBuilder.tsx.
+    for (const sida of ['app/dashboard/quotes/_shared/QuoteBuilder.tsx', 'app/dashboard/quotes/[id]/edit/page.tsx']) {
       const s = read(sida)
       expect(s, `${sida} skickar inte bilagorna till live-dokumentet`)
         .toContain('attachments: attachments.length > 0')

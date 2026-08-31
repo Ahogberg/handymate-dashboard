@@ -47,13 +47,17 @@ import { ProductModal, type ProductInitialValues, type ProductSavePayload } from
 
 import { QuoteEditHeader } from './components/QuoteEditHeader'
 import { QuoteEditCustomerSection } from './components/QuoteEditCustomerSection'
-import { QuoteEditRotSection } from './components/QuoteEditRotSection'
-import { QuoteEditStandardTextsSection } from './components/QuoteEditStandardTextsSection'
-import { QuoteEditPaymentPlanSection } from './components/QuoteEditPaymentPlanSection'
-import { QuoteEditDisplaySettingsSection } from './components/QuoteEditDisplaySettingsSection'
+// Fas 1 (offert-omtaget, 2026-08-31): dessa sex flyttade till _shared/ och
+// tappade Edit-prefixet — new-sidans QuoteBuilder använder dem också, se
+// app/dashboard/quotes/_shared/QuoteBuilder.tsx. QuoteEditHeader/
+// QuoteEditCustomerSection ovan är fortsatt edit-egna, orörda.
+import { QuoteRotSection } from '../../_shared/QuoteRotSection'
+import { QuoteStandardTextsSection } from '../../_shared/QuoteStandardTextsSection'
+import { QuotePaymentPlanSection } from '../../_shared/QuotePaymentPlanSection'
+import { QuoteDisplaySettingsSection } from '../../_shared/QuoteDisplaySettingsSection'
 import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
-import { QuoteEditTotalsSection } from './components/QuoteEditTotalsSection'
-import { QuoteEditSaveTemplateModal } from './components/QuoteEditSaveTemplateModal'
+import { QuoteTotalsSection } from '../../_shared/QuoteTotalsSection'
+import { QuoteSaveTemplateModal } from '../../_shared/QuoteSaveTemplateModal'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -1294,7 +1298,7 @@ export default function EditQuotePage() {
               onSaveToProducts={row => setProductModalRow(row)}
             />
 
-            <QuoteEditRotSection
+            <QuoteRotSection
               items={items}
               setItems={setItems}
               hasRotItems={hasRotItems}
@@ -1304,7 +1308,7 @@ export default function EditQuotePage() {
               setFastighetsbeteckning={setFastighetsbeteckning}
             />
 
-            <QuoteEditStandardTextsSection
+            <QuoteStandardTextsSection
               open={showStandardTexts}
               setOpen={setShowStandardTexts}
               textsByType={textsByType}
@@ -1324,7 +1328,7 @@ export default function EditQuotePage() {
               setTermsText={setTermsText}
             />
 
-            <QuoteEditPaymentPlanSection
+            <QuotePaymentPlanSection
               open={showPaymentPlan}
               setOpen={setShowPaymentPlan}
               paymentPlan={paymentPlan}
@@ -1345,7 +1349,7 @@ export default function EditQuotePage() {
               onFileUpload={handleAttachmentUpload}
             />
 
-            <QuoteEditDisplaySettingsSection
+            <QuoteDisplaySettingsSection
               open={showDisplaySettings}
               setOpen={setShowDisplaySettings}
               detailLevel={detailLevel}
@@ -1356,7 +1360,7 @@ export default function EditQuotePage() {
               setShowQuantities={setShowQuantities}
             />
 
-            <QuoteEditTotalsSection
+            <QuoteTotalsSection
               totals={totals}
               vatRate={vatRate}
               discountPercent={discountPercent}
@@ -1450,7 +1454,7 @@ export default function EditQuotePage() {
         />
       )}
 
-      <QuoteEditSaveTemplateModal
+      <QuoteSaveTemplateModal
         show={showSaveTemplateModal}
         onClose={() => setShowSaveTemplateModal(false)}
         templateName={templateName}

@@ -3,7 +3,7 @@
 import { ChevronDown, CreditCard, Plus, X } from 'lucide-react'
 import type { PaymentPlanEntry } from '@/lib/types/quote'
 
-interface QuoteEditPaymentPlanSectionProps {
+interface QuotePaymentPlanSectionProps {
   open: boolean
   setOpen: (b: boolean) => void
   paymentPlan: PaymentPlanEntry[]
@@ -15,7 +15,7 @@ interface QuoteEditPaymentPlanSectionProps {
   formatCurrency: (n: number) => string
 }
 
-export function QuoteEditPaymentPlanSection({
+export function QuotePaymentPlanSection({
   open,
   setOpen,
   paymentPlan,
@@ -25,7 +25,7 @@ export function QuoteEditPaymentPlanSection({
   onUpdateEntry,
   onRemoveEntry,
   formatCurrency,
-}: QuoteEditPaymentPlanSectionProps) {
+}: QuotePaymentPlanSectionProps) {
   const sumPercent = paymentPlan.reduce((s, e) => s + e.percent, 0)
 
   return (

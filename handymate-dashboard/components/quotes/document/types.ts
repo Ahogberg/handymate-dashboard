@@ -55,8 +55,10 @@ export type QuoteDocumentMode = 'static' | 'edit'
  * sättet att uttrycka "det här fältet ska INTE gå att redigera nu".
  *
  * Befintliga anropare (new/edit-sidornas liveHandlers) skickar fortfarande
- * allt och påverkas inte. Se lib/quotes/section-handlers.ts för hur
- * delmängderna byggs.
+ * allt och påverkas inte. Sektions-DELMÄNGDER (den forna gating-mekanismen
+ * som filtrerade det här objektet till en sektion i taget) togs bort i Fas 1
+ * (offert-omtaget, 2026-08-31) — se lib/quotes/quote-completeness.ts för
+ * vad som är kvar (rena sammanfattningsfunktioner, ingen filtrering).
  */
 export interface QuoteDocumentHandlers {
   onTitleChange?: (v: string) => void

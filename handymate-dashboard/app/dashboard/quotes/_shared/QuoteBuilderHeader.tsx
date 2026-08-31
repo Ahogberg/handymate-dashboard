@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Bookmark, Loader2, Send, Sparkles } from 'lucide-react'
 
-interface QuoteNewHeaderProps {
+interface QuoteBuilderHeaderProps {
   aiGenerated: boolean
   aiConfidence: number | null
   aiPriceWarning: { message: string; link: string } | null
@@ -43,7 +43,7 @@ interface QuoteNewHeaderProps {
  * offert kortas till korta etiketter under `sm` (samma knappar, samma
  * handlers) så de alltid får plats — kravet var att de ALLTID ska synas.
  */
-export function QuoteNewHeader({
+export function QuoteBuilderHeader({
   aiGenerated,
   aiConfidence,
   aiPriceWarning,
@@ -58,7 +58,7 @@ export function QuoteNewHeader({
   onSendQuote,
   onSaveDraft,
   onSaveTemplate,
-}: QuoteNewHeaderProps) {
+}: QuoteBuilderHeaderProps) {
   return (
     <div className="sticky top-0 z-30 -mx-4 sm:-mx-6 mb-6 px-4 sm:px-6 py-3 bg-slate-50/95 backdrop-blur-md border-b border-slate-200">
       <div className="flex items-center gap-3 flex-nowrap sm:flex-wrap">

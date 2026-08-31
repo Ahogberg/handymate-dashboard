@@ -22,7 +22,7 @@ interface QuoteTotals {
   customerPaysAfterDeductions: number
 }
 
-interface QuoteEditTotalsSectionProps {
+interface QuoteTotalsSectionProps {
   totals: QuoteTotals
   vatRate: number
   discountPercent: number
@@ -38,7 +38,7 @@ interface QuoteEditTotalsSectionProps {
   setItems: React.Dispatch<React.SetStateAction<QuoteItem[]>>
 }
 
-export function QuoteEditTotalsSection({
+export function QuoteTotalsSection({
   totals,
   vatRate,
   discountPercent,
@@ -48,7 +48,7 @@ export function QuoteEditTotalsSection({
   formatCurrency,
   items,
   setItems,
-}: QuoteEditTotalsSectionProps) {
+}: QuoteTotalsSectionProps) {
   // Prioriterar ROT om båda skulle förekomma samtidigt (blandat läge från
   // per-rad-badgens fria cykling) — samma prioritetsordning som
   // getItemRotRutType redan använder (ROT kollas först).

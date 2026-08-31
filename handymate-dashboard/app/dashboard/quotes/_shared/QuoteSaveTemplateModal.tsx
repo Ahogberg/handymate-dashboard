@@ -2,7 +2,7 @@
 
 import { Loader2 } from 'lucide-react'
 
-interface QuoteEditSaveTemplateModalProps {
+interface QuoteSaveTemplateModalProps {
   show: boolean
   onClose: () => void
   templateName: string
@@ -11,14 +11,14 @@ interface QuoteEditSaveTemplateModalProps {
   onSave: () => void
 }
 
-export function QuoteEditSaveTemplateModal({
+export function QuoteSaveTemplateModal({
   show,
   onClose,
   templateName,
   setTemplateName,
   saving,
   onSave,
-}: QuoteEditSaveTemplateModalProps) {
+}: QuoteSaveTemplateModalProps) {
   if (!show) return null
 
   return (

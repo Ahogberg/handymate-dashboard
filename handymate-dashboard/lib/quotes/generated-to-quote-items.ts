@@ -9,32 +9,35 @@
  * QuoteItem[] enligt POST /api/quotes-kontraktet (app/api/quotes/route.ts,
  * `body.quote_items`), så exekveraren faktiskt kan POSTa och skapa utkastet.
  *
- * FACIT-KÄLLA: convertLegacyItems i app/dashboard/quotes/new/page.tsx är den
- * ursprungliga klient-mappningen (samma UI-knapp, samma ai-generate-svar) —
- * samma semantik återanvänds här:
+ * FAS 1 (offert-omtaget, 2026-08-31): den här filen är nu ÄVEN den enda
+ * AI-item-konverteraren på klienten. `convertLegacyItems` i
+ * app/dashboard/quotes/new/page.tsx (den ursprungliga klient-mappningen) är
+ * borttagen — dess enda extra logik jämfört med denna fil (Kvittoprincipen
+ * Fall 3: `ai_price_missing`/`save_to_products` när AI:n saknade pris,
+ * `ai_uncertain`/`ai_note` när AI:ns självrapporterade träffsäkerhet
+ * (`confidence`) ligger under tröskeln) har flyttats hit, styrd av den nya
+ * `sourceIsAi`-parametern (default `false` så alla andra anropare —
+ * legacy-mallrader, den server-sidiga godkännande-kedjan — är oförändrade).
+ *
+ * Samma semantik som den gamla klient-mappningen i övrigt:
  *  - Enhetsnormalisering (hour/timmar/h → tim, piece/styck → st).
+ *  - Fältmappning (description/unitPrice vs name/unit_price) via den delade
+ *    `resolveLegacyItemFields` (lib/quote-calculations.ts) — se den
+ *    funktionens kommentar för NaN-buggen den fixar.
  *  - ROT/RUT per rad via legacyItemRotRutType(item.type, suggestedDeductionType)
- *    + setItemRotRut — EXAKT samma rena helpers som klienten (Fix 1+2,
- *    kodrevision 2026-08-03), inte en egen omimplementation.
+ *    + setItemRotRut — EXAKT samma rena helpers (Fix 1+2, kodrevision
+ *    2026-08-03), inte en egen omimplementation.
  *  - Tillval (quote.options) mappas till item_type 'option' via
  *    applyOptionRowDefaults — alltid avbockade, aldrig förvalda.
- *
- * AVVIKELSE FRÅN convertLegacyItems (medveten, inte en bugg här): den
- * klient-sidiga signaturen är typad mot ett legacy-fält-schema
- * (`item.name`, `item.unit_price`) som INTE matchar det faktiska
- * GeneratedQuoteItem-svaret (`description`, `unitPrice` — se
- * lib/ai-quote-generator.ts rad 503-513). I klienten döljs detta av `quote:
- * any`, så TypeScript fångar det aldrig — item.unit_price blir `undefined`
- * och `total` blir `NaN` för AI-genererade rader (endast maskerat i UI:t
- * genom att `recalculateItems`/editorns egna quantity×unit_price-omräkning
- * körs om innan visning). Den här servermappningen läser fälten som
- * ai-generate FAKTISKT skickar (`description`/`unitPrice`), med `name`/
- * `unit_price` som fallback för robusthet — INTE en blind kopiering av
- * klientens fältnamn. Rapporterat som separat, oåtgärdad brist i
- * quotes/new/page.tsx (utanför denna körnings scope).
  */
 
-import { generateItemId, setItemRotRut, legacyItemRotRutType, applyOptionRowDefaults } from '@/lib/quote-calculations'
+import {
+  generateItemId,
+  setItemRotRut,
+  legacyItemRotRutType,
+  applyOptionRowDefaults,
+  resolveLegacyItemFields,
+} from '@/lib/quote-calculations'
 import type { QuoteItem } from '@/lib/types/quote'
 
 /** Formen på en rad i ai-generate-svarets `quote.items`/`quote.options`
@@ -54,9 +57,13 @@ export interface GeneratedQuoteItemInput {
   /** Artikeln i produktbanken raden kopplats till (etapp B1, 2026-08-06).
       Null när ingen säker träff fanns — se lib/products/match-generated-items.ts. */
   linkedProductId?: string | null
+  /** AI:ns självrapporterade träffsäkerhet (0-100) för raden. Saknas för
+      mall-/legacy-rader — de har ingen AI-bedömning att rapportera. Används
+      bara när `sourceIsAi` är true (Kvittoprincipen Fall 3). */
+  confidence?: number | null
 }
 
-/** Samma enhetsnormalisering som convertLegacyItems (app/dashboard/quotes/new/page.tsx). */
+/** Same unit map as the original client-side converter. */
 export function normalizeUnit(unit: string | null | undefined): string {
   const map: Record<string, string> = {
     hour: 'tim',
@@ -69,20 +76,34 @@ export function normalizeUnit(unit: string | null | undefined): string {
   return map[u] || unit || 'st'
 }
 
+// Kvittoprincipen Fall 3 (docs/design/SYNLIG-INTELLIGENS.md): samma tröskel
+// som strategin föreslår — under den visas "Osäker", över den visas
+// ingenting (tystnad är normalläget, ingen grön bock på varje rad).
+const AI_ITEM_CONFIDENCE_THRESHOLD = 70
+
 /**
  * Mappar EN GeneratedQuoteItem → QuoteItem (item_type 'item' eller 'option').
- * ROT/RUT och option-defaults sätts via samma rena helpers som
- * convertLegacyItems använder — enda skillnaden är fältnamnen som läses in.
+ * ROT/RUT och option-defaults sätts via samma rena helpers som den gamla
+ * convertLegacyItems använde — enda skillnaden är fältnamnen som läses in.
+ *
+ * `sourceIsAi` (default false): styr `ai_price_missing`/`ai_uncertain` —
+ * ENDAST relevant för genuina AI-förslag. En avsiktligt $0-radad mallrad
+ * ("Framkörning ingår") ska INTE amber-markeras som "AI gissade fel pris".
  */
 export function mapGeneratedItemToQuoteItem(
   item: GeneratedQuoteItemInput,
   suggestedDeductionType: 'rot' | 'rut' | 'none' | null | undefined,
   itemType: 'item' | 'option',
   sortOrder: number,
+  sourceIsAi: boolean = false,
 ): QuoteItem {
-  const description = item.description || item.name || ''
-  const quantity = item.quantity || 0
-  const unitPrice = item.unitPrice ?? item.unit_price ?? 0
+  const { description, quantity, unitPrice } = resolveLegacyItemFields(item)
+  const priceMissing =
+    sourceIsAi && (unitPrice === 0 || !!(item.note && item.note.includes('PRIS SAKNAS')))
+  // Under tröskeln OCH inte redan täckt av "PRIS SAKNAS" (den markeringen
+  // säger redan mer, ska inte dubbla).
+  const uncertain =
+    sourceIsAi && !priceMissing && typeof item.confidence === 'number' && item.confidence < AI_ITEM_CONFIDENCE_THRESHOLD
 
   return applyOptionRowDefaults(
     setItemRotRut(
@@ -102,6 +123,8 @@ export function mapGeneratedItemToQuoteItem(
         // före B1 — ingen arbetsandel, inget inköpspris, inga produkttriggers
         // för reservationsmotorn.
         ...(item.linkedProductId ? { linked_product_id: item.linkedProductId } : {}),
+        ...(priceMissing ? { ai_price_missing: true, save_to_products: true } : {}),
+        ...(uncertain ? { ai_uncertain: true, ai_note: item.note || null } : {}),
       },
       legacyItemRotRutType(item.type, suggestedDeductionType),
     ),
@@ -110,23 +133,21 @@ export function mapGeneratedItemToQuoteItem(
 
 /**
  * Mappar ett helt GeneratedQuote-svar (items + options) → QuoteItem[] redo
- * att POSTas som `quote_items` till POST /api/quotes. Tomma/saknade listor
- * ger tom array (ingen krasch) — POST /api/quotes hanterar redan tom
- * quote_items genom att falla tillbaka på legacy items-vägen, men
- * exekveraren (approvals/[id]/route.ts) ska aldrig anropa detta med ett
- * helt tomt AI-svar (se caller: fel returneras redan om ai-generate inte
- * gav några rader).
+ * att POSTas som `quote_items` till POST /api/quotes, eller att sättas
+ * direkt som editorns `items`-state (klientvägen, sourceIsAi=true). Tomma/
+ * saknade listor ger tom array (ingen krasch).
  */
 export function generatedQuoteToQuoteItems(
   items: GeneratedQuoteItemInput[] | null | undefined,
   options: GeneratedQuoteItemInput[] | null | undefined,
   suggestedDeductionType: 'rot' | 'rut' | 'none' | null | undefined,
+  sourceIsAi: boolean = false,
 ): QuoteItem[] {
   const baseItems = (items || []).map((it, idx) =>
-    mapGeneratedItemToQuoteItem(it, suggestedDeductionType, 'item', idx),
+    mapGeneratedItemToQuoteItem(it, suggestedDeductionType, 'item', idx, sourceIsAi),
   )
   const optionItems = (options || []).map((it, idx) =>
-    mapGeneratedItemToQuoteItem(it, suggestedDeductionType, 'option', baseItems.length + idx),
+    mapGeneratedItemToQuoteItem(it, suggestedDeductionType, 'option', baseItems.length + idx, sourceIsAi),
   )
   return [...baseItems, ...optionItems]
 }
