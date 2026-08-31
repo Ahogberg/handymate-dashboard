@@ -1,0 +1,667 @@
+diff --git a/__tests__/work-report.test.tsx b/__tests__/work-report.test.tsx
+new file mode 100644
+index 00000000..b455c97f
+--- /dev/null
++++ b/__tests__/work-report.test.tsx
+@@ -0,0 +1,161 @@
++import { act, fireEvent, render, waitFor } from '@testing-library/react-native'
++
++const mockPush = jest.fn()
++const mockRecorder = { isRecording: false, uri: 'file:///report.m4a', prepareToRecordAsync: jest.fn(), record: jest.fn(), stop: jest.fn() }
++jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }))
++jest.mock('expo-audio', () => ({
++  AudioModule: { requestRecordingPermissionsAsync: jest.fn() }, RecordingPresets: { HIGH_QUALITY: {} },
++  useAudioRecorder: () => mockRecorder, setAudioModeAsync: jest.fn(),
++}))
++jest.mock('expo-haptics', () => ({ impactAsync: jest.fn(), notificationAsync: jest.fn(), ImpactFeedbackStyle: { Heavy: 'heavy' }, NotificationFeedbackType: { Success: 'success' } }))
++jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0, bottom: 34 }) }))
++jest.mock('../components/AIAvatar', () => () => null)
++jest.mock('../components/VoiceRing', () => ({ __esModule: true, default: ({ state }: any) => {
++  const React = require('react'); const { Text } = require('react-native'); return React.createElement(Text, {}, state)
++} }))
++jest.mock('../lib/api', () => ({ chatWithMatte: jest.fn(), confirmMatteAction: jest.fn(), transcribeAudio: jest.fn(), getUserDisplayName: jest.fn().mockResolvedValue('Anders') }))
++jest.mock('@react-native-async-storage/async-storage', () => require('@react-native-async-storage/async-storage/jest/async-storage-mock'))
++
++import { AudioModule } from 'expo-audio'
++import { chatWithMatte, confirmMatteAction, transcribeAudio } from '../lib/api'
++import { sendToMatte, confirmPendingMatteAction, cancelPendingMatteAction } from '../lib/matte-actions'
++import { useMatteStore } from '../lib/matte-store'
++import MatteSheet from '../components/MatteSheet'
++import ProjectReportCard from '../components/ProjectReportCard'
++
++const config = { mode: 'text' as const, projectId: 'proj_a', projectName: 'Köket', workReport: true, workDate: '2026-08-31' }
++const scope = { ...config, customerId: null }
++const pending = { tool_name: 'log_time', args: {}, summary: 'Anders · Köket · 2026-08-31\nLägg till 4 h', confirm_label: 'Lägg till tiden', token: 'signed-token' }
++const reply = { reply: 'Hur länge jobbade du?', messages: [{ agent: 'lars', content: 'Hur länge jobbade du?' }], current_agent: 'lars', thread_id: 'thread_a', action: null }
++function deferred<T>() { let resolve!: (v: T) => void; const promise = new Promise<T>(r => { resolve = r }); return { promise, resolve } }
++
++beforeEach(() => {
++  jest.clearAllMocks()
++  useMatteStore.getState().clearMessages()
++  ;(chatWithMatte as jest.Mock).mockReset().mockResolvedValue(reply)
++  ;(confirmMatteAction as jest.Mock).mockReset()
++  ;(AudioModule.requestRecordingPermissionsAsync as jest.Mock).mockReset().mockResolvedValue({ granted: true })
++  mockRecorder.prepareToRecordAsync.mockResolvedValue(undefined)
++  mockRecorder.stop.mockResolvedValue(undefined)
++  mockRecorder.isRecording = false
++})
++
++test('project card opens real sheet in voice or text mode without executing anything', () => {
++  const onOpen = jest.fn()
++  const ui = render(<ProjectReportCard projectId="proj_a" projectName="Köket" onOpen={onOpen} />)
++  fireEvent.press(ui.getByLabelText('Rapportera dagens arbete med röst'))
++  expect(onOpen).toHaveBeenLastCalledWith(expect.objectContaining({ mode: 'voice', projectId: 'proj_a', projectName: 'Köket', workReport: true, workDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }))
++  fireEvent.press(ui.getByText('Skriv istället'))
++  expect(onOpen.mock.calls[1][0].mode).toBe('text')
++  expect(chatWithMatte).not.toHaveBeenCalled()
++})
++test('sheet to full-chat continuation retains exact project, date and thread', async () => {
++  await sendToMatte({ content: 'Monterat skåp', ...config })
++  await sendToMatte({ content: 'Fyra timmar' })
++  expect((chatWithMatte as jest.Mock).mock.calls[1][0].context).toMatchObject({ workReport: true, projectId: 'proj_a', workDate: '2026-08-31', threadId: 'thread_a' })
++  expect((chatWithMatte as jest.Mock).mock.calls[1][0].messages).toHaveLength(3)
++})
++test('project/date change discards previous messages and thread, never sends them to another project', async () => {
++  await sendToMatte({ content: 'HEMLIGT PROJEKT A', ...config })
++  await sendToMatte({ content: 'Projekt B', ...config, projectId: 'proj_b', workDate: '2026-08-30' })
++  const body = (chatWithMatte as jest.Mock).mock.calls[1][0]
++  expect(body.context.threadId).toBeUndefined(); expect(body.messages).toEqual([{ role: 'user', content: 'Projekt B' }])
++})
++test('pending card blocks sending and switching project', async () => {
++  useMatteStore.getState().setScope(scope)
++  useMatteStore.getState().setPendingConfirmation(pending)
++  await expect(sendToMatte({ content: 'Mer' })).rejects.toThrow(/Bekräfta/)
++  expect(() => useMatteStore.getState().setScope({ ...scope, projectId: 'b' })).toThrow(/Bekräfta/)
++  expect(chatWithMatte).not.toHaveBeenCalled()
++})
++test('late response from abandoned scope is not displayed under the next project', async () => {
++  const d = deferred<any>(); (chatWithMatte as jest.Mock).mockReturnValue(d.promise)
++  const send = sendToMatte({ content: 'A', ...config })
++  useMatteStore.getState().setScope({ ...scope, projectId: 'b' })
++  d.resolve({ ...reply, pending_confirmation: pending }); await send
++  expect(useMatteStore.getState().messages).toEqual([])
++  expect(useMatteStore.getState().pendingConfirmation).toBeNull()
++})
++test('network uncertainty restores exact token; second card is not auto-executed', async () => {
++  useMatteStore.getState().setScope(scope); useMatteStore.getState().setPendingConfirmation(pending)
++  ;(confirmMatteAction as jest.Mock).mockRejectedValueOnce(new Error('Network lost')).mockResolvedValueOnce({ ...reply, pending_confirmation: { ...pending, token: 'second-token', tool_name: 'add_work_note' } })
++  await expect(confirmPendingMatteAction()).rejects.toThrow('Network lost')
++  expect(useMatteStore.getState().pendingConfirmation?.token).toBe('signed-token')
++  await confirmPendingMatteAction()
++  expect((confirmMatteAction as jest.Mock).mock.calls).toEqual([['signed-token'], ['signed-token']])
++  expect(useMatteStore.getState().pendingConfirmation?.token).toBe('second-token')
++  cancelPendingMatteAction()
++  expect(useMatteStore.getState().messages.at(-1)?.content).toContain('Tidigare sparade poster påverkas inte')
++  expect(confirmMatteAction).toHaveBeenCalledTimes(2)
++})
++test('cannot send another request while a confirmation is executing', async () => {
++  useMatteStore.getState().setScope(scope); useMatteStore.getState().setPendingConfirmation(pending)
++  const d = deferred<any>(); (confirmMatteAction as jest.Mock).mockReturnValue(d.promise)
++  const confirm = confirmPendingMatteAction()
++  await expect(sendToMatte({ content: 'Mer' })).rejects.toThrow(/arbetar/)
++  await expect(confirmPendingMatteAction()).rejects.toThrow(/Vänta/)
++  d.resolve(reply); await confirm
++  expect(confirmMatteAction).toHaveBeenCalledTimes(1)
++})
++test('permission denial offers text fallback in same project', async () => {
++  ;(AudioModule.requestRecordingPermissionsAsync as jest.Mock).mockResolvedValue({ granted: false })
++  const ui = render(<MatteSheet config={{ ...config, mode: 'voice' }} onClose={jest.fn()} />)
++  await ui.findByText('Mikrofonbehörighet krävs')
++  fireEvent.press(ui.getByText('Skriv istället'))
++  fireEvent.changeText(ui.getByLabelText('Meddelande till Matte'), 'Fyra timmar, skåp')
++  fireEvent.press(ui.getByText('Skicka till Matte'))
++  await ui.findByText('Hur länge jobbade du?')
++  expect((chatWithMatte as jest.Mock).mock.calls[0][0].context).toMatchObject({ projectId: 'proj_a', workReport: true })
++  expect(mockRecorder.record).not.toHaveBeenCalled()
++})
++test('permission arriving after sheet closes does not start microphone', async () => {
++  const d = deferred<any>(); (AudioModule.requestRecordingPermissionsAsync as jest.Mock).mockReturnValue(d.promise)
++  const ui = render(<MatteSheet config={{ ...config, mode: 'voice' }} onClose={jest.fn()} />)
++  ui.rerender(<MatteSheet config={null} onClose={jest.fn()} />)
++  await act(async () => { d.resolve({ granted: true }); await d.promise })
++  expect(mockRecorder.record).not.toHaveBeenCalled()
++})
++test('transcript is editable before sending; card uses server facts and only clicks execute', async () => {
++  ;(transcribeAudio as jest.Mock).mockResolvedValue('Två timmar felhört')
++  ;(chatWithMatte as jest.Mock).mockResolvedValue({ ...reply, reply: '', messages: [], pending_confirmation: pending })
++  ;(confirmMatteAction as jest.Mock).mockResolvedValue({ ...reply, reply: 'Tiden sparad', messages: [{ agent: 'lars', content: 'Tiden sparad' }] })
++  const ui = render(<MatteSheet config={{ ...config, mode: 'voice' }} onClose={jest.fn()} />)
++  await ui.findByText('listening')
++  fireEvent.press(ui.getByText('listening'))
++  await waitFor(() => expect(ui.getByLabelText('Meddelande till Matte').props.value).toBe('Två timmar felhört'))
++  expect(chatWithMatte).not.toHaveBeenCalled()
++  fireEvent.changeText(ui.getByLabelText('Meddelande till Matte'), 'Fyra timmar, monterat skåp')
++  fireEvent.press(ui.getByText('Skicka till Matte'))
++  await ui.findByText(pending.summary)
++  expect((chatWithMatte as jest.Mock).mock.calls[0][0].messages.at(-1).content).toBe('Fyra timmar, monterat skåp')
++  expect(confirmMatteAction).not.toHaveBeenCalled()
++  fireEvent.press(ui.getByText('Lägg till tiden'))
++  await ui.findByText('Tiden sparad')
++  expect(confirmMatteAction).toHaveBeenCalledWith('signed-token')
++})
++test('changed report date still renders the first reply after scope reset', async () => {
++  useMatteStore.getState().setScope(scope)
++  useMatteStore.getState().appendMessage({ role: 'user', content: 'Gammalt' })
++  useMatteStore.getState().appendMessage({ role: 'assistant', content: 'Gammalt svar' })
++  const ui = render(<MatteSheet config={config} onClose={jest.fn()} />)
++  fireEvent.changeText(ui.getByLabelText('Rapportdatum'), '2026-08-30')
++  fireEvent.changeText(ui.getByLabelText('Meddelande till Matte'), 'Jobbade igår')
++  fireEvent.press(ui.getByText('Skicka till Matte'))
++  await ui.findByText('Hur länge jobbade du?')
++  expect((chatWithMatte as jest.Mock).mock.calls[0][0].context.workDate).toBe('2026-08-30')
++})
++test('reopening same report with pending card shows it without starting microphone', async () => {
++  useMatteStore.getState().setScope(scope); useMatteStore.getState().setPendingConfirmation(pending)
++  const ui = render(<MatteSheet config={{ ...config, mode: 'voice' }} onClose={jest.fn()} />)
++  await ui.findByText(pending.summary)
++  expect(AudioModule.requestRecordingPermissionsAsync).not.toHaveBeenCalled()
++})
++test('opening another project does not show the first projects pending card under the wrong header', async () => {
++  useMatteStore.getState().setScope(scope); useMatteStore.getState().setPendingConfirmation(pending)
++  const ui = render(<MatteSheet config={{ ...config, projectId: 'proj_b', projectName: 'Badrummet' }} onClose={jest.fn()} />)
++  await ui.findByText('Bekräfta eller avbryt det väntande kortet i chatten först.')
++  expect(ui.queryByText(pending.summary)).toBeNull()
++  fireEvent.press(ui.getByText('Fortsätt i chatten'))
++  expect(mockPush).toHaveBeenCalledWith('/matte')
++  expect(useMatteStore.getState().scope?.projectId).toBe('proj_a')
++})
+diff --git a/app/matte/index.tsx b/app/matte/index.tsx
+index 1b25da77..69de6001 100644
+--- a/app/matte/index.tsx
++++ b/app/matte/index.tsx
+@@ -48,6 +48,7 @@ export default function MatteChatScreen() {
+   const router = useRouter()
+   const [userName, setUserName] = useState('')
+   const messages = useMatteStore((s) => s.messages)
++  const scope = useMatteStore((s) => s.scope)
+   const setMessages = useMatteStore((s) => s.setMessages)
+   const markLastUserAsFailed = useMatteStore((s) => s.markLastUserAsFailed)
+   const pendingConfirmation = useMatteStore((s) => s.pendingConfirmation)
+@@ -230,7 +231,7 @@ export default function MatteChatScreen() {
+               <Text style={styles.name}>Matte</Text>
+               <View style={styles.presenceRow}>
+                 <View style={styles.dot} />
+-                <Text style={styles.presence}>Online</Text>
++                <Text style={styles.presence} numberOfLines={2}>{scope?.workReport ? `Rapport · ${scope.projectName || 'Projekt'} · ${scope.workDate}` : scope?.projectName || 'Online'}</Text>
+               </View>
+             </View>
+           </View>
+diff --git a/app/projects/[id].tsx b/app/projects/[id].tsx
+index a4a489f7..4c79c565 100644
+--- a/app/projects/[id].tsx
++++ b/app/projects/[id].tsx
+@@ -15,6 +15,7 @@
+ import { Ionicons } from '@expo/vector-icons'
+ import { useLocalSearchParams, useRouter } from 'expo-router'
+ import MatteSheet, { MatteSheetConfig } from '../../components/MatteSheet'
++import ProjectReportCard from '../../components/ProjectReportCard'
+ import { useCallback, useEffect, useMemo, useState } from 'react'
+ import {
+   ActivityIndicator,
+@@ -186,6 +187,7 @@ export default function ProjectDetailMinimal() {
+           </View>
+         ) : null}
+ 
++        <ProjectReportCard projectId={project.id} projectName={project.name} onOpen={setMatteSheet} />
+         <Pressable
+           accessibilityLabel="Prata med Matte om projektet"
+           onPress={() =>
+diff --git a/components/MatteSheet.tsx b/components/MatteSheet.tsx
+index 5a582125..ddcca51c 100644
+--- a/components/MatteSheet.tsx
++++ b/components/MatteSheet.tsx
+@@ -56,6 +56,8 @@ export interface MatteSheetConfig {
+   projectId?: string | null
+   projectName?: string | null
+   customerId?: string | null
++  workReport?: boolean
++  workDate?: string
+ }
+ 
+ interface Props {
+@@ -76,10 +78,15 @@ export default function MatteSheet({ config, onClose }: Props) {
+   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY)
+   const messages = useMatteStore((s) => s.messages)
+   const pendingConfirmation = useMatteStore((s) => s.pendingConfirmation)
++  const scope = useMatteStore((s) => s.scope)
++  const pendingInScope = pendingConfirmation && scope?.projectId === (config?.projectId ?? null) && !!scope?.workReport === !!config?.workReport
+   const [lage, setLage] = useState<Lage>({ typ: 'inspelning', ring: 'idle' })
+   const [textUtkast, setTextUtkast] = useState('')
+   const [confirming, setConfirming] = useState(false)
+   const [userName, setUserName] = useState('')
++  const [workDate, setWorkDate] = useState('')
++  const operation = useRef(0)
++  const busy = useRef(false)
+   // Svaret = allt som lagts i storen EFTER arkets senaste skick.
+   const svarStart = useRef(0)
+   const mountedRef = useRef(true)
+@@ -91,20 +98,39 @@ export default function MatteSheet({ config, onClose }: Props) {
+     getUserDisplayName().then((n) => n && setUserName(n))
+     return () => {
+       mountedRef.current = false
++      operation.current++
++      sakertStoppaInspelning()
+     }
+   }, [])
+ 
+   // Nytt öppnande: nollställ och (i röstläge) starta inspelningen direkt.
+   useEffect(() => {
+     if (!config) return
++    operation.current++
++    setWorkDate(config.workDate || '')
++    try {
++      useMatteStore.getState().setScope({
++        projectId: config.projectId ?? null, projectName: config.projectName ?? null,
++        customerId: config.customerId ?? null, workReport: config.workReport === true, workDate: config.workDate,
++      })
++    } catch (error) {
++      setLage({ typ: 'fel', text: error instanceof Error ? error.message : 'Öppna det väntande kortet i chatten.' })
++      return
++    }
+     setTextUtkast('')
+     setConfirming(false)
++    if (useMatteStore.getState().pendingConfirmation) {
++      svarStart.current = useMatteStore.getState().messages.length
++      setLage({ typ: 'svar' })
++      return () => { operation.current++; sakertStoppaInspelning() }
++    }
+     if (config.mode === 'voice') {
+       setLage({ typ: 'inspelning', ring: 'idle' })
+       void startRecording()
+     } else {
+       setLage({ typ: 'transkript', text: '' })
+     }
++    return () => { operation.current++; sakertStoppaInspelning() }
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [config])
+ 
+@@ -116,26 +142,32 @@ export default function MatteSheet({ config, onClose }: Props) {
+   }
+ 
+   async function startRecording() {
++    const current = operation.current
+     try {
+       const { granted } = await AudioModule.requestRecordingPermissionsAsync()
++      if (!mountedRef.current || operation.current !== current) return
+       if (!granted) {
+         setLage({ typ: 'fel', text: 'Mikrofonbehörighet krävs' })
+         return
+       }
+       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true })
++      if (!mountedRef.current || operation.current !== current) return
+       await audioRecorder.prepareToRecordAsync()
++      if (!mountedRef.current || operation.current !== current) return
+       audioRecorder.record()
+       if (!mountedRef.current) return
+       setLage({ typ: 'inspelning', ring: 'listening' })
+       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
+     } catch (error) {
+       console.error('[MatteSheet] start failed:', error)
+-      if (mountedRef.current) setLage({ typ: 'fel', text: 'Kunde inte starta inspelningen' })
++      if (mountedRef.current && operation.current === current) setLage({ typ: 'fel', text: 'Kunde inte starta inspelningen' })
+     }
+   }
+ 
+   async function stoppaOchTranskribera() {
+-    if (lage.typ !== 'inspelning' || lage.ring !== 'listening') return
++    if (lage.typ !== 'inspelning' || lage.ring !== 'listening' || busy.current) return
++    busy.current = true
++    const current = operation.current
+     setLage({ typ: 'inspelning', ring: 'processing' })
+     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+     try {
+@@ -145,50 +177,63 @@ export default function MatteSheet({ config, onClose }: Props) {
+       if (!uri) throw new Error('Ingen inspelning hittades')
+       const text = (await transcribeAudio(uri)).trim()
+       if (!text) throw new Error('Kunde inte uppfatta vad du sa')
+-      if (!mountedRef.current) return
++      if (!mountedRef.current || operation.current !== current) return
++      setTextUtkast(text)
+       setLage({ typ: 'transkript', text })
+     } catch (error) {
+       console.error('[MatteSheet] transcription failed:', error)
+-      if (mountedRef.current) {
++      if (mountedRef.current && operation.current === current) {
+         setLage({ typ: 'fel', text: error instanceof Error ? error.message : 'Kunde inte skriva ner det du sa' })
+       }
+-    }
++    } finally { busy.current = false }
+   }
+ 
+   async function skicka(text: string) {
+     const content = text.trim()
+-    if (!content) return
+-    svarStart.current = useMatteStore.getState().messages.length + 1 // efter user-bubblan
++    if (!content || busy.current) return
++    busy.current = true
++    const current = operation.current
+     setLage({ typ: 'skickar' })
+     try {
++      // A date/project change starts an isolated report. Take the answer index
++      // AFTER switching scope; otherwise the first reply disappears from view.
++      useMatteStore.getState().setScope({ projectId: config?.projectId ?? null, projectName: config?.projectName ?? null,
++        customerId: config?.customerId ?? null, workReport: config?.workReport === true, workDate: config?.workReport ? workDate : undefined })
++      svarStart.current = useMatteStore.getState().messages.length + 1
+       await sendToMatte({
+         content,
+         userName,
+         projectId: config?.projectId ?? null,
+         customerId: config?.customerId ?? null,
++        projectName: config?.projectName,
++        workReport: config?.workReport,
++        workDate: config?.workReport ? workDate : undefined,
+       })
+-      if (mountedRef.current) setLage({ typ: 'svar' })
++      if (mountedRef.current && operation.current === current) setLage({ typ: 'svar' })
+     } catch (error) {
+       console.error('[MatteSheet] sendToMatte failed:', error)
+       useMatteStore.getState().markLastUserAsFailed()
+-      if (mountedRef.current) setLage({ typ: 'fel', text: 'Matte kunde inte svara just nu' })
+-    }
++      if (mountedRef.current && operation.current === current) setLage({ typ: 'fel', text: error instanceof Error ? error.message : 'Matte kunde inte svara just nu' })
++    } finally { busy.current = false }
+   }
+ 
+   async function bekrafta() {
+     if (confirming) return
++    const current = operation.current
+     setConfirming(true)
+     try {
+       await confirmPendingMatteAction()
++      if (mountedRef.current && operation.current === current) setLage({ typ: 'svar' })
+     } catch (error) {
+       console.error('[MatteSheet] confirm failed:', error)
+-      if (mountedRef.current) setLage({ typ: 'fel', text: error instanceof Error ? error.message : 'Kunde inte utföra åtgärden' })
++      if (mountedRef.current && operation.current === current) setLage({ typ: 'fel', text: error instanceof Error ? error.message : 'Kunde inte utföra åtgärden' })
+     } finally {
+       if (mountedRef.current) setConfirming(false)
+     }
+   }
+ 
+   function stang() {
++    operation.current++
+     sakertStoppaInspelning()
+     onClose()
+   }
+@@ -234,6 +279,16 @@ export default function MatteSheet({ config, onClose }: Props) {
+             </Pressable>
+           </View>
+ 
++          {config?.workReport ? (
++            <View style={styles.transcriptArea}>
++              <Text style={styles.hint}>Din tid och intern arbetsanteckning. Projektet avslutas inte och inget skickas till kunden.</Text>
++              <TextInput accessibilityLabel="Rapportdatum" value={workDate} onChangeText={setWorkDate}
++                editable={lage.typ === 'transkript' && !pendingConfirmation}
++                placeholder="ÅÅÅÅ-MM-DD" style={[styles.transcriptInput, { minHeight: 44, maxHeight: 48 }]} />
++              {lage.typ === 'inspelning' ? <Text style={styles.hint}>Till exempel: ”Fyra timmar idag, monterat skåpen.”</Text> : null}
++            </View>
++          ) : null}
++
+           {lage.typ === 'inspelning' ? (
+             <View style={styles.recordArea}>
+               <Pressable onPress={stoppaOchTranskribera} disabled={lage.ring !== 'listening'}>
+@@ -260,7 +315,7 @@ export default function MatteSheet({ config, onClose }: Props) {
+                   setTextUtkast(t)
+                   setLage({ typ: 'transkript', text: t })
+                 }}
+-                placeholder="Skriv till Matte…"
++                placeholder={config?.workReport ? 'Hur länge jobbade du och vad gjorde du?' : 'Skriv till Matte…'}
+                 placeholderTextColor={color.slate400}
+                 style={styles.transcriptInput}
+                 selectionColor={color.teal700}
+@@ -300,7 +355,7 @@ export default function MatteSheet({ config, onClose }: Props) {
+                   onAdjust={fortsattIChatten}
+                 />
+               ) : null}
+-              {pendingConfirmation ? (
++              {pendingInScope ? (
+                 <MatteConfirmCard
+                   pending={pendingConfirmation}
+                   confirming={confirming}
+@@ -308,6 +363,11 @@ export default function MatteSheet({ config, onClose }: Props) {
+                   onCancel={cancelPendingMatteAction}
+                 />
+               ) : null}
++              {!pendingConfirmation ? (
++                <Pressable onPress={() => { setTextUtkast(''); setLage({ typ: 'transkript', text: '' }) }} style={styles.continueRow}>
++                  <Text style={styles.continueText}>Svara eller komplettera</Text>
++                </Pressable>
++              ) : null}
+               <Pressable onPress={fortsattIChatten} style={styles.continueRow}>
+                 <Text style={styles.continueText}>Fortsätt i chatten</Text>
+                 <Ionicons name="chevron-forward" size={15} color={color.teal700} />
+@@ -318,12 +378,20 @@ export default function MatteSheet({ config, onClose }: Props) {
+           {lage.typ === 'fel' ? (
+             <View style={styles.recordArea}>
+               <Text style={styles.errorText}>{lage.text}</Text>
++              {pendingInScope ? (
++                <>
++                  <Text style={styles.hint}>Svaret kunde inte bekräftas. Kontrollera eller försök med samma bekräftelse igen; skapa inte en ny tidpost.</Text>
++                  <MatteConfirmCard pending={pendingConfirmation} confirming={confirming} onConfirm={bekrafta}
++                    onCancel={() => { cancelPendingMatteAction(); setLage({ typ: 'svar' }) }} />
++                </>
++              ) : null}
+               <Pressable
+-                onPress={() => (config?.mode === 'voice' ? startRecording() : setLage({ typ: 'transkript', text: textUtkast }))}
++                onPress={() => { sakertStoppaInspelning(); setLage({ typ: 'transkript', text: textUtkast }) }}
+                 style={styles.sendBtn}
+               >
+-                <Text style={styles.sendBtnText}>Försök igen</Text>
++                <Text style={styles.sendBtnText}>Skriv istället</Text>
+               </Pressable>
++              <Pressable onPress={fortsattIChatten} style={styles.continueRow}><Text style={styles.continueText}>Fortsätt i chatten</Text></Pressable>
+             </View>
+           ) : null}
+         </View>
+diff --git a/components/ProjectReportCard.tsx b/components/ProjectReportCard.tsx
+new file mode 100644
+index 00000000..e91ce176
+--- /dev/null
++++ b/components/ProjectReportCard.tsx
+@@ -0,0 +1,36 @@
++import { Ionicons } from '@expo/vector-icons'
++import { Pressable, StyleSheet, Text, View } from 'react-native'
++import type { MatteSheetConfig } from './MatteSheet'
++import { toIsoDate } from '../lib/datetime'
++import { color, font, radius, spacing } from '../theme/tokens'
++
++export default function ProjectReportCard({ projectId, projectName, onOpen }: {
++  projectId: string; projectName: string; onOpen: (config: MatteSheetConfig) => void
++}) {
++  const open = (mode: 'voice' | 'text') => onOpen({ mode, projectId, projectName, workReport: true, workDate: toIsoDate(new Date()) })
++  return (
++    <View style={styles.card}>
++      <Text style={styles.title}>Rapportera dagens arbete</Text>
++      <Text style={styles.hint}>Berätta hur länge du jobbade och vad du gjorde. Matte tar hjälp av Lars. Du kontrollerar varje förslag innan det sparas.</Text>
++      <View style={styles.row}>
++        <Pressable accessibilityRole="button" accessibilityLabel="Rapportera dagens arbete med röst" onPress={() => open('voice')} style={styles.voice}>
++          <Ionicons name="mic" size={20} color={color.white} />
++          <Text style={styles.voiceText}>Berätta för Matte</Text>
++        </Pressable>
++        <Pressable accessibilityRole="button" onPress={() => open('text')} style={styles.text}>
++          <Text style={styles.textLabel}>Skriv istället</Text>
++        </Pressable>
++      </View>
++    </View>
++  )
++}
++const styles = StyleSheet.create({
++  card: { backgroundColor: color.slate50, borderRadius: radius.xl, padding: spacing.base, gap: spacing.sm },
++  title: { color: color.slate900, fontSize: font.size.lg, fontWeight: font.weight.bold },
++  hint: { color: color.slate500, fontSize: font.size.sm, lineHeight: 20 },
++  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
++  voice: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, minHeight: 48, paddingHorizontal: spacing.base, borderRadius: radius.lg, backgroundColor: color.teal700 },
++  voiceText: { color: color.white, fontWeight: font.weight.bold },
++  text: { minHeight: 48, justifyContent: 'center', paddingHorizontal: spacing.sm },
++  textLabel: { color: color.teal700, fontWeight: font.weight.semibold },
++})
+diff --git a/lib/api.ts b/lib/api.ts
+index b10f123c..b25f670d 100644
+--- a/lib/api.ts
++++ b/lib/api.ts
+@@ -1640,6 +1640,8 @@ export interface MatteChatMessage {
+ }
+ 
+ export interface MatteChatContext {
++  workReport?: boolean
++  workDate?: string
+   userName?: string
+   businessName?: string
+   customerId?: string | null
+diff --git a/lib/matte-actions.ts b/lib/matte-actions.ts
+index 7ed63cb3..2b36ad6f 100644
+--- a/lib/matte-actions.ts
++++ b/lib/matte-actions.ts
+@@ -1,6 +1,8 @@
+ import { chatWithMatte, confirmMatteAction, type MatteAction, type MatteResponse } from './api'
+ import { useMatteStore, type ChatEntry } from './matte-store'
+ 
++let sending = false
++
+ // Shared send-to-Matte flow used by both chat and voice screens.
+ // - Appends the user message to the shared store immediately
+ // - Sends the last 10 messages to the backend (frontend keeps full history)
+@@ -13,8 +15,21 @@ export async function sendToMatte(params: {
+   userName?: string
+   projectId?: string | null
+   customerId?: string | null
++  workReport?: boolean
++  workDate?: string
++  projectName?: string | null
+ }): Promise<void> {
++  if (sending) throw new Error('Matte arbetar redan med ditt förra meddelande.')
++  if (useMatteStore.getState().pendingConfirmation) throw new Error('Bekräfta eller avbryt förslaget innan du skickar mer.')
++  if (params.projectId !== undefined) {
++    useMatteStore.getState().setScope({
++      projectId: params.projectId, projectName: params.projectName ?? useMatteStore.getState().scope?.projectName ?? null,
++      customerId: params.customerId ?? null, workReport: params.workReport === true, workDate: params.workDate,
++    })
++  }
+   const store = useMatteStore.getState()
++  const scope = store.scope
++  if (scope?.workReport && params.images?.length) throw new Error('Rapportera med röst eller text här. Bilder hanteras i vanliga Matte-chatten.')
+   const userEntry: ChatEntry = {
+     role: 'user',
+     content: params.content,
+@@ -29,19 +44,24 @@ export async function sendToMatte(params: {
+ 
+   const recent = [...previous, userEntry].slice(-10)
+ 
++  sending = true
++  try {
+   const response = await chatWithMatte({
+     messages: recent.map(({ role, content }) => ({ role, content })),
+     // Skicka tillbaka threadId → server-side trådminne + handoff-stickiness.
+     context: {
+       userName: params.userName,
+       threadId: store.threadId ?? undefined,
+-      projectId: params.projectId ?? undefined,
+-      customerId: params.customerId ?? undefined,
++      projectId: scope?.projectId ?? undefined,
++      customerId: scope?.customerId ?? undefined,
++      workReport: scope?.workReport ?? false,
++      workDate: scope?.workDate,
+     },
+     images: params.images?.length ? params.images : null,
+   })
+ 
+-  applyMatteResponse(response)
++  if (useMatteStore.getState().scope === scope) applyMatteResponse(response)
++  } finally { sending = false }
+ }
+ 
+ /**
+@@ -90,18 +110,28 @@ function applyMatteResponse(response: MatteResponse): void {
+  * har ett eget dubbelskydd vid skrivningen, men UI:t ska inte ens fresta.
+  */
+ export async function confirmPendingMatteAction(): Promise<void> {
++  if (sending) throw new Error('Vänta tills Matte har svarat på den pågående åtgärden.')
+   const store = useMatteStore.getState()
+   const pending = store.pendingConfirmation
+   if (!pending) return
+ 
++  sending = true
+   store.setPendingConfirmation(null)
+-  const response = await confirmMatteAction(pending.token)
+-  applyMatteResponse(response)
++  const scope = store.scope
++  try {
++    const response = await confirmMatteAction(pending.token)
++    if (useMatteStore.getState().scope === scope) applyMatteResponse(response)
++  } catch (error) {
++    // Transport error is ambiguous, not proof of failure. Report tokens use
++    // deterministic row IDs server-side, so the EXACT token can be retried.
++    if (scope?.workReport && useMatteStore.getState().scope === scope) store.setPendingConfirmation(pending)
++    throw error
++  } finally { sending = false }
+ }
+ 
+ /**
+- * [Avbryt]: rent klientsidigt — verktyget kördes aldrig på servern, så det
+- * finns ingenting att ångra där.
++ * [Avbryt]: stänger bara kortet. Det återställer aldrig en redan sparad post,
++ * inklusive ett tidigare bekräftelseförsök vars nätverkssvar försvann.
+  */
+ export function cancelPendingMatteAction(): void {
+   const store = useMatteStore.getState()
+@@ -109,7 +139,7 @@ export function cancelPendingMatteAction(): void {
+   store.setPendingConfirmation(null)
+   store.appendMessage({
+     role: 'assistant',
+-    content: 'Avbrutet — ingenting utfördes.',
++    content: 'Det väntande förslaget avbröts. Tidigare sparade poster påverkas inte.',
+     agent: 'matte',
+   })
+ }
+diff --git a/lib/matte-store.ts b/lib/matte-store.ts
+index 50d74cf4..3c8a86d1 100644
+--- a/lib/matte-store.ts
++++ b/lib/matte-store.ts
+@@ -26,7 +26,16 @@ export interface ChatEntry extends MatteMessage {
+   presentation?: { kind: string } & Record<string, unknown>
+ }
+ 
++export interface MatteScope {
++  projectId: string | null
++  projectName: string | null
++  customerId: string | null
++  workReport: boolean
++  workDate?: string
++}
+ interface MatteStore {
++  scope: MatteScope | null
++  setScope: (scope: MatteScope | null) => void
+   messages: ChatEntry[]
+   /** Aktiv tråd för server-side kontinuitet + handoff-stickiness. */
+   threadId: string | null
+@@ -51,6 +60,14 @@ export const useMatteStore = create<MatteStore>()(
+   persist(
+     (set) => ({
+       messages: [],
++      scope: null,
++      setScope: (scope) => set((s) => {
++        const same = s.scope?.projectId === scope?.projectId && s.scope?.customerId === scope?.customerId &&
++          !!s.scope?.workReport === !!scope?.workReport && s.scope?.workDate === scope?.workDate
++        if (same) return s
++        if (s.pendingConfirmation) throw new Error('Bekräfta eller avbryt det väntande kortet i chatten först.')
++        return { scope, messages: [], threadId: null, currentAgent: null, pendingConfirmation: null }
++      }),
+       threadId: null,
+       currentAgent: null,
+       pendingConfirmation: null,
+@@ -81,13 +98,13 @@ export const useMatteStore = create<MatteStore>()(
+           return s
+         }),
+       clearMessages: () =>
+-        set({ messages: [], threadId: null, currentAgent: null, pendingConfirmation: null }),
++        set({ messages: [], scope: null, threadId: null, currentAgent: null, pendingConfirmation: null }),
+     }),
+     {
+       name: 'matte-store',
+       version: 1,
+       storage: createJSONStorage(() => asyncStorage ?? memoryStorage),
+-      partialize: (state) => ({ messages: state.messages, threadId: state.threadId }),
++      partialize: (state) => ({ messages: state.scope?.workReport ? [] : state.messages, threadId: state.scope?.workReport ? null : state.threadId, scope: state.scope?.workReport ? null : state.scope }),
+     }
+   )
+ )

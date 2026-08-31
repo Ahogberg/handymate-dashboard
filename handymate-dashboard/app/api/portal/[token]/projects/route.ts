@@ -81,6 +81,10 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
           supabase
             .from('project_log')
             .select('project_id, description:work_description, created_at')
+            // Explicit internal-report boundary; never rely on a legacy column
+            // mismatch to keep the employee's report out of the customer portal.
+            .not('id', 'like', 'log_report_%')
+            .eq('business_id', customer.business_id)
             .in('project_id', ids)
             .order('created_at', { ascending: false }),
           supabase

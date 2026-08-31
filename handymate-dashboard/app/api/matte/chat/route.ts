@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { loadWorkReportContext, workReportPrompt, prepareWorkReportAction, isWorkReportTool, WorkReportError, type WorkReportContext, type WorkReportAction } from '@/lib/matte/work-report'
+import { pendingWorkReport, confirmWorkReport } from '@/lib/matte/work-report-confirmation'
 import { AGENT_CAPABILITIES, type AgentId } from '@/lib/agent/capabilities'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 import {
@@ -731,7 +733,7 @@ interface AgentTurnResult {
    * huset (send_sms/send_email) medan require_confirm_external=true. Verktyget
    * har INTE exekverats — outer loop stannar och ber om explicit bekräftelse.
    */
-  pendingExternal: { toolName: string; toolInput: Record<string, unknown> } | null
+  pendingExternal: { toolName: string; toolInput: Record<string, unknown>; remaining?: WorkReportAction[] } | null
   /**
    * Epic 2: vad verktygen FAKTISKT gjorde under turen. Grunden för stegets
    * status — utan den härleds "klart" ur modellens egen text, vilket är
@@ -758,6 +760,7 @@ interface AgentTurnResult {
  * turen är slut och väntar på klientens bekräftelse.
  */
 async function runAgentTurn(opts: {
+  workReport?: WorkReportContext | null
   apiKey: string
   agent: AgentId
   systemArray: any[]
@@ -775,8 +778,9 @@ async function runAgentTurn(opts: {
   const MISSION_TOOL_NAMES = new Set(['propose_mission_plan', 'confirm_mission'])
   // Agentens allowlist låses för hela turen — byts agenten sker det via en
   // NY runAgentTurn efter handoff, med den nya agentens lista.
-  const agentTools = toolsForAgent(opts.agent).filter(
-    t => opts.missionToolsAllowed || !MISSION_TOOL_NAMES.has(t.name),
+  const candidates = opts.workReport ? filterTools(['log_time', 'add_work_note']).filter(t => isToolAllowedForAgent(opts.agent, t.name)) : toolsForAgent(opts.agent)
+  const agentTools = candidates.filter(
+    t => (opts.missionToolsAllowed || !MISSION_TOOL_NAMES.has(t.name)) && (!opts.workReport || isWorkReportTool(t.name)),
   )
   let response = await callClaude({
     apiKey: opts.apiKey,
@@ -809,6 +813,26 @@ async function runAgentTurn(opts: {
   while (response.stop_reason === 'tool_use' && iterations < MAX_TOOL_ITERATIONS) {
     iterations++
     const toolUseBlocks = (response.content || []).filter((b: any) => b.type === 'tool_use')
+
+    if (opts.workReport) {
+      try {
+      // A real execution boundary, not just an instruction to the model.
+      if (toolUseBlocks.some((b: any) => !isWorkReportTool(b.name)) || toolUseBlocks.length > 2 || new Set(toolUseBlocks.map((b: any) => b.name)).size !== toolUseBlocks.length) {
+        throw new WorkReportError(409, 'Rapportläget kan bara föreslå en tidpost och en arbetsanteckning. Inget har sparats.')
+      }
+      const actions = toolUseBlocks.map((b: any) => prepareWorkReportAction(b.name, b.input || {}, opts.workReport!))
+      if (actions.length) return {
+        text: '', action: null, handoff: null,
+        pendingExternal: { ...actions[0], remaining: actions.slice(1) },
+        toolOutcomes, presentation: null, usage,
+      }
+      } catch (error) {
+        // The model call already happened. Return a failed step so the normal
+        // metering path still records usage, even for an invalid proposal.
+        return { text: error instanceof Error ? error.message : 'Förslaget kunde inte kontrolleras. Inget har sparats.', action: null, handoff: null, pendingExternal: null,
+          toolOutcomes: [{ tool: 'work_report', ok: false, error: 'Förslaget avvisades före skrivning.' }], presentation: null, usage }
+      }
+    }
 
     // Hitta handoff-anrop FÖRST — det avbryter allt annat
     const handoffBlock = toolUseBlocks.find((b: any) => b.name === 'handoff_to_agent')
@@ -941,7 +965,7 @@ async function runAgentTurn(opts: {
     .join('\n')
     .trim()
 
-  return { text: finalText, action: finalAction, handoff: null, pendingExternal: null, toolOutcomes, presentation, usage }
+  return { text: opts.workReport ? `Inget nytt har sparats i den här turen.\n${finalText}` : finalText, action: finalAction, handoff: null, pendingExternal: null, toolOutcomes, presentation, usage }
 }
 
 /**
@@ -966,6 +990,12 @@ async function handleConfirmedExternalAction(
   }
 
   const supabase = getServerSupabase()
+  if (pending.workReport) {
+    const user = await getCurrentUser(request, businessId)
+    const response = await confirmWorkReport(pending, supabase, businessId, user, executeSharedTool)
+    if (pending.threadId) await saveThreadMessage({ threadId: pending.threadId, businessId, role: 'assistant', agent: 'lars', content: response.reply })
+    return NextResponse.json(response)
+  }
   const bizCtx = await fetchBusinessContext(supabase, businessId, 'user')
   // Identiteten följer med även i bekräftelsevägen (Matte Mobile Voice V1):
   // ett bekräftat log_time ska attribueras till den som tryckte på knappen,
@@ -1051,6 +1081,7 @@ export async function POST(request: NextRequest) {
     const rawCustomerId: string | null = safeContextId(context?.customerId)
     const rawProjectId: string | null = safeContextId(context?.projectId)
     const explicitThreadId: string | null = context?.threadId || null
+    const reportRequested = context?.workReport === true
 
     // ── Bilder: normalisera + validera ─────────────────────────────────
     // Klienten kan skicka antingen array av strängar (base64) eller array
@@ -1120,7 +1151,9 @@ export async function POST(request: NextRequest) {
 
     // Serverägd sidkontext: bara ID:n som bevisligen tillhör tenanten går
     // vidare — se verifyPageContextOwnership ovan.
-    const sidkontext = await verifyPageContextOwnership(supabase, businessId, {
+    const currentBusinessUser = await getCurrentUser(request, businessId)
+    const workReport = reportRequested ? await loadWorkReportContext(supabase, businessId, currentBusinessUser, rawProjectId, context?.workDate) : null
+    const sidkontext = workReport ? { projectId: workReport.projectId, customerId: null, quoteId: null, invoiceId: null } : await verifyPageContextOwnership(supabase, businessId, {
       customerId: rawCustomerId,
       projectId: rawProjectId,
       quoteId: safeContextId(context?.quoteId),
@@ -1133,17 +1166,16 @@ export async function POST(request: NextRequest) {
     // autonoma agenten) — ger bl.a. Google-koppling för kalender/bokning.
     // TD-52: detta är en levande dashboard-/mobil-chatt (session-auth ovan
     // via getAuthenticatedBusiness) — triggerSource är alltid 'user'.
-    const bizCtx = await fetchBusinessContext(supabase, businessId, 'user')
+    const bizCtx = workReport ? null : await fetchBusinessContext(supabase, businessId, 'user')
     // Etapp D-härdning: business_users.id för den inloggade — trådas in i
     // ToolContext så confirm_mission kan skriva ett riktigt created_by i
     // stället för alltid NULL (se lib/agent/agents/shared.ts ToolContext).
-    const currentBusinessUser = await getCurrentUser(request, businessId)
     // Mission Control är ägar-/admin-låst (Andreas fynd 2026-08-18): samma
     // grind som mission-rutterna (Etapp D). Utan behörighet: inget
     // portföljblock (det bär fakturabelopp) och inga mission-verktyg —
     // chatten i övrigt orörd. Dubbelgrind: verktygslistan filtreras OCH
     // exekveringen vägrar (djupförsvar, samma filosofi som external-actor).
-    const missionBehorig = currentBusinessUser != null && isOwnerOrAdmin(currentBusinessUser)
+    const missionBehorig = !workReport && currentBusinessUser != null && isOwnerOrAdmin(currentBusinessUser)
     const toolContext: ToolContext = {
       ...(bizCtx?.toolContext ?? {
         businessName,
@@ -1161,11 +1193,11 @@ export async function POST(request: NextRequest) {
     // tråd; annars en ny allmän tråd (getOrCreateThread skapar ny vid tom kontext).
     let thread: Awaited<ReturnType<typeof getOrCreateThread>> | null = null
     try {
-      thread = await getOrCreateThread({ businessId, customerId, projectId, threadId: explicitThreadId })
+      thread = await getOrCreateThread(workReport ? { businessId, threadId: explicitThreadId } : { businessId, customerId, projectId, threadId: explicitThreadId })
     } catch (err) {
       console.error('[matte/chat] thread fetch/create failed (non-blocking):', err)
     }
-    let currentAgent: AgentId = (thread?.current_agent_id as AgentId) || 'matte'
+    let currentAgent: AgentId = workReport ? 'lars' : (thread?.current_agent_id as AgentId) || 'matte'
     // Support-agenten (escalate_to_handymate_team): tråden finns först nu,
     // efter getOrCreateThread ovan — samma ställe som businessUserId sätts
     // hade inte tråden ännu. support_ticket.thread_id är NOT NULL, så
@@ -1198,11 +1230,29 @@ export async function POST(request: NextRequest) {
     // Hämta verklig affärsdata (non-blocking)
     let contextSection = ''
     try {
-      const bizContext = await getBusinessContext(businessId)
-      contextSection = buildContextSection(bizContext)
+      if (workReport) contextSection = workReportPrompt(workReport)
+      else contextSection = buildContextSection(await getBusinessContext(businessId))
     } catch (err) {
       console.error('[matte/chat] Failed to load business context:', err)
       contextSection = `AKTUELL AFFÄRSSTATUS (${new Date().toLocaleDateString('sv-SE')}): kunde inte laddas just nu.`
+    }
+
+    // UX3a (Prisslingan V2 pass 4): den kanoniska prislistan in i kontexten —
+    // create_quote-verktyget hade tidigare NOLL priskontext och gissade
+    // priser fritt (grep på price i denna fil gav noll träffar). Prislösa
+    // artiklar är MÄRKTA så modellen kan länka utan att hitta på belopp.
+    // Fail-soft: utan lista beter sig chatten som förut.
+    if (!workReport) {
+      try {
+        const { getServerSupabase } = await import('@/lib/supabase')
+        const { fetchPriceContextProducts, buildAgentPriceBlock } = await import('@/lib/products/price-context')
+        const produkter = await fetchPriceContextProducts(getServerSupabase(), businessId)
+        if (produkter.length > 0) {
+          contextSection += '\n\n' + buildAgentPriceBlock(produkter)
+        }
+      } catch (err) {
+        console.error('[matte/chat] prislistan kunde inte laddas (fail-soft):', err)
+      }
     }
 
     // ── Multi-turn historik ─────────────────────────────────────────────
@@ -1213,7 +1263,7 @@ export async function POST(request: NextRequest) {
     // content kan vara string ELLER content-blocks-array (för multimodal).
     type ChatMessage = { role: 'user' | 'assistant'; content: any }
     let initialMessages: ChatMessage[]
-    let historySummary: string | null = thread?.context_summary || null
+    let historySummary: string | null = workReport ? null : thread?.context_summary || null
 
     // Senaste user-meddelandet — det vi ska svara på och spara
     const lastUserMessage = messages
@@ -1222,7 +1272,7 @@ export async function POST(request: NextRequest) {
       .find((m: { role: string; content: string }) => m.role === 'user')
     const newUserText: string = lastUserMessage?.content || ''
 
-    if (thread) {
+    if (thread && !workReport) {
       const persisted = await loadThreadMessages(thread.id, { limit: 20 })
 
       // Token-management: om historik är för lång, sammanfatta äldre delar
@@ -1269,6 +1319,9 @@ export async function POST(request: NextRequest) {
         }).catch(() => {})
       }
     } else {
+      // Report history is the device's scoped conversation only. Never import
+      // the shared company's customer/project thread or financial memories.
+      if (workReport && thread && newUserText) await saveThreadMessage({ threadId: thread.id, businessId, role: 'user', content: newUserText })
       // Legacy: använd payload-historiken (senaste 10). Utan thread sparas
       // ingenting — bilder skickas direkt till Claude i sista user-msg.
       initialMessages = messages.slice(-10).map((m: { role: string; content: string }) => ({
@@ -1369,7 +1422,7 @@ export async function POST(request: NextRequest) {
       // Fail-safe: fel här får aldrig fälla chatten — degraderar tyst.
       let memorySuffix = ''
       try {
-        const memories = await getRelevantMemories(businessId, currentAgent)
+        const memories = workReport ? [] : await getRelevantMemories(businessId, currentAgent)
         memorySuffix = buildMemoryPrompt(memories)
       } catch (err) {
         console.error('[matte/chat] memory fetch failed (non-blocking):', err)
@@ -1416,7 +1469,7 @@ export async function POST(request: NextRequest) {
       const systemArray: any[] = [
         {
           type: 'text',
-          text: buildAgentSystemPrompt(currentAgent, userName, businessName, hasImages),
+          text: buildAgentSystemPrompt(currentAgent, workReport?.userName || userName, businessName, hasImages),
           cache_control: { type: 'ephemeral' },
         },
         { type: 'text', text: contextSection },
@@ -1461,6 +1514,7 @@ export async function POST(request: NextRequest) {
       }
 
       const turn = await runAgentTurn({
+        workReport,
         apiKey,
         agent: currentAgent,
         systemArray,
@@ -1490,6 +1544,12 @@ export async function POST(request: NextRequest) {
       // text den redan sa (t.ex. "Visst, skickar nu...") och returnera direkt
       // — inget verktyg har körts, inget mer sker förrän klienten bekräftar.
       if (turn.pendingExternal) {
+        if (workReport) {
+          const action = prepareWorkReportAction(turn.pendingExternal.toolName, turn.pendingExternal.toolInput, workReport)
+          const pending = pendingWorkReport(action, workReport, businessId, thread?.id || null, turn.pendingExternal.remaining || [])
+          await bokforMatteUsage(`matte_${thread?.id || businessId}_${Date.now()}`)
+          return NextResponse.json({ messages: [], current_agent: 'lars', thread_id: thread?.id || null, reply: pending.summary, action: null, pending_confirmation: pending })
+        }
         if ((turn.text || turn.presentation) && thread) {
           saveThreadMessage({
             threadId: thread.id,
@@ -1700,7 +1760,8 @@ export async function POST(request: NextRequest) {
     // (samma pipeline som triggern — se lib/agents/memory.ts). Fire-and-
     // forget precis som i trigger-vägen; blockerar aldrig svaret och
     // extractAndSaveMemory degraderar redan internt tyst vid fel/kort svar.
-    extractAndSaveMemory(businessId, currentAgent, cleanReply, 'chat', {
+    // A personal draft/report must not become an unconfirmed company-wide memory.
+    if (!workReport) extractAndSaveMemory(businessId, currentAgent, cleanReply, 'chat', {
       customerId,
       projectId,
       userMessage: newUserText,
@@ -1723,6 +1784,7 @@ export async function POST(request: NextRequest) {
       action: finalAction,
     })
   } catch (error: any) {
+    if (error instanceof WorkReportError) return NextResponse.json({ error: error.message, reply: error.message, messages: [] }, { status: error.status })
     console.error('[matte/chat] Error:', error)
     // P0-lärdomen 2026-08-31: Anthropic-krediterna tog slut och kunderna
     // fick generiska fel i två dygn utan att någon larmades. Ett känt
