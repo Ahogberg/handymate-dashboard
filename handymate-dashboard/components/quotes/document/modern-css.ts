@@ -84,6 +84,12 @@ export const MODERN_DOCUMENT_CSS = `
    inte får se, utan att raden försvinner ur hans egen översikt. */
 .quote-document tbody tr.row-hidden td { opacity: 0.45; }
 .quote-document tbody tr.row-hidden td:first-child { border-left: 2px dashed #94A3B8; }
+/* Prislös rad (Fas C, offertskaparen-design-polish) — ENDAST edit-läge (se
+   isPriceless-gaten i QuoteDocumentRow.tsx). Svag gul ton så hantverkaren
+   ser vilka rader som väntar på ett pris utan att det läses som en varning
+   eller ett fel. */
+.quote-document tbody tr.row-priceless td { background: #fffdf5; }
+.quote-document .price-missing-pill { display: inline-block; background: #f0fdf9; color: #0f766e; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 8px; }
 /* Reservationer (v91) — eget block efter villkorsstycket. Punktlista så varje
    förbehåll går att peka på, i stället för att drunkna i löpande text. */
 .quote-document .reservations { margin: 0 0 24px; break-inside: avoid; page-break-inside: avoid; }
