@@ -818,19 +818,21 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
   }, [loading, liveAvailable])
 
   /**
-   * Edit-lägets completeness-chip-klick (gap upptäckt i offertskaparens
-   * design-polish-etapp: edit-läget saknade helt chip-raden och därmed ett
-   * klick-mål). Återanvänder scrollToSection oförändrad — dess useEffect på
+   * Completeness-chip-klickets fulla väg, DELAD av båda lägena (rättat efter
+   * kodgranskning av offertskaparens design-polish-etapp: den ursprungliga
+   * kommentaren här hävdade felaktigt att bara edit-läget rendrerar
+   * dokumentet bakom en kollapsbar panel — i verkligheten gör BÅDA det.
+   * Create-lägets `mainView === 'document'`-gren rendrerar exakt samma
+   * `QuotePreviewPanel`, styrd av exakt samma `showPreviewPanel`/
+   * `previewMode`-state (se grenen längre ner i JSX:en). `data-section`
+   * finns bara i DOM:en när den panelen är öppen och på Live-fliken —
+   * annars är chip-klicket ett tyst no-op i BÅDA lägena. Den här hjälparen
+   * säkerställer det innan `scrollToSection` (oförändrad, dess useEffect på
    * pendingScrollSection kör samma querySelector('[data-section]') oavsett
-   * mode. Skillnaden mot create-läget: dokumentet ligger i edit-läget bakom
-   * QuotePreviewPanel (kollapsbar, Live/Slutdesign-flikar), inte direkt i
-   * huvudytan — så ett klick säkerställer först att panelen är öppen och på
-   * Live-fliken (där QuoteDocument/data-section faktiskt finns i DOM:en)
-   * innan samma scroll körs. Ren komposition av redan existerande
-   * setters/state (showPreviewPanel/previewMode/liveAvailable skickas redan
-   * till QuoteEditView) — ingen ny state.
+   * mode) körs. Ren komposition av redan existerande setters/state — ingen
+   * ny state.
    */
-  const onSelectSectionEdit = useCallback((section: QuoteSection) => {
+  const selectSectionAndReveal = useCallback((section: QuoteSection) => {
     if (liveAvailable) {
       setShowPreviewPanel(true)
       setPreviewMode('live')
@@ -2145,7 +2147,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
         quoteId={quoteId}
         quoteNumber={quoteNumberRef.current}
         completenessSummaries={completenessSummaries}
-        onSelectSection={onSelectSectionEdit}
+        onSelectSection={selectSectionAndReveal}
         autoSaveStatus={autoSaveStatus}
         saving={saving}
         onSendQuote={() => saveQuote(true)}
@@ -2360,7 +2362,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
         <QuoteBuilderHeader
           title={title}
           completenessSummaries={completenessSummaries}
-          onSelectSection={scrollToSection}
+          onSelectSection={selectSectionAndReveal}
           aiGenerated={aiGenerated}
           aiConfidence={aiConfidence}
           aiPriceWarning={aiPriceWarning}

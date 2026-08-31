@@ -93,9 +93,12 @@ export function QuoteBuilderHeader({
   onSaveTemplate,
 }: QuoteBuilderHeaderProps) {
   // Fallback oförändrat om titeln saknas/är tom — bara vilken text som
-  // vinner ändras, quoteNumber-badgen intill (edit-läge) rörs inte.
-  const headerTitle = title?.trim()
-    ? title
+  // vinner ändras, quoteNumber-badgen intill (edit-läge) rörs inte. Trimmad
+  // både för sanningskollen och för visningen, så ett titelfält med bara
+  // inledande/avslutande whitespace inte visas ordagrant.
+  const trimmedTitle = title?.trim()
+  const headerTitle = trimmedTitle
+    ? trimmedTitle
     : mode === 'edit'
       ? 'Redigerar offert'
       : 'Ny offert'
