@@ -19,5 +19,11 @@ import QuoteBuilder from '../../_shared/QuoteBuilder'
 export default function EditQuotePage() {
   const params = useParams()
   const quoteId = (params as any)?.id as string
-  return <QuoteBuilder mode="edit" quoteId={quoteId} />
+  // key={quoteId}: App Router återanvänder annars samma QuoteBuilder-instans
+  // vid en klientnavigering mellan två redigera-URL:er (t.ex. en framtida
+  // offertväxlare) - dess laddnings-effekt beror bara på business_id, så utan
+  // key:n skulle den fortsätta visa/autospara FÖREGÅENDE offertens data mot
+  // den nya URL:en. Ingen nuvarande länk navigerar så idag, men key:n gör
+  // detta ofarligt att bygga senare.
+  return <QuoteBuilder key={quoteId} mode="edit" quoteId={quoteId} />
 }
