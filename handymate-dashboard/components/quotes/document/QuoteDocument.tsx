@@ -5,7 +5,8 @@ import { MODERN_DOCUMENT_CSS } from './modern-css'
 import { QuoteDocumentRow } from './QuoteDocumentRow'
 import { SignatureCta } from './SignatureCta'
 import { InvoicePaymentSection } from './InvoicePaymentSection'
-import { mixWithWhite, describeReservationSuggestionRows } from './format'
+import { mixWithWhite } from './format'
+import { ReservationSuggestionBox } from './ReservationSuggestionBox'
 import type { QuoteDocumentHandlers, QuoteDocumentMode, QuoteDocumentMobileProps, MoneyDocumentData } from './types'
 import type { ReservationSuggestion } from '@/lib/reservations/match'
 
@@ -676,46 +677,11 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             "ta ställning till förslag"-uppmaning, exakt samma disciplin
             som "Sätt pris"-pillen (QuoteDocumentRow.tsx isPriceless). */}
         {!isInvoice && mode === 'edit' && reservationSuggestions && reservationSuggestions.length > 0 && (
-          <div
-            {...section('reservationer')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-              background: '#fffbeb',
-              border: '1px solid #fde68a',
-              borderRadius: 10,
-              padding: '9px 12px',
-              margin: '0 0 24px',
-            }}
-          >
-            <p style={{ margin: 0, fontSize: '12.5px', lineHeight: 1.5, color: '#92400e' }}>
-              <strong>{reservationSuggestions.length} förslag från Daniel</strong>
-              {' — följer med raderna '}
-              {describeReservationSuggestionRows(
-                reservationSuggestions.flatMap(s => s.triggeredBy.map(t => t.description)),
-              )}
-            </p>
-            <button
-              type="button"
-              onClick={() => onReviewReservationSuggestions?.()}
-              style={{
-                background: '#fff',
-                border: '1px solid #fde68a',
-                color: '#92400e',
-                borderRadius: 9,
-                padding: '6px 12px',
-                fontSize: '12px',
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-                flexShrink: 0,
-              }}
-            >
-              Ta ställning
-            </button>
-          </div>
+          <ReservationSuggestionBox
+            suggestions={reservationSuggestions}
+            onReview={onReviewReservationSuggestions}
+            sectionAttrs={section('reservationer')}
+          />
         )}
 
         {/* ETAPP C3-fix (2026-08-06): platshållare när listan är tom.

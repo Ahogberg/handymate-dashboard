@@ -97,6 +97,29 @@ export const MODERN_DOCUMENT_CSS = `
 .quote-document .reservations ul { margin: 0; padding-left: 16px; }
 .quote-document .reservations li { font-size: 11px; line-height: 1.65; color: #475569; margin-bottom: 5px; }
 .quote-document .reservations li strong { color: #0F172A; font-weight: 600; }
+/* Reservationsförslag (Fas D, offertskaparen-design-polish) — amberfärgad
+   ruta INUTI Reservationer-sektionen (ersätter den fristående
+   ReservationSuggestionBanner:en i assistentkolumnen). ENDAST edit-läge, se
+   gaten i QuoteDocument.tsx. Följer .row-priceless/.price-missing-pill:s
+   mönster (statiska temafärger som klasser, inte inline style). */
+.quote-document .reservation-suggestion-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 9px 12px; margin: 0 0 24px; }
+/* min-width:0 krävs för att text-overflow ska få effekt på ett flex-barn —
+   annars vägrar barnet krympa under sin innehållsbredd och en ovanligt lång
+   produkt-/radbeskrivning trycker granskningsknappen (__cta) ut ur rutan i
+   stället för att klippas med "…".
+   OBS: undvik medvetet knapptextens EGNA ord i den här kommentaren — CSS:en
+   ligger inbäddad i en <style>-tagg som renderas i ALLA lägen (även när
+   rutan själv inte monteras), så en ordagrann knapptext här gav tidigare
+   falska träffar i facit-testens not.toContain(knapptext)-kontroller. */
+.quote-document .reservation-suggestion-banner__text { margin: 0; min-width: 0; flex: 1 1 auto; font-size: 12.5px; line-height: 1.5; color: #92400e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quote-document .reservation-suggestion-banner__text strong { font-weight: 700; }
+.quote-document .reservation-suggestion-banner__actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.quote-document .reservation-suggestion-banner__cta { background: #fff; border: 1px solid #fde68a; color: #92400e; border-radius: 9px; padding: 6px 12px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+/* Lokal dismiss-knapp (×), adversarial review 2026-09-01 — se
+   ReservationSuggestionBox.tsx:s docblock för varför den här knappen finns:
+   återger originalbannerns egen, icke-persisterade "dölj den här gången". */
+.quote-document .reservation-suggestion-banner__dismiss { background: transparent; border: none; color: #92400e; opacity: .55; cursor: pointer; padding: 2px 6px; line-height: 1; font-size: 15px; flex-shrink: 0; }
+.quote-document .reservation-suggestion-banner__dismiss:hover { opacity: 1; }
 /* Betalplan (etapp A4) — eget block direkt efter summeringen. Håller ihop över
    sidbrytning: en halv betalplan är värre än ingen. */
 .quote-document .payment-plan { margin: 0 0 24px; break-inside: avoid; page-break-inside: avoid; }

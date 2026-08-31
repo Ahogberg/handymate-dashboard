@@ -1,9 +1,15 @@
 /**
  * Formatterings-hjälpare delade av QuoteDocument (edit + static-läge).
- * Kopierade EXAKT (inte omskrivna) från lib/quote-templates/modern.ts så
+ *
+ * formatNumber/mixWithWhite/A4_WIDTH_PX/computeFitScale nedan är kopierade
+ * EXAKT (inte omskrivna) från lib/quote-templates/modern.ts så
  * paritetstestet (tests/quote-document-parity.spec.ts) inte kan fastna på
  * en oavsiktlig avrundnings-/mellanslagsskillnad mellan gammal och ny
- * renderare.
+ * renderare. Det påståendet gäller BARA de funktionerna —
+ * describeReservationSuggestionRows (Fas D, offertskaparen-design-polish)
+ * är ny, orelaterad logik utan motsvarighet i modern.ts, och hör hemma
+ * här bara för att den är en annan ren formatteringshjälpare QuoteDocument
+ * (edit-läget) delar.
  */
 
 /** "10 000" — mellanslag som tusentalsavgränsare, decimaler bevaras. */
