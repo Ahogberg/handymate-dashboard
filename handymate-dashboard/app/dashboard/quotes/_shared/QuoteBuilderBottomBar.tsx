@@ -94,15 +94,19 @@ export function QuoteBuilderBottomBar({
         })}
       </div>
 
+      {/* ETAPP 1f-motsvarigheten till headerns orsakstext: renderas i NORMALT
+          flöde (inte absolut positionerad) ovanför knapparna. Fas B-
+          granskningsfix (2026-08-31): en tidigare `absolute -top-5`-variant
+          här flöt in i chip-radens nedre padding och riskerade att krocka
+          visuellt med den — normalt flöde knuffar i stället bara ner
+          knapparna en rad, aldrig en overlap. */}
+      {!canSend && sendDisabledReason && (
+        <p className="text-[10px] text-slate-400 mb-1.5 px-0.5">{sendDisabledReason}</p>
+      )}
+
       {/* Spara utkast / Skicka offert — samma handlers/villkor som
           QuoteBuilderHeader.tsx:s (nu desktop-only) knappar. */}
       <div className="relative flex items-stretch gap-2">
-        {!canSend && sendDisabledReason && (
-          <span className="absolute -top-5 left-1 text-[10px] text-slate-400 whitespace-nowrap">
-            {sendDisabledReason}
-          </span>
-        )}
-
         <button
           type="button"
           onClick={onSaveDraft}

@@ -2341,6 +2341,12 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
     )
   }
 
+  // Fas B-granskningsfix (offertskaparen-design-polish, 2026-08-31): lyft ur
+  // en gång i stället för att copy-pasta samma två uttryck till både
+  // QuoteBuilderHeader (desktop) och QuoteBuilderBottomBar (mobil) nedan.
+  const canSend = !!selectedCustomer
+  const sendDisabledReason = !selectedCustomer ? 'Välj kund först' : undefined
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Mallväljaren. Öppnas bara från Snabboffertens intag — den är inte
@@ -2358,13 +2364,16 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
           skickas in i QuoteBuilderHeader (rad 2, completeness-remsan) för
           vad som ersatte kvittots granskningskrav. */}
       <div
-        // Fas B (offertskaparen-design-polish, 2026-08-31): pb-32/lg:pb-6
+        // Fas B (offertskaparen-design-polish, 2026-08-31): pb-40/lg:pb-6
         // ersätter det gamla py-4/sm:py-6-bottenvärdet EXPLICIT (pt-* hanterar
         // toppen oförändrat) så det nya fasta bottenfältet (QuoteBuilderBottomBar,
-        // lg:hidden) aldrig täcker dokumentets sista rad under `lg`. Uträknat mot
-        // barens faktiska höjd: chip-rad (~40px) + knapprad (52px) + paddingen
-        // runt dem + safe-area — 8rem (128px) har rejäl marginal.
-        className="max-w-[1600px] mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-32 lg:pb-6"
+        // lg:hidden) aldrig täcker dokumentets sista rad under `lg`. Granskad
+        // matematik (fix efter kod-granskning): chip-rad ~40px + knapprad 52px +
+        // barens egen padding (pt-2.5 10px + pb-2.5 10px mellan raderna + 16px
+        // bas-bottenpadding) ≈ 128px vid safe-area=0 — men på riktiga iPhones med
+        // home indicator är safe-area-inset-bottom ~34px, inte 16px, så barens
+        // faktiska höjd blir ~146px. pb-40 (160px) täcker det med marginal.
+        className="max-w-[1600px] mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-40 lg:pb-6"
       >
         <QuoteBuilderHeader
           title={title}
@@ -2375,8 +2384,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
           aiPriceWarning={aiPriceWarning}
           aiPhotoCount={aiPhotoCount}
           saving={saving}
-          canSend={!!selectedCustomer}
-          sendDisabledReason={!selectedCustomer ? 'Välj kund först' : undefined}
+          canSend={canSend}
+          sendDisabledReason={sendDisabledReason}
           sendConfirmPending={sendConfirmPending}
           onConfirmSend={() => saveQuote(true, true)}
           onCancelSend={() => setSendConfirmPending(false)}
@@ -2769,8 +2778,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
         summaries={completenessSummaries}
         onSelect={selectSectionAndReveal}
         saving={saving}
-        canSend={!!selectedCustomer}
-        sendDisabledReason={!selectedCustomer ? 'Välj kund först' : undefined}
+        canSend={canSend}
+        sendDisabledReason={sendDisabledReason}
         sendConfirmPending={sendConfirmPending}
         onConfirmSend={() => saveQuote(true, true)}
         onCancelSend={() => setSendConfirmPending(false)}

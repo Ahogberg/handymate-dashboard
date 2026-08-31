@@ -239,14 +239,21 @@ export function QuoteEditView(props: QuoteEditViewProps) {
     showSaveTemplateModal, setShowSaveTemplateModal, templateName, setTemplateName, savingTemplate, saveAsTemplate,
   } = props
 
+  // Fas B-granskningsfix (offertskaparen-design-polish, 2026-08-31): lyft ur
+  // en gång i stället för att copy-pasta samma uttryck till både
+  // QuoteBuilderHeader (desktop) och QuoteBuilderBottomBar (mobil) nedan.
+  const canSend = !!selectedCustomer
+
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Fas B (offertskaparen-design-polish, 2026-08-31): pb-32/lg:pb-6
+      {/* Fas B (offertskaparen-design-polish, 2026-08-31): pb-40/lg:pb-6
           ersätter det gamla py-4/sm:py-6-bottenvärdet EXPLICIT (pt-* hanterar
           toppen oförändrat) så det fasta bottenfältet (QuoteBuilderBottomBar,
           lg:hidden, monterad nedan) aldrig täcker dokumentets sista rad
-          under `lg`. Se samma kommentar i QuoteBuilder.tsx (create-läget). */}
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-32 lg:pb-6">
+          under `lg`. Se samma (granskade) matteräkning i QuoteBuilder.tsx
+          (create-läget) — safe-area-inset-bottom på riktiga iPhones (~34px)
+          gör baren högre än pb-32 räckte till. */}
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-40 lg:pb-6">
         <QuoteBuilderHeader
           mode="edit"
           quoteNumber={quoteNumber}
@@ -255,7 +262,7 @@ export function QuoteEditView(props: QuoteEditViewProps) {
           onSelectSection={onSelectSection}
           autoSaveStatus={autoSaveStatus}
           saving={saving}
-          canSend={!!selectedCustomer}
+          canSend={canSend}
           hasItems={hasItems}
           onSendQuote={onSendQuote}
           onSaveDraft={onSaveDraft}
@@ -428,7 +435,7 @@ export function QuoteEditView(props: QuoteEditViewProps) {
         summaries={completenessSummaries}
         onSelect={onSelectSection}
         saving={saving}
-        canSend={!!selectedCustomer}
+        canSend={canSend}
         onSendQuote={onSendQuote}
         onSaveDraft={onSaveDraft}
       />
