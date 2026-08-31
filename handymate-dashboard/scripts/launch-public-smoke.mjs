@@ -28,7 +28,10 @@ for (const probe of probes) {
       const body = await response.json().catch(() => null)
       const timestampMs = Date.parse(body?.timestamp || '')
       const ageMs = Date.now() - timestampMs
-      const fresh = Number.isFinite(timestampMs) && ageMs >= 0 && ageMs < 5 * 60 * 1000
+      // Tolerate normal clock skew between this machine and the server (observed up to
+      // ~1.3s against Vercel's edge) instead of requiring the timestamp to be in the past.
+      const CLOCK_SKEW_TOLERANCE_MS = 15_000
+      const fresh = Number.isFinite(timestampMs) && ageMs >= -CLOCK_SKEW_TOLERANCE_MS && ageMs < 5 * 60 * 1000
       ok = fresh && body?.status === 'healthy'
       detail += fresh
         ? ` · healthy · ${Math.round(ageMs / 1000)} s gammal`

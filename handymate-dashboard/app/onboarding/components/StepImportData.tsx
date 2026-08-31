@@ -3,11 +3,9 @@
 /**
  * StepImportData — "Hämta in din verksamhet" (onboarding-steg, efter betalning).
  *
- * ALL LOGIK ÄR OFÖRÄNDRAD (Fortnox-OAuth, runFortnoxImport, handleCsvFile,
- * parseCsvCustomers, view-state-maskinen, setData, felhantering,
- * useEffect-callbacken). Endast det VISUELLA lagret är de förfinade
- * obi-*-komponenterna (states A–E) från Claude Design. Kräver CSS-tillägget
- * obi-* i onboarding.css.
+ * Fortnox-flödet är separat från CSV-importens gemensamma serverkvittens.
+ * CSV visar även delvisa fel; antal importerade kunder är unika bekräftade ID:n.
+ * Kräver CSS-tillägget obi-* i onboarding.css.
  *
  * Beroenden: lucide-react, ./OnboardingHeader, @/lib/agents/team (avatarer).
  */
@@ -28,6 +26,9 @@ import OnboardingHeader from './OnboardingHeader'
 import { TEAM } from '@/lib/agents/team'
 import { isDemoBusinessId } from '@/lib/demo/is-demo-client'
 import type { OnboardingFormData } from '../types-redesign'
+import CustomerImportReceipt from '@/components/customers/CustomerImportReceipt'
+import { parseCsvCustomers } from '@/lib/customers/csv'
+import { readCustomerImportResult, type CustomerImportResult } from '@/lib/customers/import-result'
 
 interface Props {
   onNext: () => void
@@ -55,7 +56,7 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
   const [view, setView] = useState<View>('choose')
   const [error, setError] = useState<string | null>(null)
   const [fortnoxResult, setFortnoxResult] = useState<FortnoxResult | null>(null)
-  const [csvCount, setCsvCount] = useState(0)
+  const [csvResult, setCsvResult] = useState<CustomerImportResult | null>(null)
   const [csvBusy, setCsvBusy] = useState(false)
   const [dragOver, setDragOver] = useState(false)
 
@@ -81,6 +82,7 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
   }, [view])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const importStartedRef = useRef(false)
+  const csvBusyRef = useRef(false)
 
   /* ─────────── LOGIK (oförändrad) ─────────── */
 
@@ -174,6 +176,8 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
   }, [setData])
 
   async function handleCsvFile(file: File) {
+    if (csvBusyRef.current) return
+    csvBusyRef.current = true
     setCsvBusy(true)
     setError(null)
     try {
@@ -189,14 +193,16 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d?.error ?? 'Import misslyckades')
-      const imported = Number(d?.success ?? 0)
-      setCsvCount(imported)
-      setData(prev => ({ ...prev, importedCustomers: imported }))
+      const result = readCustomerImportResult(d)
+      setCsvResult(result)
+      setData(prev => ({ ...prev, importedCustomers: result.importedIds.length }))
       setView('csv-done')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Kunde inte läsa filen')
+      setError(`${e instanceof Error ? e.message : 'Importresultatet kunde inte bekräftas.'} Kontrollera kundlistan innan du försöker igen; vissa rader kan redan ha sparats.`)
     } finally {
+      csvBusyRef.current = false
       setCsvBusy(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -232,7 +238,7 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
                 <span className="obi-choice-ic soft"><FileSpreadsheet size={24} strokeWidth={2.2} /></span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="obi-choice-title">Ladda upp kundlista</span>
-                  <span className="obi-choice-sub">Har du en CSV/Excel-fil? Vi läser in den åt dig.</span>
+                  <span className="obi-choice-sub">Exportera din kundlista från Excel som CSV och läs in den här.</span>
                 </span>
                 <span className="obi-choice-arrow"><ArrowRight size={20} /></span>
               </button>
@@ -300,9 +306,9 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
         {view === 'csv' && (
           <>
             <h1 className="ob-headline" style={{ fontSize: 22 }}>Ladda upp kundlista</h1>
-            <p className="ob-sub" style={{ marginBottom: 18 }}>CSV eller Excel — vi känner igen kolumnerna åt dig.</p>
+            <p className="ob-sub" style={{ marginBottom: 18 }}>Ladda upp en CSV-fil — vi känner igen kolumnerna åt dig.</p>
 
-            {error && <FallbackNote text={error} />}
+            {error && <p role="alert" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{error}</p>}
 
             <div
               className={`obi-drop ${dragOver ? 'over' : ''}`}
@@ -368,16 +374,11 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
         )}
 
         {/* CSV — klart */}
-        {view === 'csv-done' && (
-          <SuccessView
-            title={<><span className="hl">{csvCount} kunder</span> inlästa</>}
-            sub="Teamet kan nu jobba på hela din kundbas."
-            genomgang={genomgang ?? undefined}
-            agent={{
-              id: 'hanna',
-              text: <><b>Hanna</b> kan nu väcka dina vilande kunder med en reaktiverings-kampanj — starta den på dashboarden.</>,
-            }}
-          />
+        {view === 'csv-done' && csvResult && (
+          <div className="ob-card p-4">
+            <CustomerImportReceipt result={csvResult} />
+            <button type="button" className="obi-skiplink mt-4" onClick={() => setView('csv')}>Tillbaka till filval</button>
+          </div>
         )}
       </div>
 
@@ -496,7 +497,7 @@ function SuccessView({
   )
 }
 
-/* ─────────── CSV-parser + mall (oförändrad logik) ─────────── */
+/* ─────────── CSV-mappning + mall; delad parser med kundimporten ─────────── */
 
 function downloadTemplate() {
   const template =
@@ -508,37 +509,4 @@ function downloadTemplate() {
   a.download = 'kundimport_mall.csv'
   a.click()
   URL.revokeObjectURL(url)
-}
-
-function parseCsvCustomers(
-  text: string
-): Array<{ name: string; phone_number: string; email: string; address: string }> {
-  const lines = text.split(/\r?\n/).filter(l => l.trim())
-  if (lines.length === 0) return []
-
-  const delimiter = lines[0].includes(';') ? ';' : lines[0].includes('\t') ? '\t' : ','
-  const split = (line: string) => line.split(delimiter).map(c => c.trim().replace(/^"|"$/g, ''))
-
-  const header = split(lines[0]).map(h => h.toLowerCase())
-  const findCol = (keys: string[]) => header.findIndex(h => keys.some(k => h.includes(k)))
-
-  const nameIdx = findCol(['namn', 'name', 'kund', 'företag', 'foretag'])
-  const phoneIdx = findCol(['telefon', 'phone', 'mobil', 'tel'])
-  const emailIdx = findCol(['e-post', 'epost', 'email', 'mail', 'e-mail'])
-  const addrIdx = findCol(['adress', 'address', 'gata'])
-
-  const hasHeader = nameIdx >= 0 || phoneIdx >= 0 || emailIdx >= 0
-  const dataLines = hasHeader ? lines.slice(1) : lines
-
-  const out: Array<{ name: string; phone_number: string; email: string; address: string }> = []
-  for (const line of dataLines) {
-    const cols = split(line)
-    const name = nameIdx >= 0 ? cols[nameIdx] ?? '' : cols[0] ?? ''
-    const phone = phoneIdx >= 0 ? cols[phoneIdx] ?? '' : cols[1] ?? ''
-    const email = emailIdx >= 0 ? cols[emailIdx] ?? '' : ''
-    const address = addrIdx >= 0 ? cols[addrIdx] ?? '' : ''
-    if (!name && !phone) continue
-    out.push({ name, phone_number: phone, email, address })
-  }
-  return out
 }

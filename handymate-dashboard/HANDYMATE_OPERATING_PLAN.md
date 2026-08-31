@@ -1,6 +1,6 @@
 # HANDYMATE — OPERATIV GTM-PLAN FÖR ANDREAS OCH CHRISTOFFER
 
-_Version 2026-08-24. Detta är den gemensamma kommersiella arbetsytan fram till
+_Version 2026-08-31. Detta är den gemensamma kommersiella arbetsytan fram till
 och efter lanseringen. Den ersätter juliplanens gamla produktgrindar och kalla
 SMS-spår. Den ersätter inte den tekniska lanseringschecklistan._
 
@@ -271,9 +271,10 @@ Visa vad som behöver ägaren, vad teamet sköter och vad som väntar. Förklara
 specialisterna med roll första gången: “Matte, din chefsagent”, “Karin, din
 ekonom” och så vidare.
 
-### 6–11 minuter: ge Matte ett mål
+### 6–11 minuter: visa teamets svar på kundens viktigaste problem
 
-Använd ett mål som passar prospektets smärta. Matte får bara bygga en plan ur
+Använd Uppdrag om kunden faktiskt har ett mål som behöver flera steg. Annars
+börjar vi direkt i den relevanta arbetskedjan nedan. Matte får bara bygga en plan ur
 verkliga signaler. Visa ansvarig specialist, väntande beslut och att potential
 inte blandas med bekräftat resultat.
 
@@ -313,26 +314,60 @@ Avsluta med ett val:
 “Jag ska fundera” följs av: “Absolut — vad är den viktigaste frågan du behöver
 få svar på för att kunna avgöra?”
 
+### Efter ja: kundens första fungerande arbetsdag
+
+Christoffer och Andreas väljer **en** startkedja med kunden. Detta är ett
+uppstartsmanus, inte en ny teknisk lanseringsgrind. Go/no-go ägs fortsatt av
+den externa lanseringschecklistan.
+
+| Kundens prioritet | Gemensamt startprov | Vad kunden får se |
+|---|---|---|
+| Fånga förfrågningar | En märkt testförfrågan via vald webb-/mejlkanal; därefter ett återbesök från samma testkund | Rätt kund, ny förfrågan/affär, inget dubbelt kundkort, synligt nästa steg |
+| Slippa dubbelarbete i fält | En fil och en tidrad på rätt testprojekt, med rätt medarbetarbehörighet | Filen öppnas i plattformen; tiden finns en gång och på rätt person/projekt |
+| Få betalt för utfört arbete | Följ ett förberett testärende genom underlag, granskning och leverans | Vad som är förslag, godkänt, fakturerat respektive betalt hålls isär |
+
+Proven görs bara med godkända testkonton och mottagare. Skicka inte fakturor
+eller SMS till en riktig kund för att demonstrera. Betalning kräver verkligt
+betalningsbevis eller tydligt märkt sandbox; ändra inte en produktionsfaktura
+för att få ett grönt test. Röst/telefon provas separat med riktiga enheter och
+med de aktiveringsvillkor som gäller då.
+
+**Import är inte aktivering:** börja med en liten kontrollerad CSV, jämför
+skapade/uppdaterade/oförändrade/överhoppade/misslyckade rader mot kundlistan.
+Ett delresultat är inte ”allt klart”. Ett transportfel ger okänt resultat —
+kontrollera sparade kunder före nytt försök. Fortnox-synk och inflödeskanal
+behöver egna bevis; CSV-importen bevisar ingen av dem.
+
+Använd befintliga Kom igång- och kanalhälsovyer för nästa steg. Ingen extra
+onboardinglista eller ny målfråga behövs. Inom två arbetsdagar frågar
+Christoffer: ”Har en riktig händelse gått genom den valda kedjan, och vad
+behövde du fortfarande göra manuellt?” Svaret styr hjälpen, inte antalet
+inloggningar. Senaste avgränsade kod-/testunderlag:
+[Nu-pass 31 augusti](docs/audits/PRELAUNCH_NOW_2026-08-31.md).
+
 ## 9. Vad Christoffer får och inte får säga
 
 ### Kärnfraser
 
-- “De ger dig ett verktyg. Vi ger dig ett team.”
+- “Ditt AI-team för hantverksföretaget — från kundförfrågan till betalning.”
 - “Du ska inte arbeta för systemet. Systemet ska arbeta för dig.”
 - “Matte är din chefsagent och samordnar specialisterna.”
 - “Teamet föreslår och förbereder. Du godkänner viktiga handlingar.”
 - “Potential, utfört, fakturerat och betalt hålls isär.”
-- “Du behöver inte riva ut det du använder första dagen.”
+- “Vi väljer en första arbetskedja och kontrollerar vad som behöver kopplas eller flyttas.”
 
 ### Förbjudet
 
-- Säg inte att Lisa är en talande AI-röstagent.
+- Lova inte Lisa Live eller aktiverad samtalsinspelning utan motsvarande
+  aktivering och skarpbevis. Matte-röst och Lisa-samtalsefterarbete är olika saker.
 - Säg inte att Fortnox fungerar utan att nämna kundens licensförutsättning.
 - Säg inte att potential är intäkt eller att ett förslag är utfört.
 - Säg inte att Handymate garanterar en viss tids- eller intäktsvinst.
 - Säg inte att en ny funktion är beprövad hos kunder när den bara är byggd
   eller demokörd.
 - Säg inte “alla konkurrenter saknar X” utan aktuell, verifierad källa.
+- Säg inte att Easofts AI bara är en workshop eller att marknaden saknar
+  AI-konkurrenter. Jämför samma konkreta arbetskedja, kostnad och kontroll.
 - Visa inte verkliga kunduppgifter utan tydligt tillstånd.
 
 Vid osäkerhet vinner `tasks/sales-arsenal.md` och den faktiska produkten över

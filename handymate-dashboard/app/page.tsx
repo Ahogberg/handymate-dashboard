@@ -17,18 +17,18 @@ export default function Home() {
             </svg>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Handymate</h1>
-          <p className="text-gray-500">AI-driven back office för hantverkare</p>
+          <p className="text-gray-500">Ditt AI-team för hantverksföretaget</p>
         </div>
         
         <Link 
           href="/dashboard"
           className="block w-full bg-primary-700 text-white py-4 px-4 rounded-xl text-center font-semibold transition-all shadow-lg shadow-primary-600/10"
         >
-          Gå till Dashboard
+          Öppna Handymate
         </Link>
         
         <p className="text-center text-sm text-gray-400 mt-6">
-          Demo-läge • Ingen inloggning krävs
+          Logga in för att se ditt företag och ditt team.
         </p>
 
         <div className="mt-8 pt-6 border-t border-gray-200">

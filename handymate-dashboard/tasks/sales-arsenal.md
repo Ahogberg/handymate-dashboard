@@ -1,119 +1,167 @@
 # Säljarsenal — kanonisk källa för allt säljspråk
 
-_2026-07-29. Byggd på tasks/moat-technical-analysis.md. Demo-manus, pitch,
-SEO och invändningshantering hämtar HÄRIFRÅN — ingen improviserar om samma
-saker i olika trådar. Ärlighetsreglerna sist gäller ALL användning._
+_Uppdaterad 2026-08-31 efter konkurrentresearch och Nu-fördjupning. Ersätter
+äldre jämförelser i denna fil, inklusive ”bara en workshop”, ”bara en chattruta”
+och uppskattade kopieringstider. Demo, pitch och invändningssvar hämtar
+härifrån. Detta är språkunderlag, inte bevis på produktionsstatus._
 
-## Kärnfras (kategorin)
+## 1. Kategorin och löftet
 
-**"De ger dig ett verktyg. Vi ger dig ett team."**
-Kategoriterm: **AI-team för hantverkare.**
+**Ditt AI-team för hantverksföretaget.**
 
-## Sex demo-repliker (mappade mot teknisk moat)
+> Från kundförfrågan till utfört jobb och betalning — med kontroll på vad som
+> faktiskt är klart.
 
-1. **SVARA VS GÖRA** _(kö-som-skrivväg, kopieringstid 12–24 mån)_:
-   "Deras AI kommer kunna svara på frågor. Vårt team GÖR saker — skickar
-   påminnelsen, jagar offerten som ingen öppnat, förbereder fakturan. Och
-   inget går ut utan att du tryckt OK."
-2. **DAG 1 VS DAG 100** _(lärande-lagret ovanpå kön, 18–24 mån)_:
-   "Första veckan frågar teamet mycket. Efter tre månader vet det hur du
-   prissätter, vilka kunder som betalar sent, hur dina offerter ska låta.
-   En chatbot är lika dum dag 100 som dag 1."
-3. **ROT-FÄLLAN** _(BYGGT★ — demobar nu)_:
-   "ROT räknas på arbetet, inte materialet. Vi delar upp det på varje rad
-   automatiskt — och när du ändrar prislistan ändras inte gamla offerter,
-   varje offert är fryst som ett kvitto. Fråga din nuvarande leverantör hur
-   de löser det." _[Medveten fälla — rad-nivå-ROT + snapshot kräver deras
-   smärtsammaste retrofit.]_
-4. **FACIT-MASKINEN** _(ärlighetsgräns: säg "samlar facit från dag 1",
-   ALDRIG "AI:n prissätter idag")_:
-   "Systemet ser vad du offererade, vad jobbet faktiskt tog, och vad du
-   fakturerade. Från första jobbet samlas ditt facit — grunden för att veta
-   om du prissätter rätt."
-5. **BEHÅLL DET DU HAR** _(coexistence-kilen ur DEL 2B)_:
-   "Du behöver inte byta bort något. Teamet jobbar ovanpå det du har —
-   fångar samtalen du missar, jagar offerterna som ligger. Flytta resten
-   när du själv vill."
-6. **GRUNDARHASTIGHETEN**:
-   "Vår pilot bad om en produktbank — den var byggd inom en vecka. Fråga
-   Bygglet när de senast byggde något en kund bad om samma månad."
-   _[ANDREAS: bekräfta tidslinjen mot din minnesbild innan repliken används
-   skarpt — bygget är daterat 7–8 juli, verifiera när Christoffer bad.]_
+**Varumärkesrad:** Välkommen till framtidens hantverksföretag.
 
-## Fyra invändningssvar
+**Nyttorad:** Hittar pengar. Skyddar marginalen. Minskar admin.
 
-- **"Bygglet får väl också AI snart?"** → "Jo — en chattruta. Fråga vad den
-  kan GÖRA. Kan den skicka påminnelsen? Jaga offerten? Lär den sig hur du
-  prissätter? En chatbot ovanpå ett system från 2010 är en mikrofon på en
-  grammofon — låter modernt, spelar samma skiva."
-- **"Ni är små och nya"** → "Ja — det är därför du pratar med grundaren, och
-  därför byggdes produktbanken dagar efter att vår pilot bad om den. Ingen
-  bindningstid, pengarna-tillbaka-garanti — och din data kan du få ut när
-  du vill."
-  _[VERIFIERAT 2026-07-29: "din data kan du få ut när du vill" är SKARPT —
-  självbetjäningsknapp "Exportera min data" finns under Inställningar →
-  Företagsinformation (JSON med kunder/offerter/fakturor/bokningar/projekt,
-  personnummer maskerade som standard). KVARSTÅR att verifiera: "datan
-  ligger i EU" — Andreas bekräftar Supabase-projektets region
-  (Settings → General) innan det påstås.]_
-- **"Vad händer när AI:n gör fel?"** → "Inget går ut utan ditt OK. Teamet
-  föreslår, du godkänner. Ju mer du godkänner desto mer kan du släppa
-  taget — men du bestämmer alltid takten."
-- **"Jag orkar inte byta system"** → "Behåll det. Börja med att teamet
-  fångar dina missade samtal — det rör inte ditt nuvarande system
-  överhuvudtaget."
+Nyttoraden beskriver vad produkten hjälper till med, inte en ekonomisk
+garanti. Följ den med ett konkret exempel, inte ytterligare superlativ.
 
-## Fällefrågor prospekten kan ställa sin nuvarande leverantör
+Chefsagenten Matte samordnar specialisterna. Kunden ger teamet ett **Uppdrag**.
+”Mission Control” är ett internt begrepp. Introducera alltid agentens roll
+innan namnet används ensamt.
 
-- "Vad kan er AI **göra** — inte svara på, utan utföra?"
-- "Hur delar ni ROT på arbete vs material **per rad**?"
-- "Lär sig systemet hur **jag** prissätter?"
+## 2. Kort pitch
 
-## Konkurrent-motdrag (förberedda svar)
+> Du ska inte behöva hålla hela firman i huvudet. Handymate samlar kunder,
+> jobb och ekonomi med ett AI-team som hjälper dig följa upp det som annars
+> faller mellan stolarna. Matte håller ihop arbetet, specialisterna förbereder
+> nästa steg och du ser vad som behöver ditt beslut — och vad som faktiskt hänt.
 
-- **NY fällefråga (research 2026-08-04, tasks/competitive-easoft-ai-2026-08.md):**
-  "Fråga Easoft om deras AI är en produkt eller en workshop för 1 500 €."
-  Deras AI-agenter = betald konsultworkshop + skräddarsydda byggen via
-  extern partner (Serviceform), inga skärmdumpar, inga kundcase, noll
-  AI-omnämnanden i recensioner. VÅRA agenter är levererad produkt med
-  godkännandekö och lärande — visa kön live i demon.
-- **BEVAKNINGSPUNKT (inte panikanledning): EG Intelligence.** Easofts
-  moderbolag EG A/S bygger koncern-AI med telefonsvars-/bokningsagent
-  för hantverkare på 2026-roadmapen (47k kunder). Ej bekräftat live i
-  Easoft-produkten per aug 2026. Vår replik om det landar: "de rullar ut
-  en generisk koncernagent — vår kan redan ROT, Fortnox och din
-  produktbank." Bevaka H2 2026.
-- **"Har inte Easoft/Bygglet redan AI?"** → Easoft har själva publicerat
-  "Tio tidsbovar för byggföretag" (easoft.se/blogg, läst 2026-08-02) —
-  exakt de tio problemen vi säger att teamet löser. Deras lösning för
-  samtliga tio: digitala formulär och rapportverktyg. Ordet AI förekommer
-  inte i en enda lösning, bara som menylänk på sajten i övrigt. **Citera
-  gärna rakt av** — det är deras egen artikel, inte vår tolkning: "Fråga
-  dem vilken av de tio punkterna en agent faktiskt löser åt dig. Svaret
-  är noll — allihop kräver att DU fyller i formuläret."
-  _[STATUSUPPDATERING 08-02, tasks/easoft-gap-plan.md: 5 av deras 10
-  punkter är nu AI-först hos oss (senast kvalitetskontroll —
-  egenkontroll-agenten läser foton mot checklistan och föreslår vilka
-  punkter som är styrkta). ⚠️ SÄG ALDRIG "alla tio" eller ett specifikt
-  antal i skarp pitch — planens ärlighetsregel gäller: bara BYGGT★ MED
-  verklig kunddrift räknas som "stängt". Repliken ovan ("svaret är noll")
-  är fortfarande den säkra att använda tills fler etapper är kunddrivna.]_
-- **Deras chatbot lanseras** → vi äger redan distinktionen (SEO-artikeln
-  "chatbot vs team", se seo-drafts/10); fällefrågorna gör jobbet.
-- **De köper röst före oss** → "deras röst svarar, vår kommer att boka" —
-  panik-bygg INTE, håll Röst-Lisa-planen (gated ~kund 10).
-- **De förvärvar AI-bolag** → integration tar 12+ mån hos konsoliderare
-  (moat-analysen §3c: integrationsproblemet byter bara ägare); vinn på
-  hastighet + case studies under tiden.
-- **De prisdumpar "AI ingår gratis"** → argumentera ALDRIG pris mot pris;
-  alltid utfall (ersatt admin, räddade jobb) mot funktion.
+**Följdfråga:** ”Vad måste du själv komma ihåg idag för att inte tappa jobb,
+tid eller betalning?”
 
-## Ärlighetsregler (gäller ALL användning av arsenalen)
+Börja där kunden har ett verkligt problem. Alla behöver inte en
+tväragent-plan i första demon.
 
-- Inget påstående om LIVE-funktion som är SPEC/BRANCH —
-  **tasks/capability-inventory.md är facit.**
-- Facit-maskinen = **datainsamling** idag; AI-prissättning är framtid.
-- Röst-Lisa finns inte — nämns aldrig som nutid.
-- Kopieringstiderna kommer ur tasks/moat-technical-analysis.md ([BEDÖMT]) —
-  används som resonemang i rummet, aldrig som publicerade siffror.
-- Punkter märkta [VERIFIERA]/[ANDREAS] används inte skarpt före bekräftelse.
+## 3. Tre berättelser att bevisa
+
+### Förfrågan ska inte försvinna
+
+> ”När nästa kund hör av sig ska förfrågan få en plats, en kundkoppling och
+> ett nästa steg — inte ligga gömd bland meddelanden.”
+
+Visa en provad kanal, en faktiskt mottagen förfrågan och rätt kund/affär.
+Visa återkommande kund utan dubbelt kundkort. Visa vad som väntar på
+hantverkaren. En installerad widget, sparad API-nyckel eller importerad
+kundlista är inte i sig ett fungerande inflöde.
+
+### Jobbet ska dokumenteras en gång
+
+> ”Det du registrerar ute på jobbet ska finnas på rätt projekt när du kommer
+> tillbaka — tillsammans med underlaget.”
+
+Visa riktig filförhandsvisning och sparad tidrad på testprojektet.
+Om röst visas: verklig transkribering, rätt projekt/person och faktisk
+kvittens. Säg inte att ett förslag är sparad tid. Är projektnamnet tvetydigt
+ska användaren få välja, inte imponeras av en gissning.
+
+### Utfört arbete ska få rätt väg till betalning
+
+> ”Att jobbet är klart betyder inte att allt är faktureringsklart. Teamet
+> hjälper dig se vilket underlag eller beslut som saknas.”
+
+Visa namngiven blockerare, relevant beslut och vad som därefter händer.
+Offert, ÄTA, utfört arbete, fakturering och betalning är olika sanningar.
+Ett utskick är inte mottagarbevis; en skickad faktura är inte betald.
+Teamets ekonomiska värde får inte härledas enbart från samtidiga betalningar.
+
+**Gemensam demoregel:** anpassa berättelsen efter en kontrollerad miljö.
+Syntetiska data märks som demo. Saknas bevis visar vi inte en simulerad
+funktion som live. Sändningar kräver godkända testmottagare.
+
+## 4. Fyra invändningar
+
+**”Har inte de andra också AI?”**
+
+> ”Jo, flera bygger och erbjuder AI. Det viktiga är hur just ditt arbete
+> hänger ihop. Låt oss jämföra samma kundförfrågan eller samma jobb hela
+> vägen: vad behöver du göra, vad gör systemet, och hur ser du om något
+> misslyckas?”
+
+**”Vi har redan ett system.”**
+
+> ”Vad fungerar bra där, och vad behöver du fortfarande göra vid sidan av?
+> Vi väljer en första kedja och går igenom vad som behöver kopplas eller
+> flyttas. Jag vill inte lova en integration vi inte har provat.”
+
+**”Vad händer när AI:n gör fel?”**
+
+> ”Du ska kunna se underlaget, vad som föreslås och vad som faktiskt utförts.
+> Viktiga åtgärder har behörighets- och godkännanderegler. Vid osäkerhet ska
+> systemet fråga eller visa felet — inte kvittera något som inte blev gjort.”
+
+Undvik ”ingenting skickas utan att du klickat OK”: befintliga
+transaktionsmeddelanden, inställningar och godkända mandat kan styra
+utskick på andra sätt. Visa den faktiska grinden för just handlingen.
+
+**”Ni är små och nya.”**
+
+> ”Ja. Därför börjar vi med ett tydligt avgränsat arbetsflöde och följer upp
+> att det fungerar för er. Du får nära kontakt med oss, och vi visar vad vi
+> kan bevisa istället för att lova att allt passar alla.”
+
+Pris, avtalstid, garanti och grundarkundserbjudande hämtas ur aktuellt
+godkänt erbjudande i operating plan/avtal. Improvisera inte ”ingen bindning”
+eller ”allt ingår”. Prislistan upprepas inte här.
+
+## 5. Konkurrens: jämför arbete, inte födelseår
+
+Underlag: [konkurrentresearch 31 augusti](../docs/gtm/COMPETITOR_RESEARCH_2026-08-31.md).
+
+Easoft har publicerat en lansering av sin AI-agentplattform. Den äldre
+beskrivningen ”bara en workshop” ska därför inte användas.
+[Deras lansering](https://easoft.se/ai-agentplattform-lansering/) är ett
+leverantörspåstående — vi har inte själva provat deras produktionssystem.
+Samma beviskrav gäller våra egna påståenden.
+
+Frågor för en saklig jämförelse:
+
+- Kan samma kundförfrågan följas till affär och nästa steg utan dubbla kunder?
+- Vad är faktiskt tillgängligt, vad är pilot och vad är roadmap?
+- Vad händer när en integration eller agentåtgärd misslyckas?
+- Hur skiljs förslag, godkännande, utförande och betalning åt?
+- Vad fungerar för svenska hantverkare, med deras telefoner och ekonomisystem?
+- Vad kräver installation, tillägg, migrering och löpande handpåläggning?
+- Hur hjälper ni kunden till första fungerande arbetsflödet?
+
+Marknadsför gärna vår syn på mindre administration och tydligare ansvar.
+Påstå inte att alla andra bara erbjuder menyer, att de saknar AI, att vi är
+ensamma eller att deras implementation måste vara dyr/långsam. Avsaknad av
+offentligt pris är inte bevis för prisnivån.
+
+## 6. Starta litet och bevisa det
+
+1. Välj kundens viktigaste kedja.
+2. Koppla relevant kanal eller läs in en liten kontrollerad kundlista.
+3. Visa importkvittot: skapade, uppdaterade, oförändrade, överhoppade och
+   misslyckade rader. Skilj rader från unika kunder.
+4. Prova kedjan med överenskomna testuppgifter och mottagare.
+5. Följ första verkliga händelsen och det som fortfarande behöver hjälp.
+
+En CSV med namn och telefon bevisar inte kundhistorik, erbjudanderelevans
+eller tillåtelse till en återaktiveringskampanj. Att förbereda en kampanj är
+inte detsamma som att skicka den. Importen är inte ett kvitto på Fortnox-synk
+eller aktiverad telefon-/webb-/mejlkanal.
+
+Uppstartsmanus och ansvar finns i
+[operating plan](../HANDYMATE_OPERATING_PLAN.md#8-demon--20-minuter).
+Den externa lanseringschecklistan fortsätter äga tekniskt go/no-go.
+
+## 7. Ärlighetsregler
+
+- **Byggt, lokalt testat, driftsatt och provat hos kund är olika statusar.**
+  Hänvisa till daterat körbevis för flödet, inte enbart en funktionslista.
+- Lisa SMS-uppföljning, samtalsefterarbete och Lisa Live är inte samma sak.
+  Följ [kundspråket och samtalsgränserna](../docs/marketing/product-language.md).
+- Inspelning får inte presenteras som aktiverad innan villkoren och flaggorna
+  är bekräftade. Kundens och medarbetarens behörighet måste hållas isär.
+- Lärande växer med användbart, bekräftat underlag. Lova inte en bestämd
+  intelligensnivå efter tre månader eller en viss ekonomisk förbättring.
+- Påstå inte att en signal, risk eller potential är verkligt intjänade pengar.
+- Inga påhittade kundcase, jämförelsepriser, kopieringstider eller konkurrentbrister.
+- Ingen generell integrations-, fullständig export- eller lagringsgaranti utan
+  kontrollerat aktuellt underlag för just det påståendet.
+- Fel och delresultat ska kunna demonstreras lika ärligt som framgång.

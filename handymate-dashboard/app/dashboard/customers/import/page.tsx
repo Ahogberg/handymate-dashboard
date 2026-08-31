@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -9,12 +9,14 @@ import {
   Check,
   Loader2,
   Download,
-  X,
   Megaphone
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
+import CustomerImportReceipt from '@/components/customers/CustomerImportReceipt'
+import { parseCustomerCsv } from '@/lib/customers/csv'
+import { readCustomerImportResult, type CustomerImportResult } from '@/lib/customers/import-result'
 
 interface ParsedRow {
   name: string
@@ -50,52 +52,30 @@ export default function ImportCustomersPage() {
   const [duplicateCount, setDuplicateCount] = useState(0)
   const [skipDuplicates, setSkipDuplicates] = useState(false)
   const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: string[]; importedIds: string[] } | null>(null)
+  const [importResult, setImportResult] = useState<CustomerImportResult | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
+  const importBusyRef = useRef(false)
   const [dragOver, setDragOver] = useState(false)
 
-  const parseCSV = (text: string): { headers: string[]; rows: string[][] } => {
-    const lines = text.split(/\r?\n/).filter(line => line.trim())
-    if (lines.length === 0) return { headers: [], rows: [] }
-
-    // Detect delimiter (comma, semicolon, or tab)
-    const firstLine = lines[0]
-    let delimiter = ','
-    if (firstLine.includes(';') && !firstLine.includes(',')) delimiter = ';'
-    if (firstLine.includes('\t') && !firstLine.includes(',') && !firstLine.includes(';')) delimiter = '\t'
-
-    const parseRow = (line: string): string[] => {
-      const result: string[] = []
-      let current = ''
-      let inQuotes = false
-      
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i]
-        if (char === '"') {
-          inQuotes = !inQuotes
-        } else if (char === delimiter && !inQuotes) {
-          result.push(current.trim())
-          current = ''
-        } else {
-          current += char
-        }
-      }
-      result.push(current.trim())
-      return result
-    }
-
-    const headers = parseRow(lines[0])
-    const rows = lines.slice(1).map(parseRow).filter(row => row.some(cell => cell))
-
-    return { headers, rows }
-  }
 
   const handleFile = useCallback((selectedFile: File) => {
     setFile(selectedFile)
+    setImportError(null)
     
     const reader = new FileReader()
     reader.onload = (e) => {
       const text = e.target?.result as string
-      const { headers: parsedHeaders, rows: parsedRows } = parseCSV(text)
+      let parsed: ReturnType<typeof parseCustomerCsv>
+      try { parsed = parseCustomerCsv(text) }
+      catch (error) {
+        setImportError(error instanceof Error ? error.message : 'Kunde inte läsa CSV-filen.')
+        return
+      }
+      const { headers: parsedHeaders, rows: parsedRows } = parsed
+      if (!parsedRows.length) {
+        setImportError('CSV-filen innehåller inga kundrader efter rubrikerna.')
+        return
+      }
       setHeaders(parsedHeaders)
       setRows(parsedRows)
       
@@ -126,6 +106,7 @@ export default function ImportCustomersPage() {
       setMapping(autoMapping)
       setStep(2)
     }
+    reader.onerror = () => setImportError('Kunde inte läsa filen. Ingen import har startats.')
     reader.readAsText(selectedFile, 'UTF-8')
   }, [])
 
@@ -171,6 +152,7 @@ export default function ImportCustomersPage() {
 
   const prepareData = async () => {
     if (mapping.phone_number === null) return
+    setImportError(null)
 
     const prepared: ParsedRow[] = rows.map(row => ({
       name: mapping.name !== null ? row[mapping.name] || '' : '',
@@ -182,11 +164,16 @@ export default function ImportCustomersPage() {
 
     // Check for existing customers (duplicates)
     const phones = prepared.map(r => r.phone_number)
-    const { data: existingCustomers } = await supabase
+    const { data: existingCustomers, error } = await supabase
       .from('customer')
       .select('phone_number')
       .eq('business_id', business.business_id)
       .in('phone_number', phones)
+
+    if (error) {
+      setImportError('Kunde inte kontrollera befintliga kunder. Ingen import har startats.')
+      return
+    }
 
     const existingPhones = new Set((existingCustomers || []).map((c: { phone_number: string }) => c.phone_number))
     const withDuplicates = prepared.map(row => ({
@@ -201,71 +188,29 @@ export default function ImportCustomersPage() {
   }
 
   const handleImport = async () => {
+    if (importBusyRef.current || parsedData.length === 0) return
+    importBusyRef.current = true
     setImporting(true)
-
-    let success = 0
-    let failed = 0
-    const errors: string[] = []
-    const importedIds: string[] = []
-
-    const rowsToImport = skipDuplicates
-      ? parsedData.filter(r => !r.isDuplicate)
-      : parsedData
-
-    for (const row of rowsToImport) {
-      try {
-        // Kolla om kunden redan finns (baserat på telefonnummer)
-        const { data: existing } = await supabase
-          .from('customer')
-          .select('customer_id')
-          .eq('business_id', business.business_id)
-          .eq('phone_number', row.phone_number)
-          .maybeSingle()
-
-        if (existing) {
-          // Uppdatera befintlig kund
-          await supabase
-            .from('customer')
-            .update({
-              name: row.name || undefined,
-              email: row.email || undefined,
-              address_line: row.address || undefined,
-            })
-            .eq('customer_id', existing.customer_id)
-          importedIds.push(existing.customer_id)
-          success++
-        } else {
-          // Skapa ny kund
-          const customerId = 'cust_' + Math.random().toString(36).substr(2, 9)
-          const { error } = await supabase
-            .from('customer')
-            .insert({
-              customer_id: customerId,
-              business_id: business.business_id,
-              name: row.name || 'Okänd',
-              phone_number: row.phone_number,
-              email: row.email || null,
-              address_line: row.address || null,
-              created_at: new Date().toISOString(),
-            })
-
-          if (error) {
-            failed++
-            errors.push(`${row.name || row.phone_number}: ${error.message}`)
-          } else {
-            importedIds.push(customerId)
-            success++
-          }
-        }
-      } catch (err: any) {
-        failed++
-        errors.push(`${row.name || row.phone_number}: ${err.message}`)
-      }
+    setImportError(null)
+    try {
+      const response = await fetch('/api/customers/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customers: parsedData.map(({ name, phone_number, email, address }) => ({ name, phone_number, email, address })),
+          skip_existing: skipDuplicates,
+        }),
+      })
+      const body = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(body?.error || 'Importresultatet kunde inte bekräftas.')
+      setImportResult(readCustomerImportResult(body))
+      setStep(4)
+    } catch (error) {
+      setImportError(`${error instanceof Error ? error.message : 'Importresultatet kunde inte bekräftas.'} Kontrollera kundlistan innan du försöker igen; vissa rader kan redan ha sparats.`)
+    } finally {
+      importBusyRef.current = false
+      setImporting(false)
     }
-
-    setImportResult({ success, failed, errors, importedIds })
-    setStep(4)
-    setImporting(false)
   }
 
   const downloadTemplate = () => {
@@ -325,6 +270,8 @@ export default function ImportCustomersPage() {
             </div>
           ))}
         </div>
+
+        {importError && <p role="alert" className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{importError}</p>}
 
         {/* Step 1: Upload */}
         {step === 1 && (
@@ -493,7 +440,7 @@ export default function ImportCustomersPage() {
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-2">Redo att importera</h3>
               <p className="text-gray-400 mb-6">
-                {parsedData.length} kunder kommer att importeras
+                {parsedData.length} rader är redo att kontrolleras och importeras
               </p>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -584,13 +531,14 @@ export default function ImportCustomersPage() {
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setStep(2)}
+                disabled={importing}
                 className="px-6 py-3 text-gray-500 hover:text-gray-900 transition-colors"
               >
                 ← Tillbaka
               </button>
               <button
                 onClick={handleImport}
-                disabled={importing}
+                disabled={importing || parsedData.length === 0}
                 className="flex items-center px-8 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {importing ? (
@@ -601,7 +549,7 @@ export default function ImportCustomersPage() {
                 ) : (
                   <>
                     <Upload className="w-5 h-5 mr-2" />
-                    Importera {skipDuplicates ? parsedData.length - duplicateCount : parsedData.length} kunder
+                    Importera kundlistan
                   </>
                 )}
               </button>
@@ -613,48 +561,9 @@ export default function ImportCustomersPage() {
         {step === 4 && importResult && (
           <div className="space-y-6">
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-8 text-center">
-              {importResult.success > 0 ? (
-                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Check className="w-8 h-8 text-emerald-600" />
-                </div>
-              ) : (
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <X className="w-8 h-8 text-red-600" />
-                </div>
-              )}
-              
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                {importResult.success > 0 ? 'Import klar!' : 'Import misslyckades'}
-              </h2>
-              
-              <div className="flex items-center justify-center gap-8 my-6">
-                <div>
-                  <p className="text-3xl font-bold text-emerald-600">{importResult.success}</p>
-                  <p className="text-sm text-gray-400">Importerade</p>
-                </div>
-                {importResult.failed > 0 && (
-                  <div>
-                    <p className="text-3xl font-bold text-red-600">{importResult.failed}</p>
-                    <p className="text-sm text-gray-400">Misslyckade</p>
-                  </div>
-                )}
-              </div>
+              <CustomerImportReceipt result={importResult} />
 
-              {importResult.errors.length > 0 && (
-                <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-left">
-                  <p className="text-sm font-medium text-red-600 mb-2">Fel:</p>
-                  <ul className="text-xs text-red-700 space-y-1 max-h-32 overflow-y-auto">
-                    {importResult.errors.slice(0, 10).map((err, i) => (
-                      <li key={i}>{err}</li>
-                    ))}
-                    {importResult.errors.length > 10 && (
-                      <li>...och {importResult.errors.length - 10} till</li>
-                    )}
-                  </ul>
-                </div>
-              )}
-
-              {importResult.success > 0 && (
+              {importResult.importedIds.length > 0 && (
                 <button
                   onClick={() => {
                     sessionStorage.setItem('importedCustomerIds', JSON.stringify(importResult.importedIds))
@@ -663,7 +572,7 @@ export default function ImportCustomersPage() {
                   className="flex items-center justify-center gap-3 w-full mt-6 px-6 py-4 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 transition-all"
                 >
                   <Megaphone className="w-5 h-5" />
-                  Skicka reaktiverings-SMS till dessa {importResult.success} kunder
+                  Förbered uppföljning för {importResult.importedIds.length} kunder
                 </button>
               )}
 
