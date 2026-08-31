@@ -1,7 +1,8 @@
 import { checkFuelGate } from '@/lib/costs/fuel'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
-import { generateQuoteFromInput, getAveragePrice, analyzeJobImage, resolveCustomerPriceList } from '@/lib/ai-quote-generator'
+import { generateQuoteFromInput, getAveragePrice, analyzeJobImage } from '@/lib/ai-quote-generator'
+import { buildQuoteGenerationContext } from '@/lib/quotes/quote-generation-context'
 import { getServerSupabase } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
@@ -43,48 +44,14 @@ export async function POST(request: NextRequest) {
     const supabase = getServerSupabase()
     const branch = business.industry || 'Bygg'
 
-    // Produktbank-konsolidering: fallback-priskontexten läses ur products
-    // (artikelregistret) i stället för döda price_list. Mappas till samma
-    // PriceListItem-form (unit_price = sales_price) så buildPriceContext är
-    // oförändrad. Kundspecifik price_lists_v2 (topp-prio) hämtas separat
-    // nedan (B4) via resolveCustomerPriceList och tar över när den finns.
-    //
-    // B3 (kodrevision 2026-08-03): tidigare .limit(50) UTAN .order() gav en
-    // hantverkare med 300 artiklar 50 GODTYCKLIGA rader i AI-prompten
-    // (Postgres garanterar ingen ordning utan ORDER BY). Samma order som
-    // usePriceListLookup.ts (favoriter → namn) — konsekvent med hur
-    // snabbvalen i quotes/new redan sorterar produktbanken. Höjd limit
-    // (50 → 100) ger fler kandidater innan gränsen träffas.
-    const [priceListResult, templatesResult, customerPriceList] = await Promise.all([
-      supabase
-        .from('products')
-        // ETAPP B1 (2026-08-06): id hämtas nu också. Utan det kan raderna inte
-        // kopplas till produktbanken, och då saknar de komponent-snapshot,
-        // arbetsandel, ROT-split och inköpspris.
-        .select('id, name, unit, sales_price, category')
-        .eq('business_id', business.business_id)
-        .eq('is_active', true)
-        .order('is_favorite', { ascending: false })
-        .order('name')
-        .limit(100),
-      supabase
-        .from('quote_templates')
-        .select('name, default_items, category')
-        .eq('business_id', business.business_id)
-        .limit(5),
-      // B4: kundspecifik prislista (price_lists_v2) — undefined om ingen
-      // customerId, ingen kundprislista finns, eller uppslaget failar.
-      resolveCustomerPriceList(business.business_id, customerId),
-    ])
-
-    const priceListData = (priceListResult.data || []).map(p => ({
-      id: p.id,
-      name: p.name,
-      unit: p.unit,
-      unit_price: p.sales_price,
-      category: p.category,
-    }))
-    const templatesData = templatesResult.data || []
+    // Fas 3 (offert-omtaget, 2026-08-31): prislista + mallar + kundprislista
+    // hämtas nu via EN delad helper (lib/quotes/quote-generation-context.ts)
+    // — samma urval som Matte-chattens create_quote_draft-verktyg och
+    // bakgrundsförslaget (lib/quotes/suggest-quote-draft.ts) använder, så de
+    // tre vägarna in i generateQuoteFromInput aldrig kan glida isär om vilka
+    // artiklar/mallar/kundpriser som "finns".
+    const { priceList: priceListData, templates: templatesData, customerPriceList } =
+      await buildQuoteGenerationContext(supabase, business.business_id, customerId)
 
     const hourlyRate = business.pricing_settings?.hourly_rate || business.default_hourly_rate || 650
 

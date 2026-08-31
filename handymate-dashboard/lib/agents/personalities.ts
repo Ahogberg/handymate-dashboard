@@ -121,7 +121,7 @@ Skriv alltid på svenska.`,
     allowedTools: [
       'get_customer', 'search_customers', 'create_customer',
       'qualify_lead', 'update_lead_status', 'get_lead', 'search_leads',
-      'create_quote', 'get_quotes', 'send_sms', 'send_email',
+      'create_quote', 'create_quote_draft', 'get_quotes', 'send_sms', 'send_email',
       'create_approval_request', 'check_pending_approvals',
       'get_daily_stats', 'log_automation_action',
       'get_pricing_suggestion', 'get_efterkalkyl_insight',

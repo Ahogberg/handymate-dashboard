@@ -28,6 +28,11 @@ import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { mapQuoteItemsToInvoiceItems } from '@/lib/invoices/quote-to-invoice-items'
 import { fetchPriceContextProducts, matchProductByName } from '@/lib/products/price-context'
+import { generateQuoteFromInput } from '@/lib/ai-quote-generator'
+import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
+import { buildQuoteGenerationContext, hasEnoughDescriptionForAiDraft } from '@/lib/quotes/quote-generation-context'
+import { hourlyRateField } from '@/lib/company/company-model'
+import { fetchReservationLibrary, suggestSnapshotForItems } from '@/lib/reservations/suggest-for-items'
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
 import { resolveTimeEntryHourlyRate } from '@/lib/time-entry/rate'
 import { hittaNyligDubblett } from '@/lib/agent/recent-duplicate'
@@ -176,6 +181,8 @@ export async function executeTool(
         return await updateCustomer(supabase, businessId, input)
       case 'create_quote':
         return await createQuote(supabase, businessId, input)
+      case 'create_quote_draft':
+        return await createQuoteDraft(supabase, businessId, input)
       case 'get_quotes':
         return await getQuotes(supabase, businessId, input)
       case 'create_invoice':
@@ -610,12 +617,44 @@ async function createQuote(
   // linked_product_id + article_number ger efterkalkyl, Fortnox-artikelnr
   // och reservationstriggers. Radens PRIS rörs ALDRIG (hantverkaren granskar
   // utkastet). Fail-soft: utan bankträff sparas raden precis som förut.
-  // (reservations_snapshot sätts inte här — createCanonicalQuote saknar
-  // fältet; kö-vägen i approvals äger den delen.)
   let bankArtiklar: Awaited<ReturnType<typeof fetchPriceContextProducts>> = []
   try {
     bankArtiklar = await fetchPriceContextProducts(supabase, businessId)
   } catch { /* fail-soft */ }
+
+  const itemsForInsert = items.map(i => {
+    const isLabor = i.type === 'labor'
+    const beskrivning = i.name ?? i.description ?? ''
+    const bankTraff = matchProductByName(bankArtiklar, beskrivning)
+    return {
+      // create_quote-schemat (tool-definitions.ts) definierar radfältet som
+      // "name", inte "description" — name är primärt, description
+      // accepteras också ifall agenten (mot schema) skickar det.
+      description: beskrivning,
+      quantity: i.quantity ?? 0,
+      unit: i.unit ?? 'st',
+      unit_price: i.unit_price ?? 0,
+      is_rot_eligible: isLabor && rotRutType === 'rot',
+      is_rut_eligible: isLabor && rotRutType === 'rut',
+      rot_rut_type: isLabor && (rotRutType === 'rot' || rotRutType === 'rut') ? rotRutType : null,
+      ...(bankTraff ? { linked_product_id: bankTraff.id, article_number: bankTraff.sku ?? undefined } : {}),
+    }
+  })
+
+  // Fas 3 (offert-omtaget, 2026-08-31): agentens/Mattes create_quote-offerter
+  // fick tidigare ALDRIG reservations_snapshot — bara editorn och
+  // godkännande-kedjans create_quote_draft-exekvering (kö-vägen) körde
+  // förbehållsmotorn (Prisslingan V2 pass 4, UX3b). En Codex-granskning
+  // flaggade gapet 2026-08-31; verifierat äkta (kommentaren ovan sa uttryckligen
+  // "sätts inte här"). Samma fail-soft mönster som förbehållslib:et självt
+  // kräver: ett fel här får ALDRIG fälla offertskapandet.
+  let reservationsSnapshot: Array<{ reservation_id: string | null; title: string; content: string }> = []
+  try {
+    const bibliotek = await fetchReservationLibrary(supabase, businessId)
+    reservationsSnapshot = suggestSnapshotForItems(bibliotek, itemsForInsert)
+  } catch (resErr) {
+    console.error('[create_quote] reservationsförslag hoppades (fail-soft):', resErr)
+  }
 
   // Kanoniska byggaren (lib/quotes/create-quote.ts). Agentens offerter fick
   // tidigare varken quote_number eller sign_token — smart-communication satte
@@ -629,27 +668,13 @@ async function createQuote(
     rotRutDeduction,
     validDays: (params.valid_days as number) || 30,
     source: 'agent',
-    items: items.map(i => {
-      const isLabor = i.type === 'labor'
-      const beskrivning = i.name ?? i.description ?? ''
-      const bankTraff = matchProductByName(bankArtiklar, beskrivning)
-      return {
-        // create_quote-schemat (tool-definitions.ts) definierar radfältet som
-        // "name", inte "description" — name är primärt, description
-        // accepteras också ifall agenten (mot schema) skickar det.
-        description: beskrivning,
-        quantity: i.quantity ?? 0,
-        unit: i.unit ?? 'st',
-        unit_price: i.unit_price ?? 0,
-        is_rot_eligible: isLabor && rotRutType === 'rot',
-        is_rut_eligible: isLabor && rotRutType === 'rut',
-        rot_rut_type: isLabor && (rotRutType === 'rot' || rotRutType === 'rut') ? rotRutType : null,
-        ...(bankTraff ? { linked_product_id: bankTraff.id, article_number: bankTraff.sku ?? undefined } : {}),
-      }
-    }),
+    items: itemsForInsert,
     // items-JSONB:n är bara en spegling (quote_items är sanningen), men
     // speglingen behålls tills läsarna av den är migrerade.
-    extra: { items, labor_total: laborTotal, material_total: materialTotal, vat_amount: vatAmount },
+    extra: {
+      items, labor_total: laborTotal, material_total: materialTotal, vat_amount: vatAmount,
+      ...(reservationsSnapshot.length > 0 ? { reservations_snapshot: reservationsSnapshot } : {}),
+    },
   })
 
   if (!skapad.success) return { success: false, error: skapad.error }
@@ -664,6 +689,194 @@ async function createQuote(
       ...(rotRutCapped ? { rot_rut_capped: true, rot_rut_warning: rotRutWarning } : {}),
     }
   }}
+}
+
+/**
+ * create_quote_draft (Fas 3, offert-omtaget, 2026-08-31) — Matte-chattens
+ * AI-offertutkast, med RIKTIG generering i stället för att modellen dikterar
+ * rader själv (det create_quote ovan kräver av anroparen).
+ *
+ * ═══ GAPET DEN STÄNGER ═══
+ *
+ * create_quote (ovan) kräver `items` i schemat — Claude fick alltså SJÄLV
+ * räkna ut rader och priser under samtalet, med bara den platta prislista-
+ * texten (buildAgentPriceBlock) i systemprompten som stöd. Det motsvarar inte
+ * "Bygg utkast"-knappen i offertvyn: ingen kundspecifik prislista
+ * (price_lists_v2), inga bekräftade lärdomar/kundfakta/mönster/affärsregler,
+ * ingen ROT/RUT-förslagslogik, inga tillval. Den riktiga motorn
+ * (generateQuoteFromInput, lib/ai-quote-generator.ts) fanns redan — men
+ * bara tre vägar in använde den: UI-knappen, godkännande-kön (kvalificerad
+ * lead → create_quote_draft-KORT, se lib/quotes/suggest-quote-draft.ts —
+ * ett HELT ANNAT begrepp, en bakgrunds-approval_type, inte ett Claude-verktyg)
+ * och ingen av dem är "en levande hantverkare ber Matte om ett utkast just nu".
+ *
+ * ═══ VARFÖR EN NY, INTE EN UTÖKAD create_quote ═══
+ *
+ * create_quote delas med den autonoma agenten och förväntar sig redan
+ * strukturerade rader (t.ex. från ett samtal där kunden dikterat exakt vad
+ * som ska ingå). Att göra `items` valfritt DÄR och gissa mellan "hand-
+ * författade rader" och "generera från beskrivning" i samma funktion hade
+ * gjort en redan komplex funktion svårare att lita på. Två verktyg med
+ * olika kontrakt — Claude väljer rätt ett beroende på om den redan VET
+ * raderna eller bara har en beskrivning — är tydligare än en flagga.
+ *
+ * ═══ ÄRLIGHETSREGELN ═══
+ *
+ * Två saker vägrar hellre än att gissa: (1) en för tung/kort beskrivning
+ * (samma tröskel som suggestQuoteDraftForLead — hasEnoughDescriptionForAiDraft)
+ * ger inget skräputkast, och (2) ett saknat timpris (hourlyRateField, samma
+ * "aldrig ett hårdkodat 650"-princip) stoppar hellre genereringen än citerar
+ * ett påhittat pris. I BÅDA fallen returneras ett tydligt fel Claude kan
+ * relätera till hantverkaren — Claude har fortfarande create_quote kvar för
+ * fallet "hantverkaren dikterade redan raderna", så ingen förmåga försvinner.
+ */
+async function createQuoteDraft(
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+): Promise<ToolResult> {
+  const jobDescription = typeof params.job_description === 'string' ? params.job_description.trim() : ''
+  if (!hasEnoughDescriptionForAiDraft(jobDescription)) {
+    return {
+      success: false,
+      error: 'Beskrivningen är för kort för ett meningsfullt AI-utkast. Be hantverkaren om fler detaljer (vad som ska göras, ytor/mått, material) — eller använd create_quote direkt om raderna redan är kända.',
+    }
+  }
+
+  // Tenantvakten FÖRE första skrivningen — se assertCustomerInBusiness.
+  // customer_id är valfritt här (till skillnad från create_quote): ett
+  // utkast kan behöva finnas innan kunden är upplagd, precis som
+  // "Bygg utkast"-knappen fungerar utan vald kund.
+  if (params.customer_id) {
+    const tenantFel = await assertCustomerInBusiness(supabase, businessId, params.customer_id)
+    if (tenantFel) return { success: false, error: tenantFel }
+  }
+
+  const { data: bizRow, error: bizErr } = await supabase
+    .from('business_config')
+    .select('industry, pricing_settings, default_hourly_rate, default_vat_rate')
+    .eq('business_id', businessId)
+    .maybeSingle()
+  if (bizErr || !bizRow) return { success: false, error: 'Kunde inte läsa företagsinställningarna' }
+
+  const branch = bizRow.industry || 'Bygg'
+  const vatRate = bizRow.default_vat_rate ?? bizRow.pricing_settings?.vat_rate ?? 25
+
+  // KVITTOPRINCIPEN (samma som suggestQuoteDraftForLead): aldrig ett
+  // hårdkodat timpris. Saknas det på riktigt — hoppa över genereringen
+  // hellre än att citera ett gissat pris i en offert.
+  const hourlyRate = hourlyRateField(bizRow.pricing_settings).value ?? bizRow.default_hourly_rate ?? null
+  if (!hourlyRate) {
+    return {
+      success: false,
+      error: 'Timpris saknas i inställningarna (Inställningar → Prissättning) — kan inte generera ett prissatt utkast utan att gissa. Använd create_quote med egna rader, eller be hantverkaren sätta timpriset först.',
+    }
+  }
+
+  const customerId = (params.customer_id as string) || undefined
+  const { priceList, templates, customerPriceList } = await buildQuoteGenerationContext(
+    supabase, businessId, customerId,
+  )
+
+  let generated
+  try {
+    generated = await generateQuoteFromInput({
+      businessId,
+      branch,
+      hourlyRate,
+      textDescription: jobDescription,
+      customerId,
+      jobType: (params.job_type as string) || undefined,
+      priceList,
+      templates,
+      customerPriceList,
+    })
+  } catch (genErr) {
+    console.error('[create_quote_draft] generateQuoteFromInput kastade:', genErr)
+    return {
+      success: false,
+      error: genErr instanceof Error ? genErr.message : 'AI-genereringen misslyckades — försök igen, eller använd create_quote med egna rader.',
+    }
+  }
+
+  // sourceIsAi=false (default): det här är en server-sidig skaparväg, precis
+  // som godkännande-kedjan — ai_price_missing/ai_uncertain är editor-interna
+  // markörer som ändå strippas innan quote_items sparas (se filhuvudet i
+  // lib/quotes/generated-to-quote-items.ts), inte kolumner createQuote()
+  // känner till.
+  const quoteItems = generatedQuoteToQuoteItems(generated.items, generated.options, generated.suggestedDeductionType)
+  if (quoteItems.length === 0) {
+    return { success: false, error: 'AI-genereringen gav inga rader att spara.' }
+  }
+
+  // UX3b-mönstret (Prisslingan V2 pass 4): samma reservationsförslag som
+  // editorn och godkännande-kedjan. Fail-soft — ett förbehållsfel får
+  // aldrig fälla offertskapandet.
+  let reservationsSnapshot: Array<{ reservation_id: string | null; title: string; content: string }> = []
+  try {
+    const bibliotek = await fetchReservationLibrary(supabase, businessId)
+    reservationsSnapshot = suggestSnapshotForItems(bibliotek, quoteItems)
+  } catch (resErr) {
+    console.error('[create_quote_draft] reservationsförslag hoppades (fail-soft):', resErr)
+  }
+
+  // Årstakskontroll (samma mönster som create_quote ovan) — bara meningsfullt
+  // med en känd kund att slå upp förbrukat utrymme mot.
+  const rotRutType = generated.suggestedDeductionType !== 'none' ? generated.suggestedDeductionType : null
+  let rotRutDeduction = 0
+  let rotRutCapped = false
+  let rotRutWarning: string | undefined
+  if (rotRutType && customerId) {
+    const laborTotal = quoteItems
+      .filter(i => i.item_type === 'item' && (i.is_rot_eligible || i.is_rut_eligible))
+      .reduce((s, i) => s + i.total, 0)
+    const capped = await calculateCappedDeduction(customerId, businessId, rotRutType, laborTotal, { vatRate })
+    rotRutDeduction = capped.deduction
+    rotRutCapped = capped.capped
+    rotRutWarning = capped.warning
+  }
+
+  const skapad = await createCanonicalQuote(supabase, businessId, {
+    customerId: customerId ?? null,
+    title: (params.title as string) || generated.jobTitle || 'Offert',
+    description: generated.jobDescription || null,
+    vatRate,
+    rotRutType,
+    rotRutDeduction,
+    source: 'matte',
+    items: quoteItems,
+    extra: {
+      ai_generated: true,
+      ai_confidence: generated.confidence ?? null,
+      source_transcript: jobDescription,
+      ...(generated.notIncludedSuggestions.length > 0
+        ? { not_included: generated.notIncludedSuggestions.join('\n') }
+        : {}),
+      ...(reservationsSnapshot.length > 0 ? { reservations_snapshot: reservationsSnapshot } : {}),
+    },
+  })
+
+  if (!skapad.success) return { success: false, error: skapad.error }
+
+  return {
+    success: true,
+    data: {
+      quote_id: skapad.quoteId,
+      quote_number: skapad.quoteNumber,
+      message: `Offertutkast ${skapad.quoteNumber} "${(params.title as string) || generated.jobTitle}" genererat av AI-motorn — granska raderna innan den skickas.`,
+      summary: {
+        job_title: generated.jobTitle,
+        confidence: generated.confidence,
+        labor_cost: generated.laborCost,
+        material_cost: generated.materialCost,
+        total_before_vat: generated.totalBeforeVat,
+        suggested_deduction_type: generated.suggestedDeductionType,
+        rot_rut_deduction: rotRutDeduction,
+        missing_price_count: generated.missingPriceCount,
+        options_count: generated.options.length,
+        not_included_suggestions: generated.notIncludedSuggestions,
+        ...(rotRutCapped ? { rot_rut_capped: true, rot_rut_warning: rotRutWarning } : {}),
+      },
+    },
+  }
 }
 
 async function getQuotes(

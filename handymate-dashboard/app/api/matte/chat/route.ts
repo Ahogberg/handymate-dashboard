@@ -43,7 +43,6 @@ import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd, type TokenUsage } from '@/lib/costs/meter'
 import { checkFuelGate } from '@/lib/costs/fuel'
 import { byggAskCoverage } from '@/lib/matte/ask-coverage'
-import { createQuote } from '@/lib/quotes/create-quote'
 import {
   validateNextStep,
   toAgentResult,
@@ -367,7 +366,7 @@ function buildActiveMissionContextSection(mission: {
 // (chatten använder handoff_to_agent istället).
 const CURATED_TOOL_NAMES = [
   'get_customer', 'search_customers', 'create_customer', 'update_customer',
-  'create_quote', 'get_quotes', 'create_invoice',
+  'create_quote', 'create_quote_draft', 'get_quotes', 'create_invoice',
   'check_calendar', 'create_booking', 'update_project', 'log_time',
   'send_sms', 'send_email', 'read_customer_emails',
   'qualify_lead', 'update_lead_status', 'get_lead', 'search_leads',
@@ -471,158 +470,6 @@ const TOOLS: any[] = [
     },
   },
 ]
-
-// ────────────────────────────────────────────────────────────────────────────
-// Tool execution
-// ────────────────────────────────────────────────────────────────────────────
-
-function formatPhone(phone: string): string {
-  const cleaned = phone.replace(/[\s-]/g, '')
-  if (cleaned.startsWith('+')) return cleaned
-  if (cleaned.startsWith('0')) return '+46' + cleaned.slice(1)
-  return '+46' + cleaned
-}
-
-interface ToolResult {
-  result: string
-  action?: { type: string; target?: string; approval_id?: string }
-}
-
-/**
- * @deprecated EJ längre anropad. Verktygsexekveringen går nu genom den delade
- * tool-router:n (executeSharedTool) — denna lokala kopia (med dess gamla
- * send_sms/create_approval/send_invoice_reminder) ersattes i hopslagning Stage 1.
- * Behålls tillfälligt; tas bort i städning (Stage 3).
- */
-async function executeTool(
-  toolName: string,
-  toolInput: Record<string, any>,
-  businessId: string,
-  userCookie: string | null
-): Promise<ToolResult> {
-  const supabase = getServerSupabase()
-
-  switch (toolName) {
-    case 'send_sms': {
-      const { phone, message, customer_name } = toolInput
-
-      // ═══ GENOM STRYPUNKTEN (etapp 0 batch 4, 2026-08-08) ═══
-      //
-      // Det här är den SISTA vägen ut ur huset, och den ligger redan bakom
-      // bekräftelsekortet (require_confirm_external + signerad token) — men
-      // det räcket gatar om hantverkaren sett texten, inte om kunden vill ha
-      // SMS över huvud taget. Opt-out saknades alltså även här.
-      //
-      // Den lokala sms_log-insert:en tas bort; helpern skriver den, och
-      // skriver även vid misslyckande (den gamla loggade alltid 'sent').
-      // formatPhone ersätts av helperns normalizeSwedishPhone.
-      const { data: biz } = await supabase
-        .from('business_config')
-        .select('business_name')
-        .eq('business_id', businessId)
-        .single()
-
-      const { sendSmsViaElks } = await import('@/lib/sms-send')
-      const r = await sendSmsViaElks({
-        supabase,
-        businessId,
-        businessName: biz?.business_name,
-        to: String(phone),
-        message: String(message),
-        messageType: 'matte_chat',
-        recipient: 'customer',
-        purpose: 'conversational',
-      })
-
-      if (!r.success) {
-        console.error('[matte/chat] SMS misslyckades:', r.error)
-        // Matte får ALDRIG säga "skickat" när inget skickades — samma
-        // ärlighetsregel som orkestreringens statusspråk.
-        return { result: `SMS-sändning misslyckades: ${r.error || 'okänt fel'}` }
-      }
-
-      return { result: `SMS skickat till ${customer_name}.` }
-    }
-
-    case 'create_approval': {
-      const { type, title, description, payload } = toolInput
-      const id = 'appr_' + Math.random().toString(36).substring(2, 14)
-      const { error } = await supabase.from('pending_approvals').insert({
-        id,
-        business_id: businessId,
-        approval_type: String(type),
-        title: String(title),
-        description: description ? String(description) : null,
-        payload: payload || {},
-        status: 'pending',
-        risk_level: 'medium',
-        expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-      })
-
-      if (error) {
-        console.error('[matte/chat] approval insert error:', error)
-        return { result: `Kunde inte skapa godkännandet: ${error.message}` }
-      }
-
-      return {
-        result: `Godkännande skapat: "${title}". Det väntar på dig under Godkännanden.`,
-        action: { type: 'approval_created', approval_id: id },
-      }
-    }
-
-    case 'send_invoice_reminder': {
-      const { invoice_id, invoice_number } = toolInput
-      // Forwarda användarens cookie så getAuthenticatedBusiness fungerar
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (userCookie) headers['Cookie'] = userCookie
-
-      const response = await fetch(`${APP_URL}/api/invoices/${invoice_id}/reminder`, {
-        method: 'POST',
-        headers,
-      })
-
-      if (!response.ok) {
-        const errText = await response.text()
-        console.error('[matte/chat] reminder error:', errText)
-        return { result: `Kunde inte skicka påminnelse för ${invoice_number}.` }
-      }
-
-      return { result: `Påminnelse skickad för faktura ${invoice_number}.` }
-    }
-
-    case 'navigate': {
-      const { path, reason } = toolInput
-      return {
-        result: reason ? String(reason) : `Navigerar till ${path}`,
-        action: { type: 'navigate', target: String(path) },
-      }
-    }
-
-    case 'create_quote_draft': {
-      const { customer_id, title } = toolInput
-      // Kanoniska byggaren — Mattes utkast fick tidigare varken nummer eller
-      // sign_token, så det var osynligt i listor och gick inte att länka.
-      const skapad = await createQuote(supabase, businessId, {
-        customerId: (customer_id as string) || null,
-        title: String(title),
-        source: 'matte',
-      })
-
-      if (!skapad.success) {
-        console.error('[matte/chat] quote draft error:', skapad.error)
-        return { result: `Kunde inte skapa offert-utkastet: ${skapad.error}` }
-      }
-
-      return {
-        result: `Offert-utkast ${skapad.quoteNumber} skapat. Öppnar redigeringsvyn.`,
-        action: { type: 'navigate', target: `/dashboard/quotes/${skapad.quoteId}/edit` },
-      }
-    }
-
-    default:
-      return { result: `Okänt verktyg: ${toolName}` }
-  }
-}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Anthropic API helpers — raw fetch
