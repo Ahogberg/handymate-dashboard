@@ -52,6 +52,7 @@ import { QuoteSaveTemplateModal } from './QuoteSaveTemplateModal'
 import type { QuotePayloadContext } from './buildQuotePayload'
 import { useQuoteBuilderSave } from './useQuoteBuilderSave'
 import { QuoteBuilderHeader } from './QuoteBuilderHeader'
+import { QuoteBuilderBottomBar } from './QuoteBuilderBottomBar'
 import { QuoteEditView } from './QuoteEditView'
 import { fetchQuoteForEdit } from './loadEditQuote'
 import type { ReservationSnapshotEntry } from '@/lib/reservations/match'
@@ -2357,7 +2358,13 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
           skickas in i QuoteBuilderHeader (rad 2, completeness-remsan) för
           vad som ersatte kvittots granskningskrav. */}
       <div
-        className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6"
+        // Fas B (offertskaparen-design-polish, 2026-08-31): pb-32/lg:pb-6
+        // ersätter det gamla py-4/sm:py-6-bottenvärdet EXPLICIT (pt-* hanterar
+        // toppen oförändrat) så det nya fasta bottenfältet (QuoteBuilderBottomBar,
+        // lg:hidden) aldrig täcker dokumentets sista rad under `lg`. Uträknat mot
+        // barens faktiska höjd: chip-rad (~40px) + knapprad (52px) + paddingen
+        // runt dem + safe-area — 8rem (128px) har rejäl marginal.
+        className="max-w-[1600px] mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-32 lg:pb-6"
       >
         <QuoteBuilderHeader
           title={title}
@@ -2754,6 +2761,22 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
           </div>
         </div>
       </div>
+
+      {/* Fas B (offertskaparen-design-polish, 2026-08-31): mobilens fasta
+          bottenfält — samma completeness-data och Spara/Skicka-handlers som
+          headern ovan (nu desktop-only, se dess `hidden lg:flex`-gate). */}
+      <QuoteBuilderBottomBar
+        summaries={completenessSummaries}
+        onSelect={selectSectionAndReveal}
+        saving={saving}
+        canSend={!!selectedCustomer}
+        sendDisabledReason={!selectedCustomer ? 'Välj kund först' : undefined}
+        sendConfirmPending={sendConfirmPending}
+        onConfirmSend={() => saveQuote(true, true)}
+        onCancelSend={() => setSendConfirmPending(false)}
+        onSendQuote={() => saveQuote(true)}
+        onSaveDraft={() => saveQuote(false)}
+      />
 
       {/* ETAPP 3: bottom-sheet-radeditorn (mobil) — se sheetItem/sheetItemId
           ovan. Ersätter QuoteEditMobilePreviewModal/FAB:en (borttagen):

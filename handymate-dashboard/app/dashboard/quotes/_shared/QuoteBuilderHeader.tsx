@@ -150,7 +150,15 @@ export function QuoteBuilderHeader({
           aiPhotoCount={aiPhotoCount}
         />
 
-        <div className="ml-auto flex items-center gap-2 flex-nowrap">
+        {/* Fas B (offertskaparen-design-polish, 2026-08-31): desktop-only.
+            Under `lg` visas Spara/Skicka i stället i QuoteBuilderBottomBar
+            (fast bottenfält, se den filen) — ALDRIG båda samtidigt, det var
+            precis den dubbla Skicka-knappen som fick tas bort 2026-08-06
+            (se kodkommentar i QuoteBuilder.tsx). De inre `sm:`-klasserna
+            nedan (korta etiketter "Spara"/"Skicka" under `sm`) triggas i
+            praktiken aldrig längre eftersom hela gruppen redan är dold under
+            `lg` (> `sm`) — lämnade orörda enligt uppdraget, ofarlig död kod. */}
+        <div className="ml-auto hidden lg:flex items-center gap-2 flex-nowrap">
           {hasItems && (
             <button
               type="button"

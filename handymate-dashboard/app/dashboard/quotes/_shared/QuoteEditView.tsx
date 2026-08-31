@@ -31,6 +31,7 @@ import { QuoteDisplaySettingsSection } from './QuoteDisplaySettingsSection'
 import { QuoteTotalsSection } from './QuoteTotalsSection'
 import { QuoteSaveTemplateModal } from './QuoteSaveTemplateModal'
 import { QuoteBuilderHeader } from './QuoteBuilderHeader'
+import { QuoteBuilderBottomBar } from './QuoteBuilderBottomBar'
 import { QuoteEditCustomerSection } from './QuoteEditCustomerSection'
 import type { ProductWithComponents } from './applyProductToItem'
 import type { useQuoteCalculations } from './useQuoteCalculations'
@@ -240,7 +241,12 @@ export function QuoteEditView(props: QuoteEditViewProps) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
+      {/* Fas B (offertskaparen-design-polish, 2026-08-31): pb-32/lg:pb-6
+          ersätter det gamla py-4/sm:py-6-bottenvärdet EXPLICIT (pt-* hanterar
+          toppen oförändrat) så det fasta bottenfältet (QuoteBuilderBottomBar,
+          lg:hidden, monterad nedan) aldrig täcker dokumentets sista rad
+          under `lg`. Se samma kommentar i QuoteBuilder.tsx (create-läget). */}
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-32 lg:pb-6">
         <QuoteBuilderHeader
           mode="edit"
           quoteNumber={quoteNumber}
@@ -410,6 +416,22 @@ export function QuoteEditView(props: QuoteEditViewProps) {
           </div>
         </div>
       </div>
+
+      {/* Fas B (offertskaparen-design-polish, 2026-08-31): mobilens fasta
+          bottenfält — samma completeness-data och Spara/Skicka-handlers som
+          headern ovan (nu desktop-only, se dess `hidden lg:flex`-gate).
+          Edit-läget har aldrig haft sendDisabledReason/sendConfirmPending/
+          onConfirmSend/onCancelSend (se QuoteBuilderHeader.tsx:s docblock —
+          den "extra bekräftelsen" hörde bara till create-flödet), så de
+          utelämnas här precis som i mountningen av headern ovan. */}
+      <QuoteBuilderBottomBar
+        summaries={completenessSummaries}
+        onSelect={onSelectSection}
+        saving={saving}
+        canSend={!!selectedCustomer}
+        onSendQuote={onSendQuote}
+        onSaveDraft={onSaveDraft}
+      />
 
       <RowEditSheet
         item={sheetItem}
