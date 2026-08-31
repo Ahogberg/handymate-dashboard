@@ -13,6 +13,14 @@ interface QuoteBuilderBottomBarProps {
       (desktop) — se sortSectionsByAttention för varför RENDERINGEN skiljer sig
       (horisontell scroll, amber-chips först) trots samma underliggande data. */
   summaries: Record<QuoteSection, SectionSummary>
+  /** DESIGN-SPEC.md ("Helt tomt läge", offertskaparen-polish): styr BARA
+      chip-raden ovanför knapparna — Spara utkast/Skicka offert ska förbli
+      monterade och användbara även på en helt tom offert (annars kan
+      hantverkaren aldrig spara sig ur ett tomt utkast på mobil). `summaries`
+      förblir required: föräldern räknar fortfarande fram sammanfattningen
+      varje render (den behövs så fort hasQuoteContent blir true), den
+      används bara inte för att RENDERA chip-raden när detta är false. */
+  hasQuoteContent: boolean
   onSelect: (section: QuoteSection) => void
   saving: boolean
   canSend: boolean
@@ -45,6 +53,7 @@ interface QuoteBuilderBottomBarProps {
  */
 export function QuoteBuilderBottomBar({
   summaries,
+  hasQuoteContent,
   onSelect,
   saving,
   canSend,
@@ -64,35 +73,44 @@ export function QuoteBuilderBottomBar({
       {/* Chip-raden — horisontellt scrollbar, amber (attention) chips
           först (sortSectionsByAttention), sedan lugna slate-chips i
           SECTION_ORDER. Samma klick-beteende som QuoteCompletenessStrip:
-          scrollar till ämnet i dokumentet. */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-2.5">
-        {orderedSections.map(section => {
-          const summary = summaries[section]
-          const hasAttention = !!summary.attention
-          return (
-            <button
-              key={section}
-              type="button"
-              onClick={() => onSelect(section)}
-              title={`${SECTION_LABELS[section]} — tryck för att hoppa dit`}
-              className={`shrink-0 min-h-[40px] inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-colors ${
-                hasAttention
-                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                  : 'bg-white text-slate-600 border border-slate-200'
-              }`}
-            >
-              <span
-                aria-hidden
-                className={`w-1.5 h-1.5 rounded-full shrink-0 ${hasAttention ? 'bg-amber-500' : 'bg-primary-600'}`}
-              />
-              {SECTION_LABELS[section]}
-              <span className={hasAttention ? 'text-amber-700' : 'text-slate-400'}>
-                {summary.attention || summary.text}
-              </span>
-            </button>
-          )
-        })}
-      </div>
+          scrollar till ämnet i dokumentet.
+
+          DESIGN-SPEC.md ("Helt tomt läge"): hela raden döljs (inte bara
+          attention-styling) när offerten saknar innehåll — utan detta
+          visade en helt ny, tom offert en amber "Inkluderat — Offerten har
+          inga rader"-chip här SAMTIDIGT som canvasen bredvid visade Fas E:s
+          lugna tomt-läge, två motsägande budskap på samma skärm. Knapparna
+          nedan förblir OVILLKORLIGT monterade — bara chip-raden gates. */}
+      {hasQuoteContent && (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-2.5">
+          {orderedSections.map(section => {
+            const summary = summaries[section]
+            const hasAttention = !!summary.attention
+            return (
+              <button
+                key={section}
+                type="button"
+                onClick={() => onSelect(section)}
+                title={`${SECTION_LABELS[section]} — tryck för att hoppa dit`}
+                className={`shrink-0 min-h-[40px] inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-colors ${
+                  hasAttention
+                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                    : 'bg-white text-slate-600 border border-slate-200'
+                }`}
+              >
+                <span
+                  aria-hidden
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${hasAttention ? 'bg-amber-500' : 'bg-primary-600'}`}
+                />
+                {SECTION_LABELS[section]}
+                <span className={hasAttention ? 'text-amber-700' : 'text-slate-400'}>
+                  {summary.attention || summary.text}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* ETAPP 1f-motsvarigheten till headerns orsakstext: renderas i NORMALT
           flöde (inte absolut positionerad) ovanför knapparna. Fas B-

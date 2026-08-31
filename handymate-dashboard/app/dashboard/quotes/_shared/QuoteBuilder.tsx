@@ -556,6 +556,15 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
     totals, hasRotItems, hasRutItems, personnummer, paymentPlanValid, paymentPlan.length,
   ])
 
+  // DESIGN-SPEC.md ("Helt tomt läge", offertskaparen-polish): completeness-
+  // remsan (header rad 2 + bottenfältets chip-rad) ska döljas HELT — inte
+  // bara sin attention/amber-styling — tills offerten har meningsfullt
+  // innehåll. Utan detta visade mobilens bottenfält en amber "Offerten har
+  // inga rader"-chip precis ovanpå Fas E:s lugna, inbjudande tomt-läge i
+  // canvasen — två motsägande budskap på exakt samma skärm vid den absolut
+  // vanligaste "dag ett"-vägen (ny offert, noll rader, mobil).
+  const hasQuoteContent = items.length > 0 || !!selectedCustomer
+
   /**
    * Chip-radens klick-mål: scrollar till ämnet i dokumentet via
    * QuoteDocuments `data-section`-attribut, som redan sätts på varje
@@ -2377,7 +2386,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       >
         <QuoteBuilderHeader
           title={title}
-          completenessSummaries={completenessSummaries}
+          completenessSummaries={hasQuoteContent ? completenessSummaries : undefined}
           onSelectSection={selectSectionAndReveal}
           aiGenerated={aiGenerated}
           aiConfidence={aiConfidence}
@@ -2791,6 +2800,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
           headern ovan (nu desktop-only, se dess `hidden lg:flex`-gate). */}
       <QuoteBuilderBottomBar
         summaries={completenessSummaries}
+        hasQuoteContent={hasQuoteContent}
         onSelect={selectSectionAndReveal}
         saving={saving}
         canSend={canSend}

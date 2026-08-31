@@ -144,11 +144,17 @@ test.describe('completeness-chipraden ersätter kvittots granskningskrav', () =>
     expect(mountIdx, 'QuoteCompletenessStrip monteras inte i QuoteBuilderHeader.tsx').toBeGreaterThan(-1)
   })
 
-  test('QuoteBuilder.tsx skickar completenessSummaries ovillkorligt till headern, inte bakom en quickMode-gate', () => {
+  test('QuoteBuilder.tsx skickar completenessSummaries till headern, inte bakom en quickMode-gate', () => {
     const mountIdx = BUILDER.indexOf('<QuoteBuilderHeader')
     expect(mountIdx, 'QuoteBuilderHeader monteras inte i QuoteBuilder.tsx').toBeGreaterThan(-1)
     const propsBlock = BUILDER.slice(mountIdx, BUILDER.indexOf('/>', mountIdx))
-    expect(propsBlock).toContain('completenessSummaries={completenessSummaries}')
+    // Slutgranskningsfix (offertskaparen-design-polish, "Helt tomt läge"):
+    // proppen är sedan dess villkorad på hasQuoteContent (DESIGN-SPEC.md),
+    // inte längre den råa completenessSummaries-referensen rakt av — se
+    // egen test.describe nedan för hasQuoteContent-villkoret självt. Det
+    // som fortfarande gäller, och som denna test bevakar, är att INGEN
+    // quickMode-gate ligger emellan (se assertionen längre ner).
+    expect(propsBlock).toContain('completenessSummaries={hasQuoteContent ? completenessSummaries : undefined}')
     // Ingen `{quickMode === '...' && (` precis före monteringen — headern
     // (och därmed chip-raden) ska vara ovillkorlig så fort man är i den
     // fulla editorn (quickMode null-grenen, dit alla tre starterna redan
@@ -163,7 +169,59 @@ test.describe('completeness-chipraden ersätter kvittots granskningskrav', () =>
     const mountIdx = EDIT_VIEW.indexOf('<QuoteBuilderHeader')
     expect(mountIdx, 'QuoteBuilderHeader monteras inte i QuoteEditView.tsx').toBeGreaterThan(-1)
     const propsBlock = EDIT_VIEW.slice(mountIdx, EDIT_VIEW.indexOf('/>', mountIdx))
-    expect(propsBlock).toContain('completenessSummaries={completenessSummaries}')
+    expect(propsBlock).toContain('completenessSummaries={hasQuoteContent ? completenessSummaries : undefined}')
     expect(propsBlock).toContain('onSelectSection={onSelectSection}')
+  })
+})
+
+test.describe('"Helt tomt läge" (DESIGN-SPEC.md) — completeness-remsan döljs helt, inte bara attention-styling', () => {
+  // Slutgranskningsfynd (offertskaparen-design-polish): DESIGN-SPEC.md
+  // (rad ~62-65) kräver att BÅDE header-radens strip och mobilens
+  // bottenfälts-chiprad döljs HELT när offerten saknar meningsfullt
+  // innehåll (`items.length > 0 || selectedCustomer`) — inte bara att
+  // attention/amber-styling stängs av. Utan detta visade en helt ny, tom
+  // offert en amber "Offerten har inga rader"-chip i bottenfältet SAMTIDIGT
+  // som Fas E:s lugna tomt-läge i canvasen — två motsägande budskap på
+  // samma skärm, den vanligaste "dag ett"-vägen (ny offert, mobil).
+  const EDIT_VIEW = fs.readFileSync(path.join(QUOTES_DIR, '_shared', 'QuoteEditView.tsx'), 'utf8')
+  const BOTTOM_BAR = fs.readFileSync(path.join(QUOTES_DIR, '_shared', 'QuoteBuilderBottomBar.tsx'), 'utf8')
+
+  test('QuoteBuilder.tsx (create) och QuoteEditView.tsx beräknar exakt samma villkor', () => {
+    const NEEDLE = 'const hasQuoteContent = items.length > 0 || !!selectedCustomer'
+    expect(BUILDER, 'hasQuoteContent saknas i QuoteBuilder.tsx').toContain(NEEDLE)
+    expect(EDIT_VIEW, 'hasQuoteContent saknas i QuoteEditView.tsx').toContain(NEEDLE)
+  })
+
+  test('QuoteBuilder.tsx trådar hasQuoteContent in i QuoteBuilderBottomBar', () => {
+    const mountIdx = BUILDER.indexOf('<QuoteBuilderBottomBar')
+    expect(mountIdx, 'QuoteBuilderBottomBar monteras inte i QuoteBuilder.tsx').toBeGreaterThan(-1)
+    const propsBlock = BUILDER.slice(mountIdx, BUILDER.indexOf('/>', mountIdx))
+    expect(propsBlock).toContain('hasQuoteContent={hasQuoteContent}')
+  })
+
+  test('QuoteEditView.tsx trådar hasQuoteContent in i QuoteBuilderBottomBar', () => {
+    const mountIdx = EDIT_VIEW.indexOf('<QuoteBuilderBottomBar')
+    expect(mountIdx, 'QuoteBuilderBottomBar monteras inte i QuoteEditView.tsx').toBeGreaterThan(-1)
+    const propsBlock = EDIT_VIEW.slice(mountIdx, EDIT_VIEW.indexOf('/>', mountIdx))
+    expect(propsBlock).toContain('hasQuoteContent={hasQuoteContent}')
+  })
+
+  test('QuoteBuilderBottomBar.tsx: chip-raden är gated på hasQuoteContent, knapparna är det INTE', () => {
+    expect(BOTTOM_BAR).toContain('hasQuoteContent: boolean')
+    expect(BOTTOM_BAR).toContain('{hasQuoteContent && (')
+
+    // Knapparnas rot-<div> (den som håller Spara utkast/Skicka offert) ska
+    // finnas UTANFÖR den villkorade chip-raden — dvs. efter dess stängande
+    // `)}`, inte inuti den.
+    const gateIdx = BOTTOM_BAR.indexOf('{hasQuoteContent && (')
+    const buttonsIdx = BOTTOM_BAR.indexOf('<div className="relative flex items-stretch gap-2">')
+    expect(buttonsIdx, 'knapparnas rot-div hittades inte').toBeGreaterThan(-1)
+    expect(buttonsIdx, 'knapparna ligger inuti (eller före) chip-radens villkor')
+      .toBeGreaterThan(gateIdx)
+
+    const saveDraftIdx = BOTTOM_BAR.indexOf('onClick={onSaveDraft}')
+    const sendQuoteIdx = BOTTOM_BAR.indexOf('onClick={onSendQuote}')
+    expect(saveDraftIdx).toBeGreaterThan(buttonsIdx)
+    expect(sendQuoteIdx).toBeGreaterThan(buttonsIdx)
   })
 })

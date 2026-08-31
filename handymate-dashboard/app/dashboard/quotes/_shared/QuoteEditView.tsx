@@ -244,6 +244,13 @@ export function QuoteEditView(props: QuoteEditViewProps) {
   // QuoteBuilderHeader (desktop) och QuoteBuilderBottomBar (mobil) nedan.
   const canSend = !!selectedCustomer
 
+  // DESIGN-SPEC.md ("Helt tomt läge", offertskaparen-polish): samma villkor
+  // som QuoteBuilder.tsx (create-läget) — döljer completeness-remsan (både
+  // header-rad 2 och bottenfältets chip-rad) helt tills offerten har
+  // meningsfullt innehåll. Beräknas lokalt av samma skäl som `canSend` ovan:
+  // den här komponenten är ren presentation men äger sitt eget JSX-träd.
+  const hasQuoteContent = items.length > 0 || !!selectedCustomer
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Fas B (offertskaparen-design-polish, 2026-08-31): pb-40/lg:pb-6
@@ -258,7 +265,7 @@ export function QuoteEditView(props: QuoteEditViewProps) {
           mode="edit"
           quoteNumber={quoteNumber}
           title={title}
-          completenessSummaries={completenessSummaries}
+          completenessSummaries={hasQuoteContent ? completenessSummaries : undefined}
           onSelectSection={onSelectSection}
           autoSaveStatus={autoSaveStatus}
           saving={saving}
@@ -442,6 +449,7 @@ export function QuoteEditView(props: QuoteEditViewProps) {
           utelämnas här precis som i mountningen av headern ovan. */}
       <QuoteBuilderBottomBar
         summaries={completenessSummaries}
+        hasQuoteContent={hasQuoteContent}
         onSelect={onSelectSection}
         saving={saving}
         canSend={canSend}
