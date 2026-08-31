@@ -296,7 +296,10 @@ const BRANCH_PRODUCTS: Record<string, ProductDefault[]> = {
     { sku: 'HM-BYG-005', name: 'Maskinförare', unit: 'tim', unit_price: 0, category: 'arbete', legacy_category: 'labor', labor_share: 1, deduction: 'rot' },
     { sku: 'HM-BYG-006', name: 'Projektering och bygglovsritning', unit: 'tim', unit_price: 0, category: 'arbete', legacy_category: 'labor', labor_share: 1, deduction: null },
 
-    { sku: 'HM-BYG-018', name: 'Tillbyggnad', description: 'Stomme och tätt hus, per kvadratmeter', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.5, deduction: 'rot' },
+    // C1 (pass 3): hette 'Tillbyggnad' — exakt samma (namn, enhet) som
+    // prissatta HM-BYG-012 → dubblett i varje bygg-konto och godtycklig
+    // namnmatchning i matchGeneratedItems. Namnet skiljer nu varianten.
+    { sku: 'HM-BYG-018', name: 'Tillbyggnad (stomme och tätt hus)', description: 'Stomme och tätt hus, per kvadratmeter', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.5, deduction: 'rot' },
     { sku: 'HM-BYG-019', name: 'Uppbyggnad garage', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.5, deduction: 'rot' },
     { sku: 'HM-BYG-020', name: 'Uppbyggnad altan', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.55, deduction: 'rot' },
     { sku: 'HM-BYG-021', name: 'Byggnation carport', unit: 'kvm', unit_price: 0, category: 'arbete', legacy_category: 'service', labor_share: 0.5, deduction: 'rot' },
@@ -537,9 +540,19 @@ export function getDefaultProducts(branch: string | string[]): ProductDefault[] 
   const medSvans = (b: string) => [...BRANCH_PRODUCTS[b], ...(LONGTAIL_PRODUCTS[b] ?? [])]
   const bases = known.length > 0 ? known.map(medSvans) : [medSvans('other')]
 
+  // C1 (pass 3): dedup på BÅDE sku OCH (namn, enhet). Multi-bransch-konton
+  // fick tidigare t.ex. 'Lärling'/tim från varje bransch (olika sku, samma
+  // namn) — matchGeneratedItems tar första namn-träffen godtyckligt, och
+  // v183:s unika index (business_id, LOWER(name), unit) skulle avvisa
+  // seedningen. Första förekomsten vinner (huvudbranschen står först).
   const bySku = new Map<string, ProductDefault>()
+  const settNamnEnhet = new Set<string>()
   for (const p of [...bases.flat(), ...COMMON_EXTRAS]) {
-    if (!bySku.has(p.sku)) bySku.set(p.sku, p)
+    if (bySku.has(p.sku)) continue
+    const nyckel = `${p.name.trim().toLowerCase()}|${p.unit}`
+    if (settNamnEnhet.has(nyckel)) continue
+    bySku.set(p.sku, p)
+    settNamnEnhet.add(nyckel)
   }
   return Array.from(bySku.values())
 }

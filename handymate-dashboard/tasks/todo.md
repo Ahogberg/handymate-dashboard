@@ -1,3 +1,17 @@
+# Prisslingan V2 — pass 3: dedup + unikt index + upsert (Claude 2026-08-31)
+
+Pass 2 LIVE (4533d1e8). v183 är DESTRUKTIV (DELETE av dubblettrader) —
+filen visas för Andreas och körs via MCP först efter hans uttryckliga "kör".
+
+- [x] C1 källfix: namn+enhet-dedup i getDefaultProducts (Lärling fanns i TIO branscher efter långsvansen — analysskript bekräftade 13 tvärs-nycklar + 1 inom-bransch); HM-BYG-018 omdöpt 'Tillbyggnad (stomme och tätt hus)'; C1-facit i product-register.spec
+- [x] v183_products_dedup_unique.sql SKRIVEN (dry-run-frågor + verifierings-SELECT inbäddade; prod-läget dokumenterat: 15 grupper/11 businesses, Bee-tien avgörs på äldst) — EJ KÖRD, väntar Andreas granskning + "kör v183"
+- [x] C3: POST /api/products upsert (ilike-namn+enhet m. wildcard-escape, hitta+prissätt → updated_price, 23505-nät, kanoniskKategori v88-normalisering, created:true/false i svaret)
+- [x] C4: quotes/new auto-create speglar created:false+updated_price via setLocalPrice
+- [x] Facit: products-upsert.spec + C1-namndedup — tsc 0, tio riktade sviter gröna
+- [ ] build + REN-worktree-tsc → push → deploy → visa v183 för Andreas
+
+---
+
 # Prisslingan V2 — pass 2: kanonisering + beta-av + branscher (Claude 2026-08-31)
 
 Andreas "Kör" efter pass 1-avstämningen. Pass 1 LIVE (f2fa8c9).

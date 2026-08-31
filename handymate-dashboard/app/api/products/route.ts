@@ -147,6 +147,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'En produkt kan inte vara både ROT- och RUT-berättigad' }, { status: 400 })
     }
 
+    // C3 (Prisslingan V2 pass 3): UPSERT-beteende — POST var en dubblettmotor.
+    // Exakt namn+enhet-träff (case-okänslig) → återanvänd bankartikeln:
+    // prislös befintlig + pris i body = "hitta+prissätt" (hela loopens poäng),
+    // annars returneras befintlig med created:false. v183:s unika index blir
+    // skyddsnätet på DB-nivå; detta är den vänliga vägen före felkoden.
+    const namn = String(body.name).trim()
+    const enhet = body.unit || 'st'
+    const { data: befintlig } = await supabase
+      .from('products')
+      .select('*')
+      .eq('business_id', business.business_id)
+      .ilike('name', namn.replace(/([%_\\])/g, '\\$1'))
+      .eq('unit', enhet)
+      .limit(1)
+      .maybeSingle()
+    if (befintlig) {
+      if (Number(body.sales_price) > 0 && !(Number(befintlig.sales_price) > 0)) {
+        const { data: prissatt, error: prisFel } = await supabase
+          .from('products')
+          .update({ sales_price: body.sales_price, is_active: true })
+          .eq('id', befintlig.id)
+          .eq('business_id', business.business_id)
+          .select()
+          .single()
+        if (prisFel) throw prisFel
+        return NextResponse.json({ product: prissatt, created: false, updated_price: true })
+      }
+      return NextResponse.json({ product: befintlig, created: false })
+    }
+
     // Auto-calculate markup if purchase_price provided
     let markup_percent = body.markup_percent ?? null
     if (body.purchase_price && body.purchase_price > 0 && body.sales_price > 0 && markup_percent === null) {
@@ -157,9 +187,12 @@ export async function POST(request: NextRequest) {
       .from('products')
       .insert({
         business_id: business.business_id,
-        name: body.name,
+        name: namn,
         description: body.description || null,
-        category: body.category || 'material',
+        // C3: normalisera till v88:s kanoniska mängd (arbete/material/hyra/
+        // övrigt) — offertflödena skickade v13-sluggar (arbete_bygg …) som
+        // återförorenade kolumnen AI-prompten grupperar på.
+        category: kanoniskKategori(body.category),
         sku: body.sku || null,
         unit: body.unit || 'st',
         purchase_price: body.purchase_price ?? null,
@@ -177,13 +210,38 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      // 23505-skyddsnätet (race mot v183:s unika index): någon hann skapa
+      // samma (namn, enhet) mellan uppslaget och inserten — slå upp och
+      // returnera den i stället för ett fel.
+      if ((error as any).code === '23505') {
+        const { data: vinnare } = await supabase
+          .from('products')
+          .select('*')
+          .eq('business_id', business.business_id)
+          .ilike('name', namn.replace(/([%_\\])/g, '\\$1'))
+          .eq('unit', enhet)
+          .limit(1)
+          .maybeSingle()
+        if (vinnare) return NextResponse.json({ product: vinnare, created: false })
+      }
+      throw error
+    }
 
-    return NextResponse.json({ product: data })
+    return NextResponse.json({ product: data, created: true })
   } catch (error: any) {
     console.error('POST products error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+}
+
+/** v88:s kanoniska kategorimängd — allt annat mappas hit (C3). */
+function kanoniskKategori(input: unknown): 'arbete' | 'material' | 'hyra' | 'övrigt' {
+  const s = String(input || '').toLowerCase()
+  if (s.startsWith('arbete') || s === 'labor') return 'arbete'
+  if (s === 'hyra') return 'hyra'
+  if (s.startsWith('ovrigt') || s.startsWith('övrigt') || s === 'service' || s === 'annat') return 'övrigt'
+  return 'material'
 }
 
 /**

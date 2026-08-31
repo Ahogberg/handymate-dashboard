@@ -1937,6 +1937,12 @@ export default function NewQuotePage() {
               const newId = data.product?.id
               if (newId) {
                 workingItems = workingItems.map(i => (i.id === row.id ? { ...i, linked_product_id: newId } : i))
+                // C4: servern kan ha ÅTERANVÄNT en befintlig artikel
+                // (created:false) och prissatt den — spegla lokalt så
+                // väljare/standardpris-erbjudandet ser rätt pris direkt.
+                if (data.created === false && data.updated_price) {
+                  setLocalPrice(newId, row.unit_price)
+                }
               }
             }
           } catch (err) {

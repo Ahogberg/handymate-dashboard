@@ -257,6 +257,31 @@ test.describe('prislösa artiklar når aldrig kundvända ytor (B2: vyn äger fil
   })
 })
 
+test.describe('C1 — aldrig två rader med samma (namn, enhet)', () => {
+  test('varje enskild bransch är namn+enhet-unik', () => {
+    for (const branch of getSeededBranches()) {
+      const sedd = new Set<string>()
+      for (const p of getDefaultProducts(branch)) {
+        const k = `${p.name.trim().toLowerCase()}|${p.unit}`
+        expect(sedd.has(k), `${branch}: dubblett '${p.name}' (${p.unit})`).toBe(false)
+        sedd.add(k)
+      }
+    }
+  })
+
+  test('multi-bransch-merge deduperar på namn+enhet (Lärling finns i tio branscher)', () => {
+    const alla = getDefaultProducts(getSeededBranches())
+    const sedd = new Set<string>()
+    for (const p of alla) {
+      const k = `${p.name.trim().toLowerCase()}|${p.unit}`
+      expect(sedd.has(k), `multi-bransch: dubblett '${p.name}' (${p.unit})`).toBe(false)
+      sedd.add(k)
+    }
+    // Lärling ska finnas EN gång — huvudbranschens (första) variant vinner
+    expect(alla.filter(p => p.name === 'Lärling').length).toBe(1)
+  })
+})
+
 test.describe('flera branscher — verkligheten är sällan en bransch', () => {
   test('två branscher ger båda sortimenten', () => {
     // Bee arbetar både som elektriker och med bygg. Ett påtvingat val hade
