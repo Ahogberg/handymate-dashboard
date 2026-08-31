@@ -63,10 +63,27 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
      * med .in('project_id', ids) en gång och grupperas i minnet. Svarets
      * form är oförändrad — frontend märker bara att det går fortare.
      *
-     * Aliasen är bevarade från tidigare lagningar: project_log har
-     * work_description (aldrig description), schedule_entry har
-     * start_datetime/end_datetime (aldrig start_time) — båda gav 42703 och
-     * tomma sektioner en gång i tiden.
+     * Aliasen är bevarade från tidigare lagningar: schedule_entry har
+     * start_datetime/end_datetime (aldrig start_time) — gav 42703 och en
+     * tom sektion en gång i tiden.
+     *
+     * project_log-fyndet (2026-08-31, Work Report V1-granskningen): den
+     * ursprungliga tabelldesignen (sql/rot_rut_documents.sql) hette
+     * project_id/work_description — men den LEVANDE tabellen döptes om till
+     * order_id/work_performed (verifierat i app/api/projects/[id]/logs/
+     * route.ts, som skriver mot just de namnen) utan att denna fråga
+     * följde med. Selecten bad om kolumner som inte finns
+     * (project_id, work_description) → PostgREST 42703 → fångas tyst av
+     * felloggningen nedan → latestLog blev ALLTID null, tyst, för varje
+     * portalbesök. Ingen kunddata läckte — frågan gav bara aldrig ett svar.
+     *
+     * Fixen aliasar till de RIKTIGA kolumnerna. Notera valet: work_performed
+     * ("vad utfördes") är byggdagbokens avsedda kundnarrativ — motsvarar
+     * ursprungets work_description. Den levande kolumnen `description`
+     * (skrivs av notes-fältet i formuläret, se logs/route.ts rad 97) är
+     * INTERNA anteckningar, inte det kundvända fältet — att alisera dit
+     * hade varit den faktiska läckan. log_report_%-spärren (Work Report V1)
+     * skyddar mot de NYA interna raderna oavsett.
      */
     const ids = (projects || []).map((p: any) => p.project_id)
     const [milestonesRes, logsRes, scheduleRes, ataRes, stagesRes, photosRes, invoiceRes] = ids.length === 0
@@ -80,12 +97,12 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
             .order('sort_order', { ascending: true }),
           supabase
             .from('project_log')
-            .select('project_id, description:work_description, created_at')
+            .select('project_id:order_id, description:work_performed, created_at')
             // Explicit internal-report boundary; never rely on a legacy column
             // mismatch to keep the employee's report out of the customer portal.
             .not('id', 'like', 'log_report_%')
             .eq('business_id', customer.business_id)
-            .in('project_id', ids)
+            .in('order_id', ids)
             .order('created_at', { ascending: false }),
           supabase
             .from('schedule_entry')
