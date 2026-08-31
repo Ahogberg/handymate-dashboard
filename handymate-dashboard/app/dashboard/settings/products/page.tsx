@@ -229,7 +229,11 @@ export default function ProductsPage() {
     }
   }
 
-  async function handleSave(payload: Record<string, unknown>, components: ComponentPayload[] | null) {
+  async function handleSave(
+    payload: Record<string, unknown>,
+    components: ComponentPayload[] | null,
+    reservationIds: string[] | null
+  ) {
     setSaving(true)
     try {
       const isEdit = !!payload.id
@@ -253,6 +257,19 @@ export default function ProductsPage() {
         if (!compRes.ok) {
           const d = await compRes.json().catch(() => ({}))
           toast.error(d.error || 'Produkten sparades men inte komponenterna')
+          fetchProducts(search)
+          return
+        }
+      }
+      if (reservationIds !== null && product?.id) {
+        const resRes = await fetch(`/api/products/${product.id}/reservations`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reservation_ids: reservationIds }),
+        })
+        if (!resRes.ok) {
+          const d = await resRes.json().catch(() => ({}))
+          toast.error(d.error || 'Produkten sparades men inte förbehållskopplingarna')
           fetchProducts(search)
           return
         }

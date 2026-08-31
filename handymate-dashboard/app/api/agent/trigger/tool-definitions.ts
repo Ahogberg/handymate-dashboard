@@ -85,6 +85,26 @@ export const toolDefinitions = [
       required: ["customer_id", "title", "description", "items"],
     },
   },
+  // Fas 3 (offert-omtaget, 2026-08-31): AI-genererat offertutkast från en
+  // jobbeskrivning — samma motor som "Bygg utkast"-knappen i offertvyn
+  // (generateQuoteFromInput). Skild från create_quote ovan: det verktyget
+  // kräver att raderna redan är kända (hantverkaren/kunden dikterat dem),
+  // det här verktyget RÄKNAR UT rader, priser, ROT/RUT-förslag och tillval
+  // åt dig. Använd det ena eller det andra — aldrig båda för samma utkast.
+  {
+    name: "create_quote_draft",
+    description: "Generera ett offertutkast från en jobbeskrivning med AI-motorn (samma motor som 'Bygg utkast'-knappen i offertvyn) — ger prissatta rader, ROT/RUT-förslag och ev. tillval automatiskt, med hänsyn till hantverkarens prislista, ev. kundspecifik prislista och tidigare lärdomar. Använd det HÄR verktyget när du har en beskrivning av jobbet men INTE själv räknat ut exakta rader/priser. Använd create_quote i stället när hantverkaren eller kunden redan dikterat exakta rader du bara ska spara. Navigera gärna till /dashboard/quotes/{quote_id}/edit efteråt så utkastet kan granskas.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        customer_id: { type: "string", description: "Kundens ID, om känt. Kan utelämnas — utkastet kan skapas innan kunden är vald." },
+        title: { type: "string", description: "Kort titel för offerten. Utelämna för att låta AI:n föreslå en titel utifrån jobbeskrivningen." },
+        job_description: { type: "string", description: "Så detaljerad beskrivning som möjligt av jobbet: vad som ska göras, ytor/mått, material, skick — allt som påverkar prissättningen." },
+        job_type: { type: "string", description: "Valfri jobbtyp/kategori (t.ex. 'badrum', 'kök', 'altan', 'elinstallation') — styr vilka tidigare bekräftade lärdomar AI:n tar hänsyn till." },
+      },
+      required: ["job_description"],
+    },
+  },
   // Våg 2b (tasks/value-chain-plan.md) — ÄTA-kedjan. Skapar ALDRIG en ÄTA
   // direkt — bara ett förslagskort i godkännande-kön (kö-först-principen,
   // samma som create_approval_request). Använd när kunden ber om

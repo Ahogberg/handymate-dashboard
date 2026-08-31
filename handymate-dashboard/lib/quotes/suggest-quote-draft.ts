@@ -73,7 +73,8 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { checkCostGuards, type CostGuardBusiness } from '@/lib/agents/shared/cost-guard'
-import { generateQuoteFromInput, type PriceListItem, type QuoteTemplate } from '@/lib/ai-quote-generator'
+import { generateQuoteFromInput } from '@/lib/ai-quote-generator'
+import { buildQuoteGenerationContext } from '@/lib/quotes/quote-generation-context'
 import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
 import { hourlyRateField } from '@/lib/company/company-model'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
@@ -241,38 +242,15 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
       return
     }
 
-    // ── 6. Produktbank + mallar (samma mönster som app/api/quotes/ ──
-    // ai-generate/route.ts — fallback-priskontexten läses ur products,
-    // se kommentaren där om produktbanks-konsolideringen v67).
-    // B3 (kodrevision 2026-08-03): samma .limit(50)-utan-.order()-mönster
-    // kopierades hit från ai-generate/route.ts — samma fix, samma
-    // sortering (favoriter → namn, se usePriceListLookup.ts).
-    const [priceListResult, templatesResult] = await Promise.all([
-      supabase
-        .from('products')
-        // ETAPP B1 (2026-08-06): id krävs för produktkopplingen — se
-        // lib/products/match-generated-items.ts.
-        .select('id, name, unit, sales_price, category')
-        .eq('business_id', businessId)
-        .eq('is_active', true)
-        .order('is_favorite', { ascending: false })
-        .order('name')
-        .limit(100),
-      supabase
-        .from('quote_templates')
-        .select('name, default_items, category')
-        .eq('business_id', businessId)
-        .limit(5),
-    ])
-
-    const priceList: PriceListItem[] = (priceListResult.data || []).map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      unit: p.unit,
-      unit_price: p.sales_price,
-      category: p.category,
-    }))
-    const templates: QuoteTemplate[] = templatesResult.data || []
+    // ── 6. Produktbank + mallar — delad helper (Fas 3, offert-omtaget, ──
+    // 2026-08-31): samma urval som ai-generate/route.ts och Matte-chattens
+    // create_quote_draft-verktyg, se lib/quotes/quote-generation-context.ts.
+    // Leaden har ingen kund-koppling förrän lead.customer_id är satt — utan
+    // customerId returnerar helpern helt enkelt ingen kundprislista (samma
+    // fail-soft som tidigare, bara centraliserad).
+    const { priceList, templates, customerPriceList } = await buildQuoteGenerationContext(
+      supabase, businessId, lead.customer_id,
+    )
 
     const bizConfig = bizRow as {
       industry?: string | null
@@ -316,6 +294,12 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
         textDescription,
         priceList,
         templates,
+        // Fas 3 (offert-omtaget, 2026-08-31): tidigare hämtades ALDRIG
+        // kundens price_lists_v2 här (till skillnad från ai-generate/route.ts
+        // sedan B4) — en kund med kundspecifik prislista fick ändå bara
+        // generella produktbankspriser i bakgrundsförslaget. buildQuoteGenerationContext
+        // hämtar den nu åt alla tre anropare; fail-soft (undefined) när ingen finns.
+        customerPriceList,
         customerId: lead.customer_id || undefined,
         // lead.job_type sätts av qualifyLead() (agentverktyget) — redan i
         // scope ovan (används i textDescription). Låter fetchRecentLessons

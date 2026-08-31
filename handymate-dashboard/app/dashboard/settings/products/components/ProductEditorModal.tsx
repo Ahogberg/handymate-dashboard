@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Loader2, Plus, Save, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Loader2, Plus, Save, Search, Trash2, X } from 'lucide-react'
 import { resolveLaborShare, type SnapshotComponent } from '@/lib/products/build-item-snapshot'
 import { PRODUCT_UNIT_OPTIONS } from '@/components/products/ProductModal'
-import type { ComponentPayload, ProductCategory, ProductRow } from '../types'
+import type { ComponentPayload, ProductCategory, ProductReservation, ProductRow } from '../types'
 
 const INPUT_CLS =
   'w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors'
@@ -32,10 +32,14 @@ interface ProductEditorModalProps {
   categories: ProductCategory[]
   saving: boolean
   /**
-   * components är null för NYA produkter (komponenter kräver ett produkt-id) —
-   * sidan hoppar då över PUT mot components-routen.
+   * components och reservationIds är null för NYA produkter (båda kräver ett
+   * produkt-id) — sidan hoppar då över PUT mot respektive delresurs-rutt.
    */
-  onSave: (payload: Record<string, unknown>, components: ComponentPayload[] | null) => void
+  onSave: (
+    payload: Record<string, unknown>,
+    components: ComponentPayload[] | null,
+    reservationIds: string[] | null
+  ) => void
   onClose: () => void
   onError: (message: string) => void
 }
@@ -97,6 +101,61 @@ export function ProductEditorModal({
       unit_cost: String(c.unit_cost),
     }))
   )
+
+  // Förbehåll kopplade till artikeln (sql/v91_reservations.sql) — precis
+  // som komponenterna ovan kräver kopplingen ett produkt-id, så bara
+  // BEFINTLIGA produkter hämtar och kan ändra dem.
+  const [reservationOptions, setReservationOptions] = useState<ProductReservation[]>([])
+  const [linkedReservations, setLinkedReservations] = useState<ProductReservation[]>([])
+  const [reservationSearch, setReservationSearch] = useState('')
+  const [loadingReservations, setLoadingReservations] = useState(false)
+
+  useEffect(() => {
+    if (!product) return
+    let cancelled = false
+    setLoadingReservations(true)
+    Promise.all([
+      fetch('/api/reservations').then(r => (r.ok ? r.json() : { reservations: [] })),
+      fetch(`/api/products/${product.id}/reservations`).then(r => (r.ok ? r.json() : { reservations: [] })),
+    ])
+      .then(([allRes, linkedRes]) => {
+        if (cancelled) return
+        setReservationOptions(allRes.reservations || [])
+        setLinkedReservations(linkedRes.reservations || [])
+      })
+      .catch(() => {
+        if (!cancelled) onError('Kunde inte hämta förbehåll')
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingReservations(false)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id])
+
+  const reservationHits = useMemo(() => {
+    const q = reservationSearch.trim().toLowerCase()
+    if (!q) return []
+    const linkedIds = new Set(linkedReservations.map(r => r.id))
+    return reservationOptions
+      .filter(
+        r =>
+          !linkedIds.has(r.id) &&
+          (r.title.toLowerCase().includes(q) || r.content.toLowerCase().includes(q))
+      )
+      .slice(0, 8)
+  }, [reservationSearch, reservationOptions, linkedReservations])
+
+  function addReservation(r: ProductReservation) {
+    setLinkedReservations(prev => (prev.some(x => x.id === r.id) ? prev : [...prev, r]))
+    setReservationSearch('')
+  }
+
+  function removeReservation(id: string) {
+    setLinkedReservations(prev => prev.filter(r => r.id !== id))
+  }
 
   const unitLabel = PRODUCT_UNIT_OPTIONS.find(u => u.value === unit)?.label || unit
 
@@ -210,7 +269,11 @@ export function ProductEditorModal({
       payload.default_labor_share = shareEnabled ? Math.min(100, Math.max(0, sharePct)) / 100 : null
     }
 
-    onSave(payload, product ? components : null)
+    onSave(
+      payload,
+      product ? components : null,
+      product ? linkedReservations.map(r => r.id) : null
+    )
   }
 
   return (
@@ -577,6 +640,76 @@ export function ProductEditorModal({
                   </p>
                 )}
               </div>
+            )}
+          </div>
+
+          {/* Förbehåll kopplade till artikeln (sql/v91_reservations.sql) —
+              samma tabell som förbehålls-editorn skriver till, så en koppling
+              gjord härifrån dyker upp under "Reservationer" där automatiskt. */}
+          <div className="pt-2 border-t border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-900 mb-1">
+              Förbehåll som gäller den här artikeln
+            </h3>
+            <p className="text-xs text-slate-400 mb-3">
+              Föreslås automatiskt i offerter som innehåller artikeln, och listas under
+              "Reservationer" när den finns med.
+            </p>
+
+            {!product ? (
+              <p className="text-sm text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3">
+                Spara produkten först för att koppla förbehåll
+              </p>
+            ) : (
+              <>
+                {linkedReservations.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {linkedReservations.map(r => (
+                      <span
+                        key={r.id}
+                        className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 bg-primary-50 border border-primary-100 text-primary-800 text-sm rounded-full"
+                      >
+                        {r.title}
+                        <button
+                          type="button"
+                          onClick={() => removeReservation(r.id)}
+                          aria-label={`Ta bort kopplingen ${r.title}`}
+                          className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-primary-100"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={reservationSearch}
+                    onChange={e => setReservationSearch(e.target.value)}
+                    placeholder={loadingReservations ? 'Hämtar förbehåll…' : 'Sök förbehåll att koppla…'}
+                    disabled={loadingReservations}
+                    className={`${INPUT_CLS} pl-10`}
+                  />
+                </div>
+                {reservationHits.length > 0 && (
+                  <ul className="mt-1.5 space-y-1">
+                    {reservationHits.map(r => (
+                      <li key={r.id}>
+                        <button
+                          type="button"
+                          onClick={() => addReservation(r)}
+                          className="w-full text-left px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg hover:border-primary-300 hover:bg-primary-50/40"
+                        >
+                          {r.title}
+                          <span className="block text-[11px] text-slate-400 truncate">{r.content}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
           </div>
         </div>

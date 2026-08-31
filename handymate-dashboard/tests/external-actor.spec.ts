@@ -101,6 +101,9 @@ const EXTERNAL_DENIED_TOOLS: Record<string, string> = {
   // uppdatera detta facit — samma mönster som 2026-08-25 ovan):
   log_material: 'skrivande, materialrad på ett projekt — samma kategori som log_time',
   add_work_note: 'skrivande, arbetsanteckning på ett projekt — samma kategori som log_time',
+  // Klassad 2026-08-31 (Fas 3, offert-omtaget) — samma kategori som
+  // create_quote ovan, bara med AI-genererade rader i stället för dikterade.
+  create_quote_draft: 'skrivande, ekonomi (AI-genererat offertutkast)',
 }
 
 test.describe('Etapp S — fail-closed klassificeringsfacit', () => {

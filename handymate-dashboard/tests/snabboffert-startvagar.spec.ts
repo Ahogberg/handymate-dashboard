@@ -3,13 +3,21 @@
  *
  *   "Oavsett om man väljer att få utkast med AI, att skapa en ny själv
  *    eller med en sparad mall ska man ALLTID hamna i vår nya
- *    offertskapare" — den sektionsvisa granskningen från 2026-08-14.
+ *    offertskapare."
  *
- * Alla tre starterna ska konvergera i enterQuickReview(). Den gamla
- * fullständiga editorn får BARA nås via explicita utrymningsvägar
- * ("Öppna editorn direkt"/"Öppna fullständiga editorn") eller den
- * sparade editor-preferensen — aldrig som oavsiktlig landningsyta för
- * någon av de tre riktiga starterna.
+ * ═══ HISTORIK (Fas 1, offert-omtaget 2026-08-31) ═══
+ *
+ * Fram till 2026-08-31 betydde "vår nya offertskapare" en sektionsvis
+ * tvingad granskningssekvens (`enterQuickReview()` → quickMode 'review'/
+ * 'overview'). Den granskningen är borttagen — grundaren konstaterade att
+ * den inte fungerade i praktiken. Invarianten själv består oförändrad
+ * (alla tre starterna ska konvergera på EN plats, aldrig glida isär), bara
+ * MÅLET bytte: alla tre landar nu direkt i den fulla canvas-editorn
+ * (quickMode = null) via den delade `finishQuickStart()` — se
+ * `app/dashboard/quotes/_shared/QuoteBuilder.tsx`. Det är alltså numera
+ * HELT OK att slutsteget sätter quickMode till null, så länge det sker
+ * via den delade funktionen och inte via en egen, parallell genväg per
+ * startväg (vilket är precis vad testerna nedan låser).
  *
  * Källskanning (husets facit-stil): låser strukturen som gör invarianten
  * sann, så en refaktor som bryter den blir röd — inte en tyst regression
@@ -22,7 +30,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 const PAGE = fs.readFileSync(
-  path.join(__dirname, '..', 'app', 'dashboard', 'quotes', 'new', 'page.tsx'),
+  path.join(__dirname, '..', 'app', 'dashboard', 'quotes', '_shared', 'QuoteBuilder.tsx'),
   'utf8',
 )
 const INTAKE = fs.readFileSync(
@@ -30,29 +38,39 @@ const INTAKE = fs.readFileSync(
   'utf8',
 )
 
-test.describe('alla tre starterna landar i sektionsgranskningen', () => {
-  test('AI-vägen: buildQuickDraft slutar i enterQuickReview', () => {
+test.describe('alla tre starterna landar i samma fulla editor', () => {
+  test('AI-vägen: buildQuickDraft slutar i finishQuickStart', () => {
     const fn = PAGE.slice(PAGE.indexOf('async function buildQuickDraft'))
     const body = fn.slice(0, fn.indexOf('\n  }'))
-    expect(body, 'AI-utkastet ska landa i granskningen, inte editorn').toContain('enterQuickReview()')
-    expect(body, 'AI-vägen får aldrig sätta quickMode(null) som slutsteg').not.toContain('setQuickMode(null)')
+    expect(body, 'AI-utkastet ska landa i editorn via den delade funktionen').toContain('finishQuickStart()')
+    expect(body, 'AI-vägen får aldrig sätta quickMode(null) direkt, förbi den delade funktionen').not.toContain('setQuickMode(null)')
   })
 
-  test('Bygg själv-vägen: startBlankQuickDraft slutar i enterQuickReview', () => {
+  test('Bygg själv-vägen: startBlankQuickDraft slutar i finishQuickStart', () => {
     const fn = PAGE.slice(PAGE.indexOf('function startBlankQuickDraft'))
     const body = fn.slice(0, fn.indexOf('\n  }'))
-    expect(body, 'blankstarten ska landa i granskningen, inte editorn').toContain('enterQuickReview()')
+    expect(body, 'blankstarten ska landa i editorn via den delade funktionen').toContain('finishQuickStart()')
     expect(body).not.toContain('setQuickMode(null)')
   })
 
-  test('mallvägen: VARJE onSelectTemplate-hanterare kör enterQuickReview', () => {
+  test('mallvägen: VARJE onSelectTemplate-hanterare kör finishQuickStart', () => {
     // Båda monteringsställena av QuoteNewStartChooser — ett mallval får
-    // aldrig landa i den fullständiga editorn.
+    // aldrig landa i editorn via en egen, parallell genväg.
     const handlers = PAGE.match(/onSelectTemplate=\{[^}]*\}\}/g) || []
     expect(handlers.length, 'minst ett monteringsställe för mallväljaren').toBeGreaterThanOrEqual(1)
     for (const h of handlers) {
-      expect(h, `mallval utan granskning: ${h}`).toContain('enterQuickReview()')
+      expect(h, `mallval utan den delade avslutningen: ${h}`).toContain('finishQuickStart()')
     }
+  })
+
+  test('finishQuickStart() finns bara en gång och landar i editorn', () => {
+    // Den delade svansen ska bara definieras EN gång — annars kan mall-,
+    // blank- och AI-vägarna glida isär från varandra igen.
+    const defs = PAGE.match(/function finishQuickStart\(\)/g) || []
+    expect(defs.length, 'finishQuickStart ska definieras exakt en gång').toBe(1)
+    const fn = PAGE.slice(PAGE.indexOf('function finishQuickStart()'))
+    const body = fn.slice(0, fn.indexOf('\n  }'))
+    expect(body).toContain('setQuickMode(null)')
   })
 })
 

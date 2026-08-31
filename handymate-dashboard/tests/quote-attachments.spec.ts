@@ -19,6 +19,8 @@ import { buildQuoteTemplateData } from '../lib/quote-templates/data-builder'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
+const builder = read('app/dashboard/quotes/_shared/QuoteBuilder.tsx')
+const payload = read('app/dashboard/quotes/_shared/buildQuotePayload.ts')
 
 const minimalQuote = (attachments: unknown) => ({
   quote_items: [],
@@ -86,28 +88,32 @@ test.describe('hela kedjan renderar — dokument, PDF, portal, publika sidan', (
   })
 
   test('live-förhandsvisningarna visar samma sak som kunden får', () => {
-    for (const sida of ['app/dashboard/quotes/new/page.tsx', 'app/dashboard/quotes/[id]/edit/page.tsx']) {
-      const s = read(sida)
-      expect(s, `${sida} skickar inte bilagorna till live-dokumentet`)
-        .toContain('attachments: attachments.length > 0')
-    }
+    // FAS 1+2 (offert-omtaget, 2026-08-31): create- OCH edit-orkestratorn
+    // delar nu EN quoteTemplateData-useMemo i _shared/QuoteBuilder.tsx —
+    // new/page.tsx och [id]/edit/page.tsx är båda tunna wrappers.
+    expect(builder, 'QuoteBuilder.tsx skickar inte bilagorna till live-dokumentet')
+      .toContain('attachments: attachments.length > 0')
   })
 })
 
 test.describe('edit-sidan tappar aldrig bilagorna', () => {
-  const edit = read('app/dashboard/quotes/[id]/edit/page.tsx')
+  // FAS 2 (offert-omtaget, 2026-08-31): edit-sidans hydrering/payload-
+  // byggnad flyttade till loadEditQuote.ts (laddning) och
+  // buildQuotePayload.ts (spar/autospar) — [id]/edit/page.tsx är nu en tunn
+  // wrapper utan egen logik.
+  const loader = read('app/dashboard/quotes/_shared/loadEditQuote.ts')
 
   test('hydrerar från offerten och renderar kortet', () => {
-    expect(edit).toContain('setAttachments((quote as any).attachments)')
-    expect(edit).toContain('<QuoteNewAttachmentsCard')
+    expect(loader).toContain('Array.isArray(quote.attachments)')
+    expect(read('app/dashboard/quotes/_shared/QuoteEditView.tsx')).toContain('<QuoteNewAttachmentsCard')
   })
 
   test('payloaden bär fältet — även som tömd lista, så borttag sparas', () => {
     // API:t uppdaterar bara när fältet finns i bodyn (body.attachments !==
-    // undefined) — skickas det aldrig går bilagor inte att ta bort.
-    const i = edit.indexOf('const buildPayload')
-    const block = edit.slice(i, edit.indexOf('async function', i))
-    expect(block).toContain('attachments,')
+    // undefined) — skickas det aldrig går bilagor inte att ta bort. Delad
+    // buildQuotePayload (samma funktion som create-läget) skickar ALLTID
+    // `attachments` — som [] om tom, aldrig `undefined`.
+    expect(payload).toContain('attachments: input.attachments.length > 0')
   })
 
   test('PUT-vägen skriver bara när fältet skickas — ingen radering av misstag', () => {

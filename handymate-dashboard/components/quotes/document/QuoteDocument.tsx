@@ -43,13 +43,17 @@ export interface QuoteDocumentProps extends QuoteDocumentMobileProps {
   style?: 'modern'
   handlers?: QuoteDocumentHandlers
   /**
-   * ETAPP C3 (Snabbofferten, 2026-08-06): sektionen som granskas just nu.
+   * ETAPP C3 (Snabbofferten, 2026-08-06): sektionen att lyfta fram/dimma
+   * andra sektioner kring.
    *
-   * Satt → alla andra sektioner dimmas och blir icke-klickbara, den fokuserade
-   * lyfts fram. Det är en REN visningsangelägenhet: vilka FÄLT som går att
-   * redigera styrs av vilka handlers som skickas in (se
-   * lib/quotes/section-handlers.ts). Två oberoende spakar, med flit — dimning
-   * utan handler-gating hade sett låst ut men fortfarande varit redigerbart.
+   * FAS 1 (offert-omtaget, 2026-08-31): den forcerade steg-för-steg-
+   * granskningen som satte denna prop tillsammans med en handler-gating
+   * (lib/quotes/section-handlers.ts → nu lib/quotes/quote-completeness.ts,
+   * gatingen borttagen) är borta. Ingen anropare sätter längre denna prop —
+   * `data-section` (alltid satt, se `section()` nedan) räcker för den nya
+   * chip-radens scrollIntoView. Mekanismen (dimning via opacity/pointer-
+   * events) lämnas orörd här ifall en framtida yta behöver den, men den är
+   * i praktiken vilande.
    *
    * Implementeras med opacity och pointer-events, ALDRIG med transform:
    * DocumentScaler CSS-transformerar redan hela A4:an, och en andra transform
@@ -565,9 +569,11 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             {/* ÄTA (etapp A4): renderades aldrig — se kommentaren i static-
                 grenen nedan. Båda grenarna får samma tillägg så de inte kan
                 divergera. Del 1 (2026-08-17): nu dokumentredigerbart via
-                samma mönster som "Ej inkluderat" två block ovan — gatas på
-                onAtaTermsChange (lib/quotes/section-handlers.ts:
-                SECTION_KEYS.exkluderat). */}
+                samma mönster som "Ej inkluderat" två block ovan — gatas bara
+                på att `handlers.onAtaTermsChange` finns (den forna
+                sektionsgatingen i lib/quotes/section-handlers.ts som styrde
+                VILKA anropare skickade in den handlern är borttagen i Fas 1,
+                offert-omtaget 2026-08-31 — new/edit skickar den alltid). */}
             {(data.quote.ataTerms || handlers.onAtaTermsChange) ? (
               <>
                 <br /><br /><strong>Ändringar och tilläggsarbeten:</strong>{' '}

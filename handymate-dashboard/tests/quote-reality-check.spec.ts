@@ -159,10 +159,15 @@ test.describe('arkitekturfacit', () => {
   })
 
   test('dealens explicita jobbtyp överlever offertskapandet till utskickskontrollen', () => {
-    const page = read('app/dashboard/quotes/new/page.tsx')
+    // FAS 1 (offert-omtaget, 2026-08-31): app/dashboard/quotes/new/page.tsx
+    // är nu en tunn wrapper — deal-prefillen bor i QuoteBuilder.tsx, och
+    // payload-byggandet (job_type in i POST-bodyn) flyttade separat till
+    // buildQuotePayload.ts.
+    const builder = read('app/dashboard/quotes/_shared/QuoteBuilder.tsx')
+    const payload = read('app/dashboard/quotes/_shared/buildQuotePayload.ts')
     const route = read('app/api/quotes/route.ts')
-    expect(page).toContain('setQuoteJobType(deal.job_type)')
-    expect(page).toContain('job_type: quoteJobType')
+    expect(builder).toContain('setQuoteJobType(deal.job_type)')
+    expect(payload).toContain('job_type: input.quoteJobType')
     expect(route).toContain("job_type: typeof body.job_type === 'string'")
     expect(route).toContain('body.job_type.trim().slice(0, 120)')
     expect(route).toContain('template_id: source.template_id')

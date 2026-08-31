@@ -157,7 +157,14 @@ export function QuickIntake({
   }, [recording.blob])
 
   const isRecording = recording.state === 'recording'
-  const canBuild = value.trim().length > 0 && !building && !transcribing
+  // Minimispärr mot enradsutkast (Fas 0, 2026-08-31): ett enda tecken var
+  // tidigare nog för att trigga en fullständig AI-genererad offert. Foton
+  // räcker alltid ensamma — bilden BÄR beskrivningen då.
+  const trimmedValue = value.trim()
+  const hasSubstantialText =
+    trimmedValue.length >= 12 && trimmedValue.split(/\s+/).filter(Boolean).length > 1
+  const canBuild = (hasSubstantialText || photos.length > 0) && !building && !transcribing
+  const textTooThin = !canBuild && !building && !transcribing && trimmedValue.length > 0
 
   const voiceUnavailable = recording.state === 'denied' || recording.state === 'unsupported'
 
@@ -375,7 +382,11 @@ export function QuickIntake({
           {/* Den inaktiverade knappen förklarar sig — höjden är reserverad
               så förklaringen inte knuffar knapparna när den försvinner. */}
           <p className="text-center text-xs text-slate-400 mt-2.5 min-h-[16px] m-0">
-            {!canBuild && !building && !transcribing ? 'Beskriv jobbet — eller bygg själv, sektion för sektion.' : ''}
+            {!canBuild && !building && !transcribing
+              ? (textTooThin
+                  ? 'Beskriv lite mer om jobbet — några ord till räcker.'
+                  : 'Beskriv jobbet — eller bygg själv, sektion för sektion.')
+              : ''}
           </p>
         </div>
       </div>

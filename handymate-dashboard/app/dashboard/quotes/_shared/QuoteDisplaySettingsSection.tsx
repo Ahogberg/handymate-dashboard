@@ -8,7 +8,7 @@ import {
   type DisplayLevel,
 } from '@/lib/quotes/display-level'
 
-interface QuoteEditDisplaySettingsSectionProps {
+interface QuoteDisplaySettingsSectionProps {
   open: boolean
   setOpen: (b: boolean) => void
   detailLevel: DetailLevel
@@ -31,7 +31,7 @@ const OPTIONS: { level: DisplayLevel; title: string; desc: string }[] = [
  * displayLevelToWriteFields). Omöjliga kombinationer kan inte längre skapas.
  * Läsning normaliserar gamla värden (inkl. total_only) via resolveDisplayLevel.
  */
-export function QuoteEditDisplaySettingsSection({
+export function QuoteDisplaySettingsSection({
   open,
   setOpen,
   detailLevel,
@@ -40,7 +40,7 @@ export function QuoteEditDisplaySettingsSection({
   setShowUnitPrices,
   showQuantities,
   setShowQuantities,
-}: QuoteEditDisplaySettingsSectionProps) {
+}: QuoteDisplaySettingsSectionProps) {
   const current = resolveDisplayLevel({ detail_level: detailLevel, show_unit_prices: showUnitPrices })
 
   const select = (level: DisplayLevel) => {

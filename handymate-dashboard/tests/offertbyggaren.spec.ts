@@ -95,13 +95,23 @@ test.describe('spärrhaken: en väg in', () => {
 
   test('de migrerade skrivarna använder byggaren', () => {
     for (const fil of [
-      'app/api/matte/chat/route.ts',
       'app/api/voice/execute/route.ts',
       'app/api/agent/trigger/tool-router.ts',
       'app/api/quotes/route.ts',
     ]) {
       expect(kod(fil), `${fil} importerar inte byggaren`).toContain('quotes/create-quote')
     }
+  })
+
+  test('matte/chat delegerar sina quote-verktyg till tool-router, inte en egen skrivare', () => {
+    // Offert-omtaget (2026-08-31): den döda lokala executeTool()-kopian togs
+    // bort härifrån (den skapade aldrig annat än ett tomt skal). Matte
+    // anropar nu SAMMA executeSharedTool/create_quote(_draft) som
+    // tool-router.ts äger — route.ts importerar inte byggaren direkt längre,
+    // och ska inte göra det igen utan att gå via tool-router.
+    const s = kod('app/api/matte/chat/route.ts')
+    expect(s).not.toContain('quotes/create-quote')
+    expect(s).toContain('executeSharedTool')
   })
 
   test('api/quotes POST skriver inte offerthuvudet själv längre', () => {

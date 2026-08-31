@@ -68,8 +68,10 @@ function klientLasare(): string[] {
  * utan bankgiro är trasig.
  */
 const DOKUMENTYTOR = [
-  'app/dashboard/quotes/new/page.tsx',
-  'app/dashboard/quotes/[id]/edit/page.tsx',
+  // FAS 1+2 (offert-omtaget, 2026-08-31): new/page.tsx OCH [id]/edit/page.tsx
+  // är båda tunna wrappers nu (QuoteBuilder mode="create"/"edit") — själva
+  // business_config-läsningen bor bara i den delade orkestratorn.
+  'app/dashboard/quotes/_shared/QuoteBuilder.tsx',
   'app/dashboard/invoices/new/page.tsx',
   'app/dashboard/invoices/_shared/InvoiceEditor.tsx',
   'app/dashboard/orders/new/page.tsx',

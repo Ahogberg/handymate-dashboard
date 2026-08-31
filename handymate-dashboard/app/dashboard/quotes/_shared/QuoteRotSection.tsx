@@ -4,7 +4,7 @@ import { Sparkles } from 'lucide-react'
 import type { QuoteItem } from '@/lib/types/quote'
 import { applyGlobalDeductionType } from '@/lib/quote-calculations'
 
-interface QuoteEditRotSectionProps {
+interface QuoteRotSectionProps {
   items: QuoteItem[]
   setItems: React.Dispatch<React.SetStateAction<QuoteItem[]>>
   hasRotItems: boolean
@@ -14,7 +14,7 @@ interface QuoteEditRotSectionProps {
   setFastighetsbeteckning: (s: string) => void
 }
 
-export function QuoteEditRotSection({
+export function QuoteRotSection({
   items,
   setItems,
   hasRotItems,
@@ -22,7 +22,7 @@ export function QuoteEditRotSection({
   setPersonnummer,
   fastighetsbeteckning,
   setFastighetsbeteckning,
-}: QuoteEditRotSectionProps) {
+}: QuoteRotSectionProps) {
   // Punkt 5 (offert-feedback 2026-08-04): denna switch var tidigare en EGEN
   // on/off-toggle (applyGlobalRotToggle) som kunde divergera från
   // Summeringens nya ROT/RUT-kontroll (QuoteEditTotalsSection) — två vägar

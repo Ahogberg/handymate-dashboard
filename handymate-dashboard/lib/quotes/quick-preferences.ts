@@ -3,20 +3,25 @@
  *
  * ═══ PROBLEMET ═══
  *
- * Offert nummer 40 ska inte kräva samma steg som nummer 1. Ett flöde som
- * tvingar fram samma tryck varje gång blir något man börjar undvika — och då
- * är vi tillbaka i "blir galen", bara med en snyggare skärm.
+ * Kallstart går till Snabbofferten. Men den som gång på gång tar sig därifrån
+ * till editorn eller till en mall säger något med handling, och ska få slippa
+ * upprepa det. Efter tredje gången frågar vi EN gång.
  *
- * Två sorters inlärning bor här:
+ * ═══ HISTORIK (Fas 1, offert-omtaget 2026-08-31) ═══
  *
- * 1. **Sekvensen.** Efter fem genomförda snabbofferter landar utkastet direkt
- *    i ÖVERSIKTEN i stället för i sektion ett. Granskningen blir on-demand;
- *    sektioner som behöver ögon bär amber-chips i kvittot.
+ * Den här filen höll tidigare även på "sekvensen": efter fem genomförda
+ * snabbofferter landade utkastet direkt i en ÖVERSIKT i stället för i steg
+ * ett av en tvingad sektionsgranskning (`SKIP_SEQUENCE_AFTER`/
+ * `shouldSkipSequence`, plus räknaren `getCompletedCount`/
+ * `recordCompletedQuickQuote`). Den granskningssekvensen är borttagen —
+ * grundaren konstaterade att den inte fungerade i praktiken, och den femte-
+ * offerten-tröskeln var själva beviset: användare börjar undvika tvingade
+ * repetitiva steg. Utan sekvensen har räknaren ingen läsare kvar, så den
+ * togs bort med den i stället för att bli en övergiven export.
  *
- * 2. **Startläget.** Kallstart går till Snabbofferten. Men den som gång på
- *    gång tar sig därifrån till editorn eller till en mall säger något med
- *    handling, och ska få slippa upprepa det. Efter tredje gången frågar vi
- *    EN gång.
+ * Kvar är BARA startläges-inlärningen: en helt orättvänd, fortsatt
+ * legitim preferens om VILKEN startskärm (Snabboffert/editor/mall) en
+ * kallstart ska landa i.
  *
  * ═══ VARFÖR localStorage OCH INTE DATABASEN ═══
  *
@@ -36,26 +41,12 @@ export type StartMode = 'quick' | 'editor' | 'template'
     den är default och kräver inget val av användaren. */
 export type EscapeRoute = Exclude<StartMode, 'quick'>
 
-const COMPLETED_KEY = 'handymate.quickQuote.completed'
 const PREFERRED_KEY = 'handymate.quickQuote.preferredStart'
 const ESCAPE_KEY = (mode: EscapeRoute) => `handymate.quickQuote.chose.${mode}`
 const ASKED_KEY = (mode: EscapeRoute) => `handymate.quickQuote.asked.${mode}`
 
-/** Efter så här många genomförda snabbofferter hoppas sekvensen över. */
-export const SKIP_SEQUENCE_AFTER = 5
-
 /** Efter så här många gånger på samma väg ut frågar vi EN gång. */
 export const ASK_PREFERRED_AFTER = 3
-
-/**
- * Ska utkastet landa direkt i översikten i stället för i sektion ett?
- *
- * Ren funktion — hela poängen med att bryta ut den är att tröskeln ska gå att
- * pröva utan att simulera en webbläsare.
- */
-export function shouldSkipSequence(completedCount: number): boolean {
-  return completedCount >= SKIP_SEQUENCE_AFTER
-}
 
 /**
  * Ska vi fråga "vill du alltid börja så här?".
@@ -100,19 +91,6 @@ function write(key: string, value: string): void {
   } catch {
     /* privat läge eller full lagring — vanan går förlorad, offerten gör det inte */
   }
-}
-
-// ── Sekvensen ──────────────────────────────────────────────────────────
-
-export function getCompletedCount(): number {
-  return readNumber(COMPLETED_KEY)
-}
-
-/** Räknas EFTER en skickad snabboffert, aldrig när utkastet byggdes. */
-export function recordCompletedQuickQuote(): number {
-  const next = getCompletedCount() + 1
-  write(COMPLETED_KEY, String(next))
-  return next
 }
 
 // ── Startläget ─────────────────────────────────────────────────────────

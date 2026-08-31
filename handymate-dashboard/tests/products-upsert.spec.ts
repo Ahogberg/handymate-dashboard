@@ -41,7 +41,10 @@ test.describe('POST /api/products — upsert, aldrig dubblettmotor', () => {
 
 test.describe('C4 — offertens auto-create speglar server-upserten', () => {
   test('created:false + updated_price → setLocalPrice', () => {
-    const sida = source('app/dashboard/quotes/new/page.tsx')
+    // FAS 1 (offert-omtaget, 2026-08-31): produktbanks-auto-länkningen
+    // flyttade från new/page.tsx (nu en tunn wrapper) till den delade
+    // useQuoteBuilderSave.ts.
+    const sida = source('app/dashboard/quotes/_shared/useQuoteBuilderSave.ts')
     expect(sida).toContain('data.created === false && data.updated_price')
   })
 })

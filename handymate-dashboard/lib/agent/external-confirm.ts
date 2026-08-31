@@ -54,6 +54,9 @@ export interface PendingExternalAction {
   businessId: string
   threadId: string | null
   agent: string
+  /** Samtalsefterarbete (Matte voice, 2026-08-30, lib/matte/work-report-
+      confirmation.ts): kopplar en pending bekräftelse till vilket
+      arbetsrapport-utkast den avser + ev. återstående utkast i samma kedja. */
   workReport?: WorkReportScope & { requestId: string; remaining: WorkReportAction[] }
   ts: number
 }
