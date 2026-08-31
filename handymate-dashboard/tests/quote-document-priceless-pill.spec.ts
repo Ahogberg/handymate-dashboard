@@ -26,7 +26,6 @@
  *   npx playwright test tests/quote-document-priceless-pill.spec.ts --no-deps
  */
 import { test, expect } from '@playwright/test'
-// @ts-ignore -- react-dom/server.browser saknar typdeklarationer (samma HOTFIX-mönster som render-react.tsx)
 import { renderToStaticMarkup as renderToStaticMarkupUntyped } from 'react-dom/server.browser'
 import { createElement, type ReactElement } from 'react'
 import { QuoteDocumentRow } from '../components/quotes/document/QuoteDocumentRow'

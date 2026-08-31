@@ -176,8 +176,11 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
   // aldrig något en kund ska se i static/PDF-läget — där renderas alltid
   // formatCurrency(total) precis som förut, oavsett pris.
   const isPriceless = (unitPrice: number) => isEdit && priceState(unitPrice) === 'osatt'
-  const sumCell = (unitPrice: number, total: number, unit: string) =>
-    isPriceless(unitPrice)
+  // priceless beräknas EN gång per rad av anroparen (isPriceless(item.unitPrice))
+  // och skickas in hit — annars räknas priceState() ut två gånger per rad
+  // (en för klassen, en för cellen).
+  const sumCell = (priceless: boolean, unitPrice: number, total: number, unit: string) =>
+    priceless
       ? <td className="num"><span className="price-missing-pill">{priceLabel(unitPrice, unit)}</span></td>
       : <td className="num">{formatCurrency(total)}</td>
 
@@ -252,7 +255,8 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
   // ── Tillval ───────────────────────────────────────────────────
   if (itemType === 'option') {
     const box = item.optionSelected ? '☑' : '☐'
-    const pricelessClass = isPriceless(item.unitPrice) ? 'row-priceless' : undefined
+    const priceless = isPriceless(item.unitPrice)
+    const pricelessClass = priceless ? 'row-priceless' : undefined
     return (
       <tr {...rowTapProps} className={[`row-option${item.optionSelected ? '' : ' unselected'}`, isEdit ? 'row-hover' : '', pricelessClass, rowTapProps.className, hiddenRowClass].filter(Boolean).join(' ') || undefined}>
         <td style={isEdit ? { position: 'relative' } : undefined}>
@@ -283,13 +287,14 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
         </td>
         {qtyCell}
         {priceCell(item.unitPrice, fieldsEditable ? v => patch(item.id!, { unitPrice: v }) : undefined)}
-        {sumCell(item.unitPrice, item.total, item.unit)}
+        {sumCell(priceless, item.unitPrice, item.total, item.unit)}
       </tr>
     )
   }
 
   // ── Vanlig rad ('item') ──────────────────────────────────────
-  const pricelessClass = isPriceless(item.unitPrice) ? 'row-priceless' : undefined
+  const priceless = isPriceless(item.unitPrice)
+  const pricelessClass = priceless ? 'row-priceless' : undefined
   return (
     <tr {...rowTapProps} className={[isEdit ? 'row-hover' : '', pricelessClass, rowTapProps.className, hiddenRowClass].filter(Boolean).join(' ') || undefined}>
       <td style={isEdit ? { position: 'relative' } : undefined}>
@@ -320,7 +325,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
       </td>
       {qtyCell}
       {priceCell(item.unitPrice, fieldsEditable ? v => patch(item.id!, { unitPrice: v }) : undefined)}
-      {sumCell(item.unitPrice, item.total, item.unit)}
+      {sumCell(priceless, item.unitPrice, item.total, item.unit)}
     </tr>
   )
 }
