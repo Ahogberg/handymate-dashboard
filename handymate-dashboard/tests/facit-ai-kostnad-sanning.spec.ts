@@ -102,7 +102,6 @@ const GRINDAS_I: Record<string, string[]> = {
   'lib/agents/hanna/avtal-forslag.ts': ['app/api/cron/avtal-forslag/route.ts'],
   'lib/egenkontroll/photo-assessment.ts': ['lib/egenkontroll/analyze-and-queue.ts'],
   'lib/ai-quote-generator.ts': [
-    'app/api/quotes/generate/route.ts',
     'app/api/quotes/ai-generate/route.ts',
     'lib/quotes/suggest-quote-draft.ts',
   ],
