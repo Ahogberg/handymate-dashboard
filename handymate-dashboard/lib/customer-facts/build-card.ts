@@ -11,7 +11,7 @@
  * pending_approvals. Godkännandet hanteras generiskt av
  * app/api/approvals/[id]/route.ts (case 'customer_fact').
  */
-import type { DecisionRecord } from '@/lib/ai/decision-record'
+import { withDecisionRecord, type DecisionRecord } from '@/lib/ai/decision-record'
 
 /** Minsta gemensamma form för ett fynd — röstgrenarnas AISuggestion och
     e-postgrenens ExtractedFact mappas båda hit strukturellt. */
@@ -87,7 +87,10 @@ export function buildCustomerFactCard(
       ...(opts.recordingId ? { recording_id: opts.recordingId } : {}),
       ...(opts.emailConversationId ? { email_conversation_id: opts.emailConversationId } : {}),
       agent_id: 'matte',
-      decision_record: opts.decisionRecord,
+      // Kanoniska nyckeln (_decision) via withDecisionRecord — läsbar med
+      // readDecisionRecord(), till skillnad från gamla decision_record-
+      // nyckeln som ingen läsare någonsin hittade.
+      ...withDecisionRecord({}, opts.decisionRecord),
     },
   }
 }

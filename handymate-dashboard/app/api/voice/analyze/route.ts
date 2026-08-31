@@ -5,7 +5,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { getClaudeModel } from '@/lib/ai/get-model'
 import { filtreraAnalysforslag, type AnalysForslagsTyp } from '@/lib/voice/analysis-scope'
-import { buildDecisionRecord } from '@/lib/ai/decision-record'
+import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
 import { buildCustomerFactCard } from '@/lib/customer-facts/build-card'
 import { splitTranscript, MAP_REDUCE_TROSKEL_TECKEN } from '@/lib/meetings/split-transcript'
 import { checkFuelGate } from '@/lib/costs/fuel'
@@ -820,7 +820,10 @@ Svara ENDAST med JSON i följande format:
               recording_id,
               lead_id: pipelineResult?.leadId || null,
               routed_agent: 'daniel',
-              decision_record: beslutsstampel,
+              // Kanoniska nyckeln (_decision) via withDecisionRecord — annars
+              // kan readDecisionRecord() aldrig läsa tillbaka stämpeln
+              // (facit: tests/decision-record.spec.ts, producent-blocket).
+              ...withDecisionRecord({}, beslutsstampel),
             },
           })
         } else if (s.type === 'customer_fact') {
@@ -849,7 +852,10 @@ Svara ENDAST med JSON i följande format:
               customer_id: customerId,
               recording_id,
               routed_agent: 'lisa',
-              decision_record: beslutsstampel,
+              // Kanoniska nyckeln (_decision) via withDecisionRecord — annars
+              // kan readDecisionRecord() aldrig läsa tillbaka stämpeln
+              // (facit: tests/decision-record.spec.ts, producent-blocket).
+              ...withDecisionRecord({}, beslutsstampel),
             },
           })
         }
