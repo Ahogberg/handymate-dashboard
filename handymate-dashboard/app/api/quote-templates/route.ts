@@ -4,6 +4,10 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getFeatureLimit, PlanType } from '@/lib/feature-gates'
 import { getAllDefaultTemplateNames } from '@/lib/quote-template-defaults'
 
+// Auth via request.headers — kräver force-dynamic mot Full Route Cache
+// (2026-08-22-klassen, se CLAUDE.md).
+export const dynamic = 'force-dynamic'
+
 /**
  * sql/v72_quote_template_terms.sql lägger till terms_text-kolumnen men körs
  * MANUELLT av Andreas i Supabase SQL Editor efter merge — det finns alltså

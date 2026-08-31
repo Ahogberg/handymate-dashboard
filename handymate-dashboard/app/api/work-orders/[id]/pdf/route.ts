@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import jsPDF from 'jspdf'
+// Auth via request.headers i importerad helper — utan force-dynamic kan
+// rutten frysas i Full Route Cache och servera fel företags data
+// (2026-08-22-klassen, se CLAUDE.md; residualsvep 2026-08-31).
+export const dynamic = 'force-dynamic'
+
 
 const ACCENT = [15, 118, 110] as const
 const TEXT_PRIMARY = [30, 41, 59] as const

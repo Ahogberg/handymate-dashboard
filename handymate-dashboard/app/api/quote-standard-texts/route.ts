@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 
+// Auth via request.headers — kräver force-dynamic mot Full Route Cache
+// (2026-08-22-klassen, se CLAUDE.md).
+export const dynamic = 'force-dynamic'
+
 /**
  * GET - Lista standardtexter per business + typ
  */

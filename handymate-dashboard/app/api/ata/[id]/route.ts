@@ -3,6 +3,11 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { maybeStripAtaList } from '@/lib/ata/strip-prices'
 import { canTransitionAta, isAtaEditable, ataTransitionError } from '@/lib/ata/lifecycle'
+// Auth via request.headers i importerad helper — utan force-dynamic kan
+// rutten frysas i Full Route Cache och servera fel företags data
+// (2026-08-22-klassen, se CLAUDE.md; residualsvep 2026-08-31).
+export const dynamic = 'force-dynamic'
+
 
 /**
  * GET /api/ata/[id] — Hämta en ÄTA

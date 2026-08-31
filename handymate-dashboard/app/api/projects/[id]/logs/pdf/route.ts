@@ -3,6 +3,11 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+// Auth via request.headers i importerad helper — utan force-dynamic kan
+// rutten frysas i Full Route Cache och servera fel företags data
+// (2026-08-22-klassen, se CLAUDE.md; residualsvep 2026-08-31).
+export const dynamic = 'force-dynamic'
+
 
 const ACCENT_RGB = [15, 118, 110] as const
 const TEXT_PRIMARY = [30, 41, 59] as const

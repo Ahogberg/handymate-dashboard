@@ -4,6 +4,11 @@ import { getServerSupabase } from '@/lib/supabase'
 import { expandSynonyms, rankBySearchMatch } from '@/lib/products/search-ranking'
 import { syncPriceListRow } from '@/lib/products/sync-price-list'
 
+// getAuthenticatedBusiness läser request.headers direkt — utan denna export
+// kan rutten frysas i Full Route Cache och servera ETT företags artikelbank
+// till alla (samma klass som 2026-08-22-buggen, se CLAUDE.md).
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/products?search=&category=&category_id=&favorites=&include=components
  * - search matchar namn ELLER artikelnr (sku)

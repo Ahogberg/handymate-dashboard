@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 
+// Auth via request.headers — kräver force-dynamic mot Full Route Cache
+// (2026-08-22-klassen, se CLAUDE.md).
+export const dynamic = 'force-dynamic'
+
 /**
  * Produktkategorier — exakt 2 nivåer (huvudrubrik → underrubrik).
  * Tabell: product_categories (sql/v67_produktbank.sql). 2-nivåersregeln

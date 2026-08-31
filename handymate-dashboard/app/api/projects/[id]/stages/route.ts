@@ -3,6 +3,11 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { halsning } from '@/lib/customers/namn'
+// Auth via request.headers i importerad helper — utan force-dynamic kan
+// rutten frysas i Full Route Cache och servera fel företags data
+// (2026-08-22-klassen, se CLAUDE.md; residualsvep 2026-08-31).
+export const dynamic = 'force-dynamic'
+
 
 const STAGE_LABELS: Record<string, string> = {
   quote_accepted: 'Offert godkänd',

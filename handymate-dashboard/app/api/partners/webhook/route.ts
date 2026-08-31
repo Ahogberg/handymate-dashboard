@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPartnerFromToken, getPartnerTokenFromRequest } from '@/lib/partners/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { createHmac } from 'crypto'
+// Auth via request.headers i importerad helper — utan force-dynamic kan
+// rutten frysas i Full Route Cache och servera fel företags data
+// (2026-08-22-klassen, se CLAUDE.md; residualsvep 2026-08-31).
+export const dynamic = 'force-dynamic'
+
 
 /**
  * GET /api/partners/webhook — hämta hemligheter PÅ BEGÄRAN (2026-08-11).
