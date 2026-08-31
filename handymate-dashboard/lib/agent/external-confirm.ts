@@ -22,6 +22,7 @@
  * secret saknas, timingSafeEqual).
  */
 import crypto from 'crypto'
+import type { WorkReportAction, WorkReportScope } from '../matte/work-report'
 
 /** Verktyg som faktiskt skickar något UT ur huset. */
 const EXTERNAL_SEND_TOOL_NAMES = new Set(['send_sms', 'send_email'])
@@ -53,6 +54,7 @@ export interface PendingExternalAction {
   businessId: string
   threadId: string | null
   agent: string
+  workReport?: WorkReportScope & { requestId: string; remaining: WorkReportAction[] }
   ts: number
 }
 
