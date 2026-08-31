@@ -423,6 +423,11 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               templatePreviewPayload={templatePreviewPayload}
               reservationSuggestions={reservations.suggestions}
               onReviewReservationSuggestions={() => reservations.setReviewOpen(true)}
+              // onOpenAiHelp intentionally omitted: edit-läget har ingen
+              // AI-utkasts-flöde (showAiHelper/QuoteNewAIHelper finns bara i
+              // create-läget i QuoteBuilder.tsx) — utan proppen visar
+              // dokumentets tomma-läge bara "Lägg till rad", ingen "eller
+              // beskriv jobbet"-länk. Se QuoteDocument.tsx:s onOpenAiHelp-docblock.
             />
           </div>
         </div>
