@@ -195,8 +195,9 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true)
   const [portalLoading, setPortalLoading] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
-  // Årsavtal (Andreas-beslut 2026-08-19): default Månadsvis vid plan-byte.
-  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
+  // Årsavtal (Andreas-beslut 2026-08-31, ersätter 2026-08-19): default Årsvis
+  // vid plan-byte — matchar sajtens frontade årspris.
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('yearly')
   const guaranteeDays = billing?.founders_available
     ? FOUNDERS_GUARANTEE_DAYS
     : STANDARD_GUARANTEE_DAYS

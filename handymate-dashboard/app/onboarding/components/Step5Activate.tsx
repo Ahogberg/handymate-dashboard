@@ -104,9 +104,10 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
   const plan = data.plan || 'professional'
   const setPlan = (id: string) => setData(d => ({ ...d, plan: id }))
 
-  // Årsavtal (Andreas-beslut 2026-08-19): default Månadsvis — kunden väljer
-  // aktivt bort den lägre totalkostnaden, inte tvärtom.
-  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
+  // Årsavtal (Andreas-beslut 2026-08-31, ersätter 2026-08-19): default Årsvis
+  // — sajten frontar nu det lägre månadsekvivalenta årspriset, köpflödet
+  // ska matcha (beloppen kommer alltid från getPlanYearlyPrice, aldrig här).
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('yearly')
   const [redirecting, setRedirecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [infoPlanId, setInfoPlanId] = useState<string | null>(null)

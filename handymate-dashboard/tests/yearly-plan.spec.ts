@@ -5,6 +5,11 @@
  *   Storfirman (business): 119 950 kr/år
  *   starter/Bas: inget årspris (säljs inte publikt).
  *
+ * Default-intervallet flippades till Årsvis 2026-08-31 (ersätter 2026-08-19-
+ * beslutet nedan) för att matcha landningssidans nya pristoggle, som frontar
+ * årspriset. Köpflödets fail-closed-grindar (whitelist, prisrad-uppslag,
+ * "Årsbetalning är inte aktiverad ännu") är oförändrade.
+ *
  * getPlanYearlyPrice (lib/feature-gates.ts) är den kanoniska källan — ingen
  * yta får hårdkoda 59950/119950/4996 själv. Checkout-rutterna (onboarding-
  * checkout + checkout) måste fail-closed:a på interval='yearly' utan en
@@ -126,11 +131,11 @@ test.describe('Step5Activate — köpflödet i onboarding', () => {
     }
   })
 
-  test('Månadsvis/Årsvis-toggle finns, default monthly', () => {
+  test('Månadsvis/Årsvis-toggle finns, default yearly (2026-08-31)', () => {
     const s = read(FILE)
     expect(s).toContain('Månadsvis')
     expect(s).toContain('Årsvis')
-    expect(s).toContain("useState<'monthly' | 'yearly'>('monthly')")
+    expect(s).toContain("useState<'monthly' | 'yearly'>('yearly')")
   })
 
   test('badge "2 månader på köpet" på toggeln', () => {
@@ -170,10 +175,11 @@ test.describe('Billing-sidan (Inställningar) — årsalternativ vid plan-byte',
     }
   })
 
-  test('Månadsvis/Årsvis-toggle finns vid plan-bytet', () => {
+  test('Månadsvis/Årsvis-toggle finns vid plan-bytet, default yearly (2026-08-31)', () => {
     const s = read(FILE)
     expect(s).toContain('Månadsvis')
     expect(s).toContain('Årsvis')
+    expect(s).toContain("useState<'monthly' | 'yearly'>('yearly')")
   })
 
   test('garantitexten nämns explicit när Årsvis visas', () => {
