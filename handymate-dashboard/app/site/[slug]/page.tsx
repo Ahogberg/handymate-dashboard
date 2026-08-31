@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import StorefrontClient from './StorefrontClient'
 import StorefrontTracker from './StorefrontTracker'
 import { getAppBaseUrl } from '@/lib/site-url'
+import { getPublicPriceList } from '@/lib/products/price-list-view'
 
 // Sidan cachas som ISR och byggs om i bakgrunden en gång i timmen. Den
 // gamla server-side fire-and-forget-fetchen till /api/storefront/track
@@ -141,12 +142,12 @@ async function getStorefrontData(slug: string) {
 
   if (!business) return null
 
-  const { data: priceItems } = await supabase
-    .from('price_list')
-    .select('name, category, unit, unit_price')
-    .eq('business_id', storefront.business_id)
-    .eq('category', 'labor')
-    .limit(12)
+  // B1 (Prisslingan V2): KANONISKA products (arbete, sales_price>0) —
+  // price_list var tom sedan dag ett; publika sajten har aldrig visat priser.
+  const priceItems = await getPublicPriceList(supabase, storefront.business_id, {
+    onlyLabor: true,
+    limit: 12,
+  }).catch(() => [])
 
   // review_request saknar FK till customer i prod — en embed (`customer
   // (name)`) avvisar HELA queryn (PGRST200) och gör att recensioner aldrig

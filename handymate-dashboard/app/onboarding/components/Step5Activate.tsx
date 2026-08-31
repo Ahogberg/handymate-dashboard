@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ArrowRight, Check, Info, Loader2, Shield } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
+import { OB_DOTS, OB_DOT_TOTAL } from '../constants'
 import InfoSheet from './InfoSheet'
 import { TEAM } from '@/lib/agents/team'
 import {
@@ -145,7 +146,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
 
   return (
     <div className="ob-screen">
-      <OnboardingHeader step={3} total={6} onBack={onBack} />
+      <OnboardingHeader step={OB_DOTS.activate} total={OB_DOT_TOTAL} onBack={onBack} />
       <div className="ob-body">
         {/* Lanseringserbjudandet "Grundarkunderna" (Andreas-beslut 2026-08-19)
             — server-härlett via data.foundersAvailable (GET /api/onboarding,

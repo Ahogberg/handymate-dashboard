@@ -23,6 +23,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
+import { OB_DOTS, OB_DOT_TOTAL } from '../constants'
 import { TEAM } from '@/lib/agents/team'
 import { isDemoBusinessId } from '@/lib/demo/is-demo-client'
 import type { OnboardingFormData } from '../types-redesign'
@@ -210,7 +211,7 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
 
   return (
     <div className="ob-screen">
-      <OnboardingHeader step={4} total={6} onBack={onBack} onSkip={onNext} />
+      <OnboardingHeader step={OB_DOTS.importData} total={OB_DOT_TOTAL} onBack={onBack} onSkip={onNext} />
       <div className="ob-body">
         {/* A. Val-skärm */}
         {view === 'choose' && (

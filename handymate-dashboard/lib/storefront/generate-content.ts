@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getImagesForBranch } from '@/lib/industry-images'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
+import { getPublicPriceList } from '@/lib/products/price-list-view'
 
 const STOREFRONT_MODEL = 'claude-sonnet-4-6'
 
@@ -72,11 +73,13 @@ export async function generateStorefrontContent(
       return { ok: false, error: configError?.message || 'Business not found' }
     }
 
-    const { data: priceItems } = await supabase
-      .from('price_list')
-      .select('name, category, unit, unit_price')
-      .eq('business_id', businessId)
-      .limit(20)
+    // B1 (Prisslingan V2): kanoniska products (sales_price>0) — price_list
+    // var tom sedan dag ett, hemside-genereringen har aldrig sett priser.
+    // Spread till anonyma objekt: konsumenterna nedan typar raderna som
+    // Record<string, unknown> (PublicPriceRow saknar index-signatur).
+    const priceItems: Array<Record<string, unknown>> = (
+      await getPublicPriceList(supabase, businessId, { limit: 20 }).catch(() => [])
+    ).map(p => ({ ...p }))
 
     const services = config.services_offered || []
 

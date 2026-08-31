@@ -932,12 +932,26 @@ export default function ProjectDetailPage() {
       fetchSupplierInvoices()
       fetchProjectInvoices()
       if (projectPriceList.length === 0) {
-        supabase
-          .from('price_list')
-          .select('id, name, unit, unit_price, default_quantity, category')
-          .eq('business_id', business.business_id)
-          .eq('is_active', true)
-          .then(({ data }: { data: any }) => { if (data) setProjectPriceList(data) })
+        // B1 (Prisslingan V2): kanoniska products via API:t (samma väg som
+        // offertens snabbval) — price_list var tom sedan dag ett, så
+        // snabbvalen har aldrig visats här. Prislösa filtreras (blir annars
+        // 0 kr-material). default_quantity fanns bara på price_list → 1.
+        fetch('/api/products')
+          .then(r => (r.ok ? r.json() : { products: [] }))
+          .then((d: any) => {
+            const rader = (d.products || [])
+              .filter((p: any) => Number(p.sales_price) > 0)
+              .map((p: any) => ({
+                id: p.id,
+                name: p.name,
+                unit: p.unit,
+                unit_price: Number(p.sales_price),
+                default_quantity: 1,
+                category: p.category,
+              }))
+            if (rader.length) setProjectPriceList(rader)
+          })
+          .catch(() => {})
       }
     }
   }, [activeGroup])

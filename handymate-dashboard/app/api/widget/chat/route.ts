@@ -8,6 +8,7 @@ import { createLeadAndDeal } from '@/lib/leads/golden-path'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
 import { checkFuelGate } from '@/lib/costs/fuel'
+import { getPublicPriceList } from '@/lib/products/price-list-view'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -159,18 +160,18 @@ export async function POST(request: NextRequest) {
     const knowledgeText = formatKnowledgeForPrompt(config.knowledge_base)
     const guardrailsText = formatGuardrailsForPrompt(config.widget_guardrails)
 
-    // Price list från price_list-tabellen om den finns. Vi loggar fel istället
-    // för att svälja dem tyst så vi fångar liknande disconnects framöver.
+    // B1 (Prisslingan V2): prislistan läses ur KANONISKA products
+    // (sales_price>0 — prislösa artiklar får aldrig bli "0 kr" mot kund).
+    // Legacy price_list var tom sedan dag ett; widgeten har aldrig haft
+    // priser förrän nu. Fel loggas, sväljs inte tyst.
     let priceListText = ''
-    const { data: prices, error: priceErr } = await supabase
-      .from('price_list')
-      .select('name, category, unit, unit_price')
-      .eq('business_id', business_id)
-      .limit(50)
-    if (priceErr) {
-      console.warn('[widget/chat] price_list query failed:', priceErr.message)
-    } else if (prices && prices.length > 0) {
-      priceListText = prices.map((p: any) => `${p.name} (${p.category}): ${p.unit_price} kr/${p.unit}`).join('\n')
+    try {
+      const prisRader = await getPublicPriceList(supabase, business_id, { limit: 50 })
+      if (prisRader.length > 0) {
+        priceListText = prisRader.map(p => `${p.name} (${p.category}): ${p.unit_price} kr/${p.unit}`).join('\n')
+      }
+    } catch (priceErr: any) {
+      console.warn('[widget/chat] prislista misslyckades:', priceErr?.message)
     }
 
     // Build conversation history for Claude

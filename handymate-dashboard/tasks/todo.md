@@ -1,3 +1,20 @@
+# Prisslingan V2 — pass 2: kanonisering + beta-av + branscher (Claude 2026-08-31)
+
+Andreas "Kör" efter pass 1-avstämningen. Pass 1 LIVE (f2fa8c9).
+
+- [x] B1: lib/products/price-list-view.ts (getPublicPriceList, sales_price>0) + 6 läsare omkopplade + voice/analyze → products (grossistpriserna borta ur samtalsanalysen)
+- [x] B2: död kod bort — sync-price-list, seedPriceList, /api/price-list/seed-from-onboarding (0 anropare), getDefaultPriceList/PriceListEntry/price-list-defaults, approvals legacy-gren, tests/price-list-sync; 4 facit omskrivna till nya kontraktet
+- [x] v182_pricing_v2_rls_members.sql KÖRD via MCP + policy-SELECT verifierad (alla 4 bär business_users-UNION)
+- [x] UX2a: "Saknar pris (N)"-pill (?filter=saknar-pris) + Prissätt snabbt (delad QuickPriceInput, Enter=spara, raden lämnar filtret)
+- [x] UX2b: pricedCount/unpricedCount i oversikt; AgentReadinessCard levande text + filter-länk; checklistan matas med prissatta
+- [x] UX2c: StepProductRegister "10 vanliga att prissätta nu"
+- [x] UX2d: OB_DOTS/OB_DOT_TOTAL i constants — 7 hårdkodade ställen ersatta, facit uppdaterat
+- [x] Nollställning: 147 gissade fastpriser → 0 i 11 branscher (timartiklar kvar för overlay 1f); prispolicyn dokumenterad i filhuvudet
+- [x] Branscher: lib/product-defaults-longtail.ts (subagent, 571 prislösa artiklar, 11 branscher, deduction-fördelning granskad — enda RUT-raden i carpenter är korrekt Möbelmontering) + mergad i getDefaultProducts (kärnan först, seed-index bevaras)
+- [ ] Facit + REN-worktree-tsc + build + regression (ALDRIG pipat) → push → deploy-verifiering → rapport
+
+---
+
 # Prisslingan V2 — pass 1: pengasanning + offertloopen (Claude 2026-08-31)
 
 Godkänd plan (C:\Users\Gaming\.claude\plans\recursive-painting-possum.md).

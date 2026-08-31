@@ -1,7 +1,7 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { getDefaultStandardTexts } from '@/lib/quote-standard-text-defaults'
 import { getChecklistsForBranch } from '@/lib/checklist-defaults'
-import { applyHourlyRateToDefaults, getDefaultPriceList, getDefaultProducts } from '@/lib/product-defaults'
+import { applyHourlyRateToDefaults, getDefaultProducts } from '@/lib/product-defaults'
 import { getDefaultReservations } from '@/lib/reservation-defaults'
 import { getDefaultQuoteTemplates, normalizeTemplateBranch } from '@/lib/quote-template-defaults'
 import { getDefaultAgreementTypes } from '@/lib/agreement-type-defaults'
@@ -44,7 +44,6 @@ export async function seedAllDefaults(
     seedQuoteStandardTexts(supabase, businessId, branch),
     seedChecklistTemplates(supabase, businessId, branch),
     seedProducts(supabase, businessId, productBranches, hourlyRate),
-    seedPriceList(supabase, businessId, productBranches),
     seedReservations(supabase, businessId, branch),
     seedQuoteTemplates(supabase, businessId, branch),
     seedAgreementTypes(supabase, businessId, branch),
@@ -360,46 +359,11 @@ async function seedReservations(supabase: SupabaseClient, businessId: string, br
   }
 }
 
-/**
- * Seedar den äldre `price_list`-tabellen (telefonagent/widget/storefront).
- *
- * `product_id` (sql/v137_price_list_product_link.sql) länkar varje rad till
- * sin `products`-motsvarighet, så en prisändring i produktbanken kan
- * skriva-igenom hit (lib/products/sync-price-list.ts) — utan den länken
- * fastnar telefonagenten på seed-priset för alltid (den kända luckan i
- * kommentaren ovanför getDefaultPriceList).
- *
- * Ingen extra DB-fråga behövs för att hitta product_id: getDefaultProducts
- * är en ren, deterministisk funktion — samma branschargument ger samma
- * array i samma ordning varje gång, så seedProducts id-schema
- * (`prod_${businessId}_${index}`) kan räknas fram här igen utan att fråga
- * databasen om vad som just seedades.
- */
-export async function seedPriceList(supabase: SupabaseClient, businessId: string, branch: string | string[]) {
-  const { data: existing } = await supabase
-    .from('price_list')
-    .select('id')
-    .eq('business_id', businessId)
-    .limit(1)
-
-  if (existing && existing.length > 0) return
-
-  const skuToProductId = new Map<string, string>()
-  getDefaultProducts(branch).forEach((p, i) => skuToProductId.set(p.sku, `prod_${businessId}_${i}`))
-
-  const entries = getDefaultPriceList(branch)
-  await supabase.from('price_list').insert(
-    entries.map((e, i) => ({
-      id: `pl_${businessId}_${i}`,
-      business_id: businessId,
-      category: e.category,
-      name: e.name,
-      unit: e.unit,
-      unit_price: e.unit_price,
-      product_id: skuToProductId.get(e.sku) ?? null,
-    }))
-  )
-}
+// B2 (Prisslingan V2, 2026-08-31): seedPriceList borttagen. Den kunde
+// ALDRIG lyckas — price_list.id är INTEGER med sequence medan seeden
+// skickade TEXT-id:n ('pl_...'), och insert-felet destrukturerades aldrig.
+// Bevis i prod: price_list_id_seq.last_value var NULL — tabellen har aldrig
+// haft en rad. Läsarna går nu mot products (lib/products/price-list-view.ts).
 
 /**
  * Seedar mallbanken (quote_templates) — delar lib/quote-template-defaults.ts

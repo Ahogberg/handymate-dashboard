@@ -12,6 +12,7 @@ import { checkFuelGate } from '@/lib/costs/fuel'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { claimCallProcessing, callProcessingRpc, publishCallCards, type CallPipelineResult } from '@/lib/voice/call-processing'
+import { getPublicPriceList } from '@/lib/products/price-list-view'
 
 export const maxDuration = 300
 
@@ -395,15 +396,15 @@ export async function POST(request: NextRequest) {
       .eq('business_id', recording.business_id)
       .single()
 
-    // Hämta leverantörsprodukter för kontext (max 50 vanligaste)
-    const { data: products } = await supabase
-      .from('supplier_product')
-      .select('name, category, sell_price')
-      .eq('business_id', recording.business_id)
-      .limit(50)
+    // B1 (Prisslingan V2): priskontexten läser HANTVERKARENS egna säljpriser
+    // ur kanoniska products (sales_price>0) — tidigare lästes
+    // supplier_product (grossistpriser, 7 rader totalt i prod) vilket gav
+    // efteranalysen fel prisbild.
+    const produktRader = await getPublicPriceList(supabase, recording.business_id, { limit: 50 })
+      .catch(() => [] as Awaited<ReturnType<typeof getPublicPriceList>>)
 
-    const productContext = products?.length
-      ? `\n\nTILLGÄNGLIGA PRODUKTER/MATERIAL:\n${products.map((p: { name: string; category: string | null; sell_price: number | null }) => `- ${p.name} (${p.category || 'Övrigt'}): ${p.sell_price || '?'} kr`).join('\n')}`
+    const productContext = produktRader.length
+      ? `\n\nHANTVERKARENS PRISLISTA (säljpriser):\n${produktRader.map(p => `- ${p.name}: ${p.unit_price} kr/${p.unit}`).join('\n')}`
       : ''
 
     const industry = business?.industry || 'hantverkare'

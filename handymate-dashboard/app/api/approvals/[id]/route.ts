@@ -2155,21 +2155,11 @@ async function executeApprovalPayload(
           return { action: 'price_adjustment', ok: true, price_list_id: pl.price_list_id, new_rate: pl.suggested_rate }
         }
 
-        // Legacy-form (item_id + suggested_price mot price_list) — behållen
-        // för eventuella gamla pending-kort, men ingen nuvarande producent
-        // skapar den formen.
-        if (pl.item_id && pl.suggested_price) {
-          const { error: priceUpdateError } = await supabasePa.from('price_list').update({
-            unit_price: pl.suggested_price,
-          }).eq('id', pl.item_id).eq('business_id', businessId)
-          if (priceUpdateError) {
-            return { action: 'price_adjustment', ok: false, error: priceUpdateError.message }
-          }
-          return { action: 'price_adjustment', ok: true }
-        }
-
+        // B2 (Prisslingan V2): legacy-grenen (item_id mot price_list) är
+        // borttagen — tabellen har aldrig innehållit en rad och ingen
+        // producent skapar den payload-formen (bekräftat i kommentaren ovan).
         // Utfalls-hårdning: dolt no-op får aldrig klassas som success.
-        return { action: 'price_adjustment', skipped: 'payload saknar price_list_id/suggested_rate (och legacy item_id/suggested_price)' }
+        return { action: 'price_adjustment', skipped: 'payload saknar price_list_id/suggested_rate' }
       }
 
       case 'profitability_warning': {

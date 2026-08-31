@@ -15,7 +15,9 @@ import {
   Wrench,
   X,
 } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
 import { useToast } from '@/components/Toast'
+import { QuickPriceInput } from '@/components/products/QuickPriceInput'
 import { PRODUCT_UNIT_OPTIONS } from '@/components/products/ProductModal'
 import { CategoryTree, type CategoryFilter } from './components/CategoryTree'
 import { ProductEditorModal } from './components/ProductEditorModal'
@@ -39,6 +41,16 @@ export default function ProductsPage() {
   const [showBanner, setShowBanner] = useState(false)
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
   const bannerChecked = useRef(false)
+  // UX2a (Prisslingan V2): beta-av-vyn — filtrera fram prislösa och
+  // prissätt dem löpande utan att öppna hela editorn per artikel.
+  // ?filter=saknar-pris (nudge-länkarna) aktiverar filtret direkt.
+  const searchParams = useSearchParams()
+  const [visaSaknarPris, setVisaSaknarPris] = useState(false)
+  const [snabbLage, setSnabbLage] = useState(false)
+  useEffect(() => {
+    if (searchParams?.get('filter') === 'saknar-pris') setVisaSaknarPris(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const fetchProducts = useCallback(async (searchTerm: string) => {
     try {
@@ -91,12 +103,22 @@ export default function ProductsPage() {
 
   // Kategorifiltret appliceras klient-side: huvudrubrik tar med sina underrubriker
   const visibleProducts = useMemo(() => {
-    if (filter === 'all') return products
-    if (filter === 'none') return products.filter(p => !p.category_id)
-    const main = categories.find(c => c.id === filter)
-    const ids = new Set(main ? [main.id, ...main.children.map(c => c.id)] : [filter])
-    return products.filter(p => p.category_id != null && ids.has(p.category_id))
-  }, [products, filter, categories])
+    let bas = products
+    if (filter === 'none') bas = products.filter(p => !p.category_id)
+    else if (filter !== 'all') {
+      const main = categories.find(c => c.id === filter)
+      const ids = new Set(main ? [main.id, ...main.children.map(c => c.id)] : [filter])
+      bas = products.filter(p => p.category_id != null && ids.has(p.category_id))
+    }
+    // UX2a: "Saknar pris" läggs OVANPÅ kategorifiltret (aktiva prislösa)
+    if (visaSaknarPris) bas = bas.filter(p => p.is_active && !(p.sales_price > 0))
+    return bas
+  }, [products, filter, categories, visaSaknarPris])
+
+  const antalSaknarPris = useMemo(
+    () => products.filter(p => p.is_active && !(p.sales_price > 0)).length,
+    [products],
+  )
 
   const categoryNameById = useMemo(() => {
     const map = new Map<string, string>()
@@ -352,6 +374,42 @@ export default function ProductsPage() {
               />
             </div>
 
+            {/* UX2a (Prisslingan V2): beta-av-vyn. Pillen visar hur många som
+                väntar på pris; snabbläget prissätter rad för rad (Enter =
+                spara + raden lämnar filtret). Långsvansen är designen —
+                pillen är ett verktyg, aldrig ett krav på noll. */}
+            {antalSaknarPris > 0 && (
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => { setVisaSaknarPris(v => !v); if (visaSaknarPris) setSnabbLage(false) }}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                    visaSaknarPris
+                      ? 'bg-primary-700 text-white border-primary-700'
+                      : 'bg-white text-primary-700 border-primary-200 hover:bg-primary-50'
+                  }`}
+                >
+                  Saknar pris ({antalSaknarPris})
+                </button>
+                {visaSaknarPris && (
+                  <button
+                    type="button"
+                    onClick={() => setSnabbLage(s => !s)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                      snabbLage
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+                    }`}
+                  >
+                    {snabbLage ? 'Prissätt snabbt — på' : 'Prissätt snabbt'}
+                  </button>
+                )}
+                {visaSaknarPris && snabbLage && (
+                  <span className="text-xs text-gray-400">Skriv pris + Enter — raden försvinner ur filtret när den är satt</span>
+                )}
+              </div>
+            )}
+
             <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
               <div className="divide-y divide-gray-100">
                 {visibleProducts.length === 0 && (
@@ -452,6 +510,20 @@ export default function ProductsPage() {
                           {priceLabel(product.sales_price, formatUnit(product.unit))}
                         </p>
                       </button>
+
+                      {/* UX2a: snabbprissättning — optimistisk uppdatering gör
+                          att raden lämnar saknar-pris-filtret direkt (memo). */}
+                      {visaSaknarPris && snabbLage && !(product.sales_price > 0) && (
+                        <QuickPriceInput
+                          productId={product.id}
+                          unit={formatUnit(product.unit)}
+                          onSaved={pris =>
+                            setProducts(prev =>
+                              prev.map(x => (x.id === product.id ? { ...x, sales_price: pris } : x)),
+                            )
+                          }
+                        />
+                      )}
 
                       {/* Aktiv-toggle */}
                       <button

@@ -19,6 +19,7 @@ import {
   Check,
 } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
+import { OB_DOTS, OB_DOT_TOTAL } from '../constants'
 import type { OnboardingFormData } from '../types-redesign'
 import { TRADES } from '../constants'
 import { normalizeWebsiteUrl, type ScrapedExtraction } from '@/lib/onboarding/website-scrape'
@@ -542,7 +543,7 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
   if (webPhase !== 'form') {
     return (
       <div className="ob-screen">
-        <OnboardingHeader step={0} total={6} onBack={goBackWebFlow} />
+        <OnboardingHeader step={OB_DOTS.business} total={OB_DOT_TOTAL} onBack={goBackWebFlow} />
         <div className="ob-body" style={{ display: 'flex', flexDirection: 'column' }}>
           {webPhase === 'orgnr' && (
             <>
@@ -706,7 +707,7 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
 
   return (
     <div className="ob-screen">
-      <OnboardingHeader step={0} total={6} onBack={onBack} />
+      <OnboardingHeader step={OB_DOTS.business} total={OB_DOT_TOTAL} onBack={onBack} />
       <div className="ob-body">
         <h1 className="ob-headline">Berätta om ditt företag</h1>
         <p className="ob-sub">

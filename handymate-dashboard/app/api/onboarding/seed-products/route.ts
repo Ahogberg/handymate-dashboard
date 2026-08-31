@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
-import { seedProducts, seedPriceList } from '@/lib/seed-defaults'
+import { seedProducts } from '@/lib/seed-defaults'
 import { resolveBranches } from '@/lib/product-defaults'
 import { isOnboardingPaymentBlocked } from '@/lib/onboarding/payment-gate'
 
@@ -47,10 +47,10 @@ export async function POST(request: NextRequest) {
   const hourlyRate = Number(config?.default_hourly_rate) || null
 
   try {
-    await Promise.all([
-      seedProducts(supabase, business.business_id, branches, hourlyRate),
-      seedPriceList(supabase, business.business_id, branches),
-    ])
+    // B2 (Prisslingan V2): seedPriceList borttagen — price_list är död
+    // (aldrig en rad; INTEGER-id vs TEXT-inserts) och alla läsare går nu
+    // mot products via lib/products/price-list-view.ts.
+    await seedProducts(supabase, business.business_id, branches, hourlyRate)
     return NextResponse.json({ ok: true })
   } catch (error: any) {
     console.error('[onboarding/seed-products] seedning misslyckades:', business.business_id, error?.message)

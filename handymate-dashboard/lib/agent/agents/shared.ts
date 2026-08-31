@@ -12,6 +12,7 @@ import { toolDefinitions } from '@/app/api/agent/trigger/tool-definitions'
 import { ensureValidToken } from '@/lib/google-calendar'
 import { getBusinessPreferences } from '@/lib/business-preferences'
 import { isToolAllowedForActor, type ActorType } from '@/lib/agent/external-actor'
+import { getPublicPriceList } from '@/lib/products/price-list-view'
 
 // ── Types ──
 
@@ -281,17 +282,14 @@ export async function fetchBusinessContext(
     learnedPreferences = prefs
   } catch { /* non-blocking */ }
 
-  // Fetch price list for quote generation context
+  // Fetch price list for quote generation context.
+  // B1 (Prisslingan V2): läser KANONISKA products via getPublicPriceList —
+  // legacy-tabellen price_list har aldrig innehållit en rad (INTEGER-id +
+  // TEXT-inserts, tyst svalt fel), så ekonomi-agenten har varit prislös
+  // sedan dag ett. sales_price>0-filtret ligger i vyn.
   let priceList: Array<{ name: string; unit: string; unit_price: number; category: string }> = []
   try {
-    const { data: prices } = await supabase
-      .from('price_list')
-      .select('name, unit, unit_price, category')
-      .eq('business_id', businessId)
-      .eq('is_active', true)
-      .order('category', { ascending: true })
-      .limit(50)
-    priceList = prices || []
+    priceList = await getPublicPriceList(supabase, businessId, { limit: 50 })
   } catch { /* non-blocking */ }
 
   return {

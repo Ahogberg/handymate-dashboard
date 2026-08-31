@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { expandSynonyms, rankBySearchMatch } from '@/lib/products/search-ranking'
-import { syncPriceListRow } from '@/lib/products/sync-price-list'
 
 // getAuthenticatedBusiness läser request.headers direkt — utan denna export
 // kan rutten frysas i Full Route Cache och servera ETT företags artikelbank
@@ -245,18 +244,10 @@ export async function PUT(request: NextRequest) {
 
     if (error) throw error
 
-    // Skriv-igenom till price_list (v137) — best-effort, kastar aldrig, se
-    // lib/products/sync-price-list.ts. En prisändring här ska synas för
-    // telefonagenten/widgeten/storefronten utan manuell ombyggnad.
-    if (data) {
-      await syncPriceListRow(
-        supabase,
-        business.business_id,
-        data.id,
-        { name: data.name, unit: data.unit, unit_price: data.sales_price, is_active: data.is_active },
-        data.name,
-      )
-    }
+    // B2 (Prisslingan V2): v137-skriv-igenom till price_list borttagen —
+    // tabellen har aldrig innehållit en rad (syncPriceListRow var UPDATE-only
+    // mot en tom tabell = no-op sedan dag ett). Alla läsare går nu direkt
+    // mot products via lib/products/price-list-view.ts.
 
     return NextResponse.json({ product: data })
   } catch (error: any) {
@@ -289,12 +280,6 @@ export async function DELETE(request: NextRequest) {
       .eq('business_id', business.business_id)
 
     if (error) throw error
-
-    // Skriv-igenom till price_list (v137) — best-effort, kastar aldrig.
-    // Bara product_id-matchning (ingen namn-fallback tillgänglig här utan
-    // en extra fråga) — förmigrations-rader utan länk avaktiveras inte,
-    // ett känt, accepterat gap (se sql/v137_price_list_product_link.sql).
-    await syncPriceListRow(supabase, business.business_id, id, { is_active: false })
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

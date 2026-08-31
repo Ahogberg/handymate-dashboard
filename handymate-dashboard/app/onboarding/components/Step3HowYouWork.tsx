@@ -7,7 +7,7 @@ import InfoSheet from './InfoSheet'
 import { TEAM } from '@/lib/agents/team'
 import type { OnboardingFormData } from '../types-redesign'
 import { FIRST_FOCUS_OPTIONS } from '@/lib/onboarding/first-focus'
-import { SPECIALTIES_BY_TRADE, TRADES, getTradeLabel } from '../constants'
+import { OB_DOTS, OB_DOT_TOTAL, SPECIALTIES_BY_TRADE, TRADES, getTradeLabel } from '../constants'
 
 interface Step3Props {
   onNext: () => void
@@ -79,7 +79,7 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
 
   return (
     <div className="ob-screen">
-      <OnboardingHeader step={1} total={6} onBack={onBack} />
+      <OnboardingHeader step={OB_DOTS.howYouWork} total={OB_DOT_TOTAL} onBack={onBack} />
       <div className="ob-body">
         <h1 className="ob-headline">Hur jobbar du?</h1>
         {/* "svara rätt i telefonen" är FÖRBJUDEN copy (låter som talande

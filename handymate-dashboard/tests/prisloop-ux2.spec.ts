@@ -1,0 +1,75 @@
+/**
+ * Facit för UX2 (Prisslingan V2 pass 2): beta-av-vyn + levande nudgar.
+ * Källkontrakt — låser att ytorna räknar PRISSATTA (inte totalen) och att
+ * saknar-pris-vägen finns kvar hela kedjan nudge → filter → snabbpris.
+ */
+import { test, expect } from '@playwright/test'
+import fs from 'fs'
+import path from 'path'
+
+const ROOT = path.resolve(__dirname, '..')
+const source = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
+
+test.describe('UX2a — beta-av-vyn i Inställningar → Produkter', () => {
+  const sida = source('app/dashboard/settings/products/page.tsx')
+
+  test('?filter=saknar-pris aktiverar filtret (nudge-länkarnas kontrakt)', () => {
+    expect(sida).toContain("searchParams?.get('filter') === 'saknar-pris'")
+  })
+
+  test('filtret räknar aktiva prislösa och läggs OVANPÅ kategorifiltret', () => {
+    expect(sida).toContain('antalSaknarPris')
+    expect(sida).toContain('!(p.sales_price > 0)')
+  })
+
+  test('snabbläget använder delade QuickPriceInput (samma som onboardingen)', () => {
+    expect(sida).toContain("from '@/components/products/QuickPriceInput'")
+    const onboarding = source('app/onboarding/components/StepProductRegister.tsx')
+    expect(onboarding).toContain("from '@/components/products/QuickPriceInput'")
+  })
+})
+
+test.describe('UX2b — nudgarna räknar prissatta, inte totalen', () => {
+  test('oversikt räknar priced/unpriced separat (gt sales_price 0)', () => {
+    const oversikt = source('app/dashboard/oversikt/page.tsx')
+    expect(oversikt).toContain(".gt('sales_price', 0)")
+    expect(oversikt).toContain('setPricedCount')
+    expect(oversikt).toContain('setUnpricedCount')
+  })
+
+  test('AgentReadinessCard: grönt på pricedCount > 0, länk till saknar-pris-filtret', () => {
+    const kort = source('components/dashboard/AgentReadinessCard.tsx')
+    expect(kort).toContain('ok: pricedCount > 0')
+    expect(kort).toContain('?filter=saknar-pris')
+    // Långsvansen är designen: unpricedCount får aldrig krävas vara 0.
+    expect(kort).not.toContain('unpricedCount === 0')
+  })
+
+  test('OnboardingChecklist matas med prissatta (inte råa totalen)', () => {
+    const oversikt = source('app/dashboard/oversikt/page.tsx')
+    expect(oversikt).toContain('priceListCount={pricedCount}')
+  })
+})
+
+test.describe('UX2c — onboardingens "10 vanliga att prissätta nu"', () => {
+  const steg = source('app/onboarding/components/StepProductRegister.tsx')
+
+  test('max 10 prislösa arbetsartiklar, seed-ordningen är prioriteten', () => {
+    expect(steg).toContain(".slice(0, 10)")
+    expect(steg).toContain("p.category === 'arbete'")
+  })
+
+  test('steget är fortfarande frivilligt — skip-länken orörd', () => {
+    expect(steg).toContain('Hoppa över — jag gör det senare')
+  })
+})
+
+test.describe('QuickPriceInput — kontraktet', () => {
+  const komponent = source('components/products/QuickPriceInput.tsx')
+
+  test('sparar via PUT /api/products (saveStandardPrice-vägen), aldrig 0', () => {
+    expect(komponent).toContain("method: 'PUT'")
+    expect(komponent).toContain('sales_price: pris')
+    expect(komponent).toContain('if (!(pris > 0)')
+  })
+})

@@ -88,7 +88,10 @@ export default function DashboardOversiktPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null)
   const [callCount, setCallCount] = useState(0)
-  const [priceListCount, setPriceListCount] = useState(0)
+  // UX2b (Prisslingan V2): PRISSATTA räknas separat — totalen är sann direkt
+  // efter seedningen (95+ rader) och släckte nudgen innan ett enda eget pris.
+  const [pricedCount, setPricedCount] = useState(0)
+  const [unpricedCount, setUnpricedCount] = useState(0)
   const [showOnboarding, setShowOnboarding] = useState(true)
   const [showWelcome, setShowWelcome] = useState(false)
   const [activeProjects, setActiveProjects] = useState(0)
@@ -236,14 +239,23 @@ export default function DashboardOversiktPage() {
         setCallCount(count || 0)
       })
 
-    const priceListPromise = supabase
-      .from('products')
-      .select('*', { count: 'exact', head: true })
-      .eq('business_id', business.business_id)
-      .eq('is_active', true)
-      .then(({ count }: { count: number | null }) => {
-        setPriceListCount(count || 0)
-      })
+    const priceListPromise = Promise.all([
+      supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', business.business_id)
+        .eq('is_active', true)
+        .gt('sales_price', 0),
+      supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', business.business_id)
+        .eq('is_active', true)
+        .lte('sales_price', 0),
+    ]).then(([priced, unpriced]: any[]) => {
+      setPricedCount(priced?.count || 0)
+      setUnpricedCount(unpriced?.count || 0)
+    })
 
     const projectsPromise = supabase
       .from('project')
@@ -424,7 +436,7 @@ export default function DashboardOversiktPage() {
             businessId={business.business_id}
             businessConfig={onboardingData}
             callCount={callCount}
-            priceListCount={priceListCount}
+            priceListCount={pricedCount}
             onDismiss={() => setShowOnboarding(false)}
             onUpdate={fetchData}
           />
@@ -434,7 +446,8 @@ export default function DashboardOversiktPage() {
         {onboardingData && (
           <AgentReadinessCard
             hourlyRateSet={!!(onboardingData.pricing_settings?.hourly_rate || onboardingData.default_hourly_rate)}
-            productsCount={priceListCount}
+            pricedCount={pricedCount}
+            unpricedCount={unpricedCount}
             customersCount={stats ? stats.customers.total : null}
           />
         )}

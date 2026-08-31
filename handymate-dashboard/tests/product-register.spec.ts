@@ -19,11 +19,12 @@
 import { test, expect } from '@playwright/test'
 import {
   getDefaultProducts,
-  getDefaultPriceList,
   getSeededBranches,
   resolveBranches,
   type ProductDefault,
 } from '../lib/product-defaults'
+import fs from 'fs'
+import path from 'path'
 import { unitFamily } from '../lib/products/match-generated-items'
 
 function allProducts(): ProductDefault[] {
@@ -229,29 +230,29 @@ test.describe('SANITY — vakten läser faktiskt registret', () => {
   })
 })
 
-test.describe('prislösa artiklar når aldrig telefonen', () => {
-  test('price_list innehåller inga nollpriser', () => {
-    // Produktbanken kan visa "Sätt pris" i stället för ett belopp; en röst
-    // kan inte. Telefonagenten läser price_list och skulle säga att jobbet är
-    // gratis — värre än att inte veta.
-    for (const branch of getSeededBranches()) {
-      const noll = getDefaultPriceList(branch).filter(e => !(e.unit_price > 0))
-      expect(noll.map(e => e.name), `${branch} skickar nollpriser till telefonagenten`).toEqual([])
-    }
+test.describe('prislösa artiklar når aldrig kundvända ytor (B2: vyn äger filtret)', () => {
+  test('getPublicPriceList filtrerar sales_price > 0 — källkontrakt', () => {
+    // Produktbanken kan visa "Sätt pris" i stället för ett belopp; en röst/
+    // widget/storefront kan inte. Filtret bor nu i den kanoniska vyn
+    // (lib/products/price-list-view.ts) i stället för i en seed-funktion —
+    // getDefaultPriceList är borttagen (price_list var död, aldrig en rad).
+    const vy = fs.readFileSync(path.resolve(__dirname, '../lib/products/price-list-view.ts'), 'utf8')
+    expect(vy).toContain(".gt('sales_price', 0)")
+    expect(vy).toContain(".eq('is_active', true)")
   })
 
   test('men produktbanken behåller dem', () => {
-    // Filtret får bara gälla price_list. Försvinner de ur products är hela
-    // långsvansen borta och hantverkaren skriver fritext igen.
+    // Filtret får bara gälla den kundvända vyn. Försvinner de ur products är
+    // hela långsvansen borta och hantverkaren skriver fritext igen.
     const prislosa = getDefaultProducts('electrician').filter(p => p.unit_price === 0)
     expect(prislosa.length).toBeGreaterThan(0)
   })
 
-  test('varje bransch har kvar något att säga i luren', () => {
-    // Om filtret någon gång tömmer listan blir telefonagenten stum om priser
-    // utan att något kastar.
+  test('varje bransch har prissatta rader att visa kundvänt', () => {
+    // Om allt seedas prislöst blir widget/storefront stumma om priser.
     for (const branch of getSeededBranches()) {
-      expect(getDefaultPriceList(branch).length, `${branch} har tom prislista`).toBeGreaterThan(0)
+      const prissatta = getDefaultProducts(branch).filter(p => p.unit_price > 0)
+      expect(prissatta.length, `${branch} saknar prissatta rader`).toBeGreaterThan(0)
     }
   })
 })

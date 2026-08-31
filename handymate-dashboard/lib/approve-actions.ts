@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { createQuote as createCanonicalQuote } from '@/lib/quotes/create-quote'
 import { findCustomerDuplicates } from '@/lib/customer-dedupe'
+import { getPublicPriceList } from '@/lib/products/price-list-view'
 
 /**
  * Shared action execution for AI suggestion approval.
@@ -216,12 +217,10 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
         || (business?.pricing_settings as any)?.default_hourly_rate
         || 500
 
-      // Fetch price list for this business
-      const { data: priceListRows } = await supabase
-        .from('price_list')
-        .select('name, unit, unit_price, category')
-        .eq('business_id', businessId)
-        .limit(100)
+      // B1 (Prisslingan V2): kanoniska products via getPublicPriceList —
+      // MED id, så [P#]-handtagen fungerar och godkännandeköns AI-offerter
+      // äntligen får produktkoppling (price_list var tom sedan dag ett).
+      const priceListRows = await getPublicPriceList(supabase, businessId, { limit: 100 }).catch(() => [])
 
       // Build description from suggestion context
       const description = [

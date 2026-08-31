@@ -16,7 +16,7 @@ import {
   scoreProductMatch,
   rankBySearchMatch,
 } from '../lib/products/search-ranking'
-import { getDefaultProducts, getDefaultPriceList, getSeededBranches } from '../lib/product-defaults'
+import { getDefaultProducts, getSeededBranches } from '../lib/product-defaults'
 
 test.describe('expandSynonyms — hantverkarens ord vs artikelns namn', () => {
   test('kända ord expanderas åt båda hållen', () => {
@@ -180,25 +180,23 @@ test.describe('branschsortimentet — ingen kund startar tom', () => {
     expect(buildLabor?.deduction).toBe('rot')
   })
 
-  test('price_list härleds ur samma data — telefonen kan inte säga ett annat pris', () => {
-    // OMSKRIVEN 2026-08-06: listorna är inte längre lika långa. Prislösa
-    // artiklar filtreras bort ur price_list innan seedning — produktbanken kan
-    // visa "Sätt pris" i stället för ett belopp, en röst kan inte.
-    // Telefonagenten läser den här tabellen och hade sagt att jobbet är
-    // gratis, vilket är värre än att inte veta.
-    //
-    // Invarianten som står kvar är den som faktiskt betyder något: varje rad
-    // som NÅR telefonen ska ha samma namn och samma pris som i banken.
+  test('B2: kundvända ytor läser SAMMA bank via kanoniska vyn — inte en egen lista', () => {
+    // OMSKRIVEN 2026-08-31 (Prisslingan V2 pass 2): getDefaultPriceList är
+    // borta — price_list kunde aldrig ta emot en rad. Invarianten som betyder
+    // något nu: telefonens/widgetens/storefrontens priser kommer ur EXAKT
+    // samma products-rader som offerten, via lib/products/price-list-view.ts
+    // (sales_price>0-filtret bor DÄR, en gång).
+    const fss = require('fs') as typeof import('fs')
+    const pathh = require('path') as typeof import('path')
+    const vy = fss.readFileSync(pathh.resolve(__dirname, '../lib/products/price-list-view.ts'), 'utf8')
+    expect(vy).toContain("from('products')")
+    expect(vy).toContain(".gt('sales_price', 0)")
+    // Och seed-datat har fortfarande prissatta rader att visa:
     for (const branch of getSeededBranches()) {
-      const products = getDefaultProducts(branch)
-      const priceList = getDefaultPriceList(branch)
-      const prissatta = products.filter(p => p.unit_price > 0)
-
-      expect(priceList.length, `${branch}: prislistan speglar inte de prissatta artiklarna`).toBe(prissatta.length)
-      for (let i = 0; i < prissatta.length; i++) {
-        expect(priceList[i].name).toBe(prissatta[i].name)
-        expect(priceList[i].unit_price).toBe(prissatta[i].unit_price)
-      }
+      expect(
+        getDefaultProducts(branch).filter(p => p.unit_price > 0).length,
+        `${branch} saknar prissatta rader`,
+      ).toBeGreaterThan(0)
     }
   })
 

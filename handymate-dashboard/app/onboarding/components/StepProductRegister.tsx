@@ -4,10 +4,11 @@
  * StepProductRegister — "Ditt produktregister" (onboarding-steg, efter
  * kundimporten StepImportData).
  *
- * Produkter/price_list seedas TIDIGT här (POST /api/onboarding/
- * seed-products) i stället för vid onboarding-avslut som tidigare —
- * seedProducts/seedPriceList är idempotenta, så finalize-anropet i
- * seedAllDefaults blir automatiskt en no-op andra gången.
+ * Produktbanken seedas TIDIGT här (POST /api/onboarding/seed-products)
+ * i stället för vid onboarding-avslut som tidigare — seedProducts är
+ * idempotent, så finalize-anropet i seedAllDefaults blir automatiskt en
+ * no-op andra gången. (B2: price_list-seedningen är borttagen — tabellen
+ * kunde aldrig ta emot en rad.)
  *
  * Granskningslistan visar bara de redan PRISSATTA startartiklarna
  * (sales_price > 0) — den prislösa långsvansen finns redan i registret
@@ -26,6 +27,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowRight, AlertTriangle, Package, Upload } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
+import { OB_DOTS, OB_DOT_TOTAL } from '../constants'
+import { QuickPriceInput } from '@/components/products/QuickPriceInput'
 import { ToastProvider } from '@/components/Toast'
 import { ProductEditorModal } from '@/app/dashboard/settings/products/components/ProductEditorModal'
 import { ProductCsvImportModal } from '@/app/dashboard/settings/products/components/ProductCsvImportModal'
@@ -59,6 +62,10 @@ export default function StepProductRegister({ onNext, onBack }: Props) {
   const [showImport, setShowImport] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // UX2c (Prisslingan V2): topp-10 PRISLÖSA arbetsartiklar att prissätta
+  // direkt — seed-ordningen ÄR prioritetsordningen (vanligaste först).
+  const [osatta, setOsatta] = useState<ProductRow[]>([])
+
   const fetchPriced = useCallback(async () => {
     try {
       const res = await fetch('/api/products?include_inactive=true')
@@ -66,6 +73,11 @@ export default function StepProductRegister({ onNext, onBack }: Props) {
         const d = await res.json()
         const list: ProductRow[] = d.products || []
         setProducts(list.filter(p => p.sales_price > 0))
+        setOsatta(
+          list
+            .filter(p => p.is_active !== false && !(p.sales_price > 0) && p.category === 'arbete')
+            .slice(0, 10),
+        )
       }
     } catch { /* granskningslistan visas ändå tom — Settings har alltid det fulla registret */ }
   }, [])
@@ -125,7 +137,7 @@ export default function StepProductRegister({ onNext, onBack }: Props) {
 
   return (
     <div className="ob-screen">
-      <OnboardingHeader step={5} total={6} onBack={onBack} onSkip={onNext} />
+      <OnboardingHeader step={OB_DOTS.productRegister} total={OB_DOT_TOTAL} onBack={onBack} onSkip={onNext} />
       <div className="ob-body">
         {view === 'loading' && (
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '100%' }}>
@@ -180,6 +192,33 @@ export default function StepProductRegister({ onNext, onBack }: Props) {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* UX2c: frivilligt — max 10, steget blir inte längre. Ett pris
+                här är hantverkarens EGET från dag 1; resten "Sätt pris" vid
+                användning (pricing-state-filosofin). */}
+            {osatta.length > 0 && (
+              <div style={{ marginBottom: 18 }}>
+                <div className="obi-unlock-label">10 vanliga att prissätta nu (frivilligt)</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                  {osatta.map(p => (
+                    <div
+                      key={p.id}
+                      className="obi-choice"
+                      style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10 }}
+                    >
+                      <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                        <span className="obi-choice-title" style={{ fontSize: 14 }}>{p.name}</span>
+                      </span>
+                      <QuickPriceInput
+                        productId={p.id}
+                        unit={p.unit}
+                        onSaved={() => fetchPriced()}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

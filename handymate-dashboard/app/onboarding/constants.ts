@@ -28,6 +28,21 @@ export interface Trade {
  * tillagda efter Andreas pilot-feedback. Bakåtkompatibla ID:n behålls för
  * befintliga businesses.
  */
+// ─── Prick-indikatorn (UX2d, Prisslingan V2) ────────────────────────
+// SEX prickar är ett MEDVETET beslut (intro + livetour är passiva payoff-
+// skärmar, se OnboardingHeader.tsx) — felet var att mappningen låg
+// hårdkodad i sex komponenter (CLAUDE.md:s "Onboarding steg-index"-
+// fallgrop). EN källa här; komponenterna får aldrig egna siffror.
+export const OB_DOT_TOTAL = 6
+export const OB_DOTS = {
+  business: 0,
+  howYouWork: 1,
+  phone: 2,
+  activate: 3,
+  importData: 4,
+  productRegister: 5,
+} as const
+
 export const TRADES: Trade[] = [
   { id: 'electrician',         label: 'El',              icon: Zap },
   { id: 'plumber',             label: 'VVS',             icon: Droplets },

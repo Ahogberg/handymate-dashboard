@@ -8,8 +8,15 @@ interface AgentReadinessCardProps {
       default_hourly_rate (samma fallback-kedja som AI:n läser, se
       app/api/quotes/ai-generate/route.ts). */
   hourlyRateSet: boolean
-  /** Antal aktiva produkter i produktbanken. */
-  productsCount: number
+  /**
+   * UX2b (Prisslingan V2): antal aktiva PRISSATTA artiklar. Tidigare räknades
+   * alla aktiva — sant direkt efter seedningen (95+ rader), så nudgen slocknade
+   * innan hantverkaren satt ett enda eget pris.
+   */
+  pricedCount: number
+  /** Antal aktiva prislösa artiklar ("Sätt pris"-långsvansen). Bara text —
+      kräv ALDRIG 0 för grönt; långsvansen är designen, inte ett fel. */
+  unpricedCount?: number
   /** Antal kunder. null = ännu inte hämtat — raden döljs tills dess. */
   customersCount: number | null
 }
@@ -34,7 +41,7 @@ interface ReadinessRow {
  * konfigurerat grunderna. Data återanvänds från dashboardens redan gjorda
  * hämtningar (business_config + /api/dashboard/stats) — inga nya anrop.
  */
-export function AgentReadinessCard({ hourlyRateSet, productsCount, customersCount }: AgentReadinessCardProps) {
+export function AgentReadinessCard({ hourlyRateSet, pricedCount, unpricedCount = 0, customersCount }: AgentReadinessCardProps) {
   const rows: ReadinessRow[] = [
     {
       id: 'hourly_rate',
@@ -45,10 +52,10 @@ export function AgentReadinessCard({ hourlyRateSet, productsCount, customersCoun
     },
     {
       id: 'products',
-      ok: productsCount > 0,
-      okText: `Daniel prissätter material rätt (${productsCount} produkter)`,
-      gapText: 'Materialrader blir 0 kr i offerter tills du lägger in priser',
-      link: '/dashboard/settings/products',
+      ok: pricedCount > 0,
+      okText: `Daniel prissätter med dina priser (${pricedCount} prissatta${unpricedCount > 0 ? ` · ${unpricedCount} väntar på pris` : ''})`,
+      gapText: 'Materialrader blir "Sätt pris" i offerter tills du prissatt dina vanligaste artiklar',
+      link: '/dashboard/settings/products?filter=saknar-pris',
     },
     ...(customersCount === null
       ? []
