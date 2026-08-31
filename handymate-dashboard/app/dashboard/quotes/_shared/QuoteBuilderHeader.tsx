@@ -2,23 +2,34 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Bookmark, Loader2, Send, Sparkles } from 'lucide-react'
+import { ArrowLeft, Bookmark, Check, Loader2, Send, Sparkles } from 'lucide-react'
 
 interface QuoteBuilderHeaderProps {
-  aiGenerated: boolean
-  aiConfidence: number | null
-  aiPriceWarning: { message: string; link: string } | null
-  aiPhotoCount: number
+  /** 'create' (default om utelämnad) → "Ny offert", inga autosave-badges.
+      'edit' (Fas 2, offert-omtaget 2026-08-31) → "Redigerar offert" +
+      offertnummer + autosave-indikatorn (slår ihop gamla QuoteEditHeader
+      hit). */
+  mode?: 'create' | 'edit'
+  /** Edit-läge: offertnumret bredvid titeln. */
+  quoteNumber?: string
+  /** Edit-läge: autosparets status — samma badge som gamla QuoteEditHeader. */
+  autoSaveStatus?: 'idle' | 'saving' | 'saved' | 'error'
+  aiGenerated?: boolean
+  aiConfidence?: number | null
+  aiPriceWarning?: { message: string; link: string } | null
+  aiPhotoCount?: number
   // Action-knappar (rendas i sticky top-bar; tidigare i högerkolumnen)
   saving: boolean
   canSend: boolean
   /** ETAPP 1f (offert-masterplan.md): synlig orsakstext när canSend är
       false — härledd av föräldern ur SAMMA villkor som canSend, istället
-      för en tyst disabled-knapp utan förklaring. */
+      för en tyst disabled-knapp utan förklaring. Create-läget använder
+      detta; edit-läget hade aldrig denna förklaringstext. */
   sendDisabledReason?: string
   /** Beskrivningsvarningen (tidigare descriptionWarningShownRef — en
       osynlig "klicka Skicka igen"-vägg): visar en inline-bekräftelse
-      vid knappen istället. */
+      vid knappen istället. Create-läge ENDAST — edit-sidan hade aldrig
+      detta mellansteg (se useQuoteBuilderSave.ts). */
   sendConfirmPending?: boolean
   onConfirmSend?: () => void
   onCancelSend?: () => void
@@ -29,9 +40,12 @@ interface QuoteBuilderHeaderProps {
 }
 
 /**
- * Sticky header för ny offert. Visar AI-status (genererad, säkerhet,
- * foto-räknare, prisvarning) som badges + action-knappar (Skicka,
- * Spara utkast, Spara som mall). Backdrop-blur säkerställer läsbarhet.
+ * Sticky header, delad av offertskaparen och offertredigeraren (Fas 2,
+ * offert-omtaget 2026-08-31 — slog ihop den gamla `QuoteEditHeader.tsx`
+ * hit). Visar AI-status (genererad, säkerhet, foto-räknare, prisvarning) i
+ * create-läge, autosave-indikator + offertnummer i edit-läge, och samma
+ * action-knappar (Skicka, Spara utkast, Spara som mall) i båda. Backdrop-
+ * blur säkerställer läsbarhet.
  *
  * ETAPP 3 (offert-masterplan.md), punkt 4: under `sm` visades de tre
  * AI-badgarna (aiGenerated/aiPriceWarning/aiPhotoCount) inline och kunde
@@ -44,6 +58,9 @@ interface QuoteBuilderHeaderProps {
  * handlers) så de alltid får plats — kravet var att de ALLTID ska synas.
  */
 export function QuoteBuilderHeader({
+  mode = 'create',
+  quoteNumber,
+  autoSaveStatus,
   aiGenerated,
   aiConfidence,
   aiPriceWarning,
@@ -71,9 +88,15 @@ export function QuoteBuilderHeader({
           <span className="hidden sm:inline">Offerter</span>
         </Link>
         <div className="h-4 w-px bg-slate-300 shrink-0" aria-hidden />
-        <h1 className="font-heading text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">
-          Ny offert
-        </h1>
+        <div className="flex items-baseline gap-2 min-w-0">
+          <h1 className="font-heading text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">
+            {mode === 'edit' ? 'Redigerar offert' : 'Ny offert'}
+          </h1>
+          {mode === 'edit' && quoteNumber && (
+            <span className="hidden sm:inline text-xs font-medium text-slate-500 font-mono">{quoteNumber}</span>
+          )}
+        </div>
+        {mode === 'edit' && autoSaveStatus && <AutoSaveIndicator status={autoSaveStatus} />}
         {aiGenerated && (
           <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-primary-50 text-primary-700 border border-primary-100">
             <Sparkles className="w-3 h-3" />
@@ -90,7 +113,7 @@ export function QuoteBuilderHeader({
               : aiPriceWarning.message}
           </a>
         )}
-        {aiPhotoCount > 1 && (
+        {(aiPhotoCount ?? 0) > 1 && (
           <span className="hidden sm:inline text-[11px] text-slate-400">Baserad på {aiPhotoCount} foton</span>
         )}
         <MobileInfoChip
@@ -179,13 +202,13 @@ function MobileInfoChip({
   aiPriceWarning,
   aiPhotoCount,
 }: {
-  aiGenerated: boolean
-  aiConfidence: number | null
-  aiPriceWarning: { message: string; link: string } | null
-  aiPhotoCount: number
+  aiGenerated?: boolean
+  aiConfidence?: number | null
+  aiPriceWarning?: { message: string; link: string } | null
+  aiPhotoCount?: number
 }) {
   const [open, setOpen] = useState(false)
-  const hasInfo = aiGenerated || !!aiPriceWarning || aiPhotoCount > 1
+  const hasInfo = !!aiGenerated || !!aiPriceWarning || (aiPhotoCount ?? 0) > 1
   if (!hasInfo) return null
 
   return (
@@ -217,12 +240,50 @@ function MobileInfoChip({
                 {aiPriceWarning.message}
               </a>
             )}
-            {aiPhotoCount > 1 && (
+            {(aiPhotoCount ?? 0) > 1 && (
               <p className="text-xs text-slate-500">Baserad på {aiPhotoCount} foton</p>
             )}
           </div>
         </>
       )}
     </div>
+  )
+}
+
+/**
+ * Edit-lägets autosave-badge — flyttad hit oförändrad från gamla
+ * `[id]/edit/components/QuoteEditHeader.tsx` (Fas 2, offert-omtaget
+ * 2026-08-31). Create-läget skickar aldrig `autoSaveStatus` och ser
+ * därför aldrig detta (se `mode === 'edit' && autoSaveStatus`-villkoret
+ * ovan).
+ */
+function AutoSaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' | 'error' }) {
+  if (status === 'idle') return null
+
+  const cfg = {
+    saving: {
+      icon: <Loader2 className="w-3 h-3 animate-spin" />,
+      label: 'Sparar…',
+      cls: 'bg-slate-100 text-slate-600 border-slate-200',
+    },
+    saved: {
+      icon: <Check className="w-3 h-3" />,
+      label: 'Sparad',
+      cls: 'bg-green-50 text-green-700 border-green-200',
+    },
+    error: {
+      icon: null,
+      label: 'Kunde inte spara',
+      cls: 'bg-red-50 text-red-700 border-red-200',
+    },
+  }[status]
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${cfg.cls}`}
+    >
+      {cfg.icon}
+      {cfg.label}
+    </span>
   )
 }

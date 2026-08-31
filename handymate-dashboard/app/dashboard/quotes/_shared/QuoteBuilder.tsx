@@ -53,6 +53,9 @@ import type { QuotePayloadContext } from './buildQuotePayload'
 import { useQuoteBuilderSave } from './useQuoteBuilderSave'
 import { QuoteBuilderHeader } from './QuoteBuilderHeader'
 import { QuoteCompletenessStrip } from './QuoteCompletenessStrip'
+import { QuoteEditView } from './QuoteEditView'
+import { fetchQuoteForEdit } from './loadEditQuote'
+import type { ReservationSnapshotEntry } from '@/lib/reservations/match'
 
 import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
 import { panelStatus } from '@/lib/quotes/panel-status'
@@ -169,20 +172,21 @@ function MerPanelClose({ onClose }: { onClose: () => void }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface QuoteBuilderProps {
-  /** Bara 'create' finns idag (new/page.tsx). Prop finns redan så Fas 2 kan
-      lägga till 'edit' (migrera [id]/edit/page.tsx hit) utan att tråda om
-      alla anropare på nytt. */
-  mode: 'create'
+  /** 'create' → new/page.tsx (POST, explicit spara/skicka).
+      'edit' → [id]/edit/page.tsx (Fas 2, offert-omtaget 2026-08-31 — PUT,
+      autosave var 5:e sekund + explicit skicka). */
+  mode: 'create' | 'edit'
+  /** Krävs när mode==='edit'. */
+  quoteId?: string
 }
 
-// `mode` läses inte idag ('create' är enda varianten) — propen finns
-// förberedd för Fas 2 (edit-läge), som lägger till läsningen av den.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function QuoteBuilder(props: QuoteBuilderProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const business = useBusiness()
   const toast = useToast()
+  const isEditMode = props.mode === 'edit'
+  const quoteId = props.quoteId || ''
 
   // ─── Loading / global state ─────────────────────────────────────────
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -211,6 +215,23 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
   // `saving` ägs numera av useQuoteBuilderSave (se hooket längre ner) —
   // ingen egen kopia här.
   const [generating, setGenerating] = useState(false)
+
+  // ─── EDIT-LÄGE ENDAST (Fas 2, offert-omtaget 2026-08-31) ────────────
+  // Offertens LADDADE status (draft/sent/...) — skickas oförändrad tillbaka
+  // vid varje autospar (idempotent PUT), överskrivs bara explicit till
+  // 'sent' vid Skicka (useQuoteBuilderSave.ts).
+  const [quoteStatus, setQuoteStatus] = useState('draft')
+  // Ref (inte state) — påverkar bara headerns text, ingen anledning att
+  // trigga om-render vid sättning.
+  const quoteNumberRef = useRef('')
+  // Reservationsmotorns snapshot laddas asynkront med resten av offerten —
+  // se useReservationSuggestions' egen effekt som konsumerar denna.
+  const [loadedReservations, setLoadedReservations] = useState<ReservationSnapshotEntry[]>([])
+  // Autosparets "har första laddningen hunnit klart"-vakt — utan den skriver
+  // den tomma initial-state:en över offerten innan quote.json hunnit läsas
+  // in (samma vakt som gamla edit-sidans initialLoadDone-ref).
+  const initialLoadDoneRef = useRef(false)
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // ─── Standard texts ────────────────────────────────────────────────
   const [allStandardTexts, setAllStandardTexts] = useState<QuoteStandardText[]>([])
@@ -439,8 +460,9 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
   // Reservationsmotorn (v91): matchar raderna mot reservationsbiblioteket och
   // föreslår förbehåll — utan att någonsin avbryta. Delad hook så new och edit
   // beter sig identiskt. Måste ligga före liveHandlers/quoteTemplateData som
-  // båda läser snapshoten.
-  const reservations = useReservationSuggestions(items)
+  // båda läser snapshoten. Edit-läget ger hooken den laddade snapshoten (satt
+  // asynkront av fetchQuote nedan) — create-läget har ingen (ny offert).
+  const reservations = useReservationSuggestions(items, isEditMode ? loadedReservations : undefined)
 
   // ─── Derived: standard texts grouped by type ──────────────────────
   const textsByType = useMemo(() => {
@@ -866,6 +888,19 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
 
   useEffect(() => {
     if (!business.business_id) return
+
+    // EDIT-LÄGE (Fas 2, offert-omtaget 2026-08-31): hämta den befintliga
+    // offerten i stället för de nya-offert-specifika query-param-prefillen/
+    // deal-lookupen nedan (som alla hör till create-flödet).
+    if (isEditMode) {
+      if (!quoteId) return
+      fetchData()
+      fetchStandardTexts()
+      fetchQuote()
+      fetchProductsCount()
+      return
+    }
+
     fetchData()
     fetchStandardTexts()
     fetchProductsCount()
@@ -1008,7 +1043,12 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
         warranty_years: 2,
       },
     )
-    setLoading(false)
+    // EDIT-LÄGE: `loading` styrs av fetchQuote() nedan (samma
+    // "vänta-in-hela-offerten"-disciplin som gamla edit-sidan hade — dess
+    // fetchData() satte ALDRIG loading, bara fetchQuote() gjorde det, sist).
+    // Utan detta villkor hade edit-vyn kunnat rendera EN gång med tomma
+    // rader innan fetchQuote() (som körs parallellt) hunnit svara.
+    if (!isEditMode) setLoading(false)
   }
 
   async function fetchStandardTexts() {
@@ -1019,6 +1059,12 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       const texts: QuoteStandardText[] = data.texts || []
       setAllStandardTexts(texts)
 
+      // EDIT-LÄGE: defaulttexter appliceras INTE ovillkorligt här (till
+      // skillnad från create-läget, som alltid startar tomt) — bara när
+      // den laddade offerten saknar ALLA tre fält, se
+      // loadDefaultStandardTextsForEdit() nedan (anropas av fetchQuote()).
+      if (isEditMode) return
+
       const defaultNotIncluded = texts.find(t => t.text_type === 'not_included' && t.is_default)
       const defaultAta = texts.find(t => t.text_type === 'ata_terms' && t.is_default)
       const defaultPayment = texts.find(t => t.text_type === 'payment_terms' && t.is_default)
@@ -1028,6 +1074,99 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       if (defaultPayment) setPaymentTermsText(defaultPayment.content)
     } catch {
       // silent
+    }
+  }
+
+  // EDIT-LÄGE ENDAST: samma defaulttext-logik som ovan, men anropas
+  // separat EFTER att offerten laddat klart (fetchQuote), och bara om
+  // offerten INTE redan hade någon av de tre texterna sparade — annars
+  // skulle en riktig, ifylld text skrivas över av en generisk mall-default.
+  async function loadDefaultStandardTextsForEdit() {
+    try {
+      const res = await fetch('/api/quote-standard-texts')
+      if (!res.ok) return
+      const data = await res.json()
+      const texts: QuoteStandardText[] = data.texts || []
+
+      const defaultNotIncluded = texts.find(t => t.text_type === 'not_included' && t.is_default)
+      const defaultAta = texts.find(t => t.text_type === 'ata_terms' && t.is_default)
+      const defaultPayment = texts.find(t => t.text_type === 'payment_terms' && t.is_default)
+
+      if (defaultNotIncluded) setNotIncluded(defaultNotIncluded.content)
+      if (defaultAta) setAtaTerms(defaultAta.content)
+      if (defaultPayment) setPaymentTermsText(defaultPayment.content)
+    } catch {
+      // silent
+    }
+  }
+
+  // EDIT-LÄGE ENDAST (Fas 2, offert-omtaget 2026-08-31): hämtar+mappar den
+  // befintliga offerten via den delade load-mappern (loadEditQuote.ts) och
+  // applicerar den på EXAKT samma state som create-läget använder — se den
+  // filens docblock för de två historiska buggarna (is_hidden/valid_until)
+  // den skyddar mot.
+  async function fetchQuote() {
+    try {
+      const loaded = await fetchQuoteForEdit(quoteId)
+
+      setSelectedCustomer(loaded.selectedCustomer)
+      setTitle(loaded.title)
+      setDescription(loaded.description)
+      setQuoteStatus(loaded.quoteStatus)
+      quoteNumberRef.current = loaded.quoteNumber
+      setItems(loaded.items)
+
+      // Inlednings-/avslutningstext laddas INTE längre in i redigerbart
+      // state (borttagna ur flödet, redundanta mot description, pilot-
+      // beslut 2026-07) — kolumnerna kan fortfarande innehålla gamla
+      // värden i DB men de visas eller redigeras inte här.
+      setNotIncluded(loaded.notIncluded)
+      setAtaTerms(loaded.ataTerms)
+      setPaymentTermsText(loaded.paymentTermsText)
+      setTermsText(loaded.termsText)
+
+      if (loaded.loadedReservations.length > 0) setLoadedReservations(loaded.loadedReservations)
+      if (loaded.attachments.length > 0) setAttachments(loaded.attachments)
+
+      if (!loaded.hasAnyStandardText) {
+        loadDefaultStandardTextsForEdit()
+      } else {
+        setShowStandardTexts(true)
+      }
+
+      if (loaded.hasPaymentPlan) {
+        setPaymentPlan(loaded.paymentPlan)
+        setShowPaymentPlan(true)
+      }
+
+      setReferencePerson(loaded.referencePerson)
+      setCustomerReference(loaded.customerReference)
+      setProjectAddress(loaded.projectAddress)
+
+      setDetailLevel(loaded.detailLevel)
+      setShowUnitPrices(loaded.showUnitPrices)
+      setShowQuantities(loaded.showQuantities)
+
+      if (loaded.templateStyle) setTemplateStyle(loaded.templateStyle)
+
+      setPersonnummer(loaded.personnummer)
+      setFastighetsbeteckning(loaded.fastighetsbeteckning)
+      setDiscountPercent(loaded.discountPercent)
+      setValidDays(loaded.validDays)
+
+      setLoading(false)
+      // Samma 500ms-marginal som gamla edit-sidan: låter alla setState-
+      // anropen ovan hinna committa (och de useEffects de triggar, t.ex.
+      // pris-/mall-uppslag) innan autosave-effekten armeras — annars hade
+      // laddningen SJÄLV kunnat räknas som "en ändring" och triggat ett
+      // autospar av den precis inlästa datan.
+      setTimeout(() => {
+        initialLoadDoneRef.current = true
+      }, 500)
+    } catch (err) {
+      console.error('Failed to load quote:', err)
+      toast.error('Kunde inte ladda offerten')
+      router.push('/dashboard/quotes')
     }
   }
 
@@ -1760,8 +1899,9 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
   // useQuoteBuilderSave-hooken (app/dashboard/quotes/_shared/) — se den
   // filens docblock. `getContext` läses FÄRSKT vid varje `saveQuote()`-
   // anrop (inte memo:ad) så den alltid speglar senaste state.
-  const { saving, save: saveQuote } = useQuoteBuilderSave({
-    mode: 'create',
+  const { saving, save: saveQuote, autoSaveStatus, performAutoSave } = useQuoteBuilderSave({
+    mode: props.mode,
+    quoteId,
     items,
     setItems,
     products,
@@ -1794,17 +1934,55 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       personnummer,
       fastighetsbeteckning,
       validDays,
-      aiGenerated,
-      aiConfidence,
-      sourceTranscript,
-      templateId,
-      quoteJobType,
       templateStyle,
       attachments,
-      dealId: dealIdFromQuery,
-      leadId: leadIdFromQuery,
+      // EDIT-LÄGE (Fas 2, offert-omtaget 2026-08-31): skickar tillbaka
+      // offertens LADDADE status (idempotent autospar) — 'sent' sätts
+      // explicit av useQuoteBuilderSave.ts vid Skicka. Create-läget lämnar
+      // detta odefinierat ('draft' är buildQuotePayload:s default).
+      status: isEditMode ? quoteStatus : undefined,
+      // Create-läge-specifika AI-/mall-/koppling-fält — utelämnas HELT i
+      // edit-läge (inte bara null), se buildQuotePayload.ts docblock för
+      // varför (PUT-ruttens `!== undefined`-mönster, särskilt deal_id).
+      ...(isEditMode
+        ? {}
+        : {
+            aiGenerated,
+            aiConfidence,
+            sourceTranscript,
+            templateId,
+            quoteJobType,
+            dealId: dealIdFromQuery,
+            leadId: leadIdFromQuery,
+          }),
     }),
   })
+
+  // EDIT-LÄGE ENDAST (Fas 2, offert-omtaget 2026-08-31): 5s-debounce-
+  // autosparet. Timern lever HÄR (inte i useQuoteBuilderSave.ts) eftersom
+  // den bevakar sidans egna state direkt — EXAKT samma fältlista som gamla
+  // edit-sidans motsvarande useEffect bevakade. `initialLoadDoneRef` skyddar
+  // mot att den nyss inlästa offerten räknas som "en ändring" och autosparas
+  // innan hantverkaren rört något (se fetchQuote() ovan).
+  useEffect(() => {
+    if (!isEditMode || !initialLoadDoneRef.current) return
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = setTimeout(() => {
+      void performAutoSave()
+    }, 5000)
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    selectedCustomer, title, description, items, discountPercent, validDays,
+    personnummer, fastighetsbeteckning, referencePerson, customerReference,
+    projectAddress, notIncluded, ataTerms,
+    paymentTermsText, termsText, paymentPlan, detailLevel, showUnitPrices, showQuantities,
+    templateStyle, attachments,
+  ])
 
   async function saveAsTemplate() {
     if (!templateName.trim()) return
@@ -1870,9 +2048,15 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
    * kund eller ett transkript vet vi redan vad offerten gäller och ska inte
    * fråga om något.
    */
-  const coldStart = !hasQuoteStartSignal
+  // EDIT-LÄGE (Fas 2, offert-omtaget 2026-08-31): Snabbofferten hör bara
+  // till create-flödet. Utan denna vakt hade en offert öppnad för redigering
+  // (som normalt saknar transcript/deal_id/title-query-param) räknats som
+  // "kallstart" och tyst satt quickMode='intake' i bakgrunden — ofarligt i
+  // sig (isEditMode-grenen ovan renderar QuoteEditView oavsett quickMode),
+  // men förvirrande state att lämna satt.
+  const coldStart = !isEditMode && !hasQuoteStartSignal
   useEffect(() => {
-    if (loading || !coldStart || quickMode !== null || quickStartDoneRef.current) return
+    if (isEditMode || loading || !coldStart || quickMode !== null || quickStartDoneRef.current) return
     quickStartDoneRef.current = true
 
     // Etapp D2: hantverkarens egen vana väger tyngre än vårt default. Den som
@@ -1928,6 +2112,138 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
+    )
+  }
+
+  // EDIT-LÄGE (Fas 2, offert-omtaget 2026-08-31): egen layout, egen fil
+  // (QuoteEditView.tsx) — se den filens docblock för varför den INTE ligger
+  // inline här (mount-räkningen i tests/quotes-mer-i-flodet.spec.ts).
+  // Snabbofferten/canvas-first-"Mer"-raden nedan hör bara till create-läget.
+  if (isEditMode) {
+    return (
+      <QuoteEditView
+        quoteId={quoteId}
+        quoteNumber={quoteNumberRef.current}
+        autoSaveStatus={autoSaveStatus}
+        saving={saving}
+        onSendQuote={() => saveQuote(true)}
+        onSaveDraft={() => saveQuote(false)}
+        onSaveTemplate={() => {
+          setTemplateName(title)
+          setShowSaveTemplateModal(true)
+        }}
+        hasItems={items.length > 0}
+        businessDefaultStyle={businessDefaultStyle}
+        templateStyle={templateStyle}
+        setTemplateStyle={setTemplateStyle}
+        reservations={reservations}
+        recalculated={recalculated}
+        customers={customers}
+        selectedCustomer={selectedCustomer}
+        setSelectedCustomer={setSelectedCustomer}
+        validDays={validDays}
+        setValidDays={setValidDays}
+        title={title}
+        setTitle={setTitle}
+        description={description}
+        setDescription={setDescription}
+        items={items}
+        setItems={setItems}
+        allCategories={allCategories}
+        localCustomCategories={localCustomCategories}
+        products={products}
+        onSaveAsStandard={saveStandardPrice}
+        dndSensors={dndSensors}
+        handleDragEnd={handleDragEnd}
+        addItem={addItem}
+        updateItem={updateItem}
+        removeItem={removeItem}
+        moveItem={moveItem}
+        moveItemById={moveItemById}
+        addFromProduct={addFromProduct}
+        applyProductToExistingRow={applyProductToExistingRow}
+        addBlankRowWithDescription={addBlankRowWithDescription}
+        setShowGrossistSearch={setShowGrossistSearch}
+        createCustomCategory={createCustomCategory}
+        showNewCategoryInput={showNewCategoryInput}
+        setShowNewCategoryInput={setShowNewCategoryInput}
+        newCategoryLabel={newCategoryLabel}
+        setNewCategoryLabel={setNewCategoryLabel}
+        setProductModalRow={setProductModalRow}
+        hasRotItems={hasRotItems}
+        hasRutItems={hasRutItems}
+        personnummer={personnummer}
+        setPersonnummer={setPersonnummer}
+        fastighetsbeteckning={fastighetsbeteckning}
+        setFastighetsbeteckning={setFastighetsbeteckning}
+        showStandardTexts={showStandardTexts}
+        setShowStandardTexts={setShowStandardTexts}
+        textsByType={textsByType}
+        referencePerson={referencePerson}
+        setReferencePerson={setReferencePerson}
+        customerReference={customerReference}
+        setCustomerReference={setCustomerReference}
+        projectAddress={projectAddress}
+        setProjectAddress={setProjectAddress}
+        notIncluded={notIncluded}
+        setNotIncluded={setNotIncluded}
+        ataTerms={ataTerms}
+        setAtaTerms={setAtaTerms}
+        paymentTermsText={paymentTermsText}
+        setPaymentTermsText={setPaymentTermsText}
+        termsText={termsText}
+        setTermsText={setTermsText}
+        showPaymentPlan={showPaymentPlan}
+        setShowPaymentPlan={setShowPaymentPlan}
+        paymentPlan={paymentPlan}
+        calculatedPaymentPlan={calculatedPaymentPlan}
+        paymentPlanValid={paymentPlanValid}
+        addPaymentPlanEntry={addPaymentPlanEntry}
+        updatePaymentPlanEntry={updatePaymentPlanEntry}
+        removePaymentPlanEntry={removePaymentPlanEntry}
+        formatCurrency={formatCurrency}
+        attachments={attachments}
+        setAttachments={setAttachments}
+        uploadingFile={uploadingFile}
+        onFileUpload={handleFileUpload}
+        showDisplaySettings={showDisplaySettings}
+        setShowDisplaySettings={setShowDisplaySettings}
+        detailLevel={detailLevel}
+        setDetailLevel={setDetailLevel}
+        showUnitPrices={showUnitPrices}
+        setShowUnitPrices={setShowUnitPrices}
+        showQuantities={showQuantities}
+        setShowQuantities={setShowQuantities}
+        totals={totals}
+        vatRate={vatRate}
+        discountPercent={discountPercent}
+        setDiscountPercent={setDiscountPercent}
+        showPreviewPanel={showPreviewPanel}
+        setShowPreviewPanel={setShowPreviewPanel}
+        previewMode={previewMode}
+        setPreviewMode={setPreviewMode}
+        liveAvailable={liveAvailable}
+        quoteTemplateData={quoteTemplateData}
+        liveHandlers={liveHandlers}
+        setSheetItemId={setSheetItemId}
+        addRowSheetOpen={addRowSheetOpen}
+        setAddRowSheetOpen={setAddRowSheetOpen}
+        templatePreviewPayload={templatePreviewPayload}
+        sheetItem={sheetItem}
+        showGrossistSearch={showGrossistSearch}
+        businessId={business.business_id}
+        addFromGrossist={addFromGrossist}
+        productModalRow={productModalRow}
+        savingProduct={savingProduct}
+        saveItemToProducts={saveItemToProducts}
+        buildProductInitialValues={buildProductInitialValues}
+        showSaveTemplateModal={showSaveTemplateModal}
+        setShowSaveTemplateModal={setShowSaveTemplateModal}
+        templateName={templateName}
+        setTemplateName={setTemplateName}
+        savingTemplate={savingTemplate}
+        saveAsTemplate={saveAsTemplate}
+      />
     )
   }
 

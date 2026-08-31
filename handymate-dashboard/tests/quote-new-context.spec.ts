@@ -71,6 +71,9 @@ test('kallstart (ingen deal) skickar inget jobType-fält i AI-generate-anropen',
 })
 
 test('quotes.job_type skrivs från quoteJobType vid spar (buildQuotePayload)', () => {
-  expect(payloadSource).toContain('quoteJobType: string | null')
+  // Fas 2 (offert-omtaget, 2026-08-31): fältet är nu OPTIONELLT på
+  // QuotePayloadContext (edit-läget sätter det aldrig — se docblocket i
+  // buildQuotePayload.ts) — samma typ, `string | null`, bara `?` tillagt.
+  expect(payloadSource).toContain('quoteJobType?: string | null')
   expect(payloadSource).toContain('job_type: input.quoteJobType')
 })

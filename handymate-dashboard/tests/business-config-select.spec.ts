@@ -24,10 +24,12 @@ import { QUOTE_SURFACE_BUSINESS_SELECT } from '../lib/business/quote-surface-sel
 
 const ROOT = path.resolve(__dirname, '..')
 
-/** Klient-ytor ('use client') som läser business_config direkt via anon-nyckeln. */
+/** Klient-ytor ('use client') som läser business_config direkt via anon-nyckeln.
+ *  FAS 1+2 (offert-omtaget, 2026-08-31): new/page.tsx och [id]/edit/page.tsx
+ *  är båda tunna wrappers (QuoteBuilder mode="create"/"edit") — läsningen
+ *  bor bara i den delade orkestratorn. */
 const CLIENT_SURFACES = [
-  'app/dashboard/quotes/new/page.tsx',
-  'app/dashboard/quotes/[id]/edit/page.tsx',
+  'app/dashboard/quotes/_shared/QuoteBuilder.tsx',
   'app/dashboard/quotes/[id]/page.tsx',
   'app/dashboard/invoices/_shared/InvoiceEditor.tsx',
 ]
