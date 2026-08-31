@@ -12,7 +12,10 @@
  * `default_items`) gjorde redan rätt för arbetsraden
  * (`pricingSettings?.hourly_rate || 650`) men den logiken fanns bara där.
  *
- * TRE KATEGORIER, TRE BEHANDLINGAR (beslut av Andreas):
+ * Epic 2: en EXPLICIT linked_product_id prövas före alla tre kategorierna.
+ * Ägarens val av artikel (även arbete) slår den generella timkostnaden.
+ * Saknad artikel/enhet/pris ger prislös rad, aldrig en annan namnträff.
+ * Följande legacy-regler gäller enbart rader UTAN explicit koppling:
  *
  *  1. Arbetsrader (unit 'tim') — ALLTID företagets `pricingSettings.hourly_rate`,
  *     aldrig mallens gissning, oavsett vilket tal mallen råkar ha. Saknas
@@ -55,6 +58,7 @@ import {
   type MatchableProduct,
 } from '@/lib/products/match-generated-items'
 import { priceState } from '@/lib/products/pricing-state'
+import { sameUnit } from './job-type-setup'
 
 /** Samma fallback som den äldre legacy-mallvägen (handleTemplateSelect). */
 export const DEFAULT_TEMPLATE_HOURLY_RATE = 650
@@ -69,7 +73,7 @@ export interface TemplatePricingProduct {
   id: string
   name: string
   unit: string
-  sales_price: number
+  sales_price: number | null
 }
 
 function isPriceableItem(item: QuoteItem): boolean {
@@ -98,6 +102,18 @@ export function resolveTemplateItemPrices(
   return items.map(item => {
     if (!isPriceableItem(item)) return item
 
+    if (item.linked_product_id) {
+      const selected = byId.get(item.linked_product_id)
+      const compatible = selected && sameUnit(item.unit, selected.unit)
+      const priced = compatible && Number.isFinite(selected.sales_price) && priceState(selected.sales_price) === 'satt'
+      const unit_price = priced ? Number(selected.sales_price) : 0
+      return {
+        ...item, unit_price, total: item.quantity * unit_price, ai_price_missing: !priced,
+        // En felaktig/inaktiv koppling får inte väcka fel produktreservation.
+        linked_product_id: compatible ? selected.id : undefined,
+      }
+    }
+
     // 1) Arbetsrader — mallens gissade á-pris betyder ingenting, det är
     // alltid FÖRETAGETS timkostnad som gäller.
     if (item.unit === 'tim') {
@@ -119,7 +135,7 @@ export function resolveTemplateItemPrices(
     const product = match ? byId.get(match.productId) : undefined
 
     if (product && priceState(product.sales_price) === 'satt') {
-      const unit_price = product.sales_price
+      const unit_price = Number(product.sales_price)
       return {
         ...item,
         unit_price,

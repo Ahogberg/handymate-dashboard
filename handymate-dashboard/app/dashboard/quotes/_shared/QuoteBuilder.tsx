@@ -17,6 +17,11 @@ import {
 } from '@/lib/quote-calculations'
 import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
 import { resolveTemplateItemPrices } from '@/lib/quotes/resolve-template-item-prices'
+import type { TemplatePricingProduct } from '@/lib/quotes/resolve-template-item-prices'
+import { QuoteJobTypeStart } from '@/components/onboarding/QuoteJobTypeStart'
+import { canApplyJobTypeStart, loadJobTypeStart, type QuoteStartSnapshot } from '@/lib/quotes/job-type-start'
+import { readFirstQuoteIntent } from '@/lib/onboarding/first-quote-handoff'
+import type { FirstQuoteSelection } from '@/lib/quotes/job-type-setup'
 import { compressImageFile } from '@/lib/images/compress-photo'
 import { getAllCategories, type CustomCategory } from '@/lib/constants/categories'
 import {
@@ -187,6 +192,11 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
   const toast = useToast()
   const isEditMode = props.mode === 'edit'
   const quoteId = props.quoteId || ''
+  const firstQuoteIntent = searchParams ? readFirstQuoteIntent(searchParams) : null
+  const [dealContextReady, setDealContextReady] = useState(!searchParams?.get('deal_id'))
+  const [inheritedJobType, setInheritedJobType] = useState<string | null>(null)
+  const [jobStartApplied, setJobStartApplied] = useState(false)
+  const jobStartAttempted = useRef(false)
 
   // ─── Loading / global state ─────────────────────────────────────────
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -404,6 +414,12 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       studsat tillbaka in i intaget direkt. */
   const quickStartDoneRef = useRef(false)
   const [quickInput, setQuickInput] = useState('')
+  const jobStartSnapshot = useRef<QuoteStartSnapshot>({ items, jobType: quoteJobType, input: quickInput, mode: quickMode, busy: false })
+  jobStartSnapshot.current = { items, jobType: quoteJobType, input: quickInput,
+    mode: `${quickMode}:${templatePickerOpen}`, busy: generating || quickMode === 'building',
+    formSignature: JSON.stringify([selectedCustomer, title, description, notIncluded, ataTerms, paymentTermsText,
+      termsText, paymentPlan, detailLevel, showUnitPrices, showQuantities, pricingSettings?.hourly_rate, templateId]),
+  }
   /** Vilket ämne chip-raden senast bads scrolla till — se scrollToSection
       och effekten som konsumerar den, längre ner. */
   const [pendingScrollSection, setPendingScrollSection] = useState<QuoteSection | null>(null)
@@ -956,12 +972,15 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       // Motor 1: deal-prefill gav ev. en jobbtyp — hämta efterkalkyl-insikt
       // som sekundär nyckel (mall vinner om användaren sen väljer en).
       if (deal.job_type) {
+        setInheritedJobType(deal.job_type)
         setQuoteJobType(deal.job_type)
         fetchEfterkalkylInsight({ jobType: deal.job_type })
       }
     } catch (err) {
       console.error('[NewQuote] Kunde inte hämta deal:', err)
       // Tyst degradering — formuläret fungerar precis som utan deal-lookup.
+    } finally {
+      setDealContextReady(true)
     }
   }
 
@@ -1482,6 +1501,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
           textDescription: photoDescription || undefined,
           customerId: selectedCustomer || undefined,
           jobType: quoteJobType || undefined,
+          templateId: templateId || undefined,
         }),
       })
       const data = await response.json()
@@ -1517,6 +1537,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       const body: Record<string, string> = { textDescription: inputText }
       if (sourceImageBase64) body.imageBase64 = sourceImageBase64
       if (quoteJobType) body.jobType = quoteJobType
+      if (templateId) body.templateId = templateId
       const response = await fetch('/api/quotes/ai-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1568,6 +1589,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       if (photos.length > 0) body.images = photos.map(p => p.split(',')[1])
       if (selectedCustomer) body.customerId = selectedCustomer
       if (quoteJobType) body.jobType = quoteJobType
+      if (templateId) body.templateId = templateId
 
       const response = await fetch('/api/quotes/ai-generate', {
         method: 'POST',
@@ -1618,7 +1640,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
   // Template handlers
   // ═══════════════════════════════════════════════════════════════════
 
-  function handleNewTemplateSelect(template: QuoteTemplate) {
+  function handleNewTemplateSelect(template: QuoteTemplate, pricingProducts: TemplatePricingProduct[] = products) {
+    jobStartAttempted.current = true
     // Sätts ENDAST om fälten fortfarande är tomma — en deal-prefill (Etapp 2)
     // äger jobbets identitet och ska aldrig skrivas över av mallvalet.
     setTitle(prev => prev || template.name)
@@ -1630,6 +1653,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
     if (template.default_items && template.default_items.length > 0) {
       const cloned: QuoteItem[] = template.default_items.map((item, idx) => ({
         ...item,
+        item_type: item.item_type || 'item',
         id: generateItemId(),
         sort_order: idx,
         total: item.item_type === 'item' ? item.quantity * item.unit_price : item.total,
@@ -1638,7 +1662,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       // á-pris, materialradernas kronor, paketprisernas fasta belopp) betyder
       // ingenting för DETTA företag — se lib/quotes/resolve-template-item-prices.ts
       // för de tre kategoriernas separata behandling.
-      setItems(resolveTemplateItemPrices(cloned, products, pricingSettings?.hourly_rate))
+      setItems(resolveTemplateItemPrices(cloned, pricingProducts, pricingSettings?.hourly_rate))
     }
 
     if (template.default_payment_plan && template.default_payment_plan.length > 0) {
@@ -1666,6 +1690,26 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
     }).catch(() => {})
 
     toast.success(`Mall "${template.name}" tillämpad`)
+  }
+
+  async function applyJobTypeStart(selection: FirstQuoteSelection, signal: AbortSignal) {
+    if (isEditMode || !dealContextReady) return
+    jobStartAttempted.current = true
+    if (inheritedJobType && inheritedJobType !== selection.jobTypeSlug) {
+      throw new Error('Affären har en annan jobbtyp. Dess kund och jobbtyp är kvar — välj underlag för den.')
+    }
+    const before = jobStartSnapshot.current
+    const start = await loadJobTypeStart(selection, signal)
+    if (signal.aborted) return
+    if (!canApplyJobTypeStart(before, jobStartSnapshot.current)) {
+      throw new Error('Du har börjat ändra offerten. Dina ändringar behålls; inget underlag har lagts in.')
+    }
+    // Samma mallhandler, prisresolver och reservationshook som alla andra
+    // mallstarter. Rör INTE kund, affär, titel/beskrivning som redan finns.
+    setQuoteJobType(start.selection.jobTypeSlug)
+    handleNewTemplateSelect(start.template, start.products)
+    setJobStartApplied(true)
+    finishQuickStart()
   }
 
   function handleTemplateSelect(template: any) {
@@ -2025,6 +2069,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
   // ska bli — transcript (AI-flödet öppnas redan automatiskt ovan),
   // deal/lead-koppling, vald kund, eller en förifylld titel.
   const hasQuoteStartSignal = !!(
+    firstQuoteIntent ||
     searchParams?.get('transcript') ||
     searchParams?.get('deal_id') || searchParams?.get('lead_id') ||
     searchParams?.get('customerId') || searchParams?.get('customer_id') ||
@@ -2095,6 +2140,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
    * inte finns någon väg tillbaka till intaget var den i praktiken tappad.
    */
   function leaveQuickMode(route: EscapeRoute, carryText: boolean) {
+    jobStartAttempted.current = true
     if (carryText) {
       const typed = quickInput.trim()
       // Skriver aldrig över något som redan står där.
@@ -2247,6 +2293,12 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
     )
   }
 
+  const jobTypeStart = !isEditMode && items.length === 0 && !jobStartApplied && dealContextReady && !templatePickerOpen ? (
+    <QuoteJobTypeStart jobType={quoteJobType} inherited={!!inheritedJobType}
+      initialIntent={firstQuoteIntent} automatic={!jobStartAttempted.current}
+      onSelectJobType={slug => { jobStartAttempted.current = true; setQuoteJobType(slug) }} onApply={applyJobTypeStart} />
+  ) : null
+
   // ═══ SNABBOFFERTEN: intag och byggkänsla är fullskärmslägen ══════════
   if (quickMode === 'intake') {
     return (
@@ -2261,6 +2313,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
         onSelectTemplate={t => { handleTemplateSelect(t); finishQuickStart() }}
       />
       <QuickIntake
+        jobTypeStart={jobTypeStart}
         customers={customers}
         selectedCustomer={selectedCustomer}
         onSelectCustomer={setSelectedCustomer}
@@ -2317,7 +2370,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className={`min-h-screen bg-slate-50${jobStartApplied ? ' first-quote-arrival' : ''}`}>
       {/* Mallväljaren. Öppnas bara från Snabboffertens intag — den är inte
           längre ett startval utan en av två utgångar därifrån. */}
       <QuoteNewStartChooser
@@ -2354,6 +2407,10 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
             setShowSaveTemplateModal(true)
           }}
         />
+        {jobTypeStart}
+        {jobStartApplied && <p className="mb-4 text-sm text-teal-800" role="status">
+          Ditt underlag är på plats. Kontrollera mängder, priser och föreslagna förbehåll — inget är skickat.
+        </p>}
 
         {/* Kvittoprincipen Fall 1: motorns eget resonemang, direkt under
             headern före radlistan. Renderar ingenting utan reasoning;

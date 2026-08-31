@@ -29,6 +29,7 @@ import { ArrowRight, AlertTriangle, Package, Upload } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import { OB_DOTS, OB_DOT_TOTAL } from '../constants'
 import { QuickPriceInput } from '@/components/products/QuickPriceInput'
+import { JobTypeQuoteSetup } from '@/components/onboarding/JobTypeQuoteSetup'
 import { ToastProvider } from '@/components/Toast'
 import { ProductEditorModal } from '@/app/dashboard/settings/products/components/ProductEditorModal'
 import { ProductCsvImportModal } from '@/app/dashboard/settings/products/components/ProductCsvImportModal'
@@ -54,13 +55,15 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_ORDER = ['arbete', 'material', 'hyra', 'övrigt']
 
-export default function StepProductRegister({ onNext, onBack }: Props) {
+export default function StepProductRegister({ onNext, onBack, data, setData }: Props) {
   const [view, setView] = useState<View>('loading')
   const [products, setProducts] = useState<ProductRow[]>([])
   const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null)
   const [saving, setSaving] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [setupRefresh, setSetupRefresh] = useState(0)
+  const [setupBusy, setSetupBusy] = useState(false)
 
   // UX2c (Prisslingan V2): topp-10 PRISLÖSA arbetsartiklar att prissätta
   // direkt — seed-ordningen ÄR prioritetsordningen (vanligaste först).
@@ -72,14 +75,14 @@ export default function StepProductRegister({ onNext, onBack }: Props) {
       if (res.ok) {
         const d = await res.json()
         const list: ProductRow[] = d.products || []
-        setProducts(list.filter(p => p.sales_price > 0))
+        setProducts(list.filter(p => p.is_active !== false && p.sales_price > 0))
         setOsatta(
           list
             .filter(p => p.is_active !== false && !(p.sales_price > 0) && p.category === 'arbete')
             .slice(0, 10),
         )
-      }
-    } catch { /* granskningslistan visas ändå tom — Settings har alltid det fulla registret */ }
+      } else { throw new Error('Kunde inte läsa artikelregistret.') }
+    } catch { setError('Kunde inte läsa artikelregistret. Du kan fortsätta och försöka igen senare.') }
   }, [])
 
   // Seeda tidigt vid steg-inträde. fail-soft: ett seed-fel visar bara ett
@@ -88,8 +91,9 @@ export default function StepProductRegister({ onNext, onBack }: Props) {
     let cancelled = false
     async function seedThenLoad() {
       try {
-        await fetch('/api/onboarding/seed-products', { method: 'POST' })
-      } catch { /* fail-soft */ }
+        const response = await fetch('/api/onboarding/seed-products', { method: 'POST' })
+        if (!response.ok) throw new Error('seed failed')
+      } catch { if (!cancelled) setError('Startartiklarna kunde inte hämtas. Dina befintliga artiklar påverkas inte.') }
       if (cancelled) return
       await fetchPriced()
       if (!cancelled) setView('ready')
@@ -115,14 +119,19 @@ export default function StepProductRegister({ onNext, onBack }: Props) {
       }
       const { product } = await res.json()
       if (components !== null && product?.id) {
-        await fetch(`/api/products/${product.id}/components`, {
+        const componentResponse = await fetch(`/api/products/${product.id}/components`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ components }),
         })
+        if (!componentResponse.ok) {
+          setError('Artikeln sparades, men komponenterna kunde inte sparas. Försök igen.')
+          return
+        }
       }
       setEditingProduct(null)
       await fetchPriced()
+      setSetupRefresh(n => n + 1)
     } catch {
       setError('Kunde inte spara produkten')
     } finally {
@@ -137,7 +146,7 @@ export default function StepProductRegister({ onNext, onBack }: Props) {
 
   return (
     <div className="ob-screen">
-      <OnboardingHeader step={OB_DOTS.productRegister} total={OB_DOT_TOTAL} onBack={onBack} onSkip={onNext} />
+      <OnboardingHeader step={OB_DOTS.productRegister} total={OB_DOT_TOTAL} onBack={setupBusy ? null : onBack} onSkip={setupBusy ? null : onNext} />
       <div className="ob-body">
         {view === 'loading' && (
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '100%' }}>
@@ -150,21 +159,24 @@ export default function StepProductRegister({ onNext, onBack }: Props) {
 
         {view === 'ready' && (
           <>
-            <h1 className="ob-headline">Ditt register står redan klart.</h1>
+            <h1 className="ob-headline">Ditt sätt att offerera.</h1>
             <p className="ob-sub">
-              De flesta system låter dig bygga ett produktregister själv, artikel för
-              artikel. Hos oss är det redan gjort — du finslipar det, du börjar inte om.
-              Resten av artiklarna prissätter sig själva när du använder dem första
-              gången. Ju bättre registret är, desto bättre offertförslag kan Daniel
-              skriva åt dig.
+              Välj en vanlig jobbtyp, koppla en offertmall och sätt priser på dina artiklar.
+              Då kan Daniel förbereda nästa offert med ert eget underlag — i stället för att du börjar från noll.
             </p>
 
             {error && <FallbackNote text={error} />}
 
+            <JobTypeQuoteSetup initialJobTypes={data.quoteJobTypes} initialSelection={data.firstQuoteSelection}
+              refreshKey={setupRefresh} onBusyChange={setSetupBusy} onChange={(selection, jobTypes) => setData(d => ({ ...d, quoteJobTypes: jobTypes, firstQuoteSelection: selection }))} />
+
+            <details style={{ marginBottom: 20 }}>
+              <summary style={{ cursor: 'pointer', minHeight: 44, color: '#0F766E', fontWeight: 600 }}>Visa mitt övriga artikelregister</summary>
+
             {products.length === 0 ? (
               <p className="ob-sub">
-                Inga startartiklar hittades för din bransch — inget problem, du bygger
-                registret i Inställningar när du vill.
+                Inga prissatta artiklar kunde visas här. Du kan lägga till eller
+                prissätta artiklar under Inställningar när du vill.
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 18 }}>
@@ -214,13 +226,14 @@ export default function StepProductRegister({ onNext, onBack }: Props) {
                       <QuickPriceInput
                         productId={p.id}
                         unit={p.unit}
-                        onSaved={() => fetchPriced()}
+                        onSaved={() => { void fetchPriced(); setSetupRefresh(n => n + 1) }}
                       />
                     </div>
                   ))}
                 </div>
               </div>
             )}
+            </details>
 
             <button type="button" className="obi-choice" onClick={() => setShowImport(true)}>
               <span className="obi-choice-ic teal"><Upload size={22} strokeWidth={2.2} /></span>
@@ -231,7 +244,7 @@ export default function StepProductRegister({ onNext, onBack }: Props) {
               <span className="obi-choice-arrow"><ArrowRight size={20} /></span>
             </button>
 
-            <button type="button" className="obi-skiplink" style={{ marginTop: 16 }} onClick={onNext}>
+            <button type="button" className="obi-skiplink" style={{ marginTop: 16 }} onClick={onNext} disabled={setupBusy}>
               Hoppa över — jag gör det senare
             </button>
           </>
@@ -240,7 +253,7 @@ export default function StepProductRegister({ onNext, onBack }: Props) {
 
       <div className="ob-footer">
         {view === 'ready' && (
-          <button type="button" className="ob-cta" onClick={onNext}>
+          <button type="button" className="ob-cta" onClick={onNext} disabled={setupBusy}>
             Fortsätt <ArrowRight size={18} />
           </button>
         )}
@@ -261,7 +274,7 @@ export default function StepProductRegister({ onNext, onBack }: Props) {
         <ToastProvider>
           <ProductCsvImportModal
             onClose={() => setShowImport(false)}
-            onImported={() => { setShowImport(false); fetchPriced() }}
+            onImported={() => { setShowImport(false); fetchPriced(); setSetupRefresh(n => n + 1) }}
           />
         </ToastProvider>
       )}

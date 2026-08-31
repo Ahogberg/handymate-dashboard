@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Plus, Loader2, X, Trash2, Briefcase, GripVertical } from 'lucide-react'
 import { useToast } from '@/components/Toast'
 import { JOB_TYPE_COLORS } from '@/lib/job-types'
+import { JobTypeQuoteSetup } from '@/components/onboarding/JobTypeQuoteSetup'
 
 interface JobType {
   id: string
@@ -35,6 +36,7 @@ export default function JobTypesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', color: '#0F766E', default_hourly_rate: '' })
   const [saving, setSaving] = useState(false)
+  const [setupRevision, setSetupRevision] = useState(0)
 
   const fetchJobTypes = useCallback(async () => {
     setLoading(true)
@@ -43,6 +45,7 @@ export default function JobTypesPage() {
       if (!res.ok) throw new Error()
       const data = await res.json()
       setJobTypes(data.job_types || [])
+      setSetupRevision(n => n + 1)
     } catch {
       toast.error('Kunde inte hämta jobbtyper')
     } finally {
@@ -143,6 +146,9 @@ export default function JobTypesPage() {
         </div>
 
         {/* Innehåll */}
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 md:p-6 mb-6">
+          <JobTypeQuoteSetup refreshKey={setupRevision} allowCreateJobType={false} />
+        </div>
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Step1MeetTheTeam from './components/Step1MeetTheTeam'
 import Step2Business from './components/Step2Business'
@@ -12,6 +12,10 @@ import StepProductRegister from './components/StepProductRegister'
 import Step6LiveTour from './components/Step6LiveTour'
 import type { OnboardingFormData } from './types-redesign'
 import { hasStep2Draft } from './step2-draft'
+import { FirstQuoteLaunch } from '@/components/onboarding/FirstQuoteLaunch'
+import { completeFirstQuoteOnboarding } from '@/lib/onboarding/first-quote-handoff'
+import { fetchQuoteSetup } from '@/lib/quotes/job-type-start'
+import { resolveFirstQuoteSelection, type QuoteSetupData } from '@/lib/quotes/job-type-setup'
 
 const TOTAL_STEPS = 8
 
@@ -36,6 +40,21 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0)
   const [data, setData] = useState<OnboardingFormData>({ fSkatt: true })
   const [loading, setLoading] = useState(true)
+  const [launchRequested, setLaunchRequested] = useState(false)
+  const [quoteSetup, setQuoteSetup] = useState<QuoteSetupData | null>(null)
+  const [quoteSetupError, setQuoteSetupError] = useState(false)
+  const [setupRetry, setSetupRetry] = useState(0)
+  const finalizeLock = useRef(false)
+
+  useEffect(() => {
+    if (!launchRequested) return
+    const controller = new AbortController()
+    setQuoteSetup(null); setQuoteSetupError(false)
+    fetchQuoteSetup(controller.signal).then(value => {
+      if (!controller.signal.aborted) setQuoteSetup(value)
+    }).catch(() => { if (!controller.signal.aborted) setQuoteSetupError(true) })
+    return () => controller.abort()
+  }, [launchRequested, setupRetry])
 
   // Vid load: kolla om användaren redan börjat onboarding
   useEffect(() => {
@@ -207,8 +226,11 @@ export default function OnboardingPage() {
   const [finishError, setFinishError] = useState(false)
 
   const finish = useCallback(async () => {
+    if (finalizeLock.current) return
+    finalizeLock.current = true
     if (!data.businessId) {
       // Inget konto att finalisera (edge case) — inget att fela på.
+      finalizeLock.current = false
       router.push('/dashboard')
       return
     }
@@ -235,8 +257,24 @@ export default function OnboardingPage() {
     } catch {
       setFinishing(false)
       setFinishError(true)
+    } finally {
+      finalizeLock.current = false
     }
   }, [data.businessId, router])
+
+  async function launchFirstQuote() {
+    if (finalizeLock.current) return
+    if (!data.businessId || !data.firstQuoteSelection) throw new Error('Offertunderlag saknas')
+    finalizeLock.current = true
+    try {
+      const href = await completeFirstQuoteOnboarding(data.firstQuoteSelection, sanitizeForSave(data))
+      router.push(href)
+    } finally { finalizeLock.current = false }
+  }
+
+  const verifiedSelection = quoteSetup ? resolveFirstQuoteSelection(quoteSetup, data.firstQuoteSelection) : null
+  const launchJob = quoteSetup?.jobTypes.find(j => j.slug === verifiedSelection?.jobTypeSlug)
+  const launchTemplate = quoteSetup?.templates.find(t => t.id === verifiedSelection?.templateId)
 
   const setDataUpdater = useCallback(
     (updater: (d: OnboardingFormData) => OnboardingFormData) => setData(updater),
@@ -297,7 +335,20 @@ export default function OnboardingPage() {
         {step === 6 && (
           <StepProductRegister onNext={next} onBack={back} data={data} setData={setDataUpdater} />
         )}
-        {step === 7 && <Step6LiveTour onFinish={finish} data={data} />}
+        {step === 7 && !launchRequested && <Step6LiveTour onFinish={finish} data={data}
+          onFirstQuote={data.firstQuoteSelection ? () => setLaunchRequested(true) : undefined} />}
+        {step === 7 && launchRequested && (launchJob && launchTemplate ?
+          <FirstQuoteLaunch companyName={data.companyName || 'Ditt företag'} jobName={launchJob.name} templateName={launchTemplate.name}
+            onContinue={launchFirstQuote} onSkip={finish} /> :
+          <section className="first-quote-launch" aria-label="Din första offert">
+            <h2>Vi tar med ditt upplägg</h2>
+            {quoteSetupError || quoteSetup ? <>
+              <p role="alert">{quoteSetupError ? 'Kunde inte läsa underlaget just nu.' : 'Ditt underlag har ändrats. Välj jobbtyp och mall igen i artikelsteget.'}</p>
+              <button type="button" className="first-quote-open" onClick={() => setSetupRetry(n => n + 1)}>Försök igen</button>
+              <button type="button" className="first-quote-skip" onClick={() => { setLaunchRequested(false); setStep(6) }}>Till artikelsteget</button>
+            </> : <p role="status">Kontrollerar din jobbtyp och mall…</p>}
+            <button type="button" className="first-quote-skip" disabled={finishing} onClick={finish}>Till översikten i stället</button>
+          </section>)}
       </div>
 
       {/* Finalize-fel (Fynd 6): navigera ALDRIG till dashboarden på ett

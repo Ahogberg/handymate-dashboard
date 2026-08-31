@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
 import { generateQuoteFromInput, getAveragePrice, analyzeJobImage } from '@/lib/ai-quote-generator'
 import { buildQuoteGenerationContext } from '@/lib/quotes/quote-generation-context'
+import { QuoteContextError } from '@/lib/quotes/job-type-generation'
 import { getServerSupabase } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
     // deal) skickas fältet inte alls.
     // Utan det hämtas inga project_lesson-lärdomar (sanningsprincipen,
     // lib/ai-quote-generator.ts) — hellre inga lärdomar än fel jobbtyps lärdomar.
-    const { imageBase64, images, voiceTranscript, textDescription, customerId, jobType, job_type } = await request.json()
+    const { imageBase64, images, voiceTranscript, textDescription, customerId, jobType, job_type, templateId, template_id } = await request.json()
 
     // Stöd både images[] (nytt) och imageBase64 (bakåtkompatibilitet)
     const allImages: string[] = images?.length ? images : imageBase64 ? [imageBase64] : []
@@ -50,8 +51,10 @@ export async function POST(request: NextRequest) {
     // bakgrundsförslaget (lib/quotes/suggest-quote-draft.ts) använder, så de
     // tre vägarna in i generateQuoteFromInput aldrig kan glida isär om vilka
     // artiklar/mallar/kundpriser som "finns".
-    const { priceList: priceListData, templates: templatesData, customerPriceList } =
-      await buildQuoteGenerationContext(supabase, business.business_id, customerId)
+    const { priceList: priceListData, templates: templatesData, customerPriceList, jobTypeContext } =
+      await buildQuoteGenerationContext(supabase, business.business_id, customerId, {
+        jobType: jobType ?? job_type, templateId: templateId ?? template_id,
+      })
 
     const hourlyRate = business.pricing_settings?.hourly_rate || business.default_hourly_rate || 650
 
@@ -82,6 +85,7 @@ export async function POST(request: NextRequest) {
       priceList: priceListData,
       templates: templatesData,
       customerPriceList,
+      jobTypeContext,
       jobType: jobType || job_type || undefined,
     })
 
@@ -115,6 +119,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('AI quote generation error:', error)
+    if (error instanceof QuoteContextError) return NextResponse.json({ error: error.message, templateChoices: error.choices }, { status: error.status })
     return NextResponse.json({ error: error.message || 'Generering misslyckades' }, { status: 500 })
   }
 }

@@ -31,6 +31,7 @@ import { fetchPriceContextProducts, matchProductByName } from '@/lib/products/pr
 import { generateQuoteFromInput } from '@/lib/ai-quote-generator'
 import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
 import { buildQuoteGenerationContext, hasEnoughDescriptionForAiDraft } from '@/lib/quotes/quote-generation-context'
+import { QuoteContextError } from '@/lib/quotes/job-type-generation'
 import { hourlyRateField } from '@/lib/company/company-model'
 import { fetchReservationLibrary, suggestSnapshotForItems } from '@/lib/reservations/suggest-for-items'
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
@@ -772,12 +773,11 @@ async function createQuoteDraft(
   }
 
   const customerId = (params.customer_id as string) || undefined
-  const { priceList, templates, customerPriceList } = await buildQuoteGenerationContext(
-    supabase, businessId, customerId,
-  )
-
   let generated
   try {
+    const { priceList, templates, customerPriceList, jobTypeContext } = await buildQuoteGenerationContext(
+      supabase, businessId, customerId, { jobType: params.job_type, templateId: params.template_id },
+    )
     generated = await generateQuoteFromInput({
       businessId,
       branch,
@@ -788,12 +788,14 @@ async function createQuoteDraft(
       priceList,
       templates,
       customerPriceList,
+      jobTypeContext,
     })
   } catch (genErr) {
     console.error('[create_quote_draft] generateQuoteFromInput kastade:', genErr)
     return {
       success: false,
       error: genErr instanceof Error ? genErr.message : 'AI-genereringen misslyckades — försök igen, eller använd create_quote med egna rader.',
+      ...(genErr instanceof QuoteContextError && genErr.choices ? { data: { template_choices: genErr.choices, requires_user_choice: true } } : {}),
     }
   }
 
@@ -847,6 +849,8 @@ async function createQuoteDraft(
       ai_generated: true,
       ai_confidence: generated.confidence ?? null,
       source_transcript: jobDescription,
+      ...(generated.quoteBasis?.jobType ? { job_type: generated.quoteBasis.jobType } : {}),
+      ...(generated.quoteBasis?.templateId ? { template_id: generated.quoteBasis.templateId } : {}),
       ...(generated.notIncludedSuggestions.length > 0
         ? { not_included: generated.notIncludedSuggestions.join('\n') }
         : {}),
@@ -873,6 +877,7 @@ async function createQuoteDraft(
         missing_price_count: generated.missingPriceCount,
         options_count: generated.options.length,
         not_included_suggestions: generated.notIncludedSuggestions,
+        quote_basis: generated.quoteBasis,
         ...(rotRutCapped ? { rot_rut_capped: true, rot_rut_warning: rotRutWarning } : {}),
       },
     },

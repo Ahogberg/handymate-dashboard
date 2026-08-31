@@ -27,6 +27,7 @@ import type { OnboardingFormData } from '../types-redesign'
 
 interface Step6Props {
   onFinish: () => void
+  onFirstQuote?: () => void
   data: OnboardingFormData
 }
 
@@ -99,7 +100,7 @@ const TOUR_STEPS: TourStep[] = [
   },
 ]
 
-export default function Step6LiveTour({ onFinish, data }: Step6Props) {
+export default function Step6LiveTour({ onFinish, onFirstQuote, data }: Step6Props) {
   const [tourStep, setTourStep] = useState(-1)
   const [showToast, setShowToast] = useState(true)
   // Payoff-data: null = laddar (neutral placeholder), sedan värden eller fallback.
@@ -275,6 +276,9 @@ export default function Step6LiveTour({ onFinish, data }: Step6Props) {
           >
             Ge teamet ditt första uppdrag <Rocket size={18} />
           </button>
+          {onFirstQuote && <button type="button" className="ob-cta ghost" style={{ marginTop: 8 }} onClick={onFirstQuote}>
+            Skapa min första offert
+          </button>}
           <button
             type="button"
             className="ob-cta ghost"

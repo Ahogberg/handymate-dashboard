@@ -248,8 +248,8 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
     // Leaden har ingen kund-koppling förrän lead.customer_id är satt — utan
     // customerId returnerar helpern helt enkelt ingen kundprislista (samma
     // fail-soft som tidigare, bara centraliserad).
-    const { priceList, templates, customerPriceList } = await buildQuoteGenerationContext(
-      supabase, businessId, lead.customer_id,
+    const { priceList, templates, customerPriceList, jobTypeContext } = await buildQuoteGenerationContext(
+      supabase, businessId, lead.customer_id, { jobType: lead.job_type },
     )
 
     const bizConfig = bizRow as {
@@ -300,6 +300,7 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
         // generella produktbankspriser i bakgrundsförslaget. buildQuoteGenerationContext
         // hämtar den nu åt alla tre anropare; fail-soft (undefined) när ingen finns.
         customerPriceList,
+        jobTypeContext,
         customerId: lead.customer_id || undefined,
         // lead.job_type sätts av qualifyLead() (agentverktyget) — redan i
         // scope ovan (används i textDescription). Låter fetchRecentLessons

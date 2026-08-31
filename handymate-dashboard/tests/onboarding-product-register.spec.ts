@@ -96,7 +96,7 @@ test.describe('onboarding-flödets ledningsdragning', () => {
 
     const step5Index = src.indexOf('{step === 5 &&')
     const step6Index = src.indexOf('{step === 6 &&')
-    const step7Index = src.indexOf('step === 7 && <Step6LiveTour')
+    const step7Index = src.indexOf('step === 7 && !launchRequested && <Step6LiveTour')
     expect(step5Index).toBeGreaterThan(-1)
     expect(step6Index).toBeGreaterThan(step5Index)
     expect(step7Index).toBeGreaterThan(step6Index)

@@ -37,6 +37,36 @@ function line(overrides: Partial<QuoteItem>): QuoteItem {
   }
 }
 
+test.describe('Epic 2 — explicit artikelval går före mallens generella prissättning', () => {
+  const product = { id: 'prod-vald', name: 'Valt arbete', unit: 'tim', sales_price: 950 }
+  test('valt timpris vinner över både mallpris och företagets generella timpris', () => {
+    const original = line({ linked_product_id: product.id, unit: 'tim', quantity: 4, unit_price: 650, ai_price_missing: true })
+    const [resolved] = resolveTemplateItemPrices([original], [product], 700)
+    expect(resolved.unit_price).toBe(950)
+    expect(resolved.total).toBe(3800)
+    expect(resolved.ai_price_missing).toBe(false)
+    expect(original.unit_price).toBe(650)
+  })
+  test('en explicit koppling fungerar även när mallens ursprungspris är noll', () => {
+    const [resolved] = resolveTemplateItemPrices([line({ linked_product_id: product.id, unit: 'st' })], [{ ...product, unit: 'st' }], 700)
+    expect(resolved.unit_price).toBe(950)
+  })
+  for (const reason of ['missing', 'unit', 'price', 'infinite']) {
+    test(`${reason}: ingen gissning eller ny namnmatch ersätter en trasig explicit koppling`, () => {
+      const selected = reason === 'missing' ? [] : [{ ...product,
+        unit: reason === 'unit' ? 'st' : 'tim',
+        sales_price: reason === 'price' ? 0 : reason === 'infinite' ? Infinity : 950,
+      }]
+      const [resolved] = resolveTemplateItemPrices([
+        line({ linked_product_id: product.id, description: 'Arbete', unit: 'tim', unit_price: 650 }),
+      ], [...selected, { id: 'annan', name: 'Arbete', unit: 'tim', sales_price: 1200 }], 700)
+      expect(resolved.unit_price).toBe(0)
+      expect(resolved.ai_price_missing).toBe(true)
+      expect(resolved.linked_product_id).not.toBe('annan')
+    })
+  }
+})
+
 test.describe('kategori 1 — arbetsrader (unit "tim")', () => {
   test('företagets egen timkostnad slår mallens gissning, inte tvärtom', () => {
     const items = [line({ description: 'Arbetskostnad', quantity: 8, unit: 'tim', unit_price: 650 })]

@@ -5,6 +5,9 @@ import { WON_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 import { rapporteraTystFel, arSchemaSaknas } from '@/lib/observability/driftlarm'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { buildJobTypePrompt, type JobTypeGenerationContext } from '@/lib/quotes/job-type-generation'
+import { applyGeneratedPriceTruth } from '@/lib/quotes/generated-price-truth'
 
 export interface PriceListItem {
   name: string
@@ -42,6 +45,8 @@ export interface QuoteGenerationInput {
       visa badrumslärdomar i en altanoffert vore fel, inte bara oprecist.
       Hellre inga lärdomar än fel lärdomar. */
   jobType?: string
+  /** Verifierat serverunderlag från de tre gemensamma AI-ingångarna. */
+  jobTypeContext?: JobTypeGenerationContext
 }
 
 export interface GeneratedQuoteItem {
@@ -68,6 +73,7 @@ export interface GeneratedQuoteItem {
   linkedProductId?: string | null
   /** Hur träffen gjordes — loggas så träffkvaliteten kan mätas. */
   productMatchType?: 'handle' | 'exact' | 'fuzzy' | null
+  quantitySource?: 'proposal'
 }
 
 export interface GeneratedQuote {
@@ -120,6 +126,8 @@ export interface GeneratedQuote {
    * anroparen märker det. Se lib/ai/decision-record.ts.
    */
   model: string
+  /** Källa, aldrig modellens påstående om vilken mall som användes. */
+  quoteBasis?: Omit<JobTypeGenerationContext, 'rows'>
 }
 
 export interface ImageAnalysis {
@@ -487,59 +495,88 @@ export function buildPriceContext(
  * data (customerPriceList är optional i buildPriceContext) — AI-generering
  * ska aldrig krascha eller sinkas av ett kundprislistuppslag som strular.
  */
+// Den gemensamma offertgenereringen väljer strict=true: läsfel, dubbla
+// listor och trasiga länkar är inte tillstånd att använda standardpriser.
 export async function resolveCustomerPriceList(
   businessId: string,
   customerId: string | null | undefined,
+  options: { supabase?: SupabaseClient; strict?: boolean } = {},
 ): Promise<CustomerPriceList | undefined> {
   if (!businessId || !customerId) return undefined
   try {
-    const supabase = getServerSupabase()
+    const supabase = options.supabase || getServerSupabase()
 
-    const { data: customer } = await supabase
+    const check = (error: unknown) => { if (options.strict && error) throw new Error('Kunde inte läsa kundens prisavtal. Försök igen innan offerten skapas.') }
+
+    const { data: customer, error: customerError } = await supabase
       .from('customer')
       .select('price_list_id, segment_id')
       .eq('customer_id', customerId)
       .eq('business_id', businessId)
       .maybeSingle()
-    if (!customer) return undefined
+    check(customerError)
+    if (!customer) {
+      if (options.strict) throw new Error('Kunden kunde inte verifieras för företaget.')
+      return undefined
+    }
 
     let priceListId: string | null = customer.price_list_id || null
 
     if (!priceListId && customer.segment_id) {
-      const { data: segList } = await supabase
+      const { data: segList, error: segmentError } = await supabase
         .from('price_lists_v2')
         .select('id')
         .eq('business_id', businessId)
         .eq('segment_id', customer.segment_id)
-        .limit(1)
+        .order('id')
+        .limit(options.strict ? 2 : 1)
         .maybeSingle()
+      check(segmentError)
       priceListId = segList?.id || null
     }
 
     if (!priceListId) {
-      const { data: defaultList } = await supabase
+      const { data: defaultList, error: defaultError } = await supabase
         .from('price_lists_v2')
         .select('id')
         .eq('business_id', businessId)
         .eq('is_default', true)
-        .limit(1)
+        .order('id')
+        .limit(options.strict ? 2 : 1)
         .maybeSingle()
+      check(defaultError)
       priceListId = defaultList?.id || null
     }
 
     if (!priceListId) return undefined
 
-    const { data: priceList } = await supabase
+    const { data: priceList, error: priceError } = await supabase
       .from('price_lists_v2')
-      .select(`
+      .select(options.strict ? 'name, hourly_rate_normal, hourly_rate_ob1, hourly_rate_ob2, hourly_rate_emergency, material_markup_pct, callout_fee' : `
         name, hourly_rate_normal, hourly_rate_ob1, hourly_rate_ob2, hourly_rate_emergency,
         material_markup_pct, callout_fee,
         items:price_list_items_v2(name, unit, price, is_rot_eligible)
       `)
       .eq('id', priceListId)
       .eq('business_id', businessId)
-      .maybeSingle()
-    if (!priceList) return undefined
+      .maybeSingle<CustomerPriceList>()
+    check(priceError)
+    if (!priceList) {
+      if (options.strict) throw new Error('Kundens kopplade prislista kunde inte verifieras.')
+      return undefined
+    }
+
+    let items = priceList.items || []
+    if (options.strict) {
+      // Separat tenantfiltrerad fråga: en felkopplad child-rad får aldrig
+      // bli ett kundavtal, och kolumnvakten kan verifiera rätt tabell.
+      const { data: itemRows, error: itemsError } = await supabase.from('price_list_items_v2')
+        .select('name, unit, price, is_rot_eligible').eq('business_id', businessId)
+        .eq('price_list_id', priceListId).order('id').limit(1000)
+      check(itemsError)
+      if ((itemRows || []).length >= 1000) throw new Error('Kundprislistan är för stor för att verifieras i detta utkast. Kontakta supporten.')
+      items = itemRows || []
+    }
 
     return {
       name: priceList.name,
@@ -549,10 +586,11 @@ export async function resolveCustomerPriceList(
       hourly_rate_emergency: priceList.hourly_rate_emergency,
       material_markup_pct: priceList.material_markup_pct,
       callout_fee: priceList.callout_fee,
-      items: (priceList.items || []) as CustomerPriceList['items'],
+      items,
     }
   } catch (err) {
     console.error('[ai-quote-generator] resolveCustomerPriceList failed:', err)
+    if (options.strict) throw err
     return undefined
   }
 }
@@ -816,18 +854,19 @@ Om bilden är ett FOTO:
     : ''
 
   const priceContext = buildPriceContext(input.priceList, input.hourlyRate, input.templates, input.customerPriceList)
+  const jobTypeContext = input.jobTypeContext ? buildJobTypePrompt(input.jobTypeContext, input.priceList || []) : ''
   const hasPriceList = (input.priceList?.length || 0) > 0
 
   const systemPrompt = `Du är en erfaren svensk kalkylator för bygg- och hantverksprojekt.
 
 Bransch: ${input.branch || 'Bygg/Hantverkare'}
-${priceContext}${historicalContext}${lessonsContext}${customerFactsContext}${rulesContext}${patternsContext}
+${priceContext}${jobTypeContext}${historicalContext}${lessonsContext}${customerFactsContext}${rulesContext}${patternsContext}
 
 Analysera beskrivningen (och en eventuellt bifogad bild — se instruktioner nedan) och ge ett detaljerat offertförslag.
 ${imageInstructions}
 
 REGLER FÖR PRISSÄTTNING:
-1. Arbete: använd ALLTID hantverkarens timpris (${input.hourlyRate} kr/h)
+1. Arbete: kundprislistans exakta rader och vanliga timpris har företräde. Annars används den valda arbetsartikelns pris; generellt timpris (${input.hourlyRate} kr/h) bara för timarbete utan egen artikel. Ändra aldrig enhet för att passa ett pris.
 2. Material: ${hasPriceList
     ? 'Använd ENBART priser från prislistan ovan. Markera priser från prislistan med "fromPriceList": true.'
     : 'Prislista saknas — sätt ALLA materialpriser till 0 och markera med "note": "PRIS SAKNAS — fyll i manuellt".'}
@@ -843,6 +882,7 @@ REGLER FÖR PRISSÄTTNING:
 12. I fältet "productRef": om du använt en artikel ur prislistan, skriv dess handtag (t.ex. "P4"). Gissa ALDRIG ett handtag — utelämna fältet eller sätt null när du inte använt någon artikel ur listan. Ett felaktigt handtag är värre än inget.
 13. I fältet "notIncludedSuggestions": 0-4 KORTA punkter om vad som rimligen INTE ingår i just det här jobbet (t.ex. "Målning efter kaklingen", "Bygglov och myndighetsavgifter", "Bortforsling av rivningsmassor"). Skriv bara sådant som är genuint relevant för beskrivningen — hitta ALDRIG på avgränsningar för att fylla listan. Tom lista ([]) är RÄTT svar när inget särskilt behöver avgränsas.
 14. I fältet "options": föreslå 0-3 GENUINT relevanta TILLÄGGSARBETEN kunden kan välja till utöver grundofferten (t.ex. "demontering och bortforsling av gammalt kök" vid ett kökbyte, eller "målning av foder" vid ett fönsterbyte). Samma fältformat som "items". Hitta ALDRIG på tillägg bara för att fylla listan — en tom lista ([]) är RÄTT svar när inget genuint relevant tillägg finns.
+15. Om kundavtalet har flera timpriser: ange "customerRateRef" på timarbetsraden som "normal", "ob1", "ob2" eller "emergency" utifrån jobbets uttryckliga förutsättningar. Om debiteringen inte framgår, utelämna fältet och förklara att debiteringstid behöver granskas. Servern hämtar beloppet från avtalet; föreslaget val är inte kundbekräftat.
 
 Svara ENDAST med JSON (ingen markdown):
 {
@@ -943,7 +983,7 @@ Svara ENDAST med JSON (ingen markdown):
   }
 
   // Map items with IDs
-  const items: GeneratedQuoteItem[] = (parsed.items || []).map((item: any, i: number) => ({
+  let items: GeneratedQuoteItem[] = (parsed.items || []).map((item: any, i: number) => ({
     id: `item_${Math.random().toString(36).substr(2, 9)}`,
     description: item.description,
     quantity: item.quantity,
@@ -959,7 +999,7 @@ Svara ENDAST med JSON (ingen markdown):
   // in i laborCost/materialCost/totalBeforeVat (kunden har inte valt dem
   // till). Defensiv slice(0, 3) — prompten instruerar 0-3, men modellen är
   // inte en garanti.
-  const options: GeneratedQuoteItem[] = (parsed.options || []).slice(0, 3).map((item: any, i: number) => ({
+  let options: GeneratedQuoteItem[] = (parsed.options || []).slice(0, 3).map((item: any, i: number) => ({
     id: `opt_${Math.random().toString(36).substr(2, 9)}`,
     description: item.description,
     quantity: item.quantity,
@@ -1012,9 +1052,15 @@ Svara ENDAST med JSON (ingen markdown):
     console.log(`[ai-quote-generator] Produktkoppling: ${hits}/${items.length} rader kopplade`)
   }
 
-  const missingPriceCount = items.filter(i => i.unitPrice === 0 || i.note?.includes('PRIS SAKNAS')).length
+  if (input.jobTypeContext) {
+    items = applyGeneratedPriceTruth(items, parsed.items || [], input.priceList || [], input.hourlyRate, input.customerPriceList, input.jobTypeContext)
+    options = applyGeneratedPriceTruth(options, (parsed.options || []).slice(0, 3), input.priceList || [], input.hourlyRate, input.customerPriceList, input.jobTypeContext)
+  }
+
+  const missingPriceCount = [...items, ...options].filter(i => i.unitPrice === 0 || i.note?.includes('PRIS SAKNAS')).length
   const laborCost = items.filter(i => i.type === 'labor').reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)
   const materialCost = items.filter(i => i.type !== 'labor').reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)
+  if (input.jobTypeContext && !Number.isFinite(laborCost + materialCost)) throw new Error('Offertens belopp kunde inte beräknas. Granska mängderna.')
 
   return {
     jobTitle: parsed.jobTitle || 'Offert',
@@ -1027,7 +1073,14 @@ Svara ENDAST med JSON (ingen markdown):
     totalBeforeVat: laborCost + materialCost,
     suggestedDeductionType: parsed.suggestedDeductionType || 'none',
     confidence: parsed.confidence || 50,
-    reasoning: parsed.reasoning || '',
+    reasoning: input.jobTypeContext
+      ? [input.jobTypeContext.status === 'selected'
+        ? `Underlag: ${input.jobTypeContext.templateName}. Artikelpriser kontrollerade mot produktbank och eventuellt kundavtal.`
+        : input.jobTypeContext.status === 'unavailable' ? 'Jobbtypskopplingen kunde inte läsas. Ingen jobbtypsmall har använts.'
+          : input.jobTypeContext.status === 'unconfigured' ? 'Ingen entydig, aktiv jobbtypsmall finns för detta underlag.' : '',
+        'Mängderna är förslag att granska mot jobbet, inte bekräftade mått. Saknade priser behöver fyllas i.',
+        parsed.reasoning || ''].filter(Boolean).join('\n\n')
+      : parsed.reasoning || '',
     similarHistoricalQuotes: similarQuotes.map(q => ({
       id: q.quote_id,
       title: q.title,
@@ -1048,5 +1101,9 @@ Svara ENDAST med JSON (ingen markdown):
           .slice(0, 4)
       : [],
     model: MODEL,
+    ...(input.jobTypeContext ? { quoteBasis: {
+      status: input.jobTypeContext.status, jobType: input.jobTypeContext.jobType,
+      templateId: input.jobTypeContext.templateId, templateName: input.jobTypeContext.templateName,
+    } } : {}),
   }
 }

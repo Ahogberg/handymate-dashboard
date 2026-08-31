@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, Camera, FileText, Loader2, Mic, PenLine, Square, X } from 'lucide-react'
 import { useAudioRecording } from '@/hooks/useAudioRecording'
 /** Bara det intaget faktiskt behöver. Strukturell typ i stället för en import
@@ -52,6 +52,8 @@ const EXEMPEL = [
 ]
 
 interface QuickIntakeProps {
+  /** Valfri jobbtypsstart INUTI helskärmsytan — inte bakom dess fixed-lager. */
+  jobTypeStart?: ReactNode
   customers: IntakeCustomer[]
   selectedCustomer: string
   onSelectCustomer: (id: string) => void
@@ -91,6 +93,7 @@ interface QuickIntakeProps {
 }
 
 export function QuickIntake({
+  jobTypeStart,
   customers,
   selectedCustomer,
   onSelectCustomer,
@@ -203,6 +206,7 @@ export function QuickIntake({
         </div>
 
         {/* Arbetsytan — ett kort, tre kontroller. */}
+        {jobTypeStart}
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm">
         <div className="relative">
           <textarea

@@ -1,4 +1,5 @@
 import type { FirstFocusId } from '@/lib/onboarding/first-focus'
+import type { FirstQuoteSelection } from '@/lib/quotes/job-type-setup'
 /**
  * Delad form-state för det nya onboarding-flödet (Claude Design redesign).
  * Hanterar både pre-registrerings-state (Step 2 skapar kontot) och
@@ -84,6 +85,10 @@ export interface OnboardingFormData {
   // Antal importerade rader — LiveTour kan visa dem som payoff (state E).
   importedCustomers?: number
   importedInvoices?: number
+
+  // Epic 2: preferenser i befintliga onboarding_data, aldrig offertbelopp.
+  quoteJobTypes?: string[]
+  firstQuoteSelection?: FirstQuoteSelection | null
 
   // ── Hemsida-förgreningen (fråga i Step2Business, direkt efter att
   //    kontot skapats) ──────────────────────────────────────────────

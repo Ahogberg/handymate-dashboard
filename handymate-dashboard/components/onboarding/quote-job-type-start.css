@@ -1,0 +1,9 @@
+.quote-job-start{max-width:720px;margin:20px auto;padding:22px 24px;background:#fff;border:1px solid #cce6df;border-radius:20px;color:#102f2c;box-shadow:0 8px 26px #0f766e08}
+.quote-job-start h2{font-size:20px;font-weight:700;margin:0 0 6px}.quote-job-start p{font-size:14px;line-height:1.6;color:#536663;margin:8px 0}
+.quote-job-choices{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}.quote-job-choices button{min-height:44px;border:1px solid #d6e4e0;border-radius:10px;padding:8px 14px;background:white;font-size:14px}
+.quote-job-choices button[aria-pressed=true]{border-color:#0f766e;background:#e8f6f2;color:#0f766e}.quote-job-template{display:flex;align-items:center;justify-content:space-between;width:100%;padding:14px 16px;margin-top:10px;border:1px solid #d6e4e0;border-radius:12px;text-align:left;background:#f7fbfa;gap:12px}
+.quote-job-template strong,.quote-job-template small{display:block}.quote-job-template small{font-size:12px;margin-top:4px;color:#62756e}.quote-job-start a,.quote-job-start [role=alert] button{text-decoration:underline;color:#0f766e}.quote-job-start [role=alert] button{min-height:44px}
+.quote-job-start button:focus-visible,.quote-job-start a:focus-visible{outline:3px solid #0f766e;outline-offset:3px}.quote-job-start button:disabled{opacity:.6}.quote-job-start [role=alert]{color:#9f3c26}.quote-job-selected{font-weight:700}
+@media(max-width:480px){.quote-job-start{margin:12px;padding:18px}.quote-job-template{padding:12px}.quote-job-start h2{font-size:19px}}
+.first-quote-arrival{animation:quote-arrive .45s ease-out both}@keyframes quote-arrive{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.first-quote-arrival{animation:none}.quote-job-start .animate-spin{animation:none}}

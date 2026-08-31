@@ -17,12 +17,16 @@ export function QuickPriceInput({
   unit,
   onSaved,
   autoFocus,
+  onSavingChange,
+  label = 'Artikelpris',
 }: {
   productId: string
   unit: string
   /** Anropas efter lyckad sparning med det nya priset. */
   onSaved: (price: number) => void
   autoFocus?: boolean
+  onSavingChange?: (saving: boolean) => void
+  label?: string
 }) {
   const [value, setValue] = useState('')
   const [saving, setSaving] = useState(false)
@@ -30,8 +34,9 @@ export function QuickPriceInput({
 
   async function spara() {
     const pris = Math.round(Number(value))
-    if (!(pris > 0) || saving) return
+    if (!(pris > 0) || !Number.isFinite(pris) || saving) return
     setSaving(true)
+    onSavingChange?.(true)
     setFel(false)
     try {
       const res = await fetch('/api/products', {
@@ -45,6 +50,7 @@ export function QuickPriceInput({
       setFel(true)
     } finally {
       setSaving(false)
+      onSavingChange?.(false)
     }
   }
 
@@ -52,6 +58,9 @@ export function QuickPriceInput({
     <span className="inline-flex items-center gap-1.5">
       <input
         type="number"
+        aria-label={label}
+        aria-invalid={fel}
+        disabled={saving}
         inputMode="numeric"
         min={1}
         value={value}
@@ -78,6 +87,7 @@ export function QuickPriceInput({
       >
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
       </button>
+      {fel && <span role="alert" className="text-xs text-red-700">Kunde inte spara. Försök igen.</span>}
     </span>
   )
 }

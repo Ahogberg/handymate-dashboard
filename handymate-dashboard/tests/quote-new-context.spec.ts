@@ -41,7 +41,7 @@ test('lead-id skickas aldrig till deal-API:t', () => {
 // deal → quoteJobType → AI-generate-body → quotes.job_type.
 test('deal.job_type sätter quoteJobType-state vid deal-prefill', () => {
   expect(source).toContain('const [quoteJobType, setQuoteJobType] = useState<string | null>(null)')
-  expect(source).toMatch(/if \(deal\.job_type\) \{\s*setQuoteJobType\(deal\.job_type\)/)
+  expect(source).toMatch(/if \(deal\.job_type\) \{\s*setInheritedJobType\(deal\.job_type\)\s*setQuoteJobType\(deal\.job_type\)/)
 })
 
 test('alla tre AI-generate-anrop skickar jobType från quoteJobType när en deal satt den', () => {
@@ -59,15 +59,27 @@ test('alla tre AI-generate-anrop skickar jobType från quoteJobType när en deal
   expect(conditionalJobTypeAssignments).toBe(2)
 })
 
-test('kallstart (ingen deal) skickar inget jobType-fält i AI-generate-anropen', () => {
-  // quoteJobType initieras till null och sätts ENDAST i fetchDealAndPrefill
-  // (if (deal.job_type)) — utan deal-kontext förblir den null, och samtliga
-  // tre call sites villkorar/nollställer fältet i det läget i stället för
-  // att skicka jobType: null eller jobType: undefined explicit som en
-  // egen literal.
+// Epic 2-uppföljning (2026-08-31): en jobbtyp med FLERA kopplade mallar
+// kräver att servern vet VILKEN mallen är — annars 409:ar den (medvetet,
+// se quote-generation-context.ts). Utan templateId i anropet kunde den
+// mall handleNewTemplateSelect redan applicerat i editorn ändå inte
+// disambiguera AI-anropet. templateId-state finns redan (mallval +
+// jobbtypsstart delar samma handleNewTemplateSelect) — den behövde bara
+// trådas till samma tre anrop som jobType.
+test('alla tre AI-generate-anrop skickar även templateId när en mall är applicerad', () => {
+  expect(source).toMatch(/jobType: quoteJobType \|\| undefined,\s*templateId: templateId \|\| undefined,/)
+  const conditionalTemplateIdAssignments = (source.match(/if \(templateId\) body\.templateId = templateId/g) || []).length
+  expect(conditionalTemplateIdAssignments).toBe(2)
+})
+
+test('utan deal ELLER uttryckligt jobbtypsval gissas ingen jobbtyp vid kallstart', () => {
+  // Epic 2: kallstart får nu ha ett mänskligt val eller verifierat
+  // onboardingval. Antalet setState-anrop är inte längre rätt facit.
   expect(source).not.toMatch(/jobType:\s*null/)
-  const setQuoteJobTypeCallSites = (source.match(/setQuoteJobType\(/g) || []).length
-  expect(setQuoteJobTypeCallSites).toBe(1) // bara i fetchDealAndPrefill
+  expect(source).toContain('useState<string | null>(null)')
+  expect(source).toContain('setQuoteJobType(start.selection.jobTypeSlug)')
+  expect(source).toContain('onSelectJobType={slug =>')
+  expect(source).toContain('canApplyJobTypeStart(before, jobStartSnapshot.current)')
 })
 
 test('quotes.job_type skrivs från quoteJobType vid spar (buildQuotePayload)', () => {
