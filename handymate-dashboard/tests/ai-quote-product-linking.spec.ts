@@ -81,6 +81,24 @@ test.describe('handtagen i prompten', () => {
     })
   })
 
+  test('D1: kundprislista är ett ÖVERLÄGG — handtagen skrivs ÄNDÅ', () => {
+    // Tidigare ERSATTE kundlistan hela produktbanken: [P#] skickades aldrig
+    // och produktkopplingen förlorades exakt för kunder MED prislista.
+    const prompt = buildPriceContext(PRICE_LIST, 650, undefined, {
+      name: 'Bees kundlista',
+      hourly_rate_normal: 795,
+      items: [{ name: 'Specialtimme', price: 795, unit: 'tim' }],
+    })
+    expect(prompt).toContain('KUNDSPECIFIK PRISLISTA')
+    expect(prompt).toContain('Specialtimme: 795 kr/tim')
+    // ...och produktbanken med intakta handtag följer alltid med:
+    const handles = handlesInPrompt(prompt)
+    PRICE_LIST.forEach((product, index) => {
+      expect(handles.get(`P${index + 1}`)).toBe(product.name)
+    })
+    expect(prompt).toContain('productRef')
+  })
+
   test('prislista UTAN id får inga handtag och ingen instruktion om dem', () => {
     // Äldre anropare (app/api/quotes/generate) skickar bara namn och pris.
     // Att då be modellen ange ett handtag hade varit en instruktion den inte

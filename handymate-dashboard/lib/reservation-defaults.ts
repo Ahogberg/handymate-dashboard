@@ -375,8 +375,13 @@ const RESERVATIONS: ReservationDefault[] = [
  * grunduppsättningen (tillträde + tilläggsarbeten) — aldrig en tom lista, för
  * då syns motorn aldrig och hantverkaren får aldrig veta att den finns.
  */
-export function getDefaultReservations(branch: string): ReservationDefault[] {
-  const matching = RESERVATIONS.filter(r => r.branches.includes(branch))
+export function getDefaultReservations(branch: string | string[]): ReservationDefault[] {
+  // UX5 (Prisslingan V2 pass 4): FLERA branscher → unionen av deras urval.
+  // Ett el+bygg-företag fick tidigare bara el-förbehållen (halva skyddet).
+  // Samma post i flera branscher förekommer naturligt EN gång (filter på
+  // originallistan); seed-idempotensen vilar på system_key precis som förut.
+  const branches = (Array.isArray(branch) ? branch : [branch]).filter(Boolean)
+  const matching = RESERVATIONS.filter(r => r.branches.some(b => branches.includes(b)))
   if (matching.length > 0) return matching
   return RESERVATIONS.filter(r => r.branches.includes('other'))
 }

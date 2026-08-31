@@ -376,9 +376,14 @@ export function buildPriceContext(
 ): string {
   const lines: string[] = []
 
-  // Customer-specific price list takes priority if available
+  // D1 (Prisslingan V2 pass 4): kundlistan är ett ÖVERLÄGG — inte en
+  // ersättning. Tidigare utelämnades HELA produktbanken när en kundlista
+  // fanns: [P#]-handtagen skickades aldrig, raderna tappade produktkoppling
+  // (snapshot/ROT-split/marginal) exakt för de kunder som HAR en prislista.
+  // Nu skrivs kundens timpriser/påslag/rader FÖRST med företräde, och
+  // produktbanken (med handtag) följer alltid nedanför.
   if (customerPriceList) {
-    lines.push(`PRISLISTA SOM GÄLLER FÖR DENNA KUND: ${customerPriceList.name}`)
+    lines.push(`KUNDSPECIFIK PRISLISTA (företräde): ${customerPriceList.name}`)
     if (customerPriceList.hourly_rate_normal) lines.push(`Timpris normal: ${customerPriceList.hourly_rate_normal} kr/tim`)
     if (customerPriceList.hourly_rate_ob1) lines.push(`Timpris OB1: ${customerPriceList.hourly_rate_ob1} kr/tim`)
     if (customerPriceList.hourly_rate_ob2) lines.push(`Timpris OB2: ${customerPriceList.hourly_rate_ob2} kr/tim`)
@@ -393,9 +398,12 @@ export function buildPriceContext(
       }
     }
 
-    lines.push('\nAnvänd ALLTID dessa priser när du skapar offertrader.')
-    lines.push('Avvik inte från priserna om inte användaren ber om det.')
-  } else if (priceList && priceList.length > 0) {
+    lines.push('\nDessa kundpriser har FÖRETRÄDE: använd dem för timdebitering, påslag och de specifika raderna ovan.')
+    lines.push('För artiklar som INTE täcks av kundlistan: använd produktbanken nedan och ange productRef som vanligt.')
+    lines.push('')
+  }
+
+  if (priceList && priceList.length > 0) {
     // ETAPP B1 (2026-08-06): varje artikel får ett kort handtag ([P1], [P2] …)
     // som modellen ombeds eka tillbaka i "productRef". Handtaget är NYCKELN
     // till att raden kan kopplas till produktbanken och därmed ärva
@@ -453,6 +461,8 @@ export function buildPriceContext(
 
   if (!customerPriceList) {
     lines.push(`\nStandard timpris: ${hourlyRate} kr/tim`)
+  } else {
+    lines.push(`\nStandard timpris (om kundlistan saknar timpris): ${hourlyRate} kr/tim`)
   }
 
   if (templates && templates.length > 0) {

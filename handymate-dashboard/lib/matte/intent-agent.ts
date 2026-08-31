@@ -118,7 +118,18 @@ export async function runIntentAgent(
   }
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
-  const context = buildContext(signal, entity, businessConfig, availableSlots)
+  // UX3a (Prisslingan V2 pass 4): regeln "Ge ALDRIG prisuppgifter utan
+  // prislista" (systemprompten rad ~87) hade aldrig någon prislista att
+  // hålla sig till — nu får agenten den kanoniska (prislösa MÄRKTA, aldrig
+  // gissningsbara). Fail-soft: utan lista gäller regeln som förut.
+  let prisBlock = ''
+  try {
+    const { fetchPriceContextProducts, buildAgentPriceBlock } = await import('@/lib/products/price-context')
+    const produkter = await fetchPriceContextProducts(supabase, businessId)
+    if (produkter.length > 0) prisBlock = '\n\n' + buildAgentPriceBlock(produkter, businessConfig.hourlyRate)
+  } catch { /* fail-soft */ }
+
+  const context = buildContext(signal, entity, businessConfig, availableSlots) + prisBlock
 
   const response = await anthropic.messages.create({
     model: INTENT_AGENT_MODEL,

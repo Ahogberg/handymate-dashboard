@@ -44,7 +44,8 @@ export async function seedAllDefaults(
     seedQuoteStandardTexts(supabase, businessId, branch),
     seedChecklistTemplates(supabase, businessId, branch),
     seedProducts(supabase, businessId, productBranches, hourlyRate),
-    seedReservations(supabase, businessId, branch),
+    // UX5: ALLA branscher (inte bara huvud-) — el+bygg får båda urvalen.
+    seedReservations(supabase, businessId, productBranches),
     seedQuoteTemplates(supabase, businessId, branch),
     seedAgreementTypes(supabase, businessId, branch),
   ])
@@ -307,7 +308,7 @@ export async function seedProducts(supabase: SupabaseClient, businessId: string,
  * hoppas över, precis som seedAgreementTypes gör mot v74 — annars skulle ett
  * saknat schema blockera hela onboardingen.
  */
-async function seedReservations(supabase: SupabaseClient, businessId: string, branch: string) {
+async function seedReservations(supabase: SupabaseClient, businessId: string, branch: string | string[]) {
   const { data: existing, error: existErr } = await supabase
     .from('reservation_texts')
     .select('id')

@@ -27,6 +27,7 @@ import { arTestId, arTestNamn } from '@/lib/testdata'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { mapQuoteItemsToInvoiceItems } from '@/lib/invoices/quote-to-invoice-items'
+import { fetchPriceContextProducts, matchProductByName } from '@/lib/products/price-context'
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
 import { resolveTimeEntryHourlyRate } from '@/lib/time-entry/rate'
 import { hittaNyligDubblett } from '@/lib/agent/recent-duplicate'
@@ -605,6 +606,17 @@ async function createQuote(
 
   const rotRutType = (params.rot_rut_type as string) ?? null
 
+  // UX3a (Prisslingan V2 pass 4): namnmatcha agentens rader mot banken —
+  // linked_product_id + article_number ger efterkalkyl, Fortnox-artikelnr
+  // och reservationstriggers. Radens PRIS rörs ALDRIG (hantverkaren granskar
+  // utkastet). Fail-soft: utan bankträff sparas raden precis som förut.
+  // (reservations_snapshot sätts inte här — createCanonicalQuote saknar
+  // fältet; kö-vägen i approvals äger den delen.)
+  let bankArtiklar: Awaited<ReturnType<typeof fetchPriceContextProducts>> = []
+  try {
+    bankArtiklar = await fetchPriceContextProducts(supabase, businessId)
+  } catch { /* fail-soft */ }
+
   // Kanoniska byggaren (lib/quotes/create-quote.ts). Agentens offerter fick
   // tidigare varken quote_number eller sign_token — smart-communication satte
   // då quote_link: undefined och SMS:et till kunden gick ut UTAN länk.
@@ -619,17 +631,20 @@ async function createQuote(
     source: 'agent',
     items: items.map(i => {
       const isLabor = i.type === 'labor'
+      const beskrivning = i.name ?? i.description ?? ''
+      const bankTraff = matchProductByName(bankArtiklar, beskrivning)
       return {
         // create_quote-schemat (tool-definitions.ts) definierar radfältet som
         // "name", inte "description" — name är primärt, description
         // accepteras också ifall agenten (mot schema) skickar det.
-        description: i.name ?? i.description ?? '',
+        description: beskrivning,
         quantity: i.quantity ?? 0,
         unit: i.unit ?? 'st',
         unit_price: i.unit_price ?? 0,
         is_rot_eligible: isLabor && rotRutType === 'rot',
         is_rut_eligible: isLabor && rotRutType === 'rut',
         rot_rut_type: isLabor && (rotRutType === 'rot' || rotRutType === 'rut') ? rotRutType : null,
+        ...(bankTraff ? { linked_product_id: bankTraff.id, article_number: bankTraff.sku ?? undefined } : {}),
       }
     }),
     // items-JSONB:n är bara en spegling (quote_items är sanningen), men

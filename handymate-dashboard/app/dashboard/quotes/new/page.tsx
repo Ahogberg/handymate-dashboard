@@ -1160,34 +1160,15 @@ export default function NewQuotePage() {
     if (customer.name && !customerReference) setCustomerReference(customer.name)
 
     ;(async () => {
-      const cust = customer as any
-      let priceListId = cust.price_list_id
-
-      if (!priceListId && cust.segment_id) {
-        try {
-          const segRes = await supabase
-            .from('price_lists_v2')
-            .select('id')
-            .eq('business_id', business.business_id)
-            .eq('segment_id', cust.segment_id)
-            .limit(1)
-            .maybeSingle()
-          if (segRes.data?.id) priceListId = segRes.data.id
-        } catch {}
-      }
-
-      if (!priceListId) {
-        try {
-          const defRes = await supabase
-            .from('price_lists_v2')
-            .select('id')
-            .eq('business_id', business.business_id)
-            .eq('is_default', true)
-            .limit(1)
-            .maybeSingle()
-          if (defRes.data?.id) priceListId = defRes.data.id
-        } catch {}
-      }
+      // D3 (Prisslingan V2 pass 4): uppslagsordningen (kundens lista →
+      // segmentets → företagets default) ägs av SERVERN — tidigare låg en
+      // klient-side-dubblett här som läste price_lists_v2 med anon-nyckeln
+      // (RLS-känslig: före v182 fick anställda tyst tomt svar). ETT fetch.
+      let priceListId: string | null = null
+      try {
+        const res = await fetch(`/api/pricing/resolve?customer_id=${encodeURIComponent(selectedCustomer)}`)
+        if (res.ok) priceListId = (await res.json()).priceListId || null
+      } catch {}
 
       if (priceListId) {
         fetch(`/api/pricing/price-lists/${priceListId}`)

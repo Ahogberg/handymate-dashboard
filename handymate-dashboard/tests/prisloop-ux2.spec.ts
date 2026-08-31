@@ -64,6 +64,36 @@ test.describe('UX2c — onboardingens "10 vanliga att prissätta nu"', () => {
   })
 })
 
+test.describe('Pass 4 — agentpriskontext + reservationer serverside (UX3/UX5/D3)', () => {
+  test('UX3a: intent-agenten och tool-routern använder den delade priskontexten', () => {
+    expect(source('lib/matte/intent-agent.ts')).toContain('buildAgentPriceBlock')
+    const router = source('app/api/agent/trigger/tool-router.ts')
+    expect(router).toContain('fetchPriceContextProducts')
+    expect(router).toContain('matchProductByName(bankArtiklar')
+    // Priset rörs aldrig av länkningen — bara id/artikelnr sätts
+    expect(router).toContain('linked_product_id: bankTraff.id')
+  })
+
+  test('UX3b: kö-godkända utkast får reservations_snapshot (fail-soft)', () => {
+    const approvals = source('app/api/approvals/[id]/route.ts')
+    expect(approvals).toContain('suggestSnapshotForItems')
+    expect(approvals).toContain('reservations_snapshot: reservationsSnapshot')
+  })
+
+  test('D3: kundprislist-uppslaget har EN serverväg', () => {
+    const route = source('app/api/pricing/resolve/route.ts')
+    expect(route).toContain('resolveCustomerPriceList')
+    expect(route).toContain("dynamic = 'force-dynamic'")
+  })
+
+  test('UX5: reservationer seedas för ALLA branscher', () => {
+    const seed = source('lib/seed-defaults.ts')
+    expect(seed).toContain('seedReservations(supabase, businessId, productBranches)')
+    const defaults = source('lib/reservation-defaults.ts')
+    expect(defaults).toContain('branch: string | string[]')
+  })
+})
+
 test.describe('QuickPriceInput — kontraktet', () => {
   const komponent = source('components/products/QuickPriceInput.tsx')
 

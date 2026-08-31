@@ -1,3 +1,17 @@
+# Prisslingan V2 — pass 4: agenterna + reservationer serverside (Claude 2026-08-31)
+
+Pass 3 LIVE (aa4e840c). v183 väntar Andreas "kör v183".
+
+- [x] UX3a: lib/products/price-context.ts → Matte-chattens kontext (create_quote hade NOLL priskontext), intent-agenten (regeln rad 87 har äntligen en lista), tool-routerns createQuote namnmatchar → linked_product_id + article_number (rör aldrig modellens pris)
+- [x] UX3b: lib/reservations/suggest-for-items.ts → approvals create_quote_draft skickar reservations_snapshot fail-soft (tool-routern: medvetet EJ — createCanonicalQuote saknar fältet, dokumenterat)
+- [x] D1: kundlistan är ÖVERLÄGG i buildPriceContext — [P#]-handtagen skrivs ALLTID; facit i ai-quote-product-linking
+- [x] D3: GET /api/pricing/resolve (priceListId + priceList, force-dynamic); quotes/new-prefillen bytte två anon-nyckel-queries mot ETT fetch
+- [x] UX5: getDefaultReservations string|string[] (union) + seedReservations får productBranches
+- [x] Facit (pass 4-describe i prisloop-ux2 + D1-test) — tsc 0, 12 sviter gröna
+- [ ] build + REN-worktree-tsc → push → deploy → rapport
+
+---
+
 # Prisslingan V2 — pass 3: dedup + unikt index + upsert (Claude 2026-08-31)
 
 Pass 2 LIVE (4533d1e8). v183 är DESTRUKTIV (DELETE av dubblettrader) —

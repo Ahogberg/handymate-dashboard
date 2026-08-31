@@ -1722,6 +1722,20 @@ async function executeApprovalPayload(
 
         const leadId = pl.lead_id || pl.entity?.leadId || undefined
 
+        // UX3b (Prisslingan V2 pass 4): kö-godkända utkast får förbehåll —
+        // samma motor som editorn, serverside. FAIL-SOFT: ett förbehållsfel
+        // får aldrig fälla godkännandet. Ingen inlärning skrivs här.
+        let reservationsSnapshot: Array<{ reservation_id: string | null; title: string; content: string }> = []
+        try {
+          const { getServerSupabase } = await import('@/lib/supabase')
+          const { fetchReservationLibrary, suggestSnapshotForItems } = await import('@/lib/reservations/suggest-for-items')
+          const supaRs = getServerSupabase()
+          const bibliotek = await fetchReservationLibrary(supaRs, businessId)
+          reservationsSnapshot = suggestSnapshotForItems(bibliotek, quoteItems)
+        } catch (resErr) {
+          console.error('[create_quote_draft] reservationsförslag hoppades (fail-soft):', resErr)
+        }
+
         const createRes = await fetch(`${appUrl}/api/quotes`, {
           method: 'POST',
           headers: forwardHeaders(),
@@ -1730,6 +1744,7 @@ async function executeApprovalPayload(
             title: generated.jobTitle || 'Offert',
             description: generated.jobDescription || '',
             quote_items: quoteItems,
+            ...(reservationsSnapshot.length > 0 ? { reservations_snapshot: reservationsSnapshot } : {}),
             rot_rut_type:
               generated.suggestedDeductionType && generated.suggestedDeductionType !== 'none'
                 ? generated.suggestedDeductionType
