@@ -49,16 +49,16 @@ claude/next-dev-steps-launch-b4xqwu.
       /api/push/send skickar TTL+urgency (web-push) och ttl+priority (Expo).
 - [x] Facit: tests/kortkvalitet.spec.ts + tests/push-policy.spec.ts.
 
-## Migration — VÄNTAR PÅ "kör"
-- [ ] `sql/v190_platform_health_and_push_dispatch.sql` — två nya tabeller,
-      service_role-only. Koden är fail-soft tills den körts: health visar
-      "migrationen ej körd" som warn, push-dedupen släpper igenom.
+## Migration
+- [x] `sql/v190_platform_health_and_push_dispatch.sql` KÖRD via MCP
+      2026-09-01 (Andreas "Kör!"), facit-SELECT verifierad: relrowsecurity
+      = true på båda, 0 grants till anon/authenticated, dedupe-indexet finns.
 
 ## Verifiering
 - [x] tsc 0 fel (var 2 fel på färsk checkout före types/-filen)
 - [x] test:contracts 158/158; grannsviter push/dispatch/checklist/driftlarm
       102/102; outbound-truth/innehållskontrakt/feature-gates 86/86
-- [ ] next build — se commit-/rapporttext
+- [x] next build exit 0 (689 rutter); Kontraktsgrind grön på branchen (run 33553161185, 2,5 min)
 - [ ] Efter deploy: sätt NEXT_PUBLIC_SENTRY_DSN + SENTRY_DSN i Vercel,
       kör v190, trigga /api/cron/credit-watch manuellt (admin-session
       räcker), läs /api/health och /admin/kortkvalitet.
