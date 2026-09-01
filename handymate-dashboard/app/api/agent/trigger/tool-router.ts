@@ -1248,6 +1248,81 @@ async function createBooking(
   const tenantFel = await assertCustomerInBusiness(supabase, businessId, params.customer_id)
   if (tenantFel) return { success: false, error: tenantFel }
 
+  // Godkännandegrind (2026-09-02): require_approval_create_booking var tidigare
+  // bara text i systemprompten (se getAutomationSettings) — verktyget skrev
+  // till databasen och synkade till Google Calendar oavsett vad hantverkaren
+  // kryssat i, om modellen glömde/missförstod instruktionen. Det här är en
+  // RIKTIG kodgrind i stället för en förhoppning om att modellen lyder.
+  // Standard vid saknad inställningsrad är false, samma default som
+  // getAutomationSettings redan dokumenterar — inga nya grindar för företag
+  // som aldrig rört inställningen.
+  // Fail-closed vid databasfel (adversariell granskning, 2026-09-02): en
+  // riktig frågefel (timeout/nätverk) ger data:null precis som "ingen rad
+  // finns" — utan att skilja på dem hade grinden fallit igenom rakt in i
+  // direkt-insert exakt när databasen redan har problem, dvs. exakt när en
+  // grind behövs som mest. getAutomationSettings (samma fil) kollar också
+  // error explicit i stället för att anta false — samma mönster här.
+  const { data: automationSettings, error: automationSettingsError } = await supabase
+    .from('v3_automation_settings')
+    .select('require_approval_create_booking')
+    .eq('business_id', businessId)
+    .maybeSingle()
+
+  if (automationSettingsError) {
+    return { success: false, error: `Kunde inte läsa godkännandeinställningen för bokning: ${automationSettingsError.message}` }
+  }
+
+  if (automationSettings?.require_approval_create_booking) {
+    const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+    // Formad exakt som POST /api/bookings förväntar sig (se app/api/bookings/
+    // route.ts) — det är den routen som faktiskt kör bokningen när ett
+    // människa klickar Godkänn (app/api/approvals/[id]/route.ts:978-988,
+    // med cookie-forwarding så den routen inte 401:ar).
+    const bookingPayload = {
+      customer_id: params.customer_id,
+      scheduled_start: params.scheduled_start,
+      scheduled_end: params.scheduled_end,
+      notes: params.notes,
+      service_type: params.service_type,
+    }
+    const title = `Ny bokning: ${(params.service_type as string) || 'okänd tjänst'}`
+
+    const { error: approvalError } = await supabase.from('pending_approvals').insert({
+      id: approvalId,
+      business_id: businessId,
+      approval_type: 'create_booking',
+      title,
+      description: (params.notes as string) || null,
+      payload: bookingPayload,
+      status: 'pending',
+      risk_level: 'high',
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    })
+    if (approvalError) return { success: false, error: approvalError.message }
+
+    // Fire-and-forget, samma mönster som createApprovalRequests high-gren.
+    fetch(`${appUrl}/api/push/send`, {
+      method: 'POST',
+      headers: internalPushHeaders(),
+      body: JSON.stringify({
+        business_id: businessId,
+        title: 'Nytt att godkänna',
+        body: title,
+        url: '/dashboard/approvals',
+      }),
+    })
+
+    return {
+      success: true,
+      data: {
+        message: 'Bokningen kräver godkännande innan den skapas — ett kort väntar i "Väntar på dig". Inget är bokat än.',
+        approval_id: approvalId,
+        deferred: true,
+      },
+    }
+  }
+
   const bookingId = generateId('book')
   const { error } = await supabase.from('booking').insert({
     booking_id: bookingId, business_id: businessId, customer_id: params.customer_id,
@@ -2742,7 +2817,15 @@ async function createApprovalRequest(
 // utan att något skickades. Nu: SMS genom strypunkten, faktura genom
 // sändkärnan, och send_quote är BORTTAGEN ur mängden (ingen sändkärna
 // utan session finns) → kortet blir pending, aldrig falskt utfört.
-const INTERNAL_EXEC_TYPES = new Set(['send_sms', 'send_invoice', 'create_booking'])
+//
+// create_booking borttagen 2026-09-02 av samma anledning + en till: dess
+// exec-gren gjorde en osessionerad fetch mot /api/bookings (sessions-
+// grindad, samma 401-mönster som ovan) OCH — även om den hade fungerat —
+// require_approval_create_booking ska betyda "en människa ser kortet
+// först", inte "modellen fick själv gissa risknivå och exekvera direkt".
+// Nu tvingas varje create_booking-godkännande till high (se
+// fail-closed-logiken nedan), precis som send_quote redan gjorde.
+const INTERNAL_EXEC_TYPES = new Set(['send_sms', 'send_invoice'])
 
 async function executeApprovalPayloadInternal(
   appUrl: string,
@@ -2782,14 +2865,11 @@ async function executeApprovalPayloadInternal(
         const delivered = r.found && !!(r.email || r.sms || r.einvoice)
         return { action: 'send_invoice', ok: delivered, error: delivered ? undefined : (r.errors.join('; ') || 'ingen leverans') }
       }
-      case 'create_booking': {
-        const res = await fetch(`${appUrl}/api/bookings`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...payload, business_id: businessId }),
-        })
-        return { action: 'create_booking', ok: res.ok }
-      }
+      // create_booking borttagen ur INTERNAL_EXEC_TYPES (se kommentaren där)
+      // — denna gren är nu oåtkomlig (fail-closed till high innan den kan
+      // nås). Lämnad borta medvetet i stället för att bara tas bort ur
+      // mängden, så den inte råkar återinföras av misstag; träffar `default`
+      // om något ändå kallar den direkt.
       default:
         return { action: approval_type, skipped: 'no handler', payload }
     }

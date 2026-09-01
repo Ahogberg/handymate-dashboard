@@ -82,14 +82,60 @@ test.describe('8.2 — inga anrop till rutter som inte finns', () => {
     expect(fn).toContain('if (!result.success) return { success: false')
   })
 
-  test('tool-routerns interna executor: SMS via strypunkten, faktura via sändkärnan, send_quote fail-closed', () => {
+  test('tool-routerns interna executor: SMS via strypunkten, faktura via sändkärnan, send_quote OCH create_booking fail-closed', () => {
     const s = read('app/api/agent/trigger/tool-router.ts')
     expect(s).not.toMatch(/api\/quotes\/\$\{[^}]+\}\/send/)
     expect(s).not.toMatch(/api\/invoices\/\$\{[^}]+\}\/send/)
-    expect(s).toContain("const INTERNAL_EXEC_TYPES = new Set(['send_sms', 'send_invoice', 'create_booking'])")
+    // create_booking borttagen 2026-09-02: dess exec-gren gjorde en
+    // osessionerad fetch mot en sessions-grindad rutt (samma 401-mönster
+    // send_quote/send_invoice redan fixades för), OCH — separat skäl —
+    // require_approval_create_booking ska betyda en människa ser kortet,
+    // inte att modellen själv får gissa risknivå och exekvera direkt.
+    expect(s).toContain("const INTERNAL_EXEC_TYPES = new Set(['send_sms', 'send_invoice'])")
     const fn = s.slice(s.indexOf('async function executeApprovalPayloadInternal'))
     expect(fn.slice(0, 2500)).toContain('sendSmsViaElks({')
     expect(fn.slice(0, 2500)).toContain("await import('@/lib/invoices/send-invoice')")
+    // Grenen för create_booking ska vara borta helt, inte bara ur mängden —
+    // annars kan den råka återinföras utan att någon märker det.
+    expect(fn.slice(0, 2500)).not.toContain("case 'create_booking'")
+  })
+
+  test('create_booking har en riktig kodgrind mot require_approval_create_booking, inte bara prompt-text', () => {
+    const s = read('app/api/agent/trigger/tool-router.ts')
+    const fn = s.slice(s.indexOf('async function createBooking'), s.indexOf('async function bookSiteVisitTool'))
+    expect(fn).toContain("select('require_approval_create_booking')")
+    expect(fn).toContain('automationSettings?.require_approval_create_booking')
+    // Fail-closed vid frågefel (adversariell granskning 2026-09-02): data:null
+    // vid ett riktigt DB-fel ser likadant ut som "ingen rad finns" om man
+    // bara läser data — måste kolla error separat och blockera, inte anta
+    // false och falla igenom till en obevakad insert.
+    expect(fn).toContain('error: automationSettingsError')
+    expect(fn).toContain('if (automationSettingsError)')
+    const preGate = fn.slice(0, fn.indexOf('if (automationSettings?.require_approval_create_booking)'))
+    expect(preGate.slice(preGate.indexOf('if (automationSettingsError)'))).toContain('success: false')
+    // När grindad: en pending_approvals-rad, ALDRIG en direkt insert i booking,
+    // och funktionen måste faktiskt RETURNERA — annars faller koden igenom
+    // och skapar bokningen ändå trots att den redan köats för godkännande.
+    const gated = fn.slice(fn.indexOf('if (automationSettings?.require_approval_create_booking)'), fn.indexOf("const bookingId = generateId('book')"))
+    expect(gated).toContain("approval_type: 'create_booking'")
+    expect(gated).toContain("status: 'pending'")
+    expect(gated).toContain("risk_level: 'high'")
+    expect(gated).not.toContain(".from('booking').insert")
+    expect(gated).toContain('return {')
+    expect(gated).toContain('deferred: true')
+
+    // Nyttolasten måste vara EXAKT vad POST /api/bookings destrukturerar ur
+    // sin body — annars misslyckas varje godkänd bokning tyst vid utförande
+    // (hantverkaren klickar Godkänn, tror det funkade, inget händer).
+    const bookingsRoute = read('app/api/bookings/route.ts')
+    const destructureLine = bookingsRoute.slice(
+      bookingsRoute.indexOf('export async function POST'),
+      bookingsRoute.indexOf('export async function POST') + 1000,
+    )
+    for (const field of ['customer_id', 'scheduled_start', 'scheduled_end', 'notes', 'service_type']) {
+      expect(destructureLine).toContain(field)
+      expect(gated).toContain(`${field}:`)
+    }
   })
 })
 

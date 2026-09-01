@@ -378,7 +378,7 @@ export const toolDefinitions = [
   // Approval flow
   {
     name: "create_approval_request",
-    description: "Skapa en godkännandebegäran. Välj rätt risk_level: 'low' = utförs direkt utan notis (skapa kund, anteckning, logga aktivitet), 'medium' = utförs direkt och loggas i dashboard (boka tid, skicka SMS-påminnelse), 'high' = väntar på hantverkarens godkännande + push-notis (skicka offert, faktura, avboka).",
+    description: "Skapa en godkännandebegäran. Välj rätt risk_level: 'low' = utförs direkt utan notis (skapa kund, anteckning, logga aktivitet), 'medium' = utförs direkt och loggas i dashboard (skicka SMS-påminnelse, skicka faktura), 'high' = väntar på hantverkarens godkännande + push-notis (skicka offert, boka tid, avboka). OBS: begär du low/medium för en typ som inte kan auto-utföras säkert tvingas den ändå till high — kortet väntar då på ett mänskligt godkännande i stället för att avvisas.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -386,7 +386,10 @@ export const toolDefinitions = [
           type: "string",
           // 'other' fanns här förut men saknas i ACTION_CONTRACT — ett sådant
           // kort gick inte att godkänna. Okänd typ avvisas numera vid skapandet.
-          description: "Typ av åtgärd: send_sms, send_quote, send_invoice, create_booking. Endast dessa auto-utförs vid low/medium — övriga kontraktstyper blir alltid väntande kort.",
+          // send_quote OCH create_booking tvingas ALLTID till high oavsett
+          // begärd risk_level (fail-closed, 2026-09-02 för create_booking) —
+          // bara send_sms/send_invoice kan faktiskt auto-utföras vid low/medium.
+          description: "Typ av åtgärd: send_sms, send_quote, send_invoice, create_booking. Endast send_sms och send_invoice kan faktiskt auto-utföras vid low/medium — send_quote och create_booking blir alltid väntande kort oavsett begärd risknivå.",
         },
         title: {
           type: "string",
