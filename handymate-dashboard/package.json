@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "launch:smoke": "node scripts/launch-public-smoke.mjs",
+    "proof:onboarding:two-account": "node scripts/onboarding-two-account-proof.mjs",
     "test:tenant-isolation": "playwright test --config=playwright.integration.config.ts"
   },
   "dependencies": {
