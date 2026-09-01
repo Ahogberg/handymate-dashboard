@@ -36,8 +36,16 @@ test('första Matte-frågan: fokuset vinner över årsmålet, annars som förut'
   expect(buildFirstMissionPrompt(1_200_000, undefined)).toContain('Vi siktar på')
 })
 
-test('LiveTouren skickar fokuset; NBA-målkontexten läser det som bakgrundsrad', () => {
-  expect(kod('app/onboarding/components/Step6LiveTour.tsx')).toContain('buildFirstMissionPrompt(undefined, data.firstFocus)')
+test('första uppdraget bär fokuset (LiveTour → FirstAssignmentFinal → alternativen); NBA-målkontexten läser det som bakgrundsrad', () => {
+  // Sedan första-uppdraget-valet (FirstAssignmentFinal) ersatte den direkta
+  // Matte-prompten i LiveTouren går fokuset via deriveFirstAssignmentOptions:
+  // portföljplanens rubrik/prompt byggs av firstFocusOption, och den valda
+  // prompten skrivs till handoffen med writeFirstMissionPrompt.
+  expect(kod('app/onboarding/components/Step6LiveTour.tsx')).toContain('<FirstAssignmentFinal')
+  const final = kod('app/onboarding/components/FirstAssignmentFinal.tsx')
+  expect(final).toContain('firstFocus: data.firstFocus')
+  expect(final).toContain('writeFirstMissionPrompt(selected.prompt)')
+  expect(kod('lib/onboarding/first-assignment-options.ts')).toContain('firstFocusOption(snapshot.firstFocus)')
   const nba = kod('lib/jarvis/next-best-action-goals.ts')
   expect(nba).toContain("select('revenue_target_annual_sek, onboarding_data')")
   expect(nba).toContain('firstFocusContextLine(od?.firstFocus ?? od?.first_focus)')

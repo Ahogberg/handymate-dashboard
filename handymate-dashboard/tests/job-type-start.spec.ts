@@ -108,5 +108,7 @@ test('inkopplingen äger ingen ny offertskrivare, ingen ny pris-/reservationsmot
   expect(onboarding).toContain('TOTAL_STEPS = 8')
   expect(onboarding).toContain('<FirstQuoteLaunch')
   expect(onboarding).toContain('await completeFirstQuoteOnboarding')
-  expect(read('app/onboarding/components/Step6LiveTour.tsx')).toContain('writeFirstMissionPrompt')
+  // Handoffen till Matte-chatten skrivs numera av första-uppdraget-valet
+  // (FirstAssignmentFinal, renderad av Step6LiveTour), inte av LiveTouren själv.
+  expect(read('app/onboarding/components/FirstAssignmentFinal.tsx')).toContain('writeFirstMissionPrompt')
 })
