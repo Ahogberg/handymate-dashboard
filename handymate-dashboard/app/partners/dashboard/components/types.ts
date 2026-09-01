@@ -49,6 +49,7 @@ export interface Referral {
   status: string
   created_at: string
   converted_at: string | null
+  referred_by: string | null
   activity_level: 'onboardar' | 'aktiv' | 'inaktiv' | 'churnad'
   activity_label: string
   customer_month: number

@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
+import fs from 'fs'
+import path from 'path'
 import { registerPartner } from '@/lib/partners/auth'
 import { signApproveToken } from '@/lib/partners/approve-token'
+
+const AGREEMENT_VERSION = '1.0'
+const AGREEMENT_PATH = path.join(process.cwd(), 'content', 'partner', 'partneravtal-v1.md')
 
 /**
  * POST /api/partners/register
  * Registrera ny partner — status: pending_approval.
+ *
+ * Avtalsacceptans loggas obligatoriskt (agreementAccepted måste vara true) —
+ * partneravtalets innehåll hashas server-side vid varje registrering så
+ * agreement_hash bevisar exakt VILKEN version som godkändes, oavsett om
+ * dokumentet ändras senare. Samma bevismönster som offert-/ÄTA-signering.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +24,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ogiltig request' }, { status: 400 })
     }
 
-    const { email, name, company, password } = body
+    const { email, name, company, password, agreementAccepted } = body
 
     if (!email || !name || !password) {
       return NextResponse.json({ error: 'Namn, e-post och lösenord krävs' }, { status: 400 })
@@ -23,7 +34,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Lösenordet måste vara minst 8 tecken' }, { status: 400 })
     }
 
-    const { partner, error } = await registerPartner(email, name, company || null, password)
+    if (agreementAccepted !== true) {
+      return NextResponse.json({ error: 'Du måste godkänna partneravtalet för att registrera dig' }, { status: 400 })
+    }
+
+    const agreementText = fs.readFileSync(AGREEMENT_PATH, 'utf-8')
+    const agreementHash = createHash('sha256').update(agreementText).digest('hex')
+    const ip =
+      request.headers.get('x-forwarded-for') ||
+      request.headers.get('x-real-ip') ||
+      'unknown'
+
+    const { partner, error } = await registerPartner(email, name, company || null, password, {
+      version: AGREEMENT_VERSION,
+      hash: agreementHash,
+      ip,
+    })
 
     if (error || !partner) {
       return NextResponse.json({ error: error || 'Registrering misslyckades' }, { status: 400 })

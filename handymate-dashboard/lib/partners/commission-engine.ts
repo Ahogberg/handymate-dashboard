@@ -3,17 +3,21 @@
  * (tests/partner-commission.spec.ts). DB-orkestreringen ligger i
  * lib/partners/commission.ts.
  *
- * Affärsmodellen (Andreas beslut 2026-08-11):
- *  - Trappa per partner, t.ex. [{min:0,rate:0.20},{min:6,rate:0.25},
- *    {min:16,rate:0.30}], utvärderad på antal AKTIVA BETALANDE kunder i
- *    perioden. Tom/null trappa → legacy partners.commission_rate.
+ * Affärsmodellen (Andreas beslut 2026-09-01, se content/partner/partneravtal-v1.md
+ * Bilaga 1 — ersätter den tidigare trappan från 2026-08-11):
+ *  - Standard är EN flat sats (default commission_tiers = [{min:0,rate:0.20}])
+ *    i ladder_months (default 36) kalendermånader, därefter base_rate_after
+ *    (default 0 %). Motorn själv förblir generisk — en explicit flertrappa
+ *    eller ett annat ladder_months/base_rate_after är fortsatt en giltig
+ *    per-partner-avvikelse (Partnerbekräftelse, avtalets punkt 16.3), satt
+ *    via PartnerCommissionModal. Tom/null trappa → legacy partners.commission_rate.
  *  - tier_mode 'book' (default): uppnådd sats gäller hela kundstocken.
  *    'marginal': kunder fördelas i band efter converted_at stigande —
  *    kund på position p får satsen för högsta steget med min <= p.
- *  - Månad 1..ladder_months (default 12) per kund på trappsatsen,
- *    därefter EVIG basnivå (base_rate_after, default 10 %) så länge
- *    kunden betalar. "Månad" = BETALD månad — en obetald månad avancerar
- *    inte räknaren (ingen betalning → ingen liggarrad).
+ *  - Månad 1..ladder_months per kund på trappsatsen, därefter EVIG
+ *    basnivå (base_rate_after) så länge kunden betalar. "Månad" = BETALD
+ *    månad — en obetald månad avancerar inte räknaren (ingen betalning →
+ *    ingen liggarrad).
  *  - Basen är faktiskt betalt EX MOMS. Systemet kör idag Stripe utan
  *    automatic_tax (amount_paid == ex moms); om moms aktiveras senare
  *    bär billing_event.data total_excluding_tax/tax från 2026-08-11.

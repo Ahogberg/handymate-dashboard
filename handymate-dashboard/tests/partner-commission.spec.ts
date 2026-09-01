@@ -1,9 +1,15 @@
 /**
- * Facit för provisionsmotorn (partnerprogram v2, 2026-08-11).
+ * Facit för provisionsmotorn (partnerprogram, standard sedan 2026-09-01:
+ * flat 20 % i 36 kalendermånader, 0 % därefter — se
+ * content/partner/partneravtal-v1.md Bilaga 1). Motorn själv förblir
+ * generisk (trappa, tier_mode, ladder_months, base_rate_after är alla
+ * fortsatt konfigurerbara per partner för en individuell avvikelse enligt
+ * avtalets punkt 16.3) — bara STANDARDVÄRDET är flat nu.
  *
  * Motorn producerar utbetalningsunderlag för självfakturering — en motor
  * som räknar fel en enda gång kostar förtroende och pengar. Därför testas
- * trappan, 12-månadersgränsen, marginal-läget och momshärledningen hårt.
+ * default-satsen, 36-månadersgränsen, konfigurerbarheten (trappa/marginal-
+ * läge/eget ladder_months/egen basnivå) och momshärledningen hårt.
  *
  *   npx playwright test tests/partner-commission.spec.ts --no-deps --project=chromium
  */
@@ -19,6 +25,9 @@ import {
   type PartnerCommissionConfig,
 } from '../lib/partners/commission-engine'
 
+/** Explicit flertrappa — används för att bevisa att motorn fortfarande
+ *  klarar en avvikande per-partner-konfiguration, inte för att den är
+ *  standard längre. */
 const TRAPPA = [
   { min: 0, rate: 0.2 },
   { min: 6, rate: 0.25 },
@@ -26,11 +35,11 @@ const TRAPPA = [
 ]
 
 const config = (over: Partial<PartnerCommissionConfig> = {}): PartnerCommissionConfig => ({
-  tiers: TRAPPA,
+  tiers: [{ min: 0, rate: 0.2 }],
   legacyRate: 0.2,
-  baseRateAfter: 0.1,
+  baseRateAfter: 0,
   tierMode: 'book',
-  ladderMonths: 12,
+  ladderMonths: 36,
   ...over,
 })
 
@@ -47,7 +56,7 @@ const kund = (n: number, over: Partial<CustomerPayment> = {}): CustomerPayment =
 const kunder = (antal: number): CustomerPayment[] =>
   Array.from({ length: antal }, (_, i) => kund(i + 1, { convertedAt: `2026-01-${String(i + 1).padStart(2, '0')}T00:00:00Z` }))
 
-test.describe('Trappgränser (book-läge)', () => {
+test.describe('Trappgränser (book-läge, avvikande per-partner-konfiguration)', () => {
   test('5 aktiva → 20 %', () => {
     expect(evaluateBookRate(TRAPPA, 5)).toEqual({ rate: 0.2, band: 0 })
   })
@@ -67,56 +76,55 @@ test.describe('Trappgränser (book-läge)', () => {
   })
 })
 
-test.describe('Book-läge: hela stocken', () => {
-  test('7 kunder → alla får 25 %', () => {
+test.describe('Standard flat-rate (book-läge): hela stocken', () => {
+  test('7 kunder → alla får 20 %', () => {
     const rows = computeLedgerRows(config(), kunder(7))
     expect(rows).toHaveLength(7)
     for (const r of rows) {
-      expect(r.rate).toBe(0.25)
+      expect(r.rate).toBe(0.2)
       expect(r.rateSource).toBe('tier')
       expect(r.tierSnapshot.active_count).toBe(7)
     }
   })
-  test('svans-kund (mån 13) räknas i volymen men får basnivån', () => {
-    const alla = [...kunder(5), kund(6, { customerMonth: 13, convertedAt: '2025-01-01T00:00:00Z' })]
+  test('svans-kund (mån 37) räknas i volymen men får basnivån (0 %)', () => {
+    const alla = [...kunder(5), kund(6, { customerMonth: 37, convertedAt: '2023-01-01T00:00:00Z' })]
     const rows = computeLedgerRows(config(), alla)
-    // 6 betalande totalt → trappsteget 25 % för de trappberättigade
     const trappRader = rows.filter(r => r.rateSource === 'tier')
     const svansRader = rows.filter(r => r.rateSource === 'base_rate')
     expect(trappRader).toHaveLength(5)
     expect(svansRader).toHaveLength(1)
-    for (const r of trappRader) expect(r.rate).toBe(0.25)
-    expect(svansRader[0].rate).toBe(0.1)
+    for (const r of trappRader) expect(r.rate).toBe(0.2)
+    expect(svansRader[0].rate).toBe(0)
     expect(svansRader[0].tierSnapshot.active_count).toBe(6)
   })
 })
 
-test.describe('12-månadersgränsen', () => {
-  test('månad 12 → trappsats; månad 13 → basnivå', () => {
+test.describe('36-månadersgränsen', () => {
+  test('månad 36 → 20 %; månad 37 → 0 %', () => {
     const rows = computeLedgerRows(config(), [
-      kund(1, { customerMonth: 12 }),
-      kund(2, { customerMonth: 13 }),
+      kund(1, { customerMonth: 36 }),
+      kund(2, { customerMonth: 37 }),
     ])
-    const m12 = rows.find(r => r.customerMonth === 12)!
-    const m13 = rows.find(r => r.customerMonth === 13)!
-    expect(m12.rateSource).toBe('tier')
-    expect(m12.rate).toBe(0.2)
-    expect(m13.rateSource).toBe('base_rate')
-    expect(m13.rate).toBe(0.1)
+    const m36 = rows.find(r => r.customerMonth === 36)!
+    const m37 = rows.find(r => r.customerMonth === 37)!
+    expect(m36.rateSource).toBe('tier')
+    expect(m36.rate).toBe(0.2)
+    expect(m37.rateSource).toBe('base_rate')
+    expect(m37.rate).toBe(0)
   })
-  test('konfigurerbar ladder_months respekteras', () => {
-    const rows = computeLedgerRows(config({ ladderMonths: 24 }), [kund(1, { customerMonth: 13 })])
-    expect(rows[0].rateSource).toBe('tier')
+  test('konfigurerbar ladder_months respekteras (per-partner-avvikelse)', () => {
+    const rows = computeLedgerRows(config({ ladderMonths: 24 }), [kund(1, { customerMonth: 25 })])
+    expect(rows[0].rateSource).toBe('base_rate')
   })
   test('basnivån är konfigurerbar per partner', () => {
-    const rows = computeLedgerRows(config({ baseRateAfter: 0.15 }), [kund(1, { customerMonth: 20 })])
+    const rows = computeLedgerRows(config({ baseRateAfter: 0.15, ladderMonths: 6 }), [kund(1, { customerMonth: 20 })])
     expect(rows[0].rate).toBe(0.15)
   })
 })
 
-test.describe('Marginal-läge', () => {
+test.describe('Marginal-läge (avvikande per-partner-konfiguration)', () => {
   test('8 kunder → position 1–5 får 20 %, 6–8 får 25 %', () => {
-    const rows = computeLedgerRows(config({ tierMode: 'marginal' }), kunder(8))
+    const rows = computeLedgerRows(config({ tierMode: 'marginal', tiers: TRAPPA }), kunder(8))
     const perKund = new Map(rows.map(r => [r.businessId, r.rate]))
     // Sorterade på convertedAt: biz_001 äldst → position 1
     for (let i = 1; i <= 5; i++) expect(perKund.get(`biz_${String(i).padStart(3, '0')}`)).toBe(0.2)

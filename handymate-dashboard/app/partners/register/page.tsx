@@ -11,6 +11,7 @@ export default function PartnerRegisterPage() {
   const [company, setCompany] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [agreementAccepted, setAgreementAccepted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -24,7 +25,7 @@ export default function PartnerRegisterPage() {
       const res = await fetch('/api/partners/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, company: company || null, email, password }),
+        body: JSON.stringify({ name, company: company || null, email, password, agreementAccepted }),
       })
 
       const data = await res.json()
@@ -136,13 +137,29 @@ export default function PartnerRegisterPage() {
               />
             </div>
 
+            <label className="flex items-start gap-2.5 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={agreementAccepted}
+                onChange={e => setAgreementAccepted(e.target.checked)}
+                required
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-primary-700 focus:ring-primary-600"
+              />
+              <span>
+                Jag har läst och godkänner{' '}
+                <Link href="/partners/avtal" target="_blank" className="text-primary-700 hover:text-primary-800 font-medium underline">
+                  Handymates partneravtal
+                </Link>.
+              </span>
+            </label>
+
             {error && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
             )}
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !agreementAccepted}
               className="w-full py-3 bg-primary-800 text-white font-medium rounded-lg hover:bg-primary-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (

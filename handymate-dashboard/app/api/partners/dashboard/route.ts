@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
   const [bizRes, ledgerRes, followupRes, eventsRes, paymentsRes] = await Promise.all([
     bizIds.length
       ? supabase.from('business_config')
-          .select('business_id, company_name, business_name, subscription_status, onboarding_completed_at')
+          .select('business_id, company_name, business_name, subscription_status, onboarding_completed_at, referred_by')
           .in('business_id', bizIds)
       : Promise.resolve({ data: [] as any[] }),
     supabase.from('partner_commission_ledger')
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
     followupsByBiz.set(f.business_id, list)
   }
 
-  const ladderMonths = fullPartner?.ladder_months ?? 12
+  const ladderMonths = fullPartner?.ladder_months ?? 36
 
   const enrichedReferrals = realRefs.map(ref => {
     const biz = bizFor.get(ref.referred_business_id)
@@ -125,6 +125,7 @@ export async function GET(request: NextRequest) {
       status: ref.status,
       created_at: ref.created_at,
       converted_at: ref.converted_at,
+      referred_by: biz?.referred_by || null,
       activity_level: ref.status === 'churned' ? 'churnad' : activity,
       activity_label: AKTIVITETS_ETIKETT[ref.status === 'churned' ? 'churnad' : activity],
       // Provisionsläget för kunden — ur liggaren, inga kundbelopp.
@@ -200,7 +201,7 @@ export async function GET(request: NextRequest) {
       referral_code: partner.referral_code,
       referral_url: partner.referral_url,
       commission_tiers: tiers,
-      base_rate_after: fullPartner?.base_rate_after ?? 0.1,
+      base_rate_after: fullPartner?.base_rate_after ?? 0,
       tier_mode: fullPartner?.tier_mode ?? 'book',
       ladder_months: ladderMonths,
       legacy_commission_rate: fullPartner?.commission_rate ?? 0.2,

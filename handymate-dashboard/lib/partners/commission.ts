@@ -141,9 +141,9 @@ export async function processCommissionPeriod(period: string): Promise<ProcessRe
       const config: PartnerCommissionConfig = {
         tiers: (partner.commission_tiers as TierStep[] | null) ?? null,
         legacyRate: partner.commission_rate || 0.2,
-        baseRateAfter: partner.base_rate_after ?? 0.1,
+        baseRateAfter: partner.base_rate_after ?? 0,
         tierMode: partner.tier_mode === 'marginal' ? 'marginal' : 'book',
-        ladderMonths: partner.ladder_months ?? 12,
+        ladderMonths: partner.ladder_months ?? 36,
       }
 
       const drafts = computeLedgerRows(config, customers)

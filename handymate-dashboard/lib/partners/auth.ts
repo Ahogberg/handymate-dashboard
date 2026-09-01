@@ -38,6 +38,14 @@ export interface Partner {
   approved_at: string | null
 }
 
+/** Bevis för att partnern faktiskt accepterat en specifik avtalsversion —
+ *  samma mönster som offert-/ÄTA-signering (signed_at/signed_by_ip). */
+export interface AgreementAcceptance {
+  version: string
+  hash: string
+  ip: string
+}
+
 /**
  * Generate a partner referral code: P-{3 letters}-{4 digits}
  */
@@ -53,12 +61,15 @@ function generatePartnerCode(name: string): string {
 
 /**
  * Register a new partner. Status starts as 'pending_approval'.
+ * agreement: krävs -- ingen partner skapas utan loggad avtalsacceptans
+ * (agreement_version/hash/accepted_at/accepted_ip på partners-raden).
  */
 export async function registerPartner(
   email: string,
   name: string,
   company: string | null,
-  password: string
+  password: string,
+  agreement: AgreementAcceptance
 ): Promise<{ partner: Partner | null; error?: string }> {
   const supabase = getServerSupabase()
 
@@ -106,6 +117,10 @@ export async function registerPartner(
       password_hash: passwordHash,
       referral_code: referralCode,
       referral_url: referralUrl,
+      agreement_version: agreement.version,
+      agreement_hash: agreement.hash,
+      agreement_accepted_at: new Date().toISOString(),
+      agreement_accepted_ip: agreement.ip,
     })
     .select('id, email, name, company, referral_code, referral_url, commission_rate, total_earned_sek, total_pending_sek, status, created_at, approved_at')
     .single()

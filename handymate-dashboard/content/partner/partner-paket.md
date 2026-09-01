@@ -19,7 +19,7 @@ Du får en personlig P-kod (t.ex. `P-XXXXXX`) och en länk:
 - Kunder som registrerar sig via din länk/kod attribueras till dig automatiskt.
 - Du följer dina förmedlingar och din provision i partner-dashboarden:
   `https://app.handymate.se/partners/login`
-- Provision: **20 % av kundens betalda månadsavgift i 12 månader.**
+- Provision: **20 % av kundens betalda månadsavgift i 36 månader.**
   Utbetalning månadsvis i efterskott (detaljer i avtalet).
 
 ## 2. Ditt säljmaterial (endast detta får användas)

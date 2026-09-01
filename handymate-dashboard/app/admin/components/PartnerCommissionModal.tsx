@@ -67,9 +67,9 @@ export default function PartnerCommissionModal({
   const [batches, setBatches] = useState<Batch[]>([])
 
   const [tiers, setTiers] = useState<TierStep[]>([])
-  const [baseRate, setBaseRate] = useState('10')
+  const [baseRate, setBaseRate] = useState('0')
   const [tierMode, setTierMode] = useState<'book' | 'marginal'>('book')
-  const [ladderMonths, setLadderMonths] = useState('12')
+  const [ladderMonths, setLadderMonths] = useState('36')
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -87,9 +87,9 @@ export default function PartnerCommissionModal({
           ? data.partner.commission_tiers
           : [{ min: 0, rate: data.partner?.commission_rate ?? 0.2 }]
       )
-      setBaseRate(String(Math.round((data.partner?.base_rate_after ?? 0.1) * 1000) / 10))
+      setBaseRate(String(Math.round((data.partner?.base_rate_after ?? 0) * 1000) / 10))
       setTierMode(data.partner?.tier_mode === 'marginal' ? 'marginal' : 'book')
-      setLadderMonths(String(data.partner?.ladder_months ?? 12))
+      setLadderMonths(String(data.partner?.ladder_months ?? 36))
     } finally {
       setLoading(false)
     }

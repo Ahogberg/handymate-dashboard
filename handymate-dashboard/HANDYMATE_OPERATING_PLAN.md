@@ -431,7 +431,7 @@ antal:
 - Accepterar de att Handymate behåller produkt, fakturering, datarelation och
   prissättningskontroll?
 
-Standardförslag: 20 % av faktiskt betald abonnemangsintäkt i 12 månader.
+Standardförslag: 20 % av faktiskt betald abonnemangsintäkt i 36 månader.
 Kom igång-paket kan delas 50/50 när partnern utför arbetet. Alla avvikelser
 kräver Andreas beslut och signerat avtal. Se
 `docs/council/PARTNER_ADDON_PACKAGING.md`.

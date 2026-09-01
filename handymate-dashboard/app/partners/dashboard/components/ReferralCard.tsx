@@ -59,6 +59,7 @@ export default function ReferralCard({ referral: ref, events, expanded, onToggle
           <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
             <span>Registrerad: {formatDate(ref.created_at)}</span>
             {ref.converted_at && <span>Kund sedan: {formatDate(ref.converted_at)}</span>}
+            {ref.referred_by && <span>Attributionskod: {ref.referred_by}</span>}
           </div>
         </div>
 
