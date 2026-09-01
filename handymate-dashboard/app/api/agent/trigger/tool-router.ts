@@ -1248,78 +1248,54 @@ async function createBooking(
   const tenantFel = await assertCustomerInBusiness(supabase, businessId, params.customer_id)
   if (tenantFel) return { success: false, error: tenantFel }
 
-  // Godkännandegrind (2026-09-02): require_approval_create_booking var tidigare
-  // bara text i systemprompten (se getAutomationSettings) — verktyget skrev
-  // till databasen och synkade till Google Calendar oavsett vad hantverkaren
-  // kryssat i, om modellen glömde/missförstod instruktionen. Det här är en
-  // RIKTIG kodgrind i stället för en förhoppning om att modellen lyder.
-  // Standard vid saknad inställningsrad är false, samma default som
-  // getAutomationSettings redan dokumenterar — inga nya grindar för företag
-  // som aldrig rört inställningen.
-  // Fail-closed vid databasfel (adversariell granskning, 2026-09-02): en
-  // riktig frågefel (timeout/nätverk) ger data:null precis som "ingen rad
-  // finns" — utan att skilja på dem hade grinden fallit igenom rakt in i
-  // direkt-insert exakt när databasen redan har problem, dvs. exakt när en
-  // grind behövs som mest. getAutomationSettings (samma fil) kollar också
-  // error explicit i stället för att anta false — samma mönster här.
-  const { data: automationSettings, error: automationSettingsError } = await supabase
-    .from('v3_automation_settings')
-    .select('require_approval_create_booking')
-    .eq('business_id', businessId)
-    .maybeSingle()
+  // Godkännandegrind (2026-09-02, Andreas-beslut): require_approval_create_
+  // booking var tidigare bara text i systemprompten (se getAutomationSettings)
+  // — verktyget skrev till databasen och synkade till Google Calendar oavsett
+  // vad hantverkaren kryssat i, om modellen glömde/missförstod instruktionen.
+  // Det här är en RIKTIG kodgrind i stället för en förhoppning om att
+  // modellen lyder — MEN precis som send_sms/send_email (TD-52,
+  // shouldQueueForApproval) gäller den bara systemtriggade bokningar (cron,
+  // autonom automation, agent-handoff). Har kunden redan sagt "ja, 14:00
+  // funkar" i ett pågående samtal räknas det som användarinitierat och
+  // bokas direkt — precis som ett SMS-svar redan gör. Standard vid saknad
+  // inställningsrad är false, samma default som getAutomationSettings redan
+  // dokumenterar — inga nya grindar för företag som aldrig rört inställningen.
+  if (shouldQueueForApproval(context.triggerSource, false)) {
+    // Fail-closed vid databasfel (adversariell granskning, 2026-09-02): en
+    // riktig frågefel (timeout/nätverk) ger data:null precis som "ingen rad
+    // finns" — utan att skilja på dem hade grinden fallit igenom rakt in i
+    // direkt-insert exakt när databasen redan har problem, dvs. exakt när en
+    // grind behövs som mest. getAutomationSettings (samma fil) kollar också
+    // error explicit i stället för att anta false — samma mönster här.
+    const { data: automationSettings, error: automationSettingsError } = await supabase
+      .from('v3_automation_settings')
+      .select('require_approval_create_booking')
+      .eq('business_id', businessId)
+      .maybeSingle()
 
-  if (automationSettingsError) {
-    return { success: false, error: `Kunde inte läsa godkännandeinställningen för bokning: ${automationSettingsError.message}` }
-  }
-
-  if (automationSettings?.require_approval_create_booking) {
-    const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-    // Formad exakt som POST /api/bookings förväntar sig (se app/api/bookings/
-    // route.ts) — det är den routen som faktiskt kör bokningen när ett
-    // människa klickar Godkänn (app/api/approvals/[id]/route.ts:978-988,
-    // med cookie-forwarding så den routen inte 401:ar).
-    const bookingPayload = {
-      customer_id: params.customer_id,
-      scheduled_start: params.scheduled_start,
-      scheduled_end: params.scheduled_end,
-      notes: params.notes,
-      service_type: params.service_type,
+    if (automationSettingsError) {
+      return { success: false, error: `Kunde inte läsa godkännandeinställningen för bokning: ${automationSettingsError.message}` }
     }
-    const title = `Ny bokning: ${(params.service_type as string) || 'okänd tjänst'}`
 
-    const { error: approvalError } = await supabase.from('pending_approvals').insert({
-      id: approvalId,
-      business_id: businessId,
-      approval_type: 'create_booking',
-      title,
-      description: (params.notes as string) || null,
-      payload: bookingPayload,
-      status: 'pending',
-      risk_level: 'high',
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    })
-    if (approvalError) return { success: false, error: approvalError.message }
-
-    // Fire-and-forget, samma mönster som createApprovalRequests high-gren.
-    fetch(`${appUrl}/api/push/send`, {
-      method: 'POST',
-      headers: internalPushHeaders(),
-      body: JSON.stringify({
-        business_id: businessId,
-        title: 'Nytt att godkänna',
-        body: title,
-        url: '/dashboard/approvals',
-      }),
-    })
-
-    return {
-      success: true,
-      data: {
-        message: 'Bokningen kräver godkännande innan den skapas — ett kort väntar i "Väntar på dig". Inget är bokat än.',
-        approval_id: approvalId,
-        deferred: true,
-      },
+    if (automationSettings?.require_approval_create_booking) {
+      // Formad exakt som POST /api/bookings förväntar sig (se app/api/
+      // bookings/route.ts) — det är den routen som faktiskt kör bokningen
+      // när en människa klickar Godkänn (app/api/approvals/[id]/
+      // route.ts:978-988, med cookie-forwarding så den routen inte 401:ar).
+      const bookingPayload = {
+        customer_id: params.customer_id,
+        scheduled_start: params.scheduled_start,
+        scheduled_end: params.scheduled_end,
+        notes: params.notes,
+        service_type: params.service_type,
+      }
+      return await queueAgentActionForApproval(
+        supabase, businessId, 'create_booking',
+        `Ny bokning: ${(params.service_type as string) || 'okänd tjänst'}`,
+        bookingPayload,
+        context,
+        (params.notes as string) || null,
+      )
     }
   }
 
@@ -1411,11 +1387,31 @@ async function createBooking(
     console.error('[createBooking] Dispatch suggestion error (non-blocking):', dispatchErr.message)
   }
 
+  // Kontaktad + projektworkflow + auto-skapat projekt (2026-09-02): denna
+  // väg gav tidigare bara kalendersynk + dispatch, ALDRIG "Kontaktad"-
+  // markeringen eller projekt-kopplingen som dashboardens POST /api/bookings
+  // alltid gett — samma sidoeffekter nu, delade via
+  // lib/bookings/apply-pipeline-effects.ts (se den filens egen kommentar).
+  let projectId: string | null = null
+  try {
+    const { applyBookingPipelineEffects } = await import('@/lib/bookings/apply-pipeline-effects')
+    const result = await applyBookingPipelineEffects(supabase, businessId, {
+      bookingId,
+      customerId: (params.customer_id as string) || null,
+      serviceType: (params.service_type as string) || null,
+      scheduledStart: (params.scheduled_start as string) || null,
+    })
+    projectId = result.projectId
+  } catch (pipelineErr: any) {
+    console.error('[createBooking] applyBookingPipelineEffects error (non-blocking):', pipelineErr.message)
+  }
+
   return { success: true, data: {
     booking_id: bookingId,
     message: `Bokning skapad: ${params.service_type}`,
     google_synced: !!googleEventId,
     google_event_id: googleEventId,
+    ...(projectId ? { project_id: projectId } : {}),
   }}
 }
 
@@ -1932,20 +1928,23 @@ async function createAtaDraftTool(
 // ── Communications ──────────────────────────────────────
 
 /**
- * TD-52: köa ett agent-initierat send_sms/send_email som en pending_approval
- * istället för att skicka direkt. Används när triggerSource === 'system' och
- * ingen förtjänad autonomi täcker åtgärden (se shouldQueueForApproval).
- * Payloaden speglar exakt det som executeApprovalPayload (app/api/approvals/
- * [id]/route.ts) läser för approval_type 'send_sms'/'send_email' — annars
- * exekveras kortet inte korrekt vid godkännande.
+ * TD-52: köa en agent-initierad åtgärd som en pending_approval i stället för
+ * att utföra den direkt. Ursprungligen bara send_sms/send_email (används när
+ * triggerSource === 'system' och ingen förtjänad autonomi täcker åtgärden,
+ * se shouldQueueForApproval) — utökad 2026-09-02 med create_booking, av
+ * samma skäl och med samma mönster. Payloaden speglar exakt det som
+ * executeApprovalPayload (app/api/approvals/[id]/route.ts) läser för
+ * respektive approval_type — annars exekveras kortet inte korrekt vid
+ * godkännande.
  */
-async function queueAgentSendForApproval(
+async function queueAgentActionForApproval(
   supabase: SupabaseClient,
   businessId: string,
-  approvalType: 'send_sms' | 'send_email',
+  approvalType: 'send_sms' | 'send_email' | 'create_booking',
   title: string,
   payload: Record<string, unknown>,
-  context: ToolContext
+  context: ToolContext,
+  descriptionOverride?: string | null
 ): Promise<ToolResult> {
   const id = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
   const { error } = await supabase.from('pending_approvals').insert({
@@ -1953,7 +1952,9 @@ async function queueAgentSendForApproval(
     business_id: businessId,
     approval_type: approvalType,
     title,
-    description: (payload.message as string | undefined) || (payload.body as string | undefined) || null,
+    description: descriptionOverride !== undefined
+      ? descriptionOverride
+      : (payload.message as string | undefined) || (payload.body as string | undefined) || null,
     payload: { ...payload, routed_agent: context.agentId || 'matte' },
     status: 'pending',
     risk_level: 'high',
@@ -1976,14 +1977,15 @@ async function queueAgentSendForApproval(
       body: title,
       url: '/dashboard/approvals',
     }),
-  }).catch((err) => console.error('[queueAgentSendForApproval] push failed (non-blocking):', err))
+  }).catch((err) => console.error('[queueAgentActionForApproval] push failed (non-blocking):', err))
 
+  const verb = approvalType === 'create_booking' ? 'skapas' : 'skickas'
   return {
     success: true,
     data: {
       queued_for_approval: true,
       approval_id: id,
-      message: 'Utkastet är lagt i godkännande-kön — hantverkaren måste godkänna innan det skickas.',
+      message: `Lagt i godkännande-kön — hantverkaren måste godkänna innan det ${verb}. Inget är gjort än.`,
     },
   }
 }
@@ -2008,7 +2010,7 @@ async function sendSms(
   // v3-regelmotorn och fakturapåminnelse-cronen — gör det redan uppströms,
   // innan detta tool-anrop ens sker.)
   if (shouldQueueForApproval(context.triggerSource, false)) {
-    return await queueAgentSendForApproval(
+    return await queueAgentActionForApproval(
       supabase, businessId, 'send_sms',
       `SMS till ${to}`,
       { to, message },
@@ -2086,7 +2088,7 @@ async function sendEmail(
 ): Promise<ToolResult> {
   // TD-52 godkännande-gate — samma resonemang som sendSms ovan.
   if (shouldQueueForApproval(context.triggerSource, false)) {
-    return await queueAgentSendForApproval(
+    return await queueAgentActionForApproval(
       supabase, businessId, 'send_email',
       `E-post: ${params.subject}`,
       { to: params.to, subject: params.subject, body: params.body },

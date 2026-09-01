@@ -103,26 +103,41 @@ test.describe('8.2 — inga anrop till rutter som inte finns', () => {
   test('create_booking har en riktig kodgrind mot require_approval_create_booking, inte bara prompt-text', () => {
     const s = read('app/api/agent/trigger/tool-router.ts')
     const fn = s.slice(s.indexOf('async function createBooking'), s.indexOf('async function bookSiteVisitTool'))
-    expect(fn).toContain("select('require_approval_create_booking')")
-    expect(fn).toContain('automationSettings?.require_approval_create_booking')
+
+    // Andreas-beslut 2026-09-02: gäller bara systemtriggade bokningar (cron/
+    // automation/handoff) — en levande "ja, 14:00 funkar" i ett pågående
+    // samtal räknas som användarinitierat och bokas direkt, precis som
+    // send_sms/send_email redan gör (samma shouldQueueForApproval).
+    expect(fn).toContain("if (shouldQueueForApproval(context.triggerSource, false))")
+    const gate = fn.slice(fn.indexOf('if (shouldQueueForApproval(context.triggerSource, false))'), fn.indexOf("const bookingId = generateId('book')"))
+    expect(gate).toContain("select('require_approval_create_booking')")
+    expect(gate).toContain('automationSettings?.require_approval_create_booking')
+
     // Fail-closed vid frågefel (adversariell granskning 2026-09-02): data:null
     // vid ett riktigt DB-fel ser likadant ut som "ingen rad finns" om man
     // bara läser data — måste kolla error separat och blockera, inte anta
     // false och falla igenom till en obevakad insert.
-    expect(fn).toContain('error: automationSettingsError')
-    expect(fn).toContain('if (automationSettingsError)')
-    const preGate = fn.slice(0, fn.indexOf('if (automationSettings?.require_approval_create_booking)'))
-    expect(preGate.slice(preGate.indexOf('if (automationSettingsError)'))).toContain('success: false')
-    // När grindad: en pending_approvals-rad, ALDRIG en direkt insert i booking,
-    // och funktionen måste faktiskt RETURNERA — annars faller koden igenom
-    // och skapar bokningen ändå trots att den redan köats för godkännande.
-    const gated = fn.slice(fn.indexOf('if (automationSettings?.require_approval_create_booking)'), fn.indexOf("const bookingId = generateId('book')"))
-    expect(gated).toContain("approval_type: 'create_booking'")
-    expect(gated).toContain("status: 'pending'")
-    expect(gated).toContain("risk_level: 'high'")
-    expect(gated).not.toContain(".from('booking').insert")
-    expect(gated).toContain('return {')
-    expect(gated).toContain('deferred: true')
+    expect(gate).toContain('error: automationSettingsError')
+    const preInnerGate = gate.slice(0, gate.indexOf('if (automationSettings?.require_approval_create_booking)'))
+    expect(preInnerGate.slice(preInnerGate.indexOf('if (automationSettingsError)'))).toContain('success: false')
+
+    // Grindad: delegerar till den delade könings-helpern, ALDRIG en direkt
+    // insert i booking i den här grenen — och funktionen måste faktiskt
+    // RETURNERA (via helperns retur), annars faller koden igenom och skapar
+    // bokningen ändå trots att den redan köats för godkännande.
+    const innerGated = gate.slice(gate.indexOf('if (automationSettings?.require_approval_create_booking)'))
+    expect(innerGated).toContain('return await queueAgentActionForApproval(')
+    expect(innerGated).toContain("'create_booking'")
+    expect(innerGated).not.toContain(".from('booking').insert")
+
+    // queueAgentActionForApproval själv: en riktig pending_approvals-rad,
+    // hög risk, väntande — och create_booking måste faktiskt vara en giltig
+    // typ i dess signatur (annars TS-felar anropet, men detta bevisar det
+    // uttryckligen i facit).
+    const helper = s.slice(s.indexOf('async function queueAgentActionForApproval'), s.indexOf('async function sendSms'))
+    expect(helper).toContain("'send_sms' | 'send_email' | 'create_booking'")
+    expect(helper).toContain("status: 'pending'")
+    expect(helper).toContain("risk_level: 'high'")
 
     // Nyttolasten måste vara EXAKT vad POST /api/bookings destrukturerar ur
     // sin body — annars misslyckas varje godkänd bokning tyst vid utförande
@@ -134,8 +149,30 @@ test.describe('8.2 — inga anrop till rutter som inte finns', () => {
     )
     for (const field of ['customer_id', 'scheduled_start', 'scheduled_end', 'notes', 'service_type']) {
       expect(destructureLine).toContain(field)
-      expect(gated).toContain(`${field}:`)
+      expect(innerGated).toContain(`${field}:`)
     }
+  })
+
+  test('godkända/direkta bokningar delar samma Kontaktad+projekt-sidoeffekter — de två vägarna kan inte glida isär igen', () => {
+    // Adversariell granskning 2026-09-02 + Andreas-beslut: agentverktygets
+    // direktinsert gav bara kalendersynk+dispatch, ALDRIG "Kontaktad" eller
+    // projekt-koppling som dashboardvägen alltid gett. Nu delar båda samma
+    // helper i stället för två kodvägar som kan glida isär igen.
+    const effects = read('lib/bookings/apply-pipeline-effects.ts')
+    expect(effects).toContain('markCustomerContacted')
+    expect(effects).toContain('bumpProjectStage')
+    expect(effects).toContain('maybeCreateProjectFromBooking')
+
+    const toolRouter = read('app/api/agent/trigger/tool-router.ts')
+    const createBookingFn = toolRouter.slice(toolRouter.indexOf('async function createBooking'), toolRouter.indexOf('async function bookSiteVisitTool'))
+    expect(createBookingFn).toContain("await import('@/lib/bookings/apply-pipeline-effects')")
+    expect(createBookingFn).toContain('applyBookingPipelineEffects(')
+
+    const bookingsRoute = read('app/api/bookings/route.ts')
+    expect(bookingsRoute).toContain("from '@/lib/bookings/apply-pipeline-effects'")
+    expect(bookingsRoute).toContain('applyBookingPipelineEffects(')
+    // Ingen av de två anroparna ska ha återinfört en egen lokal kopia.
+    expect(bookingsRoute).not.toContain('markCustomerContacted(supabase, business.business_id, customer_id')
   })
 })
 

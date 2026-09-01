@@ -30,7 +30,10 @@ test('varje kontaktväg anropar regeln', () => {
     ['lib/quote-confirmation-email.ts', 'customerId: quote.customer_id,\n    to: customer.email,'],
     ['app/api/agent/trigger/tool-router.ts', "(params.customer_id as string) || null, 'mejl')"],
     ['app/api/portal-messages/route.ts', "markCustomerContacted(supabase, business.business_id, customerId, 'portalmeddelande')"],
-    ['app/api/bookings/route.ts', "customer_id, 'besök bokat')"],
+    // Flyttad 2026-09-02 till en delad helper (lib/bookings/apply-pipeline-
+    // effects.ts) så agentens create_booking-verktyg och dashboardens
+    // POST /api/bookings inte kan glida isär om vad en bokning ger.
+    ['lib/bookings/apply-pipeline-effects.ts', "customerId, 'besök bokat')"],
     ['lib/smart-communication.ts', "params.channel === 'sms' ? 'sms' : 'mejl')"],
   ]
   for (const [fil, snutt] of vagar) expect(kod(fil), fil).toContain(snutt)

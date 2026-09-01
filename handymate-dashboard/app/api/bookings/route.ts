@@ -9,7 +9,7 @@ import {
 } from '@/lib/google-calendar-sync'
 import { computeBookingDayProgress, fetchProjectBookings } from '@/lib/bookings/day-progress'
 import { notifyBookingAssignment } from '@/lib/notifications/schedule-push'
-import { markCustomerContacted } from '@/lib/pipeline/contacted'
+import { applyBookingPipelineEffects } from '@/lib/bookings/apply-pipeline-effects'
 
 /**
  * GET - Lista bokningar för ett företag
@@ -241,12 +241,6 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
-    // Kontaktad (2026-08-28): ett bokat besök är en kontakt — kundens öppna
-    // affärer flyttas till Kontaktad (framåt-only, aldrig tillbaka).
-    if (customer_id && booking) {
-      await markCustomerContacted(supabase, business.business_id, customer_id, 'besök bokat')
-    }
-
     // Hämta kundnamn för dispatch + calendar (en gång)
     let customerName: string | null = null
     if (customer_id) {
@@ -308,46 +302,18 @@ export async function POST(request: NextRequest) {
       console.error('Dispatch suggestion error (non-blocking):', dispatchErr)
     }
 
-    // Project workflow stage: 'Startmöte bokat' (Del B, 2026-08-26) — genom
-    // händelsebryggan: bokningens project_id först, annars kunden om hon
-    // har EXAKT ett aktivt projekt (aldrig "senaste"). Forward-only, så en
-    // bokning på ett pågående projekt rör inget. Sätter start_date om
-    // projektet saknar ett. Andra bokningsvägar fångas av cronens ps-02-svep.
-    if (customer_id || booking?.project_id) {
-      try {
-        const { bumpProjectStage } = await import('@/lib/project-stages/event-bridge')
-        const flytt = await bumpProjectStage(
-          business.business_id,
-          { projectId: booking?.project_id || null, customerId: customer_id || null },
-          'booking_created',
-          { startDateHint: scheduled_start || null },
-        )
-        if (!flytt.moved && !flytt.skipped) console.error('[bookings] stegflytten misslyckades (non-blocking):', flytt.error, { projectId: flytt.projectId })
-      } catch (err) {
-        console.error('[bookings] bumpProjectStage booking_created failed (non-blocking):', err)
-      }
-    }
-
-    // Auto-skapa projekt för OFFERT-LÖSA jobb: bokningen = åtagandet. Guarden
-    // (kund utan aktivt projekt + ingen öppen offert) ligger i helpern, så vi
-    // föregår aldrig accept-flödet. Icke-blockerande.
-    if (customer_id) {
-      try {
-        const { maybeCreateProjectFromBooking } = await import('@/lib/projects/maybe-create-from-booking')
-        const result = await maybeCreateProjectFromBooking(supabase, business.business_id, {
-          customerId: customer_id,
-          bookingId,
-          serviceType: service_type || null,
-          scheduledStart: scheduled_start || null,
-        })
-        if (result.created && result.project_id) {
-          booking.project_id = result.project_id
-          console.log(`[bookings] Auto-skapade projekt ${result.project_id} från bokning ${bookingId} (${result.reason})`)
-        }
-      } catch (projErr) {
-        console.error('[bookings] maybeCreateProjectFromBooking failed (non-blocking):', projErr)
-      }
-    }
+    // Kontaktad + projektworkflow ("Startmöte bokat") + auto-skapat projekt
+    // för offert-lösa jobb — delad med agentens create_booking-verktyg
+    // (lib/bookings/apply-pipeline-effects.ts) sedan 2026-09-02, så de två
+    // vägarna som skapar bokningar inte kan glida isär igen (se filens
+    // egen kommentar för bakgrunden). Icke-blockerande i sig själv.
+    const { projectId } = await applyBookingPipelineEffects(supabase, business.business_id, {
+      bookingId,
+      customerId: customer_id || null,
+      serviceType: service_type || null,
+      scheduledStart: scheduled_start || null,
+    })
+    if (projectId) booking.project_id = projectId
 
     return NextResponse.json({ booking })
   } catch (error: any) {

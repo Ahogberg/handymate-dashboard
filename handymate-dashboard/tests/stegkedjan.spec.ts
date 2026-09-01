@@ -122,11 +122,15 @@ test.describe('Jobb igång har verkliga producenter (2026-08-10)', () => {
     // inte stegmotorn själv längre — den går genom applyInvoicePayment,
     // vars runPostPaymentAutomations är den enda kopian av kedjan och
     // läser .moved. Låses nedan i stället för via sync-payments.
+    // 2026-09-02: bokningens stegflytt flyttade från app/api/bookings/
+    // route.ts till en delad helper (lib/bookings/apply-pipeline-effects.ts)
+    // så agentens create_booking-verktyg och dashboardvägen inte kan glida
+    // isär om vad en bokning ger. Facitet pekar dit i stället.
     for (const fil of [
       'lib/invoices/send-invoice.ts',
       'lib/invoices/apply-payment.ts',
       'lib/projects/complete-project.ts',
-      'app/api/bookings/route.ts',
+      'lib/bookings/apply-pipeline-effects.ts',
     ]) {
       expect(kod(fil), `${fil} läser inte flytt-resultatet`).toContain('.moved')
     }

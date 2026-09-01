@@ -51,7 +51,10 @@ test.describe('händelsebryggan — lib/project-stages/event-bridge.ts', () => {
 
 test.describe('producenterna går genom bryggan', () => {
   const cases: Array<{ fil: string; event: string }> = [
-    { fil: 'app/api/bookings/route.ts', event: 'booking_created' },
+    // Flyttad 2026-09-02 till en delad helper (lib/bookings/apply-pipeline-
+    // effects.ts) så agentens create_booking-verktyg och dashboardens
+    // POST /api/bookings inte kan glida isär om vad en bokning ger.
+    { fil: 'lib/bookings/apply-pipeline-effects.ts', event: 'booking_created' },
     { fil: 'app/api/cron/maintenance/route.ts', event: 'booking_created' },
     { fil: 'lib/project-ai-engine.ts', event: 'work_logged' },
     { fil: 'app/api/projects/[id]/milestones/route.ts', event: 'milestone_completed' },
@@ -74,6 +77,7 @@ test.describe('producenterna går genom bryggan', () => {
   test('inga inline-flyttar kvar i de ompekade producenterna', () => {
     for (const fil of [
       'app/api/bookings/route.ts',
+      'lib/bookings/apply-pipeline-effects.ts',
       'app/api/projects/[id]/milestones/route.ts',
       'lib/invoices/send-invoice.ts',
       'app/api/invoices/route.ts',
