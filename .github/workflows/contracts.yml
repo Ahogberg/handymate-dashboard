@@ -78,6 +78,8 @@ jobs:
           tests/credit-watch.spec.ts
           tests/kortkvalitet.spec.ts
           tests/push-policy.spec.ts
+          tests/facit-tenant-sweep.spec.ts
+          tests/facit-route-auth-inventory.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

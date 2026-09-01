@@ -154,7 +154,8 @@ export default function PortalQuoteSigningModal({
   useEffect(() => {
     if (!quote.quote_id) return
     const sessionId = `portal_${quote.quote_id}`
-    fetch(`/api/quotes/track?q=${encodeURIComponent(quote.quote_id)}&e=opened&s=${sessionId}`)
+    if (!quote.sign_token) return
+    fetch(`/api/quotes/track?q=${encodeURIComponent(quote.quote_id)}&t=${encodeURIComponent(quote.sign_token)}&e=opened&s=${sessionId}`)
       .catch(() => { /* spårning får aldrig störa signeringen */ })
   }, [quote.quote_id])
 

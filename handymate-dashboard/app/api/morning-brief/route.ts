@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { generateMorningBrief, MORNING_BRIEF_VERSION } from '@/lib/matte/morning-brief'
 import { getServerSupabase } from '@/lib/supabase'
 
@@ -37,8 +38,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (authHeader === `Bearer ${process.env.CRON_SECRET}`) {
+  // Tenant-svepet 2026-09-01: fail-closed cron-grind i stället för
+  // `=== \`Bearer ${process.env.CRON_SECRET}\`` ("Bearer undefined" utan env).
+  if (verifyCronSecret(request)) {
     // Cron: generera för alla aktiva businesses
     const supabase = getServerSupabase()
     const { data: businesses } = await supabase

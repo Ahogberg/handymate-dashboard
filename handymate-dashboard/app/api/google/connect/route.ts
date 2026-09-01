@@ -3,6 +3,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/permissions'
 import { getGoogleAuthUrl } from '@/lib/google-calendar'
 import { getServerSupabase } from '@/lib/supabase'
+import { signOAuthState } from '@/lib/google/oauth-state'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,14 +58,18 @@ export async function GET(request: NextRequest) {
       userId = inserted.id
     }
 
-    // Generate state token with business_id, user_id and timestamp
-    const state = Buffer.from(
-      JSON.stringify({
-        business_id: business.business_id,
-        user_id: userId,
-        timestamp: Date.now(),
-      })
-    ).toString('base64')
+    // Signerad state (lib/google/oauth-state.ts, tenant-svepet 2026-09-01):
+    // HMAC över {business_id, user_id, timestamp} — callbacken verifierar
+    // signaturen OCH att sessionen som kommer tillbaka är samma företag.
+    if (!userId) {
+      return NextResponse.redirect(
+        new URL('/dashboard/settings?tab=integrations&google=error&message=' + encodeURIComponent('Kunde inte fastställa användare'), request.url)
+      )
+    }
+    const state = signOAuthState({
+      business_id: business.business_id,
+      user_id: userId,
+    })
 
     // Generate Google OAuth URL
     const authUrl = getGoogleAuthUrl(state)

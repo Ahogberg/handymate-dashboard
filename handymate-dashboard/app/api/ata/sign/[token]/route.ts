@@ -127,7 +127,10 @@ export async function POST(
     // Decline
     if (action === 'decline') {
       const declinedAt = new Date().toISOString()
-      const { error: updateError } = await supabase
+      // Atomisk statusövergång (tenant-svepet 2026-09-01): två samtidiga
+      // POST passerade båda läskontrollen ovan och gav dubbla kort/pushar.
+      // Villkoret i UPDATE + radräkning gör att bara EN vinner.
+      const { data: declinedRows, error: updateError } = await supabase
         .from('project_change')
         .update({
           status: 'declined',
@@ -135,8 +138,13 @@ export async function POST(
           declined_reason: reason || null,
         })
         .eq('sign_token', token)
+        .not('status', 'in', '("signed","declined")')
+        .select('change_id')
 
       if (updateError) throw updateError
+      if (!declinedRows || declinedRows.length === 0) {
+        return NextResponse.json({ error: 'ÄTA:n är redan avgjord' }, { status: 409 })
+      }
 
       // Notifiering till hantverkaren via existing pending_approvals-feed.
       // Hem-skärmens ApprovalCard renderar denna automatiskt — ingen ny
@@ -187,7 +195,7 @@ export async function POST(
       'unknown'
 
     const signedAt = new Date().toISOString()
-    const { error: updateError } = await supabase
+    const { data: signedRows, error: updateError } = await supabase
       .from('project_change')
       .update({
         status: 'signed',
@@ -197,8 +205,13 @@ export async function POST(
         signature_data,
       })
       .eq('sign_token', token)
+      .not('status', 'in', '("signed","declined")')
+      .select('change_id')
 
     if (updateError) throw updateError
+    if (!signedRows || signedRows.length === 0) {
+      return NextResponse.json({ error: 'ÄTA:n är redan avgjord' }, { status: 409 })
+    }
 
     // Notifiering till hantverkaren via existing pending_approvals-feed.
     // Hem-skärmens ApprovalCard renderar denna automatiskt — Christoffer

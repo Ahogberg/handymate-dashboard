@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
+import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
+
+const LEAD_PORTAL_HISTORY_DAYS = 180
+const LEAD_PORTAL_MAX_ROWS = 200
+const LEAD_PORTAL_MAX_POSTS_PER_HOUR = 30
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,12 +47,18 @@ export async function GET(
       .eq('business_id', source.business_id)
       .single()
 
-    // Hämta leads för denna källa
+    // Hämta leads för denna källa. Tenant-svepet 2026-09-01: tidigare HELA
+    // historiken med full PII till varje bärare av koden — nu ett fönster
+    // (senaste 180 dagarna, högst 200 rader) och alltid företagsfiltrerat.
+    const sedan = new Date(Date.now() - LEAD_PORTAL_HISTORY_DAYS * 86_400_000).toISOString()
     const { data: leads } = await supabase
       .from('leads')
       .select('lead_id, name, phone, email, status, notes, source, source_ref, created_at, estimated_value, pipeline_stage_key, category')
+      .eq('business_id', source.business_id)
       .eq('lead_source_id', source.id)
+      .gte('created_at', sedan)
       .order('created_at', { ascending: false })
+      .limit(LEAD_PORTAL_MAX_ROWS)
 
     // Statistik
     const allLeads = leads || []
@@ -110,6 +121,17 @@ export async function POST(
 
     if (!source) {
       return NextResponse.json({ error: 'Portal hittades inte eller är inaktiv' }, { status: 404, headers: corsHeaders })
+    }
+
+    // Tenant-svepet 2026-09-01: varje POST skapar kund + lead + affär och
+    // skickar ägar-SMS. Utan tak kunde en läckt kod fylla pipelinen och
+    // tömma SMS-kvoten. Fail-closed per källa (koden), inte per IP.
+    const rate = await checkPublicRateLimitDb(`lead-portal:source:${source.id}`, {
+      maxRequests: LEAD_PORTAL_MAX_POSTS_PER_HOUR,
+      windowMs: 60 * 60 * 1000,
+    })
+    if (!rate.allowed) {
+      return NextResponse.json({ error: 'För många leads på kort tid — försök igen om en stund' }, { status: 429, headers: corsHeaders })
     }
 
     const body = await request.json()

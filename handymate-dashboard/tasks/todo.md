@@ -1,3 +1,36 @@
+# Nattpass 1: tenant-svep av rutterna utanför standardgrinden (Claude 2026-09-01→02)
+
+Andreas: "kör igenom nummer 1 och sen nummer 2 direkt när det är klart,
+pausa inte för accesser". Rapport: docs/audits/TENANT_SWEEP_2026-09-01.md.
+
+- [x] Inventering: 554 rutter, 120 utan getAuthenticatedBusiness, 38 utan
+      igenkänd grind granskade rad för rad (tre parallella granskningar)
+- [x] KRITISKT: reminders hade hårdkodad reservhemlighet → verifyCronSecret
+- [x] HÖGT: google/callback osignerad OAuth-state → HMAC + sessionsmatchning
+      (lib/google/oauth-state.ts); karin-deadlines, invoices/auto-generate,
+      morning-brief: "Bearer undefined"-mönstret → verifyCronSecret
+- [x] Google Calendar-webhooken kräver kanaltoken (lib/google/channel-token.ts)
+- [x] quotes/track kräver sign_token; portal messages, quotes/public
+      fråga/bokning, lead-portal, public/book, storefront/track,
+      partners/register: fail-closed rate limits (checkPublicRateLimitDb)
+- [x] ÄTA-signering atomisk, fältrapport-reject engångs, inbjudan utan
+      utgång = utgången, Swish-QR validerar, voice/greeting signeras,
+      inbound-mejl faller bara tillbaka vid saknat schema, auth/register
+      kryptografiskt business_id, portalens customer_message business-filtrerad
+- [x] Facit: tests/facit-tenant-sweep.spec.ts + tests/facit-route-auth-
+      inventory.spec.ts (PUBLIC_BY_DESIGN är beslutet) — i CI-grinden
+- [x] Rött på main före passet: cogs-matare räknade 2 bokforMatteUsage,
+      efb8d69 lade till en tredje — facit uppdaterat
+- [x] tsc 0, 27 berörda sviter + nya facit 208 gröna, test:contracts grön
+
+## Beslut för Andreas (INTE ändrat)
+- public-dto exponerar customer.portal_token i offertsvaret (offert→portal-
+  redirect). Scope-eskalering inom samma kund. Gata efter accept?
+- admin/partners/[id]/approve är muterande GET (mejllänk).
+- Portaltoken utan utgång, återaktiveras vid ny länk.
+
+---
+
 # Lanseringsgrund: CI-grind, driftsynlighet, kortkvalitet (Claude 2026-09-01)
 
 Andreas ask efter genomgången "nästa utvecklingssteg inför lansering":

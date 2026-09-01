@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { createInvoice } from '@/lib/invoices/create-invoice'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
@@ -22,9 +23,10 @@ export async function POST(request: NextRequest) {
     let autoSend = false
     let maxAmount = 50000
 
-    // Auth: either authenticated user or cron secret
-    const authHeader = request.headers.get('authorization')
-    const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`
+    // Auth: either authenticated user or cron secret. Tenant-svepet
+    // 2026-09-01: `=== \`Bearer ${process.env.CRON_SECRET}\`` blev "Bearer
+    // undefined" utan env → cron-läget (ALLA företag) var öppet. Fail-closed.
+    const isCron = verifyCronSecret(request)
 
     if (isCron) {
       // Cron mode: process all businesses with auto_invoice_enabled

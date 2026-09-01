@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
-import { checkRateLimitDb } from '@/lib/rate-limit-db'
+import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
 import { createHash } from 'crypto'
 
 /**
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     // per IP räcker för legitima formulär- och portalintegrationer men
     // stoppar skript som spammar lead_sources-nycklar.
     const ipHash = hashIp(getClientIp(request))
-    const rateCheck = await checkRateLimitDb(`leads-intake:ip:${ipHash}`, {
+    const rateCheck = await checkPublicRateLimitDb(`leads-intake:ip:${ipHash}`, {
       maxRequests: 10,
       windowMs: 60 * 60 * 1000,
     })

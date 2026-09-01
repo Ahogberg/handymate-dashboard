@@ -238,7 +238,7 @@ export default function QuoteSignPage() {
     const startTime = Date.now()
 
     // Logga "opened"
-    fetch(`/api/quotes/track?q=${quote.quote_id}&e=opened&s=${sessionId}`).catch(() => {})
+    fetch(`/api/quotes/track?q=${quote.quote_id}&t=${encodeURIComponent(token)}&e=opened&s=${sessionId}`).catch(() => {})
 
     // Logga tid vid stängning
     const handleUnload = () => {
@@ -248,6 +248,7 @@ export default function QuoteSignPage() {
           '/api/quotes/track',
           JSON.stringify({
             quoteId: quote.quote_id,
+            signToken: token,
             event: 'closed',
             sessionId,
             duration,

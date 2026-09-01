@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getCustomerFromPortalToken } from '@/lib/portal-link'
+import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
 
 export const dynamic = 'force-dynamic'
 
 const MESSAGES_CUSTOMER_SELECT = 'customer_id, business_id, portal_enabled, name, phone_number'
+/** Tak per kund och fönster för POST — se kommentaren i POST. */
+const PORTAL_MESSAGE_MAX_PER_WINDOW = 20
+const PORTAL_MESSAGE_WINDOW_MS = 15 * 60 * 1000
 
 export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
   try {
@@ -32,6 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
     const { error: markReadError } = await supabase
       .from('customer_message')
       .update({ read_at: new Date().toISOString() })
+      .eq('business_id', customer.business_id)
       .eq('customer_id', customer.customer_id)
       .eq('direction', 'outbound')
       .is('read_at', null)
@@ -57,6 +62,21 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
     if (message.length > 2000) {
       return NextResponse.json({ error: 'Meddelandet är för långt' }, { status: 400 })
+    }
+
+    // Tenant-svepet 2026-09-01: varje POST här skapar en tråd-rad, ett kort i
+    // ägarens godkännande-kö OCH en push — utan tak kunde en vidarebefordrad
+    // portallänk översvämma hantverkarens telefon. Nyckeln är kunden, inte
+    // IP:t: en riktig kund skriver aldrig 20 meddelanden på en kvart.
+    const rate = await checkPublicRateLimitDb(`portal-messages:customer:${customer.customer_id}`, {
+      maxRequests: PORTAL_MESSAGE_MAX_PER_WINDOW,
+      windowMs: PORTAL_MESSAGE_WINDOW_MS,
+    })
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: 'För många meddelanden på kort tid — vänta en stund och försök igen' },
+        { status: 429 },
+      )
     }
 
     // Tidigare skrevs meddelandet bara till tabellen och stannade där: ingen

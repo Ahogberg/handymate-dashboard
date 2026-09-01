@@ -94,7 +94,8 @@ test('storefront har honeypot och persistent rate limit men inga egna kund- elle
   const route = kod('app/api/storefront/contact/route.ts')
   expect(route).toContain('const { business_id, name, phone, email, message, _hp } = body')
   expect(route).toContain('if (_hp)')
-  expect(route).toContain('checkRateLimitDb(')
+  // Fail-closed-varianten sedan tenant-svepet 2026-09-01 (lib/rate-limit-db.ts).
+  expect(route).toContain('checkPublicRateLimitDb(')
   expect(route).toContain("source: 'website_form'")
   expect(route).not.toContain("from('pipeline_stage')")
   expect(route).not.toContain("from('pipeline_stages')")

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
@@ -51,11 +52,13 @@ async function sendSMS(
 }
 
 export async function POST(request: NextRequest) {
-  // Verifiera att anropet kommer från en cron job (enkel API-nyckel)
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET || 'handymate-cron-secret'
-
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  // Tenant-svepet 2026-09-01: här låg `process.env.CRON_SECRET ||
+  // 'handymate-cron-secret'` — en HÅRDKODAD reservhemlighet i källkoden.
+  // Rutten läser bokningar över ALLA företag och skickar riktiga SMS, så
+  // en saknad env-variabel hade öppnat plattformsbred SMS-sändning för
+  // vem som helst som läst repot. Nu samma fail-closed helper som alla
+  // cron-rutter (lib/cron/verify-secret.ts).
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

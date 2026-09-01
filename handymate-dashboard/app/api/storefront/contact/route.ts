@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
-import { checkRateLimitDb } from '@/lib/rate-limit-db'
+import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
 import { getServerSupabase } from '@/lib/supabase'
 
 const CORS_HEADERS = {
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ange telefon eller e-post' }, { status: 400, headers: CORS_HEADERS })
     }
 
-    const rateCheck = await checkRateLimitDb(`storefront-contact:ip:${hashIp(clientIp(request))}`, {
+    const rateCheck = await checkPublicRateLimitDb(`storefront-contact:ip:${hashIp(clientIp(request))}`, {
       maxRequests: 10,
       windowMs: 60 * 60 * 1000,
     })

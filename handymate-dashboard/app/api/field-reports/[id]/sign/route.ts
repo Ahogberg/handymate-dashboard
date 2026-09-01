@@ -30,6 +30,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   if (report.status === 'signed') {
     return NextResponse.json({ error: 'Redan signerad' }, { status: 400 })
   }
+  // Tenant-svepet 2026-09-01: 'reject' saknade guard — samma token kunde
+  // avvisa om och om igen, och varje gång gick ett SMS till hantverkaren
+  // med fri text från anroparen. Ett avgjort ärende är avgjort.
+  if (report.status === 'rejected') {
+    return NextResponse.json({ error: 'Rapporten är redan avvisad' }, { status: 400 })
+  }
+  if (typeof signed_by === 'string' && signed_by.length > 120) {
+    return NextResponse.json({ error: 'Namnet är för långt' }, { status: 400 })
+  }
+  if (typeof customer_note === 'string' && customer_note.length > 1000) {
+    return NextResponse.json({ error: 'Kommentaren är för lång' }, { status: 400 })
+  }
 
   if (action === 'sign') {
     await supabase.from('field_reports').update({

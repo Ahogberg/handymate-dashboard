@@ -456,7 +456,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Kunde inte skapa portal-länk' }, { status: 500 })
     }
     const signUrl = portalUrl
-    const trackingPixelUrl = `${APP_URL}/api/quotes/track?q=${quoteId}&e=opened&s=${trackingSessionId}`
+    // t=sign_token krävs av /api/quotes/track sedan tenant-svepet 2026-09-01.
+    const trackingPixelUrl = `${APP_URL}/api/quotes/track?q=${quoteId}&t=${encodeURIComponent(signToken)}&e=opened&s=${trackingSessionId}`
 
     let smsSent = false
     let emailSent = false
