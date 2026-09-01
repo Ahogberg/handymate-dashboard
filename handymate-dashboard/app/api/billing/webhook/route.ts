@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { logAutomationActivity } from '@/lib/automations'
 import Stripe from 'stripe'
+import { reverseRevenueSnapshot } from '@/lib/partners/revenue-classification'
+import { classifyStripeInvoiceForPartner } from '@/lib/partners/stripe-revenue'
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -126,6 +128,16 @@ export async function POST(request: NextRequest) {
 
       case 'invoice.payment_succeeded': {
         await handlePaymentSucceeded(supabase, event)
+        break
+      }
+
+      case 'refund.created': {
+        await handleRevenueReversal(supabase, event, stripe, 'refund')
+        break
+      }
+
+      case 'charge.dispute.created': {
+        await handleRevenueReversal(supabase, event, stripe, 'chargeback')
         break
       }
 
@@ -530,12 +542,14 @@ async function handlePaymentSucceeded(supabase: any, event: Stripe.Event) {
     .update({ subscription_status: 'active' })
     .eq('business_id', business.business_id)
 
+  const partnerRevenue = await classifyStripeInvoiceForPartner(supabase, invoice as unknown as Record<string, unknown>)
+
   // Logga händelse. total_excluding_tax/tax (2026-08-11): provisionsmotorn
   // (lib/partners/commission-engine.ts) räknar partnerprovision på faktiskt
   // betalt belopp EX MOMS. Idag kör Stripe utan automatic_tax så
   // amount_paid == ex moms, men om moms aktiveras senare måste basen komma
   // härifrån — därför sparas fälten från och med nu.
-  await supabase
+  const { error: eventError } = await supabase
     .from('billing_event')
     .insert({
       business_id: business.business_id,
@@ -547,9 +561,100 @@ async function handlePaymentSucceeded(supabase: any, event: Stripe.Event) {
         total_excluding_tax: invoice.total_excluding_tax ?? null,
         tax: (invoice as any).tax ?? null,
         currency: invoice.currency,
-        hosted_invoice_url: invoice.hosted_invoice_url
+        hosted_invoice_url: invoice.hosted_invoice_url,
+        // En fryst, fail-closed radklassning. Provisionsmotorn läser bara
+        // allocations ur denna snapshot — aldrig fakturans odifferentierade total.
+        partner_revenue: partnerRevenue,
       }
     })
+  if (eventError) throw new Error(`Betalningshändelsen kunde inte bokföras: ${eventError.message}`)
+}
+
+/**
+ * refund.created / charge.dispute.created
+ *
+ * Hämtar originalfakturan, klassar den med exakt samma allowlist som vid
+ * betalningen och sparar en negativ, proportionell snapshot. Originalet
+ * skrivs aldrig om; provisionsmotorn gör en append-only korrigeringsrad.
+ */
+async function handleRevenueReversal(
+  supabase: any,
+  event: Stripe.Event,
+  stripe: Stripe,
+  kind: 'refund' | 'chargeback',
+) {
+  const object = event.data.object as any
+  const chargeRef = object.charge
+  const charge = typeof chargeRef === 'string'
+    ? await stripe.charges.retrieve(chargeRef)
+    : chargeRef
+
+  if (!charge || typeof charge.id !== 'string') {
+    throw new Error(`${kind}: Stripe-charge saknas`)
+  }
+
+  const invoiceRef = charge.invoice
+  const invoiceId = typeof invoiceRef === 'string' ? invoiceRef : invoiceRef?.id
+  if (!invoiceId) {
+    // Engångsköp (t.ex. Bränsle) saknar faktura och är uttryckligen inte
+    // provisionsgrundande. Logga ändå händelsen för revision/idempotens.
+    const customerId = typeof charge.customer === 'string' ? charge.customer : charge.customer?.id
+    if (!customerId) throw new Error(`${kind}: Stripe-kund saknas`)
+    const { data: business, error: businessError } = await supabase
+      .from('business_config')
+      .select('business_id')
+      .eq('stripe_customer_id', customerId)
+      .single()
+    if (businessError || !business) throw new Error(`${kind}: företag kunde inte verifieras`)
+    const { error } = await supabase.from('billing_event').insert({
+      business_id: business.business_id,
+      event_type: kind === 'refund' ? 'payment_refunded' : 'payment_chargeback',
+      stripe_event_id: event.id,
+      data: {
+        charge_id: charge.id,
+        amount: object.amount,
+        currency: object.currency || charge.currency,
+        partner_revenue: null,
+        classification: 'excluded_non_invoice',
+      },
+    })
+    if (error) throw new Error(`${kind}: händelsen kunde inte bokföras: ${error.message}`)
+    return
+  }
+
+  const invoice = await stripe.invoices.retrieve(invoiceId, {
+    expand: ['lines.data.price'],
+  } as any)
+  const customerId = typeof invoice.customer === 'string' ? invoice.customer : (invoice.customer as any)?.id
+  if (!customerId) throw new Error(`${kind}: Stripe-kund saknas på fakturan`)
+
+  const { data: business, error: businessError } = await supabase
+    .from('business_config')
+    .select('business_id')
+    .eq('stripe_customer_id', customerId)
+    .single()
+  if (businessError || !business) throw new Error(`${kind}: företag kunde inte verifieras`)
+
+  const original = await classifyStripeInvoiceForPartner(supabase, invoice as unknown as Record<string, unknown>)
+  const reversedOre = Number(object.amount || 0)
+  const chargeOre = Number(charge.amount || 0)
+  const ratio = reversedOre > 0 && chargeOre > 0 ? reversedOre / chargeOre : 0
+  const partnerRevenue = reverseRevenueSnapshot(original, kind, ratio)
+
+  const { error } = await supabase.from('billing_event').insert({
+    business_id: business.business_id,
+    event_type: kind === 'refund' ? 'payment_refunded' : 'payment_chargeback',
+    stripe_event_id: event.id,
+    data: {
+      invoice_id: invoiceId,
+      charge_id: charge.id,
+      amount: reversedOre,
+      currency: object.currency || charge.currency,
+      reversal_ratio: Math.max(0, Math.min(1, ratio)),
+      partner_revenue: partnerRevenue,
+    },
+  })
+  if (error) throw new Error(`${kind}: händelsen kunde inte bokföras: ${error.message}`)
 }
 
 /**

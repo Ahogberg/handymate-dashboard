@@ -23,12 +23,15 @@
 import { getServerSupabase } from '@/lib/supabase'
 import {
   computeLedgerRows,
-  deriveExMomsSek,
   periodBounds,
   type CustomerPayment,
   type PartnerCommissionConfig,
   type TierStep,
 } from './commission-engine'
+import {
+  commissionCalendarMonth,
+  extractPartnerRevenueForPeriod,
+} from './revenue-classification'
 
 export { previousMonth } from './commission-engine'
 
@@ -70,72 +73,101 @@ export async function processCommissionPeriod(period: string): Promise<ProcessRe
       // Konverterade referrals för partnern. Legacy-rader från den gamla
       // lead-agency-routen saknar riktigt business-id ('partner_…') och
       // filtreras bort — de kan aldrig matcha billing_events ändå.
-      const { data: referrals } = await supabase
+      const { data: referrals, error: referralsError } = await supabase
         .from('referrals')
         .select('id, referred_business_id, converted_at, status')
         .eq('partner_id', partner.id)
         .not('converted_at', 'is', null)
         .not('referred_business_id', 'like', 'partner_%')
 
+      if (referralsError) {
+        errors.push(`Partner ${partner.id}: referrals kunde inte läsas: ${referralsError.message}`)
+        continue
+      }
       if (!referrals || referrals.length === 0) continue
       partnersProcessed++
 
       const businessIds = referrals.map(r => r.referred_business_id)
       const refByBusiness = new Map(referrals.map(r => [r.referred_business_id, r]))
 
-      // Periodens lyckade betalningar för partnerns kunder.
-      const { data: events } = await supabase
+      // Alla klassade intäktshändelser som kan bära en allocation till
+      // perioden. Ingen nedre created_at-gräns: en årsbetalning i september
+      // ska ge sin allocation även i augusti året därpå.
+      const { data: events, error: eventsError } = await supabase
         .from('billing_event')
         .select('id, business_id, data, created_at')
-        .eq('event_type', 'payment_succeeded')
+        .in('event_type', ['payment_succeeded', 'payment_refunded', 'payment_chargeback'])
         .in('business_id', businessIds)
-        .gte('created_at', start)
         .lt('created_at', end)
 
+      if (eventsError) {
+        errors.push(`Partner ${partner.id}: billing_event kunde inte läsas: ${eventsError.message}`)
+        continue
+      }
       if (!events || events.length === 0) continue
 
-      // Summera ex-moms per business.
-      const paidByBusiness = new Map<string, { sek: number; eventIds: string[] }>()
+      // Summera bara versionsmärkta, klassade allocations. En gammal eller
+      // okänd payment_succeeded-rad i målperioden blir ett synligt fel och
+      // exakt 0 kr — aldrig fallback till invoice-totalen.
+      const paidByBusiness = new Map<string, { ore: number; eventIds: string[] }>()
       for (const ev of events) {
-        const sek = deriveExMomsSek(ev.data)
-        if (sek <= 0) continue
-        const curr = paidByBusiness.get(ev.business_id) || { sek: 0, eventIds: [] }
-        curr.sek += sek
+        const extracted = extractPartnerRevenueForPeriod(ev.data, period)
+        if (!extracted.hasSnapshot) {
+          if (ev.created_at >= start) {
+            errors.push(`Partner ${partner.id}: oklassad billing_event ${ev.id} — 0 kr provisionsgrundat`)
+          }
+          continue
+        }
+        if (extracted.amountExVatOre === 0) continue
+        const curr = paidByBusiness.get(ev.business_id) || { ore: 0, eventIds: [] }
+        curr.ore += extracted.amountExVatOre
         curr.eventIds.push(ev.id)
         paidByBusiness.set(ev.business_id, curr)
       }
+      const nonPositiveBusinesses: string[] = []
+      paidByBusiness.forEach((paid, businessId) => {
+        if (paid.ore <= 0) nonPositiveBusinesses.push(businessId)
+      })
+      for (const businessId of nonPositiveBusinesses) paidByBusiness.delete(businessId)
       if (paidByBusiness.size === 0) continue
 
-      // Betald-månads-räknare + befintliga rader för idempotens. Räknaren
-      // baseras på antal liggarrader FÖRE denna period (obetalda månader
-      // avancerar den inte — D1-beslutet).
+      // Befintliga rader används bara för idempotens. Avtalsmånaden härleds
+      // nedan från converted_at + kalenderperiod och får aldrig påverkas av
+      // hur många betalda månader/liggarrader som råkar finnas.
       const payingIds = Array.from(paidByBusiness.keys())
-      const { data: ledgerRows } = await supabase
+      const { data: ledgerRows, error: ledgerError } = await supabase
         .from('partner_commission_ledger')
         .select('business_id, period')
         .eq('partner_id', partner.id)
         .in('business_id', payingIds)
 
-      const priorMonths = new Map<string, number>()
+      if (ledgerError) {
+        errors.push(`Partner ${partner.id}: liggaren kunde inte läsas: ${ledgerError.message}`)
+        continue
+      }
       const alreadyLedgered = new Set<string>()
       for (const row of ledgerRows || []) {
         if (row.period === period) alreadyLedgered.add(row.business_id)
-        else if (row.period < period) priorMonths.set(row.business_id, (priorMonths.get(row.business_id) || 0) + 1)
       }
 
       // Bygg motorns indata: ALLA betalande kunder (även redan liggade —
       // de ska räknas i volymen/banden), insert sker bara för oliggade.
-      const customers: CustomerPayment[] = payingIds.map(bid => {
+      const customers: CustomerPayment[] = payingIds.flatMap(bid => {
         const ref = refByBusiness.get(bid)!
         const paid = paidByBusiness.get(bid)!
-        return {
+        const customerMonth = commissionCalendarMonth(ref.converted_at, period)
+        if (customerMonth < 1) {
+          errors.push(`Partner ${partner.id}: ogiltig provisionsstart för referral ${ref.id}`)
+          return []
+        }
+        return [{
           businessId: bid,
           referralId: ref.id,
-          customerMonth: (priorMonths.get(bid) || 0) + 1,
-          paidExMomsSek: paid.sek,
+          customerMonth,
+          paidExMomsSek: paid.ore / 100,
           convertedAt: ref.converted_at,
           billingEventIds: paid.eventIds,
-        }
+        }]
       })
 
       const config: PartnerCommissionConfig = {

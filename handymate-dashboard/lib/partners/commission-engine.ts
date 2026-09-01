@@ -14,10 +14,9 @@
  *  - tier_mode 'book' (default): uppnådd sats gäller hela kundstocken.
  *    'marginal': kunder fördelas i band efter converted_at stigande —
  *    kund på position p får satsen för högsta steget med min <= p.
- *  - Månad 1..ladder_months per kund på trappsatsen, därefter EVIG
- *    basnivå (base_rate_after) så länge kunden betalar. "Månad" = BETALD
- *    månad — en obetald månad avancerar inte räknaren (ingen betalning →
- *    ingen liggarrad).
+ *  - Månad 1..ladder_months per kund på trappsatsen, därefter
+ *    base_rate_after. "Månad" är kalenderavståndet från kundens första
+ *    godkända betalning; obetald månad/churn pausar aldrig klockan.
  *  - Basen är faktiskt betalt EX MOMS. Systemet kör idag Stripe utan
  *    automatic_tax (amount_paid == ex moms); om moms aktiveras senare
  *    bär billing_event.data total_excluding_tax/tax från 2026-08-11.
@@ -40,7 +39,7 @@ export interface PartnerCommissionConfig {
 export interface CustomerPayment {
   businessId: string
   referralId: string | null
-  /** 1..N — betald-månads-räknare INKLUSIVE denna period. */
+  /** 1..N — kalenderbaserad avtalsmånad INKLUSIVE denna period. */
   customerMonth: number
   paidExMomsSek: number
   /** ISO-datum för konvertering — styr bandordning i marginal-läget. */
@@ -63,6 +62,11 @@ export interface LedgerRowDraft {
     band: number | null
   }
   billingEventIds: string[]
+}
+
+/** Svensk valuta i kronor med högst två decimaler. */
+export function roundSek(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
 interface BillingEventData {
@@ -211,7 +215,7 @@ export function computeLedgerRows(
       customerMonth: c.customerMonth,
       baseAmountSek: c.paidExMomsSek,
       rate,
-      amountSek: Math.round(c.paidExMomsSek * rate),
+      amountSek: roundSek(c.paidExMomsSek * rate),
       rateSource,
       tierSnapshot: {
         active_count: activeCount,
