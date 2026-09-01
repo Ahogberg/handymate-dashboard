@@ -1,7 +1,7 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { getDefaultStandardTexts } from '@/lib/quote-standard-text-defaults'
 import { getChecklistsForBranch } from '@/lib/checklist-defaults'
-import { applyHourlyRateToDefaults, getDefaultProducts } from '@/lib/product-defaults'
+import { applyHourlyRateToDefaults, getStarterProducts } from '@/lib/product-defaults'
 import { getDefaultReservations } from '@/lib/reservation-defaults'
 import { getDefaultQuoteTemplates, normalizeTemplateBranch } from '@/lib/quote-template-defaults'
 import { getDefaultAgreementTypes } from '@/lib/agreement-type-defaults'
@@ -268,7 +268,9 @@ export async function seedProducts(supabase: SupabaseClient, businessId: string,
   // UX1f: hantverkarens EGET timpris (onboarding steg 3) läggs på de
   // prissatta timartiklarna — statiska 550 kr motsade den enda prisuppgift
   // han lämnat. Prislösa rörs aldrig; se applyHourlyRateToDefaults.
-  const products = applyHourlyRateToDefaults(getDefaultProducts(branch), hourlyRate)
+  // Hela Handymate-biblioteket är frivilligt. Automatik skriver bara den
+  // kompakta startbanken till företagets privata artikelregister.
+  const products = applyHourlyRateToDefaults(getStarterProducts(branch), hourlyRate)
   const { error } = await supabase.from('products').insert(
     products.map((p, i) => ({
       id: `prod_${businessId}_${i}`,

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import {
   ArrowLeft,
   ChevronDown,
+  Library,
   Loader2,
   Package,
   Pencil,
@@ -22,6 +23,7 @@ import { PRODUCT_UNIT_OPTIONS } from '@/components/products/ProductModal'
 import { CategoryTree, type CategoryFilter } from './components/CategoryTree'
 import { ProductEditorModal } from './components/ProductEditorModal'
 import { ProductCsvImportModal } from './components/ProductCsvImportModal'
+import { ProductCatalogModal } from './components/ProductCatalogModal'
 import type { ComponentPayload, ProductCategory, ProductRow } from './types'
 import { priceLabel, priceState } from '@/lib/products/pricing-state'
 
@@ -37,6 +39,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showCatalogModal, setShowCatalogModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showBanner, setShowBanner] = useState(false)
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
@@ -325,6 +328,13 @@ export default function ProductsPage() {
             <p className="text-sm text-gray-500 mt-0.5">Din produktbank — kategorier, priser och komponentkalkyler för offerter</p>
           </div>
           <button
+            onClick={() => setShowCatalogModal(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-primary-200 text-primary-700 rounded-lg font-medium hover:bg-primary-50 transition-colors shrink-0"
+            title="Välj från Handymates artikelbibliotek"
+          >
+            <Library className="w-4 h-4" /> <span className="hidden sm:inline">Handymate-biblioteket</span>
+          </button>
+          <button
             onClick={() => setShowImportModal(true)}
             className="flex items-center gap-2 px-3 py-2 bg-white border border-[#E2E8F0] text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors shrink-0"
             title="Ladda upp prislista (CSV)"
@@ -605,6 +615,22 @@ export default function ProductsPage() {
             fetchProducts(search)
             fetchCategories()
           }}
+        />
+      )}
+
+      {showCatalogModal && (
+        <ProductCatalogModal
+          onClose={() => setShowCatalogModal(false)}
+          onImported={count => {
+            setShowCatalogModal(false)
+            fetchProducts(search)
+            toast.success(
+              count > 0
+                ? `${count} ${count === 1 ? 'artikel har' : 'artiklar har'} lagts till utan gissade priser`
+                : 'De valda artiklarna finns redan i er artikelbank',
+            )
+          }}
+          onError={message => toast.error(message)}
         />
       )}
     </div>

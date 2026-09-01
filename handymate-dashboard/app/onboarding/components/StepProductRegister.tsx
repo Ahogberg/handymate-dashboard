@@ -10,10 +10,9 @@
  * no-op andra gången. (B2: price_list-seedningen är borttagen — tabellen
  * kunde aldrig ta emot en rad.)
  *
- * Granskningslistan visar bara de redan PRISSATTA startartiklarna
- * (sales_price > 0) — den prislösa långsvansen finns redan i registret
- * och prissätter sig själv vid första användning (lib/products/
- * pricing-state.ts), ingen ny logik för det här.
+ * Granskningslistan visar företagets egna artiklar. Den stora, granskade
+ * branschkatalogen kopieras inte längre automatiskt; kunden väljer aktivt
+ * från Handymates bibliotek och sätter därefter sina egna priser.
  *
  * Återanvänder den BEFINTLIGA ProductEditorModal och ProductCsvImportModal
  * (Inställningar → Produkter) rakt av — ingen ny editor byggs.
@@ -25,7 +24,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowRight, AlertTriangle, Package, Upload } from 'lucide-react'
+import { ArrowRight, AlertTriangle, Library, Package, Upload } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import { OB_DOTS, OB_DOT_TOTAL } from '../constants'
 import { QuickPriceInput } from '@/components/products/QuickPriceInput'
@@ -33,6 +32,7 @@ import { JobTypeQuoteSetup } from '@/components/onboarding/JobTypeQuoteSetup'
 import { ToastProvider } from '@/components/Toast'
 import { ProductEditorModal } from '@/app/dashboard/settings/products/components/ProductEditorModal'
 import { ProductCsvImportModal } from '@/app/dashboard/settings/products/components/ProductCsvImportModal'
+import { ProductCatalogModal } from '@/app/dashboard/settings/products/components/ProductCatalogModal'
 import { priceLabel } from '@/lib/products/pricing-state'
 import type { ComponentPayload, ProductRow } from '@/app/dashboard/settings/products/types'
 import type { OnboardingFormData } from '../types-redesign'
@@ -61,6 +61,7 @@ export default function StepProductRegister({ onNext, onBack, data, setData }: P
   const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null)
   const [saving, setSaving] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [showCatalog, setShowCatalog] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [setupRefresh, setSetupRefresh] = useState(0)
   const [setupBusy, setSetupBusy] = useState(false)
@@ -171,6 +172,15 @@ export default function StepProductRegister({ onNext, onBack, data, setData }: P
             <JobTypeQuoteSetup initialJobTypes={data.quoteJobTypes} initialSelection={data.firstQuoteSelection}
               refreshKey={setupRefresh} onBusyChange={setSetupBusy} onChange={(selection, jobTypes) => setData(d => ({ ...d, quoteJobTypes: jobTypes, firstQuoteSelection: selection }))} />
 
+            <button type="button" className="obi-choice" onClick={() => setShowCatalog(true)} style={{ marginBottom: 12 }}>
+              <span className="obi-choice-ic teal"><Library size={22} strokeWidth={2.2} /></span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span className="obi-choice-title">Välj från Handymates artikelbibliotek</span>
+                <span className="obi-choice-sub">Hämta bara det ni använder — priset lämnas tomt tills ni sätter det.</span>
+              </span>
+              <span className="obi-choice-arrow"><ArrowRight size={20} /></span>
+            </button>
+
             <details style={{ marginBottom: 20 }}>
               <summary style={{ cursor: 'pointer', minHeight: 44, color: '#0F766E', fontWeight: 600 }}>Visa mitt övriga artikelregister</summary>
 
@@ -240,7 +250,7 @@ export default function StepProductRegister({ onNext, onBack, data, setData }: P
               <span className="obi-choice-ic teal"><Upload size={22} strokeWidth={2.2} /></span>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span className="obi-choice-title">Ladda upp min egen prislista</span>
-                <span className="obi-choice-sub">Ett tillägg till det redan seedade registret — inte en ersättning.</span>
+                <span className="obi-choice-sub">Lägg in företagets befintliga artiklar och priser direkt.</span>
               </span>
               <span className="obi-choice-arrow"><ArrowRight size={20} /></span>
             </button>
@@ -278,6 +288,18 @@ export default function StepProductRegister({ onNext, onBack, data, setData }: P
             onImported={() => { setShowImport(false); fetchPriced(); setSetupRefresh(n => n + 1) }}
           />
         </ToastProvider>
+      )}
+
+      {showCatalog && (
+        <ProductCatalogModal
+          onClose={() => setShowCatalog(false)}
+          onImported={() => {
+            setShowCatalog(false)
+            void fetchPriced()
+            setSetupRefresh(n => n + 1)
+          }}
+          onError={message => setError(message)}
+        />
       )}
     </div>
   )

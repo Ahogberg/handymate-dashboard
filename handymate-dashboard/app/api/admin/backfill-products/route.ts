@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdmin } from '@/lib/admin-auth'
 import { getServerSupabase } from '@/lib/supabase'
-import { getDefaultProducts, resolveBranches } from '@/lib/product-defaults'
+import { getStarterProducts, resolveBranches } from '@/lib/product-defaults'
 
 export const dynamic = 'force-dynamic'
 
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       // både elektriker och bygg och ska ha båda sortimenten.
       const branches = resolveBranches(biz as Parameters<typeof resolveBranches>[0])
       const branch = branches.join(' + ')
-      let products = getDefaultProducts(branches)
+      let products = getStarterProducts(branches)
 
       if (complement) {
         // Enbart det som SAKNAS. Befintliga rader — och deras eventuellt

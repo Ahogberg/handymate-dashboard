@@ -1,5 +1,5 @@
 /**
- * Branschsortimentet — ENDA sanningskällan för artiklar en ny kund får.
+ * Handymates branschbibliotek och den lilla startbank en ny kund får.
  *
  * Bakgrund (kartläggning 2026-08-05): onboarding seedade bara `price_list`,
  * medan offert-editorn och AI:n läser `products`. Följden var att varje ny
@@ -532,7 +532,7 @@ const BRANCH_PRODUCTS: Record<string, ProductDefault[]> = {
  * kund med ['electrician', 'nonsens'] ska få elsortimentet, inte spädas ut
  * med allmängods.
  */
-export function getDefaultProducts(branch: string | string[]): ProductDefault[] {
+export function getProductCatalog(branch: string | string[]): ProductDefault[] {
   const branches = (Array.isArray(branch) ? branch : [branch]).filter(Boolean)
   const known = branches.filter(b => BRANCH_PRODUCTS[b])
   // Kärnan + branschens prislösa långsvans (pass 2) — kärnan först så
@@ -555,6 +555,49 @@ export function getDefaultProducts(branch: string | string[]): ProductDefault[] 
     settNamnEnhet.add(nyckel)
   }
   return Array.from(bySku.values())
+}
+
+/**
+ * Bakåtkompatibelt namn för äldre läsare av hela biblioteket. Nya skrivvägar
+ * ska använda `getStarterProducts`; katalogytor använder `getProductCatalog`.
+ */
+export function getDefaultProducts(branch: string | string[]): ProductDefault[] {
+  return getProductCatalog(branch)
+}
+
+/**
+ * Den enda bank som får skapas automatiskt för ett nytt företag.
+ *
+ * En huvudsaklig timartikel per vald bransch får företagets verkliga timpris
+ * av seedProducts. De tre allmänna raderna följer med prislösa. Hela den
+ * prislösa långsvansen finns kvar i det frivilliga biblioteket men kopieras
+ * aldrig längre in i företagets privata artikelbank utan ett aktivt val.
+ */
+export function getStarterProducts(branch: string | string[]): ProductDefault[] {
+  const branches = (Array.isArray(branch) ? branch : [branch]).filter(Boolean)
+  const known = branches.filter(b => BRANCH_PRODUCTS[b])
+  const selected = known.length > 0 ? known : ['other']
+
+  const primaryHourly = selected
+    .map(b => BRANCH_PRODUCTS[b].find(p =>
+      p.category === 'arbete' &&
+      p.legacy_category === 'labor' &&
+      p.unit === 'tim' &&
+      p.labor_share === 1 &&
+      p.unit_price > 0,
+    ))
+    .filter((p): p is ProductDefault => Boolean(p))
+
+  const candidates = [
+    ...primaryHourly,
+    ...COMMON_EXTRAS.map(p => ({ ...p, unit_price: 0 })),
+  ]
+  const byNameAndUnit = new Map<string, ProductDefault>()
+  for (const product of candidates) {
+    const key = `${product.name.trim().toLowerCase()}|${product.unit}`
+    if (!byNameAndUnit.has(key)) byNameAndUnit.set(key, { ...product })
+  }
+  return Array.from(byNameAndUnit.values())
 }
 
 /**

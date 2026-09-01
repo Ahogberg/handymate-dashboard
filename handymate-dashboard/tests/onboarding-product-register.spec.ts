@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 import { seedProducts } from '../lib/seed-defaults'
-import { getDefaultProducts } from '../lib/product-defaults'
+import { getStarterProducts } from '../lib/product-defaults'
 
 const ROOT = path.resolve(__dirname, '..')
 function source(relativePath: string): string {
@@ -42,12 +42,12 @@ function fakeSeedSupabase() {
 }
 
 test.describe('seedProducts — deterministisk seed av produktbanken', () => {
-  test('id-schemat är prod_{businessId}_{index i getDefaultProducts}', async () => {
+  test('id-schemat är prod_{businessId}_{index i den kompakta startbanken}', async () => {
     const fake = fakeSeedSupabase()
     const businessId = 'biz_c'
     await seedProducts(fake.client, businessId, 'electrician')
 
-    const all = getDefaultProducts('electrician')
+    const all = getStarterProducts('electrician')
     const firstPriced = all.find(p => p.unit_price > 0)
     expect(firstPriced).toBeTruthy()
     const expectedIndex = all.indexOf(firstPriced!)
@@ -64,20 +64,21 @@ test.describe('seedProducts — deterministisk seed av produktbanken', () => {
 })
 
 test.describe('UX1f — timpriset från steg 3 når seedade timartiklar', () => {
-  test('seedProducts med hourlyRate: basen får timpriset, relativa påslag bevaras, prislösa orörda', async () => {
+  test('seedProducts med hourlyRate: bara basartikeln får företagets pris, övrigt är prislöst', async () => {
     const fake = fakeSeedSupabase()
     await seedProducts(fake.client, 'biz_rate', 'electrician', 900)
 
     const byName = new Map(fake.inserted.products.map((p: any) => [p.name, p]))
     // Bas: Elinstallation 550 → 900
     expect(byName.get('Elinstallation')!.sales_price).toBe(900)
-    // Felsökning 650 (bas+100) → 1000; Jour 950 (bas+400) → 1300
-    expect(byName.get('Felsökning')!.sales_price).toBe(1000)
-    expect(byName.get('Jour och akut utryckning')!.sales_price).toBe(1300)
-    // Prislös timartikel rörs aldrig
-    expect(byName.get('Lärling')!.sales_price).toBe(0)
-    // Icke-tim-artikel orörd
-    expect(byName.get('Installation vägguttag')!.sales_price).toBe(850)
+    // Handymates gissade priser och långsvans skrivs inte längre automatiskt.
+    expect(byName.has('Felsökning')).toBe(false)
+    expect(byName.has('Jour och akut utryckning')).toBe(false)
+    expect(byName.has('Lärling')).toBe(false)
+    expect(byName.has('Drivdon för LED')).toBe(false)
+    // Generella rader kan vara användbara men priset måste ägas av företaget.
+    expect(byName.get('Framkörning')!.sales_price).toBe(0)
+    expect(byName.get('Bortforsling av avfall')!.sales_price).toBe(0)
   })
 
   test('utan hourlyRate: exakt samma priser som förut (identitet)', async () => {
@@ -193,12 +194,14 @@ test.describe('B2 — price_list-spåret är dött och får inte återuppstå', 
 })
 
 test.describe('StepProductRegister — återanvänder befintlig UI, bygger ingen ny editor', () => {
-  test('importerar ProductEditorModal och ProductCsvImportModal från Settings, definierar ingen egen', () => {
+  test('återanvänder editor, CSV-import och Handymate-bibliotek från Settings', () => {
     const stepSrc = source('app/onboarding/components/StepProductRegister.tsx')
     expect(stepSrc).toContain("from '@/app/dashboard/settings/products/components/ProductEditorModal'")
     expect(stepSrc).toContain("from '@/app/dashboard/settings/products/components/ProductCsvImportModal'")
+    expect(stepSrc).toContain("from '@/app/dashboard/settings/products/components/ProductCatalogModal'")
     expect(stepSrc).not.toMatch(/function ProductEditorModal/)
     expect(stepSrc).not.toMatch(/function ProductCsvImportModal/)
+    expect(stepSrc).not.toMatch(/function ProductCatalogModal/)
   })
 
   test('CSV-importmodalen wrappas i en lokal ToastProvider (saknas i onboarding-trädet annars)', () => {
