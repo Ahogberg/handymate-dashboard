@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 /**
  * ETAPP 3 (offert-masterplan.md): samma brytpunkt som Tailwinds `lg`
  * (1024px) — dokumentmotorns mobilanpassningar (DocumentScaler.tsx skalar
- * A4 till skärmbredd, QuotePreviewPanel sätter QuoteDocument i sheetMode)
+ * A4 till skärmbredd, QuoteDocumentSurface sätter QuoteDocument i sheetMode)
  * ska växla vid exakt samma gräns som resten av canvas-first-layouten
  * (new/page.tsx + [id]/edit/page.tsx använder `lg:`-prefixet överallt).
  */

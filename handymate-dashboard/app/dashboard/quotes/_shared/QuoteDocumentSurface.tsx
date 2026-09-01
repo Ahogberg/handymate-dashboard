@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, Eye, FileText, Loader2, Maximize2, X } from 'lucide-react'
+import { Eye, FileText, Loader2, Maximize2, X } from 'lucide-react'
 import TemplatePreviewFrame, { type TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import QuoteDocument, { type QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
 import { DocumentScaler } from '@/components/quotes/document/DocumentScaler'
@@ -10,15 +10,9 @@ import type { QuoteTemplateData } from '@/lib/quote-templates/types'
 import type { QuoteSection } from '@/lib/quotes/quote-completeness'
 import type { ReservationSuggestion } from '@/lib/reservations/match'
 
-type PreviewMode = 'live' | 'design'
-
-interface QuotePreviewPanelProps {
-  open: boolean
-  setOpen: (b: boolean) => void
-  previewMode: PreviewMode
-  setPreviewMode: (m: PreviewMode) => void
-  /** ETAPP 2c (offert-masterplan.md): styr om Live-fliken (redigerbar
-      dokumentcanvas) erbjuds. new-sidan hade tidigare live-läget, edit
+interface QuoteDocumentSurfaceProps {
+  /** ETAPP 2c (offert-masterplan.md): styr om den redigerbara
+      dokumentcanvasen erbjuds. new-sidan hade tidigare canvasen, edit
       inte — motorn (QuoteDocument) är stil-agnostisk för valet av data,
       så det fanns ingen teknisk anledning att neka edit-sidan samma
       funktion. `liveTemplateData`/`liveHandlers` krävs bara när true. */
@@ -28,7 +22,7 @@ interface QuotePreviewPanelProps {
   /** ETAPP 3 (offert-masterplan.md): tryck på en rad i canvasen UNDER lg
       (sheetMode sätts automatiskt här utifrån viewport-bredden, se
       useIsMobileViewport) — sidan (new/edit) öppnar sin RowEditSheet med
-      raden. Krävs bara för Live-fliken; utelämnad → sheetMode blir aldrig
+      raden. Krävs bara för canvasgrenen; utelämnad → sheetMode blir aldrig
       aktivt (QuoteDocument faller tillbaka till vanlig inline-redigering). */
   onRowTap?: (itemId: string) => void
   /** Mobilens "+ Lägg till rad". Sidan öppnar sin AddRowSheet (sök i
@@ -67,7 +61,7 @@ interface QuotePreviewPanelProps {
    * matchade-men-ej-tillagda förslag, vidarebefordrade rakt till
    * QuoteDocument (se dess docblock för `reservationSuggestions`/
    * `onReviewReservationSuggestions`) — den fristående bannern som satt
-   * här i panelen bredvid är borttagen, förslagen renderas nu inuti
+   * bredvid dokumentet är borttagen, förslagen renderas nu inuti
    * dokumentets egen Reservationer-sektion.
    */
   reservationSuggestions?: ReservationSuggestion[]
@@ -75,17 +69,23 @@ interface QuotePreviewPanelProps {
 }
 
 /**
- * QuotePreviewPanel — ETAPP 2c (offert-masterplan.md): förenar
- * QuoteNewPreviewPanel och QuoteEditPreviewPanel till EN komponent.
- * Skillnaden var bara Live-fliken (fanns i new, saknades i edit) — nu
- * styrd av `liveEnabled` istället för att vara två separata filer som
- * kunde divergera.
+ * QuoteDocumentSurface — offerten ÄR ytan (Claude Design-handoffen,
+ * offert-omtaget): inga flikar, ingen kollapsbar "Förhandsgranska"-panel.
+ * Dokumentet renderas alltid, direkt i huvudytan, i både create- och
+ * edit-läget: redigerbar dokumentcanvas (QuoteDocument) när Modern-stilen
+ * är vald, annars server-renderad iframe (TemplatePreviewFrame) — samma
+ * mönster som app/dashboard/invoices/_shared/InvoiceEditor.tsx (ingen flik,
+ * canvas om Modern, iframe annars). TemplatePreviewFrame behålls eftersom
+ * /api/quotes/preview-html är den enda renderaren för Premium/Friendly —
+ * och den rutten fungerar även för osparade utkast (se dess egen
+ * kommentar), så iframen är en fungerande yta direkt, ingen
+ * "spara först"-tomruta behövs.
+ *
+ * (Historik: komponenten förenade i ETAPP 2c, offert-masterplan.md,
+ * new/edit-sidornas två separata paneler till EN fil — `liveEnabled` är
+ * kvar därifrån.)
  */
-export function QuotePreviewPanel({
-  open,
-  setOpen,
-  previewMode,
-  setPreviewMode,
+export function QuoteDocumentSurface({
   liveEnabled,
   liveTemplateData,
   liveHandlers,
@@ -97,12 +97,12 @@ export function QuotePreviewPanel({
   quickReveal,
   reservationSuggestions,
   onReviewReservationSuggestions,
-}: QuotePreviewPanelProps) {
+}: QuoteDocumentSurfaceProps) {
   const [fullscreen, setFullscreen] = useState(false)
   const [previewPending, setPreviewPending] = useState(false)
   // Fångat vid montering och därefter oföränderligt. Två skäl: proppen får
   // aldrig kunna starta om animationen mitt i granskningen, och
-  // renderPreviewBody anropas på TVÅ ställen (inline och fullskärm) — utan
+  // renderDocument anropas på TVÅ ställen (inline och fullskärm) — utan
   // den här låsningen hade revealen spelats om när fullskärmsläget öppnas.
   const [revealOnMount] = useState(() => !!quickReveal)
   // ETAPP 3: samma brytpunkt som DocumentScaler — under lg stängs radernas
@@ -110,9 +110,11 @@ export function QuotePreviewPanel({
   // 44px-kravet i A4-skala, se offert-masterplan.md).
   const isMobile = useIsMobileViewport()
 
-  function renderPreviewBody(flexFill: boolean) {
+  const showLive = liveEnabled && !!liveTemplateData && !!liveHandlers
+
+  function renderDocument(flexFill: boolean) {
     const sizeCls = flexFill ? 'flex-1 min-h-0' : 'h-full'
-    if (previewMode === 'live' && liveEnabled && liveTemplateData && liveHandlers) {
+    if (showLive && liveTemplateData && liveHandlers) {
       // Reveal-klassen ligger på den BEFINTLIGA diven nedan, inte på en ny
       // wrapper: ett extra element hade ändrat trädformen, fått React att
       // montera om DocumentScaler + QuoteDocument, och ett pågående inline-fält
@@ -189,10 +191,16 @@ export function QuotePreviewPanel({
         </div>
       )
     }
+    // Iframe = dokumentytan för Premium/Friendly (InvoiceEditor-precedenten).
+    // max-lg:aspect-[210/297] ger riktig höjd under lg där sticky-wrapperns
+    // h-[calc(100vh-7rem)] inte gäller (fixar 0-höjdskollapsen: flex-1 i en
+    // kolumn vars höjd själv är auto löses till 0). max-lg:flex-none hindrar
+    // flex-1 från att nolla aspect-ration — i en flex-kolumn styr flex
+    // huvudaxeln (höjden) och vinner annars över aspect-ratio.
     return (
       <TemplatePreviewFrame
         payload={templatePreviewPayload}
-        className={sizeCls}
+        className={`${sizeCls} max-lg:flex-none max-lg:aspect-[210/297]`}
         onPendingChange={setPreviewPending}
       />
     )
@@ -200,81 +208,26 @@ export function QuotePreviewPanel({
 
   return (
     <>
-      {/* ETAPP 3 (offert-masterplan.md): panelen var tidigare `hidden lg:flex`
-          — dokumentet syntes ALDRIG i huvudytan under lg (bara FAB:ens
-          statiska, oredigerbara modal). "Dokumentet ÄR gränssnittet" gäller
-          mobilen lika mycket som desktop — panelen är nu synlig i alla
-          brytpunkter, oförändrad vid lg+. */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col h-full">
-        <div className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50/50 transition-colors">
-          <button
-            type="button"
-            onClick={() => setOpen(!open)}
-            className="flex items-center gap-3 flex-1 min-w-0 text-left"
-          >
-            <div className="w-9 h-9 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center flex-shrink-0">
-              <Eye className="w-4.5 h-4.5" />
-            </div>
-            <h2 className="font-heading text-base font-bold text-slate-900 tracking-tight flex-1">
-              Förhandsgranska
-            </h2>
-            {previewMode === 'design' && previewPending && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                Uppdaterar
-              </span>
-            )}
-          </button>
-          {open && (
-            <button
-              type="button"
-              onClick={() => setFullscreen(true)}
-              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-              aria-label="Maximera"
-              title="Visa i fullskärm"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setOpen(!open)}
-            aria-label={open ? 'Dölj' : 'Visa'}
-            className="p-1 text-slate-400"
-          >
-            <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
-        {open && (
-          <div className="px-3 pb-3 space-y-3 border-t border-slate-100 pt-3 flex-1 min-h-0 flex flex-col">
-            <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => liveEnabled && setPreviewMode('live')}
-                disabled={!liveEnabled}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  previewMode === 'live'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                } ${!liveEnabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                title={liveEnabled ? 'Inline-redigera direkt i mallen' : 'Live-redigering för Premium/Friendly kommer i nästa steg'}
-              >
-                Live ✏️
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewMode('design')}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  previewMode === 'design'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                Slutdesign
-              </button>
-            </div>
-            {renderPreviewBody(true)}
-          </div>
+      <div className="relative h-full flex flex-col">
+        {renderDocument(true)}
+        {/* Diskret fullskärmsknapp — desktop only (på mobil skulle den
+            överlappa den skalade A4:an). */}
+        <button
+          type="button"
+          onClick={() => setFullscreen(true)}
+          aria-label="Maximera"
+          title="Visa i fullskärm"
+          className="hidden lg:inline-flex absolute top-3 right-3 z-10 p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 text-slate-400 hover:text-slate-700 transition-colors"
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
+        {/* Minimal överlevnad av "Uppdaterar"-badgen (signalen för
+            600ms-debouncens server-rundresa) — endast iframe-grenen. */}
+        {!showLive && previewPending && (
+          <span className="absolute top-3 left-3 z-10 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/90 text-slate-600 border border-slate-200 shadow-sm">
+            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+            Uppdaterar
+          </span>
         )}
       </div>
 
@@ -299,7 +252,7 @@ export function QuotePreviewPanel({
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-hidden p-3 flex flex-col">{renderPreviewBody(false)}</div>
+            <div className="flex-1 overflow-hidden p-3 flex flex-col">{renderDocument(false)}</div>
           </div>
         </div>
       )}

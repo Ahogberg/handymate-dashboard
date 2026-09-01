@@ -138,7 +138,7 @@ test.describe('Tomt-läge i edit-läge, oskalad canvas (Fas E)', () => {
     expect(html).toContain('<table>')
   })
 
-  test('sheetMode (mobil, skalad canvas) med noll rader → OFÖRÄNDRAT här, mobilens egen tomruta renderas OSKALAD av QuotePreviewPanel.tsx i stället', () => {
+  test('sheetMode (mobil, skalad canvas) med noll rader → OFÖRÄNDRAT här, mobilens egen tomruta renderas OSKALAD av QuoteDocumentSurface.tsx i stället', () => {
     const html = renderDoc([], 'edit', { sheetMode: true, onOpenAiHelp: () => {} })
     expect(html).not.toContain(EMPTY_BOX_OPEN_TAG)
     expect(html).toContain('<table>')

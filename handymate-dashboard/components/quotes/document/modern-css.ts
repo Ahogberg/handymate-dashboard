@@ -153,7 +153,7 @@ export const MODERN_DOCUMENT_CSS = `
    elementets ÖVERKANT mot scrollportens överkant. Det värdet faktiskt
    kompenserar är den sticky headern (QuoteNewHeader, sticky top-0), och
    bara när SIDAN är det som scrollar. Vid lg scrollar dokumentrutan internt
-   (QuotePreviewPanel, overflow-auto + höjdbegränsad) och där täcker ingenting
+   (QuoteDocumentSurface, overflow-auto + höjdbegränsad) och där täcker ingenting
    överkanten — värdet ska vara litet. Den tidigare kommentaren här påstod fel. */
 .quote-document--interactive [data-section] {
   transition: opacity .25s ease;
@@ -219,7 +219,7 @@ export const MODERN_DOCUMENT_CSS = `
    rad för rad, i stället för att bara finnas. Total budget ~1,2 s.
 
    Gatad på .quick-reveal, en klass som BARA snabboffertens granskningsvy
-   sätter (QuotePreviewPanel, opt-in-prop). Medvetet INTE gatad på
+   sätter (QuoteDocumentSurface, opt-in-prop). Medvetet INTE gatad på
    [data-focus-section]: det attributet försvinner vid översikten och skulle
    spela om hela revealen varje gång hantverkaren går tillbaka till en sektion.
 

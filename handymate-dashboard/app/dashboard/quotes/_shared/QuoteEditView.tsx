@@ -22,7 +22,7 @@ import { useReservationSuggestions } from './useReservationSuggestions'
 import { ReservationMutedNotice } from './ReservationSuggestionBanner'
 import { ReservationReviewSheet } from './ReservationReviewSheet'
 import { QuoteMarginCard } from './QuoteMarginCard'
-import { QuotePreviewPanel } from './QuotePreviewPanel'
+import { QuoteDocumentSurface } from './QuoteDocumentSurface'
 import { QuoteItemsSection } from './QuoteItemsSection'
 import { QuoteRotSection } from './QuoteRotSection'
 import { QuoteStandardTextsSection } from './QuoteStandardTextsSection'
@@ -180,10 +180,6 @@ export interface QuoteEditViewProps {
   discountPercent: number
   setDiscountPercent: (n: number) => void
 
-  showPreviewPanel: boolean
-  setShowPreviewPanel: (b: boolean) => void
-  previewMode: 'live' | 'design'
-  setPreviewMode: (m: 'live' | 'design') => void
   liveAvailable: boolean
   quoteTemplateData: QuoteTemplateData
   liveHandlers: QuoteDocumentHandlers
@@ -232,7 +228,7 @@ export function QuoteEditView(props: QuoteEditViewProps) {
     showDisplaySettings, setShowDisplaySettings, detailLevel, setDetailLevel, showUnitPrices, setShowUnitPrices,
     showQuantities, setShowQuantities,
     totals, vatRate, discountPercent, setDiscountPercent,
-    showPreviewPanel, setShowPreviewPanel, previewMode, setPreviewMode, liveAvailable, quoteTemplateData,
+    liveAvailable, quoteTemplateData,
     liveHandlers, setSheetItemId, addRowSheetOpen, setAddRowSheetOpen, templatePreviewPayload, sheetItem,
     showGrossistSearch, businessId, addFromGrossist,
     productModalRow, savingProduct, saveItemToProducts, buildProductInitialValues,
@@ -291,7 +287,7 @@ export function QuoteEditView(props: QuoteEditViewProps) {
                 (ReservationSuggestionBanner) är borttagen — förslagen
                 renderas nu i dokumentets egen Reservationer-sektion
                 (QuoteDocument.tsx, se `reservationSuggestions`-proppen på
-                QuotePreviewPanel nedan). ReservationMutedNotice är en
+                QuoteDocumentSurface nedan). ReservationMutedNotice är en
                 ANNAN, orelaterad affordans och stannar kvar precis här. */}
             {reservations.mutedNotice && (
               <ReservationMutedNotice
@@ -415,13 +411,9 @@ export function QuoteEditView(props: QuoteEditViewProps) {
             />
           </div>
 
-          {/* ── Right Column — Preview-only, fyller viewport ─────── */}
+          {/* ── Höger kolumn — dokumentytan, fyller viewport ─────── */}
           <div className="lg:sticky lg:top-[5.5rem] lg:h-[calc(100vh-7rem)]">
-            <QuotePreviewPanel
-              open={showPreviewPanel}
-              setOpen={setShowPreviewPanel}
-              previewMode={previewMode}
-              setPreviewMode={setPreviewMode}
+            <QuoteDocumentSurface
               liveEnabled={liveAvailable}
               liveTemplateData={quoteTemplateData}
               liveHandlers={liveHandlers}
