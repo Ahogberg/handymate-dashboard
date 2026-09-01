@@ -1,6 +1,0 @@
-/* Kvar EFTER kompakteringen (offertytan Del 2): bara ankomst-animationen som
-   QuoteBuilder sätter på sidroten när underlaget landat (first-quote-arrival).
-   Alla .quote-job-*-regler (720px-boxen) är borttagna — remsan i
-   QuoteJobTypeStart.tsx är ren Tailwind. Importeras numera av QuoteBuilder. */
-.first-quote-arrival{animation:quote-arrive .45s ease-out both}@keyframes quote-arrive{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){.first-quote-arrival{animation:none}}

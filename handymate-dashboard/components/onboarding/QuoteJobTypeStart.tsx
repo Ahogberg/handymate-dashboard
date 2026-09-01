@@ -84,7 +84,12 @@ export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic
 
   const matching = data && jobType ? templatesForJobType(data.templates, jobType).filter(t => t.items.length > 0) : []
   // Chipstil = Fas E:s Mer-chips, så remsan läses som en i verktygsstacken.
-  const chip = 'px-3 py-1.5 rounded-[10px] text-[12.5px] font-semibold transition-colors border disabled:opacity-60'
+  // MEN med 44px träffyta under sm: remsan är hantverkarens FÖRSTA tryck vid
+  // offertstart på telefon (CLAUDE.md: mobiloptimerat, telefon på bygget) —
+  // gamla CSS:en garanterade min-height:44px och kompakteringen får inte
+  // tappa det. Från sm och uppåt kompakt som Mer-raden.
+  const touch = 'min-h-[44px] sm:min-h-0'
+  const chip = `px-3 py-1.5 rounded-[10px] text-[12.5px] font-semibold transition-colors border disabled:opacity-60 ${touch}`
   return <section aria-label="Jobbtyp och offertunderlag" aria-busy={loading || busy}
     className="bg-white border border-slate-200 rounded-2xl p-2 flex flex-wrap items-center gap-1.5">
     <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
@@ -93,7 +98,7 @@ export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic
     {loading && <span role="status" className="text-[12.5px] text-slate-500">Hämtar ditt upplägg…</span>}
     {error && <span role="alert" className="text-[12.5px] text-red-700">
       {error}{' '}
-      <button type="button" disabled={busy} className="underline font-semibold text-primary-700 disabled:opacity-60" onClick={() => {
+      <button type="button" disabled={busy} className={`underline font-semibold text-primary-700 disabled:opacity-60 px-1 inline-flex items-center ${touch}`} onClick={() => {
         if (lastSelection.current) void apply(lastSelection.current)
         else { attempted.current = false; setRetry(n => n + 1) }
       }}>Försök igen</button>
@@ -105,7 +110,7 @@ export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic
           onClick={() => { lastSelection.current = null; onSelectJobType(job.slug); setError('') }}>{job.name}</button>)}
       {!data.linkingAvailable && <span className="text-[12.5px] text-slate-500">Mallkopplingen är inte aktiverad ännu — beskriv jobbet eller välj en mall som vanligt.</span>}
       {data.linkingAvailable && matching.map(t => <button type="button" key={t.id} disabled={busy}
-        className="px-3 py-1.5 rounded-[10px] border border-primary-700/30 bg-primary-50 hover:bg-primary-100 transition-colors inline-flex items-center gap-2 text-left disabled:opacity-60"
+        className={`px-3 py-1.5 rounded-[10px] border border-primary-700/30 bg-primary-50 hover:bg-primary-100 transition-colors inline-flex items-center gap-2 text-left disabled:opacity-60 ${touch}`}
         onClick={() => void apply({ jobTypeSlug: jobType!, templateId: t.id })}>
         <span className="text-[12.5px] font-semibold text-primary-800">{t.name}</span>
         <span className="text-[11px] text-slate-400">{t.items.length} rader · dina priser</span>
