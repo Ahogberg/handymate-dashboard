@@ -1,3 +1,4 @@
+/** @jsxImportSource react */
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
@@ -116,7 +117,18 @@ export function EditableText({ value, onChange, className = '', placeholder, mul
         padding: '0 2px',
         margin: '0 -2px',
         transition: 'background 0.1s',
-        display: 'inline-block',
+        // 'inline' för ifyllda värden — 'inline-block' + 'pre-line' lade
+        // flerradiga värden FEL: en inline-blocks baslinje är dess SISTA
+        // radbox (CSS 2.1 §10.8.1), så alla rader utom den sista hamnade
+        // OVANFÖR etiketten i stycket (t.ex. "Ej inkluderat:"-punkterna i
+        // villkorsstycket). En vanlig inline-box fragmenterar över radboxar
+        // och flödar naturligt efter etiketten. Bara tomma värden behåller
+        // inline-block: minWidth-klickytan kräver en block-container
+        // (min-width har ingen effekt på inline-boxar) och placeholdern är
+        // alltid enradig, så baslinjeproblemet kan inte uppstå där.
+        // OBS: EditableDate/EditableNumber är medvetet kvar på inline-block
+        // — de är enradiga i praktiken och saknar pre-line.
+        display: isEmpty ? 'inline-block' : 'inline',
         minWidth: '1ch',
         whiteSpace: 'pre-line',
       }}
