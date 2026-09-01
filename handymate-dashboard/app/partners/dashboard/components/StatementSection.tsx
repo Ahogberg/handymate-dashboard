@@ -1,9 +1,8 @@
 'use client'
 
 // Provisionsunderlag per månad (partnerprogram v2, 2026-08-11):
-// kund × månad × sats × belopp med summarad "Att fakturera
-// (självfakturering)". Underlaget är exakt det partnern fakturerar
-// Handymate på — liggaren är sanningen, det här är dess vy.
+// kund × månad × sats × belopp. Detta är en livevy av liggaren; den
+// numrerade självfakturan blir ett separat fryst dokument när batchen skapas.
 
 import { useState } from 'react'
 import { FileText } from 'lucide-react'
@@ -67,7 +66,7 @@ export default function StatementSection({
         ) : (
           <>Provision: <span className="font-medium">{formatProcent(legacyRate)}</span>. </>
         )}
-        Gäller kundens första {ladderMonths} betalda månader — därefter{' '}
+        Gäller kundens första {ladderMonths} kalendermånader — därefter{' '}
         <span className="font-medium">{formatProcent(baseRateAfter)}</span> så länge kunden betalar.
       </div>
 
@@ -109,7 +108,7 @@ export default function StatementSection({
             <tfoot>
               <tr className="border-t border-gray-200 bg-slate-50/50">
                 <td colSpan={3} className="px-5 py-3 font-semibold text-gray-900">
-                  {vald.all_paid ? 'Utbetalt för perioden' : 'Att fakturera (självfakturering)'}
+                  {vald.all_paid ? 'Utbetalt för perioden' : 'Upplupet provisionsunderlag'}
                 </td>
                 <td className="px-3 py-3 text-right font-bold text-primary-700">{formatSek(vald.total_sek)}</td>
                 <td />

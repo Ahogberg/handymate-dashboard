@@ -18,9 +18,11 @@ import {
 import ReferralCard from './components/ReferralCard'
 import AgreementGate from '../components/AgreementGate'
 import StatementSection from './components/StatementSection'
+import BillingProfileCard from './components/BillingProfileCard'
+import SelfBillingSection from './components/SelfBillingSection'
 import {
   formatSek,
-  type PartnerData, type Stats, type Referral, type Statement, type PartnerEvent,
+  type PartnerData, type Stats, type Referral, type Statement, type PartnerEvent, type SelfBillingBatch,
 } from './components/types'
 
 const WEBHOOK_EVENT_OPTIONS = [
@@ -37,6 +39,7 @@ export default function PartnerDashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [referrals, setReferrals] = useState<Referral[]>([])
   const [statements, setStatements] = useState<Statement[]>([])
+  const [selfBillingBatches, setSelfBillingBatches] = useState<SelfBillingBatch[]>([])
   const [eventsByBusiness, setEventsByBusiness] = useState<Record<string, PartnerEvent[]>>({})
 
   const [copiedLink, setCopiedLink] = useState(false)
@@ -75,6 +78,7 @@ export default function PartnerDashboardPage() {
       setStats(data.stats)
       setReferrals(data.referrals || [])
       setStatements(data.statements || [])
+      setSelfBillingBatches(data.self_billing_batches || [])
       setEventsByBusiness(data.events_by_business || {})
 
       if (data.partner) {
@@ -337,6 +341,14 @@ export default function PartnerDashboardPage() {
           ladderMonths={partner.ladder_months}
         />
 
+        {/* ─── Självfakturering ─── */}
+        <BillingProfileCard
+          profile={partner.billing_profile}
+          complete={partner.billing_profile_complete}
+          onSaved={fetchDashboard}
+        />
+        <SelfBillingSection batches={selfBillingBatches} onChanged={fetchDashboard} />
+
         {/* ─── Webhook settings ─── */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center justify-between">
@@ -364,9 +376,9 @@ export default function PartnerDashboardPage() {
           <h3 className="font-semibold text-primary-800 mb-2">Om provisionsutbetalning</h3>
           <p className="text-sm text-primary-700">
             Provisionen räknas på vad dina kunder faktiskt betalat och ackrueras automatiskt
-            månaden efter betalningen. Utbetalning sker via självfakturering: du fakturerar oss
-            beloppet i underlaget ovan, månadsvis i efterskott. Dina exakta villkor ser du i
-            provisionssektionen.
+            enligt tjänsteperioden. Handymate skapar och numrerar självfakturan i ditt namn.
+            Du får den här i portalen för granskning och kan godkänna eller invända innan
+            utbetalningen. Dina exakta villkor ser du i provisionssektionen.
           </p>
         </div>
       </div>

@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
   const { data: fullPartner } = await supabase
     .from('partners')
-    .select('id, name, company, email, referral_code, referral_url, commission_rate, commission_tiers, base_rate_after, tier_mode, ladder_months, total_earned_sek, total_pending_sek, api_key, webhook_url, webhook_secret, webhook_events')
+    .select('id, name, company, email, referral_code, referral_url, commission_rate, commission_tiers, base_rate_after, tier_mode, ladder_months, total_earned_sek, total_pending_sek, api_key, webhook_url, webhook_secret, webhook_events, self_billing_legal_name, self_billing_org_number, self_billing_registered_address, self_billing_vat_number, self_billing_vat_registered, self_billing_vat_rate, self_billing_f_tax_approved, self_billing_email, payout_bankgiro, payout_plusgiro, payout_account')
     .eq('id', partner.id)
     .single()
 
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
   const bizIds = realRefs.map(r => r.referred_business_id)
 
   // Batchade uppslag — ett anrop per tabell, inte per referral.
-  const [bizRes, ledgerRes, followupRes, eventsRes, paymentsRes] = await Promise.all([
+  const [bizRes, ledgerRes, followupRes, eventsRes, paymentsRes, batchesRes] = await Promise.all([
     bizIds.length
       ? supabase.from('business_config')
           .select('business_id, company_name, business_name, subscription_status, onboarding_completed_at, referred_by')
@@ -82,6 +82,11 @@ export async function GET(request: NextRequest) {
           .in('business_id', bizIds)
           .order('created_at', { ascending: false })
       : Promise.resolve({ data: [] as any[] }),
+    supabase.from('partner_payout_batch')
+      .select('id, period, invoice_number, invoice_date, due_date, subtotal_sek, vat_sek, total_incl_vat_sek, delivery_status, review_status, reviewed_at, dispute_reason, status, paid_at')
+      .eq('partner_id', partner.id)
+      .not('invoice_number', 'is', null)
+      .order('invoice_date', { ascending: false }),
   ])
 
   const bizFor = new Map((bizRes.data || []).map((b: any) => [b.business_id, b]))
@@ -192,6 +197,30 @@ export async function GET(request: NextRequest) {
   }
 
   const apiKey: string | null = fullPartner?.api_key || null
+  const billingProfile = {
+    self_billing_legal_name: fullPartner?.self_billing_legal_name || null,
+    self_billing_org_number: fullPartner?.self_billing_org_number || null,
+    self_billing_registered_address: fullPartner?.self_billing_registered_address || null,
+    self_billing_vat_number: fullPartner?.self_billing_vat_number || null,
+    self_billing_vat_registered: fullPartner?.self_billing_vat_registered ?? null,
+    self_billing_vat_rate: fullPartner?.self_billing_vat_rate === null || fullPartner?.self_billing_vat_rate === undefined ? null : Number(fullPartner.self_billing_vat_rate),
+    self_billing_f_tax_approved: fullPartner?.self_billing_f_tax_approved ?? null,
+    self_billing_email: fullPartner?.self_billing_email || null,
+    payout_bankgiro: fullPartner?.payout_bankgiro || null,
+    payout_plusgiro: fullPartner?.payout_plusgiro || null,
+    payout_account: fullPartner?.payout_account || null,
+  }
+  const billingProfileComplete = Boolean(
+    billingProfile.self_billing_legal_name
+    && billingProfile.self_billing_org_number
+    && billingProfile.self_billing_registered_address
+    && billingProfile.self_billing_email
+    && typeof billingProfile.self_billing_vat_registered === 'boolean'
+    && typeof billingProfile.self_billing_f_tax_approved === 'boolean'
+    && billingProfile.self_billing_vat_rate !== null
+    && (billingProfile.payout_bankgiro || billingProfile.payout_plusgiro || billingProfile.payout_account)
+    && (billingProfile.self_billing_vat_registered === false || billingProfile.self_billing_vat_number)
+  )
 
   return NextResponse.json({
     partner: {
@@ -218,6 +247,8 @@ export async function GET(request: NextRequest) {
       agreement_version: partner.agreement_version,
       agreement_required: !hasAcceptedCurrentAgreement(partner),
       current_agreement_version: AGREEMENT_VERSION,
+      billing_profile: billingProfile,
+      billing_profile_complete: billingProfileComplete,
     },
     stats: {
       total_referred: enrichedReferrals.length,
@@ -229,6 +260,12 @@ export async function GET(request: NextRequest) {
     },
     referrals: enrichedReferrals,
     statements,
+    self_billing_batches: (batchesRes.data || []).map(batch => ({
+      ...batch,
+      subtotal_sek: Number(batch.subtotal_sek || 0),
+      vat_sek: Number(batch.vat_sek || 0),
+      total_incl_vat_sek: Number(batch.total_incl_vat_sek || 0),
+    })),
     events_by_business: eventsByBusiness,
   })
 }

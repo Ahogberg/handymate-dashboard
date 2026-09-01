@@ -168,9 +168,16 @@ export async function POST(request: NextRequest) {
     if (!partnerId || !period) {
       return NextResponse.json({ error: 'partner_id och period (YYYY-MM) krävs' }, { status: 400 })
     }
-    const result = await createPayoutBatch(partnerId, period)
+    const result = await createPayoutBatch(partnerId, period, adminCheck.email || 'admin')
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 })
-    return NextResponse.json({ success: true, batch_id: result.batchId, total_sek: result.totalSek })
+    return NextResponse.json({
+      success: true,
+      batch_id: result.batchId,
+      invoice_number: result.invoiceNumber,
+      subtotal_sek: result.subtotalSek,
+      vat_sek: result.vatSek,
+      total_sek: result.totalSek,
+    })
   }
 
   if (action === 'mark_paid') {

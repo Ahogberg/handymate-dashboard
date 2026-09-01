@@ -27,6 +27,39 @@ export interface PartnerData {
   agreement_version: string | null
   agreement_required: boolean
   current_agreement_version: string
+  billing_profile: PartnerBillingProfile
+  billing_profile_complete: boolean
+}
+
+export interface PartnerBillingProfile {
+  self_billing_legal_name: string | null
+  self_billing_org_number: string | null
+  self_billing_registered_address: string | null
+  self_billing_vat_number: string | null
+  self_billing_vat_registered: boolean | null
+  self_billing_vat_rate: number | null
+  self_billing_f_tax_approved: boolean | null
+  self_billing_email: string | null
+  payout_bankgiro: string | null
+  payout_plusgiro: string | null
+  payout_account: string | null
+}
+
+export interface SelfBillingBatch {
+  id: string
+  period: string
+  invoice_number: string
+  invoice_date: string
+  due_date: string
+  subtotal_sek: number
+  vat_sek: number
+  total_incl_vat_sek: number
+  delivery_status: 'pending' | 'available' | 'emailed' | 'failed'
+  review_status: 'pending' | 'approved' | 'disputed' | 'deemed_approved'
+  reviewed_at: string | null
+  dispute_reason: string | null
+  status: 'open' | 'paid'
+  paid_at: string | null
 }
 
 export interface Stats {

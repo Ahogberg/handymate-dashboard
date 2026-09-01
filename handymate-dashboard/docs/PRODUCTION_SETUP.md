@@ -33,6 +33,12 @@ GOOGLE_CLIENT_SECRET
 GOOGLE_MAPS_API_KEY          # För adress-autocomplete
 
 NEXT_PUBLIC_APP_URL          # https://app.handymate.se
+
+HANDYMATE_LEGAL_NAME          # Köparidentitet på partnerns självfaktura (lib/partners/self-billing.ts)
+HANDYMATE_ORG_NUMBER           # utan dessa fem vägrar createPayoutBatch skapa en batch
+HANDYMATE_REGISTERED_ADDRESS
+HANDYMATE_VAT_NUMBER
+HANDYMATE_BILLING_EMAIL
 ```
 
 ### Valfria
