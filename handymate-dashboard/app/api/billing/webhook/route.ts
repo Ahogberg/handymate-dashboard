@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { logAutomationActivity } from '@/lib/automations'
 import Stripe from 'stripe'
-import { reverseRevenueSnapshot } from '@/lib/partners/revenue-classification'
+import { reverseRevenueSnapshot, type PartnerRevenueSnapshot } from '@/lib/partners/revenue-classification'
 import { classifyStripeInvoiceForPartner } from '@/lib/partners/stripe-revenue'
 
 function getStripe() {
@@ -22,6 +22,27 @@ function toIsoOrNull(unixSeconds: unknown): string | null {
   if (!n || !isFinite(n)) return null
   const d = new Date(n * 1000)
   return isNaN(d.getTime()) ? null : d.toISOString()
+}
+
+/**
+ * En refund kan komma månader efter originalbetalningen. Kör om exakt de
+ * perioder som reversal-snapshoten bär; source_key gör varje omkörning
+ * idempotent. Kastas ett fel retriar Stripe, även när billing_event-raden
+ * redan hann skapas.
+ */
+async function reconcilePartnerRevenueSnapshot(snapshot: PartnerRevenueSnapshot): Promise<void> {
+  const periods = Array.from(new Set(snapshot.lines.flatMap(line =>
+    line.allocations.map(allocation => allocation.period)
+  ))).sort()
+  if (periods.length === 0) return
+
+  const { processCommissionPeriod } = await import('@/lib/partners/commission')
+  for (const period of periods) {
+    const result = await processCommissionPeriod(period)
+    if (result.errors.length > 0) {
+      throw new Error(`Partnerprovision kunde inte stämmas av för ${period}: ${result.errors.join('; ')}`)
+    }
+  }
 }
 
 /**
@@ -102,10 +123,14 @@ export async function POST(request: NextRequest) {
     // notiser/referral-belöningar/loggrader). Race-skydd: unikt index i sql/v64.
     const { data: alreadyProcessed } = await supabase
       .from('billing_event')
-      .select('id')
+      .select('id, event_type, data')
       .eq('stripe_event_id', event.id)
       .maybeSingle()
     if (alreadyProcessed) {
+      if (alreadyProcessed.event_type === 'payment_refunded' || alreadyProcessed.event_type === 'payment_chargeback') {
+        const snapshot = alreadyProcessed.data?.partner_revenue as PartnerRevenueSnapshot | undefined
+        if (snapshot?.schemaVersion === 1) await reconcilePartnerRevenueSnapshot(snapshot)
+      }
       console.log('[Billing] event redan bearbetat, hoppar över:', event.id)
       return NextResponse.json({ received: true, duplicate: true })
     }
@@ -655,6 +680,7 @@ async function handleRevenueReversal(
     },
   })
   if (error) throw new Error(`${kind}: händelsen kunde inte bokföras: ${error.message}`)
+  await reconcilePartnerRevenueSnapshot(partnerRevenue)
 }
 
 /**

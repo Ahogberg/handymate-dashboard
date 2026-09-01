@@ -19,6 +19,8 @@ test.describe('Stripe → partnerintäkt-kontrakt', () => {
     expect(webhook).toContain("'payment_refunded'")
     expect(webhook).toContain("'payment_chargeback'")
     expect(webhook).toContain('reverseRevenueSnapshot')
+    expect(webhook).toContain('reconcilePartnerRevenueSnapshot(partnerRevenue)')
+    expect(webhook).toContain("alreadyProcessed.event_type === 'payment_refunded'")
   })
 
   test('provisionsmotorn läser bara snapshot-allocationer, aldrig rå amount_paid', () => {
@@ -31,5 +33,12 @@ test.describe('Stripe → partnerintäkt-kontrakt', () => {
     expect(commission).toContain('commissionCalendarMonth(ref.converted_at, period)')
     expect(commission).not.toContain('priorMonths')
   })
-})
 
+  test('ackrual och refund-rättelser skrivs atomiskt via RPC', () => {
+    expect(commission).toContain("rpc('record_partner_commission_rows'")
+    expect(commission).toContain('reconcileCommissionBase')
+    expect(commission).toContain('paid.ore / 100')
+    expect(commission).not.toContain(".lt('created_at', end)")
+    expect(commission).not.toContain(".from('partner_commission_ledger')\n        .upsert")
+  })
+})

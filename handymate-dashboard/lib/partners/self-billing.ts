@@ -54,6 +54,20 @@ export interface BuildSelfBillingInput {
   generatedAt?: string
 }
 
+/**
+ * Handymates juridiska köparidentitet får aldrig hårdkodas eller gissas.
+ * Batchskapandet stannar tills alla värden är satta i den skarpa miljön.
+ */
+export function getHandymateBillingIdentityFromEnv(): LegalBillingIdentity {
+  return {
+    legalName: required(process.env.HANDYMATE_LEGAL_NAME || '', 'Handymates juridiska namn'),
+    organizationNumber: required(process.env.HANDYMATE_ORG_NUMBER || '', 'Handymates organisationsnummer'),
+    registeredAddress: required(process.env.HANDYMATE_REGISTERED_ADDRESS || '', 'Handymates adress'),
+    vatNumber: required(process.env.HANDYMATE_VAT_NUMBER || '', 'Handymates momsregistreringsnummer'),
+    email: required(process.env.HANDYMATE_BILLING_EMAIL || '', 'Handymates faktura-e-post'),
+  }
+}
+
 function required(value: string, label: string): string {
   const trimmed = value?.trim()
   if (!trimmed) throw new Error(`${label} saknas för självfakturering`)
@@ -209,4 +223,3 @@ export function generateSelfBillingPdf(document: SelfBillingDocument): Uint8Arra
 
   return new Uint8Array(doc.output('arraybuffer'))
 }
-
