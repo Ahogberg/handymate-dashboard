@@ -9,15 +9,16 @@ function validPrice(value: unknown): value is number {
 export type PricedGeneratedItem = GeneratedQuoteItem & { quantitySource: 'proposal' }
 
 /**
- * Modellen väljer innehåll, aldrig ett auktoritativt pris. Gäller de tre
- * ingångarna med gemensamt verifierat underlag. Äldre generatoranrop är orörda.
+ * Modellen väljer innehåll, aldrig ett auktoritativt pris. Gäller alla
+ * ingångar till den delade generatorn; jobbtypskontexten skärper ägarens
+ * uttryckliga mallkopplingar men krävs inte för prisgranskningen.
  * Kundens EXAKTA namn+enhet → kundens vanliga timpris (arbete/tim) → vald
  * bankartikel → företagets timpris (endast olänkad, generell arbetsrad).
  * Ingen fuzzy-prissättning, materialpåslagsberäkning eller mängdomräkning.
  */
 export function applyGeneratedPriceTruth(
   rows: GeneratedQuoteItem[], raw: Array<{ productRef?: unknown; customerRateRef?: unknown }>, prices: PriceListItem[],
-  hourlyRate: number, customer?: CustomerPriceList, context?: JobTypeGenerationContext,
+  hourlyRate: number | null | undefined, customer?: CustomerPriceList, context?: JobTypeGenerationContext,
 ): PricedGeneratedItem[] {
   if (rows.length > 100) throw new Error('Offertförslaget innehåller för många rader. Dela upp beskrivningen och försök igen.')
   const products: MatchableProduct[] = prices.filter(p => p.id).map(p => ({ id: p.id!, name: p.name, unit: p.unit }))

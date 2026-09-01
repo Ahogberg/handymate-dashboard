@@ -29,7 +29,8 @@ export interface QuoteTemplate {
 export interface QuoteGenerationInput {
   businessId: string
   branch: string
-  hourlyRate: number
+  /** Uttryckligt företagspris. null betyder att servern ska lämna arbetsraden prislös. */
+  hourlyRate: number | null
   imageBase64?: string
   voiceTranscript?: string
   textDescription?: string
@@ -378,7 +379,7 @@ export interface CustomerPriceList {
 
 export function buildPriceContext(
   priceList: PriceListItem[] | undefined,
-  hourlyRate: number,
+  hourlyRate: number | null | undefined,
   templates?: QuoteTemplate[],
   customerPriceList?: CustomerPriceList
 ): string {
@@ -467,10 +468,15 @@ export function buildPriceContext(
     lines.push('PRISLISTA: Ej ifylld av hantverkaren. Markera ALLA priser med "PRIS SAKNAS — fyll i manuellt" och sätt unit_price till 0.')
   }
 
-  if (!customerPriceList) {
-    lines.push(`\nStandard timpris: ${hourlyRate} kr/tim`)
+  const hasHourlyRate = Number.isFinite(hourlyRate) && Number(hourlyRate) > 0
+  if (hasHourlyRate) {
+    if (!customerPriceList) {
+      lines.push(`\nStandard timpris: ${Number(hourlyRate)} kr/tim`)
+    } else {
+      lines.push(`\nStandard timpris (om kundlistan saknar timpris): ${Number(hourlyRate)} kr/tim`)
+    }
   } else {
-    lines.push(`\nStandard timpris (om kundlistan saknar timpris): ${hourlyRate} kr/tim`)
+    lines.push('\nStandard timpris: Ej satt. Olänkade arbetsrader ska ha 0 kr och markeras "PRIS SAKNAS — fyll i manuellt".')
   }
 
   if (templates && templates.length > 0) {
@@ -857,6 +863,13 @@ Om bilden är ett FOTO:
   const jobTypeContext = input.jobTypeContext ? buildJobTypePrompt(input.jobTypeContext, input.priceList || []) : ''
   const hasPriceList = (input.priceList?.length || 0) > 0
 
+  const verifiedHourlyRate = Number.isFinite(input.hourlyRate) && Number(input.hourlyRate) > 0
+    ? Number(input.hourlyRate)
+    : null
+  const laborPricingRule = verifiedHourlyRate
+    ? `generellt timpris (${verifiedHourlyRate} kr/h) bara för timarbete utan egen artikel`
+    : 'saknas både kundpris och vald arbetsartikel ska timarbetsraden sättas till 0 kr och markeras PRIS SAKNAS — fyll i manuellt'
+
   const systemPrompt = `Du är en erfaren svensk kalkylator för bygg- och hantverksprojekt.
 
 Bransch: ${input.branch || 'Bygg/Hantverkare'}
@@ -866,7 +879,7 @@ Analysera beskrivningen (och en eventuellt bifogad bild — se instruktioner ned
 ${imageInstructions}
 
 REGLER FÖR PRISSÄTTNING:
-1. Arbete: kundprislistans exakta rader och vanliga timpris har företräde. Annars används den valda arbetsartikelns pris; generellt timpris (${input.hourlyRate} kr/h) bara för timarbete utan egen artikel. Ändra aldrig enhet för att passa ett pris.
+1. Arbete: kundprislistans exakta rader och vanliga timpris har företräde. Annars används den valda arbetsartikelns pris; ${laborPricingRule}. Ändra aldrig enhet för att passa ett pris.
 2. Material: ${hasPriceList
     ? 'Använd ENBART priser från prislistan ovan. Markera priser från prislistan med "fromPriceList": true.'
     : 'Prislista saknas — sätt ALLA materialpriser till 0 och markera med "note": "PRIS SAKNAS — fyll i manuellt".'}
@@ -895,7 +908,7 @@ Svara ENDAST med JSON (ingen markdown):
     "ceiling_area_m2": null
   },
   "items": [
-    {"description": "Arbete - beskrivning", "quantity": 8, "unit": "timmar", "unitPrice": ${input.hourlyRate}, "type": "labor", "confidence": 90, "fromPriceList": false, "productRef": null, "note": null},
+    {"description": "Arbete - beskrivning", "quantity": 8, "unit": "timmar", "unitPrice": ${verifiedHourlyRate ?? 0}, "type": "labor", "confidence": 90, "fromPriceList": false, "productRef": null, "note": ${verifiedHourlyRate ? 'null' : '"PRIS SAKNAS — fyll i manuellt"'}},
     {"description": "Materialnamn", "quantity": 1, "unit": "st", "unitPrice": 0, "type": "material", "confidence": 70, "fromPriceList": false, "productRef": null, "note": "PRIS SAKNAS — fyll i manuellt"}
   ],
   "options": [
@@ -1052,15 +1065,16 @@ Svara ENDAST med JSON (ingen markdown):
     console.log(`[ai-quote-generator] Produktkoppling: ${hits}/${items.length} rader kopplade`)
   }
 
-  if (input.jobTypeContext) {
-    items = applyGeneratedPriceTruth(items, parsed.items || [], input.priceList || [], input.hourlyRate, input.customerPriceList, input.jobTypeContext)
-    options = applyGeneratedPriceTruth(options, (parsed.options || []).slice(0, 3), input.priceList || [], input.hourlyRate, input.customerPriceList, input.jobTypeContext)
-  }
+  // Modellen väljer rader och mängder, aldrig pris. Samma serververifiering
+  // gäller även kallstarter utan jobbtyp; context skärper bara ägarens
+  // uttryckliga mallkopplingar.
+  items = applyGeneratedPriceTruth(items, parsed.items || [], input.priceList || [], input.hourlyRate, input.customerPriceList, input.jobTypeContext)
+  options = applyGeneratedPriceTruth(options, (parsed.options || []).slice(0, 3), input.priceList || [], input.hourlyRate, input.customerPriceList, input.jobTypeContext)
 
   const missingPriceCount = [...items, ...options].filter(i => i.unitPrice === 0 || i.note?.includes('PRIS SAKNAS')).length
   const laborCost = items.filter(i => i.type === 'labor').reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)
   const materialCost = items.filter(i => i.type !== 'labor').reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)
-  if (input.jobTypeContext && !Number.isFinite(laborCost + materialCost)) throw new Error('Offertens belopp kunde inte beräknas. Granska mängderna.')
+  if (!Number.isFinite(laborCost + materialCost)) throw new Error('Offertens belopp kunde inte beräknas. Granska mängderna.')
 
   return {
     jobTitle: parsed.jobTitle || 'Offert',

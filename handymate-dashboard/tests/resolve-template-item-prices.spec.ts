@@ -14,7 +14,6 @@
 import { test, expect } from '@playwright/test'
 import {
   resolveTemplateItemPrices,
-  DEFAULT_TEMPLATE_HOURLY_RATE,
   type TemplatePricingProduct,
 } from '../lib/quotes/resolve-template-item-prices'
 import { getDefaultQuoteTemplates } from '../lib/quote-template-defaults'
@@ -94,11 +93,14 @@ test.describe('kategori 1 — arbetsrader (unit "tim")', () => {
     expect(resolved.total).toBe(8 * 900)
   })
 
-  test('saknas pricingSettings.hourly_rate: faller tillbaka på 650, precis som den äldre legacy-vägen', () => {
+  test('saknas företagets timpris: raden blir prislös och markeras för granskning', () => {
     const items = [line({ unit: 'tim', quantity: 2, unit_price: 750 })]
-    expect(resolveTemplateItemPrices(items, [], null)[0].unit_price).toBe(DEFAULT_TEMPLATE_HOURLY_RATE)
-    expect(resolveTemplateItemPrices(items, [], undefined)[0].unit_price).toBe(DEFAULT_TEMPLATE_HOURLY_RATE)
-    expect(resolveTemplateItemPrices(items, [], 0)[0].unit_price).toBe(DEFAULT_TEMPLATE_HOURLY_RATE)
+    for (const rate of [null, undefined, 0, -1]) {
+      const [resolved] = resolveTemplateItemPrices(items, [], rate)
+      expect(resolved.unit_price).toBe(0)
+      expect(resolved.total).toBe(0)
+      expect(resolved.ai_price_missing).toBe(true)
+    }
   })
 
   test('rubrik- och delsummerader har ingen "timkostnad" — rörs aldrig', () => {

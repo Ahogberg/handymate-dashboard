@@ -1,5 +1,6 @@
 import type { FirstFocusId } from '@/lib/onboarding/first-focus'
 import type { FirstQuoteSelection } from '@/lib/quotes/job-type-setup'
+import type { WorkPricingModel } from '@/lib/onboarding/pricing-start'
 /**
  * Delad form-state för det nya onboarding-flödet (Claude Design redesign).
  * Hanterar både pre-registrerings-state (Step 2 skapar kontot) och
@@ -55,6 +56,10 @@ export interface OnboardingFormData {
   endHour?: number
   priceMin?: number
   priceMax?: number
+  /** Hur företaget säljer arbete. Standardpriset är bara reservkälla när en
+      jobbtyp/arbetsartikel inte har ett uttryckligt eget pris. */
+  pricingModel?: WorkPricingModel
+  standardHourlyRate?: number | null
   /** Materialpåslag i % (Prisslingan V2, beslut 4) — företagets EGET påslag,
       förifyllt 20 som förslag i steg 3. Appliceras i fakturakedjan (pass 5). */
   materialMarkup?: number

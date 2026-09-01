@@ -9,8 +9,8 @@
  * företag fick Handymates gissning på varje "Använd en mall"-offert, aldrig
  * sin egen timkostnad eller sina egna artikelpriser — tyst, utan varning.
  * Den ÄLDRE legacy-mallvägen (handleTemplateSelect, mallar UTAN
- * `default_items`) gjorde redan rätt för arbetsraden
- * (`pricingSettings?.hourly_rate || 650`) men den logiken fanns bara där.
+ * `default_items`) använde tidigare samma dolda 650-kronorsreserv. Även den
+ * vägen följer nu sanningsregeln: saknas företagspris blir raden prislös.
  *
  * Epic 2: en EXPLICIT linked_product_id prövas före alla tre kategorierna.
  * Ägarens val av artikel (även arbete) slår den generella timkostnaden.
@@ -19,8 +19,7 @@
  *
  *  1. Arbetsrader (unit 'tim') — ALLTID företagets `pricingSettings.hourly_rate`,
  *     aldrig mallens gissning, oavsett vilket tal mallen råkar ha. Saknas
- *     inställningen faller vi tillbaka på DEFAULT_TEMPLATE_HOURLY_RATE (650)
- *     — samma fallback som den äldre legacy-vägen redan använder.
+ *     inställningen blir raden prislös och kräver granskning.
  *
  *  2. Materialrader (icke-tim, med ett gissat pris > 0) — försök koppla raden
  *     till en riktig artikel i företagets produktbank. Återanvänder EXAKT
@@ -60,9 +59,6 @@ import {
 import { priceState } from '@/lib/products/pricing-state'
 import { sameUnit } from './job-type-setup'
 
-/** Samma fallback som den äldre legacy-mallvägen (handleTemplateSelect). */
-export const DEFAULT_TEMPLATE_HOURLY_RATE = 650
-
 /**
  * Strukturell delmängd av `ProductWithComponents`
  * (app/dashboard/quotes/_shared/applyProductToItem.ts) — bara det den här
@@ -85,9 +81,9 @@ function isPriceableItem(item: QuoteItem): boolean {
  * företagets timpris, produktbankens artikelpriser, eller "prislös tills
  * bekräftad" när ingen av delarna ger ett riktigt svar.
  *
- * `hourlyRate` är `pricingSettings.hourly_rate` — null/undefined/0/negativ
- * faller tillbaka på DEFAULT_TEMPLATE_HOURLY_RATE, det ska aldrig krascha
- * eller ge en 0-kronorsrad bara för att inställningen saknas.
+ * `hourlyRate` är företagets uttryckliga standardpris. null/undefined/0/
+ * negativ betyder "ej satt" och ger en tydligt prislös rad — aldrig ett
+ * Handymate-påhittat reservpris.
  */
 export function resolveTemplateItemPrices(
   items: QuoteItem[],
@@ -97,7 +93,9 @@ export function resolveTemplateItemPrices(
   const matchable: MatchableProduct[] = products.map(p => ({ id: p.id, name: p.name, unit: p.unit }))
   const handles = buildProductHandles(matchable)
   const byId = new Map(products.map(p => [p.id, p]))
-  const effectiveHourlyRate = hourlyRate && hourlyRate > 0 ? hourlyRate : DEFAULT_TEMPLATE_HOURLY_RATE
+  const effectiveHourlyRate = Number.isFinite(hourlyRate) && Number(hourlyRate) > 0
+    ? Number(hourlyRate)
+    : null
 
   return items.map(item => {
     if (!isPriceableItem(item)) return item
@@ -117,8 +115,13 @@ export function resolveTemplateItemPrices(
     // 1) Arbetsrader — mallens gissade á-pris betyder ingenting, det är
     // alltid FÖRETAGETS timkostnad som gäller.
     if (item.unit === 'tim') {
-      const unit_price = effectiveHourlyRate
-      return { ...item, unit_price, total: item.quantity * unit_price }
+      const unit_price = effectiveHourlyRate ?? 0
+      return {
+        ...item,
+        unit_price,
+        total: item.quantity * unit_price,
+        ai_price_missing: effectiveHourlyRate === null,
+      }
     }
 
     // Avsiktlig $0-rad ("pris bestäms löpande/senare") — det är redan

@@ -78,15 +78,15 @@ export function applyHourlyRateToDefaults(
   if (!(rate > 0)) return products
 
   const isTimArbete = (p: ProductDefault) =>
-    p.unit === 'tim' && p.labor_share === 1 && p.unit_price > 0
+    p.unit === 'tim' && p.labor_share === 1
 
   // Bas per sku-prefix ("HM-EL", "HM-BYG", "HM-GEN" …) = första tim-artikeln
   // i seed-ordningen (den är prioritetsordningen).
-  const basePerPrefix = new Map<string, number>()
+  const basePerPrefix = new Map<string, { sku: string; price: number }>()
   for (const p of products) {
     if (!isTimArbete(p)) continue
     const prefix = p.sku.split('-').slice(0, 2).join('-')
-    if (!basePerPrefix.has(prefix)) basePerPrefix.set(prefix, p.unit_price)
+    if (!basePerPrefix.has(prefix)) basePerPrefix.set(prefix, { sku: p.sku, price: p.unit_price })
   }
 
   return products.map(p => {
@@ -94,7 +94,13 @@ export function applyHourlyRateToDefaults(
     const prefix = p.sku.split('-').slice(0, 2).join('-')
     const base = basePerPrefix.get(prefix)
     if (base == null) return p
-    return { ...p, unit_price: rate + (p.unit_price - base) }
+    // Nollrader efter basartikeln är avsiktligt prislösa (t.ex. lärling)
+    // och får aldrig ärva standardpriset bara för att de delar bransch.
+    if (p.unit_price <= 0 && p.sku !== base.sku) return p
+    // Startbanken innehåller en prislös basartikel per bransch. Noll betyder
+    // fortfarande ”osatt” när inget pris lämnats; när ägaren lämnat ett
+    // pris är det just den artikeln som får företagets uttryckliga reservpris.
+    return { ...p, unit_price: base.price > 0 ? rate + (p.unit_price - base.price) : rate }
   })
 }
 
@@ -589,7 +595,10 @@ export function getStarterProducts(branch: string | string[]): ProductDefault[] 
     .filter((p): p is ProductDefault => Boolean(p))
 
   const candidates = [
-    ...primaryHourly,
+    // Bibliotekets branschpris är orientering, inte företagets sanning.
+    // Startbanken får därför en prislös timartikel tills ägaren uttryckligen
+    // satt sitt standardpris i onboarding eller senare i Inställningar.
+    ...primaryHourly.map(product => ({ ...product, unit_price: 0 })),
     ...COMMON_EXTRAS.map(p => ({ ...p, unit_price: 0 })),
   ]
   const byNameAndUnit = new Map<string, ProductDefault>()

@@ -109,7 +109,8 @@ interface Customer {
 }
 
 interface PricingSettings {
-  hourly_rate: number
+  /** Företagets uttryckliga standardpris. null = ej satt, aldrig en dold reserv. */
+  hourly_rate: number | null
   callout_fee: number
   minimum_hours: number
   vat_rate: number
@@ -1057,9 +1058,10 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
         service_area: (cfg.service_area as string | null) ?? null,
       })
     }
+    const loadedPricing = settingsRes.data?.pricing_settings
+    const loadedHourlyRate = Number(loadedPricing?.hourly_rate ?? settingsRes.data?.default_hourly_rate)
     setPricingSettings(
-      settingsRes.data?.pricing_settings || {
-        hourly_rate: 650,
+      {
         callout_fee: 495,
         minimum_hours: 1,
         vat_rate: 25,
@@ -1069,6 +1071,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
         rut_percent: 50,
         payment_terms: 30,
         warranty_years: 2,
+        ...(loadedPricing || {}),
+        hourly_rate: Number.isFinite(loadedHourlyRate) && loadedHourlyRate > 0 ? loadedHourlyRate : null,
       },
     )
     // EDIT-LÄGE: `loading` styrs av fetchQuote() nedan (samma
@@ -1332,7 +1336,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
               if (pl.hourly_rate_normal || pl.callout_fee) {
                 setPricingSettings(prev => ({
                   ...(prev || {
-                    hourly_rate: 650,
+                    hourly_rate: null,
                     callout_fee: 495,
                     minimum_hours: 1,
                     vat_rate: 25,
@@ -1343,7 +1347,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
                     payment_terms: 30,
                     warranty_years: 2,
                   }),
-                  hourly_rate: pl.hourly_rate_normal || prev?.hourly_rate || 650,
+                  hourly_rate: pl.hourly_rate_normal || prev?.hourly_rate || null,
                   callout_fee: pl.callout_fee ?? prev?.callout_fee ?? 495,
                 }))
               }
@@ -1737,7 +1741,9 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       setItems(generatedQuoteToQuoteItems(template.items, null, null))
     } else {
       const newItems: QuoteItem[] = []
-      const hourlyRate = pricingSettings?.hourly_rate || 650
+      const hourlyRate = pricingSettings?.hourly_rate && pricingSettings.hourly_rate > 0
+        ? pricingSettings.hourly_rate
+        : null
 
       if (template.estimated_hours && template.labor_cost) {
         newItems.push({
@@ -1746,8 +1752,9 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
           description: template.name,
           quantity: template.estimated_hours,
           unit: 'tim',
-          unit_price: hourlyRate,
-          total: template.estimated_hours * hourlyRate,
+          unit_price: hourlyRate ?? 0,
+          total: template.estimated_hours * (hourlyRate ?? 0),
+          ai_price_missing: hourlyRate === null,
           is_rot_eligible: true,
           is_rut_eligible: false,
           sort_order: 0,

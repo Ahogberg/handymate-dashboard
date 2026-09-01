@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { ArrowRight, Check, ChevronDown, Plus } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import InfoSheet from './InfoSheet'
 import { TEAM } from '@/lib/agents/team'
 import type { OnboardingFormData } from '../types-redesign'
 import { FIRST_FOCUS_OPTIONS } from '@/lib/onboarding/first-focus'
+import type { WorkPricingModel } from '@/lib/onboarding/pricing-start'
 import { OB_DOTS, OB_DOT_TOTAL, SPECIALTIES_BY_TRADE, TRADES, getTradeLabel } from '../constants'
 
 interface Step3Props {
@@ -28,8 +29,8 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
   const days = data.days || DEFAULT_DAYS
   const startHour = data.startHour ?? 7
   const endHour = data.endHour ?? 17
-  const priceMin = data.priceMin ?? 600
-  const priceMax = data.priceMax ?? 1200
+  const pricingModel = data.pricingModel
+  const standardHourlyRate = data.standardHourlyRate ?? null
   // Prisslingan V2 (beslut 4): företagets eget materialpåslag — 20 är ett
   // synligt FÖRSLAG han kan ändra, aldrig en tyst applicerad konstant.
   const materialMarkup = data.materialMarkup ?? 20
@@ -72,10 +73,11 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
     update({ days: next })
   }
 
-  const valid = selected.length > 0 && days.some(Boolean)
+  const rateRequired = pricingModel === 'one_standard_rate'
+  const valid = selected.length > 0 && days.some(Boolean) && Boolean(pricingModel) && (!rateRequired || Number(standardHourlyRate) > 0)
   const [visaSaknas, setVisaSaknas] = useState(false)
 
-  const lisa = TEAM.find(a => a.id === 'lisa')
+  const matte = TEAM.find(a => a.id === 'matte')
 
   return (
     <div className="ob-screen">
@@ -218,22 +220,78 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
           </div>
         </section>
 
-        {/* Price */}
+        {/* Prisstart — företagets val, aldrig ett förifyllt Handymate-pris. */}
         <section>
-          <label className="ob-label">Timdebitering (ex moms)</label>
-          <DualSlider
-            min={300}
-            max={2500}
-            step={50}
-            valueMin={priceMin}
-            valueMax={priceMax}
-            onChange={(a, b) => update({ priceMin: a, priceMax: b })}
-          />
-          {/* Andreas pilot-feedback (2026-06-03): visa både ex/inkl moms.
-              Default 25% moms — svenska standard. */}
-          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ob-muted)', lineHeight: 1.5 }}>
-            {priceMin}–{priceMax} kr/h ex moms · {Math.round(priceMin * 1.25)}–{Math.round(priceMax * 1.25)} kr/h inkl moms
+          <label className="ob-label">Hur brukar ni prissätta arbetet?</label>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ob-muted)', lineHeight: 1.5 }}>
+            Matte använder alltid det mest specifika pris ni har angett.
+          </p>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {([
+              ['one_standard_rate', 'Samma timpris för de flesta jobb', 'Ett enkelt standardpris som fungerar som reserv.'],
+              ['job_type_rates', 'Olika pris beroende på jobbtyp', 'Till exempel service, badrum och akutjobb.'],
+              ['fixed_or_mixed', 'Mest fasta priser eller en blandning', 'Timpris kan fortfarande anges som reserv när det behövs.'],
+            ] as Array<[WorkPricingModel, string, string]>).map(([id, title, description]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => update({ pricingModel: id })}
+                aria-pressed={pricingModel === id}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px',
+                  textAlign: 'left', borderRadius: 'var(--ob-r-md)',
+                  border: `1.5px solid ${pricingModel === id ? 'var(--ob-primary-700)' : 'var(--ob-border)'}`,
+                  background: pricingModel === id ? 'var(--ob-primary-50)' : 'var(--ob-surface)',
+                  color: 'var(--ob-ink)', cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                <span style={{
+                  width: 20, height: 20, marginTop: 1, flexShrink: 0, borderRadius: '50%',
+                  border: `1.5px solid ${pricingModel === id ? 'var(--ob-primary-700)' : 'var(--ob-border-strong)'}`,
+                  background: pricingModel === id ? 'var(--ob-primary-700)' : '#fff', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {pricingModel === id && <Check size={13} />}
+                </span>
+                <span>
+                  <strong style={{ display: 'block', fontSize: 13.5 }}>{title}</strong>
+                  <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: 'var(--ob-muted)', lineHeight: 1.4 }}>{description}</span>
+                </span>
+              </button>
+            ))}
           </div>
+
+          {pricingModel && (
+            <div style={{ marginTop: 16 }}>
+              <label className="ob-label" htmlFor="standard-hourly-rate">
+                Standardpris för arbete {rateRequired ? '' : '(frivilligt)'}
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  id="standard-hourly-rate"
+                  type="number"
+                  inputMode="decimal"
+                  min={1}
+                  max={100000}
+                  step={50}
+                  value={standardHourlyRate ?? ''}
+                  onChange={e => update({ standardHourlyRate: e.target.value === '' ? null : Number(e.target.value) })}
+                  placeholder="Exempel: 825"
+                  className="ob-input"
+                  style={{ width: 170 }}
+                />
+                <span style={{ fontSize: 13, color: 'var(--ob-muted)' }}>kr/tim ex moms</span>
+              </div>
+              <p style={{ margin: '7px 0 0', fontSize: 12, color: 'var(--ob-muted)', lineHeight: 1.5 }}>
+                Det används när jobbtypen saknar ett eget pris. En kopplad arbetsartikel för jobbtypen går alltid före.
+              </p>
+              {Number(standardHourlyRate) > 0 && (
+                <p style={{ margin: '5px 0 0', fontSize: 12, color: 'var(--ob-primary-700)', fontWeight: 600 }}>
+                  Kunden ser {Math.round(Number(standardHourlyRate) * 1.25).toLocaleString('sv-SE')} kr/tim inklusive 25 % moms.
+                </p>
+              )}
+            </div>
+          )}
           {/* Materialpåslag (Prisslingan V2, beslut 4): samma princip som
               timpriset — en siffra varje hantverkare kan utantill. Fältet är
               synligt förifyllt; att passera steget med det = bekräftat. */}
@@ -294,7 +352,7 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
                 height: 28,
                 flexShrink: 0,
                 borderRadius: '50%',
-                backgroundImage: lisa?.avatar ? `url(${lisa.avatar})` : undefined,
+                backgroundImage: matte?.avatar ? `url(${matte.avatar})` : undefined,
                 backgroundColor: '#E0F2FE',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
@@ -302,9 +360,9 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
               }}
             />
             <p style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.4 }}>
-              Lisa säger:{' '}
+              Matte använder pris i den här ordningen:{' '}
               <strong style={{ color: 'var(--ob-primary-700)' }}>
-                ”ungefär {Math.round(priceMin * 1.25)}–{Math.round(priceMax * 1.25)} kr per timme inkl moms”
+                jobbtypens arbetsartikel → företagets standardpris → fråga dig om pris saknas.
               </strong>
             </p>
           </div>
@@ -362,6 +420,8 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
             {[
               selected.length === 0 ? 'välj minst en specialitet' : null,
               !days.some(Boolean) ? 'markera minst en arbetsdag' : null,
+              !pricingModel ? 'välj hur ni brukar prissätta arbetet' : null,
+              rateRequired && !(Number(standardHourlyRate) > 0) ? 'ange ert standardpris för arbete' : null,
             ].filter(Boolean).join(' och ')}
           </div>
         )}
@@ -376,19 +436,19 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
         </button>
       </div>
 
-      {/* Timdebitering — ex/inkl moms-förklaring */}
+      {/* Arbetspris — ex/inkl moms-förklaring */}
       <InfoSheet
         open={priceInfoOpen}
         onClose={() => setPriceInfoOpen(false)}
-        title="Timdebitering ex vs inkl moms"
+        title="Arbetspris ex vs inkl moms"
       >
         <p style={{ marginTop: 0 }}>
-          Du anger ditt timpris <strong>exklusive moms</strong> — det är beloppet du faktiskt
-          får in i fickan när fakturan är betald.
+          Arbetspriset anges <strong>exklusive moms</strong> — det är företagets försäljningspris,
+          inte den interna kostnaden för en arbetstimme.
         </p>
         <p>
-          När vi visar offerten för kunden lägger vi automatiskt på <strong>25 % moms</strong>
-          {' '}(svensk standard). En timme à 600 kr ex moms blir alltså 750 kr på offerten.
+          När vi visar offerten för kunden lägger vi normalt på <strong>25 % moms</strong>.
+          Ett pris på 800 kr ex moms visas då som 1 000 kr inklusive moms.
         </p>
         <p>
           Svenska konsumenter tänker oftast på inkl-moms-priset (det är det de betalar).
@@ -396,8 +456,8 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
           så du kan ha rätt samtal med rätt kund.
         </p>
         <p style={{ color: 'var(--ob-muted)', fontSize: 13 }}>
-          Du kan justera momssats per offert i Karins ekonomi-vy senare — t.ex. 0 % för export
-          eller 12 % för ROT-jobb.
+          ROT och RUT påverkar avdraget på arbetskostnaden, inte momssatsen. Momsen och avdraget
+          visas separat i offerten.
         </p>
       </InfoSheet>
 
@@ -540,125 +600,6 @@ function TimeSelect({ label, value, onChange }: TimeSelectProps) {
       >
         <ChevronDown size={16} />
       </span>
-    </div>
-  )
-}
-
-interface DualSliderProps {
-  min: number
-  max: number
-  step: number
-  valueMin: number
-  valueMax: number
-  onChange: (min: number, max: number) => void
-}
-
-function DualSlider({ min, max, step, valueMin, valueMax, onChange }: DualSliderProps) {
-  const [dragging, setDragging] = useState<'min' | 'max' | null>(null)
-  const ref = useRef<HTMLDivElement>(null)
-
-  const pct = (v: number) => ((v - min) / (max - min)) * 100
-
-  useEffect(() => {
-    if (!dragging) return
-
-    const onMove = (e: MouseEvent | TouchEvent) => {
-      if (!ref.current) return
-      const r = ref.current.getBoundingClientRect()
-      const clientX =
-        'touches' in e ? e.touches[0]?.clientX ?? 0 : e.clientX
-      const ratio = Math.max(0, Math.min(1, (clientX - r.left) / r.width))
-      const v = Math.round((min + ratio * (max - min)) / step) * step
-      if (dragging === 'min') onChange(Math.min(v, valueMax - step), valueMax)
-      else onChange(valueMin, Math.max(v, valueMin + step))
-    }
-
-    const up = () => setDragging(null)
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('touchmove', onMove)
-    window.addEventListener('mouseup', up)
-    window.addEventListener('touchend', up)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('touchmove', onMove)
-      window.removeEventListener('mouseup', up)
-      window.removeEventListener('touchend', up)
-    }
-  }, [dragging, valueMin, valueMax, min, max, step, onChange])
-
-  return (
-    <div style={{ padding: '24px 12px 8px' }}>
-      <div
-        ref={ref}
-        style={{
-          position: 'relative',
-          height: 6,
-          background: 'var(--ob-border)',
-          borderRadius: 3,
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            height: '100%',
-            left: `${pct(valueMin)}%`,
-            right: `${100 - pct(valueMax)}%`,
-            background: 'var(--ob-primary-700)',
-            borderRadius: 3,
-          }}
-        />
-        {(['min', 'max'] as const).map(k => {
-          const v = k === 'min' ? valueMin : valueMax
-          return (
-            <div
-              key={k}
-              onMouseDown={() => setDragging(k)}
-              onTouchStart={() => setDragging(k)}
-              style={{
-                position: 'absolute',
-                left: `${pct(v)}%`,
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: 26,
-                height: 26,
-                background: '#fff',
-                border: '2px solid var(--ob-primary-700)',
-                borderRadius: '50%',
-                boxShadow: 'var(--ob-sh-md)',
-                cursor: 'grab',
-                touchAction: 'none',
-              }}
-            >
-              <span
-                style={{
-                  position: 'absolute',
-                  top: -28,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: 'var(--ob-primary-700)',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {v} kr
-              </span>
-            </div>
-          )
-        })}
-      </div>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          marginTop: 10,
-          fontSize: 11,
-          color: 'var(--ob-muted)',
-        }}
-      >
-        <span>{min} kr</span>
-        <span>{max} kr</span>
-      </div>
     </div>
   )
 }

@@ -18,12 +18,12 @@
  */
 
 import { useEffect, useState } from 'react'
-import { ListChecks, Rocket, Target, Crown, TrendingUp, Compass } from 'lucide-react'
+import { ListChecks, Target, Crown, TrendingUp, Compass } from 'lucide-react'
 import { TEAM, getAgentById } from '@/lib/agents/team'
 import { TourTarget, SpotlightOverlay, type TourStepBase } from '@/components/tour/TourPrimitives'
-import { buildFirstMissionPrompt, writeFirstMissionPrompt } from '@/lib/onboarding/first-mission-handoff'
 import { KOM_IGANG_DEFAULT_LABELS, KOM_IGANG_HEADING } from '@/lib/onboarding/kom-igang-tasks'
 import type { OnboardingFormData } from '../types-redesign'
+import { FirstAssignmentFinal } from './FirstAssignmentFinal'
 
 interface Step6Props {
   onFinish: () => void
@@ -231,16 +231,8 @@ export default function Step6LiveTour({ onFinish, onFirstQuote, data }: Step6Pro
         </button>
       )}
 
-      {/* Final CTA — Första-uppdraget-beat (Etapp R). Konkret handling i
-          stället för bara "Kör igång": ett mål från Step3 (om satt) blir en
-          förifylld fråga till Matte via sessionStorage-bryggan (se
-          lib/onboarding/first-mission-handoff.ts — JobbuddyProvider finns
-          inte i onboardingens layout, så handoffen konsumeras av
-          components/jarvis/FirstMissionHandoff.tsx efter navigeringen).
-          ALDRIG auto-send — hantverkaren ser och kan redigera frågan innan
-          den går iväg. Skippbar: "Utforska själv" kör exakt samma finish()
-          som förut, utan förifylld prompt — onboardingen får aldrig fånga
-          någon. */}
+      {/* Final CTA — samma befintliga handoff/offertväg, men alternativen
+          härleds ur verkliga signaler. Ingen mission skrivs från onboarding. */}
       {finished && (
         <div
           style={{
@@ -253,40 +245,13 @@ export default function Step6LiveTour({ onFinish, onFirstQuote, data }: Step6Pro
             animation: 'ob-fade-in 400ms',
           }}
         >
-          <p
-            style={{
-              textAlign: 'center',
-              fontSize: 13,
-              fontWeight: 500,
-              color: 'var(--ob-muted)',
-              lineHeight: 1.5,
-              marginBottom: 10,
-            }}
-          >
-            Teamet tittar redan på det som finns i {data.companyName || 'din firma'} —{' '}
-            ju mer data som kommer in, desto vassare förslag.
-          </p>
-          <button
-            type="button"
-            className="ob-cta"
-            onClick={() => {
-              writeFirstMissionPrompt(buildFirstMissionPrompt(undefined, data.firstFocus))
-              onFinish()
-            }}
-          >
-            Ge teamet ditt första uppdrag <Rocket size={18} />
-          </button>
-          {onFirstQuote && <button type="button" className="ob-cta ghost" style={{ marginTop: 8 }} onClick={onFirstQuote}>
-            Skapa min första offert
-          </button>}
-          <button
-            type="button"
-            className="ob-cta ghost"
-            onClick={onFinish}
-            style={{ marginTop: 8 }}
-          >
-            Utforska själv
-          </button>
+          <FirstAssignmentFinal
+            data={data}
+            unpaidCount={instant?.unpaid_count ?? 0}
+            openDealsCount={instant?.open_deals_count ?? 0}
+            onFinish={onFinish}
+            onFirstQuote={onFirstQuote}
+          />
         </div>
       )}
     </div>

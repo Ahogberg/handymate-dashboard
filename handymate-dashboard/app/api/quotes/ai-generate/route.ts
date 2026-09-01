@@ -56,7 +56,10 @@ export async function POST(request: NextRequest) {
         jobType: jobType ?? job_type, templateId: templateId ?? template_id,
       })
 
-    const hourlyRate = business.pricing_settings?.hourly_rate || business.default_hourly_rate || 650
+    const configuredHourlyRate = Number(business.pricing_settings?.hourly_rate || business.default_hourly_rate)
+    const hourlyRate = Number.isFinite(configuredHourlyRate) && configuredHourlyRate > 0
+      ? configuredHourlyRate
+      : null
 
     // Om flera bilder: analysera extra bilder och kombinera med textDescription
     let combinedText = textDescription || ''

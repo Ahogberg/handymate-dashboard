@@ -21,7 +21,7 @@ test.describe('kompakt startbank — automatiken skapar aldrig katalogbrus', () 
       const starter = getStarterProducts(branch)
       expect(starter, branch).toHaveLength(4)
       expect(starter.filter(product => product.sku.startsWith('HM-GEN-'))).toHaveLength(3)
-      expect(starter.filter(product => product.unit_price > 0), branch).toHaveLength(1)
+      expect(starter.filter(product => product.unit_price > 0), branch).toHaveLength(0)
       expect(starter.filter(product => product.sku.startsWith('HM-GEN-')).every(product => product.unit_price === 0)).toBe(true)
     }
   })

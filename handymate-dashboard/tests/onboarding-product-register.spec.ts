@@ -48,10 +48,10 @@ test.describe('seedProducts — deterministisk seed av produktbanken', () => {
     await seedProducts(fake.client, businessId, 'electrician')
 
     const all = getStarterProducts('electrician')
-    const firstPriced = all.find(p => p.unit_price > 0)
-    expect(firstPriced).toBeTruthy()
-    const expectedIndex = all.indexOf(firstPriced!)
-    const row = fake.inserted.products.find((r: any) => r.name === firstPriced!.name)
+    const firstProduct = all[0]
+    expect(firstProduct).toBeTruthy()
+    const expectedIndex = 0
+    const row = fake.inserted.products.find((r: any) => r.name === firstProduct.name)
     expect(row.id).toBe(`prod_${businessId}_${expectedIndex}`)
   })
 
@@ -81,11 +81,11 @@ test.describe('UX1f — timpriset från steg 3 når seedade timartiklar', () => 
     expect(byName.get('Bortforsling av avfall')!.sales_price).toBe(0)
   })
 
-  test('utan hourlyRate: exakt samma priser som förut (identitet)', async () => {
+  test('utan hourlyRate: startbankens arbetsartikel är ärligt prislös', async () => {
     const fake = fakeSeedSupabase()
     await seedProducts(fake.client, 'biz_norate', 'electrician')
     const byName = new Map(fake.inserted.products.map((p: any) => [p.name, p]))
-    expect(byName.get('Elinstallation')!.sales_price).toBe(550)
+    expect(byName.get('Elinstallation')!.sales_price).toBe(0)
   })
 })
 

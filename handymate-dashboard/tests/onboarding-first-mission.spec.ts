@@ -24,6 +24,7 @@ const ROOT = path.resolve(__dirname, '..')
 const read = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
 
 const step6 = read('app/onboarding/components/Step6LiveTour.tsx')
+const firstAssignment = read('app/onboarding/components/FirstAssignmentFinal.tsx')
 const handoffLib = read('lib/onboarding/first-mission-handoff.ts')
 const handoffConsumer = read('components/jarvis/FirstMissionHandoff.tsx')
 const dashboardLayout = read('app/dashboard/layout.tsx')
@@ -52,25 +53,30 @@ test.describe('Step6LiveTour.tsx — uppdragsbandets tooltip berättar kedjornas
 })
 
 test.describe('Step6LiveTour.tsx — Första-uppdraget-beaten', () => {
-  test('erbjuder knappen "Ge teamet ditt första uppdrag"', () => {
-    expect(step6).toContain('Ge teamet ditt första uppdrag')
+  test('monterar den signalstyrda första-uppdragsfinalen', () => {
+    expect(step6).toContain('<FirstAssignmentFinal')
+    expect(firstAssignment).toContain('Vad ska vi ta tag i först?')
   })
 
   test('är skippbar — "Utforska själv" finns och kör samma onFinish', () => {
-    expect(step6).toContain('Utforska själv')
+    expect(firstAssignment).toContain('Utforska själv')
+    expect(firstAssignment).toContain('onClick={onFinish}')
   })
 
-  test('ärlighetsregeln: copyn lovar aldrig ett färdigt facit, bara att teamet redan tittar', () => {
-    expect(step6).toContain('ju mer data som kommer in, desto vassare förslag')
+  test('ärlighetsregeln: planen kontrolleras och inget skickas utan godkännande', () => {
+    expect(firstAssignment).toContain('Matte kontrollerar underlaget')
+    expect(firstAssignment).toContain('inget skickas utan ditt godkännande')
   })
 
-  test('beaten skriver via handoff-bryggan, aldrig direkt setPendingPrompt/fetch-send i Step6', () => {
+  test('beaten skriver via handoff-bryggan, aldrig direkt setPendingPrompt/fetch-send', () => {
     // Step6LiveTour saknar JobbuddyProvider (se filhuvudkommentaren i
     // lib/onboarding/first-mission-handoff.ts) — den får ALDRIG anropa
     // setPendingPrompt eller useJobbuddy() själv.
     expect(step6).not.toContain('setPendingPrompt')
     expect(step6).not.toContain('useJobbuddy')
-    expect(step6).toContain('writeFirstMissionPrompt(buildFirstMissionPrompt(')
+    expect(firstAssignment).not.toContain('setPendingPrompt')
+    expect(firstAssignment).not.toContain('useJobbuddy')
+    expect(firstAssignment).toContain('writeFirstMissionPrompt(selected.prompt)')
   })
 
   test('inga send-/execute-mönster i filen (bara läsande instant-value-fetchen och den befintliga finalize-POST:en)', () => {

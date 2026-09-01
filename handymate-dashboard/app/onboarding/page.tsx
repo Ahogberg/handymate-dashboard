@@ -16,6 +16,8 @@ import { FirstQuoteLaunch } from '@/components/onboarding/FirstQuoteLaunch'
 import { completeFirstQuoteOnboarding } from '@/lib/onboarding/first-quote-handoff'
 import { fetchQuoteSetup } from '@/lib/quotes/job-type-start'
 import { resolveFirstQuoteSelection, type QuoteSetupData } from '@/lib/quotes/job-type-setup'
+import { normalizeStandardHourlyRate } from '@/lib/onboarding/pricing-start'
+import { MatteSetupGuide } from '@/components/onboarding/MatteSetupGuide'
 
 const TOTAL_STEPS = 8
 
@@ -129,6 +131,9 @@ export default function OnboardingPage() {
           // Placerad EFTER spreadet så den aldrig kan skuggas av ett gammalt
           // cachat värde i onboarding_data.
           foundersAvailable: Boolean(d.founders_available),
+          // Ett äldre, uttryckligt sparat standardpris får visas igen, men
+          // prismodellen väljs fortfarande av ägaren — inget inferred val.
+          standardHourlyRate: (d.onboarding_data || {}).standardHourlyRate ?? d.default_hourly_rate ?? null,
         }
 
         setData(restored)
@@ -182,11 +187,10 @@ export default function OnboardingPage() {
         // Lämnar Step3HowYouWork — spara specialiteter + arbetstider + pris
         config.specialties = data.specialties || []
         config.working_hours = buildWorkingHours(data)
-        config.hourly_rate_min = data.priceMin ?? null
-        config.hourly_rate_max = data.priceMax ?? null
-        config.default_hourly_rate = data.priceMax
-          ? Math.round(((data.priceMin || 0) + data.priceMax) / 2)
-          : null
+        const standardHourlyRate = normalizeStandardHourlyRate(data.standardHourlyRate)
+        config.hourly_rate_min = standardHourlyRate
+        config.hourly_rate_max = standardHourlyRate
+        config.default_hourly_rate = standardHourlyRate
         // Prisslingan V2 (beslut 4): företagets eget materialpåslag — synligt
         // fält i steget (förifyllt 20 som förslag), aldrig en tyst konstant.
         config.material_markup_pct = data.materialMarkup ?? 20
@@ -315,6 +319,8 @@ export default function OnboardingPage() {
           telefonformatets 460px tvingade fram en inre scroll där halva
           teamet var osynligt. Övriga steg är formulär och mår bra i det
           smala kortet — bredden gäller BARA där den behövs. */}
+      <div className="ob-stage" data-guided={step > 0 && step < 7 ? 'true' : undefined}>
+      {step > 0 && step < 7 && <MatteSetupGuide step={step} data={data} />}
       <div className="ob-card-wrap" data-wide={step === 0 ? 'true' : undefined}>
         {step === 0 && <Step1MeetTheTeam onNext={next} />}
         {step === 1 && (
@@ -349,6 +355,7 @@ export default function OnboardingPage() {
             </> : <p role="status">Kontrollerar din jobbtyp och mall…</p>}
             <button type="button" className="first-quote-skip" disabled={finishing} onClick={finish}>Till översikten i stället</button>
           </section>)}
+      </div>
       </div>
 
       {/* Finalize-fel (Fynd 6): navigera ALDRIG till dashboarden på ett

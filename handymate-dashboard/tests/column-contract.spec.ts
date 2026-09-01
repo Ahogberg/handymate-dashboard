@@ -164,10 +164,11 @@ const KANDA_LUCKOR = new Set([
 ])
 
 /**
- * Kolumner som verifierades read-only mot `information_schema.columns` i
- * produktion 2026-08-07, men där repots historiska CREATE TABLE-filer beskriver
- * en äldre tabellform. Migrationerna har körts manuellt, så sql/ är inte bevis
- * för att de här kolumnerna saknas.
+ * Kolumner som verifierats mot den levande produktionstabellen, men där repots
+ * historiska CREATE TABLE-filer beskriver en äldre tabellform. Grundlistan
+ * verifierades read-only 2026-08-07; project_log.work_performed verifierades i
+ * portal-/writer-kryssprovet 2026-08-31. Migrationerna har körts manuellt, så
+ * sql/ är inte bevis för att de här kolumnerna saknas.
  *
  * Listan är avsiktligt explicit och storlekslåst nedan. Den ska ersättas av ett
  * versionshanterat basschema, inte bli en allmän undantagsventil.
@@ -176,6 +177,7 @@ const PRODUKTIONSVERIFIERADE_KOLUMNER = new Set([
   'project_checklist.order_id',
   'project_log.date',
   'project_log.order_id',
+  'project_log.work_performed',
 ])
 
 const FILTER_METHODS = ['eq', 'neq', 'gt', 'lt', 'in', 'is', 'contains', 'order'] as const
@@ -419,12 +421,16 @@ test.describe('kolumnkontraktet', () => {
       'project_checklist.order_id',
       'project_log.date',
       'project_log.order_id',
+      'project_log.work_performed',
     ])
   })
 
   test('app/dashboard/quotes ingår i filtervakten', () => {
     const refs = collectFilterRefs([path.join(ROOT, 'app', 'dashboard', 'quotes')])
-    expect(refs.length, 'inga offertfilter hittades — quotes-trädet skannas inte').toBeGreaterThan(10)
+    // QuoteBuilder-konsolideringen 2026-08-31 minskade antalet separata
+    // Supabase-kedjor. Vakten ska bevisa att trädet faktiskt skannas, inte
+    // låsa en historisk implementeringsmängd.
+    expect(refs.length, 'inga offertfilter hittades — quotes-trädet skannas inte').toBeGreaterThan(5)
     expect(new Set(refs.map(ref => ref.metod))).toEqual(new Set(['eq', 'order']))
   })
 })
