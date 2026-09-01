@@ -9,7 +9,7 @@ import { firstQuoteHref, readFirstQuoteIntent, resolveQuoteStart } from '../lib/
 
 const product: SetupProduct = { id: 'p1', name: 'Arbete', unit: 'tim', salesPrice: 950 }
 const template: SetupTemplate = { id: 't1', name: 'Service', category: 'Service', jobTypeSlug: 'service', updatedAt: null,
-  items: [{ index: 0, description: 'Servicearbete', unit: 'tim', linkedProductId: 'p1' }] }
+  items: [{ index: 0, itemType: 'item', description: 'Servicearbete', unit: 'tim', linkedProductId: 'p1' }] }
 const data: QuoteSetupData = { linkingAvailable: true, jobTypes: [{ id: 'j1', name: 'Service', slug: 'service' }], templates: [template], products: [product] }
 
 test('bara explicit jobbtypskoppling — liknande kategorier är inga bevis', () => {

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowRight, Check, FileText, Loader2, Plus } from 'lucide-react'
 import { getAgentById } from '@/lib/agents/team'
 import { QuickPriceInput } from '@/components/products/QuickPriceInput'
+import { JobTypeQuotePreview } from '@/components/onboarding/JobTypeQuotePreview'
+import type { ReservationWithTriggers } from '@/lib/reservations/match'
 import { coreArticleGuidance, inspectTemplate, relevantProducts, resolveFirstQuoteSelection, sameUnit, setupSummary, templatesForJobType,
   type FirstQuoteSelection, type QuoteSetupData, type SetupTemplate } from '@/lib/quotes/job-type-setup'
 import './job-type-setup.css'
@@ -34,6 +36,7 @@ export function JobTypeQuoteSetup({ initialJobTypes = [], initialSelection, onCh
   const [jobName, setJobName] = useState('')
   const [showAll, setShowAll] = useState(false)
   const [editingPrice, setEditingPrice] = useState<string | null>(null)
+  const [reservationLibrary, setReservationLibrary] = useState<ReservationWithTriggers[] | null>(null)
   const revision = useRef(0)
   const mutationLock = useRef(false)
   const onChangeRef = useRef(onChange)
@@ -49,11 +52,19 @@ export function JobTypeQuoteSetup({ initialJobTypes = [], initialSelection, onCh
     setLoading(true)
     setError('')
     try {
+      const reservationRequest = fetch('/api/reservations?include=triggers', { cache: 'no-store' }).catch(() => null)
       const response = await fetch('/api/job-types/quote-setup', { cache: 'no-store' })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Kunde inte hämta underlaget.')
+      const reservationResponse = await reservationRequest
+      let nextReservationLibrary: ReservationWithTriggers[] | null = null
+      if (reservationResponse?.ok) {
+        const reservationResult = await reservationResponse.json().catch(() => null)
+        if (Array.isArray(reservationResult?.reservations)) nextReservationLibrary = reservationResult.reservations
+      }
       if (request !== revision.current) return
       setData(result)
+      setReservationLibrary(nextReservationLibrary)
       setSelected(old => old.filter(slug => result.jobTypes.some((j: { slug: string }) => j.slug === slug)))
     } catch (err) {
       if (request === revision.current) {
@@ -163,6 +174,7 @@ export function JobTypeQuoteSetup({ initialJobTypes = [], initialSelection, onCh
           <p className="job-setup-summary" role="status">{setupSummary(rows)}</p>
           <p className="job-setup-caption">{coreArticleGuidance(rows)}</p>
           <p className="job-setup-caption">Artikelpriser exkl. moms. Mängder, kundavtal och jobbets förutsättningar granskar du i offerten.</p>
+          <JobTypeQuotePreview jobName={job.name} template={chosen} products={data.products} reservationLibrary={reservationLibrary} />
           <div className="job-setup-products">
             {(showAll ? products : products.slice(0, 10)).map(p => <div className="job-setup-product" key={p.id}>
               <div><strong>{p.name}</strong><span>{p.unit}</span></div>

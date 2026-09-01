@@ -11,6 +11,7 @@ export interface SetupJobType {
 
 export interface SetupItem {
   index: number
+  itemType: 'item' | 'option'
   description: string
   unit: string
   linkedProductId: string | null
@@ -128,7 +129,7 @@ export function toSetupTemplate(row: Record<string, unknown>): SetupTemplate {
       if (!item || typeof item !== 'object' || Array.isArray(item)) return []
       const type = item.item_type || 'item'
       if (type !== 'item' && type !== 'option') return []
-      return [{ index, description: String(item.description || ''), unit: String(item.unit || ''),
+      return [{ index, itemType: type, description: String(item.description || ''), unit: String(item.unit || ''),
         linkedProductId: typeof item.linked_product_id === 'string' ? item.linked_product_id : null }]
     }),
   }
