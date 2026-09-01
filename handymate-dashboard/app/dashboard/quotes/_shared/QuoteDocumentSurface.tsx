@@ -202,6 +202,9 @@ export function QuoteDocumentSurface({
         payload={templatePreviewPayload}
         className={`${sizeCls} max-lg:flex-none max-lg:aspect-[210/297]`}
         onPendingChange={setPreviewPending}
+        // Ramens egen hörn-spinner (top-2 right-2) av: "Uppdaterar"-pillen
+        // ovan är enda indikatorn här, och hörnet upptas av fullskärmsknappen.
+        showSpinner={false}
       />
     )
   }

@@ -133,7 +133,7 @@ export interface InvoiceEditorProps {
  * MEDVETET inte — se rapporten för fältparitets-kartläggningen.
  *
  * Kontrollerad komponent: allt redigeringsbart state ägs av anroparen
- * (new/edit-sidorna) — samma mönster som QuoteItemsSection/QuotePreviewPanel
+ * (new/edit-sidorna) — samma mönster som QuoteItemsSection/QuoteDocumentSurface
  * redan använder på offertsidan. InvoiceEditor äger bara UI-lokalt state
  * (vilken Mer-panel/vy som är aktiv, mobil-sheetens öppna rad,
  * business_config-hämtningen för live-canvasen).

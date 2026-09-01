@@ -72,7 +72,8 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     // Offert-identitet (v68): avsändaren = skaparen. En sparad offert bär
-    // created_by → använd den. Ett osparat utkast (Slutdesign i byggaren)
+    // created_by → använd den. Ett osparat utkast (dokumentytan i byggaren —
+    // iframen är hela ytan för Premium/Friendly, se QuoteDocumentSurface.tsx)
     // saknar created_by → visa den INLOGGADE användaren så förhandsvisningen
     // speglar vad kunden får. Ingen created_by + ingen inloggad → fallback.
     let creator = await fetchQuoteCreator(supabase, quote.created_by)
