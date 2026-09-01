@@ -87,6 +87,25 @@ test('flera mallar kräver ett verkligt knappval', async () => {
   expect(calls).toBe(1)
 })
 
+test('jobbtypschipens aria-pressed följer valet — kompakteringen får inte tappa den', async () => {
+  const props = { ...base, inherited: false, jobType: null, onApply: async () => {} }
+  await render(QuoteJobTypeStart, props)
+  expect(button('Service').getAttribute('aria-pressed')).toBe('false')
+  await render(QuoteJobTypeStart, { ...props, jobType: 'service' })
+  expect(button('Service').getAttribute('aria-pressed')).toBe('true')
+})
+
+test('pågående hämtning annonseras via role=status', async () => {
+  global.fetch = (() => new Promise(() => {})) as typeof fetch
+  await render(QuoteJobTypeStart, { ...base, onApply: async () => {} })
+  expect(host.querySelector('[role=status]')?.textContent).toContain('Hämtar ditt upplägg')
+})
+
+test('pågående mallkontroll annonseras via role=status', async () => {
+  await render(QuoteJobTypeStart, { ...base, onApply: () => new Promise<void>(() => {}) })
+  expect(host.querySelector('[role=status]')?.textContent).toContain('Kontrollerar mall')
+})
+
 test('onboardingens specifika mallval får inte bytas mot första mall i listan', async () => {
   let chosen: unknown
   await render(QuoteJobTypeStart, { ...base, initialIntent: { ...selection, templateId: 'explicit' }, onApply: async (s: unknown) => { chosen = s } })

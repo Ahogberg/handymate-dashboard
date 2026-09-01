@@ -733,9 +733,9 @@ export default function ApprovalsPage() {
         </div>
       </div>
 
-      {/* Tabbar — segmenterad kontroll, samma idiom som QuotePreviewPanels
-          Live/Slutdesign-toggle (bg-slate-100 rack + vit "pill" på aktivt
-          läge i stället för den gamla ramade primary-50-varianten). */}
+      {/* Tabbar — segmenterad kontroll, offertytornas etablerade idiom
+          (bg-slate-100 rack + vit "pill" på aktivt läge i stället för den
+          gamla ramade primary-50-varianten). */}
       <div className="px-4 sm:px-8 pb-4">
         <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
           {(['pending', 'resolved'] as const).map(tab => (

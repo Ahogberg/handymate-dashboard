@@ -43,7 +43,7 @@ import { useReservationSuggestions } from './useReservationSuggestions'
 import { ReservationMutedNotice } from './ReservationSuggestionBanner'
 import { ReservationReviewSheet } from './ReservationReviewSheet'
 import { QuoteMarginCard } from './QuoteMarginCard'
-import { QuotePreviewPanel } from './QuotePreviewPanel'
+import { QuoteDocumentSurface } from './QuoteDocumentSurface'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 
 // Delade sektionskomponenter (flyttade+döpta om från [id]/edit/components/ i
@@ -364,11 +364,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       som helhet — se kommentaren vid showTemplatePicker nedan. */
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
 
-  // Preview
-  const [showPreviewPanel, setShowPreviewPanel] = useState(true)
-  const [previewMode, setPreviewMode] = useState<'live' | 'design'>('live')
   // ETAPP 3 (offert-masterplan.md): id på raden vars RowEditSheet (bottom-
-  // sheet-radeditorn) är öppen — satt av QuotePreviewPanels onRowTap när
+  // sheet-radeditorn) är öppen — satt av QuoteDocumentSurfaces onRowTap när
   // hantverkaren trycker på en rad i canvasen under lg. Ersätter
   // QuoteEditMobilePreviewModal/FAB:en (borttagen) — dokumentet syns nu
   // direkt i huvudytan på mobil istället för bakom en separat modal-knapp.
@@ -830,6 +827,9 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
     // A4: betalplanen renderas nu i dokumentet — utan dessa beror memon inte
     // på den och blocket hade legat kvar med gamla siffror efter en ändring.
     paymentPlan.length, calculatedPaymentPlan,
+    // Del 3 (offertytan): memon läser `attachments` ovan men saknade den i
+    // dep-arrayen — dokumentet uppdaterades inte när bilagor ändrades.
+    attachments,
   ])
 
   const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
@@ -842,29 +842,6 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       setMainView(liveAvailable ? 'document' : 'list')
     }
   }, [loading, liveAvailable])
-
-  /**
-   * Completeness-chip-klickets fulla väg, DELAD av båda lägena (rättat efter
-   * kodgranskning av offertskaparens design-polish-etapp: den ursprungliga
-   * kommentaren här hävdade felaktigt att bara edit-läget rendrerar
-   * dokumentet bakom en kollapsbar panel — i verkligheten gör BÅDA det.
-   * Create-lägets `mainView === 'document'`-gren rendrerar exakt samma
-   * `QuotePreviewPanel`, styrd av exakt samma `showPreviewPanel`/
-   * `previewMode`-state (se grenen längre ner i JSX:en). `data-section`
-   * finns bara i DOM:en när den panelen är öppen och på Live-fliken —
-   * annars är chip-klicket ett tyst no-op i BÅDA lägena. Den här hjälparen
-   * säkerställer det innan `scrollToSection` (oförändrad, dess useEffect på
-   * pendingScrollSection kör samma querySelector('[data-section]') oavsett
-   * mode) körs. Ren komposition av redan existerande setters/state — ingen
-   * ny state.
-   */
-  const selectSectionAndReveal = useCallback((section: QuoteSection) => {
-    if (liveAvailable) {
-      setShowPreviewPanel(true)
-      setPreviewMode('live')
-    }
-    scrollToSection(section)
-  }, [liveAvailable, scrollToSection])
 
   // ETAPP 2a (offert-masterplan.md), punkt 6: id-baserade liveHandlers —
   // ersätter tidigare index-mutation. Återanvänder useQuoteItems' egna
@@ -2203,7 +2180,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
         quoteId={quoteId}
         quoteNumber={quoteNumberRef.current}
         completenessSummaries={completenessSummaries}
-        onSelectSection={selectSectionAndReveal}
+        onSelectSection={scrollToSection}
         autoSaveStatus={autoSaveStatus}
         saving={saving}
         onSendQuote={() => saveQuote(true)}
@@ -2298,10 +2275,6 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
         vatRate={vatRate}
         discountPercent={discountPercent}
         setDiscountPercent={setDiscountPercent}
-        showPreviewPanel={showPreviewPanel}
-        setShowPreviewPanel={setShowPreviewPanel}
-        previewMode={previewMode}
-        setPreviewMode={setPreviewMode}
         liveAvailable={liveAvailable}
         quoteTemplateData={quoteTemplateData}
         liveHandlers={liveHandlers}
@@ -2440,7 +2413,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
         <QuoteBuilderHeader
           title={title}
           completenessSummaries={hasQuoteContent ? completenessSummaries : undefined}
-          onSelectSection={selectSectionAndReveal}
+          onSelectSection={scrollToSection}
           aiGenerated={aiGenerated}
           aiConfidence={aiConfidence}
           aiPriceWarning={aiPriceWarning}
@@ -2459,11 +2432,6 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
             setShowSaveTemplateModal(true)
           }}
         />
-        {jobTypeStart}
-        {jobStartApplied && <p className="mb-4 text-sm text-teal-800" role="status">
-          Ditt underlag är på plats. Kontrollera mängder, priser och föreslagna förbehåll — inget är skickat.
-        </p>}
-
         {/* Kvittoprincipen Fall 1: motorns eget resonemang, direkt under
             headern före radlistan. Renderar ingenting utan reasoning;
             expanderat från start när en affärsregel aktiverats. Visas
@@ -2546,7 +2514,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
                 (ReservationSuggestionBanner) är borttagen — förslagen
                 renderas nu i dokumentets egen Reservationer-sektion
                 (QuoteDocument.tsx, se `reservationSuggestions`-proppen på
-                QuotePreviewPanel nedan) i stället för i assistentkolumnen,
+                QuoteDocumentSurface nedan) i stället för i assistentkolumnen,
                 utanför dokumentet. Discovery-vägen är completeness-chippen
                 (redan amber+räknare, se quote-completeness.ts) — ingen ny
                 mekanism byggd. ReservationMutedNotice är en ANNAN,
@@ -2621,6 +2589,15 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
 
           {/* ── Dokumentpanelen — huvudytan, näst överst på mobil ── */}
           <div className="order-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 flex flex-col gap-3">
+            {/* Jobbtypsremsan (Del 2, offertytan): flyttad hit från header-
+                nivån så den följer dokumentkolumnens bredd och läses som en
+                del av verktygsstacken ovanför "Mer"-raden. Grindvillkoret
+                bor kvar på jobTypeStart-variabeln högre upp — orört. Den
+                teala kvittoraden efter apply följde med hit av samma skäl. */}
+            {jobTypeStart}
+            {jobStartApplied && <p className="text-sm text-teal-800" role="status">
+              Ditt underlag är på plats. Kontrollera mängder, priser och föreslagna förbehåll — inget är skickat.
+            </p>}
             {/* "Mer"-verktygsrad — Stil/Villkor/Betalplan/Visning/Bilagor/
                 ROT nås härifrån, en panel synlig i taget (inte modal —
                 dokumentet syns hela tiden nedanför). Listvy/Dokument växlar
@@ -2813,11 +2790,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
               />
             ) : (
               <div className="lg:sticky lg:top-[5.5rem] lg:h-[calc(100vh-7rem)]">
-                <QuotePreviewPanel
-                  open={showPreviewPanel}
-                  setOpen={setShowPreviewPanel}
-                  previewMode={previewMode}
-                  setPreviewMode={setPreviewMode}
+                <QuoteDocumentSurface
                   liveEnabled={liveAvailable}
                   liveTemplateData={quoteTemplateData}
                   // ETAPP C3: i granskningsläget skickas bara den fokuserade
@@ -2858,7 +2831,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       <QuoteBuilderBottomBar
         summaries={completenessSummaries}
         hasQuoteContent={hasQuoteContent}
-        onSelect={selectSectionAndReveal}
+        onSelect={scrollToSection}
         saving={saving}
         canSend={canSend}
         sendDisabledReason={sendDisabledReason}
@@ -2871,9 +2844,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
 
       {/* ETAPP 3: bottom-sheet-radeditorn (mobil) — se sheetItem/sheetItemId
           ovan. Ersätter QuoteEditMobilePreviewModal/FAB:en (borttagen):
-          dokumentet syns nu direkt i huvudytan på mobil (QuotePreviewPanel
-          är inte längre `hidden lg:flex`) istället för bakom en separat
-          modal-knapp. */}
+          dokumentet (QuoteDocumentSurface) syns direkt i huvudytan på mobil
+          istället för bakom en separat modal-knapp. */}
       <RowEditSheet
         item={sheetItem}
         allCategories={allCategories}

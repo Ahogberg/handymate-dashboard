@@ -359,7 +359,7 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             grenen (items.length === 0, edit, oskalad canvas) är ny — en
             tom tabell med bara en huvudrad var ingen affordans, bara
             frånvaron av en. sheetMode undantas: mobilens motsvarande
-            tomruta renderas OSKALAD av QuotePreviewPanel.tsx, av samma
+            tomruta renderas OSKALAD av QuoteDocumentSurface.tsx, av samma
             träffyte-skäl som "+ Lägg till rad" nedan.
 
             FIX (holistisk slutgranskning, offertskaparen-design-polish):
@@ -431,7 +431,7 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             useInvoiceItems/useQuoteItems-mönster), så knappen fungerar för
             båda dokumenttyperna nu. */}
         {/* I sheetMode (mobil) renderas knappen i stället OSKALAD utanför
-            dokumentet av QuotePreviewPanel. Inuti den skalade A4:an blev
+            dokumentet av QuoteDocumentSurface. Inuti den skalade A4:an blev
             träffytan ~15px vid 375px skärmbredd — långt under 44px-kravet,
             och just på den yta som är hantverkarens huvudvy. */}
         {/* SPÅR B1: onAddRow öppnar artikelbanken; onItemAdd ger en tom rad.

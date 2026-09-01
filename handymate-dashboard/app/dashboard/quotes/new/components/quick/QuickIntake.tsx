@@ -205,8 +205,10 @@ export function QuickIntake({
           </p>
         </div>
 
-        {/* Arbetsytan — ett kort, tre kontroller. */}
-        {jobTypeStart}
+        {/* Arbetsytan — ett kort, tre kontroller. Remsan bär inga egna
+            marginaler sedan Del 2 (i editorn spacear flex-gap den), så här
+            får den ett wrapper-avstånd — bara när den faktiskt renderas. */}
+        {jobTypeStart && <div className="mb-4">{jobTypeStart}</div>}
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm">
         <div className="relative">
           <textarea

@@ -51,8 +51,17 @@ h1, h2, h3, h4, h5, h6 {
 .anim-rise { animation: qk-rise var(--motion-slow) var(--ease-standard) backwards; }
 .anim-pop  { animation: qk-pop  var(--motion-base) var(--ease-standard) backwards; }
 
+/* Underlagets ankomst — QuoteBuilder sätter klassen på offertsidans rot när
+   jobbtypsstarten applicerats. Flyttad hit från components/onboarding/
+   quote-job-type-start.css (raderad, offertytan Del 2-uppföljning):
+   keyframes+utilities bor i den här filen så reduced-motion-skyddet stannar
+   på ETT ställe. Samma klass på samma element som före flytten — bara
+   CSS:en har bytt hem. */
+@keyframes quote-arrive { from { opacity: 0; transform: translateY(12px) } }
+.first-quote-arrival { animation: quote-arrive .45s ease-out both; }
+
 @media (prefers-reduced-motion: reduce) {
-  .anim-fade, .anim-rise, .anim-pop { animation: none; }
+  .anim-fade, .anim-rise, .anim-pop, .first-quote-arrival { animation: none; }
 }
 
 /* Bränsle-badgens kritiska puls (Sidebar, 2026-08-14) — egen klass, samma

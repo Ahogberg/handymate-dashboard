@@ -23,6 +23,15 @@ interface Props {
    * sync-indikator i panelheadern.
    */
   onPendingChange?: (pending: boolean) => void
+  /**
+   * Den interna hörn-spinnern (top-2 right-2) som visas vid omrendering när
+   * gammal HTML fortfarande syns. Default true så befintliga konsumenter
+   * (offertdetaljsidans QuoteDocumentPanel m.fl.) är opåverkade.
+   * QuoteDocumentSurface skickar false: dess "Uppdaterar"-pill är den enda
+   * indikatorn där, och hörnet upptas av dokumentytans fullskärmsknapp
+   * (top-3 right-3, z-10) — spinnern hade hamnat halvt skymd bakom den.
+   */
+  showSpinner?: boolean
 }
 
 /**
@@ -32,7 +41,7 @@ interface Props {
  * Debouncar payload-ändringar så vi inte hamrar endpointen vid varje knapptryck.
  * Behåller senaste genererade HTML medan ny laddas så previewn inte blinkar.
  */
-export default function TemplatePreviewFrame({ payload, debounceMs = 600, className, onPendingChange }: Props) {
+export default function TemplatePreviewFrame({ payload, debounceMs = 600, className, onPendingChange, showSpinner = true }: Props) {
   const [html, setHtml] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -103,7 +112,7 @@ export default function TemplatePreviewFrame({ payload, debounceMs = 600, classN
         />
       )}
       {/* Subtil indikator när ny render pågår men vi visar gammal */}
-      {loading && html !== '' && (
+      {showSpinner && loading && html !== '' && (
         <div className="absolute top-2 right-2 bg-white/90 rounded-full p-1.5 shadow-sm">
           <Loader2 className="w-3.5 h-3.5 text-primary-700 animate-spin" />
         </div>

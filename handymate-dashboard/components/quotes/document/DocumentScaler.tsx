@@ -15,7 +15,7 @@ import { A4_WIDTH_PX, computeFitScale } from './format'
  * tidigare på appens vanliga mobil-brytpunktshook — ett VIEWPORT-test,
  * "lg och uppåt är ett no-op". Det höll så länge förhandsgranskningen bara
  * levde i gamla editorns breda tvåkolumnslayout (max-w-[1600px]). Samma
- * QuotePreviewPanel/DocumentScaler-kedja monteras nu ÄVEN i det guidade
+ * QuoteDocumentSurface/DocumentScaler-kedja monteras nu ÄVEN i det guidade
  * Snabboffert-flödet, i en mycket smalare enkolumns-container
  * (max-w-3xl ≈ 768px) — smalare än A4-bredden, men på en RIKTIG
  * desktopskärm där isMobile alltid är false. Skalningen stängdes då helt
