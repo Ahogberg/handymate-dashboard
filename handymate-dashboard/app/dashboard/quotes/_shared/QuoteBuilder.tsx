@@ -2432,6 +2432,20 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
             setShowSaveTemplateModal(true)
           }}
         />
+        {/* Jobbtypsremsan (Del 2, offertytan, 2026-09-01 — flyttad hit
+            2026-09-02): låg tidigare i dokumentkolumnen ovanför "Mer"-raden,
+            men på mobil hamnar den kolumnen efter hela assistentkolumn del 1
+            (kund & varningar, se MOBILORDNING-kommentaren nedan) — så en
+            hantverkare som kommer från en affär med flera kopplade mallar
+            fick scrolla en hel skärm förbi kundkortet för att se sitt
+            mallval. Direkt under headern, före grid-splitten, syns den
+            OAVSETT skärmstorlek utan att kundkortets mobilordning rörs.
+            Grindvillkoret bor kvar på jobTypeStart-variabeln högre upp —
+            orört. */}
+        {jobTypeStart}
+        {jobStartApplied && <p className="text-sm text-teal-800 mb-4" role="status">
+          Ditt underlag är på plats. Kontrollera mängder, priser och föreslagna förbehåll — inget är skickat.
+        </p>}
         {/* Kvittoprincipen Fall 1: motorns eget resonemang, direkt under
             headern före radlistan. Renderar ingenting utan reasoning;
             expanderat från start när en affärsregel aktiverats. Visas
@@ -2589,15 +2603,9 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
 
           {/* ── Dokumentpanelen — huvudytan, näst överst på mobil ── */}
           <div className="order-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 flex flex-col gap-3">
-            {/* Jobbtypsremsan (Del 2, offertytan): flyttad hit från header-
-                nivån så den följer dokumentkolumnens bredd och läses som en
-                del av verktygsstacken ovanför "Mer"-raden. Grindvillkoret
-                bor kvar på jobTypeStart-variabeln högre upp — orört. Den
-                teala kvittoraden efter apply följde med hit av samma skäl. */}
-            {jobTypeStart}
-            {jobStartApplied && <p className="text-sm text-teal-800" role="status">
-              Ditt underlag är på plats. Kontrollera mängder, priser och föreslagna förbehåll — inget är skickat.
-            </p>}
+            {/* Jobbtypsremsan flyttades HÄRIFRÅN 2026-09-02 till direkt under
+                headern (se kommentaren där) — mobilordningen gjorde att den
+                hamnade en hel skärm ner, bakom hela assistentkolumn del 1. */}
             {/* "Mer"-verktygsrad — Stil/Villkor/Betalplan/Visning/Bilagor/
                 ROT nås härifrån, en panel synlig i taget (inte modal —
                 dokumentet syns hela tiden nedanför). Listvy/Dokument växlar
