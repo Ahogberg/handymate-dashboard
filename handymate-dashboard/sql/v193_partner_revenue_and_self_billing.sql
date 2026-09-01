@@ -1,4 +1,9 @@
--- v191 — Partner Revenue Reality: append-only liggare, atomiska batchar och riktig självfaktura
+-- v193 — Partner Revenue Reality: append-only liggare, atomiska batchar och riktig självfaktura
+--
+-- Döpt om från v191 (2026-09-01): kolliderade med v191_platform_health_and_push_dispatch.sql
+-- från en parallell session — kollisionen ledde till att Andreas råkade köra
+-- platform-health-migrationen i tron att det var den här. v192 är tagen
+-- (samtalsefterarbete), så v193 är nästa fria nummer.
 --
 -- Förutsätter v190 (partnerattributionen låst). Körs MANUELLT i Supabase SQL Editor.
 -- Ingen befintlig ekonomisk rad räknas om eller skrivs över. Gamla liggarrader
