@@ -13,6 +13,10 @@ interface ChannelResult {
   reason?: string
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 /**
  * POST /api/push/send — Internal helper to send push notifications
  * Body: { business_id, title, body, url?, tag?, target_user_id? }
@@ -40,7 +44,7 @@ interface ChannelResult {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { business_id, title, body, url, tag, target_user_id } = await request.json()
+    const { business_id, title, body, url, tag, target_user_id, data } = await request.json()
 
     if (!business_id || !title) {
       return NextResponse.json({ error: 'Missing business_id or title' }, { status: 400 })
@@ -68,6 +72,7 @@ export async function POST(request: NextRequest) {
     // gatas av dem. P1-4: anropet awaitas så svaret redovisar verklig
     // provideracceptans; en schemalagd promise är inte ett leveransbevis.
     const expoData: Record<string, unknown> = {
+      ...(isRecord(data) ? data : {}),
       url: url || '/dashboard',
       tag: tag || 'handymate',
     }

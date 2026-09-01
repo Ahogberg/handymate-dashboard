@@ -29,6 +29,7 @@ export interface InternalPushPayload {
   url?: string
   tag?: string
   target_user_id?: string | null
+  data?: Record<string, unknown>
 }
 
 export interface InternalPushResult {

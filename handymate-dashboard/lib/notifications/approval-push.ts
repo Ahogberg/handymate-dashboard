@@ -18,6 +18,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAbsenceWindow, isAbsenceActive } from '@/lib/absence/absence-window'
 import { classifyAbsenceEvent } from '@/lib/absence/escalation'
 import { internalPushHeaders } from '@/lib/notifications/push-internal'
+import { buildAgentPushEnvelopeV1 } from '@/lib/notifications/agent-push'
 
 interface ApprovalLike {
   business_id: string
@@ -317,6 +318,7 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
   // faller tillbaka till oförändrat businessblast, precis som innan detta
   // fält fanns.
   const targetUserId = await resolveTargetUserId(approval.routed_business_user_id)
+  const agentPushEnvelope = buildAgentPushEnvelopeV1(approval.approval_type, payload)
   // A confidential call must never fall back to a whole-business blast.
   if (approval.approval_type === 'meeting_summary' && payload.source === 'phone_call' && !targetUserId) {
     console.error('[approval-push] samtalsnotis saknar verifierad mottagare')
@@ -333,6 +335,7 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
         body: template.body,
         url: template.url,
         tag: `approval:${approval.approval_type}`,
+        ...(agentPushEnvelope ? { data: agentPushEnvelope } : {}),
         ...(targetUserId ? { target_user_id: targetUserId } : {}),
       }),
     })
