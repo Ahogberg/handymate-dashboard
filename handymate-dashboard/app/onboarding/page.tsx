@@ -183,13 +183,20 @@ export default function OnboardingPage() {
         await fetch('/api/onboarding', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ step: s, data: extraData || {}, config: config || {} }),
+          // variant: vilken guide kunden faktiskt såg — servern stämplar
+          // tratten (lib/onboarding/funnel.ts) så A/B-testet går att läsa av.
+          body: JSON.stringify({
+            step: s,
+            data: extraData || {},
+            config: config || {},
+            variant: studioMode ? 'studio' : 'classic',
+          }),
         })
       } catch {
         // Silent — onboarding fortsätter ändå, kan resume senare
       }
     },
-    [data.businessId],
+    [data.businessId, studioMode],
   )
 
   const next = useCallback(async () => {

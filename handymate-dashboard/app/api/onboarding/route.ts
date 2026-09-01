@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { FUNNEL_KEY, markFinalized, markStepReached, normaliseraVariant, readFunnel, stripFunnelFromClientData } from '@/lib/onboarding/funnel'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { seedAllDefaults } from '@/lib/seed-defaults'
 import { isOnboardingPaymentBlocked } from '@/lib/onboarding/payment-gate'
@@ -90,17 +91,20 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json()
     const { step, data: stepData, config } = body
+    const variant = normaliseraVariant(body.variant)
 
     const supabase = getServerSupabase()
 
     // Build update object
     const updates: Record<string, unknown> = {}
 
-    if (typeof step === 'number' && step >= 1 && step <= 10) {
+    const harSteg = typeof step === 'number' && step >= 1 && step <= 10
+    if (harSteg) {
       updates.onboarding_step = step
     }
 
-    if (stepData && typeof stepData === 'object') {
+    const harStegdata = stepData && typeof stepData === 'object'
+    if (harStegdata || harSteg) {
       // Merge with existing onboarding_data
       const { data: current } = await supabase
         .from('business_config')
@@ -109,7 +113,18 @@ export async function PUT(request: NextRequest) {
         .single()
 
       const existing = (current?.onboarding_data as Record<string, unknown>) || {}
-      updates.onboarding_data = { ...existing, ...stepData }
+      // Onboardingtratten (lib/onboarding/funnel.ts, 2026-09-01): servern
+      // stämplar FÖRSTA gången varje steg nås under onboarding_data._funnel.
+      // Klientens eko av nyckeln strippas — servern äger den.
+      const inkommande = harStegdata ? stripFunnelFromClientData(stepData as Record<string, unknown>) : {}
+      const funnel = harSteg
+        ? markStepReached(readFunnel(existing), step, new Date().toISOString(), variant)
+        : readFunnel(existing)
+      updates.onboarding_data = {
+        ...existing,
+        ...inkommande,
+        ...(funnel ? { [FUNNEL_KEY]: funnel } : {}),
+      }
     }
 
     // Direct business_config column writes (whitelisted för säkerhet).
@@ -260,6 +275,23 @@ export async function POST(request: NextRequest) {
     const updates: Record<string, unknown> = {
       onboarding_step: 10, // Mark fully complete (compat with both V1 and V2 flows)
       onboarding_completed_at: new Date().toISOString(),
+    }
+
+    // Onboardingtratten: stämpla finalize (första gången) under _funnel.
+    // Best-effort — en misslyckad läsning får aldrig stoppa finalize.
+    try {
+      const { data: current } = await supabase
+        .from('business_config')
+        .select('onboarding_data')
+        .eq('business_id', business.business_id)
+        .single()
+      const existing = (current?.onboarding_data as Record<string, unknown>) || {}
+      updates.onboarding_data = {
+        ...existing,
+        [FUNNEL_KEY]: markFinalized(readFunnel(existing), new Date().toISOString()),
+      }
+    } catch (err) {
+      console.warn('[onboarding finalize] kunde inte stämpla tratten (icke-blockerande):', err)
     }
 
     // Only set non-undefined values

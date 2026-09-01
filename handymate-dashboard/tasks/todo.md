@@ -1,3 +1,67 @@
+# Nattpass 2: onboardingtratten (Claude 2026-09-02)
+
+Stöd för Andreas onboarding-A/B. Ingen migration — tidsstämplarna bor under
+onboarding_data._funnel (servern äger nyckeln).
+
+- [x] lib/onboarding/funnel.ts: markStepReached (första gången vinner),
+      markFinalized, readFunnel, stripFunnelFromClientData, sammanstallTratt
+      (nådde/bortfall/median per steg, per variant studio/classic, var de
+      ofullbordade står, legacy-fallback på onboarding_step, testkonton
+      exkluderade men listade)
+- [x] PUT /api/onboarding stämplar steg + variant; POST finalize stämplar
+      finalized_at best-effort; app/onboarding/page.tsx skickar variant
+- [x] GET /api/admin/onboarding-funnel?days=30|90|365 + /admin/onboarding-
+      funnel (isAdmin), länk från /admin
+- [x] tests/onboarding-funnel.spec.ts i kontraktsgrinden
+- [x] tsc 0, 12 onboarding-sviter + facit 176 gröna, test:contracts 209
+- [x] Merge av origin/main (partner-självfaktura, samtalsefterarbete,
+      v191→v193) utan konflikter; tsc + contracts gröna på merged tree
+
+## Rött på main före passet (inte rört — nattsviten kommer flagga)
+- tests/first-focus.spec.ts + tests/job-type-start.spec.ts pekar på
+  Step6LiveTour för logik som flyttade till FirstAssignmentFinal i
+  8df45b0/0ecda0b (buildFirstMissionPrompt anropas inte längre alls).
+
+## Att läsa av i morgon
+- /admin/onboarding-funnel: konton skapade efter deploy får tid per steg;
+  äldre konton visas "(utan tid)" på nuvarande steg. Variant blir 'classic'
+  tills NEXT_PUBLIC_SETUP_STUDIO_ENABLED sätts.
+
+---
+
+# Nattpass 1: tenant-svep av rutterna utanför standardgrinden (Claude 2026-09-01→02)
+
+Andreas: "kör igenom nummer 1 och sen nummer 2 direkt när det är klart,
+pausa inte för accesser". Rapport: docs/audits/TENANT_SWEEP_2026-09-01.md.
+
+- [x] Inventering: 554 rutter, 120 utan getAuthenticatedBusiness, 38 utan
+      igenkänd grind granskade rad för rad (tre parallella granskningar)
+- [x] KRITISKT: reminders hade hårdkodad reservhemlighet → verifyCronSecret
+- [x] HÖGT: google/callback osignerad OAuth-state → HMAC + sessionsmatchning
+      (lib/google/oauth-state.ts); karin-deadlines, invoices/auto-generate,
+      morning-brief: "Bearer undefined"-mönstret → verifyCronSecret
+- [x] Google Calendar-webhooken kräver kanaltoken (lib/google/channel-token.ts)
+- [x] quotes/track kräver sign_token; portal messages, quotes/public
+      fråga/bokning, lead-portal, public/book, storefront/track,
+      partners/register: fail-closed rate limits (checkPublicRateLimitDb)
+- [x] ÄTA-signering atomisk, fältrapport-reject engångs, inbjudan utan
+      utgång = utgången, Swish-QR validerar, voice/greeting signeras,
+      inbound-mejl faller bara tillbaka vid saknat schema, auth/register
+      kryptografiskt business_id, portalens customer_message business-filtrerad
+- [x] Facit: tests/facit-tenant-sweep.spec.ts + tests/facit-route-auth-
+      inventory.spec.ts (PUBLIC_BY_DESIGN är beslutet) — i CI-grinden
+- [x] Rött på main före passet: cogs-matare räknade 2 bokforMatteUsage,
+      efb8d69 lade till en tredje — facit uppdaterat
+- [x] tsc 0, 27 berörda sviter + nya facit 208 gröna, test:contracts grön
+
+## Beslut för Andreas (INTE ändrat)
+- public-dto exponerar customer.portal_token i offertsvaret (offert→portal-
+  redirect). Scope-eskalering inom samma kund. Gata efter accept?
+- admin/partners/[id]/approve är muterande GET (mejllänk).
+- Portaltoken utan utgång, återaktiveras vid ny länk.
+
+---
+
 # Lanseringsgrund: CI-grind, driftsynlighet, kortkvalitet (Claude 2026-09-01)
 
 Andreas ask efter genomgången "nästa utvecklingssteg inför lansering":

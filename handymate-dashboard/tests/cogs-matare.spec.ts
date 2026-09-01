@@ -322,9 +322,11 @@ test.describe('COGS-mätaren etapp 1 — de tre förut omätta ytorna (2026-08-1
     const s = kod('app/api/matte/chat/route.ts')
     expect(s).toContain('meterDirectLlmCall({')
     expect(s).toContain("refType: 'matte_chat_turn'")
-    // Bokförs på BÅDA return-vägarna (klart-svar och pending_confirmation),
-    // inte bara den vanliga — annars läcker en tyst gren igen.
-    expect(s.match(/await bokforMatteUsage\(/g)?.length).toBe(2)
+    // Bokförs på VARJE return-väg (klart-svar, pending_confirmation och,
+    // sedan efb8d69 2026-08-31, offertgeneratorns create_quote_draft-gren),
+    // inte bara den vanliga — annars läcker en tyst gren igen. Talet var
+    // stelt kodat till 2 och blev rött på main när tredje grenen tillkom.
+    expect(s.match(/await bokforMatteUsage\(/g)?.length).toBe(3)
   })
 
   test('den publika widgeten kör Haiku och mäts, inte längre obevakad Sonnet', () => {

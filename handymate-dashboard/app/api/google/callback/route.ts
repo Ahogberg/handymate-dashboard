@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getGoogleTokens, getCalendarList } from '@/lib/google-calendar'
+import { getAuthenticatedBusiness } from '@/lib/auth'
+import { verifyOAuthState } from '@/lib/google/oauth-state'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,19 +35,28 @@ export async function GET(request: NextRequest) {
       return errorRedirect('Saknar authorization code eller state')
     }
 
-    // Decode and validate state
-    let state: { business_id: string; user_id: string; timestamp: number }
-    try {
-      state = JSON.parse(Buffer.from(stateParam, 'base64').toString('utf-8'))
-    } catch {
-      console.error('Invalid state parameter')
-      return errorRedirect('Ogiltig state-parameter')
+    // Tenant-svepet 2026-09-01: state var osignerad base64-JSON — vem som
+    // helst kunde tillverka en state med ett annat företags id och binda
+    // sitt Google-konto till offrets Gmail-sändning, eller lura ett offer
+    // att godkänna en state som pekade på angriparens företag. Nu: HMAC-
+    // verifierad state (lib/google/oauth-state.ts) OCH sessionen som
+    // landar här måste vara samma företag som state bär.
+    const verified = verifyOAuthState(stateParam)
+    if (!verified.ok) {
+      console.error('[google/callback] ogiltig state:', verified.reason)
+      return errorRedirect(
+        verified.reason === 'expired' ? 'Sessionen har gått ut, försök igen' : 'Ogiltig state-parameter',
+      )
     }
+    const state = verified.state
 
-    // Validate timestamp (must be within 10 minutes)
-    if (Date.now() - state.timestamp > 10 * 60 * 1000) {
-      console.error('State token expired')
-      return errorRedirect('Sessionen har gått ut, försök igen')
+    const sessionBusiness = await getAuthenticatedBusiness(request)
+    if (!sessionBusiness || sessionBusiness.business_id !== state.business_id) {
+      console.error('[google/callback] sessionen matchar inte state', {
+        session_business: sessionBusiness?.business_id ?? null,
+        state_business: state.business_id,
+      })
+      return errorRedirect('Logga in på samma konto som startade Google-kopplingen och försök igen')
     }
 
     // Exchange code for tokens
@@ -132,13 +143,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Synka Gmail-sändning till business_config så att gmail-send.ts hittar det
+    // refresh_token skrivs bara när Google faktiskt gav ett nytt — samma
+    // regel som calendar_connection ovan; annars nollades det vid re-consent.
     await supabase
       .from('business_config')
       .update({
         gmail_send_enabled: true,
         gmail_email: tokens.email,
         google_access_token: tokens.access_token,
-        google_refresh_token: tokens.refresh_token,
+        ...(hasNewRefreshToken ? { google_refresh_token: tokens.refresh_token } : {}),
       })
       .eq('business_id', state.business_id)
 

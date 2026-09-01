@@ -70,6 +70,7 @@ export async function GET(_request: NextRequest, { params }: { params: { token: 
       supabase
         .from('customer_message')
         .select('id, message, direction, created_at')
+        .eq('business_id', customer.business_id)
         .eq('customer_id', customer.customer_id)
         .eq('direction', 'outbound')
         .gte('created_at', sinceIso)

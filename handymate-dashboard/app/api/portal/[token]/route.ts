@@ -93,6 +93,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
     const { count: unreadCount } = await supabase
       .from('customer_message')
       .select('*', { count: 'exact', head: true })
+      .eq('business_id', customer.business_id)
       .eq('customer_id', customer.customer_id)
       .eq('direction', 'outbound')
       .is('read_at', null)

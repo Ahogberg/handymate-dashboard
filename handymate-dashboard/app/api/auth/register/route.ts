@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { randomBytes } from 'crypto'
 import { getServerSupabase } from '@/lib/supabase'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
@@ -41,7 +42,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Kunde inte skapa användare' }, { status: 400 })
     }
 
-    const businessId = 'biz_' + Math.random().toString(36).substr(2, 12)
+    // Tenant-svepet 2026-09-01: Math.random() är förutsägbar — och business_id
+    // är den enda "hemlighet" flera publika ytor (widget, storefront, OAuth-
+    // state) bär. Samma format (biz_ + 12 tecken), kryptografisk källa.
+    const businessId = 'biz_' + randomBytes(9).toString('base64url').replace(/[^a-z0-9]/gi, '').slice(0, 12).toLowerCase().padEnd(12, '0')
 
     const defaultWorkingHours = {
       monday: { active: true, start: '08:00', end: '17:00' },

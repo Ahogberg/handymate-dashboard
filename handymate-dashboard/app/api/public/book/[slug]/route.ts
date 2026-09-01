@@ -5,6 +5,9 @@ import { normalizeSwedishPhone } from '@/lib/phone-normalize'
 import { sendSmsViaElks } from '@/lib/sms-send'
 import { syncBookingToCalendar } from '@/lib/google-calendar-sync'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
+import { checkPublicRateLimitDb, hashClientIp } from '@/lib/rate-limit-db'
+
+const PUBLIC_BOOK_MAX_PER_HOUR = 5
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +28,20 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
 
   if (!date || !time || !name?.trim() || !phone || !phone.startsWith('+')) {
     return NextResponse.json({ error: 'Fyll i namn, giltigt telefonnummer, datum och tid.' }, { status: 400 })
+  }
+  // Tenant-svepet 2026-09-01: ett felformat datum gav NaN genom hela kedjan
+  // och en okontrollerad RangeError (500) — validera som availability gör.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date)) || !/^\d{2}:\d{2}$/.test(String(time))) {
+    return NextResponse.json({ error: 'Ogiltigt datum eller tid.' }, { status: 400 })
+  }
+  // Varje bokning skickar två SMS (kunden + hantverkaren) och skapar
+  // lead/affär/bokning — fail-closed tak per IP.
+  const rate = await checkPublicRateLimitDb(`public-book:ip:${hashClientIp(request)}`, {
+    maxRequests: PUBLIC_BOOK_MAX_PER_HOUR,
+    windowMs: 60 * 60 * 1000,
+  })
+  if (!rate.allowed) {
+    return NextResponse.json({ error: 'För många bokningsförsök — försök igen om en stund.' }, { status: 429 })
   }
 
   // Slug → publicerat storefront → företag

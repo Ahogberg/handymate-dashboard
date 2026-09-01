@@ -27,6 +27,7 @@ import { fuelAllows } from '@/lib/costs/fuel'
 import { NextRequest } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { verifyPostmarkBasicAuth } from '@/lib/email/postmark-signature'
+import { arSchemaSaknas } from '@/lib/observability/driftlarm'
 import { isLikelyLead, parseLeadFromEmail, type EmailInput } from '@/lib/gmail-lead-detection'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
 import { saveInboundAttachments, type PostmarkAttachment } from '@/lib/email/postmark-attachments'
@@ -101,10 +102,16 @@ async function resolveInboundBusinessId(
       if (error) throw error
       if (data?.business_id) return data.business_id
     } catch (err) {
-      // Tabellen finns troligen inte ännu (v106 ej körd) — kan också vara
-      // ett tillfälligt DB-fel. Båda fallen: samma env-fallback, aldrig
-      // payload-styrd gissning.
-      console.warn('[email-inbound] uppslag mot email_inbound_route misslyckades, faller tillbaka på env:', err)
+      // Tenant-svepet 2026-09-01: bara "tabellen finns inte än" (v106 ej
+      // körd) får falla tillbaka på env-företaget. Ett tillfälligt DB-fel
+      // gjorde tidigare att en främmande adress mejl hamnade hos pilot-
+      // tenanten — nu avvisas mejlet (null) och Postmark försöker igen.
+      if (arSchemaSaknas(err)) {
+        console.warn('[email-inbound] email_inbound_route saknas (v106 ej körd) — faller tillbaka på env')
+      } else {
+        console.error('[email-inbound] uppslag mot email_inbound_route misslyckades — avvisar utan fallback:', err)
+        return null
+      }
     }
   }
 

@@ -82,6 +82,8 @@ const MATS_AV_ANROPAREN: Record<string, string[]> = {
 const INGEN_KUND_ATT_BELASTA: Record<string, string> = {
   'lib/launch-desk/brief.ts':
     'Handymates eget launch desk (adminspärrad) — intern COGS, inget business_id',
+  'lib/observability/credit-watch.ts':
+    'Kreditbevakningens 1-token-probe mot Anthropic (max_tokens: 1, en gång per dygn, cron-grindad) — plattformskostnad, inget business_id',
 }
 
 /**

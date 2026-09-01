@@ -8,6 +8,7 @@
 import { google } from 'googleapis'
 import { getGoogleAuthClient } from './google-calendar'
 import { getServerSupabase } from './supabase'
+import { calendarChannelToken } from './google/channel-token'
 import crypto from 'crypto'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
@@ -40,6 +41,10 @@ export async function registerCalendarWatch(
         type: 'web_hook',
         address: WEBHOOK_URL,
         expiration: String(expiration),
+        // Hemligt kanaltoken (lib/google/channel-token.ts) — Google skickar
+        // tillbaka det i X-Goog-Channel-Token, webhooken kräver att det
+        // stämmer. Utan CRON_SECRET registreras kanalen utan token (som förr).
+        ...(calendarChannelToken(channelId) ? { token: calendarChannelToken(channelId)! } : {}),
       },
     })
 

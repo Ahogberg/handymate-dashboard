@@ -3,6 +3,16 @@ import { getServerSupabase } from '@/lib/supabase'
 import { createHash } from 'crypto'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 
+// Läser x-forwarded-for/user-agent — får aldrig cachas statiskt (CLAUDE.md).
+export const dynamic = 'force-dynamic'
+
+/** Visningstid per event klampas — klienten kunde tidigare skicka vad som helst. */
+const QUOTE_TRACK_MAX_DURATION_SECONDS = 4 * 3600
+function begransaDuration(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0
+  return Math.min(QUOTE_TRACK_MAX_DURATION_SECONDS, Math.round(value))
+}
+
 // 1x1 transparent GIF
 const PIXEL = Buffer.from(
   'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
@@ -26,11 +36,17 @@ function hashIP(ip: string): string {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const quoteId = searchParams.get('q')
+  const signToken = searchParams.get('t')
   const event = searchParams.get('e') || 'opened'
-  const sessionId = searchParams.get('s') || 'unknown'
-  const duration = parseInt(searchParams.get('dur') || '0') || 0
+  const sessionId = (searchParams.get('s') || 'unknown').slice(0, 80)
+  const duration = begransaDuration(parseInt(searchParams.get('dur') || '0') || 0)
 
-  if (!quoteId) {
+  // Tenant-svepet 2026-09-01: quote_id ensamt är ingen hemlighet (syns i
+  // dashboardens URL:er och payloads, Math.random-genererat) — och rutten
+  // flippade status sent→opened och skrev händelser i offertens tenant.
+  // Nu krävs offertens sign_token (t) för varje skrivning. Pixeln
+  // returneras alltid så gamla mejl inte visar trasig bild.
+  if (!quoteId || !signToken) {
     return new Response(PIXEL, { headers: pixelHeaders })
   }
 
@@ -46,6 +62,7 @@ export async function GET(req: NextRequest) {
       .from('quotes')
       .select('business_id, status')
       .eq('quote_id', quoteId)
+      .eq('sign_token', signToken)
       .single()
 
     if (quoteErr) {
@@ -105,9 +122,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { quoteId, event, sessionId, duration } = body
+    const { quoteId, signToken, event, sessionId } = body
+    const duration = begransaDuration(Number(body.duration) || 0)
 
-    if (!quoteId) return Response.json({ ok: true })
+    // Samma tokenkrav som GET (tenant-svepet 2026-09-01).
+    if (!quoteId || typeof signToken !== 'string' || !signToken) return Response.json({ ok: true })
 
     const supabase = getServerSupabase()
 
@@ -115,6 +134,7 @@ export async function POST(req: NextRequest) {
       .from('quotes')
       .select('business_id, total_view_seconds')
       .eq('quote_id', quoteId)
+      .eq('sign_token', signToken)
       .single()
 
     if (!quote) return Response.json({ ok: true })
@@ -122,8 +142,8 @@ export async function POST(req: NextRequest) {
     await supabase.from('quote_tracking_events').insert({
       quote_id: quoteId,
       business_id: quote.business_id,
-      event_type: event || 'closed',
-      session_id: sessionId,
+      event_type: typeof event === 'string' ? event.slice(0, 40) : 'closed',
+      session_id: typeof sessionId === 'string' ? sessionId.slice(0, 80) : 'unknown',
       duration_seconds: duration > 0 ? duration : null,
       ip_hash: hashIP(req.headers.get('x-forwarded-for') || ''),
       user_agent: (req.headers.get('user-agent') || '').slice(0, 200),

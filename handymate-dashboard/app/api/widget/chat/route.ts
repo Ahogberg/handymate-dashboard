@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { checkRateLimitDb } from '@/lib/rate-limit-db'
+import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
 import { createHash } from 'crypto'
 import Anthropic from '@anthropic-ai/sdk'
 import { formatKnowledgeForPrompt, formatGuardrailsForPrompt } from '@/lib/widget-activation'
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     // samma anti-spam-mål utan att kräva schema-ändring för IP↔session-
     // mappning. 50 anrop = ~10 sessions vid normalt 3-7 msg/session.
     const ipHash = hashIp(getClientIp(request))
-    const rateCheck = await checkRateLimitDb(`widget-chat:ip:${ipHash}`, {
+    const rateCheck = await checkPublicRateLimitDb(`widget-chat:ip:${ipHash}`, {
       maxRequests: 50,
       windowMs: 24 * 60 * 60 * 1000,
     })

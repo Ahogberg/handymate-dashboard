@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { ensureValidToken, getCalendarEvents } from '@/lib/google-calendar'
+import { calendarChannelTokenMatches } from '@/lib/google/channel-token'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
     // Hitta vilken business som äger denna channel
     const { data: watch } = await supabase
       .from('calendar_watches')
-      .select('business_id, calendar_connection_id')
+      .select('business_id, calendar_connection_id, resource_id')
       .eq('channel_id', channelId)
       .eq('is_active', true)
       .single()
@@ -39,6 +40,22 @@ export async function POST(request: NextRequest) {
     if (!watch) {
       console.warn(`[Calendar Webhook] Unknown channel: ${channelId}`)
       return new NextResponse(null, { status: 200 })
+    }
+
+    // Tenant-svepet 2026-09-01: kanal-id:t är ingen hemlighet (delas med
+    // Google, syns i loggar). Kräv det hemliga kanaltokenet vi registrerade
+    // (lib/google/channel-token.ts). Kanaler registrerade FÖRE detta saknar
+    // token hos Google i upp till sex dagar (förnyas av cron) — de släpps
+    // igenom bara om resource-id:t matchar det vi sparade vid registrering.
+    const presentedToken = request.headers.get('x-goog-channel-token')
+    const tokenOk = calendarChannelTokenMatches(channelId, presentedToken)
+    const legacyOk = !presentedToken && Boolean(watch.resource_id) && resourceId === watch.resource_id
+    if (!tokenOk && !legacyOk) {
+      console.warn(`[Calendar Webhook] Avvisad notis för kanal ${channelId}: ogiltigt kanaltoken/resource-id`)
+      return new NextResponse(null, { status: 401 })
+    }
+    if (legacyOk) {
+      console.warn(`[Calendar Webhook] Kanal ${channelId} saknar token (registrerad före 2026-09-01) — accepterad på resource-id, förnyas av cron`)
     }
 
     // Hämta calendar connection

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { registerPartner } from '@/lib/partners/auth'
 import { signApproveToken } from '@/lib/partners/approve-token'
 import { AGREEMENT_VERSION, readAgreementHash, captureRequestIp } from '@/lib/partners/agreement'
+import { checkPublicRateLimitDb, hashClientIp } from '@/lib/rate-limit-db'
+
+const PARTNER_REGISTER_MAX_PER_HOUR = 5
 
 /**
  * POST /api/partners/register
@@ -20,6 +23,16 @@ export async function POST(request: NextRequest) {
     }
 
     const { email, name, company, password, agreementAccepted } = body
+
+    // Tenant-svepet 2026-09-01: ingen begränsning alls — obegränsat bcrypt-
+    // arbete, Resend-kvot och admin-mejl per registrering. Fail-closed IP-tak.
+    const rate = await checkPublicRateLimitDb(`partners-register:ip:${hashClientIp(request)}`, {
+      maxRequests: PARTNER_REGISTER_MAX_PER_HOUR,
+      windowMs: 60 * 60 * 1000,
+    })
+    if (!rate.allowed) {
+      return NextResponse.json({ error: 'För många registreringsförsök — försök igen om en stund' }, { status: 429 })
+    }
 
     if (!email || !name || !password) {
       return NextResponse.json({ error: 'Namn, e-post och lösenord krävs' }, { status: 400 })

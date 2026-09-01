@@ -418,6 +418,13 @@ export default function AdminDashboardPage() {
               <Zap className="w-4 h-4" />
               Kortkvalitet
             </a>
+            <a
+              href="/admin/onboarding-funnel"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-800 bg-primary-50 border border-primary-200 rounded-xl hover:bg-primary-100 transition-colors"
+            >
+              <TrendingDown className="w-4 h-4" />
+              Onboardingtratt
+            </a>
             <button
               onClick={handleRefresh}
               disabled={refreshing}

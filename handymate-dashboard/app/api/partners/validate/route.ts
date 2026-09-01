@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { checkRateLimitDb } from '@/lib/rate-limit-db'
+import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
 import { extractClientIp } from '@/lib/onboarding/website-scrape'
 
 export const dynamic = 'force-dynamic'
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       request.headers.get('x-forwarded-for'),
       request.headers.get('x-real-ip'),
     )
-    const rateLimit = await checkRateLimitDb(`partner-validate:${ip}`, {
+    const rateLimit = await checkPublicRateLimitDb(`partner-validate:${ip}`, {
       maxRequests: 20,
       windowMs: 60 * 60 * 1000, // 1 timme
     })

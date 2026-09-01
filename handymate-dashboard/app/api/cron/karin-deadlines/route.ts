@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { materializeObligations } from '@/lib/karin/obligations'
 import { obligationToEvent } from '@/lib/karin/calendar'
@@ -60,7 +61,11 @@ export async function POST(request: NextRequest) {
 }
 
 async function kor(request: NextRequest) {
-  if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Tenant-svepet 2026-09-01: jämförelsen mot `Bearer ${process.env.CRON_SECRET}`
+  // blev bokstavligen "Bearer undefined" när variabeln saknades — samma
+  // fail-open som N2 stängde i alla andra cron-rutter. Rutten läser
+  // business_config för ALLA företag och skriver kort per företag.
+  if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

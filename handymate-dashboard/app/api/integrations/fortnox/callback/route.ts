@@ -3,6 +3,9 @@ import { cookies } from 'next/headers'
 import { saveFortnoxTokens, getFortnoxCompanyInfo } from '@/lib/fortnox'
 import { logFortnoxApi } from '@/lib/fortnox/api-log'
 
+// Läser state-cookien per request — får aldrig cachas statiskt (CLAUDE.md).
+export const dynamic = 'force-dynamic'
+
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 const FORTNOX_AUTH_BASE = 'https://apps.fortnox.se/oauth-v1'
 

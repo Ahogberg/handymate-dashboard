@@ -34,7 +34,10 @@ export async function POST(
       return NextResponse.json({ error: 'Inbjudan redan accepterad' }, { status: 400 })
     }
 
-    if (invite.invite_expires_at && new Date(invite.invite_expires_at) < new Date()) {
+    // Tenant-svepet 2026-09-01: en rad UTAN utgångsdatum var en evig
+    // inbjudan (fail-open). Saknat datum räknas nu som utgånget — en
+    // inbjudan ger ett fullt personalkonto, den ska aldrig leva för alltid.
+    if (!invite.invite_expires_at || new Date(invite.invite_expires_at) < new Date()) {
       return NextResponse.json({ error: 'Inbjudan har gått ut' }, { status: 400 })
     }
 

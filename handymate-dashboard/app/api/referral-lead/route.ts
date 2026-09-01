@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { verifyReferralToken } from '@/lib/referral/link'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
-import { checkRateLimitDb } from '@/lib/rate-limit-db'
+import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
 import { createHash } from 'crypto'
 
 /**
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     // IP-rate-limit (anti-abuse) — publikt formulär utan CAPTCHA. Samma
     // gräns som /api/leads/intake: 10/IP/timme.
     const ipHash = hashIp(getClientIp(request))
-    const rateCheck = await checkRateLimitDb(`referral-lead:ip:${ipHash}`, {
+    const rateCheck = await checkPublicRateLimitDb(`referral-lead:ip:${ipHash}`, {
       maxRequests: 10,
       windowMs: 60 * 60 * 1000,
     })

@@ -11,6 +11,10 @@ import { buildPublicQuoteDto } from '@/lib/quotes/public-dto'
 import { stripPrintBar } from '@/lib/document-html'
 import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/business/quote-surface-select'
 import { signAttachmentList } from '@/lib/storage-signing'
+import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
+
+/** Frågor + bokningsönskemål per offertlänk och timme (tenant-svepet 2026-09-01). */
+const QUOTE_PUBLIC_ACTION_MAX_PER_HOUR = 10
 
 // ETAPP 5 (offert-masterplan.md): dokument-HTML-rendering (Premium/Friendly)
 // kräver Node-runtime (react-dom/server via lib/quote-templates, samma som
@@ -325,6 +329,20 @@ export async function POST(
     // Skapar INTE en bokning rakt in i kalendern — det vore att låta en kund
     // skriva i hantverkarens schema. I stället ett önskemål i godkännande-kön
     // som hantverkaren bekräftar. Kunden får besked om att det är preliminärt.
+    // Tenant-svepet 2026-09-01: 'question' och 'request_booking' ligger
+    // medvetet FÖRE status-guarderna (ett samtal är aldrig ett dubbelt beslut)
+    // men skapar kort + push per anrop. Fail-closed tak per offertlänk så en
+    // vidarebefordrad länk inte kan begrava hantverkarens kö och telefon.
+    if (action === 'request_booking' || action === 'question') {
+      const rate = await checkPublicRateLimitDb(`quote-public-action:${token}`, {
+        maxRequests: QUOTE_PUBLIC_ACTION_MAX_PER_HOUR,
+        windowMs: 60 * 60 * 1000,
+      })
+      if (!rate.allowed) {
+        return NextResponse.json({ error: 'För många förfrågningar på kort tid — försök igen om en stund' }, { status: 429 })
+      }
+    }
+
     if (action === 'request_booking') {
       const requestedDate = typeof body.date === 'string' ? body.date.trim() : ''
       if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
