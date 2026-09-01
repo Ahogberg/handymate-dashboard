@@ -19,6 +19,10 @@ import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-item
 import { resolveTemplateItemPrices } from '@/lib/quotes/resolve-template-item-prices'
 import type { TemplatePricingProduct } from '@/lib/quotes/resolve-template-item-prices'
 import { QuoteJobTypeStart } from '@/components/onboarding/QuoteJobTypeStart'
+// first-quote-arrival-animationen (sidroten nedan) bor kvar i denna fil
+// sedan Del 2 tömde den på boxstilarna — det är DENNA komponent som
+// använder klassen, därför importeras filen här och inte i remsan.
+import '@/components/onboarding/quote-job-type-start.css'
 import { canApplyJobTypeStart, loadJobTypeStart, type QuoteStartSnapshot } from '@/lib/quotes/job-type-start'
 import { readFirstQuoteIntent } from '@/lib/onboarding/first-quote-handoff'
 import type { FirstQuoteSelection } from '@/lib/quotes/job-type-setup'
@@ -2432,10 +2436,10 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
             setShowSaveTemplateModal(true)
           }}
         />
-        {jobTypeStart}
-        {jobStartApplied && <p className="mb-4 text-sm text-teal-800" role="status">
-          Ditt underlag är på plats. Kontrollera mängder, priser och föreslagna förbehåll — inget är skickat.
-        </p>}
+        {/* Jobbtypsremsan renderades här (mellan headern och griden) fram
+            till Del 2 (offertytan) — som 720px centrerad box bröt den
+            gridens linjer och sköt ner dokumentet. Den bor nu i dokument-
+            kolumnen, direkt ovanför "Mer"-raden. */}
 
         {/* Kvittoprincipen Fall 1: motorns eget resonemang, direkt under
             headern före radlistan. Renderar ingenting utan reasoning;
@@ -2594,6 +2598,15 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
 
           {/* ── Dokumentpanelen — huvudytan, näst överst på mobil ── */}
           <div className="order-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 flex flex-col gap-3">
+            {/* Jobbtypsremsan (Del 2, offertytan): flyttad hit från header-
+                nivån så den följer dokumentkolumnens bredd och läses som en
+                del av verktygsstacken ovanför "Mer"-raden. Grindvillkoret
+                bor kvar på jobTypeStart-variabeln högre upp — orört. Den
+                teala kvittoraden efter apply följde med hit av samma skäl. */}
+            {jobTypeStart}
+            {jobStartApplied && <p className="text-sm text-teal-800" role="status">
+              Ditt underlag är på plats. Kontrollera mängder, priser och föreslagna förbehåll — inget är skickat.
+            </p>}
             {/* "Mer"-verktygsrad — Stil/Villkor/Betalplan/Visning/Bilagor/
                 ROT nås härifrån, en panel synlig i taget (inte modal —
                 dokumentet syns hela tiden nedanför). Listvy/Dokument växlar
