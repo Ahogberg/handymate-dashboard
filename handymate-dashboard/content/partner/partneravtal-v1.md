@@ -153,7 +153,7 @@ I Avtalet avses med:
 
 8.3 Beteckningar som ”grundande partner”, ”certifierad partner” eller ”rekommenderad implementeringspartner” får användas endast efter skriftligt godkännande och enligt då gällande kriterier. Handymate får återkalla en sådan status vid avtalsbrott, inaktivitet eller om kriterierna inte längre uppfylls.
 
-## 9. Partnerns egna tilläggstjänster
+## 9. Partnerns egna tilläggstjänster och konkurrerande produkter
 
 9.1 Partnern får erbjuda egna fristående tjänster, exempelvis implementation, datamigrering, utbildning, rådgivning eller annonsering, om de inte förväxlas med Handymates kärntjänst och inte strider mot Avtalet.
 
@@ -161,7 +161,13 @@ I Avtalet avses med:
 
 9.3 Partnern får inte få tillgång till eller använda data i Handymate för sin egen tjänst utan kundens dokumenterade instruktion, tillämplig rättslig grund och de avtal som krävs. En särskild personuppgiftsbiträdesbilaga ska tecknas om någon Part behandlar personuppgifter enbart på den andra Partens instruktion.
 
-9.4 Intäktsdelning, paketering, certifiering och supportansvar för en gemensamt erbjuden tilläggstjänst gäller endast om det står i en särskild bilaga. Ingen generell rätt till femtio procent (50 %) eller annan andel uppkommer genom detta Avtal.
+9.4 Partnern får inte utan Handymates föregående skriftliga godkännande paketera, marknadsföra eller sälja en egen eller tredje mans produkt eller tjänst tillsammans med Handymate, beskriva den som en del av, integrerad med, godkänd av eller rekommenderad av Handymate eller använda Handymates varumärke, material, gränssnitt eller kundrelation för sådan försäljning. Ett godkännande ska dokumenteras i en särskild bilaga som reglerar erbjudandets omfattning, varumärkesanvändning, prissättning, kundavtal, leverans-, support- och personuppgiftsansvar samt eventuell intäktsdelning. Ingen generell rätt till femtio procent (50 %) eller annan andel uppkommer genom detta Avtal.
+
+9.5 Med **Direkt konkurrerande produkt** avses i Avtalet en digital produkt eller tjänst vars huvudsakliga syfte är att helt eller till väsentlig del ersätta Handymates kärntjänst för samma kundsegment. En kompletterande tjänst för exempelvis bokföring, betalning, telefoni, marknadsföring, utbildning eller implementation är inte en Direkt konkurrerande produkt enbart därför att den kan användas tillsammans med ett affärssystem.
+
+9.6 Under Avtalstiden får Partnern inte utan Handymates föregående skriftliga godkännande aktivt marknadsföra, demonstrera, sälja, återförsälja, distribuera, implementera eller hänvisa kunder till, eller ta emot ersättning för, en Direkt konkurrerande produkt inom det territorium som anges i Partnerbekräftelsen. Begränsningen gäller endast Direkt konkurrerande produkter för samma kundsegment och upphör när Avtalet upphör; den innebär inget konkurrensförbud efter Avtalstiden.
+
+9.7 Partnern får aldrig använda Partnerlänken, Partnerportalen, Godkänt material eller information om Handymates hänvisningar, kunder, prissättning, produkt eller roadmap för att marknadsföra eller sälja en egen eller tredje mans produkt eller tjänst utan Handymates föregående skriftliga godkännande.
 
 ## 10. Personuppgifter och informationssäkerhet
 
@@ -250,7 +256,7 @@ I Avtalet avses med:
 
 ## 18. Övrigt
 
-18.1 Avtalet är icke-exklusivt. Båda Parter får samarbeta med andra, inklusive konkurrerande aktörer, förutsatt att sekretess, immateriella rättigheter och övriga skyldigheter följs.
+18.1 Avtalet är icke-exklusivt. Med de uttryckliga begränsningarna i punkterna 9.4–9.7 får båda Parter samarbeta med andra aktörer. Handymate får anlita eller samarbeta med andra marknadsförings-, hänvisnings-, sälj- och implementationspartners. Partnern får erbjuda egna fristående och kompletterande tjänster enligt punkt 9, men får inte sälja eller främja Direkt konkurrerande produkter i strid med punkt 9.6.
 
 18.2 Partnern får inte överlåta Avtalet utan Handymates skriftliga godkännande. Handymate får överlåta Avtalet inom sin koncern eller i samband med överlåtelse av verksamheten eller tjänsten, förutsatt att Partnerns redan intjänade rättigheter inte försämras.
 
@@ -286,7 +292,8 @@ I Avtalet avses med:
 | Churn/återkomst | Provision kan återupptas endast på betalningar inom den ursprungliga 36-månadersperioden; perioden pausas inte |
 | Exklusivitet | Ingen |
 | Territorium | Sverige, om inte Partnerbekräftelsen anger annat |
-| Egna tilläggstjänster | Tillåtna enligt punkt 9; ingen automatisk intäktsdelning |
+| Egna tilläggstjänster | Fristående egna tjänster är tillåtna enligt punkt 9; gemensam paketering eller försäljning tillsammans med Handymate kräver föregående skriftligt godkännande; ingen automatisk intäktsdelning |
+| Direkt konkurrerande produkter | Får inte aktivt marknadsföras, säljas eller främjas under Avtalstiden inom avtalat territorium utan Handymates föregående skriftliga godkännande enligt punkt 9.6 |
 
 Villkor som avviker från tabellen ska anges uttryckligen i Partnerbekräftelsen.
 
