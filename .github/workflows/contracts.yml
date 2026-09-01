@@ -80,6 +80,7 @@ jobs:
           tests/push-policy.spec.ts
           tests/facit-tenant-sweep.spec.ts
           tests/facit-route-auth-inventory.spec.ts
+          tests/onboarding-funnel.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
