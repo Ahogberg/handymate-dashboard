@@ -1,3 +1,34 @@
+# Nattpass 2: onboardingtratten (Claude 2026-09-02)
+
+Stöd för Andreas onboarding-A/B. Ingen migration — tidsstämplarna bor under
+onboarding_data._funnel (servern äger nyckeln).
+
+- [x] lib/onboarding/funnel.ts: markStepReached (första gången vinner),
+      markFinalized, readFunnel, stripFunnelFromClientData, sammanstallTratt
+      (nådde/bortfall/median per steg, per variant studio/classic, var de
+      ofullbordade står, legacy-fallback på onboarding_step, testkonton
+      exkluderade men listade)
+- [x] PUT /api/onboarding stämplar steg + variant; POST finalize stämplar
+      finalized_at best-effort; app/onboarding/page.tsx skickar variant
+- [x] GET /api/admin/onboarding-funnel?days=30|90|365 + /admin/onboarding-
+      funnel (isAdmin), länk från /admin
+- [x] tests/onboarding-funnel.spec.ts i kontraktsgrinden
+- [x] tsc 0, 12 onboarding-sviter + facit 176 gröna, test:contracts 209
+- [x] Merge av origin/main (partner-självfaktura, samtalsefterarbete,
+      v191→v193) utan konflikter; tsc + contracts gröna på merged tree
+
+## Rött på main före passet (inte rört — nattsviten kommer flagga)
+- tests/first-focus.spec.ts + tests/job-type-start.spec.ts pekar på
+  Step6LiveTour för logik som flyttade till FirstAssignmentFinal i
+  8df45b0/0ecda0b (buildFirstMissionPrompt anropas inte längre alls).
+
+## Att läsa av i morgon
+- /admin/onboarding-funnel: konton skapade efter deploy får tid per steg;
+  äldre konton visas "(utan tid)" på nuvarande steg. Variant blir 'classic'
+  tills NEXT_PUBLIC_SETUP_STUDIO_ENABLED sätts.
+
+---
+
 # Nattpass 1: tenant-svep av rutterna utanför standardgrinden (Claude 2026-09-01→02)
 
 Andreas: "kör igenom nummer 1 och sen nummer 2 direkt när det är klart,
