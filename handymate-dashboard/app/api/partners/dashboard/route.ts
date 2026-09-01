@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
           .order('created_at', { ascending: false })
       : Promise.resolve({ data: [] as any[] }),
     supabase.from('partner_payout_batch')
-      .select('id, period, invoice_number, invoice_date, due_date, subtotal_sek, vat_sek, total_incl_vat_sek, delivery_status, review_status, reviewed_at, dispute_reason, status, paid_at')
+      .select('id, period, invoice_number, invoice_date, due_date, subtotal_sek, vat_sek, total_incl_vat_sek, delivery_status, review_status, reviewed_at, dispute_reason, status, paid_at, payment_reference')
       .eq('partner_id', partner.id)
       .not('invoice_number', 'is', null)
       .order('invoice_date', { ascending: false }),

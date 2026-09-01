@@ -60,6 +60,7 @@ export interface SelfBillingBatch {
   dispute_reason: string | null
   status: 'open' | 'paid'
   paid_at: string | null
+  payment_reference: string | null
 }
 
 export interface Stats {

@@ -342,15 +342,24 @@ export async function createPayoutBatch(
 /**
  * Markera en batch som utbetald: batchen → paid, raderna → paid + paid_at,
  * partnerns cachade totaler räknas om ur liggaren.
+ *
+ * paymentReference är obligatorisk (RPC:n avvisar tom sträng) — den manuella
+ * banköverföringen (bankgiro/plusgiro/konto) ska lämna ett verkligt spår,
+ * inte bara adminens namn. paidAt är valfri: låter admin ange det faktiska
+ * betaldatumet separat från servertiden, om det skiljer sig.
  */
 export async function markBatchPaid(
   batchId: string,
   paidBy: string,
+  paymentReference: string,
+  paidAt?: string,
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = getServerSupabase()
   const { error } = await supabase.rpc('mark_partner_self_billing_paid', {
     p_batch_id: batchId,
     p_paid_by: paidBy,
+    p_payment_reference: paymentReference,
+    p_paid_at: paidAt || null,
   })
   if (error) return { success: false, error: error.message }
   return { success: true }

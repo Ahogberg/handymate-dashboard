@@ -4,11 +4,12 @@ import path from 'path'
 
 const root = path.resolve(__dirname, '..')
 const sql = fs.readFileSync(path.join(root, 'sql/v193_partner_revenue_and_self_billing.sql'), 'utf8')
+const v194 = fs.readFileSync(path.join(root, 'sql/v194_partner_payout_reference.sql'), 'utf8')
 const commission = fs.readFileSync(path.join(root, 'lib/partners/commission.ts'), 'utf8')
 
-function bodyOf(functionName: string): string {
-  const match = sql.match(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${functionName}\\([\\s\\S]*?\\n\\$\\$;`))
-  expect(match, `${functionName} ska finnas i v191`).not.toBeNull()
+function bodyOf(functionName: string, source = sql): string {
+  const match = source.match(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${functionName}\\([\\s\\S]*?\\n\\$\\$;`))
+  expect(match, `${functionName} ska finnas`).not.toBeNull()
   return match![0]
 }
 
@@ -54,13 +55,22 @@ test.describe('v191 — Partner Revenue Reality', () => {
     expect(body).toContain('Anledning krävs vid bestridande')
   })
 
-  test('betalning uppdaterar batch, liggare och cache atomiskt efter granskning', () => {
-    const body = bodyOf('mark_partner_self_billing_paid')
+  test('betalning uppdaterar batch, liggare och cache atomiskt efter granskning — nu (v194) med obligatorisk referens', () => {
+    // mark_partner_self_billing_paid byttes ut i v194 (kräver payment_reference,
+    // tar ett valfritt admin-satt betaldatum) — den gamla tvåparameter-kroppen i
+    // v193 är retirerad (droppas explicit av v194), inte längre den levande sanningen.
+    const body = bodyOf('mark_partner_self_billing_paid', v194)
     expect(body).toContain("review_status = 'disputed'")
     expect(body).toContain("review_status = 'deemed_approved'")
-    expect(body).toContain("SET status = 'paid', paid_at = v_now")
+    expect(body).toContain("SET status = 'paid', paid_at = v_paid_at")
     expect(body).toContain('total_pending_sek')
     expect(body).toContain('total_earned_sek')
+    expect(body).toContain("COALESCE(BTRIM(p_payment_reference), '') = ''")
+    expect(body).toContain("RAISE EXCEPTION 'Betalningsreferens krävs'")
+  })
+
+  test('v194 droppar den gamla mark_partner_self_billing_paid-signaturen explicit', () => {
+    expect(v194).toContain('DROP FUNCTION IF EXISTS public.mark_partner_self_billing_paid(UUID, TEXT)')
   })
 
   test('alla ekonomiska RPC:er är endast körbara av service_role', () => {
@@ -68,10 +78,13 @@ test.describe('v191 — Partner Revenue Reality', () => {
       'record_partner_commission_rows(UUID, TEXT, JSONB)',
       'create_partner_self_billing_batch(UUID, TEXT, JSONB, TEXT)',
       'review_partner_self_billing_batch(UUID, UUID, TEXT, TEXT)',
-      'mark_partner_self_billing_paid(UUID, TEXT)',
     ]) {
       expect(sql).toContain(`REVOKE ALL ON FUNCTION public.${signature} FROM PUBLIC, anon, authenticated`)
       expect(sql).toContain(`GRANT EXECUTE ON FUNCTION public.${signature} TO service_role`)
     }
+    // mark_partner_self_billing_paid bytte signatur i v194 — kontrollera den nya där.
+    const newSig = 'mark_partner_self_billing_paid(UUID, TEXT, TEXT, TIMESTAMPTZ)'
+    expect(v194).toContain(`REVOKE ALL ON FUNCTION public.${newSig} FROM PUBLIC, anon, authenticated`)
+    expect(v194).toContain(`GRANT EXECUTE ON FUNCTION public.${newSig} TO service_role`)
   })
 })

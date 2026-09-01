@@ -59,6 +59,7 @@ export default function SelfBillingSection({ batches, onChanged }: { batches: Se
               </div>
               {disputing === batch.id && <div className="mt-3 rounded-lg bg-red-50 p-3"><textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} maxLength={2000} placeholder="Beskriv vad som behöver korrigeras" className="w-full rounded-lg border border-red-200 px-3 py-2 text-sm" /><button onClick={() => review(batch.id, 'disputed')} disabled={!reason.trim() || busy === batch.id} className="mt-2 rounded-lg bg-red-700 text-white px-3 py-2 text-sm font-medium disabled:opacity-50">Skicka invändning</button></div>}
               {batch.dispute_reason && <p className="mt-3 text-sm text-red-700 bg-red-50 rounded-lg p-3">Invändning: {batch.dispute_reason}</p>}
+              {batch.status === 'paid' && batch.payment_reference && <p className="mt-3 text-sm text-green-700 bg-green-50 rounded-lg p-3">Betalningsreferens: {batch.payment_reference}</p>}
             </div>
           })}
         </div>

@@ -20,6 +20,10 @@ const selfBillingLib = read('lib/partners/self-billing.ts')
 const page = read('app/partners/dashboard/page.tsx')
 const billingProfileCard = read('app/partners/dashboard/components/BillingProfileCard.tsx')
 const selfBillingSection = read('app/partners/dashboard/components/SelfBillingSection.tsx')
+const dashboardTypes = read('app/partners/dashboard/components/types.ts')
+const adminCommissionRoute = read('app/api/admin/partners/commission/route.ts')
+const adminCommissionModal = read('app/admin/components/PartnerCommissionModal.tsx')
+const v194 = read('sql/v194_partner_payout_reference.sql')
 
 test.describe('varje läsning filtreras på partnerns egna JWT-id', () => {
   test('fakturauppgifts-rutten autentiserar och läser/skriver bara den egna partner-raden', () => {
@@ -114,5 +118,56 @@ test.describe('ytan är monterad i partnerdashboarden', () => {
   test('BillingProfileCard sparar via PUT mot samma rutt facitet testar ovan', () => {
     expect(billingProfileCard).toContain("fetch('/api/partners/billing-profile'")
     expect(billingProfileCard).toContain("method: 'PUT'")
+  })
+})
+
+test.describe('betalningsreferens krävs vid "markera betald" (v194, 2026-09-02)', () => {
+  test('RPC:n avvisar tom eller whitespace-referens innan något skrivs', () => {
+    const fn = v194.slice(v194.indexOf('CREATE OR REPLACE FUNCTION public.mark_partner_self_billing_paid'))
+    const guardIdx = fn.indexOf("COALESCE(BTRIM(p_payment_reference), '') = ''")
+    const updateIdx = fn.indexOf('SET status = \'paid\'')
+    expect(guardIdx).toBeGreaterThan(-1)
+    expect(updateIdx).toBeGreaterThan(-1)
+    expect(guardIdx).toBeLessThan(updateIdx)
+    expect(fn).toContain("RAISE EXCEPTION 'Betalningsreferens krävs'")
+  })
+
+  test('funktionens gamla tvåparameter-signatur droppas explicit — CREATE OR REPLACE byter inte signatur', () => {
+    expect(v194).toContain('DROP FUNCTION IF EXISTS public.mark_partner_self_billing_paid(UUID, TEXT)')
+    expect(v194).toContain('p_payment_reference TEXT,')
+    expect(v194).toContain('p_paid_at TIMESTAMPTZ DEFAULT NULL')
+  })
+
+  test('grants pekar på den nya fyra-parameter-signaturen, service_role-only', () => {
+    expect(v194).toContain('mark_partner_self_billing_paid(UUID, TEXT, TEXT, TIMESTAMPTZ) FROM PUBLIC, anon, authenticated')
+    expect(v194).toContain('mark_partner_self_billing_paid(UUID, TEXT, TEXT, TIMESTAMPTZ) TO service_role')
+  })
+
+  test('markBatchPaid skickar referens och valfritt betaldatum vidare till RPC:n', () => {
+    const fn = commission.slice(commission.indexOf('export async function markBatchPaid'))
+    expect(fn).toContain('paymentReference: string,')
+    expect(fn).toContain('p_payment_reference: paymentReference')
+    expect(fn).toContain('p_paid_at: paidAt || null')
+  })
+
+  test('admin-rutten kräver payment_reference (400 utan den) innan markBatchPaid anropas', () => {
+    const branch = adminCommissionRoute.slice(adminCommissionRoute.indexOf("action === 'mark_paid'"))
+    expect(branch).toContain("if (!paymentReference) return NextResponse.json({ error: 'Betalningsreferens krävs' }, { status: 400 })")
+    expect(branch).toContain('markBatchPaid(batchId, adminCheck.email')
+  })
+
+  test('adminvyn kräver ifylld referens innan bekräfta-knappen går att klicka', () => {
+    expect(adminCommissionModal).toContain('disabled={!paymentReference.trim() || busy !== null}')
+    expect(adminCommissionModal).toContain("action: 'mark_paid', batch_id: batchId, payment_reference: paymentReference, paid_at: paidAtDate")
+  })
+
+  test('partnern ser sin egen betalningsreferens i portalen', () => {
+    expect(selfBillingSection).toContain("batch.status === 'paid' && batch.payment_reference")
+    expect(dashboardTypes).toContain('payment_reference: string | null')
+  })
+
+  test('dashboard-rutten hämtar payment_reference i samma select som övriga batchfält', () => {
+    const selectLine = dashboardRoute.slice(dashboardRoute.indexOf("supabase.from('partner_payout_batch')"), dashboardRoute.indexOf("supabase.from('partner_payout_batch')") + 400)
+    expect(selectLine).toContain('payment_reference')
   })
 })

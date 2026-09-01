@@ -32,6 +32,11 @@ interface Batch {
   created_at: string
   paid_at: string | null
   paid_by: string | null
+  payment_reference: string | null
+}
+
+function today(): string {
+  return new Date().toISOString().slice(0, 10)
 }
 
 interface PartnerConfig {
@@ -73,6 +78,10 @@ export default function PartnerCommissionModal({
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+
+  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null)
+  const [paymentReference, setPaymentReference] = useState('')
+  const [paidAtDate, setPaidAtDate] = useState(today())
 
   const load = useCallback(async () => {
     try {
@@ -140,6 +149,32 @@ export default function PartnerCommissionModal({
               ? `Underlag skapat: ${formatSek(data.total_sek ?? 0)}`
               : 'Markerad som utbetald'
         )
+        await load()
+      } else {
+        setMessage(data.error || 'Något gick fel')
+      }
+    } catch {
+      setMessage('Nätverksfel')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function confirmMarkPaid(batchId: string) {
+    const label = `paid_${batchId}`
+    setBusy(label)
+    setMessage(null)
+    try {
+      const res = await fetch('/api/admin/partners/commission', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mark_paid', batch_id: batchId, payment_reference: paymentReference, paid_at: paidAtDate }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setMessage('Markerad som utbetald')
+        setMarkingPaidId(null)
+        setPaymentReference('')
         await load()
       } else {
         setMessage(data.error || 'Något gick fel')
@@ -301,26 +336,71 @@ export default function PartnerCommissionModal({
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-3 border-b border-gray-100">Utbetalningsunderlag</p>
                 <div className="divide-y divide-gray-50">
                   {batches.map(b => (
-                    <div key={b.id} className="px-4 py-3 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">t.o.m. {b.period} · {formatSek(b.total_sek)}</p>
-                        <p className="text-xs text-gray-500">
-                          {b.status === 'paid'
-                            ? `Utbetald ${b.paid_at ? new Date(b.paid_at).toLocaleDateString('sv-SE') : ''} av ${b.paid_by || '—'}`
-                            : `Skapad ${new Date(b.created_at).toLocaleDateString('sv-SE')} — väntar på utbetalning`}
-                        </p>
+                    <div key={b.id} className="px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">t.o.m. {b.period} · {formatSek(b.total_sek)}</p>
+                          <p className="text-xs text-gray-500">
+                            {b.status === 'paid'
+                              ? `Utbetald ${b.paid_at ? new Date(b.paid_at).toLocaleDateString('sv-SE') : ''} av ${b.paid_by || '—'}${b.payment_reference ? ` · Ref: ${b.payment_reference}` : ''}`
+                              : `Skapad ${new Date(b.created_at).toLocaleDateString('sv-SE')} — väntar på utbetalning`}
+                          </p>
+                        </div>
+                        {b.status === 'open' ? (
+                          markingPaidId === b.id ? null : (
+                            <button
+                              onClick={() => { setMarkingPaidId(b.id); setPaymentReference(''); setPaidAtDate(today()) }}
+                              disabled={busy !== null}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-700 text-white text-xs font-medium rounded-lg hover:bg-primary-800 disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              Markera utbetald
+                            </button>
+                          )
+                        ) : (
+                          <span className="text-xs font-medium px-2 py-1 rounded-full bg-green-50 text-green-700">Utbetald</span>
+                        )}
                       </div>
-                      {b.status === 'open' ? (
-                        <button
-                          onClick={() => action({ action: 'mark_paid', batch_id: b.id }, `paid_${b.id}`)}
-                          disabled={busy !== null}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-700 text-white text-xs font-medium rounded-lg hover:bg-primary-800 disabled:opacity-50"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          {busy === `paid_${b.id}` ? 'Markerar…' : 'Markera utbetald'}
-                        </button>
-                      ) : (
-                        <span className="text-xs font-medium px-2 py-1 rounded-full bg-green-50 text-green-700">Utbetald</span>
+                      {markingPaidId === b.id && (
+                        <div className="mt-3 rounded-lg bg-slate-50 p-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-gray-500 w-24 flex-none">Betaldatum</label>
+                            <input
+                              type="date"
+                              value={paidAtDate}
+                              onChange={e => setPaidAtDate(e.target.value)}
+                              className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-gray-500 w-24 flex-none">Referens</label>
+                            <input
+                              type="text"
+                              value={paymentReference}
+                              onChange={e => setPaymentReference(e.target.value)}
+                              placeholder="Bank-OCR / transaktions-id"
+                              maxLength={200}
+                              className="flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              onClick={() => confirmMarkPaid(b.id)}
+                              disabled={!paymentReference.trim() || busy !== null}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-700 text-white text-xs font-medium rounded-lg hover:bg-primary-800 disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              {busy === `paid_${b.id}` ? 'Markerar…' : 'Bekräfta utbetalning'}
+                            </button>
+                            <button
+                              onClick={() => { setMarkingPaidId(null); setPaymentReference('') }}
+                              disabled={busy !== null}
+                              className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800"
+                            >
+                              Avbryt
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   ))}
