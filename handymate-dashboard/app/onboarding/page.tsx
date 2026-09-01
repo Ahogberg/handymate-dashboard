@@ -18,6 +18,12 @@ import { fetchQuoteSetup } from '@/lib/quotes/job-type-start'
 import { resolveFirstQuoteSelection, type QuoteSetupData } from '@/lib/quotes/job-type-setup'
 import { normalizeStandardHourlyRate } from '@/lib/onboarding/pricing-start'
 import { MatteSetupGuide } from '@/components/onboarding/MatteSetupGuide'
+import { SetupStudioShell } from '@/components/onboarding/SetupStudioShell'
+import {
+  readSetupStudioPreference,
+  resolveSetupStudioMode,
+  writeSetupStudioPreference,
+} from '@/lib/onboarding/setup-studio'
 
 const TOTAL_STEPS = 8
 
@@ -46,7 +52,18 @@ export default function OnboardingPage() {
   const [quoteSetup, setQuoteSetup] = useState<QuoteSetupData | null>(null)
   const [quoteSetupError, setQuoteSetupError] = useState(false)
   const [setupRetry, setSetupRetry] = useState(0)
+  const [studioMode, setStudioMode] = useState(
+    process.env.NEXT_PUBLIC_SETUP_STUDIO_ENABLED === 'true',
+  )
   const finalizeLock = useRef(false)
+
+  useEffect(() => {
+    setStudioMode(resolveSetupStudioMode(
+      process.env.NEXT_PUBLIC_SETUP_STUDIO_ENABLED,
+      window.location.search,
+      readSetupStudioPreference(),
+    ))
+  }, [])
 
   useEffect(() => {
     if (!launchRequested) return
@@ -285,6 +302,49 @@ export default function OnboardingPage() {
     [],
   )
 
+  const useClassicGuide = useCallback(() => {
+    writeSetupStudioPreference('classic')
+    setStudioMode(false)
+  }, [])
+
+  const onboardingStep = (
+    <div className="ob-card-wrap" data-wide={step === 0 ? 'true' : undefined}>
+      {step === 0 && <Step1MeetTheTeam onNext={next} />}
+      {step === 1 && (
+        <Step2Business onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+      )}
+      {step === 2 && (
+        <Step3HowYouWork onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+      )}
+      {step === 3 && (
+        <Step4PhoneNumber onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+      )}
+      {step === 4 && (
+        <Step5Activate onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+      )}
+      {step === 5 && (
+        <StepImportData onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+      )}
+      {step === 6 && (
+        <StepProductRegister onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+      )}
+      {step === 7 && !launchRequested && <Step6LiveTour onFinish={finish} data={data}
+        onFirstQuote={data.firstQuoteSelection ? () => setLaunchRequested(true) : undefined} />}
+      {step === 7 && launchRequested && (launchJob && launchTemplate ?
+        <FirstQuoteLaunch companyName={data.companyName || 'Ditt företag'} jobName={launchJob.name} templateName={launchTemplate.name}
+          onContinue={launchFirstQuote} onSkip={finish} /> :
+        <section className="first-quote-launch" aria-label="Din första offert">
+          <h2>Vi tar med ditt upplägg</h2>
+          {quoteSetupError || quoteSetup ? <>
+            <p role="alert">{quoteSetupError ? 'Kunde inte läsa underlaget just nu.' : 'Ditt underlag har ändrats. Välj jobbtyp och mall igen i artikelsteget.'}</p>
+            <button type="button" className="first-quote-open" onClick={() => setSetupRetry(n => n + 1)}>Försök igen</button>
+            <button type="button" className="first-quote-skip" onClick={() => { setLaunchRequested(false); setStep(6) }}>Till artikelsteget</button>
+          </> : <p role="status">Kontrollerar din jobbtyp och mall…</p>}
+          <button type="button" className="first-quote-skip" disabled={finishing} onClick={finish}>Till översikten i stället</button>
+        </section>)}
+    </div>
+  )
+
   if (loading) {
     return (
       <div className="ob-page">
@@ -319,44 +379,16 @@ export default function OnboardingPage() {
           telefonformatets 460px tvingade fram en inre scroll där halva
           teamet var osynligt. Övriga steg är formulär och mår bra i det
           smala kortet — bredden gäller BARA där den behövs. */}
-      <div className="ob-stage" data-guided={step > 0 && step < 7 ? 'true' : undefined}>
-      {step > 0 && step < 7 && <MatteSetupGuide step={step} data={data} />}
-      <div className="ob-card-wrap" data-wide={step === 0 ? 'true' : undefined}>
-        {step === 0 && <Step1MeetTheTeam onNext={next} />}
-        {step === 1 && (
-          <Step2Business onNext={next} onBack={back} data={data} setData={setDataUpdater} />
-        )}
-        {step === 2 && (
-          <Step3HowYouWork onNext={next} onBack={back} data={data} setData={setDataUpdater} />
-        )}
-        {step === 3 && (
-          <Step4PhoneNumber onNext={next} onBack={back} data={data} setData={setDataUpdater} />
-        )}
-        {step === 4 && (
-          <Step5Activate onNext={next} onBack={back} data={data} setData={setDataUpdater} />
-        )}
-        {step === 5 && (
-          <StepImportData onNext={next} onBack={back} data={data} setData={setDataUpdater} />
-        )}
-        {step === 6 && (
-          <StepProductRegister onNext={next} onBack={back} data={data} setData={setDataUpdater} />
-        )}
-        {step === 7 && !launchRequested && <Step6LiveTour onFinish={finish} data={data}
-          onFirstQuote={data.firstQuoteSelection ? () => setLaunchRequested(true) : undefined} />}
-        {step === 7 && launchRequested && (launchJob && launchTemplate ?
-          <FirstQuoteLaunch companyName={data.companyName || 'Ditt företag'} jobName={launchJob.name} templateName={launchTemplate.name}
-            onContinue={launchFirstQuote} onSkip={finish} /> :
-          <section className="first-quote-launch" aria-label="Din första offert">
-            <h2>Vi tar med ditt upplägg</h2>
-            {quoteSetupError || quoteSetup ? <>
-              <p role="alert">{quoteSetupError ? 'Kunde inte läsa underlaget just nu.' : 'Ditt underlag har ändrats. Välj jobbtyp och mall igen i artikelsteget.'}</p>
-              <button type="button" className="first-quote-open" onClick={() => setSetupRetry(n => n + 1)}>Försök igen</button>
-              <button type="button" className="first-quote-skip" onClick={() => { setLaunchRequested(false); setStep(6) }}>Till artikelsteget</button>
-            </> : <p role="status">Kontrollerar din jobbtyp och mall…</p>}
-            <button type="button" className="first-quote-skip" disabled={finishing} onClick={finish}>Till översikten i stället</button>
-          </section>)}
-      </div>
-      </div>
+      {studioMode ? (
+        <SetupStudioShell step={step} totalSteps={TOTAL_STEPS} data={data} onUseClassic={useClassicGuide}>
+          {onboardingStep}
+        </SetupStudioShell>
+      ) : (
+        <div className="ob-stage" data-guided={step > 0 && step < 7 ? 'true' : undefined}>
+          {step > 0 && step < 7 && <MatteSetupGuide step={step} data={data} />}
+          {onboardingStep}
+        </div>
+      )}
 
       {/* Finalize-fel (Fynd 6): navigera ALDRIG till dashboarden på ett
           misslyckat finalize-anrop — visa fel + låt kunden försöka igen. */}
