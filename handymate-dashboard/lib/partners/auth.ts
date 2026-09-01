@@ -36,6 +36,8 @@ export interface Partner {
   status: string
   created_at: string
   approved_at: string | null
+  /** Accepterad avtalsversion (null = registrerad före Partneravtal v1, måste acceptera i portalen). */
+  agreement_version: string | null
 }
 
 /** Bevis för att partnern faktiskt accepterat en specifik avtalsversion —
@@ -122,7 +124,7 @@ export async function registerPartner(
       agreement_accepted_at: new Date().toISOString(),
       agreement_accepted_ip: agreement.ip,
     })
-    .select('id, email, name, company, referral_code, referral_url, commission_rate, total_earned_sek, total_pending_sek, status, created_at, approved_at')
+    .select('id, email, name, company, referral_code, referral_url, commission_rate, total_earned_sek, total_pending_sek, status, created_at, approved_at, agreement_version')
     .single()
 
   if (error) {
@@ -144,7 +146,7 @@ export async function loginPartner(
 
   const { data } = await supabase
     .from('partners')
-    .select('id, email, name, company, referral_code, referral_url, commission_rate, total_earned_sek, total_pending_sek, status, created_at, approved_at, password_hash')
+    .select('id, email, name, company, referral_code, referral_url, commission_rate, total_earned_sek, total_pending_sek, status, created_at, approved_at, agreement_version, password_hash')
     .eq('email', email.toLowerCase())
     .maybeSingle()
 
@@ -189,7 +191,7 @@ export async function getPartnerFromToken(token: string): Promise<Partner | null
     const supabase = getServerSupabase()
     const { data } = await supabase
       .from('partners')
-      .select('id, email, name, company, referral_code, referral_url, commission_rate, total_earned_sek, total_pending_sek, status, created_at, approved_at')
+      .select('id, email, name, company, referral_code, referral_url, commission_rate, total_earned_sek, total_pending_sek, status, created_at, approved_at, agreement_version')
       .eq('id', partnerId)
       .eq('status', 'active')
       .maybeSingle()

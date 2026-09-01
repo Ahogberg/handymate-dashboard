@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdmin, getAdminSupabase } from '@/lib/admin-auth'
+import {
+  AGREEMENT_MISSING_MESSAGE,
+  hasAcceptedCurrentAgreement,
+  sendAgreementRequestEmail,
+} from '@/lib/partners/agreement'
 
 /**
  * GET /api/admin/partners — Lista alla partners
@@ -26,7 +31,11 @@ export async function GET(request: NextRequest) {
 
 /**
  * PATCH /api/admin/partners — Uppdatera partnerstatus
- * Body: { id, action: 'approve' | 'suspend' | 'reactivate' }
+ * Body: { id, action: 'approve' | 'suspend' | 'reactivate' | 'send_agreement' }
+ *
+ * approve är spärrat (409) tills partnern har loggad acceptans av gällande
+ * Partneravtal (P0-9, 2026-09-01). send_agreement mejlar den signerade
+ * engångslänken — fungerar för både väntande och aktiva partners.
  */
 export async function PATCH(request: NextRequest) {
   const adminCheck = await isAdmin(request)
@@ -43,7 +52,7 @@ export async function PATCH(request: NextRequest) {
 
   const { data: partner } = await supabase
     .from('partners')
-    .select('id, email, name, referral_code, referral_url, status')
+    .select('id, email, name, referral_code, referral_url, status, agreement_version')
     .eq('id', id)
     .single()
 
@@ -54,7 +63,21 @@ export async function PATCH(request: NextRequest) {
   let update: Record<string, unknown> = {}
 
   switch (action) {
+    case 'send_agreement': {
+      if (hasAcceptedCurrentAgreement(partner)) {
+        return NextResponse.json({ error: 'Partnern har redan accepterat gällande avtal' }, { status: 400 })
+      }
+      const result = await sendAgreementRequestEmail(partner)
+      if (!result.sent) {
+        return NextResponse.json({ error: result.error || 'Mejlet kunde inte skickas' }, { status: 500 })
+      }
+      return NextResponse.json({ success: true, action, partner_id: id })
+    }
+
     case 'approve':
+      if (!hasAcceptedCurrentAgreement(partner)) {
+        return NextResponse.json({ error: AGREEMENT_MISSING_MESSAGE, code: 'agreement_missing' }, { status: 409 })
+      }
       update = {
         status: 'active',
         approved_at: new Date().toISOString(),

@@ -24,6 +24,9 @@ export interface PartnerData {
   has_webhook_secret: boolean
   webhook_url: string | null
   webhook_events: string[]
+  agreement_version: string | null
+  agreement_required: boolean
+  current_agreement_version: string
 }
 
 export interface Stats {

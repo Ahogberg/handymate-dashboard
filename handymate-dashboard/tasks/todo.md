@@ -1374,3 +1374,21 @@ kunna bli en levande huvudperson i fler annonser.
       och handymate-mark-transparent.png är VIT (slutkort använder public/logo.png)
 - [x] Körbok docs/marketing/film-factory.md — "kör F06" är hela flödet; saldo 65 → 54 krediter
 - [ ] Andreas: riktigt frilagd teal-SVG av loggan (dagens PNG har svag grå platta); VO-röst; fler krediter innan hel filmserie
+
+---
+
+# P0-6 + P0-9 — lås partnerattributionen, avtalsacceptans för befintliga partners (Claude 2026-09-01)
+
+Ur PARTNER_REVENUE_REALITY_AUDIT_2026-09-01. Codex äger motorn (P0-1–5, 7, 8); Claude äger v190,
+referral-RLS, referred_by-triggern, portalens acceptansyta och adminens approve-rutter.
+
+- [x] sql/v190: referrals_tenant_member FOR ALL → FOR SELECT; BEFORE UPDATE-trigger som låser
+      business_config.referred_by för allt utom service_role/postgres. Bara fil tills Andreas säger kör.
+- [x] lib/partners/agreement.ts: delad version/hash/IP + capability-token + recordAgreementAcceptance.
+- [x] POST /api/partners/agreement: cookie (aktiv partner) ELLER engångslänk (väntande partner).
+- [x] Portalgrind: dashboard-payload bär agreement_required; AgreementGate före allt annat.
+- [x] /partners/avtal/acceptera?partner=&token= för partners som inte kan logga in än.
+- [x] Admin: båda approve-vägarna 409 utan acceptans; action send_agreement mejlar länken; UI-indikator.
+- [x] Facit: tests/partner-attribution-lock.spec.ts (RLS-källfacit + grindarna).
+- [x] tsc, riktade tester, smoke mot lokal dev (8/8 gröna 2026-09-01: gate, engångslänk, fel purpose 403, idempotent bevis, hash = fil), commit + push. Kvar: v190 efter "kör".
+

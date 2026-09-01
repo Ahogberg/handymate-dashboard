@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { verifyApproveToken } from '@/lib/partners/approve-token'
 import { isAdmin } from '@/lib/admin-auth'
+import { AGREEMENT_VERSION, hasAcceptedCurrentAgreement } from '@/lib/partners/agreement'
 
 /**
  * GET /api/admin/partners/[id]/approve?token=...
@@ -34,7 +35,7 @@ export async function GET(
   // Verify partner exists and is pending
   const { data: partner, error } = await supabase
     .from('partners')
-    .select('id, email, name, company, referral_code, referral_url, status')
+    .select('id, email, name, company, referral_code, referral_url, status, agreement_version')
     .eq('id', id)
     .maybeSingle()
 
@@ -49,6 +50,19 @@ export async function GET(
     return new NextResponse(
       '<html><body><h1>Redan godkänd</h1><p>Partnern är redan aktiv.</p></body></html>',
       { status: 200, headers: { 'Content-Type': 'text/html' } }
+    )
+  }
+
+  // Avtalsgrind (P0-9, 2026-09-01): ingen aktivering utan loggad acceptans av
+  // gällande Partneravtal. Mejllänken från en gammal ansökan får inte kringgå det.
+  if (!hasAcceptedCurrentAgreement(partner)) {
+    return new NextResponse(
+      `<html><body style="font-family: sans-serif; padding: 40px; text-align: center;">
+        <h1 style="color: #b45309;">Avtalsacceptans saknas</h1>
+        <p><strong>${partner.name}</strong> har inte accepterat Partneravtal v${AGREEMENT_VERSION}.</p>
+        <p>Skicka avtalslänken från adminpanelen (Partners → Skicka avtal) och godkänn först när acceptansen är loggad.</p>
+      </body></html>`,
+      { status: 409, headers: { 'Content-Type': 'text/html' } }
     )
   }
 

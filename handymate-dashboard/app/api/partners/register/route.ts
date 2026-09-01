@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createHash } from 'crypto'
-import fs from 'fs'
-import path from 'path'
 import { registerPartner } from '@/lib/partners/auth'
 import { signApproveToken } from '@/lib/partners/approve-token'
-
-const AGREEMENT_VERSION = '1.0'
-const AGREEMENT_PATH = path.join(process.cwd(), 'content', 'partner', 'partneravtal-v1.md')
+import { AGREEMENT_VERSION, readAgreementHash, captureRequestIp } from '@/lib/partners/agreement'
 
 /**
  * POST /api/partners/register
@@ -38,17 +33,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Du måste godkänna partneravtalet för att registrera dig' }, { status: 400 })
     }
 
-    const agreementText = fs.readFileSync(AGREEMENT_PATH, 'utf-8')
-    const agreementHash = createHash('sha256').update(agreementText).digest('hex')
-    const ip =
-      request.headers.get('x-forwarded-for') ||
-      request.headers.get('x-real-ip') ||
-      'unknown'
-
     const { partner, error } = await registerPartner(email, name, company || null, password, {
       version: AGREEMENT_VERSION,
-      hash: agreementHash,
-      ip,
+      hash: readAgreementHash(),
+      ip: captureRequestIp(request),
     })
 
     if (error || !partner) {

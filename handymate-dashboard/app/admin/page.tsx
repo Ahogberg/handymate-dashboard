@@ -75,6 +75,7 @@ interface Partner {
   status: string
   approved_at: string | null
   created_at: string
+  agreement_version: string | null
 }
 
 const PARTNER_STATUS: Record<string, { label: string; cls: string }> = {
@@ -206,7 +207,7 @@ export default function AdminDashboardPage() {
     }
   }
 
-  async function handlePartnerAction(id: string, action: 'approve' | 'suspend' | 'reactivate') {
+  async function handlePartnerAction(id: string, action: 'approve' | 'suspend' | 'reactivate' | 'send_agreement') {
     try {
       const res = await fetch('/api/admin/partners', {
         method: 'PATCH',
@@ -214,8 +215,17 @@ export default function AdminDashboardPage() {
         body: JSON.stringify({ id, action }),
       })
       if (res.ok) {
-        setToast(action === 'approve' ? 'Partner godkänd!' : action === 'suspend' ? 'Partner pausad' : 'Partner återaktiverad')
+        setToast(
+          action === 'approve' ? 'Partner godkänd!'
+            : action === 'suspend' ? 'Partner pausad'
+            : action === 'send_agreement' ? 'Avtalslänk skickad'
+            : 'Partner återaktiverad'
+        )
         fetchPartners()
+      } else {
+        // 409 = avtalsacceptans saknas — visa serverns besked istället för tyst nej.
+        const data = await res.json().catch(() => ({}))
+        setToast(data.error || 'Åtgärden misslyckades')
       }
     } catch (err) {
       console.error('Partner action failed:', err)
@@ -824,6 +834,11 @@ export default function AdminDashboardPage() {
                               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.cls}`}>
                                 {status.label}
                               </span>
+                              {partner.agreement_version ? (
+                                <p className="text-[11px] text-green-700 mt-1">Avtal v{partner.agreement_version} ✓</p>
+                              ) : (
+                                <p className="text-[11px] text-amber-700 mt-1">Avtal ej accepterat</p>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex gap-1.5 justify-end">
@@ -831,6 +846,12 @@ export default function AdminDashboardPage() {
                                   className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200">
                                   Provision
                                 </button>
+                                {!partner.agreement_version && partner.status !== 'suspended' && (
+                                  <button onClick={() => handlePartnerAction(partner.id, 'send_agreement')}
+                                    className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-xs font-medium hover:bg-amber-100">
+                                    Skicka avtal
+                                  </button>
+                                )}
                                 {partner.status === 'pending_approval' && (
                                   <button onClick={() => handlePartnerAction(partner.id, 'approve')}
                                     className="px-3 py-1 bg-primary-700 text-white rounded-lg text-xs font-medium hover:bg-primary-800">

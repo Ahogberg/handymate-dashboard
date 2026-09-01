@@ -3,6 +3,7 @@ import { getPartnerFromToken, getPartnerTokenFromRequest } from '@/lib/partners/
 import { getServerSupabase } from '@/lib/supabase'
 import { deriveActivityLevel, AKTIVITETS_ETIKETT, type ActivityLevel } from '@/lib/partners/activity'
 import type { TierStep } from '@/lib/partners/commission-engine'
+import { AGREEMENT_VERSION, hasAcceptedCurrentAgreement } from '@/lib/partners/agreement'
 
 
 // force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
@@ -212,6 +213,11 @@ export async function GET(request: NextRequest) {
       has_webhook_secret: Boolean(fullPartner?.webhook_secret),
       webhook_url: fullPartner?.webhook_url || null,
       webhook_events: fullPartner?.webhook_events || ['trial_started', 'converted', 'plan_upgraded', 'churned'],
+      // Avtalsgrind (P0-9, 2026-09-01): partners registrerade före Partneravtal v1
+      // möts av AgreementGate i portalen tills acceptansen är loggad.
+      agreement_version: partner.agreement_version,
+      agreement_required: !hasAcceptedCurrentAgreement(partner),
+      current_agreement_version: AGREEMENT_VERSION,
     },
     stats: {
       total_referred: enrichedReferrals.length,

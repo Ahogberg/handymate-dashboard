@@ -16,6 +16,7 @@ import {
   Loader2, Eye, EyeOff, Share2, Settings, X,
 } from 'lucide-react'
 import ReferralCard from './components/ReferralCard'
+import AgreementGate from '../components/AgreementGate'
 import StatementSection from './components/StatementSection'
 import {
   formatSek,
@@ -173,6 +174,17 @@ export default function PartnerDashboardPage() {
   }
 
   if (!partner || !stats) return null
+
+  // Avtalsgrind (P0-9): ingen portal förrän gällande partneravtal är accepterat.
+  if (partner.agreement_required) {
+    return (
+      <AgreementGate
+        partnerName={partner.name}
+        agreementVersion={partner.current_agreement_version}
+        onAccepted={fetchDashboard}
+      />
+    )
+  }
 
   const referralUrl = partner.referral_url || `https://app.handymate.se/registrera?ref=${partner.referral_code}`
 
