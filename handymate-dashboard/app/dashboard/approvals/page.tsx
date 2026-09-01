@@ -127,6 +127,8 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   // Meeting Intelligence Epic 2.
   meeting_summary: { label: 'Möte', icon: MessageSquare, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   meeting_followup: { label: 'Uppföljning från möte', icon: Clock, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
+  // Samtalsefterarbete (2026-09-01): samtalet som dagboksrad på projektet.
+  project_log_note: { label: 'Dagboksanteckning', icon: ClipboardList, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   // Förtjänad autonomi — nedgradering vid upprepade fel (lib/autonomy/earned-autonomy.ts recordAutonomyFailure).
   autonomy_revoked: { label: 'Förtroende', icon: KeyRound, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
   // Project Debrief Capture (2026-08-12) — de korta frågorna vid projektstängning.

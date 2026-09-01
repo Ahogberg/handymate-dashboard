@@ -13,6 +13,9 @@ import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { claimCallProcessing, callProcessingRpc, publishCallCards, type CallPipelineResult } from '@/lib/voice/call-processing'
 import { getPublicPriceList } from '@/lib/products/price-list-view'
+import { findCustomerByPhone } from '@/lib/voice/find-customer-by-phone'
+import { resolveCallProject } from '@/lib/voice/resolve-call-project'
+import { byggAtaUtkast, harPendingAtaForProjekt, shouldSuggestAtaDraft } from '@/lib/ata/suggest-ata-draft'
 
 export const maxDuration = 300
 
@@ -417,6 +420,11 @@ export async function POST(request: NextRequest) {
     // föreslås, återuppringning är meningslös (de stod bredvid varandra).
     // Kolumnen kommer med sql/v102; saknas den är allt telefoni som förut.
     const arMote = recording.source === 'site_visit'
+    // "Ring via Handymate" (2026-09-01): utgående samtal spelas in med kunden
+    // som A-ben. Kunden är alltid känd (raden skapades före uppringningen) —
+    // därför ingen lead-/deal-kvalificering och ingen "ring tillbaka".
+    const arUtgaende = !arMote && recording.direction === 'outbound'
+    const samtalsriktning = arUtgaende ? 'UTGÅENDE (hantverkaren ringde upp kunden)' : 'INKOMMANDE (kund ringde)'
 
     // Förbättrad AI-prompt
     const prompt = `Du är en AI-assistent för en ${industry} i Sverige.
@@ -432,8 +440,8 @@ Serviceområde: ${business?.service_area || 'Okänt'}
 ${productContext}
 
 === SAMTALSINFORMATION ===
-${arMote ? 'Typ: PLATSBESÖK — hantverkaren och kunden träffades fysiskt' : `Samtalsriktning: ${recording.direction === 'inbound' ? 'INKOMMANDE (kund ringde)' : 'UTGÅENDE (vi ringde)'}`}
-Telefonnummer: ${recording.phone_number || 'Okänt'}
+${arMote ? 'Typ: PLATSBESÖK — hantverkaren och kunden träffades fysiskt' : `Samtalsriktning: ${samtalsriktning}`}
+Kundens telefonnummer: ${recording.phone_number || 'Okänt'}
 Samtalslängd: ${recording.duration_seconds || 0} sekunder
 ${recording.customer ? `
 Befintlig kund: ${recording.customer.name || 'Ja'}
@@ -452,7 +460,7 @@ Analysera samtalet och extrahera följande information:
 
 **1. KUNDINFO**
 - Namn (om nämnt i samtalet)
-- Telefonnummer (from-numret: ${recording.phone_number || 'okänt'})
+- Telefonnummer (kundens nummer: ${recording.phone_number || 'okänt'})
 - Adress (om nämnd - gata, postnummer, ort)
 - Email (om nämnd)
 
@@ -509,10 +517,17 @@ affären framåt efter besöket:
   "[05:30] ...", så evidensen blir tidsatt.`
   : `Detta är ett AVSLUTAT telefonsamtal. Du får bara identifiera vad som
 bör granskas av företaget efteråt. Boka, skicka SMS eller skapa kund direkt
-utifrån transkriptet ALDRIG. Du föreslår ENBART:
+utifrån transkriptet ALDRIG. ${arUtgaende
+    ? 'Samtalet var UTGÅENDE: hantverkaren ringde upp en redan känd kund. Föreslå "callback" ENBART om kunden uttryckligen bad om att bli uppringd igen — annars aldrig. '
+    : ''}Du föreslår ENBART:
 
 - Om pris/jobb diskuterades → "quote" (skapa offert)
 - Om "skicka offert" nämndes → "quote" med hög prioritet
+- Om kunden vill ha ett tilläggs- eller ändringsarbete på ett PÅGÅENDE jobb
+  — kunden vill ha något mer eller annat än det som beställts (t.ex. "kan ni
+  ta det andra rummet också", "vi vill byta till större kakel") → "ata".
+  Beskriv konkret VAD som ska läggas till eller ändras. Gäller det ett helt
+  nytt jobb, inte ett pågående → "quote".
 - Om kund vill bli återkopplad → "callback" (ring tillbaka)
 - Om uppföljning behövs → "follow_up"
 - Om något ska påminnas om → "reminder"
@@ -555,7 +570,7 @@ Svara ENDAST med JSON i följande format:
   },
   "suggestions": [
     {
-      "type": "quote|callback|follow_up|reminder|reschedule|customer_fact",
+      "type": "quote|callback|follow_up|reminder|reschedule|customer_fact|ata",
       "title": "Kort titel på svenska",
       "description": "Beskrivning av vad som ska göras",
       "priority": "low|medium|high|urgent",
@@ -669,14 +684,8 @@ Svara ENDAST med JSON i följande format:
     let customerId = recording.customer_id
 
     if (!customerId && recording.phone_number) {
-      // Kolla om kund redan finns med samma telefonnummer
-      const { data: existingCustomer, error: customerError } = await supabase
-        .from('customer')
-        .select('customer_id')
-        .eq('business_id', recording.business_id)
-        .eq('phone_number', recording.phone_number)
-        .maybeSingle()
-      if (customerError) throw customerError
+      // Kolla om kund redan finns med samma telefonnummer (rå + E.164 + fallback)
+      const existingCustomer = await findCustomerByPhone(supabase, recording.business_id, recording.phone_number)
 
       if (existingCustomer) {
         customerId = existingCustomer.customer_id
@@ -709,7 +718,10 @@ Svara ENDAST med JSON i följande format:
     let pipelineResult: CallPipelineResult | null = work.state.pipeline || null
     let pipelineFailed = false
 
-    if (!arMote) {
+    // Utgående samtal: kunden är känd sedan raden skapades — ingen lead-/deal-
+    // kvalificering (skulle annars kunna skapa en dubblettaffär på en kund
+    // hantverkaren själv ringde upp).
+    if (!arMote && !arUtgaende) {
       try {
         const { processCallForPipeline } = await import('@/lib/pipeline-ai')
         pipelineResult = pipelineResult || await processCallForPipeline({
@@ -717,6 +729,7 @@ Svara ENDAST med JSON i följande format:
           businessId: recording.business_id,
           transcript: recording.transcript,
           callerPhone: recording.phone_number || '',
+          summary: analysisResult.summary,
         })
         await checkpoint({ pipeline: pipelineResult })
         if (!customerId && pipelineResult.customerId) {
@@ -743,9 +756,30 @@ Svara ENDAST med JSON i följande format:
       if (linkError) throw linkError
     }
 
+    // Samtalsefterarbete (2026-09-01): vilket projekt gäller samtalet? Delas
+    // av ÄTA-utkastet och dagbokskortet nedan. null = entydigt projekt saknas,
+    // då skapas inget projektbundet kort (aldrig gissa).
+    const samtalsProjekt = await resolveCallProject(supabase, {
+      businessId: recording.business_id,
+      recording: { project_id: recording.project_id, booking_id: recording.booking_id },
+      customerId,
+    })
+
     {
       let routedBusinessUserId: string | null = null
-      if (!arMote) {
+      if (arUtgaende && recording.initiated_by_user_id) {
+        // Den som ringde får sammanfattningen — men bara om personen fortfarande
+        // är en aktiv användare i företaget (aldrig push till ett främmande id).
+        const { data: ringare } = await supabase
+          .from('business_users')
+          .select('id')
+          .eq('business_id', recording.business_id)
+          .eq('id', recording.initiated_by_user_id)
+          .eq('is_active', true)
+          .maybeSingle()
+        routedBusinessUserId = ringare?.id || null
+      }
+      if (!arMote && !routedBusinessUserId) {
         const { data: owner } = await supabase
           .from('business_users')
           .select('id')
@@ -795,12 +829,86 @@ Svara ENDAST med JSON i följande format:
 
       const kort: Array<Record<string, unknown>> = []
       let utelamnadeUtanKund = 0
+      // Samtalsefterarbete (2026-09-01): ÄTA-dedupen (samma fråga som
+      // suggestAtaDraft) slås upp EN gång per samtal, lazy — bara när modellen
+      // faktiskt föreslog en "ata". Ett projekt ska aldrig ha två väntande
+      // ÄTA-förslag, varken från samtalet, Daniel eller Matte. Går uppslaget
+      // fel behandlas det som "pending finns" (fail-closed → uppföljningskort).
+      let ataPendingForProjekt: boolean | null = null
+      let ataKortIBatchen = false
       for (let suggestionIndex = 0; suggestionIndex < suggestions.length; suggestionIndex++) {
         const s = suggestions[suggestionIndex]
         if (s.confidence < 0.4) continue
         const kallform = arMote ? 'mötet' : 'samtalet'
         const evidens = s.source_text ? ` Ur ${kallform}: "${s.source_text}"` : ''
-        if (s.type === 'quote') {
+        if (s.type === 'ata') {
+          // ÄTA-utkast ur samtalet — ENBART med ett entydigt projekt
+          // (resolveCallProject gissar aldrig), utan väntande ÄTA-kort för
+          // projektet och högst ett per samtal. Allt annat faller igenom som
+          // uppföljning nedan: behovet försvinner inte, men vi skapar aldrig
+          // ett utkast på ett projekt vi bara tror att samtalet gällde.
+          let utkast: Awaited<ReturnType<typeof byggAtaUtkast>> = null
+          if (samtalsProjekt && !ataKortIBatchen) {
+            if (ataPendingForProjekt === null) {
+              ataPendingForProjekt = await harPendingAtaForProjekt(
+                supabase, recording.business_id, samtalsProjekt.project_id,
+              ).catch(() => true)
+            }
+            const ataDescription = [s.description, s.source_text].filter(Boolean).join('\n\n')
+            if (shouldSuggestAtaDraft({
+              projectId: samtalsProjekt.project_id,
+              description: ataDescription,
+              hasPendingAtaForProject: ataPendingForProjekt,
+            })) {
+              utkast = await byggAtaUtkast(supabase, {
+                businessId: recording.business_id,
+                projectId: samtalsProjekt.project_id,
+                description: ataDescription,
+                customerContext: s.source_text || null,
+                customerId: customerId || null,
+                routedAgent: 'daniel',
+              })
+            }
+          }
+          if (utkast && samtalsProjekt) {
+            ataKortIBatchen = true
+            kort.push({
+              approval_type: 'create_ata_draft',
+              title: utkast.title,
+              description: `${utkast.description}${evidens}`,
+              risk_level: 'low',
+              payload: {
+                ...utkast.payload,
+                recording_id,
+                source_text: s.source_text || null,
+                confidence: s.confidence,
+                // Fast nyckel (inte suggestion:index) — högst ett ÄTA-kort
+                // per samtal, och samma id vid en omkörning.
+                call_card_key: 'ata',
+                decision_record: beslutsstampel,
+              },
+            })
+            continue
+          }
+          kort.push({
+            approval_type: 'meeting_followup',
+            title: `Förbered ÄTA: ${s.title}`,
+            description: `${s.description || ''}${evidens}`,
+            risk_level: 'low',
+            payload: {
+              title: `Förbered ÄTA: ${s.title}`,
+              description: s.description || null,
+              source_text: s.source_text || null,
+              confidence: s.confidence,
+              priority: s.priority || 'medium',
+              customer_id: customerId,
+              recording_id,
+              ...(samtalsProjekt ? { project_id: samtalsProjekt.project_id } : {}),
+              routed_agent: 'lisa',
+              ...withDecisionRecord({}, beslutsstampel),
+            },
+          })
+        } else if (s.type === 'quote') {
           // Offertutkastets exekverare behöver en tenant-verifierad kund.
           // Om lead-automationen är avstängd visar sammanfattningen fyndet,
           // men vi skapar inte ett kort som garanterat skulle fallera.
@@ -871,6 +979,31 @@ Svara ENDAST med JSON i följande format:
             recording_id, customer_id: customerId, routed_agent: 'lisa', call_card_key: 'pipeline-review' } })
       }
 
+      // Samtalsefterarbete (2026-09-01): dagboksraden. Samtalet blir en
+      // project_log-rad NÄR hantverkaren godkänner — bara med ett entydigt
+      // projekt (resolveCallProject). Läggs sist i batchen (efter förslagen,
+      // före unshift av sammanfattningen så att "N saker att ta vidare"
+      // räknar med det); 40-taket i RPC:n hotas inte av ett enda kort.
+      if (samtalsProjekt) {
+        kort.push({
+          approval_type: 'project_log_note',
+          title: `Lägg samtalet i dagboken för ${samtalsProjekt.name || 'projektet'}`,
+          description: analysisResult.summary || 'Ingen sammanfattning kunde skapas.',
+          risk_level: 'low',
+          payload: {
+            recording_id,
+            project_id: samtalsProjekt.project_id,
+            project_name: samtalsProjekt.name,
+            customer_id: customerId,
+            summary: analysisResult.summary || null,
+            call_date: recording.created_at || null,
+            routed_agent: 'matte',
+            call_card_key: 'diary',
+            decision_record: beslutsstampel,
+          },
+        })
+      }
+
       // Sammanfattningskortet — alltid, även när inga förslag hittades.
       // Ärlighet: kortet säger vad som FANNS, aldrig "allt är hanterat".
       kort.unshift({
@@ -880,8 +1013,8 @@ Svara ENDAST med JSON i följande format:
               ? `Mötet med ${kundNamn} är sammanfattat — ${kort.length} ${kort.length === 1 ? 'sak' : 'saker'} att ta vidare`
               : `Mötet är sammanfattat — ${kort.length} ${kort.length === 1 ? 'sak' : 'saker'} att ta vidare`)
           : (kundNamn
-              ? `Lisa har sammanfattat samtalet med ${kundNamn}`
-              : 'Lisa har sammanfattat ett inkommande samtal'),
+              ? `Lisa har sammanfattat ${arUtgaende ? 'ditt samtal' : 'samtalet'} med ${kundNamn}`
+              : `Lisa har sammanfattat ett ${arUtgaende ? 'utgående' : 'inkommande'} samtal`),
         description: [
           analysisResult.summary || 'Ingen sammanfattning kunde skapas.',
           utelamnadeUtanKund > 0
@@ -893,11 +1026,15 @@ Svara ENDAST med JSON i följande format:
           recording_id,
           customer_id: customerId,
           source: arMote ? 'site_visit' : 'phone_call',
+          direction: arMote ? null : (arUtgaende ? 'outbound' : 'inbound'),
           summary: analysisResult.summary || null,
           forslag: kort.length,
           pipeline_action: pipelineResult?.action || null,
           lead_id: pipelineResult?.leadId || null,
           deal_id: pipelineResult?.dealId || null,
+          // RPC:n skriver om deal_id ur pipeline-checkpointen vid publish; den
+          // affär ett utgående samtal ringdes FRÅN bärs därför i eget fält.
+          call_deal_id: recording.deal_id || null,
           routed_agent: arMote ? 'matte' : 'lisa',
           decision_record: beslutsstampel,
         },

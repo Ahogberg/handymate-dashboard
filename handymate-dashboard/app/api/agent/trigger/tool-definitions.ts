@@ -5,7 +5,7 @@ export const toolDefinitions = [
   // CRM
   {
     name: "get_customer",
-    description: "Hämta en specifik kund med all information.",
+    description: "Hämta en specifik kund med all information: kontaktuppgifter, senaste bokningar, bekräftade kundfakta och de fem senaste sammanfattade samtalen (recent_calls — vad som sades senast).",
     input_schema: {
       type: "object" as const,
       properties: {

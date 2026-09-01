@@ -1492,3 +1492,24 @@ referral-RLS, referred_by-triggern, portalens acceptansyta och adminens approve-
 - [x] Facit: tests/partner-attribution-lock.spec.ts (RLS-källfacit + grindarna).
 - [x] tsc, riktade tester, smoke mot lokal dev (8/8 gröna 2026-09-01: gate, engångslänk, fel purpose 403, idempotent bevis, hash = fil), commit + push. Kvar: v190 efter "kör".
 
+
+---
+
+# Samtalsefterarbete — kundmatchning, Matte-minne, åtgärdskort ur samtal, Ring via Handymate (Claude 2026-09-01)
+
+Plan: ~/.claude/plans/recursive-painting-possum.md. Deploy-ordning HÅRD: sql/v192 körs via MCP (efter "kör") FÖRE koden pushas.
+
+- [x] Steg 0: sql/v192_samtalsefterarbete.sql — RPC-vitlista + create_ata_draft/project_log_note, call_recording deal_id/initiated_by_user_id/call_status + index, direction incoming→inbound. FIL KLAR, EJ KÖRD.
+- [x] Steg 1: lib/voice/find-customer-by-phone.ts (rå + E.164 + dedupe-fallback) i incoming, pipeline-ai ×2, analyze; lead-grinden på E.164.
+- [x] Steg 2: get_customer → recent_calls (max 5, bara med sammanfattning).
+- [x] Steg 3: lib/voice/resolve-call-project.ts (recording → booking → kundens enda aktiva projekt, aldrig gissning).
+- [x] Steg 4: ÄTA-utkast ur samtal — byggAtaUtkast/harPendingAtaForProjekt utbrutna, 'ata' i analysscope, kort create_ata_draft (max ett per batch) annars "Förbered ÄTA"-uppföljning.
+- [x] Steg 5: project_log_note — EXECUTABLE via godkännande (Andreas beslut), exekverare log_call_<recording_id>, utfallsregel, Jarvis-/approvals-etiketter.
+- [x] Steg 6: kundtidslinjen — ingen kod (härleds ur call_recording.customer_id, Steg 1 gör att den träffar rätt).
+- [x] Steg 7: deal ur samtal får description + suggested_action + deal_note (fail-soft); DealModal visar "Nästa steg" utan lead_score.
+- [x] Steg 8: Ring via Handymate — outbound/start (GET kapabilitet, POST rad-före-46elks, kunden = A-benet), outbound (play → connect, recordcall bara vid ok), outbound/hangup (status + call_out-kostnad), recording-vakt MIN_TRANSCRIBE_SECONDS=3, knapp (tel:-fallback) på kund + affär, "Obesvarat" i listan, analyze: riktning i prompt, ingen pipeline för utgående, push till den som ringde.
+- [x] Facit: tests/samtalsatgarder.spec.ts (18) + tests/utgaende-samtal.spec.ts (19); uppdaterade samtalsvagen/permission-contract/voice-boundaries/cogs-matare.
+- [x] Verifiering: 383/388 gröna på regressionslistan — de 5 röda är förkommittade i HEAD (matte/chat bokforMatteUsage ×3, credit-watch.ts omätt, lisa-launch-proof custId/product-language), inte ur sprinten. tsc 0.
+- [ ] next build ren
+- [x] v192 KÖRD av Andreas 2026-09-01, verifierad via MCP (vitlista, prosecdef, 3 kolumner, 2 index, 0 incoming) → commit (bara sprintens filer) → push
+- [ ] Skarptest med två telefoner (plan §Verifiering 4); prod-förutsättningar: CALL_RECORDING_*-envs, ELKS_API_*, NEXT_PUBLIC_APP_URL, assigned_phone_number + call_recording_enabled + hantverkarnummer per företag

@@ -1385,6 +1385,63 @@ async function executeApprovalPayload(
         return { action: 'meeting_followup', task_id: task.id, title: task.title }
       }
 
+      case 'project_log_note': {
+        // Samtalsefterarbete (2026-09-01): samtalet blir en dagboksrad i
+        // project_log NÄR hantverkaren godkänner — intern anteckning, inget
+        // kundutskick. Samma fältlokala, tenant-scopade mönster som
+        // meeting_followup ovan. Förlaga för skrivningen: addWorkNote i
+        // app/api/agent/trigger/tool-router.ts (LIVE-kolumnerna är
+        // order_id/date/work_performed/description — inte project_id/log_date,
+        // se tests/column-contract.spec.ts PRODUKTIONSVERIFIERADE_KOLUMNER).
+        const pl = payload as any
+        if (!pl.project_id || !pl.recording_id || !pl.summary) {
+          return { action: 'project_log_note', ok: false, error: 'Kortet saknar projekt, samtal eller sammanfattning.' }
+        }
+        const supabasePL = await getSupabase()
+        const { data: projektPL, error: projektPLErr } = await supabasePL
+          .from('project')
+          .select('project_id')
+          .eq('business_id', businessId)
+          .eq('project_id', pl.project_id)
+          .maybeSingle()
+        if (projektPLErr) {
+          return { action: 'project_log_note', ok: false, error: `Kunde inte verifiera projektet: ${projektPLErr.message}` }
+        }
+        if (!projektPL) {
+          return { action: 'project_log_note', ok: false, error: 'Projektet finns inte i det här företaget.' }
+        }
+
+        // Datum = samtalsdagen (YYYY-MM-DD), annars idag. Ett ogiltigt
+        // call_date får aldrig stoppa raden — då gäller idag.
+        const samtalsDatum = typeof pl.call_date === 'string' && !Number.isNaN(Date.parse(pl.call_date))
+          ? new Date(pl.call_date)
+          : new Date()
+        const logDate = samtalsDatum.toISOString().slice(0, 10)
+
+        // Deterministiskt id per samtal: godkänns kortet två gånger (retry,
+        // dubbeltryck) blir det ändå EN rad — 23505 kvitteras som dubblett.
+        const logId = `log_call_${pl.recording_id}`
+        const { error: logErr } = await supabasePL
+          .from('project_log')
+          .insert({
+            id: logId,
+            order_id: pl.project_id,
+            business_id: businessId,
+            business_user_id: resolvedByUserId ?? null,
+            date: logDate,
+            work_performed: 'Samtal med kund',
+            description: String(pl.summary),
+            photos: [],
+          })
+        if (logErr) {
+          if (logErr.code === '23505') {
+            return { action: 'project_log_note', ok: true, log_id: logId, duplicate: true }
+          }
+          return { action: 'project_log_note', ok: false, error: logErr.message || 'Kunde inte spara dagboksraden.' }
+        }
+        return { action: 'project_log_note', ok: true, log_id: logId, project_id: pl.project_id }
+      }
+
       case 'customer_fact': {
         // Customer Facts V1 (2026-08-12): säg-det-en-gång-minnet. Godkännande
         // skriver EN rad i customer_fact — samma mönster som meeting_followup

@@ -8,6 +8,14 @@ export const maxDuration = 300
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
 /**
+ * Under så här många sekunder finns inget att transkribera: ett samtal där
+ * kunden la på under inspelningsmeddelandet, eller en koppling som bröts
+ * direkt. Whisper hade kostat pengar och Lisa hade sammanfattat tystnad.
+ * Ljudpekaren och längden sparas ändå — raden är fortfarande ett samtal.
+ */
+const MIN_TRANSCRIBE_SECONDS = 3
+
+/**
  * Webhook från 46elks när en inspelning är klar
  * 46elks skickar: callid, recordingid, duration, wav (URL till inspelningen)
  */
@@ -42,6 +50,10 @@ export async function POST(request: NextRequest) {
     const from = formData.get('from') as string
     const to = formData.get('to') as string
     const direction = formData.get('direction') as string
+    // 46elks säger 'outgoing'/'incoming'; vårt schema säger 'outbound'/'inbound'
+    // (v192 normaliserade äldre rader). Leverantörens ord får aldrig skrivas
+    // in som de är — analysen jämför mot våra literaler.
+    const isOutbound = direction === 'outgoing' || direction === 'outbound'
 
     if (!recordingUrl || !callId) {
       console.error('No recording URL received')
@@ -64,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     if (!businessId) {
       // Försök hitta business baserat på to-nummer (inkommande samtal)
-      const phoneToCheck = direction === 'outbound' ? from : to
+      const phoneToCheck = isOutbound ? from : to
       const { data: business } = await supabase
         .from('business_config')
         .select('business_id')
@@ -115,10 +127,10 @@ export async function POST(request: NextRequest) {
           elks_recording_id: callId,
           recording_url: recordingUrl,
           duration_seconds: duration,
-          phone_number: direction === 'outbound' ? to : from,
+          phone_number: isOutbound ? to : from,
           from_number: from,
           to_number: to,
-          direction: direction || 'inbound',
+          direction: isOutbound ? 'outbound' : 'inbound',
           created_at: new Date().toISOString()
         }, { onConflict: 'recording_id', ignoreDuplicates: true })
         .select('recording_id')
@@ -131,6 +143,14 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Error saving recording:', error)
       return NextResponse.json({ error: 'Database error' }, { status: 500 })
+    }
+
+    // För kort för att innehålla ett samtal: pekaren är sparad ovan, men
+    // transkribering och efterarbete hoppas över. Vakten ligger FÖRE
+    // transcribe-anropet — Whisper ska aldrig få en tom inspelning.
+    if (duration < MIN_TRANSCRIBE_SECONDS) {
+      console.log('[voice/recording] för kort för transkribering, hoppar över', { recordingId: recording?.recording_id, duration })
+      return NextResponse.json({ success: true, skipped: 'too_short', recording_id: recording?.recording_id })
     }
 
     // Await the chain: a returned success means the handoff was accepted, not

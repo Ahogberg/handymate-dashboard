@@ -8,14 +8,12 @@
  * icke-atomära löpande summor utan spårbarhet. Allt det är ersatt av:
  *
  *  - partner_commission_ledger: EN rad per partner × kund × månad, med
- *    sats, bas, källa och tier-snapshot — självfaktureringsunderlaget.
+ *    sats, bas, källa och tier-snapshot — plus append-only-rättelser.
  *  - Betalningsdrivet: basen är billing_event payment_succeeded (faktiskt
  *    betalt, ex moms) — ingen betalning, ingen rad, inga prismappar.
- *  - Idempotent: UNIQUE(partner_id, business_id, period) + ON CONFLICT
- *    DO NOTHING. Cronen kan köra varje natt; sena Stripe-betalningar för
- *    föregående månad plockas upp i efterföljande körningar. Redan
- *    skrivna rader behåller sin sats ("sats utvärderas vid första
- *    ackrual" — dokumenterat beteende, står i partneravtalet).
+ *  - Idempotent: en fryst source_key per verifierat intäktsläge. Refunds,
+ *    chargebacks och sena betalningar ändrar aldrig originalet utan ger en
+ *    ny justeringsrad med originalets sats.
  *
  * Ren beräkningslogik ligger i commission-engine.ts (direkttestbar).
  */
@@ -23,12 +21,20 @@
 import { getServerSupabase } from '@/lib/supabase'
 import {
   computeLedgerRows,
-  deriveExMomsSek,
   periodBounds,
   type CustomerPayment,
   type PartnerCommissionConfig,
   type TierStep,
 } from './commission-engine'
+import {
+  commissionCalendarMonth,
+  extractPartnerRevenueForPeriod,
+} from './revenue-classification'
+import {
+  adjustmentSourceKey,
+  reconcileCommissionBase,
+} from './commission-reconciliation'
+import { getHandymateBillingIdentityFromEnv } from './self-billing'
 
 export { previousMonth } from './commission-engine'
 
@@ -54,7 +60,7 @@ export async function processCommissionPeriod(period: string): Promise<ProcessRe
   if (!/^\d{4}-\d{2}$/.test(period)) {
     return { period, partnersProcessed: 0, rowsInserted: 0, totalSek: 0, errors: ['Ogiltig period — förväntar YYYY-MM'] }
   }
-  const { start, end } = periodBounds(period)
+  const { start } = periodBounds(period)
 
   const { data: partners, error: partnerErr } = await supabase
     .from('partners')
@@ -70,72 +76,99 @@ export async function processCommissionPeriod(period: string): Promise<ProcessRe
       // Konverterade referrals för partnern. Legacy-rader från den gamla
       // lead-agency-routen saknar riktigt business-id ('partner_…') och
       // filtreras bort — de kan aldrig matcha billing_events ändå.
-      const { data: referrals } = await supabase
+      const { data: referrals, error: referralsError } = await supabase
         .from('referrals')
         .select('id, referred_business_id, converted_at, status')
         .eq('partner_id', partner.id)
         .not('converted_at', 'is', null)
         .not('referred_business_id', 'like', 'partner_%')
 
+      if (referralsError) {
+        errors.push(`Partner ${partner.id}: referrals kunde inte läsas: ${referralsError.message}`)
+        continue
+      }
       if (!referrals || referrals.length === 0) continue
       partnersProcessed++
 
       const businessIds = referrals.map(r => r.referred_business_id)
       const refByBusiness = new Map(referrals.map(r => [r.referred_business_id, r]))
 
-      // Periodens lyckade betalningar för partnerns kunder.
-      const { data: events } = await supabase
+      // Alla klassade intäktshändelser som kan bära en allocation till
+      // perioden. Ingen nedre created_at-gräns: en årsbetalning i september
+      // ska ge sin allocation även i augusti året därpå.
+      const { data: events, error: eventsError } = await supabase
         .from('billing_event')
         .select('id, business_id, data, created_at')
-        .eq('event_type', 'payment_succeeded')
+        .in('event_type', ['payment_succeeded', 'payment_refunded', 'payment_chargeback'])
         .in('business_id', businessIds)
-        .gte('created_at', start)
-        .lt('created_at', end)
 
+      if (eventsError) {
+        errors.push(`Partner ${partner.id}: billing_event kunde inte läsas: ${eventsError.message}`)
+        continue
+      }
       if (!events || events.length === 0) continue
 
-      // Summera ex-moms per business.
-      const paidByBusiness = new Map<string, { sek: number; eventIds: string[] }>()
+      // Summera bara versionsmärkta, klassade allocations. En gammal eller
+      // okänd payment_succeeded-rad i målperioden blir ett synligt fel och
+      // exakt 0 kr — aldrig fallback till invoice-totalen.
+      const paidByBusiness = new Map<string, { ore: number; eventIds: string[] }>()
       for (const ev of events) {
-        const sek = deriveExMomsSek(ev.data)
-        if (sek <= 0) continue
-        const curr = paidByBusiness.get(ev.business_id) || { sek: 0, eventIds: [] }
-        curr.sek += sek
+        const extracted = extractPartnerRevenueForPeriod(ev.data, period)
+        if (!extracted.hasSnapshot) {
+          if (ev.created_at >= start) {
+            errors.push(`Partner ${partner.id}: oklassad billing_event ${ev.id} — 0 kr provisionsgrundat`)
+          }
+          continue
+        }
+        if (extracted.amountExVatOre === 0) continue
+        const curr = paidByBusiness.get(ev.business_id) || { ore: 0, eventIds: [] }
+        curr.ore += extracted.amountExVatOre
         curr.eventIds.push(ev.id)
         paidByBusiness.set(ev.business_id, curr)
       }
       if (paidByBusiness.size === 0) continue
 
-      // Betald-månads-räknare + befintliga rader för idempotens. Räknaren
-      // baseras på antal liggarrader FÖRE denna period (obetalda månader
-      // avancerar den inte — D1-beslutet).
+      // Befintliga rader används bara för idempotens. Avtalsmånaden härleds
+      // nedan från converted_at + kalenderperiod och får aldrig påverkas av
+      // hur många betalda månader/liggarrader som råkar finnas.
       const payingIds = Array.from(paidByBusiness.keys())
-      const { data: ledgerRows } = await supabase
+      const { data: ledgerRows, error: ledgerError } = await supabase
         .from('partner_commission_ledger')
-        .select('business_id, period')
+        .select('id, business_id, period, entry_kind, base_amount_sek, rate, amount_sek')
         .eq('partner_id', partner.id)
         .in('business_id', payingIds)
+        .eq('period', period)
 
-      const priorMonths = new Map<string, number>()
-      const alreadyLedgered = new Set<string>()
+      if (ledgerError) {
+        errors.push(`Partner ${partner.id}: liggaren kunde inte läsas: ${ledgerError.message}`)
+        continue
+      }
+      const existingByBusiness = new Map<string, typeof ledgerRows>()
       for (const row of ledgerRows || []) {
-        if (row.period === period) alreadyLedgered.add(row.business_id)
-        else if (row.period < period) priorMonths.set(row.business_id, (priorMonths.get(row.business_id) || 0) + 1)
+        const existing = existingByBusiness.get(row.business_id) || []
+        existing.push(row)
+        existingByBusiness.set(row.business_id, existing)
       }
 
       // Bygg motorns indata: ALLA betalande kunder (även redan liggade —
       // de ska räknas i volymen/banden), insert sker bara för oliggade.
-      const customers: CustomerPayment[] = payingIds.map(bid => {
+      const customers: CustomerPayment[] = payingIds.flatMap(bid => {
         const ref = refByBusiness.get(bid)!
         const paid = paidByBusiness.get(bid)!
-        return {
+        const customerMonth = commissionCalendarMonth(ref.converted_at, period)
+        if (customerMonth < 1) {
+          errors.push(`Partner ${partner.id}: ogiltig provisionsstart för referral ${ref.id}`)
+          return []
+        }
+        if (paid.ore <= 0) return []
+        return [{
           businessId: bid,
           referralId: ref.id,
-          customerMonth: (priorMonths.get(bid) || 0) + 1,
-          paidExMomsSek: paid.sek,
+          customerMonth,
+          paidExMomsSek: paid.ore / 100,
           convertedAt: ref.converted_at,
           billingEventIds: paid.eventIds,
-        }
+        }]
       })
 
       const config: PartnerCommissionConfig = {
@@ -146,51 +179,90 @@ export async function processCommissionPeriod(period: string): Promise<ProcessRe
         ladderMonths: partner.ladder_months ?? 36,
       }
 
-      const drafts = computeLedgerRows(config, customers)
-        .filter(d => !alreadyLedgered.has(d.businessId))
+      const computedByBusiness = new Map(computeLedgerRows(config, customers).map(d => [d.businessId, d]))
+      const rowsToRecord: Array<Record<string, unknown>> = []
 
-      if (drafts.length === 0) continue
+      for (const businessId of payingIds) {
+        const ref = refByBusiness.get(businessId)!
+        const paid = paidByBusiness.get(businessId)!
+        const customerMonth = commissionCalendarMonth(ref.converted_at, period)
+        if (customerMonth < 1) continue
+        const existing = existingByBusiness.get(businessId) || []
+        const original = existing.find(row => row.entry_kind === 'accrual')
 
-      const { data: inserted, error: insertErr } = await supabase
-        .from('partner_commission_ledger')
-        .upsert(
-          drafts.map(d => ({
-            partner_id: partner.id,
-            business_id: d.businessId,
-            referral_id: d.referralId,
+        if (!original) {
+          const draft = computedByBusiness.get(businessId)
+          if (!draft) continue
+          rowsToRecord.push({
+            business_id: draft.businessId,
+            referral_id: draft.referralId,
+            customer_month: draft.customerMonth,
+            base_amount_sek: draft.baseAmountSek,
+            rate: draft.rate,
+            amount_sek: draft.amountSek,
+            rate_source: draft.rateSource,
+            tier_snapshot: draft.tierSnapshot,
+            source_billing_event_ids: draft.billingEventIds,
+            entry_kind: 'accrual',
+            source_key: `accrual:${partner.id}:${businessId}:${period}`,
+          })
+          continue
+        }
+
+        const adjustment = reconcileCommissionBase(paid.ore / 100, existing.map(row => ({
+          id: row.id,
+          entryKind: row.entry_kind === 'adjustment' ? 'adjustment' : 'accrual',
+          baseAmountSek: Number(row.base_amount_sek || 0),
+          rate: Number(row.rate || 0),
+        })))
+        if (!adjustment) continue
+
+        rowsToRecord.push({
+          business_id: businessId,
+          referral_id: ref.id,
+          customer_month: customerMonth,
+          base_amount_sek: adjustment.baseAmountSek,
+          rate: adjustment.rate,
+          amount_sek: adjustment.amountSek,
+          rate_source: 'adjustment',
+          tier_snapshot: { original_ledger_id: adjustment.adjustsLedgerId },
+          source_billing_event_ids: paid.eventIds,
+          entry_kind: adjustment.entryKind,
+          source_key: adjustmentSourceKey({
+            partnerId: partner.id,
+            businessId,
             period,
-            customer_month: d.customerMonth,
-            base_amount_sek: d.baseAmountSek,
-            rate: d.rate,
-            amount_sek: d.amountSek,
-            rate_source: d.rateSource,
-            tier_snapshot: d.tierSnapshot,
-            source_billing_event_ids: d.billingEventIds,
-            status: 'accrued',
-          })),
-          { onConflict: 'partner_id,business_id,period', ignoreDuplicates: true },
-        )
-        .select('amount_sek')
+            billingEventIds: paid.eventIds,
+          }),
+          adjusts_ledger_id: adjustment.adjustsLedgerId,
+        })
+      }
+
+      if (rowsToRecord.length === 0) continue
+
+      const { data: recorded, error: insertErr } = await supabase.rpc('record_partner_commission_rows', {
+        p_partner_id: partner.id,
+        p_period: period,
+        p_rows: rowsToRecord,
+      })
 
       if (insertErr) {
         errors.push(`Partner ${partner.id}: ${insertErr.message}`)
         continue
       }
 
-      const insertedCount = inserted?.length ?? 0
+      const insertedCount = Number(recorded?.inserted || 0)
       rowsInserted += insertedCount
-      totalSek += (inserted || []).reduce((s, r) => s + Number(r.amount_sek || 0), 0)
+      totalSek += Number(recorded?.amount_sek || 0)
 
       if (insertedCount > 0) {
-        await recomputePartnerTotals(partner.id)
-
         // Tidslinjehändelse (best effort — får aldrig fälla ackrualen).
         try {
           await supabase.from('partner_events').insert({
             partner_id: partner.id,
-            business_id: drafts[0].businessId,
+            business_id: String(rowsToRecord[0].business_id),
             event_type: 'provision_earned',
-            amount_sek: Math.round((inserted || []).reduce((s, r) => s + Number(r.amount_sek || 0), 0)),
+            amount_sek: Math.round(Number(recorded?.amount_sek || 0)),
             meta: { period, rows: insertedCount },
           })
         } catch { /* non-blocking */ }
@@ -240,60 +312,31 @@ export async function recomputePartnerTotals(partnerId: string): Promise<void> {
 export async function createPayoutBatch(
   partnerId: string,
   period: string,
-): Promise<{ success: boolean; batchId?: string; totalSek?: number; error?: string }> {
+  createdBy = 'system',
+): Promise<{ success: boolean; batchId?: string; invoiceNumber?: string; subtotalSek?: number; vatSek?: number; totalSek?: number; error?: string }> {
   const supabase = getServerSupabase()
-
-  const { data: rows, error: rowsErr } = await supabase
-    .from('partner_commission_ledger')
-    .select('id, business_id, period, customer_month, base_amount_sek, rate, amount_sek, rate_source')
-    .eq('partner_id', partnerId)
-    .eq('status', 'accrued')
-    .is('payout_batch_id', null)
-    .lte('period', period)
-    .order('period', { ascending: true })
-
-  if (rowsErr) return { success: false, error: rowsErr.message }
-  if (!rows || rows.length === 0) return { success: false, error: 'Inga upplupna rader att bunta' }
-
-  const totalSek = Math.round(rows.reduce((s, r) => s + Number(r.amount_sek || 0), 0))
-
-  // Kundnamn till underlaget (ett anrop, inte N+1).
-  const bizIds = Array.from(new Set(rows.map(r => r.business_id)))
-  const { data: businesses } = await supabase
-    .from('business_config')
-    .select('business_id, company_name, business_name')
-    .in('business_id', bizIds)
-  const nameFor = new Map((businesses || []).map(b => [b.business_id, b.company_name || b.business_name || b.business_id]))
-
-  const statement = rows.map(r => ({
-    kund: nameFor.get(r.business_id) || r.business_id,
-    period: r.period,
-    manad: r.customer_month,
-    bas_sek: Number(r.base_amount_sek),
-    sats: Number(r.rate),
-    belopp_sek: Number(r.amount_sek),
-    kalla: r.rate_source,
-  }))
-
-  const { data: batch, error: batchErr } = await supabase
-    .from('partner_payout_batch')
-    .insert({ partner_id: partnerId, period, total_sek: totalSek, statement, status: 'open' })
-    .select('id')
-    .single()
-
-  if (batchErr) {
-    // UNIQUE(partner_id, period) — en batch per period.
-    return { success: false, error: batchErr.message }
+  let buyer
+  try {
+    buyer = getHandymateBillingIdentityFromEnv()
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
   }
 
-  const { error: linkErr } = await supabase
-    .from('partner_commission_ledger')
-    .update({ payout_batch_id: batch.id })
-    .in('id', rows.map(r => r.id))
-
-  if (linkErr) return { success: false, error: linkErr.message }
-
-  return { success: true, batchId: batch.id, totalSek }
+  const { data, error } = await supabase.rpc('create_partner_self_billing_batch', {
+    p_partner_id: partnerId,
+    p_period: period,
+    p_buyer: buyer,
+    p_actor: createdBy,
+  })
+  if (error) return { success: false, error: error.message }
+  return {
+    success: true,
+    batchId: data?.batch_id,
+    invoiceNumber: data?.invoice_number,
+    subtotalSek: Number(data?.subtotal_sek || 0),
+    vatSek: Number(data?.vat_sek || 0),
+    totalSek: Number(data?.total_sek || 0),
+  }
 }
 
 /**
@@ -305,48 +348,10 @@ export async function markBatchPaid(
   paidBy: string,
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = getServerSupabase()
-  const now = new Date().toISOString()
-
-  const { data: batch, error: batchErr } = await supabase
-    .from('partner_payout_batch')
-    .select('id, partner_id, status')
-    .eq('id', batchId)
-    .single()
-
-  if (batchErr || !batch) return { success: false, error: batchErr?.message || 'Batch hittades inte' }
-  if (batch.status === 'paid') return { success: false, error: 'Batchen är redan utbetald' }
-
-  const { error: rowErr } = await supabase
-    .from('partner_commission_ledger')
-    .update({ status: 'paid', paid_at: now })
-    .eq('payout_batch_id', batchId)
-
-  if (rowErr) return { success: false, error: rowErr.message }
-
-  const { error: updErr } = await supabase
-    .from('partner_payout_batch')
-    .update({ status: 'paid', paid_at: now, paid_by: paidBy })
-    .eq('id', batchId)
-
-  if (updErr) return { success: false, error: updErr.message }
-
-  await recomputePartnerTotals(batch.partner_id)
-
-  // Tidslinjehändelse (best effort).
-  try {
-    const { data: totalRow } = await supabase
-      .from('partner_payout_batch')
-      .select('total_sek')
-      .eq('id', batchId)
-      .single()
-    await supabase.from('partner_events').insert({
-      partner_id: batch.partner_id,
-      business_id: 'system',
-      event_type: 'provision_paid',
-      amount_sek: Math.round(Number(totalRow?.total_sek || 0)),
-      meta: { batch_id: batchId },
-    })
-  } catch { /* non-blocking */ }
-
+  const { error } = await supabase.rpc('mark_partner_self_billing_paid', {
+    p_batch_id: batchId,
+    p_paid_by: paidBy,
+  })
+  if (error) return { success: false, error: error.message }
   return { success: true }
 }

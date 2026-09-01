@@ -21,6 +21,7 @@ import {
   allocateMarginalBands,
   previousMonth,
   periodBounds,
+  roundSek,
   type CustomerPayment,
   type PartnerCommissionConfig,
 } from '../lib/partners/commission-engine'
@@ -166,10 +167,10 @@ test.describe('Grundregler', () => {
     const rows = computeLedgerRows(config(), [kund(1, { paidExMomsSek: 0 })])
     expect(rows).toHaveLength(0)
   })
-  test('avrundning till hela kronor', () => {
+  test('avrundning till öre, aldrig fler decimaler', () => {
     const rows = computeLedgerRows(config(), [kund(1, { paidExMomsSek: 2495 })])
-    expect(rows[0].amountSek).toBe(Math.round(2495 * 0.2))
-    expect(Number.isInteger(rows[0].amountSek)).toBe(true)
+    expect(rows[0].amountSek).toBe(roundSek(2495 * 0.2))
+    expect(roundSek(4995.83 * 0.2)).toBe(999.17)
   })
   test('legacy-satsen används när trappa saknas', () => {
     const rows = computeLedgerRows(config({ tiers: null, legacyRate: 0.22 }), kunder(3))

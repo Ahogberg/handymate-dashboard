@@ -66,6 +66,8 @@ export const TYPE_LABEL: Record<string, string> = {
   fakturera_projekt: 'Faktura',
   meeting_summary: 'Möte',
   meeting_followup: 'Uppföljning från möte',
+  // Samtalsefterarbete (2026-09-01): samtalet som dagboksrad på projektet.
+  project_log_note: 'Dagboksanteckning',
   // Startkorten (docs/design/FORSTA-30-MINUTERNA.md).
   team_intro: 'Ditt team',
   // Måndagskortet (2026-08-13) — veckovis lägesbild, se lib/jarvis/monday-brief.ts.
@@ -140,6 +142,8 @@ export function approveLabel(approvalType: string, payload?: Record<string, unkn
   }
   if (approvalType === 'send_quote') return 'Godkänn & skicka'
   if (approvalType === 'send_sms') return 'Skicka'
+  // project_log_note SPARAR en intern dagboksrad — inget går till kunden.
+  if (approvalType === 'project_log_note') return 'Spara i dagboken'
   if (approvalType === 'autonomy_offer') return 'Ja, kör automatiskt'
   // profitability_warning är INFORMATIONAL i action-contract — inget att
   // utföra. Denna etikett syns bara om kortet någonsin renderas med en

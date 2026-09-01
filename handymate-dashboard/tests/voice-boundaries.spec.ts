@@ -111,6 +111,28 @@ test.describe('4. voice/recording — webhooken verifieras', () => {
   })
 })
 
+test.describe('4b. voice/outbound — "Ring via Handymate"-webhookarna verifieras likadant', () => {
+  // Två nya 46elks-webhookar (voice_start + whenhangup) för utgående
+  // inspelade samtal. Samma tre regler som voice/recording: HMAC före
+  // databasen, body:n läses en gång, ingen formData().
+  for (const file of ['app/api/voice/outbound/route.ts', 'app/api/voice/outbound/hangup/route.ts']) {
+    test(`${file}: 46elks-signaturen kontrolleras före call_recording`, () => {
+      const s = kod(file)
+      const sig = s.indexOf('verifyElksSignature')
+      expect(sig, 'ingen signaturkontroll').toBeGreaterThan(-1)
+      const db = s.indexOf(".from('call_recording')")
+      expect(db, 'läser aldrig call_recording?').toBeGreaterThan(-1)
+      expect(db).toBeGreaterThan(sig)
+    })
+
+    test(`${file}: body:n läses en gång`, () => {
+      const s = kod(file)
+      expect(s).toContain('new URLSearchParams(rawBody)')
+      expect(s, 'formData() läser en redan tömd ström').not.toContain('await request.formData()')
+    })
+  }
+})
+
 test.describe('5. voice/execute — SMS går genom spärren', () => {
   const s = kod('app/api/voice/execute/route.ts')
 

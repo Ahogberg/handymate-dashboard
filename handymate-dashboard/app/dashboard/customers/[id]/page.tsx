@@ -51,6 +51,7 @@ import { normalizeSwedishPhone, formatSwedishPhone } from '@/lib/phone-normalize
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { formatSEK } from '@/lib/format-price'
 import { useFilePreview } from '@/components/documents/FilePreviewProvider'
+import RingViaHandymateButton from '@/components/voice/RingViaHandymateButton'
 
 interface Customer {
   customer_id: string
@@ -1008,14 +1009,15 @@ export default function CustomerDetailPage() {
                   flex-1 gör att raden ser balanserad ut oavsett hur många
                   som visas (mönster uppskalat från DealCard.tsx:115-148). */}
               <div className="flex flex-wrap gap-2 mb-4">
+                {/* Ring via Handymate (inspelat, Lisa sammanfattar) när det
+                    är tillgängligt — annars exakt samma tel:-länk som förut. */}
                 {customer.phone_number && (
-                  <a
-                    href={`tel:${normalizeSwedishPhone(customer.phone_number)}`}
-                    className="flex-1 min-w-[60px] flex flex-col items-center justify-center gap-1.5 min-h-[64px] p-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all"
-                  >
-                    <Phone className="w-5 h-5" />
-                    <span className="text-xs font-medium">Ring</span>
-                  </a>
+                  <RingViaHandymateButton
+                    customerId={customer.customer_id}
+                    phone={customer.phone_number}
+                    customerName={customer.name}
+                    variant="tile"
+                  />
                 )}
 
                 {customer.phone_number && (

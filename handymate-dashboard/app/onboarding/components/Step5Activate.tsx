@@ -27,11 +27,13 @@ import type { OnboardingFormData } from '../types-redesign'
  * kvar i lib/feature-gates.ts och backend (tyst nedgradering + befintliga
  * konton) — se kommentar där för motivering.
  */
-// Svenska namn (Andreas-beslut 2026-07-31): Firman (1–3 personer) och
-// Storfirman (från 4 anställda). Interna id:n byts aldrig. VIKTIGT:
-// BÅDA planerna ger hela AI-teamet (sex medarbetare) — det är
-// kategorilöftet; skillnaden är volym & människor, aldrig agenter
-// (tidigare copy här påstod fel att Lars/Matte krävde Business).
+// Svenska namn (Andreas-beslut 2026-07-31): Firman och Storfirman. Interna
+// id:n byts aldrig. VIKTIGT: BÅDA planerna ger hela AI-teamet (sex
+// medarbetare) OCH obegränsat antal användare — det är kategorilöftet;
+// skillnaden är ENDAST volym (samtal/SMS), aldrig agenter eller antal
+// människor (Andreas-beslut 2026-09-01 tog bort Firmans användartak —
+// tidigare copy här påstod fel att Lars/Matte krävde Business, och senare
+// att headcount var en spärr).
 const FIRMAN_FACTS = getPlanCommercialFacts('professional')
 const STORFIRMAN_FACTS = getPlanCommercialFacts('business')
 
@@ -52,15 +54,14 @@ const PLANS = [
       'Färdig offert på minuter — ROT-avdraget rätt räknat',
       'Jobbet klart → fakturan skapad. Inget glöms',
       'Tyst vecka? Teamet föreslår utskicket som fyller den',
-      `Upp till ${FIRMAN_FACTS.users} användare`,
     ],
     valueBullets: [
       'Daniel följer upp offerter som blivit liggande',
       'Hanna väcker gamla kunder med kampanjer och serviceavtal',
       'Karin förbereder fakturor och påminnelser åt dig',
-      'För firmor med 1–5 personer',
+      'Räcker gott och väl för de flesta firmor',
     ],
-    upgradeHint: 'Fler än fem som behöver logga in? Då är Storfirman rätt.',
+    upgradeHint: 'Ringer och smsar ni mycket? Då är Storfirman rätt.',
   },
   {
     id: 'business',
@@ -69,14 +70,14 @@ const PLANS = [
     yearlyPrice: STORFIRMAN_FACTS.yearlyPriceSek,
     popular: false,
     agents: ['lisa', 'karin', 'daniel', 'hanna', 'lars', 'matte'],
-    features: ['Allt i Firman', 'Obegränsade användare', 'Större utrymme för SMS & utskick', 'Egen hemsida med SEO', 'Dedikerad support'],
+    features: ['Allt i Firman', 'Obegränsade samtal', 'Större utrymme för SMS & utskick', 'Egen hemsida med SEO', 'Dedikerad support'],
     valueBullets: [
       'Hela teamet loggar in — tidrapporter och projekt på ett ställe',
       'Lars håller koll på marginalerna när projekten blir fler',
       'Större utrymme för utskick när kundbasen växer',
-      'Från 6 anställda och uppåt',
+      'När samtalen och SMS-utskicken blir många',
     ],
-    upgradeHint: 'Fler än 10 anställda eller flera bolag? Hör av dig så skräddarsyr vi.',
+    upgradeHint: 'Ännu större volym eller flera bolag? Hör av dig så skräddarsyr vi.',
   },
 ]
 

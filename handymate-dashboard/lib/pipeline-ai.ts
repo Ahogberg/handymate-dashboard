@@ -4,6 +4,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAutomationSettings } from '@/lib/pipeline'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
+import { findCustomerByPhone } from '@/lib/voice/find-customer-by-phone'
+import { normalizeSwedishPhone } from '@/lib/phone-normalize'
 import type { CallPipelineResult } from '@/lib/voice/call-processing'
 
 interface CallAnalysis {
@@ -21,6 +23,8 @@ interface CallAnalysis {
     declineReason?: string
   }
   reasoning: string
+  /** Konkret nästa steg för hantverkaren, t.ex. "Återkom med pris på takbytet senast fredag". */
+  nextAction?: string
 }
 
 function getAnthropic() {
@@ -42,12 +46,7 @@ export async function analyzeCallForPipeline(params: {
   // Check if caller is existing customer with active deals
   let existingContext = ''
   if (params.existingCustomerPhone) {
-    const { data: customer } = await supabase
-      .from('customer')
-      .select('customer_id, name')
-      .eq('business_id', params.businessId)
-      .eq('phone_number', params.existingCustomerPhone)
-      .single()
+    const customer = await findCustomerByPhone(supabase, params.businessId, params.existingCustomerPhone)
 
     if (customer) {
       const { data: deals } = await supabase
@@ -83,7 +82,8 @@ Svara ENDAST med JSON:
     "estimatedValue": null,
     "declineReason": "om kund tackar nej"
   },
-  "reasoning": "kort förklaring"
+  "reasoning": "kort förklaring",
+  "nextAction": "konkret nästa steg för hantverkaren i en mening, t.ex. 'Återkom med pris på takbytet senast fredag' — eller null om inget lovades"
 }`,
     messages: [
       { role: 'user', content: `Analysera detta samtal:\n\n${params.transcript}` }
@@ -124,6 +124,8 @@ export async function processCallForPipeline(params: {
   businessId: string
   transcript: string
   callerPhone: string
+  /** Lisas sammanfattning av samtalet — blir affärens kontext + första anteckning. */
+  summary?: string | null
 }): Promise<CallPipelineResult> {
   const settings = await getAutomationSettings(params.businessId)
   if (!settings || !settings.ai_analyze_calls) {
@@ -140,12 +142,16 @@ export async function processCallForPipeline(params: {
   const threshold = settings.ai_auto_move_threshold || 80
   const leadThreshold = settings.ai_create_lead_threshold || 70
 
+  // Grinden och kundens sparade nummer använder E.164 — ett samtal från
+  // "0701234567" (manuell/mobil-inspelning) fick tidigare aldrig bli en lead.
+  const callerE164 = normalizeSwedishPhone(params.callerPhone || '')
+
   // Create new lead
   if (
     analysis.isNewLead &&
     analysis.leadConfidence >= leadThreshold &&
     settings.auto_create_leads &&
-    /^\+[1-9]\d{7,14}$/.test(params.callerPhone)
+    /^\+[1-9]\d{7,14}$/.test(callerE164)
   ) {
     const supabase = getServerSupabase()
 
@@ -189,7 +195,7 @@ export async function processCallForPipeline(params: {
       businessId: params.businessId,
       businessPhoneNumber: null,
       name,
-      phone: params.callerPhone,
+      phone: callerE164,
       email: null,
       message,
       source: 'vapi_call',
@@ -205,16 +211,46 @@ export async function processCallForPipeline(params: {
 
     // Golden Path äger kund/lead/deal. Samtalsvägen kompletterar bara den
     // spårning som är specifik för telefoni; varje skrivning tenantfiltreras.
+    // Samtalsefterarbete (2026-09-01): affären bär samtalets kontext och ett
+    // konkret nästa steg ("Återkom med X") — annars stod hantverkaren med en
+    // tom deal som bara hette "Ny kund (+46…)".
+    const samtalsdatum = new Date().toLocaleDateString('sv-SE')
+    const kontextDelar = [
+      analysis.extractedInfo.jobType,
+      analysis.extractedInfo.address,
+      analysis.extractedInfo.urgency === 'high' ? 'brådskande' : null,
+    ].filter(Boolean)
+    const nextAction = typeof analysis.nextAction === 'string' && analysis.nextAction.trim()
+      ? analysis.nextAction.trim()
+      : null
     const { error: dealUpdateError } = await supabase
       .from('deal')
       .update({
         source_call_id: params.callId,
         value: analysis.extractedInfo.estimatedValue || null,
         priority: urgencyMap[analysis.extractedInfo.urgency || 'medium'] || 'medium',
+        description: `Ur samtal ${samtalsdatum}${kontextDelar.length ? `: ${kontextDelar.join(', ')}` : ''}${params.summary ? `\n\n${params.summary}` : ''}`,
+        suggested_action: nextAction,
       })
       .eq('id', created.dealId)
       .eq('business_id', params.businessId)
     if (dealUpdateError) throw dealUpdateError
+
+    // Första anteckningen på affären = vad som sades. Fail-soft: affären är
+    // redan skapad, en misslyckad anteckning ska inte kasta om hela samtalet.
+    const noteContent = [
+      `Samtal ${samtalsdatum}: ${params.summary || analysis.reasoning || 'inkommande samtal'}`,
+      nextAction ? `Nästa steg: ${nextAction}` : null,
+    ].filter(Boolean).join('\n\n')
+    const { error: noteError } = await supabase
+      .from('deal_note')
+      .insert({
+        business_id: params.businessId,
+        deal_id: created.dealId,
+        content: noteContent,
+        created_by: 'Lisa',
+      })
+    if (noteError) console.error('[pipeline-ai] deal_note ur samtal misslyckades (non-blocking):', noteError)
 
     return {
       action: 'created_lead',
@@ -234,15 +270,9 @@ export async function processCallForPipeline(params: {
   // Även utan pipelineåtgärd får efteranalysen använda en SÄKER, tenant-
   // verifierad befintlig kundmatch för sina granskningskort.
   const supabase = getServerSupabase()
-  const { data: matchedCustomer, error: matchError } = params.callerPhone
-    ? await supabase
-        .from('customer')
-        .select('customer_id')
-        .eq('business_id', params.businessId)
-        .eq('phone_number', params.callerPhone)
-        .maybeSingle()
-    : { data: null, error: null }
-  if (matchError) throw matchError
+  const matchedCustomer = params.callerPhone
+    ? await findCustomerByPhone(supabase, params.businessId, params.callerPhone)
+    : null
 
   return {
     action: needsReview ? 'review_required' : 'no_action',

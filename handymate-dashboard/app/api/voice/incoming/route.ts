@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { callRecordingId } from '@/lib/voice/call-processing'
+import { findCustomerByPhone } from '@/lib/voice/find-customer-by-phone'
 import { getServerSupabase } from '@/lib/supabase'
 import { verifyElksSignature } from '@/lib/elks-signature'
 
@@ -154,15 +155,15 @@ export async function POST(request: NextRequest) {
     const transferPhone = business.personal_phone || business.forward_phone_number
 
     // Hitta eller skapa kund baserat på telefonnummer (from)
+    // Normaliserad matchning (rå + E.164 + fallback) — ett uppslagsfel får
+    // aldrig stoppa samtalet, då hellre okänd kund.
     let customerId: string | null = null
-    const { data: customer } = await supabase
-      .from('customer')
-      .select('customer_id')
-      .eq('business_id', business.business_id)
-      .eq('phone_number', from)
-      .single()
-
-    customerId = customer?.customer_id || null
+    try {
+      const customer = await findCustomerByPhone(supabase, business.business_id, from)
+      customerId = customer?.customer_id || null
+    } catch (lookupErr) {
+      console.error('[Voice] kundmatchning på telefonnummer misslyckades (non-blocking):', lookupErr)
+    }
 
     // Logga samtalet i databasen
     // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): recording_id är
@@ -178,7 +179,9 @@ export async function POST(request: NextRequest) {
         phone_number: from,
         from_number: from,
         to_number: to,
-        direction: direction,
+        // Alltid vår egen literal: 46elks säger 'incoming', analysen jämför mot
+        // 'inbound' (v192 normaliserade äldre rader). Utgående skrivs av outbound/start.
+        direction: 'inbound',
         elks_recording_id: callId,
         created_at: new Date().toISOString()
       }, { onConflict: 'recording_id', ignoreDuplicates: true })

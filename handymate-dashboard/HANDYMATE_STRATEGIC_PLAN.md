@@ -136,8 +136,9 @@ ofta:
   specialintegrationer före första värde;
 - prospekt som kräver den framtida röstagenten som villkor för köp.
 
-Planen **Firman** kan passa 1–5 användare, men den kommersiella beachheaden är
-snävare: företag där 5 995 kr/mån kan motiveras av ett konkret operativt och
+Planen **Firman** passar de flesta firmor oavsett antal anställda (inget
+användartak sedan 2026-09-01), men den kommersiella beachheaden är snävare:
+företag där 5 995 kr/mån kan motiveras av ett konkret operativt och
 ekonomiskt problem.
 
 ## 6. Erbjudande och prissättning
@@ -146,8 +147,8 @@ Det publika standardutbudet är:
 
 | Plan | Pris exkl. moms | Passar | Princip |
 |---|---:|---|---|
-| **Firman** | 5 995 kr/mån | upp till 5 användare | hela agentteamet och kärnprodukten |
-| **Storfirman** | 11 995 kr/mån | större team | hela agentteamet, större volym och obegränsade användare |
+| **Firman** | 5 995 kr/mån | de flesta firmor | hela agentteamet, obegränsade användare, kärnprodukten |
+| **Storfirman** | 11 995 kr/mån | hög volym | hela agentteamet, obegränsade samtal och SMS-utrymme |
 
 Årsbetalning innebär betala för 10 månader och få 12. Båda årsplanernas
 Stripe-priser verifierades i den körande databasen 2026-08-23. Bas/Starter

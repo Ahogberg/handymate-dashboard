@@ -39,6 +39,8 @@ const REASON_TEXT: Record<string, string> = {
  *   quote_id      — create_quote_draft/quote_request/quote_addition,
  *                   create_ata_draft (reservväg utan projekt), four_eyes_quote
  *   task_id       — meeting_followup
+ *   log_id        — project_log_note (dagboksraden ur ett samtal,
+ *                   Samtalsefterarbete 2026-09-01)
  *   fact_id       — customer_fact
  *   booking_id    — reserverad för create_booking/autopilot_package —
  *                   inget case exponerar den på toppnivå ännu (den ligger
@@ -71,6 +73,7 @@ export const ARTIFACT_ID_KEYS = [
   'invoice_id',
   'quote_id',
   'task_id',
+  'log_id',
   'fact_id',
   'booking_id',
   'campaign_id',

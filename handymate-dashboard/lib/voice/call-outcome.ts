@@ -21,7 +21,12 @@ const artifacts: Record<string, { key: string; route: string; label: string }> =
   create_quote_draft: { key: 'quote_id', route: '/dashboard/quotes/', label: 'Offertutkast skapat — inte skickat' },
   meeting_followup: { key: 'task_id', route: '/dashboard/tasks', label: 'Uppföljningsuppgift skapad — inte ett utskick' },
   customer_fact: { key: 'fact_id', route: '/dashboard/customers/', label: 'Kunduppgift bekräftad' },
+  // Samtalsefterarbete (2026-09-01): båda landar på projektet (payload.project_id).
+  create_ata_draft: { key: 'ata_id', route: '/dashboard/projects/', label: 'ÄTA-utkast skapat — inte skickat' },
+  project_log_note: { key: 'log_id', route: '/dashboard/projects/', label: 'Dagboksrad sparad — intern anteckning' },
 }
+
+const PROJEKTKORT = new Set(['create_ata_draft', 'project_log_note'])
 
 /** Presentation only. No new AI, no inference from model text or approval status. */
 export function deriveCallOutcome(state: CallProcessingState, rows: CallApproval[], now = new Date()) {
@@ -35,7 +40,8 @@ export function deriveCallOutcome(state: CallProcessingState, rows: CallApproval
     const result = payload.execution_result
     const rule = artifacts[row.approval_type]
     const item: CallOutcomeItem = { id: row.id, title: row.title,
-      agent: row.approval_type === 'create_quote_draft' ? 'Daniel' : row.approval_type === 'customer_fact' ? 'Matte' : 'Lisa',
+      agent: row.approval_type === 'create_quote_draft' || row.approval_type === 'create_ata_draft' ? 'Daniel'
+        : row.approval_type === 'customer_fact' || row.approval_type === 'project_log_note' ? 'Matte' : 'Lisa',
       label: '', href: `/dashboard/approvals?recording_id=${encodeURIComponent(String(payload.recording_id || ''))}#approval-${encodeURIComponent(row.id)}` }
     if (result?.outcome === 'failed') {
       failed.push({ ...item, label: 'Kunde inte utföras — öppna beslutet' })
@@ -44,7 +50,9 @@ export function deriveCallOutcome(state: CallProcessingState, rows: CallApproval
       const href = row.approval_type === 'meeting_followup' ? rule.route
         : row.approval_type === 'customer_fact' && payload.customer_id
           ? `${rule.route}${encodeURIComponent(payload.customer_id)}`
-          : row.approval_type === 'create_quote_draft' ? `${rule.route}${encodeURIComponent(id)}` : item.href
+          : PROJEKTKORT.has(row.approval_type) && payload.project_id
+            ? `${rule.route}${encodeURIComponent(payload.project_id)}`
+            : row.approval_type === 'create_quote_draft' ? `${rule.route}${encodeURIComponent(id)}` : item.href
       done.push({ ...item, href, label: rule.label })
     } else if (row.status === 'pending' && !payload.source_expired && (!row.expires_at || Date.parse(row.expires_at) > now.getTime())) {
       pending.push({ ...item, label: 'Väntar på ditt beslut' })
