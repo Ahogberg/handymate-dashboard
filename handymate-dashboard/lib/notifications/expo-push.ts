@@ -6,6 +6,14 @@ interface ExpoPushMessage {
   body: string
   sound?: 'default' | null
   data?: Record<string, unknown>
+  /** Sekunder notisen får ligga och vänta hos Expo/APNs/FCM innan den kastas. */
+  ttl?: number
+  priority?: 'default' | 'normal' | 'high'
+}
+
+export interface ExpoPushOptions {
+  ttlSeconds?: number
+  priority?: 'high' | 'normal'
 }
 
 interface ExpoPushTicket {
@@ -159,6 +167,7 @@ export async function sendExpoPushNotification(
   body: string,
   data?: Record<string, unknown>,
   targetUserId?: string | null,
+  options: ExpoPushOptions = {},
 ): Promise<ExpoPushResult> {
   const rows = await getExpoPushTokenRows(businessId)
 
@@ -197,6 +206,10 @@ export async function sendExpoPushNotification(
     body,
     sound: 'default',
     data,
+    // TTL + prioritet (lib/notifications/push-policy.ts, 2026-09-01):
+    // ett beslut ska inte dyka upp tre dagar senare på en avstängd telefon.
+    ...(options.ttlSeconds ? { ttl: options.ttlSeconds } : {}),
+    ...(options.priority ? { priority: options.priority } : {}),
   }))
 
   try {

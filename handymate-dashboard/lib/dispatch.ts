@@ -10,6 +10,7 @@ import { computePersonWeekUtilization } from '@/lib/schedule/utilization'
 import { classifyCertStatus } from '@/lib/certifikat/status'
 import { svDateStr, svDateStrPlusDays } from '@/lib/dates'
 import { mondayOfWeek } from '@/lib/capacity/week-capacity'
+import { brusgrind } from '@/lib/approvals/noise-gate'
 
 interface TeamMember {
   id: string
@@ -32,6 +33,9 @@ interface DispatchResult {
   member?: TeamMember
   reasons?: string[]
   approval_id?: string
+  /** true = en kandidat fanns men brusgrinden höll tillbaka kortet. */
+  suppressed?: boolean
+  reason?: string
 }
 
 /**
@@ -267,6 +271,16 @@ export async function suggestDispatch(params: {
   // Kräv minst poäng 3 (kompetens + ledig eller liknande)
   if (best.score < 3) {
     return { suggested: false }
+  }
+
+  // 3b. Brusgrinden (lib/approvals/noise-gate.ts, 2026-09-01): på demokontot
+  // gick 28 dispatch_suggestion i rad ut orörda. Har de senaste förslagen
+  // hos det här företaget bara expirerat hålls nästa tillbaka i 14 dagar,
+  // sedan släpps ETT igenom. Fail-open — ett DB-fel i grinden stoppar
+  // aldrig ett förslag.
+  const grind = await brusgrind(supabase, params.businessId, 'dispatch_suggestion')
+  if (grind.tysta) {
+    return { suggested: false, suppressed: true, reason: grind.skal }
   }
 
   // 4. Skapa approval — berika payloaden med cert/beläggning för kortet

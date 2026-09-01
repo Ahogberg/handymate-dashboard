@@ -26,6 +26,7 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { getChecklistsForBranch, type ChecklistTemplate } from '@/lib/checklist-defaults'
+import { brusgrind } from '@/lib/approvals/noise-gate'
 
 // ─────────────────────────────────────────────────────────────────
 // pickChecklistSuggestion — ren, facit-testbar kärna
@@ -127,6 +128,13 @@ export async function suggestChecklistForProject(input: SuggestChecklistInput): 
 
     const suggestion = pickChecklistSuggestion(bizRow?.branch || '', existingChecklists || [])
     if (!suggestion) return
+
+    // ── 3b. Brusgrinden (lib/approvals/noise-gate.ts, 2026-09-01) ──
+    // 13 checklist_forslag i rad gick ut orörda på demokontot. Har de
+    // senaste förslagen hos företaget bara expirerat hålls nästa tillbaka
+    // i 14 dagar, sedan släpps ETT igenom. Fail-open.
+    const grind = await brusgrind(supabase, businessId, 'checklist_forslag')
+    if (grind.tysta) return
 
     // ── 4. Skapa förslags-kortet ─────────────────────────────────
     const requiredCount = suggestion.items.filter(it => it.required).length

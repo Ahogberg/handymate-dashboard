@@ -19,8 +19,12 @@ import { getAbsenceWindow, isAbsenceActive } from '@/lib/absence/absence-window'
 import { classifyAbsenceEvent } from '@/lib/absence/escalation'
 import { internalPushHeaders } from '@/lib/notifications/push-internal'
 import { buildAgentPushEnvelopeV1 } from '@/lib/notifications/agent-push'
+import { byggDedupeNyckel, klassificeraPush } from '@/lib/notifications/push-policy'
+import { bokforPush, nyligenSkickad } from '@/lib/notifications/push-dispatch-log'
 
 interface ApprovalLike {
+  /** pending_approvals.id om anroparen har raden — blir dedupe-objektet. */
+  id?: string | null
   business_id: string
   approval_type: string
   payload?: Record<string, unknown> | null
@@ -325,6 +329,27 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
     return
   }
 
+  // ═══ TTL, prioritet och dedupe vid SÄNDNING (2026-09-01) ═══
+  // Klassen (lib/notifications/push-policy.ts) ger TTL + prioritet som
+  // följer med till Expo/web-push, och ett dedupefönster: samma händelse
+  // till samma mottagare inom fönstret skickas inte igen
+  // (push_dispatch_log, sql/v191 — fail-open tills migrationen är körd).
+  const policy = klassificeraPush(approval.approval_type)
+  const dedupeKey = byggDedupeNyckel(
+    approval.approval_type,
+    { ...(approval.id ? { approval_id: approval.id } : {}), ...payload },
+    targetUserId,
+  )
+  const supabase = getServerSupabase()
+  if (await nyligenSkickad(supabase, approval.business_id, dedupeKey, policy.dedupeWindowSeconds)) {
+    console.info('[approval-push] dedupe: samma notis redan skickad inom fönstret', {
+      approval_type: approval.approval_type,
+      business_id: approval.business_id,
+      dedupe_key: dedupeKey,
+    })
+    return
+  }
+
   try {
     const res = await fetch(`${appUrl}/api/push/send`, {
       method: 'POST',
@@ -335,11 +360,15 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
         body: template.body,
         url: template.url,
         tag: `approval:${approval.approval_type}`,
+        ttl_seconds: policy.ttlSeconds,
+        priority: policy.priority,
         ...(agentPushEnvelope ? { data: agentPushEnvelope } : {}),
         ...(targetUserId ? { target_user_id: targetUserId } : {}),
       }),
     })
 
+    let delivered = false
+    let ingenMottagare = false
     if (!res.ok) {
       const errBody = await res.text().catch(() => '')
       console.error('[approval-push] /api/push/send failed:', {
@@ -348,7 +377,26 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
         business_id: approval.business_id,
         body: errBody.slice(0, 200),
       })
+    } else {
+      const data = await res.json().catch(() => ({})) as { delivered?: boolean; reason?: string }
+      delivered = data.delivered === true
+      ingenMottagare = data.reason === 'no_recipients' || data.reason === 'no_matching_token'
     }
+
+    // Bokförs när ett försök faktiskt nådde en provider (levererat ELLER
+    // avvisat — ett avvisat försök ska inte upprepas varje minut heller).
+    // "Ingen mottagare" bokförs INTE: registrerar personen sin telefon
+    // senare samma dag ska nästa signal kunna nå fram. delivered visar
+    // sanningen, aldrig ett antagande.
+    if (ingenMottagare) return
+    await bokforPush(supabase, {
+      business_id: approval.business_id,
+      dedupe_key: dedupeKey,
+      approval_type: approval.approval_type,
+      push_class: policy.klass,
+      target_user_id: targetUserId,
+      delivered,
+    })
   } catch (err) {
     console.error('[approval-push] fetch error:', {
       approval_type: approval.approval_type,
