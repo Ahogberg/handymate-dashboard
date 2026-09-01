@@ -11,7 +11,10 @@ export const dynamic = 'force-dynamic'
  * Body: { business_id, title, body, url?, tag?, target_user_id? }
  *
  * This is an INTERNAL route — called by other API routes (approvals, crons).
- * It uses web-push to send to all subscriptions for the business.
+ * Sends via BOTH web-push (all/targeted push_subscriptions) and Expo
+ * (mobile app, push_tokens) — the two channels are independent; a missing/
+ * unconfigured web-push setup never blocks the Expo/mobile send (P1-1/P1-2,
+ * 2026-09-01).
  *
  * Etapp 4 (multi-employee-parity-plan.md): valfri `target_user_id` —
  * en auth-uuid som MÅSTE matcha vad push_subscriptions.user_id faktiskt
@@ -48,6 +51,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const supabase = getServerSupabase()
+
+    // P1-2 (2026-09-01): Expo/mobile-push trådas nu FÖRE web-push-grenens
+    // egna early-returns (saknad VAPID-konfig, inga push_subscriptions,
+    // web-push-paketet ej installerat). Tidigare stoppade alla tre en
+    // apputvecklares mobilpush bara för att businessen aldrig installerat
+    // PWA:n — Expo har inget beroende av VAPID/web-push och ska aldrig
+    // gatas av dem. Fire-and-forget pga serverless-kontext (oförändrat).
+    const expoData: Record<string, unknown> = {
+      url: url || '/dashboard',
+      tag: tag || 'handymate',
+    }
+    sendExpoPushNotification(business_id, title, body || '', expoData, target_user_id)
+      .catch((err: unknown) => {
+        console.error('[push/send] Expo push error:', {
+          business_id,
+          title,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      })
+
     // Check if web-push is configured
     const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
     const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
@@ -58,8 +82,6 @@ export async function POST(request: NextRequest) {
       console.warn('[push/send] VAPID keys not configured, skipping push notification')
       return NextResponse.json({ success: true, sent: 0, reason: 'vapid_not_configured' })
     }
-
-    const supabase = getServerSupabase()
 
     // Get all subscriptions for this business — riktad mot en enskild
     // person om target_user_id skickades med (Etapp 4), annars alla.
@@ -118,28 +140,6 @@ export async function POST(request: NextRequest) {
         .delete()
         .in('endpoint', staleEndpoints)
     }
-
-    // Also send to Expo (mobile app) — fire-and-forget pga serverless-kontext.
-    // data-fält passas vidare till Expo så att mobile-app:en kan deep-linka
-    // via notification.data.url (tap → öppna rätt skärm). Tidigare ignorerades
-    // url + tag helt vid Expo-anrop = mobile-deep-links bröts trots att infra
-    // stödde dem.
-    //
-    // Felhantering loggar istället för att svälja exception:s tyst (TD-22-
-    // mönstret som vi vill bort från). Påverkar inte web-push-success-state
-    // som rapporteras till caller.
-    const expoData: Record<string, unknown> = {
-      url: url || '/dashboard',
-      tag: tag || 'handymate',
-    }
-    sendExpoPushNotification(business_id, title, body || '', expoData, target_user_id)
-      .catch((err: unknown) => {
-        console.error('[push/send] Expo push error:', {
-          business_id,
-          title,
-          error: err instanceof Error ? err.message : String(err),
-        })
-      })
 
     return NextResponse.json({ success: true, sent })
   } catch (error: any) {

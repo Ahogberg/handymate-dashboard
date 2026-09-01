@@ -20,9 +20,12 @@ export interface ExpoTokenRow {
 
 export interface SelectExpoTargetsResult {
   tokens: string[]
-  /** true = filtrerades faktiskt till targetUserId. false = blast (antingen för att
-   *  targetUserId saknades, eller som fail-safe när ingen rad matchade den). */
+  /** true = filtrerades faktiskt till targetUserId. false = otillriktat blast
+   *  (targetUserId saknades — den enda återstående blast-vägen). */
   usedTargetFilter: boolean
+  /** true = targetUserId var satt men ingen push_tokens-rad matchade den.
+   *  Ingen sändning sker då (se P1-1, 2026-09-01) — callern loggar gapet. */
+  noMatchingToken: boolean
 }
 
 /**
@@ -31,26 +34,34 @@ export interface SelectExpoTargetsResult {
  * (pending_approvals.routed_business_user_id slogs upp och skickades som
  * target_user_id, men mobilpushen hade ingen kolumn att filtrera på).
  *
+ * P1-1 (2026-09-01): fail-safe-blasten som ersatte det togs bort. Ett beslut
+ * riktat till EN person ska aldrig kunna exponeras för resten av tenanten
+ * bara för att just den personens telefon-token saknas — web-push
+ * (app/api/push/send/route.ts) har redan alltid gjort det rätta här (0
+ * skickat, ingen fallback). Approval-kortet försvinner inte av detta; det
+ * ligger kvar i kön oavsett om en push-notis lyckas nå någon.
+ *
  *  (a) targetUserId finns + minst en rad matchar → BARA de raderna
  *  (b) targetUserId finns men INGEN rad matchar (gammal rad utan user_id,
- *      eller användaren har bara webb-inloggning) → fail-safe: blast till
- *      alla (usedTargetFilter=false så callern kan logga gapet, inte tyst)
+ *      eller användaren har bara webb-inloggning) → INGEN sändning.
+ *      noMatchingToken=true så callern loggar gapet synligt, aldrig tyst.
  *  (c) targetUserId saknas (null/undefined/tomsträng) → oförändrat blast
+ *      (avsiktligt — company-wide-notiser har inget att rikta mot)
  */
 export function selectExpoTargets(
   rows: ExpoTokenRow[],
   targetUserId?: string | null,
 ): SelectExpoTargetsResult {
   if (!targetUserId) {
-    return { tokens: rows.map((r) => r.token), usedTargetFilter: false }
+    return { tokens: rows.map((r) => r.token), usedTargetFilter: false, noMatchingToken: false }
   }
 
   const matched = rows.filter((r) => r.user_id === targetUserId)
   if (matched.length > 0) {
-    return { tokens: matched.map((r) => r.token), usedTargetFilter: true }
+    return { tokens: matched.map((r) => r.token), usedTargetFilter: true, noMatchingToken: false }
   }
 
-  return { tokens: rows.map((r) => r.token), usedTargetFilter: false }
+  return { tokens: [], usedTargetFilter: false, noMatchingToken: true }
 }
 
 /**
@@ -119,14 +130,14 @@ export async function sendExpoPushNotification(
     return
   }
 
-  const { tokens, usedTargetFilter } = selectExpoTargets(rows, targetUserId)
+  const { tokens, noMatchingToken } = selectExpoTargets(rows, targetUserId)
 
-  if (targetUserId && !usedTargetFilter) {
-    // Fail-safe-blast: hellre en push för mycket till en anställd än att
-    // ägaren missar ett beslut helt — men INTE tyst, se lager 2 i
-    // uppdraget. Loggas så gapet (rader utan user_id, eller mål utan
-    // registrerad mobilenhet) syns i loggarna och kan åtgärdas.
-    console.warn('[expo-push] target_user_id satt men ingen matchande push_tokens-rad — fail-safe blast till alla enheter för business', {
+  if (noMatchingToken) {
+    // P1-1: ingen fallback-blast längre — riktade beslut ska aldrig kunna
+    // nå fel person bara för att målpersonens telefon saknar registrerad
+    // token. Loggas synligt (inte tyst) så gapet går att åtgärda; kortet
+    // finns kvar i approval-kön oavsett.
+    console.warn('[expo-push] target_user_id satt men ingen matchande push_tokens-rad — ingen Expo-sändning skickad', {
       businessId,
       targetUserId,
       totalTokens: rows.length,

@@ -58,6 +58,16 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // P1-3 (2026-09-01): denna GET verifierade tidigare bara tenant, inte
+    // radbehörighet — samma canActOnApproval som POST och listan (GET
+    // /api/approvals) redan använder. En tenantmedlem som filtrerats bort
+    // ur listan (t.ex. routing_role) kunde ändå läsa kortets fulla payload
+    // via en djuplänk om id:t var känt.
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getServerSupabase()
     const { data, error } = await supabase
       .from('pending_approvals')
@@ -68,6 +78,14 @@ export async function GET(
 
     if (error || !data) {
       return NextResponse.json({ error: 'Approval not found' }, { status: 404 })
+    }
+
+    const canAct = await canActOnApproval(supabase, currentUser, data)
+    if (!canAct) {
+      return NextResponse.json(
+        { error: 'Du saknar behörighet att se detta godkännande' },
+        { status: 403 },
+      )
     }
 
     return NextResponse.json({ approval: data })
