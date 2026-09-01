@@ -8,6 +8,43 @@ interface ExpoPushMessage {
   data?: Record<string, unknown>
 }
 
+interface ExpoPushTicket {
+  status?: 'ok' | 'error'
+  id?: string
+}
+
+export type ExpoPushFailureReason =
+  | 'no_tokens'
+  | 'no_matching_token'
+  | 'provider_error'
+  | 'network_error'
+
+/** Provideracceptans, inte bevis på att telefonen visade notisen. */
+export interface ExpoPushResult {
+  attempted: number
+  accepted: number
+  rejected: number
+  tickets: string[]
+  reason?: ExpoPushFailureReason
+}
+
+export function summarizeExpoTickets(payload: unknown, attempted: number): ExpoPushResult {
+  const raw = (payload as { data?: unknown } | null)?.data
+  const rows: ExpoPushTicket[] = Array.isArray(raw) ? raw : raw ? [raw as ExpoPushTicket] : []
+  const acceptedRows = rows.slice(0, attempted).filter((ticket) => ticket.status === 'ok')
+  const accepted = acceptedRows.length
+  const rejected = Math.max(0, attempted - accepted)
+  return {
+    attempted,
+    accepted,
+    rejected,
+    tickets: acceptedRows
+      .map((ticket) => ticket.id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    ...(rejected > 0 ? { reason: 'provider_error' as const } : {}),
+  }
+}
+
 /**
  * En push_tokens-rad, så mycket expo-push.ts behöver för att filtrera.
  * user_id är nullable (sql/v159_push_tokens_user_id.sql, additiv) —
@@ -122,12 +159,12 @@ export async function sendExpoPushNotification(
   body: string,
   data?: Record<string, unknown>,
   targetUserId?: string | null,
-) {
+): Promise<ExpoPushResult> {
   const rows = await getExpoPushTokenRows(businessId)
 
   if (rows.length === 0) {
     console.log(`Inga push-tokens för business ${businessId}`)
-    return
+    return { attempted: 0, accepted: 0, rejected: 0, tickets: [], reason: 'no_tokens' }
   }
 
   const { tokens, noMatchingToken } = selectExpoTargets(rows, targetUserId)
@@ -145,7 +182,13 @@ export async function sendExpoPushNotification(
   }
 
   if (tokens.length === 0) {
-    return
+    return {
+      attempted: 0,
+      accepted: 0,
+      rejected: 0,
+      tickets: [],
+      reason: noMatchingToken ? 'no_matching_token' : 'no_tokens',
+    }
   }
 
   const messages: ExpoPushMessage[] = tokens.map((token) => ({
@@ -170,15 +213,46 @@ export async function sendExpoPushNotification(
     if (!response.ok) {
       const errorText = await response.text()
       console.error('Expo Push API fel:', errorText)
+      return {
+        attempted: tokens.length,
+        accepted: 0,
+        rejected: tokens.length,
+        tickets: [],
+        reason: 'provider_error',
+      }
     }
 
-    // Uppdatera last_used_at
-    const supabase = getServerSupabase()
-    await supabase
-      .from('push_tokens')
-      .update({ last_used_at: new Date().toISOString() })
-      .in('token', tokens)
+    const providerPayload = await response.json().catch(() => null)
+    const result = summarizeExpoTickets(providerPayload, tokens.length)
+
+    const rawProviderRows = (providerPayload as { data?: unknown } | null)?.data
+    const providerRows: ExpoPushTicket[] = Array.isArray(rawProviderRows)
+      ? rawProviderRows
+      : rawProviderRows
+        ? [rawProviderRows as ExpoPushTicket]
+        : []
+    const acceptedTokens = tokens.filter((_, index) => providerRows[index]?.status === 'ok')
+
+    // last_used_at betyder nu att Expo faktiskt accepterade ticketen, inte
+    // bara att vi försökte använda tokenen.
+    if (acceptedTokens.length > 0) {
+      const supabase = getServerSupabase()
+      const { error } = await supabase
+        .from('push_tokens')
+        .update({ last_used_at: new Date().toISOString() })
+        .in('token', acceptedTokens)
+      if (error) console.error('[expo-push] kunde inte uppdatera last_used_at:', error.message)
+    }
+
+    return result
   } catch (error) {
     console.error('Push-notis misslyckades:', error)
+    return {
+      attempted: tokens.length,
+      accepted: 0,
+      rejected: tokens.length,
+      tickets: [],
+      reason: 'network_error',
+    }
   }
 }

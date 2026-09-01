@@ -32,11 +32,15 @@ export interface InternalPushPayload {
 }
 
 export interface InternalPushResult {
-  /** true = minst en mottagare fick pushen (web-push eller Expo). */
+  /** true = minst en kanal accepterade pushen. Inte ett device-receipt. */
   delivered: boolean
   sent: number
   /** 'no_recipients' | 'vapid_not_configured' | 'web_push_not_installed' | 'http_<status>' | 'network' */
   reason?: string
+  channels?: {
+    web?: { attempted: number; accepted: number; rejected: number; reason?: string }
+    expo?: { attempted: number; accepted: number; rejected: number; reason?: string }
+  }
 }
 
 export async function sendInternalPush(payload: InternalPushPayload): Promise<InternalPushResult> {
@@ -48,9 +52,19 @@ export async function sendInternalPush(payload: InternalPushPayload): Promise<In
       body: JSON.stringify(payload),
     })
     if (!res.ok) return { delivered: false, sent: 0, reason: `http_${res.status}` }
-    const data = await res.json().catch(() => ({})) as { sent?: number; reason?: string; delivered?: boolean }
+    const data = await res.json().catch(() => ({})) as {
+      sent?: number
+      reason?: string
+      delivered?: boolean
+      channels?: InternalPushResult['channels']
+    }
     const sent = Number(data.sent ?? 0)
-    return { delivered: data.delivered === true || sent > 0, sent, reason: data.reason }
+    return {
+      delivered: data.delivered === true || sent > 0,
+      sent,
+      reason: data.reason,
+      channels: data.channels,
+    }
   } catch (err: unknown) {
     console.error('[push-internal] push misslyckades:', err instanceof Error ? err.message : err)
     return { delivered: false, sent: 0, reason: 'network' }

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/permissions'
-import { isUndefinedColumnError } from '@/lib/notifications/expo-push'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,9 +16,9 @@ export const dynamic = 'force-dynamic'
  * faktiskt är inloggad (business_config-raden är gemensam) — att spara
  * DEN som user_id hade tystat riktad push för varenda anställd. currentUser
  * (getCurrentUser) ger den faktiskt inloggade personens auth-uuid.
- * Fallback till business.user_id bara om getCurrentUser undantagsvis
- * missar (t.ex. en inaktiverad business_users-rad) — hellre en
- * fungerande (om än fel-riktad) token-rad än ingen alls.
+ * P1-4 (2026-09-01): registreringen är fail-closed. Om den faktiskt
+ * inloggade business_users-raden inte kan verifieras sparas ingen token —
+ * en anställds telefon får aldrig stämplas som ägarens.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -36,8 +35,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
 
-    const currentUser = await getCurrentUser(request)
-    const ownerUserId = currentUser?.user_id || business.user_id || null
+    const currentUser = await getCurrentUser(request, business.business_id)
+    if (!currentUser?.user_id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const { error } = await supabase
       .from('push_tokens')
@@ -46,35 +47,13 @@ export async function POST(request: NextRequest) {
           business_id: business.business_id,
           token,
           platform: platform || null,
-          user_id: ownerUserId,
+          user_id: currentUser.user_id,
           last_used_at: new Date().toISOString(),
         },
         { onConflict: 'token' }
       )
 
-    if (error) {
-      // sql/v159_push_tokens_user_id.sql (Andreas kör manuellt) kanske inte
-      // körts än trots att koden är deployad — utan den här reserven skulle
-      // VARJE token-registrering 500:a tills migrationen körs. Faller
-      // tillbaka till samma upsert utan user_id (gammalt beteende).
-      if (isUndefinedColumnError(error)) {
-        console.warn('[push-tokens] push_tokens.user_id saknas ännu (sql/v159 ej körd) — registrerar utan user_id')
-        const fallback = await supabase
-          .from('push_tokens')
-          .upsert(
-            {
-              business_id: business.business_id,
-              token,
-              platform: platform || null,
-              last_used_at: new Date().toISOString(),
-            },
-            { onConflict: 'token' }
-          )
-        if (fallback.error) throw fallback.error
-      } else {
-        throw error
-      }
-    }
+    if (error) throw error
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

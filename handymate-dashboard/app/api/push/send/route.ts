@@ -6,6 +6,13 @@ import { sendExpoPushNotification } from '@/lib/notifications/expo-push'
 
 export const dynamic = 'force-dynamic'
 
+interface ChannelResult {
+  attempted: number
+  accepted: number
+  rejected: number
+  reason?: string
+}
+
 /**
  * POST /api/push/send — Internal helper to send push notifications
  * Body: { business_id, title, body, url?, tag?, target_user_id? }
@@ -28,8 +35,8 @@ export const dynamic = 'force-dynamic'
  * businessen oavsett target_user_id — push_tokens hade ingen per-user-
  * kolumn. push_tokens.user_id (sql/v159_push_tokens_user_id.sql) +
  * selectExpoTargets() gör nu Expo-leveransen target_user_id-medveten på
- * samma sätt som web-push, med fail-safe-blast (och en loggrad) när
- * target_user_id finns men ingen push_tokens-rad matchar den.
+ * samma sätt som web-push. Om target_user_id saknar matchande token
+ * skickas ingenting; en riktad push får aldrig bli en företagsblast.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -53,24 +60,25 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
 
-    // P1-2 (2026-09-01): Expo/mobile-push trådas nu FÖRE web-push-grenens
+    // P1-2 (2026-09-01): Expo/mobile-push körs FÖRE web-push-grenens
     // egna early-returns (saknad VAPID-konfig, inga push_subscriptions,
     // web-push-paketet ej installerat). Tidigare stoppade alla tre en
     // apputvecklares mobilpush bara för att businessen aldrig installerat
     // PWA:n — Expo har inget beroende av VAPID/web-push och ska aldrig
-    // gatas av dem. Fire-and-forget pga serverless-kontext (oförändrat).
+    // gatas av dem. P1-4: anropet awaitas så svaret redovisar verklig
+    // provideracceptans; en schemalagd promise är inte ett leveransbevis.
     const expoData: Record<string, unknown> = {
       url: url || '/dashboard',
       tag: tag || 'handymate',
     }
-    sendExpoPushNotification(business_id, title, body || '', expoData, target_user_id)
-      .catch((err: unknown) => {
-        console.error('[push/send] Expo push error:', {
-          business_id,
-          title,
-          error: err instanceof Error ? err.message : String(err),
-        })
-      })
+    const expo = await sendExpoPushNotification(business_id, title, body || '', expoData, target_user_id)
+
+    let web: ChannelResult = {
+      attempted: 0,
+      accepted: 0,
+      rejected: 0,
+      reason: 'not_attempted',
+    }
 
     // Check if web-push is configured
     const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
@@ -78,70 +86,111 @@ export async function POST(request: NextRequest) {
     const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:hello@handymate.se'
 
     if (!vapidPublicKey || !vapidPrivateKey) {
-      // VAPID keys not configured yet — log and return success to not break callers
+      // VAPID saknas — Expo-resultatet ska ändå returneras sanningsenligt.
       console.warn('[push/send] VAPID keys not configured, skipping push notification')
-      return NextResponse.json({ success: true, sent: 0, reason: 'vapid_not_configured' })
-    }
+      web = { attempted: 0, accepted: 0, rejected: 0, reason: 'vapid_not_configured' }
+    } else {
+      // Get all subscriptions for this business — riktad mot en enskild
+      // person om target_user_id skickades med (Etapp 4), annars alla.
+      let subscriptionsQuery = supabase
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth')
+        .eq('business_id', business_id)
 
-    // Get all subscriptions for this business — riktad mot en enskild
-    // person om target_user_id skickades med (Etapp 4), annars alla.
-    let subscriptionsQuery = supabase
-      .from('push_subscriptions')
-      .select('endpoint, p256dh, auth')
-      .eq('business_id', business_id)
+      if (target_user_id) {
+        subscriptionsQuery = subscriptionsQuery.eq('user_id', target_user_id)
+      }
 
-    if (target_user_id) {
-      subscriptionsQuery = subscriptionsQuery.eq('user_id', target_user_id)
-    }
+      const { data: subscriptions, error } = await subscriptionsQuery
 
-    const { data: subscriptions, error } = await subscriptionsQuery
-
-    if (error || !subscriptions?.length) {
-      return NextResponse.json({ success: true, sent: 0 })
-    }
-
-    // Lazy-load web-push to avoid issues if not installed
-    let webpush: typeof import('web-push')
-    try {
-      webpush = await import('web-push')
-    } catch {
-      console.warn('[push/send] web-push not installed')
-      return NextResponse.json({ success: true, sent: 0, reason: 'web_push_not_installed' })
-    }
-
-    webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey)
-
-    const payload = JSON.stringify({ title, body: body || '', url: url || '/dashboard', tag: tag || 'handymate' })
-
-    let sent = 0
-    const staleEndpoints: string[] = []
-
-    await Promise.allSettled(
-      subscriptions.map(async (sub: { endpoint: string; p256dh: string; auth: string }) => {
+      if (error) {
+        console.error('[push/send] kunde inte läsa web-push-prenumerationer:', error.message)
+        web = { attempted: 0, accepted: 0, rejected: 0, reason: 'subscription_query_failed' }
+      } else if (!subscriptions?.length) {
+        web = { attempted: 0, accepted: 0, rejected: 0, reason: 'no_subscriptions' }
+      } else {
+        // Lazy-load web-push to avoid issues if not installed
+        let webpush: typeof import('web-push') | null = null
         try {
-          await webpush.sendNotification(
-            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-            payload
-          )
-          sent++
-        } catch (err: any) {
-          // 410 Gone = subscription expired
-          if (err.statusCode === 410 || err.statusCode === 404) {
-            staleEndpoints.push(sub.endpoint)
+          webpush = await import('web-push')
+        } catch {
+          console.warn('[push/send] web-push not installed')
+          web = {
+            attempted: subscriptions.length,
+            accepted: 0,
+            rejected: subscriptions.length,
+            reason: 'web_push_not_installed',
           }
         }
-      })
-    )
 
-    // Clean up stale subscriptions
-    if (staleEndpoints.length > 0) {
-      await supabase
-        .from('push_subscriptions')
-        .delete()
-        .in('endpoint', staleEndpoints)
+        if (webpush) {
+          const activeWebpush = webpush
+          activeWebpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey)
+
+          const payload = JSON.stringify({
+            title,
+            body: body || '',
+            url: url || '/dashboard',
+            tag: tag || 'handymate',
+          })
+          const staleEndpoints: string[] = []
+          let accepted = 0
+
+          await Promise.allSettled(
+            subscriptions.map(async (sub: { endpoint: string; p256dh: string; auth: string }) => {
+              try {
+                await activeWebpush.sendNotification(
+                  { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+                  payload
+                )
+                accepted++
+              } catch (err: any) {
+                // 410 Gone = subscription expired
+                if (err.statusCode === 410 || err.statusCode === 404) {
+                  staleEndpoints.push(sub.endpoint)
+                }
+              }
+            })
+          )
+
+          web = {
+            attempted: subscriptions.length,
+            accepted,
+            rejected: subscriptions.length - accepted,
+            ...(accepted < subscriptions.length ? { reason: 'provider_error' } : {}),
+          }
+
+          // Clean up stale subscriptions
+          if (staleEndpoints.length > 0) {
+            await supabase
+              .from('push_subscriptions')
+              .delete()
+              .in('endpoint', staleEndpoints)
+          }
+        }
+      }
     }
 
-    return NextResponse.json({ success: true, sent })
+    const sent = expo.accepted + web.accepted
+    const delivered = sent > 0
+    const reason = delivered
+      ? undefined
+      : expo.reason === 'no_matching_token'
+        ? 'no_matching_token'
+        : expo.attempted === 0 && web.attempted === 0
+          ? 'no_recipients'
+          : 'provider_rejected'
+
+    return NextResponse.json({
+      success: true,
+      delivered,
+      sent,
+      ...(reason ? { reason } : {}),
+      channels: {
+        expo: expo,
+        web: web,
+      },
+    })
   } catch (error: any) {
     console.error('[push/send] Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
