@@ -1187,6 +1187,23 @@ export default function ApprovalsPage() {
                             />
                           )
                         })()}
+                        {/* Månadsrapport — ren information, ingen åtgärd att ta ställning
+                            till. Kortet är bara en notis; själva rapporten (siffror + hela
+                            AI-analysen) lagras i monthly_reviews och läses på
+                            /dashboard/monthly-review, se knapparna nedan. Teaser här visar
+                            bara de 3 rekommendationstitlarna som redan finns i payloaden. */}
+                        {approval.approval_type === 'monthly_review' && approval.payload && (() => {
+                          const pl = approval.payload as any
+                          const recs = Array.isArray(pl.recommendations) ? pl.recommendations : []
+                          if (recs.length === 0) return null
+                          return (
+                            <ul className="mt-2 bg-teal-50 rounded-lg p-3 space-y-1 border border-teal-100 text-xs text-teal-900 list-disc list-inside">
+                              {recs.slice(0, 3).map((rec: any, i: number) => (
+                                <li key={i}>{rec.title || rec.description}</li>
+                              ))}
+                            </ul>
+                          )
+                        })()}
                         {/* Lead review details (email-forwarding-flöde) */}
                         {approval.approval_type === 'lead_review' && approval.payload && (() => {
                           const pl = approval.payload as any
@@ -1368,6 +1385,30 @@ export default function ApprovalsPage() {
                           >
                             <XCircle className="w-3.5 h-3.5" />
                             {actionLoading === approval.id + 'reject' ? 'Avvisar...' : 'Avvisa'}
+                          </button>
+                        </>
+                      ) : approval.approval_type === 'monthly_review' ? (
+                        // Ren information — inget att godkänna/avvisa (se
+                        // lib/approvals/action-contract.ts: monthly_review är
+                        // INFORMATIONAL, ett klick på "Godkänn" utförde aldrig
+                        // något). Primärknappen öppnar den riktiga, lagrade
+                        // rapporten; sekundärknappen kvitterar kortet ur kön
+                        // med en ärlig etikett i stället för "Godkänn".
+                        <>
+                          <Link
+                            href="/dashboard/monthly-review"
+                            className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-primary-700 hover:bg-primary-800 text-white text-sm font-medium rounded-lg transition-all"
+                          >
+                            <FileText className="w-4 h-4" />
+                            Öppna rapporten
+                          </Link>
+                          <button
+                            onClick={() => handleAction(approval.id, 'approve')}
+                            disabled={actionLoading !== null}
+                            className="flex items-center gap-2 px-3 py-2 min-h-[44px] border border-slate-200 hover:bg-gray-50 text-slate-700 text-sm font-medium rounded-lg transition-all"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            {actionLoading === approval.id + 'approve' ? 'Markerar...' : 'Markera som läst'}
                           </button>
                         </>
                       ) : approval.approval_type === 'project_debrief' ? (

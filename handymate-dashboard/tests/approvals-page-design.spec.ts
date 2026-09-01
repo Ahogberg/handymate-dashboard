@@ -93,6 +93,30 @@ test.describe('Godkännanden — Command Center-reskin', () => {
 })
 
 /**
+ * Månadsrapporten är INFORMATIONAL (lib/approvals/action-contract.ts) —
+ * ett klick på "Godkänn" utför ingenting, bara markerar kortet läst.
+ * Andreas fynd 2026-09-01: kortet visade rå Godkänn/Avvisa utan något sätt
+ * att faktiskt öppna rapporten den syftar på (lagrad i monthly_reviews,
+ * läsbar på /dashboard/monthly-review). Samma "knappen ska säga vad som
+ * faktiskt händer"-princip som resten av filen — se approval-view.spec.ts.
+ */
+test.describe('Månadsrapportens kort öppnar den riktiga rapporten', () => {
+  test('en Link till /dashboard/monthly-review finns för approval_type monthly_review', () => {
+    expect(source).toMatch(/approval\.approval_type === 'monthly_review'/)
+    expect(source).toContain('href="/dashboard/monthly-review"')
+  })
+
+  test('sekundärknappen säger vad den gör — inte "Godkänn" på ett kort utan åtgärd', () => {
+    const block = source.slice(
+      source.indexOf("approval.approval_type === 'monthly_review' ?"),
+      source.indexOf("approval.approval_type === 'project_debrief' ?"),
+    )
+    expect(block).toContain('Markera som läst')
+    expect(block).not.toContain('>Godkänn<')
+  })
+})
+
+/**
  * En-mörk-hero-facit, repo-brett (Etapp L2a, 2026-08-18).
  *
  * Ovanstående describe-block låser bara att approvals/page.tsx (den sida
