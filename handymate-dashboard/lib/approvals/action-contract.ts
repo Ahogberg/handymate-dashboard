@@ -202,6 +202,10 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // extraktion, alltid ett kort en människa godkänner.
   meeting_summary: 'INFORMATIONAL',
   meeting_followup: 'EXECUTABLE_ACTION',
+  // Samtalsefterarbete (2026-09-01): samtalet blir en dagboksrad
+  // (project_log) NÄR hantverkaren godkänner — intern anteckning, inget
+  // kundutskick. Samma fältlokala klass som meeting_followup.
+  project_log_note: 'EXECUTABLE_ACTION',
 
   // Customer Facts V1 (2026-08-12): säg-det-en-gång-minnet. Godkännande
   // skriver EN rad i customer_fact — fältlokal skrivning, samma klass som

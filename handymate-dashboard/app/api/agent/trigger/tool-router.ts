@@ -488,7 +488,33 @@ async function getCustomer(
     confirmedFacts = []
   }
 
-  return { success: true, data: { ...data, recent_bookings: bookings || [], confirmed_facts: confirmedFacts } }
+  // Samtalsefterarbete (2026-09-01): "vad sa vi senast till kunden?" —
+  // Lisas sammanfattningar av inspelade samtal (telefon/möte/utgående).
+  // Bara rader med transcript_summary: gallrade samtal (raw borttaget) och
+  // obesvarade faller bort av filtret. Fail-safe som fakta-blocket.
+  let recentCalls: Array<{ date: string; direction: string | null; source: string | null; minutes: number | null; summary: string; project_id: string | null }> = []
+  try {
+    const { data: calls } = await supabase
+      .from('call_recording')
+      .select('recording_id, created_at, direction, source, duration_seconds, transcript_summary, project_id')
+      .eq('business_id', businessId)
+      .eq('customer_id', params.customer_id as string)
+      .not('transcript_summary', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(5)
+    recentCalls = (calls || []).map((c: any) => ({
+      date: c.created_at,
+      direction: c.direction ?? null,
+      source: c.source ?? null,
+      minutes: typeof c.duration_seconds === 'number' ? Math.round(c.duration_seconds / 60) : null,
+      summary: c.transcript_summary,
+      project_id: c.project_id ?? null,
+    }))
+  } catch {
+    recentCalls = []
+  }
+
+  return { success: true, data: { ...data, recent_bookings: bookings || [], confirmed_facts: confirmedFacts, recent_calls: recentCalls } }
 }
 
 async function searchCustomers(

@@ -328,7 +328,9 @@ test.describe('rollfördelningen är kod, inte prompttillit', () => {
     expect(s, 'typunionen i prompten har kvar Lisas typer').not.toContain('"type": "booking|quote')
     // Customer Facts V1 (2026-08-12): customer_fact lades till i unionen —
     // se lib/voice/analysis-scope.ts ANALYS_TILLATNA_TYPER.
-    expect(s).toContain('"type": "quote|callback|follow_up|reminder|reschedule|customer_fact"')
+    // Samtalsefterarbete (2026-09-01): ata sist — Daniel äger create_ata_draft,
+    // Lisa har inget ÄTA-verktyg, så typen hör hemma i analysmotorns lista.
+    expect(s).toContain('"type": "quote|callback|follow_up|reminder|reschedule|customer_fact|ata"')
   })
 })
 

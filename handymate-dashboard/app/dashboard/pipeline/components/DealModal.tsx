@@ -44,6 +44,7 @@ import { CopyId } from '@/components/CopyId'
 import { PortalLankKnapp } from '@/components/customers/PortalLankKnapp'
 import { DealTimeline } from '@/components/pipeline/DealTimeline'
 import SmartTaskTitleInput from '@/components/SmartTaskTitleInput'
+import RingViaHandymateButton from '@/components/voice/RingViaHandymateButton'
 import { SCORE_FACTOR_LABELS, getTemperatureColor, getTemperatureLabel } from '@/lib/lead-scoring'
 import { getLeadCategory } from '@/lib/lead-categories'
 import { usePipelineContext } from '../context'
@@ -363,6 +364,19 @@ export function DealModal() {
                       </div>
                     </div>
 
+                    {/* Nästa steg ur samtal (Samtalsefterarbete 2026-09-01): affärer
+                        skapade ur telefonsamtal har ingen lead_score men väl ett
+                        suggested_action — utan det här blocket var det osynligt. */}
+                    {selectedDeal.suggested_action && !(selectedDeal.lead_score != null && selectedDeal.lead_score > 0) && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 flex items-start gap-2">
+                        <Lightbulb className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs font-medium text-gray-900">Nästa steg</p>
+                          <p className="text-xs text-gray-600">{selectedDeal.suggested_action}</p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Lead Score Card */}
                     {selectedDeal.lead_score != null && selectedDeal.lead_score > 0 && (
                       <div className="rounded-lg border border-[#E2E8F0] bg-gray-50/50 p-4 space-y-3">
@@ -554,10 +568,13 @@ export function DealModal() {
                     <div className="space-y-3 pt-2">
                       <div className="flex flex-wrap gap-2">
                         {selectedDeal.customer?.phone_number && (
-                          <a href={`tel:${selectedDeal.customer.phone_number}`}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-sm text-emerald-700 hover:bg-emerald-100 transition-colors">
-                            <Phone className="w-4 h-4" /> Ring
-                          </a>
+                          <RingViaHandymateButton
+                            customerId={selectedDeal.customer.customer_id}
+                            dealId={selectedDeal.id}
+                            phone={selectedDeal.customer.phone_number}
+                            customerName={selectedDeal.customer.name}
+                            variant="chip"
+                          />
                         )}
                         {selectedDeal.customer?.phone_number && (
                           <button onClick={() => handleQuickSms(selectedDeal)}

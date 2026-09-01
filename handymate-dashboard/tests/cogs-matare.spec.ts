@@ -555,6 +555,19 @@ test.describe('Whisper och samtalsminuter', () => {
     expect(s, 'prislogik infördes innan payloaden var avstämd')
       .not.toContain("resource: 'call_out'")
   })
+
+  test('utgående samtal via Handymate bokförs i hangup-webhooken — och bara där', () => {
+    // "Ring via Handymate" (2026-09-01) är den första vägen där VI startar
+    // ett samtal medvetet och vet att båda benen (kund + hantverkare) är
+    // våra. Kostnaden bokförs i whenhangup, där duration är känd, som
+    // resource 'call_out'. Payloaden loggas rå ändå — avstämningen mot
+    // 46elks-fakturan gäller fortfarande.
+    const s = kod('app/api/voice/outbound/hangup/route.ts')
+    expect(s).toContain('RÅ PAYLOAD för kostnadsmätning')
+    expect(s).toContain("resource: 'call_out'")
+    // Inte i voice_start-routen: där finns ingen duration att bokföra.
+    expect(kod('app/api/voice/outbound/route.ts')).not.toContain("resource: 'call_out'")
+  })
 })
 
 test.describe('hälsosonden — en tyst mätare måste gå att fråga', () => {

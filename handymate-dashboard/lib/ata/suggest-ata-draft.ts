@@ -150,6 +150,55 @@ export interface SuggestAtaDraftResult {
 }
 
 /**
+ * Dedup-uppslaget som en egen, återanvändbar bit (Samtalsefterarbete
+ * 2026-09-01): samtalsanalysen (app/api/voice/analyze/route.ts) bygger sitt
+ * ÄTA-kort i en batch via manage_call_processing i stället för via
+ * suggestAtaDraft:s insert, men ska dedupa mot EXAKT samma fråga — ett
+ * projekt ska aldrig ha två väntande ÄTA-förslag oavsett vilken väg de kom.
+ *
+ * Kastar AtaDedupLookupError om databasfrågan misslyckas — så att
+ * suggestAtaDraft kan svara 'dedup_lookup_failed' precis som förut, och
+ * samtalsvägen kan välja att falla tillbaka till ett uppföljningskort.
+ */
+export class AtaDedupLookupError extends Error {
+  constructor(public readonly cause: unknown) {
+    super('ata_dedup_lookup_failed')
+  }
+}
+
+export async function harPendingAtaForProjekt(
+  supabase: SupabaseClient,
+  businessId: string,
+  projectId: string,
+): Promise<boolean> {
+  // ── Dedup — redan ett pending 'create_ata_draft'-kort för projektet? ──
+  const { count, error: pendErr } = await supabase
+    .from('pending_approvals')
+    .select('id', { count: 'exact', head: true })
+    .eq('business_id', businessId)
+    .eq('approval_type', 'create_ata_draft')
+    .eq('status', 'pending')
+    .contains('payload', { project_id: projectId })
+
+  if (pendErr) {
+    console.error('[ata/suggest-ata-draft] kunde inte kolla dedup:', pendErr)
+    throw new AtaDedupLookupError(pendErr)
+  }
+  return !!count && count > 0
+}
+
+/**
+ * Det färdiga utkastet: rubrik, brödtext och payload för ett
+ * 'create_ata_draft'-kort — utan insert. suggestAtaDraft skriver raden i
+ * pending_approvals; samtalsanalysen lägger samma objekt i sin batch.
+ */
+export interface AtaUtkast {
+  title: string
+  description: string
+  payload: Record<string, unknown>
+}
+
+/**
  * Slår upp dedup-faktan, kör gaten, och om gaten säger ja: skapar ETT
  * pending_approvals-kort med approval_type 'create_ata_draft'.
  *
@@ -164,30 +213,78 @@ export async function suggestAtaDraft(
       return { created: false, reason: 'missing_project' }
     }
 
-    // ── Dedup — redan ett pending 'create_ata_draft'-kort för projektet? ──
-    const { count, error: pendErr } = await supabase
-      .from('pending_approvals')
-      .select('id', { count: 'exact', head: true })
-      .eq('business_id', params.businessId)
-      .eq('approval_type', 'create_ata_draft')
-      .eq('status', 'pending')
-      .contains('payload', { project_id: params.projectId })
-
-    if (pendErr) {
-      console.error('[ata/suggest-ata-draft] kunde inte kolla dedup:', pendErr)
-      return { created: false, reason: 'dedup_lookup_failed' }
+    let hasPendingAtaForProject = false
+    try {
+      hasPendingAtaForProject = await harPendingAtaForProjekt(supabase, params.businessId, params.projectId)
+    } catch (err) {
+      if (err instanceof AtaDedupLookupError) return { created: false, reason: 'dedup_lookup_failed' }
+      throw err
     }
 
     const gateInput: AtaDraftGateInput = {
       projectId: params.projectId,
       description: params.description,
-      hasPendingAtaForProject: !!count && count > 0,
+      hasPendingAtaForProject,
     }
     const gateReason = getAtaDraftGateReason(gateInput)
     if (gateReason) return { created: false, reason: gateReason }
 
     // ── Skapa förslags-kortet ──────────────────────────────────────
     const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+
+    const utkast = await byggAtaUtkast(supabase, params)
+    if (!utkast) return { created: false, reason: 'unexpected_error' }
+
+    const { error: insertErr } = await supabase.from('pending_approvals').insert({
+      id: approvalId,
+      business_id: params.businessId,
+      approval_type: 'create_ata_draft',
+      // ÄTA hör till projektteamet — se lib/approvals/routing.ts.
+      routing_role: 'project_team',
+      title: utkast.title,
+      description: utkast.description,
+      status: 'pending',
+      // Åldras efter 14 dagar, som create_quote_draft. Utan expires_at
+      // matchar underhållscronens `.lt()` aldrig NULL och kortet låg kvar
+      // för evigt. Projektet finns kvar; det är förslaget som försvinner.
+      expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      // Inga pengar bundna, inget skickas till kund förrän hantverkaren
+      // själv agerar — samma resonemang som create_quote_draft (etapp 2a).
+      risk_level: 'low',
+      payload: utkast.payload,
+    })
+
+    if (insertErr) {
+      console.error('[ata/suggest-ata-draft] kunde inte skapa förslag:', insertErr, {
+        project_id: params.projectId,
+      })
+      return { created: false, reason: 'insert_failed' }
+    }
+
+    return { created: true, approvalId }
+  } catch (err) {
+    // Fail-safe: får ALDRIG störa flödet (agentverktyg/matte-actionexecutor)
+    // som anropar detta. Se filhuvudet.
+    console.error('[ata/suggest-ata-draft] oväntat fel (sväljs):', err)
+    return { created: false, reason: 'unexpected_error' }
+  }
+}
+
+/**
+ * Bygger utkastet: AI-genererad förhandsvisning (fail-soft) + rubrik +
+ * payload i exakt den form exekveraren (app/api/approvals/[id]/route.ts,
+ * case 'create_ata_draft') läser. Gör INGEN dedup och INGEN gate — det är
+ * anroparens ansvar (suggestAtaDraft ovan, samtalsanalysen).
+ *
+ * Kastar ALDRIG: returnerar null vid oväntat fel (t.ex. saknad beskrivning),
+ * annars alltid ett utkast — även när genereringen misslyckades (då utan
+ * preview och utan påstått belopp, se filhuvudet).
+ */
+export async function byggAtaUtkast(
+  supabase: SupabaseClient,
+  params: SuggestAtaDraftParams,
+): Promise<AtaUtkast | null> {
+  try {
     const description = params.description.trim()
 
     // ═══ UTKASTET PRODUCERAS FÖRST, FRÅGAN KOMMER SEDAN (2026-08-08) ═══
@@ -308,12 +405,7 @@ export async function suggestAtaDraft(
       console.error('[ata/suggest-ata-draft] generering misslyckades (kortet skapas ändå):', genErr)
     }
 
-    const { error: insertErr } = await supabase.from('pending_approvals').insert({
-      id: approvalId,
-      business_id: params.businessId,
-      approval_type: 'create_ata_draft',
-      // ÄTA hör till projektteamet — se lib/approvals/routing.ts.
-      routing_role: 'project_team',
+    return {
       // ═══ RUBRIKEN VAR EN AVHUGGEN KOPIA AV BRÖDTEXTEN (regel 2) ═══
       //
       // `ÄTA-förslag: ${description.slice(0,80)}` stod direkt ovanför samma
@@ -323,14 +415,6 @@ export async function suggestAtaDraft(
         ? `ÄTA-förslag: ${preview.job_title}${projektNamn ? ` — ${projektNamn}` : ''}`
         : `ÄTA-förslag${projektNamn ? ` — ${projektNamn}` : ''}`,
       description,
-      status: 'pending',
-      // Åldras efter 14 dagar, som create_quote_draft. Utan expires_at
-      // matchar underhållscronens `.lt()` aldrig NULL och kortet låg kvar
-      // för evigt. Projektet finns kvar; det är förslaget som försvinner.
-      expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      // Inga pengar bundna, inget skickas till kund förrän hantverkaren
-      // själv agerar — samma resonemang som create_quote_draft (etapp 2a).
-      risk_level: 'low',
       payload: {
         routed_agent: params.routedAgent || 'daniel',
         project_id: params.projectId,
@@ -364,20 +448,11 @@ export async function suggestAtaDraft(
             }))
           : {}),
       },
-    })
-
-    if (insertErr) {
-      console.error('[ata/suggest-ata-draft] kunde inte skapa förslag:', insertErr, {
-        project_id: params.projectId,
-      })
-      return { created: false, reason: 'insert_failed' }
     }
-
-    return { created: true, approvalId }
   } catch (err) {
-    // Fail-safe: får ALDRIG störa flödet (agentverktyg/matte-actionexecutor)
-    // som anropar detta. Se filhuvudet.
-    console.error('[ata/suggest-ata-draft] oväntat fel (sväljs):', err)
-    return { created: false, reason: 'unexpected_error' }
+    // Fail-safe: får ALDRIG kasta — anroparen avgör om det blir ett
+    // uppföljningskort i stället (samtalsvägen) eller 'unexpected_error'.
+    console.error('[ata/suggest-ata-draft] utkastet kunde inte byggas (sväljs):', err)
+    return null
   }
 }

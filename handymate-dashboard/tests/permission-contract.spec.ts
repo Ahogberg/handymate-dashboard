@@ -406,6 +406,10 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
 const UNPROTECTED_BY_DESIGN: Record<string, string> = {
   'projects':
     'Grindar inte utan DEGRADERAR svaret (canSeeAllProjects/canSeeFinancials filtrerar fälten). Fail-open på !currentUser är medvetet för superadmin-impersonation.',
+  'voice/outbound':
+    '46elks voice_start-webhook för "Ring via Handymate": ingen inloggad användare finns, anroparen är telefonileverantören. Skyddas av HMAC (verifyElksSignature) FÖRE varje databasläsning plus nummermatchning mot raden — se tests/voice-boundaries.spec.ts.',
+  'voice/outbound/hangup':
+    '46elks whenhangup-webhook för "Ring via Handymate": samma HMAC-skydd som voice/outbound och voice/recording. Ingen session, inget att rollgrinda — rätten att skriva kommer från signaturen, inte från en användare.',
 }
 
 /**

@@ -33,6 +33,12 @@ export const ANALYS_TILLATNA_TYPER = [
   // explicit sagda kundfakta ur möten OCH telefonsamtal. Lisa har inget
   // verktyg för det här heller — hör hemma i samma lista.
   'customer_fact',
+  // Samtalsefterarbete (2026-09-01): tilläggs-/ändringsarbete på ett
+  // pågående jobb. Lisa har inget ÄTA-verktyg — det är Daniel som äger
+  // create_ata_draft (agentverktyget + Matte-kopplingen), och samtalsvägen
+  // föreslår bara ett utkast som hantverkaren godkänner. Kräver ett entydigt
+  // projekt (lib/voice/resolve-call-project.ts); annars uppföljningskort.
+  'ata',
 ] as const
 
 export type AnalysForslagsTyp = (typeof ANALYS_TILLATNA_TYPER)[number]
