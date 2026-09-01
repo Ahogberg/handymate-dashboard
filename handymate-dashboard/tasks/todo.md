@@ -1,3 +1,70 @@
+# Lanseringsgrund: CI-grind, driftsynlighet, kortkvalitet (Claude 2026-09-01)
+
+Andreas ask efter genomgången "nästa utvecklingssteg inför lansering":
+punkt 3 (korten signal före notiser), 4 (driftsynlighet) och 5 (CI).
+Andreas kör själv Grind B + onboarding-A/B parallellt. Branch
+claude/next-dev-steps-launch-b4xqwu.
+
+## 5 — CI
+- [x] `.github/workflows/contracts.yml`: push/PR-grind = tsc + 12 browserlösa
+      sviter, inga hemligheter, inga browsers, < 3 min. Root-filen
+      "contracts-workflow-att-lagga-in.yml" flyttad in och borttagen.
+- [x] `.github/workflows/playwright.yml` (fulla prod-sviten m. service-role-
+      nyckel): NATTLIG 02:00 UTC + workflow_dispatch, inte längre på push/PR.
+- [x] Nytt jobb `tenant-isolation` i den nattliga: kör
+      `npm run test:tenant-isolation` när TENANT_*-secrets finns, hoppar
+      SYNLIGT (::warning::) annars. Secrets att lägga i repot: se filhuvudet.
+- [x] `types/react-dom-server-browser.d.ts`: tsc var röd på färsk checkout
+      (TS7016 i två offertdokument-facit från 269641f) — ambient modul.
+- [x] npm-script `test:contracts` = exakt CI-listan.
+- [x] Facit: tests/facit-ci-grind.spec.ts.
+
+## 4 — Driftsynlighet
+- [x] Sentry (@sentry/nextjs 10.73): sentry.{client,server,edge}.config.ts,
+      instrumentation.ts, withSentryConfig + instrumentationHook i
+      next.config.js. PÅ bara med DSN; sendDefaultPii=false; ingen replay.
+      Adapter lib/observability/sentry.ts (kastar aldrig) — ErrorBoundary,
+      app/global-error.tsx och rapporteraTystFel går via den.
+- [x] Kreditbevakning `/api/cron/credit-watch` 05:05 UTC
+      (lib/observability/credit-watch.ts): 46elks-saldo (/a1/me, gräns
+      CREDIT_WATCH_ELKS_MIN_SEK=300), Anthropic 1-token-probe (kreditstopp =
+      error), Stripe /v1/balance (nyckel + livemode), databas. Mejl vid
+      warn/error, SMS via HANDYMATE_SUPPORT_ALERT_PHONES vid error.
+- [x] `/api/health` visar sparat kreditläge (platform_health_check) — anropar
+      ALDRIG leverantörer själv. error → 503, warn → 200 + warnings[].
+- [x] Facit: tests/facit-driftsynlighet.spec.ts + tests/credit-watch.spec.ts.
+
+## 3 — Kortkvalitet
+- [x] lib/approvals/kortkvalitet.ts (rent): summeraKort + bedomBrusgrind.
+      Konstanter: MIN_SAMPLE=5, BRUS_EXPIRED_PCT=80, PAUS_DAGAR=14,
+      BRUSGRINDADE_TYPER = dispatch_suggestion, checklist_forslag.
+- [x] lib/approvals/noise-gate.ts (fail-open) inkopplad FÖRE insert i
+      lib/dispatch.ts och lib/egenkontroll/suggest-checklist.ts. Paus
+      bokförs en gång som automation_activity 'kortkvalitet'/skipped.
+- [x] Admin: GET /api/admin/kortkvalitet?days=30|90 + /admin/kortkvalitet
+      (per typ, per företag+typ, brusgrindens läge). Länk från /admin.
+- [x] Push TTL/prioritet/dedupe vid SÄNDNING: lib/notifications/push-policy.ts
+      (tre klasser beslut/hant/teamuppdatering), push_dispatch_log
+      (fail-open), sendApprovalPush deduplicerar före fetch och bokför efter,
+      /api/push/send skickar TTL+urgency (web-push) och ttl+priority (Expo).
+- [x] Facit: tests/kortkvalitet.spec.ts + tests/push-policy.spec.ts.
+
+## Migration
+- [x] `sql/v190_platform_health_and_push_dispatch.sql` KÖRD via MCP
+      2026-09-01 (Andreas "Kör!"), facit-SELECT verifierad: relrowsecurity
+      = true på båda, 0 grants till anon/authenticated, dedupe-indexet finns.
+
+## Verifiering
+- [x] tsc 0 fel (var 2 fel på färsk checkout före types/-filen)
+- [x] test:contracts 158/158; grannsviter push/dispatch/checklist/driftlarm
+      102/102; outbound-truth/innehållskontrakt/feature-gates 86/86
+- [x] next build exit 0 (689 rutter); Kontraktsgrind grön på branchen (run 33553161185, 2,5 min)
+- [ ] Efter deploy: sätt NEXT_PUBLIC_SENTRY_DSN + SENTRY_DSN i Vercel,
+      kör v190, trigga /api/cron/credit-watch manuellt (admin-session
+      räcker), läs /api/health och /admin/kortkvalitet.
+
+---
+
 # Prisslingan V2 — pass 5: faktura-UI + materialpåslag + städ (Claude 2026-08-31)
 
 Pass 4 + Work Report V1 LIVE (ea5078e9). v183 KÖRD+verifierad.

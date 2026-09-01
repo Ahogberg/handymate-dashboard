@@ -71,11 +71,13 @@ test('alla cron-rutter utanför Claudes Karin-fillås använder helpern', () => 
   // f56831c0) och använder helpern korrekt — siffran uppdaterades först
   // vid full-svit-körningen i Etapp Z, samma stelt-kodade-tal-fälla som
   // 2026-08-14.
-  expect(files).toHaveLength(41)
+  // 42 (2026-09-01): credit-watch tillkom (kreditbevakningen,
+  // lib/observability/credit-watch.ts) och använder helpern korrekt.
+  expect(files).toHaveLength(42)
 
   const karinRoute = path.join(CRON_DIR, 'karin-deadlines', 'route.ts')
   const ownedRoutes = files.filter(file => file !== karinRoute)
-  expect(ownedRoutes).toHaveLength(40)
+  expect(ownedRoutes).toHaveLength(41)
 
   const missing = ownedRoutes
     .filter(file => {

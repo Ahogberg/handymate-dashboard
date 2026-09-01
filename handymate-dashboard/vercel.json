@@ -130,6 +130,10 @@
       "schedule": "50 8 * * *"
     },
     {
+      "path": "/api/cron/credit-watch",
+      "schedule": "5 5 * * *"
+    },
+    {
       "path": "/api/cron/driftlarm",
       "schedule": "15 5 * * *"
     },

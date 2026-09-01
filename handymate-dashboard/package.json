@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "launch:smoke": "node scripts/launch-public-smoke.mjs",
+    "test:contracts": "playwright test tests/agent-team.spec.ts tests/approval-action-contract.spec.ts tests/column-contract.spec.ts tests/cron-auth.spec.ts tests/dead-code-paths.spec.ts tests/permission-contract.spec.ts tests/schema-contract.spec.ts tests/facit-ci-grind.spec.ts tests/facit-driftsynlighet.spec.ts tests/credit-watch.spec.ts tests/kortkvalitet.spec.ts tests/push-policy.spec.ts --no-deps --project=chromium --reporter=line",
     "proof:onboarding:two-account": "node scripts/onboarding-two-account-proof.mjs",
     "test:tenant-isolation": "playwright test --config=playwright.integration.config.ts"
   },
@@ -18,6 +19,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@googlemaps/google-maps-services-js": "^3.4.2",
     "@mendable/firecrawl-js": "^4.18.0",
+    "@sentry/nextjs": "^10.73.0",
     "@sparticuz/chromium": "^149.0.0",
     "@stripe/react-stripe-js": "^5.6.1",
     "@supabase/auth-helpers-nextjs": "^0.8.7",

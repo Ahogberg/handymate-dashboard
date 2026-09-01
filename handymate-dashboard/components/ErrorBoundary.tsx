@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { rapporteraTillSentry } from '@/lib/observability/sentry'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -29,9 +30,15 @@ export default class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    // Log to console for now — replace with Sentry later
     console.error('[ErrorBoundary] Ett oväntat fel uppstod:', error)
     console.error('[ErrorBoundary] Komponentstack:', errorInfo.componentStack)
+    // Sentry (no-op utan NEXT_PUBLIC_SENTRY_DSN) — renderfel i dashboarden
+    // syntes tidigare bara i användarens egen konsol.
+    rapporteraTillSentry({
+      meddelande: 'ErrorBoundary: renderfel i dashboarden',
+      fel: error,
+      extra: { componentStack: errorInfo.componentStack },
+    })
   }
 
   handleReload = () => {
