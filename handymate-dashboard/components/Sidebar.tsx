@@ -278,19 +278,20 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
   // ── Notifications ──────────────────────────────────────────────────
   useEffect(() => {
-    if (!businessId) return
+    if (!businessId || !currentUser?.user_id) return
     fetchNotifCount()
     const interval = setInterval(fetchNotifCount, 30000)
     return () => clearInterval(interval)
-  }, [businessId])
+  }, [businessId, currentUser?.user_id])
 
   async function fetchNotifCount() {
-    if (!businessId) return
+    if (!businessId || !currentUser?.user_id) return
     try {
       const { count } = await supabase
         .from('notification')
         .select('*', { count: 'exact', head: true })
         .eq('business_id', businessId)
+        .or(`user_id.is.null,user_id.eq.${currentUser.user_id}`)
         .eq('is_read', false)
       setNotifCount(count || 0)
     } catch { /* silent */ }
@@ -298,13 +299,14 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
   async function openNotifications() {
     setNotifOpen(!notifOpen)
-    if (!notifOpen && businessId) {
+    if (!notifOpen && businessId && currentUser?.user_id) {
       setNotifLoading(true)
       try {
         const { data } = await supabase
           .from('notification')
           .select('*')
           .eq('business_id', businessId)
+          .or(`user_id.is.null,user_id.eq.${currentUser.user_id}`)
           .order('created_at', { ascending: false })
           .limit(15)
         setNotifications((data || []) as NotificationItem[])
@@ -314,12 +316,13 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   }
 
   async function markAllRead() {
-    if (!businessId) return
+    if (!businessId || !currentUser?.user_id) return
     try {
       await supabase
         .from('notification')
         .update({ is_read: true, read_at: new Date().toISOString() })
         .eq('business_id', businessId)
+        .or(`user_id.is.null,user_id.eq.${currentUser.user_id}`)
         .eq('is_read', false)
       setNotifCount(0)
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
@@ -327,10 +330,13 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   }
 
   async function markOneRead(id: string) {
+    if (!businessId || !currentUser?.user_id) return
     try {
       await supabase
         .from('notification')
         .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('business_id', businessId)
+        .or(`user_id.is.null,user_id.eq.${currentUser.user_id}`)
         .eq('id', id)
       setNotifCount(prev => Math.max(0, prev - 1))
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
