@@ -2,6 +2,7 @@
 import { EditableText, EditableNumber, EditableSelect } from '@/components/quotes/editable/EditableFields'
 import { UNIT_OPTIONS } from '@/components/quotes/ItemRow'
 import { formatCurrency } from '@/lib/document-html'
+import { priceState, priceLabel } from '@/lib/products/pricing-state'
 import type { QuoteTemplateItem } from '@/lib/quote-templates/types'
 import type { QuoteDocumentHandlers, QuoteDocumentMode } from './types'
 import { formatNumber } from './format'
@@ -164,6 +165,25 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
       </td>
     ) : null
 
+  // Fas C (offertskaparen-design-polish): 'item'/'option'-radernas summa-
+  // cell ska ALDRIG visa "0 kr" för en artikel som aldrig prissatts — det
+  // är omöjligt att skilja från en artikel som medvetet kostar 0 kr.
+  // priceState/priceLabel är SAMMA rena funktioner AddRowSheet.tsx redan
+  // använder för produktbankens prislösa artiklar (lib/products/pricing-
+  // state.ts) — ingen ny logik, bara samma regel applicerad på offertraden.
+  //
+  // Gated på isEdit: "Sätt pris" är en intern uppmaning till hantverkaren,
+  // aldrig något en kund ska se i static/PDF-läget — där renderas alltid
+  // formatCurrency(total) precis som förut, oavsett pris.
+  const isPriceless = (unitPrice: number) => isEdit && priceState(unitPrice) === 'osatt'
+  // priceless beräknas EN gång per rad av anroparen (isPriceless(item.unitPrice))
+  // och skickas in hit — annars räknas priceState() ut två gånger per rad
+  // (en för klassen, en för cellen).
+  const sumCell = (priceless: boolean, unitPrice: number, total: number, unit: string) =>
+    priceless
+      ? <td className="num"><span className="price-missing-pill">{priceLabel(unitPrice, unit)}</span></td>
+      : <td className="num">{formatCurrency(total)}</td>
+
   // ── Rubrik ────────────────────────────────────────────────────
   if (itemType === 'heading') {
     return (
@@ -235,8 +255,10 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
   // ── Tillval ───────────────────────────────────────────────────
   if (itemType === 'option') {
     const box = item.optionSelected ? '☑' : '☐'
+    const priceless = isPriceless(item.unitPrice)
+    const pricelessClass = priceless ? 'row-priceless' : undefined
     return (
-      <tr {...rowTapProps} className={[`row-option${item.optionSelected ? '' : ' unselected'}`, isEdit ? 'row-hover' : '', rowTapProps.className, hiddenRowClass].filter(Boolean).join(' ') || undefined}>
+      <tr {...rowTapProps} className={[`row-option${item.optionSelected ? '' : ' unselected'}`, isEdit ? 'row-hover' : '', pricelessClass, rowTapProps.className, hiddenRowClass].filter(Boolean).join(' ') || undefined}>
         <td style={isEdit ? { position: 'relative' } : undefined}>
           <DeleteButton id={item.id} handlers={isEdit ? handlers : undefined} />
           <div className="item-name">
@@ -265,14 +287,16 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
         </td>
         {qtyCell}
         {priceCell(item.unitPrice, fieldsEditable ? v => patch(item.id!, { unitPrice: v }) : undefined)}
-        <td className="num">{formatCurrency(item.total)}</td>
+        {sumCell(priceless, item.unitPrice, item.total, item.unit)}
       </tr>
     )
   }
 
   // ── Vanlig rad ('item') ──────────────────────────────────────
+  const priceless = isPriceless(item.unitPrice)
+  const pricelessClass = priceless ? 'row-priceless' : undefined
   return (
-    <tr {...rowTapProps} className={[isEdit ? 'row-hover' : '', rowTapProps.className, hiddenRowClass].filter(Boolean).join(' ') || undefined}>
+    <tr {...rowTapProps} className={[isEdit ? 'row-hover' : '', pricelessClass, rowTapProps.className, hiddenRowClass].filter(Boolean).join(' ') || undefined}>
       <td style={isEdit ? { position: 'relative' } : undefined}>
         <DeleteButton id={item.id} handlers={isEdit ? handlers : undefined} />
         <div className="item-name">
@@ -301,7 +325,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
       </td>
       {qtyCell}
       {priceCell(item.unitPrice, fieldsEditable ? v => patch(item.id!, { unitPrice: v }) : undefined)}
-      <td className="num">{formatCurrency(item.total)}</td>
+      {sumCell(priceless, item.unitPrice, item.total, item.unit)}
     </tr>
   )
 }

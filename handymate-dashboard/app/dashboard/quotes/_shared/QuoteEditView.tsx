@@ -13,12 +13,13 @@ import type {
   QuoteItem,
   QuoteStandardText,
 } from '@/lib/types/quote'
+import type { QuoteSection, SectionSummary } from '@/lib/quotes/quote-completeness'
 import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 import type { CustomCategory } from '@/lib/constants/categories'
 
 import { useReservationSuggestions } from './useReservationSuggestions'
-import { ReservationSuggestionBanner, ReservationMutedNotice } from './ReservationSuggestionBanner'
+import { ReservationMutedNotice } from './ReservationSuggestionBanner'
 import { ReservationReviewSheet } from './ReservationReviewSheet'
 import { QuoteMarginCard } from './QuoteMarginCard'
 import { QuotePreviewPanel } from './QuotePreviewPanel'
@@ -30,6 +31,7 @@ import { QuoteDisplaySettingsSection } from './QuoteDisplaySettingsSection'
 import { QuoteTotalsSection } from './QuoteTotalsSection'
 import { QuoteSaveTemplateModal } from './QuoteSaveTemplateModal'
 import { QuoteBuilderHeader } from './QuoteBuilderHeader'
+import { QuoteBuilderBottomBar } from './QuoteBuilderBottomBar'
 import { QuoteEditCustomerSection } from './QuoteEditCustomerSection'
 import type { ProductWithComponents } from './applyProductToItem'
 import type { useQuoteCalculations } from './useQuoteCalculations'
@@ -68,6 +70,13 @@ interface Customer {
 export interface QuoteEditViewProps {
   quoteId: string
   quoteNumber: string
+  /** Completeness-remsan (Fas 1, offert-omtaget 2026-08-31) — samma
+      sammanfattning som create-läget beräknar (sectionSummary/SECTION_ORDER
+      i lib/quotes/quote-completeness.ts), ägd av QuoteBuilder.tsx eftersom
+      den här komponenten är ren presentation (se docblock ovan). Renderas
+      som header-RAD 2 i QuoteBuilderHeader. */
+  completenessSummaries: Record<QuoteSection, SectionSummary>
+  onSelectSection: (section: QuoteSection) => void
   autoSaveStatus: 'idle' | 'saving' | 'saved' | 'error'
   saving: boolean
   onSendQuote: () => void
@@ -204,7 +213,8 @@ export interface QuoteEditViewProps {
 
 export function QuoteEditView(props: QuoteEditViewProps) {
   const {
-    quoteId, quoteNumber, autoSaveStatus, saving, onSendQuote, onSaveDraft, onSaveTemplate, hasItems,
+    quoteId, quoteNumber, completenessSummaries, onSelectSection,
+    autoSaveStatus, saving, onSendQuote, onSaveDraft, onSaveTemplate, hasItems,
     businessDefaultStyle, templateStyle, setTemplateStyle,
     reservations, recalculated,
     customers, selectedCustomer, setSelectedCustomer, validDays, setValidDays, title, setTitle, description, setDescription,
@@ -229,15 +239,37 @@ export function QuoteEditView(props: QuoteEditViewProps) {
     showSaveTemplateModal, setShowSaveTemplateModal, templateName, setTemplateName, savingTemplate, saveAsTemplate,
   } = props
 
+  // Fas B-granskningsfix (offertskaparen-design-polish, 2026-08-31): lyft ur
+  // en gång i stället för att copy-pasta samma uttryck till både
+  // QuoteBuilderHeader (desktop) och QuoteBuilderBottomBar (mobil) nedan.
+  const canSend = !!selectedCustomer
+
+  // DESIGN-SPEC.md ("Helt tomt läge", offertskaparen-polish): samma villkor
+  // som QuoteBuilder.tsx (create-läget) — döljer completeness-remsan (både
+  // header-rad 2 och bottenfältets chip-rad) helt tills offerten har
+  // meningsfullt innehåll. Beräknas lokalt av samma skäl som `canSend` ovan:
+  // den här komponenten är ren presentation men äger sitt eget JSX-träd.
+  const hasQuoteContent = items.length > 0 || !!selectedCustomer
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
+      {/* Fas B (offertskaparen-design-polish, 2026-08-31): pb-40/lg:pb-6
+          ersätter det gamla py-4/sm:py-6-bottenvärdet EXPLICIT (pt-* hanterar
+          toppen oförändrat) så det fasta bottenfältet (QuoteBuilderBottomBar,
+          lg:hidden, monterad nedan) aldrig täcker dokumentets sista rad
+          under `lg`. Se samma (granskade) matteräkning i QuoteBuilder.tsx
+          (create-läget) — safe-area-inset-bottom på riktiga iPhones (~34px)
+          gör baren högre än pb-32 räckte till. */}
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-40 lg:pb-6">
         <QuoteBuilderHeader
           mode="edit"
           quoteNumber={quoteNumber}
+          title={title}
+          completenessSummaries={hasQuoteContent ? completenessSummaries : undefined}
+          onSelectSection={onSelectSection}
           autoSaveStatus={autoSaveStatus}
           saving={saving}
-          canSend={!!selectedCustomer}
+          canSend={canSend}
           hasItems={hasItems}
           onSendQuote={onSendQuote}
           onSaveDraft={onSaveDraft}
@@ -254,11 +286,13 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               businessDefaultStyle={businessDefaultStyle}
             />
 
-            {/* Reservationsmotorn: tyst räknare, aldrig en avbrytande dialog. */}
-            <ReservationSuggestionBanner
-              count={reservations.suggestions.length}
-              onReview={() => reservations.setReviewOpen(true)}
-            />
+            {/* FAS D (offertskaparen-design-polish, 2026-09-01): den
+                fristående "N reservationer matchar"-bannern som satt här
+                (ReservationSuggestionBanner) är borttagen — förslagen
+                renderas nu i dokumentets egen Reservationer-sektion
+                (QuoteDocument.tsx, se `reservationSuggestions`-proppen på
+                QuotePreviewPanel nedan). ReservationMutedNotice är en
+                ANNAN, orelaterad affordans och stannar kvar precis här. */}
             {reservations.mutedNotice && (
               <ReservationMutedNotice
                 title={reservations.mutedNotice.title}
@@ -394,10 +428,34 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               onRowTap={setSheetItemId}
               onAddRowTap={() => setAddRowSheetOpen(true)}
               templatePreviewPayload={templatePreviewPayload}
+              reservationSuggestions={reservations.suggestions}
+              onReviewReservationSuggestions={() => reservations.setReviewOpen(true)}
+              // onOpenAiHelp intentionally omitted: edit-läget har ingen
+              // AI-utkasts-flöde (showAiHelper/QuoteNewAIHelper finns bara i
+              // create-läget i QuoteBuilder.tsx) — utan proppen visar
+              // dokumentets tomma-läge bara "Lägg till rad", ingen "eller
+              // beskriv jobbet"-länk. Se QuoteDocument.tsx:s onOpenAiHelp-docblock.
             />
           </div>
         </div>
       </div>
+
+      {/* Fas B (offertskaparen-design-polish, 2026-08-31): mobilens fasta
+          bottenfält — samma completeness-data och Spara/Skicka-handlers som
+          headern ovan (nu desktop-only, se dess `hidden lg:flex`-gate).
+          Edit-läget har aldrig haft sendDisabledReason/sendConfirmPending/
+          onConfirmSend/onCancelSend (se QuoteBuilderHeader.tsx:s docblock —
+          den "extra bekräftelsen" hörde bara till create-flödet), så de
+          utelämnas här precis som i mountningen av headern ovan. */}
+      <QuoteBuilderBottomBar
+        summaries={completenessSummaries}
+        hasQuoteContent={hasQuoteContent}
+        onSelect={onSelectSection}
+        saving={saving}
+        canSend={canSend}
+        onSendQuote={onSendQuote}
+        onSaveDraft={onSaveDraft}
+      />
 
       <RowEditSheet
         item={sheetItem}

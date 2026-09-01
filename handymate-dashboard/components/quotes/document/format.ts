@@ -1,9 +1,15 @@
 /**
  * Formatterings-hjälpare delade av QuoteDocument (edit + static-läge).
- * Kopierade EXAKT (inte omskrivna) från lib/quote-templates/modern.ts så
+ *
+ * formatNumber/mixWithWhite/A4_WIDTH_PX/computeFitScale nedan är kopierade
+ * EXAKT (inte omskrivna) från lib/quote-templates/modern.ts så
  * paritetstestet (tests/quote-document-parity.spec.ts) inte kan fastna på
  * en oavsiktlig avrundnings-/mellanslagsskillnad mellan gammal och ny
- * renderare.
+ * renderare. Det påståendet gäller BARA de funktionerna —
+ * describeReservationSuggestionRows (Fas D, offertskaparen-design-polish)
+ * är ny, orelaterad logik utan motsvarighet i modern.ts, och hör hemma
+ * här bara för att den är en annan ren formatteringshjälpare QuoteDocument
+ * (edit-läget) delar.
  */
 
 /** "10 000" — mellanslag som tusentalsavgränsare, decimaler bevaras. */
@@ -47,4 +53,34 @@ export function computeFitScale(containerWidthPx: number, contentWidthPx: number
   if (!Number.isFinite(containerWidthPx) || containerWidthPx <= 0) return 1
   if (!Number.isFinite(contentWidthPx) || contentWidthPx <= 0) return 1
   return Math.min(1, containerWidthPx / contentWidthPx)
+}
+
+/**
+ * Fas D (offertskaparen-design-polish, 2026-09-01): radnamnen som utlöste
+ * reservationsförslagen, för den amberfärgade rutan i dokumentets
+ * Reservationer-sektion (flyttad dit från den fristående assistentkolumns-
+ * bannern, se QuoteDocument.tsx).
+ *
+ * Tar en platt lista beskrivningar (anroparen flattar `triggeredBy` från
+ * flera ReservationSuggestion — samma rad kan trigga flera förslag, och
+ * ska bara nämnas en gång) i stället för ReservationSuggestion[] direkt, så
+ * den här filen slipper importera lib/reservations/match-typerna och
+ * funktionen blir trivial att facit-testa isolerat.
+ *
+ * 1-2 distinkta radnamn: "A och B". 3+: "A och B m.fl." — aldrig en lång
+ * uppräkning som spränger den lilla rutan.
+ */
+export function describeReservationSuggestionRows(triggeredByDescriptions: string[]): string {
+  const names: string[] = []
+  const seen = new Set<string>()
+  for (const raw of triggeredByDescriptions) {
+    const d = raw.trim()
+    if (d && !seen.has(d)) {
+      seen.add(d)
+      names.push(d)
+    }
+  }
+  if (names.length === 0) return ''
+  if (names.length <= 2) return names.join(' och ')
+  return `${names[0]} och ${names[1]} m.fl.`
 }

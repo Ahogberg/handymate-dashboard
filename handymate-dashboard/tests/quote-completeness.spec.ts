@@ -29,9 +29,12 @@
 import { test, expect } from '@playwright/test'
 import {
   sectionSummary,
+  sortSectionsByAttention,
   SECTION_ORDER,
   SECTION_LABELS,
   SECTION_HINTS,
+  type QuoteSection,
+  type SectionSummary,
 } from '../lib/quotes/quote-completeness'
 
 test.describe('ämnesordningen', () => {
@@ -130,5 +133,79 @@ test.describe('Prisbild — bara verkliga hinder', () => {
       paymentPlanValid: false,
     })
     expect(s.attention).toContain('Personnummer')
+  })
+})
+
+/**
+ * Fas B (offertskaparen-design-polish, 2026-08-31): sortSectionsByAttention
+ * ordnar mobilens bottenfältschips (QuoteBuilderBottomBar) — bara en
+ * bråkdel av den horisontellt scrollbara raden syns innan man scrollar, så
+ * det som behöver ögon (attention) ska stå längst till vänster. Ren
+ * funktion: samma fyra sektioner in, en ordnad lista ut, ingen sidoeffekt.
+ * Tillagd efter kod-granskning av Fas B — testet saknades i första rundan.
+ */
+const calm = (text: string): SectionSummary => ({ text, attention: null })
+const attention = (text: string, reason: string): SectionSummary => ({ text, attention: reason })
+
+test.describe('sortSectionsByAttention — bottenfältets chip-ordning', () => {
+  test('allt lugnt (ingen attention) — SECTION_ORDER bevaras oförändrad', () => {
+    const summaries: Record<QuoteSection, SectionSummary> = {
+      inkluderat: calm('8 rader · 46 500 kr'),
+      exkluderat: calm('Inget angivet'),
+      reservationer: calm('2 förbehåll'),
+      prisbild: calm('46 500 kr'),
+    }
+    expect(sortSectionsByAttention(summaries)).toEqual(SECTION_ORDER)
+  })
+
+  test('attention-sektioner hamnar FÖRST, lugna sektioner EFTER', () => {
+    const summaries: Record<QuoteSection, SectionSummary> = {
+      inkluderat: calm('8 rader · 46 500 kr'),
+      exkluderat: calm('Inget angivet'),
+      reservationer: attention('2 förbehåll', '1 förslag att ta ställning till'),
+      prisbild: attention('46 500 kr', 'Personnummer saknas för avdraget'),
+    }
+    const result = sortSectionsByAttention(summaries)
+    // De två med attention (reservationer, prisbild) före de två utan
+    // (inkluderat, exkluderat) — oavsett var de låg i SECTION_ORDER.
+    expect(result.indexOf('reservationer')).toBeLessThan(result.indexOf('inkluderat'))
+    expect(result.indexOf('reservationer')).toBeLessThan(result.indexOf('exkluderat'))
+    expect(result.indexOf('prisbild')).toBeLessThan(result.indexOf('inkluderat'))
+    expect(result.indexOf('prisbild')).toBeLessThan(result.indexOf('exkluderat'))
+  })
+
+  test('SECTION_ORDER:s inbördes ordning bevaras INOM varje grupp', () => {
+    // SECTION_ORDER = ['inkluderat', 'exkluderat', 'reservationer', 'prisbild'].
+    // Ger 'inkluderat' och 'prisbild' attention (i den ordningen i
+    // SECTION_ORDER) och 'exkluderat'+'reservationer' lugna — resultatet ska
+    // vara ['inkluderat', 'prisbild', 'exkluderat', 'reservationer'], INTE
+    // en godtycklig ordning inom respektive grupp.
+    const summaries: Record<QuoteSection, SectionSummary> = {
+      inkluderat: attention('3 rader · 12 000 kr', '1 rad utan pris'),
+      exkluderat: calm('Inget angivet'),
+      reservationer: calm('Inga förbehåll'),
+      prisbild: attention('12 000 kr', 'Betalplanen går inte ihop'),
+    }
+    expect(sortSectionsByAttention(summaries)).toEqual(['inkluderat', 'prisbild', 'exkluderat', 'reservationer'])
+  })
+
+  test('allt har attention — SECTION_ORDER bevaras (en enda grupp)', () => {
+    const summaries: Record<QuoteSection, SectionSummary> = {
+      inkluderat: attention('0 rader', 'Offerten har inga rader'),
+      exkluderat: attention('Inget angivet', 'Saknas'),
+      reservationer: attention('0 förbehåll', 'Förslag väntar'),
+      prisbild: attention('0 kr', 'Personnummer saknas'),
+    }
+    expect(sortSectionsByAttention(summaries)).toEqual(SECTION_ORDER)
+  })
+
+  test('exakt en sektion (mitt i SECTION_ORDER) med attention flyttas till fronten, resten oförändrad ordning', () => {
+    const summaries: Record<QuoteSection, SectionSummary> = {
+      inkluderat: calm('8 rader · 46 500 kr'),
+      exkluderat: attention('Inget angivet', 'Glömt bort?'),
+      reservationer: calm('2 förbehåll'),
+      prisbild: calm('46 500 kr'),
+    }
+    expect(sortSectionsByAttention(summaries)).toEqual(['exkluderat', 'inkluderat', 'reservationer', 'prisbild'])
   })
 })

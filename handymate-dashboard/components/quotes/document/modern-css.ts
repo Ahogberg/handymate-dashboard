@@ -84,6 +84,12 @@ export const MODERN_DOCUMENT_CSS = `
    inte får se, utan att raden försvinner ur hans egen översikt. */
 .quote-document tbody tr.row-hidden td { opacity: 0.45; }
 .quote-document tbody tr.row-hidden td:first-child { border-left: 2px dashed #94A3B8; }
+/* Prislös rad (Fas C, offertskaparen-design-polish) — ENDAST edit-läge (se
+   isPriceless-gaten i QuoteDocumentRow.tsx). Svag gul ton så hantverkaren
+   ser vilka rader som väntar på ett pris utan att det läses som en varning
+   eller ett fel. */
+.quote-document tbody tr.row-priceless td { background: #fffdf5; }
+.quote-document .price-missing-pill { display: inline-block; background: #f0fdf9; color: #0f766e; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 8px; }
 /* Reservationer (v91) — eget block efter villkorsstycket. Punktlista så varje
    förbehåll går att peka på, i stället för att drunkna i löpande text. */
 .quote-document .reservations { margin: 0 0 24px; break-inside: avoid; page-break-inside: avoid; }
@@ -91,6 +97,29 @@ export const MODERN_DOCUMENT_CSS = `
 .quote-document .reservations ul { margin: 0; padding-left: 16px; }
 .quote-document .reservations li { font-size: 11px; line-height: 1.65; color: #475569; margin-bottom: 5px; }
 .quote-document .reservations li strong { color: #0F172A; font-weight: 600; }
+/* Reservationsförslag (Fas D, offertskaparen-design-polish) — amberfärgad
+   ruta INUTI Reservationer-sektionen (ersätter den fristående
+   ReservationSuggestionBanner:en i assistentkolumnen). ENDAST edit-läge, se
+   gaten i QuoteDocument.tsx. Följer .row-priceless/.price-missing-pill:s
+   mönster (statiska temafärger som klasser, inte inline style). */
+.quote-document .reservation-suggestion-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 9px 12px; margin: 0 0 24px; }
+/* min-width:0 krävs för att text-overflow ska få effekt på ett flex-barn —
+   annars vägrar barnet krympa under sin innehållsbredd och en ovanligt lång
+   produkt-/radbeskrivning trycker granskningsknappen (__cta) ut ur rutan i
+   stället för att klippas med "…".
+   OBS: undvik medvetet knapptextens EGNA ord i den här kommentaren — CSS:en
+   ligger inbäddad i en <style>-tagg som renderas i ALLA lägen (även när
+   rutan själv inte monteras), så en ordagrann knapptext här gav tidigare
+   falska träffar i facit-testens not.toContain(knapptext)-kontroller. */
+.quote-document .reservation-suggestion-banner__text { margin: 0; min-width: 0; flex: 1 1 auto; font-size: 12.5px; line-height: 1.5; color: #92400e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quote-document .reservation-suggestion-banner__text strong { font-weight: 700; }
+.quote-document .reservation-suggestion-banner__actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.quote-document .reservation-suggestion-banner__cta { background: #fff; border: 1px solid #fde68a; color: #92400e; border-radius: 9px; padding: 6px 12px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+/* Lokal dismiss-knapp (×), adversarial review 2026-09-01 — se
+   ReservationSuggestionBox.tsx:s docblock för varför den här knappen finns:
+   återger originalbannerns egen, icke-persisterade "dölj den här gången". */
+.quote-document .reservation-suggestion-banner__dismiss { background: transparent; border: none; color: #92400e; opacity: .55; cursor: pointer; padding: 2px 6px; line-height: 1; font-size: 15px; flex-shrink: 0; }
+.quote-document .reservation-suggestion-banner__dismiss:hover { opacity: 1; }
 /* Betalplan (etapp A4) — eget block direkt efter summeringen. Håller ihop över
    sidbrytning: en halv betalplan är värre än ingen. */
 .quote-document .payment-plan { margin: 0 0 24px; break-inside: avoid; page-break-inside: avoid; }
@@ -273,6 +302,16 @@ export const MODERN_DOCUMENT_CSS = `
 .quote-document .signature-cta .sig-edit-note { font-size: 10px; color: #94A3B8; font-style: italic; margin-top: 6px; }
 .quote-document .add-row-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: rgba(15, 118, 110, 0.08); border: 1px dashed var(--qd-accent); border-radius: 6px; color: var(--qd-accent); font-size: 12px; font-weight: 500; cursor: pointer; margin-bottom: 24px; transition: background 0.15s; }
 .quote-document .add-row-btn:hover { background: rgba(15, 118, 110, 0.15); }
+/* FAS E (offertskaparen-design-polish, 2026-09-01): tomt-läges-rutan.
+   Fast teal (#0f766e), INTE var(--qd-accent) — samma val som
+   .price-missing-pill ovan: det här är en intern hantverkar-uppmaning
+   (renderas bara i mode==='edit'), inte kundvänd dokumentfärg som ska
+   följa företagets brandade accent. */
+.quote-document .empty-items { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 36px 20px; border: 1px dashed #E2E8F0; border-radius: 10px; text-align: center; margin-bottom: 24px; }
+.quote-document .empty-items .add-row-btn { margin-bottom: 0; }
+.quote-document .empty-items-hint { margin: 0; font-size: 13px; color: #94A3B8; }
+.quote-document .empty-items-link { background: none; border: none; padding: 0; margin: 0; font: inherit; font-size: 13px; font-weight: 600; color: #0f766e; text-decoration: underline; cursor: pointer; }
+.quote-document .empty-items-link:hover { color: #0d9488; }
 .quote-document .row-action { opacity: 0; transition: opacity 0.15s; }
 .quote-document tbody tr.row-hover:hover .row-action { opacity: 1; }
 .quote-document .row-action button { background: transparent; border: none; cursor: pointer; padding: 2px 4px; color: #94a3b8; font-size: 14px; line-height: 1; }

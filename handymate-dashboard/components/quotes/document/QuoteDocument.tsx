@@ -6,7 +6,9 @@ import { QuoteDocumentRow } from './QuoteDocumentRow'
 import { SignatureCta } from './SignatureCta'
 import { InvoicePaymentSection } from './InvoicePaymentSection'
 import { mixWithWhite } from './format'
+import { ReservationSuggestionBox } from './ReservationSuggestionBox'
 import type { QuoteDocumentHandlers, QuoteDocumentMode, QuoteDocumentMobileProps, MoneyDocumentData } from './types'
+import type { ReservationSuggestion } from '@/lib/reservations/match'
 
 export type { QuoteDocumentHandlers, QuoteItemPatch, QuoteDocumentMode, QuoteDocumentMobileProps, MoneyDocumentData } from './types'
 
@@ -76,12 +78,47 @@ export interface QuoteDocumentProps extends QuoteDocumentMobileProps {
    * förut, så fakturans canvas och andra anropare inte påverkas.
    */
   onAddRow?: () => void
+  /**
+   * FAS E (offertskaparen-design-polish, 2026-09-01): tom-läges-rutans
+   * "eller [beskriv jobbet] så bygger vi utkastet"-länk.
+   *
+   * Samma UI-navigerings-konvention som `onAddRow`/`onRowTap` ovan (öppnar
+   * ett gränssnittsläge, muterar ingen data) — därför en egen toppnivåprop
+   * och INTE en del av QuoteDocumentHandlers.
+   *
+   * GENUIN ASYMMETRI, inte en lucka att täppa till: AI-beskrivningsflödet
+   * (QuoteNewAIHelper) finns bara i create-flödet (QuoteBuilder.tsx →
+   * showAiHelper-state). Redigeringsvyn (QuoteEditView.tsx) har ingen
+   * motsvarighet och ska inte få en uppfunnen sådan här — den lämnar denna
+   * prop outnyttjad. Utelämnad → länken renderas inte alls, bara den
+   * primära "+ Lägg till rad"-knappen visas i tomrutan.
+   */
+  onOpenAiHelp?: () => void
+  /**
+   * FAS D (offertskaparen-design-polish, 2026-09-01): reservationsmotorns
+   * matchade-men-ej-tillagda förslag, och vad "Ta ställning"-knappen i
+   * dokumentets egen Reservationer-sektion ska göra.
+   *
+   * Ersätter den fristående ReservationSuggestionBanner:en som tidigare
+   * satt i assistentkolumnen, utanför själva dokumentet — förslagen hörde
+   * hemma i den sektion de faktiskt handlar om. Samma konvention som
+   * `onRowTap` (QuoteDocumentMobileProps ovan): UI-navigering (öppna
+   * granskningssheeten), inte en datamutation, så den ligger som egen
+   * toppnivåprop och INTE i QuoteDocumentHandlers.
+   *
+   * Utelämnad/tom → rutan renderas inte alls. Renderas ALDRIG i static-läge
+   * (kunden ska aldrig se en intern "ta ställning"-uppmaning) — se gaten i
+   * komponenten, samma edit/static-disciplin som "Sätt pris"-pillen
+   * (QuoteDocumentRow.tsx:s isPriceless).
+   */
+  reservationSuggestions?: ReservationSuggestion[]
+  onReviewReservationSuggestions?: () => void
 }
 
 /** Sektionerna hantverkaren granskar en i taget, i Andreas taxonomi. */
 export type DocumentSection = 'inkluderat' | 'exkluderat' | 'reservationer' | 'prisbild'
 
-export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTap, focusSection, onAddRow }: QuoteDocumentProps) {
+export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTap, focusSection, onAddRow, onOpenAiHelp, reservationSuggestions, onReviewReservationSuggestions }: QuoteDocumentProps) {
   const accent = data.business.accentColor
   const accent50 = mixWithWhite(accent, 0.92)
   const accent100 = mixWithWhite(accent, 0.82)
@@ -316,31 +353,73 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
         {/* Items-tabell — delad mellan offert och faktura (QuoteDocumentRow
             är docType-agnostisk sedan ETAPP 6a). Sektionsattributet bärs av
             wrappern ovan, inte av tabellen. */}
-        <table>
-          <thead>
-            <tr>
-              <th>Beskrivning</th>
-              {showQty && <th className="num">Antal</th>}
-              {showPrice && <th className="num">Á-pris</th>}
-              <th className="num">Summa</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item, idx) => (
-              <QuoteDocumentRow
-                key={item.id ?? idx}
-                item={item}
-                mode={mode}
-                showQty={showQty}
-                showPrice={showPrice}
-                colCount={colCount}
-                handlers={handlers}
-                sheetMode={sheetMode}
-                onTap={sheetMode && onRowTap && item.id ? () => onRowTap(item.id!) : undefined}
-              />
-            ))}
-          </tbody>
-        </table>
+        {/* FAS E (offertskaparen-design-polish, 2026-09-01): tomt-läge —
+            ADDITIV gren, inte en omskrivning. items.length > 0 tar alltid
+            samma väg som förut (tabellen nedan, orörd). Bara den nya
+            grenen (items.length === 0, edit, oskalad canvas) är ny — en
+            tom tabell med bara en huvudrad var ingen affordans, bara
+            frånvaron av en. sheetMode undantas: mobilens motsvarande
+            tomruta renderas OSKALAD av QuotePreviewPanel.tsx, av samma
+            träffyte-skäl som "+ Lägg till rad" nedan.
+
+            FIX (holistisk slutgranskning, offertskaparen-design-polish):
+            `!isInvoice` tillagt — saknades här till skillnad från
+            reservationsförslagsrutan (Fas D, rad ovan) och "Sätt pris"-
+            pillen (Fas C, QuoteDocumentRow.tsx), som båda redan gatar på
+            isInvoice. Utan den gick InvoiceEditor.tsx (app/dashboard/
+            invoices/_shared/InvoiceEditor.tsx, en OFÖRÄNDRAD, riktig
+            konsument av samma QuoteDocument i mode="edit") in i den här
+            grenen så fort en faktura hade noll rader och fick offertens
+            "Lägg till rad"/"beskriv jobbet"-ruta i stället för sin egen,
+            redan existerande tomrads-hantering — en yta helt utanför
+            uppdraget (branchen är uttryckligen bara offertskaparen). */}
+        {!isInvoice && items.length === 0 && mode === 'edit' && !sheetMode ? (
+          <div className="empty-items">
+            {(onAddRow || handlers?.onItemAdd) && (
+              <button type="button" onClick={onAddRow || handlers?.onItemAdd} className="add-row-btn">
+                + Lägg till rad
+              </button>
+            )}
+            {/* Se onOpenAiHelp:s docblock ovan — utelämnad i edit-läget
+                (QuoteEditView.tsx), så länken uteblir där utan att någon
+                ny AI-genereringsväg uppfinns för den ytan. */}
+            {onOpenAiHelp && (
+              <p className="empty-items-hint">
+                eller{' '}
+                <button type="button" onClick={onOpenAiHelp} className="empty-items-link">
+                  beskriv jobbet
+                </button>{' '}
+                så bygger vi utkastet
+              </p>
+            )}
+          </div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Beskrivning</th>
+                {showQty && <th className="num">Antal</th>}
+                {showPrice && <th className="num">Á-pris</th>}
+                <th className="num">Summa</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, idx) => (
+                <QuoteDocumentRow
+                  key={item.id ?? idx}
+                  item={item}
+                  mode={mode}
+                  showQty={showQty}
+                  showPrice={showPrice}
+                  colCount={colCount}
+                  handlers={handlers}
+                  sheetMode={sheetMode}
+                  onTap={sheetMode && onRowTap && item.id ? () => onRowTap(item.id!) : undefined}
+                />
+              ))}
+            </tbody>
+          </table>
+        )}
         {showOptionsNote && (
           <div className="options-note">Välj dina tillval i kundportalen innan du signerar.</div>
         )}
@@ -356,8 +435,11 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
             träffytan ~15px vid 375px skärmbredd — långt under 44px-kravet,
             och just på den yta som är hantverkarens huvudvy. */}
         {/* SPÅR B1: onAddRow öppnar artikelbanken; onItemAdd ger en tom rad.
-            Fallbacken behålls för anropare som inte skickar in någon sheet. */}
-        {mode === 'edit' && (onAddRow || handlers?.onItemAdd) && !sheetMode && (
+            Fallbacken behålls för anropare som inte skickar in någon sheet.
+            FAS E: `items.length > 0` tillagt — vid noll rader ligger samma
+            knapp redan INUTI tomrutan ovan, den här hade annars dubblerat
+            den. */}
+        {mode === 'edit' && (onAddRow || handlers?.onItemAdd) && !sheetMode && items.length > 0 && (
           <button type="button" onClick={onAddRow || handlers?.onItemAdd} className="add-row-btn">
             + Lägg till rad
           </button>
@@ -631,6 +713,36 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
               ))}
             </ul>
           </div>
+        )}
+
+        {/* FAS D (offertskaparen-design-polish, 2026-09-01): reservations-
+            motorns matchade-men-ej-tillagda förslag, flyttade hit från den
+            fristående ReservationSuggestionBanner:en i assistentkolumnen —
+            förslagen handlar om just den här sektionen, så de hör hemma i
+            den, inte utanför dokumentet.
+
+            EGEN sibling till listan ovan (INTE nästlad i dess
+            reservations.length>0-villkor): en offert kan ha noll
+            accepterade reservationer men ändå N matchade förslag, och
+            rutan ska synas då lika mycket.
+
+            Bär `section('reservationer')` OAVSETT om listan ovan redan
+            gjorde det — dubbla `data-section`-attribut i samma sektion är
+            harmlöst (scrollToSection använder querySelector, som tar den
+            FÖRSTA träffen), och det är den enda garantin att sektionen har
+            ETT element med attributet när accepterad-listan är tom (den
+            gamla platshållaren nedan renderas bara när focusSection är
+            satt, vilket i praktiken aldrig sker längre, se dess kommentar).
+
+            ALDRIG i static-läge — en kund ska aldrig se en intern
+            "ta ställning till förslag"-uppmaning, exakt samma disciplin
+            som "Sätt pris"-pillen (QuoteDocumentRow.tsx isPriceless). */}
+        {!isInvoice && mode === 'edit' && reservationSuggestions && reservationSuggestions.length > 0 && (
+          <ReservationSuggestionBox
+            suggestions={reservationSuggestions}
+            onReview={onReviewReservationSuggestions}
+            sectionAttrs={section('reservationer')}
+          />
         )}
 
         {/* ETAPP C3-fix (2026-08-06): platshållare när listan är tom.

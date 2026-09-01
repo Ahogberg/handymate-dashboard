@@ -130,3 +130,23 @@ export function sectionSummary(section: QuoteSection, input: SectionSummaryInput
     }
   }
 }
+
+/**
+ * Ordnar SECTION_ORDER så att chips med `attention` (amber) hamnar FÖRST,
+ * lugna (slate) chips efter — men bevarar SECTION_ORDER:s inbördes ordning
+ * inom respektive grupp. Ren funktion, ingen sidoeffekt.
+ *
+ * Tillkom med bottenfältets horisontellt scrollbara chip-rad (mobil,
+ * QuoteBuilderBottomBar, Fas B offertskaparen-design-polish, 2026-08-31):
+ * bara en bråkdel av raden syns innan man scrollar, så det som behöver
+ * ögon ska stå längst till vänster. Header-radens QuoteCompletenessStrip
+ * (desktop, gott om bredd för alla fyra) använder INTE detta — den
+ * behåller SECTION_ORDER rakt av, oförändrat.
+ */
+export function sortSectionsByAttention(
+  summaries: Record<QuoteSection, SectionSummary>
+): QuoteSection[] {
+  const withAttention = SECTION_ORDER.filter(section => !!summaries[section].attention)
+  const calm = SECTION_ORDER.filter(section => !summaries[section].attention)
+  return [...withAttention, ...calm]
+}

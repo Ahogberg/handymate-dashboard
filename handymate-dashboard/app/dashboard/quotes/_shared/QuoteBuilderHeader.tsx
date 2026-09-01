@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Bookmark, Check, Loader2, Send, Sparkles } from 'lucide-react'
+import { QuoteCompletenessStrip } from './QuoteCompletenessStrip'
+import type { QuoteSection, SectionSummary } from '@/lib/quotes/quote-completeness'
 
 interface QuoteBuilderHeaderProps {
   /** 'create' (default om utelämnad) → "Ny offert", inga autosave-badges.
@@ -12,6 +14,17 @@ interface QuoteBuilderHeaderProps {
   mode?: 'create' | 'edit'
   /** Edit-läge: offertnumret bredvid titeln. */
   quoteNumber?: string
+  /** Offertens egen titel (Titel-fältet). Visas i stället för den
+      hårdkodade "Ny offert"/"Redigerar offert" så snart den är ifylld —
+      se headerTitle nedan. Tom/odefinierad → oförändrat fallback-beteende. */
+  title?: string
+  /** Completeness-remsan (Fas 1, offert-omtaget 2026-08-31): renderas som
+      header-RAD 2, inne i SAMMA sticky/backdrop-blur-wrapper som rad 1 —
+      inte en egen sticky-yta, och inte längre en separat <div> som
+      scrollar bort under headern (se QuoteBuilder.tsx/QuoteEditView.tsx).
+      Utelämnad (t.ex. om ingen sammanfattning finns) → ingen rad 2 alls. */
+  completenessSummaries?: Record<QuoteSection, SectionSummary>
+  onSelectSection?: (section: QuoteSection) => void
   /** Edit-läge: autosparets status — samma badge som gamla QuoteEditHeader. */
   autoSaveStatus?: 'idle' | 'saving' | 'saved' | 'error'
   aiGenerated?: boolean
@@ -60,6 +73,9 @@ interface QuoteBuilderHeaderProps {
 export function QuoteBuilderHeader({
   mode = 'create',
   quoteNumber,
+  title,
+  completenessSummaries,
+  onSelectSection,
   autoSaveStatus,
   aiGenerated,
   aiConfidence,
@@ -76,6 +92,17 @@ export function QuoteBuilderHeader({
   onSaveDraft,
   onSaveTemplate,
 }: QuoteBuilderHeaderProps) {
+  // Fallback oförändrat om titeln saknas/är tom — bara vilken text som
+  // vinner ändras, quoteNumber-badgen intill (edit-läge) rörs inte. Trimmad
+  // både för sanningskollen och för visningen, så ett titelfält med bara
+  // inledande/avslutande whitespace inte visas ordagrant.
+  const trimmedTitle = title?.trim()
+  const headerTitle = trimmedTitle
+    ? trimmedTitle
+    : mode === 'edit'
+      ? 'Redigerar offert'
+      : 'Ny offert'
+
   return (
     <div className="sticky top-0 z-30 -mx-4 sm:-mx-6 mb-6 px-4 sm:px-6 py-3 bg-slate-50/95 backdrop-blur-md border-b border-slate-200">
       <div className="flex items-center gap-3 flex-nowrap sm:flex-wrap">
@@ -90,7 +117,7 @@ export function QuoteBuilderHeader({
         <div className="h-4 w-px bg-slate-300 shrink-0" aria-hidden />
         <div className="flex items-baseline gap-2 min-w-0">
           <h1 className="font-heading text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">
-            {mode === 'edit' ? 'Redigerar offert' : 'Ny offert'}
+            {headerTitle}
           </h1>
           {mode === 'edit' && quoteNumber && (
             <span className="hidden sm:inline text-xs font-medium text-slate-500 font-mono">{quoteNumber}</span>
@@ -123,6 +150,20 @@ export function QuoteBuilderHeader({
           aiPhotoCount={aiPhotoCount}
         />
 
+        {/* Fas B (offertskaparen-design-polish, 2026-08-31): "Spara som
+            mall" behåller sin EGNA `hidden sm:inline-flex` (synlig från
+            640px, precis som innan granskningsfixen) — den lever OBEROENDE
+            av lg-gaten nedan eftersom QuoteBuilderBottomBar (mobil) inte har
+            någon motsvarighet, och att svepa in den i `lg:`-gaten hade gjort
+            funktionen helt otillgänglig 640–1023px (fynd från kod-
+            granskningen). Bara Spara utkast/Skicka offert-paret (som HAR en
+            mobil motsvarighet i bottenfältet) blir `hidden lg:flex` — ALDRIG
+            båda samtidigt synliga, det var precis den dubbla Skicka-knappen
+            som fick tas bort 2026-08-06 (se kodkommentar i QuoteBuilder.tsx).
+            De inre `sm:`-etikettklasserna på Spara/Skicka (korta etiketter
+            under `sm`) triggas i praktiken aldrig längre eftersom det paret
+            redan är dolt under `lg` (> `sm`) — lämnade orörda enligt
+            uppdraget, ofarlig död kod. */}
         <div className="ml-auto flex items-center gap-2 flex-nowrap">
           {hasItems && (
             <button
@@ -134,57 +175,75 @@ export function QuoteBuilderHeader({
               Spara som mall
             </button>
           )}
-          <button
-            type="button"
-            onClick={onSaveDraft}
-            disabled={saving}
-            className="px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 whitespace-nowrap"
-          >
-            <span className="hidden sm:inline">Spara utkast</span>
-            <span className="sm:hidden">Spara</span>
-          </button>
-          <div className="relative flex flex-col items-end gap-1">
+          <div className="hidden lg:flex items-center gap-2">
             <button
               type="button"
-              onClick={onSendQuote}
-              disabled={saving || !canSend}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-700 hover:bg-primary-600 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm whitespace-nowrap"
+              onClick={onSaveDraft}
+              disabled={saving}
+              className="px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 whitespace-nowrap"
             >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">{saving ? 'Sparar…' : 'Skicka offert'}</span>
-              <span className="sm:hidden">{saving ? 'Sparar…' : 'Skicka'}</span>
+              <span className="hidden sm:inline">Spara utkast</span>
+              <span className="sm:hidden">Spara</span>
             </button>
-            {/* ETAPP 1f: disabled Skicka-knapp får alltid en synlig orsak
-                istället för ett tyst lås. */}
-            {!canSend && sendDisabledReason && (
-              <span className="text-[10px] text-slate-400 whitespace-nowrap">{sendDisabledReason}</span>
-            )}
-            {sendConfirmPending && (
-              <div className="absolute right-0 top-full mt-2 z-40 w-64 bg-white border border-amber-200 rounded-xl shadow-lg p-3">
-                <p className="text-xs text-slate-700 mb-2.5 leading-relaxed">
-                  Beskrivning saknas — skicka ändå?
-                </p>
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={onCancelSend}
-                    className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
-                  >
-                    Avbryt
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onConfirmSend}
-                    className="px-3 py-1.5 text-xs font-semibold bg-primary-700 hover:bg-primary-600 text-white rounded-lg transition-colors"
-                  >
-                    Skicka ändå
-                  </button>
+            <div className="relative flex flex-col items-end gap-1">
+              <button
+                type="button"
+                onClick={onSendQuote}
+                disabled={saving || !canSend}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-700 hover:bg-primary-600 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm whitespace-nowrap"
+              >
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">{saving ? 'Sparar…' : 'Skicka offert'}</span>
+                <span className="sm:hidden">{saving ? 'Sparar…' : 'Skicka'}</span>
+              </button>
+              {/* ETAPP 1f: disabled Skicka-knapp får alltid en synlig orsak
+                  istället för ett tyst lås. */}
+              {!canSend && sendDisabledReason && (
+                <span className="text-[10px] text-slate-400 whitespace-nowrap">{sendDisabledReason}</span>
+              )}
+              {sendConfirmPending && (
+                <div className="absolute right-0 top-full mt-2 z-40 w-64 bg-white border border-amber-200 rounded-xl shadow-lg p-3">
+                  <p className="text-xs text-slate-700 mb-2.5 leading-relaxed">
+                    Beskrivning saknas — skicka ändå?
+                  </p>
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={onCancelSend}
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                    >
+                      Avbryt
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onConfirmSend}
+                      className="px-3 py-1.5 text-xs font-semibold bg-primary-700 hover:bg-primary-600 text-white rounded-lg transition-colors"
+                    >
+                      Skicka ändå
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Rad 2 — completeness-remsan (Fas 1, offert-omtaget 2026-08-31,
+          flyttad hit ur en egen <div className="mb-4"> under headern så
+          att den scrollar MED headern i stället för bort under den). Samma
+          sticky/backdrop-blur-wrapper som rad 1 ovan — ingen egen sticky-
+          yta. Utelämnad helt om anroparen inte skickar in en sammanfattning.
+          Fas B-granskningsfix (2026-08-31): `hidden lg:block` — under `lg`
+          visar QuoteBuilderBottomBar (mobilens fasta bottenfält) samma
+          chip-data i sin egen horisontella rad. Utan denna gate visades
+          remsan DUBBELT på mobil (en gång här, en gång i bottenfältet) —
+          samma princip som knappgruppen ovan, exakt en yta synlig per bredd. */}
+      {completenessSummaries && onSelectSection && (
+        <div className="hidden lg:block mt-2">
+          <QuoteCompletenessStrip summaries={completenessSummaries} onSelect={onSelectSection} />
+        </div>
+      )}
     </div>
   )
 }

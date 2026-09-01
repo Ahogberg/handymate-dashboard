@@ -155,10 +155,13 @@ export function QuoteTotalsSection({
         </div>
       </div>
 
-      {/* Kund betalar box */}
+      {/* Att betala-box (FAS E, offertskaparen-design-polish 2026-09-01:
+          etiketten hette tidigare "Kund betalar" — bytt för att matcha
+          QuoteDocument.tsx:s egen statiska totalsumma, som redan sa "Att
+          betala"). */}
       {(hasRotItems || hasRutItems || totals.gronBase > 0) && totals.totalDeduction > 0 && (
         <div className="bg-primary-50 border border-primary-100 rounded-xl px-4 py-3.5 mt-4 flex justify-between items-baseline">
-          <span className="text-xs font-semibold uppercase tracking-wider text-primary-700">Kund betalar</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-primary-700">Att betala</span>
           <span className="font-heading text-xl font-bold text-primary-700 tabular-nums tracking-tight">
             {formatCurrency(
               totals.gronBase > 0

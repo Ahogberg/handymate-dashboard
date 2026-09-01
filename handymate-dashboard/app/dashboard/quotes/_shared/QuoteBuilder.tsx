@@ -40,7 +40,7 @@ import { QuoteQuickstartCard, type QuickstartRow } from './QuoteQuickstartCard'
 import { QuoteItemsSection } from './QuoteItemsSection'
 import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/business/quote-surface-select'
 import { useReservationSuggestions } from './useReservationSuggestions'
-import { ReservationSuggestionBanner, ReservationMutedNotice } from './ReservationSuggestionBanner'
+import { ReservationMutedNotice } from './ReservationSuggestionBanner'
 import { ReservationReviewSheet } from './ReservationReviewSheet'
 import { QuoteMarginCard } from './QuoteMarginCard'
 import { QuotePreviewPanel } from './QuotePreviewPanel'
@@ -57,7 +57,7 @@ import { QuoteSaveTemplateModal } from './QuoteSaveTemplateModal'
 import type { QuotePayloadContext } from './buildQuotePayload'
 import { useQuoteBuilderSave } from './useQuoteBuilderSave'
 import { QuoteBuilderHeader } from './QuoteBuilderHeader'
-import { QuoteCompletenessStrip } from './QuoteCompletenessStrip'
+import { QuoteBuilderBottomBar } from './QuoteBuilderBottomBar'
 import { QuoteEditView } from './QuoteEditView'
 import { fetchQuoteForEdit } from './loadEditQuote'
 import type { ReservationSnapshotEntry } from '@/lib/reservations/match'
@@ -572,6 +572,15 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
     totals, hasRotItems, hasRutItems, personnummer, paymentPlanValid, paymentPlan.length,
   ])
 
+  // DESIGN-SPEC.md ("Helt tomt läge", offertskaparen-polish): completeness-
+  // remsan (header rad 2 + bottenfältets chip-rad) ska döljas HELT — inte
+  // bara sin attention/amber-styling — tills offerten har meningsfullt
+  // innehåll. Utan detta visade mobilens bottenfält en amber "Offerten har
+  // inga rader"-chip precis ovanpå Fas E:s lugna, inbjudande tomt-läge i
+  // canvasen — två motsägande budskap på exakt samma skärm vid den absolut
+  // vanligaste "dag ett"-vägen (ny offert, noll rader, mobil).
+  const hasQuoteContent = items.length > 0 || !!selectedCustomer
+
   /**
    * Chip-radens klick-mål: scrollar till ämnet i dokumentet via
    * QuoteDocuments `data-section`-attribut, som redan sätts på varje
@@ -833,6 +842,29 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       setMainView(liveAvailable ? 'document' : 'list')
     }
   }, [loading, liveAvailable])
+
+  /**
+   * Completeness-chip-klickets fulla väg, DELAD av båda lägena (rättat efter
+   * kodgranskning av offertskaparens design-polish-etapp: den ursprungliga
+   * kommentaren här hävdade felaktigt att bara edit-läget rendrerar
+   * dokumentet bakom en kollapsbar panel — i verkligheten gör BÅDA det.
+   * Create-lägets `mainView === 'document'`-gren rendrerar exakt samma
+   * `QuotePreviewPanel`, styrd av exakt samma `showPreviewPanel`/
+   * `previewMode`-state (se grenen längre ner i JSX:en). `data-section`
+   * finns bara i DOM:en när den panelen är öppen och på Live-fliken —
+   * annars är chip-klicket ett tyst no-op i BÅDA lägena. Den här hjälparen
+   * säkerställer det innan `scrollToSection` (oförändrad, dess useEffect på
+   * pendingScrollSection kör samma querySelector('[data-section]') oavsett
+   * mode) körs. Ren komposition av redan existerande setters/state — ingen
+   * ny state.
+   */
+  const selectSectionAndReveal = useCallback((section: QuoteSection) => {
+    if (liveAvailable) {
+      setShowPreviewPanel(true)
+      setPreviewMode('live')
+    }
+    scrollToSection(section)
+  }, [liveAvailable, scrollToSection])
 
   // ETAPP 2a (offert-masterplan.md), punkt 6: id-baserade liveHandlers —
   // ersätter tidigare index-mutation. Återanvänder useQuoteItems' egna
@@ -2170,6 +2202,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       <QuoteEditView
         quoteId={quoteId}
         quoteNumber={quoteNumberRef.current}
+        completenessSummaries={completenessSummaries}
+        onSelectSection={selectSectionAndReveal}
         autoSaveStatus={autoSaveStatus}
         saving={saving}
         onSendQuote={() => saveQuote(true)}
@@ -2369,6 +2403,12 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
     )
   }
 
+  // Fas B-granskningsfix (offertskaparen-design-polish, 2026-08-31): lyft ur
+  // en gång i stället för att copy-pasta samma två uttryck till både
+  // QuoteBuilderHeader (desktop) och QuoteBuilderBottomBar (mobil) nedan.
+  const canSend = !!selectedCustomer
+  const sendDisabledReason = !selectedCustomer ? 'Välj kund först' : undefined
+
   return (
     <div className={`min-h-screen bg-slate-50${jobStartApplied ? ' first-quote-arrival' : ''}`}>
       {/* Mallväljaren. Öppnas bara från Snabboffertens intag — den är inte
@@ -2382,20 +2422,32 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       {/* FAS 1 (offert-omtaget, 2026-08-31): den tvingade steg-för-steg-
           granskningen ("quickMode === 'review' || 'overview'") är BORTA.
           AI-utkast, blankt och mall landar alla direkt här — samma canvas-
-          editor, oavsett startväg. Se completenessSummaries/
-          QuoteCompletenessStrip nedan för vad som ersatte kvittots
-          granskningskrav. */}
+          editor, oavsett startväg. Se completenessSummaries nedan — de
+          skickas in i QuoteBuilderHeader (rad 2, completeness-remsan) för
+          vad som ersatte kvittots granskningskrav. */}
       <div
-        className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6"
+        // Fas B (offertskaparen-design-polish, 2026-08-31): pb-40/lg:pb-6
+        // ersätter det gamla py-4/sm:py-6-bottenvärdet EXPLICIT (pt-* hanterar
+        // toppen oförändrat) så det nya fasta bottenfältet (QuoteBuilderBottomBar,
+        // lg:hidden) aldrig täcker dokumentets sista rad under `lg`. Granskad
+        // matematik (fix efter kod-granskning): chip-rad ~40px + knapprad 52px +
+        // barens egen padding (pt-2.5 10px + pb-2.5 10px mellan raderna + 16px
+        // bas-bottenpadding) ≈ 128px vid safe-area=0 — men på riktiga iPhones med
+        // home indicator är safe-area-inset-bottom ~34px, inte 16px, så barens
+        // faktiska höjd blir ~146px. pb-40 (160px) täcker det med marginal.
+        className="max-w-[1600px] mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-40 lg:pb-6"
       >
         <QuoteBuilderHeader
+          title={title}
+          completenessSummaries={hasQuoteContent ? completenessSummaries : undefined}
+          onSelectSection={selectSectionAndReveal}
           aiGenerated={aiGenerated}
           aiConfidence={aiConfidence}
           aiPriceWarning={aiPriceWarning}
           aiPhotoCount={aiPhotoCount}
           saving={saving}
-          canSend={!!selectedCustomer}
-          sendDisabledReason={!selectedCustomer ? 'Välj kund först' : undefined}
+          canSend={canSend}
+          sendDisabledReason={sendDisabledReason}
           sendConfirmPending={sendConfirmPending}
           onConfirmSend={() => saveQuote(true, true)}
           onCancelSend={() => setSendConfirmPending(false)}
@@ -2426,15 +2478,6 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
             confidence={aiConfidence}
           />
         )}
-
-        {/* FAS 1 (offert-omtaget, 2026-08-31): ersätter det borttagna
-            kvittots (QuickReceipt) granskningskrav — en alltid synlig,
-            icke-blockerande chip-rad. Varje chip scrollar till sitt ämne i
-            dokumentet (scrollToSection), filtrerar aldrig bort handlers och
-            blockerar aldrig sparande/skickande. */}
-        <div className="mb-4">
-          <QuoteCompletenessStrip summaries={completenessSummaries} onSelect={scrollToSection} />
-        </div>
 
         {/* ETAPP 2b (offert-masterplan.md): canvas-first-layouten. Dokumentet
             är huvudytan (majoritetsbredd) — assistentkolumnen innehåller bara
@@ -2498,12 +2541,17 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
             <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />
             <QuoteNewEfterkalkylBanner insight={efterkalkylInsight} />
 
-            {/* Reservationsmotorn: tyst räknare, aldrig en avbrytande dialog.
-                15 matchande artiklar ger fortfarande EN banner med en siffra. */}
-            <ReservationSuggestionBanner
-              count={reservations.suggestions.length}
-              onReview={() => reservations.setReviewOpen(true)}
-            />
+            {/* FAS D (offertskaparen-design-polish, 2026-09-01): den
+                fristående "N reservationer matchar"-bannern som satt här
+                (ReservationSuggestionBanner) är borttagen — förslagen
+                renderas nu i dokumentets egen Reservationer-sektion
+                (QuoteDocument.tsx, se `reservationSuggestions`-proppen på
+                QuotePreviewPanel nedan) i stället för i assistentkolumnen,
+                utanför dokumentet. Discovery-vägen är completeness-chippen
+                (redan amber+räknare, se quote-completeness.ts) — ingen ny
+                mekanism byggd. ReservationMutedNotice är en ANNAN,
+                orelaterad affordans (inlärningens tystnings-kvitto) och
+                stannar kvar precis här. */}
             {reservations.mutedNotice && (
               <ReservationMutedNotice
                 title={reservations.mutedNotice.title}
@@ -2600,12 +2648,12 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
                     type="button"
                     onClick={() => setActivePanel(isActive ? null : p.key)}
                     title={status.state === 'attention' ? `${p.label} — ${status.hint}` : undefined}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-[10px] text-[12.5px] font-semibold transition-colors inline-flex items-center gap-1.5 ${
                       isActive
                         ? 'bg-primary-700 text-white'
                         : status.state === 'attention'
                           ? 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
-                          : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+                          : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
                     }`}
                   >
                     {status.state !== 'empty' && (
@@ -2786,13 +2834,40 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
                   quickReveal={quickMode !== null}
                   onRowTap={setSheetItemId}
                   onAddRowTap={() => setAddRowSheetOpen(true)}
+                  // FAS E (offertskaparen-design-polish, 2026-09-01): tomt-
+                  // läges-rutans "beskriv jobbet"/"Fota eller beskriv
+                  // jobbet" — återanvänder AI-hjälpens BEFINTLIGA state
+                  // (showAiHelper), ingen ny state uppfunnen. Create-läget
+                  // ENDA anropare som skickar denna: QuoteEditView.tsx har
+                  // ingen QuoteNewAIHelper/showAiHelper alls, se
+                  // QuoteDocument.tsx:s onOpenAiHelp-docblock.
+                  onOpenAiHelp={() => setShowAiHelper(true)}
                   templatePreviewPayload={templatePreviewPayload}
+                  reservationSuggestions={reservations.suggestions}
+                  onReviewReservationSuggestions={() => reservations.setReviewOpen(true)}
                 />
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Fas B (offertskaparen-design-polish, 2026-08-31): mobilens fasta
+          bottenfält — samma completeness-data och Spara/Skicka-handlers som
+          headern ovan (nu desktop-only, se dess `hidden lg:flex`-gate). */}
+      <QuoteBuilderBottomBar
+        summaries={completenessSummaries}
+        hasQuoteContent={hasQuoteContent}
+        onSelect={selectSectionAndReveal}
+        saving={saving}
+        canSend={canSend}
+        sendDisabledReason={sendDisabledReason}
+        sendConfirmPending={sendConfirmPending}
+        onConfirmSend={() => saveQuote(true, true)}
+        onCancelSend={() => setSendConfirmPending(false)}
+        onSendQuote={() => saveQuote(true)}
+        onSaveDraft={() => saveQuote(false)}
+      />
 
       {/* ETAPP 3: bottom-sheet-radeditorn (mobil) — se sheetItem/sheetItemId
           ovan. Ersätter QuoteEditMobilePreviewModal/FAB:en (borttagen):

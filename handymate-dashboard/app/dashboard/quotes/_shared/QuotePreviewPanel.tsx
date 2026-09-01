@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, Eye, Loader2, Maximize2, X } from 'lucide-react'
+import { ChevronDown, Eye, FileText, Loader2, Maximize2, X } from 'lucide-react'
 import TemplatePreviewFrame, { type TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import QuoteDocument, { type QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
 import { DocumentScaler } from '@/components/quotes/document/DocumentScaler'
 import { useIsMobileViewport } from '@/components/quotes/document/useIsMobileViewport'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
 import type { QuoteSection } from '@/lib/quotes/quote-completeness'
+import type { ReservationSuggestion } from '@/lib/reservations/match'
 
 type PreviewMode = 'live' | 'design'
 
@@ -35,6 +36,17 @@ interface QuotePreviewPanelProps {
       ~9 interaktioner från färdig, sökningen är 2-3. Utelämnad → knappen
       faller tillbaka på liveHandlers.onItemAdd. */
   onAddRowTap?: () => void
+  /**
+   * FAS E (offertskaparen-design-polish, 2026-09-01): tomt-läges-rutans
+   * "beskriv jobbet"/"Fota eller beskriv jobbet"-affordans (desktop resp.
+   * mobil), vidarebefordrad rakt till QuoteDocument (se dess `onOpenAiHelp`-
+   * docblock) och använd direkt här för mobilens oskalade tomruta. Samma
+   * genuina asymmetri som där: create-sidan (QuoteBuilder.tsx) skickar
+   * `() => setShowAiHelper(true)`, redigeringsvyn (QuoteEditView.tsx)
+   * skickar ingenting alls. Utelämnad → ingen sekundärknapp/länk, bara
+   * "+ Lägg till rad".
+   */
+  onOpenAiHelp?: () => void
   templatePreviewPayload: TemplatePreviewPayload
   /** ETAPP C3 (Snabbofferten): sektionen som granskas — dimmar de andra.
       Ren visning; vilka fält som går att redigera styrs av liveHandlers. */
@@ -50,6 +62,16 @@ interface QuotePreviewPanelProps {
    * vid översikt → sektion hade spelat om revealen varje gång.
    */
   quickReveal?: boolean
+  /**
+   * FAS D (offertskaparen-design-polish, 2026-09-01): reservationsmotorns
+   * matchade-men-ej-tillagda förslag, vidarebefordrade rakt till
+   * QuoteDocument (se dess docblock för `reservationSuggestions`/
+   * `onReviewReservationSuggestions`) — den fristående bannern som satt
+   * här i panelen bredvid är borttagen, förslagen renderas nu inuti
+   * dokumentets egen Reservationer-sektion.
+   */
+  reservationSuggestions?: ReservationSuggestion[]
+  onReviewReservationSuggestions?: () => void
 }
 
 /**
@@ -69,9 +91,12 @@ export function QuotePreviewPanel({
   liveHandlers,
   onRowTap,
   onAddRowTap,
+  onOpenAiHelp,
   templatePreviewPayload,
   focusSection,
   quickReveal,
+  reservationSuggestions,
+  onReviewReservationSuggestions,
 }: QuotePreviewPanelProps) {
   const [fullscreen, setFullscreen] = useState(false)
   const [previewPending, setPreviewPending] = useState(false)
@@ -109,6 +134,9 @@ export function QuotePreviewPanel({
               // onItemAdd och gav en tom rad — artikelbanken nåddes inte alls
               // från standardvyn. Nu samma väg som mobilens knapp nedan.
               onAddRow={onAddRowTap}
+              onOpenAiHelp={onOpenAiHelp}
+              reservationSuggestions={reservationSuggestions}
+              onReviewReservationSuggestions={onReviewReservationSuggestions}
             />
           </DocumentScaler>
 
@@ -118,15 +146,45 @@ export function QuotePreviewPanel({
               ETAPP C3: göms när en ANNAN sektion än Inkluderat granskas —
               knappen ligger utanför dokumentet och nås därför inte av
               dimningen, så utan detta hade man kunnat lägga till en rad
-              mitt i prisgranskningen. */}
+              mitt i prisgranskningen.
+              FAS E (offertskaparen-design-polish, 2026-09-01): tomt-läge —
+              samma `liveTemplateData` som redan används för att bygga
+              dokumentet, ingen ny prop krävs för själva checken. */}
           {isMobile && (!focusSection || focusSection === 'inkluderat') && (
-            <button
-              type="button"
-              onClick={onAddRowTap || liveHandlers.onItemAdd}
-              className="mt-3 w-full min-h-[44px] flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-dashed border-slate-300 text-primary-700 text-[15px] font-semibold rounded-xl hover:bg-primary-50/50 active:bg-primary-50 transition-colors"
-            >
-              + Lägg till rad
-            </button>
+            liveTemplateData.quote.items.length === 0 ? (
+              <div className="mt-3 flex flex-col items-center gap-3 py-6 text-center">
+                <div className="w-[52px] h-[52px] rounded-2xl bg-primary-50 text-primary-700 flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <p className="text-[15px] font-bold text-slate-900">Offerten är tom än</p>
+                <button
+                  type="button"
+                  onClick={onAddRowTap || liveHandlers.onItemAdd}
+                  className="w-full min-h-[52px] flex items-center justify-center gap-2 px-4 bg-primary-700 hover:bg-primary-600 text-white text-[15px] font-semibold rounded-xl transition-colors"
+                >
+                  + Lägg till rad
+                </button>
+                {/* Se onOpenAiHelp:s docblock ovan — utelämnad i
+                    redigeringsvyn, så knappen uteblir där. */}
+                {onOpenAiHelp && (
+                  <button
+                    type="button"
+                    onClick={onOpenAiHelp}
+                    className="w-full min-h-[52px] flex items-center justify-center gap-2 px-4 bg-white border border-primary-700 text-primary-700 text-[15px] font-semibold rounded-xl hover:bg-primary-50/50 transition-colors"
+                  >
+                    Fota eller beskriv jobbet
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onAddRowTap || liveHandlers.onItemAdd}
+                className="mt-3 w-full min-h-[44px] flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-dashed border-slate-300 text-primary-700 text-[15px] font-semibold rounded-xl hover:bg-primary-50/50 active:bg-primary-50 transition-colors"
+              >
+                + Lägg till rad
+              </button>
+            )
           )}
         </div>
       )
