@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowRight, Check, FileText, Loader2, Plus } from 'lucide-react'
 import { getAgentById } from '@/lib/agents/team'
 import { QuickPriceInput } from '@/components/products/QuickPriceInput'
-import { inspectTemplate, relevantProducts, resolveFirstQuoteSelection, sameUnit, setupSummary, templatesForJobType,
+import { coreArticleGuidance, inspectTemplate, relevantProducts, resolveFirstQuoteSelection, sameUnit, setupSummary, templatesForJobType,
   type FirstQuoteSelection, type QuoteSetupData, type SetupTemplate } from '@/lib/quotes/job-type-setup'
 import './job-type-setup.css'
 
@@ -115,6 +115,7 @@ export function JobTypeQuoteSetup({ initialJobTypes = [], initialSelection, onCh
       <div><span className="job-setup-eyebrow">Matte · din chefsagent</span>
         <h2>Vilket jobb börjar vi med?</h2>
         <p>Välj upp till tre vanliga jobb. Koppla ett offertupplägg och sätt dina priser där de behövs.</p>
+        <p className="job-setup-caption">Börja gärna med 3–5 återkommande nyckelartiklar per jobbtyp, till exempel arbetstid, framkörning och vanligt material. Det är en genväg, inte ett krav.</p>
         <p className="job-setup-caption">När affären har samma jobbtyp kan offerten börja med era förvalda artikelrader. Flera mallar? Då väljer du vilken. Artikelkopplade reservationer föreslås i offerten och du granskar dem innan de läggs till.</p>
       </div>
     </div>
@@ -160,6 +161,7 @@ export function JobTypeQuoteSetup({ initialJobTypes = [], initialSelection, onCh
               { templateId: chosen.id, jobTypeSlug: job.slug, updatedAt: chosen.updatedAt })}>Koppla till {job.name} <ArrowRight size={16} /></button>}
           </div>}
           <p className="job-setup-summary" role="status">{setupSummary(rows)}</p>
+          <p className="job-setup-caption">{coreArticleGuidance(rows)}</p>
           <p className="job-setup-caption">Artikelpriser exkl. moms. Mängder, kundavtal och jobbets förutsättningar granskar du i offerten.</p>
           <div className="job-setup-products">
             {(showAll ? products : products.slice(0, 10)).map(p => <div className="job-setup-product" key={p.id}>

@@ -69,19 +69,19 @@ test('offerteditorn bevarar dolda rader genom laddning och autosave', () => {
   expect(payload).toContain("({ ai_price_missing, save_to_products, ai_uncertain, ai_note, ...rest }) => rest")
 })
 
-test('Skicka i edit-läge sätter status till sent, inte kvar på draft', () => {
-  // Historik: buildPayload(send ? 'sent' : undefined) på gamla edit-sidan.
-  // useQuoteBuilderSave.ts måste fortfarande sätta status explicit till
-  // 'sent' vid Skicka — annars ändras aldrig en redigerad offerts status
-  // trots att hantverkaren tryckte "Skicka offert".
-  expect(save).toMatch(/mode === 'edit' && send \? \{ status: 'sent' \} : \{\}/)
+test('Skicka i edit-läge sparar och öppnar riktiga skicka-dialogen', () => {
+  // Bara /api/quotes/send får sätta leveranssanningen. Den gamla edit-vägen
+  // skrev status sent och visade framgång utan att mejl/SMS hade skickats.
+  expect(save).not.toMatch(/mode === 'edit' && send \? \{ status: 'sent' \}/)
+  expect(save).toContain('`/dashboard/quotes/${quoteId}?send=true`')
+  expect(save).not.toContain("toast.success(send ? 'Offert skickad!'")
 })
 
 test('giltighetsdatumet bucketeras aldrig om från "idag" — förankrat i created_at', () => {
   // Historik: en tidigare bugg konverterade det EXAKTA valid_until till en
   // bucketerad "N dagar"-knapp räknat från NUET i stället för offertens
-  // created_at, vilket (i kombination med PUT-ruttens `today + valid_days`)
-  // sköt fram giltighetsdatumet vid varje redigering. loadEditQuote.ts
+  // created_at. PUT-rutten förankrar nu även det sparade datumet i samma
+  // created_at, så autospar kan inte skjuta fram giltighetsdatumet. Loadern
   // räknar alltid från created_at — om någon av misstag byter till
   // `new Date()` här återinförs samma klass av bugg.
   expect(loader).toContain('function computeValidDays(')

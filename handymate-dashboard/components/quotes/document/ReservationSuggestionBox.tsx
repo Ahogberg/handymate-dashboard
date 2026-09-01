@@ -1,12 +1,10 @@
+'use client'
+
 /** @jsxImportSource react */
-// Ingen egen 'use client' — komponenten monteras uteslutande som barn av
-// QuoteDocument.tsx, som i sin tur bara körs klientsidigt under
-// QuotePreviewPanel.tsx (redan 'use client') eller server-/Node-sidigt via
-// renderToStaticMarkup (där 'use client' saknar betydelse). Samma mönster
-// som components/mission/MissionPanel.tsx och components/agents/
-// MissionPlanCard.tsx: pragmat ovan behövs för att JSX:en ska kompileras
-// mot RIKTIGA React-element (utan det plockar Playwright test-runnerns
-// egen jsx-runtime upp filen i stället, se facit-testens historik).
+// Komponenten har lokal UI-state och klickhanterare och måste därför vara
+// en explicit klientgräns även när en klientkomponent råkar vara dess vanliga
+// förälder. Next klassificerar varje modul för sig under produktionsbygget.
+// Static-/PDF-läget monterar aldrig rutan (QuoteDocument gatear på editläge).
 import { useState } from 'react'
 import { describeReservationSuggestionRows } from './format'
 import type { ReservationSuggestion } from '@/lib/reservations/match'

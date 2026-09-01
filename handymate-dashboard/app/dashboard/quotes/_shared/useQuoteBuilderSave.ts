@@ -38,8 +38,8 @@ export interface UseQuoteBuilderSaveParams {
  *
  * TVÅ sparvägar, en per läge:
  * - `save(send)`: explicit knapptryck (Spara utkast/Skicka). Validerar kund/
- *   betalplan, navigerar efter lyckad POST (create) eller sätter status
- *   'sent'+navigerar efter lyckad PUT (edit).
+ *   betalplan och navigerar efter lyckad sparning till den riktiga
+ *   skicka-dialogen. Bara /api/quotes/send får sätta status 'sent'.
  * - `performAutoSave()`: EDIT-LÄGE ENDAST, tyst 5s-debounce-autospar (samma
  *   PUT-väg, ingen navigering/toast, ingen validering) — triggas av en
  *   useEffect i QuoteBuilder.tsx som bevakar exakt samma fält som den gamla
@@ -204,13 +204,12 @@ export function useQuoteBuilderSave({
           }
         }
 
-        // Edit-läge + Skicka: statusen sätts explicit till 'sent' HÄR (inte
-        // i getContext()) — annars stannar en skickad offert i sitt gamla
-        // 'draft'/tidigare-status, exakt vad gamla edit-sidans
-        // `buildPayload(send ? 'sent' : undefined)` garanterade.
+        // Skicka betyder här SPARA och öppna den riktiga skicka-dialogen.
+        // Den äldre edit-vägen satte status='sent' direkt i PUT och visade
+        // "Offert skickad" utan något utskick. Leveranssanningen ägs av
+        // /api/quotes/send, precis som i create-läget.
         const payload = buildQuotePayload({
           ...ctx,
-          ...(mode === 'edit' && send ? { status: 'sent' } : {}),
           items: workingItems,
           mode,
           quoteId,
@@ -225,9 +224,9 @@ export function useQuoteBuilderSave({
         if (!res.ok) {
           toast.error(data.error || 'Kunde inte spara offerten')
         } else if (mode === 'edit') {
-          toast.success(send ? 'Offert skickad!' : 'Offert sparad')
+          toast.success(send ? 'Offerten är sparad — välj hur den ska skickas' : 'Offert sparad')
           if (send) {
-            router.push(`/dashboard/quotes/${quoteId}`)
+            router.push(`/dashboard/quotes/${quoteId}?send=true`)
           } else {
             setAutoSaveStatus('saved')
             setTimeout(() => setAutoSaveStatus('idle'), 3000)

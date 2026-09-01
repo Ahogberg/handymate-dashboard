@@ -7,6 +7,7 @@ import { applyAnnualCap } from '@/lib/quotes/apply-annual-cap'
 import { resolveReferencePerson } from '@/lib/quotes/resolve-reference-person'
 import { lockedChanges, lockedChangeMessage } from '@/lib/quotes/lifecycle'
 import { createQuote, resolveItemSplit } from '@/lib/quotes/create-quote'
+import { calculateQuoteValidUntil } from '@/lib/quotes/validity'
 import { signAttachmentList } from '@/lib/storage-signing'
 import type { QuoteItem } from '@/lib/types/quote'
 
@@ -608,7 +609,7 @@ export async function PUT(request: NextRequest) {
 
     const { data: existing } = await supabase
       .from('quotes')
-      .select('quote_id, business_id, status, customer_id')
+      .select('quote_id, business_id, status, customer_id, created_at')
       .eq('quote_id', quote_id)
       .eq('business_id', business.business_id)
       .single()
@@ -879,9 +880,7 @@ export async function PUT(request: NextRequest) {
     }
 
     if (body.valid_days !== undefined) {
-      const validUntil = new Date()
-      validUntil.setDate(validUntil.getDate() + body.valid_days)
-      updates.valid_until = validUntil.toISOString().split('T')[0]
+      updates.valid_until = calculateQuoteValidUntil(existing.created_at, body.valid_days)
     }
 
     const { data: quote, error } = await supabase

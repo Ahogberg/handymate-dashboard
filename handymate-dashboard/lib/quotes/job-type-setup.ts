@@ -102,6 +102,20 @@ export function setupSummary(rows: SetupRow[]): string {
   ].filter(Boolean).join(' · ')
 }
 
+/**
+ * En begriplig startrekommendation, aldrig en grind. Vi räknar unika,
+ * verkligt kopplade och prissatta artiklar — inte mallrader (samma artikel
+ * kan förekomma flera gånger). Tre till fem räcker för att visa nyttan utan
+ * att göra onboardingen till registeradministration.
+ */
+export function coreArticleGuidance(rows: SetupRow[]): string {
+  const count = new Set(rows.flatMap(row => row.status === 'priced' && row.product ? [row.product.id] : [])).size
+  if (count === 0) return 'Börja gärna med 3–5 återkommande nyckelartiklar för jobbtypen.'
+  if (count < 3) return `${count} ${count === 1 ? 'nyckelartikel är' : 'nyckelartiklar är'} klar. Lägg gärna till några återkommande rader när de finns.`
+  if (count <= 5) return `${count} nyckelartiklar är prissatta — en bra start för nästa offert.`
+  return `${count} återkommande artiklar är prissatta för jobbtypen.`
+}
+
 /** Smal DTO: mallens gamla pris, kvantitet och totalsumma följer INTE med. */
 export function toSetupTemplate(row: Record<string, unknown>): SetupTemplate {
   const rawItems = Array.isArray(row.default_items) ? row.default_items : []

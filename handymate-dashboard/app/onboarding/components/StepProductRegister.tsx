@@ -163,6 +163,7 @@ export default function StepProductRegister({ onNext, onBack, data, setData }: P
             <p className="ob-sub">
               Välj en vanlig jobbtyp, koppla en offertmall och sätt priser på dina artiklar.
               Då kan Daniel förbereda nästa offert med ert eget underlag — i stället för att du börjar från noll.
+              Börja gärna med 3–5 återkommande nyckelartiklar per vanlig jobbtyp. Det är en rekommendation, inte ett krav för att fortsätta.
             </p>
 
             {error && <FallbackNote text={error} />}
