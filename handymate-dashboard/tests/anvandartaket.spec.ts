@@ -1,8 +1,9 @@
 /**
- * Facit för användartaket och värdepunkterna (Andreas-beslut 2026-08-09).
- *
- * Firman höjdes 3 → 5 användare — och taket, som tidigare var REN COPY
- * (inbjudningsrutten räknade aldrig), upprätthålls nu där copyn lovar det.
+ * Facit: användartaket är BORTA för Firman och Storfirman (Andreas-beslut
+ * 2026-09-01). Planerna differentierar numera ENDAST på volym (samtal/SMS),
+ * aldrig på antal människor. Ersätter 2026-08-09-facitet, som låste 3 → 5.
+ * 'starter' är ett tyst legacy-/nedgraderingsläge (inte en publik plan) —
+ * dess tak (3) rörs inte.
  *
  *   npx playwright test tests/anvandartaket.spec.ts --no-deps --project=chromium
  */
@@ -14,55 +15,64 @@ import { USER_LIMITS, getUserLimit } from '../lib/feature-gates'
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
 
-test.describe('taket är en regel, inte en text', () => {
-  test('Firman rymmer 5, Storfirman obegränsat, okänd plan faller ALDRIG till obegränsat', () => {
-    expect(USER_LIMITS.professional).toBe(5)
+test.describe('taket är borta för båda betalplanerna', () => {
+  test('Firman och Storfirman är obegränsade, okänd plan faller ALDRIG till obegränsat', () => {
+    expect(USER_LIMITS.professional).toBeNull()
     expect(USER_LIMITS.business).toBeNull()
     expect(getUserLimit('påhittad' as any)).toBe(3)
   })
 
-  test('inbjudningsrutten räknar aktiva medlemmar mot taket', () => {
-    const s = read('app/api/team/invite/route.ts')
-    expect(s).toContain('getUserLimit(')
-    expect(s).toContain("eq('is_active', true)")
-    // Räkningen sker FÖRE varje skapande/återaktivering.
-    const tak = s.indexOf('getUserLimit(')
-    const skapande = s.indexOf('Kolla om email redan finns')
-    expect(tak).toBeLessThan(skapande)
+  test('team_members/users-metadatan i FEATURE_GATES är synkad med USER_LIMITS', () => {
+    // lib/feature-gates.ts säger själv att USER_LIMITS är kanonisk och att
+    // dessa två gate-poster ska hållas synkade med den för hand.
+    const s = read('lib/feature-gates.ts')
+    const teamMembers = s.slice(s.indexOf("key: 'team_members'"), s.indexOf("key: 'users'"))
+    expect(teamMembers).toContain('{ starter: 3, professional: null, business: null }')
+    const users = s.slice(s.indexOf("key: 'users',"))
+    expect(users.slice(0, 200)).toContain('{ starter: 3, professional: null, business: null }')
   })
 
-  test('beskedet vid fullt tak säger vägen framåt', () => {
+  test('inbjudningsrutten räknar aldrig aktiva medlemmar mot Firman eller Storfirman', () => {
+    // Samma nollcheck som redan skyddade Storfirman skyddar nu Firman också
+    // — ingen ny kod, bara en ny konstant. Räkningsblocket lever kvar och
+    // gäller fortfarande fullt ut för 'starter' (tyst legacy-läge).
     const s = read('app/api/team/invite/route.ts')
-    expect(s).toContain('Uppgradera till Storfirman')
-    expect(s).toContain('{ status: 403 }')
+    expect(s).toContain('getUserLimit(')
+    expect(s).toContain('if (anvandartak !== null)')
+    expect(s).toContain("eq('is_active', true)")
   })
 })
 
-test.describe('copyn och regeln säger samma siffra', () => {
-  test('alla "Upp till"-texter matchar USER_LIMITS.professional', () => {
-    // 2026-08-26 (feature-gates-konsolideringen): copyn interpolerar numera
-    // FIRMAN_FACTS.users — som via getPlanCommercialFacts → getUserLimit är
-    // BUNDEN till USER_LIMITS per konstruktion. Det är STARKARE än den
-    // gamla bokstavssträngen ("Upp till 5 användare") som facitet letade
-    // efter: siffran kan inte längre driftas isär ens av ett slarvigt
-    // copy-byte. Facitet låser nu interpolationsformen + att inga
-    // hårdkodade användartal smugit tillbaka.
+test.describe('copyn har inget kvar av det gamla taket', () => {
+  test('inga hårdkodade användartal eller headcount-gränser i planvalen', () => {
     for (const fil of [
       'app/onboarding/components/Step5Activate.tsx',
       'app/dashboard/settings/billing/page.tsx',
     ]) {
       const s = read(fil)
-      expect(s, `${fil} interpolerar inte enkällans användartal`).toContain('_FACTS.users} användare')
-      expect(s, `${fil} har kvar gamla treans copy`).not.toContain('Upp till 3 användare')
-      expect(s, `${fil} har en hårdkodad femma igen`).not.toContain('Upp till 5 användare')
+      expect(s, `${fil} har en hårdkodad femma`).not.toContain('Upp till 5 användare')
+      expect(s, `${fil} har kvar gamla treans copy för Firman`).not.toContain('Upp till 3 användare')
+      expect(s, `${fil} interpolerar fortfarande FIRMAN_FACTS.users i en "Upp till"-text`).not.toMatch(/Upp till \$\{FIRMAN_FACTS\.users\}/)
     }
   })
 
-  test('gränssnittstexterna runt taket följer med (1–5, fler än fem, från 6)', () => {
+  test('gammal headcount-copy i onboarding är borta', () => {
     const s = read('app/onboarding/components/Step5Activate.tsx')
-    expect(s).toContain('För firmor med 1–5 personer')
-    expect(s).toContain('Fler än fem som behöver logga in')
-    expect(s).toContain('Från 6 anställda och uppåt')
+    expect(s, '1–5-personer-copy kvar').not.toContain('1–5 personer')
+    expect(s, '"fler än fem"-copy kvar').not.toContain('fler än fem')
+    expect(s, '"från 6 anställda"-copy kvar').not.toContain('Från 6 anställda')
+    // Nya, volymbaserade formuleringarna finns i stället.
+    expect(s).toContain('Räcker gott och väl för de flesta firmor')
+    expect(s).toContain('Ringer och smsar ni mycket?')
+  })
+
+  test('"Obegränsade användare" säljs inte längre som Storfirman-poäng', () => {
+    for (const fil of [
+      'app/onboarding/components/Step5Activate.tsx',
+      'app/dashboard/settings/billing/page.tsx',
+    ]) {
+      expect(read(fil), `${fil} har kvar "Obegränsade användare"`).not.toContain('Obegränsade användare')
+    }
   })
 })
 

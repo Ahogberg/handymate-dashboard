@@ -67,7 +67,7 @@ Skapa tre produkter i Stripe Dashboard → Products:
 | Produkt | Månadspris | Årspris | Notes |
 |---------|-----------|---------|-------|
 | Handymate Starter | 2495 SEK | 24950 SEK | 1 användare, 100 samtal/mån |
-| Handymate Professional | 5995 SEK | 59950 SEK | 5 användare, 400 samtal/mån |
+| Handymate Professional | 5995 SEK | 59950 SEK | Obegränsat antal användare, 400 samtal/mån |
 | Handymate Business | 11995 SEK | 119950 SEK | Obegränsat, 2000 samtal/mån |
 
 Kopiera respektive `price_id` (börjar med `price_...`) och spara i Vercel env:

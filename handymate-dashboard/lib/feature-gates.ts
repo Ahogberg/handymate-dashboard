@@ -49,20 +49,19 @@ export function getAutomationLimit(plan: PlanType): number | null {
 }
 
 // ---------------------------------------------------------------------------
-// Användare per plan (Andreas-beslut 2026-08-09: Firman 3 → 5)
+// Användare per plan (Andreas-beslut 2026-09-01: användartaket i Firman tas
+// bort helt)
 //
-// Typfirman är 2–5 personer; taket på 3 tvingade en firma med fyra montörer
-// till dubbla priset för EN extra inloggning — en köpstoppare precis vid
-// kortinmatningen. Storfirman behåller sin egg: obegränsat + hemsida +
-// dedikerad support.
-//
-// OBS: gränsen var tidigare REN COPY — inbjudningsrutten räknade aldrig.
-// Nu upprätthålls den där copyn lovar den (app/api/team/invite).
+// Ersätter 2026-08-09-beslutet (3 → 5), som fortfarande gjorde antal
+// människor till en spärr och ett säljargument. Nu differentierar Firman och
+// Storfirman ENDAST på volym (samtal/SMS, se CALL_LIMITS/SMS_QUOTAS) —
+// aldrig på hur många som loggar in. 'starter' är ett tyst legacy-/
+// nedgraderingsläge (inte en publik plan) och behåller sitt tak.
 // ---------------------------------------------------------------------------
 
 export const USER_LIMITS: Record<PlanType, number | null> = {
   starter: 3,
-  professional: 5,
+  professional: null, // obegränsat — se kommentar ovan
   business: null, // obegränsat
 }
 
@@ -170,21 +169,22 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     limit: { starter: 10, professional: 50, business: null },
   },
   // team_members/users limit-fälten här var 3/25/∞ — i strid med USER_LIMITS
-  // (3/5/∞) ovan, som är den siffra app/api/team/invite/route.ts faktiskt
-  // upprätthåller. USER_LIMITS är kanonisk; dessa två gate-poster är bara
-  // beskrivande metadata (t.ex. för getFeatureLimit-callsites) och hålls
-  // synkade med den hädanefter — ändra USER_LIMITS, inte här.
+  // ovan, som är den siffra app/api/team/invite/route.ts faktiskt
+  // upprätthåller. USER_LIMITS är kanonisk (professional obegränsat sedan
+  // 2026-09-01); dessa två gate-poster är bara beskrivande metadata (t.ex.
+  // för getFeatureLimit-callsites) och hålls synkade med den hädanefter —
+  // ändra USER_LIMITS, inte här.
   team_members: {
     key: 'team_members',
     name: 'Teammedlemmar',
     plans: ['starter', 'professional', 'business'],
-    limit: { starter: 3, professional: 5, business: null },
+    limit: { starter: 3, professional: null, business: null },
   },
   users: {
     key: 'users',
     name: 'Användare',
     plans: ['starter', 'professional', 'business'],
-    limit: { starter: 3, professional: 5, business: null },
+    limit: { starter: 3, professional: null, business: null },
   },
   call_volume: {
     key: 'call_volume',

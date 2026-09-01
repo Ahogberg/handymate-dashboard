@@ -118,7 +118,6 @@ const PLANS = [
     features: [
       `${FIRMAN_FACTS.smsPerMonth} SMS/mån (0,79 kr/extra)`,
       `${FIRMAN_FACTS.callsPerMonth} samtal/mån`,
-      `Upp till ${FIRMAN_FACTS.users} användare`,
       '10 offertmallar',
       'Alla automationer + custom',
       'Hela AI-teamet — sex medarbetare',
@@ -138,7 +137,6 @@ const PLANS = [
     features: [
       `${STORFIRMAN_FACTS.smsPerMonth.toLocaleString('sv-SE')} SMS/mån (0,69 kr/extra)`,
       'Obegränsade samtal',
-      'Obegränsade användare',
       'Obegränsade mallar',
       'Allt i Firman',
       'Leads-addon inkluderat',

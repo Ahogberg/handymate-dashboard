@@ -37,12 +37,15 @@ export async function POST(request: NextRequest) {
     }
 
     /**
-     * ═══ ANVÄNDARTAKET UPPRÄTTHÅLLS DÄR COPYN LOVAR DET (2026-08-09) ═══
+     * ═══ ANVÄNDARTAKET UPPRÄTTHÅLLS DÄR COPYN LOVAR DET (2026-08-09,
+     *      Firman-taket borttaget 2026-09-01) ═══
      *
-     * "Upp till X användare" i planvalet var ren copy — den här rutten
-     * räknade aldrig. Nu: aktiva medlemmar räknas mot planens tak
-     * (lib/feature-gates.ts USER_LIMITS; Firman höjdes samtidigt 3 → 5).
-     * Beskedet säger vägen framåt i stället för bara nej.
+     * Aktiva medlemmar räknas mot planens tak (lib/feature-gates.ts
+     * USER_LIMITS). Sedan 2026-09-01 är USER_LIMITS.professional null —
+     * Firman och Storfirman differentierar bara på volym (samtal/SMS),
+     * aldrig på antal människor — så blocket nedan no-opar numera för båda
+     * betalplanerna, precis som det redan gjorde för Storfirman. Bara
+     * 'starter' (tyst legacy-/nedgraderingsläge) har kvar ett tak.
      */
     // Planen finns inte på auth-objektet — slå upp den. Saknad/okänd plan
     // faller till starter (3) — samma konservativa fallback som lib/auth.ts,
