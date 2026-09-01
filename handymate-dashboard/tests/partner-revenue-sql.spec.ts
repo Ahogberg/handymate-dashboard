@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 
 const root = path.resolve(__dirname, '..')
-const sql = fs.readFileSync(path.join(root, 'sql/v191_partner_revenue_and_self_billing.sql'), 'utf8')
+const sql = fs.readFileSync(path.join(root, 'sql/v193_partner_revenue_and_self_billing.sql'), 'utf8')
 const commission = fs.readFileSync(path.join(root, 'lib/partners/commission.ts'), 'utf8')
 
 function bodyOf(functionName: string): string {
